@@ -953,6 +953,9 @@ def message_repr(message, limit=1024, username=False):
         data = css_md(uni_str("[EMPTY MESSAGE]"))
     return lim_str(data, limit)
 
+
+EmptyEmbed = discord.embeds._EmptyEmbed
+
 def as_embed(message):
     emb = discord.Embed(description=message.content).set_author(**get_author(message.author))
     urls = itertools.chain((e.url for e in message.embeds if e.url), (best_url(a) for a in message.attachments))
@@ -979,9 +982,10 @@ def as_embed(message):
     for e in message.embeds:
         if len(emb.fields) >= 25:
             break
-        if not emb.description:
-            emb.title = e.title or e.url or discord.Embed.Empty
-            emb.description = e.description or e.url or discord.Embed.Empty
+        if not emb.description or emb.description == EmptyEmbed:
+            emb.title = e.title or e.url or EmptyEmbed
+            emb.url = e.url or EmptyEmbed
+            emb.description = e.description or e.url or EmptyEmbed
         else:
             emb.add_field(name=e.title or e.url or "\u200b", value=lim_str(e.description, 1024) or e.url or "\u200b", inline=False)
         for f in e.fields:
