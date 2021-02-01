@@ -1072,7 +1072,13 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 out.append(f"https://media2.giphy.com/media/{item}/giphy.gif")
             elif images and is_tenor_url(url):
                 s = await Request(url, decode=True, aio=True)
-                search ='<meta class="dynamic" property="og:image" content="'
+                search ='property="og:image" content="'
+                s = s[s.index(search) + len(search):]
+                s = s[:s.index('"')]
+                out.append(s)
+            elif images and is_deviantart_url(url):
+                s = await Request(url, decode=True, aio=True)
+                search ='property="og:image" content="'
                 s = s[s.index(search) + len(search):]
                 s = s[:s.index('"')]
                 out.append(s)
