@@ -958,8 +958,11 @@ EmptyEmbed = discord.embeds._EmptyEmbed
 
 def as_embed(message):
     emb = discord.Embed(description=message.content).set_author(**get_author(message.author))
-    urls = itertools.chain((e.url for e in message.embeds if e.url), (best_url(a) for a in message.attachments))
-    items = list(urls)
+    if len(message.embeds) > 1 or message.content:
+        urls = itertools.chain((e.url for e in message.embeds if e.url), (best_url(a) for a in message.attachments))
+        items = list(urls)
+    else:
+        items = None
     if items:
         if emb.description in items:
             emb.description = lim_str("\n".join(items), 2048)
