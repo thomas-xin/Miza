@@ -2004,7 +2004,7 @@ class AudioDownloader:
         else:
             end = None
             args.extend(("-to", "86400"))
-        if vst:
+        if vst and vsf != asf:
             args.extend(("-i", vsf))
             if start:
                 args.extend(("-ss", str(start)))
