@@ -93,7 +93,7 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
             file.write(data if type(data) is bytes else data.read())
     try:
         if direct:
-            command = ["ffprobe", "-hide_banner", fn]
+            command = ["ffprobe", "-hide_banner", "-v", "error", fn]
             resp = bytes()
             # Up to 3 attempts to get video duration
             for _ in range(3):
