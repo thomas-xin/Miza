@@ -49,31 +49,29 @@ e_dur = lambda d: float(d) if type(d) is str else (d if d is not None else 300)
 
 # Runs ffprobe on a file or url, returning the duration if possible.
 def _get_duration(filename, _timeout=12):
-    command = ["ffprobe", "-hide_banner", filename]
+    command = subprocess.check_output([
+        "ffprobe",
+        "-v",
+        "error",
+        "-select_streams",
+        "a:0",
+        "-show_entries",
+        "stream=duration",
+        "-of",
+        "default=nokey=1:noprint_wrappers=1",
+        filename
+    ])
     resp = None
     try:
-        proc = psutil.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        fut = create_future_ex(proc.communicate, timeout=_timeout)
+        proc = psutil.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
+        fut = create_future_ex(proc.wait, timeout=_timeout)
         res = fut.result(timeout=_timeout)
-        resp = b"\n".join(res)
+        resp = float(proc.stdout.read())
     except:
         with suppress():
             proc.kill()
         print_exc()
-    if not resp:
-        return
-    s = as_str(resp)
-    with tracebacksuppressor(ValueError):
-        i = s.index("Duration: ")
-        d = s[i + 10:]
-        i = 2147483647
-        for c in ", \n\r":
-            with suppress(ValueError):
-                x = d.index(c)
-                if x < i:
-                    i = x
-        dur = time_parse(d[:i])
-        return dur
+    return resp
 
 def get_duration(filename):
     if filename:
@@ -1945,7 +1943,7 @@ class AudioDownloader:
 
     codec_map = {}
     # For ~download
-    def download_file(self, url, fmt, start=None, end=None, auds=None, ts=None, copy=False):
+    def download_file(self, url, fmt, start=None, end=None, auds=None, ts=None, copy=False, ar=SAMPLE_RATE, ac=2):
         # Select a filename based on current time to avoid conflicts
         if fmt[:3] == "mid":
             mid = True
@@ -1983,7 +1981,7 @@ class AudioDownloader:
                     try:
                         codec = codec_map[url]
                     except KeyError:
-                        codec = as_str(subprocess.check_output(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name", "-of", "default=nokey=1:noprint_wrappers=1", url])).strip()
+                        codec = as_str(subprocess.check_output(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name,sample_rate,channels", "-of", "default=nokey=1:noprint_wrappers=1", url])).strip()
                         print(codec)
                         codec_map[url] = codec
                     add_dict(codecs, {codec: 1})
@@ -2008,9 +2006,13 @@ class AudioDownloader:
                 try:
                     codec = codec_map[url]
                 except KeyError:
-                    codec = as_str(subprocess.check_output(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name", "-of", "default=nokey=1:noprint_wrappers=1", url])).strip()
-                    if codec == "vorbis":
-                        codec = "ogg"
+                    resp = as_str(subprocess.check_output(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name,sample_rate,channels", "-of", "default=nokey=1:noprint_wrappers=1", url])).strip()
+                    info = resp.split()
+                    info[1] = int(info[1])
+                    info[2] = int(info[2])
+                    if info[0] == "vorbis":
+                        info[0] = "ogg"
+                    codec = tuple(info)
                     print(codec)
                     codec_map[url] = codec
                 add_dict(codecs, {codec: 1})
@@ -2021,7 +2023,7 @@ class AudioDownloader:
                 for i, url in enumerate(ast):
                     if codec_map[url] != selcodec:
                         t += 1
-                        ast[i] = self.download_file(url, selcodec, auds=auds, ts=t)[0].rsplit("/", 1)[-1]
+                        ast[i] = self.download_file(url, selcodec[0], auds=auds, ts=t, ar=selcodec[1], ac=selcodec[2])[0].rsplit("/", 1)[-1]
             asc = "\n".join(f"file '{i}'" for i in ast)
             asf = f"cache/{ts}.concat"
             with open(asf, "w", encoding="utf-8") as f:
@@ -2070,7 +2072,7 @@ class AudioDownloader:
         elif fmt == "aac":
             fmt = "adts"
         if not vst:
-            args.extend(("-ar", str(SAMPLE_RATE), "-b:a", str(br)))
+            args.extend(("-ar", str(SAMPLE_RATE), "-ac", "2", "-b:a", str(br)))
         if copy:
             args.extend(("-c", "copy", fn))
         else:
