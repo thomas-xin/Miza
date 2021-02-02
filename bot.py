@@ -1072,7 +1072,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 out.append(f"https://media2.giphy.com/media/{item}/giphy.gif")
             else:
                 found = False
-                if images or is_tenor_url(url) or is_deviantart_url(url):
+                if images or is_tenor_url(url) or is_deviantart_url(url) or self.is_webserver_url(url):
                     resp = await create_future(requests.get, url, headers=Request.header(), stream=True)
                     with resp:
                         url = resp.url
@@ -1837,6 +1837,11 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         if regexp("^([0-9]{1,3}\\.){3}[0-9]{1,3}$").search(ip):
             self.ip = ip
             self.raw_webserver = f"http://{self.ip}:9801"
+
+    def is_webserver_url(self, url):
+        if url.startswith(self.raw_webserver) or url.startswith("https://" + self.raw_webserver.split("//", 1)[-1]):
+            return (url,)
+        return regexp("^https?:\\/\\/(?:[A-Za-z]+\\.)?mizabot\\.xyz").findall(url)
 
     # Gets the external IP address from api.ipify.org
     async def get_ip(self):

@@ -83,7 +83,7 @@ def get_duration(filename):
                     return _get_duration(filename, 20)
                 ctype = [e.strip() for e in head.get("Content-Type", "").split(";") if "/" in e][0]
                 if ctype.split("/", 1)[0] not in ("audio", "video"):
-                    return None
+                    return nan
                 it = resp.iter_content(65536)
                 data = next(it)
             ident = str(magic.from_buffer(data))
@@ -1964,10 +1964,10 @@ class AudioDownloader:
             print(entry)
             with suppress(KeyError):
                 self.searched[entry["url"]]["duration"] = entry["duration"]
-            live = not entry.get("duration") or not entry["duration"] <= 960
+            live = not entry.get("duration") or entry["duration"] > 960
             seekable = not entry.get("duration") or entry["duration"] < inf
             try:
-                f.load(stream, check_fmt=entry.get("duration") is None, webpage_url=entry["url"], live=live, seekable=seekable)
+                f.load(stream, check_fmt=isnan(entry.get("duration")), webpage_url=entry["url"], live=live, seekable=seekable)
             except:
                 self.cache.pop(fn, None)
                 raise
@@ -2848,7 +2848,7 @@ class Skip(Command):
                     if not is_finite(pos):
                         if "f" in flags:
                             auds.queue.clear()
-                            await create_future(auds.stop)
+                            await create_future(auds.reset, start=False)
                             if "h" not in flags:
                                 return italics(fix_md("Removed all items from the queue.")), 1
                             return
