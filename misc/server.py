@@ -137,11 +137,10 @@ def get_file(path, filename=None):
                 p = p3
     resp = flask.send_file(p, as_attachment=download, attachment_filename=filename or fn, mimetype=mime)
     resp.headers.update(CHEADERS)
-    send(resp)
     return resp
 
 
-def fetch_static(path):
+def fetch_static(path, ignore=False):
     while path.startswith("../"):
         path = path[3:]
     try:
@@ -158,8 +157,9 @@ def fetch_static(path):
             mime = "text/html"
         return data, mime
     except:
-        send(path)
-        send(traceback.format_exc())
+        if not ignore:
+            send(path)
+            send(traceback.format_exc())
         raise
 
 @app.route("/static/<filename>", methods=["GET"])
@@ -185,7 +185,12 @@ def clearcache():
 @app.route("/mizatlas", methods=["GET"])
 @app.route("/mizatlas/<path:filename>", methods=["GET"])
 def mizatlas(filename=None):
-    data, mime = fetch_static("mizatlas/index.html")
+    data = None
+    if filename:
+        with suppress(FileNotFoundError):
+            data, mime = fetch_static(f"mizatlas/{filename}")
+    if not data:
+        data, mime = fetch_static("mizatlas/index.html")
     send("mizatlas/index.html", mime)
     resp = flask.Response(data, mimetype=mime)
     resp.headers.update(CHEADERS)
@@ -315,7 +320,7 @@ def upload():
     if utc() - est_last > 1800:
         est_last = utc()
         create_future_ex(estimate_life)
-    return f"""<!DOCTYPE html>
+    data = f"""<!DOCTYPE html>
 <html>
     <head>
         <meta charset="utf-8">
@@ -324,8 +329,8 @@ def upload():
         <meta content="Upload a file here!" property="og:description">
         <meta content="{flask.request.url}" property="og:url">
         <meta content="https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/sky-rainbow.gif" property="og:image">
-        <meta content="#""" + colour + """\" data-react-helmet="true" name="theme-color">
-    </head>
+        <meta content="#BF7FFF" data-react-helmet="true" name="theme-color">
+    </head>""" + """
     <style>
         body {
             background-image: url('""" + flask.request.host_url + """static/spiral.gif');
@@ -341,6 +346,10 @@ def upload():
         </form>
     </body>
 </html>"""
+    resp = flask.Response(data, mimetype="text/html")
+    resp.headers.update(CHEADERS)
+    resp.headers["ETag"] = create_etag(data)
+    return resp
 
 
 geo_sem = Semaphore(90, 256, rate_limit=60)
