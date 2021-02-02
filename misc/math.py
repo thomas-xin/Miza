@@ -232,7 +232,10 @@ if os.name == "nt":
                 raise ValueError
         except (TypeError, ValueError):
             return sympy.factorint(n, **kwargs)
-        data = subprocess.check_output("misc/ecm.exe " + s).decode("utf-8").replace(" ", "")
+        args = ["misc/ecm.exe", s]
+        proc = psutil.Popen(args, stdout=subprocess.PIPE)
+        proc.wait()
+        data = proc.stdout.read().decode("utf-8", "replace").replace(" ", "")
         if "<li>" not in data:
             if not data:
                 raise RuntimeError("no output found.")
@@ -605,11 +608,11 @@ if __name__ == "__main__":
     ppid = os.getppid()
     proc = psutil.Process(pid)
     parent = psutil.Process(ppid)
-    exc = concurrent.futures.ThreadPoolExecutor(max_workers=9)
+    exc = concurrent.futures.ThreadPoolExecutor(max_workers=1)
     exc.submit(ensure_parent)
     while True:
         argv = sys.stdin.readline().rstrip()
         if argv:
             if argv[0] == "~":
                 ts, args = argv[1:].split("~", 1)
-                exc.submit(evaluate, ts, args)
+                evaluate(ts, args)
