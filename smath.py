@@ -1508,6 +1508,12 @@ class fcdict(cdict):
             return self.__getitem__(k)
         raise AttributeError(k)
 
+    def get(self, k, default=None):
+        try:
+            return self[k]
+        except KeyError:
+            return default
+
     def pop(self, k, default=Dummy):
         try:
             return super().pop(full_prune(k))

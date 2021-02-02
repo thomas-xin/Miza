@@ -108,15 +108,19 @@ def get_file(path, filename=None):
         if os.path.getsize(p) > 262144:
             if endpoint != "preview":
                 og_image = flask.request.host_url + "preview/" + orig_path
-                return f"""<!DOCTYPE html>
+                data = f"""<!DOCTYPE html>
 <html>
 <meta name="robots" content="noindex"><link rel="image_src" href="{og_image}">
-<meta property="og:image" itemprop="image" content="{og_image}">
+<meta property="og:image" content="{og_image}" itemprop="image">
 <meta property="og:url" content="{flask.request.host_url}view/{orig_path}">
 <meta property="og:image:width" content="1280">
 <meta property="og:type" content="website">
 <meta http-equiv="refresh" content="0; URL={flask.request.host_url}files/{orig_path}" />
 </html>"""
+                resp = flask.Response(data, mimetype="text/html")
+                resp.headers.update(CHEADERS)
+                resp.headers["ETag"] = create_etag(data)
+                return resp
             if prev_date != utc_dt().date():
                 PREVIEW.clear()
             elif path in PREVIEW:
@@ -322,7 +326,7 @@ def upload():
         <meta content="Files" property="og:title">
         <meta content="Upload a file here!" property="og:description">
         <meta content="{flask.request.url}" property="og:url">
-        <meta content="https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/sky-rainbow.gif" property="og:image">
+        <meta property="og:image" content="https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/sky-rainbow.gif">
         <meta content="#BF7FFF" data-react-helmet="true" name="theme-color">
     </head>""" + """
     <style>
@@ -384,7 +388,7 @@ def timezone():
         <meta content="Timezones" property="og:title">
         <meta content="Find your current timezone here!" property="og:description">
         <meta content=\"""" + flask.request.url + """\" property="og:url">
-        <meta content="https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/sky-rainbow.gif" property="og:image">
+        <meta property="og:image" content="https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/sky-rainbow.gif">
         <meta content="#""" + colour + """\" data-react-helmet="true" name="theme-color">
         <meta http-equiv="refresh" content="60">
         <link rel="stylesheet" type="text/css" href="/static/timezonestyles.css" />

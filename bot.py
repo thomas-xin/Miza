@@ -1070,20 +1070,44 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 first = url.split("?", 1)[0]
                 item = first[first.rindex("/") + 1:]
                 out.append(f"https://media2.giphy.com/media/{item}/giphy.gif")
-            elif images and is_tenor_url(url):
-                s = await Request(url, decode=True, aio=True)
-                search ='property="og:image" content="'
-                s = s[s.index(search) + len(search):]
-                s = s[:s.index('"')]
-                out.append(s)
-            elif images and is_deviantart_url(url):
-                s = await Request(url, decode=True, aio=True)
-                search ='property="og:image" content="'
-                s = s[s.index(search) + len(search):]
-                s = s[:s.index('"')]
-                out.append(s)
             else:
-                out.append(url)
+                found = False
+                resp = await create_future(requests.get, url, headers=Request.header(), stream=True)
+                with resp:
+                    url = resp.url
+                    head = fcdict(resp.headers)
+                    ctype = [t.strip() for t in head.get("Content-Type", "").split(";")]
+                    print(head, ctype, sep="\n")
+                    if "text/html" in ctype:
+                        it = resp.iter_content(65536)
+                        data = next(it)
+                        s = as_str(data)
+                        try:
+                            s = s[s.index("<meta") + 5:]
+                            search = 'http-equiv="refresh" content="'
+                            try:
+                                s = s[s.index(search) + len(search):]
+                                s = s[:s.index('"')]
+                                res = None
+                                for k in s.split(";"):
+                                    temp = k.strip()
+                                    if temp.casefold().startswith("url="):
+                                        res = temp[4:]
+                                        break
+                                if not res:
+                                    raise ValueError
+                            except ValueError:
+                                search ='property="og:image" content="'
+                                s = s[s.index(search) + len(search):]
+                                res = s[:s.index('"')]
+                        except ValueError:
+                            pass
+                        else:
+                            found = True
+                            print(res)
+                            out.append(res)
+                if not found:
+                    out.append(url)
         if lost:
             out.extend(lost)
         if not out:
