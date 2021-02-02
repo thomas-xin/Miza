@@ -104,7 +104,6 @@ def get_file(path, filename=None):
     else:
         mime = get_mime(p)
     fn = p.rsplit('/', 1)[-1].split('~', 1)[-1]
-    send(p, fn, mime)
     if endpoint.endswith("view") and mime.startswith("image/"):
         if os.path.getsize(p) > 262144:
             if endpoint != "preview":
@@ -166,7 +165,6 @@ def fetch_static(path, ignore=False):
 @app.route("/static/<path:filename>", methods=["GET"])
 def get_static_file(filename):
     data, mime = fetch_static(filename)
-    send("static/" + filename, mime)
     resp = flask.Response(data, mimetype=mime)
     resp.headers.update(CHEADERS)
     resp.headers["ETag"] = create_etag(data)
@@ -191,7 +189,6 @@ def mizatlas(filename=None):
             data, mime = fetch_static(f"mizatlas/{filename}")
     if not data:
         data, mime = fetch_static("mizatlas/index.html")
-    send("mizatlas/index.html", mime)
     resp = flask.Response(data, mimetype=mime)
     resp.headers.update(CHEADERS)
     resp.headers["ETag"] = create_etag(data)
@@ -201,7 +198,6 @@ def mizatlas(filename=None):
 @app.route("/", methods=["GET", "POST"])
 def home():
     data, mime = fetch_static("index.html")
-    send("index.html", mime)
     resp = flask.Response(data, mimetype=mime)
     resp.headers.update(CHEADERS)
     resp.headers["ETag"] = create_etag(data)
@@ -210,7 +206,6 @@ def home():
 @app.route("/favicon.ico", methods=["GET"])
 def favicon():
     data, mime = fetch_static("icon.ico")
-    send("icon.ico", mime)
     resp = flask.Response(data, mimetype=mime)
     resp.headers.update(CHEADERS)
     resp.headers["ETag"] = create_etag(data)
@@ -315,7 +310,6 @@ def upload_file():
 def upload():
     global est_last
     ip = flask.request.remote_addr
-    send(ip + "/upload\n")
     colour = hex(colour2raw(hue2colour(xrand(1536))))[2:].upper()
     if utc() - est_last > 1800:
         est_last = utc()
@@ -413,7 +407,6 @@ def timezone():
         """
         return html
     except KeyError:
-        send(traceback.format_exc())
         return flask.redirect("https://http.cat/417")
     except:
         send(traceback.format_exc())
