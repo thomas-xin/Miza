@@ -81,6 +81,9 @@ def get_duration(filename):
                 head = fcdict(resp.headers)
                 if "Content-Length" not in head:
                     return _get_duration(filename, 20)
+                ctype = [e.strip() for e in head.get("Content-Type", "").split(";") if "/" in e][0]
+                if ctype.split("/", 1)[0] not in ("audio", "video"):
+                    return None
                 it = resp.iter_content(65536)
                 data = next(it)
             ident = str(magic.from_buffer(data))
@@ -1954,6 +1957,8 @@ class AudioDownloader:
                 stream = entry.get("stream")
                 if stream in (None, "none"):
                     raise FileNotFoundError("Unable to locate appropriate file stream.")
+            entry["stream"] = stream
+            entry["icon"] = icon
             if not entry.get("duration"):
                 entry["duration"] = get_duration(stream)
             print(entry)
@@ -1968,8 +1973,6 @@ class AudioDownloader:
                 raise
             # Assign file duration estimate to queue entry
             f.assign.append(entry)
-            entry["stream"] = stream
-            entry["icon"] = icon
             entry["file"] = f
             f.ensure_time()
             # Files may have a callback set for when they are loaded
