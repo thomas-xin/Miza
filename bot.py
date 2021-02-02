@@ -1072,7 +1072,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 out.append(f"https://media2.giphy.com/media/{item}/giphy.gif")
             else:
                 found = False
-                if images or is_tenor_url(url) or is_deviantart_url(url) or self.is_webserver_url(url):
+                if not is_discord_url(url) and (images or is_tenor_url(url) or is_deviantart_url(url) or self.is_webserver_url(url)):
                     resp = await create_future(requests.get, url, headers=Request.header(), stream=True)
                     with resp:
                         url = resp.url

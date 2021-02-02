@@ -122,6 +122,8 @@ def get_best_icon(entry):
         if is_discord_url(url):
             if not is_image(url):
                 return "https://cdn.discordapp.com/embed/avatars/0.png"
+        if ytdl.bot.is_webserver_url(url):
+            return ytdl.bot.webserver + "/static/sky-rainbow.gif"
         return url
     return sorted(thumbnails, key=lambda x: float(x.get("width", x.get("preference", 0) * 4096)), reverse=True)[0]["url"]
 
