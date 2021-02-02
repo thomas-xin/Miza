@@ -1330,17 +1330,30 @@ class UpdateMimics(Database):
                         i += 1
 
 
-class Muffin(Command):
-    name=["Muffins", "🧁"]
-    description = "Muffin time! What more is there to say? :D"
+class _8Ball(ImagePool, Command):
+    description = "Pulls a random image from cdn.nekos.life/8ball, and embeds it."
+    database = "8ball"
+    name = ["🎱"]
 
-    def __call__(self, **void):
-        return "Muffin time :D 🧁🧁🧁"
-
-
-class Laser(Command):
-    name = ["Beam"]
-    description = "Creates a rainbow laser."
-
-    def __call__(self, **void):
-        return ":white_large_square:       :white_large_square:    :white_large_square: :red_square: :orange_square: :yellow_square: :green_square: :blue_square: :purple_square:"
+    def __call__(self, channel, flags, **void):
+        e_id = choice(
+            "Absolutely",
+            "Ask_Again",
+            "Go_For_It",
+            "It_is_OK",
+            "It_will_pass",
+            "Maybe",
+            "No",
+            "No_doubt",
+            "Not_Now",
+            "Very_Likely",
+            "Wait_For_It",
+            "Yes",
+            "Youre_hot",
+            "cannot_tell_now",
+            "count_on_it",
+        )
+        url = f"https://cdn.nekos.life/8ball/{e_id}.png"
+        if "v" in flags:
+            return escape_everyone(url)
+        self.bot.send_as_embeds(channel, image=url, colour=xrand(1536))

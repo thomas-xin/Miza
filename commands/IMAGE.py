@@ -1341,33 +1341,33 @@ class Dog(ImagePool, Command):
         return url
 
 
-class _8Ball(ImagePool, Command):
-    description = "Pulls a random image from cdn.nekos.life/8ball, and embeds it."
-    database = "8ball"
-    name = ["🎱"]
+class Muffin(ImagePool, Command):
+    name = ["🧁", "Muffins"]
+    description = "Muffin time! What more is there to say? :D"
+    database = "muffins"
 
-    def __call__(self, channel, flags, **void):
-        e_id = choice(
-            "Absolutely",
-            "Ask_Again",
-            "Go_For_It",
-            "It_is_OK",
-            "It_will_pass",
-            "Maybe",
-            "No",
-            "No_doubt",
-            "Not_Now",
-            "Very_Likely",
-            "Wait_For_It",
-            "Yes",
-            "Youre_hot",
-            "cannot_tell_now",
-            "count_on_it",
-        )
-        url = f"https://cdn.nekos.life/8ball/{e_id}.png"
-        if "v" in flags:
-            return escape_everyone(url)
-        self.bot.send_as_embeds(channel, image=url, colour=xrand(1536))
+    async def fetch_one(self):
+        if xrand(3):
+            s = await Request(f"https://www.gettyimages.co.uk/photos/muffin?page={random.randint(1, 100)}", decode=True, aio=True)
+            url = "https://media.gettyimages.com/photos/"
+            spl = s.split(url)[1:]
+            imageset = {url + i.split('"', 1)[0].split("?", 1)[0] for i in spl}
+        else:
+            d = await Request(f"https://unsplash.com/napi/search/photos?query=muffin&per_page=20&page={random.randint(1, 19)}", json=True, aio=True)
+            imageset = {result["urls"]["raw"] for result in d["results"]}
+        return imageset
+
+
+class XKCD(ImagePool, Command):
+    description = "Pulls a random image from xkcd.com and embeds it."
+    database = "xkcd"
+
+    async def fetch_one(self):
+        s = await Request("https://c.xkcd.com/random/comic", decode=True, aio=True)
+        search = "Image URL (for hotlinking/embedding): "
+        s = s[s.index(search) + len(search):]
+        url = s[:s.index("<")].strip()
+        return url
 
 
 class UpdateImagePools(Database):
@@ -1378,19 +1378,20 @@ class UpdateImagePools(Database):
 
     async def load_until(self, key, func, threshold):
         data = set_dict(self.data, key, alist())
-        found = set(data)
         for i in range(threshold << 1):
             if len(data) > threshold:
                 break
             with tracebacksuppressor:
                 out = await func()
-                if out not in found:
-                    if i & 1:
-                        data.appendleft(out)
-                    else:
-                        data.append(out)
-                    found.add(out)
-                    self.update(key)
+                if type(out) is str:
+                    out = (out,)
+                for url in out:
+                    if url not in data:
+                        if i & 1:
+                            data.appendleft(url)
+                        else:
+                            data.append(url)
+                        self.update(key)
         data.uniq(sorted=None)
 
     async def proc(self, key, func):
@@ -1409,6 +1410,8 @@ class UpdateImagePools(Database):
         data = set_dict(self.data, key, alist())
         if len(data) < threshold >> 1 or len(data) < threshold and xrand(2):
             out = await func()
+            if type(out) is not str:
+                out = next(iter(out))
             if out not in data:
                 data.add(out)
                 self.update(key)
