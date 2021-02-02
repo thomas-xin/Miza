@@ -1195,7 +1195,7 @@ class Status(Command):
             emb.add_field(name="Discord info", value=discord_info)
 
             misc_info = (
-                f"Cached files\n`{bot.file_count}`\nConnected voice channels\n`{len(bot.voice_clients)}`\nTotal data sent/received\n`{byte_scale(bot.total_bytes)}B`\n"
+                f"Cached files\n`{bot.file_count}`\nConnected voice channels\n`{len(bot.audio.players)}`\nTotal data sent/received\n`{byte_scale(bot.total_bytes)}B`\n"
                 + f"System time\n`{datetime.datetime.now()}`\nAPI latency\n`{sec2time(bot.api_latency)}`\nCurrent uptime\n`{dyn_time_diff(utc(), bot.start_time)}`\nPublic IP address\n`{bot.ip}`"
             )
             emb.add_field(name="Misc info", value=misc_info)

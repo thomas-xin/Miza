@@ -3760,9 +3760,9 @@ else:
     randbytes = lambda size: (np.random.random_sample(size) * 256).astype(np.uint8).tobytes()
 
 # SHA256 operations: base64 and base16.
-shash = lambda s: as_str(base64.b64encode(hashlib.sha256(s.encode("utf-8")).digest()).replace(b"/", b"-").rstrip(b"="))
-hhash = lambda s: bytes2hex(hashlib.sha256(s.encode("utf-8")).digest(), space=False)
-ihash = lambda s: int.from_bytes(hashlib.sha256(s.encode("utf-8")).digest(), "little") % 4294967296 - 2147483648
+shash = lambda s: as_str(base64.b64encode(hashlib.sha256(s if type(s) is bytes else as_str(s).encode("utf-8")).digest()).replace(b"/", b"-").rstrip(b"="))
+hhash = lambda s: bytes2hex(hashlib.sha256(s if type(s) is bytes else as_str(s).encode("utf-8")).digest(), space=False)
+ihash = lambda s: int.from_bytes(hashlib.sha256(s if type(s) is bytes else as_str(s).encode("utf-8")).digest(), "little") % 4294967296 - 2147483648
 
 def bxor(b1, b2):
     x = np.frombuffer(b1, dtype=np.uint8)

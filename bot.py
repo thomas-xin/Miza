@@ -20,7 +20,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     discord_icon = "https://cdn.discordapp.com/embed/avatars/0.png"
     twitch_url = "https://www.twitch.tv/-"
     website_background = "https://i.imgur.com/LsNWQUJ.png"
-    webserver = "https://mizabot.xyz"
+    webserver = raw_webserver = "https://mizabot.xyz"
     heartbeat = "heartbeat.tmp"
     heartbeat_ack = "heartbeat_ack.tmp"
     restart = "restart.tmp"
@@ -296,14 +296,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         <link rel="preconnect" href="https://fonts.gstatic.com">
         <link href="https://fonts.googleapis.com/css2?family=Balsamiq+Sans&amp;family=Pacifico&amp;display=swap" rel="stylesheet">
         <link href="https://unpkg.com/boxicons@2.0.7/css/boxicons.min.css" rel="stylesheet">
-        <link href="{self.webserver}/static/miza.css" rel="stylesheet">
-        <link rel="stylesheet" href="{self.webserver}/static/swiper.min.css">
+        <link href="{self.raw_webserver}/static/miza.css" rel="stylesheet">
+        <link rel="stylesheet" href="{self.raw_webserver}/static/swiper.min.css">
     </head>
     <body>
         <div class="hero">
             <img class="hero-bg" src="{self.website_background}">
             <div class="hero-text">
-                <img src="{self.raw_github}/master/misc/avatar-rainbow.gif" class="hero-image">
+                <img src="{self.raw_webserver}/static/avatar-rainbow.gif" class="hero-image">
                 <h1 class="hero-text-text" data-upside-down-emoji-because-the-class-name="yea">Miza</h1>
                 <a class="buttonish" href="{self.invite}"><i class="bx bxs-plus-square"></i>Invite</a>
                 <div class="buttonsholder">
@@ -315,7 +315,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         <div class="bigboi">
             <img
                 class="bgimg" 
-                src="{self.raw_github}/master/misc/moon.gif" 
+                src="{self.raw_webserver}/static/moon.gif" 
             />
             <h2>What is Miza?</h2>
             <p>Miza is a multipurpose Discord bot, written in Python, fashioned after the character "Misery" from the platformer game Cave Story, and initially designed to help with Cave Story modding.<br>\
@@ -359,11 +359,11 @@ Use the <a href="{self.invite}">bot invite link</a> to invite her, and you will 
 The default prefix for a command is a ~ (tilde) character, followed by the name of the command (case-insensitive, with underscores optionally omitted), for example ~Hello, ~hello, or ~HELLO<br>\
 Commands may or may not require arguments, or input text after the command name. Some commands are able to take input from attached files or URL links (including Discord message links).<br>\
 To check the method of input for a particular command, use the ~Help command with said command's name as an argument.<br><br>\
-Optionally, most of miza's commands may be easily viewed and tested on the <a href="{self.webserver}/mizatlas">command atlas</a>.<br>\
+Optionally, most of miza's commands may be easily viewed and tested on the <a href="{self.raw_webserver}/mizatlas">command atlas</a>.<br>\
 For any further questions or issues, read the documentation on <a href="{self.github}">GitHub</a>, or join the <a href="{self.rcc_invite}">Support Server</a>!
         </div>
-        <script src="{self.webserver}/static/swiper.min.js"></script>
-        <script src="{self.webserver}/static/pagination.js"></script>
+        <script src="{self.raw_webserver}/static/swiper.min.js"></script>
+        <script src="{self.raw_webserver}/static/pagination.js"></script>
     </body>
 </html>"""
             with open("misc/index.html", "w", encoding="utf-8") as f:
@@ -1811,7 +1811,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     def update_ip(self, ip):
         if regexp("^([0-9]{1,3}\\.){3}[0-9]{1,3}$").search(ip):
             self.ip = ip
-            # self.webserver = f"http://{self.ip}:9801"
+            self.raw_webserver = f"http://{self.ip}:9801"
 
     # Gets the external IP address from api.ipify.org
     async def get_ip(self):

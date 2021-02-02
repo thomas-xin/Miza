@@ -54,6 +54,11 @@ def on_error(ex):
     return flask.redirect("https://http.cat/500")
 
 
+def create_etag(data):
+    s = str(ihash(data[:128] + data[-128:]) % 4294967296)
+    return repr("0" * (10 - len(s)) + s)
+
+
 STATIC = {}
 TZCACHE = {}
 RESPONSES = {}
@@ -130,7 +135,10 @@ def get_file(path, filename=None):
                     proc.wait()
                 PREVIEW[path] = p2
                 p = p3
-    return flask.send_file(p, as_attachment=download, attachment_filename=filename or fn, mimetype=mime)
+    resp = flask.send_file(p, as_attachment=download, attachment_filename=filename or fn, mimetype=mime)
+    resp.headers.update(CHEADERS)
+    send(resp)
+    return resp
 
 
 def fetch_static(path):
@@ -159,7 +167,10 @@ def fetch_static(path):
 def get_static_file(filename):
     data, mime = fetch_static(filename)
     send("static/" + filename, mime)
-    return flask.Response(data, mimetype=mime)
+    resp = flask.Response(data, mimetype=mime)
+    resp.headers.update(CHEADERS)
+    resp.headers["ETag"] = create_etag(data)
+    return resp
 
 @app.route("/static", methods=["DELETE"])
 def clearcache():
@@ -171,72 +182,34 @@ def clearcache():
     raise PermissionError
 
 
-@app.route("/mizatlas/<path:filename>", methods=["GET"])
-def atlas(filename):
-    # if filename == "run":
-    #     content = flask.request.args.get("command", "")
-    #     ip = flask.request.remote_addr
-    #     data = get_geo(ip)
-    #     tz = data["timezone"]
-    #     t = ts_us()
-    #     if " " not in content:
-    #         content += " "
-    #     RESPONSES[t] = fut = concurrent.futures.Future()
-    #     j, after = fut.result(timeout=420)
-    #     RESPONSES.pop(t, None)
-    #     response = flask.Response(json.dumps(j), mimetype="application/json")
-    #     a = after - utc()
-    #     if a > 0:
-    #         response.headers["Retry-After"] = a
-    #     return response
-    try:
-        data, mime = fetch_static("mizatlas/" + filename)
-    except FileNotFoundError:
-        data, mime = fetch_static("mizatlas/index.html")
-    send("mizatlas/" + filename, mime)
-    return flask.Response(data, mimetype=mime)
-
 @app.route("/mizatlas", methods=["GET"])
-def mizatlas():
+@app.route("/mizatlas/<path:filename>", methods=["GET"])
+def mizatlas(filename=None):
     data, mime = fetch_static("mizatlas/index.html")
     send("mizatlas/index.html", mime)
-    return flask.Response(data, mimetype=mime)
-#     return f"""<!DOCTYPE html>
-# <html lang="en">
-#     <head>
-#         <meta charset="utf-8"/><link rel="icon" href="/mizatlas/favicon.ico"/>
-#         <meta content="MizAtlas" property="og:title">
-#         <meta content="A Miza [command tester]({flask.request.url}/run) and [atlas]({flask.request.url}/atlas)!" property="og:description">
-#         <meta content="{flask.request.url}" property="og:url">
-#         <meta content="https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/sky-rainbow.gif" property="og:image">
-#         <meta name="viewport" content="width=device-width,initial-scale=1"/>
-#         <meta content="bf7fff" data-react-helmet="true" name="theme-color">
-#         <meta name="description" content="MizAtlas"/><link rel="apple-touch-icon" href="/mizatlas/logo192.png"/>
-#         <link rel="stylesheet" href="/mizatlas/styles.css"/><link rel="manifest" href="/mizatlas/manifest.json"/>
-#         <title>MizAtlas</title>
-#     </head>
-#     <body>
-#         <noscript>You need to enable JavaScript to run this app.</noscript>
-#         <div id="root"></div><script>
-#             """ + """!function(e){function t(t){for(var n,a,i=t[0],c=t[1],l=t[2],f=0,p=[];f<i.length;f++)a=i[f],Object.prototype.hasOwnProperty.call(o,a)&&o[a]&&p.push(o[a][0]),o[a]=0;for(n in c)Object.prototype.hasOwnProperty.call(c,n)&&(e[n]=c[n]);for(s&&s(t);p.length;)p.shift()();return u.push.apply(u,l||[]),r()}function r(){for(var e,t=0;t<u.length;t++){for(var r=u[t],n=!0,i=1;i<r.length;i++){var c=r[i];0!==o[c]&&(n=!1)}n&&(u.splice(t--,1),e=a(a.s=r[0]))}return e}var n={},o={1:0},u=[];function a(t){if(n[t])return n[t].exports;var r=n[t]={i:t,l:!1,exports:{}};return e[t].call(r.exports,r,r.exports,a),r.l=!0,r.exports}a.e=function(e){var t=[],r=o[e];if(0!==r)if(r)t.push(r[2]);else{var n=new Promise((function(t,n){r=o[e]=[t,n]}));t.push(r[2]=n);var u,i=document.createElement("script");i.charset="utf-8",i.timeout=120,a.nc&&i.setAttribute("nonce",a.nc),i.src=function(e){return a.p+"static/js/"+({}[e]||e)+"."+{3:"c65330d6"}[e]+".chunk.js"}(e);var c=new Error;u=function(t){i.onerror=i.onload=null,clearTimeout(l);var r=o[e];if(0!==r){if(r){var n=t&&("load"===t.type?"missing":t.type),u=t&&t.target&&t.target.src;c.message="Loading chunk "+e+" failed.\n("+n+": "+u+")",c.name="ChunkLoadError",c.type=n,c.request=u,r[1](c)}o[e]=void 0}};var l=setTimeout((function(){u({type:"timeout",target:i})}),12e4);i.onerror=i.onload=u,document.head.appendChild(i)}return Promise.all(t)},a.m=e,a.c=n,a.d=function(e,t,r){a.o(e,t)||Object.defineProperty(e,t,{enumerable:!0,get:r})},a.r=function(e){"undefined"!=typeof Symbol&&Symbol.toStringTag&&Object.defineProperty(e,Symbol.toStringTag,{value:"Module"}),Object.defineProperty(e,"__esModule",{value:!0})},a.t=function(e,t){if(1&t&&(e=a(e)),8&t)return e;if(4&t&&"object"==typeof e&&e&&e.__esModule)return e;var r=Object.create(null);if(a.r(r),Object.defineProperty(r,"default",{enumerable:!0,value:e}),2&t&&"string"!=typeof e)for(var n in e)a.d(r,n,function(t){return e[t]}.bind(null,n));return r},a.n=function(e){var t=e&&e.__esModule?function(){return e.default}:function(){return e};return a.d(t,"a",t),t},a.o=function(e,t){return Object.prototype.hasOwnProperty.call(e,t)},a.p="/mizatlas/",a.oe=function(e){throw console.error(e),e};var i=this.webpackJsonpmizatlas=this.webpackJsonpmizatlas||[],c=i.push.bind(i);i.push=t,i=i.slice();for(var l=0;l<i.length;l++)t(i[l]);var s=c;r()}([])
-#         </script>
-#         <script src="/mizatlas/static/js/2.baca3994.chunk.js"></script>
-#         <script src="/mizatlas/static/js/main.0d3f8e6b.chunk.js"></script>
-#     </body>
-# </html>"""
+    resp = flask.Response(data, mimetype=mime)
+    resp.headers.update(CHEADERS)
+    resp.headers["ETag"] = create_etag(data)
+    return resp
 
 
 @app.route("/", methods=["GET", "POST"])
 def home():
     data, mime = fetch_static("index.html")
     send("index.html", mime)
-    return flask.Response(data, mimetype=mime)
+    resp = flask.Response(data, mimetype=mime)
+    resp.headers.update(CHEADERS)
+    resp.headers["ETag"] = create_etag(data)
+    return resp
 
 @app.route("/favicon.ico", methods=["GET"])
 def favicon():
     data, mime = fetch_static("icon.ico")
     send("icon.ico", mime)
-    return flask.Response(data, mimetype=mime)
+    resp = flask.Response(data, mimetype=mime)
+    resp.headers.update(CHEADERS)
+    resp.headers["ETag"] = create_etag(data)
+    return resp
 
 
 est_time = utc()
@@ -327,7 +300,7 @@ def upload_file():
     s += f"""
         <p style="color:cyan;">Total file size: {byte_scale(sum(os.path.getsize(f[2]) for f in urls))}B</p>
         <p style="color:orange;">Estimated file lifetime: {sec2time(utc() - est_time)}</p>
-        <img src="https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/hug.gif" alt="Miza-Dottie-Hug" style="width:14.2857%;height:14.2857%;">
+        <img src="{flask.request.host_url}static/hug.gif" alt="Miza-Dottie-Hug" style="width:14.2857%;height:14.2857%;">
         <p><a href="/upload">Click here to upload another file!</a></p>
     </body>
 </html>"""
@@ -355,7 +328,7 @@ def upload():
     </head>
     <style>
         body {
-            background-image: url('https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/spiral.gif');
+            background-image: url('""" + flask.request.host_url + """static/spiral.gif');
             background-repeat: no-repeat;
             background-attachment: fixed;
             background-size: cover;
@@ -410,14 +383,14 @@ def timezone():
         <meta content=\"""" + flask.request.url + """\" property="og:url">
         <meta content="https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/sky-rainbow.gif" property="og:image">
         <meta content="#""" + colour + """\" data-react-helmet="true" name="theme-color">
-        <meta http-equiv="refresh" content="5">
+        <meta http-equiv="refresh" content="60">
         <link rel="stylesheet" type="text/css" href="/static/timezonestyles.css" />
     </head>
     <body>
         <div>
         <h3>Estimated time:</h3>
         <h1>""" + str(dt) + """</h1>
-        <h2>Detected timezone: """ + tz + """</h2>
+        <h2>Detected timezone: """ + tz + f"""</h2>
         <p class="align_left">
             <a href="/time">Refresh</a>
         </p>
@@ -425,7 +398,7 @@ def timezone():
             <a href="/">Home</a>
         </p>
         </div>
-    <img src="https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/sky-rainbow.gif" alt="Miza-Sky" style="width:14.2857%;height:14.2857%;">
+    <img src="{flask.request.host_url}static/sky-rainbow.gif" alt="Miza-Sky" style="width:14.2857%;height:14.2857%;">
     </body>
 </html>
         """
@@ -529,6 +502,10 @@ HEADERS = {
     "Accept-Ranges": "bytes",
     "Access-Control-Allow-Origin": "*",
 }
+
+CHEADERS = cdict(
+    {"Cache-Control": "public, max-age=3600, stale-while-revalidate=1073741824, stale-if-error=1073741824"}
+)
 
 @app.after_request
 def custom_header(response):

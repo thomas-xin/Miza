@@ -1786,43 +1786,80 @@ class AudioDownloader:
                         results.append(entry)
         return sorted(results, key=lambda entry: entry.views, reverse=True)
 
+    failed_yt = 0
     def search_yt(self, query):
-        url = f"https://www.youtube.com/results?search_query={verify_url(query)}"
-        self.youtube_x += 1
-        resp = Request(url, timeout=12)
-        result = None
-        with suppress(ValueError):
-            s = resp[resp.index(b"// scraper_data_begin") + 21:resp.rindex(b"// scraper_data_end")]
-            s = s[s.index(b"var ytInitialData = ") + 20:s.rindex(b";")]
-            result = self.parse_yt(s)
-        with suppress(ValueError):
-            s = resp[resp.index(b'window["ytInitialData"] = ') + 26:]
-            s = s[:s.index(b'window["ytInitialPlayerResponse"] = null;')]
-            s = s[:s.rindex(b";")]
-            result = self.parse_yt(s)
-        if result is None:
-            raise NotImplementedError("Unable to read json response.")
-        q = to_alphanumeric(full_prune(query))
-        high = alist()
-        low = alist()
-        for entry in result:
-            if entry.duration:
-                name = full_prune(entry.name)
-                aname = to_alphanumeric(name)
-                spl = aname.split()
-                if entry.duration < 960 or "extended" in q or "hour" in q or "extended" not in spl and "hour" not in spl and "hours" not in spl:
-                    if fuzzy_substring(aname, q, match_length=False) >= 0.5:
-                        high.append(entry)
+        out = None
+        if utc() > self.failed_yt:
+            url = f"https://www.youtube.com/results?search_query={verify_url(query)}"
+            self.youtube_x += 1
+            resp = Request(url, timeout=12)
+            result = None
+            with suppress(ValueError):
+                s = resp[resp.index(b"// scraper_data_begin") + 21:resp.rindex(b"// scraper_data_end")]
+                s = s[s.index(b"var ytInitialData = ") + 20:s.rindex(b";")]
+                result = self.parse_yt(s)
+            with suppress(ValueError):
+                s = resp[resp.index(b'window["ytInitialData"] = ') + 26:]
+                s = s[:s.index(b'window["ytInitialPlayerResponse"] = null;')]
+                s = s[:s.rindex(b";")]
+                result = self.parse_yt(s)
+            if result is None:
+                raise NotImplementedError("Unable to read json response.")
+            q = to_alphanumeric(full_prune(query))
+            high = alist()
+            low = alist()
+            for entry in result:
+                if entry.duration:
+                    name = full_prune(entry.name)
+                    aname = to_alphanumeric(name)
+                    spl = aname.split()
+                    if entry.duration < 960 or "extended" in q or "hour" in q or "extended" not in spl and "hour" not in spl and "hours" not in spl:
+                        if fuzzy_substring(aname, q, match_length=False) >= 0.5:
+                            high.append(entry)
+                            continue
+                low.append(entry)
+            def key(entry):
+                coeff = fuzzy_substring(to_alphanumeric(full_prune(entry.name)), q, match_length=False)
+                if coeff < 0.5:
+                    coeff = 0
+                return coeff
+            out = sorted(high, key=key, reverse=True)
+            out.extend(sorted(low, key=key, reverse=True))
+            if not out:
+                self.failed_yt = utc() + 180
+                print(query, out)
+        if not out:
+            resp = self.extract_info(query)
+            if resp.get("_type", None) == "url":
+                resp = self.extract_from(resp["url"])
+            if resp.get("_type", None) == "playlist":
+                entries = list(resp["entries"])
+            else:
+                entries = [resp]
+            out = alist()
+            for entry in entries:
+                with tracebacksuppressor:
+                    found = True
+                    if "title" in entry:
+                        title = entry["title"]
+                    else:
+                        title = entry["url"].rsplit("/", 1)[-1]
+                        if "." in title:
+                            title = title[:title.rindex(".")]
+                        found = False
+                    if "duration" in entry:
+                        dur = float(entry["duration"])
+                    else:
+                        dur = None
+                    url = entry.get("webpage_url", entry.get("url", entry.get("id")))
+                    if not url:
                         continue
-            low.append(entry)
-        def key(entry):
-            coeff = fuzzy_substring(to_alphanumeric(full_prune(entry.name)), q, match_length=False)
-            if coeff < 0.5:
-                coeff = 0
-            return coeff
-        out = sorted(high, key=key, reverse=True)
-        out.extend(sorted(low, key=key, reverse=True))
-        # print(out)
+                    temp = cdict(name=title, url=url, duration=dur)
+                    if not is_url(url):
+                        if entry.get("ie_key", "").casefold() == "youtube":
+                            temp["url"] = f"https://www.youtube.com/watch?v={url}"
+                    temp["research"] = True
+                    out.append(temp)
         return out
 
     # Performs a search, storing and using cached search results for efficiency.
