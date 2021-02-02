@@ -227,7 +227,7 @@ class Hex2Uni(Command):
     def __call__(self, argv, **void):
         if not argv:
             raise ArgumentError("Input string is empty.")
-        b = hex2bytes(argv.replace("0x", "").replace(" ", ""))
+        b = hex2bytes(to_alphanumeric(argv).replace("0x", "").replace(" ", ""))
         return fix_md(as_str(b))
 
 
@@ -239,7 +239,7 @@ class ID2Time(Command):
     def __call__(self, argv, **void):
         if not argv:
             raise ArgumentError("Input string is empty.")
-        argv = verify_id(argv)
+        argv = int(verify_id(to_alphanumeric(argv)))
         return fix_md(snowflake_time(argv))
 
 
