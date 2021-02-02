@@ -1377,31 +1377,35 @@ class UpdateImagePools(Database):
     no_delete = True
 
     async def load_until(self, key, func, threshold):
-        data = set_dict(self.data, key, alist())
-        for i in range(threshold << 1):
-            if len(data) > threshold:
-                break
-            with tracebacksuppressor:
-                out = await func()
-                if type(out) is str:
-                    out = (out,)
-                for url in out:
-                    if url not in data:
-                        if i & 1:
-                            data.appendleft(url)
-                        else:
-                            data.append(url)
-                        self.update(key)
-        data.uniq(sorted=None)
+        with tracebacksuppressor:
+            data = set_dict(self.data, key, alist())
+            for i in range(threshold << 1):
+                if len(data) > threshold:
+                    break
+                with tracebacksuppressor:
+                    out = await func()
+                    if type(out) is str:
+                        out = (out,)
+                    for url in out:
+                        if url not in data:
+                            if i & 1:
+                                data.appendleft(url)
+                            else:
+                                data.append(url)
+                            self.update(key)
+            data.uniq(sorted=None)
 
     async def proc(self, key, func):
         async with self.sem:
             data = set_dict(self.data, key, alist())
             out = await func()
-            if out not in data:
-                data.add(out)
-                self.update(key)
-            return out
+            if type(out) is str:
+                out = (out,)
+            for url in out:
+                if url not in data:
+                    data.add(url)
+                    self.update(key)
+            return url
 
     async def get(self, key, func, threshold=1024):
         if not self.loading.get(key):
@@ -1410,12 +1414,13 @@ class UpdateImagePools(Database):
         data = set_dict(self.data, key, alist())
         if len(data) < threshold >> 1 or len(data) < threshold and xrand(2):
             out = await func()
-            if type(out) is not str:
-                out = next(iter(out))
-            if out not in data:
-                data.add(out)
-                self.update(key)
-            return out
+            if type(out) is str:
+                out = (out,)
+            for url in out:
+                if url not in data:
+                    data.add(url)
+                    self.update(key)
+            return url
         if not self.sem.is_busy():
             create_task(self.proc(key, func))
         return choice(data)
