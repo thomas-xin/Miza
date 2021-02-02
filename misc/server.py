@@ -56,7 +56,7 @@ def on_error(ex):
 
 def create_etag(data):
     s = str(ihash(data[:128] + data[-128:]) % 4294967296)
-    return repr("0" * (10 - len(s)) + s)
+    return '"' + "0" * (10 - len(s)) + s + '"'
 
 
 STATIC = {}

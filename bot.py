@@ -4087,8 +4087,8 @@ class SimulatedMessage:
     trigger_typing = async_nop
     webhooks = lambda self: []
     guild_permissions = discord.Permissions((1 << 32) - 1)
-    permissions_for = lambda self, member=None: guild_permissions
-    permissions_in = lambda self, channel=None: guild_permissions
+    permissions_for = lambda self, member=None: self.guild_permissions
+    permissions_in = lambda self, channel=None: self.guild_permissions
     invites = lambda self: exec("raise FileNotFoundError")
 
 

@@ -229,15 +229,16 @@ def rainbow_gif2(image, duration):
     loops = total / duration / 1000
     scale = 1
     while abs(loops * scale) < 1:
-        scale *= 2
+        scale <<= 1
         if length * scale >= 64:
             loops = 1 if loops >= 0 else -1
             break
     loops = round(loops * scale) / scale
-    if not loops:
+    if abs(loops) < 1:
         loops = 1 if loops >= 0 else -1
     maxsize = 960
     size = list(max_size(*image.size, maxsize))
+    # print(image, length, scale, loops)
 
     def rainbow_gif_iterator(image):
         for f in range(length * scale):
@@ -325,7 +326,7 @@ def spin_gif2(image, duration):
             loops = 1 if loops >= 0 else -1
             break
     loops = round(loops * scale) / scale
-    if not loops:
+    if abs(loops) < 1:
         loops = 1 if loops >= 0 else -1
     maxsize = 960
     size = list(max_size(*image.size, maxsize))
@@ -502,7 +503,7 @@ def magik_gif2(image, cell_size, grid_distance, iterations):
             loops = 1 if loops >= 0 else -1
             break
     loops = round(loops * scale) / scale
-    if not loops:
+    if abs(loops) < 1:
         loops = 1 if loops >= 0 else -1
     maxsize = 960
     size = list(max_size(*image.size, maxsize))
