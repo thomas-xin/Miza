@@ -1853,8 +1853,8 @@ class UpdateMessageLogs(Database):
                 emb2 = as_embed(before)
                 emb.colour = discord.Colour(0x0000FF)
                 action = f"**Message edited in** {channel_mention(after.channel.id)}:\nhttps://discord.com/channels/{guild.id}/{after.channel.id}/{after.id}"
-                emb.add_field(name="Before", value=emb2.description)
-                emb.add_field(name="After", value=emb.description)
+                emb.add_field(name="Before", value=lim_str(emb2.description, 1024))
+                emb.add_field(name="After", value=lim_str(emb.description, 1024))
                 emb.description = action
                 emb.timestamp = before.edited_at or after.created_at
                 self.bot.send_embeds(channel, emb)

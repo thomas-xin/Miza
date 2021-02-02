@@ -84,6 +84,8 @@ def get_duration(filename):
                 ctype = [e.strip() for e in head.get("Content-Type", "").split(";") if "/" in e][0]
                 if ctype.split("/", 1)[0] not in ("audio", "video"):
                     return nan
+                if ctype == "audio/midi":
+                    return nan
                 it = resp.iter_content(65536)
                 data = next(it)
             ident = str(magic.from_buffer(data))

@@ -105,6 +105,11 @@ def get_duration(filename):
                 head = fcdict(resp.headers)
                 if "Content-Length" not in head:
                     return _get_duration(filename, 20)
+                ctype = [e.strip() for e in head.get("Content-Type", "").split(";") if "/" in e][0]
+                if ctype.split("/", 1)[0] not in ("audio", "video"):
+                    return nan
+                if ctype == "audio/midi":
+                    return nan
                 it = resp.iter_content(65536)
                 data = next(it)
             ident = str(magic.from_buffer(data))
