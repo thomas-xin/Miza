@@ -1075,7 +1075,10 @@ async def str_lookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)]
 rand_colour = lambda: colour2raw(hue2colour(xrand(12) * 128))
 
 def parse_colour(s, default=None):
-    s = single_space(s.replace("#", "").replace(",", " ")).strip()
+    if s.startswith("0x"):
+        s = s[2:].rstrip()
+    else:
+        s = single_space(s.replace("#", "").replace(",", " ")).strip()
     # Try to parse as colour tuple first
     if not s:
         if default is None:
