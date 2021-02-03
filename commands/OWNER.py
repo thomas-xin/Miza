@@ -414,7 +414,7 @@ class Immortalise(Command):
     description = "Immortalises a targeted webserver URL."
     usage = "<url>"
 
-    async def __call__(self, argv, **void):
+    async def __call__(self, argv, guild, **void):
         url = find_urls(argv)[0]
         if self.bot.is_webserver_url(url):
             spl = url[8:].split("/")
@@ -425,7 +425,7 @@ class Immortalise(Command):
                     path = str(int.from_bytes(base64.urlsafe_b64decode(path.encode("utf-8") + b"==="), "big"))
                 p = find_file(path)
                 fn = urllib.parse.unquote(p.rsplit("/", 1)[-1].split("~", 1)[-1])
-                fid = 0
+                fid = guild.id
                 for fi in os.listdir("cache"):
                     if fi.startswith(f"!{fid}~"):
                         fid += 1
