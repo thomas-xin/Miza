@@ -396,7 +396,7 @@ class UpdateExec(Database):
                     if channel is None:
                         invalid.add(c_id)
                     else:
-                        self.bot.send_as_embeds(channel, msg, colour=(xrand(6) * 256), md=code_md)
+                        self.bot.send_as_embeds(channel, msg, md=code_md)
             [self.data.pop(i) for i in invalid]
 
     def _bot_ready_(self, **void):

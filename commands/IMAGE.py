@@ -136,7 +136,7 @@ class IMG(Command):
         url = choice(sources)
         if "v" in flags:
             return escape_everyone(url)
-        bot.send_as_embeds(channel, image=url, reference=message)
+        bot.send_as_embeds(channel, image=url)
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
         u_id, pos = [int(i) for i in vals.split("_", 1)]
