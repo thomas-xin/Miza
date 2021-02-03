@@ -4184,7 +4184,7 @@ class Download(Command):
         if user.id == u_id or not perm < 3:
             # Make sure reaction is a valid number
             if b"\xef\xb8\x8f\xe2\x83\xa3" in reaction:
-                async with ExceptionSender(channel):
+                with bot.ExceptionSender(channel):
                     # Make sure selected index is valid
                     num = int(as_str(reaction)[0])
                     if num <= int(spl[1]):

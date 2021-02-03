@@ -192,43 +192,6 @@ class TracebackSuppressor(contextlib.AbstractContextManager, contextlib.Abstract
 tracebacksuppressor = TracebackSuppressor()
 
 
-# Sends an exception into the target discord sendable, with the autodelete react.
-send_exception = lambda sendable, ex, reference=None: send_with_react(sendable, exc_repr(ex), reacts="❎", reference=reference)
-
-
-# A context manager that sends exception tracebacks to a sendable.
-class ExceptionSender(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
-
-    def __init__(self, sendable, *args, reference=None, **kwargs):
-        self.sendable = sendable
-        self.reference = reference
-        self.exceptions = args + tuple(kwargs.values())
-
-    def __exit__(self, exc_type, exc_value, exc_tb):
-        if exc_type and exc_value:
-            for exception in self.exceptions:
-                if issubclass(type(exc_value), exception):
-                    create_task(send_exception(self.sendable, exc_value, self.reference))
-                    return True
-            create_task(send_exception(self.sendable, exc_value, self.reference))
-            with tracebacksuppressor:
-                raise exc_value
-        return True
-
-    async def __aexit__(self, exc_type, exc_value, exc_tb):
-        if exc_type and exc_value:
-            for exception in self.exceptions:
-                if issubclass(type(exc_value), exception):
-                    await send_exception(self.sendable, exc_value, self.reference)
-                    return True
-            await send_exception(self.sendable, exc_value, self.reference)
-            with tracebacksuppressor:
-                raise exc_value
-        return True
-
-    __call__ = lambda self, *args, **kwargs: self.__class__(*args, **kwargs)
-
-
 # A context manager that delays the return of a function call.
 class delay(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
 
@@ -2185,7 +2148,6 @@ class Database(collections.abc.MutableMapping, collections.abc.Hashable, collect
 
     __hash__ = lambda self: hash(self.__name__)
     __str__ = lambda self: f"Database <{self.__name__}>"
-    __repr__ = lambda self: repr(self.data)
     __call__ = lambda self: None
     __len__ = lambda self: len(self.data)
     __iter__ = lambda self: iter(self.data)
@@ -2256,7 +2218,7 @@ class ImagePool:
         url = await bot.data.imagepools.get(self.database, self.fetch_one, self.threshold)
         if "v" in flags:
             return escape_everyone(url)
-        self.bot.send_as_embeds(channel, image=url, colour=xrand(1536))
+        self.bot.send_as_embeds(channel, image=url)
 
 
 # Redirects all print operations to target files, limiting the amount of operations that can occur in any given amount of time for efficiency.

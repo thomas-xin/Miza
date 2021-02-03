@@ -25,7 +25,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     heartbeat_ack = "heartbeat_ack.tmp"
     restart = "restart.tmp"
     shutdown = "shutdown.tmp"
-    caches = ("guilds", "channels", "users", "roles", "emojis", "messages", "members", "attachments", "deleted", "banned")
+    caches = ("guilds", "channels", "users", "roles", "emojis", "messages", "members", "attachments", "deleted", "banned", "colours")
     statuses = (discord.Status.online, discord.Status.idle, discord.Status.dnd, discord.Streaming, discord.Status.invisible)
     # Default command prefix
     prefix = AUTH.get("prefix", "~")
@@ -2149,7 +2149,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             self.react_sem[message.id] = max(utc(), self.react_sem.get(message.id, 0) + 1)
             for f in catg:
                 if f.parse_name().casefold() == func:
-                    async with ExceptionSender(message.channel, reference=message):
+                    with self.ExceptionSender(message.channel, reference=message):
                         timeout = getattr(f, "_timeout_", 1) * self.timeout
                         if timeout >= inf:
                             timeout = None
@@ -2556,7 +2556,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         if fut is not None:
                             await fut
                         command.used.pop(u_id, None)
-                        out_fut = create_task(send_exception(channel, ex, message))
+                        out_fut = self.send_exception(channel, ex, message)
                         return remaining
                     # Represents all other errors
                     except Exception as ex:
@@ -2564,7 +2564,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                             await fut
                         command.used.pop(u_id, None)
                         print_exc()
-                        out_fut = create_task(send_exception(channel, ex, message))
+                        out_fut = self.send_exception(channel, ex, message)
                     if out_fut is not None and getattr(message, "simulated", None):
                         await out_fut
             elif getattr(message, "simulated", None):
@@ -2688,7 +2688,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     async def _send_embeds(self, sendable, embeds, reacts=None, reference=None):
         s_id = verify_id(sendable)
         sendable = await self.fetch_messageable(s_id)
-        async with ExceptionSender(sendable, reference=reference):
+        with self.ExceptionSender(sendable, reference=reference):
             if not embeds:
                 return
             guild = getattr(sendable, "guild", None)
@@ -2777,8 +2777,15 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         if fin_col is None:
             if type(colour) is discord.Colour:
                 fin_col = colour
+            elif colour is None:
+                try:
+                    colour = self.cache.colours[channel.id]
+                except KeyError:
+                    colour = 0
+                self.cache.colours[channel.id] = (colour + 1) % 12
+                fin_col = colour2raw(hue2colour(colour * 1536 / 12))
             else:
-                col = 0 if colour is None else colour if not issubclass(type(colour), collections.abc.Sequence) else colour[0]
+                col = colour if not issubclass(type(colour), collections.abc.Sequence) else colour[0]
                 off = 128 if not issubclass(type(colour), collections.abc.Sequence) else colour[1]
                 fin_col = colour2raw(hue2colour(col))
         embs = deque()
@@ -2841,6 +2848,13 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     if col is not None:
                         col += 128
                         emb.colour = colour2raw(hue2colour(col))
+                    else:
+                        try:
+                            colour = self.cache.colours[channel.id]
+                        except KeyError:
+                            colour = 0
+                        self.cache.colours[channel.id] = (colour + 1) % 12
+                        emb.colour = colour2raw(hue2colour(colour * 1536 / 12))
                 emb.add_field(name=n, value=v if v else "\u200b", inline=i)
         if len(emb):
             embs.append(emb)
@@ -2864,6 +2878,13 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         if col is not None:
                             col += 128
                             emb.colour = colour2raw(hue2colour(col))
+                        else:
+                            try:
+                                colour = self.cache.colours[channel.id]
+                            except KeyError:
+                                colour = 0
+                            self.cache.colours[channel.id] = (colour + 1) % 12
+                            emb.colour = colour2raw(hue2colour(colour * 1536 / 12))
                         embs.append(emb)
                     embs[i].set_image(url=img)
                     embs[i].url = img
@@ -3010,7 +3031,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     # Handles a new sent message, calls process_message and sends an error if an exception occurs.
     async def handle_message(self, message, edit=True):
         cpy = msg = message.content
-        async with ExceptionSender(message.channel, reference=message):
+        with self.ExceptionSender(message.channel, reference=message):
             if msg and msg[0] == "\\":
                 cpy = msg[1:]
             await self.process_message(message, cpy, edit, msg)
@@ -3228,7 +3249,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 if k == "channel":
                     return bot.cache.channels.get(int(d["channel_id"]))
                 if k == "guild":
-                    return self.channel.guild
+                    return getattr(self.channel, "guild", None)
                 if k == "author":
                     self.author = bot.get_user(d["author"]["id"], replace=True)
                     guild = getattr(self.channel, "guild", None)
@@ -3285,6 +3306,28 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             popitem = data.popitem
             clear = data.clear
 
+        # A context manager that sends exception tracebacks to a sendable.
+        class ExceptionSender(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
+
+            def __init__(self, sendable, *args, reference=None, **kwargs):
+                self.sendable = sendable
+                self.reference = reference
+                self.exceptions = args + tuple(kwargs.values())
+
+            def __exit__(self, exc_type, exc_value, exc_tb):
+                if exc_type and exc_value:
+                    for exception in self.exceptions:
+                        if issubclass(type(exc_value), exception):
+                            bot.send_exception(self.sendable, exc_value, self.reference)
+                            return True
+                    bot.send_exception(self.sendable, exc_value, self.reference)
+                    with tracebacksuppressor:
+                        raise exc_value
+                return True
+            
+            __aexit__ = lambda self, *args: as_fut(self.__exit__(*args))
+            __call__ = lambda self, *args, **kwargs: self.__class__(*args, **kwargs)
+
 
         bot.UserGuild = UserGuild
         bot.GhostUser = GhostUser
@@ -3293,6 +3336,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         bot.LoadedMessage = LoadedMessage
         bot.CachedMessage = CachedMessage
         bot.MessageCache = MessageCache
+        bot.ExceptionSender = ExceptionSender
 
     def monkey_patch(self):
         bot = self
@@ -3333,6 +3377,14 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             create_task(self.reaction_add())
 
         discord.state.ConnectionState.parse_message_reaction_add = lambda self, data: parse_message_reaction_add(self, data)
+
+    def send_exception(self, messageable, ex, reference=None):
+        return self.send_as_embeds(
+            messageable,
+            description="\n".join(as_str(i) for i in ex.args),
+            title=f"⚠ {type(ex).__name__} ⚠",
+            fields=(("Unexpected or confusing error?", f"Message {self.get_user(next(iter(self.owners))).mention}, or join the [support server]({self.rcc_invite})!"),),
+        )
 
     async def reaction_add(self):
         try:

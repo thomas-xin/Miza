@@ -375,7 +375,7 @@ class Avatar(Command):
         iterator = argl if argl else (argv,)
         embs = set()
         for argv in iterator:
-            async with ExceptionSender(channel):
+            with self.bot.ExceptionSender(channel):
                 with suppress(StopIteration):
                     if argv:
                         if is_url(argv) or argv.startswith("discord.gg/"):
@@ -509,7 +509,7 @@ class Info(Command):
         iterator = argl if argl else (argv,)
         embs = set()
         for argv in iterator:
-            with ExceptionSender(channel):
+            with self.bot.ExceptionSender(channel):
                 with suppress(StopIteration):
                     if argv:
                         if is_url(argv) or argv.startswith("discord.gg/"):
@@ -832,7 +832,7 @@ class Insights(Command):
         iterator = argl if argl else (argv,)
         embs = set()
         for argv in iterator:
-            with ExceptionSender(channel):
+            with self.bot.ExceptionSender(channel):
                 with suppress(StopIteration):
                     if argv:
                         if is_url(argv) or argv.startswith("discord.gg/"):

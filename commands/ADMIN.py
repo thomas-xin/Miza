@@ -192,12 +192,12 @@ class Mute(Command):
             p = bot.get_perms(user, guild)
             if not p < 0 and not is_finite(p):
                 ex = PermissionError(f"{user} has infinite permission level, and cannot be muted in this server.")
-                await send_exception(channel, ex)
+                bot.send_exception(channel, ex)
                 continue
             elif not p + 1 <= perm and not isnan(perm):
                 reason = "to mute " + str(user) + " in " + guild.name
                 ex = self.perm_error(perm, p + 1, reason)
-                await send_exception(channel, ex)
+                bot.send_exception(channel, ex)
                 continue
             if _op is not None:
                 try:
@@ -233,7 +233,7 @@ class Mute(Command):
         for m in glob:
             u = m.user
             if user.id == u.id:
-                async with ExceptionSender(channel):
+                with bot.ExceptionSender(channel):
                     mute = mutes[u.id]
                     # Remove from global schedule, then sort and re-add
                     with suppress(LookupError):
@@ -248,7 +248,7 @@ class Mute(Command):
                     msg = css_md(f"Updated mute for {sqr_md(user)} from {sqr_md(time_until(mute['t']))} to {sqr_md(time_until(ts + length))}.")
                     await channel.send(msg)
                 return
-        async with ExceptionSender(channel):
+        with bot.ExceptionSender(channel):
             role = await self.bot.data.muteroles.get(guild)
             member = guild.get_member(user.id)
             if member is None:
@@ -417,12 +417,12 @@ class Ban(Command):
             p = bot.get_perms(user, guild)
             if not p < 0 and not is_finite(p):
                 ex = PermissionError(f"{user} has infinite permission level, and cannot be banned from this server.")
-                await send_exception(channel, ex)
+                bot.send_exception(channel, ex)
                 continue
             elif not p + 1 <= perm and not isnan(perm):
                 reason = "to ban " + str(user) + " from " + guild.name
                 ex = self.perm_error(perm, p + 1, reason)
-                await send_exception(channel, ex)
+                bot.send_exception(channel, ex)
                 continue
             if _op is not None:
                 try:
@@ -457,7 +457,7 @@ class Ban(Command):
         for b in glob:
             u = b.user
             if user.id == u.id:
-                async with ExceptionSender(channel):
+                with bot.ExceptionSender(channel):
                     ban = bans[u.id]
                     # Remove from global schedule, then sort and re-add
                     with suppress(LookupError):
@@ -473,7 +473,7 @@ class Ban(Command):
                     msg = css_md(f"Updated ban for {sqr_md(user)} from {sqr_md(time_until(ban['t']))} to {sqr_md(time_until(ts + length))}.")
                     await channel.send(msg)
                 return
-        async with ExceptionSender(channel):
+        with bot.ExceptionSender(channel):
             await bot.verified_ban(user, guild, reason)
             with suppress(LookupError):
                 banlist.remove(user.id, key=lambda x: x["u"])
@@ -768,11 +768,11 @@ class Lockdown(Command):
         perm = role.permissions
         perm.administrator = False
         perm.send_messages = False
-        async with ExceptionSender(channel):
+        with self.bot.ExceptionSender(channel):
             await role.edit(permissions=perm, reason="Server Lockdown.")
 
     async def invLock(self, inv, channel):
-        async with ExceptionSender(channel):
+        with self.bot.ExceptionSender(channel):
             await inv.delete(reason="Server Lockdown.")
 
     async def __call__(self, guild, channel, flags, **void):
@@ -2050,7 +2050,7 @@ class UpdatePublishers(Database):
                 if "invalid message type" not in repr(ex).lower():
                     self.data.pop(message.channel.id, None)
                     print_exc()
-                    await send_exception(message.channel, ex)
+                    bot.send_exception(message.channel, ex)
 
 
 class UpdateCrossposts(Database):
@@ -2150,7 +2150,7 @@ class UpdateRolegivers(Database):
                         continue
                     if role in user.roles:
                         continue
-                    async with ExceptionSender(message.channel):
+                    with bot.ExceptionSender(message.channel):
                         await user.add_roles(
                             role,
                             reason=f'Keyword "{k}" found in message "{message.content}".',
