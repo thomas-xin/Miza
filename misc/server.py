@@ -64,20 +64,6 @@ TZCACHE = {}
 RESPONSES = {}
 
 
-def find_file(path):
-    # if no file name is inputted, return no content
-    if not path:
-        raise EOFError
-    # do not include "." in the path name
-    path = path.rsplit(".", 1)[0]
-    fn = f"{IND}{path}"
-    for file in reversed(os.listdir("cache")):
-        # file cache is stored as "{timestamp}~{name}", search for file via timestamp
-        if file.rsplit(".", 1)[0].split("~", 1)[0] == fn:
-            return os.getcwd() + "/cache/" + file
-    raise FileNotFoundError(path)
-
-
 PREVIEW = {}
 prev_date = utc_dt().date()
 
@@ -93,9 +79,13 @@ prev_date = utc_dt().date()
 @app.route("/download/<path>/<path:filename>", methods=["GET"])
 def get_file(path, filename=None):
     orig_path = path
+    ind = IND
     if path.startswith("~"):
         path = str(int.from_bytes(base64.urlsafe_b64decode(path.encode("utf-8") + b"==="), "big"))
-    p = find_file(path)
+    elif path.startswith("!"):
+        ind = "!"
+        path = path[1:]
+    p = find_file(path, ind=ind)
     endpoint = flask.request.path[1:].split("/", 1)[0]
     down = flask.request.args.get("download", "false")
     download = down and down[0] not in "0fFnN" or endpoint == "download"

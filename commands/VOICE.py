@@ -1489,20 +1489,6 @@ class AudioDownloader:
                 orig_path = path
                 if path.startswith("~"):
                     path = str(int.from_bytes(base64.urlsafe_b64decode(path.encode("utf-8") + b"==="), "big"))
-
-                def find_file(path):
-                    # if no file name is inputted, return no content
-                    if not path:
-                        raise EOFError
-                    # do not include "." in the path name
-                    path = path.rsplit(".", 1)[0]
-                    fn = f"\x7f{path}"
-                    for file in reversed(os.listdir("cache")):
-                        # file cache is stored as "{timestamp}~{name}", search for file via timestamp
-                        if file.rsplit(".", 1)[0].split("~", 1)[0] == fn:
-                            return "cache/" + file
-                    raise FileNotFoundError(path)
-
                 p = find_file(path)
                 fn = urllib.parse.unquote(p.rsplit("/", 1)[-1].split("~", 1)[-1])
                 url = self.bot.raw_webserver + "/files/" + orig_path
@@ -1553,20 +1539,6 @@ class AudioDownloader:
                 orig_path = path
                 if path.startswith("~"):
                     path = str(int.from_bytes(base64.urlsafe_b64decode(path.encode("utf-8") + b"==="), "big"))
-
-                def find_file(path):
-                    # if no file name is inputted, return no content
-                    if not path:
-                        raise EOFError
-                    # do not include "." in the path name
-                    path = path.rsplit(".", 1)[0]
-                    fn = f"\x7f{path}"
-                    for file in reversed(os.listdir("cache")):
-                        # file cache is stored as "{timestamp}~{name}", search for file via timestamp
-                        if file.rsplit(".", 1)[0].split("~", 1)[0] == fn:
-                            return "cache/" + file
-                    raise FileNotFoundError(path)
-
                 p = find_file(path)
                 fn = urllib.parse.unquote(p.rsplit("/", 1)[-1].split("~", 1)[-1])
                 url = self.bot.raw_webserver + "/files/" + orig_path
@@ -1963,7 +1935,7 @@ class AudioDownloader:
         icon = entry.get("icon", None)
         # Use SHA-256 hash of URL to avoid filename conflicts
         h = shash(entry["url"])
-        fn = h + ".opus"
+        fn = "~" + h + ".opus"
         # Use cached file if one already exists
         if self.cache.get(fn) or not download:
             if video:
@@ -4395,7 +4367,7 @@ class UpdateAudio(Database):
             await asyncio.sleep(0.5)
         await wrap_future(bot.audio.fut)
         for file in os.listdir("cache"):
-            if file.endswith(".opus") and file[0] != "\x7f" and file not in ytdl.cache:
+            if file.startswith("~") and file not in ytdl.cache:
                 print("reinstating audio file", file)
                 ytdl.cache[file] = f = await create_future(AudioFileLink, file, "cache/" + file, wasfile=True)
         for k, v in self.data.items():

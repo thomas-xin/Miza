@@ -2016,7 +2016,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     def clear_cache(self):
         i = 0
         for f in os.listdir("cache"):
-            if f.startswith("\x7f") or f.startswith("attachment_") or f.startswith("emoji_") or f.endswith(".opus"):
+            if f[0] in "\x7f~!" or f.startswith("attachment_") or f.startswith("emoji_"):
                 pass
             else:
                 i += 1

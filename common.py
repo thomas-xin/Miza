@@ -1570,6 +1570,20 @@ def exec_tb(s, *args, **kwargs):
         exec(s, *args, **kwargs)
 
 
+def find_file(path, cwd="cache", ind="\x7f"):
+    # if no file name is inputted, return no content
+    if not path:
+        raise EOFError
+    # do not include "." in the path name
+    path = path.rsplit(".", 1)[0]
+    fn = f"{ind}{path}"
+    for file in reversed(os.listdir(cwd)):
+        # file cache is stored as "{timestamp}~{name}", search for file via timestamp
+        if file.rsplit(".", 1)[0].split("~", 1)[0] == fn:
+            return os.getcwd() + "/" + cwd + "/" + file
+    raise FileNotFoundError(path)
+
+
 class open2(io.IOBase):
 
     __slots__ = ("fp", "fn", "mode")

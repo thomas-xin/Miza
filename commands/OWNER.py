@@ -408,6 +408,33 @@ class UpdateExec(Database):
             PRINT.funcs.remove(self._log_)
 
 
+class Immortalise(Command):
+    name = ["Immortalize"]
+    min_level = nan
+    description = "Immortalises a targeted webserver URL."
+    usage = "<url>"
+
+    async def __call__(self, argv, **void):
+        url = find_urls(argv)[0]
+        if self.bot.is_webserver_url(url):
+            spl = url[8:].split("/")
+            if spl[1] in ("preview", "view", "file", "files", "download"):
+                path = spl[2]
+                orig_path = path
+                if path.startswith("~"):
+                    path = str(int.from_bytes(base64.urlsafe_b64decode(path.encode("utf-8") + b"==="), "big"))
+                p = find_file(path)
+                fn = urllib.parse.unquote(p.rsplit("/", 1)[-1].split("~", 1)[-1])
+                fid = 0
+                for fi in os.listdir("cache"):
+                    if fi.startswith(f"!{fid}~"):
+                        fid += 1
+                out = f"cache/!{fid}~{fn}"
+                await create_future(os.rename, p, out, priority=True)
+                return f"{self.bot.webserver}/view/!{fid}\n{self.bot.webserver}/download/!{fid}"
+        raise TypeError("Not a valid webserver URL.")
+
+
 class DownloadServer(Command):
     name = ["SaveServer", "ServerDownload"]
     min_level = nan
