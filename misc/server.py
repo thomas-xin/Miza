@@ -55,7 +55,7 @@ def on_error(ex):
 
 
 def create_etag(data):
-    s = str(ihash(data[:128] + data[-128:]) % 4294967296)
+    s = str(ihash(data[:128] + data[-128:]) + len(data) & 4294967295)
     return '"' + "0" * (10 - len(s)) + s + '"'
 
 
@@ -128,7 +128,7 @@ def get_file(path, filename=None):
                     proc.wait()
                 PREVIEW[path] = p2
                 p = p3
-    resp = flask.send_file(p, as_attachment=download, attachment_filename=filename or fn, mimetype=mime)
+    resp = flask.send_file(p, as_attachment=download, attachment_filename=filename or fn, mimetype=mime, conditional=True)
     resp.headers.update(CHEADERS)
     return resp
 
