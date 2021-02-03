@@ -2781,7 +2781,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 try:
                     colour = self.cache.colours[channel.id]
                 except KeyError:
-                    colour = 0
+                    colour = xrand(12)
                 self.cache.colours[channel.id] = (colour + 1) % 12
                 fin_col = colour2raw(hue2colour(colour * 1536 / 12))
             else:
@@ -2852,7 +2852,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         try:
                             colour = self.cache.colours[channel.id]
                         except KeyError:
-                            colour = 0
+                            colour = xrand(12)
                         self.cache.colours[channel.id] = (colour + 1) % 12
                         emb.colour = colour2raw(hue2colour(colour * 1536 / 12))
                 emb.add_field(name=n, value=v if v else "\u200b", inline=i)
@@ -2882,7 +2882,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                             try:
                                 colour = self.cache.colours[channel.id]
                             except KeyError:
-                                colour = 0
+                                colour = xrand(12)
                             self.cache.colours[channel.id] = (colour + 1) % 12
                             emb.colour = colour2raw(hue2colour(colour * 1536 / 12))
                         embs.append(emb)

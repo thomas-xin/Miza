@@ -779,7 +779,7 @@ class Wallet(Command):
             xp = floor(xp)
             bal = await bot.as_rewards(diamonds, gold)
             description = f"{bar}\n`Lv {level}`\n`XP {xp}/{xp_next}`\n{bal}"
-            bot.send_as_embeds(channel, description, thumbnail=best_url(user), author=get_author(user), colour=xrand(1536))
+            bot.send_as_embeds(channel, description, thumbnail=best_url(user), author=get_author(user))
 
     join_cache = {}
 
@@ -1356,4 +1356,4 @@ class _8Ball(ImagePool, Command):
         url = f"https://cdn.nekos.life/8ball/{e_id}.png"
         if "v" in flags:
             return escape_everyone(url)
-        self.bot.send_as_embeds(channel, image=url, colour=xrand(1536))
+        self.bot.send_as_embeds(channel, image=url)
