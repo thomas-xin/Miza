@@ -1668,7 +1668,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     r = [False]
                 else:
                     try:
-                        r = [mpf(f)]
+                        r = [round_min(mpf(f))]
                     except:
                         r = [ast.literal_eval(f)]
         except (ValueError, TypeError, SyntaxError):

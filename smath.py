@@ -2143,6 +2143,10 @@ def round_min(x):
             y = math.round(x)
             if x == y:
                 return int(y)
+            if type(x) is mpf:
+                f = float(x)
+                if str(x) == str(f):
+                    return f
         return x
     else:
         if x.imag == 0:
