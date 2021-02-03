@@ -1659,18 +1659,18 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         f = expr.strip()
         try:
             if not f:
-                r = [0]
+                return 0
             else:
                 s = f.casefold()
-                if s in ("t", "true", "y", "yes", "on"):
-                    r = [True]
-                elif s in ("f", "false", "n", "no", "off"):
-                    r = [False]
+                if len(s) < 5 and s in ("t", "true", "y", "yes", "on"):
+                    return True
+                elif len(s) < 6 and s in ("f", "false", "n", "no", "off"):
+                    return False
                 else:
                     try:
-                        r = [round_min(mpf(f))]
+                        return round_min(mpf(f))
                     except:
-                        r = [ast.literal_eval(f)]
+                        return ast.literal_eval(f)
         except (ValueError, TypeError, SyntaxError):
             r = await self.solve_math(f, 128, 0)
         x = r[0]
@@ -1681,6 +1681,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 x = tuple(x)[0]
         if type(x) is str and x.isnumeric():
             return int(x)
+        if type(x) is float:
+            return x
         x = round_min(mpf(x))
         if type(x) is not int and len(str(x)) <= 16:
             return float(x)

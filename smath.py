@@ -2143,7 +2143,7 @@ def round_min(x):
             if type(x) is mpf:
                 y = int(x)
                 if x == y:
-                    return int(y)
+                    return y
                 f = float(x)
                 if str(x) == str(f):
                     return f
