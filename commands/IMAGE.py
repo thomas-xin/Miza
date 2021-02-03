@@ -1370,6 +1370,15 @@ class XKCD(ImagePool, Command):
         return url
 
 
+class Inspiro(ImagePool, Command):
+    name = ["InspiroBot"]
+    description = "Pulls a random image from inspirobot.me and embeds it."
+    database = "inspirobot"
+
+    def fetch_one(self):
+        return Request("https://inspirobot.me/api?generate=true", decode=True, aio=True)
+
+
 class UpdateImagePools(Database):
     name = "imagepools"
     loading = {}
@@ -1387,6 +1396,7 @@ class UpdateImagePools(Database):
                     if type(out) is str:
                         out = (out,)
                     for url in out:
+                        url = url.strip()
                         if url not in data:
                             if i & 1:
                                 data.appendleft(url)
@@ -1402,6 +1412,7 @@ class UpdateImagePools(Database):
             if type(out) is str:
                 out = (out,)
             for url in out:
+                url = url.strip()
                 if url not in data:
                     data.add(url)
                     self.update(key)
@@ -1417,6 +1428,7 @@ class UpdateImagePools(Database):
             if type(out) is str:
                 out = (out,)
             for url in out:
+                url = url.strip()
                 if url not in data:
                     data.add(url)
                     self.update(key)
