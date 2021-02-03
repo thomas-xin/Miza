@@ -1487,9 +1487,13 @@ class AudioDownloader:
             if spl[1] in ("preview", "view", "file", "files", "download"):
                 path = spl[2]
                 orig_path = path
+                ind = "\x7f"
                 if path.startswith("~"):
                     path = str(int.from_bytes(base64.urlsafe_b64decode(path.encode("utf-8") + b"==="), "big"))
-                p = find_file(path)
+                elif path.startswith("!"):
+                    ind = "!"
+                    path = path[1:]
+                p = find_file(path, ind=ind)
                 fn = urllib.parse.unquote(p.rsplit("/", 1)[-1].split("~", 1)[-1])
                 url = self.bot.raw_webserver + "/files/" + orig_path
                 return dict(url=url, name=fn, direct=True)
@@ -1537,9 +1541,13 @@ class AudioDownloader:
                 url2 = url
                 path = spl[2]
                 orig_path = path
+                ind = "\x7f"
                 if path.startswith("~"):
                     path = str(int.from_bytes(base64.urlsafe_b64decode(path.encode("utf-8") + b"==="), "big"))
-                p = find_file(path)
+                elif path.startswith("!"):
+                    ind = "!"
+                    path = path[1:]
+                p = find_file(path, ind=ind)
                 fn = urllib.parse.unquote(p.rsplit("/", 1)[-1].split("~", 1)[-1])
                 url = self.bot.raw_webserver + "/files/" + orig_path
                 return dict(url=url, webpage_url=url2, title=fn, direct=True)
