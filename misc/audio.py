@@ -80,7 +80,7 @@ def _get_duration(filename, _timeout=12):
         "-select_streams",
         "a:0",
         "-show_entries",
-        "stream=duration,bitrate",
+        "stream=duration,bit_rate",
         "-of",
         "default=nokey=1:noprint_wrappers=1",
         filename,
@@ -114,6 +114,7 @@ def get_duration(filename):
                 if "Content-Length" not in head:
                     return _get_duration(filename, 20)[0]
                 if bps:
+                    print(head, bps, sep="\n")
                     return (int(head["Content-Length"]) << 3) / bps
                 ctype = [e.strip() for e in head.get("Content-Type", "").split(";") if "/" in e][0]
                 if ctype.split("/", 1)[0] not in ("audio", "video"):
