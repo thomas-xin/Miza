@@ -2102,22 +2102,30 @@ class UpdateStarboards(Database):
         if "triggered" not in self.data:
             self.data["triggered"] = set()
 
-    async def _reaction_add_(self, message, react, count, **void):
+    async def _reaction_add_(self, message, react, **void):
         if message.guild and message.guild.id in self.data:
             req = self.data[message.guild.id].get(react, (inf,))[0]
-            # print(react, count, req)
-            if count >= req and count < req + 2:
-                if message.id not in self.data["triggered"]:
-                    self.data["triggered"].add(message.id)
-                    with tracebacksuppressor(RuntimeError, KeyError):
-                        while len(self.data["triggered"]) > 4096:
-                            self.data["triggered"].discard(next(iter(self.data["triggered"])))
-                    with tracebacksuppressor:
-                        embed = as_embed(message)
-                        col = await self.bot.get_colour(message.author)
-                        embed.colour = discord.Colour(col)
-                        data = ("#" + str(message.channel), to_png(message.guild.icon_url))
-                        self.bot.data.crossposts.stack.setdefault(self.data[message.guild.id][react][1], {}).setdefault(data, alist()).append(embed)
+            if req < inf:
+                count = 1
+                if req >= 1:
+                    message = await message.channel.fetch_message(message.id)
+                    self.bot.add_message(message, files=False)
+                    for r in message.reactions:
+                        if str(r.emoji) == react:
+                            count = r.count
+                print(react, count, req)
+                if count >= req and count < req + 2:
+                    if message.id not in self.data["triggered"]:
+                        self.data["triggered"].add(message.id)
+                        with tracebacksuppressor(RuntimeError, KeyError):
+                            while len(self.data["triggered"]) > 4096:
+                                self.data["triggered"].discard(next(iter(self.data["triggered"])))
+                        with tracebacksuppressor:
+                            embed = as_embed(message)
+                            col = await self.bot.get_colour(message.author)
+                            embed.colour = discord.Colour(col)
+                            data = ("#" + str(message.channel), to_png(message.guild.icon_url))
+                            self.bot.data.crossposts.stack.setdefault(self.data[message.guild.id][react][1], {}).setdefault(data, alist()).append(embed)
 
 
 class UpdateRolegivers(Database):

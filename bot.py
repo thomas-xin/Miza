@@ -3508,12 +3508,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 if "dailies" in self.data:
                     self.data.dailies.progress_quests(user, "react")
                 reaction = str(emoji)
-                count = 1
-                for react in message.reactions:
-                    if str(react.emoji) == reaction:
-                        count = react.count
-                        break
-                await self.send_event("_reaction_add_", message=message, react=reaction, count=count)
+                await self.send_event("_reaction_add_", message=message, react=reaction)
                 await self.react_callback(message, reaction, user)
                 await self.check_to_delete(message, reaction, user)
 

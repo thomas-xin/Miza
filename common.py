@@ -986,9 +986,13 @@ def as_embed(message):
         if len(emb.fields) >= 25:
             break
         if not emb.description or emb.description == EmptyEmbed:
-            emb.title = e.title or e.url or EmptyEmbed
-            emb.url = e.url or EmptyEmbed
-            emb.description = e.description or e.url or EmptyEmbed
+            title = e.title or e.url or ""
+            if title:
+                emb.title = title
+            emb.url = e.url or ""
+            description = e.description or e.url or ""
+            if description:
+                emb.description = description
         else:
             emb.add_field(name=e.title or e.url or "\u200b", value=lim_str(e.description, 1024) or e.url or "\u200b", inline=False)
         for f in e.fields:
