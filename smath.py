@@ -2140,13 +2140,17 @@ def round_min(x):
         return x
     if type(x) is not complex:
         if is_finite(x):
-            y = math.round(x)
-            if x == y:
-                return int(y)
             if type(x) is mpf:
+                y = int(x)
+                if x == y:
+                    return int(y)
                 f = float(x)
                 if str(x) == str(f):
                     return f
+            else:
+                y = math.round(x)
+                if x == y:
+                    return int(y)
         return x
     else:
         if x.imag == 0:
