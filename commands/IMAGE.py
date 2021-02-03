@@ -338,7 +338,7 @@ class CreateEmoji(Command):
                     if not urls:
                         urls = await bot.follow_to_image(url)
                         if not urls:
-                            raise ArgumentError("Please input an image by URL or attachment.")
+                            raise ArgumentError
                 url = urls[0]
             except ArgumentError:
                 if not argv:
@@ -347,6 +347,8 @@ class CreateEmoji(Command):
                         url = await bot.get_last_image(message.channel)
                     except FileNotFoundError:
                         raise ArgumentError("Please input an image by URL or attachment.")
+                else:
+                    raise ArgumentError("Please input an image by URL or attachment.")
             name = " ".join(args).strip()
             if not name:
                 name = "emoji_" + str(len(guild.emojis))
@@ -388,7 +390,7 @@ async def get_image(bot, user, message, args, argv, default=2, ext="png"):
             args = [best_url(a) for a in message.attachments] + args
             argv = " ".join(best_url(a) for a in message.attachments) + " " * bool(argv) + argv
         if not args:
-            raise ArgumentError("Please input an image by URL or attachment.")
+            raise ArgumentError
         url = args.pop(0)
         urls = await bot.follow_url(url, best=True, allow=True, limit=1)
         if not urls:
@@ -396,7 +398,7 @@ async def get_image(bot, user, message, args, argv, default=2, ext="png"):
             if not urls:
                 urls = await bot.follow_to_image(url)
                 if not urls:
-                    raise ArgumentError("Please input an image by URL or attachment.")
+                    raise ArgumentError
         url = urls[0]
     except ArgumentError:
         if not argv:
@@ -405,6 +407,8 @@ async def get_image(bot, user, message, args, argv, default=2, ext="png"):
                 url = await bot.get_last_image(message.channel)
             except FileNotFoundError:
                 raise ArgumentError("Please input an image by URL or attachment.")
+        else:
+            raise ArgumentError("Please input an image by URL or attachment.")
     value = " ".join(args).strip()
     if not value:
         value = default
@@ -575,7 +579,7 @@ class ColourDeficiency(Command):
             argv = " ".join(best_url(a) for a in message.attachments) + " " * bool(argv) + argv
         try:
             if not args:
-                raise ArgumentError("Please input an image by URL or attachment.")
+                raise ArgumentError
             url = args.pop(0)
             urls = await bot.follow_url(url, best=True, allow=True, limit=1)
             if not urls:
@@ -583,7 +587,7 @@ class ColourDeficiency(Command):
                 if not urls:
                     urls = await bot.follow_to_image(url)
                     if not urls:
-                        raise ArgumentError("Please input an image by URL or attachment.")
+                        raise ArgumentError
             url = urls[0]
         except ArgumentError:
             if not argv:
@@ -592,6 +596,8 @@ class ColourDeficiency(Command):
                     url = await bot.get_last_image(message.channel)
                 except FileNotFoundError:
                     raise ArgumentError("Please input an image by URL or attachment.")
+            else:
+                raise ArgumentError("Please input an image by URL or attachment.")
         if "color" not in name and "colour" not in name:
             operation = name
         elif args:
@@ -644,7 +650,7 @@ class RemoveMatte(Command):
             argv = " ".join(best_url(a) for a in message.attachments) + " " * bool(argv) + argv
         try:
             if not args:
-                raise ArgumentError("Please input an image by URL or attachment.")
+                raise ArgumentError
             url = args.pop(0)
             urls = await bot.follow_url(url, best=True, allow=True, limit=1)
             if not urls:
@@ -652,7 +658,7 @@ class RemoveMatte(Command):
                 if not urls:
                     urls = await bot.follow_to_image(url)
                     if not urls:
-                        raise ArgumentError("Please input an image by URL or attachment.")
+                        raise ArgumentError
             url = urls[0]
         except ArgumentError:
             if not argv:
@@ -661,6 +667,8 @@ class RemoveMatte(Command):
                     url = await bot.get_last_image(message.channel)
                 except FileNotFoundError:
                     raise ArgumentError("Please input an image by URL or attachment.")
+            else:
+                raise ArgumentError("Please input an image by URL or attachment.")
         colour = parse_colour(" ".join(args), default=(255,) * 3)
         # Try and find a good name for the output image
         try:
@@ -809,7 +817,7 @@ class Average(Command):
             argv = " ".join(worst_url(a) for a in message.attachments) + " " * bool(argv) + argv
         try:
             if not args:
-                raise ArgumentError("Please input an image by URL or attachment.")
+                raise ArgumentError
             url = args.pop(0)
             urls = await bot.follow_url(url, best=True, allow=True, limit=1)
             if not urls:
@@ -817,7 +825,7 @@ class Average(Command):
                 if not urls:
                     urls = await bot.follow_to_image(url)
                     if not urls:
-                        raise ArgumentError("Please input an image by URL or attachment.")
+                        raise ArgumentError
             url = urls[0]
         except ArgumentError:
             if not argv:
@@ -826,6 +834,8 @@ class Average(Command):
                     url = await bot.get_last_image(message.channel)
                 except FileNotFoundError:
                     raise ArgumentError("Please input an image by URL or attachment.")
+            else:
+                raise ArgumentError("Please input an image by URL or attachment.")
         with discord.context_managers.Typing(channel):
             colour = await bot.data.colours.get(url, threshold=False)
             channels = raw2colour(colour)
@@ -881,7 +891,7 @@ class Scroll(Command):
                 args = [best_url(a) for a in message.attachments] + args
                 argv = " ".join(best_url(a) for a in message.attachments) + " " * bool(argv) + argv
             if not args:
-                raise ArgumentError("Please input an image by URL or attachment.")
+                raise ArgumentError
             url = args.pop(0)
             urls = await bot.follow_url(url, best=True, allow=True, limit=1)
             if not urls:
@@ -889,7 +899,7 @@ class Scroll(Command):
                 if not urls:
                     urls = await bot.follow_to_image(url)
                     if not urls:
-                        raise ArgumentError("Please input an image by URL or attachment.")
+                        raise ArgumentError
             url = urls[0]
         except ArgumentError:
             if not argv:
@@ -898,6 +908,8 @@ class Scroll(Command):
                     url = await bot.get_last_image(message.channel)
                 except FileNotFoundError:
                     raise ArgumentError("Please input an image by URL or attachment.")
+            else:
+                raise ArgumentError("Please input an image by URL or attachment.")
         if args:
             direction = args.pop(0)
         else:
@@ -1000,7 +1012,7 @@ class CreateGIF(Command):
             args += [best_url(a) for a in message.attachments]
         try:
             if not args:
-                raise ArgumentError("Please input images by URL or attachment.")
+                raise ArgumentError
         except ArgumentError:
             if not args:
                 url = None
@@ -1008,6 +1020,8 @@ class CreateGIF(Command):
                     url = await bot.get_last_image(message.channel)
                 except FileNotFoundError:
                     raise ArgumentError("Please input an image by URL or attachment.")
+            else:
+                raise ArgumentError("Please input an image by URL or attachment.")
         if "r" in flags:
             fr = args.pop(-1)
             rate = await bot.eval_math(fr)
@@ -1072,7 +1086,7 @@ class Resize(Command):
                     if not urls:
                         urls = await bot.follow_to_image(url)
                         if not urls:
-                            raise ArgumentError("Please input an image by URL or attachment.")
+                            raise ArgumentError
                 url = urls[0]
             except ArgumentError:
                 if not argv:
@@ -1081,6 +1095,8 @@ class Resize(Command):
                         url = await bot.get_last_image(message.channel)
                     except FileNotFoundError:
                         raise ArgumentError("Please input an image by URL or attachment.")
+                else:
+                    raise ArgumentError("Please input an image by URL or attachment.")
             value = " ".join(args).strip()
             if not value:
                 x = y = 0.5
@@ -1142,7 +1158,7 @@ class Fill(Command):
             argv = " ".join(best_url(a) for a in message.attachments) + " " * bool(argv) + argv
         try:
             if not args:
-                raise ArgumentError("Please input an image by URL or attachment.")
+                raise ArgumentError
             url = args.pop(0)
             urls = await bot.follow_url(url, best=True, allow=True, limit=1)
             if not urls:
@@ -1150,7 +1166,7 @@ class Fill(Command):
                 if not urls:
                     urls = await bot.follow_to_image(url)
                     if not urls:
-                        raise ArgumentError("Please input an image by URL or attachment.")
+                        raise ArgumentError
             url = urls[0]
         except ArgumentError:
             if not argv:
@@ -1159,6 +1175,8 @@ class Fill(Command):
                     url = await bot.get_last_image(message.channel)
                 except FileNotFoundError:
                     raise ArgumentError("Please input an image by URL or attachment.")
+            else:
+                raise ArgumentError("Please input an image by URL or attachment.")
         with discord.context_managers.Typing(channel):
             if is_numeric(args[-1]):
                 value = await bot.eval_math(args.pop(-1))
