@@ -80,7 +80,7 @@ def _get_duration(filename, _timeout=12):
         "-select_streams",
         "a:0",
         "-show_entries",
-        "stream=duration",
+        "stream=duration,bitrate",
         "-of",
         "default=nokey=1:noprint_wrappers=1",
         filename,
@@ -90,21 +90,31 @@ def _get_duration(filename, _timeout=12):
         proc = psutil.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
         fut = create_future_ex(proc.wait, timeout=_timeout)
         res = fut.result(timeout=_timeout)
-        resp = float(proc.stdout.read())
+        resp = proc.stdout.read().split()
     except:
         with suppress():
             proc.kill()
         print_exc()
-    return resp
+    try:
+        dur = float(resp[0])
+    except ValueError:
+        dur = None
+    bps = None
+    if len(resp) > 1:
+        with suppress(ValueError):
+            bps = float(resp[1])
+    return dur, bps
 
 def get_duration(filename):
     if filename:
-        dur = _get_duration(filename, 4)
+        dur, bps = _get_duration(filename, 4)
         if not dur and is_url(filename):
             with requests.get(filename, headers=Request.header(), stream=True) as resp:
                 head = fcdict(resp.headers)
                 if "Content-Length" not in head:
-                    return _get_duration(filename, 20)
+                    return _get_duration(filename, 20)[0]
+                if bps:
+                    return (int(head["Content-Length"]) << 3) / bps
                 ctype = [e.strip() for e in head.get("Content-Type", "").split(";") if "/" in e][0]
                 if ctype.split("/", 1)[0] not in ("audio", "video"):
                     return nan
@@ -117,7 +127,7 @@ def get_duration(filename):
             try:
                 bitrate = regexp("[0-9]+\\s.bps").findall(ident)[0].casefold()
             except IndexError:
-                return _get_duration(filename, 16)
+                return _get_duration(filename, 16)[0]
             bps, key = bitrate.split(None, 1)
             bps = float(bps)
             if key.startswith("k"):
