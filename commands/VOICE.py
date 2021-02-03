@@ -133,7 +133,8 @@ def get_best_icon(entry):
             if not is_image(url):
                 return "https://cdn.discordapp.com/embed/avatars/0.png"
         if ytdl.bot.is_webserver_url(url):
-            return ytdl.bot.webserver + "/static/sky-rainbow.gif"
+            return ytdl.bot.raw_github + "/master/misc/sky-rainbow.gif"
+            # return ytdl.bot.webserver + "/static/sky-rainbow.gif"
         return url
     return sorted(thumbnails, key=lambda x: float(x.get("width", x.get("preference", 0) * 4096)), reverse=True)[0]["url"]
 
@@ -1480,6 +1481,31 @@ class AudioDownloader:
             if "." in title:
                 title = title[:title.rindex(".")]
             return dict(url=url, name=title, direct=True)
+        if self.bot.is_webserver_url(url):
+            spl = url[8:].split("/")
+            if spl[1] in ("preview", "view", "file", "files", "download"):
+                path = spl[2]
+                orig_path = path
+                if path.startswith("~"):
+                    path = str(int.from_bytes(base64.urlsafe_b64decode(path.encode("utf-8") + b"==="), "big"))
+
+                def find_file(path):
+                    # if no file name is inputted, return no content
+                    if not path:
+                        raise EOFError
+                    # do not include "." in the path name
+                    path = path.rsplit(".", 1)[0]
+                    fn = f"\x7f{path}"
+                    for file in reversed(os.listdir("cache")):
+                        # file cache is stored as "{timestamp}~{name}", search for file via timestamp
+                        if file.rsplit(".", 1)[0].split("~", 1)[0] == fn:
+                            return "cache/" + file
+                    raise FileNotFoundError(path)
+
+                p = find_file(path)
+                fn = urllib.parse.unquote(p.rsplit("/", 1)[-1].split("~", 1)[-1])
+                url = self.bot.raw_webserver + "/files/" + orig_path
+                return dict(url=url, name=fn, direct=True)
         try:
             self.youtube_dl_x += 1
             entries = self.downloader.extract_info(url, download=False, process=True)
@@ -1518,6 +1544,32 @@ class AudioDownloader:
             if "." in title:
                 title = title[:title.rindex(".")]
             return dict(url=url, webpage_url=url, title=title, direct=True)
+        if self.bot.is_webserver_url(url):
+            spl = url[8:].split("/")
+            if spl[1] in ("preview", "view", "file", "files", "download"):
+                url2 = url
+                path = spl[2]
+                orig_path = path
+                if path.startswith("~"):
+                    path = str(int.from_bytes(base64.urlsafe_b64decode(path.encode("utf-8") + b"==="), "big"))
+
+                def find_file(path):
+                    # if no file name is inputted, return no content
+                    if not path:
+                        raise EOFError
+                    # do not include "." in the path name
+                    path = path.rsplit(".", 1)[0]
+                    fn = f"\x7f{path}"
+                    for file in reversed(os.listdir("cache")):
+                        # file cache is stored as "{timestamp}~{name}", search for file via timestamp
+                        if file.rsplit(".", 1)[0].split("~", 1)[0] == fn:
+                            return "cache/" + file
+                    raise FileNotFoundError(path)
+
+                p = find_file(path)
+                fn = urllib.parse.unquote(p.rsplit("/", 1)[-1].split("~", 1)[-1])
+                url = self.bot.raw_webserver + "/files/" + orig_path
+                return dict(url=url, webpage_url=url2, title=fn, direct=True)
         try:
             self.youtube_dl_x += 1
             return self.downloader.extract_info(url, download=False, process=False)
@@ -1956,6 +2008,8 @@ class AudioDownloader:
         # If stream is still not found or is a soundcloud audio fragment playlist file, perform secondary youtube-dl search
         if stream in (None, "none"):
             data = self.search(entry["url"])
+            if type(data) is str:
+                data = evalEX(data)
             stream = set_dict(data[0], "stream", data[0].url)
             icon = set_dict(data[0], "icon", data[0].url)
         elif not searched and (stream.startswith("https://cf-hls-media.sndcdn.com/") or stream.startswith("https://www.yt-download.org/download/")):

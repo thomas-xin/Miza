@@ -103,7 +103,7 @@ def get_file(path, filename=None):
         mime = MIMES.get(p.rsplit("/", 1)[-1].rsplit(".", 1)[-1])
     else:
         mime = get_mime(p)
-    fn = p.rsplit('/', 1)[-1].split('~', 1)[-1]
+    fn = p.rsplit("/", 1)[-1].split("~", 1)[-1]
     if endpoint.endswith("view") and mime.startswith("image/"):
         if os.path.getsize(p) > 262144:
             if endpoint != "preview":
