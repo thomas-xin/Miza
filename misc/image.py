@@ -93,61 +93,44 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
             file.write(data if type(data) is bytes else data.read())
     try:
         if direct:
-            command = ["ffprobe", "-hide_banner", "-v", "error", fn]
-            resp = bytes()
-            # Up to 3 attempts to get video duration
-            for _ in range(3):
-                try:
-                    proc = psutil.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                    fut = exc.submit(proc.communicate, timeout=12)
-                    res = fut.result(timeout=12)
-                    resp = bytes().join(res)
-                    break
-                except:
+            try:
+                command = ["ffprobe", "-hide_banner", "-v", "error", fn]
+                resp = bytes()
+                # Up to 3 attempts to get video duration
+                for _ in range(3):
                     try:
-                        proc.kill()
+                        proc = psutil.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                        fut = exc.submit(proc.communicate, timeout=12)
+                        res = fut.result(timeout=12)
+                        resp = bytes().join(res)
+                        break
                     except:
-                        pass
-            s = resp.decode("utf-8", "replace")
-            if dur is None:
-                i = s.index("Duration: ")
-                d = s[i + 10:]
-                i = 2147483647
-                for c in ", \n\r":
-                    try:
-                        x = d.index(c)
-                    except ValueError:
-                        pass
-                    else:
-                        if x < i:
-                            i = x
-                dur = time_parse(d[:i])
-            else:
-                d = s
-            if orig_fps is None:
-                f = re.findall(fpscheck, d)[0][:-4]
-                orig_fps = float(f)
-            if size is None:
-                sfind = re.finditer(sizecheck, d)
-                sizestr = next(sfind).group()
-                size = [int(i) for i in sizestr.split("x")]
+                        try:
+                            proc.kill()
+                        except:
+                            pass
+                s = resp.decode("utf-8", "replace")
+                if orig_fps is None:
+                    f = re.findall(fpscheck, s)[0][:-4]
+                    orig_fps = float(f)
+                if size is None:
+                    sfind = re.finditer(sizecheck, s)
+                    sizestr = next(sfind).group()
+                    size = [int(i) for i in sizestr.split("x")]
+            except (ValueError, IndexError):
+                if orig_fps is None:
+                    orig_fps = 30
+                if size is None:
+                    size = (960, 540)
         fn2 = fn + ".gif"
         f_in = fn if direct else url
         command = ["ffmpeg", "-threads", "2", "-hide_banner", "-nostdin", "-loglevel", "error", "-y", "-i", f_in, "-an", "-vf"]
         w, h = max_size(*size, maxsize)
         # Adjust FPS if duration is too long
         fps = min(fps, orig_fps)
-        r2 = 2 ** 0.5
-        rr2 = r2 ** 0.5
-        while fps < 12:
-            fps *= r2
-            w /= rr2
-            h /= rr2
-        w = round(w)
-        h = round(h)
         vf = ""
         if w != size[0]:
-            vf += "scale=" + str(w) + ":-1:flags=lanczos,"
+            vf += "scale=" + str(round(w)) + ":-1:flags=lanczos,"
         vf += "split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle"
         command.extend([vf, "-loop", "0", "-framerate", str(fps), out])
         print(command)
