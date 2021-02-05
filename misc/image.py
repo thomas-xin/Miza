@@ -31,22 +31,23 @@ def to_qr(s, rainbow=False):
     if type(s) is str:
         s = s.encode("utf-8")
     size = len(s)
-    err = "M"
+    err = "M" if size <= 2334 else "L"
     ver = None
-    if size <= 2334:
-        for i, n in enumerate(qr_bytes):
-            if n >= size:
-                ver = i + 1
-                break
-    if ver is None:
-        for i, n in enumerate(qr_bytes_ex):
-            if n >= size:
-                ver = i + 36
-                err = "L"
-    if ver is None:
-        raise OverflowError("Input string too large for QR code encoding.")
-    img = pyqrcode.create(s, error=err, version=ver, mode="binary")
-    fn = f"cache/{s.hex()}.png"
+    # if size > 125:
+    #     if size <= 2334:
+    #         for i, n in enumerate(qr_bytes):
+    #             if n >= size:
+    #                 ver = i + 1
+    #                 break
+    #     if ver is None:
+    #         for i, n in enumerate(qr_bytes_ex):
+    #             if n >= size:
+    #                 ver = i + 36
+    #                 err = "L"
+    #     if ver is None:
+    #         raise OverflowError("Input string too large for QR code encoding.")
+    img = pyqrcode.create(s, error=err, version=ver, mode=None, encoding="utf-8" if max(s) >= 80 else "ascii")
+    fn = f"cache/{time.time_ns() // 1000}.png"
     if not os.path.exists(fn):
         img.png(fn, scale=1, module_color=(255,) * 3, background=(0,) * 4)
     imo = Image.open(fn)
@@ -75,7 +76,7 @@ def to_qr(s, rainbow=False):
                 yield filt1
 
         return dict(duration=4800, count=count, frames=qr_iterator(im))
-    return ImageChops.invert(im).convert("RGB")
+    return ImageChops.invert(im).convert("RGBA")
 
 
 def logging(func):
@@ -1486,6 +1487,7 @@ def evaluate(ts, args):
         sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_result({repr(out)})\n".encode("utf-8"))
     except Exception as ex:
         sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_exception(evalex({repr(repr(ex))}))\n".encode("utf-8"))
+        sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_exception(print({repr(traceback.format_exc())}, end=''))\n".encode("utf-8"))
     sys.stdout.flush()
 
 
