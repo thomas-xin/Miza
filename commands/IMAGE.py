@@ -753,6 +753,8 @@ class QR(Command):
     typing = True
 
     async def __call__(self, bot, channel, argv, name, _timeout, **void):
+        if not argv:
+            raise ArgumentError("Input string is empty.")
         with discord.context_managers.Typing(channel):
             resp = await process_image("to_qr", "$", [argv, "rainbow" in name], timeout=_timeout)
             fn = resp[0]
