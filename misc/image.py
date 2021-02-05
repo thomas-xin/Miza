@@ -134,8 +134,6 @@ def get_request(url):
                     return f.read()
     with requests.get(url, headers=header(), stream=True, timeout=12) as resp:
         return resp.content
-    # resp = requests.get(url, headers=header(), stream=True, timeout=12)
-    # return seq(resp)
 
 
 from_colour = lambda colour, size=128, key=None: Image.new("RGB", (size, size), tuple(colour))
@@ -1330,7 +1328,7 @@ class ImageSequence(Image.Image):
 def get_image(url, out):
     if issubclass(type(url), Image.Image):
         return url
-    if type(url) not in (bytes, bytearray, io.BytesIO, seq):
+    if type(url) not in (bytes, bytearray, io.BytesIO):
         save = None
         if url in CACHE:
             return CACHE[url]
