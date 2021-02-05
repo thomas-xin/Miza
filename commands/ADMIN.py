@@ -998,7 +998,7 @@ class StarBoard(Command):
             msg = ""
         else:
             content += f"{len(curr)} starboard triggers currently assigned for {str(guild).replace('`', '')}:```*"
-            msg = "```ini\n" + iter2str({k: curr[k] for k in tuple(curr)[pos:pos + page]}) + "```"
+            msg = "```ini\n" + iter2str({k: curr[k] for k in tuple(curr)[pos:pos + page]}, key=lambda t: f"×{t[0]} {sqr_md(bot.get_channel(t[1]))}") + "```"
         colour = await self.bot.data.colours.get(to_png_ex(guild.icon_url))
         emb = discord.Embed(
             description=content + msg,
@@ -2106,7 +2106,7 @@ class UpdateStarboards(Database):
         if message.guild and message.guild.id in self.data and message.id not in self.data["triggered"]:
             if message.channel.id == self.data[message.guild.id].get(react, (message.channel.id,))[-1]:
                 return
-            req = self.data[message.guild.id].get(react, (inf,))[0]
+            req = self.data[message.guild.id][react][0]
             if req < inf:
                 count = 1
                 if req >= 1:

@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import os, sys, io, time, concurrent.futures, subprocess, psutil, collections, traceback, re, requests, blend_modes, pdf2image, zipfile, contextlib, magic #, gc
+import os, sys, io, time, concurrent.futures, subprocess, psutil, collections, traceback, re, requests, blend_modes, pdf2image, zipfile, contextlib, magic, pyqrcode
 import numpy as np
 import PIL
 from PIL import Image, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhance, ImageMath, ImageStat
@@ -15,6 +15,67 @@ exc = concurrent.futures.ThreadPoolExecutor(max_workers=3)
 start = time.time()
 CACHE = {}
 ANIM = False
+
+qr_bytes = [
+    16, 28, 44, 64, 86, 108, 124, 154, 182, 216, 254, 290, 334, 365, 415, 453, 507, 563, 627,
+    669, 714, 782, 860, 914, 1000, 1062, 1128, 1193, 1267, 1373, 1455, 1541, 1631, 1725, 1812, 1914, 1992, 2102, 2216, 2334,
+]
+qr_bytes_ex = [
+    2434, 2566, 2702, 2812, 2956,
+]
+
+SWIRL = None
+
+def to_qr(s, rainbow=False):
+    global SWIRL
+    if type(s) is str:
+        s = s.encode("utf-8")
+    size = len(s)
+    err = "M"
+    ver = None
+    if size <= 2334:
+        for i, n in enumerate(qr_bytes):
+            if n >= size:
+                ver = i + 1
+                break
+    if ver is None:
+        for i, n in enumerate(qr_bytes_ex):
+            if n >= size:
+                ver = i + 36
+                err = "L"
+    if ver is None:
+        raise OverflowError("Input string too large for QR code encoding.")
+    img = pyqrcode.create(s, error=err, version=ver, mode="binary")
+    fn = f"cache/{s.hex()}.png"
+    if not os.path.exists(fn):
+        img.png(fn, scale=1, module_color=(255,) * 3, background=(0,) * 4)
+    imo = Image.open(fn)
+    im = imo.convert("1")
+    imo.close()
+    im = im.resize((512, 512), resample=Image.NEAREST)
+    if rainbow:
+        if SWIRL is None:
+            imo = Image.open("misc/swirl.png")
+            SWIRL = imo.resize((512, 512), resample=Image.BILINEAR)
+            imo.close()
+        count = 128
+
+        def qr_iterator(image):
+            filt1 = filt2 = SWIRL
+            spl = SWIRL.convert("HSV").split()
+            for i in range(count):
+                if i:
+                    hue1 = spl[0].point(lambda x: round(x + 256 * i / count) & 255)
+                    hue2 = spl[0].point(lambda x: round(x - 256 * i / count) & 255)
+                    filt1 = Image.merge("HSV", (hue1, spl[1], spl[2])).convert("RGB")
+                    filt2 = Image.merge("HSV", (hue2, spl[1], spl[2])).convert("RGB")
+                filt1 = ImageEnhance.Brightness(ImageEnhance.Contrast(filt1).enhance(0.5)).enhance(2)
+                filt2 = ImageChops.invert(ImageEnhance.Brightness(ImageEnhance.Contrast(filt2).enhance(0.5)).enhance(2)).transpose(Image.FLIP_LEFT_RIGHT)
+                filt1.paste(filt2, mask=image)
+                yield filt1
+
+        return dict(duration=4800, count=count, frames=qr_iterator(im))
+    return ImageChops.invert(im).convert("RGB")
 
 
 def logging(func):
@@ -1224,111 +1285,6 @@ def from_bytes(b, save=None):
             raise FileNotFoundError("image file not found")
         out.seek(0)
         raise TypeError(f'Filetype "{magic.from_buffer(out.read(65536))}" is not supported.')
-
-
-class seq(io.IOBase, collections.abc.MutableSequence, contextlib.AbstractContextManager):
-
-    BUF = 262144
-
-    def __init__(self, obj, filename=None):
-        self.iter = None
-        self.closer = getattr(obj, "close", None)
-        if issubclass(type(obj), io.IOBase):
-            if issubclass(type(obj), io.BytesIO):
-                self.data = obj
-            else:
-                obj.seek(0)
-                self.data = io.BytesIO(obj.read())
-                obj.seek(0)
-        elif issubclass(type(obj), bytes) or issubclass(type(obj), bytearray) or issubclass(type(obj), memoryview):
-            self.data = io.BytesIO(obj)
-        elif issubclass(type(obj), collections.abc.Iterator):
-            self.iter = iter(obj)
-            self.data = io.BytesIO()
-            self.high = 0
-        elif issubclass(type(obj), requests.models.Response):
-            self.iter = obj.iter_content(self.BUF)
-            self.data = io.BytesIO()
-            self.high = 0
-        else:
-            raise TypeError(f"a bytes-like object is required, not '{type(obj)}'")
-        self.filename = filename
-        self.buffer = {}
-
-    def __getitem__(self, k):
-        if type(k) is slice:
-            out = io.BytesIO()
-            start = k.start or 0
-            stop = k.stop or inf
-            step = k.step or 1
-            if step < 0:
-                start, stop, step = stop + 1, start + 1, -step
-                rev = True
-            else:
-                rev = False
-            curr = start // self.BUF * self.BUF
-            offs = start % self.BUF
-            out.write(self.load(curr))
-            curr += self.BUF
-            while curr < stop:
-                temp = self.load(curr)
-                if not temp:
-                    break
-                out.write(temp)
-                curr += self.BUF
-            out.seek(0)
-            return out.read()[k]
-        base = k // self.BUF
-        with suppress(KeyError):
-            return self.load(base)[k % self.BUF]
-        raise IndexError("seq index out of range")
-
-    def __str__(self):
-        if self.filename is None:
-            return str(self.data)
-        if self.filename:
-            return f"<seq name='{self.filename}'>"
-        return f"<seq object at {hex(id(self))}"
-
-    def __iter__(self):
-        i = 0
-        while True:
-            x = self[i]
-            if x:
-                yield x
-            i += 1
-
-    def __getattr__(self, k):
-        if k in ("data", "filename"):
-            return self.data
-        return object.__getattribute__(self.data, k)
-
-    close = lambda self: self.closer() if self.closer else None
-    __exit__ = lambda self, *args: self.close()
-
-    def load(self, k):
-        with suppress(KeyError):
-            return self.buffer[k]
-        seek = getattr(self.data, "seek", None)
-        if seek:
-            if self.iter is not None and k + self.BUF >= self.high:
-                seek(self.high)
-                with suppress(StopIteration):
-                    while k + self.BUF >= self.high:
-                        temp = next(self.iter)
-                        self.data.write(temp)
-                        self.high += len(temp)
-            seek(k)
-            self.buffer[k] = self.data.read(self.BUF)
-        else:
-            with suppress(StopIteration):
-                while self.high < k:
-                    temp = next(self.data)
-                    if not temp:
-                        return b""
-                    self.buffer[self.high] = temp
-                    self.high += self.BUF
-        return self.buffer.get(k, b"")
 
 
 def ImageOpIterator(image, step, operation, ts, args):

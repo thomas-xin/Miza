@@ -547,6 +547,121 @@ class Pay(Command):
         return css_md(f"{sqr_md(user)} has paid {sqr_md(amount)} coins to {sqr_md(target)}.")
 
 
+class React(Command):
+    server_only = True
+    name = ["AutoReact"]
+    min_level = 2
+    description = "Causes ⟨MIZA⟩ to automatically assign a reaction to messages containing the substring."
+    usage = "<0:react_to>? <1:react_data>? <disable{?d}>?"
+    flags = "aedzf"
+    no_parse = True
+    directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
+    rate_limit = (1, 2)
+    slash = True
+
+    async def __call__(self, bot, flags, guild, message, user, argv, args, **void):
+        update = self.data.reacts.update
+        following = bot.data.reacts
+        curr = set_dict(following, guild.id, mdict())
+        if type(curr) is not mdict:
+            following[guild.id] = curr = mdict(curr)
+        if not argv:
+            if "d" in flags:
+                # This deletes all auto reacts for the current guild
+                if "f" not in flags and len(curr) > 1:
+                    return css_md(sqr_md(f"WARNING: {len(curr)} ITEMS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."))
+                if guild.id in following:
+                    following.pop(guild.id)
+                return italics(css_md(f"Successfully removed all {sqr_md(len(curr))} auto reacts for {sqr_md(guild)}."))
+            # Set callback message for scrollable list
+            return (
+                "*```" + "\n" * ("z" in flags) + "callback-image-react-"
+                + str(user.id) + "_0"
+                + "-\nLoading React database...```*"
+            )
+        if "d" in flags:
+            a = full_prune(args[0])
+            if a in curr:
+                curr.pop(a)
+                update(guild.id)
+                return italics(css_md(f"Removed {sqr_md(a)} from the auto react list for {sqr_md(guild)}."))
+            else:
+                raise LookupError(f"{a} is not in the auto react list.")
+        lim = 64 << bot.is_trusted(guild.id) * 2 + 1
+        if curr.count() >= lim:
+            raise OverflowError(f"React list for {guild} has reached the maximum of {lim} items. Please remove an item to add another.")
+        # Limit substring length to 64
+        a = unicode_prune(" ".join(args[:-1])).casefold()[:64]
+        try:
+            e_id = int(args[-1])
+        except:
+            emoji = args[-1]
+        else:
+            emoji = await bot.fetch_emoji(e_id)
+        emoji = str(emoji)
+        # This reaction indicates that the emoji was valid
+        await message.add_reaction(emoji)
+        curr.append(a, emoji)
+        following[guild.id] = mdict({i: curr[i] for i in sorted(curr)})
+        return css_md(f"Added {sqr_md(a)} ➡️ {sqr_md(emoji)} to the auto react list for {sqr_md(guild)}.")
+
+    async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
+        u_id, pos = [int(i) for i in vals.split("_", 1)]
+        if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
+            return
+        if reaction not in self.directions and reaction is not None:
+            return
+        guild = message.guild
+        user = await bot.fetch_user(u_id)
+        following = bot.data.reacts
+        curr = following.get(guild.id, mdict())
+        page = 16
+        last = max(0, len(curr) - page)
+        if reaction is not None:
+            i = self.directions.index(reaction)
+            if i == 0:
+                new = 0
+            elif i == 1:
+                new = max(0, pos - page)
+            elif i == 2:
+                new = min(last, pos + page)
+            elif i == 3:
+                new = last
+            else:
+                new = pos
+            pos = new
+        content = message.content
+        if not content:
+            content = message.embeds[0].description
+        i = content.index("callback")
+        content = "*```" + "\n" * ("\n" in content[:i]) + (
+            "callback-image-react-"
+            + str(u_id) + "_" + str(pos)
+            + "-\n"
+        )
+        if not curr:
+            content += f"No currently assigned auto reactions for {str(guild).replace('`', '')}.```*"
+            msg = ""
+        else:
+            content += f"{len(curr)} auto reactions currently assigned for {str(guild).replace('`', '')}:```*"
+            key = lambda x: "\n" + ", ".join(x)
+            msg = "```ini\n" + iter2str({k: curr[k] for k in tuple(curr)[pos:pos + page]}, key=key) + "```"
+        colour = await self.bot.data.colours.get(to_png_ex(guild.icon_url))
+        emb = discord.Embed(
+            description=content + msg,
+            colour=colour,
+        )
+        emb.set_author(**get_author(user))
+        more = len(curr) - pos - page
+        if more > 0:
+            emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
+        create_task(message.edit(content=None, embed=emb))
+        if reaction is None:
+            for react in self.directions:
+                create_task(message.add_reaction(as_str(react)))
+                await asyncio.sleep(0.5)
+
+
 class Dogpile(Command):
     server_only = True
     min_level = 2
@@ -963,7 +1078,7 @@ class MimicConfig(Command):
 
 class Mimic(Command):
     name = ["RolePlay", "Plural", "RP", "RPCreate"]
-    description = "Spawns a webhook mimic with an optional username and icon URL, or lists all mimics with their respective prefixes."
+    description = "Spawns a webhook mimic with an optional username and icon URL, or lists all mimics with their respective prefixes. Mimics require permission level of 1 to invoke."
     usage = "<0:prefix>? <1:user|name>? <2:url[]>? <delete{?d}>?"
     flags = "aedzf"
     no_parse = True
@@ -1196,7 +1311,7 @@ class MimicSend(Command):
         except KeyError:
             enabled = ()
         # Because this command operates across channels and servers, we need to make sure these cannot be sent to channels without this command enabled
-        if not admin and "fun" not in enabled:
+        if not admin and ("fun" not in enabled or perm < 1):
             raise PermissionError("Not permitted to send into target channel.")
         if m:
             msg = escape_everyone(msg)
@@ -1226,7 +1341,7 @@ class UpdateMimics(Database):
         if user.id in self.data:
             bot = self.bot
             perm = bot.get_perms(user.id, message.guild)
-            if perm < 0:
+            if perm < 1:
                 return
             admin = not inf > perm
             if message.guild is not None:
@@ -1357,3 +1472,130 @@ class _8Ball(ImagePool, Command):
         if "v" in flags:
             return escape_everyone(url)
         self.bot.send_as_embeds(channel, image=url)
+
+
+class Cat(ImagePool, Command):
+    description = "Pulls a random image from thecatapi.com, api.alexflipnote.dev/cats, or cdn.nekos.life/meow, and embeds it. Be sure to check out ⟨WEBSERVER⟩/cats!"
+    database = "cats"
+    name = ["🐱", "Meow", "Kitty", "Kitten"]
+    slash = True
+
+    async def fetch_one(self):
+        if random.random() > 2 / 3:
+            if random.random() > 2 / 3:
+                x = 0
+                url = await create_future(nekos.cat, timeout=8)
+            else:
+                x = 1
+        else:
+            x = 2
+        if x:
+            if x == 1 and alexflipnote_key:
+                d = await Request("https://api.alexflipnote.dev/cats", headers={"Authorization": alexflipnote_key}, json=True, aio=True)
+            else:
+                d = await Request("https://api.thecatapi.com/v1/images/search", json=True, aio=True)
+            if type(d) is list:
+                d = choice(d)
+            url = d["file" if x == 1 and alexflipnote_key else "url"]
+        return url
+
+
+class Dog(ImagePool, Command):
+    description = "Pulls a random image from images.dog.ceo, api.alexflipnote.dev/dogs, or cdn.nekos.life/woof, and embeds it. Be sure to check out ⟨WEBSERVER⟩/dogs!"
+    database = "dogs"
+    name = ["🐶", "Woof", "Doggy", "Doggo"]
+    slash = True
+
+    async def fetch_one(self):
+        if random.random() > 2 / 3:
+            if random.random() > 2 / 3:
+                x = 0
+                url = await create_future(nekos.img, "woof", timeout=8)
+            else:
+                x = 1
+        else:
+            x = 2
+        if x:
+            if x == 1 and alexflipnote_key:
+                d = await Request("https://api.alexflipnote.dev/dogs", headers={"Authorization": alexflipnote_key}, json=True, aio=True)
+            else:
+                d = await Request("https://dog.ceo/api/breeds/image/random", json=True, aio=True)
+            if type(d) is list:
+                d = choice(d)
+            url = d["file" if x == 1 and alexflipnote_key else "message"]
+            if "\\" in url:
+                url = url.replace("\\/", "/").replace("\\", "/")
+            while "///" in url:
+                url = url.replace("///", "//")
+        return url
+
+
+class Muffin(ImagePool, Command):
+    name = ["🧁", "Muffins"]
+    description = "Muffin time! What more is there to say? :D"
+    database = "muffins"
+
+    async def fetch_one(self):
+        if xrand(3):
+            s = await Request(f"https://www.gettyimages.co.uk/photos/muffin?page={random.randint(1, 100)}", decode=True, aio=True)
+            url = "https://media.gettyimages.com/photos/"
+            spl = s.split(url)[1:]
+            imageset = {url + i.split('"', 1)[0].split("?", 1)[0] for i in spl}
+        else:
+            d = await Request(f"https://unsplash.com/napi/search/photos?query=muffin&per_page=20&page={random.randint(1, 19)}", json=True, aio=True)
+            imageset = {result["urls"]["raw"] for result in d["results"]}
+        return imageset
+
+
+class XKCD(ImagePool, Command):
+    description = "Pulls a random image from xkcd.com and embeds it."
+    database = "xkcd"
+
+    async def fetch_one(self):
+        s = await Request("https://c.xkcd.com/random/comic", decode=True, aio=True)
+        search = "Image URL (for hotlinking/embedding): "
+        s = s[s.index(search) + len(search):]
+        url = s[:s.index("<")].strip()
+        return url
+
+
+class Inspiro(ImagePool, Command):
+    name = ["InspiroBot"]
+    description = "Pulls a random image from inspirobot.me and embeds it."
+    database = "inspirobot"
+
+    def fetch_one(self):
+        return Request("https://inspirobot.me/api?generate=true", decode=True, aio=True)
+
+
+class UpdateReacts(Database):
+    name = "reacts"
+
+    async def _nocommand_(self, text, edit, orig, message, **void):
+        if message.guild is None or not orig:
+            return
+        g_id = message.guild.id
+        data = self.data
+        if g_id in data:
+            with tracebacksuppressor(ZeroDivisionError):
+                following = self.data[g_id]
+                if type(following) != mdict:
+                    following = self.data[g_id] = mdict(following)
+                reacting = {}
+                for k in following:
+                    if is_alphanumeric(k) and " " not in k:
+                        words = text.split()
+                    else:
+                        words = full_prune(message.content)
+                    if k in words:
+                        emojis = following[k]
+                        # Store position for each keyword found
+                        reacting[words.index(k) / len(words)] = emojis
+                # Reactions sorted by their order of appearance in the message
+                for r in sorted(reacting):
+                    for react in reacting[r]:
+                        try:
+                            await message.add_reaction(react)
+                        except discord.HTTPException as ex:
+                            if "10014" in repr(ex):
+                                emojis.remove(react)
