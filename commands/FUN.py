@@ -9,6 +9,15 @@ except ModuleNotFoundError:
 print = PRINT
 
 
+try:
+    alexflipnote_key = AUTH["alexflipnote_key"]
+    if not alexflipnote_key:
+        raise
+except:
+    alexflipnote_key = None
+    print("WARNING: alexflipnote_key not found. Unable to use API to generate images.")
+
+
 class GameOverError(OverflowError):
     pass
 

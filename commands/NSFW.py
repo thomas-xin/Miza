@@ -272,6 +272,7 @@ def is_nsfw(channel):
 
 
 class Neko(Command):
+    name = ["Nya"]
     description = "Pulls a random image from nekos.life and embeds it."
     usage = "<tags(neko)>? <verbose{?v}|random{?r}|list{?l}>?"
     flags = "lrv"
@@ -333,7 +334,7 @@ class Neko(Command):
 class Lewd(Command):
     time_consuming = True
     _timeout_ = 2
-    name = ["nsfw"]
+    name = ["NSFW"]
     min_level = 1
     description = "Pulls a random image from a search on Rule34 and e621, and embeds it."
     usage = "<query> <verbose{?v}>?"

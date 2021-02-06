@@ -14,15 +14,6 @@ youtube_dl = youtube_dlc
 getattr(youtube_dl, "__builtins__", {})["print"] = print
 
 
-try:
-    alexflipnote_key = AUTH["alexflipnote_key"]
-    if not alexflipnote_key:
-        raise
-except:
-    alexflipnote_key = None
-    print("WARNING: alexflipnote_key not found. Unable to use API to generate images.")
-
-
 ydl_opts = {
     "quiet": 1,
     "format": "bestvideo/best",
