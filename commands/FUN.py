@@ -781,6 +781,8 @@ class UpdateDailies(Database):
 
     def __load__(self, **void):
         self.typing = {}
+        self.generator = alist()
+        self.initialize()
 
     def get(self, user):
         data = self.data.get(user.id)
@@ -801,6 +803,75 @@ class UpdateDailies(Database):
             quests.pops(pops)
             self.update(user.id)
         return data
+    
+    def add_quest(self, weight, action, name, x=1, gold=0, diamonds=0, **kwargs):
+        if weight > 0:
+
+            def func(action, name, level, x, gold, diamonds, **kwargs):
+                if callable(x):
+                    x = x(level)
+                x = round_random(x)
+                if callable(gold):
+                    gold = gold(x)
+                if callable(diamonds):
+                    diamonds = diamonds(x)
+                if callable(name):
+                    name = name(x)
+                elif "{x}" in name:
+                    name = name.format(x=x)
+                quest = cdict(
+                    action=action,
+                    name=name,
+                    progress=0,
+                    required=x,
+                    gold=round_random(gold),
+                    diamonds=round_random(diamonds),
+                )
+                quest.update(kwargs)
+                return quest
+
+            self.generator.extend(repeat(lambda level: func(action, name, level, x, gold, diamonds, **kwargs), weight))
+
+    def initialize(self):
+        add_quest = self.add_quest
+        scale = lambda low, high, level_bonus=0, multiple=0: lambda level: round_random_multiple(random.randint(low, high) + level * level_bonus * random.random(), multiple)
+        add_quest(100, "send", "Post {x} messages", gold=lambda x: x << 1,
+            x=scale(70, 180, 3, 3))
+        add_quest(70, "music", lambda x: f"Listen to {sec2time(x)} of my music", gold=nofunc, diamonds=lambda x: xrand(1, x) / 60,
+            x=scale(180, 480, 13, 60))
+        for catg in "main string voice image fun".split():
+            add_quest(13, "category", "Use {x} " + catg + " commands", catg=catg, gold=lambda x: x * 9,
+                x=scale(9, 17, 0.3))
+        add_quest(60, "typing", lambda x: f"Type for {sec2time(x)}", gold=lambda x: x * 2.5,
+            x=scale(150, 400, 11, 30))
+        add_quest(52, "first", lambda x: f"Be the first to post in a channel since {sec2time(x)} ago", gold=lambda x: x >> 3, diamonds=1,
+            x=scale(1800, 3600, 240, 300))
+        add_quest(50, "reply", "Reply to {x} messages", gold=lambda x: x * 12,
+            x=scale(23, 40, 1.1))
+        add_quest(50, "channel", "Send messages in {x} different channels", gold=lambda x: x * 24,
+            x=scale(5, 8, 0.06))
+        add_quest(45, "react", "Add {x} reactions", gold=lambda x: x * 5,
+            x=scale(20, 39, 1, 2))
+        add_quest(45, "reacted", "Have {x} reactions added to your messages by other users", gold=lambda x: x * 15, diamonds=lambda x: xrand(1, x) / 8,
+            x=scale(15, 31, 0.75, 2))
+        add_quest(42, "xp", "Earn {x} experience", gold=lambda x: x >> 2, diamonds=1,
+            x=scale(1000, 2000, 80, 50))
+        add_quest(40, "word", "Send {x} total words of text", gold=lambda x: x / sqrt(5),
+            x=scale(400, 600, 15, 5))
+        add_quest(40, "text", "Send {x} total characters of text", gold=lambda x: x >> 3,
+            x=scale(1600, 2400, 60, 10))
+        add_quest(37, "url", "Send {x} attachments or links", gold=lambda x: x * 16,
+            x=scale(12, 25, 0.15))
+        add_quest(35, "command", "Use {x} commands", gold=lambda x: x * 9,
+            x=scale(24, 40, 0.4))
+        add_quest(30, "talk", "Talk to me {x} times", gold=lambda x: x * 7, diamonds=xrand(2, 4),
+            x=lambda level: xrand(10, 21))
+        add_quest(20, "pay", "Pay {x} to other users", gold=lambda x: x >> 1, diamonds=lambda x: xrand(0, 2),
+            x=scale(400, 900, 70, 100))
+        add_quest(18, "diamond", "Earn 1 diamond", required=1, gold=lambda x: x * 50, diamonds=1,
+            x=nofunc)
+        add_quest(15, "invite", "Invite me to a server and/or react to the join message", required=1, diamonds=lambda x: 50 + x * 2 / 3,
+            x=nofunc)
 
     def generate(self, user):
         if user.id == self.bot.id or self.bot.is_blacklisted(user.id):
@@ -808,65 +879,14 @@ class UpdateDailies(Database):
         level = self.bot.data.users.xp_to_level(self.bot.data.users.get_xp(user))
         quests = alist()
         req = min(20, level + 5 >> 1)
-        while len(quests) < req:
-            q_id = xrand(100)
-            if q_id < 10:
-                x = round_random((level * 4 + 100) * random.random() + 70)
-                q = cdict(name=f"Post {x} messages", gold=x * 2, required=x, action="send")
-            elif q_id < 13:
-                q = cdict(name=f"Invite me to a server and/or react to the join message", diamonds=floor(50 + level * 2 / 3), required=1, action="invite")
-            elif q_id < 17:
-                q = cdict(name=f"Earn 1 diamond", gold=level * 50, required=1, action="diamond")
-            elif q_id < 23:
-                x = round_random((level + 30) / 3 * random.random() + 20)
-                q = cdict(name=f"Use {x} commands", gold=x * 9, required=x, action="command")
-            elif q_id < 33:
-                x = round_random((level + 30) / 5 * random.random() + 9)
-                catg = choice("main", "string", "admin", "voice", "image", "fun")
-                q = cdict(name=f"Use {x} {catg} commands", gold=x * 20, required=x, action="category", catg=catg)
-            elif q_id < 39:
-                x = round_random((level * 80 + 1000) * random.random() + 1000)
-                q = cdict(name=f"Earn {x} experience", gold=x >> 1, required=x, action="xp")
-            elif q_id < 47:
-                x = round_random((level + 15) / 4 * random.random() + 3) * 60
-                q = cdict(name=f"Listen to {sec2time(x)} of my music", gold=x, required=x, action="music")
-            elif q_id < 53:
-                x = round_random((level * 15 + 200) * random.random() + 400)
-                q = cdict(name=f"Send {x} total words of text", gold=x >> 1, required=x, action="word")
-            elif q_id < 59:
-                x = round_random((level * 90 + 1000) * random.random() + 2000)
-                q = cdict(name=f"Send {x} total characters of text", gold=x >> 3, required=x, action="text")
-            elif q_id < 64:
-                x = round_random((level * 2 + 20) * random.random() + 20)
-                q = cdict(name=f"Add {x} reactions", gold=x * 5, required=x, action="react")
-            elif q_id < 67:
-                x = round_random((level * 70 + 500) * random.random() + 400)
-                q = cdict(name=f"Pay {x} to other users", gold=x >> 1, diamonds=xrand(0, 1), required=x, action="pay")
-            elif q_id < 72:
-                x = round_random((level * 11 + 240) * random.random() + 180)
-                q = cdict(name=f"Type for {sec2time(x)}", gold=x * 2, required=x, action="typing")
-            elif q_id < 76:
-                x = xrand(10, 21)
-                q = cdict(name=f"Talk to me {x} times", gold=x * 7, required=x, action="talk")
-            elif q_id < 81:
-                x = round_random((level + 10) / 12 * random.random() + 5)
-                q = cdict(name=f"Send messages in {x} different channels", gold=x * 24, diamonds=xrand(0, 2), required=x, action="channel")
-            elif q_id < 85:
-                x = round_random((level + 13) / 6 * random.random() + 12)
-                q = cdict(name=f"Send {x} attachments or links", gold=x * 18, required=x, action="url")
-            elif q_id < 90:
-                x = round_random((level + 22) / 4.5 * random.random() + 7) * 240
-                q = cdict(name=f"Be the first to post in a channel since {sec2time(x)} ago", gold=x >> 3, diamonds=1, required=x, action="first")
-            elif q_id < 95:
-                x = round_random((level + 27) / 2.5 * random.random() + 23)
-                q = cdict(name=f"Reply to {x} messages", gold=x * 12, required=x, action="reply")
-            else:
-                x = round_random((level * 1.5 + 16) * random.random() + 15)
-                q = cdict(name=f"Have {x} reactions added to your messages by other users", gold=x * 16, diamonds=xrand(1, 4), required=x, action="reacted")
+        att = 0
+        while len(quests) < req and att < req << 1:
+            q = choice(self.generator)(level)
             if not quests or q.action not in (e.action for e in quests[-5:]):
                 q.progress = 0
                 quests.append(q)
-        return quests.appendleft(cdict(name="Daily rewards", gold=level * 30 + 400, progress=1, required=1, action=None))
+            att += 1
+        return quests.appendleft(cdict(action=None, name="Daily rewards", progress=1, required=1, gold=level * 30 + 400))
 
     def progress_quests(self, user, action, value=1):
         if user.id == self.bot.id or self.bot.is_blacklisted(user.id):
@@ -900,8 +920,8 @@ class UpdateDailies(Database):
         if user.id in self.typing:
             t = utc()
             self.progress_quests(user, "typing", t - self.typing.pop(user.id, t))
-        last = await self.bot.get_last_message(message.channel)
-        since = id2ts(message.id - last.id)
+        last = await self.bot.get_last_message(message.channel, key=lambda m: m.id < message.id)
+        since = id2td(message.id - last.id)
         self.progress_quests(user, "first", lambda quest: quest.__setitem__("progress", max(quest.progress, since)))
 
     def _command_(self, user, command, loop=False, **void):

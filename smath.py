@@ -1208,7 +1208,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
             self.offs -= len(value)
             self.size += len(value)
             return self
-        self.__init__(np.concatenate([value, self.view]))
+        self.__init__(np.concatenate([value, self.view]), fromarray=True)
         return self
 
     # Appends iterable at the end of the list, reallocating when necessary.
@@ -1222,7 +1222,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
             self.data[self.offs + self.size:self.offs + self.size + len(value)] = value
             self.size += len(value)
             return self
-        self.__init__(np.concatenate([self.view, value]))
+        self.__init__(np.concatenate([self.view, value]), fromarray=True)
         return self
 
     extendright = extend
@@ -1809,6 +1809,11 @@ def round_random(x):
     if random.random() <= y:
         x += 1
     return int(x)
+
+# Rounds x to the nearest multiple of y.
+round_multiple = lambda x, y=1: round_min(math.round(x / y) * y) if y else x
+# Randomly rounds x to the nearest multiple of y.
+round_random_multiple = lambda x, y=1: round_min(round_random(x / y) * y) if y else x
 
 # Returns integer ceiling value of x, for all complex x.
 def ceil(x):

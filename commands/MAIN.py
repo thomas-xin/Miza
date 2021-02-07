@@ -2053,7 +2053,7 @@ class UpdateUsers(Database):
             return
         size = get_message_length(message)
         points = math.sqrt(size) + len(message.content.split())
-        if points >= 8:
+        if points >= 32 and not message.attachments:
             typing = self.data.get(user.id, EMPTY).get("last_typing", None)
             if typing is None:
                 set_dict(self.data, user.id, {})["last_typing"] = inf

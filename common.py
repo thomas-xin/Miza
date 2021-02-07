@@ -43,6 +43,7 @@ MIZA_EPOCH = 1577797200000 # 1 Jan 2020
 
 time_snowflake = lambda dt: discord.utils.time_snowflake(dt) if type(dt) is not int else getattr(dt, "id", None) or dt
 id2ts = lambda id: ((id >> 22) + (id & 0xFFF) / 0x1000 + DISCORD_EPOCH) / 1000
+id2td = lambda id: ((id >> 22) + (id & 0xFFF) / 0x1000) / 1000
 
 def snowflake_time(id):
     i = getattr(id, "id", None)

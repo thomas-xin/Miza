@@ -1001,7 +1001,11 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 self.add_message(message, files=False, force=True)
                 yield message
 
-    async def get_last_message(self, channel):
+    async def get_last_message(self, channel, key=None):
+        if key:
+            async for message in self.history(channel):
+                if key(message):
+                    return message
         async for message in self.history(channel):
             return message
 
