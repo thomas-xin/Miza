@@ -40,9 +40,18 @@ escape_everyone = lambda s: s.replace("@everyone", "@\xadeveryone").replace("@he
 
 DISCORD_EPOCH = 1420070400000 # 1 Jan 2015
 MIZA_EPOCH = 1577797200000 # 1 Jan 2020
-time_snowflake = discord.utils.time_snowflake
+
+time_snowflake = lambda dt: discord.utils.time_snowflake(dt) if type(dt) is not int else getattr(dt, "id", None) or dt
 id2ts = lambda id: ((id >> 22) + (id & 0xFFF) / 0x1000 + DISCORD_EPOCH) / 1000
-snowflake_time = lambda id: utc_ft(id2ts(id))
+
+def snowflake_time(id):
+    i = getattr(id, "id", None)
+    if i is None:
+        i = id
+    if type(i) is int:
+        return utc_ft(id2ts(i))
+    return i
+
 snowflake_time_2 = lambda id: datetime.datetime.fromtimestamp(id2ts(id))
 
 ip2int = lambda ip: int.from_bytes(b"\x00" + bytes(int(i) for i in ip.split(".")), "big")
@@ -576,7 +585,8 @@ class FileHashDict(collections.abc.MutableMapping):
         return self
 
     def clear(self):
-        self.iter.clear()
+        if self.iter:
+            self.iter.clear()
         self.modified.clear()
         self.data.clear()
         with suppress(FileNotFoundError):

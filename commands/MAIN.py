@@ -2073,7 +2073,7 @@ class UpdateUsers(Database):
             self.add_gold(user, points)
         self.add_xp(user, points)
         if "dailies" in self.bot.data:
-            self.bot.data.dailies.valid_message(message)
+            create_task(self.bot.data.dailies.valid_message(message))
 
     async def _mention_(self, user, message, msg, **void):
         bot = self.bot

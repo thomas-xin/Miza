@@ -58,7 +58,7 @@ class Purge(Command):
                 found = False
                 if dt is None or after is None or dt > after:
                     async with bot.guild_semaphore:
-                        async for m in channel.history(limit=lim, before=dt, after=after, oldest_first=False):
+                        async for m in bot.history(channel, limit=lim, before=dt, after=after):
                             bot.add_message(m, force=True)
                             found = True
                             dt = m.created_at
@@ -71,7 +71,7 @@ class Purge(Command):
                     break
         else:
             async with bot.guild_semaphore:
-                async for m in channel.history(limit=None, before=cdict(id=end), after=cdict(id=start), oldest_first=False):
+                async for m in bot.history(channel, limit=None, before=end, after=start):
                     bot.add_message(m, force=True)
                     if uset is None and m.author.bot or uset and m.author.id in uset:
                         delD[m.id] = m

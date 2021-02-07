@@ -981,18 +981,32 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         position = min(length, round(length * ratio))
         return as_fut("⬜" * position + "⬛" * (length - position))
 
-    async def get_last_image(self, channel):
+    async def history(self, channel, limit=200, before=None, after=None):
         channel = self.in_cache(verify_id(channel))
         if not is_channel(channel):
             channel = await self.get_dm(channel)
+        found = set()
         if "channel_cache" in self.data:
             async for message in self.data.channel_cache.get(channel.id):
-                try:
-                    return get_last_image(message)
-                except FileNotFoundError:
-                    pass
-        async for message in channel.history(limit=200):
-            self.add_message(message, files=False, force=True)
+                if before:
+                    if message.id > time_snowflake(before):
+                        continue
+                if after:
+                    if message.id < time_snowflake(after):
+                        break
+                found.add(message.id)
+                yield message
+        async for message in channel.history(limit=limit, before=before, after=after):
+            if message.id not in found:
+                self.add_message(message, files=False, force=True)
+                yield message
+
+    async def get_last_message(self, channel):
+        async for message in self.history(channel):
+            return message
+
+    async def get_last_image(self, channel):
+        async for message in self.history(channel):
             try:
                 return get_last_image(message)
             except FileNotFoundError:
@@ -3557,10 +3571,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 if "users" in self.data:
                     self.data.users.add_xp(user, xrand(4, 7))
                     self.data.users.add_gold(user, xrand(1, 5))
-                if "dailies" in self.data:
-                    self.data.dailies.progress_quests(user, "react")
                 reaction = str(emoji)
-                await self.send_event("_reaction_add_", message=message, react=reaction)
+                await self.send_event("_reaction_add_", message=message, react=reaction, user=user)
                 await self.react_callback(message, reaction, user)
                 await self.check_to_delete(message, reaction, user)
 

@@ -222,6 +222,10 @@ def integrate(*args, **kwargs):
     except ValueError:
         return sympy.integrate(*plotArgs(args), sympy.Symbol("x"))
 
+fac = sympy.factorial
+ncr = lambda n, k: 0 if k > n else fac(n) / fac(k) / fac(n - k)
+npr = lambda n, k: 0 if k > n else fac(n) / fac(n - k)
+
 if os.name == "nt":
     def _factorint(n, **kwargs):
         try:
@@ -329,7 +333,11 @@ _globals.update({
     "ceil": sympy.ceiling,
     "min": sympy.Min,
     "max": sympy.Max,
-    "fac": sympy.factorial,
+    "fac": fac,
+    "ncr": ncr,
+    "nCr": ncr,
+    "npr": npr,
+    "nPr": npr,
     "phi": sympy.GoldenRatio,
     "tau": sympy.pi * 2,
     "deg": sympy.pi / 180,
