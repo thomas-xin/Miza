@@ -1490,13 +1490,18 @@ class fdict(cdict):
 
     __slots__ = ("_feed",)
 
+    def get_feed(self):
+        feed = object.__getattribute__(self, "_feed")
+        if callable(feed):
+            return feed()
+        return feed
+
     def _keys(self):
         found = set()
         for k in super().keys():
             found.add(k)
             yield k
-        feed = object.__getattribute__(self, "_feed")
-        for f in feed:
+        for f in self.get_feed():
             for k in f:
                 if k not in found:
                     found.add(k)
@@ -1504,10 +1509,10 @@ class fdict(cdict):
 
     def keys(self):
         try:
-            feed = object.__getattribute__(self, "_feed")
+            self.get_feed()
         except AttributeError:
             return super().keys()
-        return self._iter()
+        return self._keys()
 
     __iter__ = lambda self: iter(super().keys())
 
@@ -1516,8 +1521,7 @@ class fdict(cdict):
         for k, v in super().items():
             found.add(k)
             yield v
-        feed = object.__getattribute__(self, "_feed")
-        for f in feed:
+        for f in self.get_feed():
             for k, v in f.items():
                 if k not in found:
                     found.add(k)
@@ -1525,7 +1529,7 @@ class fdict(cdict):
 
     def values(self):
         try:
-            feed = object.__getattribute__(self, "_feed")
+            self.get_feed()
         except AttributeError:
             return super().values()
         return self._values()
@@ -1535,8 +1539,7 @@ class fdict(cdict):
         for k, v in super().items():
             found.add(k)
             yield k, v
-        feed = object.__getattribute__(self, "_feed")
-        for f in feed:
+        for f in self.get_feed():
             for k, v in f.items():
                 if k not in found:
                     found.add(k)
@@ -1544,7 +1547,7 @@ class fdict(cdict):
 
     def items(self):
         try:
-            feed = object.__getattribute__(self, "_feed")
+            self.get_feed()
         except AttributeError:
             return super().items()
         return self._items()
@@ -1552,12 +1555,10 @@ class fdict(cdict):
     def _len_(self):
         size = len(self)
         try:
-            feed = object.__getattribute__(self, "_feed")
+            self.get_feed()
         except AttributeError:
             return size
-        if callable(feed):
-            feed = feed()
-        for f in feed:
+        for f in self.get_feed():
             try:
                 size += f._len_()
             except AttributeError:
@@ -1570,12 +1571,10 @@ class fdict(cdict):
         except KeyError:
             pass
         try:
-            feed = object.__getattribute__(self, "_feed")
+            self.get_feed()
         except AttributeError:
             raise KeyError(k)
-        if callable(feed):
-            feed = feed()
-        for f in feed:
+        for f in self.get_feed():
             try:
                 return f.__getitem__(k)
             except KeyError:
@@ -1591,10 +1590,10 @@ class fdict(cdict):
         data = set(object.__dir__(self))
         data.update(self)
         try:
-            feed = object.__getattribute__(self, "_feed")
+            self.get_feed()
         except AttributeError:
             return data
-        for f in feed:
+        for f in self.get_feed():
             data.update(f)
         return data
 

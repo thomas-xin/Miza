@@ -1192,8 +1192,8 @@ class Status(Command):
             emb.add_field(name="Bot info", value=bot_info)
 
             discord_info = (
-                f"Shard count\n`{shards}`\nServer count\n`{len(bot.guilds)}`\nUser count\n`{len(bot.cache.users)}`\n"
-                + f"Channel count\n`{len(bot.cache.channels)}`\nRole count\n`{len(bot.cache.roles)}`\nEmoji count\n`{len(bot.cache.emojis)}`\nCached messages\n`{len(bot.cache.messages)}`"
+                f"Shard count\n`{shards}`\nServer count\n`{len(tuple(bot.cache.guilds.keys()))}`\nUser count\n`{len(tuple(bot.cache.users.keys()))}`\n"
+                + f"Channel count\n`{len(tuple(bot.cache.channels.keys()))}`\nRole count\n`{len(tuple(bot.cache.roles.keys()))}`\nEmoji count\n`{len(tuple(bot.cache.emojis.keys()))}`\nCached messages\n`{len(bot.cache.messages)}`"
             )
             emb.add_field(name="Discord info", value=discord_info)
 
