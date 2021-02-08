@@ -1509,7 +1509,7 @@ class fdict(cdict):
             return super().keys()
         return self._iter()
 
-    __iter__ = lambda self: iter(self.keys())
+    __iter__ = lambda self: iter(super().keys())
 
     def _values(self):
         found = set()
