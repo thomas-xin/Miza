@@ -3261,7 +3261,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         self.channel = channel
                         return channel
                     else:
-                        raise cdict(id=cid)
+                        return cdict(id=cid)
                 if k == "guild":
                     return getattr(self.channel, "guild", None)
                 if k == "author":
