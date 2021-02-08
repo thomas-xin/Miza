@@ -299,7 +299,8 @@ class AudioFile:
         classname = classname[classname.index("'") + 1:]
         return f"<{classname} object at {hex(id(self)).upper().replace('X', 'x')}>"
 
-    def load(self, stream=None, check_fmt=False, force=False, webpage_url=None, live=False, seekable=True):
+    def load(self, stream=None, check_fmt=False, force=False, webpage_url=None, live=False, seekable=True, duration=None):
+        self.dur = duration
         if live:
             self.loading = self.buffered = self.loaded = True
             self.live = self.stream = stream
@@ -533,7 +534,7 @@ class AudioFile:
         return reader        
 
     # Audio duration estimation: Get values from file if possible, otherwise URL
-    duration = lambda self: inf if not self.seekable else getattr(self, "dur", None) or set_dict(self.__dict__, "dur", get_duration("cache/" + self.file) if self.loaded and not self.live else get_duration(self.stream), ignore=True)
+    duration = lambda self: inf if not self.seekable else self.dur or set_dict(self.__dict__, "dur", get_duration("cache/" + self.file) if self.loaded and not self.live else get_duration(self.stream), ignore=True)
 
 
 # Audio reader for fully loaded files. FFmpeg with single pipe for output.

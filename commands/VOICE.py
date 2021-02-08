@@ -974,7 +974,7 @@ class AudioFileLink:
             raise AttributeError("Audio client not active.")
         return bot.audio.submit(f"cache['{self.fn}'].{k}")
 
-    def load(self, stream=None, check_fmt=False, force=False, webpage_url=None, live=False, seekable=True):
+    def load(self, stream=None, check_fmt=False, force=False, webpage_url=None, live=False, seekable=True, duration=None):
         if stream:
             self.stream = stream
         try:
@@ -985,7 +985,9 @@ class AudioFileLink:
         self.live = live
         self.seekable = seekable
         self.webpage_url = webpage_url
-        out = bot.audio.submit(f"cache['{self.fn}'].load(" + ",".join(repr(i) for i in (stream, check_fmt, force, webpage_url, live, seekable)) + ")")
+        out = bot.audio.submit(f"cache['{self.fn}'].load(" + ",".join(repr(i) for i in (stream, check_fmt, force, webpage_url, live, seekable, duration)) + ")")
+        if duration:
+            self.dur = duration
         try:
             self.readable.set_result(self)
         except concurrent.futures.InvalidStateError:
@@ -1936,6 +1938,10 @@ class AudioDownloader:
     def get_stream(self, entry, video=False, force=False, download=True, callback=None):
         if not entry.get("url"):
             raise FileNotFoundError
+        try:
+            entry.update(self.searched[entry["url"]])
+        except KeyError:
+            pass
         if video:
             stream = entry.get("video", None)
         else:
@@ -2016,7 +2022,7 @@ class AudioDownloader:
             live = not entry.get("duration") or entry["duration"] > 960
             seekable = not entry.get("duration") or entry["duration"] < inf
             try:
-                f.load(stream, check_fmt=isnan(entry.get("duration")), webpage_url=entry["url"], live=live, seekable=seekable)
+                f.load(stream, check_fmt=isnan(entry.get("duration") or nan), webpage_url=entry["url"], live=live, seekable=seekable, duration=entry.get("duration"))
             except:
                 self.cache.pop(fn, None)
                 raise

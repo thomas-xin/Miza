@@ -807,6 +807,13 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
             if c is None:
                 c = await channel.create_dm()
             channel = c
+        elif not channel.permissions_for(channel.guild.me).read_message_history:
+            fields = {}
+            if embed:
+                fields["embed"] = embed
+            if tts:
+                fields["tts"] = tts
+            return await channel.send(content, **fields)
         data = dict(
             content=content,
             message_reference=dict(message_id=str(verify_id(reference))),

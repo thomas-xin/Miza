@@ -142,7 +142,6 @@ class Math(Command):
     usage = "<string> <verbose{?v}>? <rationalize{?r}>? <show_variables{?l}>? <clear_variables{?c}>?"
     flags = "rvlcd"
     rate_limit = (0.5, 5)
-    typing = True
     slash = True
 
     async def __call__(self, bot, argv, name, channel, guild, flags, user, **void):
