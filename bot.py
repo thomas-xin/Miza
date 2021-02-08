@@ -3211,7 +3211,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
         class CachedMessage(discord.abc.Snowflake):
 
-            __slots__ = ("_data", "id", "created_at", "author", "channel_id")
+            __slots__ = ("_data", "id", "created_at", "author", "channel", "channel_id")
 
             def __init__(self, data):
                 self._data = data
@@ -3255,7 +3255,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 if k == "content":
                     return d["content"]
                 if k == "channel":
-                    return bot.cache.channels.get(int(d["channel_id"]))
+                    channel = bot.cache.channels.get(int(d["channel_id"]))
+                    if channel:
+                        self.channel = channel
+                        return channel
                 if k == "guild":
                     return getattr(self.channel, "guild", None)
                 if k == "author":
