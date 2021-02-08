@@ -3255,10 +3255,13 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 if k == "content":
                     return d["content"]
                 if k == "channel":
-                    channel = bot.cache.channels.get(int(d["channel_id"]))
+                    cid = int(d["channel_id"])
+                    channel = bot.cache.channels.get(cid)
                     if channel:
                         self.channel = channel
                         return channel
+                    else:
+                        raise cdict(id=cid)
                 if k == "guild":
                     return getattr(self.channel, "guild", None)
                 if k == "author":
