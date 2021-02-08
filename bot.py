@@ -2528,9 +2528,12 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                                 sent = None
                                 # Process list as a sequence of messages to send
                                 if type(response) is list:
+                                    futs = deque()
                                     for r in response:
                                         async with delay(1 / 3):
-                                            create_task(channel.send(r))
+                                            futs.append(create_task(channel.send(r)))
+                                    for fut in futs:
+                                        await fut
                                 # Process dict as kwargs for a message send
                                 elif issubclass(type(response), collections.abc.Mapping):
                                     if "file" in response:

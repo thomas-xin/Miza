@@ -2115,7 +2115,7 @@ class UpdateCrossposts(Database):
                         print_exc()
                         self.data[message.channel.id].discard(c_id)
                     data = (message.guild.name + "\u2009\u2009#" + str(message.channel), to_png(message.guild.icon_url))
-                    self.stack.setdefault(channel.id, {}).setdefault(data, alist()).append(embed)
+                    self.stack.setdefault(channel.id, {}).setdefault(data, []).append(embed)
 
 
 class UpdateStarboards(Database):
@@ -2131,25 +2131,23 @@ class UpdateStarboards(Database):
                 return
             req = self.data[message.guild.id][react][0]
             if req < inf:
-                count = 1
-                if req >= 1:
+                count = sum(r.count for r in message.reactions if str(r.emoji) == react)
+                if count <= 1:
                     message = await message.channel.fetch_message(message.id)
                     self.bot.add_message(message, files=False)
-                    for r in message.reactions:
-                        if str(r.emoji) == react:
-                            count = r.count
+                    count = sum(r.count for r in message.reactions if str(r.emoji) == react)
                 print(react, count, req)
                 if count >= req and count < req + 2:
                     self.data["triggered"].add(message.id)
                     with tracebacksuppressor(RuntimeError, KeyError):
-                        while len(self.data["triggered"]) > 4096:
+                        while len(self.data["triggered"]) > 16384:
                             self.data["triggered"].discard(next(iter(self.data["triggered"])))
                     with tracebacksuppressor:
                         embed = as_embed(message)
                         col = await self.bot.get_colour(message.author)
                         embed.colour = discord.Colour(col)
                         data = ("#" + str(message.channel), to_png(message.guild.icon_url))
-                        self.bot.data.crossposts.stack.setdefault(self.data[message.guild.id][react][1], {}).setdefault(data, alist()).append(embed)
+                        self.bot.data.crossposts.stack.setdefault(self.data[message.guild.id][react][1], {}).setdefault(data, []).append(embed)
 
 
 class UpdateRolegivers(Database):

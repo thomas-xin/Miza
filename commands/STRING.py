@@ -495,7 +495,7 @@ def _c2e(string, em1, em2):
         "Z": [7, 1, 2, 4, 7],
     }
     # I don't quite remember how this algorithm worked lol
-    printed = [""] * 7
+    printed = ["\u200b"] * 7
     string = string.upper()
     for i in range(len(string)):
         curr = string[i]
@@ -514,11 +514,7 @@ def _c2e(string, em1, em2):
                         printed[y + 1] += em2
         for x in range(len(printed)):
             printed[x] += em2
-    output = "\n".join(printed)
-    print("[" + em1 + "]", "[" + em2 + "]")
-    if len(em1) + len(em2) > 2 and ":" in em1 + em2:
-        return output
-    return fix_md(output)
+    return printed
 
 
 class Char2Emoj(Command):
