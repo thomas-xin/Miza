@@ -2190,7 +2190,7 @@ class UpdateAutoRoles(Database):
     name = "autoroles"
 
     async def _join_(self, user, guild, **void):
-        if guild.id in self.data:
+        if guild.id in self.data and guild.me.guild_permissions.manage_roles:
             # Do not apply autorole to users who have roles from role preservers
             with suppress(KeyError):
                 return self.bot.data.rolepreservers[guild.id][user.id]
@@ -2214,7 +2214,7 @@ class UpdateRolePreservers(Database):
 
     async def _join_(self, user, guild, **void):
         if guild.id in self.data:
-            if user.id in self.data[guild.id]:
+            if user.id in self.data[guild.id] and guild.me.guild_permissions.manage_roles:
                 if guild.id not in self.bot.data.mutes or user.id not in (x["u"] for x in self.bot.data.mutes[guild.id]):
                     roles = deque()
                     assigned = self.data[guild.id][user.id]
@@ -2222,6 +2222,7 @@ class UpdateRolePreservers(Database):
                         with tracebacksuppressor:
                             role = await self.bot.fetch_role(r_id, guild)
                             roles.append(role)
+                    roles = [role for role in roles if role < guild.me.top_role]
                     # Attempt to add all roles in one API call
                     try:
                         await user.edit(roles=roles, reason="RolePreserver")
@@ -2257,9 +2258,10 @@ class UpdateNickPreservers(Database):
         except KeyError:
             pass
         else:
-            await user.edit(nick=nick)
-            self.data[guild.id].pop(user.id, None)
-        print(f"NickPreserver: Granted {nick} to {user} in {guild}.")
+            if guild.me.guild_permissions.manage_nicknames:
+                await user.edit(nick=nick)
+                self.data[guild.id].pop(user.id, None)
+                print(f"NickPreserver: Granted {nick} to {user} in {guild}.")
 
     async def _leave_(self, user, guild, **void):
         if getattr(user, "nick", None):
