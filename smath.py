@@ -1597,6 +1597,11 @@ class fdict(cdict):
             data.update(f)
         return data
 
+    def get(self, k, default=None):
+        try:
+            return self[k]
+        except KeyError:
+            return default
 
 # A full-casefold string lookup mapping object.
 class fcdict(cdict):
@@ -1604,11 +1609,13 @@ class fcdict(cdict):
     __slots__ = ()
 
     __init__ = lambda self, *args, **kwargs: super().__init__({full_prune(k): v for k, v in dict(*args, **kwargs).items()})
+    __contains__ = lambda self, k: super().__contains__(k) or super().__contains__(full_prune(k))
+
     def __setitem__(self, k, v):
         return super().__setitem__(full_prune(k), v)
+
     def __getitem__(self, k):
         return super().__getitem__(full_prune(k))
-    __contains__ = lambda self, k: super().__contains__(k) or super().__contains__(full_prune(k))
 
     def __getattr__(self, k):
         try:
@@ -1642,7 +1649,6 @@ class fcdict(cdict):
             if default is not Dummy:
                 return default
             raise
-
 
 # Dictionary with multiple assignable values per key.
 class mdict(cdict):
@@ -1693,7 +1699,6 @@ class mdict(cdict):
         for k, v in kwargs:
             self.extend(k, v)
 
-
 # Dictionary with multiple assignable values per key. Uses sets.
 class msdict(cdict):
 
@@ -1732,7 +1737,6 @@ class msdict(cdict):
                 self.extend(k, v)
         for k, v in kwargs:
             self.extend(k, v)
-
 
 # Double ended mapping, indexable from both sides.
 class demap(collections.abc.Mapping):

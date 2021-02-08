@@ -525,15 +525,19 @@ class Char2Emoj(Command):
     name = ["C2E"]
     description = "Makes emoji blocks using a string."
     usage = "<0:string> <1:emoji_1> <2:emoji_2>"
+    no_parse = True
     slash = True
 
     def __call__(self, args, **extra):
         try:
             if len(args) != 3:
                 raise IndexError
-            for i in range(1, 3):
-                if args[i][0] == ":" and args[i][-1] != ":":
-                    args[i] = "<" + args[i] + ">"
+            for i, a in enumerate(args):
+                if find_emojis(a):
+                    if a.startswith("<a:"):
+                        args[i] = "<a:_:" + a.rsplit(":", 1)[-1]
+                    else:
+                        args[i] = "<:_:" + a.rsplit(":", 1)[-1]
             return _c2e(*args[:3])
         except IndexError:
             raise ArgumentError(

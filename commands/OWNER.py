@@ -163,7 +163,6 @@ class Exec(Command):
     })
 
     def __call__(self, bot, flags, argv, message, channel, guild, **void):
-        update = bot.data.exec.update
         if not argv:
             argv = 0
         try:
@@ -180,6 +179,7 @@ class Exec(Command):
                 bot.data.exec[channel.id] |= num
             except KeyError:
                 bot.data.exec[channel.id] = num
+            bot.data.exec.update(channel.id)
             # Test bitwise flags for enabled terminals
             out = ", ".join(self.terminal_types.get(1 << i) for i in bits(bot.data.exec[channel.id]))
             create_task(message.add_reaction("❗"))
@@ -188,7 +188,7 @@ class Exec(Command):
             with suppress(KeyError):
                 if num == 0:
                     # Test bitwise flags for enabled terminals
-                    out = ", ".join(self.terminal_types.get(1 << i) for i in bits(bot.data.exec.pop(channel.id, force=True)))
+                    out = ", ".join(self.terminal_types.get(1 << i) for i in bits(bot.data.exec.pop(channel.id, 0, force=True)))
                 else:
                     bot.data.exec[channel.id] &= -num - 1
                     if not bot.data.exec[channel.id]:

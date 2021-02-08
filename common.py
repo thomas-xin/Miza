@@ -884,7 +884,7 @@ get_author = lambda user, u_id=None: cdict(name=f"{user}" + "" if not u_id else 
 
 
 # Finds emojis and user mentions in a string.
-find_emojis = lambda s: regexp("<.?:[^<>:]+:[0-9]+>").findall(s)
+find_emojis = lambda s: regexp("<[^<>:]?:[^<>:]+:[0-9]+>").findall(s)
 find_users = lambda s: regexp("<@!?[0-9]+>").findall(s)
 
 
