@@ -584,7 +584,7 @@ class React(Command):
                 return italics(css_md(f"Successfully removed all {sqr_md(len(curr))} auto reacts for {sqr_md(guild)}."))
             # Set callback message for scrollable list
             return (
-                "*```" + "\n" * ("z" in flags) + "callback-image-react-"
+                "*```" + "\n" * ("z" in flags) + "callback-fun-react-"
                 + str(user.id) + "_0"
                 + "-\nLoading React database...```*"
             )
@@ -644,7 +644,7 @@ class React(Command):
             content = message.embeds[0].description
         i = content.index("callback")
         content = "*```" + "\n" * ("\n" in content[:i]) + (
-            "callback-image-react-"
+            "callback-fun-react-"
             + str(u_id) + "_" + str(pos)
             + "-\n"
         )

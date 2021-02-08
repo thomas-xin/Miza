@@ -737,9 +737,9 @@ class RolePreserver(Command):
     slash = True
 
     def __call__(self, flags, guild, **void):
-        update = self.bot.data.rolepreservers.update
         bot = self.bot
         following = bot.data.rolepreservers
+        update = following.update
         # Empty dictionary is enough to represent an active role preserver here
         curr = following.get(guild.id)
         if "d" in flags:
@@ -753,6 +753,34 @@ class RolePreserver(Command):
         if curr is None:
             return ini_md(f"Role preservation is currently disabled in {sqr_md(guild)}. Use ?e to enable.")
         return ini_md(f"Role preservation is currently enabled in {sqr_md(guild)}.")
+
+
+class NickPreserver(Command):
+    server_only = True
+    name = ["StickyNicks", "NicknamePreserver"]
+    min_level = 3
+    min_display = "3+"
+    description = "Causes ⟨MIZA⟩ to save nicknames for all users, and re-add them when they leave and rejoin."
+    usage = "(enable|disable)?"
+    flags = "aed"
+
+    def __call__(self, flags, guild, **void):
+        bot = self.bot
+        following = bot.data.nickpreservers
+        update = following.update
+        # Empty dictionary is enough to represent an active nick preserver here
+        curr = following.get(guild.id)
+        if "d" in flags:
+            if guild.id in following:
+                following.pop(guild.id)
+            return italics(css_md(f"Disabled nickname preservation for {sqr_md(guild)}."))
+        elif "e" in flags or "a" in flags:
+            if guild.id not in following:
+                following[guild.id] = {}
+            return italics(css_md(f"Enabled nickname preservation for {sqr_md(guild)}."))
+        if curr is None:
+            return ini_md(f"Nickname preservation is currently disabled in {sqr_md(guild)}. Use ?e to enable.")
+        return ini_md(f"Nickname preservation is currently enabled in {sqr_md(guild)}.")
 
 
 class Lockdown(Command):
@@ -1812,14 +1840,9 @@ class UpdateMessageLogs(Database):
                         futs.append(create_task(self.save_channel(channel, t)))
                 for fut in futs:
                     await fut
-                self.callback(None)
         self.bot.data.message_cache.finished = True
         self.bot.data.message_cache.setmtime()
         print("Loading new messages completed.")
-
-    def callback(self, messages, **void):
-        create_future_ex(self.bot.update_from_client, priority=True)
-        return messages
 
     async def _command_(self, message, **void):
         if getattr(message, "slash", None):
@@ -1842,7 +1865,7 @@ class UpdateMessageLogs(Database):
     async def _edit_(self, before, after, **void):
         if not after.author.bot:
             guild = before.guild
-            if guild.id in self.data:
+            if guild and guild.id in self.data:
                 c_id = self.data[guild.id]
                 try:
                     channel = await self.bot.fetch_channel(c_id)
@@ -1865,7 +1888,7 @@ class UpdateMessageLogs(Database):
         if bulk:
             return
         guild = message.guild
-        if guild.id in self.data:
+        if guild and guild.id in self.data:
             c_id = self.data[guild.id]
             try:
                 channel = await self.bot.fetch_channel(c_id)
@@ -2177,12 +2200,12 @@ class UpdateAutoRoles(Database):
                 with tracebacksuppressor:
                     role = await self.bot.fetch_role(choice(rolelist), guild)
                     roles.append(role)
-            print(f"AutoRole: Granted {roles} to {user} in {guild}.")
             # Attempt to add all roles in one API call
             try:
                 await user.add_roles(*roles, reason="AutoRole", atomic=False)
             except discord.Forbidden:
                 await user.add_roles(*roles, reason="AutoRole", atomic=True)
+            print(f"AutoRole: Granted {roles} to {user} in {guild}.")
 
 
 class UpdateRolePreservers(Database):
@@ -2199,7 +2222,6 @@ class UpdateRolePreservers(Database):
                         with tracebacksuppressor:
                             role = await self.bot.fetch_role(r_id, guild)
                             roles.append(role)
-                    print(f"RolePreserver: Granted {roles} to {user} in {guild}.")
                     # Attempt to add all roles in one API call
                     try:
                         await user.edit(roles=roles, reason="RolePreserver")
@@ -2208,7 +2230,8 @@ class UpdateRolePreservers(Database):
                             await user.add_roles(*roles, reason="RolePreserver", atomic=False)
                         except discord.Forbidden:
                             await user.add_roles(*roles, reason="RolePreserver", atomic=True)
-                    self.data[guild.id].pop(user.id)
+                    self.data[guild.id].pop(user.id, None)
+                    print(f"RolePreserver: Granted {roles} to {user} in {guild}.")
 
     async def _leave_(self, user, guild, **void):
         if guild.id in self.data:
@@ -2218,10 +2241,31 @@ class UpdateRolePreservers(Database):
                 assigned = [role.id for role in roles]
                 print("_leave_", guild, user, assigned)
                 self.data[guild.id][user.id] = assigned
+                self.update(guild.id)
             else:
                 print("_leave_", guild, user, None)
                 self.data[guild.id].pop(user.id, None)
-            self.update(guild.id)
+
+
+class UpdateNickPreservers(Database):
+    name = "nickpreservers"
+    no_delete = True
+
+    async def _join_(self, user, guild, **void):
+        try:
+            nick = self.data[guild.id][user.id]
+        except KeyError:
+            pass
+        else:
+            await user.edit(nick=nick)
+            self.data[guild.id].pop(user.id, None)
+        print(f"NickPreserver: Granted {nick} to {user} in {guild}.")
+
+    async def _leave_(self, user, guild, **void):
+        if getattr(user, "nick", None):
+            if guild.id in self.data:
+                self.data[guild.id][user.id] = user.nick
+                self.update(guild.id)
 
 
 class UpdatePerms(Database):

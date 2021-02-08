@@ -1485,6 +1485,120 @@ class cdict(dict):
     to_list = lambda self: list(super().values())
 
 
+# A dict with key-value pairs fed from more dict-like objects.
+class fdict(cdict):
+
+    __slots__ = ("_feed",)
+
+    def _keys(self):
+        found = set()
+        for k in super().keys():
+            found.add(k)
+            yield k
+        feed = object.__getattribute__(self, "_feed")
+        for f in feed:
+            for k in f:
+                if k not in found:
+                    found.add(k)
+                    yield k
+
+    def keys(self):
+        try:
+            feed = object.__getattribute__(self, "_feed")
+        except AttributeError:
+            return super().keys()
+        return self._iter()
+
+    __iter__ = lambda self: iter(self.keys())
+
+    def _values(self):
+        found = set()
+        for k, v in super().items():
+            found.add(k)
+            yield v
+        feed = object.__getattribute__(self, "_feed")
+        for f in feed:
+            for k, v in f.items():
+                if k not in found:
+                    found.add(k)
+                    yield v
+
+    def values(self):
+        try:
+            feed = object.__getattribute__(self, "_feed")
+        except AttributeError:
+            return super().values()
+        return self._values()
+
+    def _items(self):
+        found = set()
+        for k, v in super().items():
+            found.add(k)
+            yield k, v
+        feed = object.__getattribute__(self, "_feed")
+        for f in feed:
+            for k, v in f.items():
+                if k not in found:
+                    found.add(k)
+                    yield k, v
+
+    def items(self):
+        try:
+            feed = object.__getattribute__(self, "_feed")
+        except AttributeError:
+            return super().items()
+        return self._items()
+
+    def _len_(self):
+        size = len(self)
+        try:
+            feed = object.__getattribute__(self, "_feed")
+        except AttributeError:
+            return size
+        if callable(feed):
+            feed = feed()
+        for f in feed:
+            try:
+                size += f._len_()
+            except AttributeError:
+                size += len(f)
+        return size
+
+    def __getitem__(self, k):
+        try:
+            return super().__getitem__(k)
+        except KeyError:
+            pass
+        try:
+            feed = object.__getattribute__(self, "_feed")
+        except AttributeError:
+            raise KeyError(k)
+        if callable(feed):
+            feed = feed()
+        for f in feed:
+            try:
+                return f.__getitem__(k)
+            except KeyError:
+                pass
+        raise KeyError(k)
+
+    def __setattr__(self, k, v):
+        if k == "_feed" or k.startswith("__") and k.endswith("__"):
+            return object.__setattr__(self, k, v)
+        return self.__setitem__(k, v)
+
+    def __dir__(self):
+        data = set(object.__dir__(self))
+        data.update(self)
+        try:
+            feed = object.__getattribute__(self, "_feed")
+        except AttributeError:
+            return data
+        for f in feed:
+            data.update(f)
+        return data
+
+
 # A full-casefold string lookup mapping object.
 class fcdict(cdict):
 

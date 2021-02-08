@@ -51,7 +51,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         super().__init__(max_messages=256, heartbeat_timeout=60, guild_ready_timeout=5, intents=self.intents)
         self.cache_size = cache_size
         # Base cache: contains all other caches
-        self.cache = fcdict({c: {} for c in self.caches})
+        self.cache = fcdict({c: fdict() for c in self.caches})
         self.timeout = timeout
         self.set_classes()
         self.set_client_events()
@@ -66,6 +66,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.react_sem = cdict()
         self.mention = ()
         self.user_loader = set()
+        self.users_updated = True
         self.semaphore = Semaphore(2, 1, delay=0.5)
         self.ready_semaphore = Semaphore(1, inf, delay=0.5)
         self.guild_semaphore = Semaphore(5, inf, delay=1, rate_limit=5)
@@ -645,7 +646,17 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             try:
                 user = self.cache.users[u_id]
             except KeyError:
-                user = await self.fetch_user(u_id)
+                try:
+                    user = await self.fetch_user(u_id)
+                except discord.NotFound:
+                    if "webhooks" in self.data:
+                        for channel in guild.text_channels:
+                            webhooks = await self.data.webhooks.get(channel)
+                            try:
+                                return [w for w in webhooks if w.id == u_id][0]
+                            except IndexError:
+                                pass
+                    raise
             with suppress():
                 if guild:
                     member = guild.get_member(user.id)
@@ -982,7 +993,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         return as_fut("⬜" * position + "⬛" * (length - position))
 
     async def history(self, channel, limit=200, before=None, after=None):
-        channel = self.in_cache(verify_id(channel))
+        c = self.in_cache(verify_id(channel))
+        if c is None:
+            c = channel
         if not is_channel(channel):
             channel = await self.get_dm(channel)
         found = set()
@@ -1334,40 +1347,19 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 with suppress(RuntimeError):
                     c.pop(next(iter(c)))
 
-    # Updates bot cache from the discord.py client cache.
-    def update_from_client(self):
-        self.cache.guilds.update(self._guilds)
-        self.cache.channels.update(self._private_channels)
-        with delay(0.5):
-            self.cache.emojis.update(self._emojis)
-        with delay(0.5):
-            self.cache.users.update(self._users)
-
-    # Updates bot cache from the discord.py guild objects.
-    def update_from_guilds(self):
-        self.update_usernames()
-        for i, guild in enumerate(self.guilds, 1):
-            members = self.cache.members
-            members.update(t for t in guild._members.items() if t[0] not in members)
-            self.cache.channels.update(guild._channels)
-            self.cache.roles.update(guild._roles)
-            if not i & 127:
-                time.sleep(0.2)
-        attachments = (file.name for file in sorted(set(file for file in os.scandir("cache") if file.name.startswith("attachment_")), key=lambda file: file.stat().st_mtime))
-        attachments = deque(attachments)
-        while len(attachments) > 4096:
-            with tracebacksuppressor:
-                file = "cache/" + attachments.popleft()
-                if os.path.exists(file):
-                    os.remove(file)
-        attachments = {t for t in self.cache.attachments.items() if type(t[-1]) is bytes}
-        while len(attachments) > 512:
-            a_id = next(iter(attachments))
-            self.cache.attachments[a_id] = a_id
-            attachments.discard(a_id)
+    # Updates bot cache from the discord.py client cache, using automatic feeding to mitigate the need for slow dict.update() operations.
+    def update_cache_feed(self):
+        self.cache.guilds._feed = (self._guilds,)
+        self.cache.emojis._feed = (self._emojis,)
+        self.cache.users._feed = (self._users,)
+        g = self._guilds.values()
+        self.cache.members._feed = lambda: (guild._members for guild in g)
+        self.cache.channels._feed = lambda: itertools.chain((guild._channels for guild in g), (self._private_channels,))
+        self.cache.roles._feed = lambda: (guild._roles for guild in g)
 
     def update_usernames(self):
-        self.usernames = {str(user): user for user in self.cache.users.values()}
+        if self.users_updated:
+            self.usernames = {str(user): user for user in self.cache.users.values()}
 
     # Gets the target bot prefix for the target guild, return the default one if none exists.
     def get_prefix(self, guild):
@@ -2063,6 +2055,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             os.mkdir("backup")
         fn = f"backup/saves.{datetime.datetime.utcnow().date()}.zip"
         if not os.path.exists(fn):
+            self.users_updated = True
             create_future_ex(self.clear_cache, priority=True)
             await_fut(self.send_event("_save_"))
             zf = ZipFile(fn, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
@@ -2996,11 +2989,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     with MemoryTimer("update"):
                         await create_future(self.update, priority=True)
                     await asyncio.sleep(1)
-                    with MemoryTimer("update_from_guilds"):
-                        await create_future(self.update_from_guilds, priority=True)
-                    await asyncio.sleep(1)
-                    with MemoryTimer("update_from_client"):
-                        await create_future(self.update_from_client, priority=True)
+                    with MemoryTimer("update_usernames"):
+                        await create_future(self.update_usernames, priority=True)
                     await asyncio.sleep(1)
                     with MemoryTimer("update_file_cache"):
                         await create_future(update_file_cache, priority=True)
@@ -3402,6 +3392,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             description="\n".join(as_str(i) for i in ex.args),
             title=f"⚠ {type(ex).__name__} ⚠",
             fields=(("Unexpected or confusing error?", f"Message {self.get_user(next(iter(self.owners))).mention}, or join the [support server]({self.rcc_invite})!"),),
+            reacts="❎",
         )
 
     async def reaction_add(self):
@@ -3509,8 +3500,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     else:
                         print("> " + guild.name)
                 await self.handle_update()
-                futs.add(create_future(self.update_from_client, priority=True))
-                futs.add(create_future(self.update_from_guilds, priority=True))
+                self.update_cache_feed()
+                futs.add(create_future(self.update_usernames, priority=True))
                 futs.add(create_task(aretry(self.get_ip, delay=20)))
                 if not self.started:
                     create_task(self.init_ready(futs))
@@ -3556,6 +3547,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 ))
             message = await channel.send(embed=emb)
             await message.add_reaction("✅")
+            for member in guild.members:
+                name = str(member)
+                self.usernames[name] = self.cache.users[member.id]
 
         # Reaction add event: uses raw payloads rather than discord.py message cache. calls _seen_ bot database event.
         @self.event
@@ -3845,12 +3839,17 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         # Member join event: calls _join_ and _seen_ bot database events.
         @self.event
         async def on_member_join(member):
+            name = str(member)
+            self.usernames[name] = self.cache.users[member.id]
             await self.send_event("_join_", user=member, guild=member.guild)
             await self.seen(member, member.guild, event="misc", raw=f"Joining a server, {member.guild}")
 
         # Member leave event: calls _leave_ bot database event.
         @self.event
         async def on_member_remove(member):
+            if member.id not in self.cache.members:
+                name = str(member)
+                self.usernames.pop(name, None)
             await self.send_event("_leave_", user=member, guild=member.guild)
 
         # Channel create event: calls _channel_create_ bot database event.
@@ -3884,6 +3883,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         # Guild destroy event: Remove guild from bot cache.
         @self.event
         async def on_guild_remove(guild):
+            self.users_updated = True
             self.cache.guilds.pop(guild.id, None)
             print(guild, "removed.")
 
@@ -4022,6 +4022,18 @@ def update_file_cache(files=None):
                 os.remove("cache/" + IND + curr)
                 print(curr, "deleted.")
                 update_file_cache(files)
+    attachments = (file.name for file in sorted(set(file for file in os.scandir("cache") if file.name.startswith("attachment_")), key=lambda file: file.stat().st_mtime))
+    attachments = deque(attachments)
+    while len(attachments) > 8192:
+        with tracebacksuppressor:
+            file = "cache/" + attachments.popleft()
+            if os.path.exists(file):
+                os.remove(file)
+    attachments = {t for t in bot.cache.attachments.items() if type(t[-1]) is bytes}
+    while len(attachments) > 512:
+        a_id = next(iter(attachments))
+        self.cache.attachments[a_id] = a_id
+        attachments.discard(a_id)
 
 def as_file(file, filename=None, ext=None, rename=True):
     if rename:

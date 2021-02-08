@@ -124,16 +124,19 @@ class Hello(Command):
 
 class Perms(Command):
     server_only = True
-    name = ["ChangePerms", "Perm", "ChangePerm", "Permissions"]
+    name = ["DefaultPerms", "ChangePerms", "Perm", "ChangePerm", "Permissions"]
     description = "Shows or changes a user's permission level."
     usage = "<0:users>* <1:new_level>? <default{?d}>? <hide{?h}>?"
     flags = "fhd"
     multi = True
     slash = True
 
-    async def __call__(self, bot, args, argl, user, perm, channel, guild, flags, **void):
-        # Get target user from first argument
-        users = await bot.find_users(argl, args, user, guild, roles=True)
+    async def __call__(self, bot, args, argl, user, name, perm, channel, guild, flags, **void):
+        if name == "defaultperms":
+            users = (guild.get_role(guild.id),)
+        else:
+            # Get target user from first argument
+            users = await bot.find_users(argl, args, user, guild, roles=True)
         if not users:
             raise LookupError("No results found.")
         for t_user in users:

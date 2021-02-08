@@ -758,7 +758,7 @@ class Rainbow(Command):
     usage = "<0:url> <1:duration(2)>?"
     no_parse = True
     rate_limit = (5, 12)
-    _timeout_ = 4
+    _timeout_ = 8
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
@@ -776,7 +776,7 @@ class Scroll(Command):
     usage = "<0:url> <1:direction(left)>? <2:duration(2)>? <3:fps(25)>?"
     no_parse = True
     rate_limit = (5, 11)
-    _timeout_ = 4
+    _timeout_ = 8
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
@@ -844,7 +844,7 @@ class Spin(Command):
     usage = "<0:url> <1:duration(2)>?"
     no_parse = True
     rate_limit = (5, 11)
-    _timeout_ = 4
+    _timeout_ = 8
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
@@ -862,7 +862,7 @@ class GMagik(Command):
     usage = "<0:url> <cell_size(7)>?"
     no_parse = True
     rate_limit = (7, 13)
-    _timeout_ = 4
+    _timeout_ = 8
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
@@ -879,7 +879,7 @@ class Liquefy(Command):
     usage = "<0:url> <cell_size(12)>?"
     no_parse = True
     rate_limit = (7, 14)
-    _timeout_ = 4
+    _timeout_ = 8
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
@@ -896,7 +896,7 @@ class CreateGIF(Command):
     usage = "<0:url>+ <-2:framerate_setting{?r}>? <-1:framerate(16)>?"
     no_parse = True
     rate_limit = (8, 24)
-    _timeout_ = 10
+    _timeout_ = 20
     flags = "r"
     typing = True
 
@@ -959,7 +959,7 @@ class Resize(Command):
     no_parse = True
     rate_limit = (3, 6)
     flags = "l"
-    _timeout_ = 3
+    _timeout_ = 4
     typing = True
 
     async def __call__(self, bot, user, guild, channel, message, flags, args, argv, _timeout, **void):
@@ -1111,7 +1111,7 @@ class Blend(Command):
     no_parse = True
     rate_limit = (3, 8)
     flags = "l"
-    _timeout_ = 3
+    _timeout_ = 7
     typing = True
 
     async def __call__(self, bot, user, guild, channel, message, flags, args, argv, _timeout, **void):
