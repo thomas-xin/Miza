@@ -1148,6 +1148,20 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             return list(out)[:limit]
         return out
 
+    def is_animated(self, e):
+        if type(e) in (int, str):
+            try:
+                emoji = self.cache.emojis[e]
+            except KeyError:
+                url = f"https://cdn.discordapp.com/emojis/{e}.gif"
+                with requests.get(url, stream=True) as resp:
+                    if resp.status_code >= 400:
+                        return
+                return True
+        else:
+            emoji = e
+        return emoji.animated
+
     # Follows a message link, replacing emojis and user mentions with their icon URLs.
     async def follow_to_image(self, url):
         temp = find_urls(url)
@@ -1169,10 +1183,12 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             try:
                 out.append(str(self.cache.emojis[e_id].url))
             except KeyError:
-                url = f"https://cdn.discordapp.com/emojis/{e_id}.gif"
-                with requests.get(url, stream=True) as resp:
-                    if resp.status_code >= 400:
-                        url = url[:-3] + "png"
+                animated = await create_future(self.is_animated, e_id)
+                if animated:
+                    end = "gif"
+                else:
+                    end = "png"
+                url = f"https://cdn.discordapp.com/emojis/{e_id}.{end}"
             out.append(url)
         if not out:
             out = find_urls(translate_emojis(replace_emojis(url)))

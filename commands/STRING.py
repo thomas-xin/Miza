@@ -534,6 +534,14 @@ class Char2Emoj(Command):
                         args[i] = "<a:_:" + a.rsplit(":", 1)[-1]
                     else:
                         args[i] = "<:_:" + a.rsplit(":", 1)[-1]
+                elif a.isnumeric():
+                    a = int(a)
+                    try:
+                        a = self.bot.cache.emojis[a]
+                    except KeyError:
+                        args[i] = f"<:_:{a}>"
+                    else:
+                        args[i] = min_emoji(a)
             return _c2e(*args[:3])
         except IndexError:
             raise ArgumentError(

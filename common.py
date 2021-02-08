@@ -888,6 +888,12 @@ find_emojis = lambda s: regexp("<[^<>:]?:[^<>:]+:[0-9]+>").findall(s)
 find_users = lambda s: regexp("<@!?[0-9]+>").findall(s)
 
 
+def min_emoji(emoji):
+    if emoji.animated:
+        return f"<a:_:{emoji.id}>"
+    return f"<:_:{emoji.id}>"
+
+
 def get_last_image(message, embeds=True):
     for a in reversed(message.attachments):
         url = a.url

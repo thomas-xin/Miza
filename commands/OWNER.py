@@ -644,13 +644,8 @@ class UpdateEmojis(Database):
         self.bot.cache.emojis[emoji.id] = emoji
         return emoji
 
-    def convert(self, emoji):
-        if emoji.animated:
-            return f"<a:_:{emoji.id}>"
-        return f"<:_:{emoji.id}>"
-
     def emoji_as(self, s):
-        return self.convert(self.get(s))
+        return min_emoji(self.get(s))
 
     def create_progress_bar(self, length, ratio):
         start_bar = [self.emoji_as(f"start_bar_{i}.gif") for i in range(5)]
