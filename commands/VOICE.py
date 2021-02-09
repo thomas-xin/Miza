@@ -73,7 +73,7 @@ def _get_duration(filename, _timeout=12):
         print_exc()
     try:
         dur = float(resp[0])
-    except ValueError:
+    except (IndexError, ValueError):
         dur = None
     bps = None
     if len(resp) > 1:
@@ -4246,28 +4246,29 @@ class UpdateAudio(Database):
 
     # Searches for and extracts incomplete queue entries
     async def research(self, auds):
-        if not auds.search_sem.is_busy():
-            async with auds.search_sem:
-                searched = 0
-                q = auds.queue
-                async with delay(2):
-                    for i, e in enumerate(q, 1):
-                        if searched >= 32 or i > 128:
-                            break
-                        if "research" in e:
-                            try:
-                                await create_future(ytdl.extract_single, e, timeout=18)
-                                e.pop("research", None)
-                                searched += 1
-                            except:
-                                e.pop("research", None)
-                                print_exc()
+        with tracebacksuppressor:
+            if not auds.search_sem.is_busy():
+                async with auds.search_sem:
+                    searched = 0
+                    q = auds.queue
+                    async with delay(2):
+                        for i, e in enumerate(q, 1):
+                            if searched >= 32 or i > 128:
                                 break
-                            e.pop("id", None)
-                        if "research" not in e and not e.get("duration") and "stream" in e:
-                            e["duration"] = await create_future(get_duration, e["stream"])
-                        if not i & 7:
-                            await asyncio.sleep(0.4)
+                            if "research" in e:
+                                try:
+                                    await create_future(ytdl.extract_single, e, timeout=18)
+                                    e.pop("research", None)
+                                    searched += 1
+                                except:
+                                    e.pop("research", None)
+                                    print_exc()
+                                    break
+                                e.pop("id", None)
+                            if "research" not in e and not e.get("duration") and "stream" in e:
+                                e["duration"] = await create_future(get_duration, e["stream"])
+                            if not i & 7:
+                                await asyncio.sleep(0.4)
 
     # Delays audio player display message by 15 seconds when a user types in the target channel
     # async def _typing_(self, channel, user, **void):
