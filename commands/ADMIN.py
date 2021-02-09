@@ -1219,15 +1219,15 @@ class AutoEmoji(Command):
         if not content:
             content = message.embeds[0].description
         i = content.index("callback")
-        content = "*```" + "\n" * ("\n" in content[:i]) + (
+        content = "```" + "\n" * ("\n" in content[:i]) + (
             "callback-admin-autoemoji-"
             + str(u_id) + "_" + str(pos)
             + "-\n"
         )
         if guild.id in data:
-            content += f"Automatic emoji substitution is currently enabled in {sqr_md(guild)}.```*"
+            content += f"Automatic emoji substitution is currently enabled in {sqr_md(guild)}.```"
         else:
-            content += f'Automatic emoji substitution is currently disabled in {sqr_md(guild)}. Use "{bot.get_prefix(guild)}autoemoji enable" to enable.```*'
+            content += f'Automatic emoji substitution is currently disabled in {sqr_md(guild)}. Use "{bot.get_prefix(guild)}autoemoji enable" to enable.```'
         if not curr:
             msg = italics(code_md(f"No custom emojis found for {str(message.guild).replace('`', '')}."))
         else:
@@ -1261,7 +1261,7 @@ class UpdateAutoEmojis(Database):
             name = f[1:-1]
             emoji = discord.utils.get(guild.emojis, name=name)
             if not emoji and name.isnumeric():
-                emoji = discord.utils.get(guild.emojis, id=int(name))
+                emoji = bot.cache.emojis.get(int(name))
             if emoji:
                 substitutes[f] = min_emoji(emoji)
         if not substitutes:
