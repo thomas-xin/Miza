@@ -435,14 +435,22 @@ class SlotMachine(Command):
             return "❤️"
         return choice("🍒🍎🍇🍋🍉🍌")
 
-    def generate(self, count=3):
+    def generate(self, rate="low", count=3):
         x = random.random()
-        if x < 1 / 10:
-            count = 3
-        elif x < 2 / 5:
-            count = 2
+        if rate == "high":
+            if x < 1 / 5:
+                count = 3
+            elif x < 8 / 15:
+                count = 2
+            else:
+                count = 1
         else:
-            count = 1
+            if x < 1 / 10:
+                count = 3
+            elif x < 2 / 5:
+                count = 2
+            else:
+                count = 1
         out = alist((self.select(),) * count)
         while len(out) < 3:
             out.append(choice(self.emojis))
@@ -484,7 +492,7 @@ class SlotMachine(Command):
                 if bet > bot.data.users.get(user.id, {}).get("gold", 0):
                     raise OverflowError("Bet cannot be greater than your balance.")
                 bot.data.users.add_gold(user, -bet)
-            wheel_true = self.generate()
+            wheel_true = self.generate("high" if bet <= 50 else "low")
             wheel_display = [None] * 3 if not skip else wheel_true
             wheel_order = deque(shuffle(range(3))) if not skip else deque((0, ))
             colour = await bot.get_colour(user)
