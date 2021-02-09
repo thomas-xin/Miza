@@ -1169,15 +1169,18 @@ class Publish(Command):
 class AutoEmoji(Command):
     server_only = True
     name = ["NQN", "Emojis"]
-    min_level = 3
+    min_level = 0
     description = "Causes all failed emojis starting and ending with : to be deleted and reposted with a webhook, when possible."
     usage = "(enable|disable)?"
-    flags = "aedx"
+    flags = "aed"
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     rate_limit = 1
 
-    async def __call__(self, bot, flags, guild, user, name, **void):
+    async def __call__(self, bot, flags, guild, user, name, perm, **void):
         data = bot.data.autoemojis
+        if flags and perm < 3:
+            reason = "to modify autoemoji for " + guild.name
+            raise self.perm_error(perm, 3, reason)
         if "e" in flags or "a" in flags:
             data[guild.id] = True
             return italics(css_md(f"Enabled automatic emoji substitution for {sqr_md(guild)}."))
@@ -1192,7 +1195,7 @@ class AutoEmoji(Command):
     
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
         u_id, pos = [int(i) for i in vals.split("_", 1)]
-        if reaction not in (None, self.directions[-1]) and perm < 3:
+        if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
             return
         if reaction not in self.directions and reaction is not None:
             return
@@ -1252,24 +1255,54 @@ class UpdateAutoEmojis(Database):
     name = "autoemojis"
 
     async def _nocommand_(self, message, **void):
-        if not message.content or not message.guild or message.guild.id not in self.data:
+        if not message.content or not message.guild or message.guild.id not in self.data or message.content.count(":") < 2:
             return
         guild = message.guild
-        failed = regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^a\\\\`])(:[A-Za-z0-9\\-_]+:)(?:(?![^0-9]).)*(?:$|[^0-9>`])").findall(message.content)
+        matched = regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^a\\\\`])(:[A-Za-z0-9\\-_]+:)(?:(?![^0-9]).)*(?:$|[^0-9>`])").finditer(message.content)
         substitutes = {}
-        for i, f in enumerate(failed):
-            name = f[1:-1]
-            emoji = discord.utils.get(guild.emojis, name=name)
+        emojis = {}
+        for e in sorted(guild.emojis, key=lambda e: e.id):
+            n = e.name
+            while n in emojis:
+                t = n.rsplit("-", 1)
+                if t[-1].isnumeric():
+                    n = t[0] + "-" + str(int(t[-1]) + 1)
+                else:
+                    n = t[0] + "-1"
+            emojis[n] = e
+        for m in matched:
+            s = m.group()
+            start = m.start()
+            while s and not s.startswith(":") or s.startswith("::"):
+                s = s[1:]
+                start += 1
+            while s and not s.endswith(":") or s.endswith("::"):
+                s = s[:-1]
+            if not s:
+                continue
+            name = s[1:-1]
+            emoji = emojis.get(name)
             if not emoji and name.isnumeric():
-                emoji = self.bot.cache.emojis.get(int(name))
+                name = int(name)
+                emoji = self.bot.cache.emojis.get(name)
+                if not emoji:
+                    animated = await create_future(self.bot.is_animated, name)
+                    emoji = cdict(id=name, animated=animated)
             if emoji:
-                substitutes[f] = min_emoji(emoji)
+                substitutes[start] = (min_emoji(emoji), start + len(s))
         if not substitutes:
             return
         msg = message.content
+        print(msg)
+        start = 0
+        out = deque()
         for k, v in substitutes.items():
-            msg = msg.replace(k, v)
-        msg = escape_everyone(msg)
+            s = msg[start:k]
+            s += v[0]
+            start = v[1]
+            out.append(s)
+        msg = escape_everyone("".join(out) + msg[start:])
+        print(msg)
         create_task(self.bot.silent_delete(message))
         await self.bot.send_as_webhook(message.channel, msg, username=message.author.display_name, avatar_url=best_url(message.author))
 
