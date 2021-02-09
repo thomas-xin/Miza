@@ -1254,8 +1254,7 @@ class AutoEmoji(Command):
 class UpdateAutoEmojis(Database):
     name = "autoemojis"
 
-    def guild_emoji_map(self, guild):
-        emojis = {}
+    def guild_emoji_map(self, guild, emojis={}):
         for e in sorted(guild.emojis, key=lambda e: e.id):
             n = e.name
             while n in emojis:
@@ -1273,7 +1272,8 @@ class UpdateAutoEmojis(Database):
         guild = message.guild
         matched = regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^a\\\\`])(:[A-Za-z0-9\\-~_]+:)(?:(?![^0-9]).)*(?:$|[^0-9>`])").finditer(message.content)
         substitutes = {}
-        emojis = self.guild_emoji_map(guild)
+        orig = self.bot.data.emojilists.get(message.author.id, {})
+        emojis = self.guild_emoji_map(guild, dict(orig))
         for m in matched:
             s = m.group()
             start = m.start()
@@ -1306,8 +1306,24 @@ class UpdateAutoEmojis(Database):
                                 i -= 1
                                 name = t[0] + "-" + str(i)
                                 emoji = emojis.get(name)
+            elif type(emoji) is int:
+                e_id = emoji
+                emoji = self.bot.cache.emojis.get(e_id)
+                if not emoji:
+                    animated = await create_future(self.bot.is_animated, e_id, verify=True)
+                    if animated is not None:
+                        emoji = cdict(id=e_id, animated=animated)
+                if not emoji:
+                    self.bot.data.emojilists.get(message.author.id, {}).pop(name, None)
             if emoji:
                 substitutes[start] = (min_emoji(emoji), start + len(s))
+                try:
+                    name = emoji.name
+                except (KeyError, AttributeError):
+                    pass
+                else:
+                    orig = self.bot.data.emojilists.setdefault(message.author.id, {})
+                    orig[name] = emoji.id
         if not substitutes:
             return
         msg = message.content
@@ -1323,6 +1339,11 @@ class UpdateAutoEmojis(Database):
         print(msg)
         create_task(self.bot.silent_delete(message))
         await self.bot.send_as_webhook(message.channel, msg, username=message.author.display_name, avatar_url=best_url(message.author))
+
+
+class UpdateEmojiLists(Database):
+    name = "emojilists"
+    user = True
 
 
 # TODO: Stop being lazy and finish this damn command
