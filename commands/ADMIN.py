@@ -1261,7 +1261,7 @@ class UpdateAutoEmojis(Database):
             name = f[1:-1]
             emoji = discord.utils.get(guild.emojis, name=name)
             if not emoji and name.isnumeric():
-                emoji = bot.cache.emojis.get(int(name))
+                emoji = self.bot.cache.emojis.get(int(name))
             if emoji:
                 substitutes[f] = min_emoji(emoji)
         if not substitutes:
