@@ -1282,13 +1282,26 @@ class UpdateAutoEmojis(Database):
                 continue
             name = s[1:-1]
             emoji = emojis.get(name)
-            if not emoji and name.isnumeric():
-                name = int(name)
-                emoji = self.bot.cache.emojis.get(name)
-                if not emoji:
-                    animated = await create_future(self.bot.is_animated, name, verify=True)
-                    if animated is not None:
-                        emoji = cdict(id=name, animated=animated)
+            if not emoji:
+                if name.isnumeric():
+                    name = int(name)
+                    emoji = self.bot.cache.emojis.get(name)
+                    if not emoji:
+                        animated = await create_future(self.bot.is_animated, name, verify=True)
+                        if animated is not None:
+                            emoji = cdict(id=name, animated=animated)
+                else:
+                    t = name.rsplit("-", 1)
+                    if t[-1].isnumeric():
+                        i = int(t[-1])
+                        if i < 512:
+                            while i > 1 and not emoji:
+                                i -= 1
+                                name = t[0] + "-" + str(i)
+                                emoji = emojis.get(name)
+                            if not emoji:
+                                name = t[0]
+                                emoji = emojis.get(name)
             if emoji:
                 substitutes[start] = (min_emoji(emoji), start + len(s))
         if not substitutes:
