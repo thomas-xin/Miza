@@ -437,9 +437,9 @@ class SlotMachine(Command):
 
     def generate(self, count=3):
         x = random.random()
-        if x < 1 / 5:
+        if x < 1 / 10:
             count = 3
-        elif x < 8 / 15:
+        elif x < 2 / 5:
             count = 2
         else:
             count = 1
@@ -459,13 +459,10 @@ class SlotMachine(Command):
 
     async def __call__(self, argv, user, flags, **void):
         b1 = 5
-        b2 = 50
         if argv:
             bet = await self.bot.eval_math(argv)
             if bet < b1:
                 raise ValueError(f"Minimum bet is {b1} coins.")
-            if bet > b2:
-                raise ValueError(f"Maximum bet is {b2} coins.")
         else:
             bet = b1
         if not bet <= self.bot.data.users.get(user.id, {}).get("gold", 0):
