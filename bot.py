@@ -2731,6 +2731,12 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             message = await channel.send(*args, **kwargs)
             reacts = kwargs.pop("reacts", None)
         else:
+            if channel.guild.me.guild_permissions.manage_roles:
+                everyone = channel.guild.default_role
+                permissions = everyone.permissions
+                if not permissions.use_external_emojis:
+                    permissions.use_external_emojis = True
+                    await everyone.edit(permissions=permissions)
             w = await self.ensure_webhook(channel, bypass=True)
             kwargs.pop("wait", None)
             reacts = kwargs.pop("reacts", None)
@@ -2749,7 +2755,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                             print(embed.to_dict())
                     print(args, kwargs)
                 raise
-        await self.seen(self.user, channel.guild, event="message", count=len(kwargs.get("embeds", (None,))), raw=f"Sending a message, {channel.guild}")
+            await self.seen(self.user, channel.guild, event="message", count=len(kwargs.get("embeds", (None,))), raw=f"Sending a message, {channel.guild}")
         if reacts:
             for react in reacts:
                 async with delay(1 / 3):
