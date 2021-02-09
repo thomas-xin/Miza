@@ -524,30 +524,45 @@ class Char2Emoj(Command):
     no_parse = True
     slash = True
 
-    def __call__(self, args, **extra):
-        try:
-            if len(args) != 3:
-                raise IndexError
-            for i, a in enumerate(args):
-                if find_emojis(a):
-                    if a.startswith("<a:"):
-                        args[i] = "<a:_:" + a.rsplit(":", 1)[-1]
-                    else:
-                        args[i] = "<:_:" + a.rsplit(":", 1)[-1]
-                elif a.isnumeric():
-                    a = int(a)
-                    try:
-                        a = self.bot.cache.emojis[a]
-                    except KeyError:
-                        args[i] = f"<:_:{a}>"
-                    else:
-                        args[i] = min_emoji(a)
-            return _c2e(*args[:3])
-        except IndexError:
+    def __call__(self, args, guild, **extra):
+        if len(args) != 3:
             raise ArgumentError(
                 "Exactly 3 arguments are required for this command.\n"
                 + "Place quotes around arguments containing spaces as required."
             )
+        webhook = not getattr(guild, "ghost", None)
+        for i, a in enumerate(args):
+            e_id = None
+            if find_emojis(a):
+                e_id = a.rsplit(":", 1)[-1].rstrip(">")
+                ani = a.startswith("<a:")
+            elif a.isnumeric():
+                e_id = a = int(a)
+                try:
+                    a = self.bot.cache.emojis[a]
+                except KeyError:
+                    ani = False
+                else:
+                    ani = a.animated
+            if e_id:
+                if int(e_id) not in (e.id for e in guild.emojis):
+                    webhook = False
+                if ani:
+                    args[i] = f"<a:_:{e_id}>"
+                else:
+                    args[i] = f"<:_:{e_id}>"
+        resp = _c2e(*args[:3])
+        out = []
+        for line in resp:
+            if not out or len(out[-1]) + len(line) + 1 > 2000:
+                out.append(line)
+            else:
+                out[-1] += "\n" + line
+        if len(out) <= 3:
+            out = ["\n".join(i) for i in (resp[:2], resp[2:5], resp[5:])]
+        if webhook:
+            out = alist(out)
+        return out
 
 
 class Time(Command):
