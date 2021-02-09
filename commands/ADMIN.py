@@ -1254,12 +1254,7 @@ class AutoEmoji(Command):
 class UpdateAutoEmojis(Database):
     name = "autoemojis"
 
-    async def _nocommand_(self, message, **void):
-        if not message.content or not message.guild or message.guild.id not in self.data or message.content.count(":") < 2:
-            return
-        guild = message.guild
-        matched = regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^a\\\\`])(:[A-Za-z0-9\\-_]+:)(?:(?![^0-9]).)*(?:$|[^0-9>`])").finditer(message.content)
-        substitutes = {}
+    def guild_emoji_map(self, guild):
         emojis = {}
         for e in sorted(guild.emojis, key=lambda e: e.id):
             n = e.name
@@ -1270,6 +1265,15 @@ class UpdateAutoEmojis(Database):
                 else:
                     n = t[0] + "-1"
             emojis[n] = e
+        return emojis
+
+    async def _nocommand_(self, message, **void):
+        if not message.content or not message.guild or message.guild.id not in self.data or message.content.count(":") < 2:
+            return
+        guild = message.guild
+        matched = regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^a\\\\`])(:[A-Za-z0-9\\-~_]+:)(?:(?![^0-9]).)*(?:$|[^0-9>`])").finditer(message.content)
+        substitutes = {}
+        emojis = self.guild_emoji_map(guild)
         for m in matched:
             s = m.group()
             start = m.start()
@@ -1291,16 +1295,16 @@ class UpdateAutoEmojis(Database):
                         if animated is not None:
                             emoji = cdict(id=name, animated=animated)
                 else:
-                    t = name.rsplit("-", 1)
+                    t = name[::-1].replace("~", "-", 1)[::-1].rsplit("-", 1)
                     if t[-1].isnumeric():
                         i = int(t[-1])
-                        if i < 512:
+                        if i < 1000:
+                            if not emoji:
+                                name = t[0]
+                                emoji = emojis.get(name)
                             while i > 1 and not emoji:
                                 i -= 1
                                 name = t[0] + "-" + str(i)
-                                emoji = emojis.get(name)
-                            if not emoji:
-                                name = t[0]
                                 emoji = emojis.get(name)
             if emoji:
                 substitutes[start] = (min_emoji(emoji), start + len(s))
