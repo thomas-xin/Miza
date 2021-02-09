@@ -445,9 +445,9 @@ class SlotMachine(Command):
             else:
                 count = 1
         else:
-            if x < 1 / 10:
+            if x < 1 / 7:
                 count = 3
-            elif x < 2 / 5:
+            elif x < 3 / 7:
                 count = 2
             else:
                 count = 1

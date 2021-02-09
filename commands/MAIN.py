@@ -1214,7 +1214,7 @@ class Status(Command):
             emb.description = msg
         func = channel.send
         if m_id is not None:
-            with tracebacksuppressor(StopIteration):
+            with tracebacksuppressor(StopIteration, discord.NotFound, discord.Forbidden):
                 message = bot.cache.messages.get(m_id)
                 if message is None:
                     message = await aretry(channel.fetch_message, m_id, attempts=6, delay=2, exc=(discord.NotFound, discord.Forbidden))

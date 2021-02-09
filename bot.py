@@ -387,6 +387,12 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                             c[attr] = command.attr
             with open("misc/help.json", "w", encoding="utf-8") as f:
                 f.write(json.dumps(j, indent=4))
+            fn = "misc/mizatlas/static/js/main.312a0124.chunk.js"
+            with open(fn + ".txt", "r", encoding="utf-8") as f:
+                s = f.read()
+            s = s.replace("⟨MIZA⟩", self.raw_webserver)
+            with open(fn, "w", encoding="utf-8") as f:
+                f.write(s)
         self.start_webserver()
 
     def start_webserver(self):
