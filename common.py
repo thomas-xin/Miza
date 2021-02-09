@@ -542,8 +542,9 @@ class FileHashDict(collections.abc.MutableMapping):
             elif ((self.data[k] == v) is True):
                 return
         except (TypeError, KeyError, ValueError):
-            self.data[k] = v
-            self.modified.add(k)
+            pass
+        self.data[k] = v
+        self.modified.add(k)
 
     def get(self, k, default=None):
         with suppress(KeyError):
