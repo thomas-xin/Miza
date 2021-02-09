@@ -40,15 +40,15 @@ class Restart(Command):
     description = "Restarts, reloads, or shuts down ⟨MIZA⟩, with an optional delay."
     _timeout_ = inf
 
-    async def __call__(self, message, channel, guild, user,argv, name, **void):
+    async def __call__(self, message, channel, guild, user, argv, name, **void):
         bot = self.bot
         client = bot.client
         await message.add_reaction("❗")
         save = None
         if argv:
             # Restart announcements for when a time input is specified
-            if "in" in argv:
-                argv = argv[argv.rindex("in") + 2:]
+            if argv.startswith("in"):
+                argv = argv[2:].lstrip()
             wait = await bot.eval_time(argv)
             await send_with_reply(channel, content="*Preparing to " + name + " in " + sec2time(wait) + "...*", reference=message)
             emb = discord.Embed(colour=discord.Colour(1))

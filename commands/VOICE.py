@@ -548,7 +548,7 @@ class CustomAudio(collections.abc.Hashable):
                     if ch:
                         with tracebacksuppressor(SemaphoreOverflowError):
                             await_fut(self.acsi.move_to(ch))
-                            self.announce(ini_md(f"🎵 Detected {sqr_md(cnt)} user{'s' if cnt != 1 else ''} in {sqr_md(ch)}, automatically joined! 🎵"), sync=True)
+                            self.announce(ini_md(f"🎵 Detected {sqr_md(cnt)} user{'s' if cnt != 1 else ''} in {sqr_md(ch)}, automatically joined! 🎵"), aio=False)
         else:
             self.timeout = utc()
         if m.voice is not None:
@@ -4353,7 +4353,7 @@ class UpdateAudio(Database):
 
     def _announce_(self, *args, **kwargs):
         for auds in self.players.values():
-            create_future_ex(auds.announce, *args, sync=False, **kwargs)
+            create_future_ex(auds.announce, *args, aio=True, **kwargs)
 
     # Stores all currently playing audio data to temporary database when bot shuts down
     async def _destroy_(self, **void):

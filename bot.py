@@ -2727,7 +2727,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
     # Sends a message to the target channel, using a random webhook from that channel.
     async def send_as_webhook(self, channel, *args, **kwargs):
-        if hasattr(channel, "simulated"):
+        if hasattr(channel, "simulated") or hasattr(channel, "recipient"):
             message = await channel.send(*args, **kwargs)
             reacts = kwargs.pop("reacts", None)
         else:

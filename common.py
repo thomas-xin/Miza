@@ -536,10 +536,7 @@ class FileHashDict(collections.abc.MutableMapping):
             k = int(k)
         self.deleted.discard(k)
         try:
-            if type(v) in (alist, np.array):
-                if all(self.data[k] == v):
-                    return
-            elif ((self.data[k] == v) is True):
+            if self.data[k] is v:
                 return
         except (TypeError, KeyError, ValueError):
             pass
