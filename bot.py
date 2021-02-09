@@ -2731,12 +2731,12 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             message = await channel.send(*args, **kwargs)
             reacts = kwargs.pop("reacts", None)
         else:
-            if channel.guild.me.guild_permissions.manage_roles:
+            if args and args[0] and args[0].count(":") >= 2 and channel.guild.me.guild_permissions.manage_roles:
                 everyone = channel.guild.default_role
                 permissions = everyone.permissions
                 if not permissions.use_external_emojis:
                     permissions.use_external_emojis = True
-                    await everyone.edit(permissions=permissions)
+                    await everyone.edit(permissions=permissions, reason="I need to send emojis :3")
             w = await self.ensure_webhook(channel, bypass=True)
             kwargs.pop("wait", None)
             reacts = kwargs.pop("reacts", None)
