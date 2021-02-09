@@ -1268,7 +1268,7 @@ class UpdateAutoEmojis(Database):
         return emojis
 
     async def _nocommand_(self, message, **void):
-        if not message.content or not message.guild or message.guild.id not in self.data or message.content.count(":") < 2:
+        if not message.content or not message.guild or message.guild.id not in self.data or message.content.count(":") < 2 or message.content.count("```") > 1:
             return
         guild = message.guild
         matched = regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^a\\\\`])(:[A-Za-z0-9\\-~_]+:)(?:(?![^0-9]).)*(?:$|[^0-9>`])").finditer(message.content)
