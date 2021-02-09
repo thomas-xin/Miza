@@ -535,8 +535,15 @@ class FileHashDict(collections.abc.MutableMapping):
         with suppress(ValueError):
             k = int(k)
         self.deleted.discard(k)
-        self.data[k] = v
-        self.modified.add(k)
+        try:
+            if type(v) in (alist, np.array):
+                if all(self.data[k] == v):
+                    return
+            elif ((self.data[k] == v) is True):
+                return
+        except (TypeError, KeyError, ValueError):
+            self.data[k] = v
+            self.modified.add(k)
 
     def get(self, k, default=None):
         with suppress(KeyError):

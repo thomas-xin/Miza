@@ -186,7 +186,7 @@ class EnabledCommands(Command):
     flags = "aedlh"
     slash = True
 
-    def __call__(self, argv, args, flags, user, channel, guild, perm, **void):
+    def __call__(self, argv, args, flags, user, channel, guild, perm, name, **void):
         update = self.data.enabled.update
         bot = self.bot
         enabled = bot.data.enabled
@@ -225,7 +225,7 @@ class EnabledCommands(Command):
                 raise LookupError(f"Unknown command category {argv}.")
             if catg in enabled:
                 return css_md(f"Command category {sqr_md(catg)} is currently enabled in {sqr_md(channel)}.")
-            return css_md(f"Command category {sqr_md(catg)} is currently disabled in {sqr_md(channel)}. Use ?e to enable.")
+            return css_md(f'Command category {sqr_md(catg)} is currently disabled in {sqr_md(channel)}. Use "{bot.get_prefix(guild)}{name} enable" to enable.')
         args = [i.casefold() for i in args]
         for catg in args:
             if not catg in bot.categories:

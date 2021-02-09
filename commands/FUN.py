@@ -654,7 +654,7 @@ class React(Command):
         else:
             content += f"{len(curr)} auto reactions currently assigned for {str(guild).replace('`', '')}:```*"
             key = lambda x: "\n" + ", ".join(x)
-            msg = "```ini\n" + iter2str({k: curr[k] for k in tuple(curr)[pos:pos + page]}, key=key) + "```"
+            msg = ini_md(iter2str({k: curr[k] for k in tuple(curr)[pos:pos + page]}, key=key))
         colour = await self.bot.data.colours.get(to_png_ex(guild.icon_url))
         emb = discord.Embed(
             description=content + msg,
@@ -679,7 +679,7 @@ class Dogpile(Command):
     flags = "aed"
     rate_limit = 0.5
 
-    async def __call__(self, flags, guild, **void):
+    async def __call__(self, flags, guild, name, **void):
         update = self.data.dogpiles.update
         bot = self.bot
         following = bot.data.dogpiles
@@ -693,7 +693,7 @@ class Dogpile(Command):
             return css_md(f"Enabled dogpile imitating for {sqr_md(guild)}.")
         if curr:
             return ini_md(f"Dogpile imitating is currently enabled in {sqr_md(guild)}.")
-        return ini_md(f"Dogpile imitating is currently disabled in {sqr_md(guild)}. Use ?e to enable.")
+        return ini_md(f'Dogpile imitating is currently disabled in {sqr_md(guild)}. Use "{bot.get_prefix(guild)}{name} enable" to enable.')
 
 
 class UpdateDogpiles(Database):

@@ -736,7 +736,7 @@ class RolePreserver(Command):
     flags = "aed"
     slash = True
 
-    def __call__(self, flags, guild, **void):
+    def __call__(self, flags, guild, name, **void):
         bot = self.bot
         following = bot.data.rolepreservers
         update = following.update
@@ -751,7 +751,7 @@ class RolePreserver(Command):
                 following[guild.id] = {}
             return italics(css_md(f"Enabled role preservation for {sqr_md(guild)}."))
         if curr is None:
-            return ini_md(f"Role preservation is currently disabled in {sqr_md(guild)}. Use ?e to enable.")
+            return ini_md(f'Role preservation is currently disabled in {sqr_md(guild)}. Use "{bot.get_prefix(guild)}{name} enable" to enable.')
         return ini_md(f"Role preservation is currently enabled in {sqr_md(guild)}.")
 
 
@@ -764,7 +764,7 @@ class NickPreserver(Command):
     usage = "(enable|disable)?"
     flags = "aed"
 
-    def __call__(self, flags, guild, **void):
+    def __call__(self, flags, guild, name, **void):
         bot = self.bot
         following = bot.data.nickpreservers
         update = following.update
@@ -779,7 +779,7 @@ class NickPreserver(Command):
                 following[guild.id] = {}
             return italics(css_md(f"Enabled nickname preservation for {sqr_md(guild)}."))
         if curr is None:
-            return ini_md(f"Nickname preservation is currently disabled in {sqr_md(guild)}. Use ?e to enable.")
+            return ini_md(f'Nickname preservation is currently disabled in {sqr_md(guild)}. Use "{bot.get_prefix(guild)}{name} enable" to enable.')
         return ini_md(f"Nickname preservation is currently enabled in {sqr_md(guild)}.")
 
 
@@ -861,7 +861,7 @@ class UserLog(Command):
     flags = "aed"
     rate_limit = 1
 
-    async def __call__(self, bot, flags, channel, guild, **void):
+    async def __call__(self, bot, flags, channel, guild, name, **void):
         data = bot.data.logU
         update = bot.data.logU.update
         if "e" in flags or "a" in flags:
@@ -875,7 +875,7 @@ class UserLog(Command):
             c_id = data[guild.id]
             channel = await bot.fetch_channel(c_id)
             return ini_md(f"User event logging for {sqr_md(guild)} is currently enabled in {sqr_md(channel)}.")
-        return ini_md(f"User event logging is currently disabled in {sqr_md(guild)}. Use ?e to enable.")
+        return ini_md(f'User event logging is currently disabled in {sqr_md(guild)}. Use "{bot.get_prefix(guild)}{name} enable" to enable.')
 
 
 class MessageLog(Command):
@@ -886,7 +886,7 @@ class MessageLog(Command):
     flags = "aed"
     rate_limit = 1
 
-    async def __call__(self, bot, flags, channel, guild, **void):
+    async def __call__(self, bot, flags, channel, guild, name, **void):
         data = bot.data.logM
         update = bot.data.logM.update
         if "e" in flags or "a" in flags:
@@ -900,7 +900,7 @@ class MessageLog(Command):
             c_id = data[guild.id]
             channel = await bot.fetch_channel(c_id)
             return ini_md(f"Message event logging for {sqr_md(guild)} is currently enabled in {sqr_md(channel)}.")
-        return ini_md(f"Message event logging is currently disabled in {sqr_md(guild)}. Use ?e to enable.")
+        return ini_md(f'Message event logging is currently disabled in {sqr_md(guild)}. Use "{bot.get_prefix(guild)}{name} enable" to enable.')
 
 
 class FileLog(Command):
@@ -911,7 +911,7 @@ class FileLog(Command):
     flags = "aed"
     rate_limit = 1
 
-    async def __call__(self, bot, flags, channel, guild, **void):
+    async def __call__(self, bot, flags, channel, guild, name, **void):
         data = bot.data.logF
         update = bot.data.logF.update
         if "e" in flags or "a" in flags:
@@ -925,7 +925,7 @@ class FileLog(Command):
             c_id = data[guild.id]
             channel = await bot.fetch_channel(c_id)
             return ini_md(f"File deletion logging for {sqr_md(guild)} is currently enabled in {sqr_md(channel)}.")
-        return ini_md(f"File deletion logging is currently disabled in {sqr_md(guild)}. Use ?e to enable.")
+        return ini_md(f'File deletion logging is currently disabled in {sqr_md(guild)}. Use "{bot.get_prefix(guild)}{name} enable" to enable.')
 
 
 class StarBoard(Command):
@@ -1026,7 +1026,7 @@ class StarBoard(Command):
             msg = ""
         else:
             content += f"{len(curr)} starboard triggers currently assigned for {str(guild).replace('`', '')}:```*"
-            msg = "```ini\n" + iter2str({k: curr[k] for k in tuple(curr)[pos:pos + page]}, key=lambda t: f"×{t[0]} {sqr_md(bot.get_channel(t[1]))}") + "```"
+            msg = ini_md(iter2str({k: curr[k] for k in tuple(curr)[pos:pos + page]}, key=lambda t: f"×{t[0]} {sqr_md(bot.get_channel(t[1]))}"))
         colour = await self.bot.data.colours.get(to_png_ex(guild.icon_url))
         emb = discord.Embed(
             description=content + msg,
@@ -1123,7 +1123,7 @@ class Crosspost(Command):
             msg = ""
         else:
             content += f"{len(curr)} crosspost subscriptions currently assigned for #{str(message.channel).replace('`', '')}:```*"
-            msg = "```ini\n" + iter2str({k: curr[k] for k in tuple(curr)[pos:pos + page]}) + "```"
+            msg = ini_md(iter2str({k: curr[k] for k in tuple(curr)[pos:pos + page]}))
         colour = await self.bot.data.colours.get(to_png_ex(guild.icon_url))
         emb = discord.Embed(
             description=content + msg,
@@ -1149,7 +1149,7 @@ class Publish(Command):
     flags = "aedx"
     rate_limit = 1
 
-    async def __call__(self, bot, flags, message, channel, guild, **void):
+    async def __call__(self, bot, flags, message, channel, guild, name, **void):
         data = bot.data.publishers
         if "e" in flags or "a" in flags:
             if channel.type != discord.ChannelType.news:
@@ -1159,12 +1159,119 @@ class Publish(Command):
             data[channel.id] = 0 if "x" in flags else message.id
             return italics(css_md(f"Enabled automatic message publishing in {sqr_md(channel)} for {sqr_md(guild)}."))
         elif "d" in flags:
-            if channel.id in data:
-                data.pop(channel.id)
+            data.pop(channel.id, None)
             return italics(css_md(f"Disabled automatic message publishing for {sqr_md(guild)}."))
         if channel.id in data:
             return ini_md(f"Automatic message publishing is currently enabled in {sqr_md(channel)}.")
-        return ini_md(f"Automatic message publishing is currently disabled in {sqr_md(channel)}. Use ?e to enable.")
+        return ini_md(f'Automatic message publishing is currently disabled in {sqr_md(channel)}. Use "{bot.get_prefix(guild)}{name} enable" to enable.')
+
+
+class AutoEmoji(Command):
+    server_only = True
+    name = ["NQN", "Emojis"]
+    min_level = 3
+    description = "Causes all failed emojis starting and ending with : to be deleted and reposted with a webhook, when possible."
+    usage = "(enable|disable)?"
+    flags = "aedx"
+    directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
+    rate_limit = 1
+
+    async def __call__(self, bot, flags, guild, user, name, **void):
+        data = bot.data.autoemojis
+        if "e" in flags or "a" in flags:
+            data[guild.id] = True
+            return italics(css_md(f"Enabled automatic emoji substitution for {sqr_md(guild)}."))
+        elif "d" in flags:
+            data.pop(guild.id, None)
+            return italics(css_md(f"Disabled automatic emoji substitution for {sqr_md(guild)}."))
+        return (
+            "*```" + "\n" * ("z" in flags) + "callback-admin-autoemoji-"
+            + str(user.id) + "_0"
+            + "-\nLoading AutoEmoji database...```*"
+        )
+    
+    async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
+        u_id, pos = [int(i) for i in vals.split("_", 1)]
+        if reaction not in (None, self.directions[-1]) and perm < 3:
+            return
+        if reaction not in self.directions and reaction is not None:
+            return
+        guild = message.guild
+        user = await bot.fetch_user(u_id)
+        data = bot.data.autoemojis
+        curr = {f":{e.name}:": f"({e.id})` {min_emoji(e)}" for e in sorted(guild.emojis, key=lambda e: full_prune(e.name))}
+        page = 16
+        last = max(0, len(curr) - page)
+        if reaction is not None:
+            i = self.directions.index(reaction)
+            if i == 0:
+                new = 0
+            elif i == 1:
+                new = max(0, pos - page)
+            elif i == 2:
+                new = min(last, pos + page)
+            elif i == 3:
+                new = last
+            else:
+                new = pos
+            pos = new
+        content = message.content
+        if not content:
+            content = message.embeds[0].description
+        i = content.index("callback")
+        content = "*```" + "\n" * ("\n" in content[:i]) + (
+            "callback-admin-autoemoji-"
+            + str(u_id) + "_" + str(pos)
+            + "-\n"
+        )
+        if guild.id in data:
+            content += f"Automatic emoji substitution is currently enabled in {sqr_md(guild)}.```*"
+        else:
+            content += f'Automatic emoji substitution is currently disabled in {sqr_md(guild)}. Use "{bot.get_prefix(guild)}autoemoji enable" to enable.```*'
+        if not curr:
+            msg = italics(code_md(f"No custom emojis found for {str(message.guild).replace('`', '')}."))
+        else:
+            msg = italics(code_md(f"{len(curr)} custom emojis currently assigned for {str(message.guild).replace('`', '')}:")) + "\n" + iter2str({k + " " * (32 - len(k)): curr[k] for k in tuple(curr)[pos:pos + page]}, left="`", right="")
+        colour = await self.bot.data.colours.get(to_png_ex(guild.icon_url))
+        emb = discord.Embed(
+            description=msg,
+            colour=colour,
+        )
+        emb.set_author(**get_author(user))
+        more = len(curr) - pos - page
+        if more > 0:
+            emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
+        create_task(message.edit(content=content, embed=emb))
+        if reaction is None:
+            for react in self.directions:
+                create_task(message.add_reaction(as_str(react)))
+                await asyncio.sleep(0.5)
+
+
+class UpdateAutoEmojis(Database):
+    name = "autoemojis"
+
+    async def _nocommand_(self, message, **void):
+        if not message.content or not message.guild or message.guild.id not in self.data:
+            return
+        guild = message.guild
+        failed = regexp("(?:^|^[^<\\`]|[^<][^\\`]|.[^a\\`])(:[A-Za-z0-9\\-_]+:)(?:(?![^0-9]).)*(?:$|[^0-9>`])").findall(message.content)
+        substitutes = {}
+        for i, f in enumerate(failed):
+            name = f[1:-1]
+            emoji = discord.utils.get(guild.emojis, name=name)
+            if not emoji and name.isnumeric():
+                emoji = discord.utils.get(guild.emojis, id=int(name))
+            if emoji:
+                substitutes[f] = min_emoji(emoji)
+        if not substitutes:
+            return
+        msg = message.content
+        for k, v in substitutes.items():
+            msg = msg.replace(k, v)
+        msg = escape_everyone(msg)
+        create_task(self.bot.silent_delete(message))
+        await self.bot.send_as_webhook(message.channel, msg, username=message.author.display_name, avatar_url=best_url(message.author))
 
 
 # TODO: Stop being lazy and finish this damn command

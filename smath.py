@@ -3115,7 +3115,7 @@ def remove_str(s, arg):
 
 
 # Returns a string representation of an iterable, with options.
-def iter2str(it, key=None, limit=1728, offset=0, left="[", right="]"):
+def iter2str(it, key=None, limit=1728, offset=0, left="[", right="]", sep=" "):
     try:
         try:
             len(it)
@@ -3133,7 +3133,7 @@ def iter2str(it, key=None, limit=1728, offset=0, left="[", right="]"):
     s = ""
     with suppress(StopIteration):
         for k in keys:
-            index = k if type(k) is str else " " * (spacing - int(math.log10(max(1, k)))) + str(k)
+            index = k if type(k) is str else sep * (spacing - int(math.log10(max(1, k)))) + str(k)
             s += f"\n{left}{index}{right} "
             if key is None:
                 s += str(next(values))
