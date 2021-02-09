@@ -1255,7 +1255,7 @@ class UpdateAutoEmojis(Database):
         if not message.content or not message.guild or message.guild.id not in self.data:
             return
         guild = message.guild
-        failed = regexp("(?:^|^[^<\\`]|[^<][^\\`]|.[^a\\`])(:[A-Za-z0-9\\-_]+:)(?:(?![^0-9]).)*(?:$|[^0-9>`])").findall(message.content)
+        failed = regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^a\\\\`])(:[A-Za-z0-9\\-_]+:)(?:(?![^0-9]).)*(?:$|[^0-9>`])").findall(message.content)
         substitutes = {}
         for i, f in enumerate(failed):
             name = f[1:-1]
