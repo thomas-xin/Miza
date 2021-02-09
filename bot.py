@@ -1154,15 +1154,36 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             return list(out)[:limit]
         return out
 
-    def is_animated(self, e):
+    emoji_stuff = {}
+
+    def is_animated(self, e, verify=False):
         if type(e) in (int, str):
             try:
                 emoji = self.cache.emojis[e]
             except KeyError:
-                url = f"https://cdn.discordapp.com/emojis/{e}.gif"
+                e = int(e)
+                if e > time_snowflake(utc_dt(), high=True):
+                    return
+                try:
+                    return self.emoji_stuff[e]
+                except KeyError:
+                    pass
+                base = f"https://cdn.discordapp.com/emojis/{e}."
+                if verify:
+                    fut = create_future_ex(Request, base + "png")
+                url = base + "gif"
                 with requests.get(url, stream=True) as resp:
                     if resp.status_code >= 400:
-                        return
+                        if not verify:
+                            return False
+                        try:
+                            fut.result()
+                        except ConnectionError:
+                            self.emoji_stuff[e] = None
+                            return
+                        self.emoji_stuff[e] = False
+                        return False
+                self.emoji_stuff[e] = True
                 return True
         else:
             emoji = e

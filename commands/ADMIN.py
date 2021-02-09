@@ -1286,8 +1286,9 @@ class UpdateAutoEmojis(Database):
                 name = int(name)
                 emoji = self.bot.cache.emojis.get(name)
                 if not emoji:
-                    animated = await create_future(self.bot.is_animated, name)
-                    emoji = cdict(id=name, animated=animated)
+                    animated = await create_future(self.bot.is_animated, name, verify=True)
+                    if animated is not None:
+                        emoji = cdict(id=name, animated=animated)
             if emoji:
                 substitutes[start] = (min_emoji(emoji), start + len(s))
         if not substitutes:
