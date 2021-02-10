@@ -248,9 +248,11 @@ def upload_file():
         sfn = f"cache/{IND}{ts}~{fn}"
         futs.append(create_future_ex(file.save, sfn))
         href = f"/files/{ts}/{fn}"
-        url = f"{HOST}{href}"
-        urls.append((href, url, sfn))
-        send(ip + "\t" + fn + "\t" + url)
+        b = ts.bit_length() + 7 >> 3
+        url = f"{HOST}/view/~" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
+        data = (href, url, sfn)
+        urls.append(data)
+        send(ip + "\t" + fn + "\t" + str(data))
         ts += 1
     s = """<!DOCTYPE html>
 <html>
@@ -268,17 +270,14 @@ def upload_file():
             color: #ffff00;
             text-decoration: none;
         }
-
         a:visited {
             color: #ffff00;
             text-decoration: none;
         }
-
         a:hover {
             color: #ff0000;
             text-decoration: underline;
         }
-
         a:active {
             color: #00ff00;
             text-decoration: underline;
@@ -288,13 +287,30 @@ def upload_file():
     <body style="background-color:black;">
         <h1 style="color:white;">Upload successful!</h1>"""
     with tracebacksuppressor:
-        for fi, fut in zip(urls, futs):
+        for fut in futs:
             fut.result()
+        s += f"""
+        <p style="color:#00ffff;">Total file size: {byte_scale(sum(os.path.getsize(f[2]) for f in urls))}B</p>
+        <p style="color:#bf7fff;">Estimated file lifetime: {sec2time(utc() - est_time)}</p>"""
+        for fi in urls:
             s += f'\n<p><a href="{fi[0]}">{fi[1]}</a></p>'
-    s += f"""
-        <p style="color:cyan;">Total file size: {byte_scale(sum(os.path.getsize(f[2]) for f in urls))}B</p>
-        <p style="color:orange;">Estimated file lifetime: {sec2time(utc() - est_time)}</p>
-        <img src="{flask.request.host_url}static/hug.gif" alt="Miza-Dottie-Hug" style="width:14.2857%;height:14.2857%;">
+        preview = deque()
+        for f in urls:
+            mime = get_mime(f[2])
+            if mime.startswith("image/"):
+                preview.append(f'<img width="480" src="{f[0].replace("/view/", "/preview/")}" alt="{f[2].split("~", 1)[-1]}">')
+            elif mime.startswith("audio/"):
+                preview.append(f'<div align="center"><audio controls><source src="{f[0]}" type="{mime}"></audio></div>')
+            elif mime.startswith("video/"):
+                preview.append(f'<div align="center"><video width="480" controls><source src="{f[0]}" type="{mime}"></video></div>')
+            elif mime.startswith("text/"):
+                preview.append(f'<p><a href="{fi[0].replace("/view/", "/files/")}">{fi[1]}</a></p>')
+            else:
+                preview.append(f'<p><a href="{fi[0].replace("/view/", "/download/")}">{fi[1]}</a></p>')
+    if not preview:
+        preview.append(f'<img src="{flask.request.host_url}static/hug.gif" alt="Miza-Dottie-Hug" style="width:14.2857%;height:14.2857%;">')
+    s += "\n" + "\n".join(preview)
+    s += """
         <p><a href="/upload">Click here to upload another file!</a></p>
     </body>
 </html>"""

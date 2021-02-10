@@ -1280,7 +1280,7 @@ class UpdateAutoEmojis(Database):
                 animated = await create_future(self.bot.is_animated, e_id, verify=True)
             else:
                 name = animated.name
-            if animated is not None:
+            if animated is not None and not message.webhook_id:
                 orig = self.bot.data.emojilists.setdefault(message.author.id, {})
                 orig[name] = e_id
                 self.bot.data.emojilists.update(message.author.id)
@@ -1335,7 +1335,7 @@ class UpdateAutoEmojis(Database):
                         animated = await create_future(self.bot.is_animated, e_id, verify=True)
                         if animated is not None:
                             emoji = cdict(id=e_id, animated=animated)
-                    if not emoji:
+                    if not emoji and not message.webhook_id:
                         self.bot.data.emojilists.get(message.author.id, {}).pop(name, None)
                         self.bot.data.emojilists.update(message.author.id)
                 if emoji:
@@ -1345,9 +1345,10 @@ class UpdateAutoEmojis(Database):
                     except (KeyError, AttributeError):
                         pass
                     else:
-                        orig = self.bot.data.emojilists.setdefault(message.author.id, {})
-                        orig[name] = emoji.id
-                        self.bot.data.emojilists.update(message.author.id)
+                        if not message.webhook_id:
+                            orig = self.bot.data.emojilists.setdefault(message.author.id, {})
+                            orig[name] = emoji.id
+                            self.bot.data.emojilists.update(message.author.id)
             if not substitutes:
                 break
             start = 0
