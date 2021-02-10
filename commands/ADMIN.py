@@ -103,8 +103,9 @@ class Purge(Command):
             create_task(send_with_react(
                 channel,
                 italics(css_md(f"Deleted {sqr_md(deleted)} message{'s' if deleted != 1 else ''}!")),
-                reacts="❎"))
-                return
+                reacts="❎",
+            ))
+            return
 
 
 class Mute(Command):
