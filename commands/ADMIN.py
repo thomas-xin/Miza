@@ -1283,6 +1283,7 @@ class UpdateAutoEmojis(Database):
             if animated is not None:
                 orig = self.bot.data.emojilists.setdefault(message.author.id, {})
                 orig[name] = e_id
+                self.bot.data.emojilists.update(message.author.id)
         if not message.guild or message.guild.id not in self.data:
             return
         guild = message.guild
@@ -1331,6 +1332,7 @@ class UpdateAutoEmojis(Database):
                         emoji = cdict(id=e_id, animated=animated)
                 if not emoji:
                     self.bot.data.emojilists.get(message.author.id, {}).pop(name, None)
+                    self.bot.data.emojilists.update(message.author.id)
             if emoji:
                 substitutes[start] = (min_emoji(emoji), start + len(s))
                 try:
@@ -1340,6 +1342,7 @@ class UpdateAutoEmojis(Database):
                 else:
                     orig = self.bot.data.emojilists.setdefault(message.author.id, {})
                     orig[name] = emoji.id
+                    self.bot.data.emojilists.update(message.author.id)
         if not substitutes:
             return
         msg = message.content
@@ -1452,6 +1455,7 @@ class UpdateMutes(Database):
                         with suppress(KeyError):
                             x["x"] = self.bot.data.rolepreservers[guild.id][user.id]
                             self.bot.data.rolepreservers[guild.id].pop(user.id)
+                            bot.data.rolepreservers.update(guild.id)
                     role = await self.bot.data.muteroles.get(guild)
                     return await user.add_roles(role, reason="Sticky mute")
 
@@ -2343,6 +2347,7 @@ class UpdateStarboards(Database):
                         embed.colour = discord.Colour(col)
                         data = ("#" + str(message.channel), to_png(message.guild.icon_url))
                         self.bot.data.crossposts.stack.setdefault(self.data[message.guild.id][react][1], {}).setdefault(data, []).append(embed)
+                        bot.data.crossposts.update(message.guild.id)
 
 
 class UpdateRolegivers(Database):
@@ -2357,14 +2362,15 @@ class UpdateRolegivers(Database):
         assigned = self.data.get(message.channel.id, ())
         for k in assigned:
             if ((k in text) if is_alphanumeric(k) else (k in message.content.casefold())):
-                alist = assigned[k]
-                for r in alist[0]:
+                al = assigned[k]
+                for r in al[0]:
                     try:
                         role = await bot.fetch_role(r, guild)
                         if role is None:
                             raise LookupError
                     except LookupError:
-                        alist[0].remove(r)
+                        al[0].remove(r)
+                        bot.data.rolegivers.update(message.channel.id)
                         continue
                     if role in user.roles:
                         continue
@@ -2435,10 +2441,10 @@ class UpdateRolePreservers(Database):
                 assigned = [role.id for role in roles]
                 print("_leave_", guild, user, assigned)
                 self.data[guild.id][user.id] = assigned
-                self.update(guild.id)
             else:
                 print("_leave_", guild, user, None)
                 self.data[guild.id].pop(user.id, None)
+            self.update(guild.id)
 
 
 class UpdateNickPreservers(Database):

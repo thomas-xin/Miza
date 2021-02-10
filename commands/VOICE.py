@@ -3277,6 +3277,7 @@ class AudioSettings(Command):
                 orig = bool(orig)
                 if "f" in flags:
                     bot.data.audiosettings.setdefault(guild.id, {})[op] = new
+                    bot.data.audiosettings.update(guild.id)
             else:
                 if op == "bitrate":
                     if val > 1966.08:
@@ -3292,6 +3293,7 @@ class AudioSettings(Command):
                 origStats[op] = val
                 if "f" in flags:
                     bot.data.audiosettings.setdefault(guild.id, {})[op] = val
+                    bot.data.audiosettings.update(guild.id)
             if auds.queue:
                 if type(op) is str and op not in "loop repeat shuffle quiet stay":
                     # Attempt to adjust audio setting by re-initializing FFmpeg player

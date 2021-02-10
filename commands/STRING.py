@@ -914,6 +914,7 @@ class Ask(Command):
         count = bot.data.users.get(user.id, {}).get("last_talk", 0)
         add_dict(bot.data.users, {user.id: {"last_talk": 1, "last_mention": 1}})
         bot.data.users[user.id]["last_used"] = utc()
+        bot.data.users.update(user.id)
         await bot.seen(user, event="misc", raw="Talking to me")
         # print(user, q)
         if q == "why":
