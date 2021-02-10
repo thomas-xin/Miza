@@ -1192,7 +1192,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     async def min_emoji(self, e):
         animated = await create_future(self.is_animated, e, verify=True)
         if animated is None:
-            raise FileNotFoundError(f"Emoji {e} does not exist.")
+            raise LookupError(f"Emoji {e} does not exist.")
         if type(e) in (int, str):
             e = cdict(id=e, animated=animated)
         return min_emoji(e)
@@ -4277,7 +4277,7 @@ class SimulatedMessage:
     guild_permissions = discord.Permissions((1 << 32) - 1)
     permissions_for = lambda self, member=None: self.guild_permissions
     permissions_in = lambda self, channel=None: self.guild_permissions
-    invites = lambda self: exec("raise FileNotFoundError")
+    invites = lambda self: exec("raise LookupError")
 
 
 async def desktop_identify(self):

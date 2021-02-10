@@ -738,7 +738,7 @@ class EmojiList(Command):
             e_id = int(e_id)
             animated = await create_future(bot.is_animated, e_id, verify=True)
             if animated is None:
-                raise FileNotFoundError(f"Emoji {e_id} does not exist.")
+                raise LookupError(f"Emoji {e_id} does not exist.")
             bot.data.emojilists.setdefault(user.id, {})[name] = e_id
             bot.data.emojilists.update(user.id)
             return ini_md(f"Successfully added emoji alias {sqr_md(name)}: {sqr_md(e_id)} for {sqr_md(user)}.")
@@ -761,7 +761,7 @@ class EmojiList(Command):
         for k, v in sorted(following.get(user.id, {}).items(), key=lambda n: full_prune(n[0])):
             try:
                 me = await bot.min_emoji(v)
-            except FileNotFoundError:
+            except LookupError:
                 following[user.id].pop(k)
                 continue
             curr[f":{k}:"] = f"({v})` {me}"
