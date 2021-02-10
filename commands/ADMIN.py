@@ -1258,6 +1258,8 @@ class UpdateAutoEmojis(Database):
         for e in sorted(guild.emojis, key=lambda e: e.id):
             n = e.name
             while n in emojis:
+                if emojis[n] == e.id:
+                    break
                 t = n.rsplit("-", 1)
                 if t[-1].isnumeric():
                     n = t[0] + "-" + str(int(t[-1]) + 1)
@@ -1267,7 +1269,19 @@ class UpdateAutoEmojis(Database):
         return emojis
 
     async def _nocommand_(self, message, **void):
-        if not message.content or not message.guild or message.guild.id not in self.data or message.content.count(":") < 2 or message.content.count("```") > 1:
+        if not message.content or message.content.count(":") < 2 or message.content.count("```") > 1:
+            return
+        emojis = find_emojis(message.content)
+        for e in emojis:
+            name, e_id = e.split(":")[1:]
+            e_id = int("".join(regexp("[0-9]+").findall(e_id)))
+            animated = self.bot.cache.emojis.get(name)
+            if not animated:
+                animated = await create_future(self.bot.is_animated, e_id, verify=True)
+            if animated is not None:
+                orig = self.bot.data.emojilists.setdefault(message.author.id, {})
+                orig[name] = e_id
+        if not message.guild or message.guild.id not in self.data:
             return
         guild = message.guild
         matched = regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^a\\\\`])(:[A-Za-z0-9\\-~_]+:)(?:(?![^0-9]).)*(?:$|[^0-9>`])").finditer(message.content)
