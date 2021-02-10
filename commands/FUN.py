@@ -676,6 +676,147 @@ class React(Command):
                 await asyncio.sleep(0.5)
 
 
+class UpdateReacts(Database):
+    name = "reacts"
+
+    async def _nocommand_(self, text, edit, orig, message, **void):
+        if message.guild is None or not orig:
+            return
+        g_id = message.guild.id
+        data = self.data
+        if g_id in data:
+            with tracebacksuppressor(ZeroDivisionError):
+                following = self.data[g_id]
+                if type(following) != mdict:
+                    following = self.data[g_id] = mdict(following)
+                reacting = {}
+                for k in following:
+                    if is_alphanumeric(k) and " " not in k:
+                        words = text.split()
+                    else:
+                        words = full_prune(message.content)
+                    if k in words:
+                        emojis = following[k]
+                        # Store position for each keyword found
+                        reacting[words.index(k) / len(words)] = emojis
+                # Reactions sorted by their order of appearance in the message
+                for r in sorted(reacting):
+                    for react in reacting[r]:
+                        try:
+                            await message.add_reaction(react)
+                        except discord.HTTPException as ex:
+                            if "10014" in repr(ex):
+                                emojis.remove(react)
+
+
+class EmojiList(Command):
+    description = "Sets a custom alias for an emoji, usable by ~autoemoji."
+    usage = "(add|delete)? <name> <id>"
+    flags = "aed"
+    no_parse = True
+    directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
+
+    async def __call__(self, bot, flags, user, name, argv, **void):
+        data = bot.data.emojilists
+        if "d" in flags:
+            try:
+                e_id = bot.data.emojilists[user.id].pop(argv)
+            except KeyError:
+                raise KeyError(f'Emoji name "{argv}" not found.')
+            return italics(css_md(f"Successfully removed emoji alias {sqr_md(argv)}: {sqr_md(e_id)} for {sqr_md(user)}."))
+        elif argv:
+            try:
+                name, e_id = argv.rsplit(None, 1)
+            except ValueError:
+                raise ArgumentError("Please input alias followed by emoji, separated by a space.")
+            name = name.strip(":")
+            if not regexp("[A-Za-z0-9\\-~_]{1,32}").fullmatch(name):
+                raise ArgumentError("Emoji aliases may only contain 1~32 alphanumeric characters, dashes, tildes and underscores.")
+            e_id = e_id.rsplit(":", 1)[-1].rstrip(">")
+            if not e_id.isnumeric():
+                raise ArgumentError("Only custom emojis are supported.")
+            e_id = int(e_id)
+            animated = await create_future(bot.is_animated, e_id, verify=True)
+            if animated is None:
+                raise FileNotFoundError(f"Emoji {e_id} does not exist.")
+            bot.data.emojilists.setdefault(user.id, {})[name] = e_id
+            bot.data.emojilists.update(user.id)
+            return ini_md(f"Successfully added emoji alias {sqr_md(name)}: {sqr_md(e_id)} for {sqr_md(user)}.")
+        return (
+            "*```" + "\n" * ("z" in flags) + "callback-fun-emojilist-"
+            + str(user.id) + "_0"
+            + "-\nLoading EmojiList database...```*"
+        )
+    
+    async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
+        u_id, pos = [int(i) for i in vals.split("_", 1)]
+        if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
+            return
+        if reaction not in self.directions and reaction is not None:
+            return
+        guild = message.guild
+        user = await bot.fetch_user(u_id)
+        following = bot.data.emojilists
+        curr = {}
+        for k, v in sorted(following.get(user.id, {}).items(), key=lambda n: full_prune(n[0])):
+            try:
+                me = await bot.min_emoji(v)
+            except FileNotFoundError:
+                following[user.id].pop(k)
+                continue
+            curr[f":{k}:"] = f"({v})` {me}"
+        page = 16
+        last = max(0, len(curr) - page)
+        if reaction is not None:
+            i = self.directions.index(reaction)
+            if i == 0:
+                new = 0
+            elif i == 1:
+                new = max(0, pos - page)
+            elif i == 2:
+                new = min(last, pos + page)
+            elif i == 3:
+                new = last
+            else:
+                new = pos
+            pos = new
+        content = message.content
+        if not content:
+            content = message.embeds[0].description
+        i = content.index("callback")
+        content = "*```" + "\n" * ("\n" in content[:i]) + (
+            "callback-fun-emojilist-"
+            + str(u_id) + "_" + str(pos)
+            + "-\n"
+        )
+        if not curr:
+            content += f"No currently assigned emoji aliases for {str(user).replace('`', '')}.```*"
+            msg = ""
+        else:
+            content += f"{len(curr)} emoji aliases currently assigned for {str(user).replace('`', '')}:```*"
+            key = lambda x: "\n" + ", ".join(x)
+            msg = iter2str({k + " " * (32 - len(k)): curr[k] for k in tuple(curr)[pos:pos + page]}, left="`", right="")
+        colour = await self.bot.data.colours.get(to_png_ex(guild.icon_url))
+        emb = discord.Embed(
+            description=content + msg,
+            colour=colour,
+        )
+        emb.set_author(**get_author(user))
+        more = len(curr) - pos - page
+        if more > 0:
+            emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
+        create_task(message.edit(content=None, embed=emb))
+        if reaction is None:
+            for react in self.directions:
+                create_task(message.add_reaction(as_str(react)))
+                await asyncio.sleep(0.5)
+
+
+class UpdateEmojiLists(Database):
+    name = "emojilists"
+    user = True
+
+
 class Dogpile(Command):
     server_only = True
     min_level = 2
@@ -1652,36 +1793,3 @@ class Inspiro(ImagePool, Command):
 
     def fetch_one(self):
         return Request("https://inspirobot.me/api?generate=true", decode=True, aio=True)
-
-
-class UpdateReacts(Database):
-    name = "reacts"
-
-    async def _nocommand_(self, text, edit, orig, message, **void):
-        if message.guild is None or not orig:
-            return
-        g_id = message.guild.id
-        data = self.data
-        if g_id in data:
-            with tracebacksuppressor(ZeroDivisionError):
-                following = self.data[g_id]
-                if type(following) != mdict:
-                    following = self.data[g_id] = mdict(following)
-                reacting = {}
-                for k in following:
-                    if is_alphanumeric(k) and " " not in k:
-                        words = text.split()
-                    else:
-                        words = full_prune(message.content)
-                    if k in words:
-                        emojis = following[k]
-                        # Store position for each keyword found
-                        reacting[words.index(k) / len(words)] = emojis
-                # Reactions sorted by their order of appearance in the message
-                for r in sorted(reacting):
-                    for react in reacting[r]:
-                        try:
-                            await message.add_reaction(react)
-                        except discord.HTTPException as ex:
-                            if "10014" in repr(ex):
-                                emojis.remove(react)

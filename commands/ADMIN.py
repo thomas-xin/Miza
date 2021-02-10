@@ -1287,13 +1287,14 @@ class UpdateAutoEmojis(Database):
         if not message.guild or message.guild.id not in self.data:
             return
         msg = message.content
-        if not regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^a\\\\`])(:[A-Za-z0-9\\-~_]+:)(?:(?![^0-9]).)*(?:$|[^0-9>`])").search(msg):
+        regex = regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^a\\\\`])(:[A-Za-z0-9\\-~_]{1,32}:)(?:(?![^0-9]).)*(?:$|[^0-9>`])")
+        if not regex.search(msg):
             return
         guild = message.guild
         orig = self.bot.data.emojilists.get(message.author.id, {})
         emojis = self.guild_emoji_map(guild, dict(orig))
         for _ in loop(2):
-            matched = regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^a\\\\`])(:[A-Za-z0-9\\-~_]+:)(?:(?![^0-9]).)*(?:$|[^0-9>`])").finditer(msg)
+            matched = regex.finditer(msg)
             substitutes = {}
             for m in matched:
                 s = m.group()
@@ -1363,11 +1364,6 @@ class UpdateAutoEmojis(Database):
         print(msg)
         create_task(self.bot.silent_delete(message))
         await self.bot.send_as_webhook(message.channel, msg, username=message.author.display_name, avatar_url=best_url(message.author))
-
-
-class UpdateEmojiLists(Database):
-    name = "emojilists"
-    user = True
 
 
 # TODO: Stop being lazy and finish this damn command

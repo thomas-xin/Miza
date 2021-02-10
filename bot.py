@@ -1162,7 +1162,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 emoji = self.cache.emojis[e]
             except KeyError:
                 e = int(e)
-                if e > time_snowflake(utc_dt(), high=True):
+                if e <= 0 or e > time_snowflake(utc_dt(), high=True):
                     return
                 try:
                     return self.emoji_stuff[e]
@@ -1188,6 +1188,14 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         else:
             emoji = e
         return emoji.animated
+    
+    async def min_emoji(self, e):
+        animated = await create_future(self.is_animated, e, verify=True)
+        if animated is None:
+            raise FileNotFoundError(f"Emoji {e} does not exist.")
+        if type(e) in (int, str):
+            e = cdict(id=e, animated=animated)
+        return min_emoji(e)
 
     # Follows a message link, replacing emojis and user mentions with their icon URLs.
     async def follow_to_image(self, url):
