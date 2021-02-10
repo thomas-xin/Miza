@@ -716,14 +716,14 @@ class EmojiList(Command):
     no_parse = True
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
 
-    async def __call__(self, bot, flags, user, name, argv, **void):
+    async def __call__(self, bot, flags, user, name, argv, args, **void):
         data = bot.data.emojilists
         if "d" in flags:
             try:
-                e_id = bot.data.emojilists[user.id].pop(argv)
+                e_id = bot.data.emojilists[user.id].pop(args[0])
             except KeyError:
-                raise KeyError(f'Emoji name "{argv}" not found.')
-            return italics(css_md(f"Successfully removed emoji alias {sqr_md(argv)}: {sqr_md(e_id)} for {sqr_md(user)}."))
+                raise KeyError(f'Emoji name "{args[0]}" not found.')
+            return italics(css_md(f"Successfully removed emoji alias {sqr_md(args[0])}: {sqr_md(e_id)} for {sqr_md(user)}."))
         elif argv:
             try:
                 name, e_id = argv.rsplit(None, 1)
