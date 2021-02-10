@@ -1278,6 +1278,8 @@ class UpdateAutoEmojis(Database):
             animated = self.bot.cache.emojis.get(name)
             if not animated:
                 animated = await create_future(self.bot.is_animated, e_id, verify=True)
+            else:
+                name = animated.name
             if animated is not None:
                 orig = self.bot.data.emojilists.setdefault(message.author.id, {})
                 orig[name] = e_id
