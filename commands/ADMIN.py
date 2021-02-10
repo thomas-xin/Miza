@@ -1292,7 +1292,6 @@ class UpdateAutoEmojis(Database):
         guild = message.guild
         orig = self.bot.data.emojilists.get(message.author.id, {})
         emojis = self.guild_emoji_map(guild, dict(orig))
-        print(msg)
         for _ in loop(2):
             matched = regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^a\\\\`])(:[A-Za-z0-9\\-~_]+:)(?:(?![^0-9]).)*(?:$|[^0-9>`])").finditer(msg)
             substitutes = {}
@@ -1360,6 +1359,7 @@ class UpdateAutoEmojis(Database):
             msg = escape_everyone("".join(out) + msg[start:])
         if msg == message.content:
             return
+        print(message.content)
         print(msg)
         create_task(self.bot.silent_delete(message))
         await self.bot.send_as_webhook(message.channel, msg, username=message.author.display_name, avatar_url=best_url(message.author))
