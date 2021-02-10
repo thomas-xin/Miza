@@ -1323,7 +1323,7 @@ class UpdateAutoEmojis(Database):
                                 i -= 1
                                 name = t[0] + "-" + str(i)
                                 emoji = emojis.get(name)
-            elif type(emoji) is int:
+            if type(emoji) is int:
                 e_id = emoji
                 emoji = self.bot.cache.emojis.get(e_id)
                 if not emoji:
