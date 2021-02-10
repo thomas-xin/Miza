@@ -1286,10 +1286,10 @@ class UpdateAutoEmojis(Database):
                 self.bot.data.emojilists.update(message.author.id)
         if not message.guild or message.guild.id not in self.data:
             return
+        msg = message.content
         if not regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^a\\\\`])(:[A-Za-z0-9\\-~_]+:)(?:(?![^0-9]).)*(?:$|[^0-9>`])").search(msg):
             return
         guild = message.guild
-        msg = message.content
         orig = self.bot.data.emojilists.get(message.author.id, {})
         emojis = self.guild_emoji_map(guild, dict(orig))
         print(msg)
