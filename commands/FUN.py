@@ -750,7 +750,7 @@ class EmojiList(Command):
     
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
         u_id, pos = [int(i) for i in vals.split("_", 1)]
-        if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
+        if reaction not in (None, self.directions[-1]) and u_id != user.id and perm <= inf:
             return
         if reaction not in self.directions and reaction is not None:
             return
