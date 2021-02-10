@@ -1286,75 +1286,80 @@ class UpdateAutoEmojis(Database):
                 self.bot.data.emojilists.update(message.author.id)
         if not message.guild or message.guild.id not in self.data:
             return
+        if not regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^a\\\\`])(:[A-Za-z0-9\\-~_]+:)(?:(?![^0-9]).)*(?:$|[^0-9>`])").search(msg):
+            return
         guild = message.guild
-        matched = regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^a\\\\`])(:[A-Za-z0-9\\-~_]+:)(?:(?![^0-9]).)*(?:$|[^0-9>`])").finditer(message.content)
-        substitutes = {}
+        msg = message.content
         orig = self.bot.data.emojilists.get(message.author.id, {})
         emojis = self.guild_emoji_map(guild, dict(orig))
-        for m in matched:
-            s = m.group()
-            start = m.start()
-            while s and not regexp(":[A-Za-z0-9\\-~_]").fullmatch(s[:2]):
-                s = s[1:]
-                start += 1
-            while s and not regexp("[A-Za-z0-9\\-~_]:").fullmatch(s[-2:]):
-                s = s[:-1]
-            if not s:
-                continue
-            name = s[1:-1]
-            emoji = emojis.get(name)
-            if not emoji:
-                if name.isnumeric():
-                    name = int(name)
-                    emoji = self.bot.cache.emojis.get(name)
-                    if not emoji:
-                        animated = await create_future(self.bot.is_animated, name, verify=True)
-                        if animated is not None:
-                            emoji = cdict(id=name, animated=animated)
-                else:
-                    t = name[::-1].replace("~", "-", 1)[::-1].rsplit("-", 1)
-                    if t[-1].isnumeric():
-                        i = int(t[-1])
-                        if i < 1000:
-                            if not emoji:
-                                name = t[0]
-                                emoji = emojis.get(name)
-                            while i > 1 and not emoji:
-                                i -= 1
-                                name = t[0] + "-" + str(i)
-                                emoji = emojis.get(name)
-            if type(emoji) is int:
-                e_id = emoji
-                emoji = self.bot.cache.emojis.get(e_id)
-                if not emoji:
-                    animated = await create_future(self.bot.is_animated, e_id, verify=True)
-                    if animated is not None:
-                        emoji = cdict(id=e_id, animated=animated)
-                if not emoji:
-                    self.bot.data.emojilists.get(message.author.id, {}).pop(name, None)
-                    self.bot.data.emojilists.update(message.author.id)
-            if emoji:
-                substitutes[start] = (min_emoji(emoji), start + len(s))
-                try:
-                    name = emoji.name
-                except (KeyError, AttributeError):
-                    pass
-                else:
-                    orig = self.bot.data.emojilists.setdefault(message.author.id, {})
-                    orig[name] = emoji.id
-                    self.bot.data.emojilists.update(message.author.id)
-        if not substitutes:
-            return
-        msg = message.content
         print(msg)
-        start = 0
-        out = deque()
-        for k, v in substitutes.items():
-            s = msg[start:k]
-            s += v[0]
-            start = v[1]
-            out.append(s)
-        msg = escape_everyone("".join(out) + msg[start:])
+        for _ in loop(2):
+            matched = regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^a\\\\`])(:[A-Za-z0-9\\-~_]+:)(?:(?![^0-9]).)*(?:$|[^0-9>`])").finditer(msg)
+            substitutes = {}
+            for m in matched:
+                s = m.group()
+                start = m.start()
+                while s and not regexp(":[A-Za-z0-9\\-~_]").fullmatch(s[:2]):
+                    s = s[1:]
+                    start += 1
+                while s and not regexp("[A-Za-z0-9\\-~_]:").fullmatch(s[-2:]):
+                    s = s[:-1]
+                if not s:
+                    continue
+                name = s[1:-1]
+                emoji = emojis.get(name)
+                if not emoji:
+                    if name.isnumeric():
+                        name = int(name)
+                        emoji = self.bot.cache.emojis.get(name)
+                        if not emoji:
+                            animated = await create_future(self.bot.is_animated, name, verify=True)
+                            if animated is not None:
+                                emoji = cdict(id=name, animated=animated)
+                    else:
+                        t = name[::-1].replace("~", "-", 1)[::-1].rsplit("-", 1)
+                        if t[-1].isnumeric():
+                            i = int(t[-1])
+                            if i < 1000:
+                                if not emoji:
+                                    name = t[0]
+                                    emoji = emojis.get(name)
+                                while i > 1 and not emoji:
+                                    i -= 1
+                                    name = t[0] + "-" + str(i)
+                                    emoji = emojis.get(name)
+                if type(emoji) is int:
+                    e_id = emoji
+                    emoji = self.bot.cache.emojis.get(e_id)
+                    if not emoji:
+                        animated = await create_future(self.bot.is_animated, e_id, verify=True)
+                        if animated is not None:
+                            emoji = cdict(id=e_id, animated=animated)
+                    if not emoji:
+                        self.bot.data.emojilists.get(message.author.id, {}).pop(name, None)
+                        self.bot.data.emojilists.update(message.author.id)
+                if emoji:
+                    substitutes[start] = (min_emoji(emoji), start + len(s))
+                    try:
+                        name = emoji.name
+                    except (KeyError, AttributeError):
+                        pass
+                    else:
+                        orig = self.bot.data.emojilists.setdefault(message.author.id, {})
+                        orig[name] = emoji.id
+                        self.bot.data.emojilists.update(message.author.id)
+            if not substitutes:
+                break
+            start = 0
+            out = deque()
+            for k, v in substitutes.items():
+                s = msg[start:k]
+                s += v[0]
+                start = v[1]
+                out.append(s)
+            msg = escape_everyone("".join(out) + msg[start:])
+        if msg == message.content:
+            return
         print(msg)
         create_task(self.bot.silent_delete(message))
         await self.bot.send_as_webhook(message.channel, msg, username=message.author.display_name, avatar_url=best_url(message.author))
