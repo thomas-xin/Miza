@@ -1294,11 +1294,11 @@ class UpdateAutoEmojis(Database):
         for m in matched:
             s = m.group()
             start = m.start()
-            while s and not s.startswith(":") or s.startswith("::"):
-                s = s[1:]
+            while s and not s.startswith(":") or s.startswith("::") or s.startswith(": "):
+                s = s[1:].lstrip()
                 start += 1
-            while s and not s.endswith(":") or s.endswith("::"):
-                s = s[:-1]
+            while s and not s.endswith(":") or s.endswith("::") or s.endswith(" :"):
+                s = s[:-1].rstrip()
             if not s:
                 continue
             name = s[1:-1]
