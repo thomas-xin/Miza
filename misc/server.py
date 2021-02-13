@@ -343,6 +343,7 @@ def upload():
             background-repeat: no-repeat;
             background-attachment: fixed;
             background-size: cover;
+            font-family: 'Comic Sans MS';
         }
         .center {
             margin: 0;

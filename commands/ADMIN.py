@@ -105,7 +105,6 @@ class Purge(Command):
                 italics(css_md(f"Deleted {sqr_md(deleted)} message{'s' if deleted != 1 else ''}!")),
                 reacts="❎",
             ))
-            return
 
 
 class Mute(Command):
@@ -1352,7 +1351,7 @@ class UpdateAutoEmojis(Database):
                     else:
                         if not message.webhook_id:
                             orig = self.bot.data.emojilists.setdefault(message.author.id, {})
-                            orig[name] = emoji.id
+                            orig.setdefault(name, emoji.id)
                             self.bot.data.emojilists.update(message.author.id)
             if not substitutes:
                 break
