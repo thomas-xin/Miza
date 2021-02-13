@@ -1,10 +1,6 @@
 __pycache__
 .vscode
-*.json
-*.yml
 *.tmp
-*.zip
-*.vs
 backup
 cache
 saves

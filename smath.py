@@ -3615,7 +3615,7 @@ def dyn_time_diff(t2, t1):
         return "inf galactic years"
     if t2 <= -inf:
         return "-inf galactic years"
-    if t2 >= t1:
+    if t2 <= t1:
         return "0 seconds"
     return time_diff(DynamicDT.fromtimestamp(t2), DynamicDT.fromtimestamp(t1))
 
