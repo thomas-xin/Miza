@@ -100,7 +100,12 @@ class Purge(Command):
                     await bot.silent_delete(m, no_log=-1, exc=True)
                     deleted += 1
         if not "h" in flags:
-            return italics(css_md(f"Deleted {sqr_md(deleted)} message{'s' if deleted != 1 else ''}!"))
+            create_task(send_with_react(
+                channel,
+                italics(css_md(f"Deleted {sqr_md(deleted)} message{'s' if deleted != 1 else ''}!")),
+                reacts="❎",
+            ))
+            return
 
 
 class Mute(Command):
