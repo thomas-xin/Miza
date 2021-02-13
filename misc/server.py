@@ -258,8 +258,10 @@ def upload_file():
 <html>
     <head>
         <style>
-        h1 {text-align: center;}
-        p {text-align: center;}
+        body {
+            text-align: center;
+            font-family: 'Comic Sans MS';
+        }
         img {
             margin-top: 32px;
             display: block;
@@ -293,7 +295,7 @@ def upload_file():
         <p style="color:#00ffff;">Total file size: {byte_scale(sum(os.path.getsize(f[2]) for f in urls))}B</p>
         <p style="color:#bf7fff;">Estimated file lifetime: {sec2time(utc() - est_time)}</p>"""
         for fi in urls:
-            s += f'\n<p><a href="{fi[0]}">{fi[1]}</a></p>'
+            s += f'\n<a href="{fi[0]}">{fi[1]}</a>'
         preview = deque()
         for f in urls:
             mime = get_mime(f[2])
@@ -304,9 +306,9 @@ def upload_file():
             elif mime.startswith("video/"):
                 preview.append(f'<div align="center"><video width="480" controls><source src="{f[0]}" type="{mime}"></video></div>')
             elif mime.startswith("text/"):
-                preview.append(f'<p><a href="{fi[0].replace("/view/", "/files/")}">{fi[1]}</a></p>')
+                preview.append(f'<a href="{fi[0].replace("/view/", "/files/")}">{fi[1]}</a>')
             else:
-                preview.append(f'<p><a href="{fi[0].replace("/view/", "/download/")}">{fi[1]}</a></p>')
+                preview.append(f'<a href="{fi[0].replace("/view/", "/download/")}">{fi[1]}</a>')
     if not preview:
         preview.append(f'<img src="{flask.request.host_url}static/hug.gif" alt="Miza-Dottie-Hug" style="width:14.2857%;height:14.2857%;">')
     s += "\n" + "\n".join(preview)
@@ -342,12 +344,23 @@ def upload():
             background-attachment: fixed;
             background-size: cover;
         }
+        .center {
+            margin: 0;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            -ms-transform: translate(-50%, -50%);
+            transform: translate(-50%, -50%);
+        }
     </style>
     <body>
-        <form action="/upload_file" method="POST" enctype="multipart/form-data">
-            <input style="color:white;" type="file" name="file" multiple/>
-            <input type="submit"/>
-        </form>
+        <div class="center">
+            <h1 align="center" style="color:white;">Upload a file here!</h1>
+            <form action="/upload_file" method="POST" enctype="multipart/form-data">
+                <input style="color:white;" type="file" name="file" multiple/>
+                <input type="submit"/>
+            </form>
+        </div>
     </body>
 </html>"""
     resp = flask.Response(data, mimetype="text/html")

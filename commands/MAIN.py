@@ -1638,7 +1638,11 @@ class UpdateUrgentReminders(Database):
                         emb = p[3]
                         if len(p) < 4:
                             p.append(60)
-                        p[0] = max(utc() + 1, p[0] + p[4])
+                        i = 0
+                        while p[0] < utc() + 1 and i < 4096:
+                            p[0] += p[4]
+                            i += 1
+                        p[0] = max(utc() + 1, p[0])
                         channel = await self.bot.fetch_messageable(c_id)
                         message = await self.bot.fetch_message(m_id, channel)
                         for react in message.reactions:

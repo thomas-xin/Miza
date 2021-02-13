@@ -1425,7 +1425,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
         iterable = self.to_iterable(iterable, force=True)
         if len(iterable) == 1:
             return self.pop(iterable[0], force=True)
-        temp = np.delete(self.view, iterable)
+        temp = np.delete(self.view, np.asarray(iterable, dtype=np.int32))
         self.size = len(temp)
         self.view[:] = temp
         return self
@@ -2675,7 +2675,13 @@ def raw2colour(x):
 
 # Colour space conversion functions
 rgb_to_hsv = lambda c: list(colorsys.rgb_to_hsv(*c[:3])) + c[3:]
+
+def rgb_to_hsl(c):
+    col = colorsys.rgb_to_hls(*c[:3])
+    return [col[0], col[2], col[1]] + c[3:]
+
 hsv_to_rgb = lambda c: list(colorsys.hsv_to_rgb(*c[:3])) + c[3:]
+hsl_to_rgb = lambda c: list(colorsys.hls_to_rgb(c[0], c[2], c[1])) + c[3:]
 rgb_to_cmy = lambda c: [1 - x for x in c[:3]] + c[3:]
 cmy_to_rgb = rgb_to_cmy
 rgb_to_lab = lambda c: list(color_conversions.convert_color(color_objects.sRGBColor(*c[:3]), color_objects.LabColor).get_value_tuple()) + c[3:]

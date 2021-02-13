@@ -259,7 +259,7 @@ class CreateEmoji(Command):
         return css_md(f"Successfully created emoji {sqr_md(emoji)} for {sqr_md(guild)}.")
 
 
-async def get_image(bot, user, message, args, argv, default=2, ext="png"):
+async def get_image(bot, user, message, args, argv, default=2, raw=False, ext="png"):
     try:
         # Take input from any attachments, or otherwise the message contents
         if message.attachments:
@@ -288,7 +288,7 @@ async def get_image(bot, user, message, args, argv, default=2, ext="png"):
     value = " ".join(args).strip()
     if not value:
         value = default
-    else:
+    elif not raw:
         value = await bot.eval_math(value)
         if not abs(value) <= 64:
             raise OverflowError("Maximum multiplier input is 64.")
@@ -613,6 +613,42 @@ class GreyScale(Command):
         await bot.send_with_file(channel, "", fn, filename=name)
 
 
+class ColourSpace(Command):
+    name = ["ColorSpace"]
+    description = "Changes the colour space of the supplied image."
+    usage = "<url> <2:source(rgb)>? <1:dest(hsv)>?"
+    no_parse = True
+    rate_limit = (3, 6.5)
+    _timeout_ = 4
+    typing = True
+
+    async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
+        name, value, url = await get_image(bot, user, message, args, argv, raw=True, default="")
+        spl = value.rsplit(None, 1)
+        if not spl:
+            source = "rgb"
+            dest = "hsv"
+        elif len(spl) == 1:
+            source = "rgb"
+            dest = spl[0].casefold()
+        else:
+            source, dest = (i.casefold() for i in spl)
+        if source == dest:
+            raise TypeError("Colour spaces must be different.")
+        for i in (source, dest):
+            if i not in ("rgb", "bgr", "hsv", "hsl", "hsi", "cmy"):
+                raise TypeError(f"Invalid colour space {i}.")
+        with discord.context_managers.Typing(channel):
+            resp = await process_image(url, "colourspace", [source, dest], timeout=_timeout)
+            fn = resp[0]
+            if fn.endswith(".gif"):
+                if not name.endswith(".gif"):
+                    if "." in name:
+                        name = name[:name.rindex(".")]
+                    name += ".gif"
+        await bot.send_with_file(channel, "", fn, filename=name)
+
+
 class Magik(Command):
     description = "Applies the Magik image filter to supplied image."
     usage = "<0:url> <cell_size(7)>?"
@@ -643,6 +679,7 @@ class Colour(Command):
     flags = "v"
     trans = {
         "hsv": hsv_to_rgb,
+        "hsl": hsl_to_rgb,
         "cmy": cmy_to_rgb,
         "lab": lab_to_rgb,
         "luv": luv_to_rgb,
@@ -666,6 +703,7 @@ class Colour(Command):
             + "\nDEC colour code: " + sqr_md(colour2raw(channels))
             + "\nRGB values: " + str(channels)
             + "\nHSV values: " + sqr_md(", ".join(str(round(x * 255)) for x in rgb_to_hsv(adj)))
+            + "\nHSL values: " + sqr_md(", ".join(str(round(x * 255)) for x in rgb_to_hsl(adj)))
             + "\nCMY values: " + sqr_md(", ".join(str(round(x * 255)) for x in rgb_to_cmy(adj)))
             + "\nLAB values: " + sqr_md(", ".join(str(round(x)) for x in rgb_to_lab(adj)))
             + "\nLUV values: " + sqr_md(", ".join(str(round(x)) for x in rgb_to_luv(adj)))
@@ -722,6 +760,7 @@ class Average(Command):
                 + "\nDEC colour code: " + sqr_md(colour2raw(channels))
                 + "\nRGB values: " + str(channels)
                 + "\nHSV values: " + sqr_md(", ".join(str(round(x * 255)) for x in rgb_to_hsv(adj)))
+                + "\nHSL values: " + sqr_md(", ".join(str(round(x * 255)) for x in rgb_to_hsl(adj)))
                 + "\nCMY values: " + sqr_md(", ".join(str(round(x * 255)) for x in rgb_to_cmy(adj)))
                 + "\nLAB values: " + sqr_md(", ".join(str(round(x)) for x in rgb_to_lab(adj)))
                 + "\nLUV values: " + sqr_md(", ".join(str(round(x)) for x in rgb_to_luv(adj)))
@@ -1107,7 +1146,7 @@ class Fill(Command):
 class Blend(Command):
     name = ["ImageBlend", "ImageOP"]
     description = "Combines the two supplied images, using an optional blend operation."
-    usage = "<0:url1> <1:url2> (replace|add|sub|mul|div|mod|and|or|xor|nand|nor|xnor|difference|overlay|screen|soft|hard|lighten|darken|plusdarken|overflow|burn|linearburn|dodge|hue|sat|lum|colour|extract|merge)? <3:opacity(0.5|1)>?"
+    usage = "<0:url1> <1:url2> (replace|add|sub|mul|div|mod|and|or|xor|nand|nor|xnor|difference|overlay|screen|soft|hard|lighten|darken|plusdarken|overflow|lighting|burn|linearburn|dodge|hue|sat|lum|colour|extract|merge)? <3:opacity(0.5|1)>?"
     no_parse = True
     rate_limit = (3, 8)
     flags = "l"
@@ -1124,7 +1163,7 @@ class Blend(Command):
                 return ini_md(
                     "Available blend operations: ["
                     + "replace, add, sub, mul, div, mod, and, or, xor, nand, nor, xnor, "
-                    + "difference, overlay, screen, soft, hard, lighten, darken, plusdarken, overflow, "
+                    + "difference, overlay, screen, soft, hard, lighten, darken, plusdarken, overflow, lighting, "
                     + "burn, linearburn, dodge, lineardodge, hue, sat, lum, colour, extract, merge]"
                 )
             raise ArgumentError("Please input an image by URL or attachment.")

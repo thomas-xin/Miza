@@ -97,8 +97,11 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
         self._update_bin()
 
     def _update_bin(self):
-        while self.rate_bin and utc() - self.rate_bin[0] >= self.rate_limit:
-            self.rate_bin.popleft()
+        try:
+            while self.rate_bin and utc() - self.rate_bin[0] >= self.rate_limit:
+                self.rate_bin.popleft()
+        except IndexError:
+            pass
         if not self.rate_bin:
             try:
                 self.fut.set_result(None)
@@ -812,7 +815,7 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
             if c is None:
                 c = await channel.create_dm()
             channel = c
-        elif not channel.permissions_for(channel.guild.me).read_message_history:
+        elif not getattr(channel, "recipient", None) and not channel.permissions_for(channel.guild.me).read_message_history:
             fields = {}
             if embed:
                 fields["embed"] = embed
@@ -1154,7 +1157,7 @@ verify_search = lambda f: strip_acc(single_space(f.strip().translate(__strans)))
 # This reminds me of Perl - Smudge
 find_urls = lambda url: regexp("(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s`|\"'\\])>]+").findall(url)
 is_url = lambda url: regexp("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s`|\"'\\])>]+$").findall(url)
-is_discord_url = lambda url: regexp("^https?:\\/\\/(?:[A-Za-z]+\\.)?discord(?:app)?\\.com\\/").findall(url)
+is_discord_url = lambda url: regexp("^https?:\\/\\/(?:[A-Za-z]{3,8}\\.)?discord(?:app)?\\.(?:com|net)\\/").findall(url)
 is_tenor_url = lambda url: regexp("^https?:\\/\\/tenor.com(?:\\/view)?/[a-zA-Z0-9\\-_]+-[0-9]+").findall(url)
 is_imgur_url = lambda url: regexp("^https?:\\/\\/(?:[A-Za-z]\\.)?imgur.com/[a-zA-Z0-9\\-_]+").findall(url)
 is_giphy_url = lambda url: regexp("^https?:\\/\\/giphy.com/gifs/[a-zA-Z0-9\\-_]+").findall(url)
@@ -1448,9 +1451,10 @@ pthreads = MultiThreadPool(pool_count=2, thread_count=48, initializer=__setloop_
 athreads = MultiThreadPool(pool_count=2, thread_count=64, initializer=__setloop__)
 
 def get_event_loop():
-    with suppress(RuntimeError):
+    try:
         return asyncio.get_event_loop()
-    return eloop
+    except RuntimeError:
+        return eloop
 
 # Creates an asyncio Future that waits on a multithreaded one.
 def wrap_future(fut, loop=None):
@@ -1495,7 +1499,7 @@ async def _create_future(obj, *args, loop, timeout, priority, **kwargs):
         if asyncio.iscoroutinefunction(obj.__call__) or not is_main_thread():
             obj = obj.__call__(*args, **kwargs)
         else:
-            obj = await wrap_future(create_future_ex(obj, *args, timeout=timeout, **kwargs), loop=loop)
+            obj = await wrap_future(create_future_ex(obj, *args, timeout=timeout, priority=priority, **kwargs), loop=loop)
     while awaitable(obj):
         if timeout is not None:
             obj = await asyncio.wait_for(obj, timeout=timeout)
@@ -1508,7 +1512,9 @@ def create_future(obj, *args, loop=None, timeout=None, priority=False, **kwargs)
     if loop is None:
         loop = get_event_loop()
     fut = _create_future(obj, *args, loop=loop, timeout=timeout, priority=priority, **kwargs)
-    return create_task(fut, loop=loop)
+    if not isinstance(fut, asyncio.Task):
+        fut = create_task(fut, loop=loop)
+    return fut
 
 # Creates an asyncio Task object from an awaitable object.
 def create_task(fut, *args, loop=None, **kwargs):
@@ -2210,7 +2216,7 @@ class Database(collections.abc.MutableMapping, collections.abc.Hashable, collect
             try:
                 self.data.__update__()
             except:
-                print(self, self.data, traceback.format_exc(), sep="\n", end="")
+                print(self, traceback.format_exc(), sep="\n", end="")
         else:
             if modified is None:
                 self.data.modified.update(self.data.keys())

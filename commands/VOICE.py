@@ -1453,7 +1453,7 @@ class AudioDownloader:
         return out
 
     def ydl_errors(self, s):
-        return not ("video unavailable" in s or "this video is not available" in s or "this video contains content from" in s or "this video has been removed" in s)
+        return not ("this video contains content from" in s or "this video has been removed" in s) # "video unavailable" in s or "this video is not available" in s or 
 
     # Repeatedly makes calls to youtube-dl until there is no more data to be collected.
     def extract_true(self, url):
@@ -2059,7 +2059,10 @@ class AudioDownloader:
             ts = ts_us()
         outf = None
         for url in urls:
-            info = self.extract(url)[0]
+            try:
+                info = self.extract(url)[0]
+            except youtube_dl.DownloadError:
+                continue
             self.get_stream(info, video=fmt in videos, force=True, download=False)
             if not outf:
                 outf = f"{info['name']}.{fmt}"
@@ -2793,7 +2796,7 @@ class Connect(Command):
             raise ConnectionError("Insufficient permissions to connect to voice channel.")
         if vc_.permissions_for(guild.me).manage_channels:
             if guild.id in bot.data.audio.players:
-                br = round(auds.stats.bitrate * 100)
+                br = round(bot.data.audio.players[guild.id].stats.bitrate * 100)
             else:
                 br = 196608
             bitrate = min(br, guild.bitrate_limit)
