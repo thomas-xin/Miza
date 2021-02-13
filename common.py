@@ -1380,7 +1380,7 @@ def process_image(image, operation, args, timeout=24):
 def evalex(exc):
     try:
         ex = eval(exc)
-    except NameError:
+    except (SyntaxError, NameError):
         exc = as_str(exc)
         s = exc[exc.index("(") + 1:exc.index(")")]
         with suppress(TypeError, SyntaxError, ValueError):

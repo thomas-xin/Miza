@@ -1500,7 +1500,7 @@ def brightness(image, value):
         else:
             A = None
         H, S, L = hsl_split(image, convert=False, dtype=np.uint32)
-        L *= value
+        np.multiply(L, value, out=L, casting="unsafe")
         image = hsl_merge(H, S, L)
         if A:
             image.putalpha(A)
