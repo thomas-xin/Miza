@@ -2347,13 +2347,13 @@ class UpdateStarboards(Database):
                     with tracebacksuppressor(RuntimeError, KeyError):
                         while len(self.data["triggered"]) > 16384:
                             self.data["triggered"].discard(next(iter(self.data["triggered"])))
+                    self.update("triggered")
                     with tracebacksuppressor:
                         embed = as_embed(message)
                         col = await self.bot.get_colour(message.author)
                         embed.colour = discord.Colour(col)
                         data = ("#" + str(message.channel), to_png(message.guild.icon_url))
                         self.bot.data.crossposts.stack.setdefault(self.data[message.guild.id][react][1], {}).setdefault(data, []).append(embed)
-                        bot.data.crossposts.update(message.guild.id)
 
 
 class UpdateRolegivers(Database):

@@ -1357,14 +1357,12 @@ def blend_op(image, url, operation, amount, recursive=True):
                     if image.mode != mode:
                         image = image.convert(mode)
             image = Image.blend(image, image2, 0.5)
+            spl = hsl_split(image, convert=False, dtype=np.uint32)
             if filt == "OVERFLOW":
-                spl = hsl_split(image, convert=False, dtype=np.uint32)
                 spl[-1] <<= 1
-                out = hsl_merge(*spl)
             else:
-                spl = hsl_split(image, convert=False, dtype=np.uint32)
                 spl[-1] += (255 ^ spl[-1]) * spl[-1] // 255
-                out = hsl_merge(*spl)
+            out = hsl_merge(*spl)
         # Otherwise attempt to find as ImageChops filter
         else:
             if str(image.mode) != str(image2.mode):

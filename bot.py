@@ -1172,7 +1172,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 if verify:
                     fut = create_future_ex(Request, base + "png")
                 url = base + "gif"
-                with requests.get(url, stream=True) as resp:
+                with requests.head(url, stream=True) as resp:
                     if resp.status_code >= 400:
                         if not verify:
                             return False
