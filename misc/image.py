@@ -1488,6 +1488,24 @@ def colour_deficiency(image, operation, value=None):
 
 Enhance = lambda image, operation, value: getattr(ImageEnhance, operation)(image).enhance(value)
 
+def brightness(image, value):
+    if value:
+        if value < 0:
+            image = invert(image)
+            value = -value
+        if str(image.mode) == "P" and "transparency" in image.info:
+            image = image.convert("RGBA")
+        if str(image.mode) == "RGBA":
+            A = image.getchannel("A")
+        else:
+            A = None
+        H, S, L = hsl_split(image, convert=False, dtype=np.uint32)
+        L *= value
+        image = hsl_merge(H, S, L)
+        if A:
+            image.putalpha(A)
+    return image
+
 # Hueshift image using HSV channels
 def hue_shift(image, value):
     if value:
