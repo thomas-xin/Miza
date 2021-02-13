@@ -274,6 +274,7 @@ class AudioFile:
 
     seekable = True
     live = False
+    dur = None
 
     def __init__(self, fn, stream=None, wasfile=False):
         self.file = fn
@@ -534,7 +535,7 @@ class AudioFile:
         return reader        
 
     # Audio duration estimation: Get values from file if possible, otherwise URL
-    duration = lambda self: inf if not self.seekable else self.dur or set_dict(self.__dict__, "dur", get_duration("cache/" + self.file) if self.loaded and not self.live else get_duration(self.stream), ignore=True)
+    duration = lambda self: inf if not self.seekable else getattr(self, "dur", None) or set_dict(self.__dict__, "dur", get_duration("cache/" + self.file) if self.loaded and not self.live else get_duration(self.stream), ignore=True)
 
 
 # Audio reader for fully loaded files. FFmpeg with single pipe for output.
