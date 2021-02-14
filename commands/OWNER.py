@@ -586,7 +586,12 @@ class UpdateChannelCache(Database):
             return
         c_id = verify_id(channel)
         for m_id in sorted(self.data.get(c_id, ()), reverse=True):
-            yield await self.bot.fetch_message(m_id, channel)
+            try:
+                yield await self.bot.fetch_message(m_id, channel)
+            except (discord.NotFound, discord.Forbidden):
+                self.data[c_id].remove(m_id)
+            except:
+                print_exc()
 
     def add(self, c_id, m_id):
         s = self.data.setdefault(c_id, set())
