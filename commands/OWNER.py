@@ -590,7 +590,7 @@ class UpdateChannelCache(Database):
                 yield await self.bot.fetch_message(m_id, channel)
             except (discord.NotFound, discord.Forbidden):
                 self.data[c_id].remove(m_id)
-            except:
+            except (TypeError, ValueError, discord.HTTPException):
                 print_exc()
 
     def add(self, c_id, m_id):
