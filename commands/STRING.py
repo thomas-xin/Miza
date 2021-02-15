@@ -423,8 +423,9 @@ class Say(Command):
     
     def __call__(self, argv, **void):
         if not argv:
-            raise ArgumentError("bAcK sLaSh YoU tWo HuNdReD bEe")
-        return fix_md(argv)
+            raise ArgumentError("How did you even manage to send a message with no content?")
+        argv = argv.replace("@", "@\u200b").replace("<@\u200b")
+        return "\u200b" + argv[:1999]
 
 
 # Char2Emoj, a simple script to convert a string into a block of text
