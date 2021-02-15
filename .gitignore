@@ -4,5 +4,6 @@ __pycache__
 backup
 cache
 saves
+deleted
 log.txt
 auth.json
