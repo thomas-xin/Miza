@@ -1,9 +1,8 @@
 __pycache__
 .vscode
+*.json
 *.tmp
 backup
 cache
 saves
-deleted
 log.txt
-auth.json

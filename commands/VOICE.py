@@ -1855,31 +1855,32 @@ class AudioDownloader:
                 s = s[:s.index(b'window["ytInitialPlayerResponse"] = null;')]
                 s = s[:s.rindex(b";")]
                 result = self.parse_yt(s)
-            if result is None:
-                raise NotImplementedError("Unable to read json response.")
-            q = to_alphanumeric(full_prune(query))
-            high = alist()
-            low = alist()
-            for entry in result:
-                if entry.duration:
-                    name = full_prune(entry.name)
-                    aname = to_alphanumeric(name)
-                    spl = aname.split()
-                    if entry.duration < 960 or "extended" in q or "hour" in q or "extended" not in spl and "hour" not in spl and "hours" not in spl:
-                        if fuzzy_substring(aname, q, match_length=False) >= 0.5:
-                            high.append(entry)
-                            continue
-                low.append(entry)
-            def key(entry):
-                coeff = fuzzy_substring(to_alphanumeric(full_prune(entry.name)), q, match_length=False)
-                if coeff < 0.5:
-                    coeff = 0
-                return coeff
-            out = sorted(high, key=key, reverse=True)
-            out.extend(sorted(low, key=key, reverse=True))
+            if result is not None:
+                q = to_alphanumeric(full_prune(query))
+                high = alist()
+                low = alist()
+                for entry in result:
+                    if entry.duration:
+                        name = full_prune(entry.name)
+                        aname = to_alphanumeric(name)
+                        spl = aname.split()
+                        if entry.duration < 960 or "extended" in q or "hour" in q or "extended" not in spl and "hour" not in spl and "hours" not in spl:
+                            if fuzzy_substring(aname, q, match_length=False) >= 0.5:
+                                high.append(entry)
+                                continue
+                    low.append(entry)
+
+                def key(entry):
+                    coeff = fuzzy_substring(to_alphanumeric(full_prune(entry.name)), q, match_length=False)
+                    if coeff < 0.5:
+                        coeff = 0
+                    return coeff
+
+                out = sorted(high, key=key, reverse=True)
+                out.extend(sorted(low, key=key, reverse=True))
             if not out:
                 self.failed_yt = utc() + 180
-                print(query, out)
+                print(query)
         if not out:
             resp = self.extract_info(query)
             if resp.get("_type", None) == "url":

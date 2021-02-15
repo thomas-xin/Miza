@@ -421,12 +421,13 @@ class Say(Command):
     usage = "<string>"
     no_parse = True
     
-    async def __call__(self, argv, **void):
-        await miza.silent_delete(message)
+    def __call__(self, bot, user, argv, **void):
+        create_task(bot.silent_delete(message))
         if not argv:
             raise ArgumentError("How did you even manage to send a message with no content?")
-        argv = argv.replace("@", "@\u200b").replace("<@&", "<@&\u200b")
-        return "\u200b" + argv[:1999]
+        if not bot.is_owner(user):
+            argv = lim_str("\u200b" + escape_everyone(argv).lstrip("\u200b"), 2000)
+        return argv
 
 
 # Char2Emoj, a simple script to convert a string into a block of text
