@@ -1613,6 +1613,8 @@ class open2(io.IOBase):
 class CompatFile(discord.File):
 
     def __init__(self, fp, filename=None, spoiler=False):
+        if type(fp) is bytes:
+            fp = io.BytesIO(fp)
         self.fp = self._fp = fp
         if issubclass(type(fp), io.IOBase):
             self.fp = fp

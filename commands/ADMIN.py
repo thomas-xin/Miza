@@ -1514,9 +1514,13 @@ class UpdateMuteRoles(Database):
         return role
 
     async def __call__(self):
-        for g_id in tuple(self.data):
+        for g_id in deque(self.data):
             guild = self.bot.cache.guilds.get(g_id)
-            role = self.bot.cache.roles[self.data[g_id]]
+            try:
+                role = self.bot.cache.roles[self.data[g_id]]
+            except KeyError:
+                self.data.pop(g_id, None)
+                continue
             if guild:
                 if role not in guild.roles:
                     self.data.pop(g_id)
