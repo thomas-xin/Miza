@@ -425,7 +425,7 @@ class Say(Command):
         await miza.silent_delete(message)
         if not argv:
             raise ArgumentError("How did you even manage to send a message with no content?")
-        argv = argv.replace("@", "@\u200b").replace("<@\u200b")
+        argv = argv.replace("@", "@\u200b").replace("<@&", "<@&\u200b")
         return "\u200b" + argv[:1999]
 
 
