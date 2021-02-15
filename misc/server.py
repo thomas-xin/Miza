@@ -105,7 +105,7 @@ def get_file(path, filename=None):
 <meta property="og:url" content="{flask.request.host_url}view/{orig_path}">
 <meta property="og:image:width" content="1280">
 <meta property="og:type" content="website">
-<meta http-equiv="refresh" content="0; URL={flask.request.host_url}files/{orig_path}" />
+<meta http-equiv="refresh" content="0; URL={flask.request.host_url}files/{orig_path}">
 </html>"""
                 resp = flask.Response(data, mimetype="text/html")
                 resp.headers.update(CHEADERS)
@@ -501,7 +501,36 @@ def cat():
     if utc() - cat_t > 300:
         cat_t = utc()
         create_future_ex(get_cats)
-    return flask.redirect(choice(cats))
+    url = choice(cats)
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+<meta property="og:image" content="{url}">
+<meta http-equiv="refresh" content="60; URL={flask.request.url}">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>""" + """
+img {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: auto;
+  margin-bottom: auto;
+}
+.center {
+  margin: 0;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  -ms-transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%);
+}""" + f"""
+</style>
+</head>
+<body style="background-color:black;">
+<img src="{url}" class="center">
+</body>
+</html>
+"""
 
 dog_t = utc()
 def get_dogs():
@@ -518,7 +547,36 @@ def dog():
     global dogs, dog_t
     if utc() - dog_t > 300:
         create_future_ex(get_dogs)
-    return flask.redirect(choice(dogs))
+    url = choice(dogs)
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+<meta property="og:image" content="{url}">
+<meta http-equiv="refresh" content="60; URL={flask.request.url}">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>""" + """
+img {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: auto;
+  margin-bottom: auto;
+}
+.center {
+  margin: 0;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  -ms-transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%);
+}""" + f"""
+</style>
+</head>
+<body style="background-color:black;">
+<img src="{url}" class="center">
+</body>
+</html>
+"""
 
 
 HEADERS = {
