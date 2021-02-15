@@ -1310,7 +1310,8 @@ class UpdateAutoEmojis(Database):
                 start += 1
             while s and not regexp("[A-Za-z0-9\\-~_]:").fullmatch(s[-2:]):
                 s = s[:-1]
-            offs += start + len(s)
+            offs = start = offs + start
+            offs += len(s)
             if not s:
                 continue
             name = s[1:-1]
@@ -1356,9 +1357,8 @@ class UpdateAutoEmojis(Database):
                         orig = self.bot.data.emojilists.setdefault(message.author.id, {})
                         orig.setdefault(name, emoji.id)
                         self.bot.data.emojilists.update(message.author.id)
-            if not substitutes:
-                break
-            msg = msg[:substitutes[0]] + substitutes[1] + msg[substitutes[2]:]
+            if substitutes:
+                msg = msg[:substitutes[0]] + substitutes[1] + msg[substitutes[2]:]
         msg = escape_everyone(msg)
         if not msg or msg == message.content:
             return

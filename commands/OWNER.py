@@ -585,11 +585,14 @@ class UpdateChannelCache(Database):
             yield channel.message
             return
         c_id = verify_id(channel)
+        min_time = time_snowflake(utc_dt() - datetime.timedelta(days=14))
         for m_id in sorted(self.data.get(c_id, ()), reverse=True):
             try:
+                if m_id < min_time:
+                    raise OverflowError
                 yield await self.bot.fetch_message(m_id, channel)
-            except (discord.NotFound, discord.Forbidden):
-                self.data[c_id].remove(m_id)
+            except (discord.NotFound, discord.Forbidden, OverflowError):
+                self.data[c_id].discard(m_id)
             except (TypeError, ValueError, discord.HTTPException):
                 print_exc()
 
