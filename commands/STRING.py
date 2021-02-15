@@ -421,10 +421,10 @@ class Say(Command):
     usage = "<string>"
     no_parse = True
     
-    def __call__(self, bot, user, argv, **void):
+    def __call__(self, bot, user, message, argv, **void):
         create_task(bot.silent_delete(message))
         if not argv:
-            raise ArgumentError("How did you even manage to send a message with no content?")
+            raise ArgumentError("Input string is empty.")
         if not bot.is_owner(user):
             argv = lim_str("\u200b" + escape_everyone(argv).lstrip("\u200b"), 2000)
         return argv
