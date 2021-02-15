@@ -421,7 +421,7 @@ class Say(Command):
     usage = "<string>"
     no_parse = True
     
-    def __call__(self, argv, **void):
+    async def __call__(self, argv, **void):
         await miza.silent_delete(message)
         if not argv:
             raise ArgumentError("How did you even manage to send a message with no content?")
