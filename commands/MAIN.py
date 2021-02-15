@@ -1818,28 +1818,33 @@ class UpdateFlavour(Database):
         out = x = None
         i = xrand(7)
         facts = self.bot.data.users.facts
+        questions = self.bot.data.users.questions
         useless = self.bot.data.users.useless
-        if i <= 1 and facts:
+        if i < 2 and facts:
             with tracebacksuppressor:
                 text = choice(facts)
                 fact = choice(("Fun fact:", "Did you know?", "Useless fact:", "Random fact:"))
                 out = f"\n{fact} `{text}`"
-        elif i == 2:
-            x = "affirmations"
+        elif i < 4 and questions:
             with tracebacksuppressor:
-                if self.data.get(x) and len(self.data[x]) > 64 and xrand(2):
-                    return choice(self.data[x])
-                data = await Request("https://www.affirmations.dev/", json=True, aio=True)
-                text = data["affirmation"].replace("`", "")
-                out = f"\nAffirmation: `{text}`"
-        elif i == 3:
-            x = "geek_jokes"
-            with tracebacksuppressor:
-                if self.data.get(x) and len(self.data[x]) > 64 and xrand(2):
-                    return choice(self.data[x])
-                data = await Request("https://geek-jokes.sameerkumar.website/api", json=True, aio=True)
-                text = data.replace("`", "")
-                out = f"\nGeek joke: `{text}`"
+                text = choice(questions)
+                out = f"\nRandom question: `{text}`"
+        # elif i == 2:
+        #     x = "affirmations"
+        #     with tracebacksuppressor:
+        #         if self.data.get(x) and len(self.data[x]) > 64 and xrand(2):
+        #             return choice(self.data[x])
+        #         data = await Request("https://www.affirmations.dev/", json=True, aio=True)
+        #         text = data["affirmation"].replace("`", "")
+        #         out = f"\nAffirmation: `{text}`"
+        # elif i == 3:
+        #     x = "geek_jokes"
+        #     with tracebacksuppressor:
+        #         if self.data.get(x) and len(self.data[x]) > 64 and xrand(2):
+        #             return choice(self.data[x])
+        #         data = await Request("https://geek-jokes.sameerkumar.website/api", json=True, aio=True)
+        #         text = data.replace("`", "")
+        #         out = f"\nGeek joke: `{text}`"
         else:
             x = "useless_facts"
             with tracebacksuppressor:
@@ -1885,6 +1890,8 @@ class UpdateUsers(Database):
         self.useless = deque()
         with open("misc/facts.txt", "r", encoding="utf-8") as f:
             self.facts = f.read().splitlines()
+        with open("misc/questions.txt", "r", encoding="utf-8") as f:
+            self.questions = f.read().splitlines()
 
     async def _bot_ready_(self, **void):
         data = {"Command": Command}

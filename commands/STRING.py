@@ -1011,6 +1011,14 @@ class Ask(Command):
         await send_with_reply(channel, "h" not in flags and message, escape_everyone(f"\xad{q[0].upper() + q[1:]}? {out}".replace("\uf000", "")))
 
 
+class Topic(Command):
+    name = ["Question"]
+    description = "Asks a random question."
+    
+    def __call__(self, **void):
+        return "\u200b" + choice(self.bot.data.users.questions)
+
+
 class Urban(Command):
     time_consuming = True
     header = {
