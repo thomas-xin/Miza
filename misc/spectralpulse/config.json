@@ -1,0 +1,17 @@
+{
+	"source": "", # This field may be omitted to be prompted for an input at runtime; may be a file path or URL.
+	"size": [1280, 720], # Both dimensions should be divisible by 4 for best results.
+	"fps": 30, # Framerate of the output video.
+	"sample_rate": 48000, # Sample rate to evaluate fourier transforms at, should be a multiple of fps.
+	"amplitude": 0.1, # Amplitude to scale audio volume, adjust as necessary.
+	"smudge_ratio": 0.9, # Redirects vertical blurriness horizontally; should be a value between 0 and 1.
+	"speed": 2, # Speed of screen movemement in pixels per frame, does not change audio playback speed.
+	"resolution": 192, # Resolution of DFT in bars per pixel, this should be a relatively high number due to the logarithmic scale.
+	"lower_bound": "A0", # Lowest musical note displayed on the spectrogram, may optionally be the ID of the note, with respect to A0.
+	"higher_bound": "F#10", # Highest musical note displayed on the spectrogram, may optionally be the ID of the note, with respect to A0.
+	"particles": "piano", # May be one of None, "bar", "bubble", "piano", "hexagon", or a file path/URL in quotes to indicate image to use for particles.
+	"skip": true, # Whether to seek video to when audio begins playing.
+	"display": false, # Whether to preview the rendered video in a separate window.
+	"render": true, # Whether to output the result to a video file.
+	"play": false, # Whether to play the actual audio being rendered.
+}

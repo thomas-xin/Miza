@@ -751,6 +751,39 @@ class UpdateMathTest(Database):
                 await channel.send(pull[i])
 
 
+class SpectralPulse(Command):
+    _timeout_ = 150
+    description = "Runs SpectralPulse on the input URL."
+    usage = "<0:search_links>"
+    rate_limit = (12, 60)
+
+    async def __call__(self, bot, channel, message, argv, **void):
+        for a in message.attachments:
+            argv = a.url + " " + argv
+        if not argv:
+            raise ArgumentError("Input string is empty.")
+        urls = await bot.follow_url(argv, allow=True, images=False)
+        if not urls or not urls[0]:
+            raise ArgumentError("Please input a valid URL.")
+        url = urls[0]
+        name = url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0] + ".mp4"
+        ts = ts_us()
+        dest = f"cache/&{ts}"
+        fn = dest + ".mp4"
+        args = (python, "main.py", "-dest", "../../" + dest, url)
+        print(args)
+        proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc/spectralpulse", stdout=subprocess.DEVNULL)
+        try:
+            await asyncio.wait_for(proc.wait(), timeout=3200)
+        except (T0, T1, T2):
+            with tracebacksuppressor:
+                proc.kill()
+            raise
+        for ext in ("pcm", "riff"):
+            await create_future(os.remove, f"{dest}.{ext}")
+        await bot.send_with_file(channel, "", fn, filename=name)
+
+
 class DeviantArt(Command):
     server_only = True
     min_level = 2

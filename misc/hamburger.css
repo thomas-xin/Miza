@@ -1,0 +1,188 @@
+/* 
+	hamburger.css 
+	A ~~simple~~ grew mildly complicated hamburger menu with boxicons support and configurable theming.
+
+
+	@hucario on GitHub:
+	https://github.com/hucario
+	
+	Icon itself is made by @evrenakar on CodePen:
+	https://codepen.io/evrenakar
+
+	HTML structure:
+	.hamburger
+		input[checkbox]
+		.items
+			a
+				img
+			a.bx.bxClass
+
+			...
+
+		.hambg
+*/
+
+/*
+	Variables
+*/
+.hamburger {
+	--menu-width: 50px;
+	--icon-height: 36px;
+	--icon-width: var(--icon-height);
+	--pos: fixed;
+	--top: 1rem;
+	--right: 1rem;
+	--bottom: unset;
+	--left: unset;
+	--icon-color: white;
+	--icon-hover-bgcolor: rgb(0 0 0 / 0.18);
+	--icon-bgcolor: rgb(255 255 255 / 10%);
+	--icon-gap: 4px;
+	--icon-radius: 4px;
+	--inactive-menu-bgcolor: rgba(0, 0, 0, 0.8);
+	--active-menu-bgcolor: rgba(0, 0, 0, 0.1);
+	--inactive-menu-radius: 4px;
+	--active-menu-radius: var(--inactive-menu-radius);
+	--menu-hover-bgcolor: transparent;
+
+
+
+	/* don't want to dupe declarations so just ignore this bit below */
+	position: var(--pos);
+	left: var(--left);
+	right: var(--right);
+	top: var(--top);
+	bottom: var(--bottom);
+	width: var(--menu-width);
+	height: max-content;
+	font-size: var(--icon-width);
+	padding: 0;
+	margin: 0;
+	display: flex;
+	align-items: center;
+	flex-direction: column;
+	gap: var(--icon-gap);
+	z-index: 99;
+}
+.hamburger > input[type="checkbox"]:checked~.items > a:last-of-type {
+	margin-bottom: var(--icon-gap);
+}
+.hamburger > .hambg {
+	position: absolute;
+	top: 0;
+	right: 0;
+	left: 0;
+	bottom: 0;
+	background: var(--inactive-menu-bgcolor);
+	transition: all 250ms;
+	z-index: -1;
+	border-radius: var(--inactive-menu-radius);
+}
+.hamburger:hover > .hambg {
+	background: var(--menu-hover-bgcolor)
+}
+.hamburger > input[type="checkbox"]:checked~.hambg {
+	background: var(--active-menu-bgcolor);
+	border-radius: var(--inactive-menu-radius);
+}
+
+.hamburger > input[type="checkbox"] {
+	display: block;
+	cursor: pointer;
+	transform: translate(0,0);
+	appearance: none;
+	outline: none;
+	margin: 0;
+	height: var(--icon-height);
+	width: var(--icon-width);
+	padding: 0;
+	padding-top: 12px;
+	margin-bottom: 8px;
+}
+
+.hamburger > input[type="checkbox"]:before,
+.hamburger > input[type="checkbox"]:after {
+	background-color: #fff;
+	content: '';
+	display: block;
+	height: 4px;
+	transition: all 200ms ease-in-out;
+}
+.hamburger > input[type="checkbox"]:before {
+	box-shadow: 0 10px 0 #fff;
+	margin-bottom: 16px;
+}
+.hamburger > input[type="checkbox"]:checked:before {
+	box-shadow: 0 0 0 #fff;
+	transform: translateY(10px) rotate(45deg);
+}
+.hamburger > input[type="checkbox"]:checked:after{
+	transform: translateY(-10px) rotate(-45deg);
+}
+
+.hamburger > input[type="checkbox"]:not(:checked)~.items > a {
+	height: 0;
+}
+
+.hamburger > input[type="checkbox"]:not(:checked)~.items {
+	height: 0;
+	overflow: hidden;
+}
+
+.hamburger > .items {
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+	gap: var(--icon-gap);
+	transition: all 250ms;
+}
+
+.hamburger > .items > a {
+	display: block;
+	width: var(--icon-width);
+	height: var(--icon-height);
+	color: var(--icon-color);
+	background: var(--icon-bgcolor);
+	transition: all 250ms;
+	margin: 0;
+	padding: 0;
+	opacity: 1;
+	position: relative;
+	text-decoration: none;
+	border-radius: var(--icon-radius);
+}
+
+.hamburger > .items > a:hover {
+	background: var(--icon-hover-bgcolor);
+}
+
+
+.hamburger > .items > a > img {
+	width: var(--icon-width);
+	height: var(--icon-height);
+	margin: 0;
+	padding: 0;
+	object-fit: cover;
+}
+
+.hamburger > input[type="checkbox"]:checked {
+    margin-bottom: calc(var(--icon-gap)*2);
+}
+
+.hamburger > .items > a::after {
+    content: attr(data-popup);
+    display: block;
+    position: absolute;
+    right: calc(var(--icon-width) + 1rem);
+    font-size: 1.2rem;
+    font-family: system-ui, sans-serif;
+    width: max-content;
+	top: 0;
+	opacity: 1;
+	
+	transition: all 250ms;
+}
+
+.hamburger > input[type="checkbox"]:not(:checked)~.items > a::after {
+	opacity: 0;
+}

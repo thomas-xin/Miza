@@ -87,7 +87,7 @@ class Help(Command):
                 + f"[`mizatlas`]({bot.webserver}/mizatlas) for a full command list and tester.\nNeed a handy way to upload larger files? See [`upload`]({bot.webserver}/upload)!"
             )
             if bot.categories:
-                s = bold(ini_md(' '.join((sqr_md(c) for c in help_colours if c in bot.categories))))
+                s = bold(ini_md(' '.join((sqr_md(c) for c in help_colours if c in standard_commands))))
                 fields.append(dict(name="Command category list", value=s))
         if not channel.permissions_for(guild.me).send_messages:
             channel = await bot.get_dm(user)
