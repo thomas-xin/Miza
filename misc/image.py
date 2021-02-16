@@ -455,7 +455,7 @@ def rainbow_gif2(image, duration):
     def rainbow_gif_iterator(image):
         for f in range(length * scale):
             image.seek(f % length)
-            if str(image.mode) == "P" and "transparency" in image.info:
+            if str(image.mode) == "P":
                 temp = image.convert("RGBA")
             else:
                 temp = image
@@ -498,7 +498,7 @@ def rainbow_gif(image, duration):
         rate <<= 1
     if fps <= 0:
         raise ValueError("Invalid framerate value.")
-    if str(image.mode) == "P" and "transparency" in image.info:
+    if str(image.mode) == "P":
         image = image.convert("RGBA")
     if str(image.mode) == "RGBA":
         A = image.getchannel("A")
@@ -854,7 +854,7 @@ def blur(image, filt="box", radius=2):
 
 
 def invert(image):
-    if str(image.mode) == "P" and "transparency" in image.info:
+    if str(image.mode) == "P":
         image = image.convert("RGBA")
     if str(image.mode) == "RGBA":
         A = image.getchannel("A")
@@ -867,7 +867,7 @@ def invert(image):
     return image
 
 def greyscale(image):
-    if str(image.mode) == "P" and "transparency" in image.info:
+    if str(image.mode) == "P":
         image = image.convert("RGBA")
     if str(image.mode) == "RGBA":
         A = image.getchannel("A")
@@ -880,7 +880,7 @@ def greyscale(image):
     return image
 
 def colourspace(image, source, dest):
-    if str(image.mode) == "P" and "transparency" in image.info:
+    if str(image.mode) == "P":
         image = image.convert("RGBA")
     if str(image.mode) == "RGBA":
         A = image.getchannel("A")
@@ -1104,7 +1104,7 @@ def fill_channels(image, colour, *channels):
         if i in ops:
             hsv = True
     if hsv:
-        if str(image.mode) == "P" and "transparency" in image.info:
+        if str(image.mode) == "P":
             image = image.convert("RGBA")
         if str(image.mode) == "RGBA":
             A = image.getchannel("A")
@@ -1119,7 +1119,7 @@ def fill_channels(image, colour, *channels):
         if A is not None:
             image.putalpha(A)
     if 9 in ops:
-        if str(image.mode) == "P" and "transparency" in image.info:
+        if str(image.mode) == "P":
             image = image.convert("RGBA")
         if str(image.mode) == "RGBA":
             A = image.getchannel("A")
@@ -1245,7 +1245,7 @@ def blend_op(image, url, operation, amount, recursive=True):
                             image2.seek(f)
                         except EOFError:
                             break
-                        if str(image.mode) == "P" and "transparency" in image.info:
+                        if str(image.mode) == "P":
                             image = image.convert("RGBA")
                         if str(image.mode) != "RGBA":
                             temp = image.convert("RGBA")
@@ -1268,7 +1268,7 @@ def blend_op(image, url, operation, amount, recursive=True):
     if image2.width != image.width or image2.height != image.height:
         image2 = resize_to(image2, image.width, image.height, "auto")
     if type(filt) is not str:
-        if str(image.mode) == "P" and "transparency" in image.info:
+        if str(image.mode) == "P":
             image = image.convert("RGBA")
         if str(image.mode) != "RGBA":
             image = image.convert("RGBA")
@@ -1287,7 +1287,7 @@ def blend_op(image, url, operation, amount, recursive=True):
         elif filt.startswith("OP_"):
             f = filt[3:]
             if str(image.mode) != str(image2.mode):
-                if str(image.mode) == "P" and "transparency" in image.info:
+                if str(image.mode) == "P":
                     image = image.convert("RGBA")
                 if str(image.mode) != "RGBA":
                     image = image.convert("RGBA")
@@ -1306,7 +1306,7 @@ def blend_op(image, url, operation, amount, recursive=True):
         # Special operation, use HSV channels
         elif filt.startswith("SP_"):
             f = filt[3:]
-            if str(image.mode) == "P" and "transparency" in image.info:
+            if str(image.mode) == "P":
                 image = image.convert("RGBA")
             if str(image.mode) == "RGBA":
                 A1 = image.getchannel("A")
@@ -1366,7 +1366,7 @@ def blend_op(image, url, operation, amount, recursive=True):
         # Otherwise attempt to find as ImageChops filter
         else:
             if str(image.mode) != str(image2.mode):
-                if str(image.mode) == "P" and "transparency" in image.info:
+                if str(image.mode) == "P":
                     image = image.convert("RGBA")
                 if str(image.mode) != "RGBA":
                     image = image.convert("RGBA")
@@ -1377,7 +1377,7 @@ def blend_op(image, url, operation, amount, recursive=True):
             filt = getattr(ImageChops, filt)
             out = filt(image, image2)
         if str(image.mode) != str(out.mode):
-            if str(image.mode) == "P" and "transparency" in image.info:
+            if str(image.mode) == "P":
                 image = image.convert("RGBA")
             if str(image.mode) != "RGBA":
                 image = image.convert("RGBA")
@@ -1399,7 +1399,7 @@ def blend_op(image, url, operation, amount, recursive=True):
 
 
 def remove_matte(image, colour):
-    if str(image.mode) == "P" and "transparency" in image.info:
+    if str(image.mode) == "P":
         image = image.convert("RGBA")
     if str(image.mode) != "RGBA":
         image = image.convert("RGBA")
@@ -1491,7 +1491,7 @@ def brightness(image, value):
         if value < 0:
             image = invert(image)
             value = -value
-        if str(image.mode) == "P" and "transparency" in image.info:
+        if str(image.mode) == "P":
             image = image.convert("RGBA")
         if str(image.mode) == "RGBA":
             A = image.getchannel("A")
@@ -1507,7 +1507,7 @@ def brightness(image, value):
 # Hueshift image using HSV channels
 def hue_shift(image, value):
     if value:
-        if str(image.mode) == "P" and "transparency" in image.info:
+        if str(image.mode) == "P":
             image = image.convert("RGBA")
         if str(image.mode) == "RGBA":
             A = image.getchannel("A")
@@ -1596,7 +1596,7 @@ def ImageOpIterator(image, step, operation, ts, args):
             image.seek(f)
         except EOFError:
             break
-        if str(image.mode) == "P" and "transparency" in image.info:
+        if str(image.mode) == "P":
             image = image.convert("RGBA")
         if str(image.mode) != "RGBA":
             temp = image.convert("RGBA")
@@ -1690,7 +1690,7 @@ def evalImg(url, operation, args):
             except EOFError:
                 globals()["ANIM"] = False
                 image.seek(0)
-                if str(image.mode) == "P" and "transparency" in image.info:
+                if str(image.mode) == "P":
                     image = image.convert("RGBA")
                 if str(image.mode) != "RGBA":
                     temp = image.convert("RGBA")
@@ -1749,7 +1749,7 @@ def evalImg(url, operation, args):
                 frames = frameit()
             mode = str(first.mode)
             if mode == "P":
-                mode = "RGB"
+                mode = "RGBA"
             size = first.size
             print(mode)
             command = ["ffmpeg", "-threads", "2", "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", ("rgb24" if mode == "RGB" else "rgba"), "-video_size", "x".join(str(i) for i in size), "-i", "-", "-gifflags", "-offsetting", "-an"]
