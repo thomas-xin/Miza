@@ -399,6 +399,11 @@ class UpdateExec(Database):
     def _bot_ready_(self, **void):
         with suppress(AttributeError):
             PRINT.funcs.append(self._log_)
+        for c_id, flag in self.data.items():
+            if flag & 8:
+                channel = self.bot.cache.channels.get(c_id)
+                if channel:
+                    create_task(self.bot.ensure_webhook(channel, fill=10))
 
     def _destroy_(self, **void):
         with suppress(LookupError, AttributeError):
@@ -562,7 +567,7 @@ class UpdateWebhooks(Database):
         if not guild:
             raise TypeError("DM channels cannot have webhooks.")
         if channel.id in self.data and not force:
-            return [self.from_dict(w, channel.id) for w in self.data[channel.id].values()]
+            return alist(self.from_dict(w, channel.id) for w in self.data[channel.id].values())
         async with self.guild_semaphore if not bypass else emptyctx:
             self.data.pop(channel.id, None)
             if not channel.permissions_for(channel.guild.me).manage_webhooks:
@@ -573,7 +578,7 @@ class UpdateWebhooks(Database):
                     webhooks = await guild.webhooks()
             if webhooks is None:
                 webhooks = await aretry(channel.webhooks, attempts=5, delay=15, exc=(discord.Forbidden, discord.NotFound))
-        return [w for w in [self.add(w) for w in webhooks] if w.channel.id == channel.id]
+        return alist(w for w in [self.add(w) for w in webhooks] if w.channel.id == channel.id)
 
 
 class UpdateChannelCache(Database):

@@ -105,21 +105,26 @@ def _get_duration(filename, _timeout=12):
             bps = float(resp[1])
     return dur, bps
 
+DUR_CACHE = {}
+
 def get_duration(filename):
     if filename:
+        with suppress(KeyError):
+            return DUR_CACHE[filename]
         dur, bps = _get_duration(filename, 4)
         if not dur and is_url(filename):
             with requests.get(filename, headers=Request.header(), stream=True) as resp:
                 head = fcdict(resp.headers)
                 if "Content-Length" not in head:
-                    return _get_duration(filename, 20)[0]
+                    dur = _get_duration(filename, 20)[0]
+                    DUR_CACHE[filename] = dur
+                    return dur
                 if bps:
                     print(head, bps, sep="\n")
                     return (int(head["Content-Length"]) << 3) / bps
                 ctype = [e.strip() for e in head.get("Content-Type", "").split(";") if "/" in e][0]
-                if ctype.split("/", 1)[0] not in ("audio", "video"):
-                    return nan
-                if ctype == "audio/midi":
+                if ctype.split("/", 1)[0] not in ("audio", "video") or ctype == "audio/midi":
+                    DUR_CACHE[filename] = nan
                     return nan
                 it = resp.iter_content(65536)
                 data = next(it)
@@ -128,7 +133,9 @@ def get_duration(filename):
             try:
                 bitrate = regexp("[0-9]+\\s.bps").findall(ident)[0].casefold()
             except IndexError:
-                return _get_duration(filename, 16)[0]
+                dur = _get_duration(filename, 16)[0]
+                DUR_CACHE[filename] = dur
+                return dur
             bps, key = bitrate.split(None, 1)
             bps = float(bps)
             if key.startswith("k"):
@@ -137,7 +144,8 @@ def get_duration(filename):
                 bps *= 1e6
             elif key.startswith("g"):
                 bps *= 1e9
-            return (int(head["Content-Length"]) << 3) / bps
+            dur = (int(head["Content-Length"]) << 3) / bps
+        DUR_CACHE[filename] = dur
         return dur
 
 

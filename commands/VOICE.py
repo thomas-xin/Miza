@@ -81,21 +81,26 @@ def _get_duration(filename, _timeout=12):
             bps = float(resp[1])
     return dur, bps
 
+DUR_CACHE = {}
+
 def get_duration(filename):
     if filename:
+        with suppress(KeyError):
+            return DUR_CACHE[filename]
         dur, bps = _get_duration(filename, 4)
         if not dur and is_url(filename):
             with requests.get(filename, headers=Request.header(), stream=True) as resp:
                 head = fcdict(resp.headers)
                 if "Content-Length" not in head:
-                    return _get_duration(filename, 20)[0]
+                    dur = _get_duration(filename, 20)[0]
+                    DUR_CACHE[filename] = dur
+                    return dur
                 if bps:
                     print(head, bps, sep="\n")
                     return (int(head["Content-Length"]) << 3) / bps
                 ctype = [e.strip() for e in head.get("Content-Type", "").split(";") if "/" in e][0]
-                if ctype.split("/", 1)[0] not in ("audio", "video"):
-                    return nan
-                if ctype == "audio/midi":
+                if ctype.split("/", 1)[0] not in ("audio", "video") or ctype == "audio/midi":
+                    DUR_CACHE[filename] = nan
                     return nan
                 it = resp.iter_content(65536)
                 data = next(it)
@@ -104,7 +109,9 @@ def get_duration(filename):
             try:
                 bitrate = regexp("[0-9]+\\s.bps").findall(ident)[0].casefold()
             except IndexError:
-                return _get_duration(filename, 16)[0]
+                dur = _get_duration(filename, 16)[0]
+                DUR_CACHE[filename] = dur
+                return dur
             bps, key = bitrate.split(None, 1)
             bps = float(bps)
             if key.startswith("k"):
@@ -113,7 +120,8 @@ def get_duration(filename):
                 bps *= 1e6
             elif key.startswith("g"):
                 bps *= 1e9
-            return (int(head["Content-Length"]) << 3) / bps
+            dur = (int(head["Content-Length"]) << 3) / bps
+        DUR_CACHE[filename] = dur
         return dur
 
 
@@ -435,7 +443,8 @@ class CustomAudio(collections.abc.Hashable):
         self.acsi.skip()
 
     def clear_source(self):
-        create_future_ex(self.acsi.clear_source)
+        if self.source:
+            create_future_ex(self.acsi.clear_source)
         self.source = None
 
     def reset(self, start=True):
@@ -737,6 +746,8 @@ class AudioQueue(alist):
                 auds.announce(italics(ini_md(f"🎵 Now playing {sqr_md(e.name)}, added by {sqr_md(name)}! 🎵")))
 
     def start_queue(self):
+        if self.sem.is_busy():
+            return
         with tracebacksuppressor:
             auds = self.auds
             if not auds.source and self:
@@ -2000,6 +2011,7 @@ class AudioDownloader:
                 data = evalEX(data)
             stream = set_dict(data[0], "stream", data[0].url)
             icon = set_dict(data[0], "icon", data[0].url)
+            entry.update(data[0])
         elif not searched and (stream.startswith("https://cf-hls-media.sndcdn.com/") or stream.startswith("https://www.yt-download.org/download/")):
             data = self.extract(entry["url"])
             stream = set_dict(data[0], "stream", data[0].url)

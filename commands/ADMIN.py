@@ -714,7 +714,7 @@ class AutoRole(Command):
                 async with discord.context_managers.Typing(channel):
                     i = 1
                     for member in guild.members:
-                        role = choice(roles)
+                        role = roles.next()
                         if role not in member.roles:
                             create_task(member.add_roles(role, reason="InstaRole", atomic=True))
                             if not i % 5:
@@ -2398,7 +2398,7 @@ class UpdateAutoRoles(Database):
             assigned = self.data[guild.id]
             for rolelist in assigned:
                 with tracebacksuppressor:
-                    role = await self.bot.fetch_role(choice(rolelist), guild)
+                    role = await self.bot.fetch_role(rolelist.next(), guild)
                     roles.append(role)
             # Attempt to add all roles in one API call
             try:

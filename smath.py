@@ -322,7 +322,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
 
     maxoff = (1 << 24) - 1
     minsize = 9
-    __slots__ = ("hash", "block", "offs", "size", "data", "frozenset", "queries")
+    __slots__ = ("hash", "block", "offs", "size", "data", "frozenset", "queries", "_index")
 
     # For thread-safety: Waits until the list is not busy performing an operation.
     def waiting(self):
@@ -360,6 +360,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
 
     # Init takes arguments and casts to a deque if possible, else generates as a single value. Allocates space equal to 3 times the length of the input iterable.
     def __init__(self, *args, fromarray=False, **void):
+        self._index = -1
         fut = getattr(self, "block", None)
         self.block = concurrent.futures.Future()
         self.hash = None
@@ -869,6 +870,10 @@ custom list-like data structure that incorporates the functionality of numpy arr
     __length_hint__ = __len__
     __iter__ = lambda self: iter(self.view)
     __reversed__ = lambda self: iter(np.flip(self.view))
+
+    def next(self):
+        self._index = (self._index + 1) % self.size
+        return self[self._index]
 
     @waiting
     def __bytes__(self):

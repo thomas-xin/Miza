@@ -2750,13 +2750,18 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         return self.data.webhooks.get(channel, force=force, bypass=bypass)
 
     # Gets a valid webhook for the target channel, creating a new one when necessary.
-    async def ensure_webhook(self, channel, force=False, bypass=False):
+    async def ensure_webhook(self, channel, force=False, bypass=False, fill=False):
         wlist = await self.load_channel_webhooks(channel, force=force, bypass=bypass)
+        if fill:
+            while len(wlist) < fill:
+                w = await channel.create_webhook(name=self.name, reason="Auto Webhook")
+                w = self.add_webhook(w)
+                wlist.append(w)
         if not wlist:
             w = await channel.create_webhook(name=self.name, reason="Auto Webhook")
             w = self.add_webhook(w)
         else:
-            w = choice(wlist)
+            w = wlist.next()
         return w
 
     # Sends a message to the target channel, using a random webhook from that channel.
@@ -3592,6 +3597,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         @self.event
         async def on_ready():
             print("Successfully connected as " + str(self.user))
+            self.update_cache_feed()
             self.mention = (user_mention(self.id), user_pc_mention(self.id))
             if discord_id:
                 self.invite = f"https://discordapp.com/oauth2/authorize?permissions=8&client_id={discord_id}&scope=bot%20applications.commands"
@@ -3607,7 +3613,6 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     else:
                         print("> " + guild.name)
                 await self.handle_update()
-                self.update_cache_feed()
                 futs.add(create_future(self.update_usernames, priority=True))
                 futs.add(create_task(aretry(self.get_ip, delay=20)))
                 if not self.started:

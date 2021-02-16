@@ -1435,7 +1435,7 @@ class MultiThreadPool(collections.abc.Sized, concurrent.futures.Executor):
         if not self.pools:
             self._update()
         self.position = (self.position + 1) % len(self.pools)
-        choice(self.pools).submit(self._update)
+        self.pools.next().submit(self._update)
 
     def map(self, func, *args, **kwargs):
         self.update()
