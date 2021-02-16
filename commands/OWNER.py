@@ -605,6 +605,13 @@ class UpdateChannelCache(Database):
                 s.discard(next(iter(s)))
             except RuntimeError:
                 pass
+    
+    def _delete_(self, message, **void):
+        try:
+            self.data[message.channel.id].discard(message.id)
+            self.update(message.channel.id)
+        except (AttributeError, KeyError):
+            pass
 
 
 class Suspend(Command):

@@ -51,28 +51,22 @@ class Purge(Command):
         delD = {}
         if end is None:
             dt = None
-            # Keep going until finding required amount of messages or reaching the end of the channel
-            while count > 0:
-                lim = count * 2 + 16 if count < inf else None
-                after = utc_dt() - datetime.timedelta(days=14) if "i" not in flags else None
-                found = False
-                if dt is None or after is None or dt > after:
-                    async with bot.guild_semaphore:
-                        async for m in bot.history(channel, limit=lim, before=dt, after=after):
-                            bot.add_message(m, force=True)
-                            found = True
-                            dt = m.created_at
-                            if uset is None and m.author.bot or uset and m.author.id in uset:
-                                delD[m.id] = m
-                                count -= 1
-                                if count <= 0:
-                                    break
-                if lim is None or not found:
-                    break
+            lim = None
+            after = utc_dt() - datetime.timedelta(days=14) if "i" not in flags else None
+            found = False
+            if dt is None or after is None or dt > after:
+                async with bot.guild_semaphore:
+                    async for m in bot.history(channel, limit=lim, before=dt, after=after):
+                        found = True
+                        dt = m.created_at
+                        if uset is None and m.author.bot or uset and m.author.id in uset:
+                            delD[m.id] = m
+                            count -= 1
+                            if count <= 0:
+                                break
         else:
             async with bot.guild_semaphore:
                 async for m in bot.history(channel, limit=None, before=end, after=start):
-                    bot.add_message(m, force=True)
                     if uset is None and m.author.bot or uset and m.author.id in uset:
                         delD[m.id] = m
         if len(delD) >= 64 and "f" not in flags:
