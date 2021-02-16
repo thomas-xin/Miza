@@ -319,7 +319,7 @@ class Mute(Command):
         more = len(mutes) - pos - page
         if more > 0:
             emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-        create_task(message.edit(content=None, embed=emb, allowed_mentions=()))
+        create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
         if reaction is None:
             for react in self.directions:
                 async with delay(0.5):
@@ -539,7 +539,7 @@ class Ban(Command):
         more = len(bans) - pos - page
         if more > 0:
             emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-        create_task(message.edit(content=None, embed=emb, allowed_mentions=()))
+        create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
         if reaction is None:
             for react in self.directions:
                 async with delay(0.5):
@@ -1034,7 +1034,7 @@ class StarBoard(Command):
         more = len(curr) - pos - page
         if more > 0:
             emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-        create_task(message.edit(content=None, embed=emb, allowed_mentions=()))
+        create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
         if reaction is None:
             for react in self.directions:
                 create_task(message.add_reaction(as_str(react)))
@@ -1131,7 +1131,7 @@ class Crosspost(Command):
         more = len(curr) - pos - page
         if more > 0:
             emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-        create_task(message.edit(content=None, embed=emb, allowed_mentions=()))
+        create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
         if reaction is None:
             for react in self.directions:
                 create_task(message.add_reaction(as_str(react)))
