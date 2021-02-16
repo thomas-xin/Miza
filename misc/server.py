@@ -62,6 +62,7 @@ def create_etag(data):
 STATIC = {}
 TZCACHE = {}
 RESPONSES = {}
+RESPONSES[0] = cdict(set_result=lambda *args: None)
 
 
 PREVIEW = {}
@@ -202,6 +203,17 @@ def favicon():
     data, mime = fetch_static("icon.ico")
     resp = flask.Response(data, mimetype=mime)
     resp.headers.update(CHEADERS)
+    resp.headers["ETag"] = create_etag(data)
+    return resp
+
+@app.route("/ip", methods=["GET"])
+def get_ip():
+    data = json.dumps(dict(
+        remote=flask.request.remote_addr,
+        host=flask.request.host,
+    ))
+    resp = flask.Response(data, mimetype="application/json")
+    resp.headers.update(SHEADERS)
     resp.headers["ETag"] = create_etag(data)
     return resp
 
@@ -485,28 +497,25 @@ def command(content):
     return response
 
 
-cat_t = utc()
-def get_cats():
-    global cats
-    with open("saves/imagepools/cats", "rb") as f:
-        s = f.read()
-    cats = select_and_loads(s)
-    return cats
-cats = get_cats()
-
 @app.route("/cat", methods=["GET"])
 @app.route("/cats", methods=["GET"])
 def cat():
-    global cats, cat_t
-    if utc() - cat_t > 300:
-        cat_t = utc()
-        create_future_ex(get_cats)
-    url = choice(cats)
+    t = ts_us()
+    while t in RESPONSES:
+        t += 1
+    RESPONSES[t] = fut = concurrent.futures.Future()
+    send(f"!{t}\x7fbot.commands.cat[0](bot, None, 'v')", escape=False)
+    j, after = fut.result()
+    RESPONSES.pop(t, None)
+    url = j["result"]
+    if fcdict(flask.request.headers).get("Accept") == "application/json":
+        return url
+    refresh = float(flask.request.args.get("refresh", 60))
     return f"""<!DOCTYPE html>
 <html>
 <head>
 <meta property="og:image" content="{url}">
-<meta http-equiv="refresh" content="60; URL={flask.request.url}">
+<meta http-equiv="refresh" content="{refresh}; URL={flask.request.url}">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>""" + """
 img {
@@ -532,27 +541,25 @@ img {
 </html>
 """
 
-dog_t = utc()
-def get_dogs():
-    global dogs
-    with open("saves/imagepools/dogs", "rb") as f:
-        s = f.read()
-    dogs = select_and_loads(s)
-    return dogs
-dogs = get_dogs()
-
 @app.route("/dog", methods=["GET"])
 @app.route("/dogs", methods=["GET"])
 def dog():
-    global dogs, dog_t
-    if utc() - dog_t > 300:
-        create_future_ex(get_dogs)
-    url = choice(dogs)
+    t = ts_us()
+    while t in RESPONSES:
+        t += 1
+    RESPONSES[t] = fut = concurrent.futures.Future()
+    send(f"!{t}\x7fbot.commands.dog[0](bot, None, 'v')", escape=False)
+    j, after = fut.result()
+    RESPONSES.pop(t, None)
+    url = j["result"]
+    refresh = float(flask.request.args.get("refresh", 60))
+    if fcdict(flask.request.headers).get("Accept") == "application/json":
+        return url
     return f"""<!DOCTYPE html>
 <html>
 <head>
 <meta property="og:image" content="{url}">
-<meta http-equiv="refresh" content="60; URL={flask.request.url}">
+<meta http-equiv="refresh" content="{refresh}; URL={flask.request.url}">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>""" + """
 img {
@@ -587,9 +594,8 @@ HEADERS = {
     "Access-Control-Allow-Origin": "*",
 }
 
-CHEADERS = cdict(
-    {"Cache-Control": "public, max-age=3600, stale-while-revalidate=1073741824, stale-if-error=1073741824"}
-)
+CHEADERS = {"Cache-Control": "public, max-age=3600, stale-while-revalidate=1073741824, stale-if-error=1073741824"}
+SHEADERS = {"Cache-Control": "public, max-age=30, stale-while-revalidate=1073741824, stale-if-error=1073741824"}
 
 @app.after_request
 def custom_header(response):

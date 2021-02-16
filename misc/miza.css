@@ -202,10 +202,6 @@ img.bgimg {
     margin: 0;
 }
 
-body > * {
-    scroll-snap-align: start;
-}
-
 :root {
     scroll-snap-type: y proximity;
 }

@@ -301,6 +301,29 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         <link rel="stylesheet" href="{self.raw_webserver}/static/swiper.min.css">
     </head>
     <body>
+        <link href="/static/hamburger.css" rel="stylesheet">
+        <div class="hamburger">
+            <input
+                type="checkbox"
+                title="Toggle menu"
+            />
+            <div class="items">
+                <a href="/" data-popup="Home"><img
+                    src="{self.raw_webserver}/static/avatar-rainbow.gif"
+                /></a>
+                <a href="/mizatlas" data-popup="Command Atlas"><img
+                    src="{self.raw_webserver}/static/background-rainbow.gif"
+                /></a>
+                <a href="/upload" data-popup="File Host"><img
+                    src="{self.raw_webserver}/static/sky-rainbow.gif"
+                /></a>
+                <a 
+                    href="/time"
+                    data-popup="Clock"
+                    class='bx bx-time'></a>
+            </div>
+            <div class="hambg"></div>
+        </div>
         <div class="hero">
             <img class="hero-bg" src="{self.website_background}">
             <div class="hero-text">
@@ -1899,7 +1922,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     def update_ip(self, ip):
         if regexp("^([0-9]{1,3}\\.){3}[0-9]{1,3}$").search(ip):
             self.ip = ip
-            self.raw_webserver = f"http://{self.ip}:9801"
+            new_ip = f"http://{self.ip}:9801"
+            if self.raw_webserver and self.raw_webserver != new_ip:
+                create_task(self.create_main_website())
+            self.raw_webserver = new_ip
 
     def is_webserver_url(self, url):
         if url.startswith(self.raw_webserver) or url.startswith("https://" + self.raw_webserver.split("//", 1)[-1]):

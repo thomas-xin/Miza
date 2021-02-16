@@ -278,9 +278,31 @@ class Neko(Command):
     flags = "lrv"
     rate_limit = (0.05, 4)
     threshold = 256
+    moe_sem = Semaphore(1, 0, rate_limit=10)
 
-    def img(self, tag):
-        return self.bot.data.imagepools.get(f"neko~{tag}", lambda: create_future(nekos.img, tag), self.threshold)
+    def img(self, tag=None):
+
+        async def fetch(nekos, tag):
+            if tag is None:
+                tag = "neko"
+                if not xrand(50) and not self.moe_sem.is_busy():
+                    with self.moe_sem:
+                        resp = await Request(
+                            "https://nekos.moe/api/v1/images/search",
+                            data=json.dumps(dict(nsfw=False, limit=50, skip=xrand(10) * 50, sort="newest", artist="", uploader="")),
+                            headers={"Content-Type": "application/json"},
+                            method="POST",
+                            json=True,
+                            aio=True,
+                        )
+                    out = set("https://nekos.moe/image/" + e["id"] for e in resp["images"])
+                    if out:
+                        print("nekos.moe", len(out))
+                        return out
+            return await create_future(nekos.img, tag)
+
+        file = f"neko~{tag}" if tag else "neko"
+        return self.bot.data.imagepools.get(file, fetch, self.threshold, args=(nekos, tag))
 
     async def __call__(self, bot, args, argv, flags, message, channel, guild, **void):
         isNSFW = is_nsfw(channel)
@@ -307,7 +329,7 @@ class Neko(Command):
             selected.append(possible[xrand(len(possible))])
         if not selected:
             if not argv:
-                url = await self.img("neko")
+                url = await self.img()
             else:
                 raise LookupError(f"Search tag {argv} not found. Use {bot.get_prefix(guild)}neko list for list.")
         else:
