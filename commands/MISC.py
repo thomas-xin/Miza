@@ -753,10 +753,11 @@ class UpdateMathTest(Database):
 
 class SpectralPulse(Command):
     _timeout_ = 150
-    description = "Runs SpectralPulse on the input URL."
+    description = "Runs SpectralPulse on the input URL. Operates on a global queue system."
     usage = "<0:search_links>"
     rate_limit = (12, 60)
     typing = True
+    spec_sem = Semaphore(1, 256, rate_limit=1)
 
     async def __call__(self, bot, channel, message, argv, **void):
         for a in message.attachments:
@@ -773,16 +774,19 @@ class SpectralPulse(Command):
         fn = dest + ".mp4"
         args = (python, "main.py", "-dest", "../../" + dest, url)
         print(args)
-        proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc/spectralpulse", stdout=subprocess.DEVNULL)
         with discord.context_managers.Typing(channel):
-            try:
-                await asyncio.wait_for(proc.wait(), timeout=3200)
-            except (T0, T1, T2):
-                with tracebacksuppressor:
-                    proc.kill()
-                raise
-            for ext in ("pcm", "riff"):
-                await create_future(os.remove, f"{dest}.{ext}")
+            if self.spec_sem.is_busy():
+                await send_with_react(channel, italics(ini_md(f"{url} enqueued in position {self.spec_sem.passive + 1}.")), reacts="❎", reference=message)
+            async with self.spec_sem:
+                proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc/spectralpulse", stdout=subprocess.DEVNULL)
+                try:
+                    await asyncio.wait_for(proc.wait(), timeout=3200)
+                except (T0, T1, T2):
+                    with tracebacksuppressor:
+                        proc.kill()
+                    raise
+                for ext in ("pcm", "riff"):
+                    await create_future(os.remove, f"{dest}.{ext}")
         await bot.send_with_file(channel, "", fn, filename=name)
 
 
