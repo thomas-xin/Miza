@@ -331,8 +331,8 @@ class Loop(Command):
         fake_message = copy.copy(message)
         fake_message.content = func2
         for i in range(iters):
-            message = await bot.fetch_message(message.id, channel)
-            if getattr(message, "deleted", None):
+            curr_message = await bot.fetch_message(message.id, channel)
+            if getattr(message, "deleted", None) or getattr(curr_message, "deleted", None):
                 break
             loop = i < iters - 1
             t = utc()

@@ -24,8 +24,9 @@ def send(*args, escape=True):
         if s:
             if s[-1] != "\n":
                 s += "\n"
-            sys.stdout.write(s)
-            sys.__stderr__.write(s)
+            s = s.encode("utf-8")
+            sys.stdout.buffer.write(s)
+            sys.__stderr__.buffer.write(s)
             sys.__stderr__.flush()
     except OSError:
         psutil.Process().kill()
@@ -79,7 +80,7 @@ prev_date = utc_dt().date()
 @app.route("/files/<path>/<path:filename>", methods=["GET"])
 @app.route("/download/<path>/<path:filename>", methods=["GET"])
 def get_file(path, filename=None):
-    if path == "hacks":
+    if path in ("hacks", "mods", "files", "download", "static"):
         send(flask.request.remote_addr + " was rickrolled 🙃")
         return flask.redirect("https://youtu.be/dQw4w9WgXcQ")
     orig_path = path
@@ -351,6 +352,7 @@ def upload():
         <meta content="{flask.request.url}" property="og:url">
         <meta property="og:image" content="https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/sky-rainbow.gif">
         <meta content="#BF7FFF" data-react-helmet="true" name="theme-color">
+        <link href="https://unpkg.com/boxicons@2.0.7/css/boxicons.min.css" rel="stylesheet">
     </head>""" + """
     <style>
         body {
@@ -360,6 +362,15 @@ def upload():
             background-size: cover;
             font-family: 'Comic Sans MS';
         }
+        .select {
+            vertical-align: center;
+            background: transparent;
+            color: white;
+            width: 100%;
+            height: 100%;
+            font-weight: 400;
+            align-items: center;
+        }
         .center {
             margin: 0;
             position: absolute;
@@ -367,9 +378,32 @@ def upload():
             left: 50%;
             -ms-transform: translate(-50%, -50%);
             transform: translate(-50%, -50%);
-        }
+        }""" + f"""
     </style>
     <body>
+        <link href="/static/hamburger.css" rel="stylesheet">
+        <div class="hamburger">
+            <input
+                type="checkbox"
+                title="Toggle menu"
+            />
+            <div class="items select">
+                <a href="/" data-popup="Home"><img
+                    src="{flask.request.host_url}static/avatar-rainbow.gif"
+                /></a>
+                <a href="/mizatlas" data-popup="Command Atlas"><img
+                    src="{flask.request.host_url}static/background-rainbow.gif"
+                /></a>
+                <a href="/upload" data-popup="File Host"><img
+                    src="{flask.request.host_url}static/sky-rainbow.gif"
+                /></a>
+                <a 
+                    href="/time"
+                    data-popup="Clock"
+                    class='bx bx-time'></a>
+            </div>
+            <div class="hambg"></div>
+        </div>
         <div class="center">
             <h1 align="center" style="color:white;">Upload a file here!</h1>
             <form action="/upload_file" method="POST" enctype="multipart/form-data">
@@ -426,21 +460,45 @@ def timezone():
         <meta property="og:image" content="https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/sky-rainbow.gif">
         <meta content="#""" + colour + """\" data-react-helmet="true" name="theme-color">
         <meta http-equiv="refresh" content="60">
-        <link rel="stylesheet" type="text/css" href="/static/timezonestyles.css" />
+        <link rel="stylesheet" type="text/css" href="/static/timezonestyles.css">
+        <link href="https://unpkg.com/boxicons@2.0.7/css/boxicons.min.css" rel="stylesheet">
     </head>
-    <body>
-        <div>
-        <h3>Estimated time:</h3>
-        <h1>""" + str(dt) + """</h1>
-        <h2>Detected timezone: """ + tz + f"""</h2>
-        <p class="align_left">
-            <a href="/time">Refresh</a>
-        </p>
-        <p class="align_right">
-            <a href="/">Home</a>
-        </p>
+    <body>""" + f"""
+        <link href="/static/hamburger.css" rel="stylesheet">
+        <div class="hamburger">
+            <input
+                type="checkbox"
+                title="Toggle menu"
+            />
+            <div class="items select">
+                <a href="/" data-popup="Home"><img
+                    src="{flask.request.host_url}static/avatar-rainbow.gif"
+                /></a>
+                <a href="/mizatlas" data-popup="Command Atlas"><img
+                    src="{flask.request.host_url}static/background-rainbow.gif"
+                /></a>
+                <a href="/upload" data-popup="File Host"><img
+                    src="{flask.request.host_url}static/sky-rainbow.gif"
+                /></a>
+                <a 
+                    href="/time"
+                    data-popup="Clock"
+                    class='bx bx-time'></a>
+            </div>
+            <div class="hambg"></div>
         </div>
-    <img src="{flask.request.host_url}static/sky-rainbow.gif" alt="Miza-Sky" style="width:14.2857%;height:14.2857%;">
+        <div class="main">
+            <h3>Estimated time:</h3>
+            <h1>""" + str(dt) + """</h1>
+            <h2>Detected timezone: """ + tz + f"""</h2>
+            <p class="align_left">
+                <a class="glow" href="/time">Refresh</a>
+            </p>
+            <p class="align_right">
+                <a class="glow" href="/">Home</a>
+            </p>
+        </div>
+    <img class="border" src="{flask.request.host_url}static/sky-rainbow.gif" alt="Miza-Sky" style="width:14.2857%;height:14.2857%;">
     </body>
 </html>
         """

@@ -308,7 +308,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 type="checkbox"
                 title="Toggle menu"
             />
-            <div class="items">
+            <div class="items select">
                 <a href="/" data-popup="Home"><img
                     src="{self.raw_webserver}/static/avatar-rainbow.gif"
                 /></a>
@@ -3306,6 +3306,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             clear_reactions = delete
             ack = delete
             ghost = True
+            deleted = True
 
         class ExtendedMessage:
 

@@ -48,7 +48,7 @@ class Purge(Command):
             print(count)
         else:
             print(start, end)
-        delD = {}
+        delD = deque()
         if end is None:
             dt = None
             lim = None
@@ -60,7 +60,7 @@ class Purge(Command):
                         found = True
                         dt = m.created_at
                         if uset is None and m.author.bot or uset and m.author.id in uset:
-                            delD[m.id] = m
+                            delD.append(m)
                             count -= 1
                             if count <= 0:
                                 break
@@ -68,12 +68,12 @@ class Purge(Command):
             async with bot.guild_semaphore:
                 async for m in bot.history(channel, limit=None, before=end, after=start):
                     if uset is None and m.author.bot or uset and m.author.id in uset:
-                        delD[m.id] = m
+                        delD.append(m)
         if len(delD) >= 64 and "f" not in flags:
             return css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(delD))} MESSAGES TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0))
         # attempt to bulk delete up to 100 at a time, otherwise delete 1 at a time
         deleted = 0
-        delM = alist(delD.values())
+        delM = alist(delD)
         while len(delM):
             try:
                 if hasattr(channel, "delete_messages") and channel.permissions_for(channel.guild.me).manage_messages:
