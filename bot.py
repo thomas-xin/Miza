@@ -55,6 +55,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.timeout = timeout
         self.set_classes()
         self.set_client_events()
+        self.monkey_patch()
         self.bot = self
         self.client = super()
         self.closed = False
@@ -3302,12 +3303,22 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
         class ExtendedMessage:
 
+            __slots__ = ("message", "deleted", "_data")
+
+            @classmethod
+            def new(cls, data):
+                channel, _ = bot._get_guild_channel(data)
+                message = discord.Message(channel=channel, data=copy.deepcopy(data), state=bot._state)
+                self = cls(message)
+                self._data = data
+                return self
+
             def __init__(self, message):
                 self.message = message
 
             def __getattr__(self, k):
                 try:
-                    return object.__getattribute__(self, k)
+                    return self.__getattribute__(k)
                 except AttributeError:
                     pass
                 return getattr(object.__getattribute__(self, "message"), k)
@@ -3317,7 +3328,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
         class CachedMessage(discord.abc.Snowflake):
 
-            __slots__ = ("_data", "id", "created_at", "author", "channel", "channel_id")
+            __slots__ = ("_data", "id", "created_at", "author", "channel", "channel_id", "deleted")
 
             def __init__(self, data):
                 self._data = data
@@ -3361,6 +3372,14 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 if k == "content":
                     return d["content"]
                 if k == "channel":
+                    try:
+                        channel, _ = bot._get_guild_channel(d)
+                        if channel is None:
+                            raise LookupError
+                    except LookupError:
+                        pass
+                    else:
+                        return channel
                     cid = int(d["channel_id"])
                     channel = bot.cache.channels.get(cid)
                     if channel:
@@ -3389,7 +3408,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 m = bot.cache.messages.get(d["id"])
                 if m is None or m is self or not issubclass(type(m), bot.LoadedMessage):
                     message = self.__copy__()
-                    if type(m) is not discord.Message:
+                    if type(m) not in (discord.Message, bot.ExtendedMessage):
                         bot.add_message(message, files=False)
                     return getattr(message, k)
                 return getattr(m, k)
@@ -3498,6 +3517,22 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
         discord.state.ConnectionState.parse_message_reaction_add = lambda self, data: parse_message_reaction_add(self, data)
 
+        def parse_message_create(self, data):
+            message = bot.ExtendedMessage.new(data)
+            self.dispatch("message", message)
+            if self._messages is not None:
+                self._messages.append(message)
+            if channel and isinstance(channel, discord.TextChannel):
+                channel.last_message_id = message.id
+
+        discord.state.ConnectionState.parse_message_create = lambda self, data: parse_message_create(self, data)
+
+        def create_message(self, channel, data):
+            data["channel_id"] = channel.id
+            return bot.ExtendedMessage.new(data)
+        
+        discord.state.ConnectionState.create_message = lambda self, *, channel, data: create_message(self, channel, data)
+
     def send_exception(self, messageable, ex, reference=None):
         return self.send_as_embeds(
             messageable,
@@ -3544,7 +3579,6 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                             self.events.append(f, func)
             print("Database events:")
             print(self.events.keys())
-            self.monkey_patch()
             for fut in futs:
                 await fut
             await self.fetch_user(self.deleted_user)
@@ -3841,6 +3875,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         before = copy.copy(before)
                     after = copy.copy(before)
                     after._update(data)
+            with suppress(AttributeError):
+                before.deleted = True
             if after.channel is None:
                 after.channel = await self.fetch_channel(payload.channel_id)
             self.add_message(after, files=False, force=True)
@@ -3878,7 +3914,12 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         message.guild = None
                     message.id = payload.message_id
                     message.author = await self.fetch_user(self.deleted_user)
-            self.add_message(self.ExtendedMessage(message), force=True)
+            try:
+                message.deleted = True
+            except AttributeError:
+                message = self.ExtendedMessage(message)
+                self.add_message(message, force=True)
+                message.deleted = True
             guild = message.guild
             if guild:
                 await self.send_event("_delete_", message=message)
@@ -3909,7 +3950,16 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         message.id = m_id
                         message.author = await self.fetch_user(self.deleted_user)
                     messages.add(message)
-            messages = sorted((self.add_message(self.ExtendedMessage(message), force=True) for message in messages), key=lambda m: m.id)
+            out = deque()
+            for message in sorted(messages, key=lambda m: m.id):
+                try:
+                    message.deleted = True
+                except AttributeError:
+                    message = self.ExtendedMessage(message)
+                    self.add_message(message, force=True)
+                    message.deleted = True
+                out.append(message)
+            messages = alist(out)
             await self.send_event("_bulk_delete_", messages=messages)
             for message in messages:
                 guild = getattr(message, "guild", None)

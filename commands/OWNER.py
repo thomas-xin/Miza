@@ -568,7 +568,7 @@ class UpdateWebhooks(Database):
             raise TypeError("DM channels cannot have webhooks.")
         if channel.id in self.data and not force:
             return alist(self.from_dict(w, channel.id) for w in self.data[channel.id].values())
-        async with self.guild_semaphore if not bypass else emptyctx:
+        async with self.bot.guild_semaphore if not bypass else emptyctx:
             self.data.pop(channel.id, None)
             if not channel.permissions_for(channel.guild.me).manage_webhooks:
                 raise PermissionError("Not permitted to create webhooks in channel.")

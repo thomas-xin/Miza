@@ -2029,7 +2029,7 @@ class AudioDownloader:
             entry["icon"] = icon
             if not entry.get("duration"):
                 entry["duration"] = get_duration(stream)
-            print(entry)
+            print(entry.url, entry.duration)
             with suppress(KeyError):
                 self.searched[entry["url"]]["duration"] = entry["duration"]
             live = not entry.get("duration") or entry["duration"] > 960

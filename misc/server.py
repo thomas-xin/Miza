@@ -79,6 +79,9 @@ prev_date = utc_dt().date()
 @app.route("/files/<path>/<path:filename>", methods=["GET"])
 @app.route("/download/<path>/<path:filename>", methods=["GET"])
 def get_file(path, filename=None):
+    if path == "hacks":
+        send(flask.request.remote_addr + " was rickrolled 🙃")
+        return flask.redirect("https://youtu.be/dQw4w9WgXcQ")
     orig_path = path
     ind = IND
     if path.startswith("~"):

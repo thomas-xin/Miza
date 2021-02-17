@@ -331,7 +331,7 @@ class Loop(Command):
         fake_message = copy.copy(message)
         fake_message.content = func2
         for i in range(iters):
-            if getattr(bot.cache.messages[message.id], "deleted", None):
+            if getattr(message, "deleted", None):
                 break
             loop = i < iters - 1
             t = utc()

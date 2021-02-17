@@ -342,7 +342,10 @@ custom list-like data structure that incorporates the functionality of numpy arr
             self.block = concurrent.futures.Future()
             self.hash = None
             self.frozenset = None
-            self.queries = 0
+            try:
+                del self.queries
+            except AttributeError:
+                pass
             try:
                 output = func(self, *args, **kwargs)
             except:
@@ -360,12 +363,19 @@ custom list-like data structure that incorporates the functionality of numpy arr
 
     # Init takes arguments and casts to a deque if possible, else generates as a single value. Allocates space equal to 3 times the length of the input iterable.
     def __init__(self, *args, fromarray=False, **void):
-        self._index = -1
         fut = getattr(self, "block", None)
         self.block = concurrent.futures.Future()
         self.hash = None
         self.frozenset = None
-        self.queries = 0
+        if fut:
+            try:
+                del self.queries
+            except AttributeError:
+                pass
+            try:
+                del self._index
+            except AttributeError:
+                pass
         if not args:
             self.offs = 0
             self.size = 0
@@ -432,7 +442,10 @@ custom list-like data structure that incorporates the functionality of numpy arr
                 self.data, self.offs, self.size = s
                 self.hash = None
                 self.frozenset = None
-                self.queries = 0
+                try:
+                    del self.queries
+                except AttributeError:
+                    pass
                 self.block = None
                 return
         raise TypeError("Unpickling failed:", s)
@@ -872,7 +885,10 @@ custom list-like data structure that incorporates the functionality of numpy arr
     __reversed__ = lambda self: iter(np.flip(self.view))
 
     def next(self):
-        self._index = (self._index + 1) % self.size
+        try:
+            self._index = (self._index + 1) % self.size
+        except AttributeError:
+            self._index = 0
         return self[self._index]
 
     @waiting
@@ -880,11 +896,14 @@ custom list-like data structure that incorporates the functionality of numpy arr
         return bytes(round(i) & 255 for i in self.view)
 
     def __contains__(self, item):
-        if self.queries >= 8:
-            return item in self.to_frozenset()
-        if self.frozenset is not None:
-            return item in self.frozenset
-        self.queries += 1
+        try:
+            if self.queries >= 8:
+                return item in self.to_frozenset()
+            if self.frozenset is not None:
+                return item in self.frozenset
+            self.queries += 1
+        except AttributeError:
+            self.queries = 1
         return item in self.view
 
     __copy__ = lambda self: self.copy()

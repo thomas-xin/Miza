@@ -803,7 +803,7 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
     else:
         inter = False
         url = f"https://discord.com/api/v8/channels/{channel.id}/messages"
-        if not reference or getattr(reference, "noref", None) or getattr(channel, "simulated", None):
+        if not reference or getattr(reference, "noref", None) or getattr(channel, "simulated", None) or getattr(reference, "deleted", None):
             fields = {}
             if embed:
                 fields["embed"] = embed

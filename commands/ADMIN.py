@@ -1903,7 +1903,8 @@ class UpdateMessageCache(Database):
             self.loaded[fn].update(messages)
         saved = self.raws.setdefault(fn, {})
         for i, message in enumerate(tuple(messages.values()), 1):
-            if type(message) is bot.CachedMessage:
+            m = getattr(message, "_data", None)
+            if m:
                 m = message._data
                 if "author" not in m:
                     author = message.author
