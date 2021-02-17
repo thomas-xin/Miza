@@ -2401,7 +2401,7 @@ def _predict_next(seq):
 	if b is not None:
 		return round_min(seq[-1] * b)
 
-def predict_next(seq, limit=10):
+def predict_next(seq, limit=12):
 	seq = np.asarray(seq, dtype=np.float64)
 	for i in range(3, 1 + min(len(seq), limit)):
 		temp = _predict_next(seq[-i:])

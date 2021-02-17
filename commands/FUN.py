@@ -868,8 +868,10 @@ class UpdateDogpiles(Database):
                         number = None
                 else:
                     numbers = deque((number,))
+                mcount = 0
                 count = 0
                 last_author_id = u_id
+                stopped = False
                 async for m in self.bot.history(message.channel, limit=100):
                     if m.id == message.id:
                         continue
@@ -894,10 +896,14 @@ class UpdateDogpiles(Database):
                             numbers.appendleft(n)
                     elif c != content:
                         break
-                    if m.author.id == last_author_id or m.author.id == self.bot.id:
+                    if m.author.id == last_author_id:
                         break
-                    count += 1
-                    if count >= 10:
+                    if m.author.id == self.bot.id:
+                        stopped = True
+                    elif not stopped:
+                        count += 1
+                    mcount += 1
+                    if mcount >= 11:
                         break
                     last_author_id = m.author.id
                 # print(content, count)
@@ -906,7 +912,7 @@ class UpdateDogpiles(Database):
                         if type(number) is str:
                             content = chr(ord(last_number) - add)
                         else:
-                            n = predict_next(numbers)
+                            n = await create_future(predict_next, numbers)
                             if not n:
                                 return
                             content = str(n)
