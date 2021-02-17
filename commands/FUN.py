@@ -906,7 +906,10 @@ class UpdateDogpiles(Database):
                         if type(number) is str:
                             content = chr(ord(last_number) - add)
                         else:
-                            content = str(predict_next(numbers))
+                            n = predict_next(numbers)
+                            if not n:
+                                return
+                            content = str(n)
                         content = content.strip()
                         if not content:
                             return
