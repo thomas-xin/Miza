@@ -756,6 +756,8 @@ if __name__ == "__main__":
             sources.extend(fut.result())
         else:
             sources.append(fut)
+    if dest:
+        sources = (sources[0],)
     for entry in sources:
         if type(entry) is not str:
             ytdl.extract_single(entry)
