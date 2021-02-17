@@ -144,7 +144,7 @@ def get_file(path, filename=None):
                 r = len(b) / 1048576
                 if r < 0.75:
                     send(f"Zipping {p}...")
-                    with zipfile.ZipFile(fi, "w", compression=zipfile.ZIP_DEFLATED, strict_timestamps=False) as z:
+                    with ZipFile(fi, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False) as z:
                         z.write(p, arcname=filename or fn)
                     r = os.path.getsize(fi) / size
             else:

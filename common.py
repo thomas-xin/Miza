@@ -346,16 +346,14 @@ enc_box = nacl.secret.SecretBox(base64.b64decode(enc_key)[:32])
 def zip2bytes(data):
     if not hasattr(data, "read"):
         data = io.BytesIO(data)
-    z = ZipFile(data, compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False)
-    b = z.open("DATA").read()
-    z.close()
+    with ZipFile(data, compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False) as z:
+        b = z.open("DATA").read()
     return b
 
 def bytes2zip(data):
     b = io.BytesIO()
-    z = ZipFile(b, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
-    z.writestr("DATA", data=data)
-    z.close()
+    with ZipFile(b, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True) as z:
+        z.writestr("DATA", data=data)
     b.seek(0)
     return b.read()
 
@@ -396,13 +394,12 @@ def select_and_loads(s, mode="safe", size=None):
     if zipfile.is_zipfile(b):
         print(f"Loading zip file of size {len(s)}...")
         b.seek(0)
-        z = ZipFile(b, compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False)
-        if size:
-            x = z.getinfo("DATA").file_size
-            if size < x:
-                raise OverflowError(f"Data input size too large ({x} > {size}).")
-        s = z.open("DATA").read()
-        z.close()
+        with ZipFile(b, compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False) as z:
+            if size:
+                x = z.getinfo("DATA").file_size
+                if size < x:
+                    raise OverflowError(f"Data input size too large ({x} > {size}).")
+            s = z.open("DATA").read()
     data = None
     with tracebacksuppressor:
         if s[0] == 128:
@@ -523,10 +520,9 @@ class FileHashDict(collections.abc.MutableMapping):
         if data is BaseException:
             for file in sorted(os.listdir("backup"), reverse=True):
                 with tracebacksuppressor:
-                    z = zipfile.ZipFile("backup/" + file, compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False)
-                    time.sleep(0.03)
-                    s = z.open(fn).read()
-                    z.close()
+                    with zipfile.ZipFile("backup/" + file, compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False) as z:
+                        time.sleep(0.03)
+                        s = z.open(fn).read()
                     data = select_and_loads(s, mode="unsafe")
                     print(f"Successfully recovered backup of {fn} from {file}.")
                     break
