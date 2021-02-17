@@ -26,6 +26,7 @@ with MultiThreadedImporter(globals()) as importer:
 
 PROC = psutil.Process()
 quit = lambda *args, **kwargs: PROC.kill()
+BOT = [None]
 
 tracemalloc.start()
 
@@ -780,6 +781,7 @@ is_channel = lambda channel: issubclass(type(channel), discord.abc.GuildChannel)
 REPLY_SEM = cdict()
 
 async def send_with_reply(channel, reference, content="", embed=None, tts=None, mention=False):
+    bot = BOT[0]
     try:
         sem = REPLY_SEM[channel.id]
     except KeyError:
@@ -801,9 +803,10 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
             ),
         )
     else:
+        m_id = verify_id(reference)
         inter = False
         url = f"https://discord.com/api/v8/channels/{channel.id}/messages"
-        if not reference or getattr(reference, "noref", None) or getattr(channel, "simulated", None) or getattr(reference, "deleted", None):
+        if not reference or getattr(reference, "noref", None) or getattr(channel, "simulated", None) or bot and getattr(bot.messages.get(m_id), "deleted", None):
             fields = {}
             if embed:
                 fields["embed"] = embed
@@ -824,7 +827,7 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
             return await channel.send(content, **fields)
         data = dict(
             content=content,
-            message_reference=dict(message_id=str(verify_id(reference))),
+            message_reference=dict(message_id=str(m_id)),
             allowed_mentions=dict(parse=["users", "roles", "everyone"], replied_user=mention)
         )
         if embed is not None:
@@ -846,7 +849,11 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
                     decode=False,
                     files=None,
                 )
-            return discord.Message(state=channel._state, channel=channel, data=eval_json(resp))
+            if bot:
+                M = bot.ExtendedMessage.new
+            else:
+                M = discord.Message
+            return M(state=channel._state, channel=channel, data=eval_json(resp))
         except Exception as ex:
             exc = ex
             if ex.args and "400" in str(ex.args[0]) or "401" in str(ex.args[0]) or "403" in str(ex.args[0]) or "404" in str(ex.args[0]):

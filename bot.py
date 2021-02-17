@@ -119,7 +119,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.embed_senders = cdict()
         # Assign bot cache to global variables for convenience
         globals().update(self.cache)
-        globals()["messages"] = self.MessageCache()
+        globals()["messages"] = self.messages = self.MessageCache()
         self.get_modules()
         self.heartbeat_proc = heartbeat_proc
 
@@ -3312,8 +3312,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             __slots__ = ("message", "deleted", "_data")
 
             @classmethod
-            def new(cls, data):
-                channel, _ = bot._get_guild_channel(data)
+            def new(cls, data, channel=None, **void):
+                if not channel:
+                    channel, _ = bot._get_guild_channel(data)
                 message = discord.Message(channel=channel, data=copy.deepcopy(data), state=bot._state)
                 self = cls(message)
                 self._data = data
@@ -4422,7 +4423,7 @@ if __name__ == "__main__":
             sys.stdout = sys.stderr = print = PRINT
             print("Logging started.")
             create_future_ex(proc_start)
-            miza = bot = client = Bot()
+            miza = bot = client = BOT[0] = Bot()
             miza.http.user_agent = "Miza"
             miza.miza = miza
             with miza:
