@@ -134,14 +134,16 @@ def get_file(path, filename=None):
                 PREVIEW[path] = p2
                 p = p3
     elif endpoint == "download" and p[-1] != IND and not p.endswith(".zip"):
-        size = os.path.getsize(p) > 16777216
-        if size:
+        size = os.path.getsize(p)
+        if size > 16777216:
             fi = p.rsplit(".", 1)[0] + ".zip" + IND
             if not os.path.exists(fi):
+                test = min(67108864, max(1048576, size >> 6))
+                send(f"Testing {p} with {test} bytes...")
                 with open(p, "rb") as f:
-                    data = f.read(1048576)
+                    data = f.read(test)
                 b = bytes2zip(data)
-                r = len(b) / 1048576
+                r = len(b) / test
                 if r < 0.75:
                     send(f"Zipping {p}...")
                     with ZipFile(fi, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False) as z:
