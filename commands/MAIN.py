@@ -2168,7 +2168,7 @@ class UpdateUsers(Database):
         user = message.author
         # Smudge invaded this code to mimic the funny mishaps from Eliza AI
         if message.content.startswith("The trouble is, my mother's "):
-            await send_with_reply(message.channel, message, f"How long has she been {message.content[28:]}")
+            await send_with_reply(message.channel, message, f"How long has she been {message.content[28:]}?")
             return
 
         if force or bot.is_mentioned(message, bot, message.guild):
