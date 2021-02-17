@@ -2282,6 +2282,15 @@ def sub_dict(d, key):
 
 # Casts a number to integers if the conversion would not alter the value.
 def round_min(x):
+    if type(x) is str:
+        if "." in x:
+            x = x.strip
+            if len(x) > 8:
+                x = mpf(x)
+            else:
+                x = float(x)
+        else:
+            x = int(x)
     if type(x) is int:
         return x
     if type(x) is not complex:

@@ -1056,6 +1056,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         break
                 found.add(message.id)
                 yield message
+                if len(found) >= limit:
+                    return
         async for message in channel.history(limit=limit, before=before, after=after):
             if message.id not in found:
                 self.add_message(message, files=False, force=True)
@@ -1770,7 +1772,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     return False
                 else:
                     try:
-                        return round_min(mpf(f))
+                        return round_min(f)
                     except:
                         return ast.literal_eval(f)
         except (ValueError, TypeError, SyntaxError):
@@ -1785,7 +1787,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             return int(x)
         if type(x) is float:
             return x
-        x = round_min(mpf(x))
+        x = round_min(x)
         if type(x) is not int and len(str(x)) <= 16:
             return float(x)
         return x

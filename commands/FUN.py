@@ -858,22 +858,52 @@ class UpdateDogpiles(Database):
                     content = zwremove(message.content)
                     if not content:
                         return
+                    if regexp("^-?[0-9\\.]+$").match(content):
+                        last_number = number = round_min(content)
+                        add = None
+                        mul = None
+                    else:
+                        number = None
                     count = 0
                     last_author_id = u_id
                     async for m in self.bot.history(message.channel, limit=100):
+                        if m.id == message.id:
+                            continue
                         c = zwremove(m.content)
                         if not c:
                             break
-                        if c != content:
+                        if number is not None:
+                            try:
+                                n = round_min(c)
+                            except:
+                                break
+                            if mul is None:
+                                add = n - number
+                                mul = n / number
+                            if add is None or n - add != number:
+                                add = None
+                                if n / mul != number:
+                                    break
+                            number = n
+                        elif c != content:
                             break
                         if m.author.id == last_author_id or m.author.id == self.bot.id:
                             break
                         count += 1
-                        if count >= 3:
+                        if count >= 10:
                             break
                         last_author_id = m.author.id
-                    if count >= 3 and not xrand(3):
-                        create_task(message.channel.send(lim_str("\u200b" + content, 2000), tts=message.tts))
+                    # print(content, count)
+                    if count >= 3 and random.random() > 2 / count:
+                        if number is not None:
+                            if add is None:
+                                content = str(round_min(last_number / mul))
+                            else:
+                                content = str(round_min(last_number - add))
+                        print(message.channel, content, count)
+                        if content[0].isascii():
+                            content = lim_str("\u200b" + content, 2000)
+                        create_task(message.channel.send(content, tts=message.tts))
                         self.bot.data.users.add_xp(message.author, len(message.content) / 2 + 16)
                         self.bot.data.users.add_gold(message.author, len(message.content) / 4 + 32)
 

@@ -51,12 +51,11 @@ class Purge(Command):
         delD = deque()
         if end is None:
             dt = None
-            lim = None
             after = utc_dt() - datetime.timedelta(days=14) if "i" not in flags else None
             found = False
             if dt is None or after is None or dt > after:
                 async with bot.guild_semaphore:
-                    async for m in bot.history(channel, limit=lim, before=dt, after=after):
+                    async for m in bot.history(channel, limit=None, before=dt, after=after):
                         found = True
                         dt = m.created_at
                         if uset is None and m.author.bot or uset and m.author.id in uset:
