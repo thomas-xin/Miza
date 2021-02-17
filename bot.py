@@ -2753,16 +2753,22 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     # Gets a valid webhook for the target channel, creating a new one when necessary.
     async def ensure_webhook(self, channel, force=False, bypass=False, fill=False):
         wlist = await self.load_channel_webhooks(channel, force=force, bypass=bypass)
-        if fill:
-            while len(wlist) < fill:
+        try:
+            if fill:
+                while len(wlist) < fill:
+                    w = await channel.create_webhook(name=self.name, reason="Auto Webhook")
+                    w = self.add_webhook(w)
+                    wlist.append(w)
+            if not wlist:
                 w = await channel.create_webhook(name=self.name, reason="Auto Webhook")
                 w = self.add_webhook(w)
-                wlist.append(w)
-        if not wlist:
-            w = await channel.create_webhook(name=self.name, reason="Auto Webhook")
-            w = self.add_webhook(w)
-        else:
-            w = wlist.next()
+            else:
+                w = wlist.next()
+        except discord.HTTPException as ex:
+            if "maximum" in str(ex).lower():
+                print_exc()
+                wlist = await self.load_channel_webhooks(channel, force=True, bypass=bypass)
+                w = wlist.next()
         return w
 
     # Sends a message to the target channel, using a random webhook from that channel.
