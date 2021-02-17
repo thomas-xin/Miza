@@ -2166,6 +2166,11 @@ class UpdateUsers(Database):
     async def _nocommand_(self, message, msg, force=False, flags=(), **void):
         bot = self.bot
         user = message.author
+        # Smudge invaded this code to mimic the funny mishaps from Eliza AI
+        if message.content.startswith("The trouble is, my mother's "):
+            send_with_reply(message.channel, message, f"How long has she been {message.content[28:]}")
+            return
+
         if force or bot.is_mentioned(message, bot, message.guild):
             if user.bot:
                 with suppress(AttributeError):
