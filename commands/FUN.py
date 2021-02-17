@@ -860,7 +860,7 @@ class UpdateDogpiles(Database):
                         return
                     count = 0
                     last_author_id = u_id
-                    async for m in self.bot.history(c_id, limit=100):
+                    async for m in self.bot.history(message.channel, limit=100):
                         c = zwremove(m.content)
                         if not c:
                             break

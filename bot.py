@@ -537,18 +537,30 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     # Returns a discord object if it is in any of the internal cache.
     def in_cache(self, o_id):
         cache = self.cache
-        with suppress(KeyError):
+        try:
             return self.cache.users[o_id]
-        with suppress(KeyError):
+        except KeyError:
+            pass
+        try:
             return self.cache.channels[o_id]
-        with suppress(KeyError):
+        except KeyError:
+            pass
+        try:
             return self.cache.guilds[o_id]
-        with suppress(KeyError):
+        except KeyError:
+            pass
+        try:
             return self.cache.roles[o_id]
-        with suppress(KeyError):
+        except KeyError:
+            pass
+        try:
             return self.cache.emojis[o_id]
-        with suppress(KeyError):
+        except KeyError:
+            pass
+        try:
             return self.data.mimics[o_id]
+        except KeyError:
+            pass
 
     # Fetches either a user or channel object from ID, using the bot cache when possible.
     async def fetch_messageable(self, s_id):
@@ -1029,6 +1041,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         c = self.in_cache(verify_id(channel))
         if c is None:
             c = channel
+        if channel is None:
+            return
         if not is_channel(channel):
             channel = await self.get_dm(channel)
         found = set()
