@@ -595,11 +595,14 @@ class UpdateChannelCache(Database):
             try:
                 if m_id < min_time:
                     raise OverflowError
-                yield await self.bot.fetch_message(m_id, channel)
+                message = await self.bot.fetch_message(m_id, channel)
+                if getattr(message, "deleted", None):
+                    continue
             except (discord.NotFound, discord.Forbidden, OverflowError):
                 self.data[c_id].discard(m_id)
             except (TypeError, ValueError, discord.HTTPException):
                 print_exc()
+            yield message
 
     def add(self, c_id, m_id):
         s = self.data.setdefault(c_id, set())
