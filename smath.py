@@ -2383,6 +2383,32 @@ def lcmRange(x):
     return y
 
 
+def _predict_next(seq):
+	if len(seq) < 2:
+		return
+	if np.min(seq) == np.max(seq):
+		return seq[0]
+	if len(seq) < 3:
+		return
+	if len(seq) > 4 and all(seq[2:] - seq[1:-1] == seq[:-2]):
+		return round_min(seq[-1] + seq[-2])
+	a = _predict_next(seq[1:] - seq[:-1])
+	if a is not None:
+		return round_min(seq[-1] + a)
+	if len(seq) < 4 or 0 in seq[:-1]:
+		return
+	b = _predict_next(seq[1:] / seq[:-1])
+	if b is not None:
+		return round_min(seq[-1] * b)
+
+def predict_next(seq, limit=10):
+	seq = np.asarray(seq, dtype=np.float64)
+	for i in range(3, 1 + min(len(seq), limit)):
+		temp = _predict_next(seq[-i:])
+		if temp is not None:
+			return temp
+
+
 # Computes the mean of all numbers in an iterable.
 mean = lambda *nums: round_min(np.mean(nums))
 

@@ -850,81 +850,72 @@ class UpdateDogpiles(Database):
             return
         g_id = message.guild.id
         following = self.data
-        if g_id in following:
+        dogpile = following.get(g_id)
+        if dogpile:
             u_id = message.author.id
             c_id = message.channel.id
             if not edit:
-                if following[g_id]:
-                    content = zwremove(message.content)
-                    if not content:
-                        return
-                    if regexp("^-?[0-9\\.]+$").match(content):
-                        last_number = number = round_min(content)
-                        add = None
-                        mul = None
-                    elif len(content) == 1:
+                content = zwremove(message.content)
+                if not content:
+                    return
+                try:
+                    number = round_min(content)
+                except ValueError:
+                    if len(content) == 1:
                         last_number = number = content
                         add = None
                     else:
                         number = None
-                    count = 0
-                    last_author_id = u_id
-                    async for m in self.bot.history(message.channel, limit=100):
-                        if m.id == message.id:
-                            continue
-                        c = zwremove(m.content)
-                        if not c:
-                            break
-                        if number is not None:
-                            if type(number) is str:
-                                if len(c) != 1:
-                                    break
-                                n = ord(c)
-                                if add is None:
-                                    add = n - ord(number)
-                                elif n - add != ord(number):
-                                    break
-                                number = c
-                            else:
-                                try:
-                                    n = round_min(c)
-                                except:
-                                    break
-                                if mul is None:
-                                    add = n - number
-                                    mul = n / number
-                                if add is None or n - add != number:
-                                    add = None
-                                    if n / mul != number:
-                                        break
-                                number = n
-                        elif c != content:
-                            break
-                        if m.author.id == last_author_id or m.author.id == self.bot.id:
-                            break
-                        count += 1
-                        if count >= 10:
-                            break
-                        last_author_id = m.author.id
-                    # print(content, count)
-                    if count >= 3 and random.random() > 2 / count:
-                        if number is not None:
-                            if type(number) is str:
-                                content = chr(ord(last_number) - add)
-                            else:
-                                if add is None:
-                                    content = str(round_min(last_number / mul))
-                                else:
-                                    content = str(round_min(last_number - add))
-                            content = content.strip()
-                            if not content:
-                                return
-                        print(message.channel, content, count)
-                        if content[0].isascii():
-                            content = lim_str("\u200b" + content, 2000)
-                        create_task(message.channel.send(content, tts=message.tts))
-                        self.bot.data.users.add_xp(message.author, len(message.content) / 2 + 16)
-                        self.bot.data.users.add_gold(message.author, len(message.content) / 4 + 32)
+                else:
+                    numbers = deque((number,))
+                count = 0
+                last_author_id = u_id
+                async for m in self.bot.history(message.channel, limit=100):
+                    if m.id == message.id:
+                        continue
+                    c = zwremove(m.content)
+                    if not c:
+                        break
+                    if number is not None:
+                        if type(number) is str:
+                            if len(c) != 1:
+                                break
+                            n = ord(c)
+                            if add is None:
+                                add = n - ord(number)
+                            elif n - add != ord(number):
+                                break
+                            number = c
+                        else:
+                            try:
+                                n = round_min(c)
+                            except:
+                                break
+                            numbers.appendleft(n)
+                    elif c != content:
+                        break
+                    if m.author.id == last_author_id or m.author.id == self.bot.id:
+                        break
+                    count += 1
+                    if count >= 10:
+                        break
+                    last_author_id = m.author.id
+                # print(content, count)
+                if count >= 3 and random.random() > 2 / count:
+                    if number is not None:
+                        if type(number) is str:
+                            content = chr(ord(last_number) - add)
+                        else:
+                            content = str(predict_next(numbers))
+                        content = content.strip()
+                        if not content:
+                            return
+                    print(message.channel, content, count)
+                    if content[0].isascii():
+                        content = lim_str("\u200b" + content, 2000)
+                    create_task(message.channel.send(content, tts=message.tts))
+                    self.bot.data.users.add_xp(message.author, len(message.content) / 2 + 16)
+                    self.bot.data.users.add_gold(message.author, len(message.content) / 4 + 32)
 
 
 class Daily(Command):
