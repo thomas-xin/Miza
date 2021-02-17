@@ -3695,8 +3695,11 @@ __zeroEncoder = demap({chr(i + 97): c for i, c in enumerate(ZeroEnc)})
 __zeroEncode = "".maketrans(dict(__zeroEncoder.a))
 __zeroDecode = "".maketrans(dict(__zeroEncoder.b))
 is_zero_enc = lambda s: (s[0] in ZeroEnc) if s else None
-zwencode = lambda s: (s if type(s) is str else str(s)).casefold().translate(__zeroEncode)
-zwdecode = lambda s: (s if type(s) is str else str(s)).casefold().translate(__zeroDecode)
+zwencode = lambda s: as_str(s).casefold().translate(__zeroEncode)
+zwdecode = lambda s: as_str(s).casefold().translate(__zeroDecode)
+__zeroRemover = {c: "" for c in ZeroEnc}
+__zeroRemoverTrans = "".maketrans(__zeroRemover)
+zwremove = lambda s: as_str(s).translate(__zeroRemoverTrans)
 
 
 # Unicode fonts for alphanumeric characters.

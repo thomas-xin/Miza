@@ -130,9 +130,9 @@
 }
 
 .hamburger > .items {
-    display: flex;
-    align-items: center;
-    flex-direction: column;
+	display: flex;
+	align-items: center;
+	flex-direction: column;
 	gap: var(--icon-gap);
 	transition: all 250ms;
 }
@@ -166,17 +166,17 @@
 }
 
 .hamburger > input[type="checkbox"]:checked {
-    margin-bottom: calc(var(--icon-gap)*2);
+	margin-bottom: calc(var(--icon-gap)*2);
 }
 
 .hamburger > .items > a::after {
-    content: attr(data-popup);
-    display: block;
-    position: absolute;
-    right: calc(var(--icon-width) + 1rem);
-    font-size: 1.2rem;
-    font-family: system-ui, sans-serif;
-    width: max-content;
+	content: attr(data-popup);
+	display: block;
+	position: absolute;
+	right: calc(var(--icon-width) + 1rem);
+	font-size: 1.2rem;
+	font-family: system-ui, sans-serif;
+	width: max-content;
 	top: 0;
 	opacity: 1;
 	
@@ -185,4 +185,13 @@
 
 .hamburger > input[type="checkbox"]:not(:checked)~.items > a::after {
 	opacity: 0;
+}
+
+.hamburger ~ #root {
+	--icon-color: black;
+	--icon-hover-bgcolor: rgb(0 0 0 / 0.18);
+	--icon-bgcolor: rgb(255 255 255 / 10%);
+	--inactive-menu-bgcolor: rgba(0, 0, 0, 0.8);
+	--active-menu-bgcolor: rgba(0, 0, 0, 0.1);
+	--menu-hover-bgcolor: #00000082;
 }

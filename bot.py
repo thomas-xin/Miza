@@ -343,9 +343,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 src="{self.raw_webserver}/static/moon.gif" 
             />
             <h2>What is Miza?</h2>
-            <p>Miza is a multipurpose Discord bot, written in Python, fashioned after the character "Misery" from the platformer game Cave Story, and initially designed to help with Cave Story modding.<br>\
-She quickly branched out into all the areas you'd need in a Discord bot, and with her owner dedicated to improving her functionalities and capabilities even further, she never stops growing!<br>\
-Miza has plenty of original commands and features, with lots of optimization to provide a smooth, reliable and unique Discord experience, but the general premise for Miza is: "Fuck it, other bots can do it; Miza should be able to do it too" 🙃</p> 
+            <p>Built on discord.py, Miza is a multipurpose Discord bot, fashioned after the character "Misery" from the platformer game Cave Story, and initially designed to help with Cave Story modding.<br>\
+She quickly branched out into all the areas you'd desire in a server, with careful attention to efficiency, performance, quality, and reliability.<br>\
+All of Miza's commands are easily accessible and manageable, with permission levels assignable on a user/role basis, as well as command category enabling/disabling at will per channel.<br>\
+The prefix is customizable, the command parser is intelligent, with the ability to recognize text in unicode fonts, the ability to parse and solve mathematical formulae for numerical inputs, in addition to fuzzy searching usernames.<br>\
+Sporting features from every category, Miza is capable of suiting just about anyone's needs, from invoking google translate, solving calculus equations, creating fancy unicode text, setting announcements, to temporarily muting/banning users, logging messages, to music and video filtering, playing, and downloading, image commands from magik distortion to rainbow gifs, webhook mimics/plurals, custom emojis, and much more!<br>\
+Above all else, Miza aims to provide users with a smooth, reliable and unique Discord experience, but the general premise for Miza is: "Fuck it, other bots can do it; Miza should be able to do it too" 🙃</p> 
             <h2>What can Miza do?</h2>
             <p>Oh, just a few things:</p>"""
             commands = set()

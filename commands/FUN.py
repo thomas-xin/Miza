@@ -845,11 +845,8 @@ class Dogpile(Command):
 class UpdateDogpiles(Database):
     name = "dogpiles"
 
-    def __load__(self):
-        self.msgFollow = cdict()
-
-    async def _nocommand_(self, text, edit, orig, message, **void):
-        if message.guild is None or not orig:
+    async def _nocommand_(self, edit, message, **void):
+        if message.guild is None or not message.content:
             return
         g_id = message.guild.id
         following = self.data
@@ -858,27 +855,27 @@ class UpdateDogpiles(Database):
             c_id = message.channel.id
             if not edit:
                 if following[g_id]:
-                    checker = orig
-                    curr = self.msgFollow.get(c_id)
-                    if curr is None:
-                        curr = [checker, 1, 0]
-                        self.msgFollow[c_id] = curr
-                    # Must not imitate same user spamming
-                    elif checker == curr[0] and u_id != curr[2]:
-                        curr[1] += 1
-                        if curr[1] >= 3:
-                            curr[1] = xrand(-3) + 1
-                            if len(checker):
-                                create_task(message.channel.send(checker, tts=message.tts))
-                                self.bot.data.users.add_xp(message.author, len(message.content) / 2 + 16)
-                                self.bot.data.users.add_gold(message.author, len(message.content) / 4 + 32)
-                    else:
-                        # Don't imitate messages longer than 128 characters to prevent spam
-                        if len(checker) > 128:
-                            checker = ""
-                        curr[0] = checker
-                        curr[1] = xrand(-1, 2)
-                    curr[2] = u_id
+                    content = zwremove(message.content)
+                    if not content:
+                        return
+                    count = 0
+                    last_author_id = u_id
+                    async for m in self.bot.history(c_id, limit=100):
+                        c = zwremove(m.content)
+                        if not c:
+                            break
+                        if c != content:
+                            break
+                        if m.author.id == last_author_id or m.author.id == self.bot.id:
+                            break
+                        count += 1
+                        if count >= 3:
+                            break
+                        last_author_id = m.author.id
+                    if count >= 3 and not xrand(3):
+                        create_task(message.channel.send(lim_str("\u200b" + content, 2000), tts=message.tts))
+                        self.bot.data.users.add_xp(message.author, len(message.content) / 2 + 16)
+                        self.bot.data.users.add_gold(message.author, len(message.content) / 4 + 32)
 
 
 class Daily(Command):
