@@ -602,7 +602,8 @@ class UpdateChannelCache(Database):
                 self.data[c_id].discard(m_id)
             except (TypeError, ValueError, discord.HTTPException):
                 print_exc()
-            yield message
+            else:
+                yield message
 
     def add(self, c_id, m_id):
         s = self.data.setdefault(c_id, set())
