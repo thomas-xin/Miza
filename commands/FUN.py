@@ -862,6 +862,9 @@ class UpdateDogpiles(Database):
                         last_number = number = round_min(content)
                         add = None
                         mul = None
+                    elif len(content) == 1:
+                        last_number = number = content
+                        add = None
                     else:
                         number = None
                     count = 0
@@ -873,18 +876,28 @@ class UpdateDogpiles(Database):
                         if not c:
                             break
                         if number is not None:
-                            try:
-                                n = round_min(c)
-                            except:
-                                break
-                            if mul is None:
-                                add = n - number
-                                mul = n / number
-                            if add is None or n - add != number:
-                                add = None
-                                if n / mul != number:
+                            if type(number) is str:
+                                if len(c) != 1:
                                     break
-                            number = n
+                                n = ord(c)
+                                if add is None:
+                                    add = n - ord(number)
+                                elif n - add != ord(number):
+                                    break
+                                number = c
+                            else:
+                                try:
+                                    n = round_min(c)
+                                except:
+                                    break
+                                if mul is None:
+                                    add = n - number
+                                    mul = n / number
+                                if add is None or n - add != number:
+                                    add = None
+                                    if n / mul != number:
+                                        break
+                                number = n
                         elif c != content:
                             break
                         if m.author.id == last_author_id or m.author.id == self.bot.id:
@@ -896,10 +909,16 @@ class UpdateDogpiles(Database):
                     # print(content, count)
                     if count >= 3 and random.random() > 2 / count:
                         if number is not None:
-                            if add is None:
-                                content = str(round_min(last_number / mul))
+                            if type(number) is str:
+                                content = chr(ord(last_number) - add)
                             else:
-                                content = str(round_min(last_number - add))
+                                if add is None:
+                                    content = str(round_min(last_number / mul))
+                                else:
+                                    content = str(round_min(last_number - add))
+                            content = content.strip()
+                            if not content:
+                                return
                         print(message.channel, content, count)
                         if content[0].isascii():
                             content = lim_str("\u200b" + content, 2000)
