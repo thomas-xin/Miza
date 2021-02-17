@@ -138,11 +138,21 @@ def get_file(path, filename=None):
         if size:
             fi = p.rsplit(".", 1)[0] + ".zip" + IND
             if not os.path.exists(fi):
-                send(f"Zipping {p}...")
-                with zipfile.ZipFile(fi, "w", compression=zipfile.ZIP_DEFLATED, strict_timestamps=False) as z:
-                    z.write(p, arcname=filename or fn)
-            if os.path.getsize(fi) < size * 0.75:
+                with open(p, "rb") as f:
+                    data = f.read(1048576)
+                b = bytes2zip(data)
+                r = len(b) / 1048576
+                if r < 0.75:
+                    send(f"Zipping {p}...")
+                    with zipfile.ZipFile(fi, "w", compression=zipfile.ZIP_DEFLATED, strict_timestamps=False) as z:
+                        z.write(p, arcname=filename or fn)
+                    r = os.path.getsize(fi) / size
+            else:
+                r = os.path.getsize(fi) / size
+            if r < 0.8:
                 p = fi
+            else:
+                send(f"{p} has compression ratio {r}, skipping...")
     resp = flask.send_file(p, as_attachment=download, attachment_filename=filename or fn, mimetype=mime, conditional=True)
     resp.headers.update(CHEADERS)
     return resp
