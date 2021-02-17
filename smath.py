@@ -2284,7 +2284,7 @@ def sub_dict(d, key):
 def round_min(x):
     if type(x) is str:
         if "." in x:
-            x = x.strip
+            x = x.strip("0")
             if len(x) > 8:
                 x = mpf(x)
             else:

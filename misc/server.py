@@ -98,9 +98,9 @@ def get_file(path, filename=None):
         mime = MIMES.get(p.rsplit("/", 1)[-1].rsplit(".", 1)[-1])
     else:
         mime = get_mime(p)
-    fn = p.rsplit("/", 1)[-1].split("~", 1)[-1]
+    fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
     if endpoint.endswith("view") and mime.startswith("image/"):
-        if os.path.getsize(p) > 262144:
+        if os.path.getsize(p) > 1048576:
             if endpoint != "preview":
                 og_image = flask.request.host_url + "preview/" + orig_path
                 data = f"""<!DOCTYPE html>
@@ -133,6 +133,16 @@ def get_file(path, filename=None):
                     proc.wait()
                 PREVIEW[path] = p2
                 p = p3
+    elif endpoint == "download" and p[-1] != IND and not p.endswith(".zip"):
+        size = os.path.getsize(p) > 16777216
+        if size:
+            fi = p.rsplit(".", 1)[0] + ".zip" + IND
+            if not os.path.exists(fi):
+                send(f"Zipping {p}...")
+                with zipfile.ZipFile(fi, "w", compression=zipfile.ZIP_DEFLATED, strict_timestamps=False) as z:
+                    z.write(p, arcname=filename or fn)
+            if os.path.getsize(fi) < size * 0.75:
+                p = fi
     resp = flask.send_file(p, as_attachment=download, attachment_filename=filename or fn, mimetype=mime, conditional=True)
     resp.headers.update(CHEADERS)
     return resp

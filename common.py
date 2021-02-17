@@ -1591,7 +1591,7 @@ def find_file(path, cwd="cache", ind="\x7f"):
     fn = f"{ind}{path}"
     for file in reversed(os.listdir(cwd)):
         # file cache is stored as "{timestamp}~{name}", search for file via timestamp
-        if file.rsplit(".", 1)[0].split("~", 1)[0] == fn:
+        if file[-1] != ind and file.rsplit(".", 1)[0].split("~", 1)[0] == fn:
             return os.getcwd() + "/" + cwd + "/" + file
     raise FileNotFoundError(path)
 
