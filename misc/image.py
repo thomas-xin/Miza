@@ -1597,8 +1597,8 @@ def ImageOpIterator(image, step, operation, ts, args):
         except EOFError:
             break
         if str(image.mode) == "P":
-            image = image.convert("RGBA")
-        if str(image.mode) != "RGBA":
+            temp = image.convert("RGBA")
+        elif str(image.mode) != "RGBA":
             temp = image.convert("RGBA")
         else:
             temp = image
@@ -1691,8 +1691,8 @@ def evalImg(url, operation, args):
                 globals()["ANIM"] = False
                 image.seek(0)
                 if str(image.mode) == "P":
-                    image = image.convert("RGBA")
-                if str(image.mode) != "RGBA":
+                    temp = image.convert("RGBA")
+                elif str(image.mode) != "RGBA":
                     temp = image.convert("RGBA")
                 else:
                     temp = image
