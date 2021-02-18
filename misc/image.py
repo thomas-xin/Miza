@@ -1247,7 +1247,7 @@ def blend_op(image, url, operation, amount, recursive=True):
                             break
                         if str(image.mode) == "P":
                             image = image.convert("RGBA")
-                        if str(image.mode) != "RGBA":
+                        elif str(image.mode) != "RGBA":
                             temp = image.convert("RGBA")
                         else:
                             temp = image
