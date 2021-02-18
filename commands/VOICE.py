@@ -1502,12 +1502,15 @@ class AudioDownloader:
                 orig_path = path
                 ind = "\x7f"
                 if path.startswith("~"):
-                    path = str(int.from_bytes(base64.urlsafe_b64decode(path.encode("utf-8") + b"==="), "big"))
+                    b = path.split(".", 1)[0].encode("utf-8") + b"==="
+                    if (len(b) - 1) & 3 == 0:
+                        b += b"="
+                    path = str(int.from_bytes(base64.urlsafe_b64decode(b), "big"))
                 elif path.startswith("!"):
                     ind = "!"
                     path = path[1:]
                 p = find_file(path, ind=ind)
-                fn = urllib.parse.unquote(p.rsplit("/", 1)[-1].split("~", 1)[-1])
+                fn = urllib.parse.unquote(p.rsplit("/", 1)[-1].split("~", 1)[-1].rsplit(".", 1)[0])
                 url = self.bot.raw_webserver + "/files/" + orig_path
                 return dict(url=url, name=fn, direct=True)
         try:
@@ -1556,12 +1559,15 @@ class AudioDownloader:
                 orig_path = path
                 ind = "\x7f"
                 if path.startswith("~"):
-                    path = str(int.from_bytes(base64.urlsafe_b64decode(path.encode("utf-8") + b"==="), "big"))
+                    b = path.split(".", 1)[0].encode("utf-8") + b"==="
+                    if (len(b) - 1) & 3 == 0:
+                        b += b"="
+                    path = str(int.from_bytes(base64.urlsafe_b64decode(b), "big"))
                 elif path.startswith("!"):
                     ind = "!"
                     path = path[1:]
                 p = find_file(path, ind=ind)
-                fn = urllib.parse.unquote(p.rsplit("/", 1)[-1].split("~", 1)[-1])
+                fn = urllib.parse.unquote(p.rsplit("/", 1)[-1].split("~", 1)[-1].rsplit(".", 1)[0])
                 url = self.bot.raw_webserver + "/files/" + orig_path
                 return dict(url=url, webpage_url=url2, title=fn, direct=True)
         try:

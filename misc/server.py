@@ -86,7 +86,10 @@ def get_file(path, filename=None):
     orig_path = path
     ind = IND
     if path.startswith("~"):
-        path = str(int.from_bytes(base64.urlsafe_b64decode(path.encode("utf-8") + b"==="), "big"))
+        b = path.split(".", 1)[0].encode("utf-8") + b"==="
+        if (len(b) - 1) & 3 == 0:
+            b += b"="
+        path = str(int.from_bytes(base64.urlsafe_b64decode(b), "big"))
     elif path.startswith("!"):
         ind = "!"
         path = path[1:]
