@@ -1490,6 +1490,10 @@ def create_thread(func, *args, wait=False, **kwargs):
 
 # Runs a function call in a parallel thread, returning a future object waiting on the output.
 def create_future_ex(func, *args, timeout=None, priority=False, **kwargs):
+    try:
+        kwargs["timeout"] = kwargs.pop("_timeout_")
+    except KeyError:
+        pass
     fut = (athreads, pthreads)[priority].submit(func, *args, **kwargs)
     if timeout is not None:
         fut = (athreads, pthreads)[priority].submit(fut.result, timeout=timeout)

@@ -416,7 +416,7 @@ def create_gif(in_type, args, delay):
                     size = max_size(img.width, img.height, maxsize)
                 temp = resize_to(img, *size, operation="hamming")
                 if str(temp.mode) == "RGBA":
-                    if str(imgs[0]) != "RGBA":
+                    if imgs and str(imgs[0]) != "RGBA":
                         imgs[0] = imgs[0].convert("RGBA")
                 imgs.append(temp)
     size = list(imgs[0].size)

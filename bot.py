@@ -1079,6 +1079,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 pass
         raise FileNotFoundError("Image file not found.")
 
+    mime = magic.Magic(mime=True, mime_encoding=True)
+    mimes = {}
+
     # Finds URLs in a string, following any discord message links found.
     async def follow_url(self, url, it=None, best=False, preserve=True, images=True, allow=False, limit=None):
         if limit is not None and limit <= 0:
@@ -1153,40 +1156,44 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             else:
                 found = False
                 if not is_discord_url(url) and (images or is_tenor_url(url) or is_deviantart_url(url) or self.is_webserver_url(url)):
-                    resp = await create_future(requests.get, url, headers=Request.header(), stream=True)
-                    with resp:
-                        url = resp.url
-                        head = fcdict(resp.headers)
-                        ctype = [t.strip() for t in head.get("Content-Type", "").split(";")]
-                        print(head, ctype, sep="\n")
-                        if "text/html" in ctype:
-                            it = resp.iter_content(65536)
-                            data = next(it)
-                            s = as_str(data)
-                            try:
-                                s = s[s.index("<meta") + 5:]
-                                search = 'http-equiv="refresh" content="'
+                    skip = False
+                    if url in self.mimes:
+                        skip = "text/html" not in self.mimes[url]
+                    if not skip:
+                        resp = await create_future(requests.get, url, headers=Request.header(), stream=True)
+                        with resp:
+                            url = resp.url
+                            head = fcdict(resp.headers)
+                            ctype = [t.strip() for t in head.get("Content-Type", "").split(";")]
+                            print(head, ctype, sep="\n")
+                            if "text/html" in ctype:
+                                it = resp.iter_content(65536)
+                                data = next(it)
+                                s = as_str(data)
                                 try:
-                                    s = s[s.index(search) + len(search):]
-                                    s = s[:s.index('"')]
-                                    res = None
-                                    for k in s.split(";"):
-                                        temp = k.strip()
-                                        if temp.casefold().startswith("url="):
-                                            res = temp[4:]
-                                            break
-                                    if not res:
-                                        raise ValueError
+                                    s = s[s.index("<meta") + 5:]
+                                    search = 'http-equiv="refresh" content="'
+                                    try:
+                                        s = s[s.index(search) + len(search):]
+                                        s = s[:s.index('"')]
+                                        res = None
+                                        for k in s.split(";"):
+                                            temp = k.strip()
+                                            if temp.casefold().startswith("url="):
+                                                res = temp[4:]
+                                                break
+                                        if not res:
+                                            raise ValueError
+                                    except ValueError:
+                                        search ='property="og:image" content="'
+                                        s = s[s.index(search) + len(search):]
+                                        res = s[:s.index('"')]
                                 except ValueError:
-                                    search ='property="og:image" content="'
-                                    s = s[s.index(search) + len(search):]
-                                    res = s[:s.index('"')]
-                            except ValueError:
-                                pass
-                            else:
-                                found = True
-                                print(res)
-                                out.append(res)
+                                    pass
+                                else:
+                                    found = True
+                                    print(res)
+                                    out.append(res)
                 if not found:
                     out.append(url)
         if lost:
@@ -1196,6 +1203,21 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         if limit is not None:
             return list(out)[:limit]
         return out
+
+    def detect_mime(self, url):
+        try:
+            return self.mimes[url]
+        except KeyError:
+            pass
+        with requests.get(url, stream=True) as resp:
+            head = fcdict(resp.headers)
+            try:
+                mime = [t.strip() for t in head.get("Content-Type", "").split(";")]
+            except KeyError:
+                it = resp.iter_content(65536)
+                mime = [t.strip() for t in self.mime.from_buffer(data).split(";")]
+            self.mimes[url] = mime
+            return mime
 
     emoji_stuff = {}
 

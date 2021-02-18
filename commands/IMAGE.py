@@ -1238,13 +1238,52 @@ class Blend(Command):
 
 class Waifu2x(Command):
     description = "Resizes the target image using the popular Waifu2x AI algorithm."
-    usage = "<url>"
+    usage = "<url> <local{?l}>"
     no_parse = True
-    rate_limit = (0.5, 1)
+    rate_limit = (5, 10)
+    flags = "l"
+    _timeout_ = 5
+    typing = True
 
-    async def __call__(self, bot, user, message, channel, args, argv, **void):
+    async def __call__(self, bot, user, message, channel, args, argv, flags, **void):
         name, value, url = await get_image(bot, user, message, args, argv, raw=True, default="")
-        return self.bot.webserver + "/waifu2x?source=" + url
+        if "l" in flags:
+            return self.bot.webserver + "/waifu2x?source=" + url
+        with discord.context_managers.Typing(channel):
+            mime = await create_future(bot.detect_mime, url)
+            if "image/png" not in mime and "image/jpg" not in mime and "image/jpeg" not in mime:
+                resp = await process_image(url, "resize_mult", ["-nogif", 1, 1, "auto"], timeout=60)
+                with open(resp[0], "rb") as f:
+                    image = await create_future(f.read)
+            else:
+                image = await Request(url, timeout=20, aio=True)
+            data = await create_future(
+                Request,
+                "https://api.alcaamado.es/api/v1/waifu2x/convert",
+                files={
+                    "denoise": (None, "2"),
+                    "scale": (None, "true"),
+                    "file": ("file.png", image),
+                },
+                _timeout_=22,
+                method="post",
+                json=True,
+            )
+            for i in range(60):
+                async with delay(0.75):
+                    img = await Request(
+                        f"https://api.alcaamado.es/api/v1/waifu2x/get?hash={data['hash']}",
+                        headers=dict(Accept="application/json, text/plain, */*"),
+                        timeout=60,
+                        json=True,
+                        aio=True,
+                    )
+                    if img.get("image"):
+                        break
+            if not img.get("image"):
+                raise FileNotFoundError("image file not found")
+            image = await create_future(base64.b64decode, img["image"])
+        await bot.send_with_file(channel, "", file=image, filename=name)
 
 
 class UpdateImages(Database):
