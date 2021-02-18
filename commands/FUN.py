@@ -1651,6 +1651,20 @@ class UpdateMimics(Database):
                             sending[-1].msg += "\n" + line
                     if sending:
                         create_task(bot.silent_delete(message))
+                        guild = message.guild
+                        if guild and "logM" in bot.data and guild.id in bot.data.logM:
+                            c_id = bot.data.logM[guild.id]
+                            try:
+                                channel = await self.bot.fetch_channel(c_id)
+                            except (EOFError, discord.NotFound):
+                                bot.data.logM.pop(guild.id)
+                                return
+                            emb = as_embed(message)
+                            emb.colour = discord.Colour(0x00FF00)
+                            action = f"**Mimic invoked in** {channel_mention(message.channel.id)}:\nhttps://discord.com/channels/{guild.id}/{channel.id}/{message.id}\n"
+                            emb.description = lim_str(action + emb.description, 2048)
+                            emb.timestamp = message.created_at
+                            self.bot.send_embeds(channel, emb)
                         for k in sending:
                             mimic = self.data[k.m_id]
                             await self.updateMimic(mimic, guild=message.guild)
