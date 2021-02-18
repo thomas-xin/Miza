@@ -1251,19 +1251,29 @@ class Waifu2x(Command):
             return self.bot.webserver + "/waifu2x?source=" + url
         with discord.context_managers.Typing(channel):
             mime = await create_future(bot.detect_mime, url)
-            if "image/png" not in mime and "image/jpg" not in mime and "image/jpeg" not in mime:
-                resp = await process_image(url, "resize_mult", ["-nogif", 1, 1, "auto"], timeout=60)
-                with open(resp[0], "rb") as f:
-                    image = await create_future(f.read)
+            image = None
+            if "image/png" not in mime:
+                if "image/jpg" not in mime:
+                    if "image/jpeg" not in mime:
+                        resp = await process_image(url, "resize_mult", ["-nogif", 1, 1, "auto"], timeout=60)
+                        with open(resp[0], "rb") as f:
+                            image = await create_future(f.read)
+                        ext = "png"
+                    else:
+                        ext = "jpeg"
+                else:
+                    ext = "jpg"
             else:
+                ext = "png"
+            if not image:
                 image = await Request(url, timeout=20, aio=True)
             data = await create_future(
                 Request,
                 "https://api.alcaamado.es/api/v1/waifu2x/convert",
                 files={
-                    "denoise": (None, "2"),
+                    "denoise": (None, "1"),
                     "scale": (None, "true"),
-                    "file": ("file.png", image),
+                    "file": (f"file.{ext}", image),
                 },
                 _timeout_=22,
                 method="post",
