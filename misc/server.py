@@ -397,7 +397,7 @@ def upload_file():
         <p style="color:#00ffff;">Total file size: {byte_scale(sum(os.path.getsize(f[2]) for f in urls))}B</p>
         <p style="color:#bf7fff;">Estimated file lifetime: {sec2time(utc() - est_time)}</p>"""
         for fi in urls:
-            s += f'\n<a href="{fi[0]}">{fi[1]}</a>'
+            s += f'\n<a href="{fi[0]}">{fi[1]}<br></a>'
         preview = deque()
         for f in urls:
             mime = get_mime(f[2])
@@ -408,9 +408,9 @@ def upload_file():
             elif mime.startswith("video/"):
                 preview.append(f'<div align="center"><video width="480" controls><source src="{f[0]}" type="{mime}"></video></div>')
             elif mime.startswith("text/"):
-                preview.append(f'<a href="{fi[0].replace("/view/", "/files/")}">{fi[1]}</a>')
+                preview.append(f'<a href="{fi[0].replace("/view/", "/files/")}">{fi[1].replace("/view/", "/files/")}</a>')
             else:
-                preview.append(f'<a href="{fi[0].replace("/view/", "/download/")}">{fi[1]}</a>')
+                preview.append(f'<a href="{fi[0].replace("/view/", "/download/")}">{fi[1].replace("/view/", "/files/")}</a>')
     if not preview:
         preview.append(f'<img src="{flask.request.host_url}static/hug.gif" alt="Miza-Dottie-Hug" style="width:14.2857%;height:14.2857%;">')
     s += "\n" + "\n".join(preview)
