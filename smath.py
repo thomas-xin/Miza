@@ -2403,7 +2403,7 @@ def _predict_next(seq):
 
 def predict_next(seq, limit=12):
 	seq = np.asarray(seq, dtype=np.float64)
-	for i in range(3, 1 + min(len(seq), limit)):
+	for i in range(8, 1 + min(len(seq), limit)):
 		temp = _predict_next(seq[-i:])
 		if temp is not None:
 			return temp
