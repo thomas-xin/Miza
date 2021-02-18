@@ -38,6 +38,7 @@ class Restart(Command):
     name = ["Shutdown", "Reboot"]
     min_level = nan
     description = "Restarts, reloads, or shuts down ⟨MIZA⟩, with an optional delay."
+    usage = "<delay>?"
     _timeout_ = inf
 
     async def __call__(self, message, channel, guild, user, argv, name, **void):

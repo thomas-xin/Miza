@@ -753,7 +753,7 @@ class UpdateMathTest(Database):
 
 class SpectralPulse(Command):
     _timeout_ = 150
-    description = "Runs SpectralPulse on the input URL. Operates on a global queue system."
+    description = "Runs SpectralPulse on the input URL. Operates on a global queue system. See https://github.com/thomas-xin/SpectralPulse for more info, or to run it yourself!"
     usage = "<0:search_links>"
     rate_limit = (12, 60)
     typing = True
