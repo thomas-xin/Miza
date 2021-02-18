@@ -234,7 +234,7 @@ def waifu2x_ex(filename):
         raise EOFError
     if not is_url(source):
         raise FileNotFoundError
-    if not source.startswith("https://images-ext-1.discordapp.net/external/") and not source.startswith("https://media.discordapp.net/"):
+    if not regexp("https:\\/\\/images-ext-[0-9]+\\.discordapp\\.net\\/external\\/").match(source) and not source.startswith("https://media.discordapp.net/"):
         if not source.startswith(flask.request.host_url):
             t = ts_us()
             while t in RESPONSES:

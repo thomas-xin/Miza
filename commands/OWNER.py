@@ -420,7 +420,7 @@ class UpdateExec(Database):
     proxies = {}
 
     def proxy(self, url):
-        if is_url(url) and not url.startswith("https://images-ext-1.discordapp.net/external/") and not url.startswith("https://media.discordapp.net/") and not self.bot.is_webserver_url(url):
+        if is_url(url) and not regexp("https:\\/\\/images-ext-[0-9]+\\.discordapp\\.net\\/external\\/").match(url) and not url.startswith("https://media.discordapp.net/") and not self.bot.is_webserver_url(url):
             try:
                 return self.proxies[url]
             except KeyError:
