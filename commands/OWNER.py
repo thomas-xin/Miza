@@ -404,7 +404,17 @@ class UpdateExec(Database):
         channel = await bot.fetch_channel(c_id)
         message = await bot.send_as_webhook(channel, url)
         if not message.embeds:
-            await asyncio.wait_for(bot.wait_for("raw_message_edit", check=lambda m: getattr(m, "id", None) == message.id and m.embeds), timeout=12)
+            fut = create_task(asyncio.wait_for(bot.wait_for("raw_message_edit", check=lambda m: [m_id == message.id and getattr(self.bot.cache.messages.get(m_id), "embeds", None) for m_id in (getattr(m, "id", None) or getattr(m, "message_id", None),)][0]), timeout=12))
+            for i in range(120):
+                try:
+                    message = fut.result()
+                except ISE:
+                    message = await self.bot.fetch_message(message.id, message.channel)
+                    if message.embeds:
+                        break
+                else:
+                    break
+                await asyncio.sleep(0.1)
         return message.embeds[0].thumbnail.proxy_url
     
     proxies = {}
