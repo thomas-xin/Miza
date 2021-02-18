@@ -161,6 +161,7 @@ class Exec(Command):
         "relay": 2,
         "virtual": 4,
         "log": 8,
+        "proxy": 16,
     })
 
     def __call__(self, bot, flags, argv, message, channel, guild, **void):
@@ -396,6 +397,27 @@ class UpdateExec(Database):
                     else:
                         self.bot.send_as_embeds(channel, msg, md=code_md)
             [self.data.pop(i) for i in invalid]
+
+    async def _proxy(self, url):
+        bot = self.bot
+        c_id = choice(list(c_id for c_id, flag in self.data.items() if flag & 16))
+        channel = await bot.fetch_channel(c_id)
+        message = await bot.send_as_webhook(channel, url)
+        if not message.embeds:
+            await asyncio.wait_for(bot.wait_for("raw_message_edit", check=lambda m: getattr(m, "id", None) == message.id and m.embeds), timeout=12)
+        return message.embeds[0].thumbnail.proxy_url
+    
+    proxies = {}
+
+    def proxy(self, url):
+        if is_url(url) and not url.startswith("https://images-ext-1.discordapp.net/external/") and not url.startswith("https://media.discordapp.net/") and not self.bot.is_webserver_url(url):
+            try:
+                return self.proxies[url]
+            except KeyError:
+                new = await_fut(self._proxy(url))
+                self.proxies[url] = new
+                return new
+        return url
 
     def _bot_ready_(self, **void):
         with suppress(AttributeError):

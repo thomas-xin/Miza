@@ -1236,5 +1236,16 @@ class Blend(Command):
         await bot.send_with_file(channel, "", fn, filename=name)
 
 
+class Waifu2x(Command):
+    description = "Resizes the target image using the popular Waifu2x AI algorithm."
+    usage = "<url>"
+    no_parse = True
+    rate_limit = (0.5, 1)
+
+    async def __call__(self, bot, user, message, channel, args, argv, **void):
+        name, value, url = await get_image(bot, user, message, args, argv, raw=True, default="")
+        return self.bot.webserver + "/waifu2x?source=" + url
+
+
 class UpdateImages(Database):
     name = "images"

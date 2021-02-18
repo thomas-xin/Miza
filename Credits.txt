@@ -43,6 +43,11 @@ https://github.com/Quihico/handy.stuff/blob/master/yt.pagetokens.x10
 https://github.com/pocmo/Python-Brainfuck
 -Used for the ~math Brainfuck interpreter.
 
+nihui, 20kdc
+https://github.com/nihui/waifu2x-ncnn-vulkan
+https://github.com/20kdc
+-Used for the ~waifu2x command
+
 https://stackoverflow.com/a/37350619
 -Used for the image transform filter
 

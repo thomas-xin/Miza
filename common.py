@@ -1219,6 +1219,7 @@ def is_video(url):
 
 
 MIMES = dict(
+    bin="application/octet-stream",
     css="text/css",
     json="application/json",
     js="application/javascript",

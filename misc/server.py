@@ -219,6 +219,67 @@ def mizatlas(filename=None):
     return resp
 
 
+@app.route("/asa_model/<path:filename>", methods=["GET"])
+def asa_model(filename):
+    data, mime = fetch_static(f"waifu2x/asa_model/{filename}")
+    resp = flask.Response(data, mimetype=mime)
+    resp.headers.update(CHEADERS)
+    resp.headers["ETag"] = create_etag(data)
+    return resp
+
+@app.route("/waifu2x/<path:filename>", methods=["GET"])
+def waifu2x_ex(filename):
+    source = flask.request.args.get("source")
+    if not source:
+        raise EOFError
+    if not is_url(source):
+        raise FileNotFoundError
+    if not source.startswith("https://images-ext-1.discordapp.net/external/") and not source.startswith("https://media.discordapp.net/"):
+        if not source.startswith(flask.request.host_url):
+            t = ts_us()
+            while t in RESPONSES:
+                t += 1
+            RESPONSES[t] = fut = concurrent.futures.Future()
+            send(f"!{t}\x7fbot.data.exec.proxy({repr(source)})", escape=False)
+            j, after = fut.result()
+            RESPONSES.pop(t, None)
+            source = j["result"]
+    data, mime = fetch_static("waifu2x/main.js")
+    data = data.replace(b"inp.png", source.encode("utf-8"))
+    resp = flask.Response(data, mimetype=mime)
+    resp.headers.update(CHEADERS)
+    resp.headers["ETag"] = create_etag(data)
+    return resp
+
+@app.route("/waifu2x", methods=["GET"])
+def waifu2x():
+    source = flask.request.args.get("source")
+    if not source:
+        raise EOFError
+    data = f"""<!DOCTYPE html>
+<html>
+    <meta property="og:image" content="{source}">""" + """
+    <style>
+        .center {
+            margin: 0;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            -ms-transform: translate(-50%, -50%);
+            transform: translate(-50%, -50%);
+        }
+    </style>""" + f"""
+	<body class="center" style="background-color:black;">
+		<canvas id="canvas" width="400" height="400"/>
+		<script src="{flask.request.base_url}/main.js?source={urllib.parse.quote(source)}"></script>
+	</body>
+</html>"""
+    resp = flask.Response(data, mimetype="text/html")
+    resp.headers.update(CHEADERS)
+    resp.headers["ETag"] = create_etag(data)
+    return resp
+
+
 @app.route("/", methods=["GET", "POST"])
 def home():
     data, mime = fetch_static("index.html")
@@ -525,8 +586,7 @@ def timezone():
         </div>
     <img class="border" src="{flask.request.host_url}static/sky-rainbow.gif" alt="Miza-Sky" style="width:14.2857%;height:14.2857%;">
     </body>
-</html>
-        """
+</html>"""
         return html
     except KeyError:
         return flask.redirect("https://http.cat/417")
@@ -624,8 +684,7 @@ img {
 <body style="background-color:black;">
 <img src="{url}" class="center">
 </body>
-</html>
-"""
+</html>"""
 
 @app.route("/dog", methods=["GET"])
 @app.route("/dogs", methods=["GET"])
@@ -668,8 +727,7 @@ img {
 <body style="background-color:black;">
 <img src="{url}" class="center">
 </body>
-</html>
-"""
+</html>"""
 
 
 HEADERS = {
