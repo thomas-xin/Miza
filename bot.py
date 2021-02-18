@@ -2820,7 +2820,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                             print(embed.to_dict())
                     print(args, kwargs)
                 raise
-            await self.seen(self.user, channel.guild, event="message", count=len(kwargs.get("embeds", (None,))), raw=f"Sending a message, {channel.guild}")
+            await self.seen(self.user, channel.guild, event="message", count=len(kwargs.get("embeds", (None,))), raw=f"Sending a message")
         if reacts:
             for react in reacts:
                 async with delay(1 / 3):
@@ -3734,10 +3734,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             except discord.NotFound:
                 return
             emoji = self._upgrade_partial_emoji(payload.emoji)
-            raw = "Adding a reaction"
-            if getattr(channel, "guild", None) is not None:
-                raw += f", {channel.guild}"
-            await self.seen(user, message.channel, message.guild, event="reaction", raw=raw)
+            await self.seen(user, message.channel, message.guild, event="reaction", raw="Adding a reaction")
             if user.id != self.id:
                 if "users" in self.data:
                     self.data.users.add_xp(user, xrand(4, 7))
@@ -3756,10 +3753,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 message = await self.fetch_message(payload.message_id, channel=channel)
             except discord.NotFound:
                 return
-            raw = "Adding a reaction"
-            if getattr(channel, "guild", None) is not None:
-                raw += f", {channel.guild}"
-            await self.seen(user, message.channel, message.guild, event="reaction", raw=raw)
+            await self.seen(user, message.channel, message.guild, event="reaction", raw="Removing a reaction")
             if user.id != self.id:
                 reaction = str(payload.emoji)
                 await self.react_callback(message, reaction, user)
@@ -3781,21 +3775,15 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     if "users" in self.data:
                         self.data.users.add_xp(after, xrand(6, 12))
                         self.data.users.add_gold(after, xrand(2, 5))
-                    await self.seen(member, member.guild, event="misc", raw=f"Joining a voice channel, {member.guild}")
+                    await self.seen(member, member.guild, event="misc", raw=f"Joining a voice channel")
                 elif any((getattr(before, attr) != getattr(after, attr) for attr in ("self_mute", "self_deaf", "self_stream", "self_video"))):
-                    await self.seen(member, member.guild, event="misc", raw=f"Updating their voice settings, {member.guild}")
+                    await self.seen(member, member.guild, event="misc", raw=f"Updating their voice settings")
 
         # Typing event: calls _typing_ and _seen_ bot database events.
         @self.event
         async def on_typing(channel, user, when):
             await self.send_event("_typing_", channel=channel, user=user)
-            raw = "Typing"
-            if getattr(channel, "guild", None) is not None:
-                raw += f", {channel.guild}"
-                guild = channel.guild
-            else:
-                guild = None
-            await self.seen(user, guild, delay=10, event="typing", raw=raw)
+            await self.seen(user, channel.guild, delay=10, event="typing", raw="Typing")
 
         # Message send event: processes new message. calls _send_ and _seen_ bot database events.
         @self.event
@@ -3804,10 +3792,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             guild = message.guild
             if guild:
                 create_task(self.send_event("_send_", message=message))
-            raw = "Sending a message"
-            if message.guild is not None:
-                raw += f", {message.guild}"
-            await self.seen(message.author, message.channel, message.guild, event="message", raw=raw)
+            await self.seen(message.author, message.channel, message.guild, event="message", raw="Sending a message")
             await self.react_callback(message, None, message.author)
             await self.handle_message(message, False)
 
@@ -3913,10 +3898,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 await self.handle_message(after)
                 if getattr(after, "guild", None):
                     create_task(self.send_event("_edit_", before=before, after=after))
-                raw = "Editing a message"
-                if after.guild is not None:
-                    raw += f", {after.guild}"
-                await self.seen(after.author, after.channel, after.guild, event="message", raw=raw)
+                await self.seen(after.author, after.channel, after.guild, event="message", raw="Editing a message")
 
         # Message delete event: uses raw payloads rather than discord.py message cache. calls _delete_ bot database event.
         @self.event
@@ -4031,7 +4013,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             name = str(member)
             self.usernames[name] = self.cache.users[member.id]
             await self.send_event("_join_", user=member, guild=member.guild)
-            await self.seen(member, member.guild, event="misc", raw=f"Joining a server, {member.guild}")
+            await self.seen(member, member.guild, event="misc", raw=f"Joining a server")
 
         # Member leave event: calls _leave_ bot database event.
         @self.event

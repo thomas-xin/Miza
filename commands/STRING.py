@@ -1015,8 +1015,9 @@ class Topic(Command):
     name = ["Question"]
     description = "Asks a random question."
     
-    def __call__(self, **void):
-        return "\u200b" + choice(self.bot.data.users.questions)
+    def __call__(self, bot, user, **void):
+        create_task(bot.seen(user, event="misc", raw="Talking to me"))
+        return "\u200b" + choice(bot.data.users.questions)
 
 
 class Urban(Command):
