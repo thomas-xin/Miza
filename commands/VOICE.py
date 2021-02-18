@@ -2842,7 +2842,7 @@ class Connect(Command):
 
 class Skip(Command):
     server_only = True
-    name = ["⏭", "🚫", "S", "SK", "CQ", "Remove", "Rem", "ClearQueue", "Clear"]
+    name = ["⏭", "🚫", "S", "SK", "FS", "CQ", "ForceSkip", "Remove", "Rem", "ClearQueue", "Clear"]
     min_display = "0~1"
     description = "Removes an entry or range of entries from the voice channel queue."
     usage = "<queue_positions(0)>* <force{?f}|vote{?v}|hide{?h}>*"
@@ -2859,8 +2859,7 @@ class Skip(Command):
         if name.startswith("c"):
             argv = "inf"
             args = [argv]
-            flags["f"] = True
-        if "f" in flags:
+        if name[0] in "rcf" or "f" in flags:
             if not is_alone(auds, user) and perm < 1:
                 raise self.perm_error(perm, 1, "to force skip while other users are in voice")
         count = len(auds.queue)
@@ -2923,7 +2922,7 @@ class Skip(Command):
                 try:
                     # If infinite entries are selected and force flag is set, remove all items
                     if not is_finite(pos):
-                        if "f" in flags:
+                        if name[0] in "rcf" or "f" in flags:
                             auds.queue.clear()
                             await create_future(auds.reset, start=False)
                             if "h" not in flags:
@@ -2936,7 +2935,7 @@ class Skip(Command):
                     continue
                 # Add skips if voting
                 if issubclass(type(curr.skips), collections.abc.MutableSequence):
-                    if "f" in flags or user.id == curr["u_id"] and not "v" in flags:
+                    if name[0] in "rcf" or "f" in flags or user.id == curr["u_id"] and not "v" in flags:
                         curr.skips = None
                     elif user.id not in curr.skips:
                         curr.skips.append(user.id)
