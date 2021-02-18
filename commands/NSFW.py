@@ -299,6 +299,9 @@ class Neko(Command):
                     if out:
                         print("nekos.moe", len(out))
                         return out
+            if xrand(2):
+                data = await Request("https://nekobot.xyz/api/image?type=neko", aio=True, json=True)
+                return data["message"]
             return await create_future(nekos.img, tag)
 
         file = f"neko~{tag}" if tag else "neko"
