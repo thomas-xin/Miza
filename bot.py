@@ -3425,7 +3425,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     try:
                         return self.__getattribute__(k)
                     except AttributeError:
-                        pass
+                        if k == "deleted":
+                            raise
                 if k in ("simulated", "slash"):
                     raise AttributeError
                 d = self.__getattribute__("_data")
