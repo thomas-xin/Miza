@@ -1238,7 +1238,7 @@ class Blend(Command):
 
 class Waifu2x(Command):
     description = "Resizes the target image using the popular Waifu2x AI algorithm."
-    usage = "<url> <local{?l}>"
+    usage = "<url> <api{?a}>"
     no_parse = True
     rate_limit = (5, 10)
     flags = "l"
@@ -1247,7 +1247,7 @@ class Waifu2x(Command):
 
     async def __call__(self, bot, user, message, channel, args, argv, flags, **void):
         name, value, url = await get_image(bot, user, message, args, argv, raw=True, default="")
-        if "l" in flags:
+        if "a" not in flags:
             return self.bot.webserver + "/waifu2x?source=" + url
         with discord.context_managers.Typing(channel):
             mime = await create_future(bot.detect_mime, url)
