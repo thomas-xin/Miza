@@ -426,7 +426,7 @@ class UpdateExec(Database):
                 return self.bot.data.proxies[url]
             except KeyError:
                 new = await_fut(self._proxy(url))
-                self.bot.data.proxies[url] = new
+                self.bot.data.proxies[shash(url)] = new
                 return new
         return url
     
@@ -444,7 +444,7 @@ class UpdateExec(Database):
         for i, f in enumerate(files):
             if f:
                 try:
-                    self.bot.data.proxies[urls[i]] = out[i] = message.embeds[c].thumbnail.proxy_url
+                    self.bot.data.proxies[shash(urls[i])] = out[i] = message.embeds[c].thumbnail.proxy_url
                 except IndexError:
                     break
                 c += 1
@@ -458,20 +458,27 @@ class UpdateExec(Database):
                 try:
                     out[i] = self.bot.data.proxies[url]
                 except KeyError:
-                    with tracebacksuppressor:
-                        bot = self.bot
-                        data = await Request(url, aio=True)
-                        fn = url.rsplit("/", 1)[-1].split("?", 1)[0]
-                        files[i] = CompatFile(data, filename=fn)
+                    fn = url.rsplit("/", 1)[-1].split("?", 1)[0]
+                    files[i] = cdict(fut=create_task(Request(url, aio=True)), filename=fn)
+        bot = self.bot
+        failed = [None] * len(urls)
+        for i, fut in enumerate(files):
+            if fut:
+                try:
+                    data = await fut.fut
+                    files[i] = CompatFile(data, filename=fut.filename)
+                except:
+                    failed[i] = True
+                    print_exc()
         c_id = choice(list(c_id for c_id, flag in self.data.items() if flag & 16))
         channel = await bot.fetch_channel(c_id)
         m = channel.guild.me
         message = await bot.send_as_webhook(channel, files=[i for i in files if i], username=m.display_name, avatar_url=best_url(m))
         c = 0
         for i, f in enumerate(files):
-            if f:
+            if f and not failed[i]:
                 try:
-                    self.bot.data.proxies[urls[i]] = out[i] = message.attachments[c].proxy_url
+                    self.bot.data.proxies[shash(urls[i])] = out[i] = message.attachments[c].proxy_url
                 except IndexError:
                     break
                 c += 1
@@ -583,7 +590,7 @@ class UpdateColours(Database):
         if is_discord_url(url) and "avatars" in url[:48]:
             key = url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
         else:
-            key = url.split("?", 1)[0]
+            key = shash(url.split("?", 1)[0])
         try:
             out = self.data["colours"][key]
         except KeyError:
