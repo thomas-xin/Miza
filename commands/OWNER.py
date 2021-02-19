@@ -462,7 +462,7 @@ class UpdateExec(Database):
                     out[i] = self.bot.data.proxies[shash(url)]
                 except KeyError:
                     fn = url.rsplit("/", 1)[-1].split("?", 1)[0]
-                    files[i] = cdict(fut=create_task(Request(url, aio=True)), filename=fn)
+                    files[i] = cdict(fut=create_task(Request(url, aio=True)), filename="SPOILER_" + fn)
         bot = self.bot
         failed = [None] * len(urls)
         for i, fut in enumerate(files):
