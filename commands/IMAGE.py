@@ -126,7 +126,7 @@ class IMG(Command):
             raise LookupError(f"Target image {argv} not found. Use img for list.")
         url = choice(sources)
         if "v" in flags:
-            return escape_everyone(url)
+            return escape_roles(url)
         bot.send_as_embeds(channel, image=url)
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):

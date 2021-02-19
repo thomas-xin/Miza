@@ -1352,8 +1352,10 @@ class UpdateAutoEmojis(Database):
                         self.bot.data.emojilists.update(message.author.id)
             if substitutes:
                 msg = msg[:substitutes[0]] + substitutes[1] + msg[substitutes[2]:]
-        msg = escape_everyone(msg)
         if not msg or msg == message.content:
+            return
+        msg = escape_everyone(msg)
+        if msg == message.content:
             return
         print(message.content)
         print(msg)
@@ -1493,6 +1495,8 @@ class UpdateMuteRoles(Database):
         manage_emojis=False,
     )
 
+    failed = set()
+
     async def get(self, guild):
         with suppress(KeyError):
             return self.bot.cache.roles[self.data[guild.id]]
@@ -1501,9 +1505,13 @@ class UpdateMuteRoles(Database):
         self.data[guild.id] = role.id
         self.update(guild.id)
         for channel in guild.channels:
-            if channel.permissions_for(guild.me).manage_channels and not channel.permissions_synced:
-                with tracebacksuppressor:
+            if channel.permissions_for(guild.me).manage_channels and channel.permissions_for(guild.me).manage_roles and not channel.permissions_synced and channel.id not in self.failed:
+                try:
                     await channel.set_permissions(target=role, overwrite=self.mute)
+                except discord.Forbidden:
+                    self.failed.add(channel.id)
+                except:
+                    print_exc()
         return role
 
     async def __call__(self):
@@ -1519,10 +1527,17 @@ class UpdateMuteRoles(Database):
                     self.data.pop(g_id)
                 role = await self.get(guild)
                 for channel in guild.channels:
-                    if channel.permissions_for(guild.me).manage_channels and not channel.permissions_synced:
+                    if channel.permissions_for(guild.me).manage_channels and channel.permissions_for(guild.me).manage_roles and not channel.permissions_synced and channel.id not in self.failed:
                         if role not in channel.overwrites:
-                            with tracebacksuppressor:
+                            try:
                                 await channel.set_permissions(target=role, overwrite=self.mute)
+                            except discord.Forbidden:
+                                self.failed.add(channel.id)
+                            except:
+                                print_exc()
+
+    def _day_(self):
+        self.failed.clear()
 
 
 class UpdateBans(Database):

@@ -426,7 +426,7 @@ class Say(Command):
         if not argv:
             raise ArgumentError("Input string is empty.")
         if not bot.is_owner(user):
-            argv = lim_str("\u200b" + escape_everyone(argv).lstrip("\u200b"), 2000)
+            argv = lim_str("\u200b" + escape_roles(argv).lstrip("\u200b"), 2000)
         return argv
 
 
@@ -861,7 +861,7 @@ class Follow(Command):
         if len(output) > 2000 and len(output) < 54000:
             self.bot.send_as_embeds(channel, output, reference=message)
         else:
-            return escape_everyone(output)
+            return escape_roles(output)
 
 
 class Match(Command):
@@ -1008,7 +1008,7 @@ class Ask(Command):
         q = " ".join(res.replace("you", "I").replace("i", "you").replace("me", "you").replace("i", "I").replace("i'm", "I'm").replace("i'll", "I'll"))
         if "dailies" in bot.data:
             bot.data.dailies.progress_quests(user, "talk")
-        await send_with_reply(channel, "h" not in flags and message, escape_everyone(f"\xad{q[0].upper() + q[1:]}? {out}".replace("\uf000", "")))
+        await send_with_reply(channel, "h" not in flags and message, escape_roles(f"\xad{q[0].upper() + q[1:]}? {out}".replace("\uf000", "")))
 
 
 class Topic(Command):

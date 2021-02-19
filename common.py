@@ -37,7 +37,8 @@ import nacl.secret
 url_parse = urllib.parse.quote_plus
 escape_markdown = discord.utils.escape_markdown
 escape_mentions = discord.utils.escape_mentions
-escape_everyone = lambda s: s.replace("@everyone", "@\xadeveryone").replace("@here", "@\xadhere").replace("<@&", "<@\xad&")
+escape_everyone = lambda s: s.replace("@everyone", "@\xadeveryone").replace("@here", "@\xadhere")
+escape_roles = lambda s: escape_everyone(s).replace("<@&", "<@\xad&")
 
 DISCORD_EPOCH = 1420070400000 # 1 Jan 2015
 MIZA_EPOCH = 1577797200000 # 1 Jan 2020
@@ -316,7 +317,7 @@ class CommandCancelledError(RuntimeError):
     __slots__ = ()
 
 
-python = ("python3", "python")[os.name == "nt"]
+python = ("python3", "py")[os.name == "nt"]
 python_path = ""
 
 
@@ -1309,12 +1310,31 @@ def proc_communicate(k, i):
                     print(s)
         time.sleep(0.001)
 
+proc_args = cdict(
+    math=[python, "misc/math.py"],
+    image=[python, "misc/image.py"],
+)
+
+def check_pillow_simd():
+    for v in range(8, 4, -1):
+        print(f"Attempting to find/install pillow-simd for Python 3.{v}...")
+        args = ["py", f"-3.{v}", "misc/install_pillow_simd.py"]
+        print(args)
+        resp = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if not as_str(resp.stdout).startswith(f"Python 3.{v} not found!"):
+            print(resp.stdout)
+            print(f"pillow-simd versioning successful for Python 3.{v}")
+            proc_args.image = ["py", f"-3.{v}", "misc/image.py"]
+            break
+
 def proc_start():
     PROC_COUNT.math = 3
     PROC_COUNT.image = 3
     for k, v in PROC_COUNT.items():
+        if k == "image":
+            check_pillow_simd()
         PROCS[k] = [psutil.Popen(
-            [python, f"misc/{k}.py"],
+            proc_args[k],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
         ) for _ in loop(v)]
@@ -2262,7 +2282,7 @@ class ImagePool:
     async def __call__(self, bot, channel, flags, **void):
         url = await bot.data.imagepools.get(self.database, self.fetch_one, self.threshold)
         if "v" in flags:
-            return escape_everyone(url)
+            return escape_roles(url)
         self.bot.send_as_embeds(channel, image=url)
 
 

@@ -352,7 +352,7 @@ class Neko(Command):
             else:
                 url = await self.img(get)
         if "v" in flags:
-            return escape_everyone(url)
+            return escape_roles(url)
         self.bot.send_as_embeds(channel, image=url, colour=xrand(1536))
 
 
@@ -379,5 +379,5 @@ class Lewd(Command):
                 + "__** on page **__" + str(objs[1])
                 + "__**"
             )
-            return escape_everyone(text)
+            return escape_roles(text)
         self.bot.send_as_embeds(channel, image=url, colour=xrand(1536), reference=message)

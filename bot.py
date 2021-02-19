@@ -2174,6 +2174,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             os.mkdir("backup")
         fn = f"backup/saves.{datetime.datetime.utcnow().date()}.zip"
         if not os.path.exists(fn):
+            await_fut(self.send_event("_day_"))
             self.users_updated = True
             create_future_ex(self.clear_cache, priority=True)
             await_fut(self.send_event("_save_"))
@@ -3036,7 +3037,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         if images:
             for i, img in enumerate(images):
                 if is_video(img):
-                    create_task(channel.send(escape_everyone(img)))
+                    create_task(channel.send(escape_roles(img)))
                 else:
                     if i >= len(embs):
                         emb = discord.Embed(colour=fin_col)

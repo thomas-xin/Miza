@@ -1,7 +1,7 @@
 import sys, os, subprocess, traceback
 
 # Required to open python on different operating systems
-python = ("python3", "python")[os.name == "nt"]
+python = ("python3", "py")[os.name == "nt"]
 
 
 if sys.version_info[0] < 3:
@@ -15,7 +15,7 @@ with open("requirements.txt", "rb") as f:
 import pkg_resources
 
 installing = []
-install = lambda m: installing.append(subprocess.Popen(["python", "-m", "pip", "install", "--upgrade", m, "--user"]))
+install = lambda m: installing.append(subprocess.Popen([python, "-m", "pip", "install", "--upgrade", m, "--user"]))
 
 # Parse requirements.txt
 for mod in modlist:
@@ -41,7 +41,7 @@ for mod in modlist:
 # Run pip on any modules that need installing
 if installing:
     print("Installing missing or outdated modules, please wait...")
-    subprocess.Popen([python, "-m", "pip", "install", "--upgrade", "pip", "--user"]).wait()
+    subprocess.run([python, "-m", "pip", "install", "--upgrade", "pip", "--user"])
     for i in installing:
         i.wait()
     print("Installer terminated.")

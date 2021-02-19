@@ -1587,7 +1587,7 @@ class MimicSend(Command):
         if not admin and ("fun" not in enabled or perm < 1):
             raise PermissionError("Not permitted to send into target channel.")
         if m:
-            msg = escape_everyone(msg)
+            msg = escape_roles(msg)
             if msg.startswith("/tts "):
                 msg = msg[5:]
                 tts = True
@@ -1670,7 +1670,7 @@ class UpdateMimics(Database):
                             await self.updateMimic(mimic, guild=message.guild)
                             name = mimic.name
                             url = mimic.url
-                            msg = escape_everyone(k.msg)
+                            msg = escape_roles(k.msg)
                             if msg.startswith("/tts "):
                                 msg = msg[5:]
                                 tts = True
@@ -1757,7 +1757,7 @@ class _8Ball(ImagePool, Command):
         )
         url = f"https://cdn.nekos.life/8ball/{e_id}.png"
         if "v" in flags:
-            return escape_everyone(url)
+            return escape_roles(url)
         self.bot.send_as_embeds(channel, image=url)
 
 

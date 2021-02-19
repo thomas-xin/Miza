@@ -63,17 +63,18 @@ def to_qr(s, rainbow=False):
 
         def qr_iterator(image):
             filt1 = filt2 = SWIRL
-            spl = hsv_split(SWIRL, convert=False)
+            # spl = hsv_split(SWIRL, convert=False)
+            spl = SWIRL.convert("HSV").split()
             for i in range(count):
                 if i:
-                    hue1 = spl[0] + round(i * 256 / count)
-                    hue2 = spl[0] - round(i * 256 / count)
-                    filt1 = hsv_merge(hue1, *spl[1:])
-                    filt2 = hsv_merge(hue2, *spl[1:])
-                    # hue1 = spl[0].point(lambda x: round(x + 256 * i / count) & 255)
-                    # hue2 = spl[0].point(lambda x: round(x - 256 * i / count) & 255)
-                    # filt1 = Image.merge("HSV", (hue1, spl[1], spl[2])).convert("RGB")
-                    # filt2 = Image.merge("HSV", (hue2, spl[1], spl[2])).convert("RGB")
+                    # hue1 = spl[0] + round(i * 256 / count)
+                    # hue2 = spl[0] - round(i * 256 / count)
+                    # filt1 = hsv_merge(hue1, *spl[1:])
+                    # filt2 = hsv_merge(hue2, *spl[1:])
+                    hue1 = spl[0].point(lambda x: round(x + 256 * i / count) & 255)
+                    hue2 = spl[0].point(lambda x: round(x - 256 * i / count) & 255)
+                    filt1 = Image.merge("HSV", (hue1, spl[1], spl[2])).convert("RGB")
+                    filt2 = Image.merge("HSV", (hue2, spl[1], spl[2])).convert("RGB")
                 filt1 = ImageEnhance.Brightness(ImageEnhance.Contrast(filt1).enhance(0.5)).enhance(2)
                 filt2 = ImageChops.invert(ImageEnhance.Brightness(ImageEnhance.Contrast(filt2).enhance(0.5)).enhance(2)).transpose(Image.FLIP_LEFT_RIGHT)
                 filt1.paste(filt2, mask=image)
@@ -465,11 +466,12 @@ def rainbow_gif2(image, duration):
                 A = None
             if temp.size[0] != size[0] or temp.size[1] != size[1]:
                 temp = temp.resize(size, Image.HAMMING)
-            channels = hsv_split(temp, convert=False)
-            hue = channels[0] + round(f / length / scale * loops * 256)
-            temp = hsv_merge(hue, *channels[1:])
-            # channels[0] = channels[0].point(lambda x: int(((f / length / scale * loops + x / 256) % 1) * 256))
-            # temp = Image.merge("HSV", channels).convert("RGB")
+            channels = list(temp.convert("HSV").split())
+            # channels = hsv_split(temp, convert=False)
+            # hue = channels[0] + round(f / length / scale * loops * 256)
+            # temp = hsv_merge(hue, *channels[1:])
+            channels[0] = channels[0].point(lambda x: int(((f / length / scale * loops + x / 256) % 1) * 256))
+            temp = Image.merge("HSV", channels).convert("RGB")
             if A:
                 temp.putalpha(A)
             yield temp
@@ -504,20 +506,21 @@ def rainbow_gif(image, duration):
         A = image.getchannel("A")
     else:
         A = None
-    channels = hsv_split(image, convert=False)
+    channels = list(image.convert("HSV").split())
+    # channels = hsv_split(image, convert=False)
     if duration < 0:
         rate = -rate
     count = 256 // abs(rate)
-    # func = lambda x: (x + rate) & 255
+    func = lambda x: (x + rate) & 255
 
     # Repeatedly hueshift image and return copies
     def rainbow_gif_iterator(image):
         for i in range(0, 256, abs(rate)):
             if i:
-                hue = channels[0] + i
-                # channels[0] = channels[0].point(func)
-                image = hsv_merge(hue, *channels[1:])
-                # image = Image.merge("HSV", channels).convert("RGBA")
+                # hue = channels[0] + i
+                # image = hsv_merge(hue, *channels[1:])
+                channels[0] = channels[0].point(func)
+                image = Image.merge("HSV", channels).convert("RGBA")
                 if A is not None:
                     image.putalpha(A)
             yield image
@@ -891,8 +894,10 @@ def colourspace(image, source, dest):
         if dest == "cmy":
             return invert(image)
         if dest == "hsv":
-            spl = hsv_split(image, convert=False)
-            out = rgb_merge(*spl)
+            # spl = hsv_split(image, convert=False)
+            # out = rgb_merge(*spl)
+            spl = image.convert("HSV").tobytes()
+            out = Image.frombytes("RGB", image.size, spl)
         if dest == "hsl":
             spl = hsl_split(image, convert=False)
             out = rgb_merge(*spl)
@@ -901,13 +906,17 @@ def colourspace(image, source, dest):
             out = rgb_merge(*spl)
     elif source == "hsv":
         if dest == "rgb":
-            spl = rgb_split(image)
-            out = hsv_merge(*spl)
+            # spl = rgb_split(image)
+            # out = hsv_merge(*spl)
+            spl = image.tobytes()
+            out = Image.frombytes("HSV", image.size, spl).convert("RGB")
         if dest == "cmy":
-            spl = rgb_split(image)
-            out = hsv_merge(*spl, convert=False)
-            out ^= 255
-            out = Image.fromarray(out, "RGB")
+            # spl = rgb_split(image)
+            # out = hsv_merge(*spl, convert=False)
+            # out ^= 255
+            # out = Image.fromarray(out, "RGB")
+            spl = image.tobytes()
+            out = invert(Image.frombytes("HSV", image.size, spl).convert("RGB"))
     elif source == "hsl":
         if dest == "rgb":
             spl = rgb_split(image)
@@ -930,9 +939,10 @@ def colourspace(image, source, dest):
         if dest == "rgb":
             return invert(image)
         if dest == "hsv":
-            image = invert(image)
-            spl = hsv_split(image, convert=False)
-            return rgb_merge(*spl)
+            spl = invert(image).convert("HSV").tobytes()
+            out = Image.frombytes("RGB", image.size, spl)
+            # spl = hsv_split(image, convert=False)
+            # return rgb_merge(*spl)
         if dest == "hsl":
             image = invert(image)
             spl = hsl_split(image, convert=False)
@@ -1110,12 +1120,13 @@ def fill_channels(image, colour, *channels):
             A = image.getchannel("A")
         else:
             A = None
-        spl = hsv_split(image, convert=False)
+        spl = list(image.convert("HSV").split())
+        # spl = hsv_split(image, convert=False)
         for i in range(6, 9):
             if i in ops:
                 spl[i - 6] = ch
-        image = hsv_merge(*spl)
-        # image = Image.merge("HSV", spl).convert("RGB")
+        # image = hsv_merge(*spl)
+        image = Image.merge("HSV", spl).convert("RGB")
         if A is not None:
             image.putalpha(A)
     if 9 in ops:
@@ -1126,9 +1137,8 @@ def fill_channels(image, colour, *channels):
         else:
             A = None
         spl = hsl_split(image, convert=False)
-        spl[-1] = ch
+        spl[-1] = np.full(tuple(reversed(image.size)), colour)
         image = hsl_merge(*spl)
-        # image = Image.merge("HSV", spl).convert("RGB")
         if A is not None:
             image.putalpha(A)
     return image
@@ -1322,8 +1332,10 @@ def blend_op(image, url, operation, amount, recursive=True):
                 channels1 = hsl_split(image, convert=False)
                 channels2 = hsl_split(image2, convert=False)
             else:
-                channels1 = hsv_split(image, convert=False)
-                channels2 = hsv_split(image2, convert=False)
+                channels1 = image.convert("HSV").split()
+                channels2 = image2.convert("HSV").split()
+                # channels1 = hsv_split(image, convert=False)
+                # channels2 = hsv_split(image2, convert=False)
             if f == "HUE":
                 channels = [channels2[0], channels1[1], channels1[2]]
             elif f == "SAT":
@@ -1335,7 +1347,8 @@ def blend_op(image, url, operation, amount, recursive=True):
             if f[0] == "L":
                 out = hsl_merge(*channels)
             else:
-                out = hsv_merge(*channels)
+                out = Image.merge("HSV", channels).convert("RGB")
+                # out = hsv_merge(*channels)
             if A1 or A2:
                 if not A1:
                     A = A2
@@ -1513,12 +1526,13 @@ def hue_shift(image, value):
             A = image.getchannel("A")
         else:
             A = None
-        channels = hsv_split(image, convert=False)
-        channels[0] += round(value * 256)
-        image = hsv_merge(*channels)
-        # value *= 256
-        # channels[0] = channels[0].point(lambda x: (x + value) % 256)
-        # image = Image.merge("HSV", channels).convert("RGB")
+        channels = list(image.convert("HSV").split())
+        # channels = hsv_split(image, convert=False)
+        # channels[0] += round(value * 256)
+        # image = hsv_merge(*channels)
+        value *= 256
+        channels[0] = channels[0].point(lambda x: (x + value) % 256)
+        image = Image.merge("HSV", channels).convert("RGB")
         if A is not None:
             image.putalpha(A)
     return image
