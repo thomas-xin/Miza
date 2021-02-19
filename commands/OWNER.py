@@ -471,6 +471,7 @@ class UpdateExec(Database):
                     data = await fut.fut
                     files[i] = CompatFile(data, filename=fut.filename)
                 except:
+                    files[i] = None
                     failed[i] = True
                     print_exc()
         fs = [i for i in files if i]
