@@ -582,10 +582,6 @@ function main() {
 	// Initial Loadables
 	const initialLoader = new Loader();
 	let currentModel = new Upconv7Config(ctx, initialLoader, "asa_model");
-	initialLoader.start(() => {
-		isBusy = false;
-		statusElement.innerText = "Ready.";
-	});
 	const runActualProcess = (theImage, done) => {
 		const theTexture = ctx.gl.createTexture();
 		ctx.gl.bindTexture(ctx.gl.TEXTURE_2D, theTexture);
@@ -613,8 +609,9 @@ function main() {
 	};
 	// Event Handlers
 	if (fileElement === null) {
-		function busy_loop() {
-			if (!isBusy) {
+		let imageLoaded = false;
+		function start_when_ready() {
+			if (!isBusy && imageLoaded) {
 				isBusy = true;
 				statusElement.innerText = "Running...";
 				runActualProcess(img, () => {
@@ -622,17 +619,20 @@ function main() {
 					statusElement.innerText = "Done!";
 				});
 			}
-			else {
-				setTimeout(busy_loop, 15);
-			}
 		}
 		const img = new Image();
 		img.onload = () => {
-			busy_loop();
+			imageLoaded = true;
+			start_when_ready();
 		};
 		img.onerror = completer("Error with Image.");
 		img.crossOrigin = "";
 		img.src = "inp.png";
+		initialLoader.start(() => {
+			isBusy = false;
+			statusElement.innerText = "Ready.";
+			start_when_ready();
+		});
 	}
 	else {
 		fileElement.onchange = () => {
@@ -656,6 +656,10 @@ function main() {
 				fr.readAsDataURL(files[0]);
 			}
 		};
+		initialLoader.start(() => {
+			isBusy = false;
+			statusElement.innerText = "Ready.";
+		});
 	}
 }
 main();
