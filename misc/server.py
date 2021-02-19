@@ -230,22 +230,22 @@ def asa_model(filename):
 @app.route("/waifu2x/<path:filename>", methods=["GET"])
 def waifu2x_ex(filename):
     source = flask.request.args.get("source")
-    if not source:
-        raise EOFError
-    if not is_url(source):
-        raise FileNotFoundError
-    if not regexp("https:\\/\\/images-ext-[0-9]+\\.discordapp\\.net\\/external\\/").match(source) and not source.startswith("https://media.discordapp.net/"):
-        if not source.startswith(flask.request.host_url):
-            t = ts_us()
-            while t in RESPONSES:
-                t += 1
-            RESPONSES[t] = fut = concurrent.futures.Future()
-            send(f"!{t}\x7fbot.data.exec.proxy({repr(source)})", escape=False)
-            j, after = fut.result()
-            RESPONSES.pop(t, None)
-            source = j["result"]
+    if source:
+        if not is_url(source):
+            raise FileNotFoundError
+        if not regexp("https:\\/\\/images-ext-[0-9]+\\.discordapp\\.net\\/external\\/").match(source) and not source.startswith("https://media.discordapp.net/"):
+            if not source.startswith(flask.request.host_url):
+                t = ts_us()
+                while t in RESPONSES:
+                    t += 1
+                RESPONSES[t] = fut = concurrent.futures.Future()
+                send(f"!{t}\x7fbot.data.exec.proxy({repr(source)})", escape=False)
+                j, after = fut.result()
+                RESPONSES.pop(t, None)
+                source = j["result"]
     data, mime = fetch_static("waifu2x/main.js")
-    data = data.replace(b"inp.png", source.encode("utf-8"))
+    if source:
+        data = data.replace(b"inp.png", source.encode("utf-8"))
     resp = flask.Response(data, mimetype=mime)
     resp.headers.update(CHEADERS)
     resp.headers["ETag"] = create_etag(data)
@@ -255,8 +255,7 @@ def waifu2x_ex(filename):
 def waifu2x():
     source = flask.request.args.get("source")
     if not source:
-        raise EOFError
-    data = f"""<!DOCTYPE html>
+        data = f"""<!DOCTYPE html>
 <html>
     <meta property="og:image" content="{source}">""" + """
     <style>
@@ -267,10 +266,38 @@ def waifu2x():
             left: 50%;
             -ms-transform: translate(-50%, -50%);
             transform: translate(-50%, -50%);
+            color: white;
+        }
+    </style>""" + f"""
+	<body>
+		<p>file</p>
+		<input type="file" id="image_in" accept="image/png, image/jpeg"/>
+		<p>view</p>
+		<canvas id="canvas" width="400" height="400"></canvas>
+		<div id="statusDiv">JS not loaded yet...</div>
+		<p>experimental. exposure to high amounts of data may result in hazardous levels of memory usage, which may result in system OOM.</p>
+		<script src="{flask.request.base_url}/main.js"></script>
+	</body>
+</html>"""
+    else:
+        data = f"""<!DOCTYPE html>
+<html>
+    <meta property="og:image" content="{source}">""" + """
+    <style>
+        .center {
+            margin: 0;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            -ms-transform: translate(-50%, -50%);
+            transform: translate(-50%, -50%);
+            color: white;
         }
     </style>""" + f"""
 	<body class="center" style="background-color:black;">
 		<canvas id="canvas" width="400" height="400"/>
+        <div id="statusDiv">JS not loaded yet...</div>
+        <p>experimental. exposure to high amounts of data may result in hazardous levels of memory usage, which may result in system OOM.</p>
 		<script src="{flask.request.base_url}/main.js?source={urllib.parse.quote(source)}"></script>
 	</body>
 </html>"""
