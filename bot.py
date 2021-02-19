@@ -2429,8 +2429,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 reacts="❎",
             ))
             return 0
+        truemention = True
         if self.id in (member.id for member in message.mentions):
-            truemention = True
             if message.reference:
                 mid = getattr(message.reference, "message_id", None) or getattr(message.reference, "id", None)
                 try:
@@ -2438,8 +2438,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 except:
                     pass
                 else:
-                    if m.author.id == self.id:
-                        truemention = False
+                    truemention = m.author.id != self.id and all(s not in message.content for s in self.mention)
             if truemention:
                 try:
                     await self.send_event("_mention_", user=user, message=message, msg=msg, exc=True)
@@ -2734,7 +2733,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 not_self = cola != colb
             if not_self:
                 temp = to_alphanumeric(cpy).casefold()
-                await self.send_event("_nocommand_", text=temp, edit=edit, orig=orig, msg=msg, message=message, perm=u_perm)
+                await self.send_event("_nocommand_", text=temp, edit=edit, orig=orig, msg=msg, message=message, perm=u_perm, truemention=truemention)
         # Return the delay before the message can be called again. This is calculated by the rate limit of the command.
         return remaining
 

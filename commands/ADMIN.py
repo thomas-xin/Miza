@@ -1676,6 +1676,11 @@ class UpdateUserLogs(Database):
 
     # Send a member update globally for all user updates
     async def _user_update_(self, before, after, **void):
+        b_url = best_url(before)
+        a_url = best_url(after)
+        if b_url != a_url:
+            with tracebacksuppressor:
+                await self.bot.data.exec.uproxy(b_url, a_url)
         for guild in self.bot.guilds:
             create_task(self._member_update_(before, after, guild))
 
