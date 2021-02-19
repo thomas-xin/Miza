@@ -612,7 +612,7 @@ function main() {
 		done();
 	};
 	// Event Handlers
-	if (fileElement === null || fileElement === undefined) {
+	if (fileElement === null) {
 		function busy_loop() {
 			if (!isBusy) {
 				isBusy = true;
@@ -623,9 +623,7 @@ function main() {
 				});
 			}
 			else {
-				setTimeout(function(){
-					busy_loop();
-				}, 20);
+				setTimeout(busy_loop, 15);
 			}
 		}
 		const img = new Image();
