@@ -422,11 +422,12 @@ class UpdateExec(Database):
 
     def proxy(self, url):
         if is_url(url) and not regexp("https:\\/\\/images-ext-[0-9]+\\.discordapp\\.net\\/external\\/").match(url) and not url.startswith("https://media.discordapp.net/") and not self.bot.is_webserver_url(url):
+            h = shash(url)
             try:
-                return self.bot.data.proxies[url]
+                return self.bot.data.proxies[h]
             except KeyError:
                 new = await_fut(self._proxy(url))
-                self.bot.data.proxies[shash(url)] = new
+                self.bot.data.proxies[h] = new
                 return new
         return url
     
@@ -436,18 +437,20 @@ class UpdateExec(Database):
         for i, url in enumerate(urls):
             if is_url(url):
                 try:
-                    out[i] = self.bot.data.proxies[url]
+                    out[i] = self.bot.data.proxies[shash(url)]
                 except KeyError:
                     files[i] = url
-        message = await self._proxy("\n".join(i for i in files if i), whole=True)
-        c = 0
-        for i, f in enumerate(files):
-            if f:
-                try:
-                    self.bot.data.proxies[shash(urls[i])] = out[i] = message.embeds[c].thumbnail.proxy_url
-                except IndexError:
-                    break
-                c += 1
+        fs = [i for i in files if i]
+        if fs:
+            message = await self._proxy("\n".join(fs), whole=True)
+            c = 0
+            for i, f in enumerate(files):
+                if f:
+                    try:
+                        self.bot.data.proxies[shash(urls[i])] = out[i] = message.embeds[c].thumbnail.proxy_url
+                    except IndexError:
+                        break
+                    c += 1
         return out if len(out) > 1 else out[0]
     
     async def uproxy(self, *urls):
@@ -456,7 +459,7 @@ class UpdateExec(Database):
         for i, url in enumerate(urls):
             if is_url(url):
                 try:
-                    out[i] = self.bot.data.proxies[url]
+                    out[i] = self.bot.data.proxies[shash(url)]
                 except KeyError:
                     fn = url.rsplit("/", 1)[-1].split("?", 1)[0]
                     files[i] = cdict(fut=create_task(Request(url, aio=True)), filename=fn)
@@ -470,18 +473,20 @@ class UpdateExec(Database):
                 except:
                     failed[i] = True
                     print_exc()
-        c_id = choice(list(c_id for c_id, flag in self.data.items() if flag & 16))
-        channel = await bot.fetch_channel(c_id)
-        m = channel.guild.me
-        message = await bot.send_as_webhook(channel, files=[i for i in files if i], username=m.display_name, avatar_url=best_url(m))
-        c = 0
-        for i, f in enumerate(files):
-            if f and not failed[i]:
-                try:
-                    self.bot.data.proxies[shash(urls[i])] = out[i] = message.attachments[c].proxy_url
-                except IndexError:
-                    break
-                c += 1
+        fs = [i for i in files if i]
+        if fs:
+            c_id = choice(list(c_id for c_id, flag in self.data.items() if flag & 16))
+            channel = await bot.fetch_channel(c_id)
+            m = channel.guild.me
+            message = await bot.send_as_webhook(channel, files=fs, username=m.display_name, avatar_url=best_url(m))
+            c = 0
+            for i, f in enumerate(files):
+                if f and not failed[i]:
+                    try:
+                        self.bot.data.proxies[shash(urls[i])] = out[i] = message.attachments[c].proxy_url
+                    except IndexError:
+                        break
+                    c += 1
         return out if len(out) > 1 else out[0]
 
     def _bot_ready_(self, **void):
