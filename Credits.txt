@@ -45,7 +45,7 @@ https://github.com/pocmo/Python-Brainfuck
 
 nihui, 20kdc
 https://github.com/nihui/waifu2x-ncnn-vulkan
-https://github.com/20kdc
+https://gitlab.com/20kdc/waifu2x-upconv7-webgl
 -Used for the ~waifu2x command
 
 https://stackoverflow.com/a/37350619
