@@ -2244,6 +2244,12 @@ class Database(collections.abc.MutableMapping, collections.abc.Hashable, collect
             return
         if force:
             try:
+                limit = getattr(self, "limit", None)
+                if limit and len(self) > limit:
+                    print(f"{self} overflowed by {len(self) - limit}, dropping...")
+                    with tracebacksuppressor:
+                        while len(self) > limit:
+                            self.pop(next(iter(self)))
                 self.data.__update__()
             except:
                 print(self, traceback.format_exc(), sep="\n", end="")

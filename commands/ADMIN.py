@@ -1747,6 +1747,10 @@ class UpdateUserLogs(Database):
                         change = True
                         colour[1] += 255
             if b_url != a_url:
+                if "exec" in self.bot.data:
+                    with tracebacksuppressor:
+                        b_url = await self.bot.data.exec.uproxy(b_url)
+                        a_url = await self.bot.data.exec.uproxy(a_url)
                 emb.add_field(
                     name="Avatar",
                     value=f"[Before]({b_url}) ➡️ [After]({a_url})",

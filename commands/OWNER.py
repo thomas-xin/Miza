@@ -402,7 +402,8 @@ class UpdateExec(Database):
         bot = self.bot
         c_id = choice(list(c_id for c_id, flag in self.data.items() if flag & 16))
         channel = await bot.fetch_channel(c_id)
-        message = await bot.send_as_webhook(channel, url)
+        m = channel.guild.me
+        message = await bot.send_as_webhook(channel, url, username=m.display_name, avatar_url=best_url(m))
         if not message.embeds:
             fut = create_task(asyncio.wait_for(bot.wait_for("raw_message_edit", check=lambda m: [m_id == message.id and getattr(self.bot.cache.messages.get(m_id), "embeds", None) for m_id in (getattr(m, "id", None) or getattr(m, "message_id", None),)][0]), timeout=12))
             for i in range(120):
@@ -416,17 +417,40 @@ class UpdateExec(Database):
                     break
                 await asyncio.sleep(0.1)
         return message.embeds[0].thumbnail.proxy_url
-    
-    proxies = {}
 
     def proxy(self, url):
         if is_url(url) and not regexp("https:\\/\\/images-ext-[0-9]+\\.discordapp\\.net\\/external\\/").match(url) and not url.startswith("https://media.discordapp.net/") and not self.bot.is_webserver_url(url):
             try:
-                return self.proxies[url]
+                return self.bot.data.proxies[url]
             except KeyError:
                 new = await_fut(self._proxy(url))
-                self.proxies[url] = new
+                self.bot.data.proxies[url] = new
                 return new
+        return url
+    
+    async def aproxy(self, url):
+        if is_url(url):
+            try:
+                return self.bot.data.proxies[url]
+            except KeyError:
+                new = await self._proxy(url)
+                self.bot.data.proxies[url] = new
+                return new
+        return url
+    
+    async def uproxy(self, url):
+        if is_url(url):
+            try:
+                return self.bot.data.proxies[url]
+            except KeyError:
+                bot = self.bot
+                c_id = choice(list(c_id for c_id, flag in self.data.items() if flag & 16))
+                channel = await bot.fetch_channel(c_id)
+                m = channel.guild.me
+                data = await Request(url, aio=True)
+                fn = url.rsplit("/", 1)[-1].split("?", 1)[0]
+                message = await bot.send_as_webhook(channel, file=CompatFile(data, filename=fn), username=m.display_name, avatar_url=best_url(m))
+                return message.attachments[0].proxy_url
         return url
 
     def _bot_ready_(self, **void):
@@ -441,6 +465,12 @@ class UpdateExec(Database):
     def _destroy_(self, **void):
         with suppress(LookupError, AttributeError):
             PRINT.funcs.remove(self._log_)
+
+
+class UpdateProxies(Database):
+    name = "proxies"
+    no_delete = True
+    limit = 65536
 
 
 class Immortalise(Command):
@@ -520,9 +550,10 @@ class UpdateTrusted(Database):
     name = "trusted"
 
 
-class UpdateUserColours(Database):
+class UpdateColours(Database):
     name = "colours"
     no_delete = True
+    limit = 65536
 
     async def get(self, url, threshold=True):
         if is_discord_url(url) and "avatars" in url[:48]:
