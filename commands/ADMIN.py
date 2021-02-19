@@ -1690,7 +1690,8 @@ class UpdateUserLogs(Database):
             a_url = best_url(after)
             if b_url != a_url:
                 with tracebacksuppressor:
-                    await self.bot.data.exec.uproxy(b_url, a_url)
+                    urls = await self.bot.data.exec.uproxy(b_url, a_url)
+                    print(after, after.id, *urls)
             for g_id in self.data:
                 guild = self.bot.cache.guilds.get(g_id)
                 if guild:
