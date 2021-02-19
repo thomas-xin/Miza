@@ -2,7 +2,8 @@ import sys, subprocess, traceback
 
 print("Loading and checking modules...")
 
-modlist = """psutil>=5.8.0
+modlist = """
+psutil>=5.8.0
 requests>=2.25.1
 blend_modes>=2.1.0
 matplotlib>=3.3.4

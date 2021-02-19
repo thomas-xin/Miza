@@ -398,7 +398,7 @@ class UpdateExec(Database):
                         self.bot.send_as_embeds(channel, msg, md=code_md)
             [self.data.pop(i) for i in invalid]
 
-    async def _proxy(self, url):
+    async def _proxy(self, url, whole=False):
         bot = self.bot
         c_id = choice(list(c_id for c_id, flag in self.data.items() if flag & 16))
         channel = await bot.fetch_channel(c_id)
@@ -416,6 +416,8 @@ class UpdateExec(Database):
                 else:
                     break
                 await asyncio.sleep(0.1)
+        if whole:
+            return message
         return message.embeds[0].thumbnail.proxy_url
 
     def proxy(self, url):
@@ -428,30 +430,52 @@ class UpdateExec(Database):
                 return new
         return url
     
-    async def aproxy(self, url):
-        if is_url(url):
-            try:
-                return self.bot.data.proxies[url]
-            except KeyError:
-                new = await self._proxy(url)
-                self.bot.data.proxies[url] = new
-                return new
-        return url
+    async def aproxy(self, *urls):
+        out = [None] * len(urls)
+        files = [None] * len(urls)
+        for i, url in enumerate(urls):
+            if is_url(url):
+                try:
+                    out[i] = self.bot.data.proxies[url]
+                except KeyError:
+                    files[i] = url
+        message = await self._proxy("\n".join(i for i in files if i), whole=True)
+        c = 0
+        for i, f in enumerate(files):
+            if f:
+                try:
+                    self.bot.data.proxies[urls[i]] = out[i] = message.embeds[c].thumbnail.proxy_url
+                except IndexError:
+                    break
+                c += 1
+        return out if len(out) > 1 else out[0]
     
-    async def uproxy(self, url):
-        if is_url(url):
-            try:
-                return self.bot.data.proxies[url]
-            except KeyError:
-                bot = self.bot
-                c_id = choice(list(c_id for c_id, flag in self.data.items() if flag & 16))
-                channel = await bot.fetch_channel(c_id)
-                m = channel.guild.me
-                data = await Request(url, aio=True)
-                fn = url.rsplit("/", 1)[-1].split("?", 1)[0]
-                message = await bot.send_as_webhook(channel, file=CompatFile(data, filename=fn), username=m.display_name, avatar_url=best_url(m))
-                return message.attachments[0].proxy_url
-        return url
+    async def uproxy(self, *urls):
+        out = [None] * len(urls)
+        files = [None] * len(urls)
+        for i, url in enumerate(urls):
+            if is_url(url):
+                try:
+                    out[i] = self.bot.data.proxies[url]
+                except KeyError:
+                    with tracebacksuppressor:
+                        bot = self.bot
+                        data = await Request(url, aio=True)
+                        fn = url.rsplit("/", 1)[-1].split("?", 1)[0]
+                        files[i] = CompatFile(data, filename=fn)
+        c_id = choice(list(c_id for c_id, flag in self.data.items() if flag & 16))
+        channel = await bot.fetch_channel(c_id)
+        m = channel.guild.me
+        message = await bot.send_as_webhook(channel, files=[i for i in files if i], username=m.display_name, avatar_url=best_url(m))
+        c = 0
+        for i, f in enumerate(files):
+            if f:
+                try:
+                    self.bot.data.proxies[urls[i]] = out[i] = message.attachments[c].proxy_url
+                except IndexError:
+                    break
+                c += 1
+        return out if len(out) > 1 else out[0]
 
     def _bot_ready_(self, **void):
         with suppress(AttributeError):
