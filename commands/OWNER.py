@@ -410,7 +410,7 @@ class UpdateExec(Database):
                 try:
                     message = fut.result()
                 except ISE:
-                    message = await self.bot.fetch_message(message.id, message.channel)
+                    message = await self.bot.fetch_message(message.id, channel)
                     if message.embeds:
                         break
                 else:

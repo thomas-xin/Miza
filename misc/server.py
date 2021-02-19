@@ -273,7 +273,7 @@ def waifu2x():
 		<p>file</p>
 		<input type="file" id="image_in" accept="image/png, image/jpeg"/>
 		<p>view</p>
-		<canvas id="canvas" width="400" height="400"></canvas>
+		<canvas id="canvas"></canvas>
 		<div id="statusDiv">JS not loaded yet...</div>
 		<p>experimental. exposure to high amounts of data may result in hazardous levels of memory usage, which may result in system OOM.</p>
 		<script src="{flask.request.base_url}/main.js"></script>
@@ -295,7 +295,7 @@ def waifu2x():
         }
     </style>""" + f"""
 	<body class="center" style="background-color:black;">
-		<canvas id="canvas" width="400" height="400"/>
+		<canvas id="canvas">
         <div id="statusDiv">JS not loaded yet...</div>
         <p>experimental. exposure to high amounts of data may result in hazardous levels of memory usage, which may result in system OOM.</p>
 		<script src="{flask.request.base_url}/main.js?source={urllib.parse.quote(source)}"></script>
