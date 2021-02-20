@@ -1317,7 +1317,7 @@ proc_args = cdict(
 
 class Pillow_SIMD:
     args = None
-    __bool__ = lambda self: self.args
+    __bool__ = lambda self: bool(self.args)
     get = lambda self: self.args or [python]
 
     def check(self):
@@ -1326,8 +1326,9 @@ class Pillow_SIMD:
             args = ["py", f"-3.{v}", "misc/install_pillow_simd.py"]
             print(args)
             resp = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            if not as_str(resp.stdout).startswith(f"Python 3.{v} not found!"):
-                print(resp.stdout)
+            out = as_str(resp.stdout)
+            if not out.startswith(f"Python 3.{v} not found!"):
+                print(out)
                 print(f"pillow-simd versioning successful for Python 3.{v}")
                 self.args = ["py", f"-3.{v}"]
                 return self.args

@@ -191,7 +191,7 @@ def hsv_split(image, convert=True, partial=False, dtype=np.uint8):
 
     out = [H, S, V]
     if convert:
-        out = list(Image.fromarray(a, "L") for a in out)
+        out = list(fromarray(a, "L") for a in out)
     return out
 
 def hsl_split(image, convert=True, dtype=np.uint8):
@@ -210,7 +210,7 @@ def hsl_split(image, convert=True, dtype=np.uint8):
 
     out = [H, S, L]
     if convert:
-        out = list(Image.fromarray(a, "L") for a in out)
+        out = list(fromarray(a, "L") for a in out)
     return out
 
 def hsi_split(image, convert=True, dtype=np.uint8):
@@ -226,7 +226,7 @@ def hsi_split(image, convert=True, dtype=np.uint8):
 
     out = [H, S, I]
     if convert:
-        out = list(Image.fromarray(a, "L") for a in out)
+        out = list(fromarray(a, "L") for a in out)
     return out
 
 def rgb_merge(R, G, B, convert=True):
@@ -234,7 +234,7 @@ def rgb_merge(R, G, B, convert=True):
     outT = np.moveaxis(out, -1, 0)
     outT[:] = [np.clip(a, None, 255) for a in (R, G, B)]
     if convert:
-        out = Image.fromarray(out, "RGB")
+        out = fromarray(out, "RGB")
     return out
 
 def hsv_merge(H, S, V, convert=True):
@@ -306,6 +306,20 @@ def hsl_merge(H, S, L, convert=True, value=False, intensity=False):
 
 def hsi_merge(H, S, V, convert=True):
     return hsl_merge(H, S, V, convert, intensity=True)
+
+def fromarray(arr, mode="L"):
+    try:
+        return Image.fromarray(arr, mode=mode)
+    except TypeError:
+        try:
+            b = arr.tobytes()
+        except TypeError:
+            b = bytes(arr)
+        s = tuple(reversed(arr.shape))
+        try:
+            return Image.frombuffer(mode, s, b, "raw", mode, 0, 1)
+        except TypeError:
+            return Image.frombytes(mode, s, b)
 
 
 sizecheck = re.compile("[1-9][0-9]*x[0-9]+")
@@ -914,7 +928,7 @@ def colourspace(image, source, dest):
             # spl = rgb_split(image)
             # out = hsv_merge(*spl, convert=False)
             # out ^= 255
-            # out = Image.fromarray(out, "RGB")
+            # out = fromarray(out, "RGB")
             spl = image.tobytes()
             out = invert(Image.frombytes("HSV", image.size, spl).convert("RGB"))
     elif source == "hsl":
@@ -925,7 +939,7 @@ def colourspace(image, source, dest):
             spl = rgb_split(image)
             out = hsl_merge(*spl, convert=False)
             out ^= 255
-            out = Image.fromarray(out, "RGB")
+            out = fromarray(out, "RGB")
     elif source == "hsi":
         if dest == "rgb":
             spl = rgb_split(image)
@@ -934,7 +948,7 @@ def colourspace(image, source, dest):
             spl = rgb_split(image)
             out = hsi_merge(*spl, convert=False)
             out ^= 255
-            out = Image.fromarray(out, "RGB")
+            out = fromarray(out, "RGB")
     elif source == "cmy":
         if dest == "rgb":
             return invert(image)
@@ -1288,7 +1302,7 @@ def blend_op(image, url, operation, amount, recursive=True):
             image2 = image2.convert("RGBA")
         imgA = np.array(image).astype(float)
         imgB = np.array(image2).astype(float)
-        out = Image.fromarray(np.uint8(filt(imgA, imgB, amount)))
+        out = fromarray(np.uint8(filt(imgA, imgB, amount)))
     else:
         # Basic blend, use second image
         if filt in ("blend", "replace"):
@@ -1430,7 +1444,7 @@ def remove_matte(image, colour):
                     cell[3] /= ratio
                 else:
                     cell[3] = 0
-    image = Image.fromarray(arr.astype(np.uint8))
+    image = fromarray(arr.astype(np.uint8))
     return image
 
 

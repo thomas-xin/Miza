@@ -119,7 +119,7 @@ def hsv_split(image, convert=True, partial=False, dtype=np.uint8):
 
     out = [H, S, V]
     if convert:
-        out = list(Image.fromarray(a, "L") for a in out)
+        out = list(fromarray(a, "L") for a in out)
     return out
 
 def hsl_split(image, convert=True, dtype=np.uint8):
@@ -138,7 +138,7 @@ def hsl_split(image, convert=True, dtype=np.uint8):
 
     out = [H, S, L]
     if convert:
-        out = list(Image.fromarray(a, "L") for a in out)
+        out = list(fromarray(a, "L") for a in out)
     return out
 
 def hsi_split(image, convert=True, dtype=np.uint8):
@@ -154,7 +154,7 @@ def hsi_split(image, convert=True, dtype=np.uint8):
 
     out = [H, S, I]
     if convert:
-        out = list(Image.fromarray(a, "L") for a in out)
+        out = list(fromarray(a, "L") for a in out)
     return out
 
 def rgb_merge(R, G, B, convert=True):
@@ -162,7 +162,7 @@ def rgb_merge(R, G, B, convert=True):
     outT = np.moveaxis(out, -1, 0)
     outT[:] = [np.clip(a, None, 255) for a in (R, G, B)]
     if convert:
-        out = Image.fromarray(out, "RGB")
+        out = fromarray(out, "RGB")
     return out
 
 def hsv_merge(H, S, V, convert=True):
@@ -234,6 +234,20 @@ def hsl_merge(H, S, L, convert=True, value=False, intensity=False):
 
 def hsi_merge(H, S, V, convert=True):
     return hsl_merge(H, S, V, convert, intensity=True)
+
+def fromarray(arr, mode="L"):
+    try:
+        return Image.fromarray(arr, mode=mode)
+    except TypeError:
+        try:
+            b = arr.tobytes()
+        except TypeError:
+            b = bytes(arr)
+        s = tuple(reversed(arr.shape))
+        try:
+            return Image.frombuffer(mode, s, b, "raw", mode, 0, 1)
+        except TypeError:
+            return Image.frombytes(mode, s, b)
 
 
 if __name__ == "__main__":
@@ -437,7 +451,7 @@ if __name__ == "__main__":
             # Linearly scale amplitude data (unused)
             self.linear_scale = np.arange(screensize[1], dtype=np.float64) / screensize[1]
             # Initialize hue of output image to a vertical rainbow
-            self.hue = Image.fromarray(np.expand_dims((self.linear_scale * 256).astype(np.uint8), 0), mode="L")
+            self.hue = fromarray(np.expand_dims((self.linear_scale * 256).astype(np.uint8), 0))
             # Initialize saturation of output image to be maximum
             self.sat = Image.new("L", (screensize[1], 1), 255)
             # Initialize value of output image to be maximum
@@ -569,11 +583,11 @@ if __name__ == "__main__":
                             compat[:len(temp)] += temp
                 self.part.fut = exc.submit(self.part.stdin.write, compat.tobytes())
             # Convert saturation and brightness arrays into 2D arrays of length 1, to prepare them for image conversion
-            imgsat = Image.fromarray(np.expand_dims(sat, 0), mode="L")
-            imgval = Image.fromarray(np.expand_dims(val, 0), mode="L")
-            self.sat = imgsat
-            self.val = imgval
+            self.sat = fromarray(np.expand_dims(sat, 0))
+            self.val = fromarray(np.expand_dims(val, 0))
             # Merge arrays into a single HSV image, converting to RGB and extracting as a 1D array
+            if Image.__version__ == "7.0.0.post3":
+                return np.uint8(Image.merge("HSV", (self.hue, self.sat, self.val)).convert("RGB"))[0]
             return hsv_merge(self.hue, self.sat, self.val, convert=False)[0]
             # return np.uint8(Image.merge("HSV", (self.hue, self.sat, self.val)).convert("RGB"))[0]
 

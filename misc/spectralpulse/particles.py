@@ -307,7 +307,10 @@ class Bar(Particle):
         if size > 8:
             if type(self.line) is str:
                 y = self.y + (self.width >> 1) - 12
-                width = DRAW.textlength(self.line, self.font)
+                try:
+                    width = DRAW.textlength(self.line, self.font)
+                except (TypeError, AttributeError):
+                    width = 8 * len(self.line)
                 pos = max(0, screensize[0] - size - width)
                 factor = round(255 * scale)
                 col = sum(factor << (i << 3) for i in range(3))
