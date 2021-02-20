@@ -715,7 +715,7 @@ single_md = lambda s: f"`{s}`"
 code_md = lambda s: f"```\n{s}```"
 py_md = lambda s: f"```py\n{s}```"
 ini_md = lambda s: f"```ini\n{s}```"
-css_md = lambda s: f"```css\n{s}```".replace("'", "\u2019").replace('"', "\u201d")
+css_md = ini_md#lambda s: f"```css\n{s}```".replace("'", "\u2019").replace('"', "\u201d")
 fix_md = lambda s: f"```fix\n{s}```"
 
 # Discord object mention formatting

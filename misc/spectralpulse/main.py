@@ -1,18 +1,47 @@
 #!/usr/bin/env python
 
+import os, sys
 
-if __name__ == "__main__":
-    from install_update import *
-else:
-    import os
-if os.name == "nt":
-    os.system("color")
-import numpy, time, psutil, sys, collections, random, contextlib, re, itertools, concurrent.futures
 if os.name == "nt":
     vi = sys.version_info
     python = ["py", f"-{vi[0]}.{vi[1]}"]
 else:
-    python = "python3"
+    python = ["python3"]
+
+class Pillow_SIMD:
+    args = None
+    __bool__ = lambda self: bool(self.args)
+    get = lambda self: self.args or [python]
+
+    def check(self):
+        for v in range(8, 4, -1):
+            print(f"Attempting to find/install pillow-simd for Python 3.{v}...")
+            args = ["py", f"-3.{v}", "misc/install_pillow_simd.py"]
+            print(args)
+            resp = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            out = resp.stdout.decode("utf-8", "replace")
+            if not out.startswith(f"Python 3.{v} not found!"):
+                print(out)
+                print(f"pillow-simd versioning successful for Python 3.{v}")
+                self.args = ["py", f"-3.{v}"]
+                return self.args
+        return [python]
+
+pillow_simd = Pillow_SIMD()
+
+if __name__ == "__main__":
+    if sys.version_info[1] in range(5, 9):
+        from install_pillow_simd import traceback, subprocess
+    else:
+        import subprocess
+        pillow_simd.check()
+        if pillow_simd:
+            subprocess.run(pillow_simd.get() + sys.argv)
+            sys.exit()
+        from install_update import traceback, subprocess
+if os.name == "nt":
+    os.system("color")
+import numpy, time, psutil, collections, random, contextlib, re, itertools, concurrent.futures
 suppress = contextlib.suppress
 from math import *
 from PIL import Image
@@ -316,6 +345,7 @@ if __name__ == "__main__":
 
 
     # Default settings for the program
+    dest = None
     sample_rate = 48000
     fps = 30
     amplitude = 0.1
@@ -758,6 +788,20 @@ if __name__ == "__main__":
     for path in inputs:
         if is_url(path):
             if ytdl is None:
+                if re.findall("^https?:\\/\\/(?:[a-z]+\\.)?discord(?:app)?\\.com\\/", path):
+                    title = path.split("?", 1)[0].rsplit("/", 1)[-1]
+                    if title.rsplit(".", 1)[-1] in ("ogg", "webm"):
+                        url2 = path.replace("/cdn.discordapp.com/", "/media.discordapp.net/")
+                        with requests.get(url2, stream=True) as resp:
+                            if resp.status_code in range(200, 400):
+                                futs.append(url2)
+                                continue
+                            headers = {k.casefold(): v for k, v in resp.headers.items()}
+                        mime = headers.get("content-type", "")
+                        if mime.startswith("audio/") or mime.startswith("video/"):
+                            if mime != "audio/midi":
+                                futs.append(path)
+                                continue
                 with requests.head(path, stream=True) as resp:
                     headers = {k.casefold(): v for k, v in resp.headers.items()}
                 mime = headers.get("content-type", "")

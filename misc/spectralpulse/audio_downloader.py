@@ -959,6 +959,11 @@ class AudioDownloader:
                     url = resp["id"]
         if is_discord_url(url):
             title = url.split("?", 1)[0].rsplit("/", 1)[-1]
+            if title.rsplit(".", 1)[-1] in ("ogg", "webm"):
+                url2 = url.replace("/cdn.discordapp.com/", "/media.discordapp.net/")
+                with requests.get(url2, stream=True) as resp:
+                    if resp.status_code in range(200, 400):
+                        url = url2
             if "." in title:
                 title = title[:title.rindex(".")]
             return dict(url=url, name=title, direct=True)
@@ -996,6 +1001,11 @@ class AudioDownloader:
     def extract_from(self, url):
         if is_discord_url(url):
             title = url.split("?", 1)[0].rsplit("/", 1)[-1]
+            if title.rsplit(".", 1)[-1] in ("ogg", "webm"):
+                url2 = url.replace("/cdn.discordapp.com/", "/media.discordapp.net/")
+                with requests.get(url2, stream=True) as resp:
+                    if resp.status_code in range(200, 400):
+                        url = url2
             if "." in title:
                 title = title[:title.rindex(".")]
             return dict(url=url, webpage_url=url, title=title, direct=True)
