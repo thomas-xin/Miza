@@ -1283,7 +1283,7 @@ class AudioDownloader:
         out = None
         url = f"https://www.youtube.com/results?search_query={verify_url(query)}"
         self.youtube_x += 1
-        resp = Request(url, timeout=12)
+        resp = requests.get(url, timeout=12).content
         result = None
         with suppress(ValueError):
             s = resp[resp.index(b"// scraper_data_begin") + 21:resp.rindex(b"// scraper_data_end")]
