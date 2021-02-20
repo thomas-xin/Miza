@@ -1327,7 +1327,7 @@ class AudioDownloader:
                 entries = [resp]
             out = []
             for entry in entries:
-                with tracebacksuppressor:
+                try:
                     found = True
                     if "title" in entry:
                         title = entry["title"]
@@ -1349,6 +1349,7 @@ class AudioDownloader:
                             temp["url"] = f"https://www.youtube.com/watch?v={url}"
                     temp["research"] = True
                     out.append(temp)
+                print_exc()
         return out
     # Performs a search, storing and using cached search results for efficiency.
     def search(self, item, force=False, mode=None, count=1):
