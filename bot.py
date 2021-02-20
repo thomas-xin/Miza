@@ -1363,7 +1363,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         if self.closed:
             return message
         if cache and message.id not in self.cache.messages or force:
-            if not getattr(message, "simulated", None) and cache and "channel_cache" in self.data:
+            if not getattr(message, "simulated", None) and "channel_cache" in self.data:
                 self.data.channel_cache.add(message.channel.id, message.id)
             if files and not message.author.bot:
                 if (utc_dt() - message.created_at).total_seconds() < 7200:

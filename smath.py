@@ -2290,7 +2290,10 @@ def round_min(x):
             else:
                 x = float(x)
         else:
-            x = int(x)
+            try:
+                return int(x)
+            except ValueError:
+                return float(x)
     if type(x) is int:
         return x
     if type(x) is not complex:

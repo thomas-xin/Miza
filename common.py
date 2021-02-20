@@ -1315,24 +1315,32 @@ proc_args = cdict(
     image=[python, "misc/image.py"],
 )
 
-def check_pillow_simd():
-    for v in range(8, 4, -1):
-        print(f"Attempting to find/install pillow-simd for Python 3.{v}...")
-        args = ["py", f"-3.{v}", "misc/install_pillow_simd.py"]
-        print(args)
-        resp = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if not as_str(resp.stdout).startswith(f"Python 3.{v} not found!"):
-            print(resp.stdout)
-            print(f"pillow-simd versioning successful for Python 3.{v}")
-            proc_args.image = ["py", f"-3.{v}", "misc/image.py"]
-            break
+class Pillow_SIMD:
+    args = None
+    __bool__ = lambda self: self.args
+    get = lambda self: self.args or [python]
+
+    def check(self):
+        for v in range(8, 4, -1):
+            print(f"Attempting to find/install pillow-simd for Python 3.{v}...")
+            args = ["py", f"-3.{v}", "misc/install_pillow_simd.py"]
+            print(args)
+            resp = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if not as_str(resp.stdout).startswith(f"Python 3.{v} not found!"):
+                print(resp.stdout)
+                print(f"pillow-simd versioning successful for Python 3.{v}")
+                self.args = ["py", f"-3.{v}"]
+                return self.args
+        return [python]
+
+pillow_simd = Pillow_SIMD()
 
 def proc_start():
     PROC_COUNT.math = 3
     PROC_COUNT.image = 3
     for k, v in PROC_COUNT.items():
         if k == "image":
-            check_pillow_simd()
+            proc_args.image = pillow_simd.check() + ["misc/image.py"]
         PROCS[k] = [psutil.Popen(
             proc_args[k],
             stdin=subprocess.PIPE,

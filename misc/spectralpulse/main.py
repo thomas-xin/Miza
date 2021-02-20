@@ -8,6 +8,11 @@ else:
 if os.name == "nt":
     os.system("color")
 import numpy, time, psutil, sys, collections, random, contextlib, re, itertools, concurrent.futures
+if os.name == "nt":
+    vi = sys.version_info
+    python = ["py", f"-{vi[0]}.{vi[1]}"]
+else:
+    python = "python3"
 suppress = contextlib.suppress
 from math import *
 from PIL import Image
@@ -363,7 +368,7 @@ if __name__ == "__main__":
                 fut2 = exc.submit(psutil.Popen, args, stdin=subprocess.PIPE)
             if display:
                 # Start python process running display.py to display the preview
-                args = [("python3", "python")[os.name == "nt"], "display.py", *[str(x) for x in screensize]]
+                args = python + ["display.py", *[str(x) for x in screensize]]
                 print(" ".join(args))
                 fut3 = exc.submit(psutil.Popen, args, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL)
             if not higher_bound:
@@ -395,7 +400,7 @@ if __name__ == "__main__":
             print(maxfreq, minfreq, freqmul)
             if particles:
                 # Start python process running particles.py to render the particles using amplitude sample data
-                args = [("python3", "python")[os.name == "nt"], "particles.py", str(particles), str(self.cutoff), str(screensize[1]), str(barcount), str(highest_note)]
+                args = python + ["particles.py", str(particles), str(self.cutoff), str(screensize[1]), str(barcount), str(highest_note)]
                 print(" ".join(args))
                 fut4 = exc.submit(psutil.Popen, args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             if play:
