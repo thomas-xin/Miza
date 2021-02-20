@@ -1296,8 +1296,8 @@ class AudioDownloader:
             result = self.parse_yt(s)
         if result is not None:
             q = to_alphanumeric(full_prune(query))
-            high = alist()
-            low = alist()
+            high = []
+            low = []
             for entry in result:
                 if entry.duration:
                     name = full_prune(entry.name)
@@ -1325,7 +1325,7 @@ class AudioDownloader:
                 entries = list(resp["entries"])
             else:
                 entries = [resp]
-            out = alist()
+            out = []
             for entry in entries:
                 with tracebacksuppressor:
                     found = True
