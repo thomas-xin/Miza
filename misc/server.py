@@ -227,9 +227,34 @@ def models(filename):
     resp.headers["ETag"] = create_etag(data)
     return resp
 
+@app.route("/w2wbinit.png", methods=["GET"])
+def w2wbinit():
+    data, mime = fetch_static("waifu2x/w2wbinit.png")
+    resp = flask.Response(data, mimetype=mime)
+    resp.headers.update(CHEADERS)
+    resp.headers["ETag"] = create_etag(data)
+    return resp
+
 @app.route("/waifu2x/<path:filename>", methods=["GET"])
 def waifu2x_ex(filename):
+    source = flask.request.args.get("source")
+    if not source:
+        source = "https://gitlab.com/20kdc/waifu2x-upconv7-webgl/-/raw/master/w2wbinit.png"
+    if not is_url(source):
+        raise FileNotFoundError
+    if not regexp("https:\\/\\/images-ext-[0-9]+\\.discordapp\\.net\\/external\\/").match(source) and not source.startswith("https://media.discordapp.net/"):
+        if not source.startswith(flask.request.host_url):
+            t = ts_us()
+            while t in RESPONSES:
+                t += 1
+            RESPONSES[t] = fut = concurrent.futures.Future()
+            send(f"!{t}\x7fbot.data.exec.proxy({repr(source)})", escape=False)
+            j, after = fut.result()
+            RESPONSES.pop(t, None)
+            source = j["result"]
     data, mime = fetch_static("waifu2x/main.js")
+    srcline = f'currentImage.src = "{source}";\n    currentImage.crossOrigin = "";'
+    data = data.replace(b'currentImage.src = "w2wbinit.png";', srcline.encode("utf-8", "replace"))
     resp = flask.Response(data, mimetype=mime)
     resp.headers.update(CHEADERS)
     resp.headers["ETag"] = create_etag(data)
@@ -239,36 +264,7 @@ def waifu2x_ex(filename):
 def waifu2x():
     source = flask.request.args.get("source")
     if source:
-        if not is_url(source):
-            raise FileNotFoundError
-        if not regexp("https:\\/\\/images-ext-[0-9]+\\.discordapp\\.net\\/external\\/").match(source) and not source.startswith("https://media.discordapp.net/"):
-            if not source.startswith(flask.request.host_url):
-                t = ts_us()
-                while t in RESPONSES:
-                    t += 1
-                RESPONSES[t] = fut = concurrent.futures.Future()
-                send(f"!{t}\x7fbot.data.exec.proxy({repr(source)})", escape=False)
-                j, after = fut.result()
-                RESPONSES.pop(t, None)
-                source = j["result"]
-    if source:
-        src = '<source src="' + source + '" id="imageIn"/>'
-        model = '<span value="models/upconv_7/art/scale2.0x_model"/>'
-    else:
-        src = '<input type="file" id="imageIn" accept="image/png, image/jpeg"/>'
-        model = '''<select id="modelName">
-            <option value="models/upconv_7/art/scale2.0x_model">Waifu2x Upconv7 Art</option>
-            <option value="models/upconv_7/art/noise0_scale2.0x_model">Waifu2x Upconv7 Art (noise0)</option>
-            <option value="models/upconv_7/art/noise1_scale2.0x_model">Waifu2x Upconv7 Art (noise1)</option>
-            <option value="models/upconv_7/art/noise2_scale2.0x_model">Waifu2x Upconv7 Art (noise2)</option>
-            <option value="models/upconv_7/art/noise3_scale2.0x_model">Waifu2x Upconv7 Art (noise3)</option>
-            <option value="models/upconv_7/art/scale2.0x_model">Waifu2x Upconv7 Photo</option>
-            <option value="models/upconv_7/art/noise0_scale2.0x_model">Waifu2x Upconv7 Photo (noise0)</option>
-            <option value="models/upconv_7/art/noise1_scale2.0x_model">Waifu2x Upconv7 Photo (noise1)</option>
-            <option value="models/upconv_7/art/noise2_scale2.0x_model">Waifu2x Upconv7 Photo (noise2)</option>
-            <option value="models/upconv_7/art/noise3_scale2.0x_model">Waifu2x Upconv7 Photo (noise3)</option>
-        </select>'''
-    data = f"""<!DOCTYPE html>
+        data = f"""<!DOCTYPE html>
 <html>
     <meta property="og:image" content="{source}">""" + """
     <style>
@@ -282,19 +278,60 @@ def waifu2x():
             color: white;
         }
     </style>""" + f"""
-	<body>
-		<p>file</p>
-        {src}
-		<p>model</p>
-		{model}
-		<p>Model data from <a href="https://github.com/nagadomi/waifu2x/">nagadomi waifu2x</a></p>
-		<button id="runButton">Run</button>
-		<button id="cancelButton">Cancel</button>
-		<p id="statusDiv">JS not loaded yet...</p>
-		<p>experimental. exposure to high amounts of data may result in hazardous levels of memory usage, which may result in system OOM.</p>
-		<p>view</p>
-		<canvas id="canvas" width="400" height="400"></canvas>
-		<script src="{flask.request.base_url}/main.js"></script>
+	<body style="background-color: black;">
+        <div class="center">
+            <input hidden type="file" id="imageIn" accept="image/png, image/jpeg"/>
+            <select hidden id="modelName">
+                <option value="models/upconv_7/art/scale2.0x_model">Waifu2x Upconv7 Art</option>
+            </select>
+            <button hidden id="runButton">Run</button>
+            <button hidden id="cancelButton">Cancel</button>
+            <p hidden id="statusDiv">JS not loaded yet...</p>
+            <canvas id="canvas"></canvas>
+            <script src="{flask.request.base_url}/main.js?source={urllib.parse.quote(source)}"></script>
+        </div>
+	</body>
+</html>"""
+    else:
+        data = """<!DOCTYPE html>
+<html>
+    <style>
+        .center {
+            margin: 0;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            -ms-transform: translate(-50%, -50%);
+            transform: translate(-50%, -50%);
+            color: white;
+        }
+    </style>""" + f"""
+	<body style="background-color: black;">
+        <div class="center">
+            <p>Open file</p>
+            <input type="file" id="imageIn" accept="image/png, image/jpeg"/>
+            <p>Select model</p>
+            <select id="modelName">
+                <option value="models/upconv_7/art/scale2.0x_model">Waifu2x Upconv7 Art</option>
+                <option value="models/upconv_7/art/noise0_scale2.0x_model">Waifu2x Upconv7 Art (noise0)</option>
+                <option value="models/upconv_7/art/noise1_scale2.0x_model">Waifu2x Upconv7 Art (noise1)</option>
+                <option value="models/upconv_7/art/noise2_scale2.0x_model">Waifu2x Upconv7 Art (noise2)</option>
+                <option value="models/upconv_7/art/noise3_scale2.0x_model">Waifu2x Upconv7 Art (noise3)</option>
+                <option value="models/upconv_7/art/scale2.0x_model">Waifu2x Upconv7 Photo</option>
+                <option value="models/upconv_7/art/noise0_scale2.0x_model">Waifu2x Upconv7 Photo (noise0)</option>
+                <option value="models/upconv_7/art/noise1_scale2.0x_model">Waifu2x Upconv7 Photo (noise1)</option>
+                <option value="models/upconv_7/art/noise2_scale2.0x_model">Waifu2x Upconv7 Photo (noise2)</option>
+                <option value="models/upconv_7/art/noise3_scale2.0x_model">Waifu2x Upconv7 Photo (noise3)</option>
+            </select>
+            <p>Model data from <a href="https://github.com/nagadomi/waifu2x/">nagadomi waifu2x</a></p>
+            <button id="runButton">Run</button>
+            <button id="cancelButton">Cancel</button>
+            <p id="statusDiv">JS not loaded yet...</p>
+            <p>experimental. exposure to high amounts of data may result in hazardous levels of memory usage, which may result in system OOM.</p>
+            <p>View</p>
+            <canvas id="canvas"></canvas>
+            <script src="{flask.request.base_url}/main.js"></script>
+        </div>
 	</body>
 </html>"""
     resp = flask.Response(data, mimetype="text/html")
