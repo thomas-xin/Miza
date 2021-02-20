@@ -219,9 +219,9 @@ def mizatlas(filename=None):
     return resp
 
 
-@app.route("/asa_model/<path:filename>", methods=["GET"])
-def asa_model(filename):
-    data, mime = fetch_static(f"waifu2x/asa_model/{filename}")
+@app.route("/models/<path:filename>", methods=["GET"])
+def models(filename):
+    data, mime = fetch_static(f"waifu2x/models/{filename}")
     resp = flask.Response(data, mimetype=mime)
     resp.headers.update(CHEADERS)
     resp.headers["ETag"] = create_etag(data)
@@ -229,6 +229,14 @@ def asa_model(filename):
 
 @app.route("/waifu2x/<path:filename>", methods=["GET"])
 def waifu2x_ex(filename):
+    data, mime = fetch_static("waifu2x/main.js")
+    resp = flask.Response(data, mimetype=mime)
+    resp.headers.update(CHEADERS)
+    resp.headers["ETag"] = create_etag(data)
+    return resp
+
+@app.route("/waifu2x", methods=["GET"])
+def waifu2x():
     source = flask.request.args.get("source")
     if source:
         if not is_url(source):
@@ -243,19 +251,24 @@ def waifu2x_ex(filename):
                 j, after = fut.result()
                 RESPONSES.pop(t, None)
                 source = j["result"]
-    data, mime = fetch_static("waifu2x/main.js")
     if source:
-        data = data.replace(b"inp.png", source.encode("utf-8"))
-    resp = flask.Response(data, mimetype=mime)
-    resp.headers.update(CHEADERS)
-    resp.headers["ETag"] = create_etag(data)
-    return resp
-
-@app.route("/waifu2x", methods=["GET"])
-def waifu2x():
-    source = flask.request.args.get("source")
-    if not source:
-        data = f"""<!DOCTYPE html>
+        src = '<source src="' + source + '" id="imageIn"/>'
+        model = '<span value="models/upconv_7/art/scale2.0x_model"/>'
+    else:
+        src = '<input type="file" id="imageIn" accept="image/png, image/jpeg"/>'
+        model = '''<select id="modelName">
+            <option value="models/upconv_7/art/scale2.0x_model">Waifu2x Upconv7 Art</option>
+            <option value="models/upconv_7/art/noise0_scale2.0x_model">Waifu2x Upconv7 Art (noise0)</option>
+            <option value="models/upconv_7/art/noise1_scale2.0x_model">Waifu2x Upconv7 Art (noise1)</option>
+            <option value="models/upconv_7/art/noise2_scale2.0x_model">Waifu2x Upconv7 Art (noise2)</option>
+            <option value="models/upconv_7/art/noise3_scale2.0x_model">Waifu2x Upconv7 Art (noise3)</option>
+            <option value="models/upconv_7/art/scale2.0x_model">Waifu2x Upconv7 Photo</option>
+            <option value="models/upconv_7/art/noise0_scale2.0x_model">Waifu2x Upconv7 Photo (noise0)</option>
+            <option value="models/upconv_7/art/noise1_scale2.0x_model">Waifu2x Upconv7 Photo (noise1)</option>
+            <option value="models/upconv_7/art/noise2_scale2.0x_model">Waifu2x Upconv7 Photo (noise2)</option>
+            <option value="models/upconv_7/art/noise3_scale2.0x_model">Waifu2x Upconv7 Photo (noise3)</option>
+        </select>'''
+    data = f"""<!DOCTYPE html>
 <html>
     <meta property="og:image" content="{source}">""" + """
     <style>
@@ -271,34 +284,17 @@ def waifu2x():
     </style>""" + f"""
 	<body>
 		<p>file</p>
-		<input type="file" id="image_in" accept="image/png, image/jpeg"/>
-		<p>view</p>
-		<canvas id="canvas"></canvas>
-		<div id="statusDiv">JS not loaded yet...</div>
+        {src}
+		<p>model</p>
+		{model}
+		<p>Model data from <a href="https://github.com/nagadomi/waifu2x/">nagadomi waifu2x</a></p>
+		<button id="runButton">Run</button>
+		<button id="cancelButton">Cancel</button>
+		<p id="statusDiv">JS not loaded yet...</p>
 		<p>experimental. exposure to high amounts of data may result in hazardous levels of memory usage, which may result in system OOM.</p>
+		<p>view</p>
+		<canvas id="canvas" width="400" height="400"></canvas>
 		<script src="{flask.request.base_url}/main.js"></script>
-	</body>
-</html>"""
-    else:
-        data = f"""<!DOCTYPE html>
-<html>
-    <meta property="og:image" content="{source}">""" + """
-    <style>
-        .center {
-            margin: 0;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            -ms-transform: translate(-50%, -50%);
-            transform: translate(-50%, -50%);
-            color: white;
-        }
-    </style>""" + f"""
-	<body class="center" style="background-color:black;">
-		<canvas id="canvas">
-        <div id="statusDiv">JS not loaded yet...</div>
-        <p>experimental. exposure to high amounts of data may result in hazardous levels of memory usage, which may result in system OOM.</p>
-		<script src="{flask.request.base_url}/main.js?source={urllib.parse.quote(source)}"></script>
 	</body>
 </html>"""
     resp = flask.Response(data, mimetype="text/html")

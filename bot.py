@@ -1056,7 +1056,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         break
                 found.add(message.id)
                 yield message
-                if len(found) >= limit:
+                if limit is not None and len(found) >= limit:
                     return
         async for message in channel.history(limit=limit, before=before, after=after):
             if message.id not in found:
