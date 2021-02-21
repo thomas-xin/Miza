@@ -3810,7 +3810,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             if member.id == self.id:
                 after = member.voice
                 if after is not None:
-                    if after.mute or after.deaf:
+                    if (after.mute or after.deaf) and member.permissions_in(after.channel).deafen_members:
                         # print("Unmuted self in " + member.guild.name)
                         await member.edit(mute=False, deafen=False)
                     await self.handle_update()

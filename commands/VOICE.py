@@ -513,7 +513,7 @@ class CustomAudio(collections.abc.Hashable):
 
     # Sends a deletable message to the audio player's text channel.
     def announce(self, *args, aio=False, dump=False, **kwargs):
-        if self.queue:
+        if self.queue and dump:
             resp, fn = self.get_dump(js=True)
             f = CompatFile(io.BytesIO(resp), filename=fn)
         else:
