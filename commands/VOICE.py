@@ -513,10 +513,15 @@ class CustomAudio(collections.abc.Hashable):
 
     # Sends a deletable message to the audio player's text channel.
     def announce(self, *args, aio=False, **kwargs):
+        if self.queue:
+            resp, fn = self.get_dump(js=True)
+            f = CompatFile(io.BytesIO(resp), filename=fn)
+        else:
+            f = None
         if aio:
-            return create_task(send_with_react(self.text, *args, reacts="❎", **kwargs))
+            return create_task(send_with_react(self.text, *args, file=f, reacts="❎", **kwargs))
         with self.announcer:
-            return await_fut(send_with_react(self.text, *args, reacts="❎", **kwargs))
+            return await_fut(send_with_react(self.text, *args, file=f, reacts="❎", **kwargs))
 
     # Kills this audio player, stopping audio playback. Will cause bot to leave voice upon next update event.
     def kill(self, reason=None):
@@ -2070,7 +2075,7 @@ class AudioDownloader:
                     entry["duration"] = round_min(durstr[0])
             if not entry.get("duration"):
                 entry["duration"] = get_duration(stream)
-            print(entry.url, entry.duration)
+            # print(entry.url, entry.duration)
             with suppress(KeyError):
                 self.searched[entry["url"]]["duration"] = entry["duration"]
             live = not entry.get("duration") or entry["duration"] > 960

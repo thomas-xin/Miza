@@ -1691,7 +1691,7 @@ class UpdateUserLogs(Database):
             if b_url != a_url:
                 with tracebacksuppressor:
                     urls = await self.bot.data.exec.uproxy(b_url, a_url)
-                    print(after, after.id, *urls)
+                    # print(after, after.id, *urls)
             for g_id in self.data:
                 guild = self.bot.cache.guilds.get(g_id)
                 if guild:
@@ -1900,8 +1900,8 @@ class UpdateMessageCache(Database):
             if type(data) is not dict:
                 data = {m["id"]: m for m in data}
             self.raws[fn] = data
-            if raw:
-                print(f"{len(data)} message{'s' if len(data) != 1 else ''} temporarily read from {fn}")
+            # if raw:
+                # print(f"{len(data)} message{'s' if len(data) != 1 else ''} temporarily read from {fn}")
         if not raw:
             bot = self.bot
             i = 0
@@ -1917,7 +1917,7 @@ class UpdateMessageCache(Database):
                 i += 1
                 if not i & 2047:
                     time.sleep(0.1)
-            print(f"{len(data)} message{'s' if len(data) != 1 else ''} successfully loaded from {fn}")
+            # print(f"{len(data)} message{'s' if len(data) != 1 else ''} successfully loaded from {fn}")
             return found
 
     def load_message(self, m_id):

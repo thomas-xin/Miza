@@ -470,6 +470,9 @@ class UpdateExec(Database):
                 try:
                     data = await fut.fut
                     files[i] = CompatFile(data, filename=fut.filename)
+                except ConnectionError:
+                    files[i] = None
+                    failed[i] = True
                 except:
                     files[i] = None
                     failed[i] = True
