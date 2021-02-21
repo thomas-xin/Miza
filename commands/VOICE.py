@@ -512,7 +512,7 @@ class CustomAudio(collections.abc.Hashable):
         return pos
 
     # Sends a deletable message to the audio player's text channel.
-    def announce(self, *args, aio=False, **kwargs):
+    def announce(self, *args, aio=False, dump=False, **kwargs):
         if self.queue:
             resp, fn = self.get_dump(js=True)
             f = CompatFile(io.BytesIO(resp), filename=fn)
@@ -531,7 +531,7 @@ class CustomAudio(collections.abc.Hashable):
             if reason is None:
                 reason = css_md(f"🎵 Successfully disconnected from {sqr_md(self.guild)}. 🎵")
             if reason:
-                self.announce(reason)
+                self.announce(reason, dump=True)
 
     # Update event, ensures audio is playing correctly and moves, leaves, or rejoins voice when necessary.
     def update(self, *void1, **void2):

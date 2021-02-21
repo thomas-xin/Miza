@@ -620,6 +620,7 @@ class UpdateWebhooks(Database):
     name = "webhooks"
     channel = True
     CID = collections.namedtuple("id", ["id"])
+    temp = {}
 
     def from_dict(self, d, c_id):
         d = copy.copy(d)
@@ -670,8 +671,12 @@ class UpdateWebhooks(Database):
         guild = getattr(channel, "guild", None)
         if not guild:
             raise TypeError("DM channels cannot have webhooks.")
-        if channel.id in self.data and not force:
-            return alist(self.from_dict(w, channel.id) for w in self.data[channel.id].values())
+        if not force:
+            with suppress(KeyError):
+                return self.temp[channel.id]
+            if channel.id in self.data:
+                self.temp[channel.id] = temp = alist(self.from_dict(w, channel.id) for w in self.data[channel.id].values())
+                return temp
         async with self.bot.guild_semaphore if not bypass else emptyctx:
             self.data.pop(channel.id, None)
             if not channel.permissions_for(channel.guild.me).manage_webhooks:
@@ -682,7 +687,8 @@ class UpdateWebhooks(Database):
                     webhooks = await guild.webhooks()
             if webhooks is None:
                 webhooks = await aretry(channel.webhooks, attempts=5, delay=15, exc=(discord.Forbidden, discord.NotFound))
-        return alist(w for w in [self.add(w) for w in webhooks] if w.channel.id == channel.id)
+        self.temp[channel.id] = temp = alist(w for w in [self.add(w) for w in webhooks] if w.channel.id == channel.id)
+        return temp
 
 
 class UpdateChannelCache(Database):

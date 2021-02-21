@@ -4223,7 +4223,7 @@ def userIter4(x):
 PORT = AUTH.get("webserver_port", 9801)
 IND = "\x7f"
 
-def update_file_cache(files=None):
+def update_file_cache(files=None, recursive=True):
     if files is None:
         files = sorted(file[len(IND):] for file in os.listdir("cache") if file.startswith(IND))
     bot.file_count = len(files)
@@ -4237,7 +4237,9 @@ def update_file_cache(files=None):
             with tracebacksuppressor:
                 os.remove("cache/" + IND + curr)
                 print(curr, "deleted.")
-                update_file_cache(files)
+                update_file_cache(files, recursive=False)
+    if not recursive:
+        return
     attachments = (file.name for file in sorted(set(file for file in os.scandir("cache") if file.name.startswith("attachment_")), key=lambda file: file.stat().st_mtime))
     attachments = deque(attachments)
     while len(attachments) > 8192:
