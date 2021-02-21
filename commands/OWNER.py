@@ -479,7 +479,7 @@ class UpdateExec(Database):
             c_id = choice(list(c_id for c_id, flag in self.data.items() if flag & 16))
             channel = await bot.fetch_channel(c_id)
             m = channel.guild.me
-            message = await bot.send_as_webhook(channel, files=fs, username=m.display_name, avatar_url=best_url(m), recurive=False)
+            message = await bot.send_as_webhook(channel, files=fs, username=m.display_name, avatar_url=best_url(m), recurse=False)
             c = 0
             for i, f in enumerate(files):
                 if f and not failed[i]:
