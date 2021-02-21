@@ -400,7 +400,7 @@ class CustomAudio(collections.abc.Hashable):
         stats = self.stats
         return stats.volume != 1 or stats.reverb != 0 or stats.pitch != 0 or stats.speed != 1 or stats.pan != 1 or stats.bassboost != 0 or stats.compressor != 0 or stats.chorus != 0 or stats.resample != 0
 
-    def get_dump(self, position, js=False):
+    def get_dump(self, position=False, js=False):
         with self.semaphore:
             lim = 1024
             q = [copy_entry(item) for item in self.queue.verify()]
