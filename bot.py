@@ -1965,7 +1965,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         if regexp("^([0-9]{1,3}\\.){3}[0-9]{1,3}$").search(ip):
             self.ip = ip
             new_ip = f"http://{self.ip}:9801"
-            if self.raw_webserver and self.raw_webserver != new_ip:
+            if self.raw_webserver != self.webserver and self.raw_webserver != new_ip:
                 create_task(self.create_main_website())
             self.raw_webserver = new_ip
 
