@@ -1910,7 +1910,7 @@ class UpdateUsers(Database):
                 if issubclass(v, Command) and v != Command:
                     obj = v(self.bot, mod)
                     self.bot.categories[mod].append(obj)
-                    print(f"Successfully loaded command {repr(obj)}.")
+                    # print(f"Successfully loaded command {repr(obj)}.")
         return await self()
 
     def clear_events(self, data, minimum):

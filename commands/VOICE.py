@@ -1336,7 +1336,7 @@ class AudioDownloader:
             if resp:
                 excs.append(resp)
             excs.append(ex)
-            print(excs)
+            print("\n\n".join(as_str(e) for e in excs))
             raise
 
     # Returns part of a spotify playlist.
@@ -1475,7 +1475,7 @@ class AudioDownloader:
             if "entries" in resp:
                 resp = next(iter(resp["entries"]))
             if "duration" in resp and "formats" in resp:
-                return cdict(
+                out = cdict(
                     name=resp["title"],
                     url=resp["webpage_url"],
                     duration=resp["duration"],
@@ -1483,6 +1483,12 @@ class AudioDownloader:
                     icon=get_best_icon(resp),
                     video=get_best_video(resp),
                 )
+                stream = out.stream
+                if "googlevideo" in stream[:64]:
+                    durstr = regexp("[&?]dur=([0-9\\.]+)").findall(stream)
+                    if durstr:
+                        out.duration = round_min(durstr[0])
+                return out
             try:
                 url = resp["webpage_url"]
             except KeyError:
@@ -1544,6 +1550,11 @@ class AudioDownloader:
                 icon=get_best_icon(entry),
                 video=get_best_video(entry),
             )
+            stream = temp.stream
+            if "googlevideo" in stream[:64]:
+                durstr = regexp("[&?]dur=([0-9\\.]+)").findall(stream)
+                if durstr:
+                    temp.duration = round_min(durstr[0])
             if not temp.duration:
                 temp.research = True
             out.append(temp)
@@ -1751,11 +1762,16 @@ class AudioDownloader:
                                 temp = cdict({
                                     "name": data["title"],
                                     "url": data["webpage_url"],
-                                    "duration": float(data["duration"]),
+                                    "duration": round_min(data["duration"]),
                                     "stream": get_best_audio(resp),
                                     "icon": get_best_icon(resp),
                                     "video": get_best_video(resp),
                                 })
+                            stream = temp.stream
+                            if "googlevideo" in stream[:64]:
+                                durstr = regexp("[&?]dur=([0-9\\.]+)").findall(stream)
+                                if durstr:
+                                    temp.duration = round_min(durstr[0])
                             output.append(temp)
                     else:
                         for i, entry in enumerate(entries):
@@ -1805,6 +1821,11 @@ class AudioDownloader:
                         "icon": get_best_icon(resp),
                         "video": get_best_video(resp),
                     })
+                    stream = temp.stream
+                    if "googlevideo" in stream[:64]:
+                        durstr = regexp("[&?]dur=([0-9\\.]+)").findall(stream)
+                        if durstr:
+                            temp.duration = round_min(durstr[0])
                     output.append(temp)
             return output
         except:
@@ -1905,7 +1926,7 @@ class AudioDownloader:
 
                 out = sorted(high, key=key, reverse=True)
                 out.extend(sorted(low, key=key, reverse=True))
-            if not out:
+            if not out and len(query) < 16:
                 self.failed_yt = utc() + 180
                 print(query)
         if not out:
@@ -2043,6 +2064,10 @@ class AudioDownloader:
                     raise FileNotFoundError("Unable to locate appropriate file stream.")
             entry["stream"] = stream
             entry["icon"] = icon
+            if "googlevideo" in stream[:64]:
+                durstr = regexp("[&?]dur=([0-9\\.]+)").findall(stream)
+                if durstr:
+                    entry["duration"] = round_min(durstr[0])
             if not entry.get("duration"):
                 entry["duration"] = get_duration(stream)
             print(entry.url, entry.duration)
@@ -4414,10 +4439,12 @@ class UpdateAudio(Database):
         while bot.audio is None:
             await asyncio.sleep(0.5)
         await wrap_future(bot.audio.fut)
+        count = 0
         for file in os.listdir("cache"):
             if file.startswith("~") and file not in ytdl.cache:
-                print("reinstating audio file", file)
                 ytdl.cache[file] = f = await create_future(AudioFileLink, file, "cache/" + file, wasfile=True)
+                count += 1
+        print(f"Successfully reinstated {count} audio file{'s' if count != 1 else ''}")
         for k, v in self.data.items():
             with tracebacksuppressor:
                 vc = await bot.fetch_channel(k)

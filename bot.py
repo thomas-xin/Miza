@@ -233,7 +233,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             if resp.status_code not in range(200, 400):
                 raise ConnectionError(f"Error {resp.status_code}", resp.text)
             commands = alist(c for c in resp.json() if c.get("application_id") == discord_id)
-            print(commands)
+            print(f"Successfully loaded {len(commands)} slash command{'s' if len(commands) != 1 else ''}.")
         sem = Semaphore(5, inf, 5)
         for catg in self.categories.values():
             for command in catg:
@@ -2064,16 +2064,20 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         obj = var(self, module)
                         if load_type == 1:
                             commands.append(obj)
-                            print(f"Successfully loaded command {obj}.")
+                            # print(f"Successfully loaded command {obj}.")
                         elif load_type == 2:
                             dataitems.append(obj)
-                            print(f"Successfully loaded database {obj}.")
+                            # print(f"Successfully loaded database {obj}.")
             for u in dataitems:
                 for c in commands:
                     c.data[u.name] = u
             self.categories[module] = commands
             self.dbitems[module] = dataitems
             self.size[module] = line_count("commands/" + path)
+            if commands:
+                print(f"{module}: Successfully loaded {len(commands)} command{'s' if len(commands) != 1 else ''}.")
+            if dataitems:
+                print(f"{module}: Successfully loaded {len(dataitems)} database{'s' if len(dataitems) != 1 else ''}.")
             if not new:
                 while not self.ready:
                     time.sleep(0.5)
@@ -2824,7 +2828,15 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         return w
 
     # Sends a message to the target channel, using a random webhook from that channel.
-    async def send_as_webhook(self, channel, *args, **kwargs):
+    async def send_as_webhook(self, channel, *args, recurse=True, **kwargs):
+        if recurse and "exec" in self.data:
+            try:
+                avatar_url = kwargs.pop("avatar_url")
+            except KeyError:
+                pass
+            else:
+                with tracebacksuppressor:
+                    kwargs["avatar_url"] = await self.data.exec.uproxy(avatar_url)
         if hasattr(channel, "simulated") or hasattr(channel, "recipient"):
             message = await channel.send(*args, **kwargs)
             reacts = kwargs.pop("reacts", None)
@@ -3627,10 +3639,13 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             while self.modload:
                 fut = self.modload.popleft()
                 with tracebacksuppressor:
-                    print(fut)
+                    # print(fut)
                     mod = await fut
-            print("Command aliases:")
-            print(self.commands.keys())
+            print(f"Mapped command count: {len(self.commands)}")
+            commands = set()
+            for command in self.commands.values():
+                commands.update(command)
+            print(f"Command count: {len(commands)}")
             # Assign all bot database events to their corresponding keys.
             for u in self.data.values():
                 for f in dir(u):
@@ -3638,8 +3653,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         func = getattr(u, f, None)
                         if callable(func):
                             self.events.append(f, func)
-            print("Database events:")
-            print(self.events.keys())
+            print(f"Database event count: {sum(len(v) for v in self.events.values())}")
             for fut in futs:
                 await fut
             await self.fetch_user(self.deleted_user)
@@ -3701,12 +3715,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             with tracebacksuppressor:
                 futs = set()
                 futs.add(create_task(self.get_state()))
-                print("Servers:")
                 for guild in self.guilds:
                     if guild.unavailable:
-                        print(f"> Guild {guild.id} is not available.")
-                    else:
-                        print("> " + guild.name)
+                        print(f"Warning: Guild {guild.id} is not available.")
                 await self.handle_update()
                 futs.add(create_future(self.update_usernames, priority=True))
                 futs.add(create_task(aretry(self.get_ip, delay=20)))

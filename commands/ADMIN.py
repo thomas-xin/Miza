@@ -2073,9 +2073,9 @@ class UpdateMessageLogs(Database):
                 self.bot.add_message(message, files=False, force=True)
 
     async def load_new_messages(self, t):
+        print(f"Probing new messages from {len(self.bot.guilds)} guild{'s' if len(self.bot.guilds) != 1 else ''}...")
         with tracebacksuppressor:
             for guild in self.bot.guilds:
-                print("Probing", guild)
                 futs = deque()
                 for channel in guild.text_channels:
                     if channel.permissions_for(guild.me).read_message_history:
