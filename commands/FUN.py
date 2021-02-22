@@ -6,6 +6,7 @@ except ModuleNotFoundError:
     os.chdir("..")
     from common import *
 
+import nekos
 print = PRINT
 
 

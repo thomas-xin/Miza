@@ -7,9 +7,8 @@ if not os.path.exists("auth.json") or not os.path.getsize("auth.json"):
     with open("auth.json", "w", encoding="utf-8") as f:
         d = {
             "prefix": "~",
-            "python_path": "",
-            "slash_commands": True,
-            "webserver_port": 9801,
+            "slash_commands": False,
+            "webserver_port": "",
             "discord_id": "",
             "discord_token": "",
             "owner_id": [],
