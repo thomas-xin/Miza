@@ -467,7 +467,7 @@ class UpdateExec(Database):
                 except KeyError:
                     try:
                         await asyncio.wait_for(wrap_future(self.temp[url]), timeout=12)
-                    except (KeyError, T2):
+                    except (KeyError, T1):
                         if url not in self.temp:
                             self.temp[url] = concurrent.futures.Future()
                         fn = url.rsplit("/", 1)[-1].split("?", 1)[0]
