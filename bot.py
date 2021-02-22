@@ -1455,6 +1455,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             url = to_png(g.icon_url)
         else:
             url = best_url(user)
+        if "proxies" in self.data:
+            with tracebacksuppressor:
+                url = await self.data.exec.uproxy(url)
         return url
 
     # Limits a cache to a certain amount, discarding oldest entries first.

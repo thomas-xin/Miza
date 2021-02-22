@@ -1719,9 +1719,6 @@ class UpdateUserLogs(Database):
                 self.data.pop(guild.id)
                 return
             emb = discord.Embed()
-            b_url = await self.bot.get_proxy_url(before)
-            a_url = await self.bot.get_proxy_url(after)
-            emb.set_author(name=str(after), icon_url=a_url, url=a_url)
             emb.description = (
                 "<@" + str(after.id)
                 + "> has been updated:"
@@ -1765,7 +1762,9 @@ class UpdateUserLogs(Database):
                         emb.add_field(name="Roles", value=rchange)
                         change = True
                         colour[1] += 255
-            if b_url != a_url:
+            if before.avatar != after.avatar:
+                b_url = best_url(before)
+                a_url = best_url(after)
                 if "exec" in self.bot.data:
                     with tracebacksuppressor:
                         urls = await self.bot.data.exec.uproxy(b_url, a_url)
@@ -1783,6 +1782,9 @@ class UpdateUserLogs(Database):
                 change = True
                 colour[2] += 255
             if change:
+                b_url = await self.bot.get_proxy_url(before)
+                a_url = await self.bot.get_proxy_url(after)
+                emb.set_author(name=str(after), icon_url=a_url, url=a_url)
                 emb.colour = colour2raw(colour)
                 self.bot.send_embeds(channel, emb)
 

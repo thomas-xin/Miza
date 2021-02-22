@@ -222,7 +222,7 @@ class UpdateExec(Database):
         "⸥": "'",
     }
     qtrans = "".maketrans(qmap)
-    temp = set()
+    temp = {}
 
     # Custom print function to send a message instead
     _print = lambda self, *args, sep=" ", end="\n", prefix="", channel=None, **void: self.bot.send_as_embeds(channel, "```\n" + str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix) + "```")
@@ -465,16 +465,21 @@ class UpdateExec(Database):
                 try:
                     out[i] = self.bot.data.proxies[shash(url)]
                 except KeyError:
-                    self.temp.add(url)
-                    fn = url.rsplit("/", 1)[-1].split("?", 1)[0]
-                    files[i] = cdict(fut=create_task(Request(url, aio=True)), filename="SPOILER_" + fn, url=url)
+                    try:
+                        await asyncio.wait_for(wrap_future(self.temp[url]), timeout=12)
+                    except (KeyError, T2):
+                        if url not in self.temp:
+                            self.temp[url] = concurrent.futures.Future()
+                        fn = url.rsplit("/", 1)[-1].split("?", 1)[0]
+                        files[i] = cdict(fut=create_task(Request(url, aio=True)), filename="SPOILER_" + fn, url=url)
+                    else:
+                        out[i] = self.bot.data.proxies[shash(url)]
         bot = self.bot
         failed = [None] * len(urls)
         for i, fut in enumerate(files):
             if fut:
                 try:
                     data = await fut.fut
-                    self.temp.discard(fut.url)
                     files[i] = CompatFile(data, filename=fut.filename)
                 except ConnectionError:
                     files[i] = None
@@ -496,14 +501,15 @@ class UpdateExec(Database):
                         self.bot.data.proxies[shash(urls[i])] = out[i] = message.attachments[c].proxy_url
                     except IndexError:
                         break
+                    with suppress(KeyError):
+                        self.temp.pop(urls[i]).set_result(None)
                     c += 1
         return out if len(out) > 1 else out[0]
     
     def cproxy(self, url):
         if url in self.temp:
             return
-        self.temp.add(url)
-        create_task(self.uproxy(url))
+        self.temp[url] = create_task(self.uproxy(url))
 
     def _bot_ready_(self, **void):
         with suppress(AttributeError):
