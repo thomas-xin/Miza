@@ -1455,8 +1455,6 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             url = to_png(g.icon_url)
         else:
             url = best_url(user)
-        if "exec" in self.bot.data:
-            url = await self.bot.data.exec.uproxy(url)
         return url
 
     # Limits a cache to a certain amount, discarding oldest entries first.
