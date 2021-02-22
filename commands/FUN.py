@@ -1168,7 +1168,8 @@ class Wallet(Command):
             xp = floor(xp)
             bal = await bot.as_rewards(diamonds, gold)
             description = f"{bar}\n`Lv {level}`\n`XP {xp}/{xp_next}`\n{bal}"
-            bot.send_as_embeds(channel, description, thumbnail=best_url(user), author=get_author(user))
+            url = await self.bot.get_proxy_url(user)
+            bot.send_as_embeds(channel, description, thumbnail=url, author=get_author(user))
 
     join_cache = {}
 
@@ -1439,7 +1440,7 @@ class Mimic(Command):
                         raise EOFError
                     dop = user.id
                     name = user.name
-                    url = best_url(user)
+                    url = await bot.get_proxy_url(user)
                 except:
                     try:
                         mimi = bot.get_mimic(mim, user)
@@ -1456,7 +1457,7 @@ class Mimic(Command):
                         url = "https://cdn.discordapp.com/embed/avatars/0.png"
         else:
             name = user.name
-            url = best_url(user)
+            url = await bot.get_proxy_url(user)
         # This limit is actually to comply with webhook usernames
         if len(name) > 80:
             raise OverflowError("Name must be 80 or fewer in length.")
@@ -1695,7 +1696,7 @@ class UpdateMimics(Database):
                 if user is None:
                     raise LookupError
                 mimic.name = user.display_name
-                mimic.url = best_url(user)
+                mimic.url = await bot.get_proxy_url(user)
             except (discord.NotFound, LookupError):
                 try:
                     mimi = bot.get_mimic(mim)

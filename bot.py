@@ -1450,6 +1450,15 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         url = worst_url(user)
         return self.data.colours.get(url)
 
+    async def get_proxy_url(self, user):
+        if type(user) is discord.Guild:
+            url = to_png(g.icon_url)
+        else:
+            url = best_url(user)
+        if "exec" in self.bot.data:
+            url = await self.bot.data.exec.uproxy(url)
+        return url
+
     # Limits a cache to a certain amount, discarding oldest entries first.
     def limit_cache(self, cache=None, limit=None):
         if limit is None:
@@ -2673,7 +2682,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                                     futs = deque()
                                     for r in response:
                                         async with delay(1 / 3):
-                                            futs.append(create_task(self.send_as_webhook(channel, r, username=m.display_name, avatar_url=best_url(m))))
+                                            url = await self.get_proxy_url(m)
+                                            futs.append(create_task(self.send_as_webhook(channel, r, username=m.display_name, avatar_url=url)))
                                     for fut in futs:
                                         await fut
                                 # Process dict as kwargs for a message send
@@ -2909,12 +2919,14 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 if type(emb) is not discord.Embed:
                     emb = discord.Embed.from_dict(emb)
                 if len(embs) > 9 or len(emb) + sum(len(e) for e in embs) > 6000:
-                    await self.send_as_webhook(sendable, embeds=embs, username=m.display_name, avatar_url=best_url(m), reacts=reacts)
+                    url = await self.get_proxy_url(m)
+                    await self.send_as_webhook(sendable, embeds=embs, username=m.display_name, avatar_url=url, reacts=reacts)
                     embs.clear()
                 embs.append(emb)
                 reacts = None
             if embs:
-                await self.send_as_webhook(sendable, embeds=embs, username=m.display_name, avatar_url=best_url(m), reacts=reacts)
+                url = await self.get_proxy_url(m)
+                await self.send_as_webhook(sendable, embeds=embs, username=m.display_name, avatar_url=url, reacts=reacts)
 
     # Adds embeds to the embed sender, waiting for the next update event.
     def send_embeds(self, channel, embeds=None, embed=None, reacts=None, reference=None):

@@ -435,7 +435,7 @@ class Avatar(Command):
                     else:
                         u = user
                     name = str(u)
-                    url = best_url(u)
+                    url = await self.bot.get_proxy_url(u)
                     colour = await self.bot.get_colour(u)
                     emb = discord.Embed(colour=colour)
                     emb.set_thumbnail(url=url)
@@ -457,7 +457,7 @@ class Info(Command):
 
     async def getGuildData(self, g, flags={}):
         bot = self.bot
-        url = to_png(g.icon_url)
+        url = await bot.get_proxy_url(g)
         name = g.name
         try:
             u = g.owner
@@ -590,7 +590,7 @@ class Info(Command):
                     u = await bot.fetch_user_member(u.id, guild)
                     member = guild.get_member(u.id)
                     name = str(u)
-                    url = best_url(u)
+                    url = await bot.get_proxy_url(u)
                     st = deque()
                     if u.id == bot.id:
                         st.append("Myself 🙃")
@@ -721,8 +721,8 @@ class Info(Command):
                                 zone = f"GMT+{tz}"
                             else:
                                 zone = f"GMT{tz}"
-                    if is_self and bot.github is not None:
-                        url2 = bot.github
+                    if is_self and bot.webserver:
+                        url2 = bot.webserver
                     else:
                         url2 = url
                     colour = await self.bot.get_colour(u)
@@ -893,7 +893,8 @@ class Status(Command):
         if not hasattr(bot, "bitrate"):
             return
         emb = discord.Embed(colour=rand_colour())
-        emb.set_author(name="Status", url=bot.webserver, icon_url=best_url(bot.user))
+        url = await self.bot.get_proxy_url(self.bot.user)
+        emb.set_author(name="Status", url=bot.webserver, icon_url=url)
         emb.timestamp = utc_dt()
         if msg is None:
             active = bot.get_active()
@@ -1220,7 +1221,7 @@ class Reminder(Command):
         elif len(msg) > 2048:
             raise OverflowError(f"Input message too long ({len(msg)} > 2048).")
         username = str(remind_as)
-        url = best_url(remind_as)
+        url = await bot.get_proxy_url(remind_as)
         ts = utc()
         if keyed:
             # Schedule for an event from a user
@@ -1253,6 +1254,7 @@ class Reminder(Command):
         bot.data.reminders.listed.insort((bot.data.reminders[sendable.id][0]["t"], sendable.id), key=lambda x: x[0])
         update(sendable.id)
         emb = discord.Embed(description=msg)
+        emb.colour = await bot.get_colour(remind_as)
         emb.set_author(name=username, url=url, icon_url=url)
         out = "```css\nSuccessfully set "
         if urgent:

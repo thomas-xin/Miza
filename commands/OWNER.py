@@ -53,7 +53,8 @@ class Restart(Command):
             wait = await bot.eval_time(argv)
             await send_with_reply(channel, content="*Preparing to " + name + " in " + sec2time(wait) + "...*", reference=message)
             emb = discord.Embed(colour=discord.Colour(1))
-            emb.set_author(name=str(bot.user), url=bot.github, icon_url=best_url(bot.user))
+            url = await bot.get_proxy_url(bot.user)
+            emb.set_author(name=str(bot.user), url=bot.github, icon_url=url)
             emb.description = f"I will be {'shutting down' if name == 'shutdown' else 'restarting'} in {sec2time(wait)}, apologies for any inconvenience..."
             await bot.send_event("_announce_", embed=emb)
             save = create_task(bot.send_event("_save_", force=True))
@@ -204,7 +205,6 @@ class UpdateExec(Database):
     no_delete = True
     virtuals = cdict()
     listeners = cdict()
-
     qmap = {
         "“": '"',
         "”": '"',
@@ -222,6 +222,7 @@ class UpdateExec(Database):
         "⸥": "'",
     }
     qtrans = "".maketrans(qmap)
+    temp = set()
 
     # Custom print function to send a message instead
     _print = lambda self, *args, sep=" ", end="\n", prefix="", channel=None, **void: self.bot.send_as_embeds(channel, "```\n" + str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix) + "```")
@@ -303,7 +304,8 @@ class UpdateExec(Database):
         if not hasattr(channel, "guild") or channel.guild is None:
             colour = await bot.get_colour(user)
             emb = discord.Embed(colour=colour)
-            emb.set_author(name=f"{user} ({user.id})", icon_url=best_url(user))
+            url = await bot.get_proxy_url(user)
+            emb.set_author(name=f"{user} ({user.id})", icon_url=url)
             emb.description = italics(ini_md("typing..."))
             for c_id, flag in self.data.items():
                 if flag & 2:
@@ -377,7 +379,8 @@ class UpdateExec(Database):
             emb = as_embed(message)
             col = await bot.get_colour(user)
             emb.colour = discord.Colour(col)
-            emb.set_author(name=f"{user} ({user.id})", icon_url=best_url(user))
+            url = await bot.get_proxy_url(user)
+            emb.set_author(name=f"{user} ({user.id})", icon_url=url)
             for c_id, flag in self.data.items():
                 if flag & 2:
                     channel = self.bot.cache.channels.get(c_id)
@@ -403,7 +406,8 @@ class UpdateExec(Database):
         c_id = choice(list(c_id for c_id, flag in self.data.items() if flag & 16))
         channel = await bot.fetch_channel(c_id)
         m = channel.guild.me
-        message = await bot.send_as_webhook(channel, url, username=m.display_name, avatar_url=best_url(m))
+        url = await bot.get_proxy_url(m)
+        message = await bot.send_as_webhook(channel, url, username=m.display_name, avatar_url=url)
         if not message.embeds:
             fut = create_task(asyncio.wait_for(bot.wait_for("raw_message_edit", check=lambda m: [m_id == message.id and getattr(self.bot.cache.messages.get(m_id), "embeds", None) for m_id in (getattr(m, "id", None) or getattr(m, "message_id", None),)][0]), timeout=12))
             for i in range(120):
@@ -461,14 +465,16 @@ class UpdateExec(Database):
                 try:
                     out[i] = self.bot.data.proxies[shash(url)]
                 except KeyError:
+                    self.temp.add(url)
                     fn = url.rsplit("/", 1)[-1].split("?", 1)[0]
-                    files[i] = cdict(fut=create_task(Request(url, aio=True)), filename="SPOILER_" + fn)
+                    files[i] = cdict(fut=create_task(Request(url, aio=True)), filename="SPOILER_" + fn, url=url)
         bot = self.bot
         failed = [None] * len(urls)
         for i, fut in enumerate(files):
             if fut:
                 try:
                     data = await fut.fut
+                    self.temp.discard(fut.url)
                     files[i] = CompatFile(data, filename=fut.filename)
                 except ConnectionError:
                     files[i] = None
@@ -492,6 +498,12 @@ class UpdateExec(Database):
                         break
                     c += 1
         return out if len(out) > 1 else out[0]
+    
+    def cproxy(self, url):
+        if url in self.temp:
+            return
+        self.temp.add(url)
+        create_task(self.uproxy(url))
 
     def _bot_ready_(self, **void):
         with suppress(AttributeError):

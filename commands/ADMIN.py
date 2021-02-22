@@ -1360,7 +1360,8 @@ class UpdateAutoEmojis(Database):
         print(message.content)
         print(msg)
         create_task(self.bot.silent_delete(message))
-        await self.bot.send_as_webhook(message.channel, msg, username=message.author.display_name, avatar_url=best_url(message.author))
+        url = await self.bot.get_proxy_url(message.author)
+        await self.bot.send_as_webhook(message.channel, msg, username=message.author.display_name, avatar_url=url)
 
 
 # TODO: Stop being lazy and finish this damn command
@@ -1718,8 +1719,8 @@ class UpdateUserLogs(Database):
                 self.data.pop(guild.id)
                 return
             emb = discord.Embed()
-            b_url = best_url(before)
-            a_url = best_url(after)
+            b_url = await self.bot.get_proxy_url(before)
+            a_url = await self.bot.get_proxy_url(after)
             emb.set_author(name=str(after), icon_url=a_url, url=a_url)
             emb.description = (
                 "<@" + str(after.id)
@@ -2140,7 +2141,7 @@ class UpdateMessageLogs(Database):
             now = utc_dt()
             u = message.author
             name_id = str(u)
-            url = best_url(u)
+            url = await self.bot.get_proxy_url(u)
             action = discord.AuditLogAction.message_delete
             try:
                 t = u

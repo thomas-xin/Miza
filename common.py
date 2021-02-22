@@ -883,9 +883,20 @@ best_url = lambda obj: obj if type(obj) is str else (to_png(obj.avatar_url) if g
 # Finds the worst URL for a discord object's icon.
 worst_url = lambda obj: obj if type(obj) is str else (to_png_ex(obj.avatar_url) if getattr(obj, "avatar_url", None) else obj.url)
 
-
-get_author = lambda user, u_id=None: cdict(name=f"{user}" + "" if not u_id else f" ({user.id})", icon_url=best_url(user), url=best_url(user))
-
+def get_author(user, u_id=None):
+    url = best_url(user)
+    bot = BOT[0]
+    if bot and "proxies" in bot.data:
+        url2 = bot.data.proxies.get(shash(url))
+        if url2:
+            url = url2
+        else:
+            bot.data.exec.cproxy(url)
+    if u_id:
+        name = f"{user} ({user.id})"
+    else:
+        name = str(user)
+    return cdict(name=name, icon_url=url, url=url)
 
 # Finds emojis and user mentions in a string.
 find_emojis = lambda s: regexp("<a?:[A-Za-z0-9\\-~_]+:[0-9]+>").findall(s)
