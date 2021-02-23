@@ -318,6 +318,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 <a href="/upload" data-popup="File Host"><img
                     src="{self.raw_webserver}/static/sky-rainbow.gif"
                 /></a>
+                <a href="/apidoc" data-popup="API Documentation"><img
+                    src="{self.raw_webserver}/static/hug.gif"
+                /></a>
                 <a 
                     href="/time"
                     data-popup="Clock"
@@ -414,12 +417,6 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                             c[attr] = command.attr
             with open("misc/help.json", "w", encoding="utf-8") as f:
                 f.write(json.dumps(j, indent=4))
-            fn = "misc/mizatlas/static/js/main.312a0124.chunk.js"
-            with open(fn + ".txt", "r", encoding="utf-8") as f:
-                s = f.read()
-            s = s.replace("⟨MIZA⟩", self.raw_webserver)
-            with open(fn, "w", encoding="utf-8") as f:
-                f.write(s)
         self.start_webserver()
 
     def start_webserver(self):

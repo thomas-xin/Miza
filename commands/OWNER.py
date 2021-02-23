@@ -466,7 +466,7 @@ class UpdateExec(Database):
                     out[i] = self.bot.data.proxies[shash(url)]
                 except KeyError:
                     try:
-                        await asyncio.wait_for(wrap_future(self.temp[url]), timeout=12)
+                        await asyncio.wait_for(wrap_future(self.temp[url], shield=True), timeout=12)
                     except (KeyError, T1):
                         if url not in self.temp:
                             self.temp[url] = concurrent.futures.Future()

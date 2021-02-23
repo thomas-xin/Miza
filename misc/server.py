@@ -211,8 +211,20 @@ def mizatlas(filename=None):
     if filename:
         with suppress(FileNotFoundError):
             data, mime = fetch_static(f"mizatlas/{filename}")
+            if filename == "static/js/main.312a0124.chunk.js":
+                data = data.replace("⟨MIZA⟩".encode("utf-8"), flask.request.host_url.rstrip("/").encode("utf-8"))
     if not data:
         data, mime = fetch_static("mizatlas/index.html")
+    resp = flask.Response(data, mimetype=mime)
+    resp.headers.update(CHEADERS)
+    resp.headers["ETag"] = create_etag(data)
+    return resp
+
+
+@app.route("/apidoc", methods=["GET"])
+def apidoc():
+    data, mime = fetch_static(f"apidoc.html")
+    data = data.replace("⟨MIZA⟩".encode("utf-8"), flask.request.host.encode("utf-8"))
     resp = flask.Response(data, mimetype=mime)
     resp.headers.update(CHEADERS)
     resp.headers["ETag"] = create_etag(data)
@@ -543,6 +555,9 @@ def upload():
                 <a href="/upload" data-popup="File Host"><img
                     src="{flask.request.host_url}static/sky-rainbow.gif"
                 /></a>
+                <a href="/apidoc" data-popup="API Documentation"><img
+                    src="{flask.request.host_url}static/hug.gif"
+                /></a>
                 <a 
                     href="/time"
                     data-popup="Clock"
@@ -625,6 +640,9 @@ def timezone():
                 /></a>
                 <a href="/upload" data-popup="File Host"><img
                     src="{flask.request.host_url}static/sky-rainbow.gif"
+                /></a>
+                <a href="/apidoc" data-popup="API Documentation"><img
+                    src="{flask.request.host_url}static/hug.gif"
                 /></a>
                 <a 
                     href="/time"

@@ -961,7 +961,7 @@ EmptyEmbed = discord.embeds._EmptyEmbed
 def as_embed(message):
     emb = discord.Embed(description=message.content).set_author(**get_author(message.author))
     if len(message.embeds) > 1 or message.content:
-        urls = itertools.chain((e.url for e in message.embeds if e.url), (best_url(a) for a in message.attachments))
+        urls = itertools.chain(("(" + e.url + ")" for e in message.embeds if e.url), ("[" + best_url(a) + "]" for a in message.attachments))
         items = list(urls)
     else:
         items = None
@@ -1006,6 +1006,9 @@ def as_embed(message):
             while len(emb) > 6000:
                 emb.remove_field(-1)
             break
+    if not emb.description:
+        urls = itertools.chain(("(" + e.url + ")" for e in message.embeds if e.url), ("[" + best_url(a) + "]" for a in message.attachments))
+        emb.description = lim_str("\n".join(urls), 2048)
     return emb
 
 exc_repr = lambda ex: lim_str(py_md(f"Error: {repr(ex).replace('`', '')}"), 2000)
@@ -1493,21 +1496,26 @@ def get_event_loop():
         return eloop
 
 # Creates an asyncio Future that waits on a multithreaded one.
-def wrap_future(fut, loop=None):
+def wrap_future(fut, loop=None, shield=False):
     if loop is None:
         loop = get_event_loop()
-    wrapper = loop.create_future()
+    try:
+        wrapper = asyncio.wrap_future(fut, loop=loop)
+    except (AttributeError, TypeError):
+        wrapper = loop.create_future()
 
-    def on_done(*void):
-        try:
-            res = fut.result()
-        except Exception as ex:
-            loop.call_soon_threadsafe(wrapper.set_exception, ex)
-        else:
-            loop.call_soon_threadsafe(wrapper.set_result, res)
+        def on_done(*void):
+            try:
+                res = fut.result()
+            except Exception as ex:
+                loop.call_soon_threadsafe(wrapper.set_exception, ex)
+            else:
+                loop.call_soon_threadsafe(wrapper.set_result, res)
 
-    fut.add_done_callback(on_done)
-    return asyncio.shield(wrapper)
+        fut.add_done_callback(on_done)
+    if shield:
+        wrapper = asyncio.shield(wrapper)
+    return wrapper
 
 def shutdown_thread_after(thread, fut):
     fut.result()
