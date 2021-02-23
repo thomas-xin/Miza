@@ -17,6 +17,13 @@ try:
 except:
     alexflipnote_key = None
     print("WARNING: alexflipnote_key not found. Unable to use API to generate images.")
+try:
+    giphy_key = AUTH["giphy_key"]
+    if not giphy_key:
+        raise
+except:
+    giphy_key = None
+    print("WARNING: giphy_key not found. Unable to use API to search images.")
 
 
 class GameOverError(OverflowError):
@@ -1855,3 +1862,33 @@ class Inspiro(ImagePool, Command):
 
     def fetch_one(self):
         return Request("https://inspirobot.me/api?generate=true", decode=True, aio=True)
+
+
+class Giphy(ImagePool, Command):
+    name = ["GIFSearch"]
+    description = "Pulls a random image from a search on giphy.com using tags."
+    threshold = 4
+
+    def img(self, tag=None):
+
+        async def fetch(tag):
+            images = set()
+            for i in range(100):
+                resp = await Request(f"https://api.giphy.com/v1/gifs/search?offset={i * 25}&type=gifs&sort=&explore=true&api_key={giphy_key}&q={tag}", aio=True, json=True)
+                data = resp["data"]
+                if not data:
+                    break
+                for entry in data:
+                    url = entry["images"]["source"]["url"].split("?", 1)[0]
+                    images.add(url)
+                if len(data) < 25:
+                    break
+            return images
+
+        file = f"giphy~{tag}"
+        return self.bot.data.imagepools.get(file, fetch, self.threshold, args=(tag,))
+    
+    async def __call__(self, args, channel, **void):
+        tag = "%20".join(sorted(args))
+        url = await self.img(tag)
+        self.bot.send_as_embeds(channel, image=url)
