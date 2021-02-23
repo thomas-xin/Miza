@@ -670,10 +670,11 @@ def execute(token, content):
     RESPONSES.pop(t, None)
     return j
 
-
+@app.route("/command", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
+@app.route("/commands", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
 @app.route("/command/<path:content>", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
 @app.route("/commands/<path:content>", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
-def command(content):
+def command(content=""):
     ip = flask.request.remote_addr
     if ip == "127.0.0.1":
         t, after = content.split("\x7f", 1)
@@ -684,7 +685,10 @@ def command(content):
             RESPONSES[t].set_result((j, after))
             send(j)
             return b"\xf0\x9f\x92\x9c"
-    content = urllib.parse.unquote(flask.request.full_path.rstrip("?").lstrip("/").split("/", 1)[-1])
+    try:
+        content = flask.request.args["input"]
+    except KeyError:
+        content = urllib.parse.unquote(flask.request.full_path.rstrip("?").lstrip("/").split("/", 1)[-1])
     data = get_geo(ip)
     tz = data["timezone"]
     if " " not in content:

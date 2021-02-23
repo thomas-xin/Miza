@@ -260,7 +260,27 @@ neko_tags = {
     "dog": False,
     "gif": True,
     "woof": False,
-    "404": 2,
+    "404": False,
+    "ass": True,
+    "hmidriff": True,
+    "hneko": True,
+    "hkitsune": True,
+    "kemonomimi": True,
+    "kanna": False,
+    "thigh": True,
+    "gah": False,
+    "coffee": False,
+    "food": False,
+    "paizuri": True,
+    "tentacle": True,
+    "yaoi": True,
+}
+nekobot_shared = {
+    "hentai", "holo", "neko", "pussy", "anal", "boobs"
+}
+nekobot_exclusive = {
+    "ass", "hass", "hmidriff", "pgif", "4k", "hneko", "hkitsune", "kemonomimi", "hanal", "gonewild", "kanna",
+    "thigh", "hthigh", "gah", "coffee", "food", "paizuri", "tentacle", "hboobs", "yaoi"
 }
 
 
@@ -279,6 +299,7 @@ class Neko(Command):
     rate_limit = (0.05, 4)
     threshold = 256
     moe_sem = Semaphore(1, 0, rate_limit=10)
+    nekobot_sem = Semaphore(45, 210, rate_limit=120)
 
     def img(self, tag=None):
 
@@ -300,8 +321,17 @@ class Neko(Command):
                         print("nekos.moe", len(out))
                         return out
                 if xrand(2):
-                    data = await Request("https://nekobot.xyz/api/image?type=neko", aio=True, json=True)
+                    async with self.nekobot_sem:
+                        data = await Request("https://nekobot.xyz/api/image?type=neko", aio=True, json=True)
                     return data["message"]
+            if tag in nekobot_exclusive or tag in nekobot_shared and xrand(2):
+                if tag in ("ass", "pussy", "anal", "boobs", "thigh"):
+                    tag = "h" + tag
+                async with self.nekobot_sem:
+                    url = f"https://nekobot.xyz/api/image?type={tag}"
+                    # print(url, len(self.nekobot_sem.rate_bin))
+                    data = await Request(url, aio=True, json=True)
+                return data["message"]
             return await create_future(nekos.img, tag)
 
         file = f"neko~{tag}" if tag else "neko"
@@ -310,11 +340,8 @@ class Neko(Command):
     async def __call__(self, bot, args, argv, flags, message, channel, guild, **void):
         isNSFW = is_nsfw(channel)
         if "l" in flags or argv == "list":
-            available = []
             text = "Available tags in **" + channel.name + "**:\n```ini\n"
-            for key in neko_tags:
-                if isNSFW or not neko_tags[key] == True:
-                    available.append(key)
+            available = [k for k, v in neko_tags.items() if not v or isNSFW]
             text += str(sorted(available)) + "```"
             return text
         tagNSFW = False
@@ -325,11 +352,11 @@ class Neko(Command):
                 if neko_tags.get(tag, 0) == True:
                     tagNSFW = True
                     if not isNSFW:
-                        raise PermissionError(f"This command is only available in {uni_str('NSFW')} channels.")
+                        raise PermissionError(f"This tag is only available in {uni_str('NSFW')} channels.")
                 selected.append(tag)
         for _ in loop(flags.get("r", 0)):
-            possible = [i for i in neko_tags if neko_tags[i] <= isNSFW]
-            selected.append(possible[xrand(len(possible))])
+            possible = [k for k, v in neko_tags.items() if not v or isNSFW]
+            selected.append(choice(possible))
         if not selected:
             if not argv:
                 url = await self.img()

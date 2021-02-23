@@ -501,7 +501,7 @@ class UpdateExec(Database):
                         self.bot.data.proxies[shash(urls[i])] = out[i] = message.attachments[c].proxy_url
                     except IndexError:
                         break
-                    with suppress(KeyError):
+                    with suppress(KeyError, RuntimeError):
                         self.temp.pop(urls[i]).set_result(None)
                     c += 1
         return out if len(out) > 1 else out[0]
@@ -819,17 +819,26 @@ class UpdateEmojis(Database):
 
 class UpdateImagePools(Database):
     name = "imagepools"
-    loading = {}
+    loading = set()
+    finished = set()
     sem = Semaphore(8, 2, rate_limit=1)
     no_delete = True
+
+    def _bot_ready_(self, **void):
+        finished = self.data.setdefault("finished", set())
+        if self.finished:
+            finished.update(self.finished)
+            self.update("finished")
+        self.finished = finished
 
     async def load_until(self, key, func, threshold, args=()):
         with tracebacksuppressor:
             data = set_dict(self.data, key, alist())
+            failed = 0
             for i in range(threshold << 1):
-                if len(data) > threshold:
+                if len(data) > threshold or failed > threshold >> 1:
                     break
-                with tracebacksuppressor:
+                try:
                     out = await func(*args)
                     if type(out) is str:
                         out = (out,)
@@ -840,7 +849,15 @@ class UpdateImagePools(Database):
                                 data.appendleft(url)
                             else:
                                 data.append(url)
+                            failed = 0
                             self.update(key)
+                        else:
+                            failed += 1
+                except:
+                    failed += 8
+                    print_exc()
+            self.finished.add(key)
+            self.update("finished")
             data.uniq(sorted=None)
 
     async def proc(self, key, func, args=()):
@@ -857,11 +874,11 @@ class UpdateImagePools(Database):
             return url
 
     async def get(self, key, func, threshold=1024, args=()):
-        if not self.loading.get(key):
-            self.loading[key] = True
+        if key not in self.loading:
+            self.loading.add(key)
             create_task(self.load_until(key, func, threshold, args=args))
         data = set_dict(self.data, key, alist())
-        if len(data) < threshold >> 1 or len(data) < threshold and xrand(2):
+        if not data or key not in self.finished and (len(data) < threshold >> 1 or len(data) < threshold and xrand(2)):
             out = await func(*args)
             if type(out) is str:
                 out = (out,)

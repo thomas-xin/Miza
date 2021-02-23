@@ -3841,7 +3841,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         @self.event
         async def on_typing(channel, user, when):
             await self.send_event("_typing_", channel=channel, user=user)
-            await self.seen(user, channel.guild, delay=10, event="typing", raw="Typing")
+            await self.seen(user, getattr(channel, "guild", None), delay=10, event="typing", raw="Typing")
 
         # Message send event: processes new message. calls _send_ and _seen_ bot database events.
         @self.event

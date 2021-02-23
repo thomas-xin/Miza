@@ -1507,7 +1507,7 @@ def wrap_future(fut, loop=None):
             loop.call_soon_threadsafe(wrapper.set_result, res)
 
     fut.add_done_callback(on_done)
-    return wrapper
+    return asyncio.shield(wrapper)
 
 def shutdown_thread_after(thread, fut):
     fut.result()
