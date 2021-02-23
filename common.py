@@ -1496,12 +1496,16 @@ def get_event_loop():
         return eloop
 
 # Creates an asyncio Future that waits on a multithreaded one.
-def wrap_future(fut, loop=None, shield=False):
+def wrap_future(fut, loop=None, shield=False, thread_safe=True):
     if loop is None:
         loop = get_event_loop()
-    try:
-        wrapper = asyncio.wrap_future(fut, loop=loop)
-    except (AttributeError, TypeError):
+    wrapper = None
+    if not thread_safe:
+        try:
+            wrapper = asyncio.wrap_future(fut, loop=loop)
+        except (AttributeError, TypeError):
+            pass
+    if wrapper is None:
         wrapper = loop.create_future()
 
         def on_done(*void):
