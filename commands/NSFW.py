@@ -332,6 +332,9 @@ class Neko(Command):
                     # print(url, len(self.nekobot_sem.rate_bin))
                     data = await Request(url, aio=True, json=True)
                 return data["message"]
+            if tag == "meow":
+                data = await Request("https://nekos.life/api/v2/img/meow", aio=True, json=True)
+                return data["url"]
             return await create_future(nekos.img, tag)
 
         file = f"neko~{tag}" if tag else "neko"
