@@ -109,7 +109,7 @@ def get_duration(filename):
             ident = str(magic.from_buffer(data))
             print(head, ident, sep="\n")
             try:
-                bitrate = regexp("[0-9]+\\s.?bps").findall(ident)[0].casefold()
+                bitrate = regexp("[0-9.]+\\s.?bps").findall(ident)[0].casefold()
             except IndexError:
                 dur = _get_duration(filename, 16)[0]
                 DUR_CACHE[filename] = dur
@@ -1132,7 +1132,7 @@ class AudioClientSubInterface:
 
 ACSI = AudioClientSubInterface
 
-for attr in ("skip", "stop", "pause", "resume", "clear_source", "clear", "kill", "is_connected", "is_paused", "is_playing"):
+for attr in ("read", "skip", "stop", "pause", "resume", "clear_source", "clear", "kill", "is_connected", "is_paused", "is_playing"):
     setattr(ACSI, attr, eval("""lambda self: bot.audio.submit(f"AP.from_guild({self.guild.id}).""" + f"""{attr}()")"""))
 
 

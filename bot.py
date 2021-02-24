@@ -1449,7 +1449,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
     async def get_proxy_url(self, user):
         if type(user) is discord.Guild:
-            url = to_png(g.icon_url)
+            url = to_png(user.icon_url)
         else:
             url = best_url(user)
         if "proxies" in self.data:
