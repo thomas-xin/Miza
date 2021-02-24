@@ -1508,13 +1508,22 @@ def wrap_future(fut, loop=None, shield=False, thread_safe=True):
     if wrapper is None:
         wrapper = loop.create_future()
 
+        def set_suppress(res, is_exception=False):
+            try:
+                if is_exception:
+                    wrapper.set_exception(res)
+                else:
+                    wrapper.set_result(res)
+            except (RuntimeError, asyncio.InvalidStateError):
+                pass
+
         def on_done(*void):
             try:
                 res = fut.result()
             except Exception as ex:
-                loop.call_soon_threadsafe(wrapper.set_exception, ex)
+                loop.call_soon_threadsafe(set_suppress, ex, True)
             else:
-                loop.call_soon_threadsafe(wrapper.set_result, res)
+                loop.call_soon_threadsafe(set_suppress, res)
 
         fut.add_done_callback(on_done)
     if shield:
@@ -1583,6 +1592,12 @@ async def _await_fut(fut, ret):
 def await_fut(fut, timeout=None):
     if is_main_thread():
         raise RuntimeError("This function must not be called from the main thread's asyncio loop.")
+    try:
+        fut = asyncio.run_coroutine_threadsafe(fut, loop=get_event_loop())
+    except:
+        pass
+    else:
+        return fut.result(timeout=timeout)
     ret = concurrent.futures.Future()
     create_task(_await_fut(fut, ret))
     return ret.result(timeout=timeout)
@@ -2038,7 +2053,12 @@ def parse_with_now(expr):
             expr = regexp("[0-9]{10,}").sub(str(year), expr, 1)
             return DynamicDT.fromdatetime(tparser.parse(expr)).set_offset(offs)
         elif s.startswith("Unknown string format") or s.startswith("month must be in"):
-            y = int(regexp("[0-9]{5,}").findall(expr)[0])
+            try:
+                y = int(regexp("[0-9]{5,}").findall(expr)[0])
+            except IndexError:
+                y = None
+            if y is None:
+                raise
             if bc:
                 y = -y
             offs, year = divmod(y, 400)

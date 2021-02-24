@@ -1868,13 +1868,22 @@ class Giphy(ImagePool, Command):
     name = ["GIFSearch"]
     description = "Pulls a random image from a search on giphy.com using tags."
     threshold = 4
+    sem = Semaphore(5, 256, rate_limit=1)
 
     def img(self, tag=None):
+        file = f"giphy~{tag}"
 
         async def fetch(tag):
+            resp = await Request(f"https://api.giphy.com/v1/gifs/search?offset=0&type=gifs&sort=&explore=true&api_key={giphy_key}&q={tag}", aio=True, json=True)
+            images = {entry["images"]["source"]["url"].split("?", 1)[0] for entry in resp["data"]}
+            return images
+
+        async def fetchall(tag):
+            await asyncio.sleep(1)
             images = set()
-            for i in range(100):
-                resp = await Request(f"https://api.giphy.com/v1/gifs/search?offset={i * 25}&type=gifs&sort=&explore=true&api_key={giphy_key}&q={tag}", aio=True, json=True)
+            for i in range(1, 100):
+                async with self.sem:
+                    resp = await Request(f"https://api.giphy.com/v1/gifs/search?offset={i * 25}&type=gifs&sort=&explore=true&api_key={giphy_key}&q={tag}", aio=True, json=True)
                 data = resp["data"]
                 if not data:
                     break
@@ -1883,9 +1892,15 @@ class Giphy(ImagePool, Command):
                     images.add(url)
                 if len(data) < 25:
                     break
+            data = set_dict(self.bot.data.imagepools, file, alist())
+            for url in images:
+                if url not in data:
+                    data.add(url)
+                    self.bot.data.imagepools.update(file)
             return images
 
-        file = f"giphy~{tag}"
+        if file not in self.bot.data.imagepools.finished:
+            create_task(fetchall(tag))
         return self.bot.data.imagepools.get(file, fetch, self.threshold, args=(tag,))
     
     async def __call__(self, args, channel, **void):
