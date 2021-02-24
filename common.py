@@ -1593,13 +1593,10 @@ def await_fut(fut, timeout=None):
     if is_main_thread():
         raise RuntimeError("This function must not be called from the main thread's asyncio loop.")
     try:
-        fut = asyncio.run_coroutine_threadsafe(fut, loop=get_event_loop())
+        ret = asyncio.run_coroutine_threadsafe(fut, loop=get_event_loop())
     except:
-        pass
-    else:
-        return fut.result(timeout=timeout)
-    ret = concurrent.futures.Future()
-    create_task(_await_fut(fut, ret))
+        ret = concurrent.futures.Future()
+        create_task(_await_fut(fut, ret))
     return ret.result(timeout=timeout)
 
 is_main_thread = lambda: threading.current_thread() is threading.main_thread()
