@@ -223,6 +223,8 @@ class AudioPlayer(discord.AudioSource):
                 return self.emptyopus
             with tracebacksuppressor(StopIteration):
                 out = self.queue[0][0].read()
+            if not out:
+                return self.emptyopus
         return out
 
     def play(self, source, after=None):
@@ -245,6 +247,10 @@ class AudioPlayer(discord.AudioSource):
         if self.queue:
             self.queue[0][0].close()
             self.queue[0] = None
+    
+    def clear_next(self):
+        if len(self.queue) > 1:
+            self.queue.popright()[0].close()
 
     def skip(self):
         if self.queue:

@@ -448,6 +448,11 @@ class CustomAudio(collections.abc.Hashable):
         if self.source:
             create_future_ex(self.acsi.clear_source)
         self.source = None
+    
+    def clear_next(self):
+        if self.next:
+            create_future_ex(self.acsi.clear_next)
+        self.next = None
 
     def reset(self, start=True):
         self.acsi.clear()
@@ -468,7 +473,9 @@ class CustomAudio(collections.abc.Hashable):
         if self.paused:
             self.paused = False
             self.acsi.resume()
-            self.queue.update_load()
+        else:
+            self.acsi.read()
+        self.queue.update_load()
 
     # Stops currently playing source, closing it if possible.
     def stop(self):
@@ -788,7 +795,7 @@ class AudioQueue(alist):
             q.pops(dels)
         if not q:
             if self.auds.next:
-                self.auds.next = None
+                self.auds.clear_next()
             if self.auds.source:
                 self.auds.stop()
         elif not self.auds.paused:
@@ -845,16 +852,14 @@ class AudioQueue(alist):
             if len(items) > self.maxitems:
                 items = items[:self.maxitems]
             if not self:
-                self.__init__(items)
                 self.auds.clear_source()
-                self.verify()
-                create_future_ex(self.update_load, timeout=120)
-                return self
-            if position == -1:
+            if position == -1 or not self:
                 self.extend(items)
             else:
                 if position < 1:
                     self.auds.reset(start=False)
+                elif position < 2:
+                    self.auds.clear_next()
                 self.rotate(-position)
                 self.extend(items)
                 self.rotate(len(items) + position)
@@ -1132,7 +1137,7 @@ class AudioClientSubInterface:
 
 ACSI = AudioClientSubInterface
 
-for attr in ("read", "skip", "stop", "pause", "resume", "clear_source", "clear", "kill", "is_connected", "is_paused", "is_playing"):
+for attr in ("read", "skip", "stop", "pause", "resume", "clear_source", "clear_next", "clear", "kill", "is_connected", "is_paused", "is_playing"):
     setattr(ACSI, attr, eval("""lambda self: bot.audio.submit(f"AP.from_guild({self.guild.id}).""" + f"""{attr}()")"""))
 
 
