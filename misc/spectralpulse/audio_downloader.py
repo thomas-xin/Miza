@@ -525,10 +525,12 @@ def _get_duration(filename, _timeout=12):
     except:
         with suppress():
             proc.kill()
+        with suppress():
+            resp = proc.stdout.read().split()
         print_exc()
     try:
         dur = float(resp[0])
-    except (IndexError, ValueError):
+    except (IndexError, ValueError, TypeError):
         dur = None
     bps = None
     if len(resp) > 1:
@@ -959,7 +961,7 @@ class AudioDownloader:
                     url = resp["id"]
         if is_discord_url(url):
             title = url.split("?", 1)[0].rsplit("/", 1)[-1]
-            if title.rsplit(".", 1)[-1] in ("ogg", "webm"):
+            if title.rsplit(".", 1)[-1] in ("ogg", "webm", "mp4", "avi", "mov"):
                 url2 = url.replace("/cdn.discordapp.com/", "/media.discordapp.net/")
                 with requests.get(url2, stream=True) as resp:
                     if resp.status_code in range(200, 400):
@@ -1001,7 +1003,7 @@ class AudioDownloader:
     def extract_from(self, url):
         if is_discord_url(url):
             title = url.split("?", 1)[0].rsplit("/", 1)[-1]
-            if title.rsplit(".", 1)[-1] in ("ogg", "webm"):
+            if title.rsplit(".", 1)[-1] in ("ogg", "webm", "mp4", "avi", "mov"):
                 url2 = url.replace("/cdn.discordapp.com/", "/media.discordapp.net/")
                 with requests.get(url2, stream=True) as resp:
                     if resp.status_code in range(200, 400):

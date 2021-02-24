@@ -70,10 +70,12 @@ def _get_duration(filename, _timeout=12):
     except:
         with suppress():
             proc.kill()
+        with suppress():
+            resp = proc.stdout.read().split()
         print_exc()
     try:
         dur = float(resp[0])
-    except (IndexError, ValueError):
+    except (IndexError, ValueError, TypeError):
         dur = None
     bps = None
     if len(resp) > 1:
@@ -107,7 +109,7 @@ def get_duration(filename):
             ident = str(magic.from_buffer(data))
             print(head, ident, sep="\n")
             try:
-                bitrate = regexp("[0-9]+\\s.bps").findall(ident)[0].casefold()
+                bitrate = regexp("[0-9]+\\s.?bps").findall(ident)[0].casefold()
             except IndexError:
                 dur = _get_duration(filename, 16)[0]
                 DUR_CACHE[filename] = dur
@@ -1503,7 +1505,7 @@ class AudioDownloader:
                     url = resp["id"]
         if is_discord_url(url):
             title = url.split("?", 1)[0].rsplit("/", 1)[-1]
-            if title.rsplit(".", 1)[-1] in ("ogg", "webm"):
+            if title.rsplit(".", 1)[-1] in ("ogg", "webm", "mp4", "avi", "mov"):
                 url2 = url.replace("/cdn.discordapp.com/", "/media.discordapp.net/")
                 with requests.get(url2, headers=Request.header(), stream=True) as resp:
                     if resp.status_code in range(200, 400):
@@ -1569,7 +1571,7 @@ class AudioDownloader:
     def extract_from(self, url):
         if is_discord_url(url):
             title = url.split("?", 1)[0].rsplit("/", 1)[-1]
-            if title.rsplit(".", 1)[-1] in ("ogg", "webm"):
+            if title.rsplit(".", 1)[-1] in ("ogg", "webm", "mp4", "avi", "mov"):
                 url2 = url.replace("/cdn.discordapp.com/", "/media.discordapp.net/")
                 with requests.get(url2, headers=Request.header(), stream=True) as resp:
                     if resp.status_code in range(200, 400):
@@ -2239,7 +2241,7 @@ class AudioDownloader:
             args.extend(("-f", fmt, fn))
         print(args)
         try:
-            resp = subprocess.run(args)
+            resp = subprocess.run(args, stderr=subprocess.PIPE)
             resp.check_returncode()
         except subprocess.CalledProcessError as ex:
             # Attempt to convert file from org if FFmpeg failed
@@ -2252,7 +2254,7 @@ class AudioDownloader:
             # Re-estimate duration if file was successfully converted from org
             args[args.index("-i") + 1] = new
             try:
-                resp = subprocess.run(args)
+                resp = subprocess.run(args, stderr=subprocess.PIPE)
                 resp.check_returncode()
             except subprocess.CalledProcessError as ex:
                 if resp.stderr:

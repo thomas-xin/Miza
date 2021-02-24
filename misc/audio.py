@@ -94,10 +94,12 @@ def _get_duration(filename, _timeout=12):
     except:
         with suppress():
             proc.kill()
+        with suppress():
+            resp = proc.stdout.read().split()
         print_exc()
     try:
         dur = float(resp[0])
-    except ValueError:
+    except (IndexError, ValueError, TypeError):
         dur = None
     bps = None
     if len(resp) > 1:
@@ -131,7 +133,7 @@ def get_duration(filename):
             ident = str(magic.from_buffer(data))
             print(head, ident, sep="\n")
             try:
-                bitrate = regexp("[0-9]+\\s.bps").findall(ident)[0].casefold()
+                bitrate = regexp("[0-9]+\\s.?bps").findall(ident)[0].casefold()
             except IndexError:
                 dur = _get_duration(filename, 16)[0]
                 DUR_CACHE[filename] = dur
