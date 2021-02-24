@@ -123,6 +123,13 @@ eval_const = {
 # Not completely safe, but much safer than regular eval
 safe_eval = lambda s: eval(as_str(s).replace("__", ""), {}, eval_const)
 
+def as_str(s):
+    if type(s) in (bytes, bytearray, memoryview):
+        return bytes(s).decode("utf-8", "replace")
+    return str(s)
+
+literal_eval = lambda s: ast.literal_eval(as_str(s).lstrip())
+
 null = None
 i = I = j = J = 1j
 π = pi = mp.pi
@@ -153,11 +160,6 @@ nop = lambda *void1, **void2: None
 nofunc = lambda arg, *void1, **void2: arg
 
 capwords = lambda s, spl=None: (" " if spl is None else spl).join(w.capitalize() for w in s.split(spl))
-
-def as_str(s):
-    if type(s) in (bytes, bytearray, memoryview):
-        return bytes(s).decode("utf-8", "replace")
-    return str(s)
 
 
 def choice(*args):

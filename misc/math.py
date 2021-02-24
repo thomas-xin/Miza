@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import sympy, time, os, sys, subprocess, traceback, random, collections, psutil, concurrent.futures, pickle #, gc
+import sympy, time, os, sys, subprocess, traceback, random, collections, psutil, concurrent.futures, pickle, ast #, gc
 import sympy.parsing.sympy_parser as parser
 import sympy.parsing.latex as latex
 import matplotlib.pyplot as plt
@@ -9,8 +9,15 @@ from sympy.plotting.plot import Plot
 
 deque = collections.deque
 
-
 getattr(latex, "__builtins__", {})["print"] = lambda *void1, **void2: None
+
+
+def as_str(s):
+    if type(s) in (bytes, bytearray, memoryview):
+        return bytes(s).decode("utf-8", "replace")
+    return str(s)
+
+literal_eval = lambda s: ast.literal_eval(as_str(s).lstrip())
 
 
 def logging(func):
@@ -594,7 +601,7 @@ def procResp(resp):
 
 def evaluate(ts, args):
     try:
-        resp = evalSym(*eval(eval(args)))
+        resp = evalSym(*literal_eval(literal_eval(args)))
         out = procResp(resp)
         if len(out) > 8388608:
             raise OverflowError("Output data too large.")

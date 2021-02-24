@@ -1,11 +1,19 @@
 #!/usr/bin/python3
 
-import os, sys, io, time, concurrent.futures, subprocess, psutil, collections, traceback, re, requests, blend_modes, pdf2image, zipfile, contextlib, magic, pyqrcode
+import os, sys, io, time, concurrent.futures, subprocess, psutil, collections, traceback, re, requests, blend_modes, pdf2image, zipfile, contextlib, magic, pyqrcode, ast
 import numpy as np
 import PIL
 from PIL import Image, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhance, ImageMath, ImageStat
 from zipfile import ZipFile
 import matplotlib.pyplot as plt
+
+
+def as_str(s):
+    if type(s) in (bytes, bytearray, memoryview):
+        return bytes(s).decode("utf-8", "replace")
+    return str(s)
+
+literal_eval = lambda s: ast.literal_eval(as_str(s).lstrip())
 
 mpf = float
 deque = collections.deque
@@ -1846,7 +1854,7 @@ if __name__ == "__main__":
             if argv[0] == "~":
                 ts, s = argv[1:].split("~", 1)
                 try:
-                    args = eval(eval(s))
+                    args = literal_eval(literal_eval(s))
                     if "$" in args and "plt_special" in args:
                         evaluate(ts, args)
                     else:

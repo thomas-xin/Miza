@@ -35,7 +35,7 @@ def submit(s):
 
 async def respond(s):
     k, c = as_str(s[1:]).split("~", 1)
-    c = as_str(eval(c))
+    c = as_str(literal_eval(c))
     try:
         if c.startswith("await "):
             resp = await eval(c[6:], client._globals)

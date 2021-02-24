@@ -401,7 +401,7 @@ def select_and_loads(s, mode="safe", size=None):
     #     s, data = data, None
     if data is None:
         if mode == "unsafe":
-            data = eval(compile(s.replace(b"\0", b""), "<loader>", "eval", optimize=2, dont_inherit=False))
+            data = eval(compile(s.strip(b"\0"), "<loader>", "eval", optimize=2, dont_inherit=False))
         else:
             if b"{" in s:
                 s = s[s.index(b"{"):s.rindex(b"}") + 1]
@@ -1310,7 +1310,7 @@ def proc_communicate(k, i):
             if s:
                 # print(s)
                 if s[0] == "~":
-                    c = as_str(eval(s[1:]))
+                    c = as_str(literal_eval(s[1:]))
                     create_future_ex(exec_tb, c, globals())
                 else:
                     print(s)
@@ -1926,7 +1926,7 @@ def load_emojis():
     with tracebacksuppressor:
         resp = Request("https://raw.githubusercontent.com/BreadMoirai/DiscordEmoji/master/src/main/java/com/github/breadmoirai/Emoji.java", decode=True, timeout=None)
         e_resp = [line.strip()[:-1] for line in resp[resp.index("public enum Emoji {") + len("public enum Emoji {"):resp.index("private static final Emoji[] SORTED;")].strip().split("\n")]
-        e_data = {safe_eval(words[0]).encode("utf-16", "surrogatepass").decode("utf-16"): f" {safe_eval(words[2][:-1])} " for emoji in e_resp for words in (emoji.strip(";")[emoji.index("\\u") - 1:].split(","),) if words[2][:-1].strip() != "null"}
+        e_data = {literal_eval(words[0]).encode("utf-16", "surrogatepass").decode("utf-16"): f" {literal_eval(words[2][:-1])} " for emoji in e_resp for words in (emoji.strip(";")[emoji.index("\\u") - 1:].split(","),) if words[2][:-1].strip() != "null"}
         with open("misc/emojis.txt", "r", encoding="utf-8") as f:
             resp = f.read()
         e_data.update({k: v for k, v in (line.split(" ", 1) for line in resp.splitlines())})

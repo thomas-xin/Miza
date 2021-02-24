@@ -3146,7 +3146,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                                 with tracebacksuppressor:
                                     with open("saves/status.json", "rb") as f:
                                         data = await create_future(f.read)
-                                        status = eval(data)
+                                    status = eval(data)
                                     self.start_bytes = max(0, status["net_bytes"] - net_bytes)
                         self.net_bytes.append(net_bytes)
                         self.bitrate = (self.net_bytes[-1] - self.net_bytes[0]) * 8 / len(self.net_bytes)
@@ -4163,7 +4163,7 @@ class AudioClientInterface:
                 s = as_str(proc.stdout.readline()).rstrip()
                 if s:
                     if s[0] == "~":
-                        c = as_str(eval(s[1:]))
+                        c = as_str(literal_eval(s[1:]))
                         create_future_ex(exec_tb, c, bot._globals)
                     else:
                         print(s)
