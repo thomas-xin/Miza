@@ -170,8 +170,14 @@ def fetch_static(path, ignore=False):
         try:
             data = STATIC[path]
         except KeyError:
-            with open(f"misc/{path}", "rb") as f:
-                data = f.read()
+            fn = f"misc/{path}"
+            fn2 = fn.rsplit(".", 1)[0] + ".zip"
+            if os.path.exists(fn2) and zipfile.is_zipfile(fn2):
+                with ZipFile(fn2, compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False) as z:
+                    data = z.open(path.rsplit("/", 1)[-1]).read()
+            else:
+                with open(fn, "rb") as f:
+                    data = f.read()
             STATIC[path] = data
         fmt = path.rsplit(".", 1)[-1].casefold()
         try:
