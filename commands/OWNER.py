@@ -880,6 +880,8 @@ class UpdateImagePools(Database):
         data = set_dict(self.data, key, alist())
         if not data or key not in self.finished and (len(data) < threshold >> 1 or len(data) < threshold and xrand(2)):
             out = await func(*args)
+            if not out:
+                raise LookupError("No results found.")
             if type(out) is str:
                 out = (out,)
             for url in out:

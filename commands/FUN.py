@@ -1906,6 +1906,6 @@ class Giphy(ImagePool, Command):
     async def __call__(self, args, channel, **void):
         if not args:
             raise ArgumentError("Input string is empty.")
-        tag = "".join(c for c in "%20".join(sorted(args)) if c.isalnum())
+        tag = "%20".join(sorted("".join(c for c in w.casefold() if c.isalnum()) for w in args))
         url = await self.img(tag)
         self.bot.send_as_embeds(channel, image=url)
