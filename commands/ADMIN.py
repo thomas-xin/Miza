@@ -1340,12 +1340,16 @@ class UpdateAutoEmojis(Database):
                     self.bot.data.emojilists.get(message.author.id, {}).pop(name, None)
                     self.bot.data.emojilists.update(message.author.id)
             if emoji:
-                substitutes = (start, min_emoji(emoji), start + len(s))
-                try:
-                    name = emoji.name
-                except (KeyError, AttributeError):
-                    pass
+                if len(msg) < 1936:
+                    sub = "<"
+                    if emoji.animated:
+                        sub += "a"
+                    name = getattr(emoji, "name", None) or "_"
+                    sub += f":{emoji.name}:{emoji.id}>"
                 else:
+                    sub = min_emoji(emoji)
+                substitutes = (start, sub, start + len(s))
+                if getattr(emoji, "name", None):
                     if not message.webhook_id:
                         orig = self.bot.data.emojilists.setdefault(message.author.id, {})
                         orig.setdefault(name, emoji.id)
