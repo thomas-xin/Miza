@@ -1310,7 +1310,7 @@ def proc_communicate(k, i):
             if s:
                 # print(s)
                 if s[0] == "~":
-                    c = as_str(literal_eval(s[1:]))
+                    c = as_str(eval(s[1:]))
                     create_future_ex(exec_tb, c, globals())
                 else:
                     print(s)
