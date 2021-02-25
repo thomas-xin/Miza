@@ -1602,6 +1602,19 @@ class MimicSend(Command):
                 tts = True
             else:
                 tts = False
+            if guild and "logM" in bot.data and guild.id in bot.data.logM:
+                c_id = bot.data.logM[guild.id]
+                try:
+                    c = await self.bot.fetch_channel(c_id)
+                except (EOFError, discord.NotFound):
+                    bot.data.logM.pop(guild.id)
+                    return
+                emb = as_embed(message)
+                emb.colour = discord.Colour(0x00FF00)
+                action = f"**Mimic invoked in** {channel_mention(channel.id)}:\nhttps://discord.com/channels/{guild.id}/{c.id}/{message.id}\n"
+                emb.description = lim_str(action + emb.description, 2048)
+                emb.timestamp = message.created_at
+                self.bot.send_embeds(c, emb)
             for mimic in m:
                 await bot.data.mimics.updateMimic(mimic, guild)
                 name = mimic.name
@@ -1664,16 +1677,16 @@ class UpdateMimics(Database):
                         if guild and "logM" in bot.data and guild.id in bot.data.logM:
                             c_id = bot.data.logM[guild.id]
                             try:
-                                channel = await self.bot.fetch_channel(c_id)
+                                c = await self.bot.fetch_channel(c_id)
                             except (EOFError, discord.NotFound):
                                 bot.data.logM.pop(guild.id)
                                 return
                             emb = as_embed(message)
                             emb.colour = discord.Colour(0x00FF00)
-                            action = f"**Mimic invoked in** {channel_mention(message.channel.id)}:\nhttps://discord.com/channels/{guild.id}/{channel.id}/{message.id}\n"
+                            action = f"**Mimic invoked in** {channel_mention(channel.id)}:\nhttps://discord.com/channels/{guild.id}/{c.id}/{message.id}\n"
                             emb.description = lim_str(action + emb.description, 2048)
                             emb.timestamp = message.created_at
-                            self.bot.send_embeds(channel, emb)
+                            self.bot.send_embeds(c, emb)
                         for k in sending:
                             mimic = self.data[k.m_id]
                             await self.updateMimic(mimic, guild=message.guild)

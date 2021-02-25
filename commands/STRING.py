@@ -900,6 +900,7 @@ class Match(Command):
 
 
 class Ask(Command):
+    alias = ["How"]
     description = "Ask me any question, and I'll answer it!"
     usage = "<string>"
     flags = "h"
@@ -907,10 +908,13 @@ class Ask(Command):
     rate_limit = (0.5, 1)
     slash = True
 
-    async def __call__(self, message, channel, user, argv, flags=(), **void):
+    async def __call__(self, message, channel, user, argv, name, flags=(), **void):
         bot = self.bot
         guild = getattr(channel, "guild", None)
-        q = single_space(full_prune(argv)).strip().translate(bot.mtrans).replace("?", "\u200b").strip("\u200b")
+        if name == "how":
+            q = name
+        else:
+            q = single_space(full_prune(argv)).strip().translate(bot.mtrans).replace("?", "\u200b").strip("\u200b")
         if not q:
             raise ArgumentError(choice("Sorry, didn't see that, was that a question? 🤔", "Ay, speak up, I don't bite! :3"))
         out = None

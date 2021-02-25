@@ -1026,7 +1026,7 @@ def activity_repr(activity):
 # Alphanumeric string regular expression.
 is_alphanumeric = lambda string: string.replace(" ", "").isalnum()
 to_alphanumeric = lambda string: single_space(regexp("[^a-z 0-9]+", re.I).sub(" ", unicode_prune(string)))
-is_numeric = lambda string: regexp("[0-9]", re.I).search(string)
+is_numeric = lambda string: regexp("[0-9]").search(string) and not regexp("[a-z]", re.I).search(string)
 
 
 # Strips code box from the start and end of a message.
@@ -1331,10 +1331,11 @@ class Pillow_SIMD:
             print(f"Attempting to find/install pillow-simd for Python 3.{v}...")
             args = ["py", f"-3.{v}", "misc/install_pillow_simd.py"]
             print(args)
-            resp = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            out = as_str(resp.stdout)
+            resp = subprocess.run(args, stdout=subprocess.PIPE)
+            out = as_str(resp.stdout).strip()
             if not out.startswith(f"Python 3.{v} not found!"):
-                print(out)
+                if out:
+                    print(out)
                 print(f"pillow-simd versioning successful for Python 3.{v}")
                 self.args = ["py", f"-3.{v}"]
                 return self.args
