@@ -19,7 +19,7 @@ class Pillow_SIMD:
             args = ["py", f"-3.{v}", "misc/install_pillow_simd.py"]
             print(args)
             resp = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            out = resp.stdout.decode("utf-8", "replace")
+            out = resp.stdout.decode("utf-8", "replace").strip()
             if not out.startswith(f"Python 3.{v} not found!"):
                 print(out)
                 print(f"pillow-simd versioning successful for Python 3.{v}")
@@ -350,7 +350,7 @@ if __name__ == "__main__":
     fps = 30
     amplitude = 0.1
     smudge_ratio = 0.9
-    render = display = particles = play = 0
+    render = display = particles = play = image = 0
     higher_bound = lower_bound = None
     skip = 1
     speed = resolution = 1
@@ -630,6 +630,8 @@ if __name__ == "__main__":
                 # Current time in nanoseconds, timestamps to wait for every frame as well as estimate remaining render time
                 ts = time.time_ns()
                 timestamps = deque()
+                if image:
+                    yvals = deque()
                 for i in range(2147483648):
                     # Force the first frame to calculate immediately if not yet set
                     if self.fut is None:
@@ -664,6 +666,8 @@ if __name__ == "__main__":
                     elif skip:
                         for x in range(speed):
                             self.trans[self.cutoff + i * speed + x] = line
+                    if image:
+                        yvals.append(line)
                     # Ensure that all subprocesses are functioning correctly
                     for p in ("render", "display", "particles"):
                         if globals().get(p):
@@ -703,10 +707,17 @@ if __name__ == "__main__":
                         overflow = 120 - len(nocol(out))
                         out = out[:len(out) + overflow] + " " * (overflow) + C.white
                         sys.stdout.buffer.write(out.encode("utf-8"))
-                        # Wait until the time for the next frame
-                        while time.time_ns() < ts + billion / fps:
-                            time.sleep(0.001)
+                        if play:
+                            # Wait until the time for the next frame
+                            while time.time_ns() < ts + billion / fps:
+                                time.sleep(0.001)
                         ts = max(ts + billion / fps, time.time_ns() - billion / fps)
+            if image:
+                dim = list(itertools.chain(*(itertools.repeat(y, speed) for y in yvals)))
+                img = np.array(dim, dtype=np.uint8)
+                img = np.swapaxes(img, 0, 1)
+                img = fromarray(img, mode="RGB")
+                img.save(f5)
             # Close everything and exit
             self.file.close()
             if render:
@@ -753,6 +764,7 @@ if __name__ == "__main__":
                 '"display": true, # Whether to preview the rendered video in a separate window.',
                 '"render": true, # Whether to output the result to a video file.',
                 '"play": true, # Whether to play the actual audio being rendered.',
+                '"image": false, # Whether to render entire spectrogram as an image.',
             )) + "\n}"
         with open("config.json", "w") as f:
             f.write(data)
@@ -834,6 +846,7 @@ if __name__ == "__main__":
         f2 = fn + ".pcm"
         f3 = fn + ".riff"
         f4 = fn + ".mp4"
+        f5 = fn + ".png"
         print("Loading", source)
         print(skip, display, render, play)
         r = Render(source)

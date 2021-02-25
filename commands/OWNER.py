@@ -432,6 +432,7 @@ class UpdateExec(Database):
             except KeyError:
                 new = await_fut(self._proxy(url))
                 self.bot.data.proxies[0][h] = new
+                self.bot.data.proxies.update(0)
                 return new
         return url
     
@@ -454,6 +455,7 @@ class UpdateExec(Database):
                         self.bot.data.proxies[0][shash(urls[i])] = out[i] = message.embeds[c].thumbnail.proxy_url
                     except IndexError:
                         break
+                    self.bot.data.proxies.update(0)
                     c += 1
         return out if len(out) > 1 else out[0]
     
@@ -501,6 +503,7 @@ class UpdateExec(Database):
                         self.bot.data.proxies[0][shash(urls[i])] = out[i] = message.attachments[c].proxy_url
                     except IndexError:
                         break
+                    self.bot.data.proxies.update(0)
                     with suppress(KeyError, RuntimeError):
                         self.temp.pop(urls[i]).set_result(None)
                     c += 1

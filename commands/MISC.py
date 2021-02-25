@@ -768,10 +768,13 @@ class SpectralPulse(Command):
         if not urls or not urls[0]:
             raise ArgumentError("Please input a valid URL.")
         url = urls[0]
-        name = url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0] + ".mp4"
+        name = url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
+        n1 = name + ".mp4"
+        n2 = name + ".png"
         ts = ts_us()
         dest = f"cache/&{ts}"
-        fn = dest + ".mp4"
+        fn1 = dest + ".mp4"
+        fn2 = dest + ".png"
         args = pillow_simd.get() + ["main.py", "-dest", "../../" + dest, url]
         with discord.context_managers.Typing(channel):
             if self.spec_sem.is_busy():
@@ -787,7 +790,8 @@ class SpectralPulse(Command):
                     raise
                 for ext in ("pcm", "riff"):
                     await create_future(os.remove, f"{dest}.{ext}")
-        await bot.send_with_file(channel, "", fn, filename=name)
+        await bot.send_with_file(channel, "", fn1, filename=n1)
+        await bot.send_with_file(channel, "", fn2, filename=n2)
 
 
 class DeviantArt(Command):
