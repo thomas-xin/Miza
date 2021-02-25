@@ -887,7 +887,7 @@ def get_author(user, u_id=None):
     url = best_url(user)
     bot = BOT[0]
     if bot and "proxies" in bot.data:
-        url2 = bot.data.proxies.get(shash(url))
+        url2 = bot.data.proxies[0].get(shash(url))
         if url2:
             url = url2
         else:
