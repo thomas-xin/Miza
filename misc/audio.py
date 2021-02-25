@@ -221,6 +221,9 @@ class AudioPlayer(discord.AudioSource):
         after = entry[1]
         if callable(after):
             after()
+        if self.queue:
+            with tracebacksuppressor(RuntimeError, discord.ClientException):
+                self.vc.play(self, after=self.after)
 
     def read(self):
         if not self.queue or not self.queue[0]:
@@ -233,14 +236,15 @@ class AudioPlayer(discord.AudioSource):
         except:
             print_exc()
         if not out:
-            entry = self.queue.popleft()
-            create_future_ex(entry[0].close)
-            after = entry[1]
-            if callable(after):
-                create_future_ex(after)
-            if not self.queue:
-                return self.emptyopus
+            print("EMPTY")
             with tracebacksuppressor(StopIteration):
+                entry = self.queue.popleft()
+                create_future_ex(entry[0].close)
+                after = entry[1]
+                if callable(after):
+                    create_future_ex(after)
+                if not self.queue:
+                    return self.emptyopus
                 out = self.queue[0][0].read()
         return out or self.emptyopus
 

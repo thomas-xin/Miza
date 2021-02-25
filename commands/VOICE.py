@@ -747,7 +747,7 @@ class AudioQueue(alist):
         self.lastsent = 0
         self.loading = False
         self.playlist = None
-        self.sem = Semaphore(1, 0)
+        self.sem = Semaphore(1, 0, trace=True)
 
     def announce_play(self, e):
         auds = self.auds
@@ -3144,7 +3144,7 @@ class Dump(Command):
                 if not i & 8191:
                     await asyncio.sleep(0.1)
             # Shuffle newly loaded dump if autoshuffle is on
-            if auds.stats.shuffle:
+            if auds.stats.shuffle and not vc:
                 shuffle(q)
             for k, v in deque(d["stats"].items()):
                 if k not in auds.stats:

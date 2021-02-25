@@ -82,9 +82,9 @@ emptyctx = EmptyContext()
 # Manages concurrency limits, similar to asyncio.Semaphore, but has a secondary threshold for enqueued tasks.
 class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
 
-    __slots__ = ("limit", "buffer", "fut", "active", "passive", "rate_limit", "rate_bin")
+    __slots__ = ("limit", "buffer", "fut", "active", "passive", "rate_limit", "rate_bin", "trace")
 
-    def __init__(self, limit=256, buffer=32, delay=0.05, rate_limit=None, randomize_ratio=2):
+    def __init__(self, limit=256, buffer=32, delay=0.05, rate_limit=None, randomize_ratio=2, trace=False):
         self.limit = limit
         self.buffer = buffer
         self.active = 0
@@ -93,6 +93,7 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
         self.rate_bin = deque()
         self.fut = concurrent.futures.Future()
         self.fut.set_result(None)
+        self.trace = trace and inspect.stack()[1]
 
     def _update_bin_after(self, t):
         time.sleep(t)
@@ -114,6 +115,8 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
     def enter(self):
         if self.rate_limit:
             self.rate_bin.append(utc())
+        if self.trace:
+            self.trace = inspect.stack()[2]
         self.active += 1
         if self.active >= self.limit and self.fut.done():
             self.fut = concurrent.futures.Future()
