@@ -369,6 +369,7 @@ class CustomAudio(collections.abc.Hashable):
                 bot.data.audio.players[guild.id] = self
                 self.stats.update(bot.data.audiosettings.get(guild.id, {}))
             create_future_ex(self.connect_to, channel)
+            self.timeout = utc()
 
     def __str__(self):
         classname = str(self.__class__).replace("'>", "")
@@ -592,6 +593,7 @@ class CustomAudio(collections.abc.Hashable):
             except Exception as ex:
                 self.fut.set_exception(ex)
         self.queue._init_(auds=self)
+        self.timeout = utc()
         return self.acsi
 
     # Constructs array of FFmpeg options using the audio settings.

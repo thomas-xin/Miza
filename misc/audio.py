@@ -36,23 +36,27 @@ def submit(s):
 async def respond(s):
     k, c = as_str(s[1:]).split("~", 1)
     c = as_str(literal_eval(c))
-    try:
-        if c.startswith("await "):
-            resp = await eval(c[6:], client._globals)
-        else:
-            code = None
-            try:
-                code = compile(c, "miza", "eval")
-            except SyntaxError:
-                pass
+    if c == "ytdl.update()":
+        await create_future(ytdl.update)
+        resp = None
+    else:
+        try:
+            if c.startswith("await "):
+                resp = await eval(c[6:], client._globals)
             else:
-                resp = await create_future(eval, code, client._globals, priority=True)
-            if code is None:
-                resp = await create_future(exec, c, client._globals, priority=True)
-    except Exception as ex:
-        sys.stdout.write(traceback.format_exc())
-        await create_future(submit, f"bot.audio.returns[{k}].set_exception(pickle.loads({repr(pickle.dumps(ex))}))", priority=True)
-        return
+                code = None
+                try:
+                    code = compile(c, "miza", "eval")
+                except SyntaxError:
+                    pass
+                else:
+                    resp = await create_future(eval, code, client._globals, priority=True)
+                if code is None:
+                    resp = await create_future(exec, c, client._globals, priority=True)
+        except Exception as ex:
+            sys.stdout.write(traceback.format_exc())
+            await create_future(submit, f"bot.audio.returns[{k}].set_exception(pickle.loads({repr(pickle.dumps(ex))}))", priority=True)
+            return
     res = repr(resp)
     if type(resp) not in (bool, int, float, str, bytes):
         try:
@@ -164,18 +168,24 @@ class AudioPlayer(discord.AudioSource):
     async def join(cls, channel):
         channel = client.get_channel(verify_id(channel))
         self = cls(channel.guild)
+        players[channel.guild.id] = concurrent.futures.Future()
         if not self.vc:
             if channel.guild.me.voice:
                 await channel.guild.change_voice_state(channel=None)
             self.vc = await channel.connect(timeout=7, reconnect=True)
+        players[channel.guild.id].set_result(self)
         players[channel.guild.id] = self
 
     @classmethod
     def from_guild(cls, guild):
         try:
-            return players[verify_id(guild)]
+            fut = players[verify_id(guild)]
         except KeyError:
-            return None
+            pass
+        else:
+            if type(fut) is cls:
+                return fut
+            return fut.result(timeout=4)
         self = cls(guild)
         if self.vc:
             return self
@@ -202,6 +212,15 @@ class AudioPlayer(discord.AudioSource):
             if not self.queue:
                 raise
         return getattr(self.queue[0][0], k)
+    
+    def after(self):
+        if not self.queue or not self.queue[0]:
+            return
+        entry = self.queue.popleft()
+        create_future_ex(entry[0].close)
+        after = entry[1]
+        if callable(after):
+            after()
 
     def read(self):
         if not self.queue or not self.queue[0]:
@@ -223,9 +242,7 @@ class AudioPlayer(discord.AudioSource):
                 return self.emptyopus
             with tracebacksuppressor(StopIteration):
                 out = self.queue[0][0].read()
-            if not out:
-                return self.emptyopus
-        return out
+        return out or self.emptyopus
 
     def play(self, source, after=None):
         if not self.queue:
@@ -234,11 +251,11 @@ class AudioPlayer(discord.AudioSource):
             create_future_ex(self.queue[0][0].close)
         self.queue[0] = (source, after)
         with tracebacksuppressor(RuntimeError, discord.ClientException):
-            self.vc.play(self)
+            self.vc.play(self, after=self.after)
 
     def enqueue(self, source, after=None):
         if not self.queue:
-            return self.play(source, after=None)
+            return self.play(source, after=after)
         if len(self.queue) < 2:
             self.queue.append(None)
         self.queue[1] = (source, after)
@@ -452,7 +469,7 @@ class AudioFile:
         )
 
         def read():
-            out = next(it)
+            out = next(it, b"")
             reader.pos += 1
             return out
 
@@ -577,7 +594,7 @@ class LoadedAudioReader(discord.AudioSource):
             return b
         for att in range(16):
             try:
-                out = next(self.packet_iter)
+                out = next(self.packet_iter, b"")
             except (OSError, BrokenPipeError):
                 if self.file.seekble:
                     pos = self.pos / 50
@@ -599,7 +616,7 @@ class LoadedAudioReader(discord.AudioSource):
             else:
                 self.pos += 1
                 return out
-        raise StopIteration
+        return b""
 
     def start(self):
         self.buffer = None
@@ -641,7 +658,7 @@ class BufferedAudioReader(discord.AudioSource):
             b, self.buffer = self.buffer, None
             self.pos += 1
             return b
-        out = next(self.packet_iter)
+        out = next(self.packet_iter, b"")
         self.pos += 1
         return out
 

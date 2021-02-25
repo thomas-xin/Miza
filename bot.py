@@ -3655,7 +3655,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             commands = set()
             for command in self.commands.values():
                 commands.update(command)
-            print(f"Command count: {len(commands)}")
+            print(f"Unique command count: {len(commands)}")
             # Assign all bot database events to their corresponding keys.
             for u in self.data.values():
                 for f in dir(u):
@@ -4164,7 +4164,14 @@ class AudioClientInterface:
                 if s:
                     if s[0] == "~":
                         c = as_str(literal_eval(s[1:]))
-                        create_future_ex(exec_tb, c, bot._globals)
+                        if c.startswith("bot.audio.returns[") and c.endswith("].set_result(None)"):
+                            k = int(c[18:-18])
+                            try:
+                                self.returns[k].set_result(None)
+                            except:
+                                pass
+                        else:
+                            create_future_ex(exec_tb, c, bot._globals)
                     else:
                         print(s)
 
