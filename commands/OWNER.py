@@ -406,8 +406,8 @@ class UpdateExec(Database):
         c_id = choice(list(c_id for c_id, flag in self.data.items() if flag & 16))
         channel = await bot.fetch_channel(c_id)
         m = channel.guild.me
-        url = await bot.get_proxy_url(m)
-        message = await bot.send_as_webhook(channel, url, username=m.display_name, avatar_url=url)
+        aurl = await bot.get_proxy_url(m)
+        message = await bot.send_as_webhook(channel, url, username=m.display_name, avatar_url=aurl)
         if not message.embeds:
             fut = create_task(asyncio.wait_for(bot.wait_for("raw_message_edit", check=lambda m: [m_id == message.id and getattr(self.bot.cache.messages.get(m_id), "embeds", None) for m_id in (getattr(m, "id", None) or getattr(m, "message_id", None),)][0]), timeout=12))
             for i in range(120):

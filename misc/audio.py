@@ -578,12 +578,28 @@ class LoadedAudioReader(discord.AudioSource):
         for att in range(16):
             try:
                 out = next(self.packet_iter)
-            except OSError:
+            except (OSError, BrokenPipeError):
+                if self.file.seekble:
+                    pos = self.pos / 50
+                    try:
+                        i = self.args.index("-ss")
+                    except ValueError:
+                        try:
+                            i = self.args.index("-to")
+                        except ValueError:
+                            i = self.args.index("error") + 1
+                            self.args.insert(i, "-ss")
+                            self.args.insert(i + 1, str(pos))
+                        else:
+                            self.args[i + 1] = str(float(self.args[i + 1]) - pos)
+                    else:
+                        self.args[i + 1] = str(float(self.args[i + 1]) + pos)
                 self.proc = psutil.Popen(self.args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
                 self.packet_iter = discord.oggparse.OggStream(self.proc.stdout).iter_packets()
             else:
                 self.pos += 1
                 return out
+        raise StopIteration
 
     def start(self):
         self.buffer = None
@@ -631,7 +647,7 @@ class BufferedAudioReader(discord.AudioSource):
 
     # Required loop running in background to feed data to FFmpeg
     def run(self):
-        self.file.readable.result(timeout=86400)
+        self.file.readable.result(timeout=60)
         while True:
             b = bytes()
             try:
