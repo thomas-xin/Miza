@@ -428,10 +428,10 @@ class UpdateExec(Database):
         if is_url(url) and not regexp("https:\\/\\/images-ext-[0-9]+\\.discordapp\\.net\\/external\\/").match(url) and not url.startswith("https://media.discordapp.net/") and not self.bot.is_webserver_url(url):
             h = shash(url)
             try:
-                return self.bot.data.proxies[h]
+                return self.bot.data.proxies[0][h]
             except KeyError:
                 new = await_fut(self._proxy(url))
-                self.bot.data.proxies[h] = new
+                self.bot.data.proxies[0][h] = new
                 return new
         return url
     
@@ -441,7 +441,7 @@ class UpdateExec(Database):
         for i, url in enumerate(urls):
             if is_url(url):
                 try:
-                    out[i] = self.bot.data.proxies[shash(url)]
+                    out[i] = self.bot.data.proxies[0][shash(url)]
                 except KeyError:
                     files[i] = url
         fs = [i for i in files if i]
@@ -451,7 +451,7 @@ class UpdateExec(Database):
             for i, f in enumerate(files):
                 if f:
                     try:
-                        self.bot.data.proxies[shash(urls[i])] = out[i] = message.embeds[c].thumbnail.proxy_url
+                        self.bot.data.proxies[0][shash(urls[i])] = out[i] = message.embeds[c].thumbnail.proxy_url
                     except IndexError:
                         break
                     c += 1
@@ -463,7 +463,7 @@ class UpdateExec(Database):
         for i, url in enumerate(urls):
             if is_url(url):
                 try:
-                    out[i] = self.bot.data.proxies[shash(url)]
+                    out[i] = self.bot.data.proxies[0][shash(url)]
                 except KeyError:
                     try:
                         await asyncio.wait_for(wrap_future(self.temp[url], shield=True), timeout=12)
@@ -473,7 +473,7 @@ class UpdateExec(Database):
                         fn = url.rsplit("/", 1)[-1].split("?", 1)[0]
                         files[i] = cdict(fut=create_task(Request(url, aio=True)), filename="SPOILER_" + fn, url=url)
                     else:
-                        out[i] = self.bot.data.proxies[shash(url)]
+                        out[i] = self.bot.data.proxies[0][shash(url)]
         bot = self.bot
         failed = [None] * len(urls)
         for i, fut in enumerate(files):
@@ -498,7 +498,7 @@ class UpdateExec(Database):
             for i, f in enumerate(files):
                 if f and not failed[i]:
                     try:
-                        self.bot.data.proxies[shash(urls[i])] = out[i] = message.attachments[c].proxy_url
+                        self.bot.data.proxies[0][shash(urls[i])] = out[i] = message.attachments[c].proxy_url
                     except IndexError:
                         break
                     with suppress(KeyError, RuntimeError):
@@ -529,6 +529,11 @@ class UpdateProxies(Database):
     name = "proxies"
     no_delete = True
     limit = 65536
+
+    def __load__(self, **void):
+        if 0 not in self:
+            self.clear()
+            self[0] = {}
 
 
 class Immortalise(Command):

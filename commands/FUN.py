@@ -927,7 +927,7 @@ class UpdateDogpiles(Database):
                         content = content.strip()
                         if not content:
                             return
-                    print(message.channel, content, count)
+                    print(message.channel, content, mcount)
                     if content[0].isascii():
                         content = lim_str("\u200b" + content, 2000)
                     create_task(message.channel.send(content, tts=message.tts))
