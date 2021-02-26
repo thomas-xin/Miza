@@ -769,7 +769,13 @@ class AudioQueue(alist):
             if not auds.source and self:
                 with self.sem:
                     e = self[0]
-                    source = ytdl.get_stream(e, force=True)
+                    source = None
+                    try:
+                        source = ytdl.get_stream(e, force=True)
+                    except:
+                        pass
+                    if not source:
+                        return self.update_load()
                     self.announce_play(e)
                     self.auds.play(source, pos=auds.seek_pos)
             if not auds.next and len(self) > 1:
@@ -2051,6 +2057,7 @@ class AudioDownloader:
             except:
                 print_exc()
                 entry.pop("research", None)
+                entry["url"] = ""
                 raise
             else:
                 stream = entry.get("stream", None)
@@ -2059,7 +2066,11 @@ class AudioDownloader:
         if stream in (None, "none"):
             data = self.search(entry["url"])
             if type(data) is str:
-                data = evalEX(data)
+                try:
+                    data = evalEX(data)
+                except:
+                    entry["url"] = ""
+                    raise
             stream = set_dict(data[0], "stream", data[0].url)
             icon = set_dict(data[0], "icon", data[0].url)
             entry.update(data[0])

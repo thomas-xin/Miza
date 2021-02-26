@@ -4164,15 +4164,21 @@ class AudioClientInterface:
                 if s:
                     if s[0] == "~":
                         c = as_str(literal_eval(s[1:]))
-                        if c.startswith("bot.audio.returns[") and c.endswith("].set_result(None)"):
-                            k = int(c[18:-18])
-                            try:
-                                self.returns[k].set_result(None)
-                            except:
-                                pass
-                        else:
-                            print(c)
-                            create_future_ex(exec_tb, c, bot._globals)
+                        if c.startswith("bot.audio.returns["):
+                            out = Dummy
+                            if c.endswith("].set_result(None)"):
+                                out = None
+                            elif c.endswith("].set_result(True)"):
+                                out = True
+                            if out is not Dummy:
+                                k = int(c[18:-18])
+                                try:
+                                    self.returns[k].set_result(out)
+                                except:
+                                    pass
+                                continue
+                        print(c)
+                        create_future_ex(exec_tb, c, bot._globals)
                     else:
                         print(s)
 
