@@ -767,13 +767,11 @@ class AudioQueue(alist):
         with tracebacksuppressor:
             auds = self.auds
             if not auds.source and self:
+                e = self[0]
+                source = None
                 with self.sem:
-                    e = self[0]
-                    source = None
-                    try:
+                    with tracebacksuppressor:
                         source = ytdl.get_stream(e, force=True)
-                    except:
-                        pass
                 if not source:
                     return self.update_load()
                 with self.sem:
