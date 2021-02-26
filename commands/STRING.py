@@ -548,8 +548,8 @@ class Char2Emoji(Command):
                 else:
                     ani = a.animated
             if e_id:
-                if int(e_id) not in (e.id for e in guild.emojis):
-                    webhook = False
+                # if int(e_id) not in (e.id for e in guild.emojis):
+                #     webhook = False
                 if ani:
                     args[i] = f"<a:_:{e_id}>"
                 else:
