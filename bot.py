@@ -2432,7 +2432,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 comm = comm[1:]
             op = True
         # Respond to blacklisted users attempting to use a command, or when mentioned without a command.
-        if (u_perm <= -inf and (op or self.id in (member.id for member in message.mentions))) and not cpy.content.startswith("~~"):
+        if (u_perm <= -inf and (op or self.id in (member.id for member in message.mentions))) and not cpy.startswith("~~"):
             # print(f"Ignoring command from blacklisted user {user} ({u_id}): {lim_str(message.content, 256)}")
             create_task(send_with_react(
                 channel,

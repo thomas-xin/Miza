@@ -774,8 +774,9 @@ class AudioQueue(alist):
                         source = ytdl.get_stream(e, force=True)
                     except:
                         pass
-                    if not source:
-                        return self.update_load()
+                if not source:
+                    return self.update_load()
+                with self.sem:
                     self.announce_play(e)
                     self.auds.play(source, pos=auds.seek_pos)
             if not auds.next and len(self) > 1:
