@@ -3152,6 +3152,8 @@ class Dump(Command):
                     e = q[i - 1] = cdict(e)
                 e.u_id = user.id
                 e.skips = deque()
+                if i > 2:
+                    e.research = True
                 if not i & 8191:
                     await asyncio.sleep(0.1)
             # Shuffle newly loaded dump if autoshuffle is on
