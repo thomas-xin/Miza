@@ -1345,7 +1345,7 @@ class UpdateAutoEmojis(Database):
                     if emoji.animated:
                         sub += "a"
                     name = getattr(emoji, "name", None) or "_"
-                    sub += f":{emoji.name}:{emoji.id}>"
+                    sub += f":{name}:{emoji.id}>"
                 else:
                     sub = min_emoji(emoji)
                 substitutes = (start, sub, start + len(s))
