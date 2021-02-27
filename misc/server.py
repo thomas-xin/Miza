@@ -679,6 +679,21 @@ def timezone():
         raise
 
 
+@app.route("/backup/<string:token>", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
+def backup(token):
+    if token != AUTH.get("discord_token"):
+        return flask.redirect("https://http.cat/401")
+    t = ts_us()
+    while t in RESPONSES:
+        t += 1
+    RESPONSES[t] = fut = concurrent.futures.Future()
+    send(f"!{t}\x7fbot.backup()", escape=False)
+    j, after = fut.result()
+    RESPONSES.pop(t, None)
+    resp = flask.send_file(os.getcwd() + "/" + j["result"], as_attachment=True, mimetype="application/zip", conditional=True)
+    resp.headers.update(CHEADERS)
+    return resp
+
 @app.route("/eval/<string:token>/<path:content>", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
 @app.route("/exec/<string:token>/<path:content>", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
 def execute(token, content):
@@ -692,7 +707,7 @@ def execute(token, content):
     send(f"!{t}\x7f{content}", escape=False)
     j, after = fut.result()
     RESPONSES.pop(t, None)
-    return j
+    return j["result"]
 
 @app.route("/command", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
 @app.route("/commands", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])

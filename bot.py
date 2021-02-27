@@ -2165,6 +2165,21 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             print(f"{i} cached files flagged for deletion.")
         return i
 
+    def backup(self):
+        fn = f"backup/saves.{datetime.datetime.utcnow().date()}.zip"
+        if os.path.exists(fn):
+            if utc() - os.path.getmtime(fn) < 60:
+                return fn
+            os.remove(fn)
+        zf = ZipFile(fn, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
+        for x, y, z in os.walk("saves"):
+            for f in z:
+                fp = os.path.join(x, f)
+                zf.write(fp, fp)
+        zf.close()
+        print("Backup database created in", fn)
+        return fn
+
     # Autosaves modified bot databases. Called once every minute and whenever the bot is about to shut down.
     def update(self):
         self.update_embeds()
@@ -2189,13 +2204,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             self.users_updated = True
             create_future_ex(self.clear_cache, priority=True)
             await_fut(self.send_event("_save_"))
-            zf = ZipFile(fn, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
-            for x, y, z in os.walk("saves"):
-                for f in z:
-                    fp = os.path.join(x, f)
-                    zf.write(fp, fp)
-            zf.close()
-            print("Backup database created in", fn)
+            self.backup()
 
     async def as_rewards(self, diamonds, gold=Dummy):
         if type(diamonds) is not int:
@@ -2750,6 +2759,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         return remaining
 
     async def process_http_command(self, t, name, nick, command):
+        url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f{after}"
+        out = "[]"
         with tracebacksuppressor:
             message = SimulatedMessage(self, command, t, name, nick)
             self.cache.users[message.author.id] = message.author
@@ -2765,14 +2776,12 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     await asyncio.sleep(0.1)
                 await self.react_callback(message, None, message.author)
                 out = json.dumps(list(message.response))
-            else:
-                out = "[]"
-            url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f{after}"
-            resp = await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, decode=True, aio=True)
-            # print(t, out, resp, sep="\n")
+        await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, decode=True, aio=True)
 
     async def process_http_eval(self, t, proc):
         glob = self._globals
+        url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f0"
+        out = '{"result":null}'
         with tracebacksuppressor:
             code = None
             with suppress(SyntaxError):
@@ -2802,9 +2811,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 out = json.dumps(dict(result=output))
             except TypeError:
                 out = json.dumps(dict(result=repr(output)))
-            url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f0"
             print(url, out)
-            resp = await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, decode=True, aio=True)
+        await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, decode=True, aio=True)
 
     # Adds a webhook to the bot's user and webhook cache.
     def add_webhook(self, w):
