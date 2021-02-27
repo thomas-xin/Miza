@@ -37,7 +37,8 @@ async def respond(s):
     k, c = as_str(s[1:]).split("~", 1)
     c = as_str(literal_eval(c))
     if c == "ytdl.update()":
-        await create_future(ytdl.update)
+        with tracebacksuppressor:
+            await create_future(update_cache)
         res = "None"
     else:
         res = None
@@ -666,7 +667,16 @@ class BufferedAudioReader(discord.AudioSource):
             b, self.buffer = self.buffer, None
             self.pos += 1
             return b
-        out = next(self.packet_iter, b"")
+        if self.full:
+            fut = create_future_ex(next, self.packet_iter, b"")
+            try:
+                out = fut.result(timeout=0.1)
+            except concurent.futures.TimeoutError:
+                with suppress():
+                    self.proc.kill()
+                out = b""
+        else:
+            out = next(self.packet_iter, b"")
         self.pos += 1
         return out
 

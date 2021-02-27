@@ -320,24 +320,26 @@ class Neko(Command):
                     if out:
                         print("nekos.moe", len(out))
                         return out
-                if xrand(2):
-                    if "neko" not in self.nekobot_sem:
-                        self.nekobot_sem.neko = Semaphore(56, 56, rate_limit=60, last=True)
+                if "neko" not in self.nekobot_sem:
+                    self.nekobot_sem.neko = Semaphore(56, 56, rate_limit=60, last=True)
+                if xrand(2) and not self.nekobot_sem.neko.is_busy():
                     nekobot_sem = self.nekobot_sem.neko
                     async with nekobot_sem:
                         data = await Request("https://nekobot.xyz/api/image?type=neko", aio=True, json=True)
                     return data["message"]
-            if (tag in nekobot_exclusive or tag in nekobot_shared and xrand(2)) and (tag not in self.nekobot_sem or not self.nekobot_sem[tag].is_busy()):
+            if (tag in nekobot_exclusive or tag in nekobot_shared and xrand(2)):
                 if tag not in self.nekobot_sem:
                     self.nekobot_sem[tag] = Semaphore(56, 56, rate_limit=60, last=True)
                 nekobot_sem = self.nekobot_sem[tag]
                 if tag in ("ass", "pussy", "anal", "boobs", "thigh"):
                     tag = "h" + tag
-                async with nekobot_sem:
-                    url = f"https://nekobot.xyz/api/image?type={tag}"
-                    # print(url, len(self.nekobot_sem.rate_bin))
-                    data = await Request(url, aio=True, json=True)
-                return data["message"]
+                with suppress(SemaphoreOverflowError):
+                    async with nekobot_sem:
+                        url = f"https://nekobot.xyz/api/image?type={tag}"
+                        # print(url, len(self.nekobot_sem.rate_bin))
+                        data = await Request(url, aio=True, json=True)
+                    return data["message"]
+                return
             if tag == "meow":
                 data = await Request("https://nekos.life/api/v2/img/meow", aio=True, json=True)
                 return data["url"]
