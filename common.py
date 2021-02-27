@@ -82,9 +82,9 @@ emptyctx = EmptyContext()
 # Manages concurrency limits, similar to asyncio.Semaphore, but has a secondary threshold for enqueued tasks.
 class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
 
-    __slots__ = ("limit", "buffer", "fut", "active", "passive", "rate_limit", "rate_bin", "trace")
+    __slots__ = ("limit", "buffer", "fut", "active", "passive", "rate_limit", "rate_bin", "last", "trace")
 
-    def __init__(self, limit=256, buffer=32, delay=0.05, rate_limit=None, randomize_ratio=2, trace=False):
+    def __init__(self, limit=256, buffer=32, delay=0.05, rate_limit=None, randomize_ratio=2, last=False, trace=False):
         self.limit = limit
         self.buffer = buffer
         self.active = 0
@@ -93,6 +93,7 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
         self.rate_bin = deque()
         self.fut = concurrent.futures.Future()
         self.fut.set_result(None)
+        self.last = last
         self.trace = trace and inspect.stack()[1]
 
     def __str__(self):
@@ -106,7 +107,7 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
 
     def _update_bin(self):
         try:
-            while self.rate_bin and utc() - self.rate_bin[0] >= self.rate_limit:
+            while self.rate_bin and utc() - self.rate_bin[0 - self.trace] >= self.rate_limit:
                 self.rate_bin.popleft()
         except IndexError:
             pass

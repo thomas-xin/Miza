@@ -774,14 +774,31 @@ img {
 </body>
 </html>"""
 
+ipm = dict(
+    cats="cat",
+    dogs="dog",
+    nekos="neko",
+)
+@app.route("/cat", methods=["GET"])
+@app.route("/cats", methods=["GET"])
 @app.route("/dog", methods=["GET"])
 @app.route("/dogs", methods=["GET"])
-def dog():
+@app.route("/neko", methods=["GET"])
+@app.route("/nekos", methods=["GET"])
+@app.route("/giphy", methods=["GET"])
+def imagepool():
+    name = flask.request.path.rsplit("/", 1)[-1]
+    command = ipm.get(name, name)
+    argv = flask.request.args.get("tag", "")
+    try:
+        args = shlex.split(argv)
+    except ValueError:
+        args = argv.split()
     t = ts_us()
     while t in RESPONSES:
         t += 1
     RESPONSES[t] = fut = concurrent.futures.Future()
-    send(f"!{t}\x7fbot.commands.dog[0](bot, None, 'v')", escape=False)
+    send(f"!{t}\x7fbot.commands.{command}[0](bot=bot,channel=None,flags='v',args={repr(args)},argv={repr(argv)})", escape=False)
     j, after = fut.result()
     RESPONSES.pop(t, None)
     url = j["result"]
@@ -809,6 +826,8 @@ img {
   left: 50%;
   -ms-transform: translate(-50%, -50%);
   transform: translate(-50%, -50%);
+  max-width: 100%;
+  max-height: 100%;        
 }""" + f"""
 </style>
 </head>

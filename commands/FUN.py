@@ -1916,9 +1916,11 @@ class Giphy(ImagePool, Command):
             create_task(fetchall(tag))
         return self.bot.data.imagepools.get(file, fetch, self.threshold, args=(tag,))
     
-    async def __call__(self, args, channel, **void):
+    async def __call__(self, bot, channel, flags, args, **void):
         if not args:
             raise ArgumentError("Input string is empty.")
         tag = "%20".join(sorted("".join(c for c in w.casefold() if c.isalnum()) for w in args))
         url = await self.img(tag)
+        if "v" in flags:
+            return escape_roles(url)
         self.bot.send_as_embeds(channel, image=url)

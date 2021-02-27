@@ -241,7 +241,6 @@ class AudioPlayer(discord.AudioSource):
         except:
             print_exc()
         if not out:
-            print("EMPTY")
             with tracebacksuppressor(StopIteration):
                 entry = self.queue.popleft()
                 create_future_ex(entry[0].close)

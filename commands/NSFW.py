@@ -299,12 +299,12 @@ class Neko(Command):
     rate_limit = (0.05, 4)
     threshold = 256
     moe_sem = Semaphore(1, 0, rate_limit=10)
-    nekobot_sem = Semaphore(45, 210, rate_limit=120)
+    nekobot_sem = Semaphore(55, 210, rate_limit=60, last=True)
 
     def img(self, tag=None):
 
         async def fetch(nekos, tag):
-            if tag is None:
+            if tag in (None, "neko"):
                 tag = "neko"
                 if not xrand(50) and not self.moe_sem.is_busy():
                     with self.moe_sem:
@@ -340,13 +340,14 @@ class Neko(Command):
         file = f"neko~{tag}" if tag else "neko"
         return self.bot.data.imagepools.get(file, fetch, self.threshold, args=(nekos, tag))
 
-    async def __call__(self, bot, args, argv, flags, message, channel, guild, **void):
+    async def __call__(self, bot, channel, flags, args, argv, **void):
         isNSFW = is_nsfw(channel)
         if "l" in flags or argv == "list":
             text = "Available tags in **" + channel.name + "**:\n```ini\n"
             available = [k for k, v in neko_tags.items() if not v or isNSFW]
             text += str(sorted(available)) + "```"
             return text
+        guild = getattr(channel, "guild", None)
         tagNSFW = False
         selected = []
         for tag in args:
@@ -357,9 +358,10 @@ class Neko(Command):
                     if not isNSFW:
                         raise PermissionError(f"This tag is only available in {uni_str('NSFW')} channels.")
                 selected.append(tag)
-        for _ in loop(flags.get("r", 0)):
-            possible = [k for k, v in neko_tags.items() if not v or isNSFW]
-            selected.append(choice(possible))
+        if "r" in flags:
+            for _ in loop(flags["r"]):
+                possible = [k for k, v in neko_tags.items() if not v or isNSFW]
+                selected.append(choice(possible))
         if not selected:
             if not argv:
                 url = await self.img()
@@ -383,7 +385,7 @@ class Neko(Command):
                 url = await self.img(get)
         if "v" in flags:
             return escape_roles(url)
-        self.bot.send_as_embeds(channel, image=url)
+        bot.send_as_embeds(channel, image=url)
 
 
 class Lewd(Command):

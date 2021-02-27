@@ -4131,12 +4131,12 @@ class AudioClientInterface:
     def players(self):
         return bot.data.audio.players
 
-    def submit(self, s, aio=False):
+    def submit(self, s, aio=False, ignore=False):
         key = ts_us()
         while key in self.returns:
             key += 1
         self.returns[key] = None
-        b = f"~{key}~".encode("utf-8") + (b"await " if aio else b"") + repr(as_str(s).encode("utf-8")).encode("utf-8") + b"\n"
+        b = f"~{key}~".encode("utf-8") + (b"!" if ignore else b"") + (b"await " if aio else b"") + repr(as_str(s).encode("utf-8")).encode("utf-8") + b"\n"
         # print(b)
         self.returns[key] = concurrent.futures.Future()
         self.fut.result()
