@@ -299,7 +299,7 @@ class Neko(Command):
     rate_limit = (0.05, 4)
     threshold = 256
     moe_sem = Semaphore(1, 0, rate_limit=10)
-    nekobot_sem = Semaphore(55, 210, rate_limit=60, last=True)
+    nekobot_sem = cdict()
 
     def img(self, tag=None):
 
@@ -324,10 +324,13 @@ class Neko(Command):
                     async with self.nekobot_sem:
                         data = await Request("https://nekobot.xyz/api/image?type=neko", aio=True, json=True)
                     return data["message"]
-            if tag in nekobot_exclusive or tag in nekobot_shared and xrand(2):
+            if (tag in nekobot_exclusive or tag in nekobot_shared and xrand(2)) and (tag not in self.nekobot_sem or not self.nekobot_sem[tag].is_busy()):
+                if tag not in self.nekobot_sem:
+                    self.nekobot_sem[tag] = Semaphore(56, 56, rate_limit=60, last=True)
+                nekobot_sem = self.nekobot_sem[tag]
                 if tag in ("ass", "pussy", "anal", "boobs", "thigh"):
                     tag = "h" + tag
-                async with self.nekobot_sem:
+                async with nekobot_sem:
                     url = f"https://nekobot.xyz/api/image?type={tag}"
                     # print(url, len(self.nekobot_sem.rate_bin))
                     data = await Request(url, aio=True, json=True)
