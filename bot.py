@@ -4177,7 +4177,6 @@ class AudioClientInterface:
                                 except:
                                     pass
                                 continue
-                        print(c)
                         create_future_ex(exec_tb, c, bot._globals)
                     else:
                         print(s)

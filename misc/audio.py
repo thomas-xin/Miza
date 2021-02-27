@@ -38,9 +38,13 @@ async def respond(s):
     c = as_str(literal_eval(c))
     if c == "ytdl.update()":
         await create_future(ytdl.update)
-        resp = None
+        res = "None"
     else:
+        res = None
         try:
+            if c[0] == "!":
+                c = c[1:]
+                res = "None"
             if c.startswith("await "):
                 resp = await eval(c[6:], client._globals)
             else:
@@ -57,12 +61,13 @@ async def respond(s):
             sys.stdout.write(traceback.format_exc())
             await create_future(submit, f"bot.audio.returns[{k}].set_exception(pickle.loads({repr(pickle.dumps(ex))}))", priority=True)
             return
-    res = repr(resp)
-    if type(resp) not in (bool, int, float, str, bytes):
-        try:
-            compile(res, "miza2", "eval")
-        except SyntaxError:
-            res = repr(str(resp))
+    if not res:
+        res = repr(resp)
+        if type(resp) not in (bool, int, float, str, bytes):
+            try:
+                compile(res, "miza2", "eval")
+            except SyntaxError:
+                res = repr(str(resp))
     await create_future(submit, f"bot.audio.returns[{k}].set_result({res})", priority=True)
 
 async def communicate():

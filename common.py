@@ -95,6 +95,11 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
         self.fut.set_result(None)
         self.trace = trace and inspect.stack()[1]
 
+    def __str__(self):
+        classname = str(self.__class__).replace("'>", "")
+        classname = classname[classname.index("'") + 1:]
+        return f"<{classname} object at {hex(id(self)).upper().replace('X', 'x')}>: {self.active}/{self.limit}, {self.passive}/{self.buffer}, {len(self.rate_bin)}/{self.rate_limit}"
+
     def _update_bin_after(self, t):
         time.sleep(t)
         self._update_bin()

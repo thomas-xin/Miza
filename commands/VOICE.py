@@ -355,6 +355,7 @@ class CustomAudio(collections.abc.Hashable):
             self.acsi = None
             self.args = []
             self.queue = AudioQueue()
+            self.queue._init_()
             self.queue.auds = self
             self.semaphore = Semaphore(1, 4, rate_limit=1 / 8)
             self.announcer = Semaphore(1, 1, rate_limit=1 / 3)
@@ -740,14 +741,17 @@ class AudioQueue(alist):
 
     maxitems = 262144
 
-    def _init_(self, auds):
-        self.auds = auds
-        self.bot = auds.bot
-        self.acsi = auds.acsi
+    def _init_(self, auds=None):
         self.lastsent = 0
         self.loading = False
         self.playlist = None
         self.sem = Semaphore(1, 0, trace=True)
+        self.wait = concurrent.futures.Future()
+        if auds:
+            self.auds = auds
+            self.bot = auds.bot
+            self.acsi = auds.acsi
+            self.wait.set_result(auds)
 
     def announce_play(self, e):
         auds = self.auds
@@ -777,7 +781,7 @@ class AudioQueue(alist):
                 with self.sem:
                     self.announce_play(e)
                     self.auds.play(source, pos=auds.seek_pos)
-            if not auds.next and len(self) > 1:
+            if not auds.next and auds.source and len(self) > 1:
                 with self.sem:
                     e = self[1]
                     source = ytdl.get_stream(e)
@@ -786,6 +790,7 @@ class AudioQueue(alist):
 
     # Update queue, loading all file streams that would be played soon
     def update_load(self):
+        self.wait.result()
         q = self
         if q:
             dels = deque()
@@ -806,7 +811,7 @@ class AudioQueue(alist):
             if self.auds.source:
                 self.auds.stop()
         elif not self.auds.paused:
-            create_future_ex(self.start_queue, priority=True)
+            self.start_queue()
 
     # Advances queue when applicable, taking into account loop/repeat/shuffle settings.
     def advance(self, looped=True, repeated=True, shuffled=True):
@@ -989,7 +994,7 @@ class AudioFileLink:
         self.readable = concurrent.futures.Future()
         if wasfile:
             self.readable.set_result(self)
-        source = bot.audio.submit(f"AudioFile({repr(fn)},{repr(stream)},{repr(wasfile)})")
+        source = bot.audio.submit(f"!AudioFile({repr(fn)},{repr(stream)},{repr(wasfile)})")
         self.assign = deque()
         # print("Loaded source", source)
 
@@ -1015,14 +1020,13 @@ class AudioFileLink:
         self.live = live
         self.seekable = seekable
         self.webpage_url = webpage_url
-        out = bot.audio.submit(f"cache['{self.fn}'].load(" + ",".join(repr(i) for i in (stream, check_fmt, force, webpage_url, live, seekable, duration)) + ")")
+        bot.audio.submit(f"!cache['{self.fn}'].load(" + ",".join(repr(i) for i in (stream, check_fmt, force, webpage_url, live, seekable, duration)) + ")")
         if duration:
             self.dur = duration
         try:
             self.readable.set_result(self)
         except concurrent.futures.InvalidStateError:
             pass
-        return out
 
     def create_reader(self, pos, auds=None):
         if auds is not None:
@@ -1034,7 +1038,7 @@ class AudioFileLink:
             ident = None
             options = ()
         ts = ts_us()
-        bot.audio.submit(f"cache['{self.fn}'].create_reader({repr(pos)},{repr(ident)},{repr(options)},{ts})")
+        bot.audio.submit(f"!cache['{self.fn}'].create_reader({repr(pos)},{repr(ident)},{repr(options)},{ts})")
         return ts
 
     def duration(self):
@@ -1090,7 +1094,7 @@ class AudioClientSubInterface:
         if channel:
             self.channel = channel
             self.guild = channel.guild
-            bot.audio.submit(f"await AP.join({channel.id})")
+            bot.audio.submit(f"!await AP.join({channel.id})")
             bot.audio.clients[self.guild.id] = self
 
     def __str__(self):
@@ -1128,19 +1132,17 @@ class AudioClientSubInterface:
         return bot.audio.submit(f"AP.from_guild({self.guild.id}).play(players[{repr(src)}])")
 
     def connect(self, reconnect=True, timeout=60):
-        return create_future(bot.audio.submit, f"await AP.from_guild({self.guild.id}).connect(reconnect={reconnect}, timeout={timeout})")
+        return create_future(bot.audio.submit, f"!await AP.from_guild({self.guild.id}).connect(reconnect={reconnect}, timeout={timeout})")
 
     async def disconnect(self, force=False):
-        resp = await create_future(bot.audio.submit, f"await AP.from_guild({self.guild.id}).disconnect(force={force})")
+        await create_future(bot.audio.submit, f"!await AP.from_guild({self.guild.id}).disconnect(force={force})")
         self.channel = None
-        return resp
 
     async def move_to(self, channel=None):
         if not channel:
             return await self.disconnect(force=True)
-        resp = await create_future(bot.audio.submit, f"await AP.from_guild({self.guild.id}).move_to(client.get_channel({channel.id}))")
+        await create_future(bot.audio.submit, f"!await AP.from_guild({self.guild.id}).move_to(client.get_channel({channel.id}))")
         self.channel = channel
-        return resp
 
 ACSI = AudioClientSubInterface
 
@@ -1273,7 +1275,10 @@ class AudioDownloader:
             return entry
         except Exception as ex:
             if resp:
-                excs.append(resp)
+                if b'<h3 class="text-center text-xl">Error: No Streams found.</h3>' in resp:
+                    excs.append("Error: No Streams found.")
+                else:
+                    excs.append(resp)
             excs.append(ex)
         try:
             self.other_x += 1
@@ -1327,11 +1332,15 @@ class AudioDownloader:
             return entry
         except Exception as ex:
             if resp:
-                excs.append(resp)
+                if b"our system was not able to detect any video at the adress you provided." in resp:
+                    excs.append("our system was not able to detect any video at the adress you provided.")
+                else:
+                    excs.append(resp)
             excs.append(ex)
         try:
+            resp = None
             self.other_x += 1
-            data = Request("https://y2mate.guru/api/convert", data={"url": webpage_url}, method="POST", json=True, timeout=16)
+            resp = data = Request("https://y2mate.guru/api/convert", data={"url": webpage_url}, method="POST", json=True, timeout=16)
             meta = data["meta"]
             entry = {
                 "formats": [
