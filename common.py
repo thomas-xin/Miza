@@ -144,7 +144,7 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
     def __exit__(self, *args):
         self.active -= 1
         if self.rate_bin:
-            t = self.rate_bin[0] + self.rate_limit - utc()
+            t = self.rate_bin[0 - self.trace] + self.rate_limit - utc()
             if t > 0:
                 create_future_ex(self._update_bin_after, t, priority=True)
             else:
