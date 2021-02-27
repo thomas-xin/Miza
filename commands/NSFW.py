@@ -321,7 +321,10 @@ class Neko(Command):
                         print("nekos.moe", len(out))
                         return out
                 if xrand(2):
-                    async with self.nekobot_sem:
+                    if "neko" not in self.nekobot_sem:
+                        self.nekobot_sem.neko = Semaphore(56, 56, rate_limit=60, last=True)
+                    nekobot_sem = self.nekobot_sem.neko
+                    async with nekobot_sem:
                         data = await Request("https://nekobot.xyz/api/image?type=neko", aio=True, json=True)
                     return data["message"]
             if (tag in nekobot_exclusive or tag in nekobot_shared and xrand(2)) and (tag not in self.nekobot_sem or not self.nekobot_sem[tag].is_busy()):
