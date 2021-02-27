@@ -107,8 +107,12 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
 
     def _update_bin(self):
         try:
-            while self.rate_bin and utc() - self.rate_bin[0 - self.trace] >= self.rate_limit:
-                self.rate_bin.popleft()
+            if self.last:
+                if self.rate_bin and utc() - self.rate_bin[-1] >= self.rate_limit:
+                    self.rate_bin.clear()
+            else:
+                while self.rate_bin and utc() - self.rate_bin[0] >= self.rate_limit:
+                    self.rate_bin.popleft()
         except IndexError:
             pass
         if not self.rate_bin:
