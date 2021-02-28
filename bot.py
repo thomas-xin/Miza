@@ -1457,6 +1457,69 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 url = await self.data.exec.uproxy(url)
         return url
 
+    async def as_embed(self, message):
+        emb = discord.Embed(description=message.content).set_author(**get_author(message.author))
+        if len(message.embeds) > 1 or message.content:
+            urls = list(itertools.chain(("(" + e.url + ")" for e in message.embeds if e.url), ("[" + best_url(a) + "]" for a in message.attachments)))
+            items = []
+            for i in range((len(urls) + 9) // 10):
+                temp = urls[i * 10:i * 10 + 10]
+                temp2 = await self.data.exec.uproxy(*temp, collapse=False)
+                items.extend(temp2[x] or temp[x] for x in range(len(temp)))
+        else:
+            items = None
+        if items:
+            if emb.description in items:
+                emb.description = lim_str("\n".join(items), 2048)
+            else:
+                emb.description = lim_str(emb.description + "\n" + "\n".join(items), 2048)
+        image = None
+        for a in message.attachments:
+            url = a.url
+            if is_image(url) is not None:
+                image = await self.data.exec.uproxy(url)
+        if not image and message.embeds:
+            for e in message.embeds:
+                if e.image:
+                    image = await self.data.exec.uproxy(e.image.url)
+                if e.thumbnail:
+                    image = await self.data.exec.uproxy(e.thumbnail.url)
+        if image:
+            emb.url = image
+            emb.set_image(url=image)
+        for e in message.embeds:
+            if len(emb.fields) >= 25:
+                break
+            if not emb.description or emb.description == EmptyEmbed:
+                title = e.title or ""
+                if title:
+                    emb.title = title
+                emb.url = e.url or ""
+                description = e.description or e.url or ""
+                if description:
+                    emb.description = description
+            else:
+                if e.title or e.description:
+                    emb.add_field(name=e.title or e.url or "\u200b", value=lim_str(e.description, 1024) or e.url or "\u200b", inline=False)
+            for f in e.fields:
+                if len(emb.fields) >= 25:
+                    break
+                if f:
+                    emb.add_field(name=f.name, value=f.value, inline=getattr(f, "inline", True))
+            if len(emb) >= 6000:
+                while len(emb) > 6000:
+                    emb.remove_field(-1)
+                break
+        if not emb.description:
+            urls = list(itertools.chain(("(" + e.url + ")" for e in message.embeds if e.url), ("[" + best_url(a) + "]" for a in message.attachments)))
+            items = []
+            for i in range((len(urls) + 9) // 10):
+                temp = urls[i * 10:i * 10 + 10]
+                temp2 = await self.data.exec.uproxy(*temp, collapse=False)
+                items.extend(temp2[x] or temp[x] for x in range(len(temp)))
+            emb.description = lim_str("\n".join(items), 2048)
+        return emb
+
     # Limits a cache to a certain amount, discarding oldest entries first.
     def limit_cache(self, cache=None, limit=None):
         if limit is None:

@@ -2393,7 +2393,7 @@ class UpdateStarboards(Database):
                             self.data["triggered"].discard(next(iter(self.data["triggered"])))
                     self.update("triggered")
                     with tracebacksuppressor:
-                        embed = as_embed(message)
+                        embed = await self.bot.as_embed(message)
                         col = await self.bot.get_colour(message.author)
                         embed.colour = discord.Colour(col)
                         data = ("#" + str(message.channel), to_png(message.guild.icon_url))

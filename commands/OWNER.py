@@ -459,7 +459,7 @@ class UpdateExec(Database):
                     c += 1
         return out if len(out) > 1 else out[0]
     
-    async def uproxy(self, *urls):
+    async def uproxy(self, *urls, collapse=True):
         out = [None] * len(urls)
         files = [None] * len(urls)
         for i, url in enumerate(urls):
@@ -507,7 +507,9 @@ class UpdateExec(Database):
                     with suppress(KeyError, RuntimeError):
                         self.temp.pop(urls[i]).set_result(None)
                     c += 1
-        return out if len(out) > 1 else out[0]
+        if collapse:
+            return out if len(out) > 1 else out[0]
+        return out
     
     def cproxy(self, url):
         if url in self.temp:
