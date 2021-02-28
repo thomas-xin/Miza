@@ -621,7 +621,7 @@ class FileHashDict(collections.abc.MutableMapping):
             s = select_and_dumps(d, mode="unsafe")
             with self.sem:
                 safe_save(fn, s)
-        deleted = frozenset(self.deleted)
+        deleted = list(self.deleted)
         if deleted:
             self.iter = None
         self.deleted.clear()

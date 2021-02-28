@@ -2759,7 +2759,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         return remaining
 
     async def process_http_command(self, t, name, nick, command):
-        url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f{after}"
+        url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f0"
         out = "[]"
         with tracebacksuppressor:
             message = SimulatedMessage(self, command, t, name, nick)
@@ -2776,6 +2776,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     await asyncio.sleep(0.1)
                 await self.react_callback(message, None, message.author)
                 out = json.dumps(list(message.response))
+            url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f{after}"
         await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, decode=True, aio=True)
 
     async def process_http_eval(self, t, proc):

@@ -244,9 +244,8 @@ if os.name == "nt":
         except (TypeError, ValueError):
             return sympy.factorint(n, **kwargs)
         args = ["misc/ecm.exe", s]
-        proc = psutil.Popen(args, stdout=subprocess.PIPE)
-        proc.wait()
-        data = proc.stdout.read().decode("utf-8", "replace").replace(" ", "")
+        proc = subprocess.run(args, stdout=subprocess.PIPE)
+        data = proc.stdout.decode("utf-8", "replace").replace(" ", "")
         if "<li>" not in data:
             if not data:
                 raise RuntimeError("no output found.")

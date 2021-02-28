@@ -946,7 +946,6 @@ def mid2mp3(mid):
         method="post",
         decode=True,
     )
-    print(url)
     fn = url.rsplit("/", 1)[-1].strip("\x00")
     for i in range(360):
         with delay(1):
