@@ -1283,7 +1283,7 @@ class AudioDownloader:
         try:
             self.other_x += 1
             resp = Request(
-                "https://keepv.id/",
+                "https://keepv.id",
                 headers={"Accept": "*/*", "Cookie": "PHPSESSID=" + self.keepvid_token, "X-Requested-With": "XMLHttpRequest"},
                 data=(("url", webpage_url), ("sid", self.keepvid_token)),
                 method="POST",
@@ -1541,7 +1541,7 @@ class AudioDownloader:
                 orig_path = path
                 ind = "\x7f"
                 if path.startswith("~"):
-                    b = path.split(".", 1)[0].encode("utf-8") + b"==="
+                    b = path.split(".", 1)[0].encode("utf-8") + b"=="
                     if (len(b) - 1) & 3 == 0:
                         b += b"="
                     path = str(int.from_bytes(base64.urlsafe_b64decode(b), "big"))
@@ -1608,7 +1608,7 @@ class AudioDownloader:
                 orig_path = path
                 ind = "\x7f"
                 if path.startswith("~"):
-                    b = path.split(".", 1)[0].encode("utf-8") + b"==="
+                    b = path.split(".", 1)[0].encode("utf-8") + b"=="
                     if (len(b) - 1) & 3 == 0:
                         b += b"="
                     path = str(int.from_bytes(base64.urlsafe_b64decode(b), "big"))

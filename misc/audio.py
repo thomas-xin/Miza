@@ -267,6 +267,8 @@ class AudioPlayer(discord.AudioSource):
             return self.play(source, after=after)
         if len(self.queue) < 2:
             self.queue.append(None)
+        else:
+            self.queue[1][0].close()
         self.queue[1] = (source, after)
 
     def clear_source(self):
@@ -276,7 +278,7 @@ class AudioPlayer(discord.AudioSource):
     
     def clear_next(self):
         if len(self.queue) > 1:
-            self.queue.popright()[0].close()
+            self.queue.pop()[0].close()
 
     def skip(self):
         if self.queue:
