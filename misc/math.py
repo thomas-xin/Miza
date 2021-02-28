@@ -49,7 +49,7 @@ def TryWrapper(func):
 # Brainfuck Interpreter
 # Copyright 2011 Sebastian Kaspari
 
-def evaluate(code):
+def bf_evaluate(code):
     out = deque()
     code = cleanup(list(code))
     bracemap = buildbracemap(code)
@@ -125,7 +125,7 @@ def bf_parse(s):
                         s = s[:i] + "(" + s[i + 1:] + ")"
     return s
 
-_bf = lambda s: evaluate(s)
+_bf = lambda s: bf_evaluate(s)
 
 
 # Randomizer
@@ -325,6 +325,7 @@ _globals.update({
     "lim": lim,
     "factorint": _factorint,
     "factors": _factorint,
+    "factorise": factorize,
     "factorize": factorize,
     "factor": factorize,
     "abs": sympy.Abs,
