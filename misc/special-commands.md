@@ -77,6 +77,7 @@ factorize(1201353867969769697054927471068963908362569496107926782221031) = [7051
 - Able to use all SymPy plotting functions, automatically uploading them to Discord as message attachments.
 
 ~math plot atan(x)
+
 ![plot_atan](https://cdn.discordapp.com/attachments/320915703102177293/815403492373299200/1614477739417566.png)
 
 - Some additional custom functions:
@@ -99,6 +100,7 @@ ncr(20, 4) = 4845
 
 
 ~math plot_array([5, 9, 12, -1, 3])
+
 ![plot_array](https://cdn.discordapp.com/attachments/320915703102177293/815405611688525824/1614478245186992.png)
 
 - This command is open to suggestions for more custom additions or integrations!
