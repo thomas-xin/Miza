@@ -3400,7 +3400,7 @@ class AudioSettings(Command):
             return css_md(s), 1
 
 
-class Rotate(Command):
+class Roll(Command):
     server_only = True
     name = ["🔄", "Jump"]
     min_display = "0~1"

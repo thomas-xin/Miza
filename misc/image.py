@@ -1049,6 +1049,18 @@ def resize_to(image, w, h, operation="auto"):
         image = ImageOps.flip(image)
     return image.resize([w, h], filt)
 
+def rotate_to(image, angle):
+    angle %= 360
+    if not angle % 90:
+        if angle == 90:
+            return image.transpose(Image.ROTATE_90)
+        elif angle == 180:
+            return image.transpose(Image.ROTATE_180)
+        elif angle == 270:
+            return image.transpose(Image.ROTATE_270)
+        return image
+    return image.rotate(angle, resample=Image.BICUBIC, expand=True)
+
 
 def get_colour(image):
     if "A" in str(image.mode):

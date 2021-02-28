@@ -810,7 +810,7 @@ class Rainbow(Command):
 
 
 class Scroll(Command):
-    name = ["Parallax", "Roll", "Offset", "ScrollGIF"]
+    name = ["Parallax", "Offset", "ScrollGIF"]
     description = "Creates a .gif image from repeatedly shifting supplied image in a specified direction."
     usage = "<0:url> <1:direction(left)>? <2:duration(2)>? <3:fps(25)>?"
     no_parse = True
@@ -1065,6 +1065,29 @@ class Resize(Command):
             if not name.endswith(".png"):
                 name += ".png"
             resp = await process_image(url, "resize_mult", [x, y, op], timeout=_timeout)
+            fn = resp[0]
+            if fn.endswith(".gif"):
+                if not name.endswith(".gif"):
+                    if "." in name:
+                        name = name[:name.rindex(".")]
+                    name += ".gif"
+        await bot.send_with_file(channel, "", fn, filename=name)
+
+
+class Rotate(Command):
+    name = ["Orientate", "Orientation", "Transpose"]
+    description = "Rotates an image."
+    usage = "<0:url> <1:angle(90)>?"
+    no_parse = True
+    rate_limit = (2, 5)
+    _timeout_ = 3
+    typing = True
+
+    async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
+        name, value, url = await get_image(bot, user, message, args, argv, default=90, raw=True)
+        value = await bot.eval_math(value)
+        with discord.context_managers.Typing(channel):
+            resp = await process_image(url, "rotate_to", [value], timeout=_timeout)
             fn = resp[0]
             if fn.endswith(".gif"):
                 if not name.endswith(".gif"):

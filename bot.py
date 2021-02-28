@@ -1841,6 +1841,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
     # Evaluates a math formula to a float value, using a math process from the subprocess pool when necessary.
     async def eval_math(self, expr, default=0, op=True):
+        expr = as_str(expr)
         if op:
             # Allow mathematical operations on a default value
             _op = None
