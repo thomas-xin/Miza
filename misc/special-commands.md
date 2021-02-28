@@ -66,7 +66,7 @@ x   3   45   945
 ```
 
 
-- SymPy is unable to find very large prime factors; Miza uses an implementation of [ECM](https://www.alpertron.com.ar/ECM.HTM) in order to perform factorization of numbers 2^64 or higher.
+- SymPy is unable to find very large prime factors; Miza uses an implementation of [ECM/SIQS](https://www.alpertron.com.ar/ECM.HTM) in order to perform factorization of numbers 2^64 or higher.
 
 ~math factorize(1201353867969769697054927471068963908362569496107926782221031)
 ```
