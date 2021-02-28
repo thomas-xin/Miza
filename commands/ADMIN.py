@@ -1361,8 +1361,8 @@ class UpdateAutoEmojis(Database):
         msg = escape_everyone(msg)
         if msg == message.content:
             return
-        print(message.content)
-        print(msg)
+        # print(message.content)
+        # print(msg)
         create_task(self.bot.silent_delete(message))
         url = await self.bot.get_proxy_url(message.author)
         await self.bot.send_as_webhook(message.channel, msg, username=message.author.display_name, avatar_url=url)
