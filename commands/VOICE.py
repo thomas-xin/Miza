@@ -546,40 +546,43 @@ class CustomAudio(collections.abc.Hashable):
 
     # Update event, ensures audio is playing correctly and moves, leaves, or rejoins voice when necessary.
     def update(self, *void1, **void2):
-        if self.stats.stay:
-            cnt = inf
-        else:
-            cnt = sum(1 for m in self.acsi.channel.members if not m.bot)
-        if not cnt:
-            # Timeout for leaving is 120 seconds
-            if self.timeout < utc() - 120:
-                return self.kill(css_md(f"🎵 Automatically disconnected from {sqr_md(self.guild)}: All channels empty. 🎵"))
-            perms = self.acsi.channel.permissions_for(guild.me)
-            if not perms.connect or not perms.speak:
-                return self.kill(css_md(f"🎵 Automatically disconnected from {sqr_md(self.guild)}: No permission to connect/speak in {sqr_md(self.acsi.channel)}. 🎵"))
-            # If idle for more than 10 seconds, attempt to find members in other voice channels
-            elif self.timeout < utc() - 10:
-                if guild.afk_channel and (guild.afk_channel.id != self.acsi.channel.id and guild.afk_channel.permissions_for(guild.me).connect):
-                    await_fut(self.move_unmute(vc, guild.afk_channel))
-                else:
-                    cnt = 0
-                    ch = None
-                    for channel in guild.voice_channels:
-                        if channel.id != guild.afk_channel.id:
-                            c = sum(1 for m in channel.members if not m.bot)
-                            if c > cnt:
-                                cnt = c
-                                ch = channel
-                    if ch:
-                        with tracebacksuppressor(SemaphoreOverflowError):
-                            await_fut(self.acsi.move_to(ch))
-                            self.announce(ini_md(f"🎵 Detected {sqr_md(cnt)} user{'s' if cnt != 1 else ''} in {sqr_md(ch)}, automatically joined! 🎵"), aio=False)
-        else:
-            self.timeout = utc()
-        if m.voice is not None:
-            if m.voice.deaf or m.voice.mute or m.voice.afk:
-                await_fut(m.edit(mute=False, deafen=False))
-        self.queue.update_load()
+        with tracebacksuppressor:
+            guild = self.guild
+            if self.stats.stay:
+                cnt = inf
+            else:
+                cnt = sum(1 for m in self.acsi.channel.members if not m.bot)
+            if not cnt:
+                # Timeout for leaving is 120 seconds
+                if self.timeout < utc() - 120:
+                    return self.kill(css_md(f"🎵 Automatically disconnected from {sqr_md(guild)}: All channels empty. 🎵"))
+                perms = self.acsi.channel.permissions_for(guild.me)
+                if not perms.connect or not perms.speak:
+                    return self.kill(css_md(f"🎵 Automatically disconnected from {sqr_md(guild)}: No permission to connect/speak in {sqr_md(self.acsi.channel)}. 🎵"))
+                # If idle for more than 10 seconds, attempt to find members in other voice channels
+                elif self.timeout < utc() - 10:
+                    if guild.afk_channel and (guild.afk_channel.id != self.acsi.channel.id and guild.afk_channel.permissions_for(guild.me).connect):
+                        await_fut(self.move_unmute(vc, guild.afk_channel))
+                    else:
+                        cnt = 0
+                        ch = None
+                        for channel in guild.voice_channels:
+                            if channel.id != guild.afk_channel.id:
+                                c = sum(1 for m in channel.members if not m.bot)
+                                if c > cnt:
+                                    cnt = c
+                                    ch = channel
+                        if ch:
+                            with tracebacksuppressor(SemaphoreOverflowError):
+                                await_fut(self.acsi.move_to(ch))
+                                self.announce(ini_md(f"🎵 Detected {sqr_md(cnt)} user{'s' if cnt != 1 else ''} in {sqr_md(ch)}, automatically joined! 🎵"), aio=False)
+            else:
+                self.timeout = utc()
+            m = guild.me
+            if m.voice is not None:
+                if m.voice.deaf or m.voice.mute or m.voice.afk:
+                    await_fut(m.edit(mute=False, deafen=False))
+            self.queue.update_load()
 
     # Moves to the target channel, unmuting self afterwards.
     async def move_unmute(self, vc, channel):
@@ -777,6 +780,8 @@ class AudioQueue(alist):
                     with tracebacksuppressor:
                         source = ytdl.get_stream(e, force=True)
                 if not source:
+                    if self.sem.is_busy():
+                        self.sem.wait()
                     return self.update_load()
                 with self.sem:
                     self.announce_play(e)
