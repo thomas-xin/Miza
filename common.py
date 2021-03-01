@@ -34,6 +34,7 @@ from zipfile import ZipFile
 import urllib.request, urllib.parse
 import nacl.secret
 
+requests = requests.Session()
 url_parse = urllib.parse.quote_plus
 escape_markdown = discord.utils.escape_markdown
 escape_mentions = discord.utils.escape_mentions
@@ -1750,7 +1751,7 @@ class seq(io.IOBase, collections.abc.MutableSequence, contextlib.AbstractContext
             self.iter = iter(obj)
             self.data = io.BytesIO()
             self.high = 0
-        elif issubclass(type(obj), requests.models.Response):
+        elif getattr(obj, "iter_content", None):
             self.iter = obj.iter_content(self.BUF)
             self.data = io.BytesIO()
             self.high = 0
@@ -1862,12 +1863,16 @@ class Stream(io.IOBase):
             try:
                 self.buf.write(next(self.iter))
             except StopIteration:
+                with suppress():
+                    self.resp.close()
                 return
             except:
                 if att > 16:
                     raise
                 att += 1
                 self.reset()
+        with suppress():
+            self.resp.close()
 
 
 # Manages both sync and async get requests.

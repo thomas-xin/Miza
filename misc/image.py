@@ -7,6 +7,8 @@ from PIL import Image, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhanc
 from zipfile import ZipFile
 import matplotlib.pyplot as plt
 
+requests = requests.Session()
+
 
 def as_str(s):
     if type(s) in (bytes, bytearray, memoryview):

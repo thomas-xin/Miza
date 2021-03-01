@@ -1165,7 +1165,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                             print(head, ctype, sep="\n")
                             if "text/html" in ctype:
                                 it = resp.iter_content(65536)
-                                data = next(it)
+                                data = await create_future(next, it)
                                 s = as_str(data)
                                 try:
                                     s = s[s.index("<meta") + 5:]
