@@ -568,7 +568,7 @@ class CustomAudio(collections.abc.Hashable):
                         cnt = 0
                         ch = None
                         for channel in guild.voice_channels:
-                            if channel.id != guild.afk_channel.id:
+                            if not guild.afk_channel or channel.id != guild.afk_channel.id:
                                 c = sum(1 for m in channel.members if not m.bot)
                                 if c > cnt:
                                     cnt = c
