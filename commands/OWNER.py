@@ -482,6 +482,8 @@ class UpdateExec(Database):
             if fut:
                 try:
                     data = await fut.fut
+                    if len(data) > 8388608:
+                        raise ConnectionError
                     files[i] = CompatFile(data, filename=fut.filename)
                 except ConnectionError:
                     files[i] = None

@@ -51,7 +51,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         super().__init__(max_messages=256, heartbeat_timeout=60, guild_ready_timeout=5, intents=self.intents)
         self.cache_size = cache_size
         # Base cache: contains all other caches
-        self.cache = fcdict({c: fdict() for c in self.caches})
+        self.cache = fcdict((c, fdict()) for c in self.caches)
         self.timeout = timeout
         self.set_classes()
         self.set_client_events()

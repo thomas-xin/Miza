@@ -1281,6 +1281,8 @@ class AudioDownloader:
             if resp:
                 if b'<h3 class="text-center text-xl">Error: No Streams found.</h3>' in resp:
                     excs.append("Error: No Streams found.")
+                elif b"HTTP 429: Too many requests." in resp:
+                    excs.append("HTTP 429: Too many requests.")
                 else:
                     excs.append(resp)
             excs.append(ex)

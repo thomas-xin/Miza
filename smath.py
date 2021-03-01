@@ -1634,7 +1634,7 @@ class fcdict(cdict):
 
     __slots__ = ()
 
-    __init__ = lambda self, *args, **kwargs: super().__init__({full_prune(k): v for k, v in dict(*args, **kwargs).items()})
+    __init__ = lambda self, *args, **kwargs: super().__init__((full_prune(k), v) for k, v in dict(*args, **kwargs).items())
     __contains__ = lambda self, k: super().__contains__(k) or super().__contains__(full_prune(k))
 
     def __setitem__(self, k, v):
