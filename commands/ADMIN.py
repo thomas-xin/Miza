@@ -2514,10 +2514,13 @@ class UpdateNickPreservers(Database):
                 print(f"NickPreserver: Granted {nick} to {user} in {guild}.")
 
     async def _leave_(self, user, guild, **void):
-        if getattr(user, "nick", None):
-            if guild.id in self.data:
+        if guild.id in self.data:
+            if getattr(user, "nick", None):
                 self.data[guild.id][user.id] = user.nick
                 self.update(guild.id)
+            else:
+                if self.data[guild.id].pop(user.id, None):
+                    self.update(guild.id)
 
 
 class UpdatePerms(Database):
