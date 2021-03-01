@@ -547,6 +547,7 @@ class CustomAudio(collections.abc.Hashable):
     # Update event, ensures audio is playing correctly and moves, leaves, or rejoins voice when necessary.
     def update(self, *void1, **void2):
         with tracebacksuppressor:
+            self.fut.result(timeout=12)
             guild = self.guild
             if self.stats.stay:
                 cnt = inf
