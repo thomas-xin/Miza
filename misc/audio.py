@@ -25,7 +25,7 @@ def request(s):
     with tracebacksuppressor:
         PORT = AUTH["webserver_port"]
         token = AUTH["discord_token"]
-        return eval_json(requests.get(f"http://127.0.0.1:{PORT}/eval/{token}/{url_parse(s)}").content)["result"]
+        return requests.get(f"http://127.0.0.1:{PORT}/eval/{token}/{url_parse(s)}")
 
 def submit(s):
     b = "~" + repr(as_str(s).encode("utf-8")) + "\n"
@@ -391,7 +391,8 @@ class AudioFile:
                                 else:
                                     new_stream = request(f"VOICE.get_best_audio(VOICE.ytdl.extract_backup({repr(self.webpage_url)}))")
                                 print(err)
-                                return self.load(new_stream, check_fmt=False, force=True)
+                                if new_stream:
+                                    return self.load(new_stream, check_fmt=False, force=True)
                         if check_fmt:
                             new = None
                             with suppress(ValueError):

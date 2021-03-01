@@ -1770,6 +1770,7 @@ class UpdateUserLogs(Database):
                 b_url = best_url(before)
                 a_url = best_url(after)
                 if "exec" in self.bot.data:
+                    urls = ()
                     with tracebacksuppressor:
                         urls = await self.bot.data.exec.uproxy(b_url, a_url)
                     for i, url in enumerate(urls):
