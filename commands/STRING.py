@@ -744,7 +744,7 @@ class Identify(Command):
             resp = self.probe(url)
             if mime[0] == "image" and mime[1] != "gif":
                 search = "Video:"
-                spl = regexp(r"\([^)]+\)").sub("", resp[resp.index(search) + len(search):].split("\n", 1)[0].strip()).split(", ")
+                spl = regexp(r"\([^)]+\)").sub("", resp[resp.index(search) + len(search):].split("\n", 1)[0].strip()).strip().split(", ")
                 out.append(code_md(f"Codec: {spl[1]}\nSize: {spl[2].split(None, 1)[0]}"))
             elif mime[0] == "video" or mime[1] == "gif":
                 search = "Duration:"
@@ -768,7 +768,7 @@ class Identify(Command):
                 except ValueError:
                     pass
                 else:
-                    spl = regexp(r"\([^)]+\)").sub("", resp.split("\n", 1)[0].strip()).split(", ")
+                    spl = regexp(r"\([^)]+\)").sub("", resp.split("\n", 1)[0].strip()).strip().split(", ")
                     s += f"\nCodec: {spl[1]}\nSize: {spl[2].split(None, 1)[0]}"
                     for i in spl[3:]:
                         if i.endswith(" fps"):
@@ -781,7 +781,7 @@ class Identify(Command):
                 except ValueError:
                     pass
                 else:
-                    spl = regexp(r"\([^)]+\)").sub("", resp.split("\n", 1)[0].strip()).split(", ")
+                    spl = regexp(r"\([^)]+\)").sub("", resp.split("\n", 1)[0].strip()).strip().split(", ")
                     fmt = spl[0]
                     sr = spl[1].split(None, 1)[0]
                     s = f"Audio format: {fmt}\nAudio sample rate: {sr}"
@@ -804,7 +804,7 @@ class Identify(Command):
                 resp = resp[resp.index(search) + len(search):]
                 dur = time_disp(time_parse(resp[:resp.index(",")]), False)
                 search = "Audio:"
-                spl = regexp(r"\([^)]+\)").sub("", resp[resp.index(search) + len(search):].split("\n", 1)[0].strip()).split(", ")
+                spl = regexp(r"\([^)]+\)").sub("", resp[resp.index(search) + len(search):].split("\n", 1)[0].strip()).strip().split(", ")
                 s = f"Duration: {dur}\nFormat: {spl[0]}\nSample rate: {spl[1].split(None, 1)[0]}"
                 if len(spl) > 2:
                     s += f"\nChannel: {spl[2]}"
@@ -834,7 +834,7 @@ class Identify(Command):
             fields.append((name, resp))
         if not fields:
             raise FileNotFoundError("Please input a file by URL or attachment.")
-        title = f"{len(fields)} file{'s' if len(fields) != 1 else ''} identified"
+        title = escape_markdown(f"{len(fields)} file{'s' if len(fields) != 1 else ''} identified")
         await bot.send_as_embeds(channel, title=title, author=get_author(user), fields=sorted(fields))
 
 
