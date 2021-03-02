@@ -494,21 +494,22 @@ class UpdateExec(Database):
                     print_exc()
         fs = [i for i in files if i]
         if fs:
-            c_id = choice(list(c_id for c_id, flag in self.data.items() if flag & 16))
-            channel = await bot.fetch_channel(c_id)
-            m = channel.guild.me
-            message = await bot.send_as_webhook(channel, files=fs, username=m.display_name, avatar_url=best_url(m), recurse=False)
-            c = 0
-            for i, f in enumerate(files):
-                if f and not failed[i]:
-                    try:
-                        self.bot.data.proxies[0][shash(urls[i])] = out[i] = message.attachments[c].proxy_url
-                    except IndexError:
-                        break
-                    self.bot.data.proxies.update(0)
-                    with suppress(KeyError, RuntimeError):
-                        self.temp.pop(urls[i]).set_result(None)
-                    c += 1
+            with tracebacksuppressor:
+                c_id = choice(list(c_id for c_id, flag in self.data.items() if flag & 16))
+                channel = await bot.fetch_channel(c_id)
+                m = channel.guild.me
+                message = await bot.send_as_webhook(channel, files=fs, username=m.display_name, avatar_url=best_url(m), recurse=False)
+                c = 0
+                for i, f in enumerate(files):
+                    if f and not failed[i]:
+                        try:
+                            self.bot.data.proxies[0][shash(urls[i])] = out[i] = message.attachments[c].proxy_url
+                        except IndexError:
+                            break
+                        self.bot.data.proxies.update(0)
+                        with suppress(KeyError, RuntimeError):
+                            self.temp.pop(urls[i]).set_result(None)
+                        c += 1
         if collapse:
             return out if len(out) > 1 else out[0]
         return out

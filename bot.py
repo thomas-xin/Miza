@@ -1535,17 +1535,21 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
     # Updates bot cache from the discord.py client cache, using automatic feeding to mitigate the need for slow dict.update() operations.
     def update_cache_feed(self):
-        self.cache.guilds._feed = (self._guilds,)
+        self.cache.guilds._feed = (self._guilds, self.sub_guilds)
         self.cache.emojis._feed = (self._emojis,)
         self.cache.users._feed = (self._users,)
         g = self._guilds.values()
         self.cache.members._feed = lambda: (guild._members for guild in g)
-        self.cache.channels._feed = lambda: itertools.chain((guild._channels for guild in g), (self._private_channels,))
+        self.cache.channels._feed = lambda: itertools.chain((guild._channels for guild in g), (self._private_channels,), (self.sub_channels,))
         self.cache.roles._feed = lambda: (guild._roles for guild in g)
 
     def update_usernames(self):
         if self.users_updated:
             self.usernames = {str(user): user for user in self.cache.users.values()}
+
+    def update_subs(self):
+        self.sub_guilds = dict(self._guilds) or self.sub_guilds
+        self.sub_channels = dict(itertools.chain(*(guild._channels.items() for guild in self.sub_guilds.values()))) or self.sub_channels
 
     # Gets the target bot prefix for the target guild, return the default one if none exists.
     def get_prefix(self, guild):
@@ -3258,6 +3262,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     with MemoryTimer("get_disk"):
                         await self.get_disk()
                     await asyncio.sleep(1)
+                    with MemoryTimer("update_subs"):
+                        await create_future(self.update_subs, priority=True)
+                    await asyncio.sleep(1)
                     await self.send_event("_minute_loop_")
 
     # Heartbeat loop: Repeatedly deletes a file to inform the watchdog process that the bot's event loop is still running.
@@ -3789,6 +3796,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         @self.event
         async def on_ready():
             print("Successfully connected as " + str(self.user))
+            await create_future(self.update_subs, priority=True)
             self.update_cache_feed()
             self.mention = (user_mention(self.id), user_pc_mention(self.id))
             if discord_id:
@@ -4154,7 +4162,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         # Channel create event: calls _channel_create_ bot database event.
         @self.event
         async def on_guild_channel_create(channel):
-            self.cache.channels[channel.id] = channel
+            self.sub_channels[channel.id] = channel
             guild = channel.guild
             if guild:
                 await self.send_event("_channel_create_", channel=channel, guild=guild)
@@ -4163,6 +4171,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         @self.event
         async def on_guild_channel_delete(channel):
             print(channel, "was deleted from", channel.guild)
+            self.sub_channels.pop(channel.id, None)
             guild = channel.guild
             if guild:
                 await self.send_event("_channel_delete_", channel=channel, guild=guild)
@@ -4184,6 +4193,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         async def on_guild_remove(guild):
             self.users_updated = True
             self.cache.guilds.pop(guild.id, None)
+            self.sub_guilds.pop(guild.id, None)
             print(guild, "removed.")
 
 

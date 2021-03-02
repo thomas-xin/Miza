@@ -471,7 +471,9 @@ class AudioFile:
 
         reader = cdict(
             pos=0,
+            byte_pos=0,
             file=f,
+            it=it,
             _read=lambda self, *args: f.read(args),
             closed=False,
             advanced=False,
@@ -481,8 +483,16 @@ class AudioFile:
         )
 
         def read():
-            out = next(it, b"")
+            try:
+                out = next(reader.it, b"")
+            except ValueError:
+                f = open("cache/" + self.file, "rb")
+                f.seek(self.byte_pos)
+                reader.file = f
+                reader.it = discord.oggparse.OggStream(f).iter_packets()
+                out = next(reader.id, b"")
             reader.pos += 1
+            reader.byte_pos += len(out)
             return out
 
         def close():
@@ -529,11 +539,17 @@ class AudioFile:
         # Construct FFmpeg options
         if options is None:
             options = auds.construct_options(full=self.live)
+        speed = 1
         if options or auds.reverse or pos or auds.stats.bitrate != 1966.08 or self.live:
             args = ["ffmpeg.exe", "-hide_banner", "-loglevel", "error"]
-            if pos and self.seekable:
+            if (pos or auds.reverse) and self.seekable:
                 arg = "-to" if auds.reverse else "-ss"
                 args += [arg, str(pos)]
+                if reverse and not pos:
+                    pos = self.duration() or 300
+            speed = round_min(stats.speed * 2 ** (stats.resample / 12))
+            if auds.reverse:
+                speed = -speed
             args.append("-i")
             if self.loaded:
                 buff = False
@@ -569,6 +585,7 @@ class AudioFile:
             else:
                 # Select loaded reader for loaded files
                 player = LoadedAudioReader(self, args, callback=callback, key=key)
+            player.speed = speed
             auds.args = args
             reader = player.start()
         else:
@@ -586,6 +603,8 @@ class AudioFile:
 # Audio reader for fully loaded files. FFmpeg with single pipe for output.
 class LoadedAudioReader(discord.AudioSource):
 
+    speed = 1
+
     def __init__(self, file, args, callback=None, key=None):
         self.closed = False
         self.advanced = False
@@ -602,7 +621,7 @@ class LoadedAudioReader(discord.AudioSource):
     def read(self):
         if self.buffer:
             b, self.buffer = self.buffer, None
-            self.pos += 1
+            self.pos += self.speed
             return b
         for att in range(16):
             try:
@@ -626,7 +645,7 @@ class LoadedAudioReader(discord.AudioSource):
                 self.proc = psutil.Popen(self.args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
                 self.packet_iter = discord.oggparse.OggStream(self.proc.stdout).iter_packets()
             else:
-                self.pos += 1
+                self.pos += self.speed
                 return out
         return b""
 
@@ -651,6 +670,8 @@ class LoadedAudioReader(discord.AudioSource):
 # Audio player for audio files still being written to. Continuously reads and sends data to FFmpeg process, only terminating when file download is confirmed to be finished.
 class BufferedAudioReader(discord.AudioSource):
 
+    speed = 1
+
     def __init__(self, file, args, callback=None, key=None):
         self.closed = False
         self.advanced = False
@@ -668,7 +689,7 @@ class BufferedAudioReader(discord.AudioSource):
     def read(self):
         if self.buffer:
             b, self.buffer = self.buffer, None
-            self.pos += 1
+            self.pos += self.speed
             return b
         if self.full:
             fut = create_future_ex(next, self.packet_iter, b"")
@@ -680,7 +701,7 @@ class BufferedAudioReader(discord.AudioSource):
                 out = b""
         else:
             out = next(self.packet_iter, b"")
-        self.pos += 1
+        self.pos += self.speed
         return out
 
     # Required loop running in background to feed data to FFmpeg
