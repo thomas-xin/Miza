@@ -579,10 +579,6 @@ class CustomAudio(collections.abc.Hashable):
                                 self.announce(ini_md(f"🎵 Detected {sqr_md(cnt)} user{'s' if cnt != 1 else ''} in {sqr_md(ch)}, automatically joined! 🎵"), aio=False)
             else:
                 self.timeout = utc()
-            m = guild.me
-            if m.voice is not None:
-                if m.voice.deaf or m.voice.mute or m.voice.afk:
-                    await_fut(m.edit(mute=False, deafen=False))
             self.queue.update_load()
 
     # Moves to the target channel, unmuting self afterwards.
