@@ -1324,7 +1324,7 @@ def blend_op(image, url, operation, amount, recursive=True):
             image2 = image2.convert("RGBA")
         imgA = np.array(image).astype(float)
         imgB = np.array(image2).astype(float)
-        out = fromarray(np.uint8(filt(imgA, imgB, amount)))
+        out = fromarray(np.uint8(filt(imgA, imgB, amount)), image.mode)
     else:
         # Basic blend, use second image
         if filt in ("blend", "replace"):
