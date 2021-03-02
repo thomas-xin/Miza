@@ -61,7 +61,10 @@ Change `resp = await Request("https://api.ipify.org", decode=True, aio=True)` to
 
 - **OSError()**
 
-In a nutshell, Miza needs to run various versions of Python in order to run certain voice, image, etc, commands. Because of this, if you encounter Miza erroring with an `OSError()` when you attempt to host the bot, chances are you may be missing `"python_path":"",` in your *auth.json.* However, for a while before this update to the README (written on 02/03/2020 (UTC)), Miza now adds this to the auth.json automatically.
+In a nutshell, Miza needs to run various versions of Python in order to run certain voice, image, etc, commands. Because of this, if you encounter Miza erroring with an `OSError()` when you attempt to host the bot, chances are you may be missing `"python_path":"",` in your *auth.json.* However, for a while before this update to the README (written on 02/03/2020 (UTC)), Miza now adds this to the *auth.json* automatically.
+
+For more information written by Thomas Xin:
+> Invalid argument as a windows error (which is why it's OS error) means that the process being selected is invalid, which in this case, is caused by miza trying to send data to another process running on the computer that was closed or otherwise not open. The image and math commands (and in the latest version of miza, the webserver) run in separate processes entirely, in order to share CPU more fairly and not clog up the main bot when being used for time consuming operations. Because of the matplotlib compatibility issue with python 3.9, I had to effectively make miza run two different python versions, 3.9.0 and 3.8.5, because I'd already updated a lot to 3.9. So... in order to make that possible, I added a "python path" variable to my auth.json, which only worked for Miza. The latest version of miza should run perfectly fine now with python_path set to ""
 
 - **Voice commands still not working?**
 
