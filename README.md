@@ -94,6 +94,6 @@ Miza has so much functionality, with so much to explore, with all the command ca
 
 [Check out our Website!](http://mizabot.xyz)
 
-*The the domain redirects to a webserver which includes: a command tester within the comforts of your browswer, documentation on the API, a free file host, and more!*
+*The the domain redirects to a webserver which includes: a command tester within the comforts of your browser, documentation on the API, a free file host, and more!*
 
 [Join our Discord Support Server!](https:/discord.gg//cbKQKAr)
