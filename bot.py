@@ -1758,7 +1758,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             return u_id in self.data.blacklist
         return True
 
-    dangerous_command = bold(css_md(uni_str('[WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. REPEAT COMMAND WITH "?f" FLAG TO CONFIRM.]')))
+    dangerous_command = bold(css_md(uni_str('[WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. REPEAT COMMAND WITH "?f" FLAG TO CONFIRM.]'), force=True))
 
     mmap = {
         "“": '"',
@@ -3415,7 +3415,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         # Represents a deleted/not found message.
         class GhostMessage(discord.abc.Snowflake):
 
-            content = bold(css_md(uni_str("[MESSAGE DATA NOT FOUND]")))
+            content = bold(css_md(uni_str("[MESSAGE DATA NOT FOUND]"), force=True))
 
             def __init__(self):
                 self.author = bot.get_user(bot.deleted_user)

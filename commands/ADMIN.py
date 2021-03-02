@@ -69,7 +69,7 @@ class Purge(Command):
                     if uset is None and m.author.bot or uset and m.author.id in uset:
                         delD.append(m)
         if len(delD) >= 64 and "f" not in flags:
-            return css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(delD))} MESSAGES TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0))
+            return css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(delD))} MESSAGES TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0), force=True)
         # attempt to bulk delete up to 100 at a time, otherwise delete 1 at a time
         deleted = 0
         delM = alist(delD)
@@ -95,7 +95,7 @@ class Purge(Command):
         if not "h" in flags:
             create_task(send_with_react(
                 channel,
-                italics(css_md(f"Deleted {sqr_md(deleted)} message{'s' if deleted != 1 else ''}!")),
+                italics(css_md(f"Deleted {sqr_md(deleted)} message{'s' if deleted != 1 else ''}!", force=True)),
                 reacts="❎",
             ))
 
@@ -133,7 +133,7 @@ class Mute(Command):
         if not users:
             raise LookupError("No results found.")
         if len(users) > 1 and "f" not in flags:
-            return css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(users))} USERS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0))
+            return css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(users))} USERS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0), force=True)
         if not args or name == "unmute":
             for user in users:
                 try:
@@ -358,7 +358,7 @@ class Ban(Command):
         if not users:
             raise LookupError("No results found.")
         if len(users) > 1 and "f" not in flags:
-            return css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(users))} USERS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0))
+            return css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(users))} USERS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0), force=True)
         if not args or name == "unban":
             for user in users:
                 try:

@@ -721,7 +721,7 @@ single_md = lambda s: f"`{s}`"
 code_md = lambda s: f"```\n{s}```"
 py_md = lambda s: f"```py\n{s}```"
 ini_md = lambda s: f"```ini\n{s}```"
-css_md = ini_md#lambda s: f"```css\n{s}```".replace("'", "\u2019").replace('"', "\u201d")
+css_md = lambda s, force=False: f"```css\n{s}```".replace("'", "\u2019").replace('"', "\u201d") if force else ini_md(s)
 fix_md = lambda s: f"```fix\n{s}```"
 
 # Discord object mention formatting
@@ -966,7 +966,7 @@ def message_repr(message, limit=1024, username=False):
             t = message.edited_at
         data += f"\n`({t})`"
     if not data:
-        data = css_md(uni_str("[EMPTY MESSAGE]"))
+        data = css_md(uni_str("[EMPTY MESSAGE]"), force=True)
     return lim_str(data, limit)
 
 

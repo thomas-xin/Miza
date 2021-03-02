@@ -100,7 +100,7 @@ class IMG(Command):
             if not args:
                 # This deletes all images for the current guild
                 if "f" not in flags and len(images) > 1:
-                    return css_md(sqr_md(f"WARNING: {len(images)} IMAGES TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."))
+                    return css_md(sqr_md(f"WARNING: {len(images)} IMAGES TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), force=True)
                 imglists[guild.id] = {}
                 return italics(css_md(f"Successfully removed all {sqr_md(len(images))} images from the image list for {sqr_md(guild)}."))
             key = argv.casefold()

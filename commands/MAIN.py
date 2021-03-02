@@ -1215,7 +1215,7 @@ class Reminder(Command):
             else:
                 msg = "[SAMPLE REMINDER]"
             if urgent:
-                msg = bold(css_md(msg))
+                msg = bold(css_md(msg, force=True))
             else:
                 msg = bold(ini_md(msg))
         elif len(msg) > 2048:

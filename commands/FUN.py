@@ -591,7 +591,7 @@ class React(Command):
             if "d" in flags:
                 # This deletes all auto reacts for the current guild
                 if "f" not in flags and len(curr) > 1:
-                    return css_md(sqr_md(f"WARNING: {len(curr)} ITEMS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."))
+                    return css_md(sqr_md(f"WARNING: {len(curr)} ITEMS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), force=True)
                 if guild.id in following:
                     following.pop(guild.id)
                 return italics(css_md(f"Successfully removed all {sqr_md(len(curr))} auto reacts for {sqr_md(guild)}."))
@@ -1378,7 +1378,7 @@ class Mimic(Command):
             if "d" in flags:
                 # This deletes all mimics for the current user
                 if "f" not in flags and len(mimics) > 1:
-                    return css_md(sqr_md(f"WARNING: {len(mimics)} MIMICS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."))
+                    return css_md(sqr_md(f"WARNING: {len(mimics)} MIMICS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), force=True)
                 mimicdb.pop(user.id)
                 return italics(css_md(f"Successfully removed all {sqr_md(len(mimics))} webhook mimics for {sqr_md(user)}."))
             # Set callback message for scrollable list
