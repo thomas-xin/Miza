@@ -3528,7 +3528,7 @@ def time_sum(t2, t1):
     days = t2.day + t1.day
     hours = getattr(t2, "hour", 0) + getattr(t1, "hour", 0)
     minutes = getattr(t2, "minute", 0) + getattr(t1, "minute", 0)
-    seconds = round(getattr(t2, "second", 0) + getattr(t1, "second", 0) + (getattr(t2, "microsecond", 0) + getattr(t1, "microsecond", 0)) / 100000, 6)
+    seconds = round(getattr(t2, "second", 0) + getattr(t1, "second", 0) + (getattr(t2, "microsecond", 0) + getattr(t1, "microsecond", 0)) / 1000000, 6)
     while seconds >= 60:
         minutes += 1
         seconds -= 60
@@ -3605,7 +3605,7 @@ def time_diff(t2, t1):
     days = t2.day - t1.day
     hours = getattr(t2, "hour", 0) - getattr(t1, "hour", 0)
     minutes = getattr(t2, "minute", 0) - getattr(t1, "minute", 0)
-    seconds = round(getattr(t2, "second", 0) - getattr(t1, "second", 0) + (getattr(t2, "microsecond", 0) - getattr(t1, "microsecond", 0)) / 100000, 6)
+    seconds = round(getattr(t2, "second", 0) - getattr(t1, "second", 0) + (getattr(t2, "microsecond", 0) - getattr(t1, "microsecond", 0)) / 1000000, 6)
     while seconds < 0:
         minutes -= 1
         seconds += 60
