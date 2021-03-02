@@ -1429,6 +1429,11 @@ def process_math(expr, prec=64, rat=False, timeout=12, variables=None):
 
 # Sends an operation to the image subprocess pool.
 def process_image(image, operation, args, timeout=24):
+    if type(args) is not list:
+        args = list(args)
+    for i, a in enumerate(args):
+        if type(a) is mpf:
+            args[i] = float(a)
     return create_future(sub_submit, "image", (image, operation, args), _timeout=timeout)
 
 

@@ -1875,6 +1875,8 @@ if __name__ == "__main__":
                         exc.submit(evaluate, ts, args)
                 except Exception as ex:
                     sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_exception(evalex({repr(repr(ex))}))\n".encode("utf-8"))
+                    sys.stdout.buffer.write(f"~print({s}, end='')\n".encode("utf-8"))
+                    sys.stdout.buffer.write(f"~print({repr(traceback.format_exc())}, end='')\n".encode("utf-8"))
                     sys.stdout.flush()
                 while len(CACHE) > 32:
                     try:
