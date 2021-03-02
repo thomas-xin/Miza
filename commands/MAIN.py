@@ -990,6 +990,7 @@ class Reminder(Command):
     rate_limit = (1 / 3, 4)
     keywords = ["on", "at", "in", "when", "event"]
     keydict = {re.compile(f"(^|[^a-z0-9]){i[::-1]}([^a-z0-9]|$)", re.I): None for i in keywords}
+    no_parse = True
     timefind = None
     slash = True
 
@@ -1004,11 +1005,8 @@ class Reminder(Command):
         except ValueError:
             print_exc(msg)
             msg = msg.casefold().split(None, 1)[-1]
-        argv = msg.strip(" ").strip("\n")
-        try:
-            args = shlex.split(argv)
-        except ValueError:
-            args = argv.split(" ")
+        argv = msg.strip()
+        args = argv.split()
         if "announce" in name:
             sendable = message.channel
             word = "announcements"
@@ -1208,7 +1206,7 @@ class Reminder(Command):
         if keyed:
             u = await bot.fetch_user_member(t, guild)
             t = u.id
-        msg = msg.strip(" ")
+        msg = msg.strip()
         if not msg:
             if "announce" in name:
                 msg = "[SAMPLE ANNOUNCEMENT]"
