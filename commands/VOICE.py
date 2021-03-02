@@ -2150,10 +2150,14 @@ class AudioDownloader:
         if not ts:
             ts = ts_us()
         outf = None
+        search = "https://www.yt-download.org/download/"
         for url in urls:
+            if url.startswith(search):
+                url = f"https://youtube.com/watch?v={url[len(search):].split('/', 1)[0]}"
             try:
                 info = self.extract(url)[0]
-            except youtube_dl.DownloadError:
+            except (ConnectionError, youtube_dl.DownloadError):
+                print_exc()
                 continue
             self.get_stream(info, video=fmt in videos, force=True, download=False)
             if not outf:
@@ -2210,14 +2214,19 @@ class AudioDownloader:
                     codec_map[url] = codec
                 add_dict(codecs, {codec: 1})
             if len(codecs) > 1:
+                print(codecs)
                 maxcodec = max(codecs.values())
                 selcodec = [k for k, v in codecs.items() if v >= maxcodec][0]
                 t = ts
                 for i, url in enumerate(ast):
                     if codec_map[url] != selcodec:
                         t += 1
-                        ast[i] = self.download_file(url, selcodec[0], auds=auds, ts=t, ar=selcodec[1], ac=selcodec[2])[0].rsplit("/", 1)[-1]
-            asc = "\n".join(f"file '{i}'" for i in ast)
+                        try:
+                            ast[i] = self.download_file(url, selcodec[0], auds=auds, ts=t, ar=selcodec[1], ac=selcodec[2])[0].rsplit("/", 1)[-1]
+                        except:
+                            print_exc()
+                            ast[i] = None
+            asc = "\n".join(f"file '{i}'" for i in ast if i)
             asf = f"cache/{ts}.concat"
             with open(asf, "w", encoding="utf-8") as f:
                 f.write(asc)
