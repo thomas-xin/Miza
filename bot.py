@@ -1365,7 +1365,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             if files and not message.author.bot:
                 if (utc_dt() - message.created_at).total_seconds() < 7200:
                     for attachment in message.attachments:
-                        if getattr(attachment, "size", inf) < 1048576:
+                        if getattr(attachment, "size", inf) <= 1048576:
                             create_task(self.add_attachment(attachment))
             self.cache.messages[message.id] = message
             if (utc_dt() - message.created_at).total_seconds() < 86400 * 14 and "message_cache" in self.data and not getattr(message, "simulated", None):

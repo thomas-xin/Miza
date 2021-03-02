@@ -1276,12 +1276,14 @@ class AudioDownloader:
             return entry
         except Exception as ex:
             if resp:
-                if b'<h3 class="text-center text-xl">Error: No Streams found.</h3>' in resp:
-                    excs.append("Error: No Streams found.")
-                elif b"HTTP 429: Too many requests." in resp:
-                    excs.append("HTTP 429: Too many requests.")
+                try:
+                    search = b'<h3 class="text-center text-xl">'
+                    resp = resp[resp.index(search) + len(search):]
+                    resp = resp[:resp.index(b"<")]
+                except ValueError:
+                    pass
                 else:
-                    excs.append(resp)
+                    excs.append(as_str(resp))
             excs.append(ex)
         try:
             self.other_x += 1
