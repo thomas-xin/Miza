@@ -3,7 +3,7 @@ Welcome to Miza, a multipurpose Discord bot created by [Thomas Xin](https://gith
 
 ![Miza](https://cdn.discordapp.com/attachments/688253918890688521/777456623555051521/image0.png)
 
-## Table of Contents
+## [Table of Contents](https://github.com/thomas-xin/Miza)
 
 Headings | Explinations
 ------------ | -------------
@@ -23,7 +23,7 @@ You may think its unnecessary to explain all this, but before I learnt my way ar
 
 Misc contains all the different files that the bot needs to pull from, such as the avatar (which gets automatically uploaded to the Discord Developers Portal the first time the code is run), the rainbow bar emojis (which get automatically uploaded to a server Miza is in if it cannot find the emojis already), the code necessary for converting org files, computing math equations, finding timezones and etc. You can change the bots avatar and emojis if you want to; *but if you want the code to use them the same way, the filename must be kept the same.*
 
-## How do I use the code?
+## [How do I use the code?](http://mizabot.xyz/apidoc)
 
 I'm just going to comment on what I personally found to be the most important things to know when hosting Miza. First of all, download this heccin chonka of a directory. How Miza is ran currently is through an *auth.json*, which automatically gets created if Miza is ran and cannot locate the file. Alternatively, as of 14/11/2020 (UTC), the general layout can be found at the top of *main.py* if you wish to host a Miza of your own and copy it exactly. **This file is necessary, as the bot cannot run without its token (obviosuly).** If you've successfully run the bot, you'll see some new folders in your front folder here. The most important to acknowledge are *saves* and *backup*. The saves folder is the entire databse, ~~enter with caution because wow if my file explorer doesn't hate loading this...~~ The backup folder automatically saves the current database to a zip file, going by date. If you want to export the database somewhere, the quickest way to do so is to just get rid of the day's backup zip, Miza will make a new one within a couple of minutes. Its what Thomas and I do. 🙃 Now to address some issues I've personally had hosting Miza, and solutions for if anybody experiences the same...
 
@@ -84,7 +84,7 @@ Miza logs up to three places: A *log.txt* (which the file gets refreshed upon re
 
 ![Screenshot4](https://cdn.discordapp.com/attachments/727087981285998593/777554358095183893/Capture8.PNG)
 
-## [Support!](http://27.33.133.250:9801/)
+## [Support!](http://mizabot.xyz)
 
 With that concludes the basic introduction of hosting Miza. The code is commented and explaining where everything is, so feel free to explore further to see what you can change, and if you have any questions, [Thomas Xin](https://github.com/thomas-xin) is your guy to ask!
 
@@ -94,6 +94,6 @@ Miza has so much functionality, with so much to explore, with all the command ca
 
 [Check out our Website!](http://mizabot.xyz)
 
-[View our Miza Atlas for a command tester and in-depth command list in the comforts of your browser!](http://mizabot.xyz/mizatlas)
+*The the domain redirects to a webserver which includes: a command tester within the comforts of your browswer, documentation on the API, a free file host, and more!*
 
 [Join our Discord Support Server!](https:/discord.gg//cbKQKAr)
