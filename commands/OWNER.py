@@ -473,6 +473,8 @@ class UpdateExec(Database):
                         if url not in self.temp:
                             self.temp[url] = concurrent.futures.Future()
                         fn = url.rsplit("/", 1)[-1].split("?", 1)[0]
+                        if "." not in fn:
+                            fn += ".png"
                         files[i] = cdict(fut=create_task(Request(url, aio=True)), filename="SPOILER_" + fn, url=url)
                     else:
                         out[i] = self.bot.data.proxies[0][shash(url)]

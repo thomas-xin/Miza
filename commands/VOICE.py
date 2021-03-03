@@ -56,7 +56,7 @@ def _get_duration(filename, _timeout=12):
         "-select_streams",
         "a:0",
         "-show_entries",
-        "stream=duration,bit_rate",
+        "format=duration,bit_rate",
         "-of",
         "default=nokey=1:noprint_wrappers=1",
         filename,
@@ -1179,7 +1179,9 @@ class AudioDownloader:
         self.downloading = cdict()
         self.cache = cdict()
         self.searched = cdict()
-        self.semaphore = Semaphore(4, 128, delay=0.25)
+        self.semaphore = Semaphore(4, 128)
+        self.download_sem = Semaphore(8, 64, rate_limit=0.5)
+        self.keepvid_failed = 0
 
     def __load__(self, **void):
         print("Initializing audio downloader keys...")
@@ -1206,12 +1208,17 @@ class AudioDownloader:
                 token = await_fut(aretry(Request, "https://open.spotify.com/get_access_token", aio=True, attempts=8, delay=0.5))
                 self.spotify_header = {"authorization": f"Bearer {json.loads(token[:512])['accessToken']}"}
                 self.other_x += 1
-                resp = Request("https://keepv.id", timeout=16)
-                search = b"<script>apikey='"
-                resp = resp[resp.rindex(search) + len(search):]
-                search = b";sid='"
-                resp = resp[resp.index(search) + len(search):]
-                self.keepvid_token = as_str(resp[:resp.index(b"';</script>")])
+                if self.keepvid_failed < 4:
+                    try:
+                        resp = Request("https://keepv.id", timeout=16)
+                        search = b"<script>apikey='"
+                        resp = resp[resp.rindex(search) + len(search):]
+                        search = b";sid='"
+                        resp = resp[resp.index(search) + len(search):]
+                        self.keepvid_token = as_str(resp[:resp.index(b"';</script>")])
+                    except:
+                        print_exc()
+                        self.keepvid_failed += 1
 
     # Gets data from yt-download.org, keepv.id, or y2mate.guru, adjusts the format to ensure compatibility with results from youtube-dl. Used as backup.
     def extract_backup(self, url, video=False):
@@ -2133,245 +2140,262 @@ class AudioDownloader:
 
     codec_map = {}
     # For ~download
-    def download_file(self, url, fmt, start=None, end=None, auds=None, ts=None, copy=False, ar=SAMPLE_RATE, ac=2):
-        # Select a filename based on current time to avoid conflicts
-        if fmt[:3] == "mid":
-            mid = True
-            fmt = "mp3"
+    def download_file(self, url, fmt, start=None, end=None, auds=None, ts=None, copy=False, ar=SAMPLE_RATE, ac=2, container=None, child=False):
+        if child:
+            ctx = emptyctx
         else:
-            mid = False
-        videos = ("webm", "mkv", "f4v", "flv", "mov", "qt", "wmv", "mp4", "m4v", "mpv", "gif")
-        if type(url) is str:
-            urls = (url,)
-        else:
-            urls = url
-        vst = deque()
-        ast = deque()
-        if not ts:
-            ts = ts_us()
-        outf = None
-        search = "https://www.yt-download.org/download/"
-        for url in urls:
-            if url.startswith(search):
-                url = f"https://youtube.com/watch?v={url[len(search):].split('/', 1)[0]}"
-            try:
-                info = self.extract(url)[0]
-            except (ConnectionError, youtube_dl.DownloadError):
-                print_exc()
-                continue
-            self.get_stream(info, video=fmt in videos, force=True, download=False)
-            if not outf:
-                outf = f"{info['name']}.{fmt}"
-                outft = outf.translate(filetrans)
-                fn = f"cache/\x7f{ts}~{outft}"
-            if vst or fmt in videos:
-                vst.append(info["video"])
-            ast.append(info["stream"])
-        if not ast and not vst:
-            raise LookupError(f"No stream URLs found for {url}")
-        ffmpeg = "misc/ffmpeg-c/ffmpeg.exe" if len(ast) <= 1 else "ffmpeg"
-        args = alist((ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-y"))
-        if vst:
-            if len(vst) > 1:
-                codec_map = {}
+            ctx = self.download_sem
+        with ctx:
+            # Select a filename based on current time to avoid conflicts
+            if fmt[:3] == "mid":
+                mid = True
+                fmt = "mp3"
+            else:
+                mid = False
+            videos = ("webm", "mkv", "f4v", "flv", "mov", "qt", "wmv", "mp4", "m4v", "mpv", "gif")
+            if type(url) is str:
+                urls = (url,)
+            else:
+                urls = url
+            vst = deque()
+            ast = deque()
+            if not ts:
+                ts = ts_us()
+            outf = None
+            search = "https://www.yt-download.org/download/"
+            for url in urls:
+                if url.startswith(search):
+                    url = f"https://youtube.com/watch?v={url[len(search):].split('/', 1)[0]}"
+                try:
+                    info = self.extract(url)[0]
+                except (ConnectionError, youtube_dl.DownloadError):
+                    print_exc()
+                    continue
+                self.get_stream(info, video=fmt in videos, force=True, download=False)
+                if not outf:
+                    outf = f"{info['name']}.{fmt}"
+                    outft = outf.translate(filetrans)
+                    if child:
+                        fn = f"cache/#{ts}~{outft}"
+                    else:
+                        fn = f"cache/\x7f{ts}~{outft}"
+                if vst or fmt in videos:
+                    vst.append(info["video"])
+                ast.append(info["stream"])
+            if not ast and not vst:
+                raise LookupError(f"No stream URLs found for {url}")
+            ffmpeg = "ffmpeg"
+            if len(ast) <= 1:
+                if ast and not is_youtube_stream(ast[0]):
+                    ffmpeg = "misc/ffmpeg-c/ffmpeg.exe"
+            args = alist((ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-y"))
+            if vst:
+                if len(vst) > 1:
+                    codec_map = {}
+                    codecs = {}
+                    for url in vst:
+                        try:
+                            codec = codec_map[url]
+                        except KeyError:
+                            codec = as_str(subprocess.check_output(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name,sample_rate,channels", "-of", "default=nokey=1:noprint_wrappers=1", url])).strip()
+                            print(codec)
+                            codec_map[url] = codec
+                        add_dict(codecs, {codec: 1})
+                    if len(codecs) > 1:
+                        maxcodec = max(codecs.values())
+                        selcodec = [k for k, v in codecs.items() if v >= maxcodec][0]
+                        t = ts
+                        for i, url in enumerate(vst):
+                            if codec_map[url] != selcodec:
+                                t += 1
+                                vst[i] = self.download_file(url, selcodec, auds=auds, ts=t)[0].rsplit("/", 1)[-1]
+                    vsc = "\n".join(f"file '{i}'" for i in vst)
+                    vsf = f"cache/{ts}~video.concat"
+                    with open(vsf, "w", encoding="utf-8") as f:
+                        f.write(vsc)
+                else:
+                    vsf = vsc = vst[0]
+            if len(ast) > 1:
+                codec_map = self.codec_map
                 codecs = {}
-                for url in vst:
+                pops = set()
+                for i, url in enumerate(ast):
                     try:
                         codec = codec_map[url]
                     except KeyError:
-                        codec = as_str(subprocess.check_output(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name,sample_rate,channels", "-of", "default=nokey=1:noprint_wrappers=1", url])).strip()
+                        try:
+                            resp = as_str(subprocess.check_output(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name,sample_rate,channels", "-show_entries", "format=format_name", "-of", "default=nokey=1:noprint_wrappers=1", url])).strip()
+                        except:
+                            print_exc()
+                            pops.add(i)
+                            continue
+                        info = resp.split()
+                        info[1] = int(info[1])
+                        info[2] = int(info[2])
+                        if info[0] == "vorbis":
+                            info[0] = "ogg"
+                        codec = tuple(info)
                         print(codec)
                         codec_map[url] = codec
                     add_dict(codecs, {codec: 1})
+                if pops:
+                    ast = alist(ast).pops(pops)
                 if len(codecs) > 1:
+                    print(codecs)
                     maxcodec = max(codecs.values())
                     selcodec = [k for k, v in codecs.items() if v >= maxcodec][0]
                     t = ts
-                    for i, url in enumerate(vst):
+                    for i, url in enumerate(ast):
                         if codec_map[url] != selcodec:
                             t += 1
-                            vst[i] = self.download_file(url, selcodec, auds=auds, ts=t)[0].rsplit("/", 1)[-1]
-                vsc = "\n".join(f"file '{i}'" for i in vst)
-                vsf = f"cache/{ts}~video.concat"
-                with open(vsf, "w", encoding="utf-8") as f:
-                    f.write(vsc)
+                            try:
+                                if "webm" in selcodec[3].split(","):
+                                    container = "webm"
+                                else:
+                                    container = None
+                                ast[i] = self.download_file(url, selcodec[0], auds=auds, ts=t, ar=selcodec[1], ac=selcodec[2], container=container, child=True)[0].rsplit("/", 1)[-1]
+                            except:
+                                print_exc()
+                                ast[i] = None
+                asc = "\n".join(f"file '{i}'" for i in ast if i)
+                asf = f"cache/{ts}.concat"
+                with open(asf, "w", encoding="utf-8") as f:
+                    f.write(asc)
+                args.extend(("-f", "concat", "-safe", "0", "-protocol_whitelist", "concat,tls,tcp,file,http,https"))
             else:
-                vsf = vsc = vst[0]
-        if len(ast) > 1:
-            codec_map = self.codec_map
-            codecs = {}
-            pops = set()
-            for i, url in enumerate(ast):
-                try:
-                    codec = codec_map[url]
-                except KeyError:
-                    try:
-                        resp = as_str(subprocess.check_output(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name,sample_rate,channels", "-of", "default=nokey=1:noprint_wrappers=1", url])).strip()
-                    except:
-                        print_exc()
-                        pops.add(i)
-                        continue
-                    info = resp.split()
-                    info[1] = int(info[1])
-                    info[2] = int(info[2])
-                    if info[0] == "vorbis":
-                        info[0] = "ogg"
-                    codec = tuple(info)
-                    print(codec)
-                    codec_map[url] = codec
-                add_dict(codecs, {codec: 1})
-            if pops:
-                ast = alist(ast).pops(pops)
-            if len(codecs) > 1:
-                print(codecs)
-                maxcodec = max(codecs.values())
-                selcodec = [k for k, v in codecs.items() if v >= maxcodec][0]
-                t = ts
-                for i, url in enumerate(ast):
-                    if codec_map[url] != selcodec:
-                        t += 1
-                        try:
-                            ast[i] = self.download_file(url, selcodec[0], auds=auds, ts=t, ar=selcodec[1], ac=selcodec[2])[0].rsplit("/", 1)[-1]
-                        except:
-                            print_exc()
-                            ast[i] = None
-            asc = "\n".join(f"file '{i}'" for i in ast if i)
-            asf = f"cache/{ts}.concat"
-            with open(asf, "w", encoding="utf-8") as f:
-                f.write(asc)
-            args.extend(("-f", "concat", "-safe", "0", "-protocol_whitelist", "concat,tls,tcp,file,http,https"))
-        else:
-            asf = asc = ast[0]
-        if not vst:
-            args.append("-vn")
-        elif fmt == "gif":
-            args.append("-an")
-        if str(start) != "None":
-            start = round_min(float(start))
-            args.extend(("-ss", str(start)))
-        else:
-            start = 0
-        if str(end) != "None":
-            end = round_min(min(float(end), 86400))
-            args.extend(("-to", str(end)))
-        else:
-            end = None
-            args.extend(("-to", "86400"))
-        if vst and vsf != asf:
-            args.extend(("-i", vsf))
-            if start:
+                asf = asc = ast[0]
+            if not vst:
+                args.append("-vn")
+            elif fmt == "gif":
+                args.append("-an")
+            if str(start) != "None":
+                start = round_min(float(start))
                 args.extend(("-ss", str(start)))
-            if end is not None:
+            else:
+                start = 0
+            if str(end) != "None":
+                end = round_min(min(float(end), 86400))
                 args.extend(("-to", str(end)))
-        args.extend(("-i", asf))
-        if auds is not None:
-            args.extend(auds.construct_options(full=True))
-        br = 196608
-        if auds and br > auds.stats.bitrate:
-            br = max(4096, auds.stats.bitrate)
-        if fmt in ("vox", "adpcm"):
-            args.extend(("-acodec", "adpcm_ms"))
-            fmt = "wav" if fmt == "adpcm" else "vox"
-            outf = f"{info['name']}.{fmt}"
-            fn = f"cache/\x7f{ts}~" + outf.translate(filetrans)
-        elif fmt == "pcm":
-            fmt = "s16le"
-        elif fmt == "mp2":
-            br = round(br / 64000) * 64000
-            if not br:
-                br = 64000
-        elif fmt == "aac":
-            fmt = "adts"
-        if not vst:
-            args.extend(("-ar", str(SAMPLE_RATE), "-ac", "2", "-b:a", str(br)))
-        if copy:
-            args.extend(("-c", "copy", fn))
-        else:
-            args.extend(("-f", fmt, fn))
-        print(args)
-        try:
-            resp = subprocess.run(args, stderr=subprocess.PIPE)
-            resp.check_returncode()
-        except subprocess.CalledProcessError as ex:
-            # Attempt to convert file from org if FFmpeg failed
-            try:
-                new = select_and_convert(ast[0])
-            except ValueError:
-                if resp.stderr:
-                    raise RuntimeError(*ex.args, resp.stderr)
-                raise ex
-            # Re-estimate duration if file was successfully converted from org
-            args[args.index("-i") + 1] = new
+            else:
+                end = None
+                args.extend(("-to", "86400"))
+            if vst and vsf != asf:
+                args.extend(("-i", vsf))
+                if start:
+                    args.extend(("-ss", str(start)))
+                if end is not None:
+                    args.extend(("-to", str(end)))
+            args.extend(("-i", asf, "-map_metadata", "-1"))
+            if auds is not None:
+                args.extend(auds.construct_options(full=True))
+            br = 196608
+            if auds and br > auds.stats.bitrate:
+                br = max(4096, auds.stats.bitrate)
+            if fmt in ("vox", "adpcm"):
+                args.extend(("-acodec", "adpcm_ms"))
+                fmt = "wav" if fmt == "adpcm" else "vox"
+                outf = f"{info['name']}.{fmt}"
+                fn = f"cache/\x7f{ts}~" + outf.translate(filetrans)
+            elif fmt == "pcm":
+                fmt = "s16le"
+            elif fmt == "mp2":
+                br = round(br / 64000) * 64000
+                if not br:
+                    br = 64000
+            elif fmt == "aac":
+                fmt = "adts"
+            if not vst:
+                args.extend(("-ar", str(SAMPLE_RATE), "-ac", "2", "-b:a", str(br)))
+            if copy:
+                args.extend(("-c", "copy", fn))
+            elif container:
+                args.extend(("-f", container, "-c", fmt, fn))
+            else:
+                args.extend(("-f", fmt, fn))
+            print(args)
             try:
                 resp = subprocess.run(args, stderr=subprocess.PIPE)
                 resp.check_returncode()
             except subprocess.CalledProcessError as ex:
-                if resp.stderr:
-                    raise RuntimeError(*ex.args, resp.stderr)
-                raise ex
-            if not is_url(new):
-                with suppress():
-                    os.remove(new)
-        # with tracebacksuppressor:
-        #     if len(ast) > 1:
-        #         os.remove(asf)
-        #     if len(vst) > 1:
-        #         os.remove(vsf)
-        if end:
-            odur = end - start
-            if odur:
-                dur = e_dur(get_duration(fn))
-                if dur < odur - 1:
-                    ts += 1
-                    fn, fn2 = f"cache/\x7f{ts}~{outft}", fn
-                    times = ceil(odur / dur)
-                    # if "|" not in fn2:
-                    #     loopf = None
-                    #     argi = f"concat:{((fn2 + '|') * times).rstrip('|')}"
-                    #     args = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-protocol_whitelist", "concat,tls,tcp,file,http,https", "-to", str(odur), "-i", argi, "-c", "copy", fn]
-                    # else:
-                    loopf = f"cache/{ts - 1}~loop.txt"
-                    with open(loopf, "w", encoding="utf-8") as f:
-                        f.write(f"file '{fn2.split('/', 1)[-1]}'\n" * times)
-                    args = [
-                        "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-                        "-protocol_whitelist", "concat,tls,tcp,file,http,https",
-                        "-to", str(odur), "-f", "concat", "-safe", "0",
-                        "-i", loopf, "-c", "copy", fn
-                    ]
-                    print(args)
-                    try:
-                        resp = subprocess.run(args)
-                        resp.check_returncode()
-                    except subprocess.CalledProcessError as ex:
-                        if resp.stderr:
-                            raise RuntimeError(*ex.args, resp.stderr)
-                        raise ex
+                # Attempt to convert file from org if FFmpeg failed
+                try:
+                    new = select_and_convert(ast[0])
+                except ValueError:
+                    if resp.stderr:
+                        raise RuntimeError(*ex.args, resp.stderr)
+                    raise ex
+                # Re-estimate duration if file was successfully converted from org
+                args[args.index("-i") + 1] = new
+                try:
+                    resp = subprocess.run(args, stderr=subprocess.PIPE)
+                    resp.check_returncode()
+                except subprocess.CalledProcessError as ex:
+                    if resp.stderr:
+                        raise RuntimeError(*ex.args, resp.stderr)
+                    raise ex
+                if not is_url(new):
                     with suppress():
-                        if loopf:
-                            os.remove(loopf)
-                        os.remove(fn2)
-        if not mid:
-            return fn, outf
-        self.other_x += 1
-        with open(fn, "rb") as f:
-            resp = Request(
-                "https://cts.ofoct.com/upload.php",
-                method="post",
-                files={"myfile": ("temp.mp3", f)},
-                timeout=32,
-                decode=True
-            )
-            resp_fn = ast.literal_eval(resp)[0]
-        url = f"https://cts.ofoct.com/convert-file_v2.php?cid=audio2midi&output=MID&tmpfpath={resp_fn}&row=file1&sourcename=temp.ogg&rowid=file1"
-        # print(url)
-        with suppress():
-            os.remove(fn)
-        self.other_x += 1
-        resp = Request(url, timeout=720)
-        self.other_x += 1
-        out = Request(f"https://cts.ofoct.com/get-file.php?type=get&genfpath=/tmp/{resp_fn}.mid", timeout=32)
-        return out, outf[:-4] + ".mid"
+                        os.remove(new)
+            # with tracebacksuppressor:
+            #     if len(ast) > 1:
+            #         os.remove(asf)
+            #     if len(vst) > 1:
+            #         os.remove(vsf)
+            if end:
+                odur = end - start
+                if odur:
+                    dur = e_dur(get_duration(fn))
+                    if dur < odur - 1:
+                        ts += 1
+                        fn, fn2 = f"cache/\x7f{ts}~{outft}", fn
+                        times = ceil(odur / dur)
+                        # if "|" not in fn2:
+                        #     loopf = None
+                        #     argi = f"concat:{((fn2 + '|') * times).rstrip('|')}"
+                        #     args = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-protocol_whitelist", "concat,tls,tcp,file,http,https", "-to", str(odur), "-i", argi, "-c", "copy", fn]
+                        # else:
+                        loopf = f"cache/{ts - 1}~loop.txt"
+                        with open(loopf, "w", encoding="utf-8") as f:
+                            f.write(f"file '{fn2.split('/', 1)[-1]}'\n" * times)
+                        args = [
+                            "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                            "-protocol_whitelist", "concat,tls,tcp,file,http,https",
+                            "-to", str(odur), "-f", "concat", "-safe", "0",
+                            "-i", loopf, "-c", "copy", fn
+                        ]
+                        print(args)
+                        try:
+                            resp = subprocess.run(args)
+                            resp.check_returncode()
+                        except subprocess.CalledProcessError as ex:
+                            if resp.stderr:
+                                raise RuntimeError(*ex.args, resp.stderr)
+                            raise ex
+                        with suppress():
+                            if loopf:
+                                os.remove(loopf)
+                            os.remove(fn2)
+            if not mid:
+                return fn, outf
+            self.other_x += 1
+            with open(fn, "rb") as f:
+                resp = Request(
+                    "https://cts.ofoct.com/upload.php",
+                    method="post",
+                    files={"myfile": ("temp.mp3", f)},
+                    timeout=32,
+                    decode=True
+                )
+                resp_fn = ast.literal_eval(resp)[0]
+            url = f"https://cts.ofoct.com/convert-file_v2.php?cid=audio2midi&output=MID&tmpfpath={resp_fn}&row=file1&sourcename=temp.ogg&rowid=file1"
+            # print(url)
+            with suppress():
+                os.remove(fn)
+            self.other_x += 1
+            resp = Request(url, timeout=720)
+            self.other_x += 1
+            out = Request(f"https://cts.ofoct.com/get-file.php?type=get&genfpath=/tmp/{resp_fn}.mid", timeout=32)
+            return out, outf[:-4] + ".mid"
 
     # Extracts full data for a single entry. Uses cached results for optimization.
     def extract_single(self, i, force=False):

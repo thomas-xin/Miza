@@ -1321,7 +1321,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 filename = file
             file = f2
             fp = file.fp
-            fsize = fp.getbuffer().nbytes
+            fp.seek(0)
+            data = fp.read()
+            fsize = len(data)
+            fp.seek(0)
             with suppress(AttributeError):
                 fp.clear()
         try:
@@ -2220,6 +2223,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         self.loaded = True
 
     def clear_cache(self):
+        if "audio" in self.data:
+            if self._globals["VOICE"].ytdl.download_sem.active:
+                return 0
         i = 0
         for f in os.listdir("cache"):
             if f[0] in "\x7f~!" or f.startswith("attachment_") or f.startswith("emoji_"):
