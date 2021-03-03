@@ -563,7 +563,7 @@ class CustomAudio(collections.abc.Hashable):
                 # If idle for more than 10 seconds, attempt to find members in other voice channels
                 elif self.timeout < utc() - 10:
                     if guild.afk_channel and (guild.afk_channel.id != self.acsi.channel.id and guild.afk_channel.permissions_for(guild.me).connect):
-                        await_fut(self.move_unmute(vc, guild.afk_channel))
+                        await_fut(self.move_unmute(self.acsi, guild.afk_channel))
                     else:
                         cnt = 0
                         ch = None

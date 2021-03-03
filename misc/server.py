@@ -158,7 +158,7 @@ def get_file(path, filename=None):
                 p = fi
             else:
                 send(f"{p} has compression ratio {r}, skipping...")
-    resp = flask.send_file(p, as_attachment=download, attachment_filename=filename or fn, mimetype=mime, conditional=True)
+    resp = flask.send_file(p, as_attachment=download, attachment_filename=filename or fn if download else None, mimetype=mime, conditional=True)
     resp.headers.update(CHEADERS)
     return resp
 

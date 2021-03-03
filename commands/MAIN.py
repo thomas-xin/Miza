@@ -1156,10 +1156,7 @@ class Reminder(Command):
             if "today" in argv or "tomorrow" in argv or "yesterday" in argv:
                 t = 0
                 if " " in argv:
-                    try:
-                        args = shlex.split(argv)
-                    except ValueError:
-                        args = argv.split()
+                    args = argv.split()
                     for i in (0, -1):
                         arg = args[i]
                         with suppress(KeyError):
@@ -1181,10 +1178,7 @@ class Reminder(Command):
                 break
             t = 0
             if " " in argv:
-                try:
-                    args = shlex.split(argv)
-                except ValueError:
-                    args = argv.split()
+                args = argv.split()
                 for i in (0, -1):
                     arg = args[i]
                     with suppress(KeyError):
