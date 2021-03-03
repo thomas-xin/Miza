@@ -3,7 +3,7 @@ Welcome to Miza, a multipurpose Discord bot created by [Thomas Xin](https://gith
 
 ![Miza](https://cdn.discordapp.com/attachments/688253918890688521/777456623555051521/image0.png)
 
-## Table of Contents
+## [Table of Contents](https://github.com/thomas-xin/Miza)
 
 Headings | Explinations
 ------------ | -------------
@@ -13,7 +13,7 @@ Support! | Links to where you can find Miza and get support!
 
 ## [Where can I find what?](https://github.com/thomas-xin/Miza/tree/master/commands)
 
-First and foremost, the front folder here contains all your generic license, requirements, etc... (Though requirements is necessary for the *install_update* funtionality which, automatically checks for and installs any missing modules.) But most significantly, the main files responsible for running the bots code. Throughout the code, you will frequently see `from common import *`, which is because *common.py* contains all the main necessary functions and imports to be used throughout. *main.py* is the main process, while everything else runs as a subprocess, so if you make any changes to main.py, it'll require a manual restart. Most of the bots optimization and data collection funtionaility can be found in these files, (such as running the bot of course, starting the heartbeat.tmp and other log related code, message/attachement caching, assigning variables of the Github Directory link, default bot prefix, etc...) As for where things are located...
+First and foremost, the front folder here contains all your generic license, requirements, etc... (Though requirements is necessary for the *install_update* funtionality which, automatically checks for and installs any missing modules.) But most significantly, the main files responsible for running the bots code. Throughout the code, you will frequently see `from common import *`, which is because *common.py* contains all the main necessary functions and imports to be used throughout. *main.py* is the main process, while everything else runs as a subprocess, so if you make any changes to main.py, it'll require a manual restart. Most of the bots optimization and data collection funtionaility can be found in these files, (such as running the bot of course, starting the heartbeat.tmp and other log related code, caching, assigning variables of the Github Directory link, default bot prefix, etc...) As for where things are located...
 
 - **commands**
 
@@ -21,11 +21,11 @@ You may think its unnecessary to explain all this, but before I learnt my way ar
 
 - **misc**
 
-Misc contains all the different files that the bot needs to pull from, such as the avatar (which gets automatically uploaded to the Discord Developers Portal the first time the code is ran), the rainbow bar emojis (which get automatically uploaded to a server Miza is in if it cannot find the emojis already), the code necessary for converting org files, computing math equations, finding timezones and etc. You can change the bots avatar and emojis if you want to; *but if you want the code to use them the same way, the filename must be kept the same.*
+Misc contains all the different files that the bot needs to pull from, such as the avatar (which gets automatically uploaded to the Discord Developers Portal the first time the code is run), the rainbow bar emojis (which get automatically uploaded to a server Miza is in if it cannot find the emojis already), the code necessary for converting org files, computing math equations, finding timezones and etc. You can change the bots avatar and emojis if you want to; *but if you want the code to use them the same way, the filename must be kept the same.*
 
-## How do I use the code?
+## [How do I use the code?](http://mizabot.xyz/apidoc)
 
-I'm just going to comment on what I personally found to be the most important things to know when hosting Miza. First of all, download this heccin chonka of a directory. How Miza is ran currently is through an *auth.json*, which as of 14/11/2020 (UTC), the general layout can be found at the top of *main.py* if you wish to host a Miza of your own and copy it exactly. **This file is necessary, as the bot cannot run without its token (obviosuly).** If you've successfully run the bot, you'll see some new folders in your front folder here. The most important to acknowledge are *saves* and *backup*. The saves folder is the entire databse, ~~enter with caution because wow if my file explorer doesn't hate loading this...~~ The backup folder automatically saves the current database to a zip file, going by date. If you want to export the database somewhere, the quickest way to do so is to just get rid of the day's backup zip, Miza will make a new one within a couple of minutes. Its what Thomas and I do. 🙃 Now to address some issues I've personally had hosting Miza, and solutions for if anybody experiences the same...
+I'm just going to comment on what I personally found to be the most important things to know when hosting Miza. First of all, download this heccin chonka of a directory. How Miza is ran currently is through an *auth.json*, which automatically gets created if Miza is ran and cannot locate the file. Alternatively, as of 14/11/2020 (UTC), the general layout can be found at the top of *main.py* if you wish to host a Miza of your own and copy it exactly. **This file is necessary, as the bot cannot run without its token (obviosuly).** If you've successfully run the bot, you'll see some new folders in your front folder here. The most important to acknowledge are *saves* and *backup*. The saves folder is the entire databse, ~~enter with caution because wow if my file explorer doesn't hate loading this...~~ The backup folder automatically saves the current database to a zip file, going by date. If you want to export the database somewhere, the quickest way to do so is to just get rid of the day's backup zip, Miza will make a new one within a couple of minutes. Its what Thomas and I do. 🙃 Now to address some issues I've personally had hosting Miza, and solutions for if anybody experiences the same...
 
 - **MemoryError()**
 
@@ -45,6 +45,8 @@ def __init__(self, cache_size=4194304, timeout=24):
 
 Just reduce the number in `cache_size=4194304` and you should be good to go.
 
+**Note that Miza's infinite message cache has since been removed, and the cache gets cleared after 2 weeks. It is unlikely that you will encounter this issue hence.**
+
 - **IP Address exposure**
 
 So, the main Miza bot hosts a few Minecraft Servers, and in order to keep people up-to-date with the IP whenever there's a change, the ~status will show your IP Address. If you don't want your IP Address exposed publicly, you can change this in the same *bot.py* file as before, down in the `get_ip()` function at around line 1475. It should look like this:
@@ -59,14 +61,14 @@ Change `resp = await Request("https://api.ipify.org", decode=True, aio=True)` to
 
 - **OSError()**
 
-Alright, to quote this issue from when Thomas explained it to me...
-> Invalid argument as a windows error (which is why it's OS error) means that the process being selected is invalid, which in this case, is caused by miza trying to send data to another process running on the computer that was closed or otherwise not open. The image and math commands (and in the latest version of miza, the webserver) run in separate processes entirely, in order to share CPU more fairly and not clog up the main bot when being used for time consuming operations. Because of the matplotlib compatibility issue with python 3.9, I had to effectively make miza run two different python versions, 3.9.0 and 3.8.5, because I'd already updated a lot to 3.9. So... in order to make that possible, I added a "python path" variable to my auth.json, which only worked for Miza. The latest version of miza should run perfectly fine now with python_path set to ""
+In a nutshell, Miza needs to run various versions of Python in order to run certain voice, image, etc, commands. Because of this, if you encounter Miza erroring with an `OSError()` when you attempt to host the bot, chances are you may be missing `"python_path":"",` in your *auth.json.* However, for a while before this update to the README (written on 02/03/2020 (UTC)), Miza now adds this to the *auth.json* automatically.
 
-So in a nutshell, make sure you have `"python_path":"",` in your auth.json, or else you wont be able to use any voice commands, image commands, or etc.
+For more information written by Thomas Xin:
+> Invalid argument as a windows error (which is why it's OS error) means that the process being selected is invalid, which in this case, is caused by miza trying to send data to another process running on the computer that was closed or otherwise not open. The image and math commands (and in the latest version of miza, the webserver) run in separate processes entirely, in order to share CPU more fairly and not clog up the main bot when being used for time consuming operations. Because of the matplotlib compatibility issue with python 3.9, I had to effectively make miza run two different python versions, 3.9.0 and 3.8.5, because I'd already updated a lot to 3.9. So... in order to make that possible, I added a "python path" variable to my auth.json, which only worked for Miza. The latest version of miza should run perfectly fine now with python_path set to ""
 
 - **Voice commands still not working?**
 
-Make sure you have *ffmpeg* installed onto your computer and in your PATH (it doesn't need to be in the same directory as Miza). I uh... Actually have my ffmpeg pathed by pathing to the misc folder found in [Miza Player](https://github.com/thomas-xin/Miza-Player). 🙃
+Make sure you have *ffmpeg* and *Python* installed onto your computer and in your PATH (it doesn't need to be in the same directory as Miza). I uh... Actually have my ffmpeg pathed by pathing to the misc folder found in [Miza Player](https://github.com/thomas-xin/Miza-Player). 🙃
 
 ![ffmpeg](https://cdn.discordapp.com/attachments/688253918890688521/777473182294474753/image0.png)
 
@@ -82,7 +84,7 @@ Miza logs up to three places: A *log.txt* (which the file gets refreshed upon re
 
 ![Screenshot4](https://cdn.discordapp.com/attachments/727087981285998593/777554358095183893/Capture8.PNG)
 
-## [Support!](http://27.33.133.250:9801/)
+## [Support!](http://mizabot.xyz)
 
 With that concludes the basic introduction of hosting Miza. The code is commented and explaining where everything is, so feel free to explore further to see what you can change, and if you have any questions, [Thomas Xin](https://github.com/thomas-xin) is your guy to ask!
 
@@ -92,6 +94,6 @@ Miza has so much functionality, with so much to explore, with all the command ca
 
 [Check out our Website!](http://mizabot.xyz)
 
-[View our Miza Atlas for a command tester and in-depth command list in the comforts of your browser!](http://mizabot.xyz/mizatlas)
+*The the domain redirects to a webserver which includes: a command tester within the comforts of your browser, documentation on the API, a free file host, and more!*
 
 [Join our Discord Support Server!](https:/discord.gg//cbKQKAr)
