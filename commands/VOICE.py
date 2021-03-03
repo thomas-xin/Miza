@@ -1216,6 +1216,7 @@ class AudioDownloader:
                         search = b";sid='"
                         resp = resp[resp.index(search) + len(search):]
                         self.keepvid_token = as_str(resp[:resp.index(b"';</script>")])
+                        self.keepvid_failed = 0
                     except:
                         print_exc()
                         self.keepvid_failed += 1
@@ -2309,7 +2310,7 @@ class AudioDownloader:
             if copy:
                 args.extend(("-c", "copy", fn))
             elif container:
-                args.extend(("-f", container, "-c", fmt, fn))
+                args.extend(("-f", container, "-c", fmt, "-strict", "-2", fn))
             else:
                 args.extend(("-f", fmt, fn))
             print(args)

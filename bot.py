@@ -2908,7 +2908,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 w = await channel.create_webhook(name=self.name, reason="Auto Webhook")
                 w = self.add_webhook(w)
             else:
-                w = wlist.next()
+                w = wlist[0]
         except discord.HTTPException as ex:
             if "maximum" in str(ex).lower():
                 print_exc()

@@ -528,7 +528,7 @@ class UpdateExec(Database):
             if flag & 8:
                 channel = self.bot.cache.channels.get(c_id)
                 if channel:
-                    create_task(self.bot.ensure_webhook(channel, force=True, fill=10))
+                    create_task(self.bot.ensure_webhook(channel, force=True))
 
     def _destroy_(self, **void):
         with suppress(LookupError, AttributeError):
