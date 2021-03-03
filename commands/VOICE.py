@@ -2177,7 +2177,7 @@ class AudioDownloader:
                     outf = f"{info['name']}.{fmt}"
                     outft = outf.translate(filetrans)
                     if child:
-                        fn = f"cache/#{ts}~{outft}"
+                        fn = f"cache/C{ts}~{outft}"
                     else:
                         fn = f"cache/\x7f{ts}~{outft}"
                 if vst or fmt in videos:
