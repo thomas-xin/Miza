@@ -729,7 +729,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 members.add(user)
         return members
 
-    async def query_members(self, members, query, fuzzy=1 / 3):
+    async def query_members(self, members, query, fuzzy=0.5):
         query = str(query)
         with suppress(LookupError):
             return await str_lookup(

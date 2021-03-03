@@ -2200,11 +2200,17 @@ class AudioDownloader:
         if len(ast) > 1:
             codec_map = self.codec_map
             codecs = {}
-            for url in ast:
+            pops = set()
+            for i, url in enumerate(ast):
                 try:
                     codec = codec_map[url]
                 except KeyError:
-                    resp = as_str(subprocess.check_output(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name,sample_rate,channels", "-of", "default=nokey=1:noprint_wrappers=1", url])).strip()
+                    try:
+                        resp = as_str(subprocess.check_output(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name,sample_rate,channels", "-of", "default=nokey=1:noprint_wrappers=1", url])).strip()
+                    except:
+                        print_exc()
+                        pops.add(i)
+                        continue
                     info = resp.split()
                     info[1] = int(info[1])
                     info[2] = int(info[2])
@@ -2214,6 +2220,8 @@ class AudioDownloader:
                     print(codec)
                     codec_map[url] = codec
                 add_dict(codecs, {codec: 1})
+            if pops:
+                ast = alist(ast).pops(pops)
             if len(codecs) > 1:
                 print(codecs)
                 maxcodec = max(codecs.values())
