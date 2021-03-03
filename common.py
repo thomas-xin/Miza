@@ -1262,6 +1262,10 @@ MIMES = dict(
 
 def get_mime(path):
     mime = magic.from_file(path, mime=True)
+    if mime.startswith("cannot open `"):
+        with open(path, "rb") as f:
+            b = f.read(65536)
+        mime = magic.from_buffer(b, mime=True)
     if type(mime) == "text/plain":
         mime2 = MIMES.get(path.rsplit("/", 1)[-1].rsplit(".", 1)[-1])
         if mime2.startswith("text/"):
@@ -1676,16 +1680,19 @@ def find_file(path, cwd="cache", ind="\x7f"):
 
 class open2(io.IOBase):
 
-    __slots__ = ("fp", "fn", "mode")
+    __slots__ = ("fp", "fn", "mode", "filename")
 
-    def __init__(self, fn, mode="rb"):
+    def __init__(self, fn, mode="rb", filename=None):
         self.fp = None
         self.fn = fn
         self.mode = mode
+        self.filename = filename or getattr(fn, "name", None) or fn
 
     def __getattribute__(self, k):
         if k in object.__getattribute__(self, "__slots__") or k == "clear":
             return object.__getattribute__(self, k)
+        if k == "name":
+            return object.__getattribute__(self, "filename")
         if self.fp is None:
             self.fp = open(self.fn, self.mode)
         return getattr(self.fp, k)

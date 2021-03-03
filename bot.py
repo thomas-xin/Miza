@@ -280,7 +280,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 if resp.status_code not in range(200, 400):
                     raise ConnectionError(f"Error {resp.status_code}", resp.text)
 
-    async def create_main_website(self):
+    async def create_main_website(self, first=False):
         with tracebacksuppressor:
             print("Generating website html...")
             # resp = await Request("https://github.com/thomas-xin/Miza", aio=True)
@@ -418,6 +418,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             with open("misc/help.json", "w", encoding="utf-8") as f:
                 f.write(json.dumps(j, indent=4))
         self.start_webserver()
+        if first:
+            create_thread(webserver_communicate, self)
 
     def start_webserver(self):
         if self.server:
@@ -426,7 +428,6 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         if os.path.exists("misc/server.py") and PORT:
             print("Starting webserver...")
             self.server = psutil.Popen([python, "server.py"], cwd=os.getcwd() + "/misc", stderr=subprocess.PIPE)
-            create_thread(webserver_communicate, self)
         else:
             self.server = None
 
@@ -1320,10 +1321,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 filename = file
             file = f2
             fp = file.fp
-            fp.seek(0)
-            data = fp.read()
-            fsize = len(data)
-            fp.seek(0)
+            fsize = fp.getbuffer().nbytes
             with suppress(AttributeError):
                 fp.clear()
         try:
@@ -3765,7 +3763,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             # futs = alist(create_task(self.load_guild_webhooks(guild)) for guild in self.guilds)
             futs = alist()
             futs.add(create_future(self.update_slash_commands, priority=True))
-            futs.add(create_task(self.create_main_website()))
+            futs.add(create_task(self.create_main_website(first=True)))
             futs.add(self.audio_client_start)
             self.bot_ready = True
             print("Bot ready.")

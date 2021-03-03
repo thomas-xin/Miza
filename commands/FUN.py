@@ -915,7 +915,7 @@ class UpdateDogpiles(Database):
                         break
                     last_author_id = m.author.id
                 # print(content, count)
-                if count >= 3 and random.random() > 2 / count:
+                if count >= 2 and random.random() >= 2 / (count + 0.5):
                     if number is not None:
                         if type(number) is str:
                             content = chr(ord(last_number) - add)
