@@ -2251,10 +2251,10 @@ class AudioDownloader:
                             t += 1
                             try:
                                 if "webm" in selcodec[3].split(","):
-                                    container = "webm"
+                                    ct = "webm"
                                 else:
-                                    container = None
-                                ast[i] = self.download_file(url, selcodec[0], auds=auds, ts=t, ar=selcodec[1], ac=selcodec[2], container=container, child=True)[0].rsplit("/", 1)[-1]
+                                    ct = None
+                                ast[i] = self.download_file(url, selcodec[0], auds=auds, ts=t, ar=selcodec[1], ac=selcodec[2], container=ct, child=True)[0].rsplit("/", 1)[-1]
                             except:
                                 print_exc()
                                 ast[i] = None
