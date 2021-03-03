@@ -2169,7 +2169,7 @@ class AudioDownloader:
             ast.append(info["stream"])
         if not ast and not vst:
             raise LookupError(f"No stream URLs found for {url}")
-        ffmpeg = "misc/ffmpeg-c/ffmpeg.exe" if len(urls) <= 1 else "ffmpeg"
+        ffmpeg = "misc/ffmpeg-c/ffmpeg.exe" if len(ast) <= 1 else "ffmpeg"
         args = alist((ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-y"))
         if vst:
             if len(vst) > 1:

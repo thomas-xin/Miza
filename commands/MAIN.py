@@ -84,7 +84,8 @@ class Help(Command):
             colour = discord.Colour(help_colours[None])
             description = (
                 "Please enter a command category to display usable commands, or type a command name to view more info. Examples: `~help main` or `~help rainbow`\nAlternatively, visit "
-                + f"[`mizatlas`]({bot.webserver}/mizatlas) for a full command list and tester.\nNeed a handy way to upload larger files? See [`upload`]({bot.webserver}/upload)!"
+                + f"[`mizatlas`]({bot.webserver}/mizatlas) for a full command list and tester.\nUnsure about anything, or have a bug to report? Check out the [`support server`]({bot.rcc_invite})!"
+                + f"\nNeed a handy way to upload larger files? See [`upload`]({bot.webserver}/upload)!"
             )
             if bot.categories:
                 s = bold(ini_md(' '.join((sqr_md(c) for c in help_colours if c in standard_commands))))
