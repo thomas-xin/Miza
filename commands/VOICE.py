@@ -2169,7 +2169,7 @@ class AudioDownloader:
                     url = f"https://youtube.com/watch?v={url[len(search):].split('/', 1)[0]}"
                 try:
                     info = self.extract(url)[0]
-                except (ConnectionError, youtube_dl.DownloadError):
+                except:
                     print_exc()
                     continue
                 self.get_stream(info, video=fmt in videos, force=True, download=False)
