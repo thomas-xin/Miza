@@ -1262,7 +1262,7 @@ MIMES = cdict(
 )
 
 def get_mime(path):
-    if os.path.getsize(file) < 1048576:
+    if os.path.getsize(path) < 1048576:
         mime = magic.from_file(path, mime=True)
     else:
         mime = "cannot open `"
