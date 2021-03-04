@@ -1241,7 +1241,7 @@ def is_video(url):
         return VIDEO_FORMS.get(url)
 
 
-MIMES = dict(
+MIMES = cdict(
     bin="application/octet-stream",
     css="text/css",
     json="application/json",
@@ -1262,13 +1262,16 @@ MIMES = dict(
 )
 
 def get_mime(path):
-    mime = magic.from_file(path, mime=True)
+    if os.path.getsize(file) < 1048576:
+        mime = magic.from_file(path, mime=True)
+    else:
+        mime = "cannot open `"
     if mime.startswith("cannot open `"):
         with open(path, "rb") as f:
             b = f.read(65536)
         mime = magic.from_buffer(b, mime=True)
     if type(mime) == "text/plain":
-        mime2 = MIMES.get(path.rsplit("/", 1)[-1].rsplit(".", 1)[-1])
+        mime2 = MIMES.get(path.rsplit("/", 1)[-1].rsplit(".", 1)[-1], "")
         if mime2.startswith("text/"):
             return mime2
     return mime
