@@ -2845,7 +2845,7 @@ class Connect(Command):
     server_only = True
     name = ["📲", "🎤", "🎵", "🎶", "📴", "📛", "Summon", "Join", "DC", "Disconnect", "Leave", "Move", "Reconnect"]
     # Because Rythm also has this alias :P
-    alias = name + ["FuckOff"]
+    alias = name + ["Yeet", "FuckOff"]
     description = "Summons the bot into a voice channel."
     usage = "<channel>?"
     rate_limit = (3, 4)
@@ -2854,7 +2854,7 @@ class Connect(Command):
     async def __call__(self, user, channel, name="join", argv="", vc=None, **void):
         bot = self.bot
         joining = False
-        if name in ("dc", "disconnect", "leave", "fuckoff", "📴", "📛"):
+        if name in ("dc", "disconnect", "leave", "yeet", "fuckoff", "📴", "📛"):
             vc_ = None
         elif argv or name == "move":
             c_id = verify_id(argv)
