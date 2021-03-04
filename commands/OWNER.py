@@ -525,7 +525,7 @@ class UpdateExec(Database):
         with suppress(AttributeError):
             PRINT.funcs.append(self._log_)
         for c_id, flag in self.data.items():
-            if flag & 8:
+            if flag & 24:
                 channel = self.bot.cache.channels.get(c_id)
                 if channel:
                     create_task(self.bot.ensure_webhook(channel, force=True))
