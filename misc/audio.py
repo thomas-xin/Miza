@@ -488,7 +488,7 @@ class AudioFile:
                 out = next(reader.it, b"")
             except ValueError:
                 f = open("cache/" + self.file, "rb")
-                f.seek(self.byte_pos)
+                f.seek(reader.byte_pos)
                 reader.file = f
                 reader.it = discord.oggparse.OggStream(f).iter_packets()
                 out = next(reader.id, b"")
