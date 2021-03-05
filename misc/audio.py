@@ -25,7 +25,7 @@ def request(s):
     with tracebacksuppressor:
         PORT = AUTH["webserver_port"]
         token = AUTH["discord_token"]
-        return requests.get(f"http://127.0.0.1:{PORT}/eval/{token}/{url_parse(s)}")
+        return requests.get(f"http://127.0.0.1:{PORT}/eval/{token}/{url_parse(s)}").text
 
 def submit(s):
     b = "~" + repr(as_str(s).encode("utf-8")) + "\n"
