@@ -364,7 +364,7 @@ class AudioFile:
         if webpage_url is not None:
             self.webpage_url = webpage_url
         self.loading = True
-        ffmpeg = "misc/ffmpeg-c/ffmpeg.exe" if not is_youtube_stream(stream) else "ffmpeg"
+        ffmpeg = "misc/ffmpeg-c/ffmpeg.exe" if check_fmt and not is_youtube_stream(stream) else "ffmpeg"
         # Collects data from source, converts to 48khz 192kbps opus format, outputting to target file
         cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-vn", "-i", stream, "-map_metadata", "-1", "-f", "opus", "-c:a", "libopus", "-ar", str(SAMPLE_RATE), "-ac", "2", "-b:a", "196608", "cache/" + self.file]
         if "https://cf-hls-media.sndcdn.com/" not in stream:
