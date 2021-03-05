@@ -491,7 +491,7 @@ class AudioFile:
                 f.seek(reader.byte_pos)
                 reader.file = f
                 reader.it = discord.oggparse.OggStream(f).iter_packets()
-                out = next(reader.id, b"")
+                out = next(reader.it, b"")
             reader.pos += 1
             reader.byte_pos += len(out)
             return out
