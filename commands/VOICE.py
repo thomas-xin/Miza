@@ -4439,18 +4439,19 @@ class UpdateAudio(Database):
 
     def update_vc(self, guild):
         m = guild.me
-        if guild.id not in self.players:
-            if m.voice is not None:
-                acsi = AudioClientSubInterface.from_guild(guild)
-                if acsi is not None:
-                    return create_future(acsi.kill)
-                return guild.change_voice_state(channel=None)
-        else:
-            if m.voice is not None:
-                perm = m.permissions_in(m.voice.channel)
-                if perm.mute_members and perm.deafen_members:
-                    if m.voice.deaf or m.voice.mute or m.voice.afk:
-                        return m.edit(mute=False, deafen=False)
+        if m:
+            if guild.id not in self.players:
+                if m.voice is not None:
+                    acsi = AudioClientSubInterface.from_guild(guild)
+                    if acsi is not None:
+                        return create_future(acsi.kill)
+                    return guild.change_voice_state(channel=None)
+            else:
+                if m.voice is not None:
+                    perm = m.permissions_in(m.voice.channel)
+                    if perm.mute_members and perm.deafen_members:
+                        if m.voice.deaf or m.voice.mute or m.voice.afk:
+                            return m.edit(mute=False, deafen=False)
         return emptyfut
 
     # Updates all voice clients
