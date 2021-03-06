@@ -2655,7 +2655,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                                         xi = argv.index(x)
                                         yi = argv.rindex(y)
                                         if xi < yi:
-                                            middle = argv[xi + 1:yi]
+                                            checker = argv[xi:yi + 1]
+                                            if regexp("<a?:[A-Za-z0-9\\-~_]+:[0-9]+>").fullmatch(checker) or regexp("<(?:@[!&]?|#)[0-9]+>").fullmatch(checker):
+                                                continue
+                                            middle = checker[1:-1]
                                             if len(middle.split(None, 1)) > 1 or "," in middle:
                                                 if hasattr(command, "multi"):
                                                     argv2 = single_space((argv[:xi] + " " + argv[yi + 1:]).replace("\n", " ").replace(",", " ").replace("\t", " ")).strip()
@@ -2884,7 +2887,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 out = json.dumps(dict(result=output))
             except TypeError:
                 out = json.dumps(dict(result=repr(output)))
-            print(url, out)
+            # print(url, out)
         await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, decode=True, aio=True)
 
     # Adds a webhook to the bot's user and webhook cache.

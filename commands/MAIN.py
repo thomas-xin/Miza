@@ -998,9 +998,8 @@ class Reminder(Command):
     def __load__(self):
         self.timefind = re.compile("(?:(?:(?:[0-9]+:)+[0-9.]+\\s*(?:am|pm)?|" + self.bot.num_words + "|[\\s\-+*\\/^%.,0-9]+\\s*(?:am|pm|s|m|h|d|w|y|century|centuries|millenium|millenia|(?:second|sec|minute|min|hour|hr|day|week|wk|month|mo|year|yr|decade|galactic[\\s\\-_]year)s?))\\s*)+$", re.I)
 
-    async def __call__(self, argv, name, message, flags, bot, user, guild, perm, **void):
+    async def __call__(self, name, message, flags, bot, user, guild, perm, **void):
         msg = message.content
-        argv2 = argv
         try:
             msg = msg[msg.casefold().index(name) + len(name):]
         except ValueError:
