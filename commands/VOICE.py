@@ -2095,7 +2095,7 @@ class AudioDownloader:
             stream = set_dict(data[0], "stream", data[0].url)
             icon = set_dict(data[0], "icon", data[0].url)
             entry.update(data[0])
-        elif not searched and (stream.startswith("https://cf-hls-media.sndcdn.com/") or stream.startswith("https://www.yt-download.org/download/")) or is_youtube_stream(stream) and int(stream.split("expire=", 1)[1].split("&", 1)[0]) < utc() + 60:
+        elif not searched and (stream.startswith("https://cf-hls-media.sndcdn.com/") or stream.startswith("https://www.yt-download.org/download/") and int(stream.split("/download/", 1)[1].split("/", 3)[3]) < utc() + 60) or is_youtube_stream(stream) and int(stream.split("expire=", 1)[1].split("&", 1)[0]) < utc() + 60:
             data = self.extract(entry["url"])
             stream = set_dict(data[0], "stream", data[0].url)
             icon = set_dict(data[0], "icon", data[0].url)
@@ -2165,7 +2165,7 @@ class AudioDownloader:
             outf = None
             search = "https://www.yt-download.org/download/"
             for url in urls:
-                if url.startswith(search):
+                if url.startswith(search) and int(url.split("/download/", 1)[1].split("/", 3)[3]) < utc() + 60:
                     url = f"https://youtube.com/watch?v={url[len(search):].split('/', 1)[0]}"
                 try:
                     info = self.extract(url)[0]
