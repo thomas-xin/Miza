@@ -960,6 +960,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
                 self.appendright(self.popleft(force=True), force=True)
                 steps += 1
             return self
+        self.offs = len(self.data) // 3
         self.view[:] = np.roll(self.view, steps)
         return self
 
@@ -1112,6 +1113,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
                     temp[x] = None
             temp = tuple(temp.keys())
         self.size = len(temp)
+        self.offs = len(self.data) // 3
         self.view[:] = temp
         return self
 
@@ -1279,6 +1281,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
     # Fills list with value(s).
     @blocking
     def fill(self, value):
+        self.offs = len(self.data) // 3
         self.view[:] = value
         return self
 
@@ -1449,18 +1452,24 @@ custom list-like data structure that incorporates the functionality of numpy arr
     @blocking
     def delitems(self, iterable):
         iterable = self.to_iterable(iterable, force=True)
+        if len(iterable) < 1:
+            return self
         if len(iterable) == 1:
             return self.pop(iterable[0], force=True)
         temp = np.delete(self.view, np.asarray(iterable, dtype=np.int32))
         self.size = len(temp)
-        self.view[:] = temp
+        if self.data is not None:
+            self.offs = len(self.data) // 3
+            self.view[:] = temp
+        else:
+            self.reconstitute(temp, force=True)
         return self
 
     pops = delitems
 
 hlist = alist
 
-arange = lambda a, b=None, c=None: alist(xrange(a, b, c))
+arange = lambda a, b=None, c=None: alist(range(a, b, c))
 
 azero = lambda size: alist(repeat(0, size))
 
@@ -1927,20 +1936,26 @@ def divmod(x, y):
 
 # Rounds a number to a certain amount of decimal places.
 def round(x, y=None):
-    with suppress():
+    try:
         if is_finite(x):
-            with suppress():
+            try:
                 if x == int(x):
                     return int(x)
                 if y is None:
                     return int(math.round(x))
+            except:
+                pass
             return round_min(math.round(x, y))
         else:
             return x
+    except:
+        pass
     if type(x) is complex:
         return round(x.real, y) + round(x.imag, y) * 1j
-    with suppress():
-        return math.round(x)
+    try:
+        return math.round(x, y)
+    except:
+        pass
     return x
 
 # Rounds a number to the nearest integer, with a probability determined by the fractional part.
@@ -2300,7 +2315,7 @@ def round_min(x):
         return x
     if type(x) is not complex:
         if is_finite(x):
-            if type(x) is mpf:
+            if type(x) is globals().get("mpf", None):
                 y = int(x)
                 if x == y:
                     return y

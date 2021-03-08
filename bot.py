@@ -1449,7 +1449,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         return self.data.colours.get(url)
 
     async def get_proxy_url(self, user):
-        if type(user) is discord.Guild:
+        if getattr(user, "icon_url", None):
             url = to_png(user.icon_url)
         else:
             url = best_url(user)

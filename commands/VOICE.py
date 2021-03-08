@@ -1048,7 +1048,10 @@ class AudioFileLink:
         return self.dur
 
     def ensure_time(self):
-        return bot.audio.submit(f"cache['{self.fn}'].ensure_time()")
+        try:
+            return bot.audio.submit(f"cache['{self.fn}'].ensure_time()")
+        except KeyError:
+            ytdl.cache.pop(self.fn, None)
 
     def update(self):
         # Newly loaded files have their duration estimates copied to all queue entries containing them
