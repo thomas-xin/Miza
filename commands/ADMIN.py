@@ -1266,7 +1266,7 @@ class UpdateAutoEmojis(Database):
         return emojis
 
     async def _nocommand_(self, message, **void):
-        if not message.content or message.content[0] == "\u200b" or message.content.count(":") < 2 or message.content.count("```") > 1:
+        if not message.content or getattr(message, "webhook_id", None) or message.content.count(":") < 2 or message.content.count("```") > 1:
             return
         emojis = find_emojis(message.content)
         for e in emojis:
@@ -1359,10 +1359,7 @@ class UpdateAutoEmojis(Database):
         if not msg or msg == message.content:
             return
         msg = escape_everyone(msg).strip("\u200b")
-        if not msg or msg == message.content:
-            return
-        msg = "\u200b" + msg
-        if len(msg) > 2000:
+        if not msg or msg == message.content or len(msg) > 2000:
             return
         create_task(self.bot.silent_delete(message))
         url = await self.bot.get_proxy_url(message.author)

@@ -1459,7 +1459,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
         temp = np.delete(self.view, np.asarray(iterable, dtype=np.int32))
         self.size = len(temp)
         if self.data is not None:
-            self.offs = len(self.data) // 3
+            self.offs = min(len(self.data) // 3, len(self.data) - self.size)
             self.view[:] = temp
         else:
             self.reconstitute(temp, force=True)
