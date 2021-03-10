@@ -1266,7 +1266,7 @@ class UpdateAutoEmojis(Database):
         return emojis
 
     async def _nocommand_(self, message, **void):
-        if not message.content or message.content.count(":") < 2 or message.content.count("```") > 1:
+        if not message.content or message.content[0] == "\u200b" or message.content.count(":") < 2 or message.content.count("```") > 1:
             return
         emojis = find_emojis(message.content)
         for e in emojis:
@@ -1358,11 +1358,12 @@ class UpdateAutoEmojis(Database):
                 msg = msg[:substitutes[0]] + substitutes[1] + msg[substitutes[2]:]
         if not msg or msg == message.content:
             return
-        msg = escape_everyone(msg)
-        if msg == message.content:
+        msg = escape_everyone(msg).strip("\u200b")
+        if not msg or msg == message.content:
             return
-        # print(message.content)
-        # print(msg)
+        msg = "\u200b" + msg
+        if len(msg) > 2000:
+            return
         create_task(self.bot.silent_delete(message))
         url = await self.bot.get_proxy_url(message.author)
         await self.bot.send_as_webhook(message.channel, msg, username=message.author.display_name, avatar_url=url)
@@ -2187,9 +2188,8 @@ class UpdateMessageLogs(Database):
                                 self.dc[h] += cnt
                         s = (5, 3600)[c >= 1]
                         cid = e.extra.channel.id
-                        targ = e.target.id
                         if now - h < datetime.timedelta(seconds=s):
-                            if targ == u.id and cid == message.channel.id:
+                            if (not e.target or e.target.id == u.id) and cid == message.channel.id:
                                 t = e.user
                                 init = user_mention(t.id)
             except (PermissionError, discord.Forbidden, discord.HTTPException):
@@ -2245,7 +2245,7 @@ class UpdateMessageLogs(Database):
                                 self.dc[h] += cnt
                         s = (5, 3600)[c >= len(messages)]
                         if now - h < datetime.timedelta(seconds=s):
-                            if e.target is None or e.target.id == messages[-1].channel.id:
+                            if (not e.target or e.target.id == messages[-1].channel.id):
                                 t = e.user
                                 init = user_mention(t.id)
             except (PermissionError, discord.Forbidden, discord.HTTPException):

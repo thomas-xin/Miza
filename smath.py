@@ -493,7 +493,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
     # Basic functions
     __str__ = lambda self: "[" + ", ".join(repr(i) for i in iter(self)) + "]"
     __repr__ = lambda self: f"{self.__class__.__name__}({tuple(self) if self.__bool__() else ''})"
-    __bool__ = lambda self: bool(self.size)
+    __bool__ = lambda self: self.size > 0
 
     # Arithmetic functions
 
