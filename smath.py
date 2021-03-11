@@ -924,7 +924,10 @@ custom list-like data structure that incorporates the functionality of numpy arr
     @blocking
     def clear(self):
         self.size = 0
-        self.offs = self.size >> 1
+        if self.data is not None:
+            self.offs = len(self.data) >> 1
+        else:
+            self.offs = 0
         return self
 
     @waiting
@@ -960,7 +963,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
                 self.appendright(self.popleft(force=True), force=True)
                 steps += 1
             return self
-        self.offs = len(self.data) // 3
+        self.offs = min(len(self.data) // 3, len(self.data) - s)
         self.view[:] = np.roll(self.view, steps)
         return self
 
@@ -980,7 +983,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
         if len(self.data) > 4096:
             self.data = None
             self.offs = 0
-        else:
+        elif self.data is not None:
             self.offs = len(self.data) // 3
         return True
 
