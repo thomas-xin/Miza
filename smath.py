@@ -1116,7 +1116,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
                     temp[x] = None
             temp = tuple(temp.keys())
         self.size = len(temp)
-        self.offs = len(self.data) // 3
+        self.offs = min(len(self.data) // 3, len(self.data) - self.size)
         self.view[:] = temp
         return self
 
