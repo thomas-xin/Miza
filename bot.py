@@ -2658,7 +2658,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                                         yi = argv.rindex(y)
                                         if xi < yi:
                                             checker = argv[xi:yi + 1]
-                                            if regexp("<a?:[A-Za-z0-9\\-~_]+:[0-9]+>").fullmatch(checker) or regexp("<(?:@[!&]?|#)[0-9]+>").fullmatch(checker):
+                                            if regexp("<a?:[A-Za-z0-9\\-~_]+:[0-9]+>").find(checker) or regexp("<(?:@[!&]?|#)[0-9]+>").find(checker):
                                                 continue
                                             middle = checker[1:-1]
                                             if len(middle.split(None, 1)) > 1 or "," in middle:

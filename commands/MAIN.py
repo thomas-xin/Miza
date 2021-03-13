@@ -1227,6 +1227,7 @@ class Reminder(Command):
             s = "$" + str(t)
             seq = set_dict(bot.data.reminders, s, deque())
             seq.append(sendable.id)
+            update(s)
         else:
             # Schedule for an event at a certain time
             rem = cdict(
