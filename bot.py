@@ -1699,6 +1699,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
     # Silently deletes a message, bypassing logs.
     async def silent_delete(self, message, exc=False, no_log=False, delay=None):
+        if type(message) is int:
+            message = await self.fetch_message(message)
         if delay:
             await asyncio.sleep(float(delay))
         try:
@@ -3313,6 +3315,12 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     # Handles a new sent message, calls process_message and sends an error if an exception occurs.
     async def handle_message(self, message, edit=True):
         cpy = msg = message.content
+        if not msg:
+            for i, a in enumerate(message.attachments):
+                if a.filename == "message.txt":
+                    b = await message.attachments.pop(i).read()
+                    cpy = msg = message.content = as_str(b)
+                    break
         with self.ExceptionSender(message.channel, reference=message):
             if msg and msg[0] == "\\":
                 cpy = msg[1:]

@@ -925,7 +925,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
     def clear(self):
         self.size = 0
         if self.data is not None:
-            self.offs = len(self.data) >> 1
+            self.offs = len(self.data) // 3
         else:
             self.offs = 0
         return self
@@ -963,7 +963,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
                 self.appendright(self.popleft(force=True), force=True)
                 steps += 1
             return self
-        self.offs = min(len(self.data) // 3, len(self.data) - s)
+        self.offs = (len(self.data) - self.size) // 3
         self.view[:] = np.roll(self.view, steps)
         return self
 
@@ -1116,7 +1116,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
                     temp[x] = None
             temp = tuple(temp.keys())
         self.size = len(temp)
-        self.offs = min(len(self.data) // 3, len(self.data) - self.size)
+        self.offs = (len(self.data) - self.size) // 3
         self.view[:] = temp
         return self
 
@@ -1284,7 +1284,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
     # Fills list with value(s).
     @blocking
     def fill(self, value):
-        self.offs = len(self.data) // 3
+        self.offs = (len(self.data) - self.size) // 3
         self.view[:] = value
         return self
 
@@ -1462,7 +1462,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
         temp = np.delete(self.view, np.asarray(iterable, dtype=np.int32))
         self.size = len(temp)
         if self.data is not None:
-            self.offs = min(len(self.data) // 3, len(self.data) - self.size)
+            self.offs = (len(self.data) - self.size) // 3
             self.view[:] = temp
         else:
             self.reconstitute(temp, force=True)

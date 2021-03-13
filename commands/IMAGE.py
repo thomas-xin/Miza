@@ -976,9 +976,10 @@ class CreateGIF(Command):
                 urls = await bot.follow_url(url, best=True, allow=True, limit=1)
                 url = urls[0]
                 if "discord" not in url and "channels" not in url:
-                    url, size, dur, fps = await create_future(get_video, url, 16, timeout=60)
-                    if size and dur and fps:
-                        video = (url, size, dur, fps)
+                    with tracebacksuppressor:
+                        url, size, dur, fps = await create_future(get_video, url, 16, timeout=60)
+                        if size and dur and fps:
+                            video = (url, size, dur, fps)
                 if not url:
                     raise ArgumentError(f'Invalid URL detected: "{url}".')
                 args[i] = url
