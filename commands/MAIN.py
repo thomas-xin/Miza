@@ -82,8 +82,9 @@ class Help(Command):
         else:
             # Display main help page in an embed
             colour = discord.Colour(help_colours[None])
+            p = prefix
             description = (
-                "Please enter a command category to display usable commands, or type a command name to view more info. Examples: `~help main` or `~help rainbow`\nAlternatively, visit "
+                f"Please enter a command category to display usable commands, or type a command name to view more info. Examples: `{p}help main` or `{p}help rainbow`\nAlternatively, visit "
                 + f"[`mizatlas`]({bot.webserver}/mizatlas) for a full command list and tester.\nUnsure about anything, or have a bug to report? Check out the [`support server`]({bot.rcc_invite})!"
                 + f"\nNeed a handy way to upload larger files? See [`upload`]({bot.webserver}/upload)!"
             )

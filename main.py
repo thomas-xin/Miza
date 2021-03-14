@@ -1,28 +1,28 @@
 # Loads the install_update module, which makes sure all required libraries are installed to their required versions.
 from install_update import *
-import json
 
 # Makes sure an authentication file exists.
 if not os.path.exists("auth.json") or not os.path.getsize("auth.json"):
     print("Authentication file not found. Generating empty template...")
+    d = {
+        "prefix": "~",
+        "slash_commands": False,
+        "webserver_port": "",
+        "discord_id": "",
+        "discord_token": "",
+        "owner_id": [],
+        "google_api_key": "",
+        "rapidapi_key": "",
+        "genius_key": "",
+        "alexflipnote_key": "",
+        "giphy_key": "",
+        "papago_id": "",
+        "papago_secret": "",
+        "knack_id": "",
+        "knack_secret": "",
+    }
+    import json
     with open("auth.json", "w", encoding="utf-8") as f:
-        d = {
-            "prefix": "~",
-            "slash_commands": False,
-            "webserver_port": "",
-            "discord_id": "",
-            "discord_token": "",
-            "owner_id": [],
-            "google_api_key": "",
-            "rapidapi_key": "",
-            "genius_key": "",
-            "alexflipnote_key": "",
-            "giphy_key": "",
-            "papago_id": "",
-            "papago_secret": "",
-            "knack_id": "",
-            "knack_secret": "",
-        }
         json.dump(d, f, indent=4)
     input("auth.json generated. Please fill in discord_token and restart bot when done.")
     raise SystemExit
