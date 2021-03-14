@@ -1,4 +1,5 @@
 import sys, os, subprocess, traceback
+from traceback import print_exc
 
 # Required to open python on different operating systems
 python = ("python3", "py")[os.name == "nt"]
@@ -12,10 +13,15 @@ print("Loading and checking modules...")
 with open("requirements.txt", "rb") as f:
     modlist = f.read().decode("utf-8", "replace").replace("\r", "\n").split("\n")
 
-import pkg_resources
+try:
+    import pkg_resources
+except:
+    print_exc()
+    subprocess.run(["pip", "install", "setuptools", "--upgrade", "--user"])
+    import pkg_resources
 
 installing = []
-install = lambda m: installing.append(subprocess.Popen([python, "-m", "pip", "install", "--upgrade", m, "--user"]))
+install = lambda m: installing.append(subprocess.Popen([python, "-m", "pip", "install", m, "--upgrade", "--user"]))
 
 # Parse requirements.txt
 for mod in modlist:
@@ -32,7 +38,7 @@ for mod in modlist:
                 assert eval(repr(v) + op + repr(version), {}, {})
         except:
             # Modules may require an older version, replace current version if necessary
-            traceback.print_exc()
+            print_exc()
             inst = name
             if op in ("==", "<="):
                 inst += "==" + version
@@ -41,7 +47,7 @@ for mod in modlist:
 # Run pip on any modules that need installing
 if installing:
     print("Installing missing or outdated modules, please wait...")
-    subprocess.run([python, "-m", "pip", "install", "--upgrade", "pip", "--user"])
+    subprocess.run([python, "-m", "pip", "install", "pip", "--upgrade", "--user"])
     for i in installing:
         i.wait()
     print("Installer terminated.")
