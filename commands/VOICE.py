@@ -2334,13 +2334,15 @@ class AudioDownloader:
                         except:
                             print_exc()
                         fut.result()
-                        if cfn and os.path.exists(cfn) and os.path.getsize(cfn):
-                            with open(cfn, "rb") as f:
-                                while True:
-                                    b = f.read(1048576)
-                                    if not b:
-                                        break
-                                    proc.stdin.write(b)
+                        if cfn and os.path.exists(cfn):
+                            if os.path.getsize(cfn):
+                                with open(cfn, "rb") as f:
+                                    while True:
+                                        b = f.read(1048576)
+                                        if not b:
+                                            break
+                                        proc.stdin.write(b)
+                            create_future_ex(os.remove, cfn)
                     proc.stdin.close()
                     proc.wait()
                 else:
