@@ -2142,7 +2142,7 @@ class AudioDownloader:
             print_exc()
             entry["url"] = ""
 
-    codec_map = {}
+    # codec_map = {}
     # For ~download
     def download_file(self, url, fmt, start=None, end=None, auds=None, ts=None, copy=False, ar=SAMPLE_RATE, ac=2, container=None, child=False):
         if child:
@@ -2171,7 +2171,10 @@ class AudioDownloader:
                 if url.startswith(search) and int(url.split("/download/", 1)[1].split("/", 3)[3]) < utc() + 60:
                     url = f"https://youtube.com/watch?v={url[len(search):].split('/', 1)[0]}"
                 try:
-                    info = self.extract(url)[0]
+                    res = self.search(url)
+                    if type(res) is str:
+                        raise evalex(res)
+                    info = res[0]
                 except:
                     print_exc()
                     continue
@@ -2185,12 +2188,12 @@ class AudioDownloader:
                         fn = f"cache/\x7f{ts}~{outft}"
                 if vst or fmt in videos:
                     vst.append(info["video"])
-                ast.append(info["stream"])
+                ast.append(info)
             if not ast and not vst:
                 raise LookupError(f"No stream URLs found for {url}")
             ffmpeg = "ffmpeg"
             if len(ast) <= 1:
-                if ast and not is_youtube_stream(ast[0]):
+                if ast and not is_youtube_stream(ast[0]["stream"]):
                     ffmpeg = "misc/ffmpeg-c/ffmpeg.exe"
             args = alist((ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-y"))
             if vst:
@@ -2220,54 +2223,56 @@ class AudioDownloader:
                 else:
                     vsf = vsc = vst[0]
             if len(ast) > 1:
-                codec_map = self.codec_map
-                codecs = {}
-                pops = set()
-                for i, url in enumerate(ast):
-                    try:
-                        codec = codec_map[url]
-                    except KeyError:
-                        try:
-                            resp = as_str(subprocess.check_output(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name,sample_rate,channels", "-show_entries", "format=format_name", "-of", "default=nokey=1:noprint_wrappers=1", url])).strip()
-                        except:
-                            print_exc()
-                            pops.add(i)
-                            continue
-                        info = resp.split()
-                        info[1] = int(info[1])
-                        info[2] = int(info[2])
-                        if info[0] == "vorbis":
-                            info[0] = "ogg"
-                        codec = tuple(info)
-                        print(codec)
-                        codec_map[url] = codec
-                    add_dict(codecs, {codec: 1})
-                if pops:
-                    ast = alist(ast).pops(pops)
-                if len(codecs) > 1:
-                    print(codecs)
-                    maxcodec = max(codecs.values())
-                    selcodec = [k for k, v in codecs.items() if v >= maxcodec][0]
-                    t = ts
-                    for i, url in enumerate(ast):
-                        if codec_map[url] != selcodec:
-                            t += 1
-                            try:
-                                if "webm" in selcodec[3].split(","):
-                                    ct = "webm"
-                                else:
-                                    ct = None
-                                ast[i] = self.download_file(url, selcodec[0], auds=auds, ts=t, ar=selcodec[1], ac=selcodec[2], container=ct, child=True)[0].rsplit("/", 1)[-1]
-                            except:
-                                print_exc()
-                                ast[i] = None
-                asc = "\n".join(f"file '{i}'" for i in ast if i)
-                asf = f"cache/{ts}.concat"
-                with open(asf, "w", encoding="utf-8") as f:
-                    f.write(asc)
-                args.extend(("-f", "concat", "-safe", "0", "-protocol_whitelist", "concat,tls,tcp,file,http,https"))
+                # codec_map = self.codec_map
+                # codecs = {}
+                # pops = set()
+                # for i, url in enumerate(ast):
+                #     try:
+                #         codec = codec_map[url]
+                #     except KeyError:
+                #         try:
+                #             resp = as_str(subprocess.check_output(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name,sample_rate,channels", "-show_entries", "format=format_name", "-of", "default=nokey=1:noprint_wrappers=1", url])).strip()
+                #         except:
+                #             print_exc()
+                #             pops.add(i)
+                #             continue
+                #         info = resp.split()
+                #         info[1] = int(info[1])
+                #         info[2] = int(info[2])
+                #         if info[0] == "vorbis":
+                #             info[0] = "ogg"
+                #         codec = tuple(info)
+                #         print(codec)
+                #         codec_map[url] = codec
+                #     add_dict(codecs, {codec: 1})
+                # if pops:
+                #     ast = alist(ast).pops(pops)
+                # if len(codecs) > 1:
+                #     print(codecs)
+                #     maxcodec = max(codecs.values())
+                #     selcodec = [k for k, v in codecs.items() if v >= maxcodec][0]
+                #     t = ts
+                #     for i, url in enumerate(ast):
+                #         if codec_map[url] != selcodec:
+                #             t += 1
+                #             try:
+                #                 if "webm" in selcodec[3].split(","):
+                #                     ct = "webm"
+                #                 else:
+                #                     ct = None
+                #                 ast[i] = self.download_file(url, selcodec[0], auds=auds, ts=t, ar=selcodec[1], ac=selcodec[2], container=ct, child=True)[0].rsplit("/", 1)[-1]
+                #             except:
+                #                 print_exc()
+                #                 ast[i] = None
+                # asc = "\n".join(f"file '{i}'" for i in ast if i)
+                # asf = f"cache/{ts}.concat"
+                # with open(asf, "w", encoding="utf-8") as f:
+                #     f.write(asc)
+                # args.extend(("-f", "concat", "-safe", "0", "-protocol_whitelist", "concat,tls,tcp,file,http,https"))
+                args.extend(("-f", "s16le", "-ar", "48k", "-ac", "2"))
+                asf = "-"
             else:
-                asf = asc = ast[0]
+                asf = asc = ast[0]["stream"]
             if not vst:
                 args.append("-vn")
             elif fmt == "gif":
@@ -2319,8 +2324,28 @@ class AudioDownloader:
                 args.extend(("-f", fmt, fn))
             print(args)
             try:
-                resp = subprocess.run(args, stderr=subprocess.PIPE)
-                resp.check_returncode()
+                if len(ast) > 1:
+                    proc = psutil.Popen(args, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+                    for t, info in enumerate(ast, ts + 1):
+                        cfn = None
+                        fut = create_future_ex(proc.stdin.write, b"\x00" * 32768)
+                        try:
+                            cfn = self.download_file(info.get("url"), "pcm", auds=auds, ts=t, child=True)[0]
+                        except:
+                            print_exc()
+                        fut.result()
+                        if cfn and os.path.exists(cfn) and os.path.getsize(cfn):
+                            with open(cfn, "rb") as f:
+                                while True:
+                                    b = f.read(1048576)
+                                    if not b:
+                                        break
+                                    proc.stdin.write(b)
+                    proc.stdin.close()
+                    proc.wait()
+                else:
+                    resp = subprocess.run(args, stderr=subprocess.PIPE)
+                    resp.check_returncode()
             except subprocess.CalledProcessError as ex:
                 # Attempt to convert file from org if FFmpeg failed
                 try:
