@@ -466,7 +466,7 @@ class UpdateExec(Database):
                     out[i] = self.bot.data.proxies[0][shash(url)]
                 except KeyError:
                     try:
-                        await asyncio.wait_for(wrap_future(self.temp[url], shield=True), timeout=12)
+                        url = await asyncio.wait_for(wrap_future(self.temp[url], shield=True), timeout=12)
                     except (KeyError, T1):
                         if url not in self.temp:
                             self.temp[url] = concurrent.futures.Future()
@@ -475,7 +475,7 @@ class UpdateExec(Database):
                             fn += ".png"
                         files[i] = cdict(fut=create_task(Request(url, aio=True)), filename="SPOILER_" + fn, url=url)
                     else:
-                        out[i] = self.bot.data.proxies[0][shash(url)]
+                        out[i] = url
         bot = self.bot
         failed = [None] * len(urls)
         for i, fut in enumerate(files):
@@ -508,7 +508,7 @@ class UpdateExec(Database):
                             break
                         self.bot.data.proxies.update(0)
                         with suppress(KeyError, RuntimeError):
-                            self.temp.pop(urls[i]).set_result(None)
+                            self.temp.pop(urls[i]).set_result(out[i])
                         c += 1
         if collapse:
             return out if len(out) > 1 else out[0]
