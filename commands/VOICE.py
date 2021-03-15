@@ -2069,7 +2069,7 @@ class AudioDownloader:
                 return f
         # "none" indicates stream is currently loading
         if stream == "none" and not force:
-            return None
+            return
         entry["stream"] = "none"
         searched = False
         # If "research" tag is set, entry does not contain full data and requires another search
@@ -2098,7 +2098,7 @@ class AudioDownloader:
             stream = set_dict(data[0], "stream", data[0].url)
             icon = set_dict(data[0], "icon", data[0].url)
             entry.update(data[0])
-        elif not searched and (stream.startswith("https://cf-hls-media.sndcdn.com/") or stream.startswith("https://www.yt-download.org/download/") and int(stream.split("/download/", 1)[1].split("/", 3)[3]) < utc() + 60) or is_youtube_stream(stream) and int(stream.split("expire=", 1)[1].split("&", 1)[0]) < utc() + 60:
+        elif not searched and (stream.startswith("https://cf-hls-media.sndcdn.com/") or stream.startswith("https://www.yt-download.org/download/") and int(stream.split("/download/", 1)[1].split("/", 4)[3]) < utc() + 60) or is_youtube_stream(stream) and int(stream.split("expire=", 1)[1].split("&", 1)[0]) < utc() + 60:
             data = self.extract(entry["url"])
             stream = set_dict(data[0], "stream", data[0].url)
             icon = set_dict(data[0], "icon", data[0].url)
@@ -2166,10 +2166,10 @@ class AudioDownloader:
             if not ts:
                 ts = ts_us()
             outf = None
-            search = "https://www.yt-download.org/download/"
             for url in urls:
-                if url.startswith(search) and int(url.split("/download/", 1)[1].split("/", 3)[3]) < utc() + 60:
-                    url = f"https://youtube.com/watch?v={url[len(search):].split('/', 1)[0]}"
+                if len(ast) > 1 and not vst:
+                    ast.append(url)
+                    continue
                 try:
                     res = self.search(url)
                     if type(res) is str:
@@ -2223,52 +2223,6 @@ class AudioDownloader:
                 else:
                     vsf = vsc = vst[0]
             if len(ast) > 1:
-                # codec_map = self.codec_map
-                # codecs = {}
-                # pops = set()
-                # for i, url in enumerate(ast):
-                #     try:
-                #         codec = codec_map[url]
-                #     except KeyError:
-                #         try:
-                #             resp = as_str(subprocess.check_output(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name,sample_rate,channels", "-show_entries", "format=format_name", "-of", "default=nokey=1:noprint_wrappers=1", url])).strip()
-                #         except:
-                #             print_exc()
-                #             pops.add(i)
-                #             continue
-                #         info = resp.split()
-                #         info[1] = int(info[1])
-                #         info[2] = int(info[2])
-                #         if info[0] == "vorbis":
-                #             info[0] = "ogg"
-                #         codec = tuple(info)
-                #         print(codec)
-                #         codec_map[url] = codec
-                #     add_dict(codecs, {codec: 1})
-                # if pops:
-                #     ast = alist(ast).pops(pops)
-                # if len(codecs) > 1:
-                #     print(codecs)
-                #     maxcodec = max(codecs.values())
-                #     selcodec = [k for k, v in codecs.items() if v >= maxcodec][0]
-                #     t = ts
-                #     for i, url in enumerate(ast):
-                #         if codec_map[url] != selcodec:
-                #             t += 1
-                #             try:
-                #                 if "webm" in selcodec[3].split(","):
-                #                     ct = "webm"
-                #                 else:
-                #                     ct = None
-                #                 ast[i] = self.download_file(url, selcodec[0], auds=auds, ts=t, ar=selcodec[1], ac=selcodec[2], container=ct, child=True)[0].rsplit("/", 1)[-1]
-                #             except:
-                #                 print_exc()
-                #                 ast[i] = None
-                # asc = "\n".join(f"file '{i}'" for i in ast if i)
-                # asf = f"cache/{ts}.concat"
-                # with open(asf, "w", encoding="utf-8") as f:
-                #     f.write(asc)
-                # args.extend(("-f", "concat", "-safe", "0", "-protocol_whitelist", "concat,tls,tcp,file,http,https"))
                 args.extend(("-f", "s16le", "-ar", "48k", "-ac", "2"))
                 asf = "-"
             else:
@@ -2329,8 +2283,12 @@ class AudioDownloader:
                     for t, info in enumerate(ast, ts + 1):
                         cfn = None
                         fut = create_future_ex(proc.stdin.write, b"\x00" * 32768)
+                        if type(info) is not str:
+                            url = info.get("url")
+                        else:
+                            url = info
                         try:
-                            cfn = self.download_file(info.get("url"), "pcm", auds=auds, ts=t, child=True)[0]
+                            cfn = self.download_file(url, "pcm", auds=auds, ts=t, child=True)[0]
                         except:
                             print_exc()
                         fut.result()
