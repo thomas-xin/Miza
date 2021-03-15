@@ -68,6 +68,7 @@ RESPONSES[0] = cdict(set_result=lambda *args: None)
 
 PREVIEW = {}
 prev_date = utc_dt().date()
+zfailed = set()
 
 @app.route("/preview/<path>", methods=["GET"])
 @app.route("/view/<path>", methods=["GET"])
@@ -136,7 +137,7 @@ def get_file(path, filename=None):
                     proc.wait()
                 PREVIEW[path] = p2
                 p = p3
-    elif endpoint == "download" and p[-1] != IND and not p.endswith(".zip"):
+    elif endpoint == "download" and p[-1] != IND and not p.endswith(".zip") and p not in zfailed:
         size = os.path.getsize(p)
         if size > 16777216:
             fi = p.rsplit(".", 1)[0] + ".zip" + IND
@@ -157,6 +158,7 @@ def get_file(path, filename=None):
             if r < 0.8:
                 p = fi
             else:
+                zfailed.add(p)
                 send(f"{p} has compression ratio {r}, skipping...")
     attachment = filename or fn
     resp = flask.send_file(p, as_attachment=download, attachment_filename=attachment, mimetype=mime, conditional=True)
