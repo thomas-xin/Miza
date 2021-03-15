@@ -2250,11 +2250,13 @@ class AudioDownloader:
                 if end is not None:
                     args.extend(("-to", str(end)))
             args.extend(("-i", asf, "-map_metadata", "-1"))
-            if auds is not None:
+            if auds:
                 args.extend(auds.construct_options(full=True))
             br = 196608
             if auds and br > auds.stats.bitrate:
                 br = max(4096, auds.stats.bitrate)
+            sr = str(SAMPLE_RATE)
+            ac = "2"
             if fmt in ("vox", "adpcm"):
                 args.extend(("-acodec", "adpcm_ms"))
                 fmt = "wav" if fmt == "adpcm" else "vox"
@@ -2268,8 +2270,16 @@ class AudioDownloader:
                     br = 64000
             elif fmt == "aac":
                 fmt = "adts"
-            if not vst:
-                args.extend(("-ar", str(SAMPLE_RATE), "-ac", "2", "-b:a", str(br)))
+            elif fmt == "8bit":
+                container = "wav"
+                fmt = "pcm_u8"
+                sr = "24k"
+                ac = "1"
+                br = "256"
+                outf = f"{info['name']}.wav"
+                fn = f"cache/\x7f{ts}~" + outf.translate(filetrans)
+            if ast:
+                args.extend(("-ar", sr, "-ac", ac, "-b:a", str(br)))
             if copy:
                 args.extend(("-c", "copy", fn))
             elif container:
@@ -2288,7 +2298,7 @@ class AudioDownloader:
                         else:
                             url = info
                         try:
-                            cfn = self.download_file(url, "pcm", auds=auds, ts=t, child=True)[0]
+                            cfn = self.download_file(url, "pcm", auds=None, ts=t, child=True)[0]
                         except:
                             print_exc()
                         fut.result()
@@ -2376,7 +2386,7 @@ class AudioDownloader:
                     timeout=32,
                     decode=True
                 )
-                resp_fn = ast.literal_eval(resp)[0]
+                resp_fn = literal_eval(resp)[0]
             url = f"https://cts.ofoct.com/convert-file_v2.php?cid=audio2midi&output=MID&tmpfpath={resp_fn}&row=file1&sourcename=temp.ogg&rowid=file1"
             # print(url)
             with suppress():
@@ -4047,7 +4057,7 @@ def extract_lyrics(s):
     if "window.__" in s:
         s = s[:s.index("window.__")]
     s = s[:s.rindex(");")]
-    data = ast.literal_eval(s)
+    data = literal_eval(s)
     d = eval_json(data)
     lyrics = d["songPage"]["lyricsData"]["body"]["children"][0]["children"]
     newline = True
@@ -4205,7 +4215,7 @@ class Download(Command):
                     spl = argv.split(" ")
                 if len(spl) >= 1:
                     fmt = spl[-1].lstrip(".")
-                    if fmt.casefold() not in ("mp3", "ogg", "opus", "m4a", "flac", "wav", "wma", "mp2", "vox", "adpcm", "pcm", "mid", "midi", "webm", "mp4", "avi", "mov", "m4v", "mkv", "f4v", "flv", "wmv", "gif"):
+                    if fmt.casefold() not in ("mp3", "ogg", "opus", "m4a", "flac", "wav", "wma", "mp2", "vox", "adpcm", "pcm", "8bit", "mid", "midi", "webm", "mp4", "avi", "mov", "m4v", "mkv", "f4v", "flv", "wmv", "gif"):
                         fmt = default_fmt
                     else:
                         if spl[-2] in ("as", "to"):
@@ -4325,7 +4335,7 @@ class Download(Command):
                     num = int(as_str(reaction)[0])
                     if num <= int(spl[1]):
                         # Reconstruct list of URLs from hidden encoded data
-                        data = ast.literal_eval(as_str(b642bytes(argv, True)))
+                        data = literal_eval(as_str(b642bytes(argv, True)))
                         url = data[num]
                         # Perform all these tasks asynchronously to save time
                         with discord.context_managers.Typing(channel):
