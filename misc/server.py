@@ -142,7 +142,7 @@ def get_file(path, filename=None):
         if size > 16777216:
             fi = p.rsplit(".", 1)[0] + ".zip" + IND
             if not os.path.exists(fi):
-                test = min(67108864, max(1048576, size >> 6))
+                test = min(16777216, max(1048576, size >> 6))
                 send(f"Testing {p} with {test} bytes...")
                 with open(p, "rb") as f:
                     data = f.read(test)
