@@ -2319,7 +2319,10 @@ class AudioDownloader:
             except subprocess.CalledProcessError as ex:
                 # Attempt to convert file from org if FFmpeg failed
                 try:
-                    new = select_and_convert(ast[0])
+                    url = ast[0]
+                    if type(url) is not str:
+                        url = url["url"]
+                    new = select_and_convert(url)
                 except ValueError:
                     if resp.stderr:
                         raise RuntimeError(*ex.args, resp.stderr)

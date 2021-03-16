@@ -1022,7 +1022,7 @@ class Reminder(Command):
             if not argv:
                 i = 0
             else:
-                i = await bot.eval_math(argv2)
+                i = await bot.eval_math(argv)
             i %= len(rems)
             x = rems.pop(i)
             if i == 0:
