@@ -401,7 +401,10 @@ class UpdateExec(Database):
 
     async def _proxy(self, url, whole=False):
         bot = self.bot
-        c_id = choice(list(c_id for c_id, flag in self.data.items() if flag & 16))
+        sendable = list(c_id for c_id, flag in self.data.items() if flag & 16)
+        if not sendable:
+            return url
+        c_id = choice(sendable)
         channel = await bot.fetch_channel(c_id)
         m = channel.guild.me
         aurl = await bot.get_proxy_url(m)
@@ -437,11 +440,15 @@ class UpdateExec(Database):
     async def aproxy(self, *urls):
         out = [None] * len(urls)
         files = [None] * len(urls)
+        sendable = list(c_id for c_id, flag in self.data.items() if flag & 16)
         for i, url in enumerate(urls):
             if is_url(url):
                 try:
                     out[i] = self.bot.data.proxies[0][shash(url)]
                 except KeyError:
+                    if not sendable:
+                        out[i] = url
+                        continue
                     files[i] = url
         fs = [i for i in files if i]
         if fs:
@@ -460,11 +467,15 @@ class UpdateExec(Database):
     async def uproxy(self, *urls, collapse=True):
         out = [None] * len(urls)
         files = [None] * len(urls)
+        sendable = list(c_id for c_id, flag in self.data.items() if flag & 16)
         for i, url in enumerate(urls):
             if is_url(url):
                 try:
                     out[i] = self.bot.data.proxies[0][shash(url)]
                 except KeyError:
+                    if not sendable:
+                        out[i] = url
+                        continue
                     try:
                         url = await asyncio.wait_for(wrap_future(self.temp[url], shield=True), timeout=12)
                     except (KeyError, T1):
