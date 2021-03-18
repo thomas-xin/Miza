@@ -1803,8 +1803,9 @@ def evalImg(url, operation, args):
             size = first.size
             print(mode)
             command = ["ffmpeg", "-threads", "2", "-hide_banner", "-loglevel", "error", "-hwaccel", "auto", "-y", "-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", ("rgb24" if mode == "RGB" else "rgba"), "-video_size", "x".join(map(str, size)), "-i", "-", "-gifflags", "-offsetting", "-an"]
-            if new["count"] > 8192:
-                vf = "split[s0][s1];[s0]palettegen=reserve_transparent=1:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle:alpha_threshold=128"
+            if new["count"] > 4096:
+                vf = None
+                # vf = "split[s0][s1];[s0]palettegen=reserve_transparent=1:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle:alpha_threshold=128"
             else:
                 vf = "split[s0][s1];[s0]palettegen=reserve_transparent=1:stats_mode=diff[p];[s1][p]paletteuse=diff_mode=rectangle:alpha_threshold=128"
             if vf:
