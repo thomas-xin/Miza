@@ -445,15 +445,16 @@ single_space = lambda s: regexp("  +").sub(" ", s)
 __smap = {"|": "", "*": ""}
 __strans = "".maketrans(__smap)
 verify_search = lambda f: strip_acc(single_space(f.strip().translate(__strans)))
-find_urls = lambda url: regexp("(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+").findall(url)
-is_url = lambda url: regexp("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+$").findall(url)
-is_discord_url = lambda url: regexp("^https?:\\/\\/(?:[a-z]+\\.)?discord(?:app)?\\.com\\/").findall(url)
+find_urls = lambda url: regexp("(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s`|\"'\\])>]+").findall(url)
+is_url = lambda url: regexp("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s`|\"'\\])>]+$").findall(url)
+is_discord_url = lambda url: regexp("^https?:\\/\\/(?:[A-Za-z]{3,8}\\.)?discord(?:app)?\\.(?:com|net)\\/").findall(url) + regexp("https:\\/\\/images-ext-[0-9]+\\.discordapp\\.net\\/external\\/").findall(url)
 is_tenor_url = lambda url: regexp("^https?:\\/\\/tenor.com(?:\\/view)?/[a-zA-Z0-9\\-_]+-[0-9]+").findall(url)
-is_imgur_url = lambda url: regexp("^https?:\\/\\/(?:[a-z]\\.)?imgur.com/[a-zA-Z0-9\\-_]+").findall(url)
+is_imgur_url = lambda url: regexp("^https?:\\/\\/(?:[A-Za-z]\\.)?imgur.com/[a-zA-Z0-9\\-_]+").findall(url)
 is_giphy_url = lambda url: regexp("^https?:\\/\\/giphy.com/gifs/[a-zA-Z0-9\\-_]+").findall(url)
 is_youtube_url = lambda url: regexp("^https?:\\/\\/(?:www\\.)?youtu(?:\\.be|be\\.com)\\/[^\\s<>`|\"']+").findall(url)
+is_youtube_stream = lambda url: regexp("^https?:\\/\\/r[0-9]+---.{2}-\\w+-\\w{4,}\\.googlevideo\\.com").findall(url)
+is_deviantart_url = lambda url: regexp("^https?:\\/\\/(?:www\\.)?deviantart\\.com\\/[^\\s<>`|\"']+").findall(url)
 
-is_url = lambda url: regexp("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+$").findall(url)
 verify_url = lambda url: url if is_url(url) else url_parse(url)
 
 is_alphanumeric = lambda string: string.replace(" ", "").isalnum()
@@ -511,7 +512,7 @@ def _get_duration(filename, _timeout=12):
         "-select_streams",
         "a:0",
         "-show_entries",
-        "stream=duration,bit_rate",
+        "format=duration,bit_rate",
         "-of",
         "default=nokey=1:noprint_wrappers=1",
         filename,
@@ -525,12 +526,10 @@ def _get_duration(filename, _timeout=12):
     except:
         with suppress():
             proc.kill()
-        with suppress():
-            resp = proc.stdout.read().split()
         print_exc()
     try:
         dur = float(resp[0])
-    except (IndexError, ValueError, TypeError):
+    except (IndexError, ValueError):
         dur = None
     bps = None
     if len(resp) > 1:
@@ -689,12 +688,12 @@ class AudioDownloader:
         token = requests.get("https://open.spotify.com/get_access_token").content
         self.spotify_header = {"authorization": f"Bearer {eval_json(token[:512])['accessToken']}"}
         self.other_x += 1
-        resp = requests.get("https://keepv.id/").content
-        search = b"<script>apikey='"
-        resp = resp[resp.rindex(search) + len(search):]
-        search = b";sid='"
-        resp = resp[resp.index(search) + len(search):]
-        self.keepvid_token = resp[:resp.index(b"';</script>")].decode("utf-8", "replace")
+        # resp = requests.get("https://keepv.id/").content
+        # search = b"<script>apikey='"
+        # resp = resp[resp.rindex(search) + len(search):]
+        # search = b";sid='"
+        # resp = resp[resp.index(search) + len(search):]
+        # self.keepvid_token = resp[:resp.index(b"';</script>")].decode("utf-8", "replace")
 
     # Gets data from yt-download.org, keepv.id, or y2mate.guru, adjusts the format to ensure compatibility with results from youtube-dl. Used as backup.
     def extract_backup(self, url):
@@ -735,77 +734,77 @@ class AudioDownloader:
                 "webpage_url": webpage_url,
             }
             return entry
-        except Exception as ex:
-            if resp:
-                excs.append(resp)
-            excs.append(ex)
-        try:
-            self.other_x += 1
-            resp = requests.post(
-                "https://keepv.id/",
-                headers={"Accept": "*/*", "Cookie": "PHPSESSID=" + self.keepvid_token, "X-Requested-With": "XMLHttpRequest"},
-                data=(("url", webpage_url), ("sid", self.keepvid_token)),
-            ).content
-            search = b'<h2 class="mb-3">'
-            resp = resp[resp.index(search) + len(search):]
-            title = html_decode(resp[:resp.index(b"</h3>")].decode("utf-8", "replace"))
-            search = b'<img src="'
-            resp = resp[resp.index(search) + len(search):]
-            thumbnail = resp[:resp.index(b'"')].decode("utf-8", "replace")
-            entry = {
-                "formats": [],
-                "thumbnail": thumbnail,
-                "title": title,
-                "webpage_url": webpage_url,
-            }
-            with suppress(ValueError):
-                search = b"Download Video</a><br>"
-                resp = resp[resp.index(search) + len(search):]
-                search = b"Duration: "
-                resp = resp[resp.index(search) + len(search):]
-                entry["duration"] = dur = time_parse(resp[:resp.index(b"<br><br>")].decode("utf-8", "replace"))
-            search = b"</a></td></tr></tbody></table><h3>Audio</h3>"
-            resp = resp[resp.index(search) + len(search):]
-            with suppress(ValueError):
-                while resp:
-                    search = b"""</td><td class='text-center'><span class="btn btn-sm btn-outline-"""
-                    resp = resp[resp.index(search) + len(search):]
-                    search = b"</span></td><td class='text-center'>"
-                    resp = resp[resp.index(search) + len(search):]
-                    fs = parse_fs(resp[:resp.index(b"<")])
-                    abr = fs / dur * 8
-                    search = b'class="btn btn-sm btn-outline-primary shadow vdlbtn" href='
-                    resp = resp[resp.index(search) + len(search):]
-                    stream = resp[resp.index(b'"') + 1:resp.index(b'" download="')]
-                    entry["formats"].append(dict(abr=abr, url=stream))
-            if not entry["formats"]:
-                raise FileNotFoundError
-            return entry
-        except Exception as ex:
-            if resp:
-                excs.append(resp)
-            excs.append(ex)
-        try:
-            self.other_x += 1
-            resp = requests.post("https://y2mate.guru/api/convert", decode=True, data={"url": webpage_url}).content
-            data = eval_json(resp)
-            meta = data["meta"]
-            entry = {
-                "formats": [
-                    {
-                        "abr": stream.get("quality", 0),
-                        "url": stream["url"],
-                    } for stream in data["url"] if "url" in stream and stream.get("audio")
-                ],
-                "thumbnail": data.get("thumb"),
-                "title": meta["title"],
-                "webpage_url": meta["source"],
-            }
-            if meta.get("duration"):
-                entry["duration"] = time_parse(meta["duration"])
-            if not entry["formats"]:
-                raise FileNotFoundError
-            return entry
+        # except Exception as ex:
+        #     if resp:
+        #         excs.append(resp)
+        #     excs.append(ex)
+        # try:
+        #     self.other_x += 1
+        #     resp = requests.post(
+        #         "https://keepv.id/",
+        #         headers={"Accept": "*/*", "Cookie": "PHPSESSID=" + self.keepvid_token, "X-Requested-With": "XMLHttpRequest"},
+        #         data=(("url", webpage_url), ("sid", self.keepvid_token)),
+        #     ).content
+        #     search = b'<h2 class="mb-3">'
+        #     resp = resp[resp.index(search) + len(search):]
+        #     title = html_decode(resp[:resp.index(b"</h3>")].decode("utf-8", "replace"))
+        #     search = b'<img src="'
+        #     resp = resp[resp.index(search) + len(search):]
+        #     thumbnail = resp[:resp.index(b'"')].decode("utf-8", "replace")
+        #     entry = {
+        #         "formats": [],
+        #         "thumbnail": thumbnail,
+        #         "title": title,
+        #         "webpage_url": webpage_url,
+        #     }
+        #     with suppress(ValueError):
+        #         search = b"Download Video</a><br>"
+        #         resp = resp[resp.index(search) + len(search):]
+        #         search = b"Duration: "
+        #         resp = resp[resp.index(search) + len(search):]
+        #         entry["duration"] = dur = time_parse(resp[:resp.index(b"<br><br>")].decode("utf-8", "replace"))
+        #     search = b"</a></td></tr></tbody></table><h3>Audio</h3>"
+        #     resp = resp[resp.index(search) + len(search):]
+        #     with suppress(ValueError):
+        #         while resp:
+        #             search = b"""</td><td class='text-center'><span class="btn btn-sm btn-outline-"""
+        #             resp = resp[resp.index(search) + len(search):]
+        #             search = b"</span></td><td class='text-center'>"
+        #             resp = resp[resp.index(search) + len(search):]
+        #             fs = parse_fs(resp[:resp.index(b"<")])
+        #             abr = fs / dur * 8
+        #             search = b'class="btn btn-sm btn-outline-primary shadow vdlbtn" href='
+        #             resp = resp[resp.index(search) + len(search):]
+        #             stream = resp[resp.index(b'"') + 1:resp.index(b'" download="')]
+        #             entry["formats"].append(dict(abr=abr, url=stream))
+        #     if not entry["formats"]:
+        #         raise FileNotFoundError
+        #     return entry
+        # except Exception as ex:
+        #     if resp:
+        #         excs.append(resp)
+        #     excs.append(ex)
+        # try:
+        #     self.other_x += 1
+        #     resp = requests.post("https://y2mate.guru/api/convert", decode=True, data={"url": webpage_url}).content
+        #     data = eval_json(resp)
+        #     meta = data["meta"]
+        #     entry = {
+        #         "formats": [
+        #             {
+        #                 "abr": stream.get("quality", 0),
+        #                 "url": stream["url"],
+        #             } for stream in data["url"] if "url" in stream and stream.get("audio")
+        #         ],
+        #         "thumbnail": data.get("thumb"),
+        #         "title": meta["title"],
+        #         "webpage_url": meta["source"],
+        #     }
+        #     if meta.get("duration"):
+        #         entry["duration"] = time_parse(meta["duration"])
+        #     if not entry["formats"]:
+        #         raise FileNotFoundError
+        #     return entry
         except Exception as ex:
             if resp:
                 excs.append(resp)
@@ -961,11 +960,6 @@ class AudioDownloader:
                     url = resp["id"]
         if is_discord_url(url):
             title = url.split("?", 1)[0].rsplit("/", 1)[-1]
-            if title.rsplit(".", 1)[-1] in ("ogg", "webm", "mp4", "avi", "mov"):
-                url2 = url.replace("/cdn.discordapp.com/", "/media.discordapp.net/")
-                with requests.get(url2, stream=True) as resp:
-                    if resp.status_code in range(200, 400):
-                        url = url2
             if "." in title:
                 title = title[:title.rindex(".")]
             return dict(url=url, name=title, direct=True)
@@ -1003,11 +997,6 @@ class AudioDownloader:
     def extract_from(self, url):
         if is_discord_url(url):
             title = url.split("?", 1)[0].rsplit("/", 1)[-1]
-            if title.rsplit(".", 1)[-1] in ("ogg", "webm", "mp4", "avi", "mov"):
-                url2 = url.replace("/cdn.discordapp.com/", "/media.discordapp.net/")
-                with requests.get(url2, stream=True) as resp:
-                    if resp.status_code in range(200, 400):
-                        url = url2
             if "." in title:
                 title = title[:title.rindex(".")]
             return dict(url=url, webpage_url=url, title=title, direct=True)
@@ -1282,10 +1271,9 @@ class AudioDownloader:
         return sorted(results, key=lambda entry: entry.views, reverse=True)
 
     def search_yt(self, query):
-        out = None
         url = f"https://www.youtube.com/results?search_query={verify_url(query)}"
         self.youtube_x += 1
-        resp = requests.get(url, timeout=12).content
+        resp = requests.get(url).content
         result = None
         with suppress(ValueError):
             s = resp[resp.index(b"// scraper_data_begin") + 21:resp.rindex(b"// scraper_data_end")]
@@ -1296,29 +1284,28 @@ class AudioDownloader:
             s = s[:s.index(b'window["ytInitialPlayerResponse"] = null;')]
             s = s[:s.rindex(b";")]
             result = self.parse_yt(s)
-        if result is not None:
-            q = to_alphanumeric(full_prune(query))
-            high = []
-            low = []
-            for entry in result:
-                if entry.duration:
-                    name = full_prune(entry.name)
-                    aname = to_alphanumeric(name)
-                    spl = aname.split()
-                    if entry.duration < 960 or "extended" in q or "hour" in q or "extended" not in spl and "hour" not in spl and "hours" not in spl:
-                        if fuzzy_substring(aname, q, match_length=False) >= 0.5:
-                            high.append(entry)
-                            continue
-                low.append(entry)
-
-            def key(entry):
-                coeff = fuzzy_substring(to_alphanumeric(full_prune(entry.name)), q, match_length=False)
-                if coeff < 0.5:
-                    coeff = 0
-                return coeff
-
-            out = sorted(high, key=key, reverse=True)
-            out.extend(sorted(low, key=key, reverse=True))
+        if result is None:
+            raise NotImplementedError("Unable to read json response.")
+        q = to_alphanumeric(full_prune(query))
+        high = deque()
+        low = deque()
+        for entry in result:
+            if entry.duration:
+                name = full_prune(entry.name)
+                aname = to_alphanumeric(name)
+                spl = aname.split()
+                if entry.duration < 960 or "extended" in q or "hour" in q or "extended" not in spl and "hour" not in spl and "hours" not in spl:
+                    if fuzzy_substring(aname, q, match_length=False) >= 0.5:
+                        high.append(entry)
+                        continue
+            low.append(entry)
+        def key(entry):
+            coeff = fuzzy_substring(to_alphanumeric(full_prune(entry.name)), q, match_length=False)
+            if coeff < 0.5:
+                coeff = 0
+            return coeff
+        out = sorted(high, key=key, reverse=True)
+        out.extend(sorted(low, key=key, reverse=True))
         if not out:
             resp = self.extract_info(query)
             if resp.get("_type", None) == "url":
@@ -1327,9 +1314,9 @@ class AudioDownloader:
                 entries = list(resp["entries"])
             else:
                 entries = [resp]
-            out = []
+            out = alist()
             for entry in entries:
-                try:
+                with tracebacksuppressor:
                     found = True
                     if "title" in entry:
                         title = entry["title"]
@@ -1351,9 +1338,8 @@ class AudioDownloader:
                             temp["url"] = f"https://www.youtube.com/watch?v={url}"
                     temp["research"] = True
                     out.append(temp)
-                except:
-                    print_exc()
         return out
+
     # Performs a search, storing and using cached search results for efficiency.
     def search(self, item, force=False, mode=None, count=1):
         item = verify_search(item)
@@ -1366,7 +1352,8 @@ class AudioDownloader:
             self.searched.pop(next(iter(self.searched)))
         obj = cdict(t=utc())
         obj.data = output = self.extract(item, force, mode=mode, count=count)
-        self.searched[item] = obj
+        if obj.data:
+            self.searched[item] = obj
         return output
 
     # Gets the stream URL of a queue entry, starting download when applicable.
@@ -1399,7 +1386,7 @@ class AudioDownloader:
             data = self.search(entry["url"])
             stream = data[0].setdefault("stream", data[0].url)
             icon = data[0].setdefault("icon", data[0].url)
-        elif not searched and (stream.startswith("https://cf-hls-media.sndcdn.com/") or stream.startswith("https://www.yt-download.org/download/")):
+        elif not searched and (stream.startswith("https://cf-hls-media.sndcdn.com/") or stream.startswith("https://www.yt-download.org/download/") and int(stream.split("/download/", 1)[1].split("/", 3)[3]) < utc() + 60 or is_youtube_stream(stream) and int(stream.split("expire=", 1)[1].split("&", 1)[0]) < utc() + 60):
             data = self.extract(entry["url"])
             stream = data[0].setdefault("stream", data[0].url)
             icon = data[0].setdefault("icon", data[0].url)
