@@ -131,7 +131,7 @@ def get_file(path, filename=None):
                 p2 = f"{path}~preview.{fmt}"
                 p3 = os.getcwd() + "/cache/" + p2
                 if not os.path.exists(p3):
-                    args = ["ffmpeg", "-n", "-hide_banner", "-loglevel", "error", "-hwaccel", "-i", p, "-fs", "4194304", "-vf", "scale=320:-1", p3]
+                    args = ["ffmpeg", "-n", "-hide_banner", "-loglevel", "error", "-hwaccel", "auto", "-i", p, "-fs", "4194304", "-vf", "scale=320:-1", p3]
                     send(args)
                     proc = psutil.Popen(args)
                     proc.wait()
