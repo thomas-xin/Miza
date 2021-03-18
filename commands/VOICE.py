@@ -707,10 +707,10 @@ class CustomAudio(collections.abc.Hashable):
                 dry = 1 - wet
                 options.append("[2]amix=weights=" + str(round(dry, 6)) + " " + str(round(wet, 6)))
             if coeff > 1:
-                decay = str(round(1 - 4 / (3 + coeff), 4))
-                options.append("aecho=1:1:479|613:" + decay + "|" + decay)
-                if not is_finite(coeff):
-                    options.append("aecho=1:1:757|937:1|1")
+                decay = round(1 - 4 / (3 + coeff), 4)
+                options.append(f"aecho=1:1:400|600:{decay}|{decay / 2}")
+                if decay >= 0.25:
+                    options.append(f"aecho=1:1:800|1100:{decay / 4}|{decay / 8}")
         # Pan setting, uses extrastereo and volume filters to balance
         if stats.pan != 1:
             pan = min(10000, max(-10000, stats.pan))
