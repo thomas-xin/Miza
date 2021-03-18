@@ -1615,6 +1615,16 @@ def write_to(fn, data):
     with open(fn, "wb") as f:
         f.write(data)
 
+def write_video(proc, data):
+    try:
+        i = 0
+        while i < len(data):
+            proc.stdin.write(data[i:i + 65536])
+            i += 65536
+        proc.stdin.close()
+    except:
+        print(traceback.format_exc(), end="")
+
 def from_bytes(b, save=None):
     if b[:4] == b"<svg" or b[:5] == b"<?xml":
         resp = requests.post("https://www.svgtopng.me/api/svgtopng/upload-file", headers=header(), files={"files": ("temp.svg", b, "image/svg+xml"), "format": (None, "PNG"), "forceTransparentWhite": (None, "true"), "jpegQuality": (None, "256")})
@@ -1625,16 +1635,56 @@ def from_bytes(b, save=None):
         if save and data and not os.path.exists(save):
             exc.submit(write_to, save, data)
     elif b[:4] == b"%PDF":
-        return ImageSequence(*pdf2image.convert_from_bytes(b, poppler_path="misc/poppler", use_pdftocairo=True))
+        return ImageSequence(*pdf2image.convert_from_bytes(b, poppler_path="misc/poppler", use_pdftocairo=True), copy=True)
     else:
+        data = b
         out = io.BytesIO(b) if type(b) is bytes else b
+    mime = magic.from_buffer(data, mime=True)
+    if mime == "image/gif" or mime.split("/", 1)[0] != "image":
+        fmt = "rgba" if mime == "image/gif" else "rgb24"
+        ts = time.time_ns() // 1000
+        fn = "cache/" + str(ts)
+        with open(fn, "wb") as f:
+            f.write(data)
+        cmd = ("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,r_frame_rate", "-of", "csv=s=x:p=0", fn)
+        print(cmd)
+        p = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        cmd2 = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-hwaccel", "auto", "-y", "-an", "-i", fn, "-f", "rawvideo", "-pix_fmt", fmt, "-"]
+        print(cmd2)
+        proc = psutil.Popen(cmd2, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        # exc.submit(write_video, proc, data)
+        # p.stdin.write(data)
+        # exc.submit(write_video, p, data)
+        bcount = 4 if fmt == "rgba" else 3
+        mode = "RGBA" if fmt == "rgba" else "RGB"
+        try:
+            res = as_str(p.stdout.read()).strip()
+            if not res:
+                raise EOFError
+            info = res.split("x", 2)
+        except:
+            print(as_str(p.stderr.read()), end="")
+            raise
+        print(info)
+        size = tuple(map(int, info[:2]))
+        duration = 1000 / eval(info[-1], {}, {})
+        bcount *= int(np.prod(size))
+        images = deque()
+        while True:
+            b = proc.stdout.read(bcount)
+            if len(b) < bcount:
+                break
+            img = Image.frombuffer(mode, size, b)
+            img.info["duration"] = duration
+            images.append(img)
+        return ImageSequence(*images)
     try:
         return Image.open(out)
     except PIL.UnidentifiedImageError:
         if not b:
             raise FileNotFoundError("image file not found")
         out.seek(0)
-        raise TypeError(f'Filetype "{magic.from_buffer(out.read(65536))}" is not supported.')
+        raise TypeError(f'Filetype "{mime}" is not supported.')
 
 
 def ImageOpIterator(image, step, operation, ts, args):
@@ -1662,8 +1712,11 @@ def ImageOpIterator(image, step, operation, ts, args):
 
 class ImageSequence(Image.Image):
 
-    def __init__(self, *images):
-        self._images = [image.copy() for image in images]
+    def __init__(self, *images, copy=False):
+        if copy:
+            self._images = [image.copy() for image in images]
+        else:
+            self._images = images
         self._position = 0
 
     def seek(self, position):
@@ -1801,7 +1854,6 @@ def evalImg(url, operation, args):
             if mode == "P":
                 mode = "RGBA"
             size = first.size
-            print(mode)
             command = ["ffmpeg", "-threads", "2", "-hide_banner", "-loglevel", "error", "-hwaccel", "auto", "-y", "-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", ("rgb24" if mode == "RGB" else "rgba"), "-video_size", "x".join(map(str, size)), "-i", "-", "-gifflags", "-offsetting", "-an"]
             if new["count"] > 4096:
                 vf = None

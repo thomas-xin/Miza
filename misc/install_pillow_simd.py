@@ -46,19 +46,20 @@ if installing:
     subprocess.run(["py", f"-3.{x}", "-m", "pip", "install", "--upgrade", "pip", "--user"])
     for i in installing:
         i.wait()
-try:
-    pkg_resources.get_distribution("pillow")
-except pkg_resources.DistributionNotFound:
-    pass
-else:
-    subprocess.run(["py", f"-3.{x]}", "-m", "pip", "uninstall", "pillow", "-y"])
-try:
-    pkg_resources.get_distribution("pillow-simd")
-except pkg_resources.DistributionNotFound:
-    psize = struct.calcsize("P")
-    if psize == 8:
-        win = "win_amd64"
+if x >= 9:
+    try:
+        pkg_resources.get_distribution("pillow")
+    except pkg_resources.DistributionNotFound:
+        pass
     else:
-        win = "win32"
-    subprocess.run(["py", f"-3.{x}", "-m", "pip", "install", f"https://download.lfd.uci.edu/pythonlibs/w4tscw6k/Pillow_SIMD-7.0.0.post3+avx2-cp3{x}-cp3{x}-{win}.whl", "--user"])
+        subprocess.run(["py", f"-3.{x}", "-m", "pip", "uninstall", "pillow", "-y"])
+    try:
+        pkg_resources.get_distribution("pillow-simd")
+    except pkg_resources.DistributionNotFound:
+        psize = struct.calcsize("P")
+        if psize == 8:
+            win = "win_amd64"
+        else:
+            win = "win32"
+        subprocess.run(["py", f"-3.{x}", "-m", "pip", "install", f"https://download.lfd.uci.edu/pythonlibs/w4tscw6k/Pillow_SIMD-7.0.0.post3+avx2-cp3{x}-cp3{x}-{win}.whl", "--user"])
 print("Installer terminated.")
