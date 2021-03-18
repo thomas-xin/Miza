@@ -1417,7 +1417,7 @@ class AudioDownloader:
                 dur /= 1000
             temp = cdict(
                 name=name,
-                url="ytsearch:" + f"{name} ~ {artists}".replace(":", "-"),
+                url="ytsearch:" + "".join(c if c.isascii() and c != ":" else "_" for c in f"{name} ~ {artists}"),
                 id=track["id"],
                 duration=dur,
                 research=True,
@@ -2065,7 +2065,7 @@ class AudioDownloader:
                 # Touch file to indicate usage
                 f.ensure_time()
                 f.readable.result(timeout=16)
-            if f or not force or not download:
+            if f or (not force and not download):
                 return f
         # "none" indicates stream is currently loading
         if stream == "none" and not force:
@@ -2176,6 +2176,7 @@ class AudioDownloader:
                         raise evalex(res)
                     info = res[0]
                 except:
+                    print(url)
                     print_exc()
                     continue
                 self.get_stream(info, video=fmt in videos, force=True, download=False)
