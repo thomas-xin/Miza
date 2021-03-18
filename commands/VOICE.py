@@ -2195,7 +2195,7 @@ class AudioDownloader:
             if len(ast) <= 1:
                 if ast and not is_youtube_stream(ast[0]["stream"]):
                     ffmpeg = "misc/ffmpeg-c/ffmpeg.exe"
-            args = alist((ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-y"))
+            args = alist((ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+fastseek+genpts+igndts+flush_packets", "-y"))
             if vst:
                 if len(vst) > 1:
                     codec_map = {}
@@ -2352,16 +2352,12 @@ class AudioDownloader:
                         ts += 1
                         fn, fn2 = f"cache/\x7f{ts}~{outft}", fn
                         times = ceil(odur / dur)
-                        # if "|" not in fn2:
-                        #     loopf = None
-                        #     argi = f"concat:{((fn2 + '|') * times).rstrip('|')}"
-                        #     args = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-protocol_whitelist", "concat,tls,tcp,file,http,https", "-to", str(odur), "-i", argi, "-c", "copy", fn]
-                        # else:
                         loopf = f"cache/{ts - 1}~loop.txt"
                         with open(loopf, "w", encoding="utf-8") as f:
                             f.write(f"file '{fn2.split('/', 1)[-1]}'\n" * times)
                         args = [
                             "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                            "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+fastseek+genpts+igndts+flush_packets",
                             "-protocol_whitelist", "concat,tls,tcp,file,http,https",
                             "-to", str(odur), "-f", "concat", "-safe", "0",
                             "-i", loopf, "-c", "copy", fn
