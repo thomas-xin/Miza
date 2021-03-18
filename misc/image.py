@@ -377,7 +377,7 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
                     size = (960, 540)
         fn2 = fn + ".gif"
         f_in = fn if direct else url
-        command = ["ffmpeg", "-threads", "2", "-hide_banner", "-nostdin", "-loglevel", "error", "-y", "-i", f_in, "-an", "-vf"]
+        command = ["ffmpeg", "-threads", "2", "-hide_banner", "-nostdin", "-loglevel", "error", "-hwaccel", "-y", "-i", f_in, "-an", "-vf"]
         w, h = max_size(*size, maxsize)
         # Adjust FPS if duration is too long
         fps = min(fps, orig_fps)
@@ -1802,7 +1802,7 @@ def evalImg(url, operation, args):
                 mode = "RGBA"
             size = first.size
             print(mode)
-            command = ["ffmpeg", "-threads", "2", "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", ("rgb24" if mode == "RGB" else "rgba"), "-video_size", "x".join(map(str, size)), "-i", "-", "-gifflags", "-offsetting", "-an"]
+            command = ["ffmpeg", "-threads", "2", "-hide_banner", "-loglevel", "error", "-hwaccel", "-y", "-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", ("rgb24" if mode == "RGB" else "rgba"), "-video_size", "x".join(map(str, size)), "-i", "-", "-gifflags", "-offsetting", "-an"]
             if new["count"] > 8192:
                 vf = "split[s0][s1];[s0]palettegen=reserve_transparent=1:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle:alpha_threshold=128"
             else:
