@@ -2196,7 +2196,7 @@ class AudioDownloader:
             if len(ast) <= 1:
                 if ast and not is_youtube_stream(ast[0]["stream"]):
                     ffmpeg = "misc/ffmpeg-c/ffmpeg.exe"
-            args = alist((ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-hwaccel", "auto", "-fflags", "+discardcorrupt+fastseek+genpts+igndts+flush_packets", "-y"))
+            args = alist((ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+fastseek+genpts+igndts+flush_packets", "-y"))
             if vst:
                 if len(vst) > 1:
                     codec_map = {}

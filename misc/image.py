@@ -377,7 +377,7 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
                     size = (960, 540)
         fn2 = fn + ".gif"
         f_in = fn if direct else url
-        command = ["ffmpeg", "-threads", "2", "-hide_banner", "-nostdin", "-loglevel", "error", "-hwaccel", "auto", "-y", "-i", f_in, "-an", "-vf"]
+        command = ["ffmpeg", "-threads", "2", "-hide_banner", "-nostdin", "-loglevel", "error", "-y", "-i", f_in, "-an", "-vf"]
         w, h = max_size(*size, maxsize)
         # Adjust FPS if duration is too long
         fps = min(fps, orig_fps)
@@ -1649,7 +1649,7 @@ def from_bytes(b, save=None):
         cmd = ("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,r_frame_rate", "-of", "csv=s=x:p=0", fn)
         print(cmd)
         p = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        cmd2 = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-hwaccel", "auto", "-y", "-an", "-i", fn, "-f", "rawvideo", "-pix_fmt", fmt, "-"]
+        cmd2 = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-an", "-i", fn, "-f", "rawvideo", "-pix_fmt", fmt, "-"]
         print(cmd2)
         proc = psutil.Popen(cmd2, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         # exc.submit(write_video, proc, data)
@@ -1854,7 +1854,7 @@ def evalImg(url, operation, args):
             if mode == "P":
                 mode = "RGBA"
             size = first.size
-            command = ["ffmpeg", "-threads", "2", "-hide_banner", "-loglevel", "error", "-hwaccel", "auto", "-y", "-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", ("rgb24" if mode == "RGB" else "rgba"), "-video_size", "x".join(map(str, size)), "-i", "-", "-gifflags", "-offsetting", "-an"]
+            command = ["ffmpeg", "-threads", "2", "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", ("rgb24" if mode == "RGB" else "rgba"), "-video_size", "x".join(map(str, size)), "-i", "-", "-gifflags", "-offsetting", "-an"]
             if new["count"] > 4096:
                 vf = None
                 # vf = "split[s0][s1];[s0]palettegen=reserve_transparent=1:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle:alpha_threshold=128"
