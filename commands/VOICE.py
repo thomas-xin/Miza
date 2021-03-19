@@ -2098,7 +2098,7 @@ class AudioDownloader:
             stream = set_dict(data[0], "stream", data[0].url)
             icon = set_dict(data[0], "icon", data[0].url)
             entry.update(data[0])
-        elif not searched and (stream.startswith("https://cf-hls-media.sndcdn.com/") or stream.startswith("https://www.yt-download.org/download/") and int(stream.split("/download/", 1)[1].split("/", 4)[3]) < utc() + 60) or is_youtube_stream(stream) and int(stream.split("expire=", 1)[1].split("&", 1)[0]) < utc() + 60:
+        elif not searched and (stream.startswith("ytsearch:") or stream.startswith("https://cf-hls-media.sndcdn.com/") or stream.startswith("https://www.yt-download.org/download/") and int(stream.split("/download/", 1)[1].split("/", 4)[3]) < utc() + 60) or is_youtube_stream(stream) and int(stream.split("expire=", 1)[1].split("&", 1)[0]) < utc() + 60:
             data = self.extract(entry["url"])
             stream = set_dict(data[0], "stream", data[0].url)
             icon = set_dict(data[0], "icon", data[0].url)
@@ -2144,6 +2144,7 @@ class AudioDownloader:
             print_exc()
             entry["url"] = ""
 
+    emptybuff = b"\x00" * 192000
     # codec_map = {}
     # For ~download
     def download_file(self, url, fmt, start=None, end=None, auds=None, ts=None, copy=False, ar=SAMPLE_RATE, ac=2, container=None, child=False, silenceremove=False):
@@ -2297,7 +2298,7 @@ class AudioDownloader:
                     proc = psutil.Popen(args, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
                     for t, info in enumerate(ast, ts + 1):
                         cfn = None
-                        fut = create_future_ex(proc.stdin.write, b"\x00" * 32768)
+                        fut = create_future_ex(proc.stdin.write, self.emptybuff)
                         if type(info) is not str:
                             url = info.get("url")
                         else:
@@ -2405,7 +2406,7 @@ class AudioDownloader:
     def extract_single(self, i, force=False):
         item = i.url
         if not force:
-            if item in self.searched:
+            if item in self.searched and not item.startswith("ytsearch:"):
                 if utc() - self.searched[item].t < 18000:
                     it = self.searched[item].data[0]
                     i.update(it)
@@ -2424,11 +2425,10 @@ class AudioDownloader:
                     data = data[0]
                 obj = cdict(t=utc())
                 obj.data = out = [cdict(
-                    name=data["name"],
-                    url=data["url"],
+                    name=data["title"],
+                    url=data.get("webpage_url") or data.get("url"),
                     stream=get_best_audio(data),
                     icon=get_best_icon(data),
-                    video=get_best_video(data),
                 )]
                 try:
                     out[0].duration = data["duration"]

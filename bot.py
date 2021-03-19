@@ -3712,11 +3712,13 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         discord.state.ConnectionState.create_message = lambda self, *, channel, data: create_message(self, channel, data)
 
     def send_exception(self, messageable, ex, reference=None):
+        it = iter(self.owners)
+        owners = self.get_user(next(it)).mention + ", " + self.get_user(next(it)).mention
         return self.send_as_embeds(
             messageable,
             description="\n".join(as_str(i) for i in ex.args),
             title=f"⚠ {type(ex).__name__} ⚠",
-            fields=(("Unexpected or confusing error?", f"Message {self.get_user(next(iter(self.owners))).mention}, or join the [support server]({self.rcc_invite})!"),),
+            fields=(("Unexpected or confusing error?", f"Message {owners}, or join the [support server]({self.rcc_invite})!"),),
             reacts="❎",
         )
 
