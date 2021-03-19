@@ -2144,7 +2144,7 @@ class AudioDownloader:
 
     # codec_map = {}
     # For ~download
-    def download_file(self, url, fmt, start=None, end=None, auds=None, ts=None, copy=False, ar=SAMPLE_RATE, ac=2, container=None, child=False):
+    def download_file(self, url, fmt, start=None, end=None, auds=None, ts=None, copy=False, ar=SAMPLE_RATE, ac=2, container=None, child=False, silenceremove=False):
         if child:
             ctx = emptyctx
         else:
@@ -2216,7 +2216,7 @@ class AudioDownloader:
                         for i, url in enumerate(vst):
                             if codec_map[url] != selcodec:
                                 t += 1
-                                vst[i] = self.download_file(url, selcodec, auds=auds, ts=t)[0].rsplit("/", 1)[-1]
+                                vst[i] = self.download_file(url, selcodec, auds=auds, ts=t, silenceremove=silenceremove)[0].rsplit("/", 1)[-1]
                     vsc = "\n".join(f"file '{i}'" for i in vst)
                     vsf = f"cache/{ts}~video.concat"
                     with open(vsf, "w", encoding="utf-8") as f:
@@ -2253,6 +2253,8 @@ class AudioDownloader:
             args.extend(("-i", asf, "-map_metadata", "-1"))
             if auds:
                 args.extend(auds.construct_options(full=True))
+            if silenceremove:
+                args.extend(("-af", "silenceremove=start_periods=1:start_duration=0.015625:start_threshold=-50dB:start_silence=0.015625:stop_periods=-9000:stop_threshold=-50dB:window=0.015625"))
             br = 196608
             if auds and br > auds.stats.bitrate:
                 br = max(4096, auds.stats.bitrate)
@@ -2299,7 +2301,7 @@ class AudioDownloader:
                         else:
                             url = info
                         try:
-                            cfn = self.download_file(url, "pcm", auds=None, ts=t, child=True)[0]
+                            cfn = self.download_file(url, "pcm", auds=None, ts=t, child=True, silenceremove=silenceremove)[0]
                         except:
                             print_exc()
                         fut.result()
@@ -4179,8 +4181,8 @@ class Download(Command):
     _timeout_ = 75
     name = ["📥", "Search", "YTDL", "Youtube_DL", "AF", "AudioFilter", "Trim", "Concat", "Concatenate", "ConvertORG", "Org2xm", "Convert"]
     description = "Searches and/or downloads a song from a YouTube/SoundCloud query or audio file link."
-    usage = "<0:search_links>* <trim{?t}>? <-3:trim_start|->? <-2:trim_end|->? <-1:out_format(mp4)>? <concatenate{?c}|apply_settings{?a}|verbose_search{?v}>*"
-    flags = "avtzc"
+    usage = "<0:search_links>* <trim{?t}>? <-3:trim_start|->? <-2:trim_end|->? <-1:out_format(mp4)>? <concatenate{?c}|remove_silence{?r}|apply_settings{?a}|verbose_search{?v}>*"
+    flags = "avtzcr"
     rate_limit = (7, 16)
     typing = True
     slash = True
@@ -4260,6 +4262,7 @@ class Download(Command):
                 res = res[:10]
             desc = f"Search results for {argv}:"
         a = flags.get("a", 0)
+        b = flags.get("r", 0)
         if concat or direct:
             entry = (e["url"] for e in res) if concat else res[0]["url"]
             print(entry)
@@ -4278,6 +4281,7 @@ class Download(Command):
                     start=start,
                     end=end,
                     auds=auds,
+                    silenceremove=b,
                 )
                 create_task(bot.send_with_file(
                     channel=channel,
@@ -4290,13 +4294,15 @@ class Download(Command):
         desc += "\nDestination format: {." + fmt + "}"
         if start is not None or end is not None:
             desc += f"\nTrim: [{'-' if start is None else start} ~> {'-' if end is None else end}]"
+        if b:
+            desc += ", Silence remover: {ON}"
         if a:
             desc += ", Audio settings: {ON}"
         desc += "```*"
         # Encode URL list into bytes and then custom base64 representation, hide in code box header
         url_bytes = bytes(repr([e["url"] for e in res]), "utf-8")
         url_enc = as_str(bytes2b64(url_bytes, True))
-        vals = f"{user.id}_{len(res)}_{fmt}_{int(bool(a))}_{start}_{end}"
+        vals = f"{user.id}_{len(res)}_{fmt}_{int(bool(a))}_{start}_{end}_{int(bool(b))}"
         msg = "*```" + "\n" * ("z" in flags) + "callback-voice-download-" + vals + "-" + url_enc + "\n" + desc
         emb = discord.Embed(colour=rand_colour())
         emb.set_author(**get_author(user))
@@ -4350,6 +4356,12 @@ class Download(Command):
                                     auds = None
                             except LookupError:
                                 auds = None
+                            silenceremove = False
+                            try:
+                                if int(spl[6]):
+                                    silenceremove = True
+                            except IndexError:
+                                pass
                             start = end = None
                             if len(spl) >= 6:
                                 start, end = spl[4:]
@@ -4360,6 +4372,7 @@ class Download(Command):
                                 start=start,
                                 end=end,
                                 auds=auds,
+                                silenceremove=silenceremove,
                             )
                             create_task(message.edit(
                                 content=css_md(f"Uploading {sqr_md(out)}..."),
