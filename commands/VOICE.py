@@ -2103,11 +2103,8 @@ class AudioDownloader:
             stream = set_dict(data[0], "stream", data[0].url)
             icon = set_dict(data[0], "icon", data[0].url)
             entry.update(data[0])
-        if not download:
-            return entry
         # Otherwise attempt to start file download
         try:
-            self.cache[fn] = f = AudioFileLink(fn)
             if stream.startswith("ytsearch:") or stream in (None, "none"):
                 self.extract_single(entry, force=True)
                 stream = entry.get("stream")
@@ -2124,6 +2121,9 @@ class AudioDownloader:
             # print(entry.url, entry.duration)
             with suppress(KeyError):
                 self.searched[entry["url"]]["duration"] = entry["duration"]
+            if not download:
+                return entry
+            self.cache[fn] = f = AudioFileLink(fn)
             live = not entry.get("duration") or entry["duration"] > 960
             seekable = not entry.get("duration") or entry["duration"] < inf
             try:
