@@ -2103,6 +2103,8 @@ class AudioDownloader:
             stream = set_dict(data[0], "stream", data[0].url)
             icon = set_dict(data[0], "icon", data[0].url)
             entry.update(data[0])
+        if not download:
+            return entry
         # Otherwise attempt to start file download
         try:
             self.cache[fn] = f = AudioFileLink(fn)
