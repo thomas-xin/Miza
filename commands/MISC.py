@@ -752,13 +752,14 @@ class UpdateMathTest(Database):
 
 
 class Wav2Png(Command):
-    _timeout_ = 150
+    _timeout_ = 15
+    name = ["Png2Wav", "Png2Mp3"]
     description = "Runs wav2png on the input URL. See https://github.com/thomas-xin/Audio-Image-Converter for more info, or to run it yourself!"
     usage = "<0:search_links>"
     rate_limit = (9, 30)
     typing = True
 
-    async def __call__(self, bot, channel, message, argv, **void):
+    async def __call__(self, bot, channel, message, argv, name, **void):
         for a in message.attachments:
             argv = a.url + " " + argv
         if not argv:
@@ -769,8 +770,10 @@ class Wav2Png(Command):
         url = urls[0]
         name = url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
         ts = ts_us()
-        dest = f"cache/&{ts}.png"
-        args = pillow_simd.get() + ["wav2png.py", url, "../" + dest]
+        ext = "png" if name == "wav2png" else "mp3"
+        dest = f"cache/&{ts}." + ext
+        w2p = "wav2png" if name == "wav2png" else "png2wav"
+        args = pillow_simd.get() + [w2p + ".py", url, "../" + dest]
         with discord.context_managers.Typing(channel):
             print(args)
             proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc", stdout=subprocess.DEVNULL)
@@ -780,7 +783,7 @@ class Wav2Png(Command):
                 with tracebacksuppressor:
                     proc.kill()
                 raise
-        await bot.send_with_file(channel, "", dest, filename=name + ".png")
+        await bot.send_with_file(channel, "", dest, filename=name + "." + ext)
 
 
 class SpectralPulse(Command):
