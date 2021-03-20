@@ -2144,7 +2144,7 @@ class AudioDownloader:
             print_exc()
             entry["url"] = ""
 
-    emptybuff = b"\x00" * 192000
+    emptybuff = b"\x00" * 48000 * 2 * 2 * 3
     # codec_map = {}
     # For ~download
     def download_file(self, url, fmt, start=None, end=None, auds=None, ts=None, copy=False, ar=SAMPLE_RATE, ac=2, container=None, child=False, silenceremove=False):
@@ -2425,10 +2425,11 @@ class AudioDownloader:
                     data = data[0]
                 obj = cdict(t=utc())
                 obj.data = out = [cdict(
-                    name=data["title"],
-                    url=data.get("webpage_url") or data.get("url"),
+                    name=data["name"],
+                    url=data["url"],
                     stream=get_best_audio(data),
                     icon=get_best_icon(data),
+                    video=get_best_video(data),
                 )]
                 try:
                     out[0].duration = data["duration"]

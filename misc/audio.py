@@ -290,7 +290,8 @@ class AudioPlayer(discord.AudioSource):
 
     def clear(self):
         for entry in self.queue:
-            entry[0].close()
+            if entry:
+                entry[0].close()
         self.queue.clear()
 
     def kill(self):
