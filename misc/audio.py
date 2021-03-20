@@ -390,7 +390,7 @@ class AudioFile:
                             if self.webpage_url and ("Server returned 5XX Server Error reply" in err or "Server returned 404 Not Found" in err or "Server returned 403 Forbidden" in err):
                                 print(err)
                                 with tracebacksuppressor:
-                                    if "https://cf-hls-media.sndcdn.com/" in stream or is_youtube_stream(stream) and int(stream.split("expire=", 1)[1].split("&", 1)[0]) < utc() + 60:
+                                    if "https://cf-hls-media.sndcdn.com/" in stream or is_youtube_stream(stream) and int(stream.split("expire=", 1)[-1].split("&", 1)[0]) < utc() + 60:
                                         new_stream = request(f"VOICE.get_best_audio(VOICE.ytdl.extract_from({repr(self.webpage_url)}))")
                                     else:
                                         new_stream = request(f"VOICE.get_best_audio(VOICE.ytdl.extract_backup({repr(self.webpage_url)}))")
