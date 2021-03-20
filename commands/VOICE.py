@@ -933,7 +933,6 @@ def org2xm(org, dat=None):
             os.remove(f)
     return r_xm
 
-
 def mid2mp3(mid):
     url = Request(
         "https://hostfast.onlineconverter.com/file/send",
@@ -960,6 +959,22 @@ def mid2mp3(mid):
         f.write(Request(f"https://hostfast.onlineconverter.com/file/{fn}/download"))
     return r_mp3
 
+def png2wav(png):
+    ts = ts_us()
+    r_png = f"cache/{ts}"
+    r_wav = f"cache/{ts}.wav"
+    args = ["py", f"-3.{sys.version_info[1]}", "png2wav.py", "../" + r_png, "../" + r_wav]
+    with open(r_png, "wb") as f:
+        f.write(png)
+    print(args)
+    proc = psutil.Popen(args, cwd="misc", stderr=subprocess.PIPE)
+    while True:
+        if os.path.exists(r_wav) and os.path.getsize(r_wav) >= 96000:
+            break
+        if not proc.is_running():
+            raise RuntimeError(as_str(proc.stderr.read()))
+    return r_wav
+
 
 CONVERTERS = {
     b"MThd": mid2mp3,
@@ -975,7 +990,8 @@ def select_and_convert(stream):
         try:
             convert = CONVERTERS[b[:4]]
         except KeyError:
-            raise ValueError("Invalid file header.")
+            convert = pngwav
+            # raise ValueError("Invalid file header.")
         b += resp.content
     return convert(b)
 

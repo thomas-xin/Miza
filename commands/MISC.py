@@ -751,6 +751,38 @@ class UpdateMathTest(Database):
                 await channel.send(pull[i])
 
 
+class Wav2Png(Command):
+    _timeout_ = 150
+    description = "Runs wav2png on the input URL. See https://github.com/thomas-xin/Audio-Image-Converter for more info, or to run it yourself!"
+    usage = "<0:search_links>"
+    rate_limit = (9, 30)
+    typing = True
+
+    async def __call__(self, bot, channel, message, argv, **void):
+        for a in message.attachments:
+            argv = a.url + " " + argv
+        if not argv:
+            raise ArgumentError("Input string is empty.")
+        urls = await bot.follow_url(argv, allow=True, images=False)
+        if not urls or not urls[0]:
+            raise ArgumentError("Please input a valid URL.")
+        url = urls[0]
+        name = url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
+        ts = ts_us()
+        dest = f"cache/&{ts}.png"
+        args = pillow_simd.get() + ["wav2png.py", url, "../" + dest]
+        with discord.context_managers.Typing(channel):
+            print(args)
+            proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc", stdout=subprocess.DEVNULL)
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=3200)
+            except (T0, T1, T2):
+                with tracebacksuppressor:
+                    proc.kill()
+                raise
+        await bot.send_with_file(channel, "", dest, filename=name + ".png")
+
+
 class SpectralPulse(Command):
     _timeout_ = 150
     description = "Runs SpectralPulse on the input URL. Operates on a global queue system. See https://github.com/thomas-xin/SpectralPulse for more info, or to run it yourself!"
