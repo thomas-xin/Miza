@@ -967,12 +967,12 @@ def png2wav(png):
     with open(r_png, "wb") as f:
         f.write(png)
     print(args)
-    proc = psutil.Popen(args, cwd="misc", stderr=subprocess.PIPE)
-    while True:
-        if os.path.exists(r_wav) and os.path.getsize(r_wav) >= 96000:
-            break
-        if not proc.is_running():
-            raise RuntimeError(as_str(proc.stderr.read()))
+    subprocess.run(args, cwd="misc", stderr=subprocess.PIPE)
+    # while True:
+    #     if os.path.exists(r_wav) and os.path.getsize(r_wav) >= 96000:
+    #         break
+    #     if not proc.is_running():
+    #         raise RuntimeError(as_str(proc.stderr.read()))
     return r_wav
 
 
@@ -990,7 +990,7 @@ def select_and_convert(stream):
         try:
             convert = CONVERTERS[b[:4]]
         except KeyError:
-            convert = pngwav
+            convert = png2wav
             # raise ValueError("Invalid file header.")
         b += resp.content
     return convert(b)
