@@ -38,6 +38,8 @@ dfts = ffts // 2 + 1
 # print(dfts, ffts)
 
 fi = "temp.pcm"
+if os.path.exists(fi):
+    os.remove(fi)
 
 cmd = ffmpeg_start + ("-i", fn, "-f", "f32le", "-ac", "2", "-ar", "48k", fi)
 p = psutil.Popen(cmd, stderr=subprocess.PIPE)

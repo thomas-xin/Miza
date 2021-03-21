@@ -768,7 +768,7 @@ class Wav2Png(Command):
         if not urls or not urls[0]:
             raise ArgumentError("Please input a valid URL.")
         url = urls[0]
-        name = url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
+        fn = url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
         ts = ts_us()
         ext = "png" if name == "wav2png" else "mp3"
         dest = f"cache/&{ts}." + ext
@@ -783,7 +783,7 @@ class Wav2Png(Command):
                 with tracebacksuppressor:
                     proc.kill()
                 raise
-        await bot.send_with_file(channel, "", dest, filename=name + "." + ext)
+        await bot.send_with_file(channel, "", dest, filename=fn + "." + ext)
 
 
 class SpectralPulse(Command):
