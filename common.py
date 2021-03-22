@@ -1962,11 +1962,18 @@ create_task(Request._init_())
 def load_emojis():
     global emoji_translate, emoji_replace, em_trans
     with tracebacksuppressor:
-        resp = Request("https://raw.githubusercontent.com/twitter/twemoji/master/src/test/preview-svg.html", decode=True, timeout=None)
-        lines = [line[4:-5] for line in resp.split('<ul class="emoji-list">', 1)[-1].rsplit("</ul>", 1)[0].strip().split()]
-        emojis = [html_decode(line) for line in lines]
-        e_ids = ["-".join(hex(ord(c))[2:] for c in emoji) for emoji in emojis]
-        etrans = {k: f"https://github.com/twitter/twemoji/raw/master/assets/72x72/{v}.png" for k, v in zip(emojis, e_ids)}
+        resp = Request("https://emojipedia.org/twitter", decode=True, timeout=None)
+        lines = resp.split('<ul class="emoji-grid">', 1)[-1].rsplit("</ul>", 1)[0].strip().split("</a>")
+        urls = [line.split('srcset="', 1)[-1].split('"', 1)[0].split(None, 1)[0] for line in lines if 'srcset="' in line]
+        e_ids = [url.rsplit("_", 1)[-1].split(".", 1)[0].split("-") for url in urls]
+        emojis = ["".join(chr(int(i, 16)) for i in e_id) for e_id in e_ids]
+        etrans = dict(zip(emojis, urls))
+
+        # resp = Request("https://raw.githubusercontent.com/twitter/twemoji/master/src/test/preview-svg.html", decode=True, timeout=None)
+        # emojis = [html_decode(line) for line in lines]
+        # e_ids = ["-".join(hex(ord(c))[2:] for c in emoji) for emoji in emojis]
+        # etrans = {k: f"https://github.com/twitter/twemoji/raw/master/assets/72x72/{v}.png" for k, v in zip(emojis, e_ids)}
+
         # resp = Request("https://raw.githubusercontent.com/BreadMoirai/DiscordEmoji/master/src/main/java/com/github/breadmoirai/Emoji.java", decode=True, timeout=None)
         # e_resp = [line.strip()[:-1] for line in resp[resp.index("public enum Emoji {") + len("public enum Emoji {"):resp.index("private static final Emoji[] SORTED;")].strip().split("\n")]
         # etrans = {literal_eval(words[0]).encode("utf-16", "surrogatepass").decode("utf-16"): f" {literal_eval(words[2][:-1])} " for emoji in e_resp for words in (emoji.strip(";")[emoji.index("\\u") - 1:].split(","),) if words[2][:-1].strip() != "null"}
