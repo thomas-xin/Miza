@@ -1964,7 +1964,7 @@ def load_emojis():
     with tracebacksuppressor:
         resp = Request("https://emojipedia.org/twitter", decode=True, timeout=None)
         lines = resp.split('<ul class="emoji-grid">', 1)[-1].rsplit("</ul>", 1)[0].strip().split("</a>")
-        urls = [line.split('srcset="', 1)[-1].split('"', 1)[0].split(None, 1)[0] for line in lines if 'srcset="' in line]
+        urls = [line.split('srcset="', 1)[-1].split('"', 1)[0].split(None, 1)[0].replace("/144/", "/160/", 1) for line in lines if 'srcset="' in line]
         e_ids = [url.rsplit("_", 1)[-1].split(".", 1)[0].split("-") for url in urls]
         emojis = ["".join(chr(int(i, 16)) for i in e_id) for e_id in e_ids]
         etrans = dict(zip(emojis, urls))
@@ -1980,6 +1980,7 @@ def load_emojis():
         # with open("misc/emojis.txt", "r", encoding="utf-8") as f:
         #     resp = f.read()
         # etrans.update({k: v for k, v in (line.split(" ", 1) for line in resp.splitlines())})
+
         emoji_translate = {k: v for k, v in etrans.items() if len(k) == 1}
         emoji_replace = {k: v for k, v in etrans.items() if len(k) > 1}
         em_trans = "".maketrans(emoji_translate)
