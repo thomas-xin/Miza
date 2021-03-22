@@ -2160,7 +2160,7 @@ class AudioDownloader:
             print_exc()
             entry["url"] = ""
 
-    emptybuff = b"\x00" * 48000 * 2 * 2 * 3
+    emptybuff = b"\x00" * (48000 * 2 * 2)
     # codec_map = {}
     # For ~download
     def download_file(self, url, fmt, start=None, end=None, auds=None, ts=None, copy=False, ar=SAMPLE_RATE, ac=2, container=None, child=False, silenceremove=False):
@@ -2272,7 +2272,7 @@ class AudioDownloader:
             args.extend(("-i", asf, "-map_metadata", "-1"))
             if auds:
                 args.extend(auds.construct_options(full=True))
-            if silenceremove:
+            if silenceremove and len(ast) == 1:
                 args.extend(("-af", "silenceremove=start_periods=1:start_duration=0.015625:start_threshold=-50dB:start_silence=0.015625:stop_periods=-9000:stop_threshold=-50dB:window=0.015625"))
             br = 196608
             if auds and br > auds.stats.bitrate:

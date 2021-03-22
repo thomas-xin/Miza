@@ -660,22 +660,24 @@ def html_decode(s):
             break
         try:
             if s[i + 2] == "x":
-                h = "0x"
+                base = 16
                 p = i + 3
             else:
-                h = ""
+                base = 10
                 p = i + 2
-            for a in range(4):
-                if s[p + a] == ";":
-                    v = int(h + s[p:p + a])
+            for a in range(p, p + 16):
+                c = s[a]
+                if c == ";":
+                    v = int(s[p:a], base)
+                    break
+                elif not c.isnumeric() and c not in "abcdefABCDEF":
                     break
             c = chr(v)
-            s = s[:i] + c + s[p + a + 1:]
-        except ValueError:
+            s = s[:i] + c + s[a + 1:]
+        except (ValueError, NameError, IndexError):
+            s = s[:i + 1] + "\u200b" + s[i + 1:]
             continue
-        except IndexError:
-            continue
-    s = s.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+    s = s.replace("\u200b", "").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
     return s.replace("&quot;", '"').replace("&apos;", "'")
 
 
@@ -1960,14 +1962,19 @@ create_task(Request._init_())
 def load_emojis():
     global emoji_translate, emoji_replace, em_trans
     with tracebacksuppressor:
-        resp = Request("https://raw.githubusercontent.com/BreadMoirai/DiscordEmoji/master/src/main/java/com/github/breadmoirai/Emoji.java", decode=True, timeout=None)
-        e_resp = [line.strip()[:-1] for line in resp[resp.index("public enum Emoji {") + len("public enum Emoji {"):resp.index("private static final Emoji[] SORTED;")].strip().split("\n")]
-        e_data = {literal_eval(words[0]).encode("utf-16", "surrogatepass").decode("utf-16"): f" {literal_eval(words[2][:-1])} " for emoji in e_resp for words in (emoji.strip(";")[emoji.index("\\u") - 1:].split(","),) if words[2][:-1].strip() != "null"}
-        with open("misc/emojis.txt", "r", encoding="utf-8") as f:
-            resp = f.read()
-        e_data.update({k: v for k, v in (line.split(" ", 1) for line in resp.splitlines())})
-        emoji_translate = {k: v for k, v in e_data.items() if len(k) == 1}
-        emoji_replace = {k: v for k, v in e_data.items() if len(k) > 1}
+        resp = Request("https://raw.githubusercontent.com/twitter/twemoji/master/src/test/preview-svg.html", decode=True, timeout=None)
+        lines = [line[4:-5] for line in resp.split('<ul class="emoji-list">', 1)[-1].rsplit("</ul>", 1)[0].strip().split()]
+        emojis = [html_decode(line) for line in lines]
+        e_ids = ["-".join(hex(ord(c))[2:] for c in emoji) for emoji in emojis]
+        etrans = {k: f"https://github.com/twitter/twemoji/raw/master/assets/72x72/{v}.png" for k, v in zip(emojis, e_ids)}
+        # resp = Request("https://raw.githubusercontent.com/BreadMoirai/DiscordEmoji/master/src/main/java/com/github/breadmoirai/Emoji.java", decode=True, timeout=None)
+        # e_resp = [line.strip()[:-1] for line in resp[resp.index("public enum Emoji {") + len("public enum Emoji {"):resp.index("private static final Emoji[] SORTED;")].strip().split("\n")]
+        # etrans = {literal_eval(words[0]).encode("utf-16", "surrogatepass").decode("utf-16"): f" {literal_eval(words[2][:-1])} " for emoji in e_resp for words in (emoji.strip(";")[emoji.index("\\u") - 1:].split(","),) if words[2][:-1].strip() != "null"}
+        # with open("misc/emojis.txt", "r", encoding="utf-8") as f:
+        #     resp = f.read()
+        # etrans.update({k: v for k, v in (line.split(" ", 1) for line in resp.splitlines())})
+        emoji_translate = {k: v for k, v in etrans.items() if len(k) == 1}
+        emoji_replace = {k: v for k, v in etrans.items() if len(k) > 1}
         em_trans = "".maketrans(emoji_translate)
 
 def translate_emojis(s):

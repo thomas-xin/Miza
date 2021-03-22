@@ -995,7 +995,7 @@ class CreateGIF(Command):
 class Resize(Command):
     name = ["ImageScale", "Scale", "Rescale", "ImageResize"]
     description = "Changes size of supplied image, using an optional scaling operation."
-    usage = "<0:url> <1:x_multiplier(0.5)>? <2:y_multiplier(x)>? (nearest|linear|hamming|bicubic|lanczos|auto)?"
+    usage = "<0:url> <1:x_multiplier(1)>? <2:y_multiplier(x)>? (nearest|linear|hamming|bicubic|lanczos|auto)?"
     no_parse = True
     rate_limit = (3, 6)
     flags = "l"
@@ -1033,7 +1033,7 @@ class Resize(Command):
                     raise ArgumentError("Please input an image by URL or attachment.")
             value = " ".join(args).strip()
             if not value:
-                x = y = 0.5
+                x = y = 1
                 op = "auto"
             else:
                 # Parse width and height multipliers
