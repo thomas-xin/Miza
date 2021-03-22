@@ -2511,7 +2511,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 op = True
         else:
             comm = msg
-            if comm and comm[0] == "/" or comm[0] == self.prefix:
+            if comm and (comm[0] == "/" or comm[0] == self.prefix):
                 comm = comm[1:]
             op = True
         # Respond to blacklisted users attempting to use a command, or when mentioned without a command.
