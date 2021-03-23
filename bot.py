@@ -1353,9 +1353,6 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             await message.edit(content=message.content + ("" if message.content.endswith("```") else "\n") + ("\n".join("<" + best_url(a) + ">" for a in message.attachments) if best else "\n".join("<" + a.url + ">" for a in message.attachments)))
         return message
 
-    # def insert_message(self, message):
-    #     self.data.channel_cache.add(message.channel.id, message.id)
-
     # Inserts a message into the bot cache, discarding existing ones if full.
     def add_message(self, message, files=True, cache=True, force=False):
         if self.closed:
