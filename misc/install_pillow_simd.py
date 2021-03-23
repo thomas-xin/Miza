@@ -11,6 +11,7 @@ numpy>=1.20.1
 pdf2image>=1.14.0
 python-magic-bin>=0.4.14
 pyqrcode>=1.2.1
+pygame>=2.0.1
 """.split("\n")
 
 import pkg_resources, struct

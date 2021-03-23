@@ -7,6 +7,10 @@ from PIL import Image, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhanc
 from zipfile import ZipFile
 import matplotlib.pyplot as plt
 
+write, sys.stdout.write = sys.stdout.write, lambda *args, **kwargs: None
+import pygame
+sys.stdout.write = write
+
 requests = requests.Session()
 
 
@@ -1003,6 +1007,7 @@ resizers = {
     "lanczos": Image.LANCZOS,
     "cubic": Image.BICUBIC,
     "bicubic": Image.BICUBIC,
+    "scale2x": "scale2x",
     "hamming": Image.HAMMING,
     "linear": Image.BILINEAR,
     "bilinear": Image.BILINEAR,
@@ -1033,11 +1038,13 @@ def resize_to(image, w, h, operation="auto"):
             m = n
         if m <= 64:
             filt = Image.NEAREST
-        elif m <= 256:
-            filt = Image.HAMMING
+        elif m <= 1024:
+            filt = "scale2x"
         elif m <= 2048:
-            filt = Image.LANCZOS
+            filt = Image.HAMMING
         elif m <= 3072:
+            filt = Image.LANCZOS
+        elif m <= 4096:
             filt = Image.BICUBIC
         else:
             filt = Image.BILINEAR
@@ -1049,6 +1056,17 @@ def resize_to(image, w, h, operation="auto"):
     if h < 0:
         h = -h
         image = ImageOps.flip(image)
+    if filt == "scale2x":
+        if w > image.width or h > image.height:
+            b = image.tobytes()
+            surf = pygame.image.frombuffer(b, image.size, image.mode)
+            while w > surf.get_width() or h > surf.get_height():
+                surf = pygame.transform.scale2x(surf)
+            b = pygame.image.tostring(surf, image.mode)
+            image = Image.frombuffer(image.mode, surf.get_size(), b)
+        if image.size == (w, h):
+            return image
+        filt = Image.NEAREST
     return image.resize([w, h], filt)
 
 def rotate_to(image, angle):

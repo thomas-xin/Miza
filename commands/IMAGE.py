@@ -995,7 +995,7 @@ class CreateGIF(Command):
 class Resize(Command):
     name = ["ImageScale", "Scale", "Rescale", "ImageResize"]
     description = "Changes size of supplied image, using an optional scaling operation."
-    usage = "<0:url> <1:x_multiplier(1)>? <2:y_multiplier(x)>? (nearest|linear|hamming|bicubic|lanczos|auto)?"
+    usage = "<0:url> <1:x_multiplier(1)>? <2:y_multiplier(x)>? (nearest|linear|hamming|bicubic|lanczos|scale2x|auto)?"
     no_parse = True
     rate_limit = (3, 6)
     flags = "l"
@@ -1009,7 +1009,7 @@ class Resize(Command):
             argv = " ".join(best_url(a) for a in message.attachments) + " " * bool(argv) + argv
         if not args or argv == "list":
             if "l" in flags or argv == "list":
-                return ini_md("Available scaling operations: [nearest, linear, hamming, bicubic, lanczos, auto]")
+                return ini_md("Available scaling operations: [nearest, linear, hamming, bicubic, lanczos, scale2x, auto]")
             # raise ArgumentError("Please input an image by URL or attachment.")
         with discord.context_managers.Typing(channel):
             try:
@@ -1052,6 +1052,8 @@ class Resize(Command):
                         raise OverflowError("Maximum multiplier input is 32.")
                 if spl:
                     op = " ".join(spl)
+                    if op == "scale2":
+                        op = "scale2x"
                 else:
                     op = "auto"
             # Try and find a good name for the output image
