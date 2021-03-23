@@ -584,7 +584,7 @@ def spin_gif2(image, duration):
             temp = image
             if temp.size[0] != size[0] or temp.size[1] != size[1]:
                 temp = temp.resize(size, Image.HAMMING)
-            temp = to_circle(temp.rotate(f * 360 / length / scale * loops))
+            temp = to_circle(rotate_to(temp, f * 360 / length / scale * loops, expand=False))
             yield temp
 
     return dict(duration=total * scale, count=length * scale, frames=spin_gif_iterator(image))
@@ -620,7 +620,7 @@ def spin_gif(image, duration):
     def spin_gif_iterator(image):
         for i in range(0, 256, abs(rate)):
             if i:
-                im = image.rotate(i * 360 / 256)
+                im = rotate_to(image, i * 360 / 256, expand=False)
             else:
                 im = image
             yield to_circle(im)
@@ -1069,7 +1069,7 @@ def resize_to(image, w, h, operation="auto"):
         filt = Image.NEAREST
     return image.resize([w, h], filt)
 
-def rotate_to(image, angle):
+def rotate_to(image, angle, expand=True):
     angle %= 360
     if not angle % 90:
         if angle == 90:
@@ -1079,7 +1079,7 @@ def rotate_to(image, angle):
         elif angle == 270:
             return image.transpose(Image.ROTATE_270)
         return image
-    return image.rotate(angle, resample=Image.BICUBIC, expand=True)
+    return image.rotate(angle, resample=Image.BICUBIC, expand=expand)
 
 
 def get_colour(image):
