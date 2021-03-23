@@ -910,6 +910,16 @@ def greyscale(image):
         image.putalpha(A)
     return image
 
+def laplacian(image):
+    if str(image.mode) == "P":
+        image = image.convert("RGBA")
+    b = image.tobytes()
+    surf = pygame.image.frombuffer(b, image.size, image.mode)
+    surf = pygame.transform.laplacian(surf)
+    b = pygame.image.tostring(surf, image.mode)
+    image = Image.frombuffer(image.mode, image.size, b)
+    return image
+
 def colourspace(image, source, dest):
     if str(image.mode) == "P":
         image = image.convert("RGBA")
@@ -1056,6 +1066,9 @@ def resize_to(image, w, h, operation="auto"):
     if h < 0:
         h = -h
         image = ImageOps.flip(image)
+    if filt != Image.NEAREST:
+        if str(image.mode) == "P":
+            image = image.convert("RGBA")
     if filt == "scale2x":
         if w > image.width or h > image.height:
             b = image.tobytes()

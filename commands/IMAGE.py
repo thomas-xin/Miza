@@ -613,6 +613,28 @@ class GreyScale(Command):
         await bot.send_with_file(channel, "", fn, filename=name)
 
 
+class Laplacian(Command):
+    name = ["EdgeDetect", "Edges"]
+    description = "Applies the Laplacian edge-detect algorithm to the image."
+    usage = "<url>"
+    no_parse = True
+    rate_limit = (2, 4.5)
+    _timeout_ = 3
+    typing = True
+
+    async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
+        name, value, url = await get_image(bot, user, message, args, argv)
+        with discord.context_managers.Typing(channel):
+            resp = await process_image(url, "laplacian", [], timeout=_timeout)
+            fn = resp[0]
+            if fn.endswith(".gif"):
+                if not name.endswith(".gif"):
+                    if "." in name:
+                        name = name[:name.rindex(".")]
+                    name += ".gif"
+        await bot.send_with_file(channel, "", fn, filename=name)
+
+
 class ColourSpace(Command):
     name = ["ColorSpace"]
     description = "Changes the colour space of the supplied image."
