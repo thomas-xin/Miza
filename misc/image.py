@@ -944,15 +944,13 @@ def colourspace(image, source, dest):
             out = rgb_merge(*spl)
     elif source == "hsv":
         if dest == "rgb":
-            # spl = rgb_split(image)
-            # out = hsv_merge(*spl)
+            if image.mode != "RGB":
+                image = image.convert("RGB")
             spl = image.tobytes()
             out = Image.frombytes("HSV", image.size, spl).convert("RGB")
         if dest == "cmy":
-            # spl = rgb_split(image)
-            # out = hsv_merge(*spl, convert=False)
-            # out ^= 255
-            # out = fromarray(out, "RGB")
+            if image.mode != "RGB":
+                image = image.convert("RGB")
             spl = image.tobytes()
             out = invert(Image.frombytes("HSV", image.size, spl).convert("RGB"))
     elif source == "hsl":
