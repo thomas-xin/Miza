@@ -932,8 +932,6 @@ def colourspace(image, source, dest):
         if dest == "cmy":
             return invert(image)
         if dest == "hsv":
-            # spl = hsv_split(image, convert=False)
-            # out = rgb_merge(*spl)
             spl = image.convert("HSV").tobytes()
             out = Image.frombytes("RGB", image.size, spl)
         if dest == "hsl":
@@ -977,8 +975,6 @@ def colourspace(image, source, dest):
         if dest == "hsv":
             spl = invert(image).convert("HSV").tobytes()
             out = Image.frombytes("RGB", image.size, spl)
-            # spl = hsv_split(image, convert=False)
-            # return rgb_merge(*spl)
         if dest == "hsl":
             image = invert(image)
             spl = hsl_split(image, convert=False)
