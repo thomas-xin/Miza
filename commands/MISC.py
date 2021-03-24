@@ -770,7 +770,7 @@ class Wav2Png(Command):
         url = urls[0]
         fn = url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
         ts = ts_us()
-        ext = "png" if name == "wav2png" else "mp3"
+        ext = "png" if name == "wav2png" else "wav"
         dest = f"cache/&{ts}." + ext
         w2p = "wav2png" if name == "wav2png" else "png2wav"
         args = pillow_simd.get() + [w2p + ".py", url, "../" + dest]
