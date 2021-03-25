@@ -238,7 +238,7 @@ class ID2Time(Command):
     def __call__(self, argv, **void):
         if not argv:
             raise ArgumentError("Input string is empty.")
-        argv = int(verify_id(to_alphanumeric(argv)))
+        argv = int(verify_id("".join(c for c in argv if c.isnumeric() or c == "-")))
         return fix_md(snowflake_time(argv))
 
 
