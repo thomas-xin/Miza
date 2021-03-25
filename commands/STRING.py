@@ -965,13 +965,29 @@ class Ask(Command):
                 for _info in bot.commands.info:
                     await _info(q, None, "info", guild, channel, bot, user, "")
                 return
-        elif random.random() < math.atan(count / 7) / 4:
-            if guild:
-                bots = [member for member in guild.members if member.bot and member.id != bot.id]
-            answers = ("Ay, I'm busy, ask me later!", "¯\_(ツ)_/¯", "Hm, I dunno, have you tried asking Google?")
-            if bots:
-                answers += (f"🥱 I'm tired... go ask {user_mention(choice(bots).id)}...",)
-            await send_with_reply(channel, "h" not in flags and message, choice(answers))
+        elif random.random() < 0.0625 + math.atan(count / 7) / 4:
+            if xrand(2):
+                if guild:
+                    bots = [member for member in guild.members if member.bot and member.id != bot.id]
+                answers = (
+                    "Error: System backend refused connection. Please try again later."
+                    "That's interesting, gimme a minute to think about it."
+                    "Ay, I'm busy, ask me later!",
+                    "¯\_(ツ)_/¯",
+                    "Hm, I dunno, have you tried asking Google?",
+                    "Apologies, didn't quite catch that, could you repeat?",
+                    "Be sure to check out ~topic if you're ever in need of questions to answer! Oh, what was that again?",
+                )
+                if bots:
+                    answers += (f"🥱 I'm tired... go ask {user_mention(choice(bots).id)}...",)
+                resp = choice(answers)
+            else:
+                response = (
+                    "I think it's time for me to ask a question of my own!",
+                    "While I think abot my answer, here's a question for you:",
+                )
+                resp = choice(response) + " " + choice(bot.data.users.questions)
+            await send_with_reply(channel, "h" not in flags and message, resp)
             return
         elif q.startswith("why "):
             out = alist(
@@ -979,6 +995,7 @@ class Ask(Command):
                 "It's obvious, isn't? 😏",
                 "Meh, does it matter?",
                 "Why do you think?",
+                "Who knows?",
             )[ihash(q)]
         else:
             out = alist(
@@ -987,16 +1004,20 @@ class Ask(Command):
                 "Maybe?",
                 "Definitely!",
                 "Of course!",
+                "I think so!",
+                "I suppose so?",
                 "Perhaps?",
                 "Maybe not...",
                 "Probably not?",
-                "Nah",
+                "I guess not",
+                "Nah 🙃",
                 "Don't think so...",
             )[ihash(q)]
         if not out:
             raise RuntimeError("Unable to construct a valid response.")
         q = q.replace("am i", "are y\uf000ou").replace("i am", "y\uf000ou are")
-        r = regexp("(?:shall|should|shalln't|shouldn't|must|mustn't|can|could|couldn't|may|might|mightn't|will|would|won't|wouldn't|have|had|haven't|hadn't|do|did|don't|didn't) you")
+        modal_verbs = "shall should shalln't shouldn't must mustn't can could couldn't may might mightn't will would won't wouldn't have had haven't hadn't do did don't didn't"
+        r = regexp(f"(?:{modal_verbs.replace(' ', '|')}) you")
         while True:
             m = r.search(q)
             if not m:

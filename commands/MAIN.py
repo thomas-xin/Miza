@@ -1943,7 +1943,14 @@ class UpdateUsers(Database):
             if out is not None:
                 guild = message.guild
                 # Add randomized flavour text if in conversation
-                if self.flavour_buffer:
+                if not xrand(4):
+                    front = choice(
+                        "Random question",
+                        "Question for you",
+                        "Conversation starter",
+                    )
+                    out += f"{front}: `{choice(self.questions)}`"
+                elif self.flavour_buffer:
                     out += self.flavour_buffer.popleft()
                 else:
                     out += choice(self.flavour)

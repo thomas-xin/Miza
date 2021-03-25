@@ -61,7 +61,7 @@ def get_video(url, fps):
 class IMG(Command):
     min_display = "0~2"
     description = "Sends an image in the current chat from a list."
-    usage = "(add|delete)? <0:tags>* <1:url>? <verbose{?v}|hide{?h}>?"
+    usage = "(add|delete)? <0:tags>* <1:url>? <verbose{?v}|delete{?x}|hide{?h}>?"
     flags = "vraedhzf"
     no_parse = True
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
@@ -125,6 +125,8 @@ class IMG(Command):
         if not len(sources):
             raise LookupError(f"Target image {argv} not found. Use img for list.")
         url = choice(sources)
+        if "x" in flags:
+            create_task(bot.silent_delete(message))
         if "v" in flags:
             return escape_roles(url)
         bot.send_as_embeds(channel, image=url)
