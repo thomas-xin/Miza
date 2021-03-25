@@ -62,7 +62,7 @@ class IMG(Command):
     min_display = "0~2"
     description = "Sends an image in the current chat from a list."
     usage = "(add|delete)? <0:tags>* <1:url>? <verbose{?v}|delete{?x}|hide{?h}>?"
-    flags = "vraedhzf"
+    flags = "vraedhzfx"
     no_parse = True
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     slash = True
@@ -128,8 +128,13 @@ class IMG(Command):
         if "x" in flags:
             create_task(bot.silent_delete(message))
         if "v" in flags:
-            return escape_roles(url)
-        bot.send_as_embeds(channel, image=url)
+            msg = escape_roles(url)
+        else:
+            msg = None
+        url2 = await bot.get_proxy_url(message.author)
+        colour = await create_future(bot.get_colour, message.author)
+        emb = discord.Embed(colour=colour, url=url).set_image(url=url)
+        await bot.send_as_webhook(channel, msg, embed=emb, username=message.author.display_name, avatar_url=url2)
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
         u_id, pos = [int(i) for i in vals.split("_", 1)]
