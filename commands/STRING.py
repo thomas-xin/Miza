@@ -996,7 +996,7 @@ class Ask(Command):
         if not out:
             raise RuntimeError("Unable to construct a valid response.")
         q = q.replace("am i", "are y\uf000ou").replace("i am", "y\uf000ou are")
-        r = regexp("(?:shall|should|shalln't|shouldn't|must|mustn't|can|could|couldn't|may|might|mightn't|will|would|won't|wouldn't|have|had|haven't|hadn't|do|did|don't|didn't|dare) you")
+        r = regexp("(?:shall|should|shalln't|shouldn't|must|mustn't|can|could|couldn't|may|might|mightn't|will|would|won't|wouldn't|have|had|haven't|hadn't|do|did|don't|didn't) you")
         while True:
             m = r.search(q)
             if not m:
