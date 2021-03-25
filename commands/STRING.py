@@ -996,6 +996,12 @@ class Ask(Command):
         if not out:
             raise RuntimeError("Unable to construct a valid response.")
         q = q.replace("am i", "are y\uf000ou").replace("i am", "y\uf000ou are")
+        r = regexp("(?:shall|should|shalln't|shouldn't|must|mustn't|can|could|couldn't|may|might|mightn't|will|would|won't|wouldn't|have|had|haven't|hadn't|do|did|don't|didn't|dare) you")
+        while True:
+            m = r.search(q)
+            if not m:
+                break
+            q = q[:m.end() - 3] + "I" + q[m.end():]
         q = replace_map(q, {
             "yourself": "myself",
             "your ": "my ",
@@ -1005,11 +1011,17 @@ class Ask(Command):
             "you'll": "i'll",
         })
         res = alist(q.split())
-        for sym in "!.,":
+        for sym in "!.,'":
             if sym in q:
-                for word, rep in {"you": "I", "me": "you", "i": "I"}.items():
-                    res.replace(word + sym, rep + sym)
-        q = " ".join(res.replace("you", "I").replace("i", "you").replace("me", "you").replace("i", "I").replace("i'm", "I'm").replace("i'll", "I'll"))
+                for word, rep in {"you": "m\uf000e", "me": "you", "i": "I"}.items():
+                    src = word + sym
+                    dest = rep + sym
+                    if res[0] == src:
+                        res[0] = dest
+                    res.replace(src, dest)
+        if res[0] == "you":
+            res[0] = "I"
+        q = " ".join(res.replace("you", "m\uf000e").replace("i", "you").replace("me", "you").replace("i", "I").replace("i'm", "I'm").replace("i'll", "I'll"))
         if "dailies" in bot.data:
             bot.data.dailies.progress_quests(user, "talk")
         await send_with_reply(channel, "h" not in flags and message, escape_roles(f"\xad{q[0].upper() + q[1:]}? {out}".replace("\uf000", "")))
