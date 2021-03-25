@@ -3277,6 +3277,7 @@ class DynamicDT():
             if tzinfo:
                 self._dt = self._dt.replace(tzinfo=tzinfo)
             self._offset = offs * 400
+            return
         raise TypeError("Unpickling failed:", s)
 
     def __init__(self, *args, **kwargs):

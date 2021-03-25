@@ -53,7 +53,7 @@ def snowflake_time(id):
     if i is None:
         i = id
     if type(i) is int:
-        return utc_ft(id2ts(i))
+        return utc_dft(id2ts(i))
     return i
 
 snowflake_time_2 = lambda id: datetime.datetime.fromtimestamp(id2ts(id))
