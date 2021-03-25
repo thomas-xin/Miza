@@ -434,7 +434,7 @@ custom list-like data structure that incorporates the functionality of numpy arr
             self.clear()
             self.data = None
             self.offs = 0
-        return self.data, self.offs, self.size
+        return (self.view,)
 
     def __setstate__(self, s):
         if type(s) is tuple:
@@ -446,6 +446,18 @@ custom list-like data structure that incorporates the functionality of numpy arr
                     return
             elif len(s) == 3:
                 self.data, self.offs, self.size = s
+                self.hash = None
+                self.frozenset = None
+                try:
+                    del self.queries
+                except AttributeError:
+                    pass
+                self.block = None
+                return
+            elif len(s) == 1:
+                self.data = s[0]
+                self.offs = 0
+                self.size = len(self.data) if self.data is not None else 0
                 self.hash = None
                 self.frozenset = None
                 try:
@@ -3250,16 +3262,47 @@ def int_key(d):
 
 
 # Time functions
-class DynamicDT(datetime.datetime):
+class DynamicDT():
 
-    __slots__ = ("_offset", "_ts")
+    __slots__ = ("_dt", "_offset", "_ts")
+
+    def __getstate__(self):
+        return self.timestamp(), getattr(self, "tzinfo", None)
+
+    def __setstate__(self, s):
+        if len(s) == 2:
+            ts, tzinfo = s
+            offs, ots = divmod(ts, 12622780800)
+            self._dt = datetime.datetime.fromtimestamp(ots)
+            if tzinfo:
+                self._dt = self._dt.replace(tzinfo=tzinfo)
+            self._offset = offs * 400
+        raise TypeError("Unpickling failed:", s)
+
+    def __init__(self, *args, **kwargs):
+        if type(args[0]) is bytes:
+            self._dt = datetime.datetime(args[0])
+            return
+        offs, y = divmod(args[0], 400)
+        y += 2000
+        offs *= 400
+        offs -= 2000
+        self._dt = datetime.datetime(y, *args[1:], **kwargs)
+        self._offset = offs
+
+    def __getattr__(self, k):
+        try:
+            return self.__getattribute__(k)
+        except AttributeError:
+            pass
+        return getattr(self._dt, k)
 
     def __str__(self):
         y = self.year_repr()
-        return y + super().__str__()[4:]
+        return y + str(self._dt)[4:]
 
     def __repr__(self):
-        return self.__class__.__name__ + "(" + ", ".join(str(i) for i in self.timetuple()[:6]) + (f", microsecond={self.microsecond}" if getattr(self, "microsecond", 0) else "") + ").set_offset(" + str(self.offset()) + ")"
+        return self.__class__.__name__ + "(" + ", ".join(str(i) for i in self._dt.timetuple()[:6]) + (f", microsecond={self._dt.microsecond}" if getattr(self._dt, "microsecond", 0) else "") + ").set_offset(" + str(self.offset()) + ")"
 
     def year_repr(self):
         y = self.year
@@ -3276,7 +3319,7 @@ class DynamicDT(datetime.datetime):
     def update_timestamp(self):
         offs = self.offset() * 31556952
         try:
-            self._ts = offs + round_min(datetime.datetime.timestamp(self))
+            self._ts = offs + round_min(self._dt.timestamp())
         except OSError:
             self._ts = offs + round_min((self - ep).total_seconds())
         return self._ts
@@ -3296,7 +3339,7 @@ class DynamicDT(datetime.datetime):
     def __add__(self, other):
         if type(other) is not datetime.timedelta:
             return self.__class__.fromtimestamp(self.timestamp() + other)
-        ts = super().__add__(other).timestamp()
+        ts = (self._dt + other).timestamp()
         if abs(self.offset()) >= 25600:
             ts = round(ts)
         return self.__class__.fromtimestamp(ts + self.offset() * 31556952)
@@ -3305,7 +3348,7 @@ class DynamicDT(datetime.datetime):
     def __sub__(self, other):
         if type(other) not in (datetime.timedelta, datetime.datetime, datetime.date, self.__class__):
             return self.__class__.fromtimestamp(self.timestamp() - other)
-        out = super().__sub__(other)
+        out = (self._dt - other)
         ts = getattr(out, "timestamp", None)
         if ts is None:
             return out
@@ -3325,18 +3368,18 @@ class DynamicDT(datetime.datetime):
         else:
             x = 0
         try:
-            new_dt = self.__class__(super().year + years, self.month, self.day, self.hour, self.minute, self.second, self.microsecond, tzinfo=self.tzinfo)
+            new_dt = self.__class__(self.year + years, self.month, self.day, self.hour, self.minute, self.second, self.microsecond, tzinfo=self.tzinfo)
         except ValueError:
             if added:
                 month = self.month + 1
                 if month > 12:
                     month = 1
                     years += 1
-                new_dt = self.__class__(super().year + years, month, 1, self.hour, self.minute, self.second, self.microsecond, tzinfo=self.tzinfo)
+                new_dt = self.__class__(self.year + years, month, 1, self.hour, self.minute, self.second, self.microsecond, tzinfo=self.tzinfo)
             else:
                 month = self.month
-                day = month_days(super().year + years, month)
-                new_dt = self.__class__(super().year + years, month, day, self.hour, self.minute, self.second, self.microsecond, tzinfo=self.tzinfo)
+                day = month_days(self._dt.year + years, month)
+                new_dt = self.__class__(self.year + years, month, day, self.hour, self.minute, self.second, self.microsecond, tzinfo=self.tzinfo)
         return new_dt.set_offset(offs + x * 400)
 
     def add_months(self, months=1):
@@ -3352,18 +3395,18 @@ class DynamicDT(datetime.datetime):
         else:
             x = 0
         try:
-            new_dt = self.__class__(super().year + years, month, self.day, self.hour, self.minute, self.second, self.microsecond, tzinfo=self.tzinfo)
+            new_dt = self.__class__(self.year + years, month, self.day, self.hour, self.minute, self.second, self.microsecond, tzinfo=self.tzinfo)
         except ValueError:
             month += 1
             if month > 12:
                 month = 1
                 years += 1
-            new_dt = self.__class__(super().year + years, month, 1, self.hour, self.minute, self.second, self.microsecond, tzinfo=self.tzinfo)
+            new_dt = self.__class__(self.year + years, month, 1, self.hour, self.minute, self.second, self.microsecond, tzinfo=self.tzinfo)
         return new_dt.set_offset(offs + x * 400)
 
     @property
     def year(self):
-        return super().year + self.offset()
+        return self._dt.year + self.offset()
 
     def as_date(self):
         y = self.year_repr()
