@@ -2770,6 +2770,8 @@ def raw2colour(x):
         return verify_colour(((x >> 16) & 255, (x >> 8) & 255, x & 255, (x >> 24) & 255))
     return verify_colour(((x >> 16) & 255, (x >> 8) & 255, x & 255))
 
+r2c = raw2colour
+
 # Colour space conversion functions
 rgb_to_hsv = lambda c: list(colorsys.rgb_to_hsv(*c[:3])) + c[3:]
 

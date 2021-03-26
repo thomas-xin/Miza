@@ -722,7 +722,7 @@ class Magik(Command):
 
 
 class Colour(Command):
-    name = ["RGB", "HSV", "CMY", "LAB", "LUV", "XYZ", "Color"]
+    name = ["RGB", "HSV", "HSL", "CMY", "LAB", "LUV", "XYZ", "Color"]
     description = "Creates a 128x128 image filled with the target colour."
     usage = "<colour>"
     no_parse = True
@@ -752,7 +752,7 @@ class Colour(Command):
         msg = ini_md(
             "HEX colour code: " + sqr_md(bytes(channels).hex().upper())
             + "\nDEC colour code: " + sqr_md(colour2raw(channels))
-            + "\nRGB values: " + str(channels)
+            + "\nRGB values: " + str(channels if type(channels) is list else list(channels))
             + "\nHSV values: " + sqr_md(", ".join(str(round(x * 255)) for x in rgb_to_hsv(adj)))
             + "\nHSL values: " + sqr_md(", ".join(str(round(x * 255)) for x in rgb_to_hsl(adj)))
             + "\nCMY values: " + sqr_md(", ".join(str(round(x * 255)) for x in rgb_to_cmy(adj)))

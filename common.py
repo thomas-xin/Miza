@@ -1109,6 +1109,115 @@ async def str_lookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)]
 # Generates a random colour across the spectrum, in intervals of 128.
 rand_colour = lambda: colour2raw(hue2colour(xrand(12) * 128))
 
+
+base_colours = cdict(
+    black=(0,) * 3,
+    white=(255,) * 3,
+    grey=(127,) * 3,
+    gray=(127,) * 3,
+    dark_grey=(64,) * 3,
+    dark_gray=(64,) * 3,
+    light_grey=(191,) * 3,
+    light_gray=(191,) * 3,
+    silver=(191,) * 3,
+)
+primary_secondary_colours = cdict(
+    red=(255, 0, 0),
+    green=(0, 255, 0),
+    blue=(0, 0, 255),
+    yellow=(255, 255, 0),
+    cyan=(0, 255, 255),
+    aqua=(0, 255, 255),
+    magenta=(255, 0, 255),
+    fuchsia=(255, 0, 255),
+)
+tertiary_colours = cdict(
+    orange=(255, 127, 0),
+    chartreuse=(127, 255, 0),
+    lime=(127, 255, 0),
+    lime_green=(127, 255, 0),
+    spring_green=(0, 255, 127),
+    azure=(0, 127, 255),
+    violet=(127, 0, 255),
+    rose=(255, 0, 127),
+    dark_red=(127, 0, 0),
+    maroon=(127, 0, 0),
+)
+colour_shades = cdict(
+    dark_green=(0, 127, 0),
+    dark_blue=(0, 0, 127),
+    navy_blue=(0, 0, 127),
+    dark_yellow=(127, 127, 0),
+    dark_cyan=(0, 127, 127),
+    teal=(0, 127, 127),
+    dark_magenta=(127, 0, 127),
+    dark_orange=(127, 64, 0),
+    brown=(127, 64, 0),
+    dark_chartreuse=(64, 127, 0),
+    dark_spring_green=(0, 127, 64),
+    dark_azure=(0, 64, 127),
+    dark_violet=(64, 0, 127),
+    dark_rose=(127, 0, 64),
+    light_red=(255, 127, 127),
+    peach=(255, 127, 127),
+    light_green=(127, 255, 127),
+    light_blue=(127, 127, 255),
+    light_yellow=(255, 255, 127),
+    light_cyan=(127, 255, 255),
+    turquoise=(127, 255, 255),
+    light_magenta=(255, 127, 255),
+    light_orange=(255, 191, 127),
+    light_chartreuse=(191, 255, 127),
+    light_spring_green=(127, 255, 191),
+    light_azure=(127, 191, 255),
+    sky_blue=(127, 191, 255),
+    light_violet=(191, 127, 255),
+    purple=(191, 127, 255),
+    light_rose=(255, 127, 191),
+    pink=(255, 127, 191),
+)
+# misc_colours = cdict(
+#     gold=r2c(0xffd700),
+#     tan=r2c(0xd2b48c),
+# )
+colour_types = (
+    colour_shades,
+    base_colours,
+    primary_secondary_colours,
+    tertiary_colours,
+    # misc_colours,
+)
+
+def get_colour_list():
+    global colour_names
+    with tracebacksuppressor:
+        colour_names = cdict()
+        resp = Request("https://en.wikipedia.org/wiki/List_of_colors_(compact)", decode=True, timeout=None)
+        resp = resp.split('<span class="mw-headline" id="List_of_colors">List of colors</span>', 1)[-1].split("</h3>", 1)[-1].split("<h2>", 1)[0]
+        n = len("background-color:rgb")
+        while resp:
+            try:
+                i = resp.index("background-color:rgb")
+            except ValueError:
+                break
+            colour, resp = resp[i + n:].split(";", 1)
+            colour = literal_eval(colour)
+            resp = resp.split("<a ", 1)[-1].split(">", 1)[-1]
+            name, resp = resp.split("<", 1)
+            name = full_prune(name).replace(" ", "_")
+            if "(" in name and ")" in name:
+                name = name.split("(", 1)[0] + name.rsplit(")", 1)[-1].strip()
+                if name in colour_names:
+                    continue
+            colour_names[name] = colour
+        for colour_group in colour_types:
+            if colour_group:
+                if not colour_names:
+                    colour_names = cdict(colour_group)
+                else:
+                    colour_names.update(colour_group)
+        print(f"Successfully loaded {len(colour_names)} colour names.")
+
 def parse_colour(s, default=None):
     if s.startswith("0x"):
         s = s[2:].rstrip()
@@ -1119,6 +1228,10 @@ def parse_colour(s, default=None):
         if default is None:
             raise ArgumentError("Missing required colour argument.")
         return default
+    try:
+        return colour_names[full_prune(s).replace(" ", "_")]
+    except KeyError:
+        pass
     if " " in s:
         channels = [min(255, max(0, int(round(float(i.strip()))))) for i in s.split(" ")[:5] if i]
         if len(channels) not in (3, 4):
@@ -1134,7 +1247,7 @@ def parse_colour(s, default=None):
             else:
                 raise ValueError
         except ValueError:
-            raise ArgumentError("Please input a valid hex colour.")
+            raise ArgumentError("Please input a valid colour identifier.")
     return channels
 
 
@@ -1683,6 +1796,9 @@ def exec_tb(s, *args, **kwargs):
         exec(s, *args, **kwargs)
 
 
+create_future_ex(get_colour_list, priority=False)
+
+
 def find_file(path, cwd="cache", ind="\x7f"):
     # if no file name is inputted, return no content
     if not path:
@@ -1999,6 +2115,7 @@ def load_emojis():
         emoji_translate = {k: v for k, v in etrans.items() if len(k) == 1}
         emoji_replace = {k: v for k, v in etrans.items() if len(k) > 1}
         em_trans = "".maketrans(emoji_translate)
+        print(f"Successfully loaded {len(etrans)} unicode emojis.")
 
 def translate_emojis(s):
     return s.translate(em_trans)
@@ -2019,7 +2136,7 @@ def find_emojis_ex(s):
             out.append(url[1:-1])
     return list(set(out))
 
-create_future_ex(load_emojis, priority=True)
+create_future_ex(load_emojis, priority=False)
 
 
 # Stores and manages timezones information.
@@ -2038,6 +2155,7 @@ def load_timezones():
                     if len(curr) == 1:
                         curr = curr[0]
                     TIMEZONES[abb] = curr
+            print(f"Successfully loaded {len(TIMEZONES)} timezones.")
 
 def is_dst(dt=None, timezone="UTC"):
     if dt is None:
@@ -2073,7 +2191,7 @@ def timezone_repr(tz):
         return capwords(tz)
     return tz.upper()
 
-create_future_ex(load_timezones, priority=True)
+create_future_ex(load_timezones, priority=False)
 
 def parse_with_now(expr):
     if not expr or expr.strip().casefold() == "now":
