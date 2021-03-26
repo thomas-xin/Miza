@@ -2047,6 +2047,24 @@ def brightness(image, value):
             image.putalpha(A)
     return image
 
+def luminance(image, value):
+    if value:
+        if value < 0:
+            image = invert(image)
+            value = -value
+        if str(image.mode) == "P":
+            image = image.convert("RGBA")
+        if str(image.mode) == "RGBA":
+            A = image.getchannel("A")
+        else:
+            A = None
+        H, S, L = hcl_split(image, convert=False, dtype=np.float32)
+        np.multiply(L, value, out=L, casting="unsafe")
+        image = hcl_merge(H, S, L)
+        if A:
+            image.putalpha(A)
+    return image
+
 # Hueshift image using HSV channels
 def hue_shift(image, value):
     if value:

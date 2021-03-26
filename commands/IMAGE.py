@@ -313,8 +313,8 @@ async def get_image(bot, user, message, args, argv, default=2, raw=False, ext="p
     return name, value, url
 
 
-class Saturate(Command):
-    name = ["Saturation", "ImageSaturate"]
+class Saturation(Command):
+    name = ["Saturate", "ImageSaturate"]
     description = "Changes colour saturation of supplied image."
     usage = "<0:url> <1:multiplier(2)>?"
     no_parse = True
@@ -358,7 +358,7 @@ class Contrast(Command):
 
 
 class Brightness(Command):
-    name = ["Brighten", "ImageBrightness"]
+    name = ["Brighten", "Lighten", "Lightness", "ImageBrightness"]
     description = "Changes colour brightness of supplied image."
     usage = "<0:url> <1:multiplier(2)>?"
     no_parse = True
@@ -370,6 +370,28 @@ class Brightness(Command):
         name, value, url = await get_image(bot, user, message, args, argv)
         with discord.context_managers.Typing(channel):
             resp = await process_image(url, "brightness", [value], timeout=_timeout)
+            fn = resp[0]
+            if fn.endswith(".gif"):
+                if not name.endswith(".gif"):
+                    if "." in name:
+                        name = name[:name.rindex(".")]
+                    name += ".gif"
+        await bot.send_with_file(channel, "", fn, filename=name)
+
+
+class Luminance(Command):
+    name = ["Luminosity", "ImageLuminance"]
+    description = "Changes colour luminance of supplied image."
+    usage = "<0:url> <1:multiplier(2)>?"
+    no_parse = True
+    rate_limit = (2, 5)
+    _timeout_ = 3
+    typing = True
+
+    async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
+        name, value, url = await get_image(bot, user, message, args, argv)
+        with discord.context_managers.Typing(channel):
+            resp = await process_image(url, "luminance", [value], timeout=_timeout)
             fn = resp[0]
             if fn.endswith(".gif"):
                 if not name.endswith(".gif"):
