@@ -1201,7 +1201,7 @@ def get_colour_list():
             name, resp = resp.split("<", 1)
             name = full_prune(name).strip().replace(" ", "_")
             if "(" in name and ")" in name:
-                name = name.split("(", 1)[0] + name.rsplit(")", 1)[-1].strip()
+                name = name.split("(", 1)[0] + name.rsplit(")", 1)[-1].strip("_")
                 if name in colour_names:
                     continue
             colour_names[name] = colour
