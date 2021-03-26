@@ -966,12 +966,12 @@ class Ask(Command):
                     await _info(q, None, "info", guild, channel, bot, user, "")
                 return
         elif random.random() < 0.0625 + math.atan(count / 7) / 4:
-            if xrand(2):
+            if xrand(3):
                 if guild:
                     bots = [member for member in guild.members if member.bot and member.id != bot.id]
                 answers = (
-                    "Error: System backend refused connection. Please try again later."
-                    "That's interesting, gimme a minute to think about it."
+                    "Error: System backend refused connection. Please try again later.",
+                    "That's interesting, gimme a minute to think about it.",
                     "Ay, I'm busy, ask me later!",
                     "¯\_(ツ)_/¯",
                     "Hm, I dunno, have you tried asking Google?",
@@ -984,7 +984,7 @@ class Ask(Command):
             else:
                 response = (
                     "I think it's time for me to ask a question of my own!",
-                    "While I think abot my answer, here's a question for you:",
+                    "While I think about my answer, here's a question for you:",
                 )
                 resp = choice(response) + " " + choice(bot.data.users.questions)
             await send_with_reply(channel, "h" not in flags and message, resp)

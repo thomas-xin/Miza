@@ -872,7 +872,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                             guild.icon_url = f"https://cdn.discordapp.com/icons/{guild.id}/{icon}"
                             if icon.startswith("a_"):
                                 guild.icon_url += ".gif"
-                            guild.created_at = snowflake_time(guild.id)
+                            guild.created_at = snowflake_time_3(guild.id)
                         else:
                             guild = g
                         return guild
@@ -3420,7 +3420,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
             @property
             def created_at(self):
-                return snowflake_time(self.id)
+                return snowflake_time_3(self.id)
 
             ghost = True
 
@@ -3460,7 +3460,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
             @property
             def created_at(self):
-                return snowflake_time(self.id)
+                return snowflake_time_3(self.id)
 
             edit = delete
             publish = delete
@@ -3507,7 +3507,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             def __init__(self, data):
                 self._data = data
                 self.id = int(data["id"])
-                self.created_at = snowflake_time(self.id)
+                self.created_at = snowflake_time_3(self.id)
                 author = data["author"]
                 if author["id"] not in bot.cache.users:
                     bot.user2cache(author)

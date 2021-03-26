@@ -3262,7 +3262,7 @@ def int_key(d):
 
 
 # Time functions
-class DynamicDT():
+class DynamicDT:
 
     __slots__ = ("_dt", "_offset", "_ts")
 
@@ -3358,6 +3358,67 @@ class DynamicDT():
             ts = round(ts)
         return self.__class__.fromtimestamp(ts + self.offset() * 31556952)
     __rsub__ = __sub__
+
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            if self.offset() == other.offset():
+                return self._dt == other._dt
+        elif isinstance(other, datetime.datetime):
+            if self.year == other.year:
+                return self._dt == other
+        return False
+
+    def __lt__(self, other):
+        if isinstance(other, self.__class__):
+            if self.offset() < other.offset():
+                return True
+            elif self.offset() == other.offset():
+                return self._dt < other._dt
+        elif isinstance(other, datetime.datetime):
+            if self.year < other.year:
+                return True
+            if self.year == other.year:
+                return self._dt < other
+        return False
+    
+    def __le__(self, other):
+        if isinstance(other, self.__class__):
+            if self.offset() < other.offset():
+                return True
+            elif self.offset() == other.offset():
+                return self._dt <= other._dt
+        elif isinstance(other, datetime.datetime):
+            if self.year < other.year:
+                return True
+            if self.year == other.year:
+                return self._dt <= other
+        return False
+
+    def __gt__(self, other):
+        if isinstance(other, self.__class__):
+            if self.offset() > other.offset():
+                return True
+            elif self.offset() == other.offset():
+                return self._dt > other._dt
+        elif isinstance(other, datetime.datetime):
+            if self.year > other.year:
+                return True
+            if self.year == other.year:
+                return self._dt > other
+        return False
+    
+    def __ge__(self, other):
+        if isinstance(other, self.__class__):
+            if self.offset() > other.offset():
+                return True
+            elif self.offset() == other.offset():
+                return self._dt >= other._dt
+        elif isinstance(other, datetime.datetime):
+            if self.year > other.year:
+                return True
+            if self.year == other.year:
+                return self._dt >= other
+        return False
 
     def add_years(self, years=1):
         if not years:

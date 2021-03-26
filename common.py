@@ -69,6 +69,7 @@ def snowflake_time(id):
     return i
 
 snowflake_time_2 = lambda id: datetime.datetime.fromtimestamp(id2ts(id))
+snowflake_time_3 = discord.utils.snowflake_time
 
 ip2int = lambda ip: int.from_bytes(b"\x00" + bytes(int(i) for i in ip.split(".")), "big")
 

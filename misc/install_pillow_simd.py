@@ -63,4 +63,8 @@ if x >= 9:
         else:
             win = "win32"
         subprocess.run(["py", f"-3.{x}", "-m", "pip", "install", f"https://download.lfd.uci.edu/pythonlibs/w4tscw6k/Pillow_SIMD-7.0.0.post3+avx2-cp3{x}-cp3{x}-{win}.whl", "--user"])
+try:
+    pkg_resources.get_distribution("colorspace")
+except pkg_resources.DistributionNotFound:
+    subprocess.run(["py", f"-3.{x}", "-m", "pip", "install", "git+https://github.com/retostauffer/python-colorspace", "--user"])
 print("Installer terminated.")
