@@ -1176,16 +1176,11 @@ colour_shades = cdict(
     light_rose=(255, 127, 191),
     pink=(255, 127, 191),
 )
-# misc_colours = cdict(
-#     gold=r2c(0xffd700),
-#     tan=r2c(0xd2b48c),
-# )
 colour_types = (
     colour_shades,
     base_colours,
     primary_secondary_colours,
     tertiary_colours,
-    # misc_colours,
 )
 
 def get_colour_list():
@@ -1204,7 +1199,7 @@ def get_colour_list():
             colour = literal_eval(colour)
             resp = resp.split("<a ", 1)[-1].split(">", 1)[-1]
             name, resp = resp.split("<", 1)
-            name = full_prune(name).replace(" ", "_")
+            name = full_prune(name).strip().replace(" ", "_")
             if "(" in name and ")" in name:
                 name = name.split("(", 1)[0] + name.rsplit(")", 1)[-1].strip()
                 if name in colour_names:
