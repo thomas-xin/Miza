@@ -2096,8 +2096,8 @@ special_colours = {
 }
 
 def plt_special(d, user=None, **void):
-    hours = 168
-    plt.rcParams["figure.figsize"] = (16, 9)
+    hours = 336
+    plt.rcParams["figure.figsize"] = (24, 9)
     plt.rcParams["figure.dpi"] = 128
     plt.xlim(-hours, 0)
     temp = np.zeros(len(next(iter(d.values()))))
