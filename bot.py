@@ -465,6 +465,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         with tracebacksuppressor(SemaphoreOverflowError):
             async with obj._garbage_semaphore:
                 data = obj.data
+                if getattr(obj, "garbage_collect", None):
+                    return await obj.garbage_collect()
                 for key in tuple(data):
                     if key != 0 and type(key) is not str:
                         with suppress():

@@ -745,7 +745,7 @@ class AudioQueue(alist):
         self.lastsent = 0
         self.loading = False
         self.playlist = None
-        self.sem = Semaphore(1, 0, trace=True)
+        self.sem = Semaphore(1, 0)
         self.wait = concurrent.futures.Future()
         if auds:
             self.auds = auds

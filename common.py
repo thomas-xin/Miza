@@ -137,12 +137,12 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
         return self.rate_bin
 
     def enter(self):
-        if self.rate_limit:
-            self.rate_bin.append(utc())
         if self.trace:
             self.trace = inspect.stack()[2]
         self.active += 1
-        if self.active >= self.limit and self.fut.done():
+        if self.rate_limit:
+            self._update_bin().append(utc())
+        if self.fut.done() and (self.active >= self.limit or self.rate_limit and not self.rate_bin):
             self.fut = concurrent.futures.Future()
         return self
 

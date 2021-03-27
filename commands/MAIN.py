@@ -1596,6 +1596,18 @@ class UpdateUsers(Database):
     scale = 3600 // interval
     mentionspam = re.compile("<@[!&]?[0-9]+>")
 
+    async def garbage_collect(self):
+        for i in tuple(self.data):
+            if type(i) is str:
+                if i.startswith("#"):
+                    c_id = int(i[1:])
+                    try:
+                        await self.bot.fetch_channel(c_id)
+                    except:
+                        print(f"Deleting {key} from {str(self)}...")
+                        self.pop(c_id)
+                        await asyncio.sleep(0.1)
+
     def __load__(self):
         self.semaphore = Semaphore(1, 2, delay=0.5)
         self.facts = None
