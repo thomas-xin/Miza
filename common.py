@@ -120,20 +120,21 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
         self._update_bin()
 
     def _update_bin(self):
-        try:
-            if self.last:
-                if self.rate_bin and utc() - self.rate_bin[-1] >= self.rate_limit:
-                    self.rate_bin.clear()
-            else:
-                while self.rate_bin and utc() - self.rate_bin[0] >= self.rate_limit:
-                    self.rate_bin.popleft()
-        except IndexError:
-            pass
-        if not self.rate_bin:
+        if self.rate_limit:
             try:
-                self.fut.set_result(None)
-            except concurrent.futures.InvalidStateError:
+                if self.last:
+                    if self.rate_bin and utc() - self.rate_bin[-1] >= self.rate_limit:
+                        self.rate_bin.clear()
+                else:
+                    while self.rate_bin and utc() - self.rate_bin[0] >= self.rate_limit:
+                        self.rate_bin.popleft()
+            except IndexError:
                 pass
+            if len(self.rate_bin) < self.limit:
+                try:
+                    self.fut.set_result(None)
+                except concurrent.futures.InvalidStateError:
+                    pass
         return self.rate_bin
 
     def enter(self):
@@ -1795,9 +1796,6 @@ def exec_tb(s, *args, **kwargs):
         exec(s, *args, **kwargs)
 
 
-create_future_ex(get_colour_list, priority=False)
-
-
 def find_file(path, cwd="cache", ind="\x7f"):
     # if no file name is inputted, return no content
     if not path:
@@ -2027,7 +2025,7 @@ class Stream(io.IOBase):
 class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, collections.abc.Callable):
 
     session = None
-    semaphore = emptyctx
+    semaphore = Semaphore(512, 256, delay=0.25)
 
     @classmethod
     def header(cls):
@@ -2039,7 +2037,6 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 
     async def _init_(self):
         self.session = aiohttp.ClientSession(loop=eloop)
-        self.semaphore = Semaphore(512, 256, delay=0.25)
 
     async def aio_call(self, url, headers, files, data, method, decode=False, json=False):
         if files is not None:
@@ -2086,6 +2083,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
         return async_nop()
 
 Request = RequestManager()
+create_future_ex(get_colour_list, priority=False)
 create_task(Request._init_())
 
 
