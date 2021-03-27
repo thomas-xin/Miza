@@ -1590,7 +1590,6 @@ EMPTY = {}
 # This database takes up a lot of space, storing so many events from users
 class UpdateUsers(Database):
     name = "users"
-    no_delete = True
     hours = 336
     interval = 900
     scale = 3600 // interval
@@ -1600,12 +1599,12 @@ class UpdateUsers(Database):
         for i in tuple(self.data):
             if type(i) is str:
                 if i.startswith("#"):
-                    c_id = int(i[1:])
+                    c_id = int(i[1:].rstrip("\x7f"))
                     try:
                         await self.bot.fetch_channel(c_id)
                     except:
-                        print(f"Deleting {c_id} from {str(self)}...")
-                        self.pop(c_id)
+                        print(f"Deleting #{c_id} from {str(self)}...")
+                        self.data.pop(c_id, None)
                         await asyncio.sleep(0.1)
 
     def __load__(self):
