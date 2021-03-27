@@ -604,10 +604,8 @@ def create_gif(in_type, args, delay):
                 except EOFError:
                     break
             if length != 0:
-                maxsize = int(min(maxsize, 32768 / (len(images) + length) ** 0.5))
-                dur = img.info.get("duration")
-                if dur:
-                    delay = dur
+                # maxsize = int(min(maxsize, 32768 / (len(images) + length) ** 0.5))
+                delay = img.info.get("duration") or delay or 16
             for f in range(2147483648):
                 try:
                     img.seek(f)
@@ -616,18 +614,20 @@ def create_gif(in_type, args, delay):
                 if not imgs:
                     size = max_size(img.width, img.height, maxsize)
                 temp = resize_to(img, *size, operation="hamming")
+                if type(temp) is ImageSequence:
+                    temp = temp._images[temp._position]
                 if str(temp.mode) == "RGBA":
                     if imgs and str(imgs[0]) != "RGBA":
                         imgs[0] = imgs[0].convert("RGBA")
                 imgs.append(temp)
-    size = list(imgs[0].size)
-    while size[0] * size[1] * len(imgs) > 8388608:
-        size[0] /= 2 ** 0.5
-        size[1] /= 2 ** 0.5
-    size = [round(size[0]), round(size[1])]
+    # size = list(imgs[0].size)
+    # while size[0] * size[1] * len(imgs) > 8388608:
+    #     size[0] /= 2 ** 0.5
+    #     size[1] /= 2 ** 0.5
+    # size = [round(size[0]), round(size[1])]
+    # if imgs[0].size[0] != size[0]:
+    #     imgs = (resize_to(img, *size, operation="hamming") for img in imgs)
     count = len(imgs)
-    if imgs[0].size[0] != size[0]:
-        imgs = (resize_to(img, *size, operation="hamming") for img in imgs)
     return dict(duration=delay * count, count=count, frames=imgs)
 
 def rainbow_gif2(image, duration):
@@ -2184,11 +2184,16 @@ def from_bytes(b, save=None):
         images = deque()
         while True:
             b = proc.stdout.read(bcount)
+            while len(b) < bcount:
+                if not proc.is_running():
+                    break
+                b += proc.stdout.read(bcount - len(b))
             if len(b) < bcount:
                 break
             img = Image.frombuffer(mode, size, b)
             img.info["duration"] = duration
             images.append(img)
+        print(len(images))
         return ImageSequence(*images)
     try:
         return Image.open(out)

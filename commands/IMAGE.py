@@ -28,7 +28,7 @@ ydl_opts = {
 }
 downloader = youtube_dl.YoutubeDL(ydl_opts)
 
-def get_video(url, fps):
+def get_video(url, fps=None):
     try:
         entry = downloader.extract_info(url, download=False)
     except:
@@ -1010,16 +1010,16 @@ class CreateGIF(Command):
             fr = args.pop(-1)
             rate = await bot.eval_math(fr)
         else:
-            rate = 16
+            rate = None
         # Validate framerate values to prevent issues further down the line
-        if rate <= 0:
+        if rate and rate <= 0:
             args = args[:1]
             rate = 1
-        delay = round(1000 / rate)
-        if delay <= 0:
+        delay = round(1000 / rate) if rate else None
+        if delay and delay <= 0:
             args = args[-1:]
             delay = 1000
-        if delay >= 16777216:
+        elif delay and delay >= 16777216:
             raise OverflowError("GIF image framerate too low.")
         with discord.context_managers.Typing(channel):
             video = None
@@ -1028,7 +1028,7 @@ class CreateGIF(Command):
                 url = urls[0]
                 if "discord" not in url and "channels" not in url:
                     with tracebacksuppressor:
-                        url, size, dur, fps = await create_future(get_video, url, 16, timeout=60)
+                        url, size, dur, fps = await create_future(get_video, url, None, timeout=60)
                         if size and dur and fps:
                             video = (url, size, dur, fps)
                 if not url:
