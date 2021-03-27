@@ -1603,8 +1603,8 @@ class UpdateUsers(Database):
                     try:
                         await self.bot.fetch_channel(c_id)
                     except:
-                        print(f"Deleting #{c_id} from {str(self)}...")
-                        self.data.pop(c_id, None)
+                        print(f"Deleting {i} from {self}...")
+                        self.data.pop(i, None)
                         await asyncio.sleep(0.1)
 
     def __load__(self):

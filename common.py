@@ -578,16 +578,19 @@ class FileHashDict(collections.abc.MutableMapping):
         try:
             if force:
                 out = self[k]
-                del self.data[k]
                 self.deleted.add(k)
-                return out
+                return self.data.pop(k, out)
             self.deleted.add(k)
-            return self.data.pop(k)
+            return self.data.pop(k, None)
         except KeyError:
             if not os.path.exists(fn):
                 if args:
                     return args[0]
                 raise
+            self.deleted.add(k)
+            if args:
+                return self.data.pop(k, args[0])
+            return self.data.pop(k, None)
 
     __delitem__ = pop
 
@@ -645,6 +648,7 @@ class FileHashDict(collections.abc.MutableMapping):
             self.iter = None
         self.deleted.clear()
         for k in deleted:
+            self.data.pop(k, None)
             with suppress(FileNotFoundError):
                 os.remove(self.key_path(k))
         while len(self.data) > 1048576:
