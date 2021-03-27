@@ -142,7 +142,7 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
         self.active += 1
         if self.rate_limit:
             self._update_bin().append(utc())
-        if self.fut.done() and (self.active >= self.limit or self.rate_limit and not self.rate_bin):
+        if self.fut.done() and (self.active >= self.limit or self.rate_limit and len(self.rate_bin) >= self.limit):
             self.fut = concurrent.futures.Future()
         return self
 
