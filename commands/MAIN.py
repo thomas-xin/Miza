@@ -1591,7 +1591,7 @@ EMPTY = {}
 class UpdateUsers(Database):
     name = "users"
     no_delete = True
-    hours = 168
+    hours = 336
     interval = 900
     scale = 3600 // interval
     mentionspam = re.compile("<@[!&]?[0-9]+>")

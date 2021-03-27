@@ -1882,7 +1882,7 @@ class UpdateMessageCache(Database):
             os.mkdir(self.files)
 
     def get_fn(self, m_id):
-        return  m_id // 10 ** 14
+        return  m_id // 10 ** 13
 
     def load_file(self, fn, raw=False):
         if not raw:
@@ -1899,7 +1899,7 @@ class UpdateMessageCache(Database):
                 if not os.path.exists(path):
                     return
             with open(path, "rb") as f:
-                out = zipped = f.read()
+                out = zipped = decrypt(f.read())
             with tracebacksuppressor(zipfile.BadZipFile):
                 out = zip2bytes(zipped)
             data = pickle.loads(out)
@@ -2001,6 +2001,7 @@ class UpdateMessageCache(Database):
         out = data = pickle.dumps(saved)
         if len(data) > 32768:
             out = bytes2zip(data)
+        out = encrypt(out)
         safe_save(path, out)
         return len(saved)
 
@@ -2008,8 +2009,6 @@ class UpdateMessageCache(Database):
         if self.save_sem.is_busy():
             return
         async with self.save_sem:
-            # with suppress(AttributeError):
-            #     fut = create_task(self.bot.data.channel_cache.saves())
             saving = deque(self.saving.items())
             self.saving.clear()
             i = 0
@@ -2044,7 +2043,6 @@ class UpdateMessageCache(Database):
                 print(f"Message Database: {deleted} files deleted.")
             if os.path.exists(self.files + "/-1"):
                 self.setmtime()
-            # await fut
 
     getmtime = lambda self: os.path.getmtime(self.files + "/-1")
     setmtime = lambda self: open(self.files + "/-1", "wb").close()

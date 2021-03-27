@@ -355,11 +355,23 @@ with tracebacksuppressor:
     enc_key = AUTH["encryption_key"]
 
 if not enc_key:
-    enc_key = AUTH["encryption_key"] = as_str(base64.b64encode(randbytes(32)))
+    enc_key = AUTH["encryption_key"] = as_str(base64.b64encode(randbytes(32)).rstrip("="))
     with open("auth.json", "w", encoding="utf-8") as f:
         json.dump(AUTH, f, indent=4)
 
+enc_key += "=="
+if (len(enc_key) - 1) & 3 == 0:
+    enc_key += "="
+
 enc_box = nacl.secret.SecretBox(base64.b64decode(enc_key)[:32])
+
+encrypt = lambda s: b">~MIZA~>" + enc_box.encrypt(s if type(s) is bytes else str(s).encode("utf-8"))
+def decrypt(s):
+    if type(s) is not bytes:
+        s = str(s).encode("utf-8")
+    if s[:8] == b">~MIZA~>":
+        return enc_box.decrypt(s[8:])
+    raise ValueError("Data header not found.")
 
 
 def zip2bytes(data):
@@ -384,14 +396,6 @@ def eval_json(s):
     with suppress(json.JSONDecodeError):
         return json.loads(s)
     return safe_eval(s)
-
-encrypt = lambda s: b">~MIZA~>" + enc_box.encrypt(s if type(s) is bytes else str(s).encode("utf-8"))
-def decrypt(s):
-    if type(s) is not bytes:
-        s = str(s).encode("utf-8")
-    if s[:8] == b">~MIZA~>":
-        return enc_box.decrypt(s[8:])
-    raise ValueError("Data header not found.")
 
 def select_and_loads(s, mode="safe", size=None):
     if not s:
@@ -438,7 +442,7 @@ def select_and_loads(s, mode="safe", size=None):
 def select_and_dumps(data, mode="safe"):
     if mode == "unsafe":
         s = pickle.dumps(data)
-        if len(s) > 65536:
+        if len(s) > 32768:
             s = bytes2zip(s)
         return s
     try:
@@ -1201,7 +1205,7 @@ def get_colour_list():
             name, resp = resp.split("<", 1)
             name = full_prune(name).strip().replace(" ", "_")
             if "(" in name and ")" in name:
-                name = name.split("(", 1)[0] + name.rsplit(")", 1)[-1].strip("_")
+                name = (name.split("(", 1)[0] + name.rsplit(")", 1)[-1]).strip("_")
                 if name in colour_names:
                     continue
             colour_names[name] = colour
