@@ -556,6 +556,8 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
         command = ["ffmpeg", "-threads", "2", "-hide_banner", "-nostdin", "-loglevel", "error", "-y", "-i", f_in, "-an", "-vf"]
         w, h = max_size(*size, maxsize)
         # Adjust FPS if duration is too long
+        fps = fps or orig_fps or 16
+        orig_fps = orig_fps or fps or 16
         fps = min(fps, orig_fps)
         vf = ""
         if w != size[0]:
@@ -579,7 +581,7 @@ def create_gif(in_type, args, delay):
     out = "cache/" + str(ts) + ".gif"
     maxsize = 960
     if in_type == "video":
-        video2img(args[0], maxsize, round(1000 / delay), out, args[1], args[2], args[3])
+        video2img(args[0], maxsize, round(1000 / delay) if delay else None, out, args[1], args[2], args[3])
         return "$" + out
     images = args
     # Detect if an image sequence or video is being inputted
@@ -590,7 +592,7 @@ def create_gif(in_type, args, delay):
             img = get_image(data, None)
         except (PIL.UnidentifiedImageError, OverflowError, TypeError):
             if len(data) < 268435456:
-                video2img(data, maxsize, round(1000 / delay), out, data=data)
+                video2img(data, maxsize, round(1000 / delay) if delay else None, out, data=data)
                 # $ symbol indicates to return directly
                 return "$" + out
             else:

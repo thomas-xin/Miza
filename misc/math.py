@@ -233,6 +233,28 @@ fac = sympy.factorial
 ncr = lambda n, k: 0 if k > n else fac(n) / fac(k) / fac(n - k)
 npr = lambda n, k: 0 if k > n else fac(n) / fac(n - k)
 
+def lcm(*nums):
+    while len(nums) > 1:
+        if len(nums) & 1:
+            x = nums[-1]
+        else:
+            x = None
+        nums = [sympy.lcm(*t) for t in zip(nums[::2], nums[1::2])]
+        if x is not None:
+            nums.append(x)
+    return nums[0]
+
+def gcd(*nums):
+    while len(nums) > 1:
+        if len(nums) & 1:
+            x = nums[-1]
+        else:
+            x = None
+        nums = [sympy.gcd(*t) for t in zip(nums[::2], nums[1::2])]
+        if x is not None:
+            nums.append(x)
+    return nums[0]
+
 if os.name == "nt":
     def _factorint(n, **kwargs):
         try:
@@ -345,6 +367,9 @@ _globals.update({
     "nCr": ncr,
     "npr": npr,
     "nPr": npr,
+    "lcm": lcm,
+    "gcd": gcd,
+    "hcf": gcd,
     "phi": sympy.GoldenRatio,
     "tau": sympy.pi * 2,
     "deg": sympy.pi / 180,
