@@ -959,7 +959,7 @@ class GMagik(Command):
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
         name, value, url = await get_image(bot, user, message, args, argv, ext="gif")
         with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "magik_gif", [abs(value), max(1, round(160 / abs(value))), "-gif"], timeout=_timeout)
+            resp = await process_image(url, "magik_gif", [abs(value), "-gif"], timeout=_timeout)
             fn = resp[0]
         await bot.send_with_file(channel, "", fn, filename=name)
 
