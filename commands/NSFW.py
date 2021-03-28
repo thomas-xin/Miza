@@ -307,7 +307,7 @@ class Neko(Command):
             if tag in (None, "neko"):
                 tag = "neko"
                 if not xrand(50) and not self.moe_sem.is_busy():
-                    with self.moe_sem:
+                    async with self.moe_sem:
                         resp = await Request(
                             "https://nekos.moe/api/v1/images/search",
                             data=json.dumps(dict(nsfw=False, limit=50, skip=xrand(10) * 50, sort="newest", artist="", uploader="")),

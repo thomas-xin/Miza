@@ -1237,7 +1237,8 @@ class AudioDownloader:
                         self.keepvid_token = as_str(resp[:resp.index(b"';</script>")])
                         self.keepvid_failed = 0
                     except:
-                        print_exc()
+                        if not self.keepvid_failed:
+                            print_exc()
                         self.keepvid_failed += 1
 
     # Gets data from yt-download.org, keepv.id, or y2mate.guru, adjusts the format to ensure compatibility with results from youtube-dl. Used as backup.

@@ -2193,7 +2193,6 @@ def from_bytes(b, save=None):
             img = Image.frombuffer(mode, size, b)
             img.info["duration"] = duration
             images.append(img)
-        print(len(images))
         return ImageSequence(*images)
     try:
         return Image.open(out)
