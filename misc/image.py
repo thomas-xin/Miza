@@ -905,7 +905,7 @@ def scroll_gif(image, direction, duration, fps):
     return dict(duration=1000 * duration, count=count, frames=scroll_gif_iterator(image))
 
 
-def magik_gif2(image, cell_size, grid_distance, iterations):
+def magik_gif2(image, cell_count, grid_distance, iterations):
     total = 0
     for f in range(2147483648):
         try:
@@ -936,7 +936,7 @@ def magik_gif2(image, cell_size, grid_distance, iterations):
             if temp.size[0] != size[0] or temp.size[1] != size[1]:
                 temp = temp.resize(size, Image.HAMMING)
             for _ in range(int(31 * iterations * f / length / scale)):
-                dst_grid = griddify(shape_to_rect(image.size), cell_size, cell_size)
+                dst_grid = griddify(shape_to_rect(image.size), cell_count, cell_count)
                 src_grid = distort_grid(dst_grid, grid_distance)
                 mesh = grid_to_mesh(src_grid, dst_grid)
                 temp = temp.transform(temp.size, Image.MESH, mesh, resample=Image.NEAREST)
@@ -945,20 +945,21 @@ def magik_gif2(image, cell_size, grid_distance, iterations):
     return dict(duration=total * scale, count=length * scale, frames=magik_gif_iterator(image))
 
 
-def magik_gif(image, cell_size=7, grid_distance=23, iterations=1):
+def magik_gif(image, cell_count=7, iterations=1):
+    grid_distance = int(max(1, round(np.sqrt(np.prod(image.size)) / cell_count / 3 / iterations)))
     try:
         image.seek(1)
     except EOFError:
         image.seek(0)
     else:
-        return magik_gif2(image, cell_size, grid_distance, iterations)
+        return magik_gif2(image, cell_count, grid_distance, iterations)
     image = resize_max(image, 960, resample=Image.HAMMING)
 
     def magik_gif_iterator(image):
         yield image
         for _ in range(31):
             for _ in range(iterations):
-                dst_grid = griddify(shape_to_rect(image.size), cell_size, cell_size)
+                dst_grid = griddify(shape_to_rect(image.size), cell_count, cell_count)
                 src_grid = distort_grid(dst_grid, grid_distance)
                 mesh = grid_to_mesh(src_grid, dst_grid)
                 image = image.transform(image.size, Image.MESH, mesh, resample=Image.NEAREST)
@@ -1034,9 +1035,9 @@ def grid_to_mesh(src_grid, dst_grid):
             mesh.append([dst_rect, src_quad])
     return list(mesh)
 
-def magik(image, cell_size=7):
-    dst_grid = griddify(shape_to_rect(image.size), cell_size, cell_size)
-    src_grid = distort_grid(dst_grid, max(1, round(160 / cell_size)))
+def magik(image, cell_count=7):
+    dst_grid = griddify(shape_to_rect(image.size), cell_count, cell_count)
+    src_grid = distort_grid(dst_grid, int(max(1, round(np.sqrt(np.prod(image.size)) / cell_count / 3))))
     mesh = grid_to_mesh(src_grid, dst_grid)
     return image.transform(image.size, Image.MESH, mesh, resample=Image.NEAREST)
 

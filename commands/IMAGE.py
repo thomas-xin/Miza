@@ -701,8 +701,9 @@ class ColourSpace(Command):
 
 
 class Magik(Command):
+    name = ["Distort"]
     description = "Applies the Magik image filter to supplied image."
-    usage = "<0:url> <cell_size(7)>?"
+    usage = "<0:url> <cell_count(7)>?"
     no_parse = True
     rate_limit = (3, 7)
     _timeout_ = 4
@@ -966,16 +967,16 @@ class GMagik(Command):
 class Liquefy(Command):
     name = ["LiquidGIF"]
     description = "Repeatedly applies slight distortion to supplied image."
-    usage = "<0:url> <cell_size(12)>?"
+    usage = "<0:url> <cell_count(32)>?"
     no_parse = True
     rate_limit = (7, 14)
     _timeout_ = 8
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url = await get_image(bot, user, message, args, argv, ext="gif")
+        name, value, url = await get_image(bot, user, message, args, argv, default=32, ext="gif")
         with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "magik_gif", [abs(value), 2, 2, "-gif"], timeout=_timeout)
+            resp = await process_image(url, "magik_gif", [abs(value), 2, "-gif"], timeout=_timeout)
             fn = resp[0]
         await bot.send_with_file(channel, "", fn, filename=name)
 
