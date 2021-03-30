@@ -4177,6 +4177,14 @@ class Lyrics(Command):
         search = search.translate(self.bot.mtrans)
         # Attempt to find best query based on the song name
         item = verify_search(to_alphanumeric(lyric_trans.sub("", search)))
+        ic = item.casefold()
+        if ic.endswith(" with lyrics"):
+            item = item[:-len(" with lyrics")]
+        elif ic.endswith(" lyrics"):
+            item = item[:-len(" lyrics")]
+        elif ic.endswith(" acoustic"):
+            item = item[:-len(" acoustic")]
+        item = item.rsplit(" ft ", 1)[0].strip()
         if not item:
             item = verify_search(to_alphanumeric(search))
             if not item:
