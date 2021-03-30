@@ -69,10 +69,19 @@ class Help(Command):
                     a = ", ".join(n.strip("_") for n in com.name)
                     if not a:
                         a = "[none]"
-                    s = f"```ini\n[Aliases] {a}"
+                    s = "```ini"
+                    if len(found) <= 1:
+                        s += f"\n[Category] {com.catg.capitalize()}"
+                    s += f"\n[Aliases] {a}"
                     s += f"\n[Effect] {com.parse_description()}"
                     if v or len(found) <= 1:
                         s += f"\n[Usage] {prefix}{com.parse_name()} {com.usage}\n[Level] {com.min_display}"
+                    if len(found) <= 1:
+                        x = com.rate_limit
+                        if x:
+                            if issubclass(type(x), collections.abc.Sequence):
+                                x = x[not bot.is_trusted(getattr(guild, "id", 0))]
+                        s += f"\n[Rate Limit] {sec2time(x)}"
                     s += "```"
                     fields.append(dict(
                         name=prefix + com.parse_name(),

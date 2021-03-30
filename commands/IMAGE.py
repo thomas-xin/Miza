@@ -332,7 +332,7 @@ class Saturation(Command):
                     if "." in name:
                         name = name[:name.rindex(".")]
                     name += ".gif"
-        await bot.send_with_file(channel, "", fn, filename=name)
+        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
 class Contrast(Command):
@@ -354,7 +354,7 @@ class Contrast(Command):
                     if "." in name:
                         name = name[:name.rindex(".")]
                     name += ".gif"
-        await bot.send_with_file(channel, "", fn, filename=name)
+        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
 class Brightness(Command):
@@ -376,7 +376,7 @@ class Brightness(Command):
                     if "." in name:
                         name = name[:name.rindex(".")]
                     name += ".gif"
-        await bot.send_with_file(channel, "", fn, filename=name)
+        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
 class Luminance(Command):
@@ -398,7 +398,7 @@ class Luminance(Command):
                     if "." in name:
                         name = name[:name.rindex(".")]
                     name += ".gif"
-        await bot.send_with_file(channel, "", fn, filename=name)
+        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
 class Sharpness(Command):
@@ -420,7 +420,7 @@ class Sharpness(Command):
                     if "." in name:
                         name = name[:name.rindex(".")]
                     name += ".gif"
-        await bot.send_with_file(channel, "", fn, filename=name)
+        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
 class HueShift(Command):
@@ -442,7 +442,7 @@ class HueShift(Command):
                     if "." in name:
                         name = name[:name.rindex(".")]
                     name += ".gif"
-        await bot.send_with_file(channel, "", fn, filename=name)
+        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
 class Blur(Command):
@@ -464,7 +464,7 @@ class Blur(Command):
                     if "." in name:
                         name = name[:name.rindex(".")]
                     name += ".gif"
-        await bot.send_with_file(channel, "", fn, filename=name)
+        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
 class ColourDeficiency(Command):
@@ -536,7 +536,7 @@ class ColourDeficiency(Command):
                     if "." in name:
                         name = name[:name.rindex(".")]
                     name += ".gif"
-        await bot.send_with_file(channel, "", fn, filename=name)
+        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
 class RemoveMatte(Command):
@@ -595,7 +595,7 @@ class RemoveMatte(Command):
                     if "." in name:
                         name = name[:name.rindex(".")]
                     name += ".gif"
-        await bot.send_with_file(channel, "", fn, filename=name)
+        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
 class Invert(Command):
@@ -617,7 +617,7 @@ class Invert(Command):
                     if "." in name:
                         name = name[:name.rindex(".")]
                     name += ".gif"
-        await bot.send_with_file(channel, "", fn, filename=name)
+        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
 class GreyScale(Command):
@@ -639,7 +639,7 @@ class GreyScale(Command):
                     if "." in name:
                         name = name[:name.rindex(".")]
                     name += ".gif"
-        await bot.send_with_file(channel, "", fn, filename=name)
+        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
 class Laplacian(Command):
@@ -661,7 +661,7 @@ class Laplacian(Command):
                     if "." in name:
                         name = name[:name.rindex(".")]
                     name += ".gif"
-        await bot.send_with_file(channel, "", fn, filename=name)
+        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
 class ColourSpace(Command):
@@ -697,7 +697,7 @@ class ColourSpace(Command):
                     if "." in name:
                         name = name[:name.rindex(".")]
                     name += ".gif"
-        await bot.send_with_file(channel, "", fn, filename=name)
+        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
 class Magik(Command):
@@ -719,7 +719,7 @@ class Magik(Command):
                     if "." in name:
                         name = name[:name.rindex(".")]
                     name += ".gif"
-        await bot.send_with_file(channel, "", fn, filename=name)
+        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
 class Colour(Command):
@@ -740,7 +740,7 @@ class Colour(Command):
     typing = True
     slash = True
 
-    async def __call__(self, bot, user, channel, name, argv, **void):
+    async def __call__(self, bot, user, message, channel, name, argv, **void):
         channels = parse_colour(argv)
         if name in self.trans:
             if name in "lab luv":
@@ -765,7 +765,7 @@ class Colour(Command):
             resp = await process_image("from_colour", "$", [channels])
             fn = resp[0]
             f = CompatFile(fn, filename="colour.png")
-        await bot.send_with_file(channel, msg, f, filename=fn, best=True)
+        await bot.send_with_file(channel, msg, f, filename=fn, best=True, reference=message)
 
 
 class Average(Command):
@@ -821,7 +821,7 @@ class Average(Command):
             resp = await process_image("from_colour", "$", [channels])
             fn = resp[0]
             f = CompatFile(fn, filename="colour.png")
-        await bot.send_with_file(channel, msg, f, filename=fn, best=True)
+        await bot.send_with_file(channel, msg, f, filename=fn, best=True, reference=message)
         # return css_md("#" + bytes2hex(bytes(raw2colour(colour)), space=False))
 
 
@@ -834,13 +834,13 @@ class QR(Command):
     _timeout_ = 4
     typing = True
 
-    async def __call__(self, bot, channel, argv, name, _timeout, **void):
+    async def __call__(self, bot, message, channel, argv, name, _timeout, **void):
         if not argv:
             raise ArgumentError("Input string is empty.")
         with discord.context_managers.Typing(channel):
             resp = await process_image("to_qr", "$", [argv, "rainbow" in name], timeout=_timeout)
             fn = resp[0]
-        await bot.send_with_file(channel, "", fn, filename="QR." + ("gif" if "rainbow" in name else "png"))
+        await bot.send_with_file(channel, "", fn, filename="QR." + ("gif" if "rainbow" in name else "png"), reference=message)
 
 
 class Rainbow(Command):
@@ -858,7 +858,7 @@ class Rainbow(Command):
             # -gif signals to image subprocess that the output is always a .gif image
             resp = await process_image(url, "rainbow_gif", [value, "-gif"], timeout=_timeout)
             fn = resp[0]
-        await bot.send_with_file(channel, "", fn, filename=name)
+        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
 class Scroll(Command):
@@ -926,7 +926,7 @@ class Scroll(Command):
             # -gif signals to image subprocess that the output is always a .gif image
             resp = await process_image(url, "scroll_gif", [direction, duration, fps, "-gif"], timeout=_timeout)
             fn = resp[0]
-        await bot.send_with_file(channel, "", fn, filename=name)
+        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
 class Spin(Command):
@@ -944,7 +944,7 @@ class Spin(Command):
             # -gif signals to image subprocess that the output is always a .gif image
             resp = await process_image(url, "spin_gif", [value, "-gif"], timeout=_timeout)
             fn = resp[0]
-        await bot.send_with_file(channel, "", fn, filename=name)
+        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
 class GMagik(Command):
@@ -961,7 +961,7 @@ class GMagik(Command):
         with discord.context_managers.Typing(channel):
             resp = await process_image(url, "magik_gif", [abs(value), "-gif"], timeout=_timeout)
             fn = resp[0]
-        await bot.send_with_file(channel, "", fn, filename=name)
+        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
 class Liquefy(Command):
@@ -978,7 +978,7 @@ class Liquefy(Command):
         with discord.context_managers.Typing(channel):
             resp = await process_image(url, "magik_gif", [abs(value), 2, "-gif"], timeout=_timeout)
             fn = resp[0]
-        await bot.send_with_file(channel, "", fn, filename=name)
+        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
 class CreateGIF(Command):
@@ -1041,7 +1041,7 @@ class CreateGIF(Command):
             else:
                 resp = await process_image("create_gif", "$", ["image", args, delay], timeout=_timeout)
             fn = resp[0]
-        await bot.send_with_file(channel, "", fn, filename=name)
+        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
 class Resize(Command):
@@ -1126,7 +1126,7 @@ class Resize(Command):
                     if "." in name:
                         name = name[:name.rindex(".")]
                     name += ".gif"
-        await bot.send_with_file(channel, "", fn, filename=name)
+        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
 class Rotate(Command):
@@ -1149,7 +1149,7 @@ class Rotate(Command):
                     if "." in name:
                         name = name[:name.rindex(".")]
                     name += ".gif"
-        await bot.send_with_file(channel, "", fn, filename=name)
+        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
 class Fill(Command):
@@ -1218,7 +1218,7 @@ class Fill(Command):
                     if "." in name:
                         name = name[:name.rindex(".")]
                     name += ".gif"
-        await bot.send_with_file(channel, "", fn, filename=name)
+        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
 class Blend(Command):
@@ -1311,7 +1311,7 @@ class Blend(Command):
                     if "." in name:
                         name = name[:name.rindex(".")]
                     name += ".gif"
-        await bot.send_with_file(channel, "", fn, filename=name)
+        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
 class Waifu2x(Command):
@@ -1371,7 +1371,7 @@ class Waifu2x(Command):
             if not img.get("image"):
                 raise FileNotFoundError("image file not found")
             image = await create_future(base64.b64decode, img["image"])
-        await bot.send_with_file(channel, "", file=image, filename=name)
+        await bot.send_with_file(channel, "", file=image, filename=name, reference=message)
 
 
 class UpdateImages(Database):

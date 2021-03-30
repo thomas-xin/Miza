@@ -1295,7 +1295,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         return out
 
         # Sends a message to a channel, then edits to add links to all attached files.
-    async def send_with_file(self, channel, msg=None, file=None, filename=None, best=False, rename=True):
+    async def send_with_file(self, channel, msg=None, file=None, filename=None, best=False, rename=True, reference=None):
         f = None
         fsize = 0
         size = 8388608
@@ -1329,6 +1329,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             fp.seek(0)
             with suppress(AttributeError):
                 fp.clear()
+        if reference and getattr(reference, "slash", None) or getattr(reference, "simulated", None):
+            reference = None
         try:
             if fsize > size:
                 if not f:
@@ -1340,9 +1342,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 else:
                     ext = None
                 urls = await create_future(as_file, file if getattr(file, "_fp", None) else f, filename=filename, ext=ext, rename=rename)
-                message = await channel.send(msg + ("" if msg.endswith("```") else "\n") + urls[0] + "\n" + urls[1]) #, embed=discord.Embed(colour=discord.Colour(1)).set_image(url=urls[-1]))
+                message = await channel.send(msg + ("" if msg.endswith("```") else "\n") + urls[0] + "\n" + urls[1], reference=reference, allowed_mentions=noreply) #, embed=discord.Embed(colour=discord.Colour(1)).set_image(url=urls[-1]))
             else:
-                message = await channel.send(msg, file=file)
+                message = await channel.send(msg, file=file, reference=reference, allowed_mentions=noreply)
                 if filename is not None:
                     create_future_ex(os.remove, filename, priority=True)
         except:
@@ -2772,7 +2774,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                                 # Process dict as kwargs for a message send
                                 elif issubclass(type(response), collections.abc.Mapping):
                                     if "file" in response:
-                                        sent = await self.send_with_file(channel, response.get("content", ""), **response)
+                                        sent = await self.send_with_file(channel, response.get("content", ""), **response, reference=message)
                                     else:
                                         sent = await send_with_react(channel, reference=not loop and message, **response)
                                 else:
@@ -2791,7 +2793,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                                             filemsg = "Response data:"
                                         b = io.BytesIO(response)
                                         f = CompatFile(b, filename="message.txt")
-                                        sent = await self.send_with_file(channel, filemsg, f)
+                                        sent = await self.send_with_file(channel, filemsg, f, reference=message)
                                 # Add targeted react if there is one
                                 if react and sent:
                                     await sent.add_reaction(react)
@@ -3011,6 +3013,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 url = await self.get_proxy_url(m)
                 await self.send_as_webhook(sendable, embeds=embs, username=m.display_name, avatar_url=url, reacts=reacts)
 
+    async def ignore_interaction(self, message):
+        await send_with_reply(message.channel, message, "Please wait...")
+        await Request(f"https://discord.com/api/v8/interactions/{message.id}/{message.slash}/messages/@original", method="DELETE", aio=True)
+
     # Adds embeds to the embed sender, waiting for the next update event.
     def send_embeds(self, channel, embeds=None, embed=None, reacts=None, reference=None):
         if embeds is not None and not issubclass(type(embeds), collections.abc.Collection):
@@ -3022,6 +3028,11 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 embeds = (embed,)
         elif not embeds:
             return
+        if reference:
+            if len(embeds) == 1:
+                return create_task(send_with_reply(channel, reference, embed=embeds[0]))
+            elif getattr(reference, "slash", None):
+                return create_task(self.ignore_interaction(reference))
         c_id = verify_id(channel)
         user = self.cache.users.get(c_id)
         if user is not None:
@@ -4047,10 +4058,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             if raw or before.content != after.content:
                 if "users" in self.data:
                     self.data.users.add_xp(after.author, xrand(1, 4))
-                await self.handle_message(after)
                 if getattr(after, "guild", None):
                     create_task(self.send_event("_edit_", before=before, after=after))
                 await self.seen(after.author, after.channel, after.guild, event="message", raw="Editing a message")
+                await self.handle_message(after)
 
         # Message delete event: uses raw payloads rather than discord.py message cache. calls _delete_ bot database event.
         @self.event

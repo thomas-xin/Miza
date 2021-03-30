@@ -357,7 +357,7 @@ class UpdateExec(Database):
                             output = str(result)
                             if len(output) > 54000:
                                 f = CompatFile(io.BytesIO(output.encode("utf-8")), filename="message.txt")
-                                await bot.send_with_file(channel, "Response over 54,000 characters.", file=f)
+                                await bot.send_with_file(channel, "Response over 54,000 characters.", file=f, reference=message)
                             elif len(output) > 1993:
                                 bot.send_as_embeds(channel, output, md=code_md)
                             else:

@@ -3203,7 +3203,7 @@ class Dump(Command):
             async with discord.context_managers.Typing(channel):
                 resp, fn = await create_future(auds.get_dump, "x" in flags, js=True, timeout=18)
                 f = CompatFile(io.BytesIO(resp), filename=fn)
-            create_task(bot.send_with_file(channel, f"Queue data for {bold(str(guild))}:", f))
+            create_task(bot.send_with_file(channel, f"Queue data for {bold(str(guild))}:", f, reference=message))
             return
         if not is_alone(auds, user) and perm < 1:
             raise self.perm_error(perm, 1, "to load new queue while other users are in voice")
@@ -4317,6 +4317,7 @@ class Download(Command):
                     file=f,
                     filename=out,
                     rename=False,
+                    reference=message
                 ))
                 return
         desc += "\nDestination format: {." + fmt + "}"
@@ -4407,12 +4408,17 @@ class Download(Command):
                                 embed=None,
                             ))
                             create_task(channel.trigger_typing())
+                        reference = (message, "reference", None)
+                        if reference:
+                            r_id = getattr(reference, "message_id", None) or getattr(reference, "id", None)
+                            reference = bot.cache.messages.get(r_id)
                         resp = await bot.send_with_file(
                             channel=channel,
                             msg="",
                             file=f,
                             filename=out,
                             rename=False,
+                            reference=reference,
                         )
                         if resp.attachments and type(f) is str:
                             create_future_ex(os.remove, f, timeout=18, priority=True)

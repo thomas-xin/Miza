@@ -259,7 +259,7 @@ class CS_hex2xml(Command):
     usage = "<hex_data>"
     rate_limit = (3, 5)
 
-    async def __call__(self, bot, argv, channel, **void):
+    async def __call__(self, bot, argv, channel, message, **void):
         hacks = {}
         hack = argv.replace(" ", "").replace("`", "").strip("\n")
         while len(hack):
@@ -319,7 +319,7 @@ class CS_hex2xml(Command):
         data = await create_future(bytes, output, "utf-8", timeout=8)
         b = io.BytesIO(data)
         f = CompatFile(b, filename="patch.xml")
-        create_task(bot.send_with_file(channel, "Patch successfully converted!", f))
+        create_task(bot.send_with_file(channel, "Patch successfully converted!", f, reference=message))
 
 
 class CS_npc(Command):
@@ -783,7 +783,7 @@ class Wav2Png(Command):
                 with tracebacksuppressor:
                     proc.kill()
                 raise
-        await bot.send_with_file(channel, "", dest, filename=fn + "." + ext)
+        await bot.send_with_file(channel, "", dest, filename=fn + "." + ext, reference=message)
 
 
 class SpectralPulse(Command):
@@ -825,8 +825,8 @@ class SpectralPulse(Command):
                     raise
                 for ext in ("pcm", "riff"):
                     await create_future(os.remove, f"{dest}.{ext}")
-        await bot.send_with_file(channel, "", fn1, filename=n1)
-        await bot.send_with_file(channel, "", fn2, filename=n2)
+        await bot.send_with_file(channel, "", fn1, filename=n1, reference=message)
+        await bot.send_with_file(channel, "", fn2, filename=n2, reference=message)
 
 
 class DeviantArt(Command):

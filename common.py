@@ -806,21 +806,13 @@ is_channel = lambda channel: issubclass(type(channel), discord.abc.GuildChannel)
 
 
 REPLY_SEM = cdict()
+noreply = discord.AllowedMentions(replied_user=False)
 
-async def send_with_reply(channel, reference, content="", embed=None, tts=None, mention=False):
+async def send_with_reply(channel, reference, content="", embed=None, tts=None, file=None, files=None, mention=False):
     bot = BOT[0]
-    try:
-        sem = REPLY_SEM[channel.id]
-    except KeyError:
-        sem = REPLY_SEM[channel.id] = Semaphore(5, buffer=256, delay=0.1, rate_limit=5)
-    if getattr(reference, "slash", None) and not embed:
+    if getattr(reference, "slash", None):
+        sem = emptyctx
         inter = True
-        # try:
-        #     discord_id = AUTH['discord_id']
-        # except KeyError:
-        #     url = f"https://discord.com/api/v8/interactions/{reference.id}/{reference.slash}/callback"
-        # else:
-        #     url = f"https://discord.com/api/v8/webhooks/{discord_id}/{reference.slash}"
         url = f"https://discord.com/api/v8/interactions/{reference.id}/{reference.slash}/callback"
         data = dict(
             type=4,
@@ -829,45 +821,65 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
                 content=content,
             ),
         )
+        if embed:
+            data["data"]["embed"] = embed.to_dict()
+            data["data"].pop("flags", None)
     else:
-        m_id = verify_id(reference)
-        inter = False
-        url = f"https://discord.com/api/v8/channels/{channel.id}/messages"
-        if not reference or getattr(reference, "noref", None) or getattr(channel, "simulated", None) or bot and getattr(bot.messages.get(m_id), "deleted", None):
-            fields = {}
-            if embed:
-                fields["embed"] = embed
-            if tts:
-                fields["tts"] = tts
-            return await channel.send(content, **fields)
-        if getattr(channel, "dm_channel", None):
-            c = channel.dm_channel
-            if c is None:
-                c = await channel.create_dm()
-            channel = c
-        elif not getattr(channel, "recipient", None) and not channel.permissions_for(channel.guild.me).read_message_history:
-            fields = {}
-            if embed:
-                fields["embed"] = embed
-            if tts:
-                fields["tts"] = tts
-            return await channel.send(content, **fields)
-        data = dict(
-            content=content,
-            message_reference=dict(message_id=str(m_id)),
-            allowed_mentions=dict(parse=["users", "roles", "everyone"], replied_user=mention)
-        )
-        if embed is not None:
-            data["embed"] = embed.to_dict()
-        if tts is not None:
-            data["tts"] = tts
+        fields = {}
+        if embed:
+            fields["embed"] = embed
+        if tts:
+            fields["tts"] = tts
+        if not (getattr(reference, "noref", None) or getattr(bot.messages.get(verify_id(reference)), "deleted", None) or getattr(channel, "simulated", None)): 
+            if not getattr(reference, "to_message_reference_dict", None):
+                if type(reference) is int:
+                    reference = cdict(to_message_reference_dict=eval(f"lambda: dict(message_id={reference})"))
+                else:
+                    reference.to_message_reference_dict = lambda message: dict(message_id=message.id)
+            fields["reference"] = reference
+            fields["allowed_mentions"] = noreply
+        if file:
+            fields["file"] = file
+        if files:
+            fields["files"] = files
+        return await channel.send(content, **fields)
+        # try:
+        #     sem = REPLY_SEM[channel.id]
+        # except KeyError:
+        #     sem = REPLY_SEM[channel.id] = Semaphore(5, buffer=256, delay=0.1, rate_limit=5)
+        # m_id = verify_id(reference)
+        # inter = False
+        # url = f"https://discord.com/api/v8/channels/{channel.id}/messages"
+        # if not reference or getattr(channel, "simulated", None) or bot and getattr(bot.messages.get(m_id), "deleted", None): # or getattr(reference, "noref", None)
+        #     fields = {}
+        #     if embed:
+        #         fields["embed"] = embed
+        #     if tts:
+        #         fields["tts"] = tts
+        #     return await channel.send(content, **fields)
+        # if getattr(channel, "dm_channel", None):
+        #     channel = channel.dm_channel
+        # elif not getattr(channel, "recipient", None) and not channel.permissions_for(channel.guild.me).read_message_history:
+        #     fields = {}
+        #     if embed:
+        #         fields["embed"] = embed
+        #     if tts:
+        #         fields["tts"] = tts
+        #     return await channel.send(content, **fields)
+        # data = dict(
+        #     content=content,
+        #     message_reference=dict(message_id=m_id),
+        #     allowed_mentions=dict(parse=["users", "roles", "everyone"], replied_user=mention)
+        # )
+        # if embed is not None:
+        #     data["embed"] = embed.to_dict()
+        # if tts is not None:
+        #     data["tts"] = tts
     body = json.dumps(data)
     exc = RuntimeError
     for i in range(xrand(12, 17)):
         try:
             async with sem:
-                # if inter:
-                #     print(url, body)
                 resp = await Request.aio_call(
                     url,
                     method="post",
@@ -876,24 +888,29 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
                     decode=False,
                     files=None,
                 )
-            if bot:
-                M = bot.ExtendedMessage.new
-            else:
-                M = discord.Message
-            return M(state=channel._state, channel=channel, data=eval_json(resp))
         except Exception as ex:
             exc = ex
-            if ex.args and "400" in str(ex.args[0]) or "401" in str(ex.args[0]) or "403" in str(ex.args[0]) or "404" in str(ex.args[0]):
+            if isinstance(ex, ConnectionError) and int(ex.args[0]) in range(400, 500):
                 if not inter:
                     print_exc()
-                elif "404" in str(ex.args[0]):
+                elif ex.errno == 404:
                     continue
+                # print_exc()
                 fields = {}
                 if embed:
                     fields["embed"] = embed
                 if tts:
                     fields["tts"] = tts
                 return await channel.send(content, **fields)
+            print_exc()
+        else:
+            if not resp:
+                return
+            if bot:
+                M = bot.ExtendedMessage.new
+            else:
+                M = discord.Message
+            return M(state=channel._state, channel=channel, data=eval_json(resp))
         await asyncio.sleep(i + 1)
     raise exc
 
@@ -2049,7 +2066,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
             async with getattr(self.session, method)(url, headers=headers, data=data) as resp:
                 if resp.status >= 400:
                     data = await resp.read()
-                    raise ConnectionError(f"Error {resp.status}", url, as_str(data))
+                    raise ConnectionError(resp.status, url, as_str(data))
                 if json:
                     return await resp.json()
                 data = await resp.read()
@@ -2068,7 +2085,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
         with self.semaphore:
             with getattr(requests, method)(url, headers=headers, files=files, data=data, stream=True, timeout=timeout) as resp:
                 if resp.status_code >= 400:
-                    raise ConnectionError(f"Error {resp.status_code}", url, resp.text)
+                    raise ConnectionError(resp.status_code, url, resp.text)
                 if json:
                     return resp.json()
                 if raw:

@@ -185,7 +185,7 @@ class Math(Command):
             await channel.trigger_typing()
             fn = resp["file"]
             f = CompatFile(fn)
-            await bot.send_with_file(channel, "", f, filename=fn, best=True)
+            await bot.send_with_file(channel, "", f, filename=fn, best=True, reference=reference)
             return
         answer = "\n".join(str(i) for i in resp)
         if var is not None:
