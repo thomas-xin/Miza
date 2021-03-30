@@ -650,56 +650,56 @@ class Info(Command):
                         dname = getattr(u, "simulated", None) and getattr(u, "nick", None)
                         joined = None
                     created = u.created_at
-                    activity = "\n".join(activity_repr(i) for i in getattr(u, "activities", ()))
-                    status = None
-                    if getattr(u, "status", None):
-                        streaming = None
-                        for a in getattr(u, "activities", ()):
-                            if isinstance(a, discord.Streaming):
-                                if regexp(r"^https:\/\/\www\.twitch\.tv\/[^\s]+$").search(as_str(getattr(a, "url", None))):
-                                    streaming = True
-                                    break
-                        # Show up to 3 different statuses based on the user's desktop, web and mobile status.
-                        if not is_self:
-                            status_items = ((u.desktop_status, "🖥️"), (u.web_status, "🕸️"), (u.mobile_status, "📱"))
-                        else:
-                            s = bot.statuses[bot.status_iter]
-                            if s == discord.Status.invisible:
-                                status_items = ((discord.Status.idle, "🖥️"), (discord.Status.online, "📱"))
-                            else:
-                                if s == discord.Streaming:
-                                    s = discord.Status.dnd
-                                status_items = ((s, "🖥️"), (discord.Status.dnd, "📱"))
-                        #     status_items = [(bot.statuses[(i + bot.status_iter) % 3], x) for i, x in enumerate(("🖥️", "🕸️", "📱"))]
-                        ordered = sorted(status_items, key=lambda x: status_order.index(x[0]))
-                        for s, i in ordered:
-                            if s == discord.Status.offline:
-                                ls = bot.data.users.get(u.id, {}).get("last_seen", 0)
-                                if utc() - ls < 300 and ls > bot.data.users.get(u.id, {}).get("last_offline", 0):
-                                    s = discord.Status.invisible
-                            icon = status_icon[s]
-                            if not status:
-                                s_ = u.status
-                                if s != s_ and s == discord.Status.offline:
-                                    if streaming:
-                                        status = "Streaming `🟣" + status_icon[s_] + "❓"
-                                    else:
-                                        status = status_text[s_]  + " `" + status_icon[s_] + "❓"
-                                    if s not in (discord.Status.offline, discord.Status.invisible):
-                                        status += icon
-                                else:
-                                    if streaming:
-                                        status = "Streaming `🟣" + icon
-                                    else:
-                                        status = status_text[s] + " `" + icon
-                            if s not in (discord.Status.offline, discord.Status.invisible):
-                                if icon not in status:
-                                    status += icon
-                                status += i
-                        if status:
-                            status += "`"
-                            if len(status) >= 16:
-                                status = status.replace(" ", "\n")
+                    # activity = "\n".join(activity_repr(i) for i in getattr(u, "activities", ()))
+                    # status = None
+                    # if getattr(u, "status", None):
+                    #     streaming = None
+                    #     for a in getattr(u, "activities", ()):
+                    #         if isinstance(a, discord.Streaming):
+                    #             if regexp(r"^https:\/\/\www\.twitch\.tv\/[^\s]+$").search(as_str(getattr(a, "url", None))):
+                    #                 streaming = True
+                    #                 break
+                    #     # Show up to 3 different statuses based on the user's desktop, web and mobile status.
+                    #     if not is_self:
+                    #         status_items = ((u.desktop_status, "🖥️"), (u.web_status, "🕸️"), (u.mobile_status, "📱"))
+                    #     else:
+                    #         s = bot.statuses[bot.status_iter]
+                    #         if s == discord.Status.invisible:
+                    #             status_items = ((discord.Status.idle, "🖥️"), (discord.Status.online, "📱"))
+                    #         else:
+                    #             if s == discord.Streaming:
+                    #                 s = discord.Status.dnd
+                    #             status_items = ((s, "🖥️"), (discord.Status.dnd, "📱"))
+                    #     #     status_items = [(bot.statuses[(i + bot.status_iter) % 3], x) for i, x in enumerate(("🖥️", "🕸️", "📱"))]
+                    #     ordered = sorted(status_items, key=lambda x: status_order.index(x[0]))
+                    #     for s, i in ordered:
+                    #         if s == discord.Status.offline:
+                    #             ls = bot.data.users.get(u.id, {}).get("last_seen", 0)
+                    #             if utc() - ls < 300 and ls > bot.data.users.get(u.id, {}).get("last_offline", 0):
+                    #                 s = discord.Status.invisible
+                    #         icon = status_icon[s]
+                    #         if not status:
+                    #             s_ = u.status
+                    #             if s != s_ and s == discord.Status.offline:
+                    #                 if streaming:
+                    #                     status = "Streaming `🟣" + status_icon[s_] + "❓"
+                    #                 else:
+                    #                     status = status_text[s_]  + " `" + status_icon[s_] + "❓"
+                    #                 if s not in (discord.Status.offline, discord.Status.invisible):
+                    #                     status += icon
+                    #             else:
+                    #                 if streaming:
+                    #                     status = "Streaming `🟣" + icon
+                    #                 else:
+                    #                     status = status_text[s] + " `" + icon
+                    #         if s not in (discord.Status.offline, discord.Status.invisible):
+                    #             if icon not in status:
+                    #                 status += icon
+                    #             status += i
+                    #     if status:
+                    #         status += "`"
+                    #         if len(status) >= 16:
+                    #             status = status.replace(" ", "\n")
                     if member:
                         rolelist = [role_mention(i.id) for i in reversed(getattr(u, "roles", ())) if not i.is_default()]
                         role = ", ".join(rolelist)
@@ -732,8 +732,8 @@ class Info(Command):
                     emb.set_thumbnail(url=url)
                     emb.set_author(name=name, icon_url=url, url=url2)
                     d = user_mention(u.id)
-                    if activity:
-                        d += "\n" + italics(code_md(activity))
+                    # if activity:
+                    #     d += "\n" + italics(code_md(activity))
                     if st:
                         if d[-1] == "*":
                             d += " "
@@ -746,8 +746,8 @@ class Info(Command):
                     emb.add_field(name="Creation time", value=str(created) + "\n" + dyn_time_diff(utc_dt().timestamp(), created.timestamp()) + " ago", inline=1)
                     if joined:
                         emb.add_field(name="Join time", value=str(joined) + "\n" + dyn_time_diff(utc_dt().timestamp(), joined.timestamp()) + " ago", inline=1)
-                    if status:
-                        emb.add_field(name="Status", value=str(status), inline=1)
+                    # if status:
+                    #     emb.add_field(name="Status", value=str(status), inline=1)
                     if zone:
                         emb.add_field(name="Estimated timezone", value=str(zone), inline=1)
                     if seen:

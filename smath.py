@@ -3354,7 +3354,7 @@ class DynamicDT:
         out = (self._dt - other)
         ts = getattr(out, "timestamp", None)
         if ts is None:
-            return out
+            return self.__class__.fromdatetime(out).set_offset(self.offset())
         ts = ts()
         if abs(self.offset()) >= 25600:
             ts = round(ts)

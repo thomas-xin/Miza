@@ -39,7 +39,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         emojis=True,
         webhooks=True,
         voice_states=True,
-        presences=True,
+        # presences=True,
         messages=True,
         reactions=True,
         typing=True,

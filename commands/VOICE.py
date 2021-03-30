@@ -306,7 +306,7 @@ lyric_trans = re.compile(
         "(((official|full|demo|original|extended) *)?"
         "((version|ver.?) *)?"
         "((w\\/)?"
-        "(lyrics?|vocals?|music|ost|instrumental|acoustic|studio|hd|hq) *)?"
+        "(lyrics?|vocals?|music|ost|instrumental|acoustic|studio|hd|hq|english) *)?"
         "((album|video|audio|cover|remix) *)?"
         "(upload|reupload|version|ver.?)?"
         "|(feat|ft)"
