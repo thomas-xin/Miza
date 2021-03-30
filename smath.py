@@ -3278,7 +3278,7 @@ class DynamicDT:
             self._dt = datetime.datetime.fromtimestamp(ots)
             if tzinfo:
                 self._dt = self._dt.replace(tzinfo=tzinfo)
-            self._offset = offs * 400
+            self._offset = round(offs * 400)
             return
         raise TypeError("Unpickling failed:", s)
 
@@ -3291,7 +3291,7 @@ class DynamicDT:
         offs *= 400
         offs -= 2000
         self._dt = datetime.datetime(y, *args[1:], **kwargs)
-        self._offset = offs
+        self.set_offset(offs)
 
     def __getattr__(self, k):
         try:
@@ -3490,7 +3490,8 @@ class DynamicDT:
             ots = round(ots)
             ts = round(ts)
         d = utc_ft(ots)
-        dt = cls(*d.timetuple()[:6], d.microsecond).set_offset(offs * 400, False)
+        dt = cls(*d.timetuple()[:6], d.microsecond)
+        dt._offset += round(offs * 400)
         dt._ts = ts
         return dt
 
@@ -3501,7 +3502,8 @@ class DynamicDT:
             ots = round(ots)
             ts = round(ts)
         d = datetime.datetime.fromtimestamp(ots)
-        dt = cls(*d.timetuple()[:6], d.microsecond).set_offset(offs * 400, False)
+        dt = cls(*d.timetuple()[:6], d.microsecond)
+        dt._offset += round(offs * 400)
         dt._ts = ts
         return dt
 
