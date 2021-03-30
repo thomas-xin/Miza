@@ -1048,6 +1048,17 @@ class Ask(Command):
         await send_with_reply(channel, "h" not in flags and message, escape_roles(f"\xad{q[0].upper() + q[1:]}? {out}".replace("\uf000", "")))
 
 
+class Random(Command):
+    description = "Randomizes a set of arguments."
+    usage = "<string> <string>"
+
+    def __call__(self, bot, user, message, argv, **void):
+        if not argv:
+            raise ArgumentError("Input string is empty.")
+        Argv = argv.split()
+        return random.choice(f"`{Argv}!`")
+
+
 class Topic(Command):
     name = ["Question"]
     description = "Asks a random question."
