@@ -806,7 +806,7 @@ is_channel = lambda channel: issubclass(type(channel), discord.abc.GuildChannel)
 
 
 REPLY_SEM = cdict()
-noreply = discord.AllowedMentions(replied_user=False)
+# noreply = discord.AllowedMentions(replied_user=False)
 
 async def send_with_reply(channel, reference, content="", embed=None, tts=None, file=None, files=None, mention=False):
     bot = BOT[0]
@@ -837,7 +837,7 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
                 else:
                     reference.to_message_reference_dict = lambda message: dict(message_id=message.id)
             fields["reference"] = reference
-            fields["allowed_mentions"] = noreply
+            # fields["allowed_mentions"] = noreply
         if file:
             fields["file"] = file
         if files:

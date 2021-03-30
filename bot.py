@@ -39,16 +39,19 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         emojis=True,
         webhooks=True,
         voice_states=True,
-        # presences=True,
+        presences=False,
         messages=True,
         reactions=True,
         typing=True,
+    )
+    allowed_mentions = discord.AllowedMentions(
+        replied_user=False,
     )
 
     def __init__(self, cache_size=1048576, timeout=24):
         # Initializes client (first in __mro__ of class inheritance)
         self.start_time = utc()
-        super().__init__(max_messages=256, heartbeat_timeout=60, guild_ready_timeout=5, intents=self.intents)
+        super().__init__(max_messages=256, heartbeat_timeout=60, guild_ready_timeout=5, intents=self.intents, allowed_mentions=self.allowed_mentions)
         self.cache_size = cache_size
         # Base cache: contains all other caches
         self.cache = fcdict((c, fdict()) for c in self.caches)
@@ -1342,9 +1345,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 else:
                     ext = None
                 urls = await create_future(as_file, file if getattr(file, "_fp", None) else f, filename=filename, ext=ext, rename=rename)
-                message = await channel.send(msg + ("" if msg.endswith("```") else "\n") + urls[0] + "\n" + urls[1], reference=reference, allowed_mentions=noreply) #, embed=discord.Embed(colour=discord.Colour(1)).set_image(url=urls[-1]))
+                message = await channel.send(msg + ("" if msg.endswith("```") else "\n") + urls[0] + "\n" + urls[1], reference=reference) #, embed=discord.Embed(colour=discord.Colour(1)).set_image(url=urls[-1]))
             else:
-                message = await channel.send(msg, file=file, reference=reference, allowed_mentions=noreply)
+                message = await channel.send(msg, file=file, reference=reference)
                 if filename is not None:
                     create_future_ex(os.remove, filename, priority=True)
         except:
