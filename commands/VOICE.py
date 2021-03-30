@@ -4408,7 +4408,7 @@ class Download(Command):
                                 embed=None,
                             ))
                             create_task(channel.trigger_typing())
-                        reference = (message, "reference", None)
+                        reference = getattr(message, "reference", None)
                         if reference:
                             r_id = getattr(reference, "message_id", None) or getattr(reference, "id", None)
                             reference = bot.cache.messages.get(r_id)
