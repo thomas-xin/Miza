@@ -2695,7 +2695,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                             args = None
                             # Used as a goto lol
                             with suppress(StopIteration):
-                                if hasattr(command, "no_parse"):
+                                if hasattr(command, "no_parse") or "argl" not in command.__call__.__code__.co_varnames:
                                     raise StopIteration
                                 brackets = {"<": ">", "(": ")", "[": "]", "{": "}"}
                                 for x, y in brackets.items():
