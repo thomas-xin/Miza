@@ -1484,9 +1484,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 if emb2.thumbnail:
                     url = await self.data.exec.uproxy(emb2.thumbnail.url)
                     emb.set_thumbnail(url=url)
-                for f in e.fields:
-                    if len(emb.fields) >= 25:
-                        break
+                for f in emb2.fields:
                     if f:
                         emb.add_field(name=f.name, value=f.value, inline=getattr(f, "inline", True))
                 return emb

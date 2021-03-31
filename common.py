@@ -1032,9 +1032,7 @@ def as_embed(message):
                 emb.set_image(url=emb2.image.url)
             if emb2.thumbnail:
                 emb.set_thumbnail(url=emb2.thumbnail.url)
-            for f in e.fields:
-                if len(emb.fields) >= 25:
-                    break
+            for f in emb2.fields:
                 if f:
                     emb.add_field(name=f.name, value=f.value, inline=getattr(f, "inline", True))
             return emb
