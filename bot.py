@@ -1463,9 +1463,53 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         return url
 
     async def as_embed(self, message):
-        emb = discord.Embed(description=message.content).set_author(**get_author(message.author))
+        emb = discord.Embed().set_author(**get_author(message.author))
+        if not message.content:
+            if len(message.attachments) == 1:
+                url = message.attachments[0].url
+                if is_image(url):
+                    url = await self.data.exec.uproxy(url)
+                    emb.url = url
+                    emb.set_image(url=url)
+                    return emb
+            elif not message.attachments and len(message.embeds) == 1:
+                emb2 = message.embeds[0]
+                if emb2.description != EmptyEmbed and emb2.description:
+                    emb.description = emb2.description
+                if emb2.title:
+                    emb.title = emb2.title
+                if emb2.image:
+                    url = await self.data.exec.uproxy(emb2.image.url)
+                    emb.set_image(url=url)
+                if emb2.thumbnail:
+                    url = await self.data.exec.uproxy(emb2.thumbnail.url)
+                    emb.set_thumbnail(url=url)
+                for f in e.fields:
+                    if len(emb.fields) >= 25:
+                        break
+                    if f:
+                        emb.add_field(name=f.name, value=f.value, inline=getattr(f, "inline", True))
+                return emb
+        else:
+            urls = await self.follow_url(message.content)
+            if urls:
+                with tracebacksuppressor:
+                    url = urls[0]
+                    resp = requests.get(url, headers=Request.header(), timeout=8)
+                    headers = fcdict(resp.headers)
+                    if headers.get("Content-Type", "").split("/", 1)[0] == "image":
+                        if headers.get("Content-Length", inf) < 8388608:
+                            url = await self.data.exec.uproxy(url)
+                        else:
+                            url = await self.data.exec.aproxy(url)
+                        emb.url = url
+                        emb.set_image(url=url)
+                        if url != message.content:
+                            emb.description = message.content
+                        return emb
+        emb.description = message.content
         if len(message.embeds) > 1 or message.content:
-            urls = list(itertools.chain(("(" + e.url + ")" for e in message.embeds if e.url), ("[" + best_url(a) + "]" for a in message.attachments)))
+            urls = list(itertools.chain(("(" + e.url + ")" for e in message.embeds[1:] if e.url), ("[" + best_url(a) + "]" for a in message.attachments)))
             items = []
             for i in range((len(urls) + 9) // 10):
                 temp = urls[i * 10:i * 10 + 10]
