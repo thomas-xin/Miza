@@ -2115,7 +2115,7 @@ class AudioDownloader:
             stream = set_dict(data[0], "stream", data[0].url)
             icon = set_dict(data[0], "icon", data[0].url)
             entry.update(data[0])
-        elif not searched and (stream.startswith("ytsearch:") or stream.startswith("https://cf-hls-media.sndcdn.com/") or stream.startswith("https://www.yt-download.org/download/") and int(stream.split("/download/", 1)[1].split("/", 4)[3]) < utc() + 60) or is_youtube_stream(stream) and int(stream.split("expire=", 1)[-1].split("&", 1)[0]) < utc() + 60:
+        elif not searched and (stream.startswith("ytsearch:") or stream.startswith("https://cf-hls-media.sndcdn.com/") or expired(stream)):
             data = self.extract(entry["url"])
             stream = set_dict(data[0], "stream", data[0].url)
             icon = set_dict(data[0], "icon", data[0].url)
@@ -4252,7 +4252,10 @@ class Download(Command):
                             spl.pop(-1)
                         argv = " ".join(spl[:-1])
             if name == "trim" or "t" in flags:
-                argv, start, end = argv.rsplit(None, 2)
+                try:
+                    argv, start, end = argv.rsplit(None, 2)
+                except ValueError:
+                    raise ArgumentError("Please input search term followed by trim start and end.")
                 if start == "-":
                     start = None
                 else:

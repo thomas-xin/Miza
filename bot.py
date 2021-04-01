@@ -2697,12 +2697,16 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                             with suppress(StopIteration):
                                 if hasattr(command, "no_parse") or "argl" not in command.__call__.__code__.co_varnames:
                                     raise StopIteration
+                                spl = command.split(None, 2)
+                                if len(spl) < 3:
+                                    raise StopIteration
+                                i = len(spl[0]) + len(spl[1]) + 2
                                 brackets = {"<": ">", "(": ")", "[": "]", "{": "}"}
                                 for x, y in brackets.items():
                                     if x in argv and y in argv:
                                         xi = argv.index(x)
                                         yi = argv.rindex(y)
-                                        if xi < yi:
+                                        if xi < yi and yi >= i:
                                             checker = argv[xi:yi + 1]
                                             if regexp("<a?:[A-Za-z0-9\\-~_]+:[0-9]+>").search(checker) or regexp("<(?:@[!&]?|#)[0-9]+>").search(checker):
                                                 continue

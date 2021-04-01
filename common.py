@@ -830,7 +830,7 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
             fields["embed"] = embed
         if tts:
             fields["tts"] = tts
-        if not (getattr(reference, "noref", None) or getattr(bot.messages.get(verify_id(reference)), "deleted", None) or getattr(channel, "simulated", None)): 
+        if not (not reference or getattr(reference, "noref", None) or getattr(bot.messages.get(verify_id(reference)), "deleted", None) or getattr(channel, "simulated", None)): 
             if not getattr(reference, "to_message_reference_dict", None):
                 if type(reference) is int:
                     reference = cdict(to_message_reference_dict=eval(f"lambda: dict(message_id={reference})"))
@@ -1373,6 +1373,14 @@ is_giphy_url = lambda url: url and regexp("^https?:\\/\\/giphy.com/gifs/[a-zA-Z0
 is_youtube_url = lambda url: url and regexp("^https?:\\/\\/(?:www\\.)?youtu(?:\\.be|be\\.com)\\/[^\\s<>`|\"']+").findall(url)
 is_youtube_stream = lambda url: url and regexp("^https?:\\/\\/r[0-9]+---.{2}-\\w+-\\w{4,}\\.googlevideo\\.com").findall(url)
 is_deviantart_url = lambda url: url and regexp("^https?:\\/\\/(?:www\\.)?deviantart\\.com\\/[^\\s<>`|\"']+").findall(url)
+
+def expired(stream):
+    if stream.startswith("https://www.yt-download.org/download/"):
+        if int(stream.split("/download/", 1)[1].split("/", 4)[3]) < utc() + 60:
+            return True
+    elif is_youtube_stream(stream):
+        if int(stream.replace("/", "=").split("expire=", 1)[-1].split("=", 1)[0].split("&", 1)[0]) < utc() + 60:
+            return True
 
 def is_discord_message_link(url):
     check = url[:64]

@@ -2103,7 +2103,7 @@ class UpdateMessageLogs(Database):
                 emb = as_embed(message)
                 emb.colour = discord.Colour(0x00FFFF)
                 action = f"**Slash command executed in** {channel_mention(message.channel.id)}:\nhttps://discord.com/channels/{guild.id}/{message.channel.id}/{message.id}\n"
-                emb.description = lim_str(action + emb.description, 2048)
+                emb.description = lim_str(action + (emb.description or ""), 2048)
                 emb.timestamp = message.created_at
                 self.bot.send_embeds(channel, emb)
 
@@ -2192,7 +2192,7 @@ class UpdateMessageLogs(Database):
             emb = as_embed(message)
             emb.colour = discord.Colour(0xFF0000)
             action = f"{init} **deleted message from** {channel_mention(message.channel.id)}:\nhttps://discord.com/channels/{guild.id}/{message.channel.id}/{message.id}\n"
-            emb.description = lim_str(action + emb.description, 2048)
+            emb.description = lim_str(action + (emb.description or ""), 2048)
             emb.timestamp = message.created_at
             self.bot.send_embeds(channel, emb)
 
