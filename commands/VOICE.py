@@ -844,7 +844,7 @@ class AudioQueue(alist):
                 e = cdict(p)
                 e.u_id = self.bot.id
                 e.skips = ()
-                e.stream = ytdl.get_stream(e)
+                ytdl.get_stream(e)
                 q.appendleft(e)
         elif self.auds.source:
             self.announce_play(self[0])

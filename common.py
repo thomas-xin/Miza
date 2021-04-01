@@ -1377,6 +1377,8 @@ is_youtube_stream = lambda url: url and regexp("^https?:\\/\\/r[0-9]+---.{2}-\\w
 is_deviantart_url = lambda url: url and regexp("^https?:\\/\\/(?:www\\.)?deviantart\\.com\\/[^\\s<>`|\"']+").findall(url)
 
 def expired(stream):
+    if is_youtube_url(stream):
+        return True
     if stream.startswith("https://www.yt-download.org/download/"):
         if int(stream.split("/download/", 1)[1].split("/", 4)[3]) < utc() + 60:
             return True
