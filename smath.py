@@ -1117,23 +1117,24 @@ custom list-like data structure that incorporates the functionality of numpy arr
 
     # Removes all duplicate values from the list.
     @blocking
-    def removedups(self, sorted=True):
-        if sorted:
-            try:
-                temp = np.unique(self.view)
-            except:
-                temp = sorted(set(self.view))
-        elif sorted is None:
-            temp = tuple(set(self.view))
-        else:
-            temp = {}
-            for x in self.view:
-                if x not in temp:
-                    temp[x] = None
-            temp = tuple(temp.keys())
-        self.size = len(temp)
-        self.offs = (len(self.data) - self.size) // 3
-        self.view[:] = temp
+    def removedups(self, sort=True):
+        if self.data is not None:
+            if sort:
+                try:
+                    temp = np.unique(self.view)
+                except:
+                    temp = sort(set(self.view))
+            elif sort is None:
+                temp = tuple(set(self.view))
+            else:
+                temp = {}
+                for x in self.view:
+                    if x not in temp:
+                        temp[x] = None
+                temp = tuple(temp.keys())
+            self.size = len(temp)
+            self.offs = (len(self.data) - self.size) // 3
+            self.view[:] = temp
         return self
 
     uniq = unique = removedups
@@ -1714,8 +1715,8 @@ class mdict(cdict):
         try:
             values = super().__getitem__(k)
         except KeyError:
-            return super().__setitem__(k, alist(v).uniq(sorted=False))
-        return values.extend(v).uniq(sorted=False)
+            return super().__setitem__(k, alist(v).uniq(sort=False))
+        return values.extend(v).uniq(sort=False)
 
     def append(self, k, v):
         values = set_dict(super(), k, alist())

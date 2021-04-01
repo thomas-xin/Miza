@@ -882,7 +882,7 @@ class UpdateImagePools(Database):
                     print_exc()
             self.finished.add(key)
             self.update("finished")
-            data.uniq(sorted=None)
+            data.uniq(sort=None)
 
     async def proc(self, key, func, args=()):
         async with self.sem:

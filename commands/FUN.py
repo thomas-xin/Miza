@@ -1883,20 +1883,20 @@ class Giphy(ImagePool, Command):
     threshold = 4
     sem = Semaphore(5, 256, rate_limit=1)
 
-    def img(self, tag=None):
+    def img(self, tag=None, search_tag=None):
         file = f"giphy~{tag}"
 
-        async def fetch(tag):
-            resp = await Request(f"https://api.giphy.com/v1/gifs/search?offset=0&type=gifs&sort=&explore=true&api_key={giphy_key}&q={tag}", aio=True, json=True)
+        async def fetch(tag, search_tag):
+            resp = await Request(f"https://api.giphy.com/v1/gifs/search?offset=0&type=gifs&sort=&explore=true&api_key={giphy_key}&q={search_tag}", aio=True, json=True)
             images = {entry["images"]["source"]["url"].split("?", 1)[0] for entry in resp["data"]}
             return images
 
-        async def fetchall(tag):
+        async def fetchall(tag, search_tag):
             await asyncio.sleep(1)
             images = set()
             for i in range(1, 100):
                 async with self.sem:
-                    resp = await Request(f"https://api.giphy.com/v1/gifs/search?offset={i * 25}&type=gifs&sort=&explore=true&api_key={giphy_key}&q={tag}", aio=True, json=True)
+                    resp = await Request(f"https://api.giphy.com/v1/gifs/search?offset={i * 25}&type=gifs&sort=&explore=true&api_key={giphy_key}&q={search_tag}", aio=True, json=True)
                 data = resp["data"]
                 if not data:
                     break
@@ -1913,14 +1913,16 @@ class Giphy(ImagePool, Command):
             return images
 
         if file not in self.bot.data.imagepools.finished:
-            create_task(fetchall(tag))
-        return self.bot.data.imagepools.get(file, fetch, self.threshold, args=(tag,))
+            create_task(fetchall(tag, search_tag))
+        return self.bot.data.imagepools.get(file, fetch, self.threshold, args=(tag, search_tag))
     
     async def __call__(self, bot, channel, flags, args, **void):
         if not args:
             raise ArgumentError("Input string is empty.")
-        tag = "%20".join(sorted("".join(c for c in w.casefold() if c.isalnum()) for w in args))
-        url = await self.img(tag)
+        args2 = ["".join(c for c in full_prune(w) if c.isalnum()) for w in args]
+        tag = "%20".join(sorted(args2))
+        search_tag = "%20".join(args2)
+        url = await self.img(tag, search_tag)
         if "v" in flags:
             return escape_roles(url)
         self.bot.send_as_embeds(channel, image=url)
