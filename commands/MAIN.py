@@ -1008,13 +1008,14 @@ class Reminder(Command):
     def __load__(self):
         self.timefind = re.compile("(?:(?:(?:[0-9]+:)+[0-9.]+\\s*(?:am|pm)?|" + self.bot.num_words + "|[\\s\-+*\\/^%.,0-9]+\\s*(?:am|pm|s|m|h|d|w|y|century|centuries|millenium|millenia|(?:second|sec|minute|min|hour|hr|day|week|wk|month|mo|year|yr|decade|galactic[\\s\\-_]year)s?))\\s*)+$", re.I)
 
-    async def __call__(self, name, message, flags, bot, user, guild, perm, **void):
+    async def __call__(self, name, message, flags, bot, user, guild, perm, argv, **void):
         msg = message.content
         try:
             msg = msg[msg.casefold().index(name) + len(name):]
         except ValueError:
             print_exc(msg)
             msg = msg.casefold().split(None, 1)[-1]
+        orig = argv
         argv = msg.strip()
         args = argv.split()
         if "announce" in name:
@@ -1028,10 +1029,10 @@ class Reminder(Command):
         if "d" in flags:
             if not len(rems):
                 return ini_md(f"No {word} currently set for {sqr_md(sendable)}.")
-            if not argv:
+            if not orig:
                 i = 0
             else:
-                i = await bot.eval_math(argv)
+                i = await bot.eval_math(orig)
             i %= len(rems)
             x = rems.pop(i)
             if i == 0:

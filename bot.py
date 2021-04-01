@@ -2699,10 +2699,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                             with suppress(StopIteration):
                                 if not command or hasattr(command, "no_parse") or "argl" not in command.__call__.__code__.co_varnames:
                                     raise StopIteration
-                                try:
-                                    spl = command.split(None, 2)
-                                except (AttributeError, TypeError, ValueError):
-                                    raise StopIteration
+                                spl = argv.split(None, 2)
                                 if len(spl) < 3:
                                     raise StopIteration
                                 i = len(spl[0]) + len(spl[1]) + 2
@@ -2742,9 +2739,11 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                                     if "a" in command.flags and "e" in command.flags and "d" in command.flags:
                                         if args[0].lower() in ("add", "enable", "set", "create", "append"):
                                             args.pop(0)
+                                            argv = argv.split(None, 1)[-1]
                                             inc_dict(flags, a=1)
-                                        elif args[0].lower() in ("rem", "disable", "remove", "unset", "delete"):
+                                        elif args[0].lower() in ("rem", "clear", "disable", "remove", "unset", "delete"):
                                             args.pop(0)
+                                            argv = argv.split(None, 1)[-1]
                                             inc_dict(flags, d=1)
                         # Assign "guild" as an object that mimics the discord.py guild if there is none
                         if guild is None:
