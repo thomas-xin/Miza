@@ -1478,6 +1478,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     emb.description = emb2.description
                 if emb2.title:
                     emb.title = emb2.title
+                if emb2.url:
+                    emb.url = emb2.url
                 if emb2.image:
                     url = await self.data.exec.uproxy(emb2.image.url)
                     emb.set_image(url=url)

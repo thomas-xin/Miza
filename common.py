@@ -1028,6 +1028,8 @@ def as_embed(message):
                 emb.description = emb2.description
             if emb2.title:
                 emb.title = emb2.title
+            if emb2.url:
+                emb.url = emb2.url
             if emb2.image:
                 emb.set_image(url=emb2.image.url)
             if emb2.thumbnail:
