@@ -26,4 +26,4 @@ pytz>=2020.5
 requests>=2.25.1
 rule34>=1.7.4
 sympy>=1.7.1
-youtube-dlc>=2020.11.11.post3
+youtube-dl>=2021.4.1

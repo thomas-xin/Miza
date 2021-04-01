@@ -6,7 +6,7 @@ modlist = """
 numpy>=1.20.1
 psutil>=5.8.0
 pygame>=2.0.1
-youtube-dlc>=2020.11.11.post3
+youtube-dl>=2021.4.1
 requests>=2.25.1
 """.split("\n")
 

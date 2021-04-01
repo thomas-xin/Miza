@@ -8,8 +8,8 @@ except ModuleNotFoundError:
 
 print = PRINT
 
-import youtube_dlc
-youtube_dl = youtube_dlc
+import youtube_dl
+# youtube_dl = youtube_dlc
 
 getattr(youtube_dl, "__builtins__", {})["print"] = print
 

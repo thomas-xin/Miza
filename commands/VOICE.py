@@ -8,9 +8,9 @@ except ModuleNotFoundError:
 
 print = PRINT
 
-import youtube_dlc
+import youtube_dl
 from bs4 import BeautifulSoup
-youtube_dl = youtube_dlc
+# youtube_dl = youtube_dlc
 
 # Audio sample rate for both converting and playing
 SAMPLE_RATE = 48000

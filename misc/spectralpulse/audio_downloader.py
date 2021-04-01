@@ -1,10 +1,10 @@
 # This file mostly contains code copied from the Miza discord bot's voice command category
 
-import youtube_dlc, contextlib, requests, math, time, numpy, base64, hashlib, re, collections, psutil, subprocess, urllib.parse, concurrent.futures
+import youtube_dl, contextlib, requests, math, time, numpy, base64, hashlib, re, collections, psutil, subprocess, urllib.parse, concurrent.futures
 from math import *
 
 np = numpy
-youtube_dl = youtube_dlc
+# youtube_dl = youtube_dlc
 suppress = contextlib.suppress
 url_parse = urllib.parse.quote_plus
 deque = collections.deque
