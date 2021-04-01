@@ -2697,9 +2697,12 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                             args = None
                             # Used as a goto lol
                             with suppress(StopIteration):
-                                if hasattr(command, "no_parse") or "argl" not in command.__call__.__code__.co_varnames:
+                                if not command or hasattr(command, "no_parse") or "argl" not in command.__call__.__code__.co_varnames:
                                     raise StopIteration
-                                spl = command.split(None, 2)
+                                try:
+                                    spl = command.split(None, 2)
+                                except (AttributeError, TypeError, ValueError):
+                                    raise StopIteration
                                 if len(spl) < 3:
                                     raise StopIteration
                                 i = len(spl[0]) + len(spl[1]) + 2
