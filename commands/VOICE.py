@@ -1206,6 +1206,7 @@ class AudioDownloader:
         print("Initializing audio downloader keys...")
         fut = create_future_ex(self.update_dl)
         self.setup_pages()
+        self.set_cookie()
         return fut.result()
 
     # Fetches youtube playlist page codes, split into pages of 50 items
@@ -1215,6 +1216,15 @@ class AudioDownloader:
         page10 = s.splitlines()
         self.yt_pages = {i * 10: page10[i] for i in range(len(page10))}
         # self.yt_pages = [page10[i] for i in range(0, len(page10), 5)]
+    
+    def set_cookie(self):
+        self.youtube_header = {}
+        resp = requests.get("https://www.youtube.com").text
+        if "<title>Before you continue to YouTube</title>" in resp:
+            resp = resp.split('<input type="hidden" name="v" value="', 1)[-1]
+            resp = resp[:resp.index('">')]
+            self.youtube_header = dict(cookie=f"CONSENT=YES+{resp};")
+            self.youtube_x += 1
 
     # Initializes youtube_dl object as well as spotify tokens, every 720 seconds.
     def update_dl(self):
@@ -1470,7 +1480,7 @@ class AudioDownloader:
     def get_youtube_playlist(self, p_id):
         out = deque()
         self.youtube_x += 1
-        resp = Request(f"https://www.youtube.com/playlist?list={p_id}")
+        resp = Request(f"https://www.youtube.com/playlist?list={p_id}", headers=self.youtube_header)
         try:
             search = b'window["ytInitialData"] = '
             try:
@@ -1953,7 +1963,7 @@ class AudioDownloader:
         if utc() > self.failed_yt:
             url = f"https://www.youtube.com/results?search_query={verify_url(query)}"
             self.youtube_x += 1
-            resp = Request(url, timeout=12)
+            resp = Request(url, headers=self.youtube_header, timeout=12)
             result = None
             with suppress(ValueError):
                 s = resp[resp.index(b"// scraper_data_begin") + 21:resp.rindex(b"// scraper_data_end")]
