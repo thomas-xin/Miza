@@ -2164,6 +2164,7 @@ class AudioDownloader:
             else:
                 live = not entry.get("duration") or entry["duration"] > 960
             seekable = not entry.get("duration") or entry["duration"] < inf
+            cf = isnan(entry.get("duration") or nan) or not (stream.startswith("https://cf-hls-media.sndcdn.com/") or is_youtube_stream(stream))
             try:
                 f.load(stream, check_fmt=isnan(entry.get("duration") or nan), webpage_url=entry["url"], live=live, seekable=seekable, duration=entry.get("duration"))
             except:
