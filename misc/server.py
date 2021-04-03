@@ -799,7 +799,7 @@ def command(content=""):
         j = flask.request.get_json(force=True)
         if t in RESPONSES:
             RESPONSES[t].set_result((j, after))
-            send(j)
+            # send(j)
             return b"\xf0\x9f\x92\x9c"
     try:
         content = flask.request.args["input"]

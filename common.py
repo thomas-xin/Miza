@@ -394,9 +394,14 @@ def bytes2zip(data):
 def eval_json(s):
     if type(s) is memoryview:
         s = bytes(s)
-    with suppress(json.JSONDecodeError):
+    try:
         return json.loads(s)
-    return safe_eval(s)
+    except:
+        try:
+            return safe_eval(s)
+        except:
+            pass
+        raise
 
 def select_and_loads(s, mode="safe", size=None):
     if not s:
