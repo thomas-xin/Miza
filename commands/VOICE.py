@@ -2053,6 +2053,8 @@ class AudioDownloader:
             try:
                 obj = cdict(t=utc())
                 obj.data = output = self.extract(item, force, mode=mode, count=count)
+                if obj.data:
+                    self.searched[item] = obj
                 self.searched[item] = obj
                 return output
             except Exception as ex:
