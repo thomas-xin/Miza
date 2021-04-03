@@ -365,7 +365,7 @@ class AudioFile:
         if webpage_url is not None:
             self.webpage_url = webpage_url
         self.loading = True
-        ffmpeg = "misc/ffmpeg-c/ffmpeg.exe" if check_fmt and not is_youtube_stream(stream) else "ffmpeg"
+        ffmpeg = "misc/ffmpeg-c/ffmpeg.exe" if check_fmt and is_url(stream) else "ffmpeg"
         fmt = cdc = self.file.rsplit(".", 1)[-1]
         if fmt == "ogg":
             cdc = "vorbis"
