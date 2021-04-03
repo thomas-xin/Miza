@@ -71,15 +71,23 @@ prev_date = utc_dt().date()
 zfailed = set()
 
 @app.route("/preview/<path>", methods=["GET"])
+@app.route("/p/<path>", methods=["GET"])
 @app.route("/view/<path>", methods=["GET"])
+@app.route("/v/<path>", methods=["GET"])
 @app.route("/file/<path>", methods=["GET"])
 @app.route("/files/<path>", methods=["GET"])
+@app.route("/f/<path>", methods=["GET"])
 @app.route("/download/<path>", methods=["GET"])
+@app.route("/d/<path>", methods=["GET"])
 @app.route("/preview/<path>/<path:filename>", methods=["GET"])
+@app.route("/p/<path>/<path:filename>", methods=["GET"])
 @app.route("/view/<path>/<path:filename>", methods=["GET"])
+@app.route("/v/<path>/<path:filename>", methods=["GET"])
 @app.route("/file/<path>/<path:filename>", methods=["GET"])
 @app.route("/files/<path>/<path:filename>", methods=["GET"])
+@app.route("/f/<path>/<path:filename>", methods=["GET"])
 @app.route("/download/<path>/<path:filename>", methods=["GET"])
+@app.route("/d/<path>/<path:filename>", methods=["GET"])
 def get_file(path, filename=None):
     if path in ("hacks", "mods", "files", "download", "static"):
         send(flask.request.remote_addr + " was rickrolled 🙃")
@@ -97,7 +105,7 @@ def get_file(path, filename=None):
     p = find_file(path, ind=ind)
     endpoint = flask.request.path[1:].split("/", 1)[0]
     down = flask.request.args.get("download", "false")
-    download = down and down[0] not in "0fFnN" or endpoint == "download"
+    download = down and down[0] not in "0fFnN" or endpoint.startswith("d")
     if download:
         mime = MIMES.get(p.rsplit("/", 1)[-1].rsplit(".", 1)[-1])
     else:
@@ -363,9 +371,9 @@ def waifu2x():
 
 @app.route("/ytdl", methods=["GET"])
 def ytdl():
-    d = flask.request.args.get("d")
-    v = d or flask.request.args.get("v")
-    q = d or v or flask.request.args.get("q")
+    d = flask.request.args.get("d") or flask.request.args.get("download")
+    v = d or flask.request.args.get("v") or flask.request.args.get("view")
+    q = d or v or flask.request.args.get("q") or flask.request.args.get("query")
     if not q:
         raise EOFError
     t = ts_us()

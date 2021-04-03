@@ -1895,7 +1895,9 @@ class open2(io.IOBase):
             return object.__getattribute__(self, "filename")
         if self.fp is None:
             self.fp = open(self.fn, self.mode)
-        return getattr(self.fp, k.lstrip("_"))
+        if k[0] == "_" and (len(k) < 2 or k[1] != "_"):
+            k = k[1:]
+        return getattr(self.fp, k)
 
     def clear(self):
         with suppress():
@@ -1966,7 +1968,9 @@ class DownloadingFile(io.IOBase):
             return object.__getattribute__(self, "filename")
         if self.fp is None:
             self.fp = open(self.fn, self.mode)
-        return getattr(self.fp, k.lstrip("_"))
+        if k[0] == "_" and (len(k) < 2 or k[1] != "_"):
+            k = k[1:]
+        return getattr(self.fp, k)
 
     def seek(self, pos):
         while os.path.getsize(fn) < pos:

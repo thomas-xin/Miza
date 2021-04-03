@@ -4401,10 +4401,7 @@ class Download(Command):
                         url = data[num]
                         # Perform all these tasks asynchronously to save time
                         with discord.context_managers.Typing(channel):
-                            create_task(message.edit(
-                                content=ini_md(f"Downloading and converting {sqr_md(ensure_url(url))}..."),
-                                embed=None,
-                            ))
+                            fmt = spl[2]
                             try:
                                 if int(spl[3]):
                                     auds = bot.data.audio.players[guild.id]
@@ -4421,10 +4418,20 @@ class Download(Command):
                             start = end = None
                             if len(spl) >= 6:
                                 start, end = spl[4:6]
+                            if tuple(map(str, (start, end))) == ("None", "None") and not silenceremove and not auds and fmt in ("mp3", "opus", "ogg", "wav"):
+                                content = bot.webserver + "/ytdl?view=" + url + "&fmt=" + fmt + "\n" + bot.webserver + "/ytdl?download=" + url + "&fmt=" + fmt
+                                return create_task(message.edit(
+                                    content=content,
+                                    embed=None,
+                                ))
+                            create_task(message.edit(
+                                content=ini_md(f"Downloading and converting {sqr_md(ensure_url(url))}..."),
+                                embed=None,
+                            ))
                             f, out = await create_future(
                                 ytdl.download_file,
                                 url,
-                                fmt=spl[2],
+                                fmt=fmt,
                                 start=start,
                                 end=end,
                                 auds=auds,
