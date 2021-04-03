@@ -271,7 +271,7 @@ async def auto_join(guild, channel, user, bot, preparing=False, vc=None):
 
 
 # Helper function to save all items in a queue
-copy_entry = lambda item: {"name": item.name, "url": item.url, "duration": item.duration}
+copy_entry = lambda item: {"name": item.name, "url": item.url, "duration": item.get("duration")}
 
 
 async def disconnect_members(bot, guild, members, channel=None):

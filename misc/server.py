@@ -426,7 +426,7 @@ def ytdl():
         return resp
     else:
         RESPONSES[t] = fut = concurrent.futures.Future()
-        send(f"!{t}\x7fVOICE.ytdl.search({repr(q)})", escape=False)
+        send(f"!{t}\x7f[VOICE.copy_entry(e) for e in VOICE.ytdl.search({repr(q)})]", escape=False)
         j, after = fut.result()
         RESPONSES.pop(t, None)
         res = j["result"]
