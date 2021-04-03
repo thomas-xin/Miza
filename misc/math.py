@@ -170,6 +170,20 @@ class Random(sympy.Basic):
     __str__ = __repr__
 
 
+# def lshift(a, b):
+# 	if hasattr(a, "p") and getattr(a, "q", 1) == 1 and hasattr(b, "p") and getattr(b, "q", 1) == 1:
+# 		return sympy.Integer(a.p << b.p)
+# 	return a * 2 ** b
+
+# def rshift(a, b):
+# 	if hasattr(a, "p") and getattr(a, "q", 1) == 1 and hasattr(b, "p") and getattr(b, "q", 1) == 1:
+# 		return sympy.Integer(a.p >> b.p)
+# 	return a // 2 ** b
+
+# sympy.Integer.__lshift__ = lambda self, other: lshift(self, other)
+# sympy.Integer.__rshift__ = lambda self, other: rshift(self, other)
+
+
 # Sympy plotting functions
 def plotArgs(args):
     if not args:
@@ -456,6 +470,8 @@ translators = {
 }
 
 replacers = {
+    "<<": "*2**",
+    ">>": "//2**",
     "INF": "oo",
     "NAN": "nan",
     "NaN": "nan",
