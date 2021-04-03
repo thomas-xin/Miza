@@ -371,6 +371,8 @@ class AudioFile:
             cdc = "vorbis"
         elif fmt == "wav":
             cdc = "pcm_s16le"
+        elif fmt == "opus":
+            cdc = "libopus"
         # Collects data from source, converts to 48khz 192kbps opus format, outputting to target file
         cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-hwaccel", "auto", "-fflags", "+discardcorrupt+fastseek+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", fmt, "-c:a", cdc, "-ar", str(SAMPLE_RATE), "-ac", "2", "-b:a", "196608", "cache/" + self.file]
         if "https://cf-hls-media.sndcdn.com/" not in stream:
