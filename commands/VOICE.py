@@ -4419,7 +4419,9 @@ class Download(Command):
                             if len(spl) >= 6:
                                 start, end = spl[4:6]
                             if tuple(map(str, (start, end))) == ("None", "None") and not silenceremove and not auds and fmt in ("mp3", "opus", "ogg", "wav"):
-                                content = bot.webserver + "/ytdl?view=" + url + "&fmt=" + fmt + "\n" + bot.webserver + "/ytdl?download=" + url + "&fmt=" + fmt
+                                content = bot.webserver + "/ytdl?fmt=" + fmt + "&view=" + url + "\n" + bot.webserver + "/ytdl?fmt=" + fmt + "&download=" + url
+                                if message.guild and message.guild.get_member(bot.client.user.id).permissions_in(message.channel).manage_messages:
+                                    create_task(message.clear_reactions())
                                 return create_task(message.edit(
                                     content=content,
                                     embed=None,
