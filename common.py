@@ -1895,7 +1895,7 @@ class open2(io.IOBase):
             return object.__getattribute__(self, "filename")
         if self.fp is None:
             self.fp = open(self.fn, self.mode)
-        return getattr(self.fp, k)
+        return getattr(self.fp, k.lstrip("_"))
 
     def clear(self):
         with suppress():
@@ -1943,6 +1943,58 @@ class CompatFile(discord.File):
         self.fp.close = self._closer
         if self._owner:
             self._closer()
+
+class DownloadingFile(io.IOBase):
+
+    __slots__ = ("fp", "fn", "mode", "filename", "af")
+
+    def __init__(self, fn, af, mode="rb", filename=None):
+        self.fp = None
+        self.fn = fn
+        self.mode = mode
+        self.filename = filename or getattr(fn, "name", None) or fn
+        self.af = af
+        while not os.path.exists(fn):
+            if af():
+                raise FileNotFoundError
+            time.sleep(0.1)
+
+    def __getattribute__(self, k):
+        if k in object.__getattribute__(self, "__slots__") or k in ("seek", "read", "clear"):
+            return object.__getattribute__(self, k)
+        if k == "name":
+            return object.__getattribute__(self, "filename")
+        if self.fp is None:
+            self.fp = open(self.fn, self.mode)
+        return getattr(self.fp, k.lstrip("_"))
+
+    def seek(self, pos):
+        while os.path.getsize(fn) < pos:
+            if self.af():
+                break
+            time.sleep(0.1)
+        self._seek(pos)
+
+    def read(self, size):
+        b = self._read(size)
+        s = len(b)
+        if s < size:
+            i = io.BytesIO(b)
+            while s < size:
+                if self.af():
+                    break
+                time.sleep(2 / 3)
+                b = self._read(size - s)
+                s += len(b)
+                i.write(b)
+            i.seek(0)
+            b = i.read()
+        return b
+
+    def clear(self):
+        with suppress():
+            self.fp.close()
+        self.fp = None
 
 
 class seq(io.IOBase, collections.abc.MutableSequence, contextlib.AbstractContextManager):

@@ -1540,7 +1540,7 @@ class AudioDownloader:
         return out
 
     def ydl_errors(self, s):
-        return not ("this video contains content from" in s or "this video has been removed" in s) # "video unavailable" in s or "this video is not available" in s or 
+        return "this video has been removed" not in s and "private vide" not in s
 
     # Repeatedly makes calls to youtube-dl until there is no more data to be collected.
     def extract_true(self, url):
@@ -2074,7 +2074,10 @@ class AudioDownloader:
         icon = entry.get("icon", None)
         # Use SHA-256 hash of URL to avoid filename conflicts
         h = shash(entry["url"])
-        fn = "~" + h + ".opus"
+        if type(download) is str:
+            fn = "~" + h + download
+        else:
+            fn = "~" + h + ".opus"
         # Use cached file if one already exists
         if self.cache.get(fn) or not download:
             if video:
@@ -2156,7 +2159,10 @@ class AudioDownloader:
             if not download:
                 return entry
             self.cache[fn] = f = AudioFileLink(fn)
-            live = not entry.get("duration") or entry["duration"] > 960
+            if type(download) is str:
+                live = False
+            else:
+                live = not entry.get("duration") or entry["duration"] > 960
             seekable = not entry.get("duration") or entry["duration"] < inf
             try:
                 f.load(stream, check_fmt=isnan(entry.get("duration") or nan), webpage_url=entry["url"], live=live, seekable=seekable, duration=entry.get("duration"))
@@ -4260,7 +4266,7 @@ class Download(Command):
                     spl = argv.split(" ")
                 if len(spl) >= 1:
                     fmt = spl[-1].lstrip(".")
-                    if fmt.casefold() not in ("mp3", "ogg", "opus", "m4a", "flac", "wav", "wma", "mp2", "vox", "adpcm", "pcm", "8bit", "mid", "midi", "webm", "mp4", "avi", "mov", "m4v", "mkv", "f4v", "flv", "wmv", "gif"):
+                    if fmt.casefold() not in ("mp3", "ogg", "opus", "m4a", "flac", "wav", "wma", "mp2", "weba", "vox", "adpcm", "pcm", "8bit", "mid", "midi", "webm", "mp4", "avi", "mov", "m4v", "mkv", "f4v", "flv", "wmv", "gif"):
                         fmt = default_fmt
                     else:
                         if spl[-2] in ("as", "to"):

@@ -361,6 +361,72 @@ def waifu2x():
     return resp
 
 
+@app.route("/ytdl", methods=["GET"])
+def ytdl():
+    d = flask.request.args.get("d")
+    v = d or flask.request.args.get("v")
+    q = d or v or flask.request.args.get("q")
+    if not q:
+        raise EOFError
+    t = ts_us()
+    while t in RESPONSES:
+        t += 1
+    if v:
+        fmt = flask.request.args.get("fmt")
+        if not fmt:
+            fmt = "opus" if d else "mp3"
+        if fmt not in ("mp3", "opus", "ogg", "wav"):
+            return flask.redirect("https://http.cat/415")
+        fmt = "." + fmt
+        RESPONSES[t] = fut = concurrent.futures.Future()
+        send(f"!{t}\x7fbot.audio.returns[{t}]=VOICE.ytdl.search({repr(q)})[0]", escape=False)
+        fut.result()
+        RESPONSES[t] = fut = concurrent.futures.Future()
+        send(f"!{t}\x7fVOICE.ytdl.get_stream(bot.audio.returns[{t}],force=True,download=False)", escape=False)
+        fut.result()
+        RESPONSES[t] = fut = concurrent.futures.Future()
+        send(f"!{t}\x7f(bot.audio.returns[{t}].get('name'),bot.audio.returns[{t}].get('url'))", escape=False)
+        j, after = fut.result()
+        name, url = j["result"]
+        if not name or not url:
+            raise FileNotFoundError
+        h = shash(url)
+        fn = "~" + h + fmt
+        RESPONSES[t] = fut = concurrent.futures.Future()
+        send(f"!{t}\x7fbot.audio.returns[{t}]=VOICE.ytdl.get_stream(bot.audio.returns[{t}],download={repr(fmt)})", escape=False)
+        fut.result()
+        RESPONSES.pop(t, None)
+
+        def af():
+            RESPONSES[t] = fut = concurrent.futures.Future()
+            try:
+                send(f"!{t}\x7fbool(bot.audio.returns[{t}].loaded)", escape=False)
+                j, after = fut.result()
+                RESPONSES.pop(t, None)
+            except:
+                print_exc()
+                RESPONSES.pop(t, None)
+                return True
+            return j["result"] is not False
+
+        f = DownloadingFile("cache/" + fn, af=af)
+        resp = flask.send_file(f, as_attachment=d, attachment_filename=name + fmt, mimetype=f"audio/{fmt[1:]}", conditional=True)
+        resp.headers.update(CHEADERS)
+        resp.headers["Transfer-Encoding"] = "Chunked"
+        if d and af():
+            resp.status_code = 202
+        return resp
+    else:
+        RESPONSES[t] = fut = concurrent.futures.Future()
+        send(f"!{t}\x7fVOICE.ytdl.search({repr(q)})", escape=False)
+        j, after = fut.result()
+        RESPONSES.pop(t, None)
+        res = j["result"]
+    resp = flask.Response(json.dumps(res), mimetype="application/json")
+    resp.headers.update(CHEADERS)
+    return resp
+
+
 @app.route("/", methods=["GET", "POST"])
 def home():
     data, mime = fetch_static("index.html")
@@ -874,6 +940,11 @@ def custom_header(response):
 
 def ensure_parent(proc, parent):
     while True:
+        while len(RESPONSES) > 65536:
+            try:
+                RESPONSES.pop(next(iter(RESPONSES)))
+            except:
+                pass
         if not parent.is_running():
             psutil.Process().kill()
         # t = ts_us()

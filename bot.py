@@ -2937,6 +2937,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     glob["_"] = _
             if code is not None:
                 output = await create_future(eval, code, glob, priority=True)
+            if type(output) in (deque, alist):
+                output = list(output)
             if output is not None:
                 glob["_"] = output
             try:
