@@ -1540,7 +1540,7 @@ class AudioDownloader:
         return out
 
     def ydl_errors(self, s):
-        return "this video has been removed" not in s and "private vide" not in s
+        return "this video has been removed" not in s and "private video" not in s and "has been terminated" not in s
 
     # Repeatedly makes calls to youtube-dl until there is no more data to be collected.
     def extract_true(self, url):
