@@ -942,7 +942,7 @@ class UpdateDeviantArt(Database):
         self.time = inf
         conts = {i: a[i]["user"] for a in tuple(self.data.values()) for i in a}
         total = {}
-        base = "https://www.deviantart.com/_napi/da-user-profile/api/gallery/contents?limit=24&username="
+        base = "https://www.deviantart.com/_napi/da-user-profile/api/gallery/contents?username="
         attempts, successes = 0, 0
         for content, user in conts.items():
             with tracebacksuppressor:
