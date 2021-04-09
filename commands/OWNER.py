@@ -638,6 +638,8 @@ class UpdateColours(Database):
     limit = 65536
 
     async def get(self, url, threshold=True):
+        if not url:
+            return 0
         if is_discord_url(url) and "avatars" in url[:48]:
             key = url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
         else:
