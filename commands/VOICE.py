@@ -78,7 +78,7 @@ def _get_duration(filename, _timeout=12):
     except (IndexError, ValueError, TypeError):
         dur = None
     bps = None
-    if len(resp) > 1:
+    if resp and len(resp) > 1:
         with suppress(ValueError):
             bps = float(resp[1])
     return dur, bps
