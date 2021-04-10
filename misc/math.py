@@ -317,6 +317,11 @@ def factorize(*args, **kwargs):
         output.extend([k] * temp[k])
     return output
 
+def sort(*args):
+    if len(args) != 1:
+        return sorted(args)
+    return sorted(args[0])
+
 def rounder(x):
     try:
         if type(x) is int or x == int(x):
@@ -376,6 +381,8 @@ _globals.update({
     "ceil": sympy.ceiling,
     "min": sympy.Min,
     "max": sympy.Max,
+    "sort": sort,
+    "sorted": sort,
     "fac": fac,
     "ncr": ncr,
     "nCr": ncr,

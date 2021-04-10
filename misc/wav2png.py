@@ -80,7 +80,7 @@ while True:
     amp = amplitude
     amp2 = np.log2(amp / 255)
     np.multiply(amp2, 1 / rat, out=amp2)
-    np.clip(amp2, 0, None, out=amp2)
+    np.clip(amp2, 0, 254, out=amp2)
     amp2 = np.ceil(amp2, out=amp2).astype(np.uint8)
     np.divide(amp, 1.03125 ** amp2, out=amp)
     np.clip(amp, None, 255, out=amp)
