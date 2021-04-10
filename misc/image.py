@@ -4,6 +4,7 @@ import os, sys, io, time, concurrent.futures, subprocess, psutil, collections, t
 import numpy as np
 import PIL
 from PIL import Image, ImageCms, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhance, ImageMath, ImageStat
+Image.MAX_IMAGE_PIXELS = 4294967296
 from zipfile import ZipFile
 import matplotlib.pyplot as plt
 colorlib = colorspace.colorlib()

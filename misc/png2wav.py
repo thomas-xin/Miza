@@ -1,5 +1,6 @@
 import os, sys, time, subprocess, numpy, requests
 from PIL import Image
+Image.MAX_IMAGE_PIXELS = 4294967296
 np = numpy
 
 is_url = lambda url: "://" in url and url.split("://", 1)[0].rstrip("s") in ("http", "hxxp", "ftp", "fxp")

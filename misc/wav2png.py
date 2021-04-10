@@ -1,5 +1,6 @@
 import os, sys, time, subprocess, psutil, numpy
 from PIL import Image
+Image.MAX_IMAGE_PIXELS = 4294967296
 np = numpy
 
 is_url = lambda url: "://" in url and url.split("://", 1)[0].rstrip("s") in ("http", "hxxp", "ftp", "fxp")
@@ -75,7 +76,7 @@ while True:
     amplitude[1::2] = ramp
     phase[::2] = lpha
     phase[1::2] = rpha
-    amplitude *= 255 / len(arr) * 4096
+    amplitude *= 255 * 4096 / len(arr)
     amp = amplitude
     amp2 = np.log2(amp / 255)
     np.multiply(amp2, 1 / rat, out=amp2)
