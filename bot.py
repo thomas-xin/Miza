@@ -3049,6 +3049,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     async with delay(1 / 3):
                         if type(emb) is not discord.Embed:
                             emb = discord.Embed.from_dict(emb)
+                            if not reacts:
+                                reacts = emb.pop("reacts", None)
                         if reacts or reference:
                             create_task(send_with_react(sendable, embed=emb, reacts=reacts, reference=reference))
                         else:
@@ -3057,6 +3059,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             embs = deque()
             for emb in embeds:
                 if type(emb) is not discord.Embed:
+                    if not reacts:
+                        reacts = emb.pop("reacts", None)
                     emb = discord.Embed.from_dict(emb)
                 if len(embs) > 9 or len(emb) + sum(len(e) for e in embs) > 6000:
                     url = await self.get_proxy_url(m)
@@ -3092,11 +3096,17 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         user = self.cache.users.get(c_id)
         if user is not None:
             create_task(self._send_embeds(user, embeds, reacts, reference))
-        elif reacts or reference:
+        elif reference:
             create_task(self._send_embeds(channel, embeds, reacts, reference))
         else:
+            if reacts:
+                embeds = [e.to_dict() for e in embeds]
+                for e in embeds:
+                    e["reacts"] = reacts
             embs = set_dict(self.embed_senders, c_id, [])
             embs.extend(embeds)
+            if len(embs) > 2048:
+                self.embed_senders[c_id] = embs[-2048:]
 
     def send_as_embeds(self, channel, description=None, title=None, fields=None, md=nofunc, author=None, footer=None, thumbnail=None, image=None, images=None, colour=None, reacts=None, reference=None):
         if type(description) is discord.Embed:
