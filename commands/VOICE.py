@@ -4403,7 +4403,7 @@ class Download(Command):
                 with bot.ExceptionSender(channel):
                     # Make sure selected index is valid
                     num = int(as_str(reaction)[0])
-                    if num <= int(spl[1]):
+                    if num < int(spl[1]):
                         # Reconstruct list of URLs from hidden encoded data
                         data = literal_eval(as_str(b642bytes(argv, True)))
                         url = data[num]
@@ -4428,16 +4428,18 @@ class Download(Command):
                                 start, end = spl[4:6]
                             if tuple(map(str, (start, end))) == ("None", "None") and not silenceremove and not auds and fmt in ("mp3", "opus", "ogg", "wav"):
                                 content = bot.webserver + "/ytdl?fmt=" + fmt + "&view=" + url + "\n" + bot.webserver + "/ytdl?fmt=" + fmt + "&download=" + url
-                                if message.guild and message.guild.get_member(bot.client.user.id).permissions_in(message.channel).manage_messages:
-                                    create_task(message.clear_reactions())
-                                return create_task(message.edit(
-                                    content=content,
+                                # if message.guild and message.guild.get_member(bot.client.user.id).permissions_in(message.channel).manage_messages:
+                                #     create_task(message.clear_reactions())
+                                return create_task(message.channel.send(content))
+                            if len(data) <= 1:
+                                create_task(message.edit(
+                                    content=ini_md(f"Downloading and converting {sqr_md(ensure_url(url))}..."),
                                     embed=None,
                                 ))
-                            create_task(message.edit(
-                                content=ini_md(f"Downloading and converting {sqr_md(ensure_url(url))}..."),
-                                embed=None,
-                            ))
+                            else:
+                                message = await message.channel.send(
+                                    ini_md(f"Downloading and converting {sqr_md(ensure_url(url))}..."),
+                                )
                             f, out = await create_future(
                                 ytdl.download_file,
                                 url,
