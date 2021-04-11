@@ -1875,7 +1875,7 @@ class AudioDownloader:
                                         if "." in title:
                                             title = title[:title.rindex(".")]
                                         found = False
-                                    if "duration" in entry:
+                                    if entry.get("duration") is not None:
                                         dur = float(entry["duration"])
                                     else:
                                         dur = None
@@ -4301,7 +4301,6 @@ class Download(Command):
             # Input may be a URL or set of URLs, in which case we attempt to find the first one
             urls = await bot.follow_url(argv, allow=True, images=False)
             if urls:
-                direct = True
                 if not concat:
                     urls = (urls[0],)
                 futs = deque()
@@ -4310,6 +4309,7 @@ class Download(Command):
                 for fut in futs:
                     temp = await fut
                     res.extend(temp)
+                direct = len(res) == 1 or concat
             if not res:
                 # 2 youtube results per soundcloud result, increased with verbose flag
                 sc = min(4, flags.get("v", 0) + 1)
@@ -4326,7 +4326,7 @@ class Download(Command):
             desc = f"Search results for {argv}:"
         a = flags.get("a", 0)
         b = flags.get("r", 0)
-        if concat or direct:
+        if concat:
             entry = (e["url"] for e in res) if concat else res[0]["url"]
             print(entry)
             with discord.context_managers.Typing(channel):
