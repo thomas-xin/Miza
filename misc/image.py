@@ -1079,12 +1079,13 @@ def greyscale(image):
         image = image.convert("RGBA")
     if str(image.mode) == "RGBA":
         A = image.getchannel("A")
-        image = image.convert("RGB")
     else:
         A = None
     image = ImageOps.grayscale(image)
     if A is not None:
-        image.putalpha(A)
+        if str(image.mode) != "L":
+            image = image.getchannel("R")
+        image = Image.merge("RGBA", (image, image, image, A))
     return image
 
 def laplacian(image):
