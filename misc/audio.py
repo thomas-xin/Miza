@@ -368,17 +368,20 @@ class AudioFile:
         ffmpeg = "misc/ffmpeg-c/ffmpeg.exe" if check_fmt and is_url(stream) else "ffmpeg"
         fmt = cdc = self.file.rsplit(".", 1)[-1]
         if fmt == "ogg":
-            cdc = "vorbis"
+            cdc = "libvorbis"
+            cdc2 = "vorbis"
         elif fmt == "wav":
             cdc = "pcm_s16le"
+            cdc2 = "wav"
         elif fmt == "opus":
             cdc = "libopus"
+            cdc2 = "opus"
         # Collects data from source, converts to 48khz 192kbps opus format, outputting to target file
         cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-hwaccel", "auto", "-fflags", "+discardcorrupt+fastseek+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", fmt, "-c:a", cdc, "-ar", str(SAMPLE_RATE), "-ac", "2", "-b:a", "196608", "cache/" + self.file]
         if "https://cf-hls-media.sndcdn.com/" not in stream:
             with suppress():
                 fmt2 = as_str(subprocess.check_output(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name", "-of", "default=nokey=1:noprint_wrappers=1", stream])).strip()
-                if fmt2 == cdc:
+                if fmt2 == cdc2:
                     cmd = ["ffmpeg", "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-hwaccel", "auto", "-fflags", "+discardcorrupt+fastseek+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-c:a", "copy", "cache/" + self.file]
         self.proc = None
         try:
