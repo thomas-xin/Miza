@@ -3383,9 +3383,13 @@ class DynamicDT:
     def __sub__(self, other):
         if type(other) not in (datetime.timedelta, datetime.datetime, datetime.date, self.__class__):
             return self.__class__.fromtimestamp(self.timestamp() - other)
+        if isinstance(other, self.__class__):
+            return datetime.timedelta(seconds=self.offset() - other.offset() + (self._dt - other._dt).total_seconds())
         out = (self._dt - other)
         ts = getattr(out, "timestamp", None)
         if ts is None:
+            if isinstance(out, datetime.timedelta):
+                return out
             return self.__class__.fromdatetime(out).set_offset(self.offset())
         ts = ts()
         if abs(self.offset()) >= 25600:
