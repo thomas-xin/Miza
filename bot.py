@@ -4100,7 +4100,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         else:
                             user = None
                         if not user:
-                            user = await self.fetch_user(u_id)
+                            user = self._state.store_user(data["author"])
+                            # user = await self.fetch_user(u_id)
                         before.author = user
                     try:
                         after = await channel.fetch_message(before.id)
