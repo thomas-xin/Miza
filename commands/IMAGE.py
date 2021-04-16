@@ -1152,9 +1152,10 @@ class Resize(Command):
                     y = await bot.eval_math(spl.pop(0))
                 else:
                     y = x
-                for value in (x, y):
-                    if not value >= -32 or not value <= 32:
-                        raise OverflowError("Maximum multiplier input is 32.")
+                if func == "resize_mult":
+                    for value in (x, y):
+                        if not value >= -32 or not value <= 32:
+                            raise OverflowError("Maximum multiplier input is 32.")
                 if spl:
                     op = " ".join(spl)
                     if op == "scale2":
