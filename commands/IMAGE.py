@@ -270,6 +270,7 @@ class ScanEmoji(Command):
     name = ["EmojiScan", "ScanEmojis"]
     min_level = 1
     description = "Scans all the emojis in the current server for potential issues."
+    usage = "<count(inf)>"
     no_parse = True
     rate_limit = (4, 7)
     _timeout_ = 4
@@ -288,9 +289,13 @@ class ScanEmoji(Command):
         "default=nokey=1:noprint_wrappers=1",
     )
 
-    async def __call__(self, bot, guild, channel, message, **void):
+    async def __call__(self, bot, guild, channel, message, argv, **void):
         # fut = create_task(send_with_reply(channel, message, "Emoji scan initiated. Delete the original message at any point in time to cancel."))
         p = bot.get_prefix(guild)
+        if argv:
+            count = await bot.eval_math(argv)
+        else:
+            count = inf
         found = 0
         with discord.context_managers.Typing(channel):
             for emoji in sorted(guild.emojis, key=lambda e: e.id):
@@ -310,6 +315,8 @@ class ScanEmoji(Command):
                         title=f"⚠ Issue {found} ⚠",
                         colour=discord.Colour(colour),
                     )
+                    if found >= count:
+                        break
         if not found:
             return css_md(f"No emoji issues found for {guild}.")
 

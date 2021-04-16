@@ -50,6 +50,8 @@ def on_error(ex):
         return flask.redirect("https://http.cat/403")
     if issubclass(type(ex), TimeoutError) or issubclass(type(ex), concurrent.futures.TimeoutError):
         return flask.redirect("https://http.cat/504")
+    if issubclass(type(ex), SemaphoreOverflowError):
+        return flask.redirect("https://http.cat/429")
     if issubclass(type(ex), ConnectionError):
         return flask.redirect("https://http.cat/502")
     return flask.redirect("https://http.cat/500")
@@ -60,11 +62,11 @@ def create_etag(data):
     return '"' + "0" * (10 - len(s)) + s + '"'
 
 
+SEMAPHORES = {}
 STATIC = {}
 TZCACHE = {}
 RESPONSES = {}
 RESPONSES[0] = cdict(set_result=lambda *args: None)
-
 
 PREVIEW = {}
 prev_date = utc_dt().date()
@@ -91,7 +93,7 @@ zfailed = set()
 def get_file(path, filename=None):
     if path in ("hacks", "mods", "files", "download", "static"):
         send(flask.request.remote_addr + " was rickrolled 🙃")
-        return flask.redirect("https://youtu.be/dQw4w9WgXcQ")
+        return flask.redirect("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
     orig_path = path
     ind = IND
     if path.startswith("~"):
@@ -103,75 +105,83 @@ def get_file(path, filename=None):
         ind = "!"
         path = path[1:]
     p = find_file(path, ind=ind)
-    endpoint = flask.request.path[1:].split("/", 1)[0]
-    down = flask.request.args.get("download", "false")
-    download = down and down[0] not in "0fFnN" or endpoint.startswith("d")
-    if download:
-        mime = MIMES.get(p.rsplit("/", 1)[-1].rsplit(".", 1)[-1])
-    else:
-        mime = get_mime(p)
-    fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
-#     if endpoint.endswith("view") and mime.startswith("image/"):
-#         if os.path.getsize(p) > 1048576:
-#             if endpoint != "preview":
-#                 og_image = flask.request.host_url + "preview/" + orig_path
-#                 data = f"""<!DOCTYPE html>
-# <html>
-# <meta name="robots" content="noindex"><link rel="image_src" href="{og_image}">
-# <meta property="og:image" content="{og_image}" itemprop="image">
-# <meta property="og:url" content="{flask.request.host_url}view/{orig_path}">
-# <meta property="og:image:width" content="1280">
-# <meta property="og:type" content="website">
-# <meta http-equiv="refresh" content="0; URL={flask.request.host_url}files/{orig_path}">
-# </html>"""
-#                 resp = flask.Response(data, mimetype="text/html")
-#                 resp.headers.update(CHEADERS)
-#                 resp.headers["ETag"] = create_etag(data)
-#                 return resp
-#             if prev_date != utc_dt().date():
-#                 PREVIEW.clear()
-#             elif path in PREVIEW:
-#                 p = os.getcwd() + "/cache/" + PREVIEW[path]
-#             else:
-#                 fmt = mime.rsplit('/', 1)[-1]
-#                 if fmt != "gif":
-#                     fmt = "png"
-#                 p2 = f"{path}~preview.{fmt}"
-#                 p3 = os.getcwd() + "/cache/" + p2
-#                 if not os.path.exists(p3):
-#                     args = ["ffmpeg", "-n", "-hide_banner", "-loglevel", "error", "-hwaccel", "auto", "-i", p, "-fs", "4194304", "-vf", "scale=320:-1", p3]
-#                     send(args)
-#                     proc = psutil.Popen(args)
-#                     proc.wait()
-#                 PREVIEW[path] = p2
-#                 p = p3
-#     elif endpoint == "download" and p[-1] != IND and not p.endswith(".zip") and p not in zfailed:
-#         size = os.path.getsize(p)
-#         if size > 16777216:
-#             fi = p.rsplit(".", 1)[0] + ".zip" + IND
-#             if not os.path.exists(fi):
-#                 test = min(16777216, max(1048576, size >> 6))
-#                 send(f"Testing {p} with {test} bytes...")
-#                 with open(p, "rb") as f:
-#                     data = f.read(test)
-#                 b = bytes2zip(data)
-#                 r = len(b) / test
-#                 if r < 0.75:
-#                     send(f"Zipping {p}...")
-#                     with ZipFile(fi, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False) as z:
-#                         z.write(p, arcname=filename or fn)
-#                     r = os.path.getsize(fi) / size
-#             else:
-#                 r = os.path.getsize(fi) / size
-#             if r < 0.8:
-#                 p = fi
-#             else:
-#                 zfailed.add(p)
-#                 send(f"{p} has compression ratio {r}, skipping...")
-    attachment = filename or fn
-    resp = flask.send_file(p, as_attachment=download, attachment_filename=attachment, mimetype=mime, conditional=True)
-    resp.headers.update(CHEADERS)
-    return resp
+    sem = SEMAPHORES.get(p)
+    if not sem:
+        if len(SEMAPHORES) >= 4096:
+            sem = SEMAPHORES.pop(next(iter(SEMAPHORES)))
+            if sem.is_busy():
+                raise SemaphoreOverflowError
+        sem = SEMAPHORES[p] = Semaphore(256, 256, rate_limit=60)
+    with sem:
+        endpoint = flask.request.path[1:].split("/", 1)[0]
+        down = flask.request.args.get("download", "false")
+        download = down and down[0] not in "0fFnN" or endpoint.startswith("d")
+        if download:
+            mime = MIMES.get(p.rsplit("/", 1)[-1].rsplit(".", 1)[-1])
+        else:
+            mime = get_mime(p)
+        fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
+    #     if endpoint.endswith("view") and mime.startswith("image/"):
+    #         if os.path.getsize(p) > 1048576:
+    #             if endpoint != "preview":
+    #                 og_image = flask.request.host_url + "preview/" + orig_path
+    #                 data = f"""<!DOCTYPE html>
+    # <html>
+    # <meta name="robots" content="noindex"><link rel="image_src" href="{og_image}">
+    # <meta property="og:image" content="{og_image}" itemprop="image">
+    # <meta property="og:url" content="{flask.request.host_url}view/{orig_path}">
+    # <meta property="og:image:width" content="1280">
+    # <meta property="og:type" content="website">
+    # <meta http-equiv="refresh" content="0; URL={flask.request.host_url}files/{orig_path}">
+    # </html>"""
+    #                 resp = flask.Response(data, mimetype="text/html")
+    #                 resp.headers.update(CHEADERS)
+    #                 resp.headers["ETag"] = create_etag(data)
+    #                 return resp
+    #             if prev_date != utc_dt().date():
+    #                 PREVIEW.clear()
+    #             elif path in PREVIEW:
+    #                 p = os.getcwd() + "/cache/" + PREVIEW[path]
+    #             else:
+    #                 fmt = mime.rsplit('/', 1)[-1]
+    #                 if fmt != "gif":
+    #                     fmt = "png"
+    #                 p2 = f"{path}~preview.{fmt}"
+    #                 p3 = os.getcwd() + "/cache/" + p2
+    #                 if not os.path.exists(p3):
+    #                     args = ["ffmpeg", "-n", "-hide_banner", "-loglevel", "error", "-hwaccel", "auto", "-i", p, "-fs", "4194304", "-vf", "scale=320:-1", p3]
+    #                     send(args)
+    #                     proc = psutil.Popen(args)
+    #                     proc.wait()
+    #                 PREVIEW[path] = p2
+    #                 p = p3
+    #     elif endpoint == "download" and p[-1] != IND and not p.endswith(".zip") and p not in zfailed:
+    #         size = os.path.getsize(p)
+    #         if size > 16777216:
+    #             fi = p.rsplit(".", 1)[0] + ".zip" + IND
+    #             if not os.path.exists(fi):
+    #                 test = min(16777216, max(1048576, size >> 6))
+    #                 send(f"Testing {p} with {test} bytes...")
+    #                 with open(p, "rb") as f:
+    #                     data = f.read(test)
+    #                 b = bytes2zip(data)
+    #                 r = len(b) / test
+    #                 if r < 0.75:
+    #                     send(f"Zipping {p}...")
+    #                     with ZipFile(fi, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False) as z:
+    #                         z.write(p, arcname=filename or fn)
+    #                     r = os.path.getsize(fi) / size
+    #             else:
+    #                 r = os.path.getsize(fi) / size
+    #             if r < 0.8:
+    #                 p = fi
+    #             else:
+    #                 zfailed.add(p)
+    #                 send(f"{p} has compression ratio {r}, skipping...")
+        attachment = filename or fn
+        resp = flask.send_file(p, as_attachment=download, attachment_filename=attachment, mimetype=mime, conditional=True)
+        resp.headers.update(CHEADERS)
+        return resp
 
 
 def fetch_static(path, ignore=False):
