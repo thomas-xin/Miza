@@ -1016,13 +1016,6 @@ class Ask(Command):
         if not out:
             raise RuntimeError("Unable to construct a valid response.")
         q = q.replace("am i", "are y\uf000ou").replace("i am", "y\uf000ou are")
-        modal_verbs = "shall should shalln't shouldn't must mustn't can could couldn't may might mightn't will would won't wouldn't have had haven't hadn't do did don't didn't"
-        r = regexp(f"(?:{modal_verbs.replace(' ', '|')}) you")
-        while True:
-            m = r.search(q)
-            if not m:
-                break
-            q = q[:m.end() - 3] + "I" + q[m.end():]
         q = replace_map(q, {
             "yourself": "myself",
             "your ": "my ",
@@ -1031,6 +1024,13 @@ class Ask(Command):
             "you're": "i'm",
             "you'll": "i'll",
         })
+        modal_verbs = "shall should shalln't shouldn't must mustn't can could couldn't may might mightn't will would won't wouldn't have had haven't hadn't do did don't didn't"
+        r = regexp(f"(?:{modal_verbs.replace(' ', '|')}) you")
+        while True:
+            m = r.search(q)
+            if not m:
+                break
+            q = q[:m.end() - 3] + "I" + q[m.end():]
         res = alist(q.split())
         for sym in "!.,'":
             if sym in q:

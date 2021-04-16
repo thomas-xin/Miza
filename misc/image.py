@@ -1540,6 +1540,8 @@ def resize_to(image, w, h, operation="auto"):
             image = image.convert("RGBA")
     if filt == "scale2x":
         if w > image.width or h > image.height:
+            if image.mode == "P":
+                image = image.convert("RGBA")
             b = image.tobytes()
             surf = pygame.image.frombuffer(b, image.size, image.mode)
             while w > surf.get_width() or h > surf.get_height():

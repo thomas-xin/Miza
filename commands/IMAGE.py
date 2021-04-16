@@ -266,6 +266,54 @@ class CreateEmoji(Command):
         return css_md(f"Successfully created emoji {sqr_md(emoji)} for {sqr_md(guild)}.")
 
 
+class ScanEmoji(Command):
+    name = ["EmojiScan", "ScanEmojis"]
+    min_level = 1
+    description = "Scans all the emojis in the current server for potential issues."
+    no_parse = True
+    rate_limit = (4, 7)
+    _timeout_ = 4
+    typing = True
+
+    ffprobe_start = (
+        "ffprobe",
+        "-v",
+        "error",
+        "-hide_banner",
+        "-select_streams",
+        "v:0",
+        "-show_entries",
+        "stream=width,height",
+        "-of",
+        "default=nokey=1:noprint_wrappers=1",
+    )
+
+    async def __call__(self, bot, guild, channel, message, **void):
+        # fut = create_task(send_with_reply(channel, message, "Emoji scan initiated. Delete the original message at any point in time to cancel."))
+        p = bot.get_prefix(guild)
+        found = 0
+        with discord.context_managers.Typing(channel):
+            for emoji in sorted(guild.emojis, key=lambda e: e.id):
+                url = str(emoji.url)
+                resp = await create_future(subprocess.run, self.ffprobe_start + (url,), stdout=subprocess.PIPE)
+                width, height = map(int, resp.stdout.splitlines())
+                if width < 128 or height < 128:
+                    found += 1
+                    w, h = width, height
+                    while w < 128 or h < 128:
+                        w, h = w << 1, h << 1
+                    colour = await create_future(bot.get_colour, url)
+                    bot.send_as_embeds(
+                        channel,
+                        description=f"{emoji} is {width}×{height}, which is below the recommended discord emoji size, and may appear blurry when scaled by Discord. Scaling the image using {p}resize, with filters `nearest`, `scale2x` or `lanczos` is advised.",
+                        fields=(("Example", f"{p}resize {emoji} {w}×{h} scale2x"),),
+                        title=f"⚠ Issue {found} ⚠",
+                        colour=discord.Colour(colour),
+                    )
+        if not found:
+            return css_md(f"No emoji issues found for {guild}.")
+
+
 async def get_image(bot, user, message, args, argv, default=2, raw=False, ext="png"):
     try:
         # Take input from any attachments, or otherwise the message contents
@@ -1084,12 +1132,17 @@ class Resize(Command):
                 else:
                     raise ArgumentError("Please input an image by URL or attachment.")
             value = " ".join(args).strip()
+            func = "resize_mult"
             if not value:
                 x = y = 1
                 op = "auto"
             else:
                 # Parse width and height multipliers
-                value = value.replace("x", " ").replace("X", " ").replace("*", " ").replace("×", " ")
+                if "x" in value[:-1] or "X" in value or "*" in value or "×" in value:
+                    func = "resize_to"
+                    value = value.replace("x", " ").replace("X", " ").replace("*", " ").replace("×", " ")
+                else:
+                    value = value.replace(":", " ")
                 try:
                     spl = shlex.split(value)
                 except ValueError:
@@ -1119,7 +1172,7 @@ class Resize(Command):
                 name = "unknown"
             if not name.endswith(".png"):
                 name += ".png"
-            resp = await process_image(url, "resize_mult", [x, y, op], timeout=_timeout)
+            resp = await process_image(url, func, [x, y, op], timeout=_timeout)
             fn = resp[0]
             if fn.endswith(".gif"):
                 if not name.endswith(".gif"):
