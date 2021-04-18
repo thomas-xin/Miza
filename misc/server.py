@@ -107,7 +107,7 @@ def get_file(path, filename=None):
     p = find_file(path, ind=ind)
     sem = SEMAPHORES.get(p)
     if not sem:
-        if len(SEMAPHORES) >= 4096:
+        while len(SEMAPHORES) >= 4096:
             sem = SEMAPHORES.pop(next(iter(SEMAPHORES)))
             if sem.is_busy():
                 raise SemaphoreOverflowError

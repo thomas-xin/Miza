@@ -3,8 +3,6 @@ from smath import *
 
 with MultiThreadedImporter(globals()) as importer:
     importer.__import__(
-        "os",
-        # "gc",
         "importlib",
         "inspect",
         "tracemalloc",
@@ -13,7 +11,6 @@ with MultiThreadedImporter(globals()) as importer:
         "asyncio",
         "discord",
         "json",
-        "requests",
         "aiohttp",
         "psutil",
         "threading",
