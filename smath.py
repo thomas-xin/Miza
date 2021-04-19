@@ -102,21 +102,21 @@ with MultiThreadedImporter() as importer:
 
     importer.close(shutdown=False)
 
-    collections2f = "misc/collections2.tmp"
+    collections2f = "misc/collections2.py"
 
     def update_collections2():
         with requests.get("https://raw.githubusercontent.com/thomas-xin/Python-Extra-Classes/main/full.py") as resp:
             b = resp.content
         with open(collections2f, "wb") as f:
             f.write(b)
-        exec(compile(b, "collections2.tmp", "exec"), globals())
+        exec(compile(b, "collections2.py", "exec"), globals())
         print("alist.tmp updated.")
 
     if not os.path.exists(collections2f):
         update_collections2()
     with open(collections2f, "rb") as f:
         b = f.read()
-    exec(compile(b, "collections2.tmp", "exec"), globals())
+    exec(compile(b, "collections2.py", "exec"), globals())
     if time.time() - os.path.getmtime(collections2f) > 3600:
         importer.exc.submit(update_collections2)
 
