@@ -2391,7 +2391,7 @@ class UpdateStarboards(Database):
                             with tracebacksuppressor(RuntimeError, KeyError):
                                 while len(table[None]) > 16384:
                                     table[None].pop(next(iter(table[None])))
-                            self.data.update(message.guild.id)
+                            self.update(message.guild.id)
                 else:
                     try:
                         channel = await self.bot.fetch_channel(table[react][1])
@@ -2408,7 +2408,7 @@ class UpdateStarboards(Database):
                         with tracebacksuppressor(RuntimeError, KeyError):
                             while len(table[None]) > 16384:
                                 table[None].pop(next(iter(table[None])))
-                        self.data.update(message.guild.id)
+                        self.update(message.guild.id)
 
     async def _edit_(self, after, **void):
         message = after
@@ -2429,7 +2429,7 @@ class UpdateStarboards(Database):
                 with tracebacksuppressor(RuntimeError, KeyError):
                     while len(table[None]) > 16384:
                         table[None].pop(next(iter(table[None])))
-                self.data.update(message.guild.id)
+                self.update(message.guild.id)
 
 
 class UpdateRolegivers(Database):
