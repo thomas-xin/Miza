@@ -2412,7 +2412,10 @@ class UpdateStarboards(Database):
 
     async def _edit_(self, after, **void):
         message = after
-        table = self.data[message.guild.id]
+        try:
+            table = self.data[message.guild.id]
+        except KeyError:
+            return
         if message.id in table.setdefault(None, {}):
             try:
                 channel = await self.bot.fetch_channel(table[react][1])
