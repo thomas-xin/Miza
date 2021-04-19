@@ -35,8 +35,11 @@ def _adjust_thread_count(self):
 
 concurrent.futures.ThreadPoolExecutor._adjust_thread_count = lambda self: _adjust_thread_count(self)
 
-# A context manager that enables concurrent imports.
 class MultiThreadedImporter(contextlib.AbstractContextManager, contextlib.ContextDecorator):
+
+    """A context manager that enables concurrent imports."""
+
+    closed = False
 
     def __init__(self, glob=None):
         self.glob = glob
@@ -47,6 +50,7 @@ class MultiThreadedImporter(contextlib.AbstractContextManager, contextlib.Contex
         return self
 
     def __import__(self, *modules):
+        self.closed = False
         for module in modules:
             self.out[module] = self.exc.submit(__import__, module)
 
@@ -55,12 +59,15 @@ class MultiThreadedImporter(contextlib.AbstractContextManager, contextlib.Contex
         if exc_type and exc_value:
             raise exc_value
 
-    def close(self):
-        for k in tuple(self.out):
-            self.out[k] = self.out[k].result()
-        glob = self.glob if self.glob is not None else globals()
-        glob.update(self.out)
-        self.exc.shutdown(True)
+    def close(self, shutdown=True):
+        if not self.closed:
+            for k in tuple(self.out):
+                self.out[k] = self.out[k].result()
+            glob = self.glob if self.glob is not None else globals()
+            glob.update(self.out)
+            self.closed = True
+        if shutdown:
+            self.exc.shutdown(True)
 
 with MultiThreadedImporter() as importer:
     importer.__import__(
@@ -92,6 +99,27 @@ with MultiThreadedImporter() as importer:
         "colormath",
         "requests",
     )
+
+    importer.close(shutdown=False)
+
+    collections2f = "misc/collections2.tmp"
+
+    def update_collections2():
+        with requests.get("https://raw.githubusercontent.com/thomas-xin/Python-Extra-Classes/main/full.py") as resp:
+            b = resp.content
+        with open(collections2f, "wb") as f:
+            f.write(b)
+        exec(compile(b, "collections2.tmp", "exec"), globals())
+        print("alist.tmp updated.")
+
+    if not os.path.exists(collections2f):
+        update_collections2()
+    with open(collections2f, "rb") as f:
+        b = f.read()
+    exec(compile(b, "collections2.tmp", "exec"), globals())
+    if time.time() - os.path.getmtime(collections2f) > 3600:
+        importer.exc.submit(update_collections2)
+
 
 from dateutil import parser as tparser
 from sympy.parsing.sympy_parser import parse_expr
@@ -298,25 +326,6 @@ def sort(it, key=None, reverse=False):
             return it
         except TypeError:
             raise TypeError(f"Sorting {type(it)} is not supported.")
-
-
-collections2f = "misc/collections2.tmp"
-
-def update_collections2():
-    with requests.get("https://raw.githubusercontent.com/thomas-xin/Python-Extra-Classes/main/full.py") as resp:
-        b = resp.content
-    with open(collections2f, "wb") as f:
-        f.write(b)
-    exec(compile(b, "collections2.tmp", "exec"), globals())
-    print("alist.tmp updated.")
-
-if not os.path.exists(collections2f):
-    update_collections2()
-with open(collections2f, "rb") as f:
-    b = f.read()
-exec(compile(b, "collections2.tmp", "exec"), globals())
-if utc() - os.path.getmtime(collections2f) > 3600:
-    submit(update_collections2)
 
 
 literal_eval = lambda s: ast.literal_eval(as_str(s).lstrip())

@@ -3607,7 +3607,6 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                                 ref["guild_id"] = self.channel.guild.id
                 except KeyError:
                     pass
-                d.pop("channel_id", None)
                 message = bot.LoadedMessage(state=bot._state, channel=channel, data=d)
                 message.author = author
                 return message
