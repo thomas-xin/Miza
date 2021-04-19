@@ -2347,7 +2347,7 @@ class UpdateCrossposts(Database):
     async def _send_(self, message, **void):
         if message.channel.id in self.data and not message.flags.is_crossposted and "\u2009\u2009" not in message.author.name:
             with tracebacksuppressor:
-                embed = self.bot.as_embed(message, link=True, colour=True)
+                embed = await self.bot.as_embed(message, link=True, colour=True)
                 for c_id in tuple(self.data[message.channel.id]):
                     try:
                         channel = await self.bot.fetch_channel(c_id)
