@@ -951,7 +951,10 @@ class StarBoard(Command):
                 except KeyError:
                     pass
                 else:
-                    data.update(guild.id)
+                    if any(v for k, v in data[guild.id].items() if k != None):
+                        data.update(guild.id)
+                    else:
+                        data.pop(guild.id)
                 return italics(css_md(f"Disabled starboard trigger {sqr_md(emoji)} for {sqr_md(guild)}."))
             for c_id, v in data.items():
                 data.pop(guild.id, None)
@@ -2361,12 +2364,6 @@ class UpdateCrossposts(Database):
 class UpdateStarboards(Database):
     name = "starboards"
 
-    def _bot_ready_(self, **void):
-        if "triggered" not in self.data:
-            self.data["triggered"] = {}
-        elif type(self.data["triggered"]) is set:
-            self.data["triggered"] =  dict.fromkeys(self.data["triggered"])
-
     async def _reaction_add_(self, message, react, **void):
         if message.guild and message.guild.id in self.data and message.channel.id != self.data[message.guild.id].get(react, (message.channel.id,))[-1]:
             table = self.data[message.guild.id]
@@ -2377,7 +2374,7 @@ class UpdateStarboards(Database):
                     message = await message.channel.fetch_message(message.id)
                     self.bot.add_message(message, files=False)
                     count = sum(r.count for r in message.reactions if str(r.emoji) == react)
-                if message.id not in self.data["triggered"]:
+                if message.id not in table.setdefault(None, {}):
                     if count >= req and count < req + 2:
                         embed = await self.bot.as_embed(message, link=True, colour=True)
                         text, link = embed.description.rsplit("\n\n", 1)
@@ -2388,50 +2385,51 @@ class UpdateStarboards(Database):
                             channel = await self.bot.fetch_channel(table[react][1])
                             m = await channel.send(embed=embed)
                         except (discord.NotFound, discord.Forbidden):
-                            self.data[message.guild.id].pop(react)
+                            table.pop(react)
                         else:
-                            self.data["triggered"][message.id] = m.id
+                            table[None][message.id] = m.id
                             with tracebacksuppressor(RuntimeError, KeyError):
-                                while len(self.data["triggered"]) > 32768:
-                                    self.data["triggered"].pop(next(iter(self.data["triggered"])))
-                            self.update("triggered")
+                                while len(table[None]) > 16384:
+                                    table[None].pop(next(iter(table[None])))
+                            self.data.update(message.guild.id)
                 else:
                     try:
                         channel = await self.bot.fetch_channel(table[react][1])
-                        m = await self.bot.fetch_message(self.data["triggered"][message.id], channel)
+                        m = await self.bot.fetch_message(table[None][message.id], channel)
                         embed = await self.bot.as_embed(message, link=True, colour=True)
                         text, link = embed.description.rsplit("\n\n", 1)
                         description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in sorted(message.reactions, key=lambda r: -r.count) if str(r.emoji) in table) + "   " + link
                         embed.description = lim_str(description, 2048)
                         await m.edit(content=None, embed=embed)
                     except (discord.NotFound, discord.Forbidden):
-                        self.data[message.guild.id].pop(react)
+                        table[None].pop(message.id, None)
                     else:
-                        self.data["triggered"][message.id] = m.id
+                        table[None][message.id] = m.id
                         with tracebacksuppressor(RuntimeError, KeyError):
-                            while len(self.data["triggered"]) > 32768:
-                                self.data["triggered"].pop(next(iter(self.data["triggered"])))
-                        self.update("triggered")
+                            while len(table[None]) > 16384:
+                                table[None].pop(next(iter(table[None])))
+                        self.data.update(message.guild.id)
 
     async def _edit_(self, after, **void):
         message = after
-        if message.id in self.data["triggered"]:
+        table = self.data[message.guild.id]
+        if message.id in table.setdefault(None, {}):
             try:
-                channel = await self.bot.fetch_channel(self.data[message.guild.id][react][1])
-                m = await self.bot.fetch_message(self.data["triggered"][message.id], channel)
+                channel = await self.bot.fetch_channel(table[react][1])
+                m = await self.bot.fetch_message(table[None][message.id], channel)
                 embed = await self.bot.as_embed(message, link=True, colour=True)
                 text, link = embed.description.rsplit("\n\n", 1)
                 description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in sorted(message.reactions, key=lambda r: -r.count) if str(r.emoji) in table) + "   " + link
                 embed.description = lim_str(description, 2048)
                 await m.edit(content=None, embed=embed)
             except (discord.NotFound, discord.Forbidden):
-                self.data[message.guild.id].pop(react)
+                table[None].pop(message.id, None)
             else:
-                self.data["triggered"][message.id] = m.id
+                table[None][message.id] = m.id
                 with tracebacksuppressor(RuntimeError, KeyError):
-                    while len(self.data["triggered"]) > 32768:
-                        self.data["triggered"].pop(next(iter(self.data["triggered"])))
-                self.update("triggered")
+                    while len(table[None]) > 16384:
+                        table[None].pop(next(iter(table[None])))
+                self.data.update(message.guild.id)
 
 
 class UpdateRolegivers(Database):
