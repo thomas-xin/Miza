@@ -1609,9 +1609,9 @@ class MimicSend(Command):
                 except (EOFError, discord.NotFound):
                     bot.data.logM.pop(guild.id)
                     return
-                emb = as_embed(message)
+                emb = bot.as_embed(message, link=True)
                 emb.colour = discord.Colour(0x00FF00)
-                action = f"**Mimic invoked in** {channel_mention(channel.id)}:\nhttps://discord.com/channels/{guild.id}/{c.id}/{message.id}\n"
+                action = f"**Mimic invoked in** {channel_mention(channel.id)}:\n"
                 emb.description = lim_str(action + emb.description, 2048)
                 emb.timestamp = message.created_at
                 self.bot.send_embeds(c, emb)
@@ -1681,9 +1681,9 @@ class UpdateMimics(Database):
                             except (EOFError, discord.NotFound):
                                 bot.data.logM.pop(guild.id)
                                 return
-                            emb = as_embed(message)
+                            emb = as_embed(message, link=True)
                             emb.colour = discord.Colour(0x00FF00)
-                            action = f"**Mimic invoked in** {channel_mention(channel.id)}:\nhttps://discord.com/channels/{guild.id}/{c.id}/{message.id}\n"
+                            action = f"**Mimic invoked in** {channel_mention(channel.id)}:\n"
                             emb.description = lim_str(action + emb.description, 2048)
                             emb.timestamp = message.created_at
                             self.bot.send_embeds(c, emb)

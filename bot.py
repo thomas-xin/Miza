@@ -1462,8 +1462,11 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 url = await self.data.exec.uproxy(url)
         return url
 
-    async def as_embed(self, message):
+    async def as_embed(self, message, link=False, colour=False):
         emb = discord.Embed().set_author(**get_author(message.author))
+        if colour:
+            col = await self.get_colour(message.author)
+            emb.colour = col
         if not message.content:
             if len(message.attachments) == 1:
                 url = message.attachments[0].url
@@ -1567,6 +1570,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 temp2 = await self.data.exec.uproxy(*temp, collapse=False)
                 items.extend(temp2[x] or temp[x] for x in range(len(temp)))
             emb.description = lim_str("\n".join(items), 2048)
+        if link:
+            emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 2048)
+            emb.timestamp = message.edited_at or message.created_at
         return emb
 
     # Limits a cache to a certain amount, discarding oldest entries first.

@@ -989,11 +989,13 @@ def get_message_words(message):
     return word_count(message.system_content or message.content) + sum(word_count(e.description) if e.description else sum(word_count(f.name) + word_count(f.value) for f in e.fields) if e.fields else 0 for e in message.embeds) + len(message.attachments)
 
 # Returns a string representation of a message object.
-def message_repr(message, limit=1024, username=False):
+def message_repr(message, limit=1024, username=False, link=False):
     c = message.content
     s = getattr(message, "system_content", None)
     if s and len(s) > len(c):
         c = s
+    if link:
+        c = f"https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id}\n" + c
     if username:
         c = user_mention(message.author.id) + ":\n" + c
     data = lim_str(c, limit)
@@ -1015,7 +1017,7 @@ def message_repr(message, limit=1024, username=False):
 
 EmptyEmbed = discord.embeds._EmptyEmbed
 
-def as_embed(message):
+def as_embed(message, link=False):
     emb = discord.Embed().set_author(**get_author(message.author))
     if not message.content:
         if len(message.attachments) == 1:
@@ -1104,6 +1106,9 @@ def as_embed(message):
     if not emb.description:
         urls = itertools.chain(("(" + e.url + ")" for e in message.embeds if e.url), ("[" + best_url(a) + "]" for a in message.attachments))
         emb.description = lim_str("\n".join(urls), 2048)
+    if link:
+        emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 2048)
+        emb.timestamp = message.edited_at or message.created_at
     return emb
 
 exc_repr = lambda ex: lim_str(py_md(f"Error: {repr(ex).replace('`', '')}"), 2000)

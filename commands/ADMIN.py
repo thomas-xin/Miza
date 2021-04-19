@@ -2100,11 +2100,10 @@ class UpdateMessageLogs(Database):
                 except (EOFError, discord.NotFound):
                     self.data.pop(guild.id)
                     return
-                emb = as_embed(message)
+                emb = as_embed(message, link=True)
                 emb.colour = discord.Colour(0x00FFFF)
-                action = f"**Slash command executed in** {channel_mention(message.channel.id)}:\nhttps://discord.com/channels/{guild.id}/{message.channel.id}/{message.id}\n"
+                action = f"**Slash command executed in** {channel_mention(message.channel.id)}:\n"
                 emb.description = lim_str(action + (emb.description or ""), 2048)
-                emb.timestamp = message.created_at
                 self.bot.send_embeds(channel, emb)
 
     # Edit events are rather straightforward to log
@@ -2119,7 +2118,7 @@ class UpdateMessageLogs(Database):
                     self.data.pop(guild.id)
                     return
                 emb = as_embed(after)
-                emb2 = as_embed(before)
+                emb2 = await bot.as_embed(before)
                 emb.colour = discord.Colour(0x0000FF)
                 action = f"**Message edited in** {channel_mention(after.channel.id)}:\nhttps://discord.com/channels/{guild.id}/{after.channel.id}/{after.id}"
                 emb.add_field(name="Before", value=lim_str(emb2.description, 1024))
@@ -2189,11 +2188,10 @@ class UpdateMessageLogs(Database):
                                 init = user_mention(t.id)
             except (PermissionError, discord.Forbidden, discord.HTTPException):
                 init = "[UNKNOWN USER]"
-            emb = as_embed(message)
+            emb = await bot.as_embed(message, link=True)
             emb.colour = discord.Colour(0xFF0000)
-            action = f"{init} **deleted message from** {channel_mention(message.channel.id)}:\nhttps://discord.com/channels/{guild.id}/{message.channel.id}/{message.id}\n"
+            action = f"{init} **deleted message from** {channel_mention(message.channel.id)}:\n"
             emb.description = lim_str(action + (emb.description or ""), 2048)
-            emb.timestamp = message.created_at
             self.bot.send_embeds(channel, emb)
 
     # Thanks to the embed sender feature, which allows this feature to send up to 10 logs in one message
@@ -2247,16 +2245,15 @@ class UpdateMessageLogs(Database):
                 init = "[UNKNOWN USER]"
             emb = discord.Embed(colour=0xFF00FF)
             emb.description = f"{init} **deleted {len(messages)} message{'s' if len(messages) != 1 else ''} from** {channel_mention(messages[-1].channel.id)}:\n"
+            # for message in messages:
+            #     nextline = f"\nhttps://discord.com/channels/{guild.id}/{message.channel.id}/{message.id}"
+            #     if len(emb.description) + len(nextline) > 2048:
+            #         break
+            #     emb.description += nextline
+            embs = deque((emb,))
             for message in messages:
-                nextline = f"\nhttps://discord.com/channels/{guild.id}/{message.channel.id}/{message.id}"
-                if len(emb.description) + len(nextline) > 2048:
-                    break
-                emb.description += nextline
-            embs = deque([emb])
-            for message in messages:
-                emb = as_embed(message)
+                emb = await bot.as_embed(message, link=True)
                 emb.colour = discord.Colour(0x7F007F)
-                emb.timestamp = message.created_at
                 embs.append(emb)
             self.bot.send_embeds(channel, embs)
 
@@ -2350,9 +2347,7 @@ class UpdateCrossposts(Database):
     async def _send_(self, message, **void):
         if message.channel.id in self.data and not message.flags.is_crossposted and "\u2009\u2009" not in message.author.name:
             with tracebacksuppressor:
-                embed = as_embed(message)
-                col = await self.bot.get_colour(message.author)
-                embed.colour = discord.Colour(col)
+                embed = self.bot.as_embed(message, link=True, colour=True)
                 for c_id in tuple(self.data[message.channel.id]):
                     try:
                         channel = await self.bot.fetch_channel(c_id)
@@ -2368,32 +2363,75 @@ class UpdateStarboards(Database):
 
     def _bot_ready_(self, **void):
         if "triggered" not in self.data:
-            self.data["triggered"] = set()
+            self.data["triggered"] = {}
+        elif type(self.data["triggered"]) is set:
+            self.data["triggered"] =  dict.fromkeys(self.data["triggered"])
 
     async def _reaction_add_(self, message, react, **void):
-        if message.guild and message.guild.id in self.data and message.id not in self.data["triggered"]:
-            if message.channel.id == self.data[message.guild.id].get(react, (message.channel.id,))[-1]:
-                return
-            req = self.data[message.guild.id][react][0]
+        if message.guild and message.guild.id in self.data and message.channel.id != self.data[message.guild.id].get(react, (message.channel.id,))[-1]:
+            table = self.data[message.guild.id]
+            req = table[react][0]
             if req < inf:
                 count = sum(r.count for r in message.reactions if str(r.emoji) == react)
                 if count <= 1:
                     message = await message.channel.fetch_message(message.id)
                     self.bot.add_message(message, files=False)
                     count = sum(r.count for r in message.reactions if str(r.emoji) == react)
-                print(react, count, req)
-                if count >= req and count < req + 2:
-                    self.data["triggered"].add(message.id)
-                    with tracebacksuppressor(RuntimeError, KeyError):
-                        while len(self.data["triggered"]) > 16384:
-                            self.data["triggered"].discard(next(iter(self.data["triggered"])))
-                    self.update("triggered")
-                    with tracebacksuppressor:
-                        embed = await self.bot.as_embed(message)
-                        col = await self.bot.get_colour(message.author)
-                        embed.colour = discord.Colour(col)
-                        data = ("#" + str(message.channel), to_png(message.guild.icon_url))
-                        self.bot.data.crossposts.stack.setdefault(self.data[message.guild.id][react][1], {}).setdefault(data, []).append(embed)
+                if message.id not in self.data["triggered"]:
+                    if count >= req and count < req + 2:
+                        embed = await self.bot.as_embed(message, link=True, colour=True)
+                        text, link = embed.description.rsplit("\n\n", 1)
+                        description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in sorted(message.reactions, key=lambda r: -r.count) if str(r.emoji) in table) + "   " + link
+                        embed.description = lim_str(description, 2048)
+                        # data = ("#" + str(message.channel), to_png(message.guild.icon_url))
+                        try:
+                            channel = await self.bot.fetch_channel(table[react][1])
+                            m = await channel.send(embed=embed)
+                        except (discord.NotFound, discord.Forbidden):
+                            self.data[message.guild.id].pop(react)
+                        else:
+                            self.data["triggered"][message.id] = m.id
+                            with tracebacksuppressor(RuntimeError, KeyError):
+                                while len(self.data["triggered"]) > 32768:
+                                    self.data["triggered"].pop(next(iter(self.data["triggered"])))
+                            self.update("triggered")
+                else:
+                    try:
+                        channel = await self.bot.fetch_channel(table[react][1])
+                        m = await self.bot.fetch_message(self.data["triggered"][message.id], channel)
+                        embed = await self.bot.as_embed(message, link=True, colour=True)
+                        text, link = embed.description.rsplit("\n\n", 1)
+                        description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in sorted(message.reactions, key=lambda r: -r.count) if str(r.emoji) in table) + "   " + link
+                        embed.description = lim_str(description, 2048)
+                        await m.edit(content=None, embed=embed)
+                    except (discord.NotFound, discord.Forbidden):
+                        self.data[message.guild.id].pop(react)
+                    else:
+                        self.data["triggered"][message.id] = m.id
+                        with tracebacksuppressor(RuntimeError, KeyError):
+                            while len(self.data["triggered"]) > 32768:
+                                self.data["triggered"].pop(next(iter(self.data["triggered"])))
+                        self.update("triggered")
+
+    async def _edit_(self, after, **void):
+        message = after
+        if message.id in self.data["triggered"]:
+            try:
+                channel = await self.bot.fetch_channel(self.data[message.guild.id][react][1])
+                m = await self.bot.fetch_message(self.data["triggered"][message.id], channel)
+                embed = await self.bot.as_embed(message, link=True, colour=True)
+                text, link = embed.description.rsplit("\n\n", 1)
+                description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in sorted(message.reactions, key=lambda r: -r.count) if str(r.emoji) in table) + "   " + link
+                embed.description = lim_str(description, 2048)
+                await m.edit(content=None, embed=embed)
+            except (discord.NotFound, discord.Forbidden):
+                self.data[message.guild.id].pop(react)
+            else:
+                self.data["triggered"][message.id] = m.id
+                with tracebacksuppressor(RuntimeError, KeyError):
+                    while len(self.data["triggered"]) > 32768:
+                        self.data["triggered"].pop(next(iter(self.data["triggered"])))
+                self.update("triggered")
 
 
 class UpdateRolegivers(Database):
