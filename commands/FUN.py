@@ -1681,7 +1681,7 @@ class UpdateMimics(Database):
                             except (EOFError, discord.NotFound):
                                 bot.data.logM.pop(guild.id)
                                 return
-                            emb = as_embed(message, link=True)
+                            emb = await self.bot.as_embed(message, link=True)
                             emb.colour = discord.Colour(0x00FF00)
                             action = f"**Mimic invoked in** {channel_mention(channel.id)}:\n"
                             emb.description = lim_str(action + emb.description, 2048)

@@ -2121,9 +2121,9 @@ class UpdateMessageLogs(Database):
                     self.data.pop(guild.id)
                     return
                 emb = as_embed(after)
-                emb2 = await bot.as_embed(before)
+                emb2 = await self.bot.as_embed(before)
                 emb.colour = discord.Colour(0x0000FF)
-                action = f"**Message edited in** {channel_mention(after.channel.id)}:\nhttps://discord.com/channels/{guild.id}/{after.channel.id}/{after.id}"
+                action = f"**Message edited in** {channel_mention(after.channel.id)}:\n[View Message](https://discord.com/channels/{guild.id}/{after.channel.id}/{after.id})"
                 emb.add_field(name="Before", value=lim_str(emb2.description, 1024))
                 emb.add_field(name="After", value=lim_str(emb.description, 1024))
                 emb.description = action
@@ -2191,7 +2191,7 @@ class UpdateMessageLogs(Database):
                                 init = user_mention(t.id)
             except (PermissionError, discord.Forbidden, discord.HTTPException):
                 init = "[UNKNOWN USER]"
-            emb = await bot.as_embed(message, link=True)
+            emb = await self.bot.as_embed(message, link=True)
             emb.colour = discord.Colour(0xFF0000)
             action = f"{init} **deleted message from** {channel_mention(message.channel.id)}:\n"
             emb.description = lim_str(action + (emb.description or ""), 2048)
@@ -2255,7 +2255,7 @@ class UpdateMessageLogs(Database):
             #     emb.description += nextline
             embs = deque((emb,))
             for message in messages:
-                emb = await bot.as_embed(message, link=True)
+                emb = await self.bot.as_embed(message, link=True)
                 emb.colour = discord.Colour(0x7F007F)
                 embs.append(emb)
             self.bot.send_embeds(channel, embs)
