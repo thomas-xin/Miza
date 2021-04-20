@@ -3771,9 +3771,26 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             else:
                 raw.member = None
             self.dispatch("raw_reaction_add", raw)
-            create_task(self.reaction_add())
+            create_task(self.reaction_add(raw))
 
         discord.state.ConnectionState.parse_message_reaction_add = lambda self, data: parse_message_reaction_add(self, data)
+
+        def parse_message_reaction_remove(self, data):
+            emoji = data["emoji"]
+            emoji_id = discord.utils._get_as_snowflake(emoji, "id")
+            emoji = discord.PartialEmoji.with_state(self, id=emoji_id, animated=emoji.get("animated", False), name=emoji["name"])
+            raw = RawReactionActionEvent(data, emoji, "REACTION_REMOVE")
+            self.dispatch("raw_reaction_remove", raw)
+            create_task(self.reaction_remove(raw))
+
+        discord.state.ConnectionState.parse_message_reaction_remove = lambda self, data: parse_message_reaction_remove(self, data)
+
+        def parse_message_reaction_remove_all(self, data):
+            raw = RawReactionClearEvent(data)
+            self.dispatch("raw_reaction_clear", raw)
+            create_task(self.reaction_clear(raw))
+        
+        discord.state.ConnectionState.parse_message_reaction_remove_all = lambda self, data: parse_message_reaction_remove_all(self, data)
 
         def parse_message_create(self, data):
             message = bot.ExtendedMessage.new(data)
@@ -3802,17 +3819,47 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             reacts="❎",
         )
 
-    async def reaction_add(self):
+    async def reaction_add(self, raw):
+        channel = await self.fetch_channel(raw.channel_id)
+        user = await self.fetch_user(raw.user_id)
+        emoji = self._upgrade_partial_emoji(raw.emoji)
         try:
-            channel = await self.fetch_channel(raw.channel_id)
-            user = await self.fetch_user(raw.user_id)
+            message = await self.fetch_message(raw.message_id)
+        except LookupError:
             message = await self.fetch_message(raw.message_id, channel=channel)
-        except discord.NotFound:
-            pass
-        else:
-            emoji = self._upgrade_partial_emoji(raw.emoji)
             reaction = message._add_reaction(data, emoji, user.id)
-            self.dispatch("reaction_add", reaction, user)
+            if reaction.count > 1:
+                reaction.count -= 1
+        else:
+            reaction = message._add_reaction(data, emoji, user.id)
+        self.dispatch("reaction_add", reaction, user)
+        self.add_message(message, files=False)
+
+    async def reaction_remove(self, raw):
+        channel = await self.fetch_channel(raw.channel_id)
+        user = await self.fetch_user(raw.user_id)
+        emoji = self._upgrade_partial_emoji(raw.emoji)
+        try:
+            message = await self.fetch_message(raw.message_id)
+        except LookupError:
+            message = await self.fetch_message(raw.message_id, channel=channel)
+            reaction = message._add_reaction(data, emoji, user.id)
+            if reaction.count > 1:
+                reaction.count -= 1
+        else:
+            reaction = message._remove_reaction(data, emoji, user.id)
+        self.dispatch("reaction_remove", reaction, user)
+        self.add_message(message, files=False)
+    
+    async def reaction_clear(self, raw):
+        channel = await self.fetch_channel(raw.channel_id)
+        user = await self.fetch_user(raw.user_id)
+        emoji = self._upgrade_partial_emoji(raw.emoji)
+        message = await self.fetch_message(raw.message_id, channel=channel)
+        old_reactions = message.reactions.copy()
+        message.reactions.clear()
+        self.dispatch("reaction_clear", message, old_reactions)
+        self.add_message(message, files=False)
 
     async def init_ready(self, futs):
         with tracebacksuppressor:
