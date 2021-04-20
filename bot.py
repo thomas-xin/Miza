@@ -1501,7 +1501,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     resp = requests.get(url, headers=Request.header(), timeout=8)
                     headers = fcdict(resp.headers)
                     if headers.get("Content-Type", "").split("/", 1)[0] == "image":
-                        if headers.get("Content-Length", inf) < 8388608:
+                        if int(headers.get("Content-Length", inf)) < 8388608:
                             url = await self.data.exec.uproxy(url)
                         else:
                             url = await self.data.exec.aproxy(url)
