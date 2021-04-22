@@ -559,8 +559,8 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
         w, h = max_size(*size, maxsize)
         # Adjust FPS if duration is too long
         fps = fps or orig_fps or 16
-        orig_fps = orig_fps or fps or 16
-        fps = min(fps, orig_fps)
+        # orig_fps = orig_fps or fps or 16
+        # fps = min(fps, orig_fps)
         vf = ""
         if w != size[0]:
             vf += "scale=" + str(round(w)) + ":-1:flags=lanczos,"
@@ -607,9 +607,9 @@ def create_gif(in_type, args, delay):
                     length = f
                 except EOFError:
                     break
-            if length != 0:
+            if length != 0 and not delay:
                 # maxsize = int(min(maxsize, 32768 / (len(images) + length) ** 0.5))
-                delay = img.info.get("duration") or delay or 16
+                delay = img.info.get("duration") or delay or 0.0625
             for f in range(2147483648):
                 try:
                     img.seek(f)
@@ -632,7 +632,7 @@ def create_gif(in_type, args, delay):
     # if imgs[0].size[0] != size[0]:
     #     imgs = (resize_to(img, *size, operation="hamming") for img in imgs)
     count = len(imgs)
-    delay = delay or 0.04
+    delay = delay or 0.0625
     return dict(duration=delay * count, count=count, frames=imgs)
 
 def rainbow_gif2(image, duration):
@@ -642,7 +642,7 @@ def rainbow_gif2(image, duration):
             image.seek(f)
         except EOFError:
             break
-        total += max(image.info.get("duration", 0), 1 / 60)
+        total += max(image.info.get("duration", 0), 1000 / 60)
     length = f
     loops = total / duration / 1000
     scale = 1
@@ -740,7 +740,7 @@ def spin_gif2(image, duration):
             image.seek(f)
         except EOFError:
             break
-        total += max(image.info.get("duration", 0), 1 / 60)
+        total += max(image.info.get("duration", 0), 1000 / 60)
     length = f
     loops = total / duration / 1000
     scale = 1
@@ -805,14 +805,14 @@ def spin_gif(image, duration):
     return dict(duration=1000 / fps * count, count=count, frames=spin_gif_iterator(image))
 
 
-def orbit_gif2(image, orbitals, duration):
+def orbit_gif2(image, orbitals, duration, extras):
     total = 0
     for f in range(2147483648):
         try:
             image.seek(f)
         except EOFError:
             break
-        total += max(image.info.get("duration", 0), 1 / 60)
+        total += max(image.info.get("duration", 0), 1000 / 60)
     length = f
     loops = total / duration / 1000
     scale = 1
@@ -826,9 +826,12 @@ def orbit_gif2(image, orbitals, duration):
         loops = 1 if loops >= 0 else -1
     maxsize = 960
     size = list(max_size(*image.size, maxsize))
+    sources = [image]
+    sources.extend(extras)
 
-    def orbit_gif_iterator(image):
-        diameter = max(image.height, image.width)
+    def orbit_gif_iterator(sources):
+        x = orbitals if len(sources) == 1 else 1
+        diameter = max(sources[0].size)
         scale2 = orbitals / pi * (sqrt(5) + 1) / 2 + 0.5
         size = (round(diameter * scale2),) * 2
         for f in range(0, length * scale):
@@ -839,31 +842,46 @@ def orbit_gif2(image, orbitals, duration):
                 if orbitals & 1:
                     im3 = Image.new("RGBA", size, (0,) * 4)
             for j in range(orbitals):
-                angle = f / length / scale * loops * tau / orbitals + j / orbitals * tau
-                pos = im.width / 2 + np.array((cos(angle), sin(angle))) * (diameter * scale2 / 2 - diameter / 2) - (image.width / 2, image.height / 2)
-                if not j & 1:
-                    im.paste(image, list(map(round, pos)))
-                elif j == orbitals - 1 and orbitals & 1:
-                    im3.paste(image, list(map(round, pos)))
+                image = sources[j % len(sources)]
+                if hasattr(image, "length"):
+                    g = f % image.length
                 else:
-                    im2.paste(image, list(map(round, pos)))
+                    g = f
+                try:
+                    image.seek(g)
+                except EOFError:
+                    image.length = f % length
+                    image.seek(0)
+                image = resize_max(image, diameter, force=True)
+                angle = f / length / scale * loops * tau / x + j / orbitals * tau
+                pos = im.width / 2 + np.array((cos(angle), sin(angle))) * (diameter * scale2 / 2 - diameter / 2) - (image.width / 2, image.height / 2)
+                pos = list(map(round, pos))
+                if j == orbitals - 1 and orbitals & 1 and orbitals > 1:
+                    im3.paste(image, pos)
+                elif not j & 1:
+                    im.paste(image, pos)
+                else:
+                    im2.paste(image, pos)
             if orbitals > 1:
                 if orbitals & 1:
                     im2 = Image.alpha_composite(im3, im2)
                 im = Image.alpha_composite(im, im2)
             yield im
 
-    return dict(duration=total * scale, count=length * scale, frames=orbit_gif_iterator(image))
+    return dict(duration=total * scale, count=length * scale, frames=orbit_gif_iterator(sources))
 
 
-def orbit_gif(image, orbitals, duration):
-    duration /= orbitals
+def orbit_gif(image, orbitals, duration, extras):
+    if extras:
+        extras = [get_image(url, url) for url in extras[:orbitals]]
+    else:
+        duration /= orbitals
     try:
         image.seek(1)
     except EOFError:
         image.seek(0)
     else:
-        return orbit_gif2(image, orbitals, duration)
+        return orbit_gif2(image, orbitals, duration, extras)
     maxsize = 960
     size = list(image.size)
     if duration == 0:
@@ -882,10 +900,13 @@ def orbit_gif(image, orbitals, duration):
     if duration < 0:
         rate = -rate
     count = 256 // abs(rate)
+    sources = [image]
+    sources.extend(extras)
 
     # Repeatedly rotate image and return copies
-    def orbit_gif_iterator(image):
-        diameter = max(image.height, image.width)
+    def orbit_gif_iterator(sources):
+        x = orbitals if len(sources) == 1 else 1
+        diameter = max(sources[0].size)
         scale = orbitals / pi * (sqrt(5) + 1) / 2 + 0.5
         size = (round(diameter * scale),) * 2
         for i in range(0, 256, abs(rate)):
@@ -895,21 +916,24 @@ def orbit_gif(image, orbitals, duration):
                 if orbitals & 1:
                     im3 = Image.new("RGBA", size, (0,) * 4)
             for j in range(orbitals):
-                angle = i / 256 * tau / orbitals + j / orbitals * tau
+                image = sources[j % len(sources)]
+                image = resize_max(image, diameter, force=True)
+                angle = i / 256 * tau / x + j / orbitals * tau
                 pos = im.width / 2 + np.array((cos(angle), sin(angle))) * (diameter * scale / 2 - diameter / 2) - (image.width / 2, image.height / 2)
-                if not j & 1:
-                    im.paste(image, list(map(round, pos)))
-                elif j == orbitals - 1 and orbitals & 1:
-                    im3.paste(image, list(map(round, pos)))
+                pos = list(map(round, pos))
+                if j == orbitals - 1 and orbitals & 1 and orbitals > 1:
+                    im3.paste(image, pos)
+                elif not j & 1:
+                    im.paste(image, pos)
                 else:
-                    im2.paste(image, list(map(round, pos)))
+                    im2.paste(image, pos)
             if orbitals > 1:
                 if orbitals & 1:
                     im2 = Image.alpha_composite(im3, im2)
                 im = Image.alpha_composite(im, im2)
             yield im
 
-    return dict(duration=1000 / fps * count, count=count, frames=orbit_gif_iterator(image))
+    return dict(duration=1000 / fps * count, count=count, frames=orbit_gif_iterator(sources))
 
 
 def to_square(image):
@@ -964,7 +988,7 @@ def scroll_gif2(image, direction, duration):
             image.seek(f)
         except EOFError:
             break
-        dur = max(image.info.get("duration", 0), 1 / 60)
+        dur = max(image.info.get("duration", 0), 1000 / 60)
         total += dur
     count = f
 
@@ -1024,7 +1048,7 @@ def magik_gif2(image, cell_count, grid_distance, iterations):
             image.seek(f)
         except EOFError:
             break
-        total += max(image.info.get("duration", 0), 1 / 60)
+        total += max(image.info.get("duration", 0), 1000 / 60)
     length = f
     loops = total / 2 / 1000
     scale = 1
@@ -1571,17 +1595,17 @@ def colourspace(image, source, dest):
 
 
 # Autodetect max image size, keeping aspect ratio
-def max_size(w, h, maxsize):
+def max_size(w, h, maxsize, force=False):
     s = w * h
     m = (maxsize * maxsize << 1) / 3
-    if s > m:
+    if s > m or force:
         r = (m / s) ** 0.5
-        w = int(w * r)
-        h = int(h * r)
+        w = round(w * r)
+        h = round(h * r)
     return w, h
 
-def resize_max(image, maxsize, resample=Image.LANCZOS, box=None, reducing_gap=None):
-    w, h = max_size(image.width, image.height, maxsize)
+def resize_max(image, maxsize, resample=Image.LANCZOS, box=None, reducing_gap=None, force=False):
+    w, h = max_size(image.width, image.height, maxsize, force=force)
     if w != image.width or h != image.height:
         if type(resample) is str:
             image = resize_to(image, w, h, resample)
@@ -1589,19 +1613,20 @@ def resize_max(image, maxsize, resample=Image.LANCZOS, box=None, reducing_gap=No
             image = image.resize([w, h], resample, box, reducing_gap)
     return image
 
-resizers = {
-    "sinc": Image.LANCZOS,
-    "lanczos": Image.LANCZOS,
-    "cubic": Image.BICUBIC,
-    "bicubic": Image.BICUBIC,
-    "scale2x": "scale2x",
-    "hamming": Image.HAMMING,
-    "linear": Image.BILINEAR,
-    "bilinear": Image.BILINEAR,
-    "nearest": Image.NEAREST,
-    "nearestneighbour": Image.NEAREST,
-    "crop": "crop",
-}
+resizers = dict(
+    sinc=Image.LANCZOS,
+    lanczos=Image.LANCZOS,
+    cubic=Image.BICUBIC,
+    bicubic=Image.BICUBIC,
+    scale2x="scale2x",
+    hamming=Image.HAMMING,
+    linear=Image.BILINEAR,
+    bilinear=Image.BILINEAR,
+    nearest=Image.NEAREST,
+    nearestneighbour=Image.NEAREST,
+    crop="crop",
+    padding="crop",
+)
 
 def resize_mult(image, x, y, operation):
     if x == y == 1:
@@ -1900,7 +1925,7 @@ def blend_op(image, url, operation, amount, recursive=True):
                         image2.seek(f)
                     except EOFError:
                         break
-                    dur += max(image2.info.get("duration", 0), 1 / 60)
+                    dur += max(image2.info.get("duration", 0), 1000 / 60)
                 count = f
 
                 def blend_op_iterator(image, image2, operation, amount):
@@ -1915,7 +1940,10 @@ def blend_op(image, url, operation, amount, recursive=True):
                             temp = image.convert("RGBA")
                         else:
                             temp = image
-                        yield blend_op(temp, image2, operation, amount, recursive=False)
+                        temp2 = image2._images[image2._position]
+                        # print(image2._position)
+                        # image2._images[image2._position].save(f"temp{f}.png")
+                        yield blend_op(temp, temp2, operation, amount, recursive=False)
 
                 return dict(duration=dur, count=count, frames=blend_op_iterator(image, image2, operation, amount))
         try:
@@ -2282,10 +2310,10 @@ def from_bytes(b, save=None):
         fn = "cache/" + str(ts)
         with open(fn, "wb") as f:
             f.write(data)
-        cmd = ("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,r_frame_rate", "-of", "csv=s=x:p=0", fn)
+        cmd = ("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,avg_frame_rate", "-of", "csv=s=x:p=0", fn)
         print(cmd)
         p = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        cmd2 = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-an", "-i", fn, "-f", "rawvideo", "-pix_fmt", fmt, "-"]
+        cmd2 = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-an", "-i", fn, "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0", "-"]
         print(cmd2)
         proc = psutil.Popen(cmd2, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         # exc.submit(write_video, proc, data)
@@ -2452,7 +2480,7 @@ def evalImg(url, operation, args):
                         image.seek(f)
                     except EOFError:
                         break
-                    new["duration"] += max(image.info.get("duration", 0), 1 / 60)
+                    new["duration"] += max(image.info.get("duration", 0), 1000 / 60)
                 fps = 1000 * f / new["duration"]
                 step = 1
                 while f // step > 4096 and fps // step >= 24:
@@ -2483,13 +2511,13 @@ def evalImg(url, operation, args):
                 it = iter(frames)
                 first = next(it)
 
-                def frameit():
+                def frameit(first, it):
                     yield first
                     with suppress(StopIteration):
                         while True:
                             yield next(it)
 
-                frames = frameit()
+                frames = frameit(first, it)
             mode = str(first.mode)
             if mode == "P":
                 mode = "RGBA"
@@ -2512,7 +2540,7 @@ def evalImg(url, operation, args):
                 if issubclass(type(frame), Image.Image):
                     if frame.size != size:
                         frame = frame.resize(size)
-                    if str(frame.mode) != mode:
+                    if frame.mode != mode:
                         frame = frame.convert(mode)
                     b = frame.tobytes()
                 elif type(frame) is io.BytesIO:

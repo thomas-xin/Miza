@@ -1013,18 +1013,37 @@ class Orbit(Command):
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
         name, value, url = await get_image(bot, user, message, args, argv, ext="gif", raw=True, default="")
+        extras = deque()
+        while value:
+            spl = value.split(None, 1)
+            urls = await bot.follow_url(spl[0], best=True, allow=True, limit=1)
+            if not urls:
+                break
+            value = spl[-1] if len(spl) > 1 else ""
+            extras.append(urls[0])
+        # if extras:
+        #     print(url, *extras)
         spl = value.rsplit(None, 1)
         if not spl:
-            count = 5
+            if not extras:
+                count = 5
+            else:
+                count = len(extras) + 1
             duration = 2
         elif len(spl) == 1:
-            count = await bot.eval_math(spl[0])
-            duration = 2
+            if not extras:
+                count = await bot.eval_math(spl[0])
+                duration = 2
+            else:
+                count = len(extras) + 1
+                duration = await bot.eval_math(spl[0])
         else:
             count = await bot.eval_math(spl[0])
             duration = await bot.eval_math(spl[1])
+        if count > 64:
+            raise OverflowError()
         with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "orbit_gif", [count, duration, "-gif"], timeout=_timeout)
+            resp = await process_image(url, "orbit_gif", [count, duration, list(extras), "-gif"], timeout=_timeout)
             fn = resp[0]
         await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
