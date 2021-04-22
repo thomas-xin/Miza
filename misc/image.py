@@ -849,7 +849,7 @@ def orbit_gif2(image, orbitals, duration):
                     im2.paste(image, list(map(round, pos)))
             if orbitals > 1:
                 if orbitals & 1:
-                    im2 = Image.alpha_composite(im2, im3)
+                    im2 = Image.alpha_composite(im3, im2)
                 im = Image.alpha_composite(im, im2)
             yield im
 
@@ -905,7 +905,7 @@ def orbit_gif(image, orbitals, duration):
                     im2.paste(image, list(map(round, pos)))
             if orbitals > 1:
                 if orbitals & 1:
-                    im2 = Image.alpha_composite(im2, im3)
+                    im2 = Image.alpha_composite(im3, im2)
                 im = Image.alpha_composite(im, im2)
             yield im
 
