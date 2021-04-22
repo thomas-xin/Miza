@@ -722,7 +722,7 @@ class Laplacian(Command):
 class ColourSpace(Command):
     name = ["ColorSpace"]
     description = "Changes the colour space of the supplied image."
-    usage = "<url> <2:source(rgb)>? <1:dest(hsv)>?"
+    usage = "<0:url> <2:source(rgb)>? <1:dest(hsv)>?"
     no_parse = True
     rate_limit = (3, 6.5)
     _timeout_ = 4
@@ -1002,6 +1002,33 @@ class Spin(Command):
         await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
+class Orbit(Command):
+    name = ["Orbital", "Orbitals"]
+    description = "Renders a ring of orbiting sprites of the supplied image."
+    usage = "<0:url> <1:orbital_count(5)>? <2:duration(2)>?"
+    no_parse = True
+    rate_limit = (8, 19)
+    _timeout_ = 13
+    typing = True
+
+    async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
+        name, value, url = await get_image(bot, user, message, args, argv, ext="gif", raw=True, default="")
+        spl = value.rsplit(None, 1)
+        if not spl:
+            count = 5
+            duration = 2
+        elif len(spl) == 1:
+            count = await bot.eval_math(spl[0])
+            duration = 2
+        else:
+            count = await bot.eval_math(spl[0])
+            duration = await bot.eval_math(spl[1])
+        with discord.context_managers.Typing(channel):
+            resp = await process_image(url, "orbit_gif", [count, duration, "-gif"], timeout=_timeout)
+            fn = resp[0]
+        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
+
+
 class GMagik(Command):
     name = ["MagikGIF"]
     description = "Repeatedly applies the Magik image filter to supplied image."
@@ -1102,7 +1129,7 @@ class CreateGIF(Command):
 class Resize(Command):
     name = ["ImageScale", "Scale", "Rescale", "ImageResize"]
     description = "Changes size of supplied image, using an optional scaling operation."
-    usage = "<0:url> <1:x_multiplier(1)>? <2:y_multiplier(x)>? (nearest|linear|hamming|bicubic|lanczos|scale2x|auto)?"
+    usage = "<0:url> <1:x_multiplier(1)>? <2:y_multiplier(x)>? (nearest|linear|hamming|bicubic|lanczos|scale2x|crop|auto)?"
     no_parse = True
     rate_limit = (3, 6)
     flags = "l"
@@ -1116,7 +1143,7 @@ class Resize(Command):
             argv = " ".join(best_url(a) for a in message.attachments) + " " * bool(argv) + argv
         if not args or argv == "list":
             if "l" in flags or argv == "list":
-                return ini_md("Available scaling operations: [nearest, linear, hamming, bicubic, lanczos, scale2x, auto]")
+                return ini_md("Available scaling operations: [nearest, linear, hamming, bicubic, lanczos, scale2x, crop, auto]")
             # raise ArgumentError("Please input an image by URL or attachment.")
         with discord.context_managers.Typing(channel):
             try:

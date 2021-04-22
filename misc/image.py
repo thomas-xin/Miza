@@ -8,6 +8,7 @@ Image.MAX_IMAGE_PIXELS = 4294967296
 from zipfile import ZipFile
 import matplotlib.pyplot as plt
 colorlib = colorspace.colorlib()
+from math import *
 
 write, sys.stdout.write = sys.stdout.write, lambda *args, **kwargs: None
 import pygame
@@ -804,6 +805,113 @@ def spin_gif(image, duration):
     return dict(duration=1000 / fps * count, count=count, frames=spin_gif_iterator(image))
 
 
+def orbit_gif2(image, orbitals, duration):
+    total = 0
+    for f in range(2147483648):
+        try:
+            image.seek(f)
+        except EOFError:
+            break
+        total += max(image.info.get("duration", 0), 1 / 60)
+    length = f
+    loops = total / duration / 1000
+    scale = 1
+    while abs(loops * scale) < 1:
+        scale *= 2
+        if length * scale >= 64:
+            loops = 1 if loops >= 0 else -1
+            break
+    loops = round(loops * scale) / scale
+    if abs(loops) < 1:
+        loops = 1 if loops >= 0 else -1
+    maxsize = 960
+    size = list(max_size(*image.size, maxsize))
+
+    def orbit_gif_iterator(image):
+        diameter = max(image.height, image.width)
+        scale2 = orbitals / pi * (sqrt(5) + 1) / 2 + 0.5
+        size = (round(diameter * scale2),) * 2
+        for f in range(0, length * scale):
+            image.seek(f % length)
+            im = Image.new("RGBA", size, (0,) * 4)
+            if orbitals > 1:
+                im2 = Image.new("RGBA", size, (0,) * 4)
+                if orbitals & 1:
+                    im3 = Image.new("RGBA", size, (0,) * 4)
+            for j in range(orbitals):
+                angle = f / length / scale * loops * tau / orbitals + j / orbitals * tau
+                pos = im.width / 2 + np.array((cos(angle), sin(angle))) * (diameter * scale2 / 2 - diameter / 2) - (image.width / 2, image.height / 2)
+                if not j & 1:
+                    im.paste(image, list(map(round, pos)))
+                elif j == orbitals - 1 and orbitals & 1:
+                    im3.paste(image, list(map(round, pos)))
+                else:
+                    im2.paste(image, list(map(round, pos)))
+            if orbitals > 1:
+                if orbitals & 1:
+                    im2 = Image.alpha_composite(im2, im3)
+                im = Image.alpha_composite(im, im2)
+            yield im
+
+    return dict(duration=total * scale, count=length * scale, frames=orbit_gif_iterator(image))
+
+
+def orbit_gif(image, orbitals, duration):
+    duration /= orbitals
+    try:
+        image.seek(1)
+    except EOFError:
+        image.seek(0)
+    else:
+        return orbit_gif2(image, orbitals, duration)
+    maxsize = 960
+    size = list(image.size)
+    if duration == 0:
+        fps = 0
+    else:
+        fps = round(256 / abs(duration))
+    rate = 1
+    while fps > 32 and rate < 8:
+        fps >>= 1
+        rate <<= 1
+    while fps >= 64:
+        fps >>= 1
+        rate <<= 1
+    if fps <= 0:
+        raise ValueError("Invalid framerate value.")
+    if duration < 0:
+        rate = -rate
+    count = 256 // abs(rate)
+
+    # Repeatedly rotate image and return copies
+    def orbit_gif_iterator(image):
+        diameter = max(image.height, image.width)
+        scale = orbitals / pi * (sqrt(5) + 1) / 2 + 0.5
+        size = (round(diameter * scale),) * 2
+        for i in range(0, 256, abs(rate)):
+            im = Image.new("RGBA", size, (0,) * 4)
+            if orbitals > 1:
+                im2 = Image.new("RGBA", size, (0,) * 4)
+                if orbitals & 1:
+                    im3 = Image.new("RGBA", size, (0,) * 4)
+            for j in range(orbitals):
+                angle = i / 256 * tau / orbitals + j / orbitals * tau
+                pos = im.width / 2 + np.array((cos(angle), sin(angle))) * (diameter * scale / 2 - diameter / 2) - (image.width / 2, image.height / 2)
+                if not j & 1:
+                    im.paste(image, list(map(round, pos)))
+                elif j == orbitals - 1 and orbitals & 1:
+                    im3.paste(image, list(map(round, pos)))
+                else:
+                    im2.paste(image, list(map(round, pos)))
+            if orbitals > 1:
+                if orbitals & 1:
+                    im2 = Image.alpha_composite(im2, im3)
+                im = Image.alpha_composite(im, im2)
+            yield im
+
+    return dict(duration=1000 / fps * count, count=count, frames=orbit_gif_iterator(image))
+
+
 def to_square(image):
     w, h = image.size
     d = w - h
@@ -950,7 +1058,7 @@ def magik_gif2(image, cell_count, grid_distance, iterations):
 
 
 def magik_gif(image, cell_count=7, iterations=1):
-    grid_distance = int(max(1, round(np.sqrt(np.prod(image.size)) / cell_count / 3 / iterations)))
+    grid_distance = int(max(1, round(sqrt(np.prod(image.size)) / cell_count / 3 / iterations)))
     try:
         image.seek(1)
     except EOFError:
@@ -1041,7 +1149,7 @@ def grid_to_mesh(src_grid, dst_grid):
 
 def magik(image, cell_count=7):
     dst_grid = griddify(shape_to_rect(image.size), cell_count, cell_count)
-    src_grid = distort_grid(dst_grid, int(max(1, round(np.sqrt(np.prod(image.size)) / cell_count / 3))))
+    src_grid = distort_grid(dst_grid, int(max(1, round(sqrt(np.prod(image.size)) / cell_count / 3))))
     mesh = grid_to_mesh(src_grid, dst_grid)
     return image.transform(image.size, Image.MESH, mesh, resample=Image.NEAREST)
 
@@ -1492,6 +1600,7 @@ resizers = {
     "bilinear": Image.BILINEAR,
     "nearest": Image.NEAREST,
     "nearestneighbour": Image.NEAREST,
+    "crop": "crop",
 }
 
 def resize_mult(image, x, y, operation):
@@ -1551,6 +1660,13 @@ def resize_to(image, w, h, operation="auto"):
         if image.size == (w, h):
             return image
         filt = Image.NEAREST
+    elif filt == "crop":
+        if image.mode == "P":
+            image = image.convert("RGBA")
+        out = Image.new(image.mode, (w, h), (0,) * len(image.mode))
+        pos = tuple(np.array((w, h)) - image.size >> 1)
+        out.paste(image, pos)
+        return out
     return image.resize([w, h], filt)
 
 def rotate_to(image, angle, expand=True):
@@ -2383,7 +2499,10 @@ def evalImg(url, operation, args):
                 vf = None
                 # vf = "split[s0][s1];[s0]palettegen=reserve_transparent=1:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle:alpha_threshold=128"
             else:
-                vf = "split[s0][s1];[s0]palettegen=reserve_transparent=1:stats_mode=diff[p];[s1][p]paletteuse=diff_mode=rectangle:alpha_threshold=128"
+                vf = "split[s0][s1];[s0]palettegen="
+                if mode == "RGBA":
+                    vf += "reserve_transparent=1:"
+                vf += "stats_mode=diff[p];[s1][p]paletteuse=alpha_threshold=128:diff_mode=rectangle"
             if vf:
                 command.extend(("-vf", vf))
             command.extend(("-loop", "0", out))
