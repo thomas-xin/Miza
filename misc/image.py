@@ -835,7 +835,6 @@ def orbit_gif2(image, orbitals, duration, extras):
         scale2 = orbitals / pi * (sqrt(5) + 1) / 2 + 0.5
         size = (round(diameter * scale2),) * 2
         for f in range(0, length * scale):
-            image.seek(f % length)
             im = Image.new("RGBA", size, (0,) * 4)
             if orbitals > 1:
                 im2 = Image.new("RGBA", size, (0,) * 4)
@@ -850,7 +849,7 @@ def orbit_gif2(image, orbitals, duration, extras):
                 try:
                     image.seek(g)
                 except EOFError:
-                    image.length = f % length
+                    image.length = f
                     image.seek(0)
                 image = resize_max(image, diameter, force=True)
                 angle = f / length / scale * loops * tau / x + j / orbitals * tau

@@ -46,16 +46,18 @@ time_snowflake = lambda dt, high=None: discord.utils.time_snowflake(dt, high) if
 def id2ts(id):
     i = (id >> 22) + (id & 0xFFF)
     try:
-        return (i / 0x1000 + DISCORD_EPOCH) / 1000
+        j = i + (id & 0xFFF) / 0x1000
     except OverflowError:
-        return (i // 0x1000 + DISCORD_EPOCH) // 1000
+        return (i + DISCORD_EPOCH) // 1000
+    return (j + DISCORD_EPOCH) / 1000
 
 def id2td(id):
     i = (id >> 22) + (id & 0xFFF)
     try:
-        return i / 0x1000 / 1000
+        j = i + (id & 0xFFF) / 0x1000
     except OverflowError:
-        return i // 0x1000 // 1000
+        return i // 1000
+    return j / 1000
 
 def snowflake_time(id):
     i = getattr(id, "id", None)
