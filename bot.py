@@ -3095,7 +3095,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             return
         if reference:
             if len(embeds) == 1:
-                return create_task(send_with_reply(channel, reference, embed=embeds[0]))
+                return create_task(send_with_react(channel, embed=embeds[0], reference=reference, reacts=reacts))
             elif getattr(reference, "slash", None):
                 return create_task(self.ignore_interaction(reference))
         c_id = verify_id(channel)
@@ -3817,6 +3817,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             title=f"⚠ {type(ex).__name__} ⚠",
             fields=(("Unexpected or confusing error?", f"Message {owners}, or join the [support server]({self.rcc_invite})!"),),
             reacts="❎",
+            reference=reference,
         )
 
     async def reaction_add(self, raw):
