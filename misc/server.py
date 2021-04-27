@@ -418,7 +418,7 @@ def ytdl():
         def af():
             RESPONSES[t] = fut = concurrent.futures.Future()
             try:
-                send(f"!{t}\x7fbool(bot.audio.returns[{t}].loaded)", escape=False)
+                send(f"!{t}\x7fbool(getattr(bot.audio.returns[{t}], 'loaded', None))", escape=False)
                 j, after = fut.result()
                 RESPONSES.pop(t, None)
             except:
@@ -430,7 +430,7 @@ def ytdl():
         f = DownloadingFile("cache/" + fn, af=af)
         resp = flask.send_file(f, as_attachment=d, attachment_filename=name + fmt, mimetype=f"audio/{fmt[1:]}", conditional=True)
         resp.headers.update(CHEADERS)
-        resp.headers["Transfer-Encoding"] = "Chunked"
+        # resp.headers["Transfer-Encoding"] = "Chunked"
         if d and af():
             resp.status_code = 202
         return resp

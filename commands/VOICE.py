@@ -3139,6 +3139,8 @@ class Skip(Command):
                 else:
                     i += 1
             if pops:
+                if 1 in pops:
+                    auds.clear_next()
                 auds.queue.pops(pops)
             if auds.queue:
                 # If first item is skipped, advance queue and update audio player

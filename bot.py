@@ -480,7 +480,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                                 d = await self.fetch_channel(key)
                             else:
                                 tester = await create_future(data.__getitem__, key)
-                                if not tester and not started:
+                                if not getattr(obj, "no_garbage", None) and not tester and self.started:
                                     raise LookupError
                                 with suppress(KeyError):
                                     d = self.cache.guilds[key]
