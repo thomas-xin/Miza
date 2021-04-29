@@ -31,17 +31,19 @@ from zipfile import ZipFile
 import urllib.request, urllib.parse
 import nacl.secret
 
+utils = discord.utils
 requests = requests.Session()
 url_parse = urllib.parse.quote_plus
-escape_markdown = discord.utils.escape_markdown
-escape_mentions = discord.utils.escape_mentions
+_uriquote = urllib.parse.quote
+escape_markdown = utils.escape_markdown
+escape_mentions = utils.escape_mentions
 escape_everyone = lambda s: s.replace("@everyone", "@\xadeveryone").replace("@here", "@\xadhere")
 escape_roles = lambda s: escape_everyone(s).replace("<@&", "<@\xad&")
 
 DISCORD_EPOCH = 1420070400000 # 1 Jan 2015
 MIZA_EPOCH = 1577797200000 # 1 Jan 2020
 
-time_snowflake = lambda dt, high=None: discord.utils.time_snowflake(dt, high) if type(dt) is not int else getattr(dt, "id", None) or dt
+time_snowflake = lambda dt, high=None: utils.time_snowflake(dt, high) if type(dt) is not int else getattr(dt, "id", None) or dt
 
 def id2ts(id):
     i = (id >> 22) + (id & 0xFFF)
@@ -68,7 +70,7 @@ def snowflake_time(id):
     return i
 
 snowflake_time_2 = lambda id: datetime.datetime.fromtimestamp(id2ts(id))
-snowflake_time_3 = discord.utils.snowflake_time
+snowflake_time_3 = utils.snowflake_time
 
 ip2int = lambda ip: int.from_bytes(b"\x00" + bytes(int(i) for i in ip.split(".")), "big")
 

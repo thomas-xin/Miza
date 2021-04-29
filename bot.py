@@ -57,7 +57,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             guild_ready_timeout=5,
             intents=self.intents,
             allowed_mentions=self.allowed_mentions,
-            assume_unsync_clock=False,
+            assume_unsync_clock=True,
         )
         self.cache_size = cache_size
         # Base cache: contains all other caches
@@ -960,7 +960,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             if len(guild.roles) <= 1:
                 roles = await guild.fetch_roles()
                 guild.roles = sorted(roles)
-                role = discord.utils.get(roles, id=r_id)
+                role = utils.get(roles, id=r_id)
             if role is None:
                 raise LookupError("Role not found.")
         self.cache.roles[r_id] = role
@@ -3767,7 +3767,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
         def parse_message_reaction_add(self, data):
             emoji = data["emoji"]
-            emoji_id = discord.utils._get_as_snowflake(emoji, "id")
+            emoji_id = utils._get_as_snowflake(emoji, "id")
             emoji = discord.PartialEmoji.with_state(self, id=emoji_id, animated=emoji.get("animated", False), name=emoji["name"])
             raw = discord.RawReactionActionEvent(data, emoji, "REACTION_ADD")
 
@@ -3784,7 +3784,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
         def parse_message_reaction_remove(self, data):
             emoji = data["emoji"]
-            emoji_id = discord.utils._get_as_snowflake(emoji, "id")
+            emoji_id = utils._get_as_snowflake(emoji, "id")
             emoji = discord.PartialEmoji.with_state(self, id=emoji_id, animated=emoji.get("animated", False), name=emoji["name"])
             raw = RawReactionActionEvent(data, emoji, "REACTION_REMOVE")
             self.dispatch("raw_reaction_remove", raw)
@@ -3814,6 +3814,154 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             return bot.ExtendedMessage.new(data)
         
         discord.state.ConnectionState.create_message = lambda self, *, channel, data: create_message(self, channel, data)
+    
+        async def request(self, route, *, files=None, form=None, **kwargs):
+            bucket = route.bucket
+            method = route.method
+            url = route.url
+
+            rtype = 0
+            if "/messages" in url:
+                rtype = 1
+
+            lock = self._locks.get(bucket)
+            if lock is None:
+                if rtype == 1:
+                    lock = Semaphore(5, 256, rate_limit=5)
+                else:
+                    lock = asyncio.Lock()
+                if bucket is not None:
+                    self._locks[bucket] = lock
+
+            # header creation
+            headers = {
+                'User-Agent': self.user_agent,
+            }
+
+            if self.token is not None:
+                headers['Authorization'] = 'Bot ' + self.token
+            # some checking if it's a JSON request
+            if 'json' in kwargs:
+                headers['Content-Type'] = 'application/json'
+                kwargs['data'] = utils.to_json(kwargs.pop('json'))
+
+            try:
+                reason = kwargs.pop('reason')
+            except KeyError:
+                pass
+            else:
+                if reason:
+                    headers['X-Audit-Log-Reason'] = _uriquote(reason, safe='/ ')
+
+            kwargs['headers'] = headers
+
+            # Proxy support
+            if self.proxy is not None:
+                kwargs['proxy'] = self.proxy
+            if self.proxy_auth is not None:
+                kwargs['proxy_auth'] = self.proxy_auth
+
+            if not self._global_over.is_set():
+                # wait until the global lock is complete
+                await self._global_over.wait()
+
+            if rtype:
+                ctx = lock
+            else:
+                await lock.acquire()
+                ctx = discord.http.MaybeUnlock(lock)
+            with ctx as maybe_lock:
+                for tries in range(5):
+                    if files:
+                        for f in files:
+                            f.reset(seek=tries)
+
+                    if form:
+                        form_data = aiohttp.FormData()
+                        for params in form:
+                            form_data.add_field(**params)
+                        kwargs['data'] = form_data
+
+                    try:
+                        async with self.__dict__["_HTTPClient__session"].request(method, url, **kwargs) as r:
+                            # log.debug('%s %s with %s has returned %s', method, url, kwargs.get('data'), r.status)
+
+                            # even errors have text involved in them so this is safe to call
+                            data = await discord.http.json_or_text(r)
+
+                            # check if we have rate limit header information
+                            remaining = r.headers.get('X-Ratelimit-Remaining')
+                            if not rtype and remaining == '0' and r.status != 429:
+                                # we've depleted our current bucket
+                                delta = utils._parse_ratelimit_header(r, use_clock=self.use_clock)
+                                # log.debug('A rate limit bucket has been exhausted (bucket: %s, retry: %s).', bucket, delta)
+                                maybe_lock.defer()
+                                self.loop.call_later(delta, lock.release)
+
+                            # the request was successful so just return the text/json
+                            if 300 > r.status >= 200:
+                                # log.debug('%s %s has received %s', method, url, data)
+                                return data
+
+                            # we are being rate limited
+                            if r.status == 429:
+                                if not r.headers.get('Via'):
+                                    # Banned by Cloudflare more than likely.
+                                    raise discord.HTTPException(r, data)
+
+                                # fmt = 'We are being rate limited. Retrying in %.2f seconds. Handled under the bucket "%s"'
+
+                                # sleep a bit
+                                retry_after: float = data['retry_after']  # type: ignore
+                                # log.warning(fmt, retry_after, bucket)
+
+                                # check if it's a global rate limit
+                                is_global = data.get('global', False)
+                                if is_global:
+                                    # log.warning('Global rate limit has been hit. Retrying in %.2f seconds.', retry_after)
+                                    self._global_over.clear()
+
+                                await asyncio.sleep(retry_after)
+                                # log.debug('Done sleeping for the rate limit. Retrying...')
+
+                                # release the global lock now that the
+                                # global rate limit has passed
+                                if is_global:
+                                    self._global_over.set()
+                                    # log.debug('Global rate limit is now over.')
+
+                                continue
+
+                            # we've received a 500 or 502, unconditional retry
+                            if r.status in {500, 502}:
+                                await asyncio.sleep(1 + tries * 2)
+                                continue
+
+                            # the usual error cases
+                            if r.status == 403:
+                                raise discord.Forbidden(r, data)
+                            elif r.status == 404:
+                                raise discord.NotFound(r, data)
+                            elif r.status == 503:
+                                raise discord.DiscordServerError(r, data)
+                            else:
+                                raise discord.HTTPException(r, data)
+
+                    # This is handling exceptions from the request
+                    except OSError as e:
+                        # Connection reset by peer
+                        if tries < 4 and e.errno in (54, 10054):
+                            await asyncio.sleep(1 + tries * 2)
+                            continue
+                        raise
+
+                # We've run out of retries, raise.
+                if r.status >= 500:
+                    raise discord.DiscordServerError(r, data)
+
+                raise discord.HTTPException(r, data)
+
+        discord.http.HTTPClient.request = lambda self, *args, **kwargs: request(self, *args, **kwargs)
 
     def send_exception(self, messageable, ex, reference=None):
         it = iter(self.owners)
