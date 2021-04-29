@@ -196,6 +196,8 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
     async def __call__(self):
         while self.is_busy():
             await wrap_future(self.fut)
+    
+    acquire = __call__
 
     def is_active(self):
         return self.active or self.passive

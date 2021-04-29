@@ -219,7 +219,7 @@ class AudioPlayer(discord.AudioSource):
                 raise
         return getattr(self.queue[0][0], k)
     
-    def after(self):
+    def after(self, *args):
         if not self.queue or not self.queue[0]:
             return
         entry = self.queue.popleft()

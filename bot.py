@@ -3865,10 +3865,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 # wait until the global lock is complete
                 await self._global_over.wait()
 
+            await lock.acquire()
             if rtype:
                 ctx = lock
             else:
-                await lock.acquire()
                 ctx = discord.http.MaybeUnlock(lock)
             with ctx as maybe_lock:
                 for tries in range(5):
