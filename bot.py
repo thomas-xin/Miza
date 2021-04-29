@@ -3851,7 +3851,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 pass
             else:
                 if reason:
-                    headers['X-Audit-Log-Reason'] = _uriquote(reason, safe='/ ')
+                    headers['X-Audit-Log-Reason'] = urllib.parse.quote(reason, safe='/ ')
 
             kwargs['headers'] = headers
 
