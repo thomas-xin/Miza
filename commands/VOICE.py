@@ -2990,6 +2990,7 @@ class Connect(Command):
                 await vc_.edit(bitrate=bitrate, reason="I deliver maximum quality audio only! :3")
         # Create audio source if none already exists
         if guild.id not in bot.data.audio.players:
+            globals()["bot"] = bot
             auds = CustomAudio(channel)
             auds.join(vc_)
             joining = True
