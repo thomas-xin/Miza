@@ -188,8 +188,7 @@ class IMG(Command):
         create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
         if reaction is None:
             for react in self.directions:
-                create_task(message.add_reaction(as_str(react)))
-                await asyncio.sleep(0.2)
+                await message.add_reaction(as_str(react))
 
 
 class CreateEmoji(Command):

@@ -3031,8 +3031,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             await self.seen(self.user, channel.guild, event="message", count=len(kwargs.get("embeds", (None,))), raw=f"Sending a message")
         if reacts:
             for react in reacts:
-                async with delay(0.2):
-                    create_task(message.add_reaction(react))
+                await message.add_reaction(react)
         return message
 
     # Sends a list of embeds to the target sendable, using a webhook when possible.

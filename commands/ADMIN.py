@@ -321,8 +321,7 @@ class Mute(Command):
         create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
         if reaction is None:
             for react in self.directions:
-                async with delay(0.2):
-                    create_task(message.add_reaction(as_str(react)))
+                await message.add_reaction(as_str(react))
 
 
 class Ban(Command):
@@ -541,8 +540,7 @@ class Ban(Command):
         create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
         if reaction is None:
             for react in self.directions:
-                async with delay(0.2):
-                    create_task(message.add_reaction(as_str(react)))
+                await message.add_reaction(as_str(react))
 
 
 class RoleGiver(Command):
@@ -1039,8 +1037,7 @@ class StarBoard(Command):
         create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
         if reaction is None:
             for react in self.directions:
-                create_task(message.add_reaction(as_str(react)))
-                await asyncio.sleep(0.2)
+                await message.add_reaction(as_str(react))
 
 
 class Crosspost(Command):
@@ -1136,8 +1133,7 @@ class Crosspost(Command):
         create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
         if reaction is None:
             for react in self.directions:
-                create_task(message.add_reaction(as_str(react)))
-                await asyncio.sleep(0.2)
+                await message.add_reaction(as_str(react))
 
 
 class Publish(Command):
@@ -1247,8 +1243,7 @@ class AutoEmoji(Command):
         create_task(message.edit(content=content, embed=emb))
         if reaction is None:
             for react in self.directions:
-                create_task(message.add_reaction(as_str(react)))
-                await asyncio.sleep(0.2)
+                await message.add_reaction(as_str(react))
 
 
 class UpdateAutoEmojis(Database):
