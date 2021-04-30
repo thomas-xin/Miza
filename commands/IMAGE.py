@@ -189,7 +189,7 @@ class IMG(Command):
         if reaction is None:
             for react in self.directions:
                 create_task(message.add_reaction(as_str(react)))
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(0.1)
 
 
 class CreateEmoji(Command):

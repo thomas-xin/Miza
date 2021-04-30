@@ -3031,7 +3031,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             await self.seen(self.user, channel.guild, event="message", count=len(kwargs.get("embeds", (None,))), raw=f"Sending a message")
         if reacts:
             for react in reacts:
-                async with delay(1 / 3):
+                async with delay(0.1):
                     create_task(message.add_reaction(react))
         return message
 

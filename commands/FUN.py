@@ -345,7 +345,7 @@ class Text2048(Command):
                             await message.remove_reaction(reaction.emoji, bot.client.user if message.guild is None else message.guild.get_member(bot.client.user.id))
                 for c in ("🇬", "🇦", "🇲", "🇪", "⬛", "🇴", "🇻", "3️⃣", "🇷"):
                     create_task(message.add_reaction(c))
-                    await asyncio.sleep(0.5)
+                    await asyncio.sleep(0.1)
                 return
         if data is not None:
             # Update message if gamestate has been changed
@@ -681,7 +681,7 @@ class React(Command):
         if reaction is None:
             for react in self.directions:
                 create_task(message.add_reaction(as_str(react)))
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(0.1)
 
 
 class UpdateReacts(Database):
@@ -710,11 +710,16 @@ class UpdateReacts(Database):
                 # Reactions sorted by their order of appearance in the message
                 for r in sorted(reacting):
                     for react in reacting[r]:
-                        try:
-                            await message.add_reaction(react)
-                        except discord.HTTPException as ex:
-                            if "10014" in repr(ex):
-                                emojis.remove(react)
+                        create_task(self.add_reaction_conditional(message, react, emojis, g_id))
+                        await asyncio.sleep(0.1)
+
+    async def add_reaction_conditional(self, message, react, emojis, g_id):
+        try:
+            await message.add_reaction(react)
+        except discord.HTTPException as ex:
+            if "10014" in repr(ex):
+                emojis.remove(react)
+                self.update(g_id)
 
 
 class EmojiList(Command):
@@ -817,7 +822,7 @@ class EmojiList(Command):
         if reaction is None:
             for react in self.directions:
                 create_task(message.add_reaction(as_str(react)))
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(0.1)
 
 
 class UpdateEmojiLists(Database):
@@ -1557,7 +1562,7 @@ class Mimic(Command):
         if reaction is None:
             for react in self.directions:
                 create_task(message.add_reaction(as_str(react)))
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(0.1)
 
 
 class MimicSend(Command):
