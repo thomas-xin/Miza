@@ -2763,7 +2763,7 @@ class Queue(Command):
         create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
         if reaction is None:
             for react in self.directions:
-                async with delay(0.1):
+                async with delay(0.2):
                     create_task(message.add_reaction(as_str(react)))
 
 
@@ -2889,7 +2889,7 @@ class Playlist(Command):
         create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
         if reaction is None:
             for react in self.directions:
-                async with delay(0.1):
+                async with delay(0.2):
                     create_task(message.add_reaction(as_str(react)))
 
 
@@ -4390,7 +4390,7 @@ class Download(Command):
         else:
             # Add reaction numbers corresponding to search results for selection
             for i in range(len(res)):
-                async with delay(0.1):
+                async with delay(0.2):
                     create_task(sent.add_reaction(str(i) + as_str(b"\xef\xb8\x8f\xe2\x83\xa3")))
         # await sent.add_reaction("❎")
 

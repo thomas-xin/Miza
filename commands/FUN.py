@@ -345,7 +345,7 @@ class Text2048(Command):
                             await message.remove_reaction(reaction.emoji, bot.client.user if message.guild is None else message.guild.get_member(bot.client.user.id))
                 for c in ("🇬", "🇦", "🇲", "🇪", "⬛", "🇴", "🇻", "3️⃣", "🇷"):
                     create_task(message.add_reaction(c))
-                    await asyncio.sleep(0.1)
+                    await asyncio.sleep(0.2)
                 return
         if data is not None:
             # Update message if gamestate has been changed
@@ -681,7 +681,7 @@ class React(Command):
         if reaction is None:
             for react in self.directions:
                 create_task(message.add_reaction(as_str(react)))
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(0.2)
 
 
 class UpdateReacts(Database):
@@ -711,7 +711,7 @@ class UpdateReacts(Database):
                 for r in sorted(reacting):
                     for react in reacting[r]:
                         create_task(self.add_reaction_conditional(message, react, emojis, g_id))
-                        await asyncio.sleep(0.1)
+                        await asyncio.sleep(0.2)
 
     async def add_reaction_conditional(self, message, react, emojis, g_id):
         try:
@@ -822,7 +822,7 @@ class EmojiList(Command):
         if reaction is None:
             for react in self.directions:
                 create_task(message.add_reaction(as_str(react)))
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(0.2)
 
 
 class UpdateEmojiLists(Database):
@@ -1562,7 +1562,7 @@ class Mimic(Command):
         if reaction is None:
             for react in self.directions:
                 create_task(message.add_reaction(as_str(react)))
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(0.2)
 
 
 class MimicSend(Command):
