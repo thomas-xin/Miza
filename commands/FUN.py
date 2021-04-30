@@ -928,7 +928,7 @@ class UpdateDogpiles(Database):
                         if not content:
                             return
                     print(message.channel, content, mcount)
-                    if content[0].isascii():
+                    if content[0].isascii() and content[:2] != "<:":
                         content = lim_str("\u200b" + content, 2000)
                     create_task(message.channel.send(content, tts=message.tts))
                     self.bot.data.users.add_xp(message.author, len(message.content) / 2 + 16)

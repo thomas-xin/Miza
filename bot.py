@@ -3867,10 +3867,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
             await lock.acquire()
             if rtype:
-                ctx = lock
+                maybe_lock = lock
             else:
-                ctx = discord.http.MaybeUnlock(lock)
-            with ctx as maybe_lock:
+                maybe_lock = discord.http.MaybeUnlock(lock)
+            with maybe_lock:
                 for tries in range(5):
                     if files:
                         for f in files:
@@ -3933,7 +3933,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                                 continue
 
                             # we've received a 500 or 502, unconditional retry
-                            if r.status in {500, 502}:
+                            if r.status >= 500 and tries < 3:
                                 await asyncio.sleep(1 + tries * 2)
                                 continue
 

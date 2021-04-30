@@ -123,10 +123,10 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
         if self.rate_limit:
             try:
                 if self.last:
-                    if self.rate_bin and utc() - self.rate_bin[-1] >= self.rate_limit:
+                    if self.rate_bin and time.time() - self.rate_bin[-1] >= self.rate_limit:
                         self.rate_bin.clear()
                 else:
-                    while self.rate_bin and utc() - self.rate_bin[0] >= self.rate_limit:
+                    while self.rate_bin and time.time() - self.rate_bin[0] >= self.rate_limit:
                         self.rate_bin.popleft()
             except IndexError:
                 pass
@@ -142,7 +142,7 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
             self.trace = inspect.stack()[2]
         self.active += 1
         if self.rate_limit:
-            self._update_bin().append(utc())
+            self._update_bin().append(time.time())
         if self.fut.done() and (self.active >= self.limit or self.rate_limit and len(self.rate_bin) >= self.limit):
             self.fut = concurrent.futures.Future()
         return self
@@ -163,7 +163,7 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
     def __exit__(self, *args):
         self.active -= 1
         if self.rate_bin:
-            t = self.rate_bin[0 - self.trace] + self.rate_limit - utc()
+            t = self.rate_bin[0 - self.last] + self.rate_limit - time.time()
             if t > 0:
                 create_future_ex(self._update_bin_after, t, priority=True)
             else:
