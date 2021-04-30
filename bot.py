@@ -3826,7 +3826,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             lock = self._locks.get(bucket)
             if lock is None:
                 if rtype == 1:
-                    lock = Semaphore(5, 256, rate_limit=5)
+                    lock = Semaphore(5, 256, rate_limit=5.1)
                 else:
                     lock = asyncio.Lock()
                 if bucket is not None:
@@ -3887,7 +3887,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
                                 # check if we have rate limit header information
                                 remaining = r.headers.get('X-Ratelimit-Remaining')
-                                if not rtype and remaining == '0' and r.status != 429:
+                                if remaining == '0' and r.status != 429:
                                     # we've depleted our current bucket
                                     delta = utils._parse_ratelimit_header(r, use_clock=self.use_clock)
                                     # log.debug('A rate limit bucket has been exhausted (bucket: %s, retry: %s).', bucket, delta)
@@ -3970,15 +3970,6 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
                                 # even errors have text involved in them so this is safe to call
                                 data = await discord.http.json_or_text(r)
-
-                                # check if we have rate limit header information
-                                remaining = r.headers.get('X-Ratelimit-Remaining')
-                                if not rtype and remaining == '0' and r.status != 429:
-                                    # we've depleted our current bucket
-                                    delta = utils._parse_ratelimit_header(r, use_clock=self.use_clock)
-                                    # log.debug('A rate limit bucket has been exhausted (bucket: %s, retry: %s).', bucket, delta)
-                                    maybe_lock.defer()
-                                    self.loop.call_later(delta, lock.release)
 
                                 # the request was successful so just return the text/json
                                 if 300 > r.status >= 200:
