@@ -1,11 +1,3 @@
-try:
-    from common import *
-except ModuleNotFoundError:
-    import os, sys
-    sys.path.append(os.path.abspath('..'))
-    os.chdir("..")
-    from common import *
-
 print = PRINT
 
 
@@ -1638,7 +1630,7 @@ class UpdateUsers(Database):
             + "\n\t\tawait self.bot.data.users._nocommand_(message, self.bot.user.mention + ' ' + argv, flags=flags, force=True)",
             data,
         )
-        mod = __name__
+        mod = "MAIN"
         for v in data.values():
             with suppress(TypeError):
                 if issubclass(v, Command) and v != Command:
@@ -1969,7 +1961,7 @@ class UpdateUsers(Database):
                         "Question for you",
                         "Conversation starter",
                     )
-                    out += f"{front}: `{choice(self.questions)}`"
+                    out += f"\n{front}: `{choice(self.questions)}`"
                 elif self.flavour_buffer:
                     out += self.flavour_buffer.popleft()
                 else:

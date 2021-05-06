@@ -3,7 +3,7 @@ from smath import *
 
 with MultiThreadedImporter(globals()) as importer:
     importer.__import__(
-        "importlib",
+        # "importlib",
         "inspect",
         "tracemalloc",
         "psutil",
@@ -1524,12 +1524,13 @@ PROC_RESP = {}
 sub_count = lambda: sum(sum(1 for p in v if p.is_running()) for v in PROCS.values())
 
 def force_kill(proc):
-    for child in proc.children(recursive=True):
-        with suppress():
-            child.kill()
-            print(child, "killed.")
-    print(proc, "killed.")
-    return proc.kill()
+    with tracebacksuppressor:
+        for child in proc.children(recursive=True):
+            with suppress():
+                child.kill()
+                print(child, "killed.")
+        print(proc, "killed.")
+        return proc.kill()
 
 def proc_communicate(k, i):
     while True:
@@ -1631,7 +1632,7 @@ def sub_submit(ptype, command, _timeout=12):
     return resp
 
 def sub_kill(start=True):
-    for v in PROCS.items():
+    for v in PROCS.values():
         for p in v:
             create_future_ex(force_kill, p, priority=True)
     PROCS.clear()
@@ -2219,7 +2220,6 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
         return async_nop()
 
 Request = RequestManager()
-create_future_ex(get_colour_list, priority=False)
 create_task(Request._init_())
 
 
@@ -2268,8 +2268,6 @@ def find_emojis_ex(s):
         if emoji in s:
             out.append(url[1:-1])
     return list(set(out))
-
-create_future_ex(load_emojis, priority=False)
 
 
 # Stores and manages timezones information.
@@ -2323,8 +2321,6 @@ def timezone_repr(tz):
     if tz in ZONES:
         return capwords(tz)
     return tz.upper()
-
-create_future_ex(load_timezones, priority=False)
 
 def parse_with_now(expr):
     if not expr or expr.strip().casefold() == "now":
@@ -2635,6 +2631,7 @@ class Database(collections.abc.MutableMapping, collections.abc.Hashable, collect
         self.update(force=True)
         bot.data.pop(self, None)
         bot.database.pop(self, None)
+        self.data.clear()
 
 
 class ImagePool:

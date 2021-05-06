@@ -2,7 +2,12 @@
 
 #!/usr/bin/python3
 
+import common
 from common import *
+
+create_future_ex(get_colour_list, priority=False)
+create_future_ex(load_emojis, priority=False)
+create_future_ex(load_timezones, priority=False)
 
 # Allows importing from commands and misc directories.
 sys.path.insert(1, "commands")
@@ -2182,15 +2187,24 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 print(f"Reloading module {module}...")
                 if module in self.categories:
                     self.unload(module)
-                mod = importlib.reload(self._globals[module])
+                # mod = importlib.reload(self._globals[module])
             else:
                 print(f"Loading module {module}...")
                 new = True
-                mod = __import__(module)
+                # mod = __import__(module)
+            if not new:
+                mod = self._globals.pop(module, {})
+            else:
+                mod = cdict(common.__dict__)
+            fn = f"commands/{module}.py"
+            with open(fn, "rb") as f:
+                b = f.read()
+            code = compile(b, fn, "exec", optimize=1)
+            exec(code, mod)
             self._globals[module] = mod
             commands = alist()
             dataitems = alist()
-            items = mod.__dict__
+            items = mod
             for var in items.values():
                 if callable(var) and var not in (Command, Database):
                     load_type = 0

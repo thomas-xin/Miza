@@ -1,11 +1,3 @@
-try:
-    from common import *
-except ModuleNotFoundError:
-    import os, sys
-    sys.path.append(os.path.abspath('..'))
-    os.chdir("..")
-    from common import *
-
 import nekos
 print = PRINT
 
