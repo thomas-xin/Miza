@@ -1486,6 +1486,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     url = await self.data.exec.uproxy(url)
                     emb.url = url
                     emb.set_image(url=url)
+                    if link:
+                        emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 2048)
+                        emb.timestamp = message.edited_at or message.created_at
                     return emb
             elif not message.attachments and len(message.embeds) == 1:
                 emb2 = message.embeds[0]
@@ -1504,6 +1507,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 for f in emb2.fields:
                     if f:
                         emb.add_field(name=f.name, value=f.value, inline=getattr(f, "inline", True))
+                if link:
+                    emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 2048)
+                    emb.timestamp = message.edited_at or message.created_at
                 return emb
         else:
             urls = await self.follow_url(message.content)
@@ -1521,6 +1527,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         emb.set_image(url=url)
                         if url != message.content:
                             emb.description = message.content
+                        if link:
+                            emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 2048)
+                            emb.timestamp = message.edited_at or message.created_at
                         return emb
         emb.description = message.content
         if len(message.embeds) > 1 or message.content:

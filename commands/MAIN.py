@@ -199,7 +199,7 @@ class EnabledCommands(Command):
             if perm < req:
                 reason = f"to change enabled command list for {channel}"
                 raise self.perm_error(perm, req, reason)
-        if not args:
+        if not args or argv.casefold() == "all":
             if "l" in flags:
                 return css_md(f"Standard command categories:\n[{', '.join(standard_commands)}]")
             if "e" in flags or "a" in flags:
@@ -1808,7 +1808,8 @@ class UpdateUsers(Database):
             self.add_diamonds(user, points)
             points *= 1000
             # create_task(message.add_reaction("✨"))
-            create_task(self.react_sparkle(message))
+            if self.bot.data.enabled.get(message.channel.id, True):
+                create_task(self.react_sparkle(message))
             print(f"{user} has triggered the rare message bonus in {message.guild}!")
         else:
             self.add_gold(user, points)
