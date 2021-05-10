@@ -2115,67 +2115,113 @@ def remove_matte(image, colour):
     return image
 
 
+colour_blind_map = dict(
+    protan=(
+        (
+            (0.5666, 0.43333, 0),
+            (0.55833, 0.44167, 0),
+            (0.24167, 0.75833, 0),
+        ),
+        (
+            (0.81667, 0.18333, 0),
+            (0.33333, 0.66667, 0),
+            (0, 0.125, 0.875),
+        ),
+    ),
+    deutan=(
+        (
+            (0.625, 0.375, 0),
+            (0.7, 0.3, 0),
+            (0, 0.3, 0.7),
+        ),
+        (
+            (0.8, 0.2, 0),
+            (0.25833, 0.74167, 0),
+            (0, 0.14167, 0.85833),
+        ),
+    ),
+    tritan=(
+        (
+            (0.95, 0.05, 0),
+            (0, 0.43333, 0.56667),
+            (0, 0.475, 0.525),
+        ),
+        (
+            (0.96667, 0.03333, 0),
+            (0, 0.73333, 0.26667),
+            (0, 0.18333, 0.81667),
+        ),
+    ),
+    achro=(
+        (
+            (0.299, 0.587, 0.114),
+            (0.299, 0.587, 0.114),
+            (0.299, 0.587, 0.114),
+        ),
+        (
+            (0.618, 0.32, 0.062),
+            (0.163, 0.775, 0.062),
+            (0.163, 0.32, 0.516),
+        ),
+    ),
+)
+
+colour_normal_map = (
+    (1, 0, 0),
+    (0, 1, 0),
+    (0, 0, 1),
+)
+
 def colour_deficiency(image, operation, value=None):
     if value is None:
         if operation == "protanopia":
             operation = "protan"
-            value = 0.991
+            value = 1
         elif operation == "protanomaly":
             operation = "protan"
-            value = 0.516
+            value = 0.5
         if operation == "deuteranopia":
             operation = "deutan"
-            value = 0.93
+            value = 1
         elif operation == "deuteranomaly":
             operation = "deutan"
-            value = 0.458
+            value = 0.5
         elif operation == "tritanopia":
             operation = "tritan"
-            value = 0.96
+            value = 1
         elif operation == "tritanomaly":
             operation = "tritan"
-            value = 0.45
-        elif operation == "monochromacy":
-            operation = "achro"
-            value = 1
-        elif operation == "achromatopsia":
+            value = 0.5
+        elif operation == ("monochromacy", "achromatopsia"):
             operation = "achro"
             value = 1
         elif operation == "achromatonomaly":
             operation = "achro"
-            value = 0.645
+            value = 0.5
         else:
-            value = 0.9
-    if operation == "protan":
-        redscale = [1 - 183 / 516 * value, 183 / 516 * value, 0]
-        greenscale = [333 / 516 * value, 1 - 333 / 516 * value, 0]
-        bluescale = [0, 125 / 516 * value, 1 - 125 / 516 * value]
-    elif operation == "deutan":
-        redscale = [1 - 200 / 458 * value, 200 / 458 * value, 0]
-        greenscale = [258 / 458 * value, 1 - 258 / 458 * value, 0]
-        bluescale = [0, 142 / 458 * value, 1 - 142 / 458 * value]
-    elif operation == "tritan":
-        redscale = [1 - 33 / 450 * value, 33 / 450 * value, 0]
-        greenscale = [0, 1 - 267 / 450 * value, 267 / 450 * value]
-        bluescale = [0, 183 / 450 * value, 1 - 183 / 450 * value]
-    elif operation == "achro":
-        redscale = [1 - 701 / 1000 * value, 587 / 1000 * value, 114 / 1000 * value]
-        greenscale = [299 / 1000 * value, 1 - 413 / 1000 * value, 114 / 1000 * value]
-        bluescale = [299 / 1000 * value, 587 / 1000 * value, 1 - 886 / 1000 * value]
-    else:
+            value = 1
+    try:
+        table = colour_blind_map[operation]
+    except KeyError:
         raise TypeError(f"Invalid filter {operation}.")
-    ratios = [redscale, greenscale, bluescale]
+    if value < 0.5:
+        value *= 2
+        ratios = [table[1][i] * value + colour_normal_map[i] * (1 - value) for i in range(3)]
+    else:
+        value = value * 2 - 1
+        ratios = [table[0][i] * value + table[1][i] * (1 - value) for i in range(3)]
     channels = list(image.split())
     out = [None] * len(channels)
     if len(out) == 4:
         out[-1] = channels[-1]
     for i_ratio, ratio in enumerate(ratios):
         for i_colour in range(3):
-            if ratio[i_colour] != 0:
+            if ratio[i_colour]:
+                im = channels[i_colour].point(lambda x: x * ratio[i_colour])
                 if out[i_ratio] is None:
-                    out[i_ratio] = channels[i_colour].point(lambda x: x * ratio[i_colour])
+                    out[i_ratio] = im
                 else:
-                    out[i_ratio] = ImageChops.add(out[i_ratio], channels[i_colour].point(lambda x: x * ratio[i_colour]))
+                    out[i_ratio] = ImageChops.add(out[i_ratio], im)
     return Image.merge(image.mode, out)
 
 Enhance = lambda image, operation, value: getattr(ImageEnhance, operation)(image).enhance(value)
@@ -2442,6 +2488,11 @@ def evalImg(url, operation, args):
     globals()["CURRENT_FRAME"] = 0
     ts = time.time_ns() // 1000
     out = "cache/" + str(ts) + ".png"
+    if args and args[-1] == "-seq":
+        args.pop(-1)
+        seq = True
+    else:
+        seq = False
     if operation != "$":
         if args and args[-1] == "-raw":
             args.pop(-1)
@@ -2497,7 +2548,8 @@ def evalImg(url, operation, args):
             new = next(iter(frames))
         else:
             print(duration, new["count"])
-            out = "cache/" + str(ts) + ".gif"
+            fmt = ".zip" if seq else ".gif"
+            out = "cache/" + str(ts) + fmt
             # if new["count"] <= 1024:
             #     it = iter(frames)
             #     first = next(it)
@@ -2521,35 +2573,60 @@ def evalImg(url, operation, args):
             if mode == "P":
                 mode = "RGBA"
             size = first.size
-            command = ["ffmpeg", "-threads", "2", "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", ("rgb24" if mode == "RGB" else "rgba"), "-video_size", "x".join(map(str, size)), "-i", "-", "-gifflags", "-offsetting", "-an"]
-            if new["count"] > 4096:
-                vf = None
-                # vf = "split[s0][s1];[s0]palettegen=reserve_transparent=1:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle:alpha_threshold=128"
-            else:
-                vf = "split[s0][s1];[s0]palettegen="
-                if mode == "RGBA":
-                    vf += "reserve_transparent=1:"
-                vf += "stats_mode=diff[p];[s1][p]paletteuse=alpha_threshold=128:diff_mode=rectangle"
-            if vf:
-                command.extend(("-vf", vf))
-            command.extend(("-loop", "0", out))
-            print(command)
-            proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            for frame in frames:
+            if seq:
+                resp = zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
+            if not seq:
+                command = ["ffmpeg", "-threads", "2", "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", ("rgb24" if mode == "RGB" else "rgba"), "-video_size", "x".join(map(str, size)), "-i", "-", "-gifflags", "-offsetting", "-an"]
+                if new["count"] > 4096:
+                    vf = None
+                    # vf = "split[s0][s1];[s0]palettegen=reserve_transparent=1:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle:alpha_threshold=128"
+                else:
+                    vf = "split[s0][s1];[s0]palettegen="
+                    if mode == "RGBA":
+                        vf += "reserve_transparent=1:"
+                    vf += "stats_mode=diff[p];[s1][p]paletteuse=alpha_threshold=128:diff_mode=rectangle"
+                if vf:
+                    command.extend(("-vf", vf))
+                command.extend(("-loop", "0", out))
+                print(command)
+                proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            for i, frame in enumerate(frames):
+                if seq:
+                    b = io.BytesIO()
                 if issubclass(type(frame), Image.Image):
                     if frame.size != size:
                         frame = frame.resize(size)
                     if frame.mode != mode:
                         frame = frame.convert(mode)
-                    b = frame.tobytes()
+                    if seq:
+                        frame.save(b, "png")
+                    else:
+                        b = frame.tobytes()
                 elif type(frame) is io.BytesIO:
-                    b = frame.read()
+                    if seq:
+                        with Image.open(frame) as im:
+                            im.save(b, "png")
+                    else:
+                        b = frame.read()
                 else:
-                    b = frame
-                proc.stdin.write(b)
-                time.sleep(0.02)
-            proc.stdin.close()
-            proc.wait()
+                    if seq:
+                        with Image.open(io.BytesIO(frame)) as im:
+                            im.save(b, "png")
+                    else:
+                        b = frame
+                if seq:
+                    b.seek(0)
+                    n = len(str(new["count"]))
+                    s = f"%0{n}d" % i
+                    resp.writestr(f"{s}.png", data=b.read())
+                if not seq:
+                    proc.stdin.write(b)
+                    time.sleep(0.02)
+            if seq:
+                resp.close()
+            else:
+                proc.stdin.close()
+                proc.wait()
             return [out]
     if issubclass(type(new), Image.Image):
         new.save(out, "png")

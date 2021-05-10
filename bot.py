@@ -904,7 +904,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 raise EOFError
         except:
             guild = await super().fetch_guild(g_id)
-        self.cache.guilds[g_id] = guild
+        # self.cache.guilds[g_id] = guild
         self.limit_cache("guilds")
         return guild
 
@@ -4221,6 +4221,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             # create_task(self.load_guild_webhooks(guild))
             print(f"New server: {guild}")
             g = await self.fetch_guild(guild.id)
+            self.sub_guilds[guild.id] = g
             m = guild.me
             await self.send_event("_join_", user=m, guild=g)
             channel = self.get_first_sendable(g, m)
@@ -4255,6 +4256,14 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             for member in guild.members:
                 name = str(member)
                 self.usernames[name] = self.cache.users[member.id]
+
+        # Guild destroy event: Remove guild from bot cache.
+        @self.event
+        async def on_guild_remove(guild):
+            self.users_updated = True
+            self.cache.guilds.pop(guild.id, None)
+            self.sub_guilds.pop(guild.id, None)
+            print(guild, "removed.")
 
         # Reaction add event: uses raw payloads rather than discord.py message cache. calls _seen_ bot database event.
         @self.event
@@ -4584,14 +4593,6 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             print(user, "was banned from", guild)
             if guild:
                 await self.send_event("_ban_", user=user, guild=guild)
-
-        # Guild destroy event: Remove guild from bot cache.
-        @self.event
-        async def on_guild_remove(guild):
-            self.users_updated = True
-            self.cache.guilds.pop(guild.id, None)
-            self.sub_guilds.pop(guild.id, None)
-            print(guild, "removed.")
 
 
 class AudioClientInterface:

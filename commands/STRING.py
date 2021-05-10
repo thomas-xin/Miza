@@ -1053,9 +1053,15 @@ class Random(Command):
 class Topic(Command):
     name = ["Question"]
     description = "Asks a random question."
+    usage = "<relationship{?r}>? <pickup-line{?p}>?"
+    flags = "rp"
     
-    def __call__(self, bot, user, **void):
+    def __call__(self, bot, user, flags, **void):
         create_task(bot.seen(user, event="misc", raw="Talking to me"))
+        if "r" in flags:
+            return "\u200b" + choice(bot.data.users.rquestions)
+        elif "p" in flags:
+            return "\u200b" + choice(bot.data.users.pickup_lines)
         return "\u200b" + choice(bot.data.users.questions)
 
 

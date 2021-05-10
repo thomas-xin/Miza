@@ -24,6 +24,7 @@ class Help(Command):
     description = "Shows a list of usable commands, or gives a detailed description of a command."
     usage = "<(command|category)>? <verbose{?v}>?"
     flags = "v"
+    no_parse = True
     slash = True
 
     async def __call__(self, args, user, channel, guild, message, flags, perm, **void):
@@ -39,7 +40,7 @@ class Help(Command):
         colour = None
         # Get help on categories, then commands
         for a in args:
-            a = a.casefold()
+            a = full_prune(a).replace("*", "").replace("_", "").replace("||", "")
             if a in bot.categories:
                 coms = bot.categories[a]
                 colour = discord.Colour(help_colours[a])
@@ -1619,6 +1620,10 @@ class UpdateUsers(Database):
             self.facts = f.read().splitlines()
         with open("misc/questions.txt", "r", encoding="utf-8") as f:
             self.questions = f.read().splitlines()
+        with open("misc/r-questions.txt", "r", encoding="utf-8") as f:
+            self.rquestions = f.read().splitlines()
+        with open("misc/pickup_lines.txt", "r", encoding="utf-8") as f:
+            self.pickup_lines = f.read().splitlines()
 
     async def _bot_ready_(self, **void):
         data = {"Command": Command}

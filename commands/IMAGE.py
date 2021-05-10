@@ -205,6 +205,8 @@ class CreateEmoji(Command):
             raise ArgumentError("Please enter URL, emoji, or attached file to add.")
         with discord.context_managers.Typing(channel):
             try:
+                if len(args) > 1 and not is_url(args[-1]):
+                    args.insert(0, args.pop(-1))
                 url = args.pop(-1)
                 urls = await bot.follow_url(url, best=True, allow=True, limit=1)
                 if not urls:
@@ -226,7 +228,7 @@ class CreateEmoji(Command):
             name = " ".join(args).strip()
             if not name:
                 name = "emoji_" + str(len(guild.emojis))
-            print(name, url)
+            # print(name, url)
             image = resp = await bot.get_request(url)
             if len(image) > 67108864:
                 raise OverflowError("Max file size to load is 64MB.")
@@ -1128,10 +1130,55 @@ class CreateGIF(Command):
                     raise ArgumentError(f'Invalid URL detected: "{url}".')
                 args[i] = url
             name = "unknown.gif"
-            if video is not None:
-                resp = await process_image("create_gif", "$", ["video", video, delay], timeout=_timeout)
+            if video is None:
+                video = args
+            resp = await process_image("create_gif", "$", ["image", args, delay], timeout=_timeout)
+            fn = resp[0]
+        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
+
+
+class ExtractFrames(Command):
+    name = ["ImageSequence", "Frames"]
+    description = "Extracts a video or animated image sequence into a .zip file of .png images."
+    usage = "<0:url>+"
+    no_parse = True
+    rate_limit = (7, 21)
+    _timeout_ = 18
+    typing = True
+
+    async def __call__(self, bot, user, guild, channel, message, flags, args, _timeout, **void):
+        # Take input from any attachments, or otherwise the message contents
+        if message.attachments:
+            args += [best_url(a) for a in message.attachments]
+        try:
+            if not args:
+                raise ArgumentError
+        except ArgumentError:
+            if not args:
+                url = None
+                try:
+                    url = await bot.get_last_image(message.channel)
+                except FileNotFoundError:
+                    raise ArgumentError("Please input an image by URL or attachment.")
             else:
-                resp = await process_image("create_gif", "$", ["image", args, delay], timeout=_timeout)
+                raise ArgumentError("Please input an image by URL or attachment.")
+        with discord.context_managers.Typing(channel):
+            video = None
+            for i, url in enumerate(args):
+                urls = await bot.follow_url(url, best=True, allow=True, limit=1)
+                url = urls[0]
+                if "discord" not in url and "channels" not in url:
+                    with tracebacksuppressor:
+                        url, size, dur, fps = await create_future(get_video, url, None, timeout=60)
+                        if size and dur and fps:
+                            video = (url, size, dur, fps)
+                if not url:
+                    raise ArgumentError(f'Invalid URL detected: "{url}".')
+                args[i] = url
+            name = "unknown.zip"
+            if video is None:
+                video = args
+            resp = await process_image("create_gif", "$", ["image", args, None, "-seq"], timeout=_timeout)
             fn = resp[0]
         await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
