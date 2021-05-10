@@ -10,9 +10,9 @@ Are humans more creative or destructive?
 Are intelligence and happiness tied together in any way? If you are highly intelligent, is it more likely that you'll be more, or less happy?
 Are intentions or outcomes more important when judging whether actions are moral?
 Are people ethically obligated to improve themselves?
-Are there any TV shows you can quote in your sleep?
 Are there any lessons that we can learn from history that you think are super-important?
 Are there any songs that always bring a tear to your eye?
+Are there any TV shows you can quote in your sleep?
 Are there limits to human creativity?
 Are there misconceptions about yourself you wish people wouldn't make?
 Are wealthier kids more popular? Kids who mature faster?
@@ -87,7 +87,6 @@ Do you have a morning routine?
 Do you have a signature dance move?
 Do you have any collections?
 Do you have any hidden talents?
-Do you have any pets?
 Do you have any pets? What are their names?
 Do you have any phobias?
 Do you have any recurring dreams? If so, what do you think they are trying to tell you?
@@ -316,7 +315,6 @@ How would you spend your winnings if you won the lottery?
 How would your country change if everyone, regardless of age, could vote?
 How's your day been so far?
 I am curious to know your story.
-If I steal a loaf of bread from you and eat it, when does the bread itself cease to be yours and becomes mine?
 If a boy wants to have sex and the girl is too drunk to say yes or no, what should the boy do?
 If a child somehow survived and grew up in the wilderness without any human contact, how "human" would they be without the influence of society and culture?
 If a genie gave you three wishes, what would they be?
@@ -339,6 +337,7 @@ If everything in your house had to be one color what color would you choose?
 If everything was quantified, what life stats would like to see for yourself?
 If freedom is simply being able to do what you want, are animals freer than humans?
 If humanity was put on trial by an advanced race of aliens, how would you defend humanity and argue for its continued existence?
+If I steal a loaf of bread from you and eat it, when does the bread itself cease to be yours and becomes mine?
 If it is the choices we make that express who we are, what does teasing someone say about us?
 If it was decided that all countries would be abolished and the entire earth would be one unified political body, what would be the capital city of earth? what would its flag and anthem be?
 If it was discovered that most animals were conscious of their existence and eventual death, what would be the ramifications of that discovery?
@@ -468,12 +467,12 @@ If you die and find out that everyone gets to choose a twelve-foot by twelve-foo
 If you died today, what would your greatest achievement be?
 If you found out you would inexplicably fall down dead in one year, what would you change about your life?
 If you had $10 million, would you still be working/going to school?
-If you had a HUD that showed three stats about any person you looked at, what three stats would you want it to show?
 If you had a box and you could turn it into anything, what would you turn it into?
 If you had a clock that would countdown to any one event of your choosing, what event would you want it to countdown to?
 If you had a day to yourself, what would it look like, where would you go, and what would you do?
 If you had a disease named after you, what would be the symptoms?
 If you had a giraffe that you needed to hide, where would you hide it?
+If you had a HUD that showed three stats about any person you looked at, what three stats would you want it to show?
 If you had a personal flag, what would be on it?
 If you had a personal mascot, what would your mascot be?
 If you had a time machine for a day, what would you do with it?
@@ -517,8 +516,8 @@ If you were forced to relive one 10-minute block of your life again and again fo
 If you were given $100,000, but it could only be used to upgrade your shower or bathtub what upgrades would you make?
 If you were given $20,000 to throw an amazing party, gathering, or event, what would that look like?
 If you were given $5,000 to give the most amount of happiness to the most amount of people, what would you do?
-If you were given a PhD degree, but had no more knowledge of the subject of the degree besides what you have now, what degree would you want to be given to you?
 If you were given a one-minute ad slot during the Super Bowl that you couldn't sell, what would you fill it with?
+If you were given a PhD degree, but had no more knowledge of the subject of the degree besides what you have now, what degree would you want to be given to you?
 If you were given five million dollars to open a small museum, what kind of museum would you create?
 If you were given one thousand acres of land that you didn't need to pay taxes on but couldn't sell, what would you do with it?
 If you were given the ability to make one new trend and it be instantly popular, what trend would you create?
@@ -632,13 +631,13 @@ Records, tapes, CDs, MP3s, streaming. Which did you grow up with? What is good a
 Scotch or beer?
 Scuba diving or skydiving?
 Selling Tobacco should be banned
-Should Pluto be a planet again? And what makes you think that?
-Should Students get limited access to the Internet?
 Should euthanasia be legal? Why or why not?
 Should full access to the internet be a fundamental human right?
 Should kidneys be able to be bought and sold?
 Should plastic be banned?
+Should Pluto be a planet again? And what makes you think that?
 Should smoking in public places be banned?
+Should Students get limited access to the Internet?
 Should tax payers have the option to explicitly say what they don't want their tax dollars spent on?
 Should there be limitations on the right to free speech?
 Should we terraform planets if it means that we may be destroying undiscovered microscopic alien life?
@@ -663,10 +662,6 @@ Was there ever an event in your life that defied explanation?
 Were you named after anyone?
 Were you the class clown or teacher's pet?
 What "old person" things do you do?
-What Netflix show or movie are you marathon-watching?
-What TV or YouTube channel doesn't exist but really should?
-What TV show character would it be the most fun to change places with for a week?
-What TV show was canceled too soon?
 What about our society would surprise a time traveler from the future?
 What about the current world would be most surprising to your younger self?
 What about the opposite sex confuses you the most?
@@ -792,8 +787,8 @@ What book would you bring to a deserted island?
 What brand are you most loyal to?
 What bridges do you NOT regret burning?
 What bullet have you recently dodged?
-What can I do to help you achieve [X goal]?
 What can a movie do to make you get up and walk out?
+What can I do to help you achieve [X goal]?
 What can you do to make tomorrow a great day?
 What can you not get right, no matter how many times you try?
 What can you talk all day about?
@@ -824,13 +819,13 @@ What country is the strangest?
 What current trend do you hope will go on for a long time?
 What current trend makes no sense to you?
 What defines a sport? Is fishing a sport? How about video game tournaments?
-What did you Google last?
 What did you believe for way too long as a child?
 What did you do on your last vacation?
 What did you do on your most recent birthday?
 What did you do this past weekend?
 What did you do today to take care of your body?
 What did you eat so much of that now you hate it?
+What did you Google last?
 What did you last google?
 What did you like / dislike about where you grew up?
 What did you think was going to be amazing but turned out to be horrible?
@@ -1271,6 +1266,7 @@ What mythical creature do you wish actually existed?
 What mythical creature would improve the world most if it existed?
 What naps are the most satisfying?
 What near future predictions do you have?
+What Netflix show or movie are you marathon-watching?
 What news headline would you most like to see?
 What nicknames do you have for people in your life?
 What normally delicious food gets ruined when you wrap it in a tortilla?
@@ -1391,6 +1387,9 @@ What traits do you look for in friends?
 What traits do you most admire in other people?
 What trend are you tired of?
 What trends did you follow when you were younger?
+What TV or YouTube channel doesn't exist but really should?
+What TV show character would it be the most fun to change places with for a week?
+What TV show was canceled too soon?
 What two films would you like to combine into one?
 What two questions would you ask to get the most information about who a person truly is?
 What two things are terrible when separate but great when you put them together?
@@ -1614,13 +1613,13 @@ What's something horrible that we as humans have accepted, because that's just h
 What's something obvious that you never noticed until someone pointed it out?
 What's something people don't worry about but really should?
 What's something people wouldn't guess about you?
-What's something that I don't know?
 What's something that actually happened but seems absurd and unrealistic?
 What's something that all your friends agree on?
 What's something that everyone agrees we should change, but somehow it never changes?
 What's something that everyone knows is true, but we don't like to admit it?
 What's something that everyone, absolutely everyone, in the entire world can agree on?
 What's something that happened or something that someone said that changed how you view the world?
+What's something that I don't know?
 What's something that no one wants to hear, but everyone should?
 What's something that only someone from where you grew up would understand?
 What's something that people go on and on about, and you just can't take sitting through?
@@ -1643,7 +1642,6 @@ What's surprising about you?
 What's the best $5 you've ever spent?
 What's the best / worst practical joke that you've played on someone or that was played on you?
 What's the best / worst thing about your work/school?
-What's the best Wi-Fi name you've seen?
 What's the best and worst piece of advice you've ever received?
 What's the best and worst thing about getting older?
 What's the best and worst thing about the country you are from?
@@ -1680,6 +1678,7 @@ What's the best way to discover new music?
 What's the best way to start the day?
 What's the best way to travel? (Plane, car, train, etc.)
 What's the best way you or someone you know has gotten out of a ticket / trouble with the law?
+What's the best Wi-Fi name you've seen?
 What's the biggest "scene" you've seen someone make in public?
 What's the biggest doubt you have?
 What's the biggest lesson life has taught you?
@@ -1704,8 +1703,6 @@ What's the dumbest thing you've done that actually turned out pretty well?
 What's the farthest you've ever been from home?
 What's the first thing that you think when see a homeless person?
 What's the first thing you do after school/work?
-What's the funniest TV series you have seen?
-What's the funniest TV show you've ever seen?
 What's the funniest actual name you've heard of someone having?
 What's the funniest comedy skit you've seen?
 What's the funniest joke you know by heart?
@@ -1713,16 +1710,18 @@ What's the funniest pick up line you've heard?
 What's the funniest thing you've done or had happen while your mind was wandering?
 What's the funniest thing you've seen a kid do?
 What's the funniest thing you've seen a relative do?
+What's the funniest TV series you have seen?
+What's the funniest TV show you've ever seen?
 What's the funniest word in the English language?
 What's the grossest food that you just can't get enough of?
 What's the hardest lesson you've learned?
 What's the hardest thing about being a boy?
 What's the hardest thing about being a girl?
 What's the hardest you've ever worked?
-What's the last TV show you binged?
 What's the last adventure you went on?
 What's the last decision you regretted?
 What's the last event you bought a ticket for?
+What's the last TV show you binged?
 What's the longest rabbit hole you've been down?
 What's the meaning of life?
 What's the most absurd thing that has become part of reality?
@@ -1842,8 +1841,8 @@ What's this time period the golden age of?
 What's worse than you thought it would be?
 What's worth spending more on to get the best?
 What's wrong but sounds right?
-What's your "Back in my day, we…"?
 What's your "and then it got worse" story?
+What's your "Back in my day, we…"?
 What's your "back in my day, we…"?
 What's your best ethically gray life hack?
 What's your best example of correlation not equaling causation?
@@ -1915,8 +1914,8 @@ What’s one of your favorite memories about your parents?
 What’s one of your favorite memories from our childhood?
 What’s one thing your loved ones would be surprised to learn about you?
 What’s one thing you’d tell yourself at my age? What’s one thing your younger self would tell you?
-What’s your Enneagram number and how does it influence your self-care practices?
 What’s your earliest memory?
+What’s your Enneagram number and how does it influence your self-care practices?
 What’s your favorite comfort food?
 What’s your love language?
 When did something start out badly for you but in the end, it was great?
@@ -2021,7 +2020,6 @@ Where would you rather be from?
 Where would you spend all your time if you could?
 Where's the line between soup and cereal?
 Where's your go to restaurant for amazing food?
-Which TV show do you want your life to be like?
 Which apocalyptic dystopia do you think is most likely?
 Which app has helped society the most? Which one has hurt society the most?
 Which app seemed like magic the first time you used it?
@@ -2057,6 +2055,7 @@ Which scent do you find the most soothing?
 Which season are you most active in?
 Which sport is the most exciting to watch? Which is the most boring to watch?
 Which sports do you like to play
+Which TV show do you want your life to be like?
 Which vegetable would you be and why?
 Which way should toilet paper hang, over or under?
 Which recent news story is the most interesting?
