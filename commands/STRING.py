@@ -412,14 +412,15 @@ class Say(Command):
     description = "Repeats a message that the user provides."
     usage = "<string>"
     no_parse = True
+    slash = True
     
     def __call__(self, bot, user, message, argv, **void):
-        create_task(bot.silent_delete(message))
+        create_task(bot.silent_delete(message, no_log=-1))
         if not argv:
             raise ArgumentError("Input string is empty.")
         if not bot.is_owner(user):
             argv = lim_str("\u200b" + escape_roles(argv).lstrip("\u200b"), 2000)
-        return argv
+        create_task(message.channel.send(argv))
 
 
 # Char2Emoj, a simple script to convert a string into a block of text

@@ -2118,7 +2118,7 @@ def remove_matte(image, colour):
 colour_blind_map = dict(
     protan=(
         (
-            (0.5666, 0.43333, 0),
+            (0.56667, 0.43333, 0),
             (0.55833, 0.44167, 0),
             (0.24167, 0.75833, 0),
         ),
@@ -2192,7 +2192,7 @@ def colour_deficiency(image, operation, value=None):
         elif operation == "tritanomaly":
             operation = "tritan"
             value = 0.5
-        elif operation == ("monochromacy", "achromatopsia"):
+        elif operation in ("monochromacy", "achromatopsia"):
             operation = "achro"
             value = 1
         elif operation == "achromatonomaly":

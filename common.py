@@ -849,7 +849,13 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
             fields["file"] = file
         if files:
             fields["files"] = files
-        return await channel.send(content, **fields)
+        try:
+            return await channel.send(content, **fields)
+        except discord.HTTPException as ex:
+            if fields.get("reference") and "Unknown message" in str(ex):
+                fields.pop("reference")
+                return await channel.send(content, **fields)
+            raise
         # try:
         #     sem = REPLY_SEM[channel.id]
         # except KeyError:
