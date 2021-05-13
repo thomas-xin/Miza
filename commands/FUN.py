@@ -1915,3 +1915,43 @@ class Giphy(ImagePool, Command):
         if "v" in flags:
             return escape_roles(url)
         self.bot.send_as_embeds(channel, image=url)
+
+
+class Rickroll(Command):
+    name = ["Thumbnail", "FakeThumbnail", "FakeVideo"]
+    description = "Generates a link that embeds a thumbnail, but redirects to a separate YouTube video once played."
+    usage = "<thumbnail>? <video>?"
+    no_parse = True
+    rate_limit = 1
+
+    async def __call__(self, bot, args, message, **void):
+        if message.attachments:
+            args = [best_url(a) for a in message.attachments] + args
+        if not args:
+            return "https://mizabot.xyz/view/!247184721262411780"
+        if len(args) < 2:
+            args.append("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+        image, video = args[:2]
+        urls = await bot.follow_url(image, best=True, allow=True, limit=1)
+        image = urls[0]
+        vid = None
+        if video.startswith("https://www.youtube.com/watch?v") and "=" in video:
+            vid = video.split("=", 1)[-1].split("&", 1)[0].split("#", 1)[0]
+        elif video.startswith("http://youtu.be/"):
+            vid = video.split("e/", 1)[-1].split("?", 1)[0]
+        elif video.startswith("http://youtube.com/v/"):
+            vid = video.split("v/", 1)[-1].split("?", 1)[0]
+        if not vid:
+            raise TypeError(f"Unsupported url: {video}.")
+        s = f"""<!DOCTYPE html>
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta property="og:type" content="video.other">
+<meta property="twitter:player" content="https://www.youtube.com/embed/{vid}">
+<meta property="og:video:type" content="text/html">
+<meta property="og:video:width" content="960">
+<meta property="og:video:height" content="960">
+<meta name="twitter:image" content="{image}">
+<meta http-equiv="refresh" content="0;url=https://www.youtube.com/watch?v={vid}">
+</head><body></body></html>"""
+        urls = await create_future(bot._globals["as_file"], s.encode("utf-8"))
+        return urls[0]

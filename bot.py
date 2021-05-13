@@ -2570,9 +2570,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     enabled.add("fun")
                     self.data.enabled[c_id] = enabled
             except KeyError:
-                enabled = ("main", "string", "admin")
+                enabled = ("main", "string", "admin", "voice", "image", "fun")
         else:
-            enabled = frozenset(self.categories)
+            enabled = self.categories.keys()
         u_perm = self.get_perms(u_id, guild)
         admin = not inf > u_perm
         # Gets prefix for current guild.

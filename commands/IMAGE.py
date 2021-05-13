@@ -205,8 +205,8 @@ class CreateEmoji(Command):
             raise ArgumentError("Please enter URL, emoji, or attached file to add.")
         with discord.context_managers.Typing(channel):
             try:
-                if len(args) > 1 and not is_url(args[-1]):
-                    args.insert(0, args.pop(-1))
+                if len(args) > 1 and is_url(args[0]):
+                    args.append(args.pop(0))
                 url = args.pop(-1)
                 urls = await bot.follow_url(url, best=True, allow=True, limit=1)
                 if not urls:

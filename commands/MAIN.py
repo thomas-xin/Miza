@@ -2,8 +2,8 @@ print = PRINT
 
 
 # Default and standard command categories to enable.
-default_commands = frozenset(("main", "string", "admin"))
-standard_commands = default_commands.union(("voice", "image", "fun"))
+basic_commands = frozenset(("main", "string", "admin"))
+standard_commands = default_commands = basic_commands.union(("voice", "image", "fun"))
 
 help_colours = fcdict({
     None: 0xfffffe,
@@ -88,7 +88,7 @@ class Help(Command):
             description = (
                 f"Please enter a command category to display usable commands, or type a command name to view more info. Examples: `{p}help main` or `{p}help rainbow`\nAlternatively, visit "
                 + f"[`mizatlas`]({bot.webserver}/mizatlas) for a full command list and tester.\nUnsure about anything, or have a bug to report? Check out the [`support server`]({bot.rcc_invite})!"
-                + f"\nNeed a handy way to upload larger files? See [`upload`]({bot.webserver}/upload)!"
+                + f"\nNeed a handy way to upload larger files? See [`upload`]({bot.webserver}/upload)!\nWant to enable/disable commands as an admin? See `{p}ec` for more!"
             )
             if bot.categories:
                 s = bold(ini_md(' '.join((sqr_md(c) for c in help_colours if c in standard_commands))))
