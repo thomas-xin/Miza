@@ -1949,7 +1949,7 @@ class Rickroll(Command):
 <meta property="twitter:player" content="https://www.youtube.com/embed/{vid}">
 <meta property="og:video:type" content="text/html">
 <meta property="og:video:width" content="960">
-<meta property="og:video:height" content="960">
+<meta property="og:video:height" content="720">
 <meta name="twitter:image" content="{image}">
 <meta http-equiv="refresh" content="0;url=https://www.youtube.com/watch?v={vid}">
 </head><body></body></html>"""
