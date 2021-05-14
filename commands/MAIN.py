@@ -1624,6 +1624,8 @@ class UpdateUsers(Database):
             self.rquestions = f.read().splitlines()
         with open("misc/pickup_lines.txt", "r", encoding="utf-8") as f:
             self.pickup_lines = f.read().splitlines()
+        with open("misc/nsfw_pickup_lines.txt", "r", encoding="utf-8") as f:
+            self.nsfw_pickup_lines = f.read().splitlines()
 
     async def _bot_ready_(self, **void):
         data = {"Command": Command}

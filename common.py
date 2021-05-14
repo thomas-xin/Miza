@@ -811,6 +811,12 @@ async def recursive_coro(item):
 
 is_channel = lambda channel: issubclass(type(channel), discord.abc.GuildChannel) or type(channel) is discord.abc.PrivateChannel
 
+def is_nsfw(channel):
+    try:
+        return channel.is_nsfw()
+    except AttributeError:
+        return True
+
 
 REPLY_SEM = cdict()
 # noreply = discord.AllowedMentions(replied_user=False)

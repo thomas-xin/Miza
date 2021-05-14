@@ -276,13 +276,6 @@ nekobot_exclusive = {
 }
 
 
-def is_nsfw(channel):
-    try:
-        return channel.is_nsfw()
-    except AttributeError:
-        return True
-
-
 class Neko(Command):
     name = ["Nya"]
     description = "Pulls a random image from nekos.life and embeds it."

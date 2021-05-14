@@ -1054,15 +1054,19 @@ class Random(Command):
 class Topic(Command):
     name = ["Question"]
     description = "Asks a random question."
-    usage = "<relationship{?r}>? <pickup-line{?p}>?"
-    flags = "rp"
+    usage = "<relationship{?r}>? <pickup-line{?p}>? <nsfw-pickup-line{?n}>?"
+    flags = "npr"
     
-    def __call__(self, bot, user, flags, **void):
+    def __call__(self, bot, user, flags, channel, **void):
         create_task(bot.seen(user, event="misc", raw="Talking to me"))
         if "r" in flags:
             return "\u200b" + choice(bot.data.users.rquestions)
         elif "p" in flags:
             return "\u200b" + choice(bot.data.users.pickup_lines)
+        elif "n" in flags:
+            if is_nsfw(channel):
+                return "\u200b" + choice(bot.data.users.nsfw_pickup_lines)
+            raise PermissionError(f"This tag is only available in {uni_str('NSFW')} channels.")
         return "\u200b" + choice(bot.data.users.questions)
 
 
