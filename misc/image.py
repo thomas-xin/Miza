@@ -2210,6 +2210,11 @@ def colour_deficiency(image, operation, value=None):
     else:
         value = value * 2 - 1
         ratios = [table[0][i] * value + table[1][i] * (1 - value) for i in range(3)]
+    colourmatrix = []
+    for r in ratios:
+        colourmatrix.extend(r)
+        colourmatrix.append(0)
+    return image.convert(image.mode, colourmatrix)
     channels = list(image.split())
     out = [None] * len(channels)
     if len(out) == 4:
