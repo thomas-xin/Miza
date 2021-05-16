@@ -1,7 +1,7 @@
 # [Miza](http://mizabot.xyz)
 Welcome to Miza, a multipurpose Discord bot created by [Thomas Xin](https://github.com/thomas-xin). Writing this README is [smudgedpasta](https://github.com/smudgedpasta), Miza's secondary bot owner! :3
 
-![Miza](https://mizabot.xyz/view/!683328402232573961)
+![Miza](http://mizabot.xyz/view/!683328402232573961)
 
 ## [Table of Contents](https://github.com/thomas-xin/Miza)
 
