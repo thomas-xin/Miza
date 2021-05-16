@@ -2405,11 +2405,15 @@ class UpdateStarboards(Database):
             return
         if message.id in table.setdefault(None, {}):
             try:
+                reacts = sorted(message.reactions, key=lambda r: -r.count)
+                if not reacts:
+                    return
+                react = reacts[0]
                 channel = await self.bot.fetch_channel(table[react][1])
                 m = await self.bot.fetch_message(table[None][message.id], channel)
                 embed = await self.bot.as_embed(message, link=True, colour=True)
                 text, link = embed.description.rsplit("\n\n", 1)
-                description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in sorted(message.reactions, key=lambda r: -r.count) if str(r.emoji) in table) + "   " + link
+                description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in reacts if str(r.emoji) in table) + "   " + link
                 embed.description = lim_str(description, 2048)
                 await m.edit(content=None, embed=embed)
             except (discord.NotFound, discord.Forbidden):

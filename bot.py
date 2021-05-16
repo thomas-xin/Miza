@@ -4856,7 +4856,7 @@ class SimulatedMessage:
         self.recipient = author
         self.me = bot.user
         self.channels = self.text_channels = self.voice_channels = [author]
-        self.members = [author, bot.user]
+        self.members = self._members = [author, bot.user]
         self.message = self
         self.owner = self.author
 
