@@ -906,7 +906,11 @@ class UpdateDogpiles(Database):
                     last_author_id = m.author.id
                 # print(content, count)
                 if count >= 2 and random.random() >= 2 / (count + 0.5):
-                    if number is not None:
+                    if not xrand(4096):
+                        content = "https://cdn.discordapp.com/attachments/321524006316539904/843707932989587476/secretsmall.gif"
+                        create_task(message.add_reaction("💎"))
+                        self.bot.data.users.add_diamonds(message.author, 1000)
+                    elif number is not None:
                         if type(number) is str:
                             content = chr(ord(last_number) - add)
                         else:
@@ -918,11 +922,11 @@ class UpdateDogpiles(Database):
                         if not content:
                             return
                     print(message.channel, content, mcount)
-                    if content[0].isascii() and content[:2] != "<:":
+                    if content[0].isascii() and content[:2] != "<:" and not is_url(content):
                         content = lim_str("\u200b" + content, 2000)
                     create_task(message.channel.send(content, tts=message.tts))
-                    self.bot.data.users.add_xp(message.author, len(message.content) / 2 + 16)
-                    self.bot.data.users.add_gold(message.author, len(message.content) / 4 + 32)
+                    self.bot.data.users.add_xp(message.author, len(content) / 2 + 16)
+                    self.bot.data.users.add_gold(message.author, len(content) / 4 + 32)
 
 
 class Daily(Command):

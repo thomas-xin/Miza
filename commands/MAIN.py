@@ -1800,7 +1800,7 @@ class UpdateUsers(Database):
         if user.id == self.bot.id or self.bot.get_perms(user, message.guild) <= -inf:
             return
         size = get_message_length(message)
-        points = math.sqrt(size) + len(message.content.split())
+        points = math.sqrt(size) + sum(1 for w in message.content.split() if len(w) > 1)
         if points >= 32 and not message.attachments:
             typing = self.data.get(user.id, EMPTY).get("last_typing", None)
             if typing is None:
