@@ -5,6 +5,7 @@ except ModuleNotFoundError:
     sys.path.append(os.path.abspath('..'))
     os.chdir("..")
     from common import *
+
 import flask
 from flask import Flask
 import werkzeug

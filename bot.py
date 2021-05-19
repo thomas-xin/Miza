@@ -440,9 +440,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         if self.server:
             with suppress():
                 self.server.kill()
-        if os.path.exists("misc/server.py") and PORT:
+        if os.path.exists("misc/cherry.py") and PORT:
             print("Starting webserver...")
-            self.server = psutil.Popen([python, "server.py"], cwd=os.getcwd() + "/misc", stderr=subprocess.PIPE)
+            self.server = psutil.Popen([python, "cherry.py"], cwd=os.getcwd() + "/misc", stderr=subprocess.PIPE)
         else:
             self.server = None
 
@@ -4794,8 +4794,8 @@ def as_file(file, filename=None, ext=None, rename=True):
     else:
         b = fn.bit_length() + 7 >> 3
         fn = as_str(base64.urlsafe_b64encode(fn.to_bytes(b, "big"))).rstrip("=")
-    url1 = f"{bot.webserver}/view/~{fn}"
-    url2 = f"{bot.webserver}/download/~{fn}"
+    url1 = f"{bot.webserver}/view/{fn}"
+    url2 = f"{bot.webserver}/download/{fn}"
     # if filename:
     #     fn = "/" + (str(file) if filename is None else lim_str(filename, 64).translate(filetrans))
     #     url1 += fn
@@ -4829,6 +4829,7 @@ def webserver_communicate(bot):
                     elif s[0] == "!":
                         create_task(bot.process_http_eval(*s[1:].split("\x7f", 1)))
             time.sleep(1)
+        time.sleep(0.1)
 
 
 class SimulatedMessage:

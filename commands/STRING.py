@@ -1017,13 +1017,18 @@ class Ask(Command):
             "you're": "i'm",
             "you'll": "i'll",
         })
-        modal_verbs = "shall should shalln't shouldn't must mustn't can could couldn't may might mightn't will would won't wouldn't have had haven't hadn't do did don't didn't"
-        r = regexp(f"(?:{modal_verbs.replace(' ', '|')}) you")
+        modal_verbs = "shall should shan't shalln't shouldn't must mustn't can could couldn't may might mightn't will would won't wouldn't have had haven't hadn't do did don't didn't"
+        r1 = regexp(f"(?:{modal_verbs.replace(' ', '|')}) you")
+        r2 = regexp(f"you (?:{modal_verbs.replace(' ', '|')})")
         while True:
-            m = r.search(q)
+            m = r1.search(q)
             if not m:
-                break
-            q = q[:m.end() - 3] + "I" + q[m.end():]
+                m = r2.search(q)
+                if not m:
+                    break
+                q = q[:m.start()] + "I" + q[m.start() + 3:]
+            else:
+                q = q[:m.end() - 3] + "I" + q[m.end():]
         res = alist(q.split())
         for sym in "!.,'":
             if sym in q:

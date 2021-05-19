@@ -2214,6 +2214,8 @@ def colour_deficiency(image, operation, value=None):
     for r in ratios:
         colourmatrix.extend(r)
         colourmatrix.append(0)
+    if image.mode == "P":
+        image = image.convert("RGBA")
     return image.convert(image.mode, colourmatrix)
     channels = list(image.split())
     out = [None] * len(channels)
