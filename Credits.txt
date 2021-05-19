@@ -9,6 +9,12 @@ Rapptz and others
 Sergey M. and others
 -youtube_dl: Command-line program to download videos from YouTube.com and other video sites {https://github.com/ytdl-org/youtube-dl}
 
+-CherryPy: A Minimalist Python Web Framework
+{https://github.com/cherrypy/cherrypy}
+
+-Pillow: Python Imaging Library
+{https://github.com/python-pillow/Pillow}
+
 
 OTHERS:
 
@@ -18,11 +24,11 @@ Gregot Hennig and others
 
 Fabrice Bellard, Michael Niedermayer and others
 -FFmpeg: A complete, cross-platform solution to record, convert and stream audio and video. {https://ffmpeg.org}
--Used by almost all video/audio features.
+-Used by almost all video/audio features
 
 Dario Alpern
 -Integer factorization calculator: {https://github.com/alpertron/calculators}
--Used by the factorize() function in the math command.
+-Used by the factorize() function in the math command
 
 https://www.ofoct.com/audio-converter/convert-wav-or-mp3-ogg-aac-wma-to-midi.html
 -Used by the mp3 to midi converter
@@ -41,7 +47,7 @@ https://github.com/Quihico/handy.stuff/blob/master/yt.pagetokens.x10
 -Used for the fast YouTube playlist scraper
 
 https://github.com/pocmo/Python-Brainfuck
--Used for the ~math Brainfuck interpreter.
+-Used for the ~math Brainfuck interpreter
 
 nihui, 20kdc
 https://github.com/nihui/waifu2x-ncnn-vulkan
@@ -54,7 +60,10 @@ https://stackoverflow.com/a/37350619
 https://yt-download.org/
 https://keepv.id/
 https://y2mate.guru/en8/
--Used for the backup youtube downloader.
+-Used for the backup youtube downloader
+
+https://github.com/mailopl/html5-xhr2-chunked-file-upload-slice
+-Used by the webserver's upload feature
 
 
 MISC:

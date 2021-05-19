@@ -440,9 +440,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         if self.server:
             with suppress():
                 self.server.kill()
-        if os.path.exists("misc/cherry.py") and PORT:
+        if os.path.exists("misc/server.py") and PORT:
             print("Starting webserver...")
-            self.server = psutil.Popen([python, "cherry.py"], cwd=os.getcwd() + "/misc", stderr=subprocess.PIPE)
+            self.server = psutil.Popen([python, "server.py"], cwd=os.getcwd() + "/misc", stderr=subprocess.PIPE)
         else:
             self.server = None
 

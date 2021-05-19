@@ -6,11 +6,6 @@ except ModuleNotFoundError:
     os.chdir("..")
     from common import *
 
-import flask
-from flask import Flask
-import werkzeug
-from werkzeug.exceptions import HTTPException
-
 
 HOST = "https://mizabot.xyz"
 PORT = AUTH.get("webserver_port", 9801)
@@ -32,31 +27,6 @@ def send(*args, escape=True):
     except OSError:
         psutil.Process().kill()
 
-app = Flask(__name__, static_url_path="/static")
-app.url_map.strict_slashes = False
-# app.use_x_sendfile = True
-
-
-@app.errorhandler(Exception)
-def on_error(ex):
-    send(repr(ex))
-    # Redirect HTTP errors to http.cat, python exceptions go to code 500 (internal server error)
-    if issubclass(type(ex), HTTPException):
-        return flask.redirect(f"https://http.cat/{ex.code}")
-    if issubclass(type(ex), FileNotFoundError):
-        return flask.redirect("https://http.cat/404")
-    if issubclass(type(ex), EOFError):
-        return flask.redirect("https://http.cat/204")
-    if issubclass(type(ex), PermissionError):
-        return flask.redirect("https://http.cat/403")
-    if issubclass(type(ex), TimeoutError) or issubclass(type(ex), concurrent.futures.TimeoutError):
-        return flask.redirect("https://http.cat/504")
-    if issubclass(type(ex), SemaphoreOverflowError):
-        return flask.redirect("https://http.cat/429")
-    if issubclass(type(ex), ConnectionError):
-        return flask.redirect("https://http.cat/502")
-    return flask.redirect("https://http.cat/500")
-
 
 def create_etag(data):
     s = str(ihash(data[:128] + data[-128:]) + len(data) & 4294967295)
@@ -73,116 +43,44 @@ PREVIEW = {}
 prev_date = utc_dt().date()
 zfailed = set()
 
-@app.route("/preview/<path>", methods=["GET"])
-@app.route("/p/<path>", methods=["GET"])
-@app.route("/view/<path>", methods=["GET"])
-@app.route("/v/<path>", methods=["GET"])
-@app.route("/file/<path>", methods=["GET"])
-@app.route("/files/<path>", methods=["GET"])
-@app.route("/f/<path>", methods=["GET"])
-@app.route("/download/<path>", methods=["GET"])
-@app.route("/d/<path>", methods=["GET"])
-@app.route("/preview/<path>/<path:filename>", methods=["GET"])
-@app.route("/p/<path>/<path:filename>", methods=["GET"])
-@app.route("/view/<path>/<path:filename>", methods=["GET"])
-@app.route("/v/<path>/<path:filename>", methods=["GET"])
-@app.route("/file/<path>/<path:filename>", methods=["GET"])
-@app.route("/files/<path>/<path:filename>", methods=["GET"])
-@app.route("/f/<path>/<path:filename>", methods=["GET"])
-@app.route("/download/<path>/<path:filename>", methods=["GET"])
-@app.route("/d/<path>/<path:filename>", methods=["GET"])
-def get_file(path, filename=None):
-    if path in ("hacks", "mods", "files", "download", "static"):
-        send(flask.request.remote_addr + " was rickrolled 🙃")
-        return flask.redirect("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
-    orig_path = path
-    ind = IND
-    if path.startswith("~"):
-        b = path.split(".", 1)[0].encode("utf-8") + b"=="
-        if (len(b) - 1) & 3 == 0:
-            b += b"="
-        path = str(int.from_bytes(base64.urlsafe_b64decode(b), "big"))
-    elif path.startswith("!"):
-        ind = "!"
-        path = path[1:]
-    p = find_file(path, ind=ind)
-    sem = SEMAPHORES.get(p)
-    if not sem:
-        while len(SEMAPHORES) >= 4096:
-            sem = SEMAPHORES.pop(next(iter(SEMAPHORES)))
-            if sem.is_busy():
-                raise SemaphoreOverflowError
-        sem = SEMAPHORES[p] = Semaphore(256, 256, rate_limit=60)
-    with sem:
-        endpoint = flask.request.path[1:].split("/", 1)[0]
-        down = flask.request.args.get("download", "false")
-        download = down and down[0] not in "0fFnN" or endpoint.startswith("d")
-        if download:
-            mime = MIMES.get(p.rsplit("/", 1)[-1].rsplit(".", 1)[-1])
-        else:
-            mime = get_mime(p)
-        fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
-    #     if endpoint.endswith("view") and mime.startswith("image/"):
-    #         if os.path.getsize(p) > 1048576:
-    #             if endpoint != "preview":
-    #                 og_image = flask.request.host_url + "preview/" + orig_path
-    #                 data = f"""<!DOCTYPE html>
-    # <html>
-    # <meta name="robots" content="noindex"><link rel="image_src" href="{og_image}">
-    # <meta property="og:image" content="{og_image}" itemprop="image">
-    # <meta property="og:url" content="{flask.request.host_url}view/{orig_path}">
-    # <meta property="og:image:width" content="1280">
-    # <meta property="og:type" content="website">
-    # <meta http-equiv="refresh" content="0; URL={flask.request.host_url}files/{orig_path}">
-    # </html>"""
-    #                 resp = flask.Response(data, mimetype="text/html")
-    #                 resp.headers.update(CHEADERS)
-    #                 resp.headers["ETag"] = create_etag(data)
-    #                 return resp
-    #             if prev_date != utc_dt().date():
-    #                 PREVIEW.clear()
-    #             elif path in PREVIEW:
-    #                 p = os.getcwd() + "/cache/" + PREVIEW[path]
-    #             else:
-    #                 fmt = mime.rsplit('/', 1)[-1]
-    #                 if fmt != "gif":
-    #                     fmt = "png"
-    #                 p2 = f"{path}~preview.{fmt}"
-    #                 p3 = os.getcwd() + "/cache/" + p2
-    #                 if not os.path.exists(p3):
-    #                     args = ["ffmpeg", "-n", "-hide_banner", "-loglevel", "error", "-hwaccel", "auto", "-i", p, "-fs", "4194304", "-vf", "scale=320:-1", p3]
-    #                     send(args)
-    #                     proc = psutil.Popen(args)
-    #                     proc.wait()
-    #                 PREVIEW[path] = p2
-    #                 p = p3
-    #     elif endpoint == "download" and p[-1] != IND and not p.endswith(".zip") and p not in zfailed:
-    #         size = os.path.getsize(p)
-    #         if size > 16777216:
-    #             fi = p.rsplit(".", 1)[0] + ".zip" + IND
-    #             if not os.path.exists(fi):
-    #                 test = min(16777216, max(1048576, size >> 6))
-    #                 send(f"Testing {p} with {test} bytes...")
-    #                 with open(p, "rb") as f:
-    #                     data = f.read(test)
-    #                 b = bytes2zip(data)
-    #                 r = len(b) / test
-    #                 if r < 0.75:
-    #                     send(f"Zipping {p}...")
-    #                     with ZipFile(fi, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False) as z:
-    #                         z.write(p, arcname=filename or fn)
-    #                     r = os.path.getsize(fi) / size
-    #             else:
-    #                 r = os.path.getsize(fi) / size
-    #             if r < 0.8:
-    #                 p = fi
-    #             else:
-    #                 zfailed.add(p)
-    #                 send(f"{p} has compression ratio {r}, skipping...")
-        attachment = filename or fn
-        resp = flask.send_file(p, as_attachment=download, attachment_filename=attachment, mimetype=mime, conditional=True)
-        resp.headers.update(CHEADERS)
-        return resp
+
+import cherrypy
+from cherrypy._cpdispatch import Dispatcher
+cp = cherrypy
+
+class EndpointRedirects(Dispatcher):
+
+    def __call__(self, path):
+        if path == "/favicon.ico":
+            path = "/favicon"
+        return Dispatcher.__call__(self, path)
+
+config = {
+    "global": {
+        "server.socket_host": "0.0.0.0",
+        "server.socket_port": PORT,
+        "server.thread_pool": 32,
+        "server.max_request_body_size": 0,
+        "server.socket_timeout": 60,
+    },
+    "/": {
+        "request.dispatch": EndpointRedirects(),
+    }
+}
+
+HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "Server": "Miza",
+    "Vary": "Accept-Encoding",
+    "Accept-Ranges": "bytes",
+    "Access-Control-Allow-Origin": "*",
+}
+
+CHEADERS = {"Cache-Control": "public, max-age=3600, stale-while-revalidate=1073741824, stale-if-error=1073741824"}
+SHEADERS = {"Cache-Control": "public, max-age=30, stale-while-revalidate=1073741824, stale-if-error=1073741824"}
+
+CHEADERS.update(HEADERS)
+SHEADERS.update(HEADERS)
 
 
 def fetch_static(path, ignore=False):
@@ -213,98 +111,189 @@ def fetch_static(path, ignore=False):
             send(traceback.format_exc())
         raise
 
-@app.route("/static/<filename>", methods=["GET"])
-@app.route("/static/<path:filename>", methods=["GET"])
-def get_static_file(filename):
-    data, mime = fetch_static(filename)
-    resp = flask.Response(data, mimetype=mime)
-    resp.headers.update(CHEADERS)
-    resp.headers["ETag"] = create_etag(data)
+est_time = utc()
+est_last = -inf
+
+def estimate_life():
+    global est_time, est_last
+    with tracebacksuppressor:
+        hosted = sorted(int(f[1:].split("~", 1)[0]) / 1e6 for f in os.listdir("cache") if f.startswith(IND))
+        if not hosted:
+            est_last = -inf
+        ts = hosted[0]
+        t = ts_us()
+        while t in RESPONSES:
+            t += 1
+        RESPONSES[t] = fut = concurrent.futures.Future()
+        send(f"!{t}\x7fbot.storage_ratio", escape=False)
+        j, after = fut.result()
+        RESPONSES.pop(t, None)
+        try:
+            last = (utc() - ts) / j.get("result", 1)
+        except ZeroDivisionError:
+            last = inf
+        send(last)
+        est_time = utc() - last
+        est_last = utc()
+
+estimate_life_after = lambda t: time.sleep(t) or estimate_life()
+
+create_future_ex(estimate_life_after, 10)
+
+geo_sem = Semaphore(90, 256, rate_limit=60)
+geo_count = 0
+
+def get_geo(ip):
+    global geo_count
+    try:
+        resp = TZCACHE[ip]
+    except KeyError:
+        if geo_count & 1:
+            url = f"http://ip-api.com/json/{ip}?fields=256"
+        else:
+            url = f"https://pro.ip-api.com/json/{ip}?fields=256&key=test-demo-pro"
+        geo_count += 1
+        with geo_sem:
+            resp = requests.get(url, headers={"DNT": "1", "User-Agent": f"Mozilla/5.{ip[-1]}", "Origin": "https://members.ip-api.com"})
+        resp.raise_for_status()
+        TZCACHE[ip] = resp = resp.json()
+        send(ip + "\t" + "\t".join(resp.values()))
     return resp
 
-@app.route("/static", methods=["DELETE"])
-def clearcache():
-    ip = flask.request.remote_addr
-    if ip == "127.0.0.1":
-        STATIC.clear()
-        send("Webserver cache cleared.")
-        return b"\xf0\x9f\x92\x9c"
-    raise PermissionError
 
+class Server:
 
-@app.route("/mizatlas", methods=["GET"])
-@app.route("/mizatlas/<path:filename>", methods=["GET"])
-def mizatlas(filename=None):
-    data = None
-    if filename:
-        with suppress(FileNotFoundError):
-            data, mime = fetch_static(f"mizatlas/{filename}")
-            if filename == "static/js/main.312a0124.chunk.js":
-                data = data.replace("⟨MIZA⟩".encode("utf-8"), flask.request.host_url.rstrip("/").encode("utf-8"))
-    if not data:
-        data, mime = fetch_static("mizatlas/index.html")
-    resp = flask.Response(data, mimetype=mime)
-    resp.headers.update(CHEADERS)
-    resp.headers["ETag"] = create_etag(data)
-    return resp
+    @cp.expose(("preview", "p", "view", "v", "file", "f", "download", "d"))
+    def files(self, path, filename=None, download=None, **void):
+        if path in ("hacks", "mods", "files", "download", "static"):
+            send(cp.request.remote.ip + " was rickrolled 🙃")
+            raise cp.HTTPRedirect("https://www.youtube.com/watch?v=dQw4w9WgXcQ", status=301)
+        orig_path = path
+        ind = IND
+        if path.startswith("!"):
+            ind = "!"
+            path = path[1:]
+        elif not path.startswith("@"):
+            b = path.lstrip("~").split(".", 1)[0].encode("utf-8") + b"=="
+            if (len(b) - 1) & 3 == 0:
+                b += b"="
+            path = str(int.from_bytes(base64.urlsafe_b64decode(b), "big"))
+        p = find_file(path, ind=ind)
+        sem = SEMAPHORES.get(p)
+        if not sem:
+            while len(SEMAPHORES) >= 4096:
+                sem = SEMAPHORES.pop(next(iter(SEMAPHORES)))
+                if sem.is_busy():
+                    raise SemaphoreOverflowError
+            sem = SEMAPHORES[p] = Semaphore(256, 256, rate_limit=60)
+        with sem:
+            endpoint = cp.url(qs=cp.request.query_string, relative="server")[1:].split("/", 1)[0]
+            download = download and download[0] not in "0fFnN" or endpoint.startswith("d")
+            if download:
+                mime = MIMES.get(p.rsplit("/", 1)[-1].rsplit(".", 1)[-1])
+            else:
+                mime = get_mime(p)
+            fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
+        attachment = filename or fn
+        cp.response.headers.update(CHEADERS)
+        return cp.lib.static.serve_file(p, content_type=mime, name=attachment, disposition="attachment" if download else None)
+    files._cp_config = {"response.stream": True}
 
+    @cp.expose
+    def static(self, *filepath):
+        if not filepath:
+            if cp.request.remote_ip == "127.0.0.1":
+                STATIC.clear()
+                send("Webserver cache cleared.")
+                return b"\xf0\x9f\x92\x9c"
+            raise PermissionError
+        filename = "/".join(filepath)
+        data, mime = fetch_static(filename)
+        cp.response.headers.update(CHEADERS)
+        cp.response.headers["Content-Type"] = mime
+        cp.response.headers["Content-Length"] = len(data)
+        cp.response.headers["ETag"] = create_etag(data)
+        return data
 
-@app.route("/apidoc", methods=["GET"])
-def apidoc():
-    data, mime = fetch_static(f"apidoc.html")
-    data = data.replace("⟨MIZA⟩".encode("utf-8"), flask.request.host.encode("utf-8"))
-    resp = flask.Response(data, mimetype=mime)
-    resp.headers.update(CHEADERS)
-    resp.headers["ETag"] = create_etag(data)
-    return resp
+    @cp.expose
+    def mizatlas(self, *filepath):
+        filename = "/".join(filepath)
+        data = None
+        if filename:
+            with suppress(FileNotFoundError):
+                data, mime = fetch_static(f"mizatlas/{filename}")
+                if filename == "static/js/main.312a0124.chunk.js":
+                    data = data.replace("⟨MIZA⟩".encode("utf-8"), cp.request.base.encode("utf-8"))
+        if not data:
+            data, mime = fetch_static("mizatlas/index.html")
+        cp.response.headers.update(CHEADERS)
+        cp.response.headers["Content-Type"] = mime
+        cp.response.headers["Content-Length"] = len(data)
+        cp.response.headers["ETag"] = create_etag(data)
+        return data
 
+    @cp.expose
+    def apidoc(self):
+        apidoc = getattr(self, "api", None)
+        if not apidoc:
+            apidoc = fetch_static(f"apidoc.html")
+            data, mime = apidoc
+            data2 = data.replace("⟨MIZA⟩".encode("utf-8"), cp.request.base.split("//", 1)[-1].encode("utf-8"))
+            self.api = apidoc = (data2, mime)
+        data, mime = apidoc
+        cp.response.headers.update(CHEADERS)
+        cp.response.headers["Content-Type"] = mime
+        cp.response.headers["Content-Length"] = len(data)
+        cp.response.headers["ETag"] = create_etag(data)
+        return data
 
-@app.route("/models/<path:filename>", methods=["GET"])
-def models(filename):
-    data, mime = fetch_static(f"waifu2x/models/{filename}")
-    resp = flask.Response(data, mimetype=mime)
-    resp.headers.update(CHEADERS)
-    resp.headers["ETag"] = create_etag(data)
-    return resp
+    @cp.expose
+    def models(self, *filepath):
+        filename = "/".join(filepath)
+        data, mime = fetch_static(f"waifu2x/models/{filename}")
+        cp.response.headers.update(CHEADERS)
+        cp.response.headers["Content-Type"] = mime
+        cp.response.headers["Content-Length"] = len(data)
+        cp.response.headers["ETag"] = create_etag(data)
+        return data
 
-@app.route("/w2wbinit.png", methods=["GET"])
-def w2wbinit():
-    data, mime = fetch_static("waifu2x/w2wbinit.png")
-    resp = flask.Response(data, mimetype=mime)
-    resp.headers.update(CHEADERS)
-    resp.headers["ETag"] = create_etag(data)
-    return resp
+    @cp.expose
+    def w2wbinit(self):
+        data, mime = fetch_static("waifu2x/w2wbinit.png")
+        cp.response.headers.update(CHEADERS)
+        cp.response.headers["Content-Type"] = mime
+        cp.response.headers["Content-Length"] = len(data)
+        cp.response.headers["ETag"] = create_etag(data)
+        return data
 
-@app.route("/waifu2x/<path:filename>", methods=["GET"])
-def waifu2x_ex(filename):
-    source = flask.request.args.get("source")
-    if not source:
-        source = "https://gitlab.com/20kdc/waifu2x-upconv7-webgl/-/raw/master/w2wbinit.png"
-    if not is_url(source):
-        raise FileNotFoundError
-    if not regexp("https:\\/\\/images-ext-[0-9]+\\.discordapp\\.net\\/external\\/").match(source) and not source.startswith("https://media.discordapp.net/"):
-        if not source.startswith(flask.request.host_url):
-            t = ts_us()
-            while t in RESPONSES:
-                t += 1
-            RESPONSES[t] = fut = concurrent.futures.Future()
-            send(f"!{t}\x7fbot.data.exec.proxy({repr(source)})", escape=False)
-            j, after = fut.result()
-            RESPONSES.pop(t, None)
-            source = j["result"]
-    data, mime = fetch_static("waifu2x/main.js")
-    srcline = f'currentImage.src = "{source}";\n    currentImage.crossOrigin = "";'
-    data = data.replace(b'currentImage.src = "w2wbinit.png";', srcline.encode("utf-8", "replace"))
-    resp = flask.Response(data, mimetype=mime)
-    resp.headers.update(CHEADERS)
-    resp.headers["ETag"] = create_etag(data)
-    return resp
-
-@app.route("/waifu2x", methods=["GET"])
-def waifu2x():
-    source = flask.request.args.get("source")
-    if source:
-        data = f"""<!DOCTYPE html>
+    @cp.expose
+    def waifu2x(self, *filepath, source=None):
+        if filepath:
+            filename = "/".join(filepath)
+            if not source:
+                source = "https://gitlab.com/20kdc/waifu2x-upconv7-webgl/-/raw/master/w2wbinit.png"
+            if not is_url(source):
+                raise FileNotFoundError
+            if not regexp("https:\\/\\/images-ext-[0-9]+\\.discordapp\\.net\\/external\\/").match(source) and not source.startswith("https://media.discordapp.net/"):
+                if not source.startswith(cp.request.base):
+                    t = ts_us()
+                    while t in RESPONSES:
+                        t += 1
+                    RESPONSES[t] = fut = concurrent.futures.Future()
+                    send(f"!{t}\x7fbot.data.exec.proxy({repr(source)})", escape=False)
+                    j, after = fut.result()
+                    RESPONSES.pop(t, None)
+                    source = j["result"]
+            data, mime = fetch_static("waifu2x/main.js")
+            srcline = f'currentImage.src = "{source}";\n    currentImage.crossOrigin = "";'
+            data = data.replace(b'currentImage.src = "w2wbinit.png";', srcline.encode("utf-8", "replace"))
+            cp.response.headers.update(CHEADERS)
+            cp.response.headers["Content-Type"] = mime
+            cp.response.headers["Content-Length"] = len(data)
+            cp.response.headers["ETag"] = create_etag(data)
+            return data
+        if source:
+            data = f"""<!DOCTYPE html>
 <html>
     <meta property="og:image" content="{source}">""" + """
     <style>
@@ -328,12 +317,12 @@ def waifu2x():
             <button hidden id="cancelButton">Cancel</button>
             <p hidden id="statusDiv">JS not loaded yet...</p>
             <canvas id="canvas"></canvas>
-            <script src="{flask.request.base_url}/main.js?source={urllib.parse.quote(source)}"></script>
+            <script src="{cp.url()}/main.js?source={urllib.parse.quote(source)}"></script>
         </div>
 	</body>
 </html>"""
-    else:
-        data = """<!DOCTYPE html>
+        else:
+            data = """<!DOCTYPE html>
 <html>
     <style>
         .center {
@@ -370,159 +359,146 @@ def waifu2x():
             <p>experimental. exposure to high amounts of data may result in hazardous levels of memory usage, which may result in system OOM.</p>
             <p>View</p>
             <canvas id="canvas"></canvas>
-            <script src="{flask.request.base_url}/main.js"></script>
+            <script src="{cp.url()}/main.js"></script>
         </div>
 	</body>
 </html>"""
-    resp = flask.Response(data, mimetype="text/html")
-    resp.headers.update(CHEADERS)
-    resp.headers["ETag"] = create_etag(data)
-    return resp
+        cp.response.headers.update(CHEADERS)
+        cp.response.headers["Content-Type"] = mime
+        cp.response.headers["Content-Length"] = len(data)
+        cp.response.headers["ETag"] = create_etag(data)
+        return data
 
-
-@app.route("/ytdl", methods=["GET"])
-def ytdl():
-    d = flask.request.args.get("d") or flask.request.args.get("download")
-    v = d or flask.request.args.get("v") or flask.request.args.get("view")
-    q = d or v or flask.request.args.get("q") or flask.request.args.get("query")
-    if not q:
-        raise EOFError
-    t = ts_us()
-    while t in RESPONSES:
-        t += 1
-    if v:
-        fmt = flask.request.args.get("fmt")
-        if not fmt:
-            fmt = "opus" if d else "mp3"
-        if fmt not in ("mp3", "opus", "ogg", "wav"):
-            return flask.redirect("https://http.cat/415")
-        fmt = "." + fmt
-        RESPONSES[t] = fut = concurrent.futures.Future()
-        send(f"!{t}\x7fbot.audio.returns[{t}]=VOICE.ytdl.search({repr(q)})[0]", escape=False)
-        fut.result()
-        RESPONSES[t] = fut = concurrent.futures.Future()
-        send(f"!{t}\x7fVOICE.ytdl.get_stream(bot.audio.returns[{t}],force=True,download=False)", escape=False)
-        fut.result()
-        RESPONSES[t] = fut = concurrent.futures.Future()
-        send(f"!{t}\x7f(bot.audio.returns[{t}].get('name'),bot.audio.returns[{t}].get('url'))", escape=False)
-        j, after = fut.result()
-        name, url = j["result"]
-        if not name or not url:
-            raise FileNotFoundError
-        h = shash(url)
-        fn = "~" + h + fmt
-        RESPONSES[t] = fut = concurrent.futures.Future()
-        send(f"!{t}\x7fbot.audio.returns[{t}]=VOICE.ytdl.get_stream(bot.audio.returns[{t}],download={repr(fmt)})", escape=False)
-        fut.result()
-        RESPONSES.pop(t, None)
-
-        def af():
-            RESPONSES[t] = fut = concurrent.futures.Future()
-            try:
-                send(f"!{t}\x7fbool(getattr(bot.audio.returns[{t}], 'loaded', None))", escape=False)
-                j, after = fut.result()
-                RESPONSES.pop(t, None)
-            except:
-                print_exc()
-                RESPONSES.pop(t, None)
-                return True
-            return j["result"] is not False
-
-        f = DownloadingFile("cache/" + fn, af=af)
-        resp = flask.send_file(f, as_attachment=d, attachment_filename=name + fmt, mimetype=f"audio/{fmt[1:]}", conditional=True)
-        resp.headers.update(CHEADERS)
-        # resp.headers["Transfer-Encoding"] = "Chunked"
-        if d and af():
-            resp.status_code = 202
-        return resp
-    else:
-        RESPONSES[t] = fut = concurrent.futures.Future()
-        send(f"!{t}\x7f[VOICE.copy_entry(e) for e in VOICE.ytdl.search({repr(q)})]", escape=False)
-        j, after = fut.result()
-        RESPONSES.pop(t, None)
-        res = j["result"]
-    resp = flask.Response(json.dumps(res), mimetype="application/json")
-    resp.headers.update(CHEADERS)
-    return resp
-
-
-@app.route("/", methods=["GET", "POST"])
-def home():
-    data, mime = fetch_static("index.html")
-    resp = flask.Response(data, mimetype=mime)
-    resp.headers.update(CHEADERS)
-    resp.headers["ETag"] = create_etag(data)
-    return resp
-
-@app.route("/favicon.ico", methods=["GET"])
-def favicon():
-    data, mime = fetch_static("icon.ico")
-    resp = flask.Response(data, mimetype=mime)
-    resp.headers.update(CHEADERS)
-    resp.headers["ETag"] = create_etag(data)
-    return resp
-
-@app.route("/ip", methods=["GET"])
-def get_ip():
-    data = json.dumps(dict(
-        remote=flask.request.remote_addr,
-        host=flask.request.host,
-    ))
-    resp = flask.Response(data, mimetype="application/json")
-    resp.headers.update(SHEADERS)
-    resp.headers["ETag"] = create_etag(data)
-    return resp
-
-
-est_time = utc()
-est_last = -inf
-
-def estimate_life():
-    global est_time, est_last
-    with tracebacksuppressor:
-        hosted = sorted(int(f[1:].split("~", 1)[0]) / 1e6 for f in os.listdir("cache") if f.startswith(IND))
-        if not hosted:
-            est_last = -inf
-        ts = hosted[0]
+    @cp.expose
+    def ytdl(self, **kwargs):
+        d = kwargs.get("d") or kwargs.get("download")
+        v = d or kwargs.get("v") or kwargs.get("view")
+        q = d or v or kwargs.get("q") or kwargs.get("query")
+        if not q:
+            raise EOFError
         t = ts_us()
         while t in RESPONSES:
             t += 1
-        RESPONSES[t] = fut = concurrent.futures.Future()
-        send(f"!{t}\x7fbot.storage_ratio", escape=False)
-        j, after = fut.result()
-        RESPONSES.pop(t, None)
-        last = (utc() - ts) / j.get("result", 1)
-        send(last)
-        est_time = utc() - last
-        est_last = utc()
+        if v:
+            fmt = kwargs.get("fmt")
+            if not fmt:
+                fmt = "opus" if d else "mp3"
+            if fmt not in ("mp3", "opus", "ogg", "wav"):
+                raise TypeError
+            fmt = "." + fmt
+            RESPONSES[t] = fut = concurrent.futures.Future()
+            send(f"!{t}\x7fbot.audio.returns[{t}]=VOICE.ytdl.search({repr(q)})[0]", escape=False)
+            fut.result()
+            RESPONSES[t] = fut = concurrent.futures.Future()
+            send(f"!{t}\x7fVOICE.ytdl.get_stream(bot.audio.returns[{t}],force=True,download=False)", escape=False)
+            fut.result()
+            RESPONSES[t] = fut = concurrent.futures.Future()
+            send(f"!{t}\x7f(bot.audio.returns[{t}].get('name'),bot.audio.returns[{t}].get('url'))", escape=False)
+            j, after = fut.result()
+            name, url = j["result"]
+            if not name or not url:
+                raise FileNotFoundError
+            h = shash(url)
+            fn = "~" + h + fmt
+            RESPONSES[t] = fut = concurrent.futures.Future()
+            send(f"!{t}\x7fbot.audio.returns[{t}]=VOICE.ytdl.get_stream(bot.audio.returns[{t}],download={repr(fmt)})", escape=False)
+            fut.result()
+            RESPONSES.pop(t, None)
 
-estimate_life_after = lambda t: time.sleep(t) or estimate_life()
+            def af():
+                RESPONSES[t] = fut = concurrent.futures.Future()
+                try:
+                    send(f"!{t}\x7fbool(getattr(bot.audio.returns[{t}], 'loaded', None))", escape=False)
+                    j, after = fut.result()
+                    RESPONSES.pop(t, None)
+                except:
+                    print_exc()
+                    RESPONSES.pop(t, None)
+                    return True
+                return j["result"] is not False
 
-create_future_ex(estimate_life_after, 10)
+            f = DownloadingFile("cache/" + fn, af=af)
+            cp.response.headers["Accept-Ranges"] = "bytes"
+            cp.response.headers.update(CHEADERS)
+            cp.response.headers["Content-Disposition"] = "attachment; " * bool(d) + "filename=" + name + fmt
+            if d and af():
+                cp.response.status = 202
+                count = 65536
+            else:
+                count = 1048576
+                cp.response.headers["Content-Length"] = os.path.getsize("cache/" + fn)
+            cp.response.headers["Content-Type"] = f"audio/{fmt[1:]}"
+            return cp.lib.file_generator(f, count)
+        else:
+            RESPONSES[t] = fut = concurrent.futures.Future()
+            send(f"!{t}\x7f[VOICE.copy_entry(e) for e in VOICE.ytdl.search({repr(q)})]", escape=False)
+            j, after = fut.result()
+            RESPONSES.pop(t, None)
+            res = j["result"]
+        cp.response.headers.update(CHEADERS)
+        cp.response.headers["Content-Type"] = "application/json"
+        return json.dumps(res)
+    ytdl._cp_config = {"response.stream": True}
 
+    @cp.expose
+    def index(self, *args, **kwargs):
+        data, mime = fetch_static("index.html")
+        cp.response.headers.update(CHEADERS)
+        cp.response.headers["Content-Type"] = mime
+        cp.response.headers["Content-Length"] = len(data)
+        cp.response.headers["ETag"] = create_etag(data)
+        return data
 
-@app.route("/upload_file", methods=["GET", "POST"])
-def upload_file():
-    global est_time
-    ip = flask.request.remote_addr
-    files = [file for file in flask.request.files.getlist("file") if file.filename]
-    if not files:
-        raise EOFError
-    ts = time.time_ns() // 1000
-    urls = deque()
-    futs = deque()
-    for file in files:
-        fn = file.filename
-        sfn = f"cache/{IND}{ts}~{fn}"
-        futs.append(create_future_ex(file.save, sfn))
-        href = f"/files/{ts}/{fn}"
-        b = ts.bit_length() + 7 >> 3
-        url = f"{HOST}/view/~" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
-        data = (href, url, sfn)
-        urls.append(data)
-        send(ip + "\t" + fn + "\t" + str(data))
-        ts += 1
-    s = """<!DOCTYPE html>
+    @cp.expose
+    def favicon(self, *args, **kwargs):
+        data, mime = fetch_static("icon.ico")
+        cp.response.headers.update(CHEADERS)
+        cp.response.headers["Content-Type"] = mime
+        cp.response.headers["Content-Length"] = len(data)
+        cp.response.headers["ETag"] = create_etag(data)
+        return data
+
+    @cp.expose
+    def ip(self, *args, **kwargs):
+        data = json.dumps(dict(
+            remote=cp.request.remote.ip,
+            host=cp.request.base.split("//", 1)[-1].split(":", 1)[0],
+        )).encode("utf-8")
+        cp.response.headers.update(SHEADERS)
+        cp.response.headers["Content-Type"] = "application/json"
+        cp.response.headers["Content-Length"] = len(data)
+        cp.response.headers["ETag"] = create_etag(data)
+        return data
+
+    @cp.config(**{"response.timeout": 7200})
+    @cp.expose
+    def upload_file(self, *args, **kwargs):
+        global est_time
+        ip = cp.request.remote.ip
+        files = args + tuple(kwargs.values())
+        files = [file for file in files if file.filename]
+        if not files:
+            raise EOFError
+        ts = time.time_ns() // 1000
+        urls = deque()
+        futs = deque()
+
+        def copy_file(obj, fn):
+            with open(fn, "wb") as f:
+                shutil.copyfileobj(obj, f)
+
+        for file in files:
+            fn = file.filename
+            sfn = f"cache/{IND}{ts}~{fn}"
+            futs.append(create_future_ex(copy_file, file.file, sfn))
+            b = ts.bit_length() + 7 >> 3
+            href = f"/view/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
+            url = HOST + href
+            data = (href, url, sfn)
+            urls.append(data)
+            send(ip + "\t" + fn + "\t" + str(data))
+            ts += 1
+        s = """<!DOCTYPE html>
 <html>
     <head>
         <style>
@@ -556,7 +532,6 @@ def upload_file():
     </head>
     <body style="background-color:black;">
         <h1 style="color:white;">Upload successful!</h1>"""
-    with tracebacksuppressor:
         for fut in futs:
             fut.result()
         s += f"""
@@ -577,141 +552,296 @@ def upload_file():
                 preview.append(f'<a href="{fi[0].replace("/view/", "/files/")}">{fi[1].replace("/view/", "/files/")}</a>')
             else:
                 preview.append(f'<a href="{fi[0].replace("/view/", "/download/")}">{fi[1].replace("/view/", "/files/")}</a>')
-    if not preview:
-        preview.append(f'<img src="{flask.request.host_url}static/hug.gif" alt="Miza-Dottie-Hug" style="width:14.2857%;height:14.2857%;">')
-    s += "\n" + "\n".join(preview)
-    s += """
+        if not preview:
+            preview.append(f'<img src="{cp.request.base}/static/hug.gif" alt="Miza-Dottie-Hug" style="width:14.2857%;height:14.2857%;">')
+        s += "\n" + "\n".join(preview)
+        s += """
         <p><a href="/upload">Click here to upload another file!</a></p>
     </body>
 </html>"""
-    return s
+        return s
 
-@app.route("/upload", methods=["GET", "POST"])
-def upload():
-    global est_last
-    ip = flask.request.remote_addr
-    colour = hex(colour2raw(hue2colour(xrand(1536))))[2:].upper()
-    if utc() - est_last > 1800:
-        est_last = utc()
-        create_future_ex(estimate_life)
-    data = f"""<!DOCTYPE html>
-<html>
-    <head>
-        <meta charset="utf-8">
-        <title>Files</title>
-        <meta content="Files" property="og:title">
-        <meta content="Upload a file here!" property="og:description">
-        <meta content="{flask.request.url}" property="og:url">
-        <meta property="og:image" content="https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/sky-rainbow.gif">
-        <meta content="#BF7FFF" data-react-helmet="true" name="theme-color">
-        <link href="https://unpkg.com/boxicons@2.0.7/css/boxicons.min.css" rel="stylesheet">
-    </head>""" + """
-    <style>
-        body {
-            background-image: url('""" + flask.request.host_url + """static/spiral.gif');
-            background-repeat: no-repeat;
-            background-attachment: fixed;
-            background-size: cover;
-            font-family: 'Comic Sans MS';
-        }
-        .select {
-            vertical-align: center;
-            background: transparent;
-            color: white;
-            width: 100%;
-            height: 100%;
-            font-weight: 400;
-            align-items: center;
-        }
-        .center {
-            margin: 0;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            -ms-transform: translate(-50%, -50%);
-            transform: translate(-50%, -50%);
-        }""" + f"""
-    </style>
-    <body>
-        <link href="/static/hamburger.css" rel="stylesheet">
-        <div class="hamburger">
-            <input
-                type="checkbox"
-                title="Toggle menu"
-            />
-            <div class="items select">
-                <a href="/" data-popup="Home"><img
-                    src="{flask.request.host_url}static/avatar-rainbow.gif"
-                /></a>
-                <a href="/mizatlas" data-popup="Command Atlas"><img
-                    src="{flask.request.host_url}static/background-rainbow.gif"
-                /></a>
-                <a href="/upload" data-popup="File Host"><img
-                    src="{flask.request.host_url}static/sky-rainbow.gif"
-                /></a>
-                <a href="/apidoc" data-popup="API Documentation"><img
-                    src="{flask.request.host_url}static/hug.gif"
-                /></a>
-                <a 
-                    href="/time"
-                    data-popup="Clock"
-                    class='bx bx-time'></a>
-            </div>
-            <div class="hambg"></div>
-        </div>
-        <div class="center">
-            <h1 align="center" style="color:white;">Upload a file here!</h1>
-            <form action="/upload_file" method="POST" enctype="multipart/form-data">
-                <input style="color:white;" type="file" name="file" multiple/>
-                <input type="submit"/>
-            </form>
-        </div>
-    </body>
-</html>"""
-    resp = flask.Response(data, mimetype="text/html")
-    resp.headers.update(CHEADERS)
-    resp.headers["ETag"] = create_etag(data)
-    return resp
-
-
-geo_sem = Semaphore(90, 256, rate_limit=60)
-geo_count = 0
-
-def get_geo(ip):
-    global geo_count
-    try:
-        resp = TZCACHE[ip]
-    except KeyError:
-        if geo_count & 1:
-            url = f"http://ip-api.com/json/{ip}?fields=256"
-        else:
-            url = f"https://pro.ip-api.com/json/{ip}?fields=256&key=test-demo-pro"
-        geo_count += 1
-        with geo_sem:
-            resp = requests.get(url, headers={"DNT": "1", "User-Agent": f"Mozilla/5.{ip[-1]}", "Origin": "https://members.ip-api.com"})
-        resp.raise_for_status()
-        TZCACHE[ip] = resp = resp.json()
-        send(ip + "\t" + "\t".join(resp.values()))
-    return resp
-
-@app.route("/time", methods=["GET", "POST"])
-@app.route("/timezone", methods=["GET", "POST"])
-@app.route("/timezones", methods=["GET", "POST"])
-def timezone():
-    ip = flask.request.remote_addr
-    try:
-        data = get_geo(ip)
-        tz = data["timezone"]
-        dt = datetime.datetime.now(pytz.timezone(tz))
+    @cp.expose
+    def upload(self):
+        global est_last
+        ip = cp.request.remote.ip
         colour = hex(colour2raw(hue2colour(xrand(1536))))[2:].upper()
-        html = """<!DOCTYPE html>
+        if utc() - est_last > 1800:
+            est_last = utc()
+            create_future_ex(estimate_life)
+# Code adapted from https://github.com/mailopl/html5-xhr2-chunked-file-upload-slice
+        data = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Files</title>
+    <meta content="Files" property="og:title">
+    <meta content="Upload a file here!" property="og:description">
+    <meta content="{cp.url()}" property="og:url">
+    <meta property="og:image" content="https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/sky-rainbow.gif">
+    <meta content="#BF7FFF" data-react-helmet="true" name="theme-color">
+    <link href="https://unpkg.com/boxicons@2.0.7/css/boxicons.min.css" rel="stylesheet">
+</head>""" + """
+<script type="text/javascript">
+const BYTES_PER_CHUNK = 2097152; // 2MB chunk sizes.
+var slices; // slices, value that gets decremented
+var slicesTotal; // total amount of slices, constant once calculated
+
+/**
+ * Calculates slices and indirectly uploads a chunk of a file via uploadFile()
+**/
+function sendRequest() {
+    var xhr;
+    var blob = document.getElementById('fileToUpload').files[0];
+
+    var start = 0;
+    var end;
+    var index = 0;
+
+    // calculate the number of slices 
+    slices = Math.ceil(blob.size / BYTES_PER_CHUNK);
+    slicesTotal = slices;
+
+    while(start < blob.size) {
+        end = start + BYTES_PER_CHUNK;
+        if(end > blob.size) {
+            end = blob.size;
+        }
+
+        uploadFile(blob, index, start, end);
+
+        start = end;
+        index++;
+    }
+}
+
+/**
+ * Blob to ArrayBuffer (needed ex. on Android 4.0.4)
+**/
+var str2ab_blobreader = function(str, callback) {
+    var blob;
+    BlobBuilder = window.MozBlobBuilder || window.WebKitBlobBuilder || window.BlobBuilder;
+    if (typeof(BlobBuilder) !== 'undefined') {
+      var bb = new BlobBuilder();
+      bb.append(str);
+      blob = bb.getBlob();
+    } else {
+      blob = new Blob([str]);
+    }
+    var f = new FileReader();
+    f.onload = function(e) {
+        callback(e.target.result)
+    }
+    f.readAsArrayBuffer(blob);
+}
+/**
+ * Performs actual upload, adjustes progress bars
+ *
+ * @param blob
+ * @param index
+ * @param start
+ * @param end
+ */
+function uploadFile(blob, index, start, end) {
+    var xhr;
+    var end;
+    var chunk;
+
+    xhr = new XMLHttpRequest();
+
+    xhr.onreadystatechange = function() {
+        if(xhr.readyState == 4) {
+            if(xhr.responseText) {
+                alert(xhr.responseText);
+            }
+
+            slices--;
+
+            // if we have finished all slices
+            if(slices == 0) {
+                mergeFile(blob);
+                progressBar.max = progressBar.value = 100;
+				percentageDiv.innerHTML = "100%";
+            }
+        }
+    };
+
+    if (blob.webkitSlice) {
+        chunk = blob.webkitSlice(start, end);
+    } else if (blob.mozSlice) {
+        chunk = blob.mozSlice(start, end);
+    } else {
+		chunk = blob.slice(start, end); 
+    }
+
+    xhr.addEventListener("load",  function (evt) {
+    	var percentageDiv = document.getElementById("percent");
+		var progressBar = document.getElementById("progressBar");
+    }, false);
+
+	xhr.upload.addEventListener("progress", function (evt) {
+		var percentageDiv = document.getElementById("percent");  
+		var progressBar = document.getElementById("progressBar");
+
+		if (evt.lengthComputable) {
+            progressBar.max = slicesTotal;
+            progressBar.value = index;
+            percentageDiv.innerHTML = Math.round(index/slicesTotal * 10000) / 100 + "%";
+		} 
+	}, false);
+
+
+    xhr.open("post", "upload_chunk", true);
+    xhr.setRequestHeader("X-File-Name", blob.name);             // custom header with filename and full size
+	xhr.setRequestHeader("X-File-Size", blob.size);
+	xhr.setRequestHeader("X-Index", index);                     // part identifier
+    
+    if (blob.webkitSlice) {                                     // android default browser in version 4.0.4 has webkitSlice instead of slice()
+    	var buffer = str2ab_blobreader(chunk, function(buf) {   // we cannot send a blob, because body payload will be empty
+       		xhr.send(buf);                                      // thats why we send an ArrayBuffer
+    	});	
+    } else {
+    	xhr.send(chunk);                                        // but if we support slice() everything should be ok
+    }
+}
+
+/**
+ *  Function executed once all of the slices has been sent, "TO MERGE THEM ALL!"
+**/
+function mergeFile(blob) {
+    var xhr;
+    var fd;
+
+    xhr = new XMLHttpRequest();
+    xhr.onreadystatechange = function() {
+		if (xhr.readyState == XMLHttpRequest.DONE) {
+			window.location.replace(xhr.responseText);
+		}
+	}
+
+    fd = new FormData();
+    fd.append("name", blob.name);
+    fd.append("index", slicesTotal);
+
+    xhr.open("POST", "merge", true);
+    xhr.send(fd);
+}
+</script>
+
+<style>
+    body {
+        background-image: url('""" + cp.request.base + """/static/spiral.gif');
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+        background-size: cover;
+        font-family: 'Comic Sans MS';
+    }
+    .select {
+        vertical-align: center;
+        background: transparent;
+        color: white;
+        width: 100%;
+        height: 100%;
+        font-weight: 400;
+        align-items: center;
+    }
+    .center {
+        margin: 0;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        -ms-transform: translate(-50%, -50%);
+        transform: translate(-50%, -50%);
+    }""" + f"""
+</style>
+<body>
+    <link href="/static/hamburger.css" rel="stylesheet">
+    <div class="hamburger">
+        <input
+            type="checkbox"
+            title="Toggle menu"
+        />
+        <div class="items select">
+            <a href="/" data-popup="Home"><img
+                src="{cp.request.base}/static/avatar-rainbow.gif"
+            /></a>
+            <a href="/mizatlas" data-popup="Command Atlas"><img
+                src="{cp.request.base}/static/background-rainbow.gif"
+            /></a>
+            <a href="/upload" data-popup="File Host"><img
+                src="{cp.request.base}/static/sky-rainbow.gif"
+            /></a>
+            <a href="/apidoc" data-popup="API Documentation"><img
+                src="{cp.request.base}/static/hug.gif"
+            /></a>
+            <a 
+                href="/time"
+                data-popup="Clock"
+                class='bx bx-time'></a>
+        </div>
+        <div class="hambg"></div>
+    </div>
+    <div class="center">
+		<div id="percent" align="center" style="color:white;">Upload a file here!</div>
+		<input style="color:white;" type="file" name="file" id="fileToUpload">
+		<button onclick="sendRequest()">Upload</button><br>
+		<div align="center"><progress id="progressBar" value="0" max="100"></progress></div>
+	</div>
+</body>
+</html>"""
+        cp.response.headers.update(CHEADERS)
+        cp.response.headers["Content-Type"] = "text/html"
+        cp.response.headers["Content-Length"] = len(data)
+        cp.response.headers["ETag"] = create_etag(data)
+        return data
+
+    @cp.expose
+    def upload_chunk(self, **kwargs):
+        s = cp.request.remote.ip + "%" + cp.request.headers.get("x-file-name", "")
+        h = hash(s) % 2 ** 48
+        fn = f"cache/{h}%" + cp.request.headers.get("x-index", "0")
+        with open(fn, "wb") as f:
+            shutil.copyfileobj(cp.request.body.fp, f)
+
+    @cp.expose
+    @cp.tools.accept(media="multipart/form-data")
+    def merge(self, **kwargs):
+        ts = time.time_ns() // 1000
+        name = kwargs.get("name", "")
+        s = cp.request.remote.ip + "%" + name
+        h = hash(s) % 2 ** 48
+        n = f"cache/{h}%"
+        fn = f"cache/{IND}{ts}~" + name
+        high = int(kwargs.get("index", "0"))
+        os.rename(n + "0", fn)
+        if high > 1:
+            with open(fn, "ab") as f:
+                for i in range(1, high):
+                    gn = n + str(i)
+                    with open(gn, "rb") as g:
+                        shutil.copyfileobj(g, f)
+                    os.remove(gn)
+        b = ts.bit_length() + 7 >> 3
+        href = f"/preview/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
+        url = HOST + href
+        return url
+
+    @cp.expose(("time", "timezones"))
+    def timezone(self):
+        ip = cp.request.remote.ip
+        try:
+            data = get_geo(ip)
+            tz = data["timezone"]
+            dt = datetime.datetime.now(pytz.timezone(tz))
+            colour = hex(colour2raw(hue2colour(xrand(1536))))[2:].upper()
+            html = """<!DOCTYPE html>
 <html>
     <head>
         <meta charset="utf-8">
         <title>Timezones</title>
         <meta content="Timezones" property="og:title">
         <meta content="Find your current timezone here!" property="og:description">
-        <meta content=\"""" + flask.request.url + """\" property="og:url">
+        <meta content=\"""" + cp.url() + """\" property="og:url">
         <meta property="og:image" content="https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/sky-rainbow.gif">
         <meta content="#""" + colour + """\" data-react-helmet="true" name="theme-color">
         <meta http-equiv="refresh" content="60">
@@ -727,16 +857,16 @@ def timezone():
             />
             <div class="items select">
                 <a href="/" data-popup="Home"><img
-                    src="{flask.request.host_url}static/avatar-rainbow.gif"
+                    src="{cp.request.base}/static/avatar-rainbow.gif"
                 /></a>
                 <a href="/mizatlas" data-popup="Command Atlas"><img
-                    src="{flask.request.host_url}static/background-rainbow.gif"
+                    src="{cp.request.base}/static/background-rainbow.gif"
                 /></a>
                 <a href="/upload" data-popup="File Host"><img
-                    src="{flask.request.host_url}static/sky-rainbow.gif"
+                    src="{cp.request.base}/static/sky-rainbow.gif"
                 /></a>
                 <a href="/apidoc" data-popup="API Documentation"><img
-                    src="{flask.request.host_url}static/hug.gif"
+                    src="{cp.request.base}/static/hug.gif"
                 /></a>
                 <a 
                     href="/time"
@@ -756,163 +886,96 @@ def timezone():
                 <a class="glow" href="/">Home</a>
             </p>
         </div>
-    <img class="border" src="{flask.request.host_url}static/sky-rainbow.gif" alt="Miza-Sky" style="width:14.2857%;height:14.2857%;">
+    <img class="border" src="{cp.request.base}/static/sky-rainbow.gif" alt="Miza-Sky" style="width:14.2857%;height:14.2857%;">
     </body>
 </html>"""
-        return html
-    except KeyError:
-        return flask.redirect("https://http.cat/417")
-    except:
-        send(traceback.format_exc())
-        raise
+            return html
+        except:
+            send(traceback.format_exc())
+            raise
 
+    @cp.expose
+    def backup(self, token):
+        if token != AUTH.get("discord_token"):
+            raise InterruptedError
+        t = ts_us()
+        while t in RESPONSES:
+            t += 1
+        RESPONSES[t] = fut = concurrent.futures.Future()
+        send(f"!{t}\x7fbot.backup()", escape=False)
+        j, after = fut.result()
+        RESPONSES.pop(t, None)
+        cp.response.headers.update(CHEADERS)
+        return cp.lib.static.serve_file(os.getcwd() + "/" + j["result"], content_type="application/zip", disposition="attachment")
 
-@app.route("/backup/<string:token>", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
-def backup(token):
-    if token != AUTH.get("discord_token"):
-        return flask.redirect("https://http.cat/401")
-    t = ts_us()
-    while t in RESPONSES:
-        t += 1
-    RESPONSES[t] = fut = concurrent.futures.Future()
-    send(f"!{t}\x7fbot.backup()", escape=False)
-    j, after = fut.result()
-    RESPONSES.pop(t, None)
-    resp = flask.send_file(os.getcwd() + "/" + j["result"], as_attachment=True, mimetype="application/zip", conditional=True)
-    resp.headers.update(CHEADERS)
-    return resp
+    @cp.expose(("eval", "exec"))
+    def execute(self, token, content):
+        if token != AUTH.get("discord_token"):
+            raise InterruptedError
+        content = urllib.parse.unquote(cp.url(base="server", qs=cp.request.query_string).rstrip("?").lstrip("/").split("/", 2)[-1])
+        t = ts_us()
+        while t in RESPONSES:
+            t += 1
+        RESPONSES[t] = fut = concurrent.futures.Future()
+        send(f"!{t}\x7f{content}", escape=False)
+        j, after = fut.result()
+        RESPONSES.pop(t, None)
+        return j["result"]
 
-@app.route("/eval/<string:token>/<path:content>", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
-@app.route("/exec/<string:token>/<path:content>", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
-def execute(token, content):
-    if token != AUTH.get("discord_token"):
-        return flask.redirect("https://http.cat/401")
-    content = urllib.parse.unquote(flask.request.full_path.rstrip("?").lstrip("/").split("/", 2)[-1])
-    t = ts_us()
-    while t in RESPONSES:
-        t += 1
-    RESPONSES[t] = fut = concurrent.futures.Future()
-    send(f"!{t}\x7f{content}", escape=False)
-    j, after = fut.result()
-    RESPONSES.pop(t, None)
-    return j["result"]
+    @cp.expose(("commands",))
+    def command(self, content="", input=""):
+        ip = cp.request.remote.ip
+        if ip == "127.0.0.1":
+            t, after = content.split("\x7f", 1)
+            t = int(t)
+            after = float(after)
+            cl = int(cp.request.headers["Content-Length"])
+            j = json.loads(cp.request.body.read(cl))
+            if t in RESPONSES:
+                RESPONSES[t].set_result((j, after))
+                return b"\xf0\x9f\x92\x9c"
+        content = input or urllib.parse.unquote(cp.url(base="server", qs=cp.request.query_string).rstrip("?").split("/", 2)[-1])
+        data = get_geo(ip)
+        tz = data["timezone"]
+        if " " not in content:
+            content += " "
+        t = ts_us()
+        while t in RESPONSES:
+            t += 1
+        RESPONSES[t] = fut = concurrent.futures.Future()
+        send(f"~{t}\x7f{ip}\x7f{tz}\x7f{content}", escape=False)
+        j, after = fut.result(timeout=420)
+        RESPONSES.pop(t, None)
+        a = after - utc()
+        if a > 0:
+            response.headers["Retry-After"] = a
+        return json.dumps(j)
 
-@app.route("/command", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
-@app.route("/commands", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
-@app.route("/command/<path:content>", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
-@app.route("/commands/<path:content>", methods=["GET", "POST", "PATCH", "PUT", "OPTIONS"])
-def command(content=""):
-    ip = flask.request.remote_addr
-    if ip == "127.0.0.1":
-        t, after = content.split("\x7f", 1)
-        t = int(t)
-        after = float(after)
-        j = flask.request.get_json(force=True)
-        if t in RESPONSES:
-            RESPONSES[t].set_result((j, after))
-            # send(j)
-            return b"\xf0\x9f\x92\x9c"
-    try:
-        content = flask.request.args["input"]
-    except KeyError:
-        content = urllib.parse.unquote(flask.request.full_path.rstrip("?").lstrip("/").split("/", 1)[-1])
-    data = get_geo(ip)
-    tz = data["timezone"]
-    if " " not in content:
-        content += " "
-    t = ts_us()
-    while t in RESPONSES:
-        t += 1
-    RESPONSES[t] = fut = concurrent.futures.Future()
-    send(f"~{t}\x7f{ip}\x7f{tz}\x7f{content}", escape=False)
-    j, after = fut.result(timeout=420)
-    RESPONSES.pop(t, None)
-    response = flask.Response(json.dumps(j), mimetype="application/json")
-    a = after - utc()
-    if a > 0:
-        response.headers["Retry-After"] = a
-    return response
-
-
-@app.route("/cat", methods=["GET"])
-@app.route("/cats", methods=["GET"])
-def cat():
-    t = ts_us()
-    while t in RESPONSES:
-        t += 1
-    RESPONSES[t] = fut = concurrent.futures.Future()
-    send(f"!{t}\x7fbot.commands.cat[0](bot, None, 'v')", escape=False)
-    j, after = fut.result()
-    RESPONSES.pop(t, None)
-    url = j["result"]
-    if fcdict(flask.request.headers).get("Accept") == "application/json":
-        return url
-    refresh = float(flask.request.args.get("refresh", 60))
-    return f"""<!DOCTYPE html>
+    @cp.expose(("cat", "cats", "dog", "dogs", "neko", "nekos", "giphy"))
+    def imagepool(self, tag="", refresh=60):
+        name = cp.url(base="server").rsplit("/", 1)[-1]
+        command = name.rstrip("s")
+        argv = tag
+        try:
+            args = shlex.split(argv)
+        except ValueError:
+            args = argv.split()
+        t = ts_us()
+        while t in RESPONSES:
+            t += 1
+        RESPONSES[t] = fut = concurrent.futures.Future()
+        send(f"!{t}\x7fbot.commands.{command}[0](bot=bot,channel=None,flags='v',args={repr(args)},argv={repr(argv)})", escape=False)
+        j, after = fut.result()
+        RESPONSES.pop(t, None)
+        url = j["result"]
+        refresh = float(refresh or 60)
+        if fcdict(cp.request.headers).get("Accept") == "application/json":
+            return url
+        return f"""<!DOCTYPE html>
 <html>
 <head>
 <meta property="og:image" content="{url}">
-<meta http-equiv="refresh" content="{refresh}; URL={flask.request.url}">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>""" + """
-img {
-  display: block;
-  margin-left: auto;
-  margin-right: auto;
-  margin-top: auto;
-  margin-bottom: auto;
-}
-.center {
-  margin: 0;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  -ms-transform: translate(-50%, -50%);
-  transform: translate(-50%, -50%);
-}""" + f"""
-</style>
-</head>
-<body style="background-color:black;">
-<img src="{url}" class="center">
-</body>
-</html>"""
-
-ipm = dict(
-    cats="cat",
-    dogs="dog",
-    nekos="neko",
-)
-@app.route("/cat", methods=["GET"])
-@app.route("/cats", methods=["GET"])
-@app.route("/dog", methods=["GET"])
-@app.route("/dogs", methods=["GET"])
-@app.route("/neko", methods=["GET"])
-@app.route("/nekos", methods=["GET"])
-@app.route("/giphy", methods=["GET"])
-def imagepool():
-    name = flask.request.path.rsplit("/", 1)[-1]
-    command = ipm.get(name, name)
-    argv = flask.request.args.get("tag", "")
-    try:
-        args = shlex.split(argv)
-    except ValueError:
-        args = argv.split()
-    t = ts_us()
-    while t in RESPONSES:
-        t += 1
-    RESPONSES[t] = fut = concurrent.futures.Future()
-    send(f"!{t}\x7fbot.commands.{command}[0](bot=bot,channel=None,flags='v',args={repr(args)},argv={repr(argv)})", escape=False)
-    j, after = fut.result()
-    RESPONSES.pop(t, None)
-    url = j["result"]
-    refresh = float(flask.request.args.get("refresh", 60))
-    if fcdict(flask.request.headers).get("Accept") == "application/json":
-        return url
-    return f"""<!DOCTYPE html>
-<html>
-<head>
-<meta property="og:image" content="{url}">
-<meta http-equiv="refresh" content="{refresh}; URL={flask.request.url}">
+<meta http-equiv="refresh" content="{refresh}; URL={cp.url(qs=cp.request.query_string)}">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>""" + """
 img {
@@ -939,22 +1002,10 @@ img {
 </body>
 </html>"""
 
-
-HEADERS = {
-    "X-Content-Type-Options": "nosniff",
-    "Server": "Miza",
-    "Vary": "Accept-Encoding",
-    "Accept-Ranges": "bytes",
-    "Access-Control-Allow-Origin": "*",
-}
-
-CHEADERS = {"Cache-Control": "public, max-age=3600, stale-while-revalidate=1073741824, stale-if-error=1073741824"}
-SHEADERS = {"Cache-Control": "public, max-age=30, stale-while-revalidate=1073741824, stale-if-error=1073741824"}
-
-@app.after_request
-def custom_header(response):
-    response.headers.update(HEADERS)
-    return response
+# @app.after_request
+# def custom_header(response):
+#     response.headers.update(HEADERS)
+#     return response
 
 
 def ensure_parent(proc, parent):
@@ -966,14 +1017,6 @@ def ensure_parent(proc, parent):
                 pass
         if not parent.is_running():
             psutil.Process().kill()
-        # t = ts_us()
-        # while t in RESPONSES:
-        #     t += 1
-        # RESPONSES[t] = fut = concurrent.futures.Future()
-        # send(f"!{t}\x7f{content}", escape=False)
-        # j, after = fut.result()
-        # RESPONSES.pop(t, None)
-        # send(f"!{t}\x7fGC.__setitem__({proc.pid}, {len(gc.get_objects())})", escape=False)
         time.sleep(6)
 
 if __name__ == "__main__":
@@ -983,4 +1026,4 @@ if __name__ == "__main__":
     proc = psutil.Process(pid)
     parent = psutil.Process(ppid)
     create_thread(ensure_parent, proc, parent)
-    app.run("0.0.0.0", PORT)
+    cp.quickstart(Server(), "/", config)
