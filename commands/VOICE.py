@@ -408,12 +408,17 @@ class CustomAudio(collections.abc.Hashable):
             if position:
                 d["pos"] = self.pos
             if js:
-                if len(q) > lim:
-                    s = pickle.dumps(d)
-                    if len(s) > 262144:
-                        return encrypt(bytes2zip(s)), "dump.bin"
-                    return encrypt(s), "dump.bin"
-                return json.dumps(d).encode("utf-8"), "dump.json"
+                d = json.dumps(d).encode("utf-8")
+                if len(d) > 2097152:
+                    d = bytes2zip(d)
+                    return d, "dump.zip"
+                return d, "dump.json"
+                # if len(q) > lim:
+                #     s = pickle.dumps(d)
+                #     if len(s) > 262144:
+                #         return encrypt(bytes2zip(s)), "dump.bin"
+                #     return encrypt(s), "dump.bin"
+                # return json.dumps(d).encode("utf-8"), "dump.json"
             return d, None
 
     def _reverse(self):

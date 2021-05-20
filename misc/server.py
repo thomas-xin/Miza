@@ -151,7 +151,7 @@ def get_geo(ip):
         if geo_count & 1:
             url = f"http://ip-api.com/json/{ip}?fields=256"
         else:
-            url = f"https://pro.ip-api.com/json/{ip}?fields=256&key=test-demo-pro"
+            url = f"https://demo.ip-api.com/json/{ip}?fields=256&key=test-demo-pro"
         geo_count += 1
         with geo_sem:
             resp = requests.get(url, headers={"DNT": "1", "User-Agent": f"Mozilla/5.{ip[-1]}", "Origin": "https://members.ip-api.com"})
@@ -822,9 +822,7 @@ function mergeFile(blob) {
                         shutil.copyfileobj(g, f)
                     os.remove(gn)
         b = ts.bit_length() + 7 >> 3
-        href = f"/preview/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
-        url = HOST + href
-        return url
+        return f"/preview/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
 
     @cp.expose(("time", "timezones"))
     def timezone(self):

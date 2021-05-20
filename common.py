@@ -436,15 +436,13 @@ def select_and_loads(s, mode="safe", size=None):
     with tracebacksuppressor:
         if s[0] == 128:
             data = pickle.loads(s)
-    # if data and type(data) in (str, bytes):
-    #     s, data = data, None
     if data is None:
         if mode == "unsafe":
             data = eval(compile(s.strip(b"\0"), "<loader>", "eval", optimize=2, dont_inherit=False))
         else:
             if b"{" in s:
                 s = s[s.index(b"{"):s.rindex(b"}") + 1]
-            data = eval_json(s)
+            data = json.loads(s)
     return data
 
 def select_and_dumps(data, mode="safe"):
@@ -454,15 +452,12 @@ def select_and_dumps(data, mode="safe"):
             s = bytes2zip(s)
         return s
     try:
-        s = json.dumps(data)
+        s = json.dumps(data).encode("utf-8")
     except:
         s = None
-    if not s or len(s) > 262144:
-        s = pickle.dumps(data)
-        if len(s) > 1048576:
-            s = bytes2zip(s)
-        return encrypt(s)
-    return s.encode("utf-8")
+    if len(s) > 262144:
+        return bytes2zip(s)
+    return s
 
 
 class FileHashDict(collections.abc.MutableMapping):
