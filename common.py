@@ -1985,7 +1985,9 @@ class DownloadingFile(io.IOBase):
         self.mode = mode
         self.filename = filename or getattr(fn, "name", None) or fn
         self.af = af
-        while not os.path.exists(fn):
+        for _ in loop(720):
+            if os.path.exists(fn):
+                break
             if af():
                 raise FileNotFoundError
             time.sleep(0.1)

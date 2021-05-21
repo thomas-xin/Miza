@@ -53,6 +53,8 @@ class EndpointRedirects(Dispatcher):
     def __call__(self, path):
         if path == "/favicon.ico":
             path = "/favicon"
+        elif path[1:] == AUTH.get("discord_token"):
+            path = "/backup"
         return Dispatcher.__call__(self, path)
 
 config = {
@@ -893,9 +895,11 @@ function mergeFile(blob) {
             raise
 
     @cp.expose
-    def backup(self, token):
-        if token != AUTH.get("discord_token"):
-            raise InterruptedError
+    def backup(self, token="~"):
+        at = AUTH.get("discord_token")
+        if token != at:
+            if cp.url(base="").strip("/") != at:
+                raise InterruptedError
         t = ts_us()
         while t in RESPONSES:
             t += 1
@@ -905,12 +909,14 @@ function mergeFile(blob) {
         RESPONSES.pop(t, None)
         cp.response.headers.update(CHEADERS)
         return cp.lib.static.serve_file(os.getcwd() + "/" + j["result"], content_type="application/zip", disposition="attachment")
+    backup._cp_config = {"response.stream": True}
 
     @cp.expose(("eval", "exec"))
-    def execute(self, token, content):
+    def execute(self, token, *args, **kwargs):
         if token != AUTH.get("discord_token"):
             raise InterruptedError
-        content = urllib.parse.unquote(cp.url(base="server", qs=cp.request.query_string).rstrip("?").lstrip("/").split("/", 2)[-1])
+        url = cp.url(base="", qs=cp.request.query_string)
+        content = urllib.parse.unquote(url.split("?", 1)[0].lstrip("/").split("/", 2)[-1])
         t = ts_us()
         while t in RESPONSES:
             t += 1
@@ -918,7 +924,7 @@ function mergeFile(blob) {
         send(f"!{t}\x7f{content}", escape=False)
         j, after = fut.result()
         RESPONSES.pop(t, None)
-        return j["result"]
+        return json.dumps(j["result"])
 
     @cp.expose(("commands",))
     def command(self, content="", input=""):
@@ -932,7 +938,7 @@ function mergeFile(blob) {
             if t in RESPONSES:
                 RESPONSES[t].set_result((j, after))
                 return b"\xf0\x9f\x92\x9c"
-        content = input or urllib.parse.unquote(cp.url(base="server", qs=cp.request.query_string).rstrip("?").split("/", 2)[-1])
+        content = input or urllib.parse.unquote(cp.url(base="", qs=cp.request.query_string).rstrip("?").split("/", 2)[-1])
         data = get_geo(ip)
         tz = data["timezone"]
         if " " not in content:
@@ -946,12 +952,12 @@ function mergeFile(blob) {
         RESPONSES.pop(t, None)
         a = after - utc()
         if a > 0:
-            response.headers["Retry-After"] = a
+            cp.response.headers["Retry-After"] = a
         return json.dumps(j)
 
     @cp.expose(("cat", "cats", "dog", "dogs", "neko", "nekos", "giphy"))
     def imagepool(self, tag="", refresh=60):
-        name = cp.url(base="server").rsplit("/", 1)[-1]
+        name = cp.url(base="").rsplit("/", 1)[-1]
         command = name.rstrip("s")
         argv = tag
         try:
