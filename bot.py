@@ -1357,7 +1357,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 else:
                     ext = None
                 urls = await create_future(as_file, file if getattr(file, "_fp", None) else f, filename=filename, ext=ext, rename=rename)
-                message = await channel.send(msg + ("" if msg.endswith("```") else "\n") + urls[0] + "\n" + urls[1], reference=reference) #, embed=discord.Embed(colour=discord.Colour(1)).set_image(url=urls[-1]))
+                message = await channel.send(msg + ("" if msg.endswith("```") else "\n") + urls[0], reference=reference) #, embed=discord.Embed(colour=discord.Colour(1)).set_image(url=urls[-1]))
             else:
                 message = await channel.send(msg, file=file, reference=reference)
                 if filename is not None:
@@ -4794,8 +4794,8 @@ def as_file(file, filename=None, ext=None, rename=True):
     else:
         b = fn.bit_length() + 7 >> 3
         fn = as_str(base64.urlsafe_b64encode(fn.to_bytes(b, "big"))).rstrip("=")
-    url1 = f"{bot.webserver}/view/{fn}"
-    url2 = f"{bot.webserver}/download/{fn}"
+    url1 = f"{bot.webserver}/p/{fn}"
+    url2 = f"{bot.webserver}/d/{fn}"
     # if filename:
     #     fn = "/" + (str(file) if filename is None else lim_str(filename, 64).translate(filetrans))
     #     url1 += fn

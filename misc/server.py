@@ -221,7 +221,7 @@ class Server:
                 mime = get_mime(p)
             fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
             attachment = filename or fn
-            if endpoint == "preview":
+            if endpoint.startswith("p") and mime.split("/", 1)[0] in ("image", "audio", "video"):
                 s = """<!DOCTYPE html>
 <html>
     <head>
@@ -253,10 +253,10 @@ class Server:
             text-decoration: underline;
         }
         </style>"""
-                f_url = cp.url(qs=cp.request.query_string)
-                o_url = HOST + cp.url(qs=cp.request.query_string, base="")
-                s_url = f_url.replace("/preview/", "/files/")
-                url = o_url.replace("/preview/", "/files/")
+                f_url = cp.url(qs=cp.request.query_string).replace("/preview/", "/p/")
+                o_url = HOST + cp.url(qs=cp.request.query_string, base="").replace("/preview/", "/p/")
+                s_url = f_url.replace("/p/", "/f/")
+                url = o_url.replace("/p/", "/f/")
                 s += f"""
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
         <meta name="twitter:image:src" content="{s_url}">
@@ -279,8 +279,7 @@ class Server:
                     preview.append(f'<div align="center"><video width="480" controls><source src="{s_url}" type="{mime}"></video></div>')
                 elif mime.startswith("text/"):
                     preview.append(f'<a href="{url}">{url}</a>')
-                else:
-                    preview.append(f'<a href="{url.replace("/files/", "/download/")}">{url.replace("/files/", "/download/")}</a>')
+                preview.append(f'<a style="color:#0000ff;" href="{s_url.replace("/f/", "/d/")}">Download</a>')
                 if not preview:
                     preview.append(f'<img src="{cp.request.base}/static/hug.gif" alt="Miza-Dottie-Hug" style="width:14.2857%;height:14.2857%;">')
                 s += "\n" + "\n".join(preview)
@@ -916,7 +915,7 @@ function mergeFile(blob) {
                         shutil.copyfileobj(g, f)
                     os.remove(gn)
         b = ts.bit_length() + 7 >> 3
-        return f"/preview/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
+        return f"/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
 
     @cp.expose(("time", "timezones"))
     def timezone(self):
