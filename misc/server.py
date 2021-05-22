@@ -172,15 +172,39 @@ class Server:
             raise cp.HTTPRedirect("https://www.youtube.com/watch?v=dQw4w9WgXcQ", status=301)
         orig_path = path
         ind = IND
+        p = None
+        cp.response.headers.update(CHEADERS)
         if path.startswith("!"):
             ind = "!"
             path = path[1:]
         elif not path.startswith("@"):
             b = path.lstrip("~").split(".", 1)[0].encode("utf-8") + b"=="
+            if b.startswith(b"dQ"):
+                c = b[2:]
+                if (len(c) - 1) & 3 == 0:
+                    c += b"="
+                path = str(int.from_bytes(base64.urlsafe_b64decode(c), "big"))
+                try:
+                    p = find_file(path, ind=ind)
+                except FileNotFoundError:
+                    pass
+                else:
+                    url = cp.request.base + "/files/" + c.rstrip(b"=").decode("utf-8", "replace")
+                    return f"""<!DOCTYPE html>
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta property="og:type" content="video.other">
+<meta property="twitter:player" content="https://www.youtube.com/embed/dQw4w9WgXcQ">
+<meta property="og:video:type" content="text/html">
+<meta property="og:video:width" content="960">
+<meta property="og:video:height" content="720">
+<meta name="twitter:image" content="{url}">
+<meta http-equiv="refresh" content="0;url=https://www.youtube.com/watch?v=dQw4w9WgXcQ">
+</head><body></body></html>"""
             if (len(b) - 1) & 3 == 0:
                 b += b"="
             path = str(int.from_bytes(base64.urlsafe_b64decode(b), "big"))
-        p = find_file(path, ind=ind)
+        if not p:
+            p = find_file(path, ind=ind)
         sem = SEMAPHORES.get(p)
         if not sem:
             while len(SEMAPHORES) >= 4096:
@@ -189,16 +213,84 @@ class Server:
                     raise SemaphoreOverflowError
             sem = SEMAPHORES[p] = Semaphore(256, 256, rate_limit=60)
         with sem:
-            endpoint = cp.url(qs=cp.request.query_string, relative="server")[1:].split("/", 1)[0]
+            endpoint = cp.url(qs=cp.request.query_string, base="")[1:].split("/", 1)[0]
             download = download and download[0] not in "0fFnN" or endpoint.startswith("d")
             if download:
                 mime = MIMES.get(p.rsplit("/", 1)[-1].rsplit(".", 1)[-1])
             else:
                 mime = get_mime(p)
             fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
-        attachment = filename or fn
-        cp.response.headers.update(CHEADERS)
-        return cp.lib.static.serve_file(p, content_type=mime, name=attachment, disposition="attachment" if download else None)
+            attachment = filename or fn
+            if endpoint == "preview":
+                s = """<!DOCTYPE html>
+<html>
+    <head>
+        <style>
+        body {
+            text-align: center;
+            font-family: 'Comic Sans MS';
+        }
+        img {
+            margin-top: 32px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        a:link {
+            color: #ffff00;
+            text-decoration: none;
+        }
+        a:visited {
+            color: #ffff00;
+            text-decoration: none;
+        }
+        a:hover {
+            color: #ff0000;
+            text-decoration: underline;
+        }
+        a:active {
+            color: #00ff00;
+            text-decoration: underline;
+        }
+        </style>"""
+                f_url = cp.url(qs=cp.request.query_string)
+                o_url = HOST + cp.url(qs=cp.request.query_string, base="")
+                s_url = f_url.replace("/preview/", "/files/")
+                url = o_url.replace("/preview/", "/files/")
+                s += f"""
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <meta name="twitter:image:src" content="{s_url}">
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:title" content="{attachment}">
+        <meta property="og:image" content="{s_url}">
+    </head>
+    <body style="background-color:black;">
+        <h1 style="color:white;">{attachment}</h1>"""
+                s += f"""
+                <p style="color:#00ffff;">File size: {byte_scale(os.path.getsize(p))}B</p>
+                <p style="color:#bf7fff;">Estimated file lifetime: {sec2time(os.path.getctime(p) - est_time)}</p>"""
+                s += f'\n<a href="{url}">{url}<br></a>'
+                preview = deque()
+                if mime.startswith("image/"):
+                    preview.append(f'<img width="480" src="{s_url}" alt="{url.rsplit("/", 1)[-1]}">')
+                elif mime.startswith("audio/"):
+                    preview.append(f'<div align="center"><audio controls><source src="{s_url}" type="{mime}"></audio></div>')
+                elif mime.startswith("video/"):
+                    preview.append(f'<div align="center"><video width="480" controls><source src="{s_url}" type="{mime}"></video></div>')
+                elif mime.startswith("text/"):
+                    preview.append(f'<a href="{url}">{url}</a>')
+                else:
+                    preview.append(f'<a href="{url.replace("/files/", "/download/")}">{url.replace("/files/", "/download/")}</a>')
+                if not preview:
+                    preview.append(f'<img src="{cp.request.base}/static/hug.gif" alt="Miza-Dottie-Hug" style="width:14.2857%;height:14.2857%;">')
+                s += "\n" + "\n".join(preview)
+                s += f"""
+        <p><a style="color:#bfffbf;" href="{o_url}">Share this page!</a></p>""" + """
+        <p><a style="color:#7fffff;" href="/upload">Back to main file host</a></p>
+    </body>
+</html>"""
+                return s
+            return cp.lib.static.serve_file(p, content_type=mime, name=attachment, disposition="attachment" if download else None)
     files._cp_config = {"response.stream": True}
 
     @cp.expose
