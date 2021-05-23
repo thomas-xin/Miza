@@ -162,10 +162,12 @@ def get_geo(ip):
         send(ip + "\t" + "\t".join(resp.values()))
     return resp
 
+last_image = [None] * 2
+
 
 class Server:
 
-    @cp.expose(("preview", "p", "view", "v", "file", "f", "download", "d"))
+    @cp.expose(("preview", "p", "images", "image", "i", "view", "v", "file", "f", "download", "d"))
     def files(self, path, filename=None, download=None, **void):
         if path in ("hacks", "mods", "files", "download", "static"):
             send(cp.request.remote.ip + " was rickrolled 🙃")
@@ -256,13 +258,14 @@ class Server:
                 f_url = cp.url(qs=cp.request.query_string).replace("/preview/", "/p/")
                 o_url = HOST + cp.url(qs=cp.request.query_string, base="").replace("/preview/", "/p/")
                 s_url = f_url.replace("/p/", "/f/")
+                i_url = f_url.replace("/p/", "/i/")
                 url = o_url.replace("/p/", "/f/")
                 s += f"""
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-        <meta name="twitter:image:src" content="{s_url}">
+        <meta name="twitter:image:src" content="{i_url}">
         <meta name="twitter:card" content="summary_large_image">
         <meta name="twitter:title" content="{attachment}">
-        <meta property="og:image" content="{s_url}">
+        <meta property="og:image" content="{i_url}">
     </head>
     <body style="background-color:black;">
         <h1 style="color:white;">{attachment}</h1>"""
@@ -288,7 +291,27 @@ class Server:
         <p><a style="color:#7fffff;" href="/upload">Back to main file host</a></p>
     </body>
 </html>"""
-                return s
+                b = s.encode("utf-8", "replace")
+                cp.response.headers["Content-Type"] = "text/html"
+                cp.response.headers["Content-Length"] = len(b)
+                cp.response.headers["ETag"] = create_etag(b)
+                return b
+            elif endpoint.startswith("i") and (mime in ("image/webp", "image/gif", "image/apng") or mime.split("/", 1)[0] == "video"):
+                if p != last_image[0]:
+                    args = ["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+fastseek+genpts+igndts+flush_packets", "-an", "-i", p, "-frames:v", "1", "-f", "image2", "-c:v", "png", "-"]
+                    proc = psutil.Popen(args, stdout=subprocess.PIPE)
+                    b = proc.stdout.read()
+                    last_image[:] = p, b
+                    try:
+                        proc.kill()
+                    except:
+                        pass
+                else:
+                    b = last_image[-1]
+                cp.response.headers["Content-Type"] = "image/png"
+                cp.response.headers["Content-Length"] = len(b)
+                cp.response.headers["ETag"] = create_etag(b)
+                return b
             return cp.lib.static.serve_file(p, content_type=mime, name=attachment, disposition="attachment" if download else None)
     files._cp_config = {"response.stream": True}
 
