@@ -99,7 +99,7 @@ class Help(Command):
 
 
 class Hello(Command):
-    name = ["👋", "Hi", "Hi!", "'sup", "Hey", "Greetings", "Welcome", "Bye", "Cya", "Goodbye"]
+    name = ["👋", "Hi", "Hi!", "Hewwo", "Herro", "'sup", "Hey", "Greetings", "Welcome", "Bye", "Cya", "Goodbye"]
     description = "Sends a greeting message. Useful for checking whether the bot is online."
     usage = "<user>?"
     slash = True
@@ -622,16 +622,16 @@ class Info(Command):
                             st.append("Bug Hunter 🐛")
                         is_hype = False
                         if uf.hypesquad_bravery:
-                            st.append("Discord HypeSquad Bravery 🛡️")
+                            st.append("HypeSquad Bravery 🛡️")
                             is_hype = True
                         if uf.hypesquad_brilliance:
-                            st.append("Discord HypeSquad Brilliance 🌟")
+                            st.append("HypeSquad Brilliance 🌟")
                             is_hype = True
                         if uf.hypesquad_balance:
-                            st.append("Discord HypeSquad Balance 💠")
+                            st.append("HypeSquad Balance 💠")
                             is_hype = True
                         if uf.hypesquad and not is_hype:
-                            st.append("Discord HypeSquad 👀")
+                            st.append("HypeSquad 👀")
                         if uf.early_supporter:
                             st.append("Discord Early Supporter 🌄")
                         if uf.team_user:

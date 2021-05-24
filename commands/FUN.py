@@ -533,6 +533,104 @@ class SlotMachine(Command):
                     await message.edit(embed=emb)
 
 
+barter_values = demap(
+    enchanted_book=0,
+    enchanted_iron_boots=1,
+    splash_fire_resistance=2,
+    fire_resistance=3,
+    water_bottle=4,
+    iron_nugget=5,
+    ender_pearl=6,
+    string=7,
+    nether_quartz=8,
+    obsidian=9,
+    crying_obsidian=10,
+    fire_charge=11,
+    leather=12,
+    soul_sand=13,
+    nether_brick=14,
+    spectral_arrow=15,
+    gravel=16,
+    blackstone=17,
+)
+barter_chances = {
+    0: (5, 1, 1),
+    1: (8, 1, 1),
+    2: (8, 1, 1),
+    3: (8, 1, 1),
+    4: (10, 1, 1),
+    5: (10, 10, 36),
+    6: (10, 2, 4),
+    7: (20, 3, 9),
+    8: (20, 5, 12),
+    9: (40, 1, 1),
+    10: (40, 1, 3),
+    11: (40, 1, 1),
+    12: (40, 2, 4),
+    13: (40, 2, 8),
+    14: (40, 2, 8),
+    15: (40, 6, 12),
+    16: (40, 8, 16),
+    17: (40, 8, 16),
+}
+barter_seeding = []
+for i, d in barter_chances.items():
+    barter_seeding.extend((i,) * d[0])
+barter_seeding = np.array(barter_seeding)
+barter_lowers = np.array([d[1] for d in barter_chances.values()])
+barter_uppers = np.array([d[2] for d in barter_chances.values()]) + 1
+
+
+class Barter(Command):
+    description = "Simulates a Minecraft Piglin barter. Uses gold ingots; see ~shop and ~bal for more!"
+    usage = "<amount>"
+    rate_limit = 1
+
+    async def __call__(self, bot, channel, message, user, argv, **void):
+        if not argv:
+            amount = 1
+        else:
+            amount = await bot.eval_math(argv)
+        if amount > bot.data.users.get(user.id, {}).get("ingots", 0):
+            raise OverflowError(f"Barter amount cannot be greater than your balance. See ~shop for more information.")
+        data = bot.data.users[user.id]
+        data["ingots"] -= amount
+        seeds = await create_future(np.random.randint, 0, len(barter_seeding), size=amount)
+        ids = barter_seeding[seeds]
+        counts = await create_future(np.random.randint, barter_lowers[ids], barter_uppers[ids])
+        totals = np.zeros(len(barter_chances), dtype=np.uint32)
+        await create_future(np.add.at, totals, ids, counts)
+        rewards = deque()
+        data.setdefault("minecraft", {})
+        for i, c in enumerate(totals):
+            if c:
+                try:
+                    data["minecraft"][i] += c
+                except KeyError:
+                    data["minecraft"][i] = c
+                s = await create_future(bot.data.emojis.emoji_as, barter_values[i] + ".gif")
+                if c > 1:
+                    s += f" {c}"
+                rewards.append(s)
+        out = "\n".join(rewards)
+        footer = thumbnail = None
+        if amount == 1:
+            w = barter_chances[ids[0]][0]
+            p = round(w * 100 / 459, 7)
+            footer = cdict(
+                text=f"{w} in 459 ({p}%) chance",
+            )
+            thumbnail = await create_future(bot.data.emojis.get, barter_values[ids[0]] + ".gif")
+            thumbnail = str(thumbnail.url)
+        bot.send_as_embeds(
+            channel,
+            out,
+            footer=footer,
+            thumbnail=thumbnail,
+            reference=message,
+        )
+
+
 class Pay(Command):
     name = ["GiveCoins", "GiveGold"]
     description = "Pays a specified amount of coins to the target user."
@@ -1169,6 +1267,18 @@ class Wallet(Command):
             xp = floor(xp)
             bal = await bot.as_rewards(diamonds, gold)
             description = f"{bar}\n`Lv {level}`\n`XP {xp}/{xp_next}`\n{bal}"
+            ingots = data.get("ingots", 0)
+            if ingots:
+                ingot = await create_future(bot.data.emojis.emoji_as, "gold_ingot.gif")
+                description += f" {ingot} {ingots}"
+            minecraft = data.get("minecraft", 0)
+            if minecraft:
+                items = deque()
+                for i, c in sorted(minecraft.items()):
+                    s = await create_future(bot.data.emojis.emoji_as, barter_values[i] + ".gif")
+                    s += f" {c}"
+                    items.append(s)
+                description += "\n" + " ".join(items)
             url = await self.bot.get_proxy_url(user)
             bot.send_as_embeds(channel, description, thumbnail=url, author=get_author(user))
 
@@ -1201,15 +1311,20 @@ class Shop(Command):
             cost=[240, 30720],
             description="Upgrades the server's privilege level, granting access to all command categories and reducing command cooldown.",
         ),
+        goldingots=cdict(
+            name="Gold Ingots",
+            cost=[0, 100],
+            description="Gold ingots for the ~barter command.",
+        ),
     )
 
     async def __call__(self, bot, guild, channel, user, message, argv, **void):
         if not argv:
-            desc = ""
+            desc = deque()
             for product in self.products.values():
                 cost = await bot.as_rewards(*product.cost)
-                description = ini_md(f"{sqr_md(product.name)} {cost}\n{product.description}")
-            return bot.send_as_embeds(channel, description, title="Shop", author=get_author(user), reference=message)
+                desc.append(f"**{product.name}** {cost}\n{product.description}")
+            return bot.send_as_embeds(channel, "\n\n".join(desc), title="Shop", author=get_author(user), reference=message)
         item = argv.replace("-", "").replace("_", "").replace(" ", "").casefold()
         try:
             product = self.products[item]
@@ -1226,11 +1341,16 @@ class Shop(Command):
                     if bot.is_trusted(guild):
                         return "```\nThe current server's privilege level is already at the highest available level. However, you may still purchase this item for other servers.```"
                     return await send_with_react(channel, f"```callback-fun-shop-{user.id}_{item}-\nYou are about to upgrade the server's privilege level from 0 to 1.\nThis is irreversible. Please choose wisely.```", reacts="✅", reference=message)
-                raise NotImplementedError("Target item has not yet been implemented.")
+                if product.name == "Gold Ingots":
+                    reacts = deque()
+                    for i in range(5):
+                        reacts.append(str(i) + as_str(b"\xef\xb8\x8f\xe2\x83\xa3"))
+                    return await send_with_react(channel, f"```callback-fun-shop-{user.id}_{item}-\nPlease choose how many ingots are desired;\n0: 100\n1: 1,000\n2: 10,000\n3: 100,000\n4: 1,000,000```", reacts=reacts, reference=message)
+                raise NotImplementedError(f"Target item {product.name} has not yet been implemented.")
         raise ValueError(f"Insufficient funds. Use {bot.get_prefix(guild)}shop for product list and cost.")
 
     async def _callback_(self, bot, message, reaction, user, vals, **void):
-        if reaction is None or as_str(reaction) != "✅":
+        if reaction is None or as_str(reaction) != "✅" and b"\xef\xb8\x8f\xe2\x83\xa3" not in reaction:
             return
         u_id, item = vals.split("_", 1)
         u_id = int(u_id)
@@ -1248,12 +1368,22 @@ class Shop(Command):
             if gold >= product.cost[-1]:
                 if product.name == "Upgrade Server":
                     if bot.is_trusted(guild):
-                        return "```\nThe current server's privilege level is already at the highest available level. However, you may still purchase this item for other servers."
+                        return await message.channel.send("```\nThe current server's privilege level is already at the highest available level. However, you may still purchase this item for other servers.", reference=message)
                     bot.data.users.add_diamonds(user, -product.cost[0])
                     bot.data.users.add_gold(user, -product.cost[-1])
                     bot.data.trusted[guild.id] = True
-                    return f"```{sqr_md(guild)} has been successfully elevated from 0 to 1 privilege level.```"
-                raise NotImplementedError("Target item has not yet been implemented.")
+                    return await message.channel.send(f"```{sqr_md(guild)} has been successfully elevated from 0 to 1 privilege level.```", reference=message)
+                if product.name == "Gold Ingots":
+                    magnitude = int(as_str(reaction)[0])
+                    ingots = 10 ** (magnitude + 2)
+                    if gold < ingots:
+                        raise ValueError(f"Insufficient funds. Use {bot.get_prefix(guild)}shop for product list and cost.")
+                    else:
+                        bot.data.users.add_gold(user, -ingots)
+                        bot.data.users[user.id].setdefault("ingots", 0)
+                        bot.data.users[user.id]["ingots"] += ingots
+                    return
+                raise NotImplementedError(f"Target item {product.name} has not yet been implemented.")
         raise ValueError(f"Insufficient funds. Use {bot.get_prefix(guild)}shop for product list and cost.")
 
 

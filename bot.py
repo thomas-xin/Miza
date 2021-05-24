@@ -1020,25 +1020,29 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         return channel
 
     def get_available_guild(self, animated=True):
-        found = [{} for _ in loop(3)]
+        found = [{} for _ in loop(5)]
         for guild in self.guilds:
-            if guild.owner_id == self.id:
-                return guild
             m = guild.me
             if m is not None and m.guild_permissions.manage_emojis:
                 owners_in = self.owners.intersection(guild._members)
-                if owners_in:
+                if guild.owner_id == self.id:
                     x = 0
-                elif m.guild_permissions.administrator and len(deque(member for member in guild.members if not member.bot)) <= 5:
+                elif len(owners_in) == len(self.owners):
                     x = 1
-                else:
+                elif owners_in:
                     x = 2
+                elif m.guild_permissions.administrator and len(deque(member for member in guild.members if not member.bot)) <= 5:
+                    x = 3
+                else:
+                    x = 4
                 if animated:
                     rem = guild.emoji_limit - len(deque(e for e in guild.emojis if e.animated))
+                    rem /= len(guild.members)
                     if rem > 0:
                         found[x][rem] = guild
                 else:
                     rem = guild.emoji_limit - len(deque(e for e in guild.emojis if not e.animated))
+                    rem /= len(guild.members)
                     if rem > 0:
                         found[x][rem] = guild
         for i, f in enumerate(found):

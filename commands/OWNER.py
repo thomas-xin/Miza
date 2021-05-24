@@ -131,7 +131,11 @@ class Execute(Command):
         if not users:
             raise LookupError("No results found.")
         if args:
-            argv = message.content.split("run ", 1)[-1]
+            try:
+                argv = message.content.split("run ", 1)[1]
+            except IndexError:
+                pass
+                # raise ArgumentError('"run" must be specified as a separator.')
             for u in users:
                 fake_message = copy.copy(message)
                 fake_message.content = argv
