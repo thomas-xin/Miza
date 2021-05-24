@@ -1012,6 +1012,7 @@ class Ask(Command):
         q = replace_map(q, {
             "yourself": "myself",
             "your ": "my ",
+            "yours ": "mine ",
             "are you": "am I",
             "you are": "I am",
             "you're": "i'm",
