@@ -362,6 +362,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 </div>
             </div>
         </div>
+        <video class="bgimg" autoplay muted loop style="position:fixed;right:0;bottom:0;min-width:100%;min-height:100%;z-index:-1;">
+            <source src="https://cdn.discordapp.com/attachments/691915140198826005/846611422649253899/unknown.gif" type="video/mp4">
+        </video>
         <div class="bigboi">
             <h2>What is Miza?</h2>
             <p>Built on discord.py, Miza is a multipurpose Discord bot, fashioned after the character "Misery" from the platformer game Cave Story, and initially designed to help with Cave Story modding.<br>\
@@ -411,9 +414,6 @@ To check the method of input for a particular command, use the ~Help command wit
 Optionally, most of miza's commands may be easily viewed and tested on the <a href="{self.raw_webserver}/mizatlas">command atlas</a>.<br>\
 For any further questions or issues, read the documentation on <a href="{self.github}">GitHub</a>, or join the <a href="{self.rcc_invite}">Support Server</a>!
         </div>
-        <video class="bgimg" autoplay muted loop style="left:0;bottom:0;min-width:100%;min-height:100%;z-index:-1;">
-            <source src="https://cdn.discordapp.com/attachments/691915140198826005/846611422649253899/unknown.gif" type="video/mp4">
-        </video>
         <script src="{self.raw_webserver}/static/swiper.min.js"></script>
         <script src="{self.raw_webserver}/static/pagination.js"></script>
     </body>

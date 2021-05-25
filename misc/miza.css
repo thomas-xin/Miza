@@ -44,7 +44,7 @@ body, html {
 .bigboi {
 	width: 100%;
 	min-height: 100vh;
-	background: black;
+	background: linear-gradient(150deg, rgba(0, 0, 0, 1), rgba(0, 0, 0, 0));
 	z-index: 2;
 	box-sizing: border-box;
 	padding: 0;
@@ -62,12 +62,6 @@ body, html {
 	text-shadow: 0 0 13px black;
 	margin: 0 0.5em;
 	display: inline-block;
-}
-
-img.hero-image {
-	height: 10em;
-	border-radius: 100%;
-	box-shadow: 0 0 5px 0 white;
 }
 
 a:link {
@@ -133,22 +127,6 @@ h2 {font-family: 'Balsamiq Sans', cursive;font-size: 2em;}
 
 p {
 	font-size: 1.2em;
-}
-
-img.bgimg {
-	position: absolute;
-	top: 0;
-	left: 0;
-	right: 0;
-	bottom: 0;
-	z-index: -1;
-	height: 100%;
-	width: 100%;
-	object-fit: cover;
-	object-position: center;
-	opacity: 0.5;
-	margin: 0;
-	padding: 0;
 }
 
 .bigboi > * {
