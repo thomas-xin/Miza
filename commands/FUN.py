@@ -553,7 +553,7 @@ barter_values = demap(
     gravel=16,
     blackstone=17,
 )
-barter_chances = {
+barter_weights = {
     0: (5, 1, 1),
     1: (8, 1, 1),
     2: (8, 1, 1),
@@ -574,11 +574,11 @@ barter_chances = {
     17: (40, 8, 16),
 }
 barter_seeding = []
-for i, d in barter_chances.items():
+for i, d in barter_weights.items():
     barter_seeding.extend((i,) * d[0])
-barter_seeding = np.array(barter_seeding)
-barter_lowers = np.array([d[1] for d in barter_chances.values()])
-barter_uppers = np.array([d[2] for d in barter_chances.values()]) + 1
+barter_seeding = np.array(barter_seeding, dtype=np.uint32)
+barter_lowers = np.array([d[1] for d in barter_weights.values()], dtype=np.uint32)
+barter_uppers = np.array([d[2] for d in barter_weights.values()], dtype=np.uint32) + 1
 
 
 class Barter(Command):
@@ -595,12 +595,12 @@ class Barter(Command):
             raise OverflowError(f"Barter amount cannot be greater than your balance. See ~shop for more information.")
         data = bot.data.users[user.id]
         data["ingots"] -= amount
-        totals = np.zeros(len(barter_chances), dtype=np.uint32)
+        totals = np.zeros(len(barter_weights), dtype=np.uint32)
         for i in range(amount + 1048575 >> 20):
             count = min(1048576, amount - i * 1048576)
-            seeds = await create_future(np.random.randint, 0, len(barter_seeding), size=count)
+            seeds = await create_future(np.random.randint, 0, len(barter_seeding), size=count, dtype=np.uint32)
             ids = barter_seeding[seeds]
-            counts = await create_future(np.random.randint, barter_lowers[ids], barter_uppers[ids])
+            counts = await create_future(np.random.randint, barter_lowers[ids], barter_uppers[ids], dtype=np.uint32)
             await create_future(np.add.at, totals, ids, counts)
         rewards = deque()
         data.setdefault("minecraft", {})
@@ -617,7 +617,7 @@ class Barter(Command):
         out = "\n".join(rewards)
         footer = thumbnail = None
         if amount == 1:
-            w = barter_chances[ids[0]][0]
+            w = barter_weights[ids[0]][0]
             p = round(w * 100 / 459, 7)
             footer = cdict(
                 text=f"{w} in 459 ({p}%) chance",
