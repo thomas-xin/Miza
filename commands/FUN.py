@@ -595,11 +595,13 @@ class Barter(Command):
             raise OverflowError(f"Barter amount cannot be greater than your balance. See ~shop for more information.")
         data = bot.data.users[user.id]
         data["ingots"] -= amount
-        seeds = await create_future(np.random.randint, 0, len(barter_seeding), size=amount)
-        ids = barter_seeding[seeds]
-        counts = await create_future(np.random.randint, barter_lowers[ids], barter_uppers[ids])
         totals = np.zeros(len(barter_chances), dtype=np.uint32)
-        await create_future(np.add.at, totals, ids, counts)
+        for i in range(amount + 1048575 >> 20):
+            count = min(1048576, amount - i * 1048576)
+            seeds = await create_future(np.random.randint, 0, len(barter_seeding), size=count)
+            ids = barter_seeding[seeds]
+            counts = await create_future(np.random.randint, barter_lowers[ids], barter_uppers[ids])
+            await create_future(np.add.at, totals, ids, counts)
         rewards = deque()
         data.setdefault("minecraft", {})
         for i, c in enumerate(totals):
