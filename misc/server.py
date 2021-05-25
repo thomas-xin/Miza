@@ -694,7 +694,7 @@ class Server:
     <meta content="Files" property="og:title">
     <meta content="Upload a file here!" property="og:description">
     <meta content="{cp.url()}" property="og:url">
-    <meta property="og:image" content="https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/sky-rainbow.gif">
+    <meta property="og:image" content="https://github.com/thomas-xin/Miza/raw/e62dfccef0cce3b0fc3b8a09fb3ca3edfedd8ab0/misc/sky-rainbow.gif">
     <meta content="#BF7FFF" data-react-helmet="true" name="theme-color">
     <link href="https://unpkg.com/boxicons@2.0.7/css/boxicons.min.css" rel="stylesheet">
 </head>""" + """
@@ -846,10 +846,6 @@ function mergeFile(blob) {
 
 <style>
     body {
-        background-image: url('""" + cp.request.base + """/static/spiral.gif');
-        background-repeat: no-repeat;
-        background-attachment: fixed;
-        background-size: cover;
         font-family: 'Comic Sans MS';
     }
     .select {
@@ -871,6 +867,9 @@ function mergeFile(blob) {
     }""" + f"""
 </style>
 <body>
+    <video autoplay muted loop style="position:fixed;right:0;bottom:0;min-width:100%;min-height:100%;z-index:-1;">
+        <source src="https://cdn.discordapp.com/attachments/691915140198826005/846587863797203004/GpAy.mp4" type="video/mp4">
+    </video>
     <link href="/static/hamburger.css" rel="stylesheet">
     <div class="hamburger">
         <input
@@ -878,18 +877,26 @@ function mergeFile(blob) {
             title="Toggle menu"
         />
         <div class="items select">
-            <a href="/" data-popup="Home"><img
-                src="{cp.request.base}/static/avatar-rainbow.gif"
-            /></a>
-            <a href="/mizatlas" data-popup="Command Atlas"><img
-                src="{cp.request.base}/static/background-rainbow.gif"
-            /></a>
-            <a href="/upload" data-popup="File Host"><img
-                src="{cp.request.base}/static/sky-rainbow.gif"
-            /></a>
-            <a href="/apidoc" data-popup="API Documentation"><img
-                src="{cp.request.base}/static/hug.gif"
-            /></a>
+            <a href="/" data-popup="Home">
+                <video autoplay muted loop width="36" height="36" style="z-index:-1;">
+                    <source src="https://cdn.discordapp.com/attachments/691915140198826005/846592940075515904/miza_by_smudgedpasta_de1q8lu-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOj.mp4" type="video/mp4">
+                </video>
+            </a>
+            <a href="/mizatlas" data-popup="Command Atlas">
+                <video autoplay muted loop width="36" height="36" style="z-index:-1;">
+                    <source src="https://cdn.discordapp.com/attachments/691915140198826005/846593904635281408/miza_has_a_leaf_blower_by_smudgedpasta_de6t2dl-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJz.mp4" type="video/mp4">
+                </video>
+            </a>
+            <a href="/upload" data-popup="File Host">
+                <video autoplay muted loop width="36" height="36" style="z-index:-1;">
+                    <source src="https://cdn.discordapp.com/attachments/691915140198826005/846593561444745226/magical_babey_mode_by_smudgedpasta_de1q8ky-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIi.mp4" type="video/mp4">
+                </video>
+            </a>
+            <a href="/apidoc" data-popup="API Documentation">
+                <video autoplay muted loop width="36" height="36" style="z-index:-1;">
+                    <source src="https://cdn.discordapp.com/attachments/691915140198826005/846590061901381632/deahc7l-a9773147-259d-4226-b0b6-195c6eb1f3c0.pngtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOi.mp4" type="video/mp4">
+                </video>
+            </a>
             <a 
                 href="/time"
                 data-popup="Clock"
@@ -956,7 +963,7 @@ function mergeFile(blob) {
         <meta content="Timezones" property="og:title">
         <meta content="Find your current timezone here!" property="og:description">
         <meta content=\"""" + cp.url() + """\" property="og:url">
-        <meta property="og:image" content="https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/sky-rainbow.gif">
+        <meta property="og:image" content="https://github.com/thomas-xin/Miza/raw/e62dfccef0cce3b0fc3b8a09fb3ca3edfedd8ab0/misc/sky-rainbow.gif">
         <meta content="#""" + colour + """\" data-react-helmet="true" name="theme-color">
         <meta http-equiv="refresh" content="60">
         <link rel="stylesheet" type="text/css" href="/static/timezonestyles.css">
@@ -970,18 +977,26 @@ function mergeFile(blob) {
                 title="Toggle menu"
             />
             <div class="items select">
-                <a href="/" data-popup="Home"><img
-                    src="{cp.request.base}/static/avatar-rainbow.gif"
-                /></a>
-                <a href="/mizatlas" data-popup="Command Atlas"><img
-                    src="{cp.request.base}/static/background-rainbow.gif"
-                /></a>
-                <a href="/upload" data-popup="File Host"><img
-                    src="{cp.request.base}/static/sky-rainbow.gif"
-                /></a>
-                <a href="/apidoc" data-popup="API Documentation"><img
-                    src="{cp.request.base}/static/hug.gif"
-                /></a>
+                <a href="/" data-popup="Home">
+                    <video autoplay muted loop width="36" height="36" style="z-index:-1;">
+                        <source src="https://cdn.discordapp.com/attachments/691915140198826005/846592940075515904/miza_by_smudgedpasta_de1q8lu-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOj.mp4" type="video/mp4">
+                    </video>
+                </a>
+                <a href="/mizatlas" data-popup="Command Atlas">
+                    <video autoplay muted loop width="36" height="36" style="z-index:-1;">
+                        <source src="https://cdn.discordapp.com/attachments/691915140198826005/846593904635281408/miza_has_a_leaf_blower_by_smudgedpasta_de6t2dl-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJz.mp4" type="video/mp4">
+                    </video>
+                </a>
+                <a href="/upload" data-popup="File Host">
+                    <video autoplay muted loop width="36" height="36" style="z-index:-1;">
+                        <source src="https://cdn.discordapp.com/attachments/691915140198826005/846593561444745226/magical_babey_mode_by_smudgedpasta_de1q8ky-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIi.mp4" type="video/mp4">
+                    </video>
+                </a>
+                <a href="/apidoc" data-popup="API Documentation">
+                    <video autoplay muted loop width="36" height="36" style="z-index:-1;">
+                        <source src="https://cdn.discordapp.com/attachments/691915140198826005/846590061901381632/deahc7l-a9773147-259d-4226-b0b6-195c6eb1f3c0.pngtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOi.mp4" type="video/mp4">
+                    </video>
+                </a>
                 <a 
                     href="/time"
                     data-popup="Clock"
@@ -1000,7 +1015,9 @@ function mergeFile(blob) {
                 <a class="glow" href="/">Home</a>
             </p>
         </div>
-    <img class="border" src="{cp.request.base}/static/sky-rainbow.gif" alt="Miza-Sky" style="width:14.2857%;height:14.2857%;">
+        <video autoplay muted loop class="border" style="width:14.2857%;height:14.2857%;">
+            <source src="https://cdn.discordapp.com/attachments/691915140198826005/846593561444745226/magical_babey_mode_by_smudgedpasta_de1q8ky-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIi.mp4" type="video/mp4">
+        </video>
     </body>
 </html>"""
             return html

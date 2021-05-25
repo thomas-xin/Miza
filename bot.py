@@ -298,9 +298,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     async def create_main_website(self, first=False):
         with tracebacksuppressor:
             print("Generating website html...")
-            # resp = await Request("https://github.com/thomas-xin/Miza", aio=True)
-            # description = as_str(resp[resp.index(b"<title>") + 7:resp.index(b"</title>")].split(b":", 1)[-1])
-            # <img src="{self.webserver}/static/avatar-rainbow.gif" class="hero-image">
             html = f"""<!DOCTYPE html>
 <html>
     <head>
@@ -308,7 +305,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         <meta content="Miza" property="og:title">
         <meta content="A multipurpose Discord bot." property="og:description">
         <meta content="{self.webserver}" property="og:url">
-        <meta content="{self.raw_github}/master/misc/background-rainbow.gif" property="og:image">
+        <meta content="https://github.com/thomas-xin/Miza/raw/e62dfccef0cce3b0fc3b8a09fb3ca3edfedd8ab0/misc/sky-rainbow.gif" property="og:image">
         <meta content="#BF7FFF" data-react-helmet="true" name="theme-color">
         <link rel="preconnect" href="https://fonts.gstatic.com">
         <link href="https://fonts.googleapis.com/css2?family=Balsamiq+Sans&amp;family=Pacifico&amp;display=swap" rel="stylesheet">
@@ -324,18 +321,26 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 title="Toggle menu"
             />
             <div class="items select">
-                <a href="/" data-popup="Home"><img
-                    src="{self.raw_webserver}/static/avatar-rainbow.gif"
-                /></a>
-                <a href="/mizatlas" data-popup="Command Atlas"><img
-                    src="{self.raw_webserver}/static/background-rainbow.gif"
-                /></a>
-                <a href="/upload" data-popup="File Host"><img
-                    src="{self.raw_webserver}/static/sky-rainbow.gif"
-                /></a>
-                <a href="/apidoc" data-popup="API Documentation"><img
-                    src="{self.raw_webserver}/static/hug.gif"
-                /></a>
+                <a href="/" data-popup="Home">
+                    <video autoplay muted loop width="36" height="36" style="z-index:-1;">
+                        <source src="https://cdn.discordapp.com/attachments/691915140198826005/846592940075515904/miza_by_smudgedpasta_de1q8lu-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOj.mp4" type="video/mp4">
+                    </video>
+                </a>
+                <a href="/mizatlas" data-popup="Command Atlas">
+                    <video autoplay muted loop width="36" height="36" style="z-index:-1;">
+                        <source src="https://cdn.discordapp.com/attachments/691915140198826005/846593904635281408/miza_has_a_leaf_blower_by_smudgedpasta_de6t2dl-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJz.mp4" type="video/mp4">
+                    </video>
+                </a>
+                <a href="/upload" data-popup="File Host">
+                    <video autoplay muted loop width="36" height="36" style="z-index:-1;">
+                        <source src="https://cdn.discordapp.com/attachments/691915140198826005/846593561444745226/magical_babey_mode_by_smudgedpasta_de1q8ky-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIi.mp4" type="video/mp4">
+                    </video>
+                </a>
+                <a href="/apidoc" data-popup="API Documentation">
+                    <video autoplay muted loop width="36" height="36" style="z-index:-1;">
+                        <source src="https://cdn.discordapp.com/attachments/691915140198826005/846590061901381632/deahc7l-a9773147-259d-4226-b0b6-195c6eb1f3c0.pngtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOi.mp4" type="video/mp4">
+                    </video>
+                </a>
                 <a 
                     href="/time"
                     data-popup="Clock"
@@ -346,7 +351,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         <div class="hero">
             <img class="hero-bg" src="{self.website_background}">
             <div class="hero-text">
-                <img src="{self.raw_webserver}/static/avatar-rainbow.gif" class="hero-image">
+                <video autoplay muted loop style="height:10em;border-radius:100%;box-shadow:0 0 5px 0 white;">
+                    <source src="https://cdn.discordapp.com/attachments/691915140198826005/846592940075515904/miza_by_smudgedpasta_de1q8lu-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOj.mp4" type="video/mp4">
+                </video>
                 <h1 class="hero-text-text" data-upside-down-emoji-because-the-class-name="yea">Miza</h1>
                 <a class="buttonish" href="{self.invite}"><i class="bx bxs-plus-square"></i>Invite</a>
                 <div class="buttonsholder">
@@ -356,10 +363,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             </div>
         </div>
         <div class="bigboi">
-            <img
-                class="bgimg" 
-                src="{self.raw_webserver}/static/moon.gif" 
-            />
             <h2>What is Miza?</h2>
             <p>Built on discord.py, Miza is a multipurpose Discord bot, fashioned after the character "Misery" from the platformer game Cave Story, and initially designed to help with Cave Story modding.<br>\
 She quickly branched out into all the areas you'd desire in a server, with careful attention to efficiency, performance, quality, and reliability.<br>\
@@ -408,6 +411,9 @@ To check the method of input for a particular command, use the ~Help command wit
 Optionally, most of miza's commands may be easily viewed and tested on the <a href="{self.raw_webserver}/mizatlas">command atlas</a>.<br>\
 For any further questions or issues, read the documentation on <a href="{self.github}">GitHub</a>, or join the <a href="{self.rcc_invite}">Support Server</a>!
         </div>
+        <video class="bgimg" autoplay muted loop style="left:0;bottom:0;min-width:100%;min-height:100%;z-index:-1;">
+            <source src="https://cdn.discordapp.com/attachments/691915140198826005/846611422649253899/unknown.gif" type="video/mp4">
+        </video>
         <script src="{self.raw_webserver}/static/swiper.min.js"></script>
         <script src="{self.raw_webserver}/static/pagination.js"></script>
     </body>

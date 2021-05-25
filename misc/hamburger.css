@@ -165,6 +165,14 @@
 	object-fit: cover;
 }
 
+.hamburger > .items > a > video {
+	width: var(--icon-width);
+	height: var(--icon-height);
+	margin: 0;
+	padding: 0;
+	object-fit: cover;
+}
+
 .hamburger > input[type="checkbox"]:checked {
 	margin-bottom: calc(var(--icon-gap)*2);
 }

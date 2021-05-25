@@ -49,6 +49,8 @@ def get_video(url, fps=None):
             url = url.replace("?dl=0", "?dl=1")
     return url, size, dur, fps
 
+VIDEOS = ("gif", "webp", "apng", "mp4", "webm", "mov", "wmv", "flv", "avi", "qt", "f4v")
+
 
 class IMG(Command):
     min_display = "0~2"
@@ -340,6 +342,8 @@ async def get_image(bot, user, message, args, argv, default=2, raw=False, ext="p
                 raise ArgumentError("Please input an image by URL or attachment.")
         else:
             raise ArgumentError("Please input an image by URL or attachment.")
+    if args and args[-1] in VIDEOS:
+        ext = args.pop(-1)
     value = " ".join(args).strip()
     if not value:
         value = default
@@ -358,7 +362,7 @@ async def get_image(bot, user, message, args, argv, default=2, raw=False, ext="p
         name = "unknown"
     if not name.endswith("." + ext):
         name += "." + ext
-    return name, value, url
+    return name, value, url, ext
 
 
 class Saturation(Command):
@@ -371,9 +375,9 @@ class Saturation(Command):
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url = await get_image(bot, user, message, args, argv)
+        name, value, url, fmt = await get_image(bot, user, message, args, argv)
         with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "Enhance", ["Color", value], timeout=_timeout)
+            resp = await process_image(url, "Enhance", ["Color", value, "-f", fmt], timeout=_timeout)
             fn = resp[0]
             if fn.endswith(".gif"):
                 if not name.endswith(".gif"):
@@ -393,9 +397,9 @@ class Contrast(Command):
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url = await get_image(bot, user, message, args, argv)
+        name, value, url, fmt = await get_image(bot, user, message, args, argv)
         with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "Enhance", ["Contrast", value], timeout=_timeout)
+            resp = await process_image(url, "Enhance", ["Contrast", value, "-f", fmt], timeout=_timeout)
             fn = resp[0]
             if fn.endswith(".gif"):
                 if not name.endswith(".gif"):
@@ -415,9 +419,9 @@ class Brightness(Command):
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url = await get_image(bot, user, message, args, argv)
+        name, value, url, fmt = await get_image(bot, user, message, args, argv)
         with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "brightness", [value], timeout=_timeout)
+            resp = await process_image(url, "brightness", [value, "-f", fmt], timeout=_timeout)
             fn = resp[0]
             if fn.endswith(".gif"):
                 if not name.endswith(".gif"):
@@ -437,9 +441,9 @@ class Luminance(Command):
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url = await get_image(bot, user, message, args, argv)
+        name, value, url, fmt = await get_image(bot, user, message, args, argv)
         with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "luminance", [value], timeout=_timeout)
+            resp = await process_image(url, "luminance", [value, "-f", fmt], timeout=_timeout)
             fn = resp[0]
             if fn.endswith(".gif"):
                 if not name.endswith(".gif"):
@@ -459,9 +463,9 @@ class Sharpness(Command):
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url = await get_image(bot, user, message, args, argv)
+        name, value, url, fmt = await get_image(bot, user, message, args, argv)
         with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "Enhance", ["Sharpness", value], timeout=_timeout)
+            resp = await process_image(url, "Enhance", ["Sharpness", value, "-f", fmt], timeout=_timeout)
             fn = resp[0]
             if fn.endswith(".gif"):
                 if not name.endswith(".gif"):
@@ -481,9 +485,9 @@ class HueShift(Command):
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url = await get_image(bot, user, message, args, argv, default=0.5)
+        name, value, url, fmt = await get_image(bot, user, message, args, argv, default=0.5)
         with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "hue_shift", [value], timeout=_timeout)
+            resp = await process_image(url, "hue_shift", [value, "-f", fmt], timeout=_timeout)
             fn = resp[0]
             if fn.endswith(".gif"):
                 if not name.endswith(".gif"):
@@ -503,9 +507,9 @@ class Blur(Command):
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url = await get_image(bot, user, message, args, argv, default=8)
+        name, value, url, fmt = await get_image(bot, user, message, args, argv, default=8)
         with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "blur", ["gaussian", value], timeout=_timeout)
+            resp = await process_image(url, "blur", ["gaussian", value, "-f", fmt], timeout=_timeout)
             fn = resp[0]
             if fn.endswith(".gif"):
                 if not name.endswith(".gif"):
@@ -656,9 +660,9 @@ class Invert(Command):
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url = await get_image(bot, user, message, args, argv)
+        name, value, url, fmt = await get_image(bot, user, message, args, argv)
         with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "invert", [], timeout=_timeout)
+            resp = await process_image(url, "invert", ["-f", fmt], timeout=_timeout)
             fn = resp[0]
             if fn.endswith(".gif"):
                 if not name.endswith(".gif"):
@@ -678,9 +682,9 @@ class GreyScale(Command):
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url = await get_image(bot, user, message, args, argv)
+        name, value, url, fmt = await get_image(bot, user, message, args, argv)
         with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "greyscale", [], timeout=_timeout)
+            resp = await process_image(url, "greyscale", ["-f", fmt], timeout=_timeout)
             fn = resp[0]
             if fn.endswith(".gif"):
                 if not name.endswith(".gif"):
@@ -700,9 +704,9 @@ class Laplacian(Command):
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url = await get_image(bot, user, message, args, argv)
+        name, value, url, fmt = await get_image(bot, user, message, args, argv)
         with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "laplacian", [], timeout=_timeout)
+            resp = await process_image(url, "laplacian", ["-f", fmt], timeout=_timeout)
             fn = resp[0]
             if fn.endswith(".gif"):
                 if not name.endswith(".gif"):
@@ -722,7 +726,7 @@ class ColourSpace(Command):
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url = await get_image(bot, user, message, args, argv, raw=True, default="")
+        name, value, url, fmt = await get_image(bot, user, message, args, argv, raw=True, default="")
         spl = value.rsplit(None, 1)
         if not spl:
             source = "rgb"
@@ -738,7 +742,7 @@ class ColourSpace(Command):
             if i not in ("rgb", "cmy", "hsv", "hsl", "hsi", "hcl", "lab", "luv", "xyz"):
                 raise TypeError(f"Invalid colour space {i}.")
         with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "colourspace", [source, dest], timeout=_timeout)
+            resp = await process_image(url, "colourspace", [source, dest, "-f", fmt], timeout=_timeout)
             fn = resp[0]
             if fn.endswith(".gif"):
                 if not name.endswith(".gif"):
@@ -758,9 +762,9 @@ class Magik(Command):
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url = await get_image(bot, user, message, args, argv, default=7)
+        name, value, url, fmt = await get_image(bot, user, message, args, argv, default=7)
         with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "magik", [value], timeout=_timeout)
+            resp = await process_image(url, "magik", [value, "-f", fmt], timeout=_timeout)
             fn = resp[0]
             if fn.endswith(".gif"):
                 if not name.endswith(".gif"):
@@ -901,10 +905,10 @@ class Rainbow(Command):
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url = await get_image(bot, user, message, args, argv, ext="gif")
+        name, value, url, fmt = await get_image(bot, user, message, args, argv, ext="gif")
         with discord.context_managers.Typing(channel):
             # -gif signals to image subprocess that the output is always a .gif image
-            resp = await process_image(url, "rainbow_gif", [value, "-gif"], timeout=_timeout)
+            resp = await process_image(url, "rainbow_gif", [value, "-gif", "-f", fmt], timeout=_timeout)
             fn = resp[0]
         await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
@@ -987,10 +991,10 @@ class Spin(Command):
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url = await get_image(bot, user, message, args, argv, ext="gif")
+        name, value, url, fmt = await get_image(bot, user, message, args, argv, ext="gif")
         with discord.context_managers.Typing(channel):
             # -gif signals to image subprocess that the output is always a .gif image
-            resp = await process_image(url, "spin_gif", [value, "-gif"], timeout=_timeout)
+            resp = await process_image(url, "spin_gif", [value, "-gif", "-f", fmt], timeout=_timeout)
             fn = resp[0]
         await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
@@ -1005,7 +1009,7 @@ class Orbit(Command):
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url = await get_image(bot, user, message, args, argv, ext="gif", raw=True, default="")
+        name, value, url, fmt = await get_image(bot, user, message, args, argv, ext="gif", raw=True, default="")
         extras = deque()
         while value:
             spl = value.split(None, 1)
@@ -1036,7 +1040,7 @@ class Orbit(Command):
         if count > 64:
             raise OverflowError()
         with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "orbit_gif", [count, duration, list(extras), "-gif"], timeout=_timeout)
+            resp = await process_image(url, "orbit_gif", [count, duration, list(extras), "-gif", "-f", fmt], timeout=_timeout)
             fn = resp[0]
         await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
@@ -1051,9 +1055,9 @@ class GMagik(Command):
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url = await get_image(bot, user, message, args, argv, ext="gif")
+        name, value, url, fmt = await get_image(bot, user, message, args, argv, ext="gif")
         with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "magik_gif", [abs(value), "-gif"], timeout=_timeout)
+            resp = await process_image(url, "magik_gif", [abs(value), "-gif", "-f", fmt], timeout=_timeout)
             fn = resp[0]
         await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
@@ -1068,24 +1072,24 @@ class Liquefy(Command):
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url = await get_image(bot, user, message, args, argv, default=32, ext="gif")
+        name, value, url, fmt = await get_image(bot, user, message, args, argv, default=32, ext="gif")
         with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "magik_gif", [abs(value), 2, "-gif"], timeout=_timeout)
+            resp = await process_image(url, "magik_gif", [abs(value), 2, "-gif", "-f", fmt], timeout=_timeout)
             fn = resp[0]
         await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
 class CreateGIF(Command):
-    name = ["Animate", "GIF"]
-    description = "Combines multiple supplied images, and/or optionally a video, into an animated .gif image."
-    usage = "<0:url>+ <-2:framerate_setting{?r}>? <-1:framerate(16)>?"
+    name = ["Animate", "GIF", "Frames", "ImageSequence"]
+    description = "Combines multiple supplied images, and/or optionally a video, into an animated image, image sequence, or video."
+    usage = "<0:url>+ <-2:framerate(16)>? <-1:format(gif)>?"
     no_parse = True
     rate_limit = (8, 24)
     _timeout_ = 20
     flags = "r"
     typing = True
 
-    async def __call__(self, bot, user, guild, channel, message, flags, args, _timeout, **void):
+    async def __call__(self, bot, user, guild, channel, message, flags, name, args, _timeout, **void):
         # Take input from any attachments, or otherwise the message contents
         if message.attachments:
             args += [best_url(a) for a in message.attachments]
@@ -1101,7 +1105,13 @@ class CreateGIF(Command):
                     raise ArgumentError("Please input an image by URL or attachment.")
             else:
                 raise ArgumentError("Please input an image by URL or attachment.")
-        if "r" in flags:
+        if name in ("frames", "imagesequence"):
+            fmt = "zip"
+        elif args[-1] in VIDEOS + ("zip",):
+            fmt = args.pop(-1)
+        else:
+            fmt = "gif"
+        if "r" in flags or args[-1].isnumeric():
             fr = args.pop(-1)
             rate = await bot.eval_math(fr)
         else:
@@ -1132,53 +1142,7 @@ class CreateGIF(Command):
             name = "unknown.gif"
             if video is None:
                 video = args
-            resp = await process_image("create_gif", "$", ["image", args, delay], timeout=_timeout)
-            fn = resp[0]
-        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
-
-
-class ExtractFrames(Command):
-    name = ["ImageSequence", "Frames"]
-    description = "Extracts a video or animated image sequence into a .zip file of .png images."
-    usage = "<0:url>+"
-    no_parse = True
-    rate_limit = (7, 21)
-    _timeout_ = 18
-    typing = True
-
-    async def __call__(self, bot, user, guild, channel, message, flags, args, _timeout, **void):
-        # Take input from any attachments, or otherwise the message contents
-        if message.attachments:
-            args += [best_url(a) for a in message.attachments]
-        try:
-            if not args:
-                raise ArgumentError
-        except ArgumentError:
-            if not args:
-                url = None
-                try:
-                    url = await bot.get_last_image(message.channel)
-                except FileNotFoundError:
-                    raise ArgumentError("Please input an image by URL or attachment.")
-            else:
-                raise ArgumentError("Please input an image by URL or attachment.")
-        with discord.context_managers.Typing(channel):
-            video = None
-            for i, url in enumerate(args):
-                urls = await bot.follow_url(url, best=True, allow=True, limit=1)
-                url = urls[0]
-                if "discord" not in url and "channels" not in url:
-                    with tracebacksuppressor:
-                        url, size, dur, fps = await create_future(get_video, url, None, timeout=60)
-                        if size and dur and fps:
-                            video = (url, size, dur, fps)
-                if not url:
-                    raise ArgumentError(f'Invalid URL detected: "{url}".')
-                args[i] = url
-            name = "unknown.zip"
-            if video is None:
-                video = args
-            resp = await process_image("create_gif", "$", ["image", args, None, "-seq"], timeout=_timeout)
+            resp = await process_image("create_gif", "$", ["image", args, delay, "-f", fmt], timeout=_timeout)
             fn = resp[0]
         await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
@@ -1284,10 +1248,10 @@ class Rotate(Command):
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url = await get_image(bot, user, message, args, argv, default=90, raw=True)
+        name, value, url, fmt = await get_image(bot, user, message, args, argv, default=90, raw=True)
         value = await bot.eval_math(value)
         with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "rotate_to", [value], timeout=_timeout)
+            resp = await process_image(url, "rotate_to", [value, "-f", fmt], timeout=_timeout)
             fn = resp[0]
             if fn.endswith(".gif"):
                 if not name.endswith(".gif"):
@@ -1469,7 +1433,7 @@ class Waifu2x(Command):
     typing = True
 
     async def __call__(self, bot, user, message, channel, args, argv, flags, **void):
-        name, value, url = await get_image(bot, user, message, args, argv, raw=True, default="")
+        name, value, url, fmt = await get_image(bot, user, message, args, argv, raw=True, default="")
         if "a" not in flags:
             return self.bot.webserver + "/waifu2x?source=" + url
         with discord.context_managers.Typing(channel):

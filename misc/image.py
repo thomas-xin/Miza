@@ -623,6 +623,8 @@ def create_gif(in_type, args, delay):
                 if str(temp.mode) == "RGBA":
                     if imgs and str(imgs[0]) != "RGBA":
                         imgs[0] = imgs[0].convert("RGBA")
+                if temp is img:
+                    temp = img.crop()
                 imgs.append(temp)
     # size = list(imgs[0].size)
     # while size[0] * size[1] * len(imgs) > 8388608:
@@ -654,8 +656,7 @@ def rainbow_gif2(image, duration):
     loops = round(loops * scale) / scale
     if abs(loops) < 1:
         loops = 1 if loops >= 0 else -1
-    maxsize = 960
-    size = list(max_size(*image.size, maxsize))
+    size = image.size
     # print(image, length, scale, loops)
 
     def rainbow_gif_iterator(image):
@@ -690,8 +691,9 @@ def rainbow_gif(image, duration):
         image.seek(0)
     else:
         return rainbow_gif2(image, duration)
-    image = resize_max(image, 960, resample=Image.HAMMING)
-    size = list(image.size)
+    # image = resize_max(image, 960, resample=Image.HAMMING)
+    # size = list(image.size)
+    size = image.size
     if duration == 0:
         fps = 0
     else:
@@ -752,8 +754,7 @@ def spin_gif2(image, duration):
     loops = round(loops * scale) / scale
     if abs(loops) < 1:
         loops = 1 if loops >= 0 else -1
-    maxsize = 960
-    size = list(max_size(*image.size, maxsize))
+    size = image.size
 
     def spin_gif_iterator(image):
         for f in range(length * scale):
@@ -824,8 +825,6 @@ def orbit_gif2(image, orbitals, duration, extras):
     loops = round(loops * scale) / scale
     if abs(loops) < 1:
         loops = 1 if loops >= 0 else -1
-    maxsize = 960
-    size = list(max_size(*image.size, maxsize))
     sources = [image]
     sources.extend(extras)
 
@@ -1059,8 +1058,7 @@ def magik_gif2(image, cell_count, grid_distance, iterations):
     loops = round(loops * scale) / scale
     if abs(loops) < 1:
         loops = 1 if loops >= 0 else -1
-    maxsize = 960
-    size = list(max_size(*image.size, maxsize))
+    size = image.size
 
     def magik_gif_iterator(image):
         ts = time.time_ns() // 1000
@@ -2495,11 +2493,11 @@ def evalImg(url, operation, args):
     globals()["CURRENT_FRAME"] = 0
     ts = time.time_ns() // 1000
     out = "cache/" + str(ts) + ".png"
-    if args and args[-1] == "-seq":
+    if len(args) > 1 and args[-2] == "-f":
+        fmt = args.pop(-1)
         args.pop(-1)
-        seq = True
     else:
-        seq = False
+        fmt = "gif"
     if operation != "$":
         if args and args[-1] == "-raw":
             args.pop(-1)
@@ -2508,7 +2506,8 @@ def evalImg(url, operation, args):
             image = get_image(url, out)
         # $%GIF%$ is a special case where the output is always a .gif image
         if args and args[-1] == "-gif":
-            new = eval(operation)(image, *args[:-1])
+            args.pop(-1)
+            new = eval(operation)(image, *args)
         else:
             try:
                 if args and args[0] == "-nogif":
@@ -2555,8 +2554,7 @@ def evalImg(url, operation, args):
             new = next(iter(frames))
         else:
             print(duration, new["count"])
-            fmt = ".zip" if seq else ".gif"
-            out = "cache/" + str(ts) + fmt
+            out = "cache/" + str(ts) + "." + fmt
             # if new["count"] <= 1024:
             #     it = iter(frames)
             #     first = next(it)
@@ -2580,56 +2578,59 @@ def evalImg(url, operation, args):
             if mode == "P":
                 mode = "RGBA"
             size = first.size
-            if seq:
+            if fmt == "zip":
                 resp = zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
-            if not seq:
-                command = ["ffmpeg", "-threads", "2", "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", ("rgb24" if mode == "RGB" else "rgba"), "-video_size", "x".join(map(str, size)), "-i", "-", "-gifflags", "-offsetting", "-an"]
-                if new["count"] > 4096:
-                    vf = None
-                    # vf = "split[s0][s1];[s0]palettegen=reserve_transparent=1:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle:alpha_threshold=128"
-                else:
-                    vf = "split[s0][s1];[s0]palettegen="
-                    if mode == "RGBA":
-                        vf += "reserve_transparent=1:"
-                    vf += "stats_mode=diff[p];[s1][p]paletteuse=alpha_threshold=128:diff_mode=rectangle"
-                if vf:
-                    command.extend(("-vf", vf))
-                command.extend(("-loop", "0", out))
+            else:
+                command = ["ffmpeg", "-threads", "2", "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", ("rgb24" if mode == "RGB" else "rgba"), "-video_size", "x".join(map(str, size)), "-i", "-", "-an"]
+                if fmt in ("gif", "webp", "apng"):
+                    command.extend(("-gifflags", "-offsetting"))
+                    if new["count"] > 4096:
+                        vf = None
+                        # vf = "split[s0][s1];[s0]palettegen=reserve_transparent=1:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle:alpha_threshold=128"
+                    else:
+                        vf = "split[s0][s1];[s0]palettegen="
+                        if mode == "RGBA":
+                            vf += "reserve_transparent=1:"
+                        vf += "stats_mode=diff[p];[s1][p]paletteuse=alpha_threshold=128:diff_mode=rectangle"
+                    if vf:
+                        command.extend(("-vf", vf))
+                    command.extend(("-loop", "0"))
+                command.append(out)
                 print(command)
                 proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             for i, frame in enumerate(frames):
-                if seq:
+                if fmt == "zip":
                     b = io.BytesIO()
                 if issubclass(type(frame), Image.Image):
                     if frame.size != size:
                         frame = frame.resize(size)
                     if frame.mode != mode:
                         frame = frame.convert(mode)
-                    if seq:
+                    if fmt == "zip":
                         frame.save(b, "png")
                     else:
                         b = frame.tobytes()
                 elif type(frame) is io.BytesIO:
-                    if seq:
+                    if fmt == "zip":
                         with Image.open(frame) as im:
                             im.save(b, "png")
                     else:
                         b = frame.read()
                 else:
-                    if seq:
+                    if fmt == "zip":
                         with Image.open(io.BytesIO(frame)) as im:
                             im.save(b, "png")
                     else:
                         b = frame
-                if seq:
+                if fmt == "zip":
                     b.seek(0)
                     n = len(str(new["count"]))
                     s = f"%0{n}d" % i
                     resp.writestr(f"{s}.png", data=b.read())
-                if not seq:
+                else:
                     proc.stdin.write(b)
                     time.sleep(0.02)
-            if seq:
+            if fmt == "zip":
                 resp.close()
             else:
                 proc.stdin.close()
