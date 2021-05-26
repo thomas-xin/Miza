@@ -87,7 +87,7 @@ p {
 	margin-top: 32px;
 	border: 16px solid transparent;
 	padding: -4px;
-	border-image: url('https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/border.gif') 33.333333333333% stretch;
+	border-image: url('https://github.com/thomas-xin/Miza/raw/e62dfccef0cce3b0fc3b8a09fb3ca3edfedd8ab0/misc/border.gif') 33.333333333333% stretch;
 	display: block;
 	margin-left: auto;
 	margin-right: auto;

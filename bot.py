@@ -322,22 +322,22 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             />
             <div class="items select">
                 <a href="/" data-popup="Home">
-                    <video autoplay muted loop width="36" height="36" style="z-index:-1;">
+                    <video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
                         <source src="https://cdn.discordapp.com/attachments/691915140198826005/846592940075515904/miza_by_smudgedpasta_de1q8lu-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOj.mp4" type="video/mp4">
                     </video>
                 </a>
                 <a href="/mizatlas" data-popup="Command Atlas">
-                    <video autoplay muted loop width="36" height="36" style="z-index:-1;">
+                    <video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
                         <source src="https://cdn.discordapp.com/attachments/691915140198826005/846593904635281408/miza_has_a_leaf_blower_by_smudgedpasta_de6t2dl-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJz.mp4" type="video/mp4">
                     </video>
                 </a>
                 <a href="/upload" data-popup="File Host">
-                    <video autoplay muted loop width="36" height="36" style="z-index:-1;">
+                    <video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
                         <source src="https://cdn.discordapp.com/attachments/691915140198826005/846593561444745226/magical_babey_mode_by_smudgedpasta_de1q8ky-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIi.mp4" type="video/mp4">
                     </video>
                 </a>
                 <a href="/apidoc" data-popup="API Documentation">
-                    <video autoplay muted loop width="36" height="36" style="z-index:-1;">
+                    <video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
                         <source src="https://cdn.discordapp.com/attachments/691915140198826005/846590061901381632/deahc7l-a9773147-259d-4226-b0b6-195c6eb1f3c0.pngtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOi.mp4" type="video/mp4">
                     </video>
                 </a>
@@ -351,7 +351,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         <div class="hero">
             <img class="hero-bg" src="{self.website_background}">
             <div class="hero-text">
-                <video autoplay muted loop style="height:10em;border-radius:100%;box-shadow:0 0 5px 0 white;">
+                <video playsinline autoplay muted loop poster="https://cdn.discordapp.com/attachments/691915140198826005/846951020701679627/miza_by_smudgedpasta_de1q8lu-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOj.webp" style="height:10em;border-radius:100%;box-shadow:0 0 5px 0 white;">
                     <source src="https://cdn.discordapp.com/attachments/691915140198826005/846592940075515904/miza_by_smudgedpasta_de1q8lu-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOj.mp4" type="video/mp4">
                 </video>
                 <h1 class="hero-text-text" data-upside-down-emoji-because-the-class-name="yea">Miza</h1>
@@ -362,7 +362,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 </div>
             </div>
         </div>
-        <video class="bgimg" autoplay muted loop style="position:fixed;right:0;bottom:0;min-width:100%;min-height:100%;z-index:-1;">
+        <video class="bgimg" playsinline autoplay muted loop poster="https://cdn.discordapp.com/attachments/691915140198826005/846948803726016562/unknown.gif" style="position:fixed;right:0;bottom:0;min-width:100%;min-height:100%;z-index:-1;">
             <source src="https://cdn.discordapp.com/attachments/691915140198826005/846611422649253899/unknown.gif" type="video/mp4">
         </video>
         <div class="bigboi">
@@ -3859,7 +3859,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             lock = self._locks.get(bucket)
             if lock is None:
                 if rtype == 1:
-                    lock = Semaphore(5, 256, rate_limit=5.1)
+                    lock = Semaphore(5, 256, rate_limit=5.2)
                 else:
                     lock = asyncio.Lock()
                 if bucket is not None:

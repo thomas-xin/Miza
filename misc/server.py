@@ -867,7 +867,7 @@ function mergeFile(blob) {
     }""" + f"""
 </style>
 <body>
-    <video autoplay muted loop style="position:fixed;right:0;bottom:0;min-width:100%;min-height:100%;z-index:-1;">
+    <video playsinline autoplay muted loop poster="https://cdn.discordapp.com/attachments/691915140198826005/846945647873490944/GpAy.webp" style="position:fixed;right:0;bottom:0;min-width:100%;min-height:100%;z-index:-1;">
         <source src="https://cdn.discordapp.com/attachments/691915140198826005/846587863797203004/GpAy.mp4" type="video/mp4">
     </video>
     <link href="/static/hamburger.css" rel="stylesheet">
@@ -878,22 +878,22 @@ function mergeFile(blob) {
         />
         <div class="items select">
             <a href="/" data-popup="Home">
-                <video autoplay muted loop width="36" height="36" style="z-index:-1;">
+                <video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
                     <source src="https://cdn.discordapp.com/attachments/691915140198826005/846592940075515904/miza_by_smudgedpasta_de1q8lu-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOj.mp4" type="video/mp4">
                 </video>
             </a>
             <a href="/mizatlas" data-popup="Command Atlas">
-                <video autoplay muted loop width="36" height="36" style="z-index:-1;">
+                <video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
                     <source src="https://cdn.discordapp.com/attachments/691915140198826005/846593904635281408/miza_has_a_leaf_blower_by_smudgedpasta_de6t2dl-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJz.mp4" type="video/mp4">
                 </video>
             </a>
             <a href="/upload" data-popup="File Host">
-                <video autoplay muted loop width="36" height="36" style="z-index:-1;">
+                <video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
                     <source src="https://cdn.discordapp.com/attachments/691915140198826005/846593561444745226/magical_babey_mode_by_smudgedpasta_de1q8ky-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIi.mp4" type="video/mp4">
                 </video>
             </a>
             <a href="/apidoc" data-popup="API Documentation">
-                <video autoplay muted loop width="36" height="36" style="z-index:-1;">
+                <video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
                     <source src="https://cdn.discordapp.com/attachments/691915140198826005/846590061901381632/deahc7l-a9773147-259d-4226-b0b6-195c6eb1f3c0.pngtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOi.mp4" type="video/mp4">
                 </video>
             </a>
@@ -978,22 +978,22 @@ function mergeFile(blob) {
             />
             <div class="items select">
                 <a href="/" data-popup="Home">
-                    <video autoplay muted loop width="36" height="36" style="z-index:-1;">
+                    <video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
                         <source src="https://cdn.discordapp.com/attachments/691915140198826005/846592940075515904/miza_by_smudgedpasta_de1q8lu-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOj.mp4" type="video/mp4">
                     </video>
                 </a>
                 <a href="/mizatlas" data-popup="Command Atlas">
-                    <video autoplay muted loop width="36" height="36" style="z-index:-1;">
+                    <video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
                         <source src="https://cdn.discordapp.com/attachments/691915140198826005/846593904635281408/miza_has_a_leaf_blower_by_smudgedpasta_de6t2dl-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJz.mp4" type="video/mp4">
                     </video>
                 </a>
                 <a href="/upload" data-popup="File Host">
-                    <video autoplay muted loop width="36" height="36" style="z-index:-1;">
+                    <video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
                         <source src="https://cdn.discordapp.com/attachments/691915140198826005/846593561444745226/magical_babey_mode_by_smudgedpasta_de1q8ky-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIi.mp4" type="video/mp4">
                     </video>
                 </a>
                 <a href="/apidoc" data-popup="API Documentation">
-                    <video autoplay muted loop width="36" height="36" style="z-index:-1;">
+                    <video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
                         <source src="https://cdn.discordapp.com/attachments/691915140198826005/846590061901381632/deahc7l-a9773147-259d-4226-b0b6-195c6eb1f3c0.pngtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOi.mp4" type="video/mp4">
                     </video>
                 </a>
@@ -1015,7 +1015,7 @@ function mergeFile(blob) {
                 <a class="glow" href="/">Home</a>
             </p>
         </div>
-        <video autoplay muted loop class="border" style="width:14.2857%;height:14.2857%;">
+        <video playsinline autoplay muted loop class="border" style="width:14.2857%;height:14.2857%;">
             <source src="https://cdn.discordapp.com/attachments/691915140198826005/846593561444745226/magical_babey_mode_by_smudgedpasta_de1q8ky-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIi.mp4" type="video/mp4">
         </video>
     </body>

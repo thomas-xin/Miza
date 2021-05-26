@@ -1139,12 +1139,12 @@ class CreateGIF(Command):
                 if not url:
                     raise ArgumentError(f'Invalid URL detected: "{url}".')
                 args[i] = url
-            name = "unknown.gif"
+            filename = "unknown." + fmt
             if video is None:
                 video = args
             resp = await process_image("create_gif", "$", ["image", args, delay, "-f", fmt], timeout=_timeout)
             fn = resp[0]
-        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
+        await bot.send_with_file(channel, "", fn, filename=filename, reference=message)
 
 
 class Resize(Command):
