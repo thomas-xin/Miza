@@ -2354,6 +2354,9 @@ def from_bytes(b, save=None):
         data = b
         out = io.BytesIO(b) if type(b) is bytes else b
     mime = magic.from_buffer(data, mime=True)
+    if mime == "application/zip":
+        z = zipfile.ZipFile(io.BytesIO(data), compression=zipfile.ZIP_DEFLATED, strict_timestamps=False)
+        return ImageSequence(*(Image.open(z.open(f.filename)) for f in z.filelist))
     if mime == "image/gif" or mime.split("/", 1)[0] != "image":
         fmt = "rgba" if mime == "image/gif" else "rgb24"
         ts = time.time_ns() // 1000
@@ -2374,7 +2377,7 @@ def from_bytes(b, save=None):
         try:
             res = as_str(p.stdout.read()).strip()
             if not res:
-                raise EOFError
+                raise TypeError(f'Filetype "{mime}" is not supported.')
             info = res.split("x", 2)
         except:
             print(as_str(p.stderr.read()), end="")
