@@ -1,6 +1,7 @@
 __pycache__
 .vscode
 *.tmp
+*.pem
 backup
 cache
 saves

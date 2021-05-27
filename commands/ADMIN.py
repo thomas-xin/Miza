@@ -1255,7 +1255,7 @@ class UpdateAutoEmojis(Database):
             emojis[n] = e
         return emojis
 
-    async def _nocommand_(self, message, **void):
+    async def _nocommand_(self, message, recursive=True, **void):
         if not message.content or getattr(message, "webhook_id", None) or message.content.count(":") < 2 or message.content.count("```") > 1:
             return
         emojis = find_emojis(message.content)
@@ -1277,6 +1277,7 @@ class UpdateAutoEmojis(Database):
         regex = regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^a\\\\`])(:[A-Za-z0-9\\-~_]{1,32}:)(?:(?![^0-9]).)*(?:$|[^0-9>`])")
         guild = message.guild
         orig = self.bot.data.emojilists.get(message.author.id, {})
+        pops = set()
         emojis = None
         offs = 0
         while offs < len(msg):
@@ -1330,6 +1331,7 @@ class UpdateAutoEmojis(Database):
                     self.bot.data.emojilists.get(message.author.id, {}).pop(name, None)
                     self.bot.data.emojilists.update(message.author.id)
             if emoji:
+                pops.add((str(name), emoji.id))
                 if len(msg) < 1936:
                     sub = "<"
                     if emoji.animated:
@@ -1351,9 +1353,23 @@ class UpdateAutoEmojis(Database):
         msg = escape_everyone(msg).strip("\u200b")
         if not msg or msg == message.content or len(msg) > 2000:
             return
+        if not recursive:
+            return msg
         create_task(self.bot.silent_delete(message))
         url = await self.bot.get_proxy_url(message.author)
-        await self.bot.send_as_webhook(message.channel, msg, username=message.author.display_name, avatar_url=url)
+        m = await self.bot.send_as_webhook(message.channel, msg, username=message.author.display_name, avatar_url=url)
+        if recursive and regex.search(m.content):
+            for k in tuple(pops):
+                if str(k[1]) not in m.content:
+                    orig.pop(k[0], None)
+                else:
+                    pops.discard(k)
+            if pops:
+                print("Removed emojis:", pops)
+                msg = await self._nocommand_(message, recursive=False)
+                if msg and msg != m.content:
+                    create_task(self.bot.silent_delete(m))
+                    await self.bot.send_as_webhook(message.channel, msg, username=message.author.display_name, avatar_url=url)
 
 
 # TODO: Stop being lazy and finish this damn command

@@ -8,7 +8,7 @@ except ModuleNotFoundError:
 
 
 HOST = "https://mizabot.xyz"
-PORT = AUTH.get("webserver_port", 9801)
+PORT = AUTH.get("webserver_port", 80)
 IND = "\x7f"
 
 
@@ -69,6 +69,12 @@ config = {
         "request.dispatch": EndpointRedirects(),
     }
 }
+
+if os.path.exists("misc/cert.pem") and os.path.exists("misc/private.key.pem"):
+    # config["global"]["server.ssl_module"] = "builtin"
+    config["global"]["server.ssl_certificate"] = "domain.cert.pem"
+    config["global"]["server.ssl_private_key"] = "private.key.pem"
+    config["global"]["server.ssl_certificate_chain"] = "intermediate.cert.pem"
 
 HEADERS = {
     "X-Content-Type-Options": "nosniff",

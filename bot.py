@@ -1263,7 +1263,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     fut = create_future_ex(Request, base + "png")
                 url = base + "gif"
                 with requests.head(url, stream=True) as resp:
-                    if resp.status_code >= 400:
+                    if resp.status_code in range(400, 500):
                         if not verify:
                             return False
                         try:
@@ -1279,6 +1279,18 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             emoji = e
         return emoji.animated
     
+    def emoji_exists(self, e):
+        if type(e) in (int, str):
+            url = f"https://cdn.discordapp.com/emojis/{e}.png"
+            with requests.head(url, stream=True) as resp:
+                if resp.status_code in range(400, 500):
+                    self.emoji_stuff.pop(int(e), None)
+                    return
+        else:
+            if e.id not in self.cache.emojis:
+                return
+        return True
+
     async def min_emoji(self, e):
         animated = await create_future(self.is_animated, e, verify=True)
         if animated is None:
@@ -2127,7 +2139,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     def update_ip(self, ip):
         if regexp("^([0-9]{1,3}\\.){3}[0-9]{1,3}$").search(ip):
             self.ip = ip
-            new_ip = f"http://{self.ip}:9801"
+            new_ip = f"http://{self.ip}:{PORT}"
             if self.raw_webserver != self.webserver and self.raw_webserver != new_ip:
                 create_task(self.create_main_website())
             self.raw_webserver = new_ip
@@ -4217,7 +4229,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         print(f"Warning: Guild {guild.id} is not available.")
                 await self.handle_update()
                 futs.add(create_future(self.update_usernames, priority=True))
-                futs.add(create_task(aretry(self.get_ip, delay=20)))
+                # futs.add(create_task(aretry(self.get_ip, delay=20)))
                 if not self.started:
                     create_task(self.init_ready(futs))
                 else:
@@ -4734,7 +4746,7 @@ def userIter4(x):
         yield to_alphanumeric(x.nick).replace(" ", "").casefold()
 
 
-PORT = AUTH.get("webserver_port", 9801)
+PORT = AUTH.get("webserver_port", 80)
 IND = "\x7f"
 
 def update_file_cache(files=None, recursive=True):

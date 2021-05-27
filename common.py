@@ -551,6 +551,7 @@ class FileHashDict(collections.abc.MutableMapping):
                         time.sleep(0.03)
                         s = z.open(fn).read()
                     data = select_and_loads(s, mode="unsafe")
+                    self.modified.add(k)
                     print(f"Successfully recovered backup of {fn} from {file}.")
                     break
         if data is BaseException:
