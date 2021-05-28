@@ -38,7 +38,18 @@ class Restart(Command):
         client = bot.client
         await message.add_reaction("❗")
         save = None
-        if argv:
+        if argv == "when free":
+            busy = True
+            while busy:
+                busy = False
+                for vc in bot.audio.clients.values():
+                    try:
+                        if vc.is_playing():
+                            busy = True
+                    except:
+                        print_exc()
+                await asyncio.sleep(1)
+        elif argv:
             # Restart announcements for when a time input is specified
             if argv.startswith("in"):
                 argv = argv[2:].lstrip()
@@ -52,7 +63,7 @@ class Restart(Command):
             save = create_task(bot.send_event("_save_", force=True))
             if wait > 0:
                 await asyncio.sleep(wait)
-        elif name == "shutdown":
+        if name == "shutdown":
             await send_with_reply(channel, content="Shutting down... :wave:", reference=message)
         else:
             await send_with_reply(channel, content="Restarting... :wave:", reference=message)

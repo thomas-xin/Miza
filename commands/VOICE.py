@@ -1153,6 +1153,7 @@ class AudioClientSubInterface:
 
     async def disconnect(self, force=False):
         await create_future(bot.audio.submit, f"!await AP.from_guild({self.guild.id}).disconnect(force={force})")
+        bot.audio.clients.pop(self.guild.id)
         self.channel = None
 
     async def move_to(self, channel=None):
@@ -1818,7 +1819,9 @@ class AudioDownloader:
                         return [cdict(name=e["name"], url=e["url"], duration=e.get("duration")) for e in q]
                 elif mode in (None, "yt"):
                     with suppress(NotImplementedError):
-                        return self.search_yt(item)[:count]
+                        res = self.search_yt(item)
+                        if res:
+                            return res[:count]
                 # Otherwise call automatic extract_info function
                 resp = self.extract_info(item, count, search=search, mode=mode)
                 if resp.get("_type", None) == "url":

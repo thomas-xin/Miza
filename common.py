@@ -817,7 +817,7 @@ def is_nsfw(channel):
 REPLY_SEM = cdict()
 # noreply = discord.AllowedMentions(replied_user=False)
 
-async def send_with_reply(channel, reference, content="", embed=None, tts=None, file=None, files=None, mention=False):
+async def send_with_reply(channel, reference, content="", embed=None, tts=None, file=None, files=None, buttons=None, mention=False):
     bot = BOT[0]
     if getattr(reference, "slash", None):
         sem = emptyctx
@@ -851,45 +851,56 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
             fields["file"] = file
         if files:
             fields["files"] = files
-        try:
-            return await channel.send(content, **fields)
-        except discord.HTTPException as ex:
-            if fields.get("reference") and "Unknown message" in str(ex):
-                fields.pop("reference")
+        if not buttons:
+            try:
                 return await channel.send(content, **fields)
-            raise
-        # try:
-        #     sem = REPLY_SEM[channel.id]
-        # except KeyError:
-        #     sem = REPLY_SEM[channel.id] = Semaphore(5, buffer=256, delay=0.1, rate_limit=5)
-        # m_id = verify_id(reference)
-        # inter = False
-        # url = f"https://discord.com/api/v8/channels/{channel.id}/messages"
-        # if not reference or getattr(channel, "simulated", None) or bot and getattr(bot.messages.get(m_id), "deleted", None): # or getattr(reference, "noref", None)
-        #     fields = {}
-        #     if embed:
-        #         fields["embed"] = embed
-        #     if tts:
-        #         fields["tts"] = tts
-        #     return await channel.send(content, **fields)
-        # if getattr(channel, "dm_channel", None):
-        #     channel = channel.dm_channel
-        # elif not getattr(channel, "recipient", None) and not channel.permissions_for(channel.guild.me).read_message_history:
-        #     fields = {}
-        #     if embed:
-        #         fields["embed"] = embed
-        #     if tts:
-        #         fields["tts"] = tts
-        #     return await channel.send(content, **fields)
-        # data = dict(
-        #     content=content,
-        #     message_reference=dict(message_id=m_id),
-        #     allowed_mentions=dict(parse=["users", "roles", "everyone"], replied_user=mention)
-        # )
-        # if embed is not None:
-        #     data["embed"] = embed.to_dict()
-        # if tts is not None:
-        #     data["tts"] = tts
+            except discord.HTTPException as ex:
+                if fields.get("reference") and "Unknown message" in str(ex):
+                    fields.pop("reference")
+                    return await channel.send(content, **fields)
+                raise
+        for row in buttons:
+            for button in row:
+                button["type"] = 2
+                if "name" in button:
+                    button["label"] = button["name"]
+                try:
+                    if type(button["emoji"]) is str:
+                        button["emoji"] = cdict(id=None, name=button["emoji"])
+                    elif not issubclass(type(button["emoji"]), collections.abc.Mapping):
+                        button["emoji"] = cdict.from_object(button["emoji"])
+                except KeyError:
+                    pass
+                if "url" in button:
+                    button["style"] = 5
+        components = [dict(type=1, components=row) for row in buttons]
+        try:
+            sem = REPLY_SEM[channel.id]
+        except KeyError:
+            sem = REPLY_SEM[channel.id] = Semaphore(5, buffer=256, delay=0.1, rate_limit=5)
+        m_id = verify_id(reference)
+        inter = False
+        url = f"https://discord.com/api/v8/channels/{channel.id}/messages"
+        if getattr(channel, "dm_channel", None):
+            channel = channel.dm_channel
+        elif not getattr(channel, "recipient", None) and not channel.permissions_for(channel.guild.me).read_message_history:
+            fields = {}
+            if embed:
+                fields["embed"] = embed
+            if tts:
+                fields["tts"] = tts
+            return await channel.send(content, **fields)
+        data = dict(
+            content=content,
+            message_reference=dict(message_id=m_id),
+            allowed_mentions=dict(parse=["users", "roles", "everyone"], replied_user=mention)
+        )
+        if components:
+            data["components"] = components
+        if embed is not None:
+            data["embed"] = embed.to_dict()
+        if tts is not None:
+            data["tts"] = tts
     body = json.dumps(data)
     exc = RuntimeError
     for i in range(xrand(12, 17)):
@@ -1594,7 +1605,7 @@ pillow_simd = Pillow_SIMD()
 
 def proc_start():
     PROC_COUNT.math = 3
-    PROC_COUNT.image = 3
+    PROC_COUNT.image = 7
     for k, v in PROC_COUNT.items():
         if k == "image":
             proc_args.image = pillow_simd.check() + ["misc/image.py"]
