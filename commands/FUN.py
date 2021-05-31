@@ -212,6 +212,16 @@ class ND2048(collections.abc.MutableSequence):
                     raise GameOverError("Game Over.")
         return moved
 
+    def valid_moves(self):
+        valid = 0
+        for dim in range(self.data.ndim):
+            temp = np.moveaxis(copy.deepcopy(self.data), dim, -1)
+            if self.recurse(temp.copy()):
+                valid |= 1 << dim * 2
+            if self.recurse(np.flip(temp)):
+                valid |= 1 << dim * 2 + 1
+        return valid
+
     # Attempt to perform an undo
     def undo(self):
         if self.flags & 1 and self.history:
@@ -255,6 +265,86 @@ class Text2048(Command):
     directions[b'\xe2\x86\xa9\xef\xb8\x8f'] = -1
     slash = ("2048",)
 
+    buttons = {
+        2: [
+            [
+                cdict(emoji="▪️", style=2),
+                cdict(emoji="⬆️", style=1),
+                cdict(emoji="▪️", style=2),
+            ],
+            [
+                cdict(emoji="⬅️", style=1),
+                cdict(emoji="💠", style=1),
+                cdict(emoji="➡️", style=1),
+            ],
+            [
+                cdict(emoji="▪️", style=2),
+                cdict(emoji="⬇️", style=1),
+                cdict(emoji="▪️", style=2),
+            ],
+        ],
+        3: [
+            [
+                cdict(emoji="▪️", style=2),
+                cdict(emoji="▪️", style=2),
+                cdict(emoji="⬆️", style=1),
+                cdict(emoji="▪️", style=2),
+                cdict(emoji="▪️", style=2),
+            ],
+            [
+                cdict(emoji="⏪", style=1),
+                cdict(emoji="⬅️", style=1),
+                cdict(emoji="💠", style=1),
+                cdict(emoji="➡️", style=1),
+                cdict(emoji="⏩", style=1),
+            ],
+            [
+                cdict(emoji="▪️", style=2),
+                cdict(emoji="▪️", style=2),
+                cdict(emoji="⬇️", style=1),
+                cdict(emoji="▪️", style=2),
+                cdict(emoji="▪️", style=2),
+            ],
+        ],
+        4: [
+            [
+                cdict(emoji="▪️", style=2),
+                cdict(emoji="▪️", style=2),
+                cdict(emoji="⏫", style=1),
+                cdict(emoji="▪️", style=2),
+                cdict(emoji="▪️", style=2),
+            ],
+            [
+                cdict(emoji="▪️", style=2),
+                cdict(emoji="▪️", style=2),
+                cdict(emoji="⬆️", style=1),
+                cdict(emoji="▪️", style=2),
+                cdict(emoji="▪️", style=2),
+            ],
+            [
+                cdict(emoji="⏪", style=1),
+                cdict(emoji="⬅️", style=1),
+                cdict(emoji="💠", style=1),
+                cdict(emoji="➡️", style=1),
+                cdict(emoji="⏩", style=1),
+            ],
+            [
+                cdict(emoji="▪️", style=2),
+                cdict(emoji="▪️", style=2),
+                cdict(emoji="⬇️", style=1),
+                cdict(emoji="▪️", style=2),
+                cdict(emoji="▪️", style=2),
+            ],
+            [
+                cdict(emoji="▪️", style=2),
+                cdict(emoji="▪️", style=2),
+                cdict(emoji="⏬", style=1),
+                cdict(emoji="▪️", style=2),
+                cdict(emoji="▪️", style=2),
+            ],
+        ],
+    }
+
     async def _callback_(self, bot, message, reaction, argv, user, perm, vals, **void):
         # print(user, message, reaction, argv)
         u_id, mode = [int(x) for x in vals.split("_", 1)]
@@ -264,13 +354,15 @@ class Text2048(Command):
         size = [int(x) for x in spl.pop(0).split("_")]
         data = None
         if reaction is None:
+            return
             # If game has not been started, add reactions and create new game
-            for react in self.directions.a:
-                r = self.directions.a[react]
-                if r == -2 or (r == -1 and mode & 1) or r >= 0 and r >> 1 < len(size):
-                    create_task(message.add_reaction(as_str(react)))
+            # for react in self.directions.a:
+            #     r = self.directions.a[react]
+            #     if r == -2 or (r == -1 and mode & 1) or r >= 0 and r >> 1 < len(size):
+            #         await message.add_reaction(as_str(react))
             g = ND2048(*size, flags=mode)
             data = g.serialize()
+            r = -1
             score = 0
         else:
             # Get direction of movement
@@ -316,6 +408,8 @@ class Text2048(Command):
                     emb.set_author(**get_author(u))
                 emb.description = ("**```fix\n" if mode & 6 else "**```\n") + g.render() + "```**"
                 fscore = g.score()
+                if r < 0:
+                    score = None
                 if score is not None:
                     xp = max(0, fscore - score) * 16 / np.prod(g.data.shape)
                     if mode & 1:
@@ -328,16 +422,21 @@ class Text2048(Command):
                     emb.description += await bot.as_rewards(f"+{int(xp)}")
                 emb.set_footer(text=f"Score: {fscore}")
                 # Clear reactions and announce game over message
-                await message.edit(content="**```\n2048: GAME OVER```**", embed=emb)
-                if message.guild and message.guild.get_member(bot.client.user.id).permissions_in(message.channel).manage_messages:
-                    await message.clear_reactions()
-                else:
-                    for reaction in message.reactions:
-                        if reaction.me:
-                            await message.remove_reaction(reaction.emoji, bot.client.user if message.guild is None else message.guild.get_member(bot.client.user.id))
-                for c in ("🇬", "🇦", "🇲", "🇪", "⬛", "🇴", "🇻", "3️⃣", "🇷"):
-                    await message.add_reaction(c)
-                return
+                return await Request(
+                    f"https://discord.com/api/v9/channels/{message.channel.id}/messages/{message.id}",
+                    data=json.dumps(dict(
+                        content="**```\n2048: GAME OVER```**",
+                        embed=emb.to_dict(),
+                        components=None,
+                    )),
+                    method="PATCH",
+                    headers={
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bot {bot.token}",
+                    },
+                    bypass=False,
+                    aio=True,
+                )
         if data is not None:
             # Update message if gamestate has been changed
             if u_id == 0:
@@ -355,6 +454,8 @@ class Text2048(Command):
             content = "*```callback-fun-text2048-" + str(u_id) + "_" + str(mode) + "-" + "_".join(str(i) for i in size) + "-" + as_str(data) + "\nPlaying 2048...```*"
             emb.description = ("**```fix\n" if mode & 6 else "**```\n") + g.render() + "```**"
             fscore = g.score()
+            if r < 0:
+                score = None
             if score is not None:
                 xp = max(0, fscore - score) * 16 / np.prod(g.data.shape)
                 if mode & 1:
@@ -366,9 +467,71 @@ class Text2048(Command):
                 bot.data.users.add_gold(user, xp)
                 emb.description += await bot.as_rewards(f"+{int(xp)}")
             emb.set_footer(text=f"Score: {fscore}")
-            await message.edit(content=content, embed=emb)
+            create_task(bot.ignore_interaction(message))
+            dims = max(2, len(g.data.shape))
+            buttons = copy.deepcopy(self.buttons[dims])
+            vm = g.valid_moves()
+            # print(vm)
+            dis = set()
+            if dims == 2:
+                if not vm & 1:
+                    dis.add((0, 1))
+                if not vm & 2:
+                    dis.add((-1, 1))
+                if not vm & 4:
+                    dis.add((1, 0))
+                if not vm & 8:
+                    dis.add((1, -1))
+            elif dims == 3:
+                if not vm & 1:
+                    dis.add((1, 1))
+                if not vm & 2:
+                    dis.add((-2, 1))
+                if not vm & 4:
+                    dis.add((2, 0))
+                if not vm & 8:
+                    dis.add((2, -1))
+                if not vm & 16:
+                    dis.add((0, 1))
+                if not vm & 32:
+                    dis.add((-1, 1))
+            elif dims == 4:
+                if not vm & 1:
+                    dis.add((1, 2))
+                if not vm & 2:
+                    dis.add((-2, 2))
+                if not vm & 4:
+                    dis.add((2, 1))
+                if not vm & 8:
+                    dis.add((2, -2))
+                if not vm & 16:
+                    dis.add((0, 2))
+                if not vm & 32:
+                    dis.add((-1, 2))
+                if not vm & 64:
+                    dis.add((2, 0))
+                if not vm & 128:
+                    dis.add((2, -1))
+            for x, y in dis:
+                buttons[y][x].disabled = True
+            return await Request(
+                f"https://discord.com/api/v9/channels/{message.channel.id}/messages/{message.id}",
+                data=json.dumps(dict(
+                    content=content,
+                    embed=emb.to_dict(),
+                    components=restructure_buttons(buttons),
+                )),
+                method="PATCH",
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bot {bot.token}",
+                },
+                bypass=False,
+                aio=True,
+            )
+        return await bot.ignore_interaction(message)
 
-    async def __call__(self, bot, argv, args, user, flags, guild, **void):
+    async def __call__(self, bot, argv, args, user, flags, message, guild, **void):
         # Input may be nothing, a single value representing board size, a size and dimension count input, or a sequence of numbers representing size along an arbitrary amount of dimensions
         if not len(argv.replace(" ", "")):
             size = [4, 4]
@@ -405,7 +568,31 @@ class Text2048(Command):
             mode |= 2
         if "e" in flags:
             mode |= 1
-        return "*```callback-fun-text2048-" + str(u_id) + "_" + str(mode) + "-" + "_".join(str(i) for i in size) + "\nStarting Game...```*"
+        # s = "*```callback-fun-text2048-" + str(u_id) + "_" + str(mode) + "-" + "_".join(str(i) for i in size) + "\nStarting Game...```*"
+        if len(size) <= 2:
+            buttons = self.buttons[2]
+        elif len(size) == 3:
+            buttons = self.buttons[3]
+        elif len(size) == 4:
+            buttons = self.buttons[4]
+        else:
+            raise ValueError("Button and board configuration for issued size is not yet implemented.")
+        reacts = []
+        if mode & 1:
+            reacts.append("↩️")
+        g = ND2048(*size, flags=mode)
+        data = g.serialize()
+        u = user
+        colour = await bot.get_colour(u)
+        emb = discord.Embed(colour=colour)
+        if u is None:
+            emb.set_author(name="@everyone", icon_url=bot.discord_icon)
+        else:
+            emb.set_author(**get_author(u))
+        content = "*```callback-fun-text2048-" + str(u_id) + "_" + str(mode) + "-" + "_".join(str(i) for i in size) + "-" + as_str(data) + "\nPlaying 2048...```*"
+        emb.description = ("**```fix\n" if mode & 6 else "**```\n") + g.render() + "```**"
+        emb.set_footer(text="Score: 0")
+        await send_with_react(message.channel, content, embed=emb, reacts=reacts, buttons=buttons, reference=message)
 
 
 class SlotMachine(Command):

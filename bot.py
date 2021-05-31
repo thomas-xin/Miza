@@ -109,14 +109,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         except KeyError:
             self.owners = alist()
             print("WARNING: owner_id not found. Unable to locate owner.")
-        try:
-            discord_id = AUTH["discord_id"]
-            if not discord_id:
-                raise
-        except:
-            discord_id = None
-            print("WARNING: discord_id not found. Unable to automatically generate bot invites or slash commands.")
-        globals()["discord_id"] = discord_id
         # Initialize rest of bot variables
         self.proc = PROC
         self.guild_count = 0
@@ -226,7 +218,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     def create_command(self, data):
         with tracebacksuppressor:
             for i in range(16):
-                resp = requests.post(f"https://discord.com/api/v8/applications/{AUTH['discord_id']}/commands", headers={"Content-Type": "application/json", "Authorization": "Bot " + self.token}, data=json.dumps(data))
+                resp = requests.post(
+                    f"https://discord.com/api/v9/applications/{self.id}/commands",
+                    headers={"Content-Type": "application/json", "Authorization": "Bot " + self.token},
+                    data=json.dumps(data),
+                )
                 if resp.status_code == 429:
                     time.sleep(2)
                     continue
@@ -236,18 +232,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 return
 
     def update_slash_commands(self):
-        try:
-            discord_id = AUTH["discord_id"]
-        except KeyError:
-            return
         if not AUTH.get("slash_commands"):
             return
         print("Updating global slash commands...")
         with tracebacksuppressor:
-            resp = requests.get(f"https://discord.com/api/v8/applications/{discord_id}/commands", headers=dict(Authorization="Bot " + self.token))
+            resp = requests.get(f"https://discord.com/api/v9/applications/{self.id}/commands", headers=dict(Authorization="Bot " + self.token))
             if resp.status_code not in range(200, 400):
                 raise ConnectionError(f"Error {resp.status_code}", resp.text)
-            commands = alist(c for c in resp.json() if c.get("application_id") == discord_id)
+            commands = alist(c for c in resp.json() if str(c.get("application_id")) == str(self.id))
             print(f"Successfully loaded {len(commands)} slash command{'s' if len(commands) != 1 else ''}.")
         sem = Semaphore(5, inf, 5)
         for catg in self.categories.values():
@@ -270,7 +262,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                             print(curr)
                                             print(f"{curr['name']}'s slash command does not match, removing...")
                                             for i in range(16):
-                                                resp = requests.delete(f"https://discord.com/api/v8/applications/{discord_id}/commands/{curr['id']}", headers=dict(Authorization="Bot " + self.token))
+                                                resp = requests.delete(f"https://discord.com/api/v9/applications/{self.id}/commands/{curr['id']}", headers=dict(Authorization="Bot " + self.token))
                                                 if resp.status_code == 429:
                                                     time.sleep(1)
                                                     continue
@@ -291,7 +283,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             with tracebacksuppressor:
                 print(curr)
                 print(f"{curr['name']}'s slash command does not exist, removing...")
-                resp = requests.delete(f"https://discord.com/api/v8/applications/{discord_id}/commands/{curr['id']}", headers=dict(Authorization="Bot " + self.token))
+                resp = requests.delete(f"https://discord.com/api/v9/applications/{self.id}/commands/{curr['id']}", headers=dict(Authorization="Bot " + self.token))
                 if resp.status_code not in range(200, 400):
                     raise ConnectionError(f"Error {resp.status_code}", resp.text)
 
@@ -3130,8 +3122,22 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 await self.send_as_webhook(sendable, embeds=embs, username=m.display_name, avatar_url=url, reacts=reacts)
 
     async def ignore_interaction(self, message):
-        await send_with_reply(message.channel, message, "Please wait...")
-        await Request(f"https://discord.com/api/v8/interactions/{message.id}/{message.slash}/messages/@original", method="DELETE", aio=True)
+        with tracebacksuppressor:
+            if hasattr(message, "int_id"):
+                int_id, int_token = message.int_id, message.int_token
+            else:
+                int_id, int_token = message.id, message.slash
+            await Request(
+                f"https://discord.com/api/v9/interactions/{int_id}/{int_token}/callback",
+                method="POST",
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bot {self.token}",
+                },
+                data='{"type": 6}',
+                bypass=False,
+                aio=True,
+            )
 
     # Adds embeds to the embed sender, waiting for the next update event.
     def send_embeds(self, channel, embeds=None, embed=None, reacts=None, reference=None):
@@ -3145,10 +3151,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         elif not embeds:
             return
         if reference:
+            if getattr(reference, "slash", None):
+                create_task(self.ignore_interaction(reference))
             if len(embeds) == 1:
                 return create_task(send_with_react(channel, embed=embeds[0], reference=reference, reacts=reacts))
-            elif getattr(reference, "slash", None):
-                return create_task(self.ignore_interaction(reference))
         c_id = verify_id(channel)
         user = self.cache.users.get(c_id)
         if user is not None:
@@ -3370,7 +3376,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         self.bitrate = (self.net_bytes[-1] - self.net_bytes[0]) * 8 / len(self.net_bytes)
                         self.total_bytes = self.net_bytes[-1] + self.start_bytes
                     try:
-                        resp = await create_future(requests.head, "https://discord.com/api/v8", priority=True)
+                        resp = await create_future(requests.head, "https://discord.com/api/v9", priority=True)
                         self.api_latency = resp.elapsed.total_seconds()
                     except:
                         self.api_latency = inf
@@ -3611,8 +3617,6 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
         class ExtendedMessage:
 
-            __slots__ = ("message", "deleted", "_data")
-
             @classmethod
             def new(cls, data, channel=None, **void):
                 if not channel:
@@ -3719,7 +3723,12 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     message = self.__copy__()
                     if type(m) not in (discord.Message, bot.ExtendedMessage):
                         bot.add_message(message, files=False)
-                    return getattr(message, k)
+                    try:
+                        return getattr(message, k)
+                    except KeyError:
+                        if k == "mentions":
+                            return ()
+                        raise
                 return getattr(m, k)
 
         class MessageCache(collections.abc.Mapping):
@@ -3865,13 +3874,17 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             url = route.url
 
             rtype = 0
-            if "/messages" in url:
+            if "/reactions" in route.path:
+                rtype = 2
+            elif "/messages" in route.path:
                 rtype = 1
 
             lock = self._locks.get(bucket)
             if lock is None:
+                if rtype == 2:
+                    lock = Semaphore(1, 16, rate_limit=0.55)
                 if rtype == 1:
-                    lock = Semaphore(5, 256, rate_limit=5.2)
+                    lock = Semaphore(5, 256, rate_limit=5.1)
                 else:
                     lock = asyncio.Lock()
                 if bucket is not None:
@@ -4217,10 +4230,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             await create_future(self.update_subs, priority=True)
             self.update_cache_feed()
             self.mention = (user_mention(self.id), user_pc_mention(self.id))
-            if discord_id:
-                self.invite = f"https://discordapp.com/oauth2/authorize?permissions=8&client_id={discord_id}&scope=bot%20applications.commands"
-            else:
-                self.invite = self.github
+            self.invite = f"https://discordapp.com/oauth2/authorize?permissions=8&client_id={self.id}&scope=bot%20applications.commands"
             with tracebacksuppressor:
                 futs = set()
                 futs.add(create_task(self.get_state()))
@@ -4363,45 +4373,74 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         @self.event
         async def on_socket_response(data):
             if data.get("t") == "INTERACTION_CREATE" and "d" in data:
-                with tracebacksuppressor:
+                try:
                     dt = utc_dt()
                     message = self.GhostMessage()
                     d = data["d"]
-                    # print(d)
-                    cdata = d.get("data")
-                    name = cdata["name"]
-                    args = [i.get("value", "") for i in cdata.get("options", ())]
-                    argv = " ".join(i for i in args if i)
-                    message.content = "/" + name + " " + argv
-                    try:
-                        message.id = int(d["id"])
-                    except KeyError:
-                        print_exc()
-                        message.id = time_snowflake(dt)
-                    mdata = d.get("member")
-                    if not mdata:
-                        mdata = d.get("user")
-                    else:
-                        mdata = mdata.get("user")
-                    author = self._state.store_user(mdata)
-                    message.author = author
-                    channel = None
-                    try:
-                        channel = await self.fetch_channel(d["channel_id"])
-                        guild = await self.fetch_guild(d["guild_id"])
-                        message.guild = guild
-                        author = guild.get_member(author.id)
-                        if author:
-                            message.author = author
-                    except KeyError:
-                        if author is None:
-                            raise
-                        if channel is None:
-                            channel = await self.get_dm(author)
-                    message.channel = channel
+                    message.id = int(d["id"])
                     message.slash = d["token"]
-                    message.noref = True
-                    return await self.process_message(message, message.content, slash=True)
+                    cdata = d.get("data")
+                    if d["type"] == 2:
+                        name = cdata["name"]
+                        args = [i.get("value", "") for i in cdata.get("options", ())]
+                        argv = " ".join(i for i in args if i)
+                        message.content = "/" + name + " " + argv
+                        mdata = d.get("member")
+                        if not mdata:
+                            mdata = d.get("user")
+                        else:
+                            mdata = mdata.get("user")
+                        author = self._state.store_user(mdata)
+                        message.author = author
+                        channel = None
+                        try:
+                            channel = await self.fetch_channel(d["channel_id"])
+                            guild = await self.fetch_guild(d["guild_id"])
+                            message.guild = guild
+                            author = guild.get_member(author.id)
+                            if author:
+                                message.author = author
+                        except KeyError:
+                            if author is None:
+                                raise
+                            if channel is None:
+                                channel = await self.get_dm(author)
+                        message.channel = channel
+                        message.noref = True
+                        return await self.process_message(message, message.content, slash=True)
+                    if d["type"] == 3:
+                        custom_id = cdata.get("custom_id", "")
+                        if custom_id == "▪️":
+                            return await self.ignore_interaction(message)
+                        mdata = d.get("member")
+                        if not mdata:
+                            mdata = d.get("user")
+                        else:
+                            mdata = mdata.get("user")
+                        user = self._state.store_user(mdata)
+                        channel = None
+                        try:
+                            channel = await self.fetch_channel(d["channel_id"])
+                            guild = await self.fetch_guild(d["guild_id"])
+                            user = guild.get_member(user.id)
+                        except KeyError:
+                            if user is None:
+                                raise
+                            if channel is None:
+                                channel = await self.get_dm(user)
+                        message.channel = channel
+                        m = await self.fetch_message(d["message"]["id"], channel)
+                        if type(m) is not self.ExtendedMessage:
+                            m = self.ExtendedMessage(m)
+                            self.add_message(m, force=True)
+                        m.int_id = message.id
+                        m.int_token = message.slash
+                        print(custom_id, user)
+                        return await self.react_callback(m, custom_id, user)
+                    print("Unknown interaction:\n" + str(data))
+                except:
+                    print_exc()
+                    print("Failed interaction:\n" + str(data))
 
         # Message edit event: processes edited message, uses raw payloads rather than discord.py message cache. calls _edit_ and _seen_ bot database events.
         @self.event

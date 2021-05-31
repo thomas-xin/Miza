@@ -8,7 +8,6 @@ if not os.path.exists("auth.json") or not os.path.getsize("auth.json"):
         "prefix": "~",
         "slash_commands": False,
         "webserver_port": "",
-        "discord_id": "",
         "discord_token": "",
         "owner_id": [],
         "google_api_key": "",

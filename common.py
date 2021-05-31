@@ -706,6 +706,35 @@ def html_decode(s):
     return s.replace("&quot;", '"').replace("&apos;", "'")
 
 
+def restructure_buttons(buttons):
+    for row in buttons:
+        for button in row:
+            button["type"] = 2
+            if "name" in button:
+                button["label"] = button["name"]
+            try:
+                if type(button["emoji"]) is str:
+                    button["emoji"] = cdict(id=None, name=button["emoji"])
+                elif not issubclass(type(button["emoji"]), collections.abc.Mapping):
+                    emoji = button["emoji"]
+                    button["emoji"] = cdict(name=emoji.name, id=emoji.id, animated=getattr(emoji, "animated", False))
+            except KeyError:
+                pass
+            if "url" in button:
+                button["style"] = 5
+            elif "custom_id" not in button:
+                button["custom_id"] = custom_id = button.get("label")
+                if not custom_id:
+                    if button.get("emoji"):
+                        button["custom_id"] = min_emoji(button["emoji"])
+                    else:
+                        button["custom_id"] = 0
+            if button.get("emoji"):
+                if button["emoji"].get("name") == "▪️":
+                    button["disabled"] = True
+    return [dict(type=1, components=row) for row in buttons]
+
+
 # Escapes syntax in code highlighting markdown.
 
 ESCAPE_T = {
@@ -822,7 +851,7 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
     if getattr(reference, "slash", None):
         sem = emptyctx
         inter = True
-        url = f"https://discord.com/api/v8/interactions/{reference.id}/{reference.slash}/callback"
+        url = f"https://discord.com/api/v9/interactions/{reference.id}/{reference.slash}/callback"
         data = dict(
             type=4,
             data=dict(
@@ -859,28 +888,13 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
                     fields.pop("reference")
                     return await channel.send(content, **fields)
                 raise
-        for row in buttons:
-            for button in row:
-                button["type"] = 2
-                if "name" in button:
-                    button["label"] = button["name"]
-                try:
-                    if type(button["emoji"]) is str:
-                        button["emoji"] = cdict(id=None, name=button["emoji"])
-                    elif not issubclass(type(button["emoji"]), collections.abc.Mapping):
-                        button["emoji"] = cdict.from_object(button["emoji"])
-                except KeyError:
-                    pass
-                if "url" in button:
-                    button["style"] = 5
-        components = [dict(type=1, components=row) for row in buttons]
+        components = restructure_buttons(buttons)
         try:
             sem = REPLY_SEM[channel.id]
         except KeyError:
             sem = REPLY_SEM[channel.id] = Semaphore(5, buffer=256, delay=0.1, rate_limit=5)
-        m_id = verify_id(reference)
         inter = False
-        url = f"https://discord.com/api/v8/channels/{channel.id}/messages"
+        url = f"https://discord.com/api/v9/channels/{channel.id}/messages"
         if getattr(channel, "dm_channel", None):
             channel = channel.dm_channel
         elif not getattr(channel, "recipient", None) and not channel.permissions_for(channel.guild.me).read_message_history:
@@ -892,9 +906,10 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
             return await channel.send(content, **fields)
         data = dict(
             content=content,
-            message_reference=dict(message_id=m_id),
             allowed_mentions=dict(parse=["users", "roles", "everyone"], replied_user=mention)
         )
+        if reference:
+            data["message_reference"] = dict(message_id=verify_id(reference))
         if components:
             data["components"] = components
         if embed is not None:
@@ -910,7 +925,10 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
                     url,
                     method="post",
                     data=body,
-                    headers={"Content-Type": "application/json", "authorization": f"Bot {channel._state.http.token}"},
+                    headers={
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bot {channel._state.http.token}",
+                    },
                     decode=False,
                     files=None,
                 )
@@ -943,14 +961,14 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
 # Sends a message to a channel, then adds reactions accordingly.
 async def send_with_react(channel, *args, reacts=None, reference=None, mention=False, **kwargs):
     with tracebacksuppressor:
-        if reference:
+        if reference or "buttons" in kwargs:
             sent = await send_with_reply(channel, reference, *args, mention=mention, **kwargs)
         else:
             sent = await channel.send(*args, **kwargs)
         if reacts:
             for react in reacts:
-                async with delay(1 / 3):
-                    create_task(sent.add_reaction(react))
+                await sent.add_reaction(react)
+    return sent
 
 
 # Creates and starts a coroutine for typing in a channel.
@@ -985,6 +1003,8 @@ find_users = lambda s: regexp("<@!?[0-9]+>").findall(s)
 
 
 def min_emoji(emoji):
+    if not getattr(emoji, "id", None):
+        return emoji.name
     if emoji.animated:
         return f"<a:_:{emoji.id}>"
     return f"<:_:{emoji.id}>"
@@ -2222,7 +2242,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 
     def __call__(self, url, headers={}, files=None, data=None, raw=False, timeout=8, method="get", decode=False, json=False, bypass=True, aio=False):
         if bypass:
-            if "user-agent" not in headers:
+            if "user-agent" not in headers and "User-Agent" not in headers:
                 headers["User-Agent"] = f"Mozilla/5.{xrand(1, 10)}"
             headers["DNT"] = "1"
         method = method.casefold()
