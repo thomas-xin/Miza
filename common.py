@@ -2539,6 +2539,7 @@ def tzparse(expr):
 
 def smart_split(s):
     t = shlex.shlex(s)
+    t.whitespace_split = True
     out = deque()
     while True:
         try:
