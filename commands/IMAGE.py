@@ -1199,7 +1199,7 @@ class Resize(Command):
                 else:
                     value = value.replace(":", " ")
                 try:
-                    spl = shlex.split(value)
+                    spl = smart_split(value)
                 except ValueError:
                     spl = value.split()
                 x = await bot.eval_math(spl.pop(0))
@@ -1387,7 +1387,7 @@ class Blend(Command):
                 operation = "replace"
             else:
                 try:
-                    spl = shlex.split(value)
+                    spl = smart_split(value)
                 except ValueError:
                     spl = value.split()
                 operation = spl.pop(0)

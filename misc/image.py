@@ -633,6 +633,8 @@ def create_gif(in_type, args, delay):
     # size = [round(size[0]), round(size[1])]
     # if imgs[0].size[0] != size[0]:
     #     imgs = (resize_to(img, *size, operation="hamming") for img in imgs)
+    if len(imgs) == 1:
+        imgs *= 2
     count = len(imgs)
     delay = delay or 0.0625
     return dict(duration=delay * count, count=count, frames=imgs)

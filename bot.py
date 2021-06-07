@@ -481,6 +481,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 if getattr(obj, "garbage_collect", None):
                     return await obj.garbage_collect()
                 for key in tuple(data):
+                    if getattr(data, "unloaded", False):
+                        return
                     if key != 0 and type(key) is not str:
                         with suppress():
                             # Database keys may be user, guild, or channel IDs
@@ -1324,7 +1326,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         return out
 
         # Sends a message to a channel, then edits to add links to all attached files.
-    async def send_with_file(self, channel, msg=None, file=None, filename=None, best=False, rename=True, reference=None):
+    async def send_with_file(self, channel, msg=None, embed=None, file=None, filename=None, best=False, rename=True, reference=None):
         f = None
         fsize = 0
         size = 8388608
@@ -1371,9 +1373,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 else:
                     ext = None
                 urls = await create_future(as_file, file if getattr(file, "_fp", None) else f, filename=filename, ext=ext, rename=rename)
-                message = await channel.send(msg + ("" if msg.endswith("```") else "\n") + urls[0], reference=reference) #, embed=discord.Embed(colour=discord.Colour(1)).set_image(url=urls[-1]))
+                message = await channel.send(msg + ("" if msg.endswith("```") else "\n") + urls[0], embed=embed, reference=reference) #, embed=discord.Embed(colour=discord.Colour(1)).set_image(url=urls[-1]))
             else:
-                message = await channel.send(msg, file=file, reference=reference)
+                message = await channel.send(msg, embed=embed, file=file, reference=reference)
                 if filename is not None:
                     create_future_ex(os.remove, filename, priority=True)
         except:
@@ -2022,7 +2024,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             if " " in expr:
                 # Parse timezones first
                 try:
-                    args = shlex.split(expr)
+                    args = smart_split(expr)
                 except ValueError:
                     args = expr.split()
                 for a in (args[0], args[-1]):
@@ -2768,20 +2770,20 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                                                     argv2 = single_space((argv[:xi] + " " + argv[yi + 1:]).replace("\n", " ").replace(",", " ").replace("\t", " ")).strip()
                                                     argv3 = single_space(middle.replace("\n", " ").replace(",", " ").replace("\t", " ")).strip()
                                                     try:
-                                                        argl = shlex.split(argv3)
+                                                        argl = smart_split(argv3)
                                                     except ValueError:
                                                         argl = argv3.split()
                                                 else:
                                                     argv2 = single_space(argv[:xi].replace("\n", " ").replace("\t", " ") + " " + (middle[xi + 1:yi]).replace("\n", " ").replace(",", " ").replace("\t", " ") + " " + argv[yi + 1:].replace("\n", " ").replace("\t", " "))
                                                 try:
-                                                    args = shlex.split(argv2)
+                                                    args = smart_split(argv2)
                                                 except ValueError:
                                                     args = argv2.split()
                                                 raise StopIteration
                             if args is None:
                                 argv2 = single_space(argv.replace("\n", " ").replace("\t", " "))
                                 try:
-                                    args = shlex.split(argv2)
+                                    args = smart_split(argv2)
                                 except ValueError:
                                     args = argv2.split()
                             if args and getattr(command, "flags", None):
@@ -3725,7 +3727,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         bot.add_message(message, files=False)
                     try:
                         return getattr(message, k)
-                    except KeyError:
+                    except (AttributeError, KeyError):
                         if k == "mentions":
                             return ()
                         raise
@@ -4429,7 +4431,12 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                             if channel is None:
                                 channel = await self.get_dm(user)
                         message.channel = channel
-                        m = await self.fetch_message(d["message"]["id"], channel)
+                        if custom_id.startswith("~"):
+                            m_id, custom_id = custom_id[1:].split("~", 1)
+                            custom_id = "~" + custom_id
+                        else:
+                            m_id = d["message"]["id"]
+                        m = await self.fetch_message(m_id, channel)
                         if type(m) is not self.ExtendedMessage:
                             m = self.ExtendedMessage(m)
                             self.add_message(m, force=True)
@@ -4878,7 +4885,7 @@ def is_file(url):
     return None
 
 def webserver_communicate(bot):
-    while not bot.closed:
+    while not bot.closed and bot.server:
         with tracebacksuppressor:
             while True:
                 b = bot.server.stderr.readline().lstrip(b"\x00").rstrip()

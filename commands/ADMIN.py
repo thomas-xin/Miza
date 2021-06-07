@@ -2305,6 +2305,8 @@ class UpdateFileLogs(Database):
                     msg = None
                 else:
                     msg = "\n".join(msg)
+                if len(fils) == 1:
+                    return await self.bot.send_as_file(channel, msg, embed=emb, file=fils[0])
                 await channel.send(msg, embed=emb, files=fils)
 
 
@@ -2421,7 +2423,7 @@ class UpdateStarboards(Database):
             return
         if message.id in table.setdefault(None, {}):
             try:
-                reacts = sorted(message.reactions, key=lambda r: -r.count)
+                reacts = sorted(map(str, message.reactions), key=lambda r: -r.count)
                 if not reacts:
                     return
                 react = reacts[0]

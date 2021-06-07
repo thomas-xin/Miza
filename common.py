@@ -707,6 +707,14 @@ def html_decode(s):
 
 
 def restructure_buttons(buttons):
+    if not buttons:
+        return buttons
+    if issubclass(type(buttons[0]), collections.abc.Mapping):
+        b = alist()
+        while buttons:
+            b.append(buttons[:5])
+            buttons = buttons[5:]
+        buttons = b
     for row in buttons:
         for button in row:
             button["type"] = 2
@@ -733,6 +741,53 @@ def restructure_buttons(buttons):
                 if button["emoji"].get("name") == "▪️":
                     button["disabled"] = True
     return [dict(type=1, components=row) for row in buttons]
+
+
+def interaction_response(bot, message, content=None, embed=None, components=None, buttons=None):
+    if hasattr(embed, "to_dict"):
+        embed = embed.to_dict()
+    return Request(
+        f"https://discord.com/api/v9/interactions/{message.int_id}/{message.int_token}/callback",
+        data=json.dumps(dict(
+            type=4,
+            data=dict(
+                flags=64,
+                content=content,
+                embed=embed,
+                components=components or restructure_buttons(buttons),
+            ),
+        )),
+        method="POST",
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bot {bot.token}",
+        },
+        bypass=False,
+        aio=True,
+    )
+
+def interaction_patch(bot, message, content=None, embed=None, components=None, buttons=None):
+    if hasattr(embed, "to_dict"):
+        embed = embed.to_dict()
+    return Request(
+        f"https://discord.com/api/v9/interactions/{message.int_id}/{message.int_token}/callback",
+        data=json.dumps(dict(
+            type=7,
+            data=dict(
+                flags=64,
+                content=content,
+                embed=embed,
+                components=components or restructure_buttons(buttons),
+            ),
+        )),
+        method="POST",
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bot {bot.token}",
+        },
+        bypass=False,
+        aio=True,
+    )
 
 
 # Escapes syntax in code highlighting markdown.
@@ -774,11 +829,11 @@ def bold(s):
     return s
 
 single_md = lambda s: f"`{s}`"
-code_md = lambda s: f"```\n{s}```"
-py_md = lambda s: f"```py\n{s}```"
-ini_md = lambda s: f"```ini\n{s}```"
-css_md = lambda s, force=False: f"```css\n{s}```".replace("'", "\u2019").replace('"', "\u201d") if force else ini_md(s)
-fix_md = lambda s: f"```fix\n{s}```"
+code_md = lambda s: f"```\n{s}```" if s else "``` ```"
+py_md = lambda s: f"```py\n{s}```" if s else "``` ```"
+ini_md = lambda s: f"```ini\n{s}```" if s else "``` ```"
+css_md = lambda s, force=False: (f"```css\n{s}```".replace("'", "\u2019").replace('"', "\u201d") if force else ini_md(s)) if s else "``` ```"
+fix_md = lambda s: f"```fix\n{s}```" if s else "``` ```"
 
 # Discord object mention formatting
 user_mention = lambda u_id: f"<@{u_id}>"
@@ -844,6 +899,7 @@ def is_nsfw(channel):
 
 
 REPLY_SEM = cdict()
+EDIT_SEM = cdict()
 # noreply = discord.AllowedMentions(replied_user=False)
 
 async def send_with_reply(channel, reference, content="", embed=None, tts=None, file=None, files=None, buttons=None, mention=False):
@@ -892,7 +948,7 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
         try:
             sem = REPLY_SEM[channel.id]
         except KeyError:
-            sem = REPLY_SEM[channel.id] = Semaphore(5, buffer=256, delay=0.1, rate_limit=5)
+            sem = REPLY_SEM[channel.id] = Semaphore(5.1, buffer=256, delay=0.1, rate_limit=5)
         inter = False
         url = f"https://discord.com/api/v9/channels/{channel.id}/messages"
         if getattr(channel, "dm_channel", None):
@@ -2481,6 +2537,21 @@ def tzparse(expr):
     return utc_dft(s)
 
 
+def smart_split(s):
+    t = shlex.shlex(s)
+    out = deque()
+    while True:
+        try:
+            w = t.get_token()
+        except ValueError:
+            out.append(t.token.strip(t.quotes))
+            break
+        if not w:
+            break
+        out.extend(shlex.split(w))
+    return alist(out)
+
+
 __filetrans = {
     "\\": "_",
     "/": "_",
@@ -2668,6 +2739,7 @@ class Database(collections.abc.MutableMapping, collections.abc.Hashable, collect
         return False
 
     def unload(self):
+        self.unloaded = True
         bot = self.bot
         func = getattr(self, "_destroy_", None)
         if callable(func):

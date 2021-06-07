@@ -55,6 +55,8 @@ class EndpointRedirects(Dispatcher):
             path = "/favicon"
         elif path[1:] == AUTH.get("discord_token"):
             path = "/backup"
+        elif path == "/ip":
+            path = "/get_ip"
         return Dispatcher.__call__(self, path)
 
 config = {
@@ -197,7 +199,7 @@ class Server:
                 except FileNotFoundError:
                     pass
                 else:
-                    url = cp.request.base + "/files/" + c.rstrip(b"=").decode("utf-8", "replace")
+                    url = cp.request.base + "/i/" + c.rstrip(b"=").decode("utf-8", "replace")
                     return f"""<!DOCTYPE html>
 <html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta property="og:type" content="video.other">
@@ -229,7 +231,7 @@ class Server:
                 mime = get_mime(p)
             fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
             attachment = filename or fn
-            if endpoint.startswith("p") and mime.split("/", 1)[0] in ("image", "audio", "video"):
+            if endpoint.startswith("p"):
                 s = """<!DOCTYPE html>
 <html>
     <head>
@@ -580,11 +582,22 @@ class Server:
         cp.response.headers["ETag"] = create_etag(data)
         return data
 
+    ip_sem = Semaphore(1, 0, rate_limit=150)
+
+    def get_ip_ex(self):
+        with suppress(SemaphoreOverflowError):
+            with self.ip_sem:
+                resp = Request("https://api.ipify.org", decode=True)
+                if resp:
+                    self.ip = resp
+                return resp
+
     @cp.expose
-    def ip(self, *args, **kwargs):
+    def get_ip(self, *args, **kwargs):
+        self.get_ip_ex()
         data = json.dumps(dict(
             remote=cp.request.remote.ip,
-            host=cp.request.base.split("//", 1)[-1].split(":", 1)[0],
+            host=getattr(self, "ip", "127.0.0.1"),
         )).encode("utf-8")
         cp.response.headers.update(SHEADERS)
         cp.response.headers["Content-Type"] = "application/json"
@@ -1098,7 +1111,7 @@ function mergeFile(blob) {
         command = name.rstrip("s")
         argv = tag
         try:
-            args = shlex.split(argv)
+            args = smart_split(argv)
         except ValueError:
             args = argv.split()
         t = ts_us()
@@ -1167,4 +1180,6 @@ if __name__ == "__main__":
     proc = psutil.Process(pid)
     parent = psutil.Process(ppid)
     create_thread(ensure_parent, proc, parent)
-    cp.quickstart(Server(), "/", config)
+    server = Server()
+    create_future_ex(server.get_ip)
+    cp.quickstart(server, "/", config)

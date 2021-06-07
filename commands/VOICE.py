@@ -4276,7 +4276,7 @@ class Download(Command):
             # Parse search query, detecting file format selection if possible
             if " " in argv:
                 try:
-                    spl = shlex.split(argv)
+                    spl = smart_split(argv)
                 except ValueError:
                     spl = argv.split(" ")
                 if len(spl) >= 1:

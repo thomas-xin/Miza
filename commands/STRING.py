@@ -1009,10 +1009,9 @@ class Ask(Command):
         if not out:
             raise RuntimeError("Unable to construct a valid response.")
         q = q.replace("am i", "are y\uf000ou").replace("i am", "y\uf000ou are")
+        q = q.replace(" yours ", " mine ").replace(" mine ", " yo\uf000urs ").replace(" your ", " my ").replace(" my ", " yo\uf000ur ")
         q = replace_map(q, {
             "yourself": "myself",
-            "your ": "my ",
-            "yours ": "mine ",
             "are you": "am I",
             "you are": "I am",
             "you're": "i'm",

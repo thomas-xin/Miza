@@ -421,22 +421,27 @@ class Text2048(Command):
                     bot.data.users.add_gold(user, xp)
                     emb.description += await bot.as_rewards(f"+{int(xp)}")
                 emb.set_footer(text=f"Score: {fscore}")
-                # Clear reactions and announce game over message
-                return await Request(
-                    f"https://discord.com/api/v9/channels/{message.channel.id}/messages/{message.id}",
-                    data=json.dumps(dict(
-                        content="**```\n2048: GAME OVER```**",
-                        embed=emb.to_dict(),
-                        components=None,
-                    )),
-                    method="PATCH",
-                    headers={
-                        "Content-Type": "application/json",
-                        "Authorization": f"Bot {bot.token}",
-                    },
-                    bypass=False,
-                    aio=True,
-                )
+                # Clear buttons and announce game over message
+                try:
+                    sem = EDIT_SEM[message.channel.id]
+                except KeyError:
+                    sem = EDIT_SEM[message.channel.id] = Semaphore(5.1, 256, rate_limit=5)
+                async with sem:
+                    return await Request(
+                        f"https://discord.com/api/v9/channels/{message.channel.id}/messages/{message.id}",
+                        data=json.dumps(dict(
+                            content="**```\n2048: GAME OVER```**",
+                            embed=emb.to_dict(),
+                            components=None,
+                        )),
+                        method="PATCH",
+                        headers={
+                            "Content-Type": "application/json",
+                            "Authorization": f"Bot {bot.token}",
+                        },
+                        bypass=False,
+                        aio=True,
+                    )
         if data is not None:
             # Update message if gamestate has been changed
             if u_id == 0:
@@ -514,21 +519,26 @@ class Text2048(Command):
                     dis.add((2, -1))
             for x, y in dis:
                 buttons[y][x].disabled = True
-            return await Request(
-                f"https://discord.com/api/v9/channels/{message.channel.id}/messages/{message.id}",
-                data=json.dumps(dict(
-                    content=content,
-                    embed=emb.to_dict(),
-                    components=restructure_buttons(buttons),
-                )),
-                method="PATCH",
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bot {bot.token}",
-                },
-                bypass=False,
-                aio=True,
-            )
+            try:
+                sem = EDIT_SEM[message.channel.id]
+            except KeyError:
+                sem = EDIT_SEM[message.channel.id] = Semaphore(5.1, 256, rate_limit=5)
+            async with sem:
+                return await Request(
+                    f"https://discord.com/api/v9/channels/{message.channel.id}/messages/{message.id}",
+                    data=json.dumps(dict(
+                        content=content,
+                        embed=emb.to_dict(),
+                        components=restructure_buttons(buttons),
+                    )),
+                    method="PATCH",
+                    headers={
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bot {bot.token}",
+                    },
+                    bypass=False,
+                    aio=True,
+                )
         return await bot.ignore_interaction(message)
 
     async def __call__(self, bot, argv, args, user, flags, message, guild, **void):
@@ -818,6 +828,474 @@ class Barter(Command):
             thumbnail=thumbnail,
             reference=message,
         )
+
+
+class Uno(Command):
+    description = "Play a game of UNO with me, or with friends!"
+    rate_limit = 2
+
+    async def __call__(self, bot, message, user, flags, **void):
+        # players ~ hands ~ current-card
+        h = self.hand_repr([self.sort(shuffle(self.deck)[:7])])
+        content = f"```callback-fun-uno-[{user.id}]_{h}_[]_0_Z_0_0_-\nUNO game prepared:```"
+        c = await bot.get_colour(user)
+        embed = discord.Embed(colour=c)
+        embed.title = "Current players"
+        embed.description = "👑 " + user.mention
+        embed.set_footer(text="Click ✋ to join, ✅ to start!")
+        await send_with_react(
+            message.channel,
+            content,
+            embed=embed,
+            buttons=[[cdict(emoji="✋", style=1), cdict(emoji="✅", style=3)]],
+        )
+
+    deck = [c + "0" for c in "RYGB"] + ([f"{c}{i}" for c in "RYGB" for i in range(1, 10)] + [c + t for c in "RYGB" for t in "SRD"]) * 2 + ["WX", "WY"] * 4
+    symbols = {
+        "Y": " ",
+        "X": " ",
+        "S": "🚫",
+        "R": "🔄",
+        "D": "‼",
+    }
+    colours = dict((
+        ("R", "🟥"),
+        ("Y", "🟨"),
+        ("G", "🟩"),
+        ("B", "🟦"),
+        ("W", "🔳"),
+    ))
+
+    def uno_emoji(self, v):
+        if v.isnumeric():
+            return v + as_str(b"\xef\xb8\x8f\xe2\x83\xa3")
+        return self.symbols[v]
+
+    card_repr = lambda self, c: self.colours[c[0]] + self.uno_emoji(c[1:])
+    hand_repr = lambda self, hands: "x".join("".join(s) for s in hands)
+    played_repr = lambda self, played: "".join(played)
+
+    def sort(self, hand):
+        hand.sort(key=lambda c: (int(c[1]) if c[1].isnumeric() else 256 - ord(c[1])) * len(self.colours) + (list(self.colours).index(c[0]) if c[0] != "W" else 4096))
+        return hand
+
+    async def _callback_(self, message, reaction, user, vals, perm, **void):
+        if not reaction:
+            return
+        bot = self.bot
+        vals = vals.split("_")
+        players = literal_eval(vals[0])
+        hands = [list(itertools.chain(x + y for x, y in zip(s[::2], s[1::2]))) for s in vals[1].split("x")]
+        winners = literal_eval(vals[2])
+        turn = int(vals[3])
+        last = vals[4]
+        td = 1 if vals[5] == "0" else -1
+        draw = int(vals[6])
+        played = list(itertools.chain(x + y for x, y in zip(vals[7][::2], vals[7][1::2])))
+        r = as_str(reaction)
+        print(user, r, players, hands, winners, turn, last, td, draw, played)
+        if r == "✋":
+            if user.id not in players and last == "Z":
+                players.append(user.id)
+                hand = shuffle(self.deck)[-7:]
+                self.sort(hand)
+                hands.append(hand)
+
+                content = f"```callback-fun-uno-{players}_{self.hand_repr(hands)}_[]_0_Z_0_0_-\nUNO game prepared:```"
+                embed = message.embeds[0]
+                embed.description = "\n".join(("👑 ", "▪️ ")[bool(i)] + user_mention(u) for i, u in enumerate(players))
+                embed.set_footer(text="Click ✋ to join, ✅ to start!")
+                s = ""
+                for card in hand:
+                    s += await create_future(bot.data.emojis.emoji_as, card + ".png")
+                c = await bot.get_colour(user)
+                emb = discord.Embed(
+                    colour=c,
+                    description=f"Here is your deal hand. Please wait for {user_mention(players[0])} to begin the game!",
+                )
+
+                create_task(interaction_response(
+                    bot=bot,
+                    message=message,
+                    content=s,
+                    embed=emb,
+                ))
+                return await message.edit(content=content, embed=embed)
+            hand = hands[players.index(user.id)]
+            s = ""
+            for card in hand:
+                s += await create_future(bot.data.emojis.emoji_as, card + ".png")
+            c = await bot.get_colour(user)
+            if user.id == players[0]:
+                d = f"Begin the game with ✅ when all players are ready!"
+            else:
+                d = f"Please wait for {user_mention(players[0])} to begin the game!"
+            emb = discord.Embed(
+                colour=c,
+                title="⚠️ Error: Already playing. ⚠️",
+                description=d,
+            )
+            return await interaction_response(
+                bot=bot,
+                message=message,
+                content=s,
+                embed=emb,
+            )
+        if r == "✅":
+            if user.id == players[0] or not perm < 3:
+                try:
+                    hand = hands[players.index(user.id)]
+                except ValueError:
+                    players.append(user.id)
+                    hand = shuffle(self.deck)[-7:]
+                    self.sort(hand)
+                    hands.append(hand)
+                last = choice(self.deck)
+                turn = xrand(len(players))
+                if last[-1] == "D":
+                    for card in hands[turn]:
+                        if card[-1] == "D" or card == "WY":
+                            draw = 2
+                    if not draw:
+                        hands[turn].extend(self.deck[:2])
+                        self.sort(hands[turn])
+                        turn = (turn + 1) % len(players)
+                elif last[-1] == "R":
+                    td = -td
+                elif last == "WY":
+                    for card in hands[turn]:
+                        if card == "WY":
+                            draw = 4
+                    if not draw:
+                        hands[turn].extend(self.deck[:4])
+                        self.sort(hands[turn])
+                        turn = (turn + 1) % len(players)
+
+                content = f"```callback-fun-uno-{players}_{self.hand_repr(hands)}_[]_{turn}_{last}_{'-01'[td]}_{draw}_-\nUNO game in progress...```"
+                embed = message.embeds[0]
+                embed.description = "\n".join(("➡️ ", "▪️ ")[bool(i)] + user_mention(u) + f" `{len(hands[(i - turn) % len(players)])}`" for i, u in enumerate(players[turn:] + players[:turn]))
+                emoji = await create_future(bot.data.emojis.get, last + ".png")
+                embed.set_thumbnail(url=str(emoji.url))
+                embed.set_footer(text="Click 🔻 to play if it's your turn, ✖ to leave!")
+                s = ""
+                for card in hand:
+                    s += await create_future(bot.data.emojis.emoji_as, card + ".png")
+
+                create_task(interaction_response(
+                    bot=bot,
+                    message=message,
+                    content=s,
+                ))
+                try:
+                    sem = EDIT_SEM[message.channel.id]
+                except KeyError:
+                    sem = EDIT_SEM[message.channel.id] = Semaphore(5.1, 256, rate_limit=5)
+                async with sem:
+                    return await Request(
+                        f"https://discord.com/api/v9/channels/{message.channel.id}/messages/{message.id}",
+                        data=json.dumps(dict(
+                            content=content,
+                            embed=embed.to_dict(),
+                            components=restructure_buttons([[
+                                cdict(emoji="🔻", style=1),
+                                cdict(emoji="✖", style=4),
+                            ]]),
+                        )),
+                        method="PATCH",
+                        headers={
+                            "Content-Type": "application/json",
+                            "Authorization": f"Bot {bot.token}",
+                        },
+                        bypass=False,
+                        aio=True,
+                    )
+            s = ""
+            d = f"Please wait for {user_mention(players[0])} to begin the game!"
+            try:
+                hand = hands[players.index(user.id)]
+            except ValueError:
+                s = d
+                emb = None
+            else:
+                for card in hand:
+                    s += await create_future(bot.data.emojis.emoji_as, card + ".png")
+                c = await bot.get_colour(user)
+                emb = discord.Embed(
+                    colour=c,
+                    title="⚠️ Error: Insufficient privileges. ⚠️",
+                    description=d,
+                )
+            return await interaction_response(
+                bot=bot,
+                message=message,
+                content=s,
+                embed=emb,
+            )
+        if r == "🔻":
+            if user.id == players[turn]:
+                hand = hands[turn]
+                if last[0] == "W":
+                    playable = set(hand)
+                else:
+                    playable = set()
+                    s = ""
+                    for card in hand:
+                        s += await create_future(bot.data.emojis.emoji_as, card + ".png")
+                        if card == "WY":
+                            playable.add(card)
+                        elif draw:
+                            if last[-1] == card[-1] == "D":
+                                playable.add(card)
+                        elif card == "WX":
+                            playable.add(card)
+                        elif last[0] == card[0] or last[-1] == card[-1]:
+                            playable.add(card)
+                playable = list(playable)
+                self.sort(playable)
+                pickup = max(1, draw)
+                buttons = [cdict(emoji=bot.data.emojis.get(c + ".png"), custom_id=f"~{message.id}~{c}", style=3) for c in playable]
+                buttons.append(cdict(emoji="📤", name=f"Pickup {pickup}", custom_id=f"~{message.id}~@", style=4))
+
+                return await interaction_response(
+                    bot=bot,
+                    message=message,
+                    content=s,
+                    buttons=buttons,
+                )
+            hand = hands[players.index(user.id)]
+            s = ""
+            for card in hand:
+                s += await create_future(bot.data.emojis.emoji_as, card + ".png")
+            c = await bot.get_colour(user)
+            d = f"Please wait for {user_mention(players[turn])} to complete their turn!"
+            emb = discord.Embed(
+                colour=c,
+                title="⚠️ Error: Please wait your turn. ⚠️",
+                description=d,
+            )
+            return await interaction_response(
+                bot=bot,
+                message=message,
+                content=s,
+                embed=emb,
+            )
+        if r == "~!":
+            if not draw and not played:
+                draw = 1
+            if draw:
+                hands[turn].extend(self.deck[:draw])
+                self.sort(hands[turn])
+                draw = 0
+        if r == "~@":
+            if last[0] == "W":
+                playable = [c + last[-1] for c in "RYGB"]
+                buttons = [cdict(emoji=bot.data.emojis.get(c + ".png"), custom_id=f"~{message.id}~{c}", style=3) for c in playable]
+
+                content = f"```callback-fun-uno-{players}_{self.hand_repr(hands)}_[]_{turn}_{last}_{'-01'[td]}_{draw}_{self.played_repr(played)}-\nUNO game in progress...```"
+                embed = message.embeds[0]
+                embed.description = "\n".join(("➡️ ", "▪️ ")[bool(i)] + user_mention(u) + f" `{len(hands[(i - turn) % len(players)])}`" for i, u in enumerate(players[turn:] + players[:turn]))
+                emoji = await create_future(bot.data.emojis.get, last + ".png")
+                embed.set_thumbnail(url=str(emoji.url))
+                t = ""
+                for card in played:
+                    t += await create_future(bot.data.emojis.emoji_as, card + ".png")
+                embed.clear_fields()
+                embed.add_field(name="Previous turn", value=t)
+
+                create_task(message.edit(content=content, embed=embed))
+                return await interaction_patch(
+                    bot=bot,
+                    message=message,
+                    content=s,
+                    buttons=buttons,
+                )
+            turn = (turn + td) % len(players)
+            if last[-1] == "D":
+                newdraw = None
+                for card in hands[turn]:
+                    if card[-1] == "D" or card == "WY":
+                        newdraw = draw
+                if not newdraw:
+                    hands[turn].extend(self.deck[:draw])
+                    self.sort(hands[turn])
+                    turn = (turn + td) % len(players)
+                draw = newdraw
+            elif last[-1] == "S":
+                turn = (turn + td * draw) % len(players)
+                draw = 0
+            content = f"```callback-fun-uno-{players}_{self.hand_repr(hands)}_[]_{turn}_{last}_{'-01'[td]}_{draw}_-\nUNO game in progress...```"
+            embed = message.embeds[0]
+            embed.description = "\n".join(("➡️ ", "▪️ ")[bool(i)] + user_mention(u) + f" `{len(hands[(i - turn) % len(players)])}`" for i, u in enumerate(players[turn:] + players[:turn]))
+            emoji = await create_future(bot.data.emojis.get, last + ".png")
+            embed.set_thumbnail(url=str(emoji.url))
+            t = ""
+            for card in played:
+                t += await create_future(bot.data.emojis.emoji_as, card + ".png")
+            embed.clear_fields()
+            embed.add_field(name="Previous turn", value=t)
+            create_task(message.edit(content=content, embed=embed))
+            return await interaction_patch(
+                bot=bot,
+                message=message,
+                content=s,
+                buttons=buttons,
+            )
+        if r[0] == "~":
+            if user.id == players[turn]:
+                hand = hands[turn]
+                card = r[1:]
+                if last[0] == "W" and card[1] == last[1]:
+                    if card[0] != "W":
+                        last = card
+                        turn = (turn + td) % len(players)
+                        newdraw = None
+                        for card in hands[turn]:
+                            if card[-1] == "Y":
+                                newdraw = draw
+                        if not newdraw:
+                            hands[turn].extend(self.deck[:draw])
+                            self.sort(hands[turn])
+                            turn = (turn + td) % len(players)
+                        draw = newdraw
+                        content = f"```callback-fun-uno-{players}_{self.hand_repr(hands)}_[]_{turn}_{last}_{'-01'[td]}_{draw}_-\nUNO game in progress...```"
+                        embed = message.embeds[0]
+                        embed.description = "\n".join(("➡️ ", "▪️ ")[bool(i)] + user_mention(u) + f" `{len(hands[(i - turn) % len(players)])}`" for i, u in enumerate(players[turn:] + players[:turn]))
+                        emoji = await create_future(bot.data.emojis.get, last + ".png")
+                        embed.set_thumbnail(url=str(emoji.url))
+                        t = ""
+                        for card in played:
+                            t += await create_future(bot.data.emojis.emoji_as, card + ".png")
+                        embed.clear_fields()
+                        embed.add_field(name="Previous turn", value=t)
+                        create_task(message.edit(content=content, embed=embed))
+                        return await interaction_patch(
+                            bot=bot,
+                            message=message,
+                            content=s,
+                            buttons=(),
+                        )
+                if card[1] != "WY" and last[0] != "W":
+                    if draw:
+                        if card[1] not in "DY":
+                            raise TypeError(f"illegal play sequence ({last} => {card})")
+                    elif card != "WX":
+                        if card[0] != last[0] and card[1] != last[1]:
+                            raise TypeError(f"illegal play sequence ({last} => {card})")
+                hand.remove(card)
+                last = card
+                played.append(card)
+                if card[-1] == "D":
+                    draw += 2
+                elif card[-1] == "R":
+                    td = -td
+                elif card[-1] == "S":
+                    draw += 1
+                elif card[1] == "Y":
+                    draw += 4
+                s = ""
+                for card in hand:
+                    s += await create_future(bot.data.emojis.emoji_as, card + ".png")
+                if last[0] != "W":
+                    playable = [c for c in set(hand) if c[1] == last[1]]
+                    if playable:
+                        self.sort(playable)
+                        buttons = [cdict(emoji=bot.data.emojis.get(c + ".png"), custom_id=f"~{message.id}~{c}", style=3) for c in playable]
+                        buttons.append(cdict(emoji="⏭️", name=f"Pass", custom_id=f"~{message.id}~@", style=4))
+
+                        content = f"```callback-fun-uno-{players}_{self.hand_repr(hands)}_[]_{turn}_{last}_{'-01'[td]}_{draw}_{self.played_repr(played)}-\nUNO game in progress...```"
+                        embed = message.embeds[0]
+                        embed.description = "\n".join(("➡️ ", "▪️ ")[bool(i)] + user_mention(u) + f" `{len(hands[(i - turn) % len(players)])}`" for i, u in enumerate(players[turn:] + players[:turn]))
+                        emoji = await create_future(bot.data.emojis.get, last + ".png")
+                        embed.set_thumbnail(url=str(emoji.url))
+                        t = ""
+                        for card in played:
+                            t += await create_future(bot.data.emojis.emoji_as, card + ".png")
+                        embed.clear_fields()
+                        embed.add_field(name="Previous turn", value=t)
+
+                        create_task(message.edit(content=content, embed=embed))
+                        return await interaction_patch(
+                            bot=bot,
+                            message=message,
+                            content=s,
+                            buttons=buttons,
+                        )
+                    turn = (turn + td) % len(players)
+                    if last[-1] == "D":
+                        newdraw = None
+                        for card in hands[turn]:
+                            if card[-1] in "DY":
+                                newdraw = draw
+                        if not newdraw:
+                            hands[turn].extend(self.deck[:draw])
+                            self.sort(hands[turn])
+                            turn = (turn + td) % len(players)
+                        draw = newdraw
+                    elif last[-1] == "S":
+                        turn = (turn + td * draw) % len(players)
+                        draw = 0
+                    content = f"```callback-fun-uno-{players}_{self.hand_repr(hands)}_[]_{turn}_{last}_{'-01'[td]}_{draw}_-\nUNO game in progress...```"
+                    embed = message.embeds[0]
+                    embed.description = "\n".join(("➡️ ", "▪️ ")[bool(i)] + user_mention(u) + f" `{len(hands[(i - turn) % len(players)])}`" for i, u in enumerate(players[turn:] + players[:turn]))
+                    emoji = await create_future(bot.data.emojis.get, last + ".png")
+                    embed.set_thumbnail(url=str(emoji.url))
+                    t = ""
+                    for card in played:
+                        t += await create_future(bot.data.emojis.emoji_as, card + ".png")
+                    embed.clear_fields()
+                    embed.add_field(name="Previous turn", value=t)
+                    create_task(message.edit(content=content, embed=embed))
+                    return await interaction_patch(
+                        bot=bot,
+                        message=message,
+                        content=s,
+                        buttons=(),
+                    )
+                playable = [c for c in set(hand) if c == last or last[1] == "X" and c[1] == "Y"]
+                if playable:
+                    self.sort(playable)
+                    buttons = [cdict(emoji=bot.data.emojis.get(c + ".png"), custom_id=f"~{message.id}~{c}", style=3) for c in playable]
+                    buttons.append(cdict(emoji="⏭️", name=f"Pass", custom_id=f"~{message.id}~@", style=4))
+
+                    content = f"```callback-fun-uno-{players}_{self.hand_repr(hands)}_[]_{turn}_{last}_{'-01'[td]}_{draw}_{self.played_repr(played)}-\nUNO game in progress...```"
+                    embed = message.embeds[0]
+                    embed.description = "\n".join(("➡️ ", "▪️ ")[bool(i)] + user_mention(u) + f" `{len(hands[(i - turn) % len(players)])}`" for i, u in enumerate(players[turn:] + players[:turn]))
+                    emoji = await create_future(bot.data.emojis.get, last + ".png")
+                    embed.set_thumbnail(url=str(emoji.url))
+                    t = ""
+                    for card in played:
+                        t += await create_future(bot.data.emojis.emoji_as, card + ".png")
+                    embed.clear_fields()
+                    embed.add_field(name="Previous turn", value=t)
+
+                    create_task(message.edit(content=content, embed=embed))
+                    return await interaction_patch(
+                        bot=bot,
+                        message=message,
+                        content=s,
+                        buttons=buttons,
+                    )
+                playable = [c + last[-1] for c in "RYGB"]
+                buttons = [cdict(emoji=bot.data.emojis.get(c + ".png"), custom_id=f"~{message.id}~{c}", style=3) for c in playable]
+
+                content = f"```callback-fun-uno-{players}_{self.hand_repr(hands)}_[]_{turn}_{last}_{'-01'[td]}_{draw}_{self.played_repr(played)}-\nUNO game in progress...```"
+                embed = message.embeds[0]
+                embed.description = "\n".join(("➡️ ", "▪️ ")[bool(i)] + user_mention(u) + f" `{len(hands[(i - turn) % len(players)])}`" for i, u in enumerate(players[turn:] + players[:turn]))
+                emoji = await create_future(bot.data.emojis.get, last + ".png")
+                embed.set_thumbnail(url=str(emoji.url))
+                t = ""
+                for card in played:
+                    t += await create_future(bot.data.emojis.emoji_as, card + ".png")
+                embed.clear_fields()
+                embed.add_field(name="Previous turn", value=t)
+
+                create_task(message.edit(content=content, embed=embed))
+                return await interaction_patch(
+                    bot=bot,
+                    message=message,
+                    content=s,
+                    buttons=buttons,
+                )
 
 
 class Pay(Command):
@@ -1153,6 +1631,8 @@ class UpdateDogpiles(Database):
                         number = None
                 else:
                     numbers = deque((number,))
+                curr = content
+                fix = None
                 mcount = 0
                 count = 0
                 last_author_id = u_id
@@ -1179,8 +1659,15 @@ class UpdateDogpiles(Database):
                             except:
                                 break
                             numbers.appendleft(n)
-                    elif c != content:
+                    elif c not in curr:
                         break
+                    else:
+                        spl = curr.split(c)
+                        if not fix:
+                            fix = spl
+                        elif fix != spl:
+                            break
+                        curr = c
                     if m.author.id == last_author_id:
                         break
                     if m.author.id == self.bot.id:
@@ -1208,6 +1695,8 @@ class UpdateDogpiles(Database):
                         content = content.strip()
                         if not content:
                             return
+                    elif fix:
+                        content = content.join(fix)
                     print(message.channel, content, mcount)
                     if content[0].isascii() and content[:2] != "<:" and not is_url(content):
                         content = lim_str("\u200b" + content, 2000)
@@ -1921,7 +2410,7 @@ class MimicSend(Command):
                 except (EOFError, discord.NotFound):
                     bot.data.logM.pop(guild.id)
                     return
-                emb = bot.as_embed(message, link=True)
+                emb = await bot.as_embed(message, link=True)
                 emb.colour = discord.Colour(0x00FF00)
                 action = f"**Mimic invoked in** {channel_mention(channel.id)}:\n"
                 emb.description = lim_str(action + emb.description, 2048)
@@ -2124,7 +2613,7 @@ class Cat(ImagePool, Command):
 class Dog(ImagePool, Command):
     description = "Pulls a random image from images.dog.ceo, api.alexflipnote.dev/dogs, or cdn.nekos.life/woof, and embeds it. Be sure to check out ⟨WEBSERVER⟩/dogs!"
     database = "dogs"
-    name = ["🐶", "Woof", "Doggy", "Doggo"]
+    name = ["🐶", "Woof", "Doggy", "Doggo", "Puppy", "Puppo"]
     slash = True
 
     async def fetch_one(self):
