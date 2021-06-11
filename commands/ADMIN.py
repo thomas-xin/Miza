@@ -2306,7 +2306,7 @@ class UpdateFileLogs(Database):
                 else:
                     msg = "\n".join(msg)
                 if len(fils) == 1:
-                    return await self.bot.send_as_file(channel, msg, embed=emb, file=fils[0])
+                    return await self.bot.send_with_file(channel, msg, embed=emb, file=fils[0])
                 await channel.send(msg, embed=emb, files=fils)
 
 

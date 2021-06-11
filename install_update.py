@@ -19,6 +19,7 @@ except:
     print_exc()
     subprocess.run(["pip", "install", "setuptools", "--upgrade", "--user"])
     import pkg_resources
+x = sys.version_info[1]
 
 installing = []
 install = lambda m: installing.append(subprocess.Popen([python, "-m", "pip", "install", m, "--upgrade", "--user"]))
@@ -51,4 +52,8 @@ if installing:
     subprocess.run([python, "-m", "pip", "install", "pip", "--upgrade", "--user"])
     for i in installing:
         i.wait()
-    print("Installer terminated.")
+try:
+    pkg_resources.get_distribution("colorspace")
+except pkg_resources.DistributionNotFound:
+    subprocess.run(["py", f"-3.{x}", "-m", "pip", "install", "git+https://github.com/retostauffer/python-colorspace", "--user"])
+print("Installer terminated.")

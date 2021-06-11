@@ -51,6 +51,7 @@ cp = cherrypy
 class EndpointRedirects(Dispatcher):
 
     def __call__(self, path):
+        send("@@@", escape=False)
         if path == "/favicon.ico":
             path = "/favicon"
         elif path[1:] == AUTH.get("discord_token"):
@@ -130,7 +131,9 @@ def estimate_life():
         hosted = sorted(int(f[1:].split("~", 1)[0]) / 1e6 for f in os.listdir("cache") if f.startswith(IND))
         if not hosted:
             est_last = -inf
-        ts = hosted[0]
+            ts = 0
+        else:
+            ts = hosted[0]
         t = ts_us()
         while t in RESPONSES:
             t += 1
@@ -165,6 +168,7 @@ def get_geo(ip):
         geo_count += 1
         with geo_sem:
             resp = requests.get(url, headers={"DNT": "1", "User-Agent": f"Mozilla/5.{ip[-1]}", "Origin": "https://members.ip-api.com"})
+        send("@@@", escape=False)
         resp.raise_for_status()
         TZCACHE[ip] = resp = resp.json()
         send(ip + "\t" + "\t".join(resp.values()))
@@ -175,7 +179,7 @@ last_image = [None] * 2
 
 class Server:
 
-    @cp.expose(("preview", "p", "images", "image", "i", "view", "v", "file", "f", "download", "d"))
+    @cp.expose(("preview", "p", "animate", "animation", "a", "images", "image", "i", "view", "v", "file", "f", "download", "d"))
     def files(self, path, filename=None, download=None, **void):
         if path in ("hacks", "mods", "files", "download", "static"):
             send(cp.request.remote.ip + " was rickrolled 🙃")
@@ -287,7 +291,7 @@ class Server:
                 elif mime.startswith("audio/"):
                     preview.append(f'<div align="center"><audio controls><source src="{s_url}" type="{mime}"></audio></div>')
                 elif mime.startswith("video/"):
-                    preview.append(f'<div align="center"><video width="480" controls><source src="{s_url}" type="{mime}"></video></div>')
+                    preview.append(f'<div align="center"><video width="480" playsinline controls><source src="{s_url}" type="{mime}"></video></div>')
                 elif mime.startswith("text/"):
                     preview.append(f'<a href="{url}">{url}</a>')
                 preview.append(f'<a style="color:#0000ff;" href="{s_url.replace("/f/", "/d/")}">Download</a>')
@@ -317,6 +321,36 @@ class Server:
                 else:
                     b = last_image[-1]
                 cp.response.headers["Content-Type"] = "image/png"
+                cp.response.headers["Content-Length"] = len(b)
+                cp.response.headers["ETag"] = create_etag(b)
+                return b
+            elif endpoint.startswith("a") and mime.split("/", 1)[0] in "video":
+                f_url = cp.url(qs=cp.request.query_string).replace(f"/{endpoint}/", "/f/")
+                i_url = f_url.replace("/f/", "/i/")
+                b = ("""<!DOCTYPE html>
+<html>
+<style>
+.center {
+  margin: 0;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  -ms-transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%);
+}
+</style>""" + f"""
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="twitter:image:src" content="{i_url}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{attachment}">
+<meta property="og:image" content="{i_url}">
+<body style="background-color:black;">
+<video class="center" playsinline autoplay muted loop>
+  <source src="{f_url}">
+</video>
+</body>
+</html>""").encode("utf-8")
+                cp.response.headers["Content-Type"] = "text/html"
                 cp.response.headers["Content-Length"] = len(b)
                 cp.response.headers["ETag"] = create_etag(b)
                 return b

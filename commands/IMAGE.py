@@ -257,7 +257,8 @@ class CreateEmoji(Command):
                     os.remove(path)
             emoji = await guild.create_custom_emoji(image=image, name=name, reason="CreateEmoji command")
             # This reaction indicates the emoji was created successfully
-            await message.add_reaction(emoji)
+            with suppress(discord.Forbidden):
+                await message.add_reaction(emoji)
         return css_md(f"Successfully created emoji {sqr_md(emoji)} for {sqr_md(guild)}.")
 
 

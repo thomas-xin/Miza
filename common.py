@@ -977,7 +977,7 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
     for i in range(xrand(12, 17)):
         try:
             async with sem:
-                resp = await Request.aio_call(
+                resp = await Request(
                     url,
                     method="post",
                     data=body,
@@ -985,8 +985,8 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
                         "Content-Type": "application/json",
                         "Authorization": f"Bot {channel._state.http.token}",
                     },
-                    decode=False,
-                    files=None,
+                    bypass=False,
+                    aio=True,
                 )
         except Exception as ex:
             exc = ex
@@ -1024,7 +1024,7 @@ async def send_with_react(channel, *args, reacts=None, reference=None, mention=F
         if reacts:
             for react in reacts:
                 await sent.add_reaction(react)
-    return sent
+        return sent
 
 
 # Creates and starts a coroutine for typing in a channel.
@@ -1154,6 +1154,8 @@ def as_embed(message, link=False):
             with tracebacksuppressor:
                 url = urls[0]
                 resp = requests.get(url, headers=Request.header(), timeout=8)
+                if BOT[0]:
+                    BOT[0].activity += 1
                 headers = fcdict(resp.headers)
                 if headers.get("Content-Type").split("/", 1)[0] == "image":
                     emb.url = url
@@ -1662,20 +1664,22 @@ class Pillow_SIMD:
     __bool__ = lambda self: bool(self.args)
     get = lambda self: self.args or [python]
 
-    def check(self):
-        for v in range(8, 4, -1):
-            print(f"Attempting to find/install pillow-simd for Python 3.{v}...")
-            args = ["py", f"-3.{v}", "misc/install_pillow_simd.py"]
-            print(args)
-            resp = subprocess.run(args, stdout=subprocess.PIPE)
-            out = as_str(resp.stdout).strip()
-            if not out.startswith(f"Python 3.{v} not found!"):
-                if out:
-                    print(out)
-                print(f"pillow-simd versioning successful for Python 3.{v}")
-                self.args = ["py", f"-3.{v}"]
-                return self.args
-        return [python]
+    # def check(self):
+    #     for v in range(8, 4, -1):
+    #         print(f"Attempting to find/install pillow-simd for Python 3.{v}...")
+    #         args = ["py", f"-3.{v}", "misc/install_pillow_simd.py"]
+    #         print(args)
+    #         resp = subprocess.run(args, stdout=subprocess.PIPE)
+    #         out = as_str(resp.stdout).strip()
+    #         if not out.startswith(f"Python 3.{v} not found!"):
+    #             if out:
+    #                 print(out)
+    #             print(f"pillow-simd versioning successful for Python 3.{v}")
+    #             self.args = ["py", f"-3.{v}"]
+    #             return self.args
+    #     return [python]
+
+    check = lambda self: ["py"]
 
 pillow_simd = Pillow_SIMD()
 
@@ -1705,12 +1709,15 @@ def get_idle_proc(ptype):
     return proc
 
 def sub_submit(ptype, command, _timeout=12):
+    if BOT[0]:
+        BOT[0].activity += 1
     ts = ts_us()
     proc = get_idle_proc(ptype)
     while ts in PROC_RESP:
         ts += 1
     PROC_RESP[ts] = concurrent.futures.Future()
-    s = f"~{ts}~{repr(as_str(command).encode('utf-8'))}\n".encode("utf-8")
+    command = "[" + ",".join(map(repr, command)) + "]"
+    s = f"~{ts}~{repr(command.encode('utf-8'))}\n".encode("utf-8")
     # print(ts, proc, s)
     with proc.sem:
         if not proc.is_running():
@@ -1750,12 +1757,10 @@ def process_math(expr, prec=64, rat=False, timeout=12, variables=None):
 
 # Sends an operation to the image subprocess pool.
 def process_image(image, operation, args, timeout=24):
-    if type(args) is not list:
-        args = list(args)
     for i, a in enumerate(args):
         if type(a) is mpf:
             args[i] = float(a)
-    return create_future(sub_submit, "image", (image, operation, args), _timeout=timeout)
+    return create_future(sub_submit, "image", (image, operation, list(args)), _timeout=timeout)
 
 
 def evalex(exc):
@@ -2244,6 +2249,8 @@ class Stream(io.IOBase):
             with suppress():
                 self.resp.close()
         self.resp = requests.get(url, stream=True)
+        if BOT[0]:
+            BOT[0].activity += 1
         self.iter = self.resp.iter_content(self.BUF)
 
     def refill(self):
@@ -2286,6 +2293,8 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
             raise NotImplementedError("Unable to send multipart files asynchronously.")
         async with self.semaphore:
             async with getattr(self.session, method)(url, headers=headers, data=data) as resp:
+                if BOT[0]:
+                    BOT[0].activity += 1
                 if resp.status >= 400:
                     data = await resp.read()
                     raise ConnectionError(resp.status, url, as_str(data))
@@ -2306,6 +2315,8 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
             return create_task(asyncio.wait_for(self.aio_call(url, headers, files, data, method, decode, json), timeout=timeout))
         with self.semaphore:
             with getattr(requests, method)(url, headers=headers, files=files, data=data, stream=True, timeout=timeout) as resp:
+                if BOT[0]:
+                    BOT[0].activity += 1
                 if resp.status_code >= 400:
                     raise ConnectionError(resp.status_code, url, resp.text)
                 if json:
