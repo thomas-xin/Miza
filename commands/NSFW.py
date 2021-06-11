@@ -406,4 +406,4 @@ class Lewd(Command):
                 + "__**"
             )
             return escape_roles(text)
-        self.bot.send_as_embeds(channel, image=url, reference=message)
+        self.bot.send_as_embeds(channel, image=url)

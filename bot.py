@@ -30,6 +30,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     heartbeat_ack = "heartbeat_ack.tmp"
     restart = "restart.tmp"
     shutdown = "shutdown.tmp"
+    activity = 0
     caches = ("guilds", "channels", "users", "roles", "emojis", "messages", "members", "attachments", "deleted", "banned", "colours")
     statuses = (discord.Status.online, discord.Status.idle, discord.Status.dnd, discord.Streaming, discord.Status.invisible)
     # Default command prefix
@@ -223,6 +224,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     headers={"Content-Type": "application/json", "Authorization": "Bot " + self.token},
                     data=json.dumps(data),
                 )
+                self.activity += 1
                 if resp.status_code == 429:
                     time.sleep(2)
                     continue
@@ -237,6 +239,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         print("Updating global slash commands...")
         with tracebacksuppressor:
             resp = requests.get(f"https://discord.com/api/v9/applications/{self.id}/commands", headers=dict(Authorization="Bot " + self.token))
+            self.activity += 1
             if resp.status_code not in range(200, 400):
                 raise ConnectionError(f"Error {resp.status_code}", resp.text)
             commands = alist(c for c in resp.json() if str(c.get("application_id")) == str(self.id))
@@ -263,6 +266,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                             print(f"{curr['name']}'s slash command does not match, removing...")
                                             for i in range(16):
                                                 resp = requests.delete(f"https://discord.com/api/v9/applications/{self.id}/commands/{curr['id']}", headers=dict(Authorization="Bot " + self.token))
+                                                self.activity += 1
                                                 if resp.status_code == 429:
                                                     time.sleep(1)
                                                     continue
@@ -284,6 +288,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 print(curr)
                 print(f"{curr['name']}'s slash command does not exist, removing...")
                 resp = requests.delete(f"https://discord.com/api/v9/applications/{self.id}/commands/{curr['id']}", headers=dict(Authorization="Bot " + self.token))
+                self.activity += 1
                 if resp.status_code not in range(200, 400):
                     raise ConnectionError(f"Error {resp.status_code}", resp.text)
 
@@ -1180,6 +1185,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         skip = "text/html" not in self.mimes[url]
                     if not skip:
                         resp = await create_future(requests.get, url, headers=Request.header(), stream=True)
+                        self.activity += 1
                         with resp:
                             url = resp.url
                             head = fcdict(resp.headers)
@@ -1229,6 +1235,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         except KeyError:
             pass
         with requests.get(url, stream=True) as resp:
+            self.activity += 1
             head = fcdict(resp.headers)
             try:
                 mime = [t.strip() for t in head.get("Content-Type", "").split(";")]
@@ -1257,6 +1264,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     fut = create_future_ex(Request, base + "png")
                 url = base + "gif"
                 with requests.head(url, stream=True) as resp:
+                    self.activity += 1
                     if resp.status_code in range(400, 500):
                         if not verify:
                             return False
@@ -1277,6 +1285,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         if type(e) in (int, str):
             url = f"https://cdn.discordapp.com/emojis/{e}.png"
             with requests.head(url, stream=True) as resp:
+                self.activity += 1
                 if resp.status_code in range(400, 500):
                     self.emoji_stuff.pop(int(e), None)
                     return
@@ -1326,7 +1335,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         return out
 
         # Sends a message to a channel, then edits to add links to all attached files.
-    async def send_with_file(self, channel, msg=None, embed=None, file=None, filename=None, best=False, rename=True, reference=None):
+    async def send_with_file(self, channel, msg=None, file=None, filename=None, embed=None, best=False, rename=True, reference=None):
         f = None
         fsize = 0
         size = 8388608
@@ -1533,6 +1542,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 with tracebacksuppressor:
                     url = urls[0]
                     resp = requests.get(url, headers=Request.header(), timeout=8)
+                    self.activity += 1
                     headers = fcdict(resp.headers)
                     if headers.get("Content-Type", "").split("/", 1)[0] == "image":
                         if float(headers.get("Content-Length", inf)) < 8388608:
@@ -2797,6 +2807,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                                             args.pop(0)
                                             argv = argv.split(None, 1)[-1]
                                             inc_dict(flags, d=1)
+                            args = list(args)
                         # Assign "guild" as an object that mimics the discord.py guild if there is none
                         if guild is None:
                             guild = self.UserGuild(
@@ -3053,11 +3064,11 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             kwargs.pop("wait", None)
             reacts = kwargs.pop("reacts", None)
             try:
-                async with w.semaphore:
+                async with getattr(w, "semaphore", emptyctx):
                     message = await w.send(*args, wait=True, **kwargs)
             except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
                 w = await self.ensure_webhook(channel, force=True)
-                async with w.semaphore:
+                async with getattr(w, "semaphore", emptyctx):
                     message = await w.send(*args, wait=True, **kwargs)
             except discord.HTTPException as ex:
                 if "400 Bad Request" in repr(ex):
@@ -3379,6 +3390,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         self.total_bytes = self.net_bytes[-1] + self.start_bytes
                     try:
                         resp = await create_future(requests.head, "https://discord.com/api/v9", priority=True)
+                        self.activity += 1
                         self.api_latency = resp.elapsed.total_seconds()
                     except:
                         self.api_latency = inf
@@ -3940,6 +3952,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
                         try:
                             async with self.__dict__["_HTTPClient__session"].request(method, url, **kwargs) as r:
+                                bot.activity += 1
                                 # log.debug('%s %s with %s has returned %s', method, url, kwargs.get('data'), r.status)
 
                                 # even errors have text involved in them so this is safe to call
@@ -4026,6 +4039,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
                         try:
                             async with self.__dict__["_HTTPClient__session"].request(method, url, **kwargs) as r:
+                                bot.activity += 1
                                 # log.debug('%s %s with %s has returned %s', method, url, kwargs.get('data'), r.status)
 
                                 # even errors have text involved in them so this is safe to call
@@ -4153,7 +4167,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     async def init_ready(self, futs):
         with tracebacksuppressor:
             self.started = True
-            attachments = (file.name for file in sorted(set(file for file in os.scandir("cache") if file.name.startswith("attachment_")), key=lambda file: file.stat().st_mtime))
+            attachments = (file for file in sorted(set(file for file in os.listdir("cache") if file.startswith("attachment_"))))
             for file in attachments:
                 with tracebacksuppressor:
                     self.attachment_from_file(file)
@@ -4374,6 +4388,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         # Socket response event: if the event was an interaction, create a virtual message with the arguments as the content, then process as if it were a regular command.
         @self.event
         async def on_socket_response(data):
+            self.activity += 1
             if data.get("t") == "INTERACTION_CREATE" and "d" in data:
                 try:
                     dt = utc_dt()
@@ -4681,6 +4696,7 @@ class AudioClientInterface:
         return bot.data.audio.players
 
     def submit(self, s, aio=False, ignore=False):
+        bot.activity += 1
         key = ts_us()
         while key in self.returns:
             key += 1
@@ -4712,6 +4728,7 @@ class AudioClientInterface:
                 s = as_str(proc.stdout.readline()).rstrip()
                 if s:
                     if s[0] == "~":
+                        bot.activity += 1
                         c = as_str(literal_eval(s[1:]))
                         if c.startswith("bot.audio.returns["):
                             out = Dummy
@@ -4797,22 +4814,23 @@ IND = "\x7f"
 
 def update_file_cache(files=None, recursive=True):
     if files is None:
-        files = sorted(file[len(IND):] for file in os.listdir("cache") if file.startswith(IND))
+        files = deque(sorted(file[len(IND):] for file in os.listdir("cache") if file.startswith(IND)))
     bot.file_count = len(files)
-    bot.storage_ratio = min(1, max(bot.file_count / 65536, bot.disk / (1 << 37)))
+    bot.storage_ratio = min(1, max(bot.file_count / 65536, bot.disk / (1 << 34)))
     for t in os.walk("saves"):
         bot.file_count += len(t[-1])
     if bot.storage_ratio >= 1:
         curr = files.popleft()
         ct = int(curr.rsplit(".", 1)[0].split("~", 1)[0])
-        if ts_us() - ct > 86400:
+        fn = "cache/" + IND + curr
+        if ts_us() - ct > 86400 * 60 and ts_us() - os.path.getatime(fn) > 86400 * 30:
             with tracebacksuppressor:
-                os.remove("cache/" + IND + curr)
+                os.remove(fn)
                 print(curr, "deleted.")
                 update_file_cache(files, recursive=False)
     if not recursive:
         return
-    attachments = (file.name for file in sorted(set(file for file in os.scandir("cache") if file.name.startswith("attachment_")), key=lambda file: file.stat().st_mtime))
+    attachments = (file for file in sorted(set(file for file in os.listdir("cache") if file.startswith("attachment_"))))
     attachments = deque(attachments)
     while len(attachments) > 8192:
         with tracebacksuppressor:
@@ -4891,11 +4909,18 @@ def webserver_communicate(bot):
                 b = bot.server.stderr.readline().lstrip(b"\x00").rstrip()
                 if b:
                     s = as_str(b)
-                    print(s)
                     if s[0] == "~":
+                        print(s)
                         create_task(bot.process_http_command(*s[1:].split("\x7f", 3)))
+                        bot.activity += 1
                     elif s[0] == "!":
+                        print(s)
                         create_task(bot.process_http_eval(*s[1:].split("\x7f", 1)))
+                        bot.activity += 1
+                    elif s == "@@@":
+                        bot.activity += 2
+                    else:
+                        print(s)
             time.sleep(1)
         time.sleep(0.1)
 

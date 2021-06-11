@@ -1,0 +1,119 @@
+23 21	sh	text/sh
+53 51 4C 69 74 65 20 66 6F 72 6D 61 74 20 33 00	db	application/sql
+53 50 30 31	bin	application/octet-stream
+00	bin	application/octet-stream
+00 00 01 00	ico	image/x-icon
+47 49 46 38 37 61	gif	image/gif
+47 49 46 38 39 61	gif	image/gif
+49 49 2A 00	tiff	image/tiff
+4D 4D 00 2A	tiff	image/tiff
+49 49 2A 00 10 00 00 00 43 52	cr2	image/cr2
+80 2A 5F D7	cin	image/x-cin
+53 44 50 58	dpx	image/x-dpx
+58 50 44 53	dpx	image/x-dpx
+76 2F 31 01	exr	image/x-exr
+42 50 47 FB	bpg	image/x-bpg
+FF D8 FF DB	jpg	image/jpg
+FF D8 FF E0 00 10 4A 46 49 46 00 01	jpg	image/jpg
+FF D8 FF EE	jpg	image/jpg
+46 4F 52 4D	iff	image/x-iff
+49 4E 44 58	idx	application/x-idx
+4C 5A 49 50	lz	application/x-lz
+4D 5A	exe	application/x-executable
+50 4B 03 04	zip	application/zip
+50 4B 05 06	zip	application/zip
+50 4B 07 08	zip	application/zip
+52 61 72 21 1A 07 00	rar	application/x-rar
+52 61 72 21 1A 07 01 00	rar	application/x-rar
+5A 4D	exe	application/x-executable
+7F 45 4C 46	elf	application/x-elf
+89 50 4E 47 0D 0A 1A 0A	png	image/png
+CA FE BA BE	class	application/x-java
+EF BB BF	txt	text/plain
+FF FE	txt	text/plain
+FE FF	txt	text/plain
+FF FE 00 00	txt	text/plain
+00 00 FE FF	txt	text/plain
+2B 2F 76 38	txt	text/plain
+2B 2F 76 39	txt	text/plain
+2B 2F 76 2B	txt	text/plain
+2B 2F 76 2F	txt	text/plain
+0E FE FF	txt	text/plain
+DD 73 66 73	txt	text/plain
+25 21 50 53	ps	application/x-ps
+49 54 53 46 03 00 00 00 60 00 00 00	chm	application/x-chm
+25 50 44 46 2D	pdf	application/pdf
+30 26 B2 75 8E 66 CF 11 A6 D9 00 AA 00 62 CE 6C	wmv	video/wmv
+24 53 44 49 30 30 30 31	sdi	application/x-sdi
+4F 67 67 53	ogg	audio/ogg
+38 42 50 53	psd	application/x-psd
+52 49 46 46	avi	video/avi
+FF FB	mp3	audio/mp3
+FF F3	mp3	audio/mp3
+FF F2	mp3	audio/mp3
+49 44 33	mp3	audio/mp3
+42 4D	bmp	image/bmp
+43 44 30 30 31	iso	application/iso
+66 4C 61 43	flac	audio/flac
+4D 54 68 64	mid	audio/midi
+D0 CF 11 E0 A1 B1 1A E1	doc	application/x-doc
+64 65 78 0A 30 33 35 00	dex	application/x-dex
+4B 44 4D	vmdk	application/x-vmdk
+43 72 32 34	crx	application/x-crx
+41 47 44 33	fh8	application/x-fh8
+6B 6F 6C 79	dmg	application/x-dmg
+50 4D 4F 43 43 4D 4F 43	dat	application/x-data
+4E 45 53 1A	nes	application/x-nes
+75 73 74 61 72 00 30 30	atar	application/x-tar
+75 73 74 61 72 20 20 00	atar	application/x-tar
+4D 4C 56 49	mlv	video/x-mlv
+37 7A BC AF 27 1C	7z	application/7z
+1F 8B	gz	application/gz
+FD 37 7A 58 5A 00	xz	application/xz
+04 22 4D 18	lz4	application/x-lz4
+4D 53 43 46	cab	application/x-cab
+46 4C 49 46	flif	image/x-flif
+1A 45 DF A3	webm	video/webm
+77 4F 46 46	woff	font/woff
+77 4F 46 32	woff2	font/woff2
+3C 3F 78 6D 6C 20	xml	text/xml
+3C 00 3F 00 78 00 6D 00 6C 00 20	xml	text/xml
+00 3C 00 3F 00 78 00 6D 00 6C 00 20	xml	text/xml
+3C 00 00 00 3F 00 00 00 78 00 00 00 6D 00 00 00 6C 00 00 00 20 00 00 00	xml	text/xml
+00 00 00 3C 00 00 00 3F 00 00 00 78 00 00 00 6D 00 00 00 6C 00 00 00 20	xml	text/xml
+4C 6F A7 94 93 40	xml	text/xml
+3C 21 44 4F 43 54 59 50 45 20 68 74 6D 6C	html	text/html
+3C 21 64 6F 63 74 79 70 65 20 68 74 6D 6C	html	text/html
+3C 21 44 4F 43 54 59 50 45 20 48 54 4D 4C	html	text/html
+00 61 73 6D	wasm	application/x-wasm
+CF 84 01	lep	image/x-lep
+43 57 53	swf	application/swf
+46 57 53	swf	application/swf
+21 3C 61 72 63 68 3E 0A	deb	application/x-deb
+7B 5C 72 74 66 31	rtf	text/rtf
+00 00 01 BA	mpeg	audio/mpeg
+00 00 01 B3	mpeg	audio/mpeg
+66 74 79 70 69 73 6F 6D	mp4	video/mp4
+78 01	zlib	application/zlib
+78 5E	zlib	application/zlib
+78 9C	zlib	application/zlib
+78 DA	zlib	application/zlib
+78 20	zlib	application/zlib
+78 7D	zlib	application/zlib
+78 BB	zlib	application/zlib
+78 F9	zlib	application/zlib
+1B 4C 75 61	luac	application/x-luac
+62 6F 6F 6B 00 00 00 00 6D 61 72 6B 00 00 00 00	alias	application/x-alias
+52 53 56 4B 44 41 54 41	rs	application/x-rs
+3A 29 0A	sml	text/x-sml
+49 53 63 28	cab	application/x-cab
+50 31 0A	pbm	image/pbm
+50 32 0A	pgm	image/pgm
+50 33 0A	ppm	image/ppm
+D7 CD C6 9A	wmf	application/x-wmf
+67 69 6D 70 20 78 63 66	xcf	application/x-xcf
+2F 2A 20 58 50 4D 20 2A 2F	xpm	application/x-xcf
+41 46 46	aff	application/x-aff
+41 43 4F 4E	ani	image/x-ani
+46 4C 56	flv	video/flv
+42 4C 45 4E 44 45 52	blend	application/x-blend
