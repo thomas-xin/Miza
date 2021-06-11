@@ -2145,8 +2145,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
     # Gets the external IP address from api.ipify.org
     async def get_ip(self):
-        resp = await Request("https://api.ipify.org", decode=True, aio=True)
-        self.update_ip(resp)
+    resp = await Request("https://api.ipify.org", decode=True, aio=True)
+    self.update_ip(resp)
 
     # Gets the amount of active processes, threads, coroutines.
     def get_active(self):
