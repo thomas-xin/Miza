@@ -12,13 +12,12 @@ with MultiThreadedImporter(globals()) as importer:
         "discord",
         "json",
         "aiohttp",
-        "psutil",
         "threading",
         "urllib",
         "zipfile",
         "nacl",
         "shutil",
-        "magic",
+        "filetype",
     )
 
 PROC = psutil.Process()
@@ -1575,9 +1574,56 @@ MIMES = cdict(
     mp4="video/mp4",
 )
 
+with open("misc/mimes.txt") as f:
+    mimedata = f.read().splitlines()
+    mimesplitter = {}
+    for line in mimedata:
+        dat, ext, mime = line.split("\t")
+        data = hex2bytes(dat)
+        try:
+            mimesplitter[len(data)][data] = (ext, mime)
+        except KeyError:
+            mimesplitter[len(data)] = {}
+            mimesplitter[len(data)][data] = (ext, mime)
+
+def simple_mimes(b, mime=True):
+    for k, v in reversed(mimesplitter.items()):
+        out = v.get(b[:k])
+        if out:
+            return out[mime]
+    try:
+        s = b.decode("utf-8")
+    except UnicodeDecodeError:
+        return "application/octet-stream" if mime else "bin"
+    return "text/plain" if mime else "txt"
+
+
+def from_file(path, mime=True):
+    path = filetype.get_bytes(path)
+    if mime:
+        out = filetype.guess_mime(path)
+    else:
+        out = filetype.guess_extension(path)
+    if not out:
+        out = simple_mimes(path, mime)
+    return out
+
+magic = cdict(
+    from_file=from_file,
+    from_buffer=from_file,
+    Magic=lambda mime, *args, **kwargs: cdict(
+        from_file=lambda b: from_file(b, mime),
+        from_buffer=lambda b: from_buffer(b, mime),
+    ),
+)
+
 def get_mime(path):
     if os.path.getsize(path) < 1048576:
-        mime = magic.from_file(path, mime=True)
+        try:
+            mime = magic.from_file(path, mime=True)
+        except:
+            print_exc()
+            mime = "cannot open `"
     else:
         mime = "cannot open `"
     if mime.startswith("cannot open `"):

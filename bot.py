@@ -4167,7 +4167,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     async def init_ready(self, futs):
         with tracebacksuppressor:
             self.started = True
-            attachments = (file.name for file in sorted(set(file for file in os.scandir("cache") if file.name.startswith("attachment_")), key=lambda file: file.stat().st_mtime))
+            attachments = (file for file in sorted(set(file for file in os.listdir("cache") if file.startswith("attachment_"))))
             for file in attachments:
                 with tracebacksuppressor:
                     self.attachment_from_file(file)
@@ -4814,22 +4814,23 @@ IND = "\x7f"
 
 def update_file_cache(files=None, recursive=True):
     if files is None:
-        files = sorted(file[len(IND):] for file in os.listdir("cache") if file.startswith(IND))
+        files = deque(sorted(file[len(IND):] for file in os.listdir("cache") if file.startswith(IND)))
     bot.file_count = len(files)
-    bot.storage_ratio = min(1, max(bot.file_count / 65536, bot.disk / (1 << 37)))
+    bot.storage_ratio = min(1, max(bot.file_count / 65536, bot.disk / (1 << 34)))
     for t in os.walk("saves"):
         bot.file_count += len(t[-1])
     if bot.storage_ratio >= 1:
         curr = files.popleft()
         ct = int(curr.rsplit(".", 1)[0].split("~", 1)[0])
-        if ts_us() - ct > 86400:
+        fn = "cache/" + IND + curr
+        if ts_us() - ct > 86400 * 60 and ts_us() - os.path.getatime(fn) > 86400 * 30:
             with tracebacksuppressor:
-                os.remove("cache/" + IND + curr)
+                os.remove(fn)
                 print(curr, "deleted.")
                 update_file_cache(files, recursive=False)
     if not recursive:
         return
-    attachments = (file.name for file in sorted(set(file for file in os.scandir("cache") if file.name.startswith("attachment_")), key=lambda file: file.stat().st_mtime))
+    attachments = (file for file in sorted(set(file for file in os.listdir("cache") if file.startswith("attachment_"))))
     attachments = deque(attachments)
     while len(attachments) > 8192:
         with tracebacksuppressor:

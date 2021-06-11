@@ -293,7 +293,7 @@ class Server:
                 elif mime.startswith("video/"):
                     preview.append(f'<div align="center"><video width="480" playsinline controls><source src="{s_url}" type="{mime}"></video></div>')
                 elif mime.startswith("text/"):
-                    preview.append(f'<a href="{url}">{url}</a>')
+                    preview.append(f'<a href="{url}">{url}<br></a>')
                 preview.append(f'<a style="color:#0000ff;" href="{s_url.replace("/f/", "/d/")}">Download</a>')
                 if not preview:
                     preview.append(f'<img src="{cp.request.base}/static/hug.gif" alt="Miza-Dottie-Hug" style="width:14.2857%;height:14.2857%;">')
