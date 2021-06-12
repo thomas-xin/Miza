@@ -562,8 +562,13 @@ class Server:
             send(f"!{t}\x7fbot.audio.returns[{t}]=VOICE.ytdl.get_stream(bot.audio.returns[{t}],download={repr(fmt)})", escape=False)
             fut.result()
             RESPONSES.pop(t, None)
+            fni = "cache/" + fn
 
             def af():
+                if not os.path.exists(fni):
+                    return
+                if not os.path.getsize(fni):
+                    return
                 RESPONSES[t] = fut = concurrent.futures.Future()
                 try:
                     send(f"!{t}\x7fbool(getattr(bot.audio.returns[{t}], 'loaded', None))", escape=False)
@@ -575,16 +580,17 @@ class Server:
                     return True
                 return j["result"] is not False
 
-            f = DownloadingFile("cache/" + fn, af=af)
+            f = DownloadingFile(fni, af=af)
             cp.response.headers["Accept-Ranges"] = "bytes"
             cp.response.headers.update(CHEADERS)
             cp.response.headers["Content-Disposition"] = "attachment; " * bool(d) + "filename=" + name + fmt
-            if d and af():
-                cp.response.status = 202
+            if af():
+                if d:
+                    cp.response.status = 202
                 count = 65536
             else:
                 count = 1048576
-                cp.response.headers["Content-Length"] = os.path.getsize("cache/" + fn)
+                cp.response.headers["Content-Length"] = os.path.getsize(fni)
             cp.response.headers["Content-Type"] = f"audio/{fmt[1:]}"
             return cp.lib.file_generator(f, count)
         else:

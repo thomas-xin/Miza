@@ -2971,7 +2971,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 await self.react_callback(message, None, message.author)
                 out = json.dumps(list(message.response))
             url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f{after}"
-        await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, decode=True, aio=True)
+        await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, bypass=False, decode=True, aio=True)
 
     async def process_http_eval(self, t, proc):
         glob = self._globals
@@ -3009,7 +3009,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             except TypeError:
                 out = json.dumps(dict(result=repr(output)))
             # print(url, out)
-        await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, decode=True, aio=True)
+        await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, bypass=False, decode=True, aio=True)
 
     # Adds a webhook to the bot's user and webhook cache.
     def add_webhook(self, w):

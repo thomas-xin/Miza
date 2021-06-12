@@ -405,12 +405,12 @@ class AudioFile:
                                     else:
                                         new_stream = request(f"VOICE.get_best_audio(VOICE.ytdl.extract_backup({repr(self.webpage_url)}))")
                                     if new_stream:
-                                        return self.load(new_stream, check_fmt=False, force=True)
+                                        return self.load(eval_json(new_stream), check_fmt=False, force=True)
                             new = None
                             with suppress(ValueError):
                                 new = request(f"VOICE.select_and_convert({repr(stream)})")
-                            if new is not None:
-                                return self.load(new, check_fmt=False, force=True)
+                            if new not in (None, "null"):
+                                return self.load(eval_json(new), check_fmt=False, force=True)
                         print(self.proc.args)
                         if err:
                             ex = RuntimeError(err)

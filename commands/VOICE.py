@@ -921,7 +921,7 @@ def org2xm(org, dat=None):
         args.append("c")
     subprocess.check_output(args)
     r_xm = f"cache/{ts}.xm"
-    if not os.path.exists("cache/" + str(ts) + ".xm"):
+    if not os.path.exists(r_xm):
         raise FileNotFoundError("Unable to locate converted file.")
     if not os.path.getsize(r_xm):
         raise RuntimeError("Converted file is empty.")
@@ -979,7 +979,7 @@ CONVERTERS = {
 }
 
 def select_and_convert(stream):
-    with requests.get(stream, timeout=8, stream=True) as resp:
+    with requests.get(stream, headers=Request.header(), timeout=8, stream=True) as resp:
         it = resp.iter_content(4096)
         b = bytes()
         while len(b) < 4:
