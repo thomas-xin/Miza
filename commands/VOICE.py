@@ -136,8 +136,7 @@ def get_best_icon(entry):
             if not is_image(url):
                 return "https://cdn.discordapp.com/embed/avatars/0.png"
         if ytdl.bot.is_webserver_url(url):
-            return ytdl.bot.raw_github + "/master/misc/sky-rainbow.gif"
-            # return ytdl.bot.webserver + "/static/sky-rainbow.gif"
+            return "https://github.com/thomas-xin/Miza/raw/e62dfccef0cce3b0fc3b8a09fb3ca3edfedd8ab0/misc/sky-rainbow.gif"
         return url
     return sorted(thumbnails, key=lambda x: float(x.get("width", x.get("preference", 0) * 4096)), reverse=True)[0]["url"]
 
@@ -1583,24 +1582,6 @@ class AudioDownloader:
             if "." in title:
                 title = title[:title.rindex(".")]
             return dict(url=url, name=title, direct=True)
-        if self.bot.is_webserver_url(url):
-            spl = url[8:].split("/")
-            if spl[1] in ("preview", "view", "file", "files", "download"):
-                path = spl[2]
-                orig_path = path
-                ind = "\x7f"
-                if path.startswith("~"):
-                    b = path.split(".", 1)[0].encode("utf-8") + b"=="
-                    if (len(b) - 1) & 3 == 0:
-                        b += b"="
-                    path = str(int.from_bytes(base64.urlsafe_b64decode(b), "big"))
-                elif path.startswith("!"):
-                    ind = "!"
-                    path = path[1:]
-                p = find_file(path, ind=ind)
-                fn = urllib.parse.unquote(p.rsplit("/", 1)[-1].split("~", 1)[-1].rsplit(".", 1)[0])
-                url = self.bot.raw_webserver + "/files/" + orig_path
-                return dict(url=url, name=fn, direct=True)
         try:
             if self.blocked_yt > utc():
                 raise PermissionError
@@ -1653,28 +1634,11 @@ class AudioDownloader:
             if "." in title:
                 title = title[:title.rindex(".")]
             return dict(url=url, webpage_url=url, title=title, direct=True)
-        if self.bot.is_webserver_url(url):
-            spl = url[8:].split("/")
-            if spl[1] in ("preview", "view", "file", "files", "download"):
-                url2 = url
-                path = spl[2]
-                orig_path = path
-                ind = "\x7f"
-                if path.startswith("~"):
-                    b = path.split(".", 1)[0].encode("utf-8") + b"=="
-                    if (len(b) - 1) & 3 == 0:
-                        b += b"="
-                    path = str(int.from_bytes(base64.urlsafe_b64decode(b), "big"))
-                elif path.startswith("!"):
-                    ind = "!"
-                    path = path[1:]
-                p = find_file(path, ind=ind)
-                fn = urllib.parse.unquote(p.rsplit("/", 1)[-1].split("~", 1)[-1].rsplit(".", 1)[0])
-                url = self.bot.raw_webserver + "/files/" + orig_path
-                return dict(url=url, webpage_url=url2, title=fn, direct=True)
         try:
             if self.blocked_yt > utc():
                 raise PermissionError
+            if url.startswith("https://www.youtube.com/search") or url.startswith("https://www.youtube.com/results"):
+                url = url.split("=", 1)[1].split("&", 1)[0]
             self.youtube_dl_x += 1
             return self.downloader.extract_info(url, download=False, process=False)
         except Exception as ex:
@@ -1691,7 +1655,7 @@ class AudioDownloader:
 
     # Extracts info from a URL or search, adjusting accordingly.
     def extract_info(self, item, count=1, search=False, mode=None):
-        if (mode or search) and not item.startswith("ytsearch:") and not is_url(item):
+        if (mode or search) and item[:9] not in ("ytsearch:", "scsearch:", "bcsearch:") and not is_url(item):
             if count == 1:
                 c = ""
             else:
@@ -1713,6 +1677,49 @@ class AudioDownloader:
                 raise ConnectionError(exc + repr(ex))
         if is_url(item) or not search:
             return self.extract_from(item)
+        if item[:9] == "spsearch:":
+            query = "https://api.spotify.com/v1/search?type=track%2Cshow_audio%2Cepisode_audio&include_external=audio&limit=1&q=" + url_parse(item[9:])
+            resp = requests.get(query, headers=self.spotify_header).json()
+            try:
+                track = resp["tracks"]["items"][0]
+                name = track.get("name", track["id"])
+                artists = ", ".join(a["name"] for a in track.get("artists", ()))
+            except LookupError:
+                print(resp)
+                raise LookupError(f"No results found for {item[9:]}.")
+            else:
+                item = "ytsearch:" + "".join(c if c.isascii() and c != ":" else "_" for c in f"{name} ~ {artists}")
+                self.spotify_x += 1
+        elif item[:9] == "bcsearch:":
+            query = "https://bandcamp.com/search?q=" + url_parse(item[9:])
+            resp = requests.get(query, headers=self.spotify_header).content
+            try:
+                resp = resp.split(b'<ul class="result-items">', 1)[1]
+                tracks = resp.split(b"<!-- search result type=")
+                result = cdict()
+                for track in tracks:
+                    if track.startswith(b"track id=") or track.startswith(b"album id=") and not result:
+                        ttype = track[:5]
+                        try:
+                            track = track.split(b'<img src="', 1)[1]
+                            result.thumbnail = track[:track.index(b'">')].decode("utf-8", "replace")
+                        except ValueError:
+                            pass
+                        track = track.split(b'<div class="heading">', 1)[1]
+                        result.title = track.split(b">", 1)[1].split(b"<", 1)[0].strip().decode("utf-8", "replace")
+                        result.url = track.split(b'href="', 1)[1].split(b'"', 1)[0].split(b"?", 1)[0].decode("utf-8", "replace")
+                        if ttype == b"track":
+                            break
+                if not result:
+                    raise LookupError
+                print(result)
+                return result
+            except (LookupError, ValueError):
+                print(resp)
+                raise LookupError(f"No results found for {item[9:]}.")
+            else:
+                item = "ytsearch:" + "".join(c if c.isascii() and c != ":" else "_" for c in f"{name} ~ {artists}")
+                self.other_x += 1
         self.youtube_dl_x += 1
         return self.downloader.extract_info(item, download=False, process=False)
 

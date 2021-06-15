@@ -531,7 +531,7 @@ class Server:
     def ytdl(self, **kwargs):
         d = kwargs.get("d") or kwargs.get("download")
         v = d or kwargs.get("v") or kwargs.get("view")
-        q = d or v or kwargs.get("q") or kwargs.get("query")
+        q = d or v or kwargs.get("q") or kwargs.get("query") or kwargs.get("s") or kwargs.get("search")
         if not q:
             raise EOFError
         t = ts_us()
@@ -601,7 +601,7 @@ class Server:
             res = j["result"]
         cp.response.headers.update(CHEADERS)
         cp.response.headers["Content-Type"] = "application/json"
-        return json.dumps(res)
+        return json.dumps(res).encode("utf-8")
     ytdl._cp_config = {"response.stream": True}
 
     @cp.expose
