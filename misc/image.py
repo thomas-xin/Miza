@@ -2600,6 +2600,8 @@ def evalImg(url, operation, args):
                     if vf:
                         command.extend(("-vf", vf))
                     command.extend(("-loop", "0"))
+                else:
+                    command.extend(("-b:v", "1M"))
                 command.append(out)
                 print(command)
                 proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
