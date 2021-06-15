@@ -1655,7 +1655,7 @@ class AudioDownloader:
 
     # Extracts info from a URL or search, adjusting accordingly.
     def extract_info(self, item, count=1, search=False, mode=None):
-        if (mode or search) and item[:9] not in ("ytsearch:", "scsearch:", "bcsearch:") and not is_url(item):
+        if (mode or search) and item[:9] not in ("ytsearch:", "scsearch:", "spsearch:", "bcsearch:") and not is_url(item):
             if count == 1:
                 c = ""
             else:
@@ -1909,7 +1909,7 @@ class AudioDownloader:
                         dur = None
                     temp = cdict({
                         "name": resp["title"],
-                        "url": resp["webpage_url"],
+                        "url": resp.get("webpage_url") or resp["url"],
                         "duration": dur,
                         "stream": get_best_audio(resp),
                         "icon": get_best_icon(resp),
@@ -4322,7 +4322,7 @@ class Download(Command):
                     res.extend(temp)
                 direct = len(res) == 1 or concat
             if not res:
-                # 2 youtube results per soundcloud result, increased with verbose flag
+                # 2 youtube results per soundcloud result, increased with verbose flag, followed by 1 spotify and 1 bandcamp
                 sc = min(4, flags.get("v", 0) + 1)
                 yt = min(6, sc << 1)
                 res = []
@@ -4330,6 +4330,12 @@ class Download(Command):
                 res.extend(temp)
                 temp = await create_future(ytdl.search, argv, mode="sc", count=sc)
                 res.extend(temp)
+                with tracebacksuppressor:
+                    temp = await create_future(ytdl.search, "spsearch:" + argv.split("spsearch:", 1)[-1].replace(":", "-"))
+                    res.extend(temp)
+                with tracebacksuppressor:
+                    temp = await create_future(ytdl.search, "bcsearch:" + argv.split("bcsearch:", 1)[-1].replace(":", "-"))
+                    res.extend(temp)
             if not res:
                 raise LookupError(f"No results for {argv}.")
             if not concat:
