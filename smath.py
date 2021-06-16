@@ -1343,19 +1343,6 @@ def list_permutation(dest):
     return order
 
 
-# Uses an optional interpolation mode to get a certain position in an iterable.
-def get(v, i, mode=1):
-    size = len(v)
-    i = i.real + i.imag * size
-    if i == int(i) or mode == 0:
-        return v[round(i) % size]
-    elif mode > 0 and mode < 1:
-        return get(v, i, 0) * (1 - mode) + mode * get(v, i, 1)
-    elif mode == 1:
-        return v[floor(i) % size] * (1 - i % 1) + v[ceil(i) % size] * (i % 1)
-    return get(v, i, floor(mode)) * (1 - mode % 1) + (mode % 1) * get(v, i, ceil(mode))
-
-
 # Computes product of values in an iterable.
 def product(*nums):
     try:

@@ -2386,7 +2386,10 @@ def from_bytes(b, save=None):
             raise
         print(info)
         size = tuple(map(int, info[:2]))
-        duration = 1000 / eval(info[-1], {}, {})
+        try:
+            duration = 1000 / eval(info[-1], {}, {})
+        except (ValueError, TypeError, SyntaxError, ZeroDivisionError):
+            duration = 1 / 16
         bcount *= int(np.prod(size))
         images = deque()
         while True:

@@ -100,7 +100,7 @@ while not os.path.exists(sd):
                 pass
             if os.path.exists(sd):
                 break
-        if time.time() - start < 30:
+        if time.time() - start < 60:
             att += 1
         else:
             att = 0
