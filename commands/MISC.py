@@ -825,7 +825,7 @@ class DeviantArt(Command):
     server_only = True
     min_level = 2
     description = "Subscribes to a DeviantArt Gallery, reposting links to all new posts."
-    usage = "(add|remove)? <reversed{?r}>?"
+    usage = "(add|remove)? <url> <reversed{?r}>?"
     flags = "raed"
     rate_limit = 4
 
@@ -840,7 +840,7 @@ class DeviantArt(Command):
                 data.pop(channel.id, None)
                 return css_md(f"Successfully removed all DeviantArt Gallery subscriptions from {sqr_md(channel)}.")
             return f"Currently subscribed DeviantArt Galleries for {sqr_md(channel)}:{ini_md(iter2str(assigned, key=lambda x: x['user']))}"
-        urls = await bot.follow_url(argv, allow=True)
+        urls = await bot.follow_url(argv, images=False, allow=True)
         if not urls:
             raise ArgumentError("Please input a valid URL.")
         url = urls[0]
@@ -851,7 +851,7 @@ class DeviantArt(Command):
         spl = url.split("/")
         user = spl[0]
         if spl[1] != "gallery":
-            raise ArgumentError("Please input a DeviantArt Gallery URL.")
+            raise ArgumentError("Only Gallery URLs are supported.")
         content = spl[2].split("&", 1)[0]
         folder = no_md(spl[-1].split("&", 1)[0])
         # Gallery may be an ID or "all"

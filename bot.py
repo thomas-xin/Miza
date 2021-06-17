@@ -1177,7 +1177,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 first = url.split("?", 1)[0]
                 item = first[first.rindex("/") + 1:]
                 out.append(f"https://media2.giphy.com/media/{item}/giphy.gif")
-            else:
+            elif images:
                 found = False
                 if not is_discord_url(url) and (images or is_tenor_url(url) or is_deviantart_url(url) or self.is_webserver_url(url)):
                     skip = False
