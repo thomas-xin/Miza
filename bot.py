@@ -3536,6 +3536,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 except AttributeError:
                     pass
                 return getattr(self.__getattribute__("channel"), key)
+            
+            get_role = lambda *args: None
 
             filesize_limit = 8388608
             bitrate_limit = 98304

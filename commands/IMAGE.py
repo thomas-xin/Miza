@@ -821,6 +821,18 @@ class Colour(Command):
         await bot.send_with_file(channel, msg, f, filename=fn, best=True, reference=message)
 
 
+# class Gradient(Command):
+#     description = "Generates a gradient with a specific shape."
+#     usage = "(linear|radial|conical|spiral|polygon) <0:count(1)>? <1:colour(white)>"
+#     no_parse = True
+#     rate_limit = (2, 5)
+#     typing = True
+
+#     async def __call__(self, bot, user, message, channel, args, **void):
+#         if args[0] not in "linear|radial|conical|spiral|polygon".split("|"):
+#             raise TypeError(f"Invalid gradient shape {args[0]}.")
+
+
 class Average(Command):
     name = ["AverageColour"]
     description = "Computes the average pixel colour in RGB for the supplied image."

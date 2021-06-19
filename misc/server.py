@@ -354,6 +354,60 @@ class Server:
                 cp.response.headers["Content-Length"] = len(b)
                 cp.response.headers["ETag"] = create_etag(b)
                 return b
+            elif not os.path.exists(p):
+                raise FileNotFoundError(p)
+            elif p.endswith("~.forward$") and mime == "text/html":
+                with open(p, "r", encoding="utf-8") as f:
+                    resp = f.read(1048576)
+                s = resp
+                search = "<!DOCTYPE HTML><!--"
+                if s.startswith(search):
+                    s = s[len(search):]
+                    search = '--><html><meta http-equiv="refresh" content="0; URL='
+                    try:
+                        s = s[:s.index(search)]
+                    except ValueError:
+                        pass
+                    else:
+                        url, code, ftype = json.loads(s)
+                        if ftype == 1:
+                            data = resp.encode("utf-8")
+                            cp.response.headers.update(CHEADERS)
+                            cp.response.headers["Location"] = url
+                            cp.response.headers["Content-Type"] = mime
+                            cp.response.headers["Content-Length"] = len(data)
+                            cp.response.headers["ETag"] = create_etag(data)
+                            cp.response.status = int(code)
+                            return data
+                        elif ftype == 2:
+                            headers = fcdict(cp.request.headers)
+                            headers.pop("Remote-Addr", None)
+                            headers.pop("Host", None)
+                            headers.update(Request.header())
+                            resp = requests.get(url, headers=headers, stream=True)
+                            resp.raw.decode_content = False
+                            headers = fcdict(resp.headers)
+                            headers.update(fcdict(CHEADERS))
+                            cd = headers.get("Content-Disposition")
+                            if cd:
+                                if not download:
+                                    headers["Content-Disposition"] = cd.replace("attachment;", "").strip()
+                                elif "attachment" not in cd:
+                                    headers["Content-Disposition"] = "attachment;" + cd
+                            elif download:
+                                headers["Content-Disposition"] = "attachment"
+                            cp.response.headers.update(("-".join(w.capitalize() for w in k.split("-")), v) for k, v in headers.items())
+                            send(s)
+                            send(headers)
+                            send(cp.response.headers)
+                            cp.response.status = int(resp.status_code)
+                            if float(fcdict(resp.headers).get("Content-Length", inf)) <= 8388608:
+                                b = resp.content
+                                cp.response.headers["Content-Type"] = magic.from_buffer(b)
+                                return b
+                            f = resp.raw
+                            # f = ForwardedRequest(resp, 98304)
+                            return cp.lib.file_generator(f, 65536)
             return cp.lib.static.serve_file(p, content_type=mime, name=attachment, disposition="attachment" if download else None)
     files._cp_config = {"response.stream": True}
 
@@ -923,7 +977,24 @@ function mergeFile(blob) {
         left: 50%;
         -ms-transform: translate(-50%, -50%);
         transform: translate(-50%, -50%);
-    }""" + f"""
+    }
+    a:link {
+        color: #ffff00;
+        text-decoration: none;
+    }
+    a:visited {
+        color: #ffff00;
+        text-decoration: none;
+    }
+    a:hover {
+        color: #ff0000;
+        text-decoration: underline;
+    }
+    a:active {
+        color: #00ff00;
+        text-decoration: underline;
+    }
+    """ + f"""
 </style>
 <body>
     <video playsinline autoplay muted loop poster="https://cdn.discordapp.com/attachments/691915140198826005/846945647873490944/GpAy.webp" style="position:fixed;right:0;bottom:0;min-width:100%;min-height:100%;z-index:-1;">
@@ -964,7 +1035,10 @@ function mergeFile(blob) {
         <div class="hambg"></div>
     </div>
     <div class="center">
-		<div id="percent" align="center" style="color:white;">Upload a file here!</div>
+		<div id="percent" align="center" style="color:white;">
+            <h1>Upload a file here!</h1>
+            <a href="/redirect">Click here to shorten or proxy a URL!</a>
+        </div><br>
 		<input style="color:white;" type="file" name="file" id="fileToUpload">
 		<button onclick="sendRequest()">Upload</button><br>
 		<div align="center"><progress id="progressBar" value="0" max="100"></progress></div>
@@ -1005,6 +1079,133 @@ function mergeFile(blob) {
                     os.remove(gn)
         b = ts.bit_length() + 7 >> 3
         return f"/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
+
+    @cp.expose(("proxy",))
+    def redirect(self):
+        data = """<!doctype HTML><html>
+<link href="https://unpkg.com/boxicons@2.0.7/css/boxicons.min.css" rel="stylesheet">
+<style>
+body {
+	font-family: 'Rockwell';
+	color: #00ffff;
+	background: black;
+}
+.center {
+	margin: 0;
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	-ms-transform: translate(-50%, -50%);
+	transform: translate(-50%, -50%);
+}
+.tooltip {
+  position: relative;
+  display: inline-block;
+  border-bottom: 1px dotted black;
+}
+.tooltip .tooltiptext {
+  visibility: hidden;
+  width: 120px;
+  background-color: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  text-align: center;
+  border-radius: 6px;
+  padding: 5px 0;
+  position: absolute;
+  z-index: 1;
+}
+.tooltip:hover .tooltiptext {
+  visibility: visible;
+}
+</style>
+<body>
+	<video playsinline autoplay muted loop poster="https://cdn.discordapp.com/attachments/691915140198826005/846945647873490944/GpAy.webp" style="position:fixed;right:0;bottom:0;min-width:100%;min-height:100%;z-index:-1;">
+        <source src="https://cdn.discordapp.com/attachments/691915140198826005/846587863797203004/GpAy.mp4" type="video/mp4">
+    </video>
+    <link href="/static/hamburger.css" rel="stylesheet">
+    <div class="hamburger">
+        <input
+            type="checkbox"
+            title="Toggle menu"
+        />
+        <div class="items select">
+            <a href="/" data-popup="Home">
+                <video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
+                    <source src="https://cdn.discordapp.com/attachments/691915140198826005/846592940075515904/miza_by_smudgedpasta_de1q8lu-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOj.mp4" type="video/mp4">
+                </video>
+            </a>
+            <a href="/mizatlas" data-popup="Command Atlas">
+                <video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
+                    <source src="https://cdn.discordapp.com/attachments/691915140198826005/846593904635281408/miza_has_a_leaf_blower_by_smudgedpasta_de6t2dl-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJz.mp4" type="video/mp4">
+                </video>
+            </a>
+            <a href="/upload" data-popup="File Host">
+                <video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
+                    <source src="https://cdn.discordapp.com/attachments/691915140198826005/846593561444745226/magical_babey_mode_by_smudgedpasta_de1q8ky-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIi.mp4" type="video/mp4">
+                </video>
+            </a>
+            <a href="/apidoc" data-popup="API Documentation">
+                <video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
+                    <source src="https://cdn.discordapp.com/attachments/691915140198826005/846590061901381632/deahc7l-a9773147-259d-4226-b0b6-195c6eb1f3c0.pngtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOi.mp4" type="video/mp4">
+                </video>
+            </a>
+            <a 
+                href="/time"
+                data-popup="Clock"
+                class='bx bx-time'></a>
+        </div>
+        <div class="hambg"></div>
+    </div>
+	<div class="center">
+		<h1 style="color: white;">Create a redirect or proxy URL here!</h1>
+		<form action="" method="get" class="form-example">
+			<h2>URL</h2>
+			<div class="tooltip">
+				<input type=url name="url" style="width:240;"/>
+				<span class="tooltiptext"> The URL to forward.</span>
+			</div>
+			<h2>Status Code</h2>
+			<div class="tooltip">
+				<input type=number name="code" value="307" min="100" max="599"/>
+				<span class="tooltiptext"> The status code returned by the response. Should be one of {301, 302, 303, 307, 308} for a redirect.</span>
+			</div>
+			<h2>Type</h2>
+			<div class="tooltip">
+				<input type=radio value="1" name="ftype" checked=true/>Redirect
+				<span class="tooltiptext"> A redirect page will simply forward users to the destination.</span>
+			</div>
+			<div class="tooltip">
+				<input type=radio value="2" name="ftype"/>Proxy
+				<span class="tooltiptext"> A proxy page will forward the data from the destination to the user.</span>
+			</div>
+			<br><br>
+			<input type=submit value="Create" formaction="/forward" formenctype="application/x-www-form-urlencoded" formmethod="post"/>
+		</form>
+	</div>
+</body>
+</html>"""
+        cp.response.headers.update(CHEADERS)
+        cp.response.headers["Content-Type"] = "text/html"
+        cp.response.headers["Content-Length"] = len(data)
+        cp.response.headers["ETag"] = create_etag(data)
+        return data
+
+    @cp.expose
+    @cp.tools.accept(media="multipart/form-data")
+    def forward(self, **kwargs):
+        ts = time.time_ns() // 1000
+        fn = f"cache/{IND}{ts}~.forward$"
+        url = kwargs.get("url")
+        if not url:
+            raise FileNotFoundError
+        code = int(kwargs.get("code", 307))
+        ftype = int(kwargs.get("ftype", 1))
+        s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/></html>'
+        with open(fn, "w", encoding="utf-8") as f:
+            f.write(s)
+        b = ts.bit_length() + 7 >> 3
+        url = f"/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
+        raise cp.HTTPRedirect(url, status=307)
 
     @cp.expose(("time", "timezones"))
     def timezone(self):

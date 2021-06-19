@@ -85,6 +85,7 @@ FD 37 7A 58 5A 00	xz	application/xz
 3C 21 44 4F 43 54 59 50 45 20 68 74 6D 6C	html	text/html
 3C 21 64 6F 63 74 79 70 65 20 68 74 6D 6C	html	text/html
 3C 21 44 4F 43 54 59 50 45 20 48 54 4D 4C	html	text/html
+3C 21 64 6F 63 74 79 70 65 20 48 54 4D 4C	html	text/html
 00 61 73 6D	wasm	application/x-wasm
 CF 84 01	lep	image/x-lep
 43 57 53	swf	application/swf

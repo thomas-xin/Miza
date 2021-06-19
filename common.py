@@ -1613,7 +1613,7 @@ magic = cdict(
     from_buffer=from_file,
     Magic=lambda mime, *args, **kwargs: cdict(
         from_file=lambda b: from_file(b, mime),
-        from_buffer=lambda b: from_buffer(b, mime),
+        from_buffer=lambda b: from_file(b, mime),
     ),
 )
 
@@ -1676,7 +1676,7 @@ PROC_RESP = {}
 sub_count = lambda: sum(sum(1 for p in v if p.is_running()) for v in PROCS.values())
 
 def force_kill(proc):
-    with tracebacksuppressor:
+    with tracebacksuppressor(psutil.NoSuchProcess):
         for child in proc.children(recursive=True):
             with suppress():
                 child.kill()
@@ -1687,7 +1687,10 @@ def force_kill(proc):
 def proc_communicate(k, i):
     while True:
         with tracebacksuppressor:
-            proc = PROCS[k][i]
+            try:
+                proc = PROCS[k][i]
+            except LookupError:
+                break
             while not proc.is_running():
                 time.sleep(0.8)
             s = as_str(proc.stdout.readline()).rstrip()
@@ -1698,7 +1701,7 @@ def proc_communicate(k, i):
                     create_future_ex(exec_tb, c, globals())
                 else:
                     print(s)
-        time.sleep(0.001)
+        time.sleep(0.01)
 
 proc_args = cdict(
     math=[python, "misc/math.py"],
@@ -2171,6 +2174,70 @@ class DownloadingFile(io.IOBase):
         self.fp = None
 
 
+class ForwardedRequest(io.IOBase):
+
+    __slots__ = ("fp", "resp", "size", "pos", "it")
+
+    def __init__(self, resp, buffer=65536):
+        self.resp = resp
+        self.it = resp.iter_content(buffer)
+        self.fp = io.BytesIO()
+        self.size = 0
+        self.pos = 0
+
+    def __getattribute__(self, k):
+        if k in object.__getattribute__(self, "__slots__") or k in ("seek", "read", "clear"):
+            return object.__getattribute__(self, k)
+        if k == "name":
+            return object.__getattribute__(self, "filename")
+        if self.fp is None:
+            self.fp = open(self.fn, self.mode)
+        if k[0] == "_" and (len(k) < 2 or k[1] != "_"):
+            k = k[1:]
+        return getattr(self.fp, k)
+
+    def seek(self, pos):
+        while self.size < pos:
+            try:
+                n = next(self.it)
+            except StopIteration:
+                n = b""
+            if not n:
+                self.resp.close()
+                break
+            self.fp.seek(self.size)
+            self.size += len(n)
+            self.fp.write(n)
+        self.fp.seek(pos)
+        self.pos = pos
+
+    def read(self, size):
+        b = self.fp.read(size)
+        s = len(b)
+        self.pos += s
+        while s < size:
+            try:
+                n = next(self.it)
+            except StopIteration:
+                n = b""
+            if not n:
+                self.resp.close()
+                break
+            self.fp.seek(self.size)
+            self.size += len(n)
+            self.fp.write(n)
+            self.fp.seek(self.pos)
+            b += self.fp.read(size - s)
+            s += len(b)
+            self.pos += len(b)
+        return b
+
+    def clear(self):
+        with suppress():
+            self.fp.close()
+        self.fp = None
+
+
 class seq(io.IOBase, collections.abc.MutableSequence, contextlib.AbstractContextManager):
 
     BUF = 262144
@@ -2328,6 +2395,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
         return {
             "User-Agent": f"Mozilla/5.{xrand(1, 10)}",
             "DNT": "1",
+            "X-Forwarded-For": ".".join(str(xrand(1, 255)) for _ in loop(4)),
         }
     headers = header
 
