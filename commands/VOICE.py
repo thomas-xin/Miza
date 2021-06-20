@@ -3826,6 +3826,65 @@ class Radio(Command):
         return bot.send_as_embeds(channel, title=title, thumbnail=country.icon, fields=sorted(fields), author=get_author(bot.user), reference=message)
 
 
+class Party(Command):
+    server_only = True
+    min_level = 2
+    name = ["YTT"]
+    description = "Generates an activity party link in the nearest voice channel!"
+    usage = "(poker|betrayal|youtube|fishington)?"
+    rate_limit = 5
+    sem = Semaphore(2, 8, rate_limit=8)
+    names = fcdict((
+        ("Poker", 755827207812677713),
+        ("Poker Night", 755827207812677713),
+        ("YouTube", 755600276941176913),
+        ("YouTube Together", 755600276941176913),
+        ("Betrayal", 773336526917861400),
+        ("Betrayal.io", 773336526917861400),
+        ("Fishington", 814288819477020702),
+        ("Fishington.io", 814288819477020702),
+    ))
+
+    async def __call__(self, bot, guild, channel, user, argv, **void):
+        auds = await auto_join(guild, channel, user, bot)
+        if not argv:
+            argv = "YouTube"
+        try:
+            aid = self.names[argv]
+        except KeyError:
+            if not argv.isnumeric():
+                raise KeyError(f"Unsupported party application: {argv}")
+            aid = int(argv)
+        cid = auds.channel.id
+        # invites = await bot.get_full_invites(guild)
+        # for invite in invites:
+        #     if invite.max_age == invite.max_uses == 0:
+        #         c = invite.get("channel", {})
+        #         if c.get("id") == cid:
+        #             app = invite.get("target_application")
+        #             if app:
+        #                 if app.get("id") == aid:
+        #                     return f"https://discord.gg/{invite.code}"
+        async with self.sem:
+            data = await Request(
+                f"https://discord.com/api/v9/channels/{cid}/invites",
+                method="POST",
+                data=json.dumps(dict(
+                    max_age=0,
+                    max_uses=0,
+                    target_application_id=aid,
+                    target_type=2,
+                    temporary=False,
+                    validate=None,
+                )),
+                headers={"Content-Type": "application/json", "Authorization": "Bot " + bot.token},
+                aio=True,
+                bypass=False,
+                json=True
+            )
+        return f"https://discord.gg/{data['code']}"
+
+
 # This whole thing is a mess, I can't be bothered cleaning this up lol
 # class Player(Command):
 #     server_only = True

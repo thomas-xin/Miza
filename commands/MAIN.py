@@ -913,12 +913,14 @@ class Invite(Command):
             with tracebacksuppressor:
                 member = message.guild.get_member(self.bot.id)
                 if member.guild_permissions.create_instant_invite:
-                    invites = await member.guild.invites()
+                    invites = None
+                    # invites = await member.guild.invites()
+                    # invites = sorted(invites, key=lambda invite: (invite.max_age == 0, -abs(invite.max_uses - invite.uses), len(invite.url)))
                     if not invites:
                         channel = self.bot.get_first_sendable(member.guild, member)
                         invite = await channel.create_invite(reason="Invite command")
                     else:
-                        invite = sorted(invites, key=lambda invite: (invite.max_age == 0, invite.max_uses - invite.uses != 0, len(invite.url)))[0]
+                        invite = invites[0]
                     emb.description += f" [**`Server Invite`**]({invite.url})"
         self.bot.send_embeds(channel, embed=emb, reference=message)
 

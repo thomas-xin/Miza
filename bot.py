@@ -530,6 +530,22 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         out.append(res)
                 return out
 
+    # Gets the full list of invites from a guild, if applicable.
+    async def get_full_invites(self, guild):
+        with tracebacksuppressor:
+            member = guild.get_member(self.id)
+            if member.guild_permissions.create_instant_invite:
+                invitedata = await Request(
+                    f"https://discord.com/api/v9/guilds/{guild.id}/invites",
+                    headers=dict(Authorization="Bot " + self.token),
+                    bypass=False,
+                    aio=True,
+                    json=True,
+                )
+                invites = [cdict(invite) for invite in invitedata]
+                return sorted(invites, key=lambda invite: (invite.max_age == 0, -abs(invite.max_uses - invite.uses), len(invite.url)))
+        return []
+
     # Gets the first accessable text channel in the target guild.
     def get_first_sendable(self, guild, member):
         if member is None:
@@ -5072,7 +5088,7 @@ if __name__ == "__main__":
             sys.stdout = sys.stderr = print = PRINT
             print("Logging started.")
             create_future_ex(proc_start)
-            miza = bot = client = BOT[0] = Bot()
+            self = miza = bot = client = BOT[0] = Bot()
             miza.http.user_agent = "Miza"
             miza.miza = miza
             with miza:

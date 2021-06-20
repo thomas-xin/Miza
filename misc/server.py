@@ -74,7 +74,7 @@ config = {
 }
 
 if os.path.exists("misc/cert.pem") and os.path.exists("misc/private.key.pem"):
-    # config["global"]["server.ssl_module"] = "builtin"
+    config["global"]["server.ssl_module"] = "builtin"
     config["global"]["server.ssl_certificate"] = "domain.cert.pem"
     config["global"]["server.ssl_private_key"] = "private.key.pem"
     config["global"]["server.ssl_certificate_chain"] = "intermediate.cert.pem"
