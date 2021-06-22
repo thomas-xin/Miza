@@ -536,7 +536,9 @@ class FileHashDict(collections.abc.MutableMapping):
         if not os.path.exists(fn):
             fn += "\x7f"
             if not os.path.exists(fn):
-                raise KeyError(k)
+                fn += "\x7f"
+                if not os.path.exists(fn):
+                    raise KeyError(k)
         with self.sem:
             with open(fn, "rb") as f:
                 s = f.read()
@@ -668,8 +670,6 @@ def safe_save(fn, s):
     if os.path.exists(fn) and not os.path.exists(fn + "\x7f\x7f"):
         os.rename(fn, fn + "\x7f\x7f")
         os.rename(fn + "\x7f", fn)
-        if os.path.exists(fn + "\x7f\x7f"):
-            create_future_ex(os.remove, fn + "\x7f\x7f", priority=True)
     else:
         with open(fn, "wb") as f:
             f.write(s)

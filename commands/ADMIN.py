@@ -1904,11 +1904,15 @@ class UpdateMessageCache(Database):
                 path += "\x7f"
                 if not os.path.exists(path):
                     return
-            with open(path, "rb") as f:
-                out = zipped = decrypt(f.read())
-            with tracebacksuppressor(zipfile.BadZipFile):
-                out = zip2bytes(zipped)
-            data = pickle.loads(out)
+            try:
+                with open(path, "rb") as f:
+                    out = zipped = decrypt(f.read())
+                with tracebacksuppressor(zipfile.BadZipFile):
+                    out = zip2bytes(zipped)
+                data = pickle.loads(out)
+            except:
+                print_exc()
+                data = {}
             if type(data) is not dict:
                 data = {m["id"]: m for m in data}
             self.raws[fn] = data

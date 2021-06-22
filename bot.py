@@ -4841,7 +4841,7 @@ def update_file_cache(files=None, recursive=True):
         curr = files.popleft()
         ct = int(curr.rsplit(".", 1)[0].split("~", 1)[0])
         fn = "cache/" + IND + curr
-        if ts_us() - ct > 86400 * 60 and ts_us() - os.path.getatime(fn) > 86400 * 30:
+        if utc() - ct > 86400 * 60 and utc() - os.path.getatime(fn) > 86400 * 30:
             with tracebacksuppressor:
                 os.remove(fn)
                 print(curr, "deleted.")

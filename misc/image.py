@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import os, sys, io, time, concurrent.futures, subprocess, psutil, collections, traceback, re, requests, blend_modes, pdf2image, zipfile, contextlib, magic, pyqrcode, ast, colorspace
+import os, sys, io, time, concurrent.futures, subprocess, psutil, collections, traceback, re, requests, blend_modes, pdf2image, zipfile, contextlib, filetype, pyqrcode, ast, colorspace
 import numpy as np
 import PIL
 from PIL import Image, ImageCms, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhance, ImageMath, ImageStat
@@ -2355,7 +2355,7 @@ def from_bytes(b, save=None):
     else:
         data = b
         out = io.BytesIO(b) if type(b) is bytes else b
-    mime = magic.from_buffer(data, mime=True)
+    mime = filetype.guess_mime(data)
     if mime == "application/zip":
         z = zipfile.ZipFile(io.BytesIO(data), compression=zipfile.ZIP_DEFLATED, strict_timestamps=False)
         return ImageSequence(*(Image.open(z.open(f.filename)) for f in z.filelist))
