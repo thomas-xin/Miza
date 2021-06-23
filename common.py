@@ -380,7 +380,7 @@ def zip2bytes(data):
     if not hasattr(data, "read"):
         data = io.BytesIO(data)
     with ZipFile(data, compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False) as z:
-        b = z.open("DATA").read()
+        b = read("DATA")
     return b
 
 def bytes2zip(data):
@@ -430,7 +430,7 @@ def select_and_loads(s, mode="safe", size=None):
                 x = z.getinfo("DATA").file_size
                 if size < x:
                     raise OverflowError(f"Data input size too large ({x} > {size}).")
-            s = z.open("DATA").read()
+            s = z.read("DATA")
     data = None
     with tracebacksuppressor:
         if s[0] == 128:
@@ -549,7 +549,7 @@ class FileHashDict(collections.abc.MutableMapping):
                 with tracebacksuppressor:
                     with zipfile.ZipFile("backup/" + file, compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False) as z:
                         time.sleep(0.03)
-                        s = z.open(fn).read()
+                        s = z.read(fn)
                     data = select_and_loads(s, mode="unsafe")
                     self.modified.add(k)
                     print(f"Successfully recovered backup of {fn} from {file}.")

@@ -2386,10 +2386,9 @@ def write_video(proc, data):
 def from_bytes(b, save=None):
     if b[:4] == b"<svg" or b[:5] == b"<?xml":
         resp = requests.post("https://www.svgtopng.me/api/svgtopng/upload-file", headers=header(), files={"files": ("temp.svg", b, "image/svg+xml"), "format": (None, "PNG"), "forceTransparentWhite": (None, "true"), "jpegQuality": (None, "256")})
-        z = ZipFile(io.BytesIO(resp.content), compression=zipfile.ZIP_DEFLATED, strict_timestamps=False)
-        data = z.open("temp.png").read()
+        with ZipFile(io.BytesIO(resp.content), compression=zipfile.ZIP_DEFLATED, strict_timestamps=False) as z:
+            data = z.read("temp.png")
         out = io.BytesIO(data)
-        z.close()
         if save and data and not os.path.exists(save):
             exc.submit(write_to, save, data)
     elif b[:4] == b"%PDF":
