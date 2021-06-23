@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
-import sympy, time, os, sys, subprocess, traceback, random, collections, psutil, concurrent.futures, pickle, ast #, gc
+import sympy, math, time, os, sys, subprocess, traceback, random, collections, psutil, concurrent.futures, pickle, ast #, gc
+import sympy.stats
 import sympy.parsing.sympy_parser as parser
 import sympy.parsing.latex as latex
 import matplotlib.pyplot as plt
@@ -170,18 +171,33 @@ class Random(sympy.Basic):
     __str__ = __repr__
 
 
-# def lshift(a, b):
-# 	if hasattr(a, "p") and getattr(a, "q", 1) == 1 and hasattr(b, "p") and getattr(b, "q", 1) == 1:
-# 		return sympy.Integer(a.p << b.p)
-# 	return a * 2 ** b
+def iand(a, b):
+    if hasattr(a, "p") and getattr(a, "q", 1) == 1 and hasattr(b, "p") and getattr(b, "q", 1) == 1:
+        return sympy.Integer(a.p & b.p)
+    r = 1 << 256
+    x = round(a * r)
+    y = round(b * r)
+    return sympy.Integer(x & y) / r
 
-# def rshift(a, b):
-# 	if hasattr(a, "p") and getattr(a, "q", 1) == 1 and hasattr(b, "p") and getattr(b, "q", 1) == 1:
-# 		return sympy.Integer(a.p >> b.p)
-# 	return a // 2 ** b
+def ior(a, b):
+    if hasattr(a, "p") and getattr(a, "q", 1) == 1 and hasattr(b, "p") and getattr(b, "q", 1) == 1:
+        return sympy.Integer(a.p | b.p)
+    r = 1 << 256
+    x = round(a * r)
+    y = round(b * r)
+    return sympy.Integer(x | y) / r
 
-# sympy.Integer.__lshift__ = lambda self, other: lshift(self, other)
-# sympy.Integer.__rshift__ = lambda self, other: rshift(self, other)
+def ixor(a, b):
+    if hasattr(a, "p") and getattr(a, "q", 1) == 1 and hasattr(b, "p") and getattr(b, "q", 1) == 1:
+        return sympy.Integer(a.p | b.p)
+    r = 1 << 256
+    x = round(a * r)
+    y = round(b * r)
+    return sympy.Integer(x ^ y) / r
+
+sympy.Number.__and__ = lambda self, other: iand(self, other)
+sympy.Number.__or__ = lambda self, other: ior(self, other)
+sympy.Number.__xor__ = lambda self, other: ixor(self, other)
 
 
 # Sympy plotting functions
@@ -335,7 +351,8 @@ def rounder(x):
 
 
 # Allowed functions for ~math
-_globals = dict(sympy.__dict__)
+_globals = dict(sympy.stats.__dict__)
+_globals.update(sympy.__dict__)
 pop = (
     "init_printing",
     "init_session",
@@ -474,6 +491,8 @@ translators = {
     "ω": "omega",
     "∞": "oo",
     "ℯ": "e",
+    "^": "**",
+    "\x7f": "^",
 }
 
 replacers = {
@@ -487,6 +506,7 @@ replacers = {
     "coo": "zoo",
     "cinf": "zoo",
     "Dₓ": "diff 0+",
+    "^^": "\x7f",
 }
 
 ftrans = "".maketrans(translators)
@@ -533,9 +553,10 @@ def evalSym(f, prec=64, r=False, variables=None):
     BF_PREC = sympy.ceiling(int(prec) * 1.25)
     r = int(r)
     prec = int(prec)
-    f, y = f.translate(ftrans), f
-    for i in replacers:
-        f = f.replace(i, replacers[i])
+    y = f
+    for k, v in replacers.items():
+        f = f.replace(k, v)
+    f = f.translate(ftrans)
     # Attempt to parse as SymPy expression, then as LaTeX if possible
     try:
         if "\\" in y:
