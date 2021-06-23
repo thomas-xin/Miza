@@ -2394,7 +2394,14 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         if not self.closed and hasattr(self, "total_bytes"):
             with tracebacksuppressor:
                 s = "{'net_bytes': " + str(self.total_bytes) + "}"
-                with open("saves/status.json", "w") as f:
+                saves = "saves/status.json"
+                if os.path.exists("saves"):
+                    with open(saves[:-5] + "\x7f.json", "w") as f:
+                        f.write(s)
+                    os.remove(saves[:-5] + "\x7f\x7f.json")
+                    os.rename(saves, saves[:-5] + "\x7f\x7f.json")
+                    os.rename(saves[:-5] + "\x7f.json", saves)
+                with open(saves, "w") as f:
                     f.write(s)
         if not os.path.exists("backup"):
             os.mkdir("backup")
@@ -3398,6 +3405,12 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                             if os.path.exists("saves/status.json"):
                                 with tracebacksuppressor:
                                     with open("saves/status.json", "rb") as f:
+                                        data = await create_future(f.read)
+                                    status = eval(data)
+                                    self.start_bytes = max(0, status["net_bytes"] - net_bytes)
+                            if not self.start_bytes and os.path.exists("saves/status.json\x7f\x7f"):
+                                with tracebacksuppressor:
+                                    with open("saves/status.json\x7f\x7f", "rb") as f:
                                         data = await create_future(f.read)
                                     status = eval(data)
                                     self.start_bytes = max(0, status["net_bytes"] - net_bytes)

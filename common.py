@@ -534,11 +534,9 @@ class FileHashDict(collections.abc.MutableMapping):
             return self.data[k]
         fn = self.key_path(k)
         if not os.path.exists(fn):
-            fn += "\x7f"
+            fn += "\x7f\x7f"
             if not os.path.exists(fn):
-                fn += "\x7f"
-                if not os.path.exists(fn):
-                    raise KeyError(k)
+                raise KeyError(k)
         with self.sem:
             with open(fn, "rb") as f:
                 s = f.read()
