@@ -67,14 +67,9 @@ def from_file(path, mime=True):
         out = simple_mimes(path, mime)
     return out
 
-magic = cdict(
-    from_file=from_file,
-    from_buffer=from_file,
-    Magic=lambda mime, *args, **kwargs: cdict(
-        from_file=lambda b: from_file(b, mime),
-        from_buffer=lambda b: from_file(b, mime),
-    ),
-)
+class magic:
+    from_file = from_file
+    from_buffer = from_file
 
 start = time.time()
 CACHE = {}
