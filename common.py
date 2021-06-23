@@ -1593,8 +1593,6 @@ def load_mimes():
                 mimesplitter[len(data)] = {}
                 mimesplitter[len(data)][data] = (ext, mime)
 
-create_future_ex(load_mimes)
-
 def simple_mimes(b, mime=True):
     for k, v in reversed(mimesplitter.items()):
         out = v.get(b[:k])
@@ -3005,6 +3003,7 @@ class __logPrinter:
     isatty = lambda self: False
 
 
+create_future_ex(load_mimes)
 PRINT = __logPrinter("log.txt")
 
 # Sets all instances of print to the custom print implementation.
