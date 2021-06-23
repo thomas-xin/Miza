@@ -136,7 +136,7 @@ class Math(Command):
     rate_limit = (0.5, 5)
     slash = True
 
-    async def __call__(self, bot, argv, name, channel, guild, flags, user, **void):
+    async def __call__(self, bot, argv, name, message, channel, guild, flags, user, **void):
         if "l" in flags:
             var = bot.data.variables.get(user.id, {})
             if not var:
@@ -177,7 +177,7 @@ class Math(Command):
             await channel.trigger_typing()
             fn = resp["file"]
             f = CompatFile(fn)
-            await bot.send_with_file(channel, "", f, filename=fn, best=True, reference=reference)
+            await bot.send_with_file(channel, "", f, filename=fn, best=True, reference=message)
             return
         answer = "\n".join(str(i) for i in resp)
         if var is not None:
