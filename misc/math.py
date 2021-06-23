@@ -439,7 +439,6 @@ for i in pop:
 
 sym_tr = parser.standard_transformations
 sym_tr += (
-    parser.convert_xor,
     parser.implicit_multiplication_application,
     parser.rationalize,
 )
