@@ -2398,7 +2398,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 if os.path.exists("saves"):
                     with open(saves[:-5] + "\x7f.json", "w") as f:
                         f.write(s)
-                    os.remove(saves[:-5] + "\x7f\x7f.json")
+                    with suppress(FileNotFoundError):
+                        os.remove(saves[:-5] + "\x7f\x7f.json")
                     os.rename(saves, saves[:-5] + "\x7f\x7f.json")
                     os.rename(saves[:-5] + "\x7f.json", saves)
                 with open(saves, "w") as f:
