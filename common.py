@@ -380,7 +380,7 @@ def zip2bytes(data):
     if not hasattr(data, "read"):
         data = io.BytesIO(data)
     with ZipFile(data, compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False) as z:
-        b = read("DATA")
+        b = z.read("DATA")
     return b
 
 def bytes2zip(data):
