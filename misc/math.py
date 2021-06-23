@@ -172,6 +172,8 @@ class Random(sympy.Basic):
 
 
 def iand(a, b):
+    if a == b:
+        return a
     if hasattr(a, "p") and getattr(a, "q", 1) == 1 and hasattr(b, "p") and getattr(b, "q", 1) == 1:
         return sympy.Integer(a.p & b.p)
     r = 1 << 256
@@ -180,6 +182,8 @@ def iand(a, b):
     return sympy.Integer(x & y) / r
 
 def ior(a, b):
+    if a == b:
+        return a
     if hasattr(a, "p") and getattr(a, "q", 1) == 1 and hasattr(b, "p") and getattr(b, "q", 1) == 1:
         return sympy.Integer(a.p | b.p)
     r = 1 << 256
@@ -188,6 +192,8 @@ def ior(a, b):
     return sympy.Integer(x | y) / r
 
 def ixor(a, b):
+    if a == b:
+        return sympy.Integer(0)
     if hasattr(a, "p") and getattr(a, "q", 1) == 1 and hasattr(b, "p") and getattr(b, "q", 1) == 1:
         return sympy.Integer(a.p ^ b.p)
     r = 1 << 256
@@ -195,9 +201,9 @@ def ixor(a, b):
     y = round(b * r)
     return sympy.Integer(x ^ y) / r
 
-sympy.Number.__and__ = lambda self, other: iand(self, other)
-sympy.Number.__or__ = lambda self, other: ior(self, other)
-sympy.Number.__xor__ = lambda self, other: ixor(self, other)
+sympy.Basic.__and__ = lambda self, other: iand(self, other)
+sympy.Basic.__or__ = lambda self, other: ior(self, other)
+sympy.Basic.__xor__ = lambda self, other: ixor(self, other)
 
 
 # Sympy plotting functions
