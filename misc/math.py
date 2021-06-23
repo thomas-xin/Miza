@@ -189,7 +189,7 @@ def ior(a, b):
 
 def ixor(a, b):
     if hasattr(a, "p") and getattr(a, "q", 1) == 1 and hasattr(b, "p") and getattr(b, "q", 1) == 1:
-        return sympy.Integer(a.p | b.p)
+        return sympy.Integer(a.p ^ b.p)
     r = 1 << 256
     x = round(a * r)
     y = round(b * r)
