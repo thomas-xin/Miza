@@ -29,6 +29,53 @@ deque = collections.deque
 suppress = contextlib.suppress
 
 exc = concurrent.futures.ThreadPoolExecutor(max_workers=3)
+
+def load_mimes():
+    with open("misc/mimes.txt") as f:
+        mimedata = f.read().splitlines()
+        globals()["mimesplitter"] = {}
+        for line in mimedata:
+            dat, ext, mime = line.split("\t")
+            data = hex2bytes(dat)
+            try:
+                mimesplitter[len(data)][data] = (ext, mime)
+            except KeyError:
+                mimesplitter[len(data)] = {}
+                mimesplitter[len(data)][data] = (ext, mime)
+
+exc.submit(load_mimes)
+
+def simple_mimes(b, mime=True):
+    for k, v in reversed(mimesplitter.items()):
+        out = v.get(b[:k])
+        if out:
+            return out[mime]
+    try:
+        s = b.decode("utf-8")
+    except UnicodeDecodeError:
+        return "application/octet-stream" if mime else "bin"
+    return "text/plain" if mime else "txt"
+
+
+def from_file(path, mime=True):
+    path = filetype.get_bytes(path)
+    if mime:
+        out = filetype.guess_mime(path)
+    else:
+        out = filetype.guess_extension(path)
+    if not out:
+        out = simple_mimes(path, mime)
+    return out
+
+magic = cdict(
+    from_file=from_file,
+    from_buffer=from_file,
+    Magic=lambda mime, *args, **kwargs: cdict(
+        from_file=lambda b: from_file(b, mime),
+        from_buffer=lambda b: from_file(b, mime),
+    ),
+)
+
 start = time.time()
 CACHE = {}
 ANIM = False
@@ -2355,7 +2402,7 @@ def from_bytes(b, save=None):
     else:
         data = b
         out = io.BytesIO(b) if type(b) is bytes else b
-    mime = filetype.guess_mime(data)
+    mime = magic.from_buffer(data)
     if mime == "application/zip":
         z = zipfile.ZipFile(io.BytesIO(data), compression=zipfile.ZIP_DEFLATED, strict_timestamps=False)
         return ImageSequence(*(Image.open(z.open(f.filename)) for f in z.filelist))

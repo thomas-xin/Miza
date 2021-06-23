@@ -2060,7 +2060,7 @@ class AudioDownloader:
     def search(self, item, force=False, mode=None, count=1):
         item = verify_search(item)
         if mode is None and count == 1 and item in self.searched:
-            if utc() - self.searched[item].t < 18000:
+            if utc() - self.searched[item].t < 60:
                 return self.searched[item].data
             else:
                 self.searched.pop(item)
@@ -2464,7 +2464,7 @@ class AudioDownloader:
         item = i.url
         if not force:
             if item in self.searched and not item.startswith("ytsearch:"):
-                if utc() - self.searched[item].t < 18000:
+                if utc() - self.searched[item].t < 60:
                     it = self.searched[item].data[0]
                     i.update(it)
                     if i.get("stream") not in (None, "none"):

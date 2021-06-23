@@ -504,7 +504,7 @@ class FileHashDict(collections.abc.MutableMapping):
 
     def keys(self):
         if self.iter is None or self.modified or self.deleted:
-            gen = (try_int(i) for i in os.listdir(self.path) if i not in self.deleted)
+            gen = (try_int(i) for i in os.listdir(self.path) if i not in self.deleted and not i.endswith("\x7f"))
             if self.modified:
                 gen = set(gen)
                 gen.update(self.modified)
@@ -542,6 +542,7 @@ class FileHashDict(collections.abc.MutableMapping):
         with self.sem:
             with open(fn, "rb") as f:
                 s = f.read()
+        fn = fn.rstrip("\x7f")
         data = BaseException
         with tracebacksuppressor:
             data = select_and_loads(s, mode="unsafe")
@@ -653,8 +654,13 @@ class FileHashDict(collections.abc.MutableMapping):
         self.deleted.clear()
         for k in deleted:
             self.data.pop(k, None)
+            fn = self.key_path(k)
             with suppress(FileNotFoundError):
-                os.remove(self.key_path(k))
+                os.remove(fn)
+            with suppress(FileNotFoundError):
+                os.remove(fn + "\x7f")
+            with suppress(FileNotFoundError):
+                os.remove(fn + "\x7f7f")
         while len(self.data) > 1048576:
             self.data.pop(next(iter(self.data)), None)
         return modified.union(deleted)
@@ -1574,17 +1580,20 @@ MIMES = cdict(
     mp4="video/mp4",
 )
 
-with open("misc/mimes.txt") as f:
-    mimedata = f.read().splitlines()
-    mimesplitter = {}
-    for line in mimedata:
-        dat, ext, mime = line.split("\t")
-        data = hex2bytes(dat)
-        try:
-            mimesplitter[len(data)][data] = (ext, mime)
-        except KeyError:
-            mimesplitter[len(data)] = {}
-            mimesplitter[len(data)][data] = (ext, mime)
+def load_mimes():
+    with open("misc/mimes.txt") as f:
+        mimedata = f.read().splitlines()
+        globals()["mimesplitter"] = {}
+        for line in mimedata:
+            dat, ext, mime = line.split("\t")
+            data = hex2bytes(dat)
+            try:
+                mimesplitter[len(data)][data] = (ext, mime)
+            except KeyError:
+                mimesplitter[len(data)] = {}
+                mimesplitter[len(data)][data] = (ext, mime)
+
+create_future_ex(load_mimes)
 
 def simple_mimes(b, mime=True):
     for k, v in reversed(mimesplitter.items()):
