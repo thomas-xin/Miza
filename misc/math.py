@@ -204,6 +204,8 @@ def ixor(a, b):
 sympy.Basic.__and__ = lambda self, other: iand(self, other)
 sympy.Basic.__or__ = lambda self, other: ior(self, other)
 sympy.Basic.__xor__ = lambda self, other: ixor(self, other)
+sympy.core.numbers.Infinity.__str__ = lambda self: "inf"
+sympy.core.numbers.ComplexInfinity.__str__ = lambda self: "nan"
 
 
 # Sympy plotting functions
@@ -519,9 +521,6 @@ ftrans = "".maketrans(translators)
 
 # Use more conventional names for non-finite outputs
 
-def convAns(f):
-    return str(f).replace("zoo", "nan").replace("oo", "inf")
-
 def prettyAns(f):
     return sympy.pretty(
         f,
@@ -625,18 +624,18 @@ def evalSym(f, prec=64, r=False, variables=None):
                     e = e.subs(i, rounder(i))
         if r:
             p = prettyAns(f)
-            if p == convAns(e):
+            if p == str(e):
                 p = ""
             return [f, p]
         p = prettyAns(f)
-        if p == convAns(e):
+        if p == str(e):
             p = ""
         if "." in str(e):
             e = str(e).rstrip("0")
         return [e, p]
     else:
         p = prettyAns(f)
-        if p == convAns(f):
+        if p == str(f):
             p = ""
         return [f, p]
 
@@ -669,7 +668,7 @@ def procResp(resp):
     elif type(resp) is tuple:
         s = list(resp)
     else:
-        s = [convAns(i) for i in resp]
+        s = [str(i) for i in resp]
     return s
 
 
