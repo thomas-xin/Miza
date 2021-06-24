@@ -49,7 +49,7 @@ def get_video(url, fps=None):
             url = url.replace("?dl=0", "?dl=1")
     return url, size, dur, fps
 
-VIDEOS = ("gif", "webp", "apng", "mp4", "webm", "mov", "wmv", "flv", "avi", "qt", "f4v")
+VIDEOS = ("gif", "webp", "apng", "mp4", "webm", "mov", "wmv", "flv", "avi", "qt", "f4v", "zip")
 
 
 class IMG(Command):
@@ -823,14 +823,26 @@ class Colour(Command):
 
 # class Gradient(Command):
 #     description = "Generates a gradient with a specific shape."
-#     usage = "(linear|radial|conical|spiral|polygon) <0:count(1)>? <1:colour(white)>"
+#     usage = "(linear|radial|conical|spiral|polygon)? <0:count(1)>? <1:colour(white)>?"
 #     no_parse = True
 #     rate_limit = (2, 5)
 #     typing = True
 
 #     async def __call__(self, bot, user, message, channel, args, **void):
-#         if args[0] not in "linear|radial|conical|spiral|polygon".split("|"):
+#         if not args:
+#             shape = "linear"
+#         else:
+#             shape = args.pop(0)
+#         elif shape not in "linear|radial|conical|spiral|polygon".split("|"):
 #             raise TypeError(f"Invalid gradient shape {args[0]}.")
+#         if args:
+#             colour = args.pop(-1)
+#             channels = parse_colour(colour)
+#         with discord.context_managers.Typing(channel):
+#             # -gif signals to image subprocess that the output is always a .gif image
+#             resp = await process_image(url, "gradient", [value, "-gif", "-f", fmt], timeout=_timeout)
+#             fn = resp[0]
+#         await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
 class Average(Command):
@@ -1120,7 +1132,7 @@ class CreateGIF(Command):
                 raise ArgumentError("Please input an image by URL or attachment.")
         if name in ("frames", "imagesequence"):
             fmt = "zip"
-        elif args[-1] in VIDEOS + ("zip",):
+        elif args[-1] in VIDEOS:
             fmt = args.pop(-1)
         else:
             fmt = "gif"

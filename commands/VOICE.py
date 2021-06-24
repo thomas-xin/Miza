@@ -2254,9 +2254,15 @@ class AudioDownloader:
                 raise LookupError(f"No stream URLs found for {url}")
             ffmpeg = "ffmpeg"
             if len(ast) <= 1:
-                if ast and not is_youtube_stream(ast[0]["stream"]):
-                    ffmpeg = "misc/ffmpeg-c/ffmpeg.exe"
-            args = alist((ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+fastseek+genpts+igndts+flush_packets", "-y"))
+                if ast:
+                    if not is_youtube_stream(ast[0]["stream"]):
+                        ffmpeg = "misc/ffmpeg-c/ffmpeg.exe"
+                    cdc = codec = as_str(subprocess.check_output(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "format=format_name", "-of", "default=nokey=1:noprint_wrappers=1", ast[0]["stream"]])).strip()
+                    if fmt in cdc.split(","):
+                        copy = True
+            else:
+                copy = False
+            args = alist((ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y"))
             if vst:
                 if len(vst) > 1:
                     codec_map = {}
@@ -2341,7 +2347,7 @@ class AudioDownloader:
                 br = "256"
                 outf = f"{info['name']}.wav"
                 fn = f"cache/\x7f{ts}~" + outf.translate(filetrans)
-            if ast:
+            if not copy and ast:
                 args.extend(("-ar", sr, "-ac", ac, "-b:a", str(br)))
             if copy:
                 args.extend(("-c", "copy", fn))
@@ -2420,7 +2426,7 @@ class AudioDownloader:
                             f.write(f"file '{fn2.split('/', 1)[-1]}'\n" * times)
                         args = [
                             "ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-hwaccel", "auto",
-                            "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+fastseek+genpts+igndts+flush_packets",
+                            "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets",
                             "-protocol_whitelist", "concat,tls,tcp,file,http,https",
                             "-to", str(odur), "-f", "concat", "-safe", "0",
                             "-i", loopf, "-c", "copy", fn
