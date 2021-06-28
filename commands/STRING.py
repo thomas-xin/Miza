@@ -819,7 +819,7 @@ class Identify(Command):
         argv += " ".join(best_url(a) for a in message.attachments)
         urls = await bot.follow_url(argv, allow=True, images=False)
         if not urls:
-            async for m2 in self.bot.history(message.channel, limit=5, before=message.id - 1):
+            async for m2 in self.bot.history(message.channel, limit=5, before=message.id):
                 argv = m2.content + " ".join(best_url(a) for a in m2.attachments)
                 urls = await bot.follow_url(argv, allow=True, images=False)
                 if urls:

@@ -1286,10 +1286,7 @@ class UpdateAutoEmojis(Database):
                     spl = [emi]
             if len(spl) == 1:
                 ems = spl[0]
-                async for m2 in self.bot.history(message.channel, limit=5, before=message.id - 1):
-                    m_id = m2.id
-                    if m2.author.id != self.bot.id:
-                        break
+                m2 = await self.bot.history(message.channel, limit=1, before=message.id).__anext__()
             else:
                 m2 = None
                 m_id = int(m_id)
@@ -1312,7 +1309,6 @@ class UpdateAutoEmojis(Database):
                             if name.isnumeric():
                                 emoji = int(name)
                             else:
-                                emojis = self.guild_emoji_map(guild, dict(orig))
                                 t = name[::-1].replace("~", "-", 1)[::-1].rsplit("-", 1)
                                 if t[-1].isnumeric():
                                     i = int(t[-1])

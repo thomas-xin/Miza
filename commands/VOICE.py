@@ -3015,11 +3015,11 @@ class Skip(Command):
     rate_limit = (0.5, 3)
     slash = True
 
-    async def __call__(self, bot, user, perm, name, args, argv, guild, flags, message, **void):
+    async def __call__(self, bot, channel, user, perm, name, args, argv, guild, flags, message, **void):
         if guild.id not in bot.data.audio.players:
             raise LookupError("Currently not playing in a voice channel.")
         auds = bot.data.audio.players[guild.id]
-        auds.text = message.channel
+        auds.text = channel
         # ~clear is an alias for ~skip -f inf
         if name.startswith("c"):
             argv = "inf"
@@ -3166,7 +3166,7 @@ class Pause(Command):
         if guild.id not in bot.data.audio.players:
             raise LookupError("Currently not playing in a voice channel.")
         auds = bot.data.audio.players[guild.id]
-        auds.text = message.channel
+        auds.text = channel
         if name in ("pause", "stop", "⏸️", "⏯️", "⏹️"):
             if not is_alone(auds, user) and perm < 1:
                 raise self.perm_error(perm, 1, f"to {name} while other users are in voice")
@@ -3200,7 +3200,7 @@ class Seek(Command):
         if guild.id not in bot.data.audio.players:
             raise LookupError("Currently not playing in a voice channel.")
         auds = bot.data.audio.players[guild.id]
-        auds.text = message.channel
+        auds.text = channel
         if not is_alone(auds, user) and perm < 1:
             raise self.perm_error(perm, 1, "to seek while other users are in voice")
         # ~replay always seeks to position 0
@@ -3519,7 +3519,7 @@ class Roll(Command):
         if guild.id not in bot.data.audio.players:
             raise LookupError("Currently not playing in a voice channel.")
         auds = bot.data.audio.players[guild.id]
-        auds.text = message.channel
+        auds.text = channel
         if not argv:
             amount = 1
         else:
@@ -3549,7 +3549,7 @@ class Shuffle(Command):
         if guild.id not in bot.data.audio.players:
             raise LookupError("Currently not playing in a voice channel.")
         auds = bot.data.audio.players[guild.id]
-        auds.text = message.channel
+        auds.text = channel
         if len(auds.queue) > 1:
             if not is_alone(auds, user) and perm < 1:
                 raise self.perm_error(perm, 1, "to shuffle queue while other users are in voice")
@@ -3578,7 +3578,7 @@ class Reverse(Command):
         if guild.id not in bot.data.audio.players:
             raise LookupError("Currently not playing in a voice channel.")
         auds = bot.data.audio.players[guild.id]
-        auds.text = message.channel
+        auds.text = channel
         if len(auds.queue) > 1:
             if not is_alone(auds, user) and perm < 1:
                 raise self.perm_error(perm, 1, "to reverse queue while other users are in voice")

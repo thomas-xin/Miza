@@ -1089,10 +1089,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         if "channel_cache" in self.data:
             async for message in self.data.channel_cache.get(channel.id):
                 if before:
-                    if message.id > time_snowflake(before):
+                    if message.id >= time_snowflake(before):
                         continue
                 if after:
-                    if message.id < time_snowflake(after):
+                    if message.id <= time_snowflake(after):
                         break
                 found.add(message.id)
                 yield message
