@@ -3483,23 +3483,28 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
     # Deletes own messages if any of the "X" emojis are reacted by a user with delete message permission level, or if the message originally contained the corresponding reaction from the bot.
     async def check_to_delete(self, message, reaction, user):
-        if message.author.id == self.id or getattr(message, "webhook_id", None):
-            with suppress(discord.NotFound):
-                u_perm = self.get_perms(user.id, message.guild)
-                check = False
-                if not u_perm < 3:
-                    check = True
-                else:
-                    for react in message.reactions:
-                        if str(reaction) == str(react):
-                            async for u in react.users():
-                                if u.id == self.id:
-                                    check = True
-                                    break
-                if check and user.id != self.id:
-                    s = str(reaction)
-                    if s in "❌✖️🇽❎":
+        with suppress(discord.NotFound):
+            u_perm = self.get_perms(user.id, message.guild)
+            check = False
+            if not u_perm < 3:
+                check = True
+            else:
+                for react in message.reactions:
+                    if str(reaction) == str(react):
+                        if react.me:
+                            check = True
+                            break
+                        # async for u in react.users():
+                        #     if u.id == self.id:
+                        #         check = True
+                        #         break
+            if check and user.id != self.id:
+                s = str(reaction)
+                if s in "❌✖️🇽❎":
+                    if message.author.id == self.id or getattr(message, "webhook_id", None):
                         await self.silent_delete(message, exc=True)
+                else:
+                    await message.remove_reaction(reaction, self.user)
 
     # Handles a new sent message, calls process_message and sends an error if an exception occurs.
     async def handle_message(self, message, edit=True):

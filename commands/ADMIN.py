@@ -2433,7 +2433,7 @@ class UpdateStarboards(Database):
                 count = sum(r.count for r in message.reactions if str(r.emoji) == react)
                 if count <= 1:
                     message = await message.channel.fetch_message(message.id)
-                    self.bot.add_message(message, files=False)
+                    self.bot.add_message(message, files=False, force=True)
                     count = sum(r.count for r in message.reactions if str(r.emoji) == react)
                 if message.id not in table.setdefault(None, {}):
                     if count >= req and count < req + 2:
