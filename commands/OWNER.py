@@ -337,7 +337,7 @@ class UpdateExec(Database):
                     proc = message.content.strip()
                     if proc:
                         # Ignore commented messages
-                        if proc.startswith("//") or proc.startswith("||") or proc.startswith("\\") or proc.startswith("#") or proc.startswith("<") or proc.startswith(":"):
+                        if proc[:2] in ("//", "||") or proc[0] in "\\#<:;+":
                             return
                         if proc.startswith("`") and proc.endswith("`"):
                             if proc.startswith("```"):

@@ -2766,4 +2766,4 @@ class Rickroll(Command):
 <meta http-equiv="refresh" content="0;url=https://www.youtube.com/watch?v={vid}">
 </head><body></body></html>"""
         urls = await create_future(bot._globals["as_file"], s.encode("utf-8"))
-        return urls[0]
+        return urls[0].replace("/p/", "/f/", 1)

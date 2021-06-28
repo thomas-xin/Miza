@@ -838,11 +838,11 @@ class Status(Command):
         set_dict(bot.data.messages, channel.id, {})[message.id] = cdict(t=0, command="bot.commands.status[0]")
         bot.data.messages.update(channel.id)
 
-    async def _callback2_(self, channel, m_id=None, msg=None, **void):
+    async def _callback2_(self, channel, m_id=None, msg=None, colour=None, **void):
         bot = self.bot
         if not hasattr(bot, "bitrate"):
             return
-        emb = discord.Embed(colour=rand_colour())
+        emb = discord.Embed(colour=colour or rand_colour())
         url = await self.bot.get_proxy_url(self.bot.user)
         emb.set_author(name="Status", url=bot.webserver, icon_url=url)
         emb.timestamp = utc_dt()
@@ -1439,6 +1439,7 @@ class UpdateMessages(Database):
     name = "messages"
     semaphore = Semaphore(80, 1, delay=1, rate_limit=16)
     closed = False
+    hue = 0
 
     async def wrap_semaphore(self, func, *args, **kwargs):
         with tracebacksuppressor(SemaphoreOverflowError):
@@ -1447,6 +1448,8 @@ class UpdateMessages(Database):
 
     async def __call__(self, **void):
         if self.bot.bot_ready and not self.closed:
+            self.hue += 128
+            col = colour2raw(hue2colour(self.hue))
             t = utc()
             for c_id, data in tuple(self.data.items()):
                 with tracebacksuppressor():
@@ -1460,17 +1463,19 @@ class UpdateMessages(Database):
                         for m_id, v in data.items():
                             if t - v.t >= 1:
                                 v.t = t
-                                create_task(self.wrap_semaphore(eval(v.command, self.bot._globals)._callback2_, channel=channel, m_id=m_id))
+                                create_task(self.wrap_semaphore(eval(v.command, self.bot._globals)._callback2_, channel=channel, m_id=m_id, colour=col))
 
     async def _destroy_(self, **void):
         self.closed = True
+        self.hue += 128
+        col = colour2raw(hue2colour(self.hue))
         msg = "Offline 😔"
         for c_id, data in self.data.items():
             with tracebacksuppressor(SemaphoreOverflowError):
                 channel = await self.bot.fetch_channel(c_id)
                 for m_id, v in data.items():
                     async with self.semaphore:
-                        await eval(v.command, self.bot._globals)._callback2_(channel=channel, m_id=m_id, msg=msg)
+                        await eval(v.command, self.bot._globals)._callback2_(channel=channel, m_id=m_id, msg=msg, colour=col)
 
 
 

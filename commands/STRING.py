@@ -818,6 +818,12 @@ class Identify(Command):
     async def __call__(self, bot, channel, argv, user, message, **void):
         argv += " ".join(best_url(a) for a in message.attachments)
         urls = await bot.follow_url(argv, allow=True, images=False)
+        if not urls:
+            async for m2 in self.bot.history(message.channel, limit=5, before=message.id - 1):
+                argv = m2.content + " ".join(best_url(a) for a in m2.attachments)
+                urls = await bot.follow_url(argv, allow=True, images=False)
+                if urls:
+                    break
         urls = set(urls)
         names = [url.rsplit("/", 1)[-1].rsplit("?", 1)[0] for url in urls]
         futs = [create_future(self.identify, url) for url in urls]

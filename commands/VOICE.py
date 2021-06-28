@@ -2933,26 +2933,7 @@ class Connect(Command):
             if vc is not None:
                 vc_ = vc
             else:
-                # Otherwise attempt to match user's currently connected voice channel
-                voice = user.voice
-                member = user.guild.me
-                if voice is None:
-                    # Otherwise attempt to find closest voice channel to current text channel
-                    catg = channel.category
-                    if catg is not None:
-                        channels = catg.voice_channels
-                    else:
-                        channels = None
-                    if not channels:
-                        pos = 0 if channel.category is None else channel.category.position
-                        # Sort by distance from text channel
-                        channels = sorted(tuple(channel for channel in channel.guild.voice_channels if channel.permissions_for(member).connect and channel.permissions_for(member).speak and channel.permissions_for(member).use_voice_activation), key=lambda channel: (abs(pos - (channel.position if channel.category is None else channel.category.position)), abs(channel.position)))
-                    if channels:
-                        vc_ = channels[0]
-                    else:
-                        raise LookupError("Unable to find voice channel.")
-                else:
-                    vc_ = voice.channel
+                vc_ = select_voice_channel(user, channel)
         # target guild may be different from source guild
         if vc_ is None:
             guild = channel.guild
@@ -3182,7 +3163,10 @@ class Pause(Command):
     slash = True
 
     async def __call__(self, bot, name, guild, user, perm, channel, flags, **void):
-        auds = await auto_join(guild, channel, user, bot)
+        if guild.id not in bot.data.audio.players:
+            raise LookupError("Currently not playing in a voice channel.")
+        auds = bot.data.audio.players[guild.id]
+        auds.text = message.channel
         if name in ("pause", "stop", "⏸️", "⏯️", "⏹️"):
             if not is_alone(auds, user) and perm < 1:
                 raise self.perm_error(perm, 1, f"to {name} while other users are in voice")
@@ -3213,7 +3197,10 @@ class Seek(Command):
     slash = True
 
     async def __call__(self, argv, bot, guild, user, perm, channel, name, flags, **void):
-        auds = await auto_join(guild, channel, user, bot)
+        if guild.id not in bot.data.audio.players:
+            raise LookupError("Currently not playing in a voice channel.")
+        auds = bot.data.audio.players[guild.id]
+        auds.text = message.channel
         if not is_alone(auds, user) and perm < 1:
             raise self.perm_error(perm, 1, "to seek while other users are in voice")
         # ~replay always seeks to position 0
@@ -3529,7 +3516,10 @@ class Roll(Command):
     rate_limit = (4, 9)
 
     async def __call__(self, perm, argv, flags, guild, channel, user, bot, **void):
-        auds = await auto_join(guild, channel, user, bot)
+        if guild.id not in bot.data.audio.players:
+            raise LookupError("Currently not playing in a voice channel.")
+        auds = bot.data.audio.players[guild.id]
+        auds.text = message.channel
         if not argv:
             amount = 1
         else:
@@ -3556,7 +3546,10 @@ class Shuffle(Command):
     slash = True
 
     async def __call__(self, perm, flags, guild, channel, user, bot, **void):
-        auds = await auto_join(guild, channel, user, bot)
+        if guild.id not in bot.data.audio.players:
+            raise LookupError("Currently not playing in a voice channel.")
+        auds = bot.data.audio.players[guild.id]
+        auds.text = message.channel
         if len(auds.queue) > 1:
             if not is_alone(auds, user) and perm < 1:
                 raise self.perm_error(perm, 1, "to shuffle queue while other users are in voice")
@@ -3582,7 +3575,10 @@ class Reverse(Command):
     rate_limit = (4, 9)
 
     async def __call__(self, perm, flags, guild, channel, user, bot, **void):
-        auds = await auto_join(guild, channel, user, bot)
+        if guild.id not in bot.data.audio.players:
+            raise LookupError("Currently not playing in a voice channel.")
+        auds = bot.data.audio.players[guild.id]
+        auds.text = message.channel
         if len(auds.queue) > 1:
             if not is_alone(auds, user) and perm < 1:
                 raise self.perm_error(perm, 1, "to reverse queue while other users are in voice")
@@ -3852,7 +3848,7 @@ class Party(Command):
     ))
 
     async def __call__(self, bot, guild, channel, user, argv, **void):
-        auds = await auto_join(guild, channel, user, bot)
+        vc = select_voice_channel(user, channel)
         if not argv:
             argv = "YouTube"
         try:
@@ -3861,19 +3857,18 @@ class Party(Command):
             if not argv.isnumeric():
                 raise KeyError(f"Unsupported party application: {argv}")
             aid = int(argv)
-        cid = auds.channel.id
         # invites = await bot.get_full_invites(guild)
         # for invite in invites:
         #     if invite.max_age == invite.max_uses == 0:
         #         c = invite.get("channel", {})
-        #         if c.get("id") == cid:
+        #         if c.get("id") == vc.id:
         #             app = invite.get("target_application")
         #             if app:
         #                 if app.get("id") == aid:
         #                     return f"https://discord.gg/{invite.code}"
         async with self.sem:
             data = await Request(
-                f"https://discord.com/api/v9/channels/{cid}/invites",
+                f"https://discord.com/api/v9/channels/{vc.id}/invites",
                 method="POST",
                 data=json.dumps(dict(
                     max_age=0,

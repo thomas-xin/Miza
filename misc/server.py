@@ -372,7 +372,6 @@ class Server:
                         url, code, ftype = json.loads(s)
                         if ftype == 1:
                             data = resp.encode("utf-8")
-                            cp.response.headers.update(CHEADERS)
                             cp.response.headers["Location"] = url
                             cp.response.headers["Content-Type"] = mime
                             cp.response.headers["Content-Length"] = len(data)
@@ -387,7 +386,6 @@ class Server:
                             resp = requests.get(url, headers=headers, stream=True)
                             resp.raw.decode_content = False
                             headers = fcdict(resp.headers)
-                            headers.update(fcdict(CHEADERS))
                             cd = headers.get("Content-Disposition")
                             if cd:
                                 if not download:
@@ -410,6 +408,28 @@ class Server:
                             return cp.lib.file_generator(f, 65536)
             return cp.lib.static.serve_file(p, content_type=mime, name=attachment, disposition="attachment" if download else None)
     files._cp_config = {"response.stream": True}
+
+    # @cp.expose
+    # def thumbnail(self, url):
+    #     headers = fcdict(cp.request.headers)
+    #     headers.pop("Remote-Addr", None)
+    #     headers.pop("Host", None)
+    #     headers.update(Request.header())
+    #     with requests.get(url, headers=headers, stream=True) as resp:
+    #         ct = resp.headers.get("Content-Type")
+    #         if ct == "text/html":
+    #             it = resp.iter_content(65536)
+    #             s = next(it).decode("utf-8", "replace")
+                
+    #     s = f'<!DOCTYPE HTML><html><meta http-equiv="refresh" content="0; URL={url}"/></html>'
+    #     data = resp.encode("utf-8")
+    #     cp.response.headers.update(CHEADERS)
+    #     cp.response.headers["Location"] = url
+    #     cp.response.headers["Content-Type"] = mime
+    #     cp.response.headers["Content-Length"] = len(data)
+    #     cp.response.headers["ETag"] = create_etag(data)
+    #     cp.response.status = int(code)
+    #     return data
 
     @cp.expose
     def static(self, *filepath):

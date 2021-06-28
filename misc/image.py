@@ -200,8 +200,60 @@ def get_request(url):
         return resp.content
 
 
-from_colour = lambda colour, size=128, key=None: Image.new("RGB", (size, size), tuple(colour))
+from_colour = lambda colour, size=128, key=None: Image.new("RGB" + "A" * (len(colour) > 3), (size, size), tuple(colour))
 
+def from_gradient(shape, count, colour):
+    mode = "RGB" + "A" * (len(colour) > 3)
+    s = 960
+    if shape == "linear":
+        data = np.linspace(0, count, num=s, dtype=np.float32)
+        if count > 1:
+            data %= 1
+        data = [(data * c).astype(np.uint8) for c in colour]
+        spl = [fromarray(i) for i in data]
+        im = Image.merge(mode, spl)
+        return im.resize((s,) * 2, resample=Image.NEAREST)
+    if shape == "radial":
+        try:
+            data = globals()["g-1"]
+        except KeyError:
+            data = np.linspace(-1, 1, num=s, dtype=np.float32)
+            data **= 2
+            data = np.array([data] * s)
+            data += data.T
+            data = np.sqrt(data, out=data)
+            np.subtract(1, data, out=data)
+            np.clip(data, 0, None, out=data)
+            globals()["g-1"] = data
+        if count != 1:
+            data = data * count
+            if count > 1:
+                data %= 1
+        data = [(data * c).astype(np.uint8) for c in colour]
+        spl = [fromarray(i) for i in data]
+        return Image.merge(mode, spl)
+    if shape == "conical":
+        try:
+            data = globals()["g-2"]
+        except KeyError:
+            m = (s - 1) / 2
+            row = np.arange(s, dtype=np.float32)
+            row -= m
+            data = [None] * s
+            for i in range(s):
+                data[i] = a = np.arctan2(i - m, row)
+                a *= 1 / tau
+            data = np.float32(data).T
+            globals()["g-2"] = data
+        if count != 1:
+            data = data * count
+            if count > 1:
+                data %= 1
+        data = [(data * c).astype(np.uint8) for c in colour]
+        spl = [fromarray(i) for i in data]
+        return Image.merge(mode, spl)
+    if shape == "polygon":
+        pass
 
 def rgb_split(image, dtype=np.uint8):
     channels = None
@@ -1940,6 +1992,7 @@ blenders = {
     "value": "SP_VAL",
     "color": "SP_COL",
     "colour": "SP_COL",
+    "alpha": "SP_ALP",
 }
 halve = (np.arange(1, 257) >> 1).astype(np.uint8)
 darken = np.concatenate((np.zeros(128, dtype=np.uint8), np.arange(128, dtype=np.uint8)))
@@ -2009,8 +2062,8 @@ def blend_op(image, url, operation, amount, recursive=True):
             image2 = image2.convert("RGBA")
         if str(image2.mode) != "RGBA":
             image2 = image2.convert("RGBA")
-        imgA = np.array(image).astype(float)
-        imgB = np.array(image2).astype(float)
+        imgA = np.array(image).astype(np.float64)
+        imgB = np.array(image2).astype(np.float64)
         out = fromarray(np.uint8(filt(imgA, imgB, amount)), image.mode)
     else:
         # Basic blend, use second image
@@ -2039,47 +2092,58 @@ def blend_op(image, url, operation, amount, recursive=True):
         # Special operation, use HSV channels
         elif filt.startswith("SP_"):
             f = filt[3:]
-            if str(image.mode) == "P":
-                image = image.convert("RGBA")
-            if str(image.mode) == "RGBA":
-                A1 = image.getchannel("A")
-            else:
-                A1 = None
-            if str(image2.mode) == "P" and "transparency" in image2.info:
-                image2 = image2.convert("RGBA")
-            if str(image2.mode) == "RGBA":
-                A2 = image2.getchannel("A")
-            else:
-                A2 = None
-            if f[0] == "L":
-                channels1 = hsl_split(image, convert=False)
-                channels2 = hsl_split(image2, convert=False)
-            else:
-                channels1 = image.convert("HSV").split()
-                channels2 = image2.convert("HSV").split()
-                # channels1 = hsv_split(image, convert=False)
-                # channels2 = hsv_split(image2, convert=False)
-            if f == "HUE":
-                channels = [channels2[0], channels1[1], channels1[2]]
-            elif f == "SAT":
-                channels = [channels1[0], channels2[1], channels1[2]]
-            elif f in ("LUM", "VAL"):
-                channels = [channels1[0], channels1[1], channels2[2]]
-            elif f == "COL":
-                channels = [channels2[0], channels2[1], channels1[2]]
-            if f[0] == "L":
-                out = hsl_merge(*channels)
-            else:
-                out = Image.merge("HSV", channels).convert("RGB")
-                # out = hsv_merge(*channels)
-            if A1 or A2:
-                if not A1:
-                    A = A2
-                elif not A2:
-                    A = A1
+            if f == "ALP":
+                if "A" in image2.mode:
+                    if amount % 1:
+                        out = image.copy()
+                    else:
+                        out = image
+                    out.putalpha(image2.getchannel("A"))
                 else:
-                    A = ImageMath.eval("max(X,Y)", dict(X=A1, Y=A2)).convert("L")
-                out.putalpha(A)
+                    out = image
+                    amount = 0
+            else:
+                if str(image.mode) == "P":
+                    image = image.convert("RGBA")
+                if str(image.mode) == "RGBA":
+                    A1 = image.getchannel("A")
+                else:
+                    A1 = None
+                if str(image2.mode) == "P" and "transparency" in image2.info:
+                    image2 = image2.convert("RGBA")
+                if str(image2.mode) == "RGBA":
+                    A2 = image2.getchannel("A")
+                else:
+                    A2 = None
+                if f[0] == "L":
+                    channels1 = hsl_split(image, convert=False)
+                    channels2 = hsl_split(image2, convert=False)
+                else:
+                    channels1 = image.convert("HSV").split()
+                    channels2 = image2.convert("HSV").split()
+                    # channels1 = hsv_split(image, convert=False)
+                    # channels2 = hsv_split(image2, convert=False)
+                if f == "HUE":
+                    channels = [channels2[0], channels1[1], channels1[2]]
+                elif f == "SAT":
+                    channels = [channels1[0], channels2[1], channels1[2]]
+                elif f in ("LUM", "VAL"):
+                    channels = [channels1[0], channels1[1], channels2[2]]
+                elif f == "COL":
+                    channels = [channels2[0], channels2[1], channels1[2]]
+                if f[0] == "L":
+                    out = hsl_merge(*channels)
+                else:
+                    out = Image.merge("HSV", channels).convert("RGB")
+                    # out = hsv_merge(*channels)
+                if A1 or A2:
+                    if not A1:
+                        A = A2
+                    elif not A2:
+                        A = A1
+                    else:
+                        A = ImageMath.eval("max(X,Y)", dict(X=A1, Y=A2)).convert("L")
+                    out.putalpha(A)
         elif filt in ("OVERFLOW", "LIGHTING"):
             if str(image.mode) != str(image2.mode):
                 if image.mode == "RGBA" or image2.mode == "RGBA":
@@ -2602,6 +2666,8 @@ def evalImg(url, operation, args):
         elif new["count"] == 1:
             new = next(iter(frames))
         else:
+            if fmt in ("png", "jpg", "jpeg", "bmp"):
+                fmt = "gif"
             print(duration, new["count"])
             out = "cache/" + str(ts) + "." + fmt
             # if new["count"] <= 1024:

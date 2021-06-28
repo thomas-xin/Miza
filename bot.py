@@ -1098,6 +1098,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 yield message
                 if limit is not None and len(found) >= limit:
                     return
+        if type(before) is int:
+            before = cdict(id=before)
+        if type(after) is int:
+            after = cdict(id=after)
         async for message in channel.history(limit=limit, before=before, after=after):
             if message.id not in found:
                 self.add_message(message, files=False, force=True)
@@ -3423,7 +3427,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         self.activity += 1
                         self.api_latency = resp.elapsed.total_seconds()
                     except:
-                        self.api_latency = inf
+                        if hasattr(self, "api_latency"):
+                            self.api_latency *= 2
+                        else:
+                            self.api_latency = inf
                         print_exc()
 
     # The lazy update loop that runs once every 2-4 seconds.

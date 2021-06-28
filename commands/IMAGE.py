@@ -821,28 +821,34 @@ class Colour(Command):
         await bot.send_with_file(channel, msg, f, filename=fn, best=True, reference=message)
 
 
-# class Gradient(Command):
-#     description = "Generates a gradient with a specific shape."
-#     usage = "(linear|radial|conical|spiral|polygon)? <0:count(1)>? <1:colour(white)>?"
-#     no_parse = True
-#     rate_limit = (2, 5)
-#     typing = True
+class Gradient(Command):
+    description = "Generates a gradient with a specific shape."
+    usage = "(linear|radial|conical|spiral|polygon)? <0:count(1)>? <1:colour(white)>?"
+    no_parse = True
+    rate_limit = (2, 5)
+    typing = True
 
-#     async def __call__(self, bot, user, message, channel, args, **void):
-#         if not args:
-#             shape = "linear"
-#         else:
-#             shape = args.pop(0)
-#         elif shape not in "linear|radial|conical|spiral|polygon".split("|"):
-#             raise TypeError(f"Invalid gradient shape {args[0]}.")
-#         if args:
-#             colour = args.pop(-1)
-#             channels = parse_colour(colour)
-#         with discord.context_managers.Typing(channel):
-#             # -gif signals to image subprocess that the output is always a .gif image
-#             resp = await process_image(url, "gradient", [value, "-gif", "-f", fmt], timeout=_timeout)
-#             fn = resp[0]
-#         await bot.send_with_file(channel, "", fn, filename=name, reference=message)
+    async def __call__(self, bot, user, message, channel, args, **void):
+        if not args:
+            shape = "linear"
+        else:
+            shape = args.pop(0)
+        if shape not in "linear|radial|conical|spiral|polygon".split("|"):
+            raise TypeError(f"Invalid gradient shape {args[0]}.")
+        if args:
+            colour = args.pop(-1)
+            colour = parse_colour(colour)
+        else:
+            colour = (255,) * 3
+        if args:
+            count = await bot.eval_math(" ".join(args))
+        else:
+            count = 1
+        with discord.context_managers.Typing(channel):
+            resp = await process_image("from_gradient", "$", [shape, count, colour])
+            fn = resp[0]
+            f = CompatFile(fn, filename="gradient.png")
+        await bot.send_with_file(channel, "", f, filename=fn, best=True, reference=message)
 
 
 class Average(Command):
@@ -897,7 +903,7 @@ class Average(Command):
             )
             resp = await process_image("from_colour", "$", [channels])
             fn = resp[0]
-            f = CompatFile(fn, filename="colour.png")
+            f = CompatFile(fn, filename="average.png")
         await bot.send_with_file(channel, msg, f, filename=fn, best=True, reference=message)
         # return css_md("#" + bytes2hex(bytes(raw2colour(colour)), space=False))
 
@@ -1358,7 +1364,7 @@ class Fill(Command):
 class Blend(Command):
     name = ["ImageBlend", "ImageOP"]
     description = "Combines the two supplied images, using an optional blend operation."
-    usage = "<0:url1> <1:url2> (replace|add|sub|mul|div|mod|and|or|xor|nand|nor|xnor|difference|overlay|screen|soft|hard|lighten|darken|plusdarken|overflow|lighting|burn|linearburn|dodge|hue|sat|lum|colour|extract|merge)? <3:opacity(0.5|1)>?"
+    usage = "<0:url1> <1:url2> (normal|replace|add|sub|mul|div|mod|and|or|xor|nand|nor|xnor|difference|overlay|screen|soft|hard|lighten|darken|plusdarken|overflow|lighting|burn|linearburn|dodge|hue|sat|lum|colour|extract|merge)? <3:opacity(0.5|1)>?"
     no_parse = True
     rate_limit = (3, 8)
     flags = "l"

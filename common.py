@@ -1029,6 +1029,30 @@ async def send_with_react(channel, *args, reacts=None, reference=None, mention=F
         return sent
 
 
+def select_voice_channel(user, channel):
+    # Attempt to match user's currently connected voice channel
+    voice = user.voice
+    member = user.guild.me
+    if voice is None:
+        # Otherwise attempt to find closest voice channel to current text channel
+        catg = channel.category
+        if catg is not None:
+            channels = catg.voice_channels
+        else:
+            channels = None
+        if not channels:
+            pos = 0 if channel.category is None else channel.category.position
+            # Sort by distance from text channel
+            channels = sorted(tuple(channel for channel in channel.guild.voice_channels if channel.permissions_for(member).connect and channel.permissions_for(member).speak and channel.permissions_for(member).use_voice_activation), key=lambda channel: (abs(pos - (channel.position if channel.category is None else channel.category.position)), abs(channel.position)))
+        if channels:
+            vc = channels[0]
+        else:
+            raise LookupError("Unable to find voice channel.")
+    else:
+        vc = voice.channel
+    return vc
+
+
 # Creates and starts a coroutine for typing in a channel.
 typing = lambda self: create_task(self.trigger_typing())
 
