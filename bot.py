@@ -2191,7 +2191,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             c = await create_future(proc.cpu_percent, priority=True)
             if not c:
                 await asyncio.sleep(1)
-                c = await create_future(proc.cpu_percent, priority=True)
+                c = await create_future(proc.cpu_percent, priority=False)
             m = await create_future(proc.memory_percent, priority=True)
             return float(c), float(m)
         return 0, 0
@@ -2199,7 +2199,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     async def get_disk(self):
         with tracebacksuppressor(SemaphoreOverflowError):
             async with self.disk_semaphore:
-                disk = await create_future(get_folder_size, "cache", priority=True)
+                disk = await create_future(get_folder_size, "cache", priority=False)
                 disk += await create_future(get_folder_size, "saves", priority=True)
                 self.disk = disk
         return self.disk
@@ -2213,7 +2213,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             tasks = [self.get_proc_state(p) for p in procs]
             resp = await recursive_coro(tasks)
             stats += [sum(st[0] for st in resp), sum(st[1] for st in resp), 0]
-            cpu = await create_future(psutil.cpu_count, logical=True, priority=True)
+            cpu = await create_future(psutil.cpu_count, logical=True, priority=False)
             mem = await create_future(psutil.virtual_memory, priority=True)
             disk = self.disk
             # CPU is totalled across all cores
@@ -2902,7 +2902,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                                 if type(response) is list or type(response) is alist and getattr(guild, "ghost", None):
                                     futs = deque()
                                     for r in response:
-                                        async with delay(1 / 3):
+                                        async with Delay(1 / 3):
                                             futs.append(create_task(channel.send(r)))
                                     for fut in futs:
                                         await fut
@@ -2910,7 +2910,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                                     m = guild.me
                                     futs = deque()
                                     for r in response:
-                                        async with delay(1 / 3):
+                                        async with Delay(1 / 3):
                                             url = await self.get_proxy_url(m)
                                             futs.append(create_task(self.send_as_webhook(channel, r, username=m.display_name, avatar_url=url)))
                                     for fut in futs:
@@ -3136,7 +3136,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                                 single = True
             if single:
                 for emb in embeds:
-                    async with delay(1 / 3):
+                    async with Delay(1 / 3):
                         if type(emb) is not discord.Embed:
                             emb = discord.Embed.from_dict(emb)
                             if not reacts:
@@ -3379,7 +3379,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
         async def event_call(freq):
             for i in range(freq):
-                async with delay(1 / freq):
+                async with Delay(1 / freq):
                     await self.send_event("_call_")
 
         freq = 24
@@ -3390,7 +3390,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 if sent:
                     await event_call(freq)
                 else:
-                    async with delay(1 / freq):
+                    async with Delay(1 / freq):
                         await self.send_event("_call_")
                 self.update_users()
 
@@ -3398,11 +3398,11 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     async def slow_loop(self):
         await asyncio.sleep(2)
         while not self.closed:
-            async with delay(1):
+            async with Delay(1):
                 async with tracebacksuppressor:
                     create_task(self.update_status())
                     with MemoryTimer("update_bytes"):
-                        net = await create_future(psutil.net_io_counters)
+                        net = await create_future(psutil.net_io_counters, timeout=8)
                         net_bytes = net.bytes_sent + net.bytes_recv
                         if not hasattr(self, "net_bytes"):
                             self.net_bytes = deque(maxlen=3)
@@ -3437,7 +3437,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     async def lazy_loop(self):
         await asyncio.sleep(5)
         while not self.closed:
-            async with delay(frand(2) + 2):
+            async with Delay(frand(2) + 2):
                 async with tracebacksuppressor:
                     # self.var_count = await create_future(var_count)
                     with MemoryTimer("handle_update"):
@@ -3446,7 +3446,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     # The slowest update loop that runs once a minute. Used for slow operations, such as the bot database autosave event.
     async def minute_loop(self):
         while not self.closed:
-            async with delay(60):
+            async with Delay(60):
                 async with tracebacksuppressor:
                     with MemoryTimer("update"):
                         await create_future(self.update, priority=True)
@@ -4170,14 +4170,14 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         try:
             message = await self.fetch_message(raw.message_id)
         except LookupError:
-            message = await self.fetch_message(raw.message_id, channel=channel)
+            message = await channel.fetch_message(raw.message_id)
             reaction = message._add_reaction(data, emoji, user.id)
             if reaction.count > 1:
                 reaction.count -= 1
         else:
             reaction = message._add_reaction(data, emoji, user.id)
         self.dispatch("reaction_add", reaction, user)
-        self.add_message(message, files=False)
+        self.add_message(message, files=False, force=True)
 
     async def reaction_remove(self, raw):
         channel = await self.fetch_channel(raw.channel_id)
@@ -4186,14 +4186,14 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         try:
             message = await self.fetch_message(raw.message_id)
         except LookupError:
-            message = await self.fetch_message(raw.message_id, channel=channel)
+            message = await channel.fetch_message(raw.message_id)
             reaction = message._add_reaction(data, emoji, user.id)
             if reaction.count > 1:
                 reaction.count -= 1
         else:
             reaction = message._remove_reaction(data, emoji, user.id)
         self.dispatch("reaction_remove", reaction, user)
-        self.add_message(message, files=False)
+        self.add_message(message, files=False, force=True)
     
     async def reaction_clear(self, raw):
         channel = await self.fetch_channel(raw.channel_id)
@@ -4203,7 +4203,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         old_reactions = message.reactions.copy()
         message.reactions.clear()
         self.dispatch("reaction_clear", message, old_reactions)
-        self.add_message(message, files=False)
+        self.add_message(message, files=False, force=True)
 
     async def init_ready(self, futs):
         with tracebacksuppressor:

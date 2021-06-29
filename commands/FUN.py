@@ -694,14 +694,14 @@ class SlotMachine(Command):
             colour = await bot.get_colour(user)
             emb = discord.Embed(colour=colour).set_author(**get_author(user))
             if not skip:
-                async with delay(2):
+                async with Delay(2):
                     emoj = await self.as_emojis(wheel_display)
                     gold = bot.data.users.get(user.id, {}).get("gold", 0)
                     bets = await bot.as_rewards(bet)
                     bals = await bot.as_rewards(gold)
                     emb.description = f"```css\n[Slot Machine]```{emoj}\nBet: {bets}\nBalance: {bals}"
                     await message.edit(content=None, embed=emb)
-            ctx = delay(1) if not skip else emptyctx
+            ctx = Delay(1) if not skip else emptyctx
             while wheel_order:
                 async with ctx:
                     i = wheel_order.popleft()
@@ -2539,7 +2539,7 @@ class UpdateMimics(Database):
     async def __call__(self):
         with tracebacksuppressor(SemaphoreOverflowError):
             async with self._semaphore:
-                async with delay(120):
+                async with Delay(120):
                     # Garbage collector for unassigned mimics
                     i = 1
                     for m_id in tuple(self.data):

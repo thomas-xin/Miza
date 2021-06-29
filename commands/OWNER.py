@@ -70,7 +70,7 @@ class Restart(Command):
         if save is None:
             print("Saving message cache...")
             save = create_task(bot.send_event("_save_", force=False))
-        async with delay(1):
+        async with Delay(1):
             with discord.context_managers.Typing(channel):
                 # Call _destroy_ bot event to indicate to all databases the imminent shutdown
                 print("Destroying database memory...")
@@ -866,32 +866,33 @@ class UpdateImagePools(Database):
 
     async def load_until(self, key, func, threshold, args=()):
         with tracebacksuppressor:
-            data = set_dict(self.data, key, alist())
-            failed = 0
-            for i in range(threshold << 1):
-                if len(data) > threshold or failed > threshold >> 1:
-                    break
-                try:
-                    out = await func(*args)
-                    if type(out) is str:
-                        out = (out,)
-                    for url in out:
-                        url = url.strip()
-                        if url not in data:
-                            if i & 1:
-                                data.appendleft(url)
+            async with self.sem:
+                data = set_dict(self.data, key, alist())
+                failed = 0
+                for i in range(threshold << 1):
+                    if len(data) > threshold or failed > threshold >> 1:
+                        break
+                    try:
+                        out = await func(*args)
+                        if type(out) is str:
+                            out = (out,)
+                        for url in out:
+                            url = url.strip()
+                            if url not in data:
+                                if i & 1:
+                                    data.appendleft(url)
+                                else:
+                                    data.append(url)
+                                failed = 0
+                                self.update(key)
                             else:
-                                data.append(url)
-                            failed = 0
-                            self.update(key)
-                        else:
-                            failed += 1
-                except:
-                    failed += 8
-                    print_exc()
-            self.finished.add(key)
-            self.update("finished")
-            data.uniq(sort=None)
+                                failed += 1
+                    except:
+                        failed += 8
+                        print_exc()
+                self.finished.add(key)
+                self.update("finished")
+                data.uniq(sort=None)
 
     async def proc(self, key, func, args=()):
         async with self.sem:

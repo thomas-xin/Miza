@@ -945,7 +945,7 @@ def mid2mp3(mid):
     )
     fn = url.rsplit("/", 1)[-1].strip("\x00")
     for i in range(360):
-        with delay(1):
+        with Delay(1):
             test = Request(f"https://hostfast.onlineconverter.com/file/{fn}")
             if test == b"d":
                 break
@@ -1782,7 +1782,7 @@ class AudioDownloader:
                     maxitems = 10000
                     # Optimized searching with lookaheads
                     for i, curr in enumerate(range(0, maxitems, page)):
-                        with delay(0.03125):
+                        with Delay(0.03125):
                             if curr >= maxitems:
                                 break
                             search = f"{url}&offset={curr}&limit={page}"
@@ -4035,7 +4035,7 @@ class Party(Command):
 #         orig = "\n".join(content.splitlines()[:1 + ("\n" == content[3])]) + "\n"
 #         if reaction is None and auds.player.type:
 #             for b in self.buttons:
-#                 async with delay(0.5):
+#                 async with Delay(0.5):
 #                     create_task(message.add_reaction(as_str(b)))
 #         else:
 #             if not auds.player.type:
@@ -4560,7 +4560,7 @@ class UpdateAudio(Database):
                 async with auds.search_sem:
                     searched = 0
                     q = auds.queue
-                    async with delay(2):
+                    async with Delay(2):
                         for i, e in enumerate(q, 1):
                             if searched >= 32 or i > 128:
                                 break
@@ -4638,7 +4638,7 @@ class UpdateAudio(Database):
                     create_future_ex(auds.update, priority=True)
             else:
                 a = 1
-                async with delay(0.5):
+                async with Delay(0.5):
                     for g in tuple(self.players):
                         with tracebacksuppressor(KeyError):
                             auds = self.players[g]

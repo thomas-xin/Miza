@@ -1498,7 +1498,7 @@ class Waifu2x(Command):
                 json=True,
             )
             for i in range(60):
-                async with delay(0.75):
+                async with Delay(0.75):
                     img = await Request(
                         f"https://api.alcaamado.es/api/v1/waifu2x/get?hash={data['hash']}",
                         headers=dict(Accept="application/json, text/plain, */*"),

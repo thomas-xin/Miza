@@ -831,7 +831,7 @@ class SaveChannel(Command):
         h = h[::-1]
         s = ""
         while h:
-            async with delay(0.32):
+            async with Delay(0.32):
                 if s:
                     s += "\n\n"
                 s += "\n\n".join(message_repr(m, limit=2048, username=True) for m in h[:4096])
@@ -2344,7 +2344,7 @@ class UpdateFileLogs(Database):
                             for i in range(30):
                                 if b:
                                     break
-                                with delay(1):
+                                with Delay(1):
                                     b = self.bot.cache.attachments[a.id]
                         fil = CompatFile(io.BytesIO(b), filename=str(a).rsplit("/", 1)[-1])
                         fils.append(fil)
@@ -2389,7 +2389,7 @@ class UpdateCrossposts(Database):
         if self.stack:
             with tracebacksuppressor:
                 async with self.sem:
-                    async with delay(1):
+                    async with Delay(1):
                         for c, s in self.stack.items():
                             channel = self.bot.get_channel(c)
                             for k, v in s.items():

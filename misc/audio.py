@@ -393,7 +393,7 @@ class AudioFile:
             fl = 0
             # Attempt to monitor status of output file
             while fl < 4096:
-                with delay(0.1):
+                with Delay(0.1):
                     if not self.proc.is_running():
                         err = as_str(self.proc.stderr.read())
                         if check_fmt:

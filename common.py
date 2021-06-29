@@ -237,7 +237,7 @@ tracebacksuppressor = TracebackSuppressor()
 
 
 # A context manager that delays the return of a function call.
-class delay(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
+class Delay(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
 
     def __init__(self, duration=0):
         self.duration = duration
@@ -2029,7 +2029,7 @@ is_main_thread = lambda: threading.current_thread() is threading.main_thread()
 async_nop = lambda *args, **kwargs: emptyfut
 
 async def delayed_coro(fut, duration=None):
-    async with delay(duration):
+    async with Delay(duration):
         return await fut
 
 async def traceback_coro(fut, *args):
@@ -2985,7 +2985,7 @@ class __logPrinter:
         if self.file is None:
             return
         while True:
-            with delay(1):
+            with Delay(1):
                 self.flush()
             while not os.path.exists("common.py") or self.closed:
                 time.sleep(0.5)
