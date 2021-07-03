@@ -339,6 +339,8 @@ class UpdateExec(Database):
                         # Ignore commented messages
                         if proc[:2] in ("//", "||", "~~") or proc[0] in "\\#<:;+." or not proc[0].isascii():
                             return
+                        if is_url(proc):
+                            return
                         if proc.startswith("`") and proc.endswith("`"):
                             if proc.startswith("```"):
                                 proc = proc[3:]

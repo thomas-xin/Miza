@@ -2909,9 +2909,9 @@ class Playlist(Command):
 
 class Connect(Command):
     server_only = True
-    name = ["📲", "🎤", "🎵", "🎶", "📴", "📛", "Summon", "Join", "DC", "Disconnect", "Leave", "Move", "Reconnect"]
+    name = ["📲", "🎤", "🎵", "🎶", "📴", "📛", "Summon", "Join", "DC", "Disconnect", "Leave", "Yeet", "Move", "Reconnect"]
     # Because Rythm also has this alias :P
-    alias = name + ["Yeet", "FuckOff"]
+    alias = name + ["FuckOff"]
     description = "Summons the bot into a voice channel."
     usage = "<channel>?"
     rate_limit = (3, 4)
@@ -2993,6 +2993,9 @@ class Connect(Command):
             joining = True
         else:
             auds = bot.data.audio.players[guild.id]
+            if auds.acsi.channel != vc_:
+                await auds.acsi.move_to(vc_)
+                joining = True
         if guild.me.voice is None:
             await bot.wait_for("voice_state_update", check=lambda member, before, after: member.id == bot.id and after, timeout=16)
         member = guild.me
