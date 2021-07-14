@@ -130,7 +130,6 @@ Do you swear? How many of the kids at school swear? What do you think about swea
 Do you text more or call more? Why?
 Do you think any of the kids at school are not virgins? What do you think about that?
 Do you think coffee is a drug? When do you think it's ok for kids to start drinking coffee?
-Do you think girls and guys have the same needs from sex and relationships?
 Do you think girls look better with or without makeup?
 Do you think it is ever okay to share a secret that you were told in confidence? When and why?
 Do you think it is okay for people to cry when they get upset? (male and female, young and old?)
@@ -141,7 +140,6 @@ Do you think most girls are glad when they reach puberty? Why or why not?
 Do you think most guys are glad when they reach puberty? Why or why not?
 Do you think of yourself as brave? When you're scared, what do you do?
 Do you think people read more or fewer books now than 50 years ago?
-Do you think people should be married to have sex? If not, how should they decide whether they're ready?
 Do you think small talk is useful? Why or why not?
 Do you think some day you'll date girls or guys?
 Do you think some people are more susceptible to peer pressure than others? Why do you think that is?
@@ -168,7 +166,6 @@ Does absolute power corrupt absolutely?
 Does anonymity encourage people to misbehave or does it reveal how people would choose to act all the time if they could?
 Does anything good happen after midnight?
 Does fashion help society in any way?
-Does fate exist?
 Does fate exist? If so, do we have free will?
 Does hardship make a person stronger? If so, under what conditions and at what point is it too much hardship? If not, what makes a person stronger?
 Does having a day off for a holiday increase or decrease productivity at work?
@@ -182,7 +179,7 @@ Does the government have a place in regulating food? To what extent should gover
 Does the modern age make global conspiracies more or less feasible?
 Does the study of philosophy ever lead to answers or simply more questions?
 Dogs or cats (or rabbits)?
-Education should be free
+Should education be free?
 Everybody makes poor choices sometimes. Do you remember a time when you made a choice you later regretted? Did some part of you know that was a bad idea? What kept you from listening to that part of you? How could you support yourself to make a different choice if something similar happened again?
 Given a scale from completely human to completely machine, how far would you choose to augment yourself with robotics? What parts would you augment and why?
 Has anyone ever saved your life?
@@ -254,7 +251,6 @@ How do you think traveling to a lot of different countries changes a person?
 How do you track your work goals and accomplishments?
 How do you unwind after work?
 How do you work things out with a friend when you have a disagreement?
-How does someone know if they're sexy?
 How does this human trait of morality dependent on distance shape our world?
 How does your definition of a "real man" differ from the mainstream stereotype of a "real man"?
 How far should governments go to prevent its citizens from causing harm to themselves?
@@ -306,7 +302,6 @@ How would the world change if super heroes and super villains actually existed?
 How would the world change if there was an accurate measure of aptitude?
 How would you change the world if you could?
 How would you commit the perfect crime?
-How would you define "sexy"? Is it important to be "sexy"? Are some of the kids at school sexy?
 How would you define genius?
 How would you describe a perfect date?
 How would you ensure that a video goes viral?
@@ -314,7 +309,6 @@ How would you spend your winnings if you won the lottery?
 How would your country change if everyone, regardless of age, could vote?
 How's your day been so far?
 I am curious to know your story.
-If a boy wants to have sex and the girl is too drunk to say yes or no, what should the boy do?
 If a child somehow survived and grew up in the wilderness without any human contact, how "human" would they be without the influence of society and culture?
 If a genie gave you three wishes, what would they be?
 If a girl is attracted to a guy, what do you think is the best way for her to show it?
@@ -358,7 +352,6 @@ If some of the lesser-known holidays were commercialized, what would the commerc
 If someone asked to be your apprentice and learn all that you know, what would you teach them?
 If someone asked you to give an impromptu ted talk, what would you talk about?
 If someone narrated your life, who would you want to be the narrator?
-If someone you loved was killed in front of you, but someone created a copy of them that was perfect right down to the atomic level, would they be the same person and would you love them just as much?
 If someone you loved was very sick but could not afford the medicine to get better, would it be okay to steal the medicine?
 If states could date, who would be into who and why?
 If the all the States in the USA were represented by food, what food would each state be represented by?
@@ -406,8 +399,6 @@ If you could have a full scholarship to any university, what would you choose to
 If you could have a never-ending candle that smelled like anything you wanted, what fragrance would you want it to be?
 If you could have a video of anyone event in your life, what event would you choose?
 If you could have an all-expenses paid trip to see any famous monument, which monument would you choose?
-If you could have an all-expenses paid trip to see any famous world monument, which monument would you choose?
-If you could have any animal as a pet, what animal would you choose?
 If you could have any animal as a pet, which would you choose and why?
 If you could have any car, what would it be?
 If you could have any super power, what would it be and why?
@@ -480,9 +471,7 @@ If you had one day left to live, how would you spend it?
 If you had the resources to invent anything, what would it be?
 If you had to be named after a city/state/country, which would you want it to be?
 If you had to be stuck at one age forever, what age would you choose?
-If you had to change your name, what would you change it to?
 If you had to change your name, what would your new name be, and why would you choose that name?
-If you had to change your name, what would your new name be?
 If you had to choose one cause to dedicate your life to, what would that cause be?
 If you had to choose only three words to describe yourself, what would you say?
 If you had to choose your spouse based on just one question, what question would you ask?
@@ -497,7 +486,6 @@ If you lived in a treehouse what would it look like?
 If you lived in a virtual reality world of your own creation, what would it look like?
 If you opened a business, what kind of business would it be?
 If you opened a restaurant, what kind of food would you serve?
-If you owned a restaurant, what kind of food would it serve?
 If you suddenly became a master at woodworking, what would you make?
 If you wanted to give a tourist the local flavor of where you are from, what would you have them do?
 If you wanted to slowly drive a roommate insane using only notes, what kind of notes would you leave around the house?
@@ -557,7 +545,6 @@ In the past people were buried with the items they would need in the afterlife, 
 In what situation or place would you feel the most out of place?
 In what situations, do you wish you could throw down a smoke bomb and disappear?
 In your group of friends, what role do you play?
-Is a hot dog a sandwich? Make your case.
 Is a hotdog a sandwich? Why or why not?
 Is a life that focuses on avoiding pain and seeking out pleasure a good and worthwhile life? Why or why not?
 Is a sense of humor a byproduct of consciousness or something else entirely?
@@ -603,7 +590,6 @@ Is the concept of "you" continuous or does past "you" continually fade into pres
 Is the cultural trend of individualism and the rejection of collectivism a beneficial or detrimental trend?
 Is the human tendency to create groups an overall positive or a negative trait in terms of general human flourishing?
 Is the meaning of life the same for animals and humans?
-Is there a difference between "attractive" and "hot"? Between "hot" and "sexy"?
 Is there a limit to what humans can create through technology and science?
 Is there a meaning to life? If so, what is it?
 Is there a place in the world that you feel most represents who you are?
@@ -749,7 +735,6 @@ What are you interested in that most people aren't?
 What are you interested in that most people haven't heard of?
 What are you looking forward to in the coming months?
 What are you most grateful for in this season of life?
-What are you most insecure about?
 What are you most likely to become famous for?
 What are you most likely very wrong about?
 What are you most looking forward to in the next 10 years?
@@ -814,7 +799,6 @@ What countries have you traveled to?
 What country can you name but besides the name you know almost nothing else about it?
 What country do you not know the location of even though you should?
 What country do you think is the strangest?
-What country is the strangest?
 What current trend do you hope will go on for a long time?
 What current trend makes no sense to you?
 What defines a sport? Is fishing a sport? How about video game tournaments?
@@ -915,7 +899,6 @@ What do you think about reality TV? Why do you think it's so popular?
 What do you think about taxes? Is it a good idea that everyone chips in to pay for schools and libraries and parks and roads?
 What do you think about the idea of "friends with benefits"? Does the girl benefit as much as the guy?
 What do you think about when you hear the word "classy"?
-What do you think changes when you have sex?
 What do you think could be done to improve the media?
 What do you think everyone in the family will be doing 10 years from now?
 What do you think existed before the universe was created?
@@ -952,9 +935,7 @@ What do you think you know a lot about but probably don't?
 What do you think your future self will remember about you now?
 What do you usually think about on your commute home from work?
 What do you want to be remembered for?
-What do you want to be when you grow up?
-What do you want to be when you grow up? Why?
-What do you want to do when you grow up?
+What do/did you want to do when you grow up?
 What do you want your epitaph to be?
 What do you wear when you’re feeling your very best, and why?
 What do you wish people better understood about you?
@@ -1038,7 +1019,6 @@ What hobby would you get into if time and money weren't an issue?
 What holidays have been over-commercialized?
 What horror story do you have from a job you've had?
 What hurts your feelings? How do you act when your feelings are hurt?
-What if a girl says yes to sex but then changes her mind when they start? What should the guy do?
 What if the driver was a grown-up, like your friend's parent?
 What in life is truly objective and not subjective?
 What inanimate object do you wish you could eliminate from existence?
@@ -1054,7 +1034,6 @@ What is a language you love to listen to even if you don’t speak or understand
 What is a quality you wish you could have more of?
 What is a silver-lining that you noticed recently?
 What is an activity that never looks cool?
-What is increasingly becoming socially acceptable, but shouldn't be?
 What is increasingly becoming socially acceptable?
 What is one or two of your favorite smells?
 What is one thing that people do not notice about you right away that you wish they would?
@@ -1149,7 +1128,6 @@ What is the most ridiculous rule you have to follow?
 What is the most unusual fear you have?
 What is the most useful app on your phone?
 What is the most useless thing you know how to do?
-What is the sexiest and least sexy name?
 What is the silliest fear you have?
 What is the silliest reason someone you've known has completely lost it?
 What is the strangest app you have heard of or tried?
@@ -1460,7 +1438,6 @@ What was your favorite cartoon when you were growing up?
 What was your favorite children's book?
 What was your favorite restaurant when you were a child?
 What was your favorite subject in school? Favorite teacher?
-What was your first experience with sex like?
 What was your first smartphone? How did you feel when you got it?
 What was your first thought this morning when you woke up?
 What was your last dream about?
@@ -1889,7 +1866,6 @@ What's your go-to drink/food/activity when you're sick and in bed?
 What's your good luck charm?
 What's your grossest bug story?
 What's your guilty pleasure?
-What's your guilty-pleasure netflix show?
 What's your haunted house story?
 What's your industry like right now?
 What's your least favorite app?
@@ -2003,7 +1979,6 @@ Where is the most beautiful place near where you live?
 Where is the most beautiful place you have been?
 Where is the most interesting place you've been?
 Where is the most relaxing place you have been?
-Where is the most relaxing place you've ever been to?
 Where is the most uncomfortable place you have ever slept?
 Where is the nicest place you have been to in fall?
 Where is the strangest place you've urinated or defecated?

@@ -563,11 +563,11 @@ class FileHashDict(collections.abc.MutableMapping):
         with suppress(ValueError):
             k = int(k)
         self.deleted.discard(k)
-        try:
-            if self.data[k] is v:
-                return
-        except (TypeError, KeyError, ValueError):
-            pass
+        # try:
+        #     if self.data[k] is v:
+        #         return
+        # except (TypeError, KeyError, ValueError):
+        #     pass
         self.data[k] = v
         self.modified.add(k)
 

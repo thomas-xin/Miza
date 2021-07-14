@@ -108,9 +108,9 @@ Do you stay in touch with your ex? does your partner?
 Do you still have some remaining feelings from your first relationship?
 Do you still think that you like your partner for the same reasons you used to?
 Do you think a couple's finances should be together or separate?
-Do you think a couple's finances should be together or separate?
 Do you think a relationship can come back from cheating?
 Do you think celebrating valentine's day is corny?
+Do you think girls and guys have the same needs from sex and relationships?
 Do you think I can be both your best friend and your lover?
 Do you think infidelity is always a dealbreaker, no matter what?
 Do you think it is more important for a couple with kids to focus on the kids more or each other more? why?
@@ -122,6 +122,7 @@ Do you think of yourself as an optimist, or a pessimist?
 Do you think once you love someone, you will always love them? or do you think love can fade away with time?
 Do you think past relationship secrets should always be kept hidden?
 Do you think people can really have psychic abilities?
+Do you think people should be married to have sex? If not, how should they decide whether they're ready?
 Do you think that people can change? do you expect your partner to change?
 Do you think that the type of intimacy that you share is appropriate?
 Do you think there's such a thing as "luck," or do we create our own outcomes?
@@ -197,6 +198,7 @@ How do you respond when your partner is very late to meet you?
 How do you think having kids will / has changed our lives and relationship?
 How do you think you and your partner handle fights?
 How do you want to be treated when you're down or depressed?
+How does someone know if they're sexy?
 How does your life compare to how you imagined it growing up?
 How does your partner feel about what you do for a living?
 How important do you think sex is in our relationship?
@@ -220,12 +222,15 @@ How realistic do you think couples in movies and tv are?
 How well do you think our sex drives match up?
 How well do you think we communicate?
 How would we know if we did our job as parents well?
+How would you define "sexy"? Is it important to be "sexy"? Are some of the kids at school sexy?
 How would you describe your relationship with your family?
 How would you feel if I made more money than you?
 How would you rate your kissing?
 How would you want to spend a special day with each other?
 Ideally, how long should sex last?
+If a boy wants to have sex and the girl is too drunk to say yes or no, what should the boy do?
 If so, do you ever dream about me?
+If someone you loved was killed in front of you, but someone created a copy of them that was perfect right down to the atomic level, would they be the same person and would you love them just as much?
 If something happened where I had to move very far away, would you attempt long-distance? or go our separate ways?
 If the opportunity to reverse back time would present itself, would you still choose your partner?
 If the opposite sex compliments your partner, do you feel anxious about it? 
@@ -255,6 +260,7 @@ Is going to church or another house of worship important to you?
 Is it a headache to choose a vacation destination?
 Is love something that scares you?
 Is romantic love the most important love of all?
+Is there a difference between "attractive" and "hot"? Between "hot" and "sexy"?
 Is there a personal goal you'd like to achieve in the next five years or so?
 Is there a personality trait that always ticks you off in a person?
 Is there a place that you love that you'd like to show me one day?
@@ -296,6 +302,7 @@ What are the most difficult topics for you to share with your partner?
 What are the small, daily things that make it all worth it?
 What are you afraid of?When was the last time you voted?
 What are you into, but haven't told me about?
+What are you most insecure about?
 What are your biggest fears about relationships?
 What are your favorite places to be touched? Where are your least favorite places to be touched?
 What are your greatest accomplishments? are you proud of them?
@@ -323,6 +330,7 @@ What do you like best about me?
 What do you most obviously have in common?
 What do you remember most about the night/day we first met?
 What do you see as your role in our relationship?
+What do you think changes when you have sex?
 What do you think happens after you die?
 What do you think is your best quality?
 What do you think makes people fall out of love?
@@ -339,6 +347,7 @@ What have you always wanted tell me, but never had the guts to?
 What have you always wanted to teach me?
 What historical era would you most, and least, want to go to?
 What hobby or skill would you like to learn together?
+What if a girl says yes to sex but then changes her mind when they start? What should the guy do?
 What is a relationship deal-breaker for you?
 What is one area in your life where you feel like something is missing?
 What is something I did that you thought was exceptionally kind or thoughtful?
@@ -351,6 +360,7 @@ What is the best “relationship advice” someone has ever given you?
 What is the craziest thing you've ever been asked to do in bed? Did you do it?
 What is the hottest thing a lover can say in bed?
 What is the most adventurous thing you've done sexually?
+What is the sexiest and least sexy name?
 What is the sexiest quality a partner can have?
 What is the weirdest thing that turns you on?
 What is your dream job?
@@ -389,6 +399,7 @@ What was your dream job when you were a kid?
 What was your favorite food growing up?
 What was your favorite school subject growing up?
 What was your favorite year of life?
+What was your first experience with sex like?
 What was your first sexual experience like?
 What was your very first orgasm like?
 What words or sexy phrases turn you on?
