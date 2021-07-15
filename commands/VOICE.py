@@ -3254,7 +3254,10 @@ class Dump(Command):
             else:
                 url = argv
             urls = await bot.follow_url(argv, allow=True, images=False)
-            url = urls[0]
+            try:
+                url = urls[0]
+            except IndexError:
+                raise ArgumentError("Input must be a valid URL or attachment.")
             s = await self.bot.get_request(url)
             d = await create_future(select_and_loads, s, size=268435456)
         else:

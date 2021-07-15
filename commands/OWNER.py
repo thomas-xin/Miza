@@ -53,16 +53,16 @@ class Restart(Command):
             # Restart announcements for when a time input is specified
             if argv.startswith("in"):
                 argv = argv[2:].lstrip()
-            wait = await bot.eval_time(argv)
-            await send_with_reply(channel, content="*Preparing to " + name + " in " + sec2time(wait) + "...*", reference=message)
-            emb = discord.Embed(colour=discord.Colour(1))
-            url = await bot.get_proxy_url(bot.user)
-            emb.set_author(name=str(bot.user), url=bot.github, icon_url=url)
-            emb.description = f"I will be {'shutting down' if name == 'shutdown' else 'restarting'} in {sec2time(wait)}, apologies for any inconvenience..."
-            await bot.send_event("_announce_", embed=emb)
-            save = create_task(bot.send_event("_save_", force=True))
-            if wait > 0:
-                await asyncio.sleep(wait)
+                wait = await bot.eval_time(argv)
+                await send_with_reply(channel, content="*Preparing to " + name + " in " + sec2time(wait) + "...*", reference=message)
+                emb = discord.Embed(colour=discord.Colour(1))
+                url = await bot.get_proxy_url(bot.user)
+                emb.set_author(name=str(bot.user), url=bot.github, icon_url=url)
+                emb.description = f"I will be {'shutting down' if name == 'shutdown' else 'restarting'} in {sec2time(wait)}, apologies for any inconvenience..."
+                await bot.send_event("_announce_", embed=emb)
+                save = create_task(bot.send_event("_save_", force=True))
+                if wait > 0:
+                    await asyncio.sleep(wait)
         if name == "shutdown":
             await send_with_reply(channel, content="Shutting down... :wave:", reference=message)
         else:

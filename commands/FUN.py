@@ -895,7 +895,9 @@ class Uno(Command):
         r = as_str(reaction)
         print(user, r, players, hands, winners, turn, last, td, draw, played)
         if r == "✋":
+            # Joining a game
             if user.id not in players and last == "Z":
+                # Joining as a new player
                 players.append(user.id)
                 hand = shuffle(self.deck)[-7:]
                 self.sort(hand)
@@ -906,8 +908,8 @@ class Uno(Command):
                 embed.description = "\n".join(("👑 ", "▪️ ")[bool(i)] + user_mention(u) for i, u in enumerate(players))
                 embed.set_footer(text="Click ✋ to join, ✅ to start!")
                 s = ""
-                for card in hand:
-                    s += await create_future(bot.data.emojis.emoji_as, card + ".png")
+                for c in hand:
+                    s += await create_future(bot.data.emojis.emoji_as, c + ".png")
                 c = await bot.get_colour(user)
                 emb = discord.Embed(
                     colour=c,
@@ -921,10 +923,11 @@ class Uno(Command):
                     embed=emb,
                 ))
                 return await message.edit(content=content, embed=embed)
+            # Already joined
             hand = hands[players.index(user.id)]
             s = ""
-            for card in hand:
-                s += await create_future(bot.data.emojis.emoji_as, card + ".png")
+            for c in hand:
+                s += await create_future(bot.data.emojis.emoji_as, c + ".png")
             c = await bot.get_colour(user)
             if user.id == players[0]:
                 d = f"Begin the game with ✅ when all players are ready!"
@@ -942,7 +945,9 @@ class Uno(Command):
                 embed=emb,
             )
         if r == "✅":
+            # Start game
             if user.id == players[0] or not perm < 3:
+                # Has permission to start game
                 try:
                     hand = hands[players.index(user.id)]
                 except ValueError:
@@ -978,8 +983,8 @@ class Uno(Command):
                 embed.set_thumbnail(url=str(emoji.url))
                 embed.set_footer(text="Click 🔻 to play if it's your turn, ✖ to leave!")
                 s = ""
-                for card in hand:
-                    s += await create_future(bot.data.emojis.emoji_as, card + ".png")
+                for c in hand:
+                    s += await create_future(bot.data.emojis.emoji_as, c + ".png")
 
                 create_task(interaction_response(
                     bot=bot,
@@ -1009,6 +1014,7 @@ class Uno(Command):
                         bypass=False,
                         aio=True,
                     )
+            # Does not have permission to start game
             s = ""
             d = f"Please wait for {user_mention(players[0])} to begin the game!"
             try:
@@ -1017,8 +1023,8 @@ class Uno(Command):
                 s = d
                 emb = None
             else:
-                for card in hand:
-                    s += await create_future(bot.data.emojis.emoji_as, card + ".png")
+                for c in hand:
+                    s += await create_future(bot.data.emojis.emoji_as, c + ".png")
                 c = await bot.get_colour(user)
                 emb = discord.Embed(
                     colour=c,
@@ -1032,13 +1038,19 @@ class Uno(Command):
                 embed=emb,
             )
         if r == "🔻":
+            # Begins turn
             if user.id == players[turn]:
+                # Current turn matches
                 hand = hands[turn]
-                if last[0] == "W":
+                s = ""
+                if last == "WY":
+                    playable = ("WY",)
+                elif last == "WX":
                     playable = set(hand)
+                    for c in hand:
+                        s += await create_future(bot.data.emojis.emoji_as, c + ".png")
                 else:
                     playable = set()
-                    s = ""
                     for card in hand:
                         s += await create_future(bot.data.emojis.emoji_as, card + ".png")
                         if card == "WY":
@@ -1062,10 +1074,11 @@ class Uno(Command):
                     content=s,
                     buttons=buttons,
                 )
+            # Not your turn
             hand = hands[players.index(user.id)]
             s = ""
-            for card in hand:
-                s += await create_future(bot.data.emojis.emoji_as, card + ".png")
+            for c in hand:
+                s += await create_future(bot.data.emojis.emoji_as, c + ".png")
             c = await bot.get_colour(user)
             d = f"Please wait for {user_mention(players[turn])} to complete their turn!"
             emb = discord.Embed(
@@ -1080,6 +1093,10 @@ class Uno(Command):
                 embed=emb,
             )
         if r == "~!":
+            if user.id != players[turn]:
+                raise asyncio.InvalidStateError("Error: Please wait your turn.")
+            hand = hands[turn]
+            # Draw a certain amount of cards based on played draw cards
             if not draw and not played:
                 draw = 1
             if draw:
@@ -1087,9 +1104,21 @@ class Uno(Command):
                 self.sort(hands[turn])
                 draw = 0
         if r == "~@":
+            if user.id != players[turn]:
+                raise asyncio.InvalidStateError("Error: Please wait your turn.")
+            hand = hands[turn]
+            s = ""
+            for c in hand:
+                s += await create_future(bot.data.emojis.emoji_as, c + ".png")
+            # Skip turn
             if last[0] == "W":
+                # Select a colour if last card played was wild
                 playable = [c + last[-1] for c in "RYGB"]
-                buttons = [cdict(emoji=bot.data.emojis.get(c + ".png"), custom_id=f"~{message.id}~{c}", style=3) for c in playable]
+                buttons = []
+                for c in playable:
+                    emoji = await create_future(bot.data.emojis.get, c + ".png")
+                    button = cdict(emoji=emoji, custom_id=f"~{message.id}~{c}", style=3)
+                    buttons.append(button)
 
                 content = f"```callback-fun-uno-{players}_{self.hand_repr(hands)}_[]_{turn}_{last}_{'-01'[td]}_{draw}_{self.played_repr(played)}-\nUNO game in progress...```"
                 embed = message.embeds[0]
@@ -1109,9 +1138,10 @@ class Uno(Command):
                     content=s,
                     buttons=buttons,
                 )
+            # Process end of turn
             turn = (turn + td) % len(players)
             if last[-1] == "D":
-                newdraw = None
+                newdraw = 0
                 for card in hands[turn]:
                     if card[-1] == "D" or card == "WY":
                         newdraw = draw
@@ -1138,102 +1168,32 @@ class Uno(Command):
                 bot=bot,
                 message=message,
                 content=s,
-                buttons=buttons,
+                buttons=(),
             )
         if r[0] == "~":
-            if user.id == players[turn]:
-                hand = hands[turn]
-                card = r[1:]
-                if last[0] == "W" and card[1] == last[1]:
-                    if card[0] != "W":
-                        last = card
-                        turn = (turn + td) % len(players)
-                        newdraw = None
-                        for card in hands[turn]:
-                            if card[-1] == "Y":
-                                newdraw = draw
-                        if not newdraw:
-                            hands[turn].extend(self.deck[:draw])
-                            self.sort(hands[turn])
-                            turn = (turn + td) % len(players)
-                        draw = newdraw
-                        content = f"```callback-fun-uno-{players}_{self.hand_repr(hands)}_[]_{turn}_{last}_{'-01'[td]}_{draw}_-\nUNO game in progress...```"
-                        embed = message.embeds[0]
-                        embed.description = "\n".join(("➡️ ", "▪️ ")[bool(i)] + user_mention(u) + f" `{len(hands[(i - turn) % len(players)])}`" for i, u in enumerate(players[turn:] + players[:turn]))
-                        emoji = await create_future(bot.data.emojis.get, last + ".png")
-                        embed.set_thumbnail(url=str(emoji.url))
-                        t = ""
-                        for card in played:
-                            t += await create_future(bot.data.emojis.emoji_as, card + ".png")
-                        embed.clear_fields()
-                        embed.add_field(name="Previous turn", value=t)
-                        create_task(message.edit(content=content, embed=embed))
-                        return await interaction_patch(
-                            bot=bot,
-                            message=message,
-                            content=s,
-                            buttons=(),
-                        )
-                if card[1] != "WY" and last[0] != "W":
-                    if draw:
-                        if card[1] not in "DY":
-                            raise TypeError(f"illegal play sequence ({last} => {card})")
-                    elif card != "WX":
-                        if card[0] != last[0] and card[1] != last[1]:
-                            raise TypeError(f"illegal play sequence ({last} => {card})")
-                hand.remove(card)
-                last = card
-                played.append(card)
-                if card[-1] == "D":
-                    draw += 2
-                elif card[-1] == "R":
-                    td = -td
-                elif card[-1] == "S":
-                    draw += 1
-                elif card[1] == "Y":
-                    draw += 4
-                s = ""
-                for card in hand:
-                    s += await create_future(bot.data.emojis.emoji_as, card + ".png")
-                if last[0] != "W":
-                    playable = [c for c in set(hand) if c[1] == last[1]]
-                    if playable:
-                        self.sort(playable)
-                        buttons = [cdict(emoji=bot.data.emojis.get(c + ".png"), custom_id=f"~{message.id}~{c}", style=3) for c in playable]
-                        buttons.append(cdict(emoji="⏭️", name=f"Pass", custom_id=f"~{message.id}~@", style=4))
-
-                        content = f"```callback-fun-uno-{players}_{self.hand_repr(hands)}_[]_{turn}_{last}_{'-01'[td]}_{draw}_{self.played_repr(played)}-\nUNO game in progress...```"
-                        embed = message.embeds[0]
-                        embed.description = "\n".join(("➡️ ", "▪️ ")[bool(i)] + user_mention(u) + f" `{len(hands[(i - turn) % len(players)])}`" for i, u in enumerate(players[turn:] + players[:turn]))
-                        emoji = await create_future(bot.data.emojis.get, last + ".png")
-                        embed.set_thumbnail(url=str(emoji.url))
-                        t = ""
-                        for card in played:
-                            t += await create_future(bot.data.emojis.emoji_as, card + ".png")
-                        embed.clear_fields()
-                        embed.add_field(name="Previous turn", value=t)
-
-                        create_task(message.edit(content=content, embed=embed))
-                        return await interaction_patch(
-                            bot=bot,
-                            message=message,
-                            content=s,
-                            buttons=buttons,
-                        )
+            # Process a card play
+            if user.id != players[turn]:
+                raise asyncio.InvalidStateError("Error: Please wait your turn.")
+            # Current turn matches
+            hand = hands[turn]
+            card = r[1:]
+            s = ""
+            for c in hand:
+                s += await create_future(bot.data.emojis.emoji_as, c + ".png")
+            if last[0] == "W" and card[1] == last[1]:
+                if card[0] != "W":
+                    # Player chooses a +4 colour
+                    last = card
                     turn = (turn + td) % len(players)
-                    if last[-1] == "D":
-                        newdraw = None
-                        for card in hands[turn]:
-                            if card[-1] in "DY":
-                                newdraw = draw
-                        if not newdraw:
-                            hands[turn].extend(self.deck[:draw])
-                            self.sort(hands[turn])
-                            turn = (turn + td) % len(players)
-                        draw = newdraw
-                    elif last[-1] == "S":
-                        turn = (turn + td * draw) % len(players)
-                        draw = 0
+                    newdraw = 0
+                    for card in hands[turn]:
+                        if card[-1] == "Y":
+                            newdraw = draw
+                    if not newdraw:
+                        hands[turn].extend(self.deck[:draw])
+                        self.sort(hands[turn])
+                        turn = (turn + td) % len(players)
+                    draw = newdraw
                     content = f"```callback-fun-uno-{players}_{self.hand_repr(hands)}_[]_{turn}_{last}_{'-01'[td]}_{draw}_-\nUNO game in progress...```"
                     embed = message.embeds[0]
                     embed.description = "\n".join(("➡️ ", "▪️ ")[bool(i)] + user_mention(u) + f" `{len(hands[(i - turn) % len(players)])}`" for i, u in enumerate(players[turn:] + players[:turn]))
@@ -1251,7 +1211,33 @@ class Uno(Command):
                         content=s,
                         buttons=(),
                     )
-                playable = [c for c in set(hand) if c == last or last[1] == "X" and c[1] == "Y"]
+            # Otherwise make sure card is playable (since interactions can be spoofed)
+            if card != "WY" and last[0] != "W":
+                if draw and last[1] in "DY":
+                    if card[1] not in "DY":
+                        raise TypeError(f"illegal play sequence ({last} => {card})")
+                elif card != "WX":
+                    if card[0] != last[0] and card[1] != last[1]:
+                        raise TypeError(f"illegal play sequence ({last} => {card})")
+            hand.remove(card)
+            last = card
+            played.append(card)
+            # Modify game state if playing an action card
+            if card[-1] == "D":
+                draw += 2
+            elif card[-1] == "R":
+                td = -td
+                if len(hands) < 2:
+                    draw = 1
+            elif card[-1] == "S":
+                if len(hands) < 2:
+                    draw = 1
+                else:
+                    draw += 1
+            elif card[1] == "Y":
+                draw += 4
+            if last[0] != "W":
+                playable = [c for c in set(hand) if c[1] == last[1]]
                 if playable:
                     self.sort(playable)
                     buttons = [cdict(emoji=bot.data.emojis.get(c + ".png"), custom_id=f"~{message.id}~{c}", style=3) for c in playable]
@@ -1275,8 +1261,42 @@ class Uno(Command):
                         content=s,
                         buttons=buttons,
                     )
-                playable = [c + last[-1] for c in "RYGB"]
+                turn = (turn + td) % len(players)
+                if last[-1] == "D":
+                    newdraw = 0
+                    for card in hands[turn]:
+                        if card[-1] in "DY":
+                            newdraw = draw
+                    if not newdraw:
+                        hands[turn].extend(self.deck[:draw])
+                        self.sort(hands[turn])
+                        turn = (turn + td) % len(players)
+                    draw = newdraw
+                elif last[-1] in "RS":
+                    turn = (turn + td * draw) % len(players)
+                    draw = 0
+                content = f"```callback-fun-uno-{players}_{self.hand_repr(hands)}_[]_{turn}_{last}_{'-01'[td]}_{draw}_-\nUNO game in progress...```"
+                embed = message.embeds[0]
+                embed.description = "\n".join(("➡️ ", "▪️ ")[bool(i)] + user_mention(u) + f" `{len(hands[(i - turn) % len(players)])}`" for i, u in enumerate(players[turn:] + players[:turn]))
+                emoji = await create_future(bot.data.emojis.get, last + ".png")
+                embed.set_thumbnail(url=str(emoji.url))
+                t = ""
+                for card in played:
+                    t += await create_future(bot.data.emojis.emoji_as, card + ".png")
+                embed.clear_fields()
+                embed.add_field(name="Previous turn", value=t)
+                create_task(message.edit(content=content, embed=embed))
+                return await interaction_patch(
+                    bot=bot,
+                    message=message,
+                    content=s,
+                    buttons=(),
+                )
+            playable = [c for c in set(hand) if c == last or last[1] == "X" and c[1] == "Y"]
+            if playable:
+                self.sort(playable)
                 buttons = [cdict(emoji=bot.data.emojis.get(c + ".png"), custom_id=f"~{message.id}~{c}", style=3) for c in playable]
+                buttons.append(cdict(emoji="⏭️", name=f"Pass", custom_id=f"~{message.id}~@", style=4))
 
                 content = f"```callback-fun-uno-{players}_{self.hand_repr(hands)}_[]_{turn}_{last}_{'-01'[td]}_{draw}_{self.played_repr(played)}-\nUNO game in progress...```"
                 embed = message.embeds[0]
@@ -1296,6 +1316,31 @@ class Uno(Command):
                     content=s,
                     buttons=buttons,
                 )
+            playable = [c + last[-1] for c in "RYGB"]
+            buttons = []
+            for c in playable:
+                emoji = await create_future(bot.data.emojis.get, c + ".png")
+                button = cdict(emoji=emoji, custom_id=f"~{message.id}~{c}", style=3)
+                buttons.append(button)
+
+            content = f"```callback-fun-uno-{players}_{self.hand_repr(hands)}_[]_{turn}_{last}_{'-01'[td]}_{draw}_{self.played_repr(played)}-\nUNO game in progress...```"
+            embed = message.embeds[0]
+            embed.description = "\n".join(("➡️ ", "▪️ ")[bool(i)] + user_mention(u) + f" `{len(hands[(i - turn) % len(players)])}`" for i, u in enumerate(players[turn:] + players[:turn]))
+            emoji = await create_future(bot.data.emojis.get, last + ".png")
+            embed.set_thumbnail(url=str(emoji.url))
+            t = ""
+            for card in played:
+                t += await create_future(bot.data.emojis.emoji_as, card + ".png")
+            embed.clear_fields()
+            embed.add_field(name="Previous turn", value=t)
+
+            create_task(message.edit(content=content, embed=embed))
+            return await interaction_patch(
+                bot=bot,
+                message=message,
+                content=s,
+                buttons=buttons,
+            )
 
 
 class Pay(Command):

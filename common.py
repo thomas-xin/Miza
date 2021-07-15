@@ -2015,6 +2015,8 @@ async def _await_fut(fut, ret):
 # Blocking call that waits for a single asyncio future to complete, do *not* call from main asyncio loop
 def await_fut(fut, timeout=None):
     if is_main_thread():
+        if not isinstance(fut, asyncio.Task):
+            fut = create_task(fut, loop=loop)
         raise RuntimeError("This function must not be called from the main thread's asyncio loop.")
     try:
         ret = asyncio.run_coroutine_threadsafe(fut, loop=get_event_loop())
