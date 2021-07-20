@@ -346,7 +346,7 @@ class CommandCancelledError(RuntimeError):
     __slots__ = ()
 
 
-python = ("python3", "py")[os.name == "nt"]
+python = sys.executable
 
 
 with open("auth.json") as f:
@@ -1756,7 +1756,7 @@ class Pillow_SIMD:
     #             return self.args
     #     return [python]
 
-    check = lambda self: ["py"]
+    check = lambda self: [sys.executable]
 
 pillow_simd = Pillow_SIMD()
 
@@ -1793,9 +1793,8 @@ def sub_submit(ptype, command, _timeout=12):
     while ts in PROC_RESP:
         ts += 1
     PROC_RESP[ts] = concurrent.futures.Future()
-    command = "[" + ",".join(map(repr, command)) + "]"
+    command = "[" + ",".join(map(repr, command[:2])) + "," + ",".join(map(str, command[2:])) + "]"
     s = f"~{ts}~{repr(command.encode('utf-8'))}\n".encode("utf-8")
-    # print(ts, proc, s)
     with proc.sem:
         if not proc.is_running():
             proc = get_idle_proc(ptype)
@@ -1834,10 +1833,21 @@ def process_math(expr, prec=64, rat=False, timeout=12, variables=None):
 
 # Sends an operation to the image subprocess pool.
 def process_image(image, operation, args, timeout=24):
+    if type(args) is tuple:
+        args = list(args)
     for i, a in enumerate(args):
         if type(a) is mpf:
             args[i] = float(a)
-    return create_future(sub_submit, "image", (image, operation, list(args)), _timeout=timeout)
+        elif type(a) in (list, deque, np.ndarray, dict):
+            args[i] = "pickle.loads(" + repr(pickle.dumps(a)) + ")"
+
+    def as_arg(arg):
+        if isinstance(arg, str) and arg.startswith("pickle.loads("):
+            return arg
+        return repr(arg)
+
+    command = "[" + ",".join(map(as_arg, args)) + "]"
+    return create_future(sub_submit, "image", (image, operation, command), _timeout=timeout)
 
 
 def evalex(exc):

@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import os, sys, io, time, concurrent.futures, subprocess, psutil, collections, traceback, re, requests, blend_modes, pdf2image, zipfile, contextlib, filetype, pyqrcode, ast, colorspace
+import os, sys, io, time, concurrent.futures, subprocess, psutil, collections, traceback, re, requests, blend_modes, pdf2image, zipfile, contextlib, filetype, pyqrcode, ast, colorspace, pickle
 import numpy as np
 import PIL
 from PIL import Image, ImageCms, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhance, ImageMath, ImageStat
@@ -2407,27 +2407,58 @@ special_colours = {
 
 def plt_special(d, user=None, **void):
     hours = 336
+    plt.style.use("dark_background")
     plt.rcParams["figure.figsize"] = (24, 9)
-    plt.rcParams["figure.dpi"] = 128
+    plt.rcParams["figure.dpi"] = 96
     plt.xlim(-hours, 0)
     temp = np.zeros(len(next(iter(d.values()))))
     width = hours / len(temp)
     domain = width * np.arange(-len(temp), 0)
     for k, v in d.items():
-        plt.bar(domain, v, bottom=temp, color=special_colours.get(k, "k"), edgecolor="black", width=width, label=k)
+        plt.bar(domain, v, bottom=temp, color=special_colours.get(k, "k"), edgecolor="white", width=width, label=k)
         temp += np.array(v)
-    plt.bar(list(range(-hours, 0)), np.ones(hours) * max(temp) / 512, edgecolor="black", color="k")
+    plt.bar(list(range(-hours, 0)), np.ones(hours) * max(temp) / 512, edgecolor="white", color="k")
     if user:
         plt.title("Recent Discord Activity for " + user)
     plt.xlabel("Time (Hours)")
     plt.ylabel("Action Count")
     plt.legend(loc="upper left")
     ts = time.time_ns() // 1000
-    out = "cache/" + str(ts) + ".png"
+    out = f"cache/{ts}.png"
     plt.savefig(out)
     plt.clf()
     return "$" + out
 
+def plt_mp(arr, hours, name):
+    if hours >= 336:
+        hours /= 24
+        if hours >= 336:
+            hours /= 30.436849166666665
+            if hours >= 24:
+                hours /= 12
+                word = "years"
+            else:
+                word = "months"
+        else:
+            word = "days"
+    else:
+        word = "hours"
+    plt.style.use("dark_background")
+    plt.rcParams["figure.figsize"] = (24, 9)
+    plt.rcParams["figure.dpi"] = 96
+    plt.xlim(-hours, 0)
+    x = np.linspace(-hours, 0, len(arr))
+    print(x)
+    print(arr)
+    print("-w")
+    plt.plot(x, arr, "-w")
+    plt.xlabel(word.capitalize())
+    plt.ylabel("Value")
+    ts = time.time_ns() // 1000
+    out = f"misc/{name}.png"
+    plt.savefig(out)
+    plt.clf()
+    return out
 
 discord_emoji = re.compile("^https?:\\/\\/(?:[a-z]+\\.)?discord(?:app)?\\.com\\/assets\\/[0-9A-Fa-f]+\\.svg")
 is_discord_emoji = lambda url: discord_emoji.search(url)
@@ -2791,8 +2822,8 @@ if __name__ == "__main__":
             if argv[0] == "~":
                 ts, s = argv[1:].split("~", 1)
                 try:
-                    args = literal_eval(literal_eval(s))
-                    if "$" in args and "plt_special" in args:
+                    args = eval(literal_eval(s))
+                    if "$" in args and "plt_special" in args or "plt_mp" in args:
                         evaluate(ts, args)
                     else:
                         exc.submit(evaluate, ts, args)

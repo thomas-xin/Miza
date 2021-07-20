@@ -9,13 +9,6 @@ SAMPLE_RATE = 48000
 
 
 try:
-    genius_key = AUTH["genius_key"]
-    if not genius_key:
-        raise
-except:
-    genius_key = None
-    print("WARNING: genius_key not found. Unable to use API to search song lyrics.")
-try:
     google_api_key = AUTH["google_api_key"]
     if not google_api_key:
         raise
@@ -959,7 +952,7 @@ def png2wav(png):
     ts = ts_us()
     r_png = f"cache/{ts}"
     r_wav = f"cache/{ts}.wav"
-    args = ["py", f"-3.{sys.version_info[1]}", "png2wav.py", "../" + r_png, "../" + r_wav]
+    args = [sys.executable, "png2wav.py", "../" + r_png, "../" + r_wav]
     with open(r_png, "wb") as f:
         f.write(png)
     print(args)
@@ -4217,17 +4210,12 @@ def extract_lyrics(s):
 
 # Main helper function to fetch song lyrics from genius.com searches
 async def get_lyrics(item):
-    url = "https://api.genius.com/search"
+    url = f"https://genius.com/api/search/multi?q={item}"
     for i in range(2):
-        header = {"Authorization": f"Bearer {genius_key}"}
-        if i == 0:
-            search = item
-        else:
-            search = "".join(shuffle(item.split()))
-        data = {"q": search}
-        resp = await Request(url, data=data, headers=header, aio=True, timeout=18)
-        rdata = await create_future(json.loads, resp, timeout=18)
-        hits = rdata["response"]["hits"]
+        header = {"User-Agent": "Mozilla/6.0"}
+        data = {"q": item}
+        rdata = await Request(url, data=data, headers=header, aio=True, json=True, timeout=18)
+        hits = itertools.chain(*(sect["hits"] for sect in rdata["response"]["sections"]))
         name = None
         path = None
         for h in hits:
@@ -4570,7 +4558,7 @@ class UpdateAudio(Database):
                     q = auds.queue
                     async with Delay(2):
                         for i, e in enumerate(q, 1):
-                            if searched >= 32 or i > 128:
+                            if searched >= 1 or i > 5:
                                 break
                             if "research" in e:
                                 try:
@@ -4584,8 +4572,6 @@ class UpdateAudio(Database):
                                 e.pop("id", None)
                             if "research" not in e and not e.get("duration") and "stream" in e:
                                 e["duration"] = await create_future(get_duration, e["stream"])
-                            if not i & 7:
-                                await asyncio.sleep(0.4)
 
     # Delays audio player display message by 15 seconds when a user types in the target channel
     # async def _typing_(self, channel, user, **void):

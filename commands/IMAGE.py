@@ -1208,7 +1208,7 @@ class Resize(Command):
                         if not urls:
                             raise ArgumentError
                 url = urls[0]
-            except ArgumentError:
+            except (LookupError, ArgumentError):
                 if not argv:
                     url = None
                     try:

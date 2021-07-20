@@ -912,6 +912,20 @@ def predict_next(seq, limit=12):
 			return temp
 
 
+# Performs super-sampling linear interpolation.
+def supersample(a, size):
+    n = len(a)
+    if n == size:
+        return a
+    if n < size:
+        interp = np.linspace(0, n - 1, size)
+        return np.interp(interp, range(n), a)
+    x = ceil(n / size)
+    interp = np.linspace(0, n - 1, x * size)
+    a = np.interp(interp, range(n), a)
+    return numpy.mean(a.reshape(-1, x), 1)
+
+
 # Computes the mean of all numbers in an iterable.
 mean = lambda *nums: round_min(np.mean(nums))
 

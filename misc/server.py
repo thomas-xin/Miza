@@ -58,6 +58,8 @@ class EndpointRedirects(Dispatcher):
             path = "/backup"
         elif path == "/ip":
             path = "/get_ip"
+        elif path == "/f":
+            path = "/files"
         return Dispatcher.__call__(self, path)
 
 config = {
@@ -179,7 +181,7 @@ last_image = [None] * 2
 
 class Server:
 
-    @cp.expose(("preview", "p", "animate", "animation", "a", "images", "image", "i", "view", "v", "file", "f", "download", "d"))
+    @cp.expose(("preview", "p", "animate", "animation", "a", "images", "image", "i", "view", "v", "files", "file", "f", "download", "d"))
     def files(self, path, filename=None, download=None, **void):
         if path in ("hacks", "mods", "files", "download", "static"):
             send(cp.request.remote.ip + " was rickrolled 🙃")
@@ -1337,6 +1339,234 @@ body {
         RESPONSES.pop(t, None)
         return json.dumps(j["result"])
 
+    try:
+        with open("saves/mpdata.json", "rb") as f:
+            mpdata = json.load(f)
+    except FileNotFoundError:
+        mpdata = {}
+    except:
+        if os.path.exists("saves/mpdata\x7f\x7f.json"):
+            with open("saves/mpdata\x7f\x7f.json", "rb") as f:
+                mpdata = json.load(f)
+        else:
+            mpdata = {}
+            print_exc()
+    mpdata_updated = False
+
+    try:
+        with open("saves/mpact.json", "rb") as f:
+            mpact = pickle.load(f)
+    except FileNotFoundError:
+        mpact = {}
+    except:
+        if os.path.exists("saves/mpact\x7f\x7f.json"):
+            with open("saves/mpact\x7f\x7f.json", "rb") as f:
+                mpact = pickle.load(f)
+        else:
+            mpact = {}
+            print_exc()
+
+    @cp.expose
+    def mphb(self, playing=None):
+        mpdata = self.mpdata
+        ip = cp.request.remote.ip
+        t = utc()
+        if ip not in mpdata:
+            mpdata[ip] = [0,] * 4
+        try:
+            if playing is None or cp.request.method.casefold() != "patch" or cp.request.headers["User-Agent"] != "Miza Player":
+                raise KeyError
+        except KeyError:
+            d = t - mpdata[ip][1]
+            if d < 60:
+                mpdata[ip][0] += d
+            mpdata[ip][1] = min(mpdata[ip][1], t - 60)
+            d = t - mpdata[ip][3]
+            if d < 60:
+                mpdata[ip][2] += d
+            mpdata[ip][3] = min(mpdata[ip][3], t - 60)
+            cp.response.status = 450
+            return ""
+        d = t - mpdata[ip][1]
+        if d < 60:
+            mpdata[ip][0] += d
+        mpdata[ip][1] = t
+        if full_prune(playing) == "true":
+            d = t - mpdata[ip][3]
+            if d < 60:
+                mpdata[ip][2] += d
+            mpdata[ip][3] = t
+        else:
+            d = t - mpdata[ip][3]
+            if d < 60:
+                mpdata[ip][2] += d
+            mpdata[ip][3] = min(mpdata[ip][3], t - 60)
+        if not self.mpdata_updated:
+            self.mpdata_updated = True
+            create_future_ex(self.mpdata_update)
+        return "💜"
+
+    mpimg = {}
+
+    @cp.expose
+    def mpinsights(self):
+        values = self.mpget()
+        for i in range(3):
+            values[i] = int(values[i])
+        create_future_ex(self.ensure_mpins)
+        return """<!DOCTYPE html><html>
+<head>
+    <meta charset="utf-8">
+    <title>Insights</title>
+    <meta content="Miza Player Insights" property="og:title">
+    <meta content="See the activity history for the Miza Player program!" property="og:description">
+    <meta content="{cp.url()}" property="og:url">
+    <meta property="og:image" content="https://github.com/thomas-xin/Miza/raw/e62dfccef0cce3b0fc3b8a09fb3ca3edfedd8ab0/misc/sky-rainbow.gif">
+    <meta content="#BF7FFF" data-react-helmet="true" name="theme-color">
+    <style>
+        body {
+            font-family:Rockwell;
+            background:black;
+            color:#bfbfbf;
+            text-align:center;
+        }
+        .center {
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            max-width: 100%;
+        }
+    </style>
+</head>""" + f"""
+<body>
+    <h1 style="color:white;">Miza Player Insights</h1>
+    Live users: {values[2]}
+    <img class="center" src="http://i.mizabot.xyz/mpins/2">
+    Active users: {values[1]}
+    <img class="center" src="http://i.mizabot.xyz/mpins/1">
+    Total users: {values[0]}
+    <img class="center" src="http://i.mizabot.xyz/mpins/0">
+    <br>
+    Total playtime: {sec2time(values[4])}
+    <img class="center" src="http://i.mizabot.xyz/mpins/4">
+    Total use time: {sec2time(values[3])}
+    <img class="center" src="http://i.mizabot.xyz/mpins/3">
+</body>
+</html>"""
+
+    def ensure_mpins(self):
+        try:
+            ins_time = getattr(self, "ins_time", 0)
+            t = utc()
+            if t - ins_time >= 30:
+                self.mpimg.clear()
+                self.ins_wait = concurrent.futures.Future()
+                k = self.mpact.keys()
+                data = [deque() for i in range(len(next(iter(self.mpact.values()))))]
+                for i in range(min(k), max(k) + 1):
+                    values = self.mpact.get(i) or values
+                    for j, v in enumerate(values):
+                        data[j].append(v)
+                self.ins_data = data
+                self.ins_time = t
+                self.ins_wait.set_result(None)
+                self.ins_wait = None
+        except:
+            send(traceback.format_exc())
+
+    @cp.expose
+    def mpins(self, k):
+        k = int(k)
+        try:
+            fn = self.mpimg[k]
+        except KeyError:
+            pass
+        else:
+            if os.path.exists(fn) and utc() - os.path.getmtime(fn) < 20:
+                return cp.lib.static.serve_file(fn, content_type="image/png")
+        while self.ins_wait:
+            self.ins_wait.result()
+        width = np.clip(len(self.ins_data[k]), 3, 960)
+        arr = list(supersample(self.ins_data[k], width))
+
+        t = ts_us()
+        while t in RESPONSES:
+            t += 1
+        RESPONSES[t] = fut = concurrent.futures.Future()
+        arr_repr = "pickle.loads(" + repr(pickle.dumps(arr)) + ")"
+        hours = len(self.ins_data[k])
+        content = f'await process_image("plt_mp", "$", ({arr_repr}, {hours}, {k}))'
+        send(f"!{t}\x7f{content}", escape=False)
+        j, after = fut.result()
+        RESPONSES.pop(t, None)
+        self.mpimg[k] = fn = os.path.abspath(f"misc/{k}.png")
+        return cp.lib.static.serve_file(fn, content_type="image/png")
+
+
+    # names = ("total_users", "active_users", "live_users", "active_seconds", "live_seconds")
+    def mpget(self):
+        mpdata = self.mpdata
+        values = [len(mpdata), 0, 0, 0, 0]
+        t = utc()
+        for active, atime, listen, ltime in mpdata.values():
+            values[1] += t - atime < 60
+            values[2] += t - ltime < 60
+            values[3] += active
+            values[4] += listen
+        return values
+
+    def mpdata_update(self):
+        try:
+            time.sleep(20)
+            self.mpdata_updated = False
+            if not os.path.exists("saves/mpdata.json"):
+                with open("saves/mpdata.json", "w") as f:
+                    json.dump(self.mpdata, f)
+            else:
+                with open("saves/mpdata\x7f.json", "w") as f:
+                    json.dump(self.mpdata, f)
+                if os.path.exists("saves/mpdata\x7f\x7f.json"):
+                    os.remove("saves/mpdata\x7f\x7f.json")
+                os.rename("saves/mpdata.json", "saves/mpdata\x7f\x7f.json")
+                os.rename("saves/mpdata\x7f.json", "saves/mpdata.json")
+        except:
+            send(traceback.format_exc())
+
+    def mpact_update(self):
+        try:
+            time.sleep(20)
+            self.mpact_updated = False
+            if not os.path.exists("saves/mpact.json"):
+                with open("saves/mpact.json", "wb") as f:
+                    pickle.dump(self.mpact, f)
+            else:
+                with open("saves/mpact\x7f.json", "wb") as f:
+                    pickle.dump(self.mpact, f)
+                if os.path.exists("saves/mpact\x7f\x7f.json"):
+                    os.remove("saves/mpact\x7f\x7f.json")
+                os.rename("saves/mpact.json", "saves/mpact\x7f\x7f.json")
+                os.rename("saves/mpact\x7f.json", "saves/mpact.json")
+        except:
+            send(traceback.format_exc())
+
+    def mp_activity(self):
+        try:
+            self.act_time = os.path.getmtime("saves/mpact.json") // 3600
+        except FileNotFoundError:
+            self.act_time = 0
+        while True:
+            try:
+                t = int(utc() // 3600)
+                if t > self.act_time:
+                    self.act_time = t
+                    values = self.mpget()
+                    self.mpact[t] = values
+                    self.mpact_update()
+                    self.mpimg.clear()
+            except:
+                send(traceback.format_exc())
+            time.sleep(60)
+
     @cp.expose(("commands",))
     def command(self, content="", input=""):
         ip = cp.request.remote.ip
@@ -1442,5 +1672,6 @@ if __name__ == "__main__":
     parent = psutil.Process(ppid)
     create_thread(ensure_parent, proc, parent)
     server = Server()
+    create_thread(server.mp_activity)
     create_future_ex(server.get_ip)
     cp.quickstart(server, "/", config)

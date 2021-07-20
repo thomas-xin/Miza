@@ -2,7 +2,7 @@ import sys, os, subprocess, traceback
 from traceback import print_exc
 
 # Required to open python on different operating systems
-python = ("python3", "py")[os.name == "nt"]
+python = sys.executable
 
 
 if sys.version_info[0] < 3:
@@ -55,5 +55,5 @@ if installing:
 try:
     pkg_resources.get_distribution("colorspace")
 except pkg_resources.DistributionNotFound:
-    subprocess.run(["py", f"-3.{x}", "-m", "pip", "install", "git+https://github.com/retostauffer/python-colorspace", "--user"])
+    subprocess.run([python, "-m", "pip", "install", "git+https://github.com/retostauffer/python-colorspace", "--user"])
 print("Installer terminated.")
