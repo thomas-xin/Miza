@@ -1371,22 +1371,23 @@ body {
         mpdata = self.mpdata
         ip = cp.request.remote.ip
         t = utc()
-        if ip not in mpdata:
-            mpdata[ip] = [0,] * 4
         try:
             if playing is None or cp.request.method.casefold() != "patch" or cp.request.headers["User-Agent"] != "Miza Player":
                 raise KeyError
         except KeyError:
-            d = t - mpdata[ip][1]
-            if d < 60:
-                mpdata[ip][0] += d
-            mpdata[ip][1] = min(mpdata[ip][1], t - 60)
-            d = t - mpdata[ip][3]
-            if d < 60:
-                mpdata[ip][2] += d
-            mpdata[ip][3] = min(mpdata[ip][3], t - 60)
+            if ip in mpdata:
+                d = t - mpdata[ip][1]
+                if d < 60:
+                    mpdata[ip][0] += d
+                mpdata[ip][1] = min(mpdata[ip][1], t - 60)
+                d = t - mpdata[ip][3]
+                if d < 60:
+                    mpdata[ip][2] += d
+                mpdata[ip][3] = min(mpdata[ip][3], t - 60)
             cp.response.status = 450
             return ""
+        if ip not in mpdata:
+            mpdata[ip] = [0,] * 4
         d = t - mpdata[ip][1]
         if d < 60:
             mpdata[ip][0] += d

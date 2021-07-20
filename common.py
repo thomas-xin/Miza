@@ -1660,10 +1660,12 @@ def get_mime(path):
         with open(path, "rb") as f:
             b = f.read(65536)
         mime = magic.from_buffer(b, mime=True)
-    if type(mime) == "text/plain":
+    if mime == "text/plain":
         mime2 = MIMES.get(path.rsplit("/", 1)[-1].rsplit(".", 1)[-1], "")
         if mime2.startswith("text/"):
             return mime2
+    elif mime.split("/", 1)[-1] == "zip" and path.endswith(".jar"):
+        return "application/java-archive"
     return mime
 
 

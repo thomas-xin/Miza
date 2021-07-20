@@ -2453,7 +2453,6 @@ def plt_mp(arr, hours, name):
     print("-w")
     plt.plot(x, arr, "-w")
     plt.xlabel(word.capitalize())
-    plt.ylabel("Value")
     ts = time.time_ns() // 1000
     out = f"misc/{name}.png"
     plt.savefig(out)
