@@ -597,7 +597,7 @@ class RoleSelect(Command):
         buttons = [cdict(name=role.name, emoji=get_ecolour(role.colour.to_rgb()), id="%04d" % (ihash(role.name) % 10000) + str(role.id)) for role in roles]
         colour = await self.bot.get_colour(self.bot.user)
         rolestr = "_".join(str(role.id) for role in roles)
-        description = f"```callback-admin-roleselect-{rolestr}-\n{len(buttons)} roles available```Click a button to give or remove a role from yourself!"
+        description = f"```callback-admin-roleselect-{rolestr}-\n{len(buttons)} roles available```Click a button to add or remove a role from yourself!"
         embed = discord.Embed(colour=colour, title="🗂 Role Selection 🗂", description=description)
         embed.set_author(**get_author(self.bot.user))
         await send_with_reply(None, message, embed=embed, buttons=buttons)
