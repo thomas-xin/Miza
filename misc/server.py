@@ -58,8 +58,8 @@ class EndpointRedirects(Dispatcher):
             path = "/backup"
         elif path == "/ip":
             path = "/get_ip"
-        elif path == "/f":
-            path = "/files"
+        elif path[:3] == "/f/":
+            path = "/files/" + path[3:]
         return Dispatcher.__call__(self, path)
 
 config = {

@@ -1632,6 +1632,8 @@ def from_file(path, mime=True):
         out = filetype.guess_mime(path)
     else:
         out = filetype.guess_extension(path)
+    if out.split("/", 1)[-1] == "zip" and type(path) is str and path.endswith(".jar"):
+        return "application/java-archive"
     if not out:
         out = simple_mimes(path, mime)
     return out
