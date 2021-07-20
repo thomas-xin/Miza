@@ -535,6 +535,94 @@ class Ban(Command):
                 await message.add_reaction(as_str(react))
 
 
+class RoleSelect(Command):
+    server_only = True
+    name = ["ReactionRoles", "RoleButtons", "RoleSelection", "RoleSelector"]
+    min_level = 3
+    min_display = "3+"
+    description = "Creates a message that allows users to self-assign roles from a specified list."
+    usage = "<roles>+"
+    flags = "ae"
+    no_parse = True
+    rate_limit = (1, 2)
+
+    async def __call__(self, args, message, guild, perm, **void):
+        if not args:
+            raise ArgumentError("Please input one or more roles by name or ID.")
+        roles = deque()
+        for arg in args:
+            r = verify_id(unicode_prune(arg))
+            if len(guild.roles) <= 1:
+                guild.roles = await guild.fetch_roles()
+                guild.roles.sort()
+                guild._roles.update((r.id, r) for r in guild.roles)
+            if type(r) is int:
+                role = guild.get_role(i)
+            else:
+                role = await str_lookup(
+                    guild.roles,
+                    r,
+                    qkey=lambda x: [str(x), full_prune(x.replace(" ", ""))],
+                )
+            # Must ensure that the user does not assign roles higher than their own
+            if inf > perm:
+                memb = await self.bot.fetch_member_ex(user.id, guild)
+                if memb is None:
+                    raise LookupError("Member data not found for this server.")
+                if memb.top_role <= role:
+                    raise PermissionError("Target role is higher than your highest role.")
+            roles.append(role)
+
+        def get_ecolour(colour):
+            h, s, l = rgb_to_hsl([c / 255 for c in colour])
+            if l >= 0.9375 or l >= 0.75 and s < 0.25 or l >= 0.5 and s < 0.0625:
+                return "⚪"
+            if l <= 0.0625 or l <= 0.25 and s < 0.25 or l <= 0.5 and s < 0.0625:
+                return "⚫"
+            if h < 1 / 12 or h >= 11 / 12:
+                return "🔴"
+            if 1 / 12 <= h < 1 / 4:
+                return "🟠"
+            if 1 / 4 <= h < 5 / 12:
+                return "🟡"
+            if 5 / 12 <= h < 7 / 12:
+                return "🟢"
+            if 7 / 12 <= h < 3 / 4:
+                return "🔵"
+            if 3 / 4 <= h < 11 / 12:
+                return "🟣"
+            return "🟤"
+
+        buttons = [cdict(name=role.name, emoji=get_ecolour(role.colour.to_rgb()), id="%04d" % (ihash(role.name) % 10000) + str(role.id)) for role in roles]
+        colour = await self.bot.get_colour(self.bot.user)
+        rolestr = "_".join(str(role.id) for role in roles)
+        description = f"```callback-admin-roleselect-{rolestr}-\n{len(buttons)} roles available```Click a button to give or remove a role from yourself!"
+        embed = discord.Embed(colour=colour, title="🗂 Role Selection 🗂", description=description)
+        embed.set_author(**get_author(self.bot.user))
+        await send_with_reply(None, message, embed=embed, buttons=buttons)
+
+    async def _callback_(self, bot, message, reaction, user, vals, **void):
+        if not reaction:
+            return
+        reaction = as_str(reaction)
+        if not reaction.isnumeric():
+            return
+        roles = vals.split("_")
+        h1, r_id = reaction[:4], reaction[4:]
+        if r_id not in roles:
+            raise LookupError(f"Role <@&{r_id}> no longer exists.")
+        role = await bot.fetch_role(r_id)
+        h2 = "%04d" % (ihash(role.name) % 10000)
+        if h1 != h2:
+            raise NameError(f"Incorrect hash: {h1} != {h2}")
+        if role in user.roles:
+            await user.remove_roles(role, reason="Role Select")
+            await interaction_response(bot, message, user.mention + ": Successfully removed " + role.mention)
+        else:
+            await user.add_roles(role, reason="Role Select")
+            await interaction_response(bot, message, user.mention + ": Successfully added " + role.mention)
+
+
 class RoleGiver(Command):
     server_only = True
     name = ["Verifier"]
@@ -577,15 +665,12 @@ class RoleGiver(Command):
         if len(guild.roles) <= 1:
             guild.roles = await guild.fetch_roles()
             guild.roles.sort()
-        rolelist = guild.roles
+            guild._roles.update((r.id, r) for r in guild.roles)
         if type(r) is int:
-            for i in rolelist:
-                if i.id == r:
-                    role = i
-                    break
+            role = guild.get_role(i)
         else:
             role = await str_lookup(
-                rolelist,
+                guild.roles,
                 r,
                 qkey=lambda x: [str(x), full_prune(x.replace(" ", ""))],
             )

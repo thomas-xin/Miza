@@ -733,12 +733,17 @@ def restructure_buttons(buttons):
             if "url" in button:
                 button["style"] = 5
             elif "custom_id" not in button:
-                button["custom_id"] = custom_id = button.get("label")
-                if not custom_id:
-                    if button.get("emoji"):
-                        button["custom_id"] = min_emoji(button["emoji"])
-                    else:
-                        button["custom_id"] = 0
+                if "id" in button:
+                    button["custom_id"] = button["id"]
+                else:
+                    button["custom_id"] = custom_id = button.get("label")
+                    if not custom_id:
+                        if button.get("emoji"):
+                            button["custom_id"] = min_emoji(button["emoji"])
+                        else:
+                            button["custom_id"] = 0
+            if "style" not in button:
+                button["style"] = 1
             if button.get("emoji"):
                 if button["emoji"].get("name") == "▪️":
                     button["disabled"] = True
@@ -905,6 +910,8 @@ EDIT_SEM = cdict()
 # noreply = discord.AllowedMentions(replied_user=False)
 
 async def send_with_reply(channel, reference, content="", embed=None, tts=None, file=None, files=None, buttons=None, mention=False):
+    if not channel:
+        channel = reference.channel
     bot = BOT[0]
     if getattr(reference, "slash", None):
         sem = emptyctx

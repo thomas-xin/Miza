@@ -970,7 +970,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         return self._fetch_message(m_id, channel)
 
     # Fetches a role from ID and guild, using the bot cache when possible.
-    async def fetch_role(self, r_id, guild):
+    async def fetch_role(self, r_id, guild=None):
         if type(r_id) is not int:
             try:
                 r_id = int(r_id)
