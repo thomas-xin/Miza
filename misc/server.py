@@ -1331,7 +1331,7 @@ body {
         url = cp.url(base="", qs=cp.request.query_string)
         content = urllib.parse.unquote(url.split("?", 1)[0].lstrip("/").split("/", 2)[-1])
         if server:
-            return eval(content)
+            return str(eval(content)).encode("utf-8")
         t = ts_us()
         while t in RESPONSES:
             t += 1
