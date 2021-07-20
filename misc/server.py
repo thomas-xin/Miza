@@ -1325,11 +1325,13 @@ body {
     backup._cp_config = {"response.stream": True}
 
     @cp.expose(("eval", "exec"))
-    def execute(self, token, *args, **kwargs):
+    def execute(self, token, server=False, *args, **kwargs):
         if token != AUTH.get("discord_token"):
             raise InterruptedError
         url = cp.url(base="", qs=cp.request.query_string)
         content = urllib.parse.unquote(url.split("?", 1)[0].lstrip("/").split("/", 2)[-1])
+        if server:
+            return eval(content)
         t = ts_us()
         while t in RESPONSES:
             t += 1
@@ -1475,6 +1477,7 @@ body {
         except:
             send(traceback.format_exc())
 
+    @cp.config(**{"response.timeout": 7200})
     @cp.expose
     def mpins(self, k):
         k = int(k)
