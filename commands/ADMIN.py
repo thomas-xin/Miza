@@ -563,6 +563,7 @@ class RoleSelect(Command):
                     guild.roles,
                     r,
                     qkey=lambda x: [str(x), full_prune(x.replace(" ", ""))],
+                    fuzzy=0.125,
                 )
             # Must ensure that the user does not assign roles higher than their own
             if inf > perm:
@@ -575,21 +576,21 @@ class RoleSelect(Command):
 
         def get_ecolour(colour):
             h, s, l = rgb_to_hsl([c / 255 for c in colour])
-            if l >= 0.9375 or l >= 0.75 and s < 0.25 or l >= 0.5 and s < 0.0625:
+            if l >= 0.875 or l >= 0.625 and s < 0.375 or l >= 0.5 and s < 0.875:
                 return "⚪"
-            if l <= 0.0625 or l <= 0.25 and s < 0.25 or l <= 0.5 and s < 0.0625:
+            if l <= 0.125 or l <= 0.375 and s < 0.375 or l <= 0.5 and s < 0.125:
                 return "⚫"
-            if h < 1 / 12 or h >= 11 / 12:
+            if h < 1 / 16 or h >= 41 / 48:
                 return "🔴"
-            if 1 / 12 <= h < 1 / 4:
+            if 1 / 16 <= h < 5 / 48:
                 return "🟠"
-            if 1 / 4 <= h < 5 / 12:
+            if 5 / 48 <= h < 1 / 4:
                 return "🟡"
-            if 5 / 12 <= h < 7 / 12:
+            if 1 / 4 <= h < 1 / 2:
                 return "🟢"
-            if 7 / 12 <= h < 3 / 4:
+            if 1 / 2 <= h < 35 / 48:
                 return "🔵"
-            if 3 / 4 <= h < 11 / 12:
+            if 35 / 48 <= h < 41 / 48:
                 return "🟣"
             return "🟤"
 
@@ -673,6 +674,7 @@ class RoleGiver(Command):
                 guild.roles,
                 r,
                 qkey=lambda x: [str(x), full_prune(x.replace(" ", ""))],
+                fuzzy=0.125,
             )
         # Must ensure that the user does not assign roles higher than their own
         if inf > perm:
@@ -769,6 +771,7 @@ class AutoRole(Command):
                     rolelist,
                     r,
                     qkey=lambda x: [str(x), full_prune(x.replace(" ", ""))],
+                    fuzzy=0.125,
                 )
             # Must ensure that the user does not assign roles higher than their own
             if not inf > perm:
