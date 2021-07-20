@@ -1325,13 +1325,11 @@ body {
     backup._cp_config = {"response.stream": True}
 
     @cp.expose(("eval", "exec"))
-    def execute(self, token, server=False, *args, **kwargs):
+    def execute(self, token, *args, **kwargs):
         if token != AUTH.get("discord_token"):
             raise InterruptedError
         url = cp.url(base="", qs=cp.request.query_string)
         content = urllib.parse.unquote(url.split("?", 1)[0].lstrip("/").split("/", 2)[-1])
-        if server:
-            return str(eval(content)).encode("utf-8")
         t = ts_us()
         while t in RESPONSES:
             t += 1
@@ -1340,6 +1338,14 @@ body {
         j, after = fut.result()
         RESPONSES.pop(t, None)
         return json.dumps(j["result"])
+
+    @cp.expose
+    def eval2(self, token, *args, **kwargs):
+        if token != AUTH.get("discord_token"):
+            raise InterruptedError
+        url = cp.url(base="", qs=cp.request.query_string)
+        content = urllib.parse.unquote(url.split("?", 1)[0].lstrip("/").split("/", 2)[-1])
+        return str(eval(content, globals())).encode("utf-8")
 
     try:
         with open("saves/mpdata.json", "rb") as f:
