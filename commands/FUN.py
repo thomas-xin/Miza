@@ -2523,7 +2523,7 @@ class MimicSend(Command):
                 emb = await bot.as_embed(message, link=True)
                 emb.colour = discord.Colour(0x00FF00)
                 action = f"**Mimic invoked in** {channel_mention(channel.id)}:\n"
-                emb.description = lim_str(action + emb.description, 2048)
+                emb.description = lim_str(action + emb.description, 4096)
                 emb.timestamp = message.created_at
                 self.bot.send_embeds(c, emb)
             for mimic in m:
@@ -2595,7 +2595,7 @@ class UpdateMimics(Database):
                             emb = await self.bot.as_embed(message, link=True)
                             emb.colour = discord.Colour(0x00FF00)
                             action = f"**Mimic invoked in** {channel_mention(channel.id)}:\n"
-                            emb.description = lim_str(action + emb.description, 2048)
+                            emb.description = lim_str(action + emb.description, 4096)
                             emb.timestamp = message.created_at
                             self.bot.send_embeds(c, emb)
                         for k in sending:

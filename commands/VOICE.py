@@ -2757,7 +2757,7 @@ class Queue(Command):
                         curr += "Remaining time: [" + time_until(utc() + (estim + e_dur(e.duration)) / auds.speed) + "]"
                     curr += "```"
                 curr += "\n"
-                if len(embstr) + len(curr) > 2048 - len(emb.description):
+                if len(embstr) + len(curr) > 4096 - len(emb.description):
                     break
                 embstr += curr
                 if i <= 1 or not auds.stats.shuffle:

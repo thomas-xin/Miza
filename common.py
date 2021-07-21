@@ -1159,7 +1159,7 @@ def as_embed(message, link=False):
                 emb.url = url
                 emb.set_image(url=url)
                 if link:
-                    emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 2048)
+                    emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 4096)
                     emb.timestamp = message.edited_at or message.created_at
                 return emb
         elif not message.attachments and len(message.embeds) == 1:
@@ -1178,7 +1178,7 @@ def as_embed(message, link=False):
                 if f:
                     emb.add_field(name=f.name, value=f.value, inline=getattr(f, "inline", True))
             if link:
-                emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 2048)
+                emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 4096)
                 emb.timestamp = message.edited_at or message.created_at
             return emb
     else:
@@ -1196,7 +1196,7 @@ def as_embed(message, link=False):
                     if url != message.content:
                         emb.description = message.content
                     if link:
-                        emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 2048)
+                        emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 4096)
                         emb.timestamp = message.edited_at or message.created_at
                     return emb
     emb.description = message.content
@@ -1207,9 +1207,9 @@ def as_embed(message, link=False):
         items = None
     if items:
         if emb.description in items:
-            emb.description = lim_str("\n".join(items), 2048)
+            emb.description = lim_str("\n".join(items), 4096)
         else:
-            emb.description = lim_str(emb.description + "\n" + "\n".join(items), 2048)
+            emb.description = lim_str(emb.description + "\n" + "\n".join(items), 4096)
     image = None
     for a in message.attachments:
         url = a.url
@@ -1249,9 +1249,9 @@ def as_embed(message, link=False):
             break
     if not emb.description:
         urls = itertools.chain(("(" + e.url + ")" for e in message.embeds if e.url), ("[" + best_url(a) + "]" for a in message.attachments))
-        emb.description = lim_str("\n".join(urls), 2048)
+        emb.description = lim_str("\n".join(urls), 4096)
     if link:
-        emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 2048)
+        emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 4096)
         emb.timestamp = message.edited_at or message.created_at
     return emb
 

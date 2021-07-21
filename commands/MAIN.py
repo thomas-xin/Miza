@@ -1161,8 +1161,8 @@ class Reminder(Command):
                 msg = bold(css_md(msg, force=True))
             else:
                 msg = bold(ini_md(msg))
-        elif len(msg) > 2048:
-            raise OverflowError(f"Input message too long ({len(msg)} > 2048).")
+        elif len(msg) > 4096:
+            raise OverflowError(f"Input message too long ({len(msg)} > 4096).")
         username = str(remind_as)
         url = await bot.get_proxy_url(remind_as)
         ts = utc()

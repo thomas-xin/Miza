@@ -922,7 +922,7 @@ class SaveChannel(Command):
             async with Delay(0.32):
                 if s:
                     s += "\n\n"
-                s += "\n\n".join(message_repr(m, limit=2048, username=True) for m in h[:4096])
+                s += "\n\n".join(message_repr(m, limit=4096, username=True) for m in h[:4096])
                 h = h[4096:]
         return bytes(s, "utf-8")
 
@@ -2249,7 +2249,7 @@ class UpdateMessageLogs(Database):
                 emb = as_embed(message, link=True)
                 emb.colour = discord.Colour(0x00FFFF)
                 action = f"**Slash command executed in** {channel_mention(message.channel.id)}:\n"
-                emb.description = lim_str(action + (emb.description or ""), 2048)
+                emb.description = lim_str(action + (emb.description or ""), 4096)
                 self.bot.send_embeds(channel, emb)
 
     # Edit events are rather straightforward to log
@@ -2337,7 +2337,7 @@ class UpdateMessageLogs(Database):
             emb = await self.bot.as_embed(message, link=True)
             emb.colour = discord.Colour(0xFF0000)
             action = f"{init} **deleted message from** {channel_mention(message.channel.id)}:\n"
-            emb.description = lim_str(action + (emb.description or ""), 2048)
+            emb.description = lim_str(action + (emb.description or ""), 4096)
             self.bot.send_embeds(channel, emb)
 
     # Thanks to the embed sender feature, which allows this feature to send up to 10 logs in one message
@@ -2524,7 +2524,7 @@ class UpdateStarboards(Database):
                         embed = await self.bot.as_embed(message, link=True, colour=True)
                         text, link = embed.description.rsplit("\n\n", 1)
                         description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in sorted(message.reactions, key=lambda r: -r.count) if str(r.emoji) in table) + "   " + link
-                        embed.description = lim_str(description, 2048)
+                        embed.description = lim_str(description, 4096)
                         # data = ("#" + str(message.channel), to_png(message.guild.icon_url))
                         try:
                             channel = await self.bot.fetch_channel(table[react][1])
@@ -2544,7 +2544,7 @@ class UpdateStarboards(Database):
                         embed = await self.bot.as_embed(message, link=True, colour=True)
                         text, link = embed.description.rsplit("\n\n", 1)
                         description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in sorted(message.reactions, key=lambda r: -r.count) if str(r.emoji) in table) + "   " + link
-                        embed.description = lim_str(description, 2048)
+                        embed.description = lim_str(description, 4096)
                         await m.edit(content=None, embed=embed)
                     except (discord.NotFound, discord.Forbidden):
                         table[None].pop(message.id, None)
@@ -2572,7 +2572,7 @@ class UpdateStarboards(Database):
                 embed = await self.bot.as_embed(message, link=True, colour=True)
                 text, link = embed.description.rsplit("\n\n", 1)
                 description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in reacts if str(r.emoji) in table) + "   " + link
-                embed.description = lim_str(description, 2048)
+                embed.description = lim_str(description, 4096)
                 await m.edit(content=None, embed=embed)
             except (discord.NotFound, discord.Forbidden):
                 table[None].pop(message.id, None)

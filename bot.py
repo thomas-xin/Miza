@@ -1532,7 +1532,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     emb.url = url
                     emb.set_image(url=url)
                     if link:
-                        emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 2048)
+                        emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 4096)
                         emb.timestamp = message.edited_at or message.created_at
                     return emb
             elif not message.attachments and len(message.embeds) == 1:
@@ -1553,7 +1553,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     if f:
                         emb.add_field(name=f.name, value=f.value, inline=getattr(f, "inline", True))
                 if link:
-                    emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 2048)
+                    emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 4096)
                     emb.timestamp = message.edited_at or message.created_at
                 return emb
         else:
@@ -1574,7 +1574,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         if url != message.content:
                             emb.description = message.content
                         if link:
-                            emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 2048)
+                            emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 4096)
                             emb.timestamp = message.edited_at or message.created_at
                         return emb
         emb.description = message.content
@@ -1589,9 +1589,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             items = None
         if items:
             if emb.description in items:
-                emb.description = lim_str("\n".join(items), 2048)
+                emb.description = lim_str("\n".join(items), 4096)
             else:
-                emb.description = lim_str(emb.description + "\n" + "\n".join(items), 2048)
+                emb.description = lim_str(emb.description + "\n" + "\n".join(items), 4096)
         image = None
         for a in message.attachments:
             url = a.url
@@ -1636,9 +1636,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 temp = urls[i * 10:i * 10 + 10]
                 temp2 = await self.data.exec.uproxy(*temp, collapse=False)
                 items.extend(temp2[x] or temp[x] for x in range(len(temp)))
-            emb.description = lim_str("\n".join(items), 2048)
+            emb.description = lim_str("\n".join(items), 4096)
         if link:
-            emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 2048)
+            emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 4096)
             emb.timestamp = message.edited_at or message.created_at
         return emb
 
@@ -2238,7 +2238,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 f = f[:f.rindex(".")]
             path, module = module, f
             new = False
+            reloaded = False
             if module in self._globals:
+                reloaded = True
                 print(f"Reloading module {module}...")
                 if module in self.categories:
                     self.unload(module)
@@ -2266,7 +2268,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     with suppress(TypeError):
                         if issubclass(var, Command):
                             load_type = 1
-                        elif issubclass(var, Database):
+                        elif issubclass(var, Database) and not reloaded:
                             load_type = 2
                     if load_type:
                         obj = var(self, module)
@@ -2286,7 +2288,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 print(f"{module}: Successfully loaded {len(commands)} command{'s' if len(commands) != 1 else ''}.")
             if dataitems:
                 print(f"{module}: Successfully loaded {len(dataitems)} database{'s' if len(dataitems) != 1 else ''}.")
-            if not new:
+            if not new and not reloaded:
                 while not self.ready:
                     time.sleep(0.5)
                 print(f"Resending _ready_ event to module {module}...")
@@ -2315,10 +2317,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             for mod in mods:
                 for command in self.categories[mod]:
                     command.unload()
-                for database in self.dbitems[mod]:
-                    database.unload()
+                # for database in self.dbitems[mod]:
+                #     database.unload()
                 self.categories.pop(mod)
-                self.dbitems.pop(mod)
+                # self.dbitems.pop(mod)
                 self.size.pop(mod)
             return True
 
@@ -3266,8 +3268,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 paragraphs = alist((description,))
             while paragraphs:
                 para = paragraphs.popleft()
-                if len(para) > 2000:
-                    temp = para[:2000]
+                if len(para) > 4080:
+                    temp = para[:4080]
                     try:
                         i = temp.rindex("\n")
                         s = "\n"
@@ -3276,13 +3278,13 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                             i = temp.rindex(" ")
                             s = " "
                         except ValueError:
-                            paragraphs.appendleft(para[2000:])
+                            paragraphs.appendleft(para[4080:])
                             paragraphs.appendleft(temp)
                             continue
                     paragraphs.appendleft(para[i + 1:])
                     paragraphs.appendleft(para[:i] + s)
                     continue
-                if len(curr) + len(para) > 2000:
+                if len(curr) + len(para) > 4080:
                     emb.description = md(curr.strip())
                     curr = para
                     embs.append(emb)
