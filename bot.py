@@ -4951,11 +4951,9 @@ def webserver_communicate(bot):
                 if b:
                     s = as_str(b)
                     if s[0] == "~":
-                        print(s)
                         create_task(bot.process_http_command(*s[1:].split("\x7f", 3)))
                         bot.activity += 1
                     elif s[0] == "!":
-                        print(s)
                         create_task(bot.process_http_eval(*s[1:].split("\x7f", 1)))
                         bot.activity += 1
                     elif s == "@@@":

@@ -2448,9 +2448,6 @@ def plt_mp(arr, hours, name):
     plt.rcParams["figure.dpi"] = 96
     plt.xlim(-hours, 0)
     x = np.linspace(-hours, 0, len(arr))
-    print(x)
-    print(arr)
-    print("-w")
     plt.plot(x, arr, "-w")
     plt.xlabel(word.capitalize())
     ts = time.time_ns() // 1000
