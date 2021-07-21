@@ -661,12 +661,12 @@ class Server:
             cp.response.headers.update(CHEADERS)
             cp.response.headers["Content-Disposition"] = "attachment; " * bool(d) + "filename=" + name + fmt
             if af():
+                count = 1048576
+                cp.response.headers["Content-Length"] = os.path.getsize(fni)
+            else:
                 if d:
                     cp.response.status = 202
                 count = 65536
-            else:
-                count = 1048576
-                cp.response.headers["Content-Length"] = os.path.getsize(fni)
             cp.response.headers["Content-Type"] = f"audio/{fmt[1:]}"
             return cp.lib.file_generator(f, count)
         else:
