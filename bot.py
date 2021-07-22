@@ -1579,7 +1579,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         return emb
         emb.description = message.content
         if len(message.embeds) > 1 or message.content:
-            urls = list(itertools.chain(("(" + e.url + ")" for e in message.embeds[1:] if e.url), ("[" + best_url(a) + "]" for a in message.attachments)))
+            urls = list(chain(("(" + e.url + ")" for e in message.embeds[1:] if e.url), ("[" + best_url(a) + "]" for a in message.attachments)))
             items = []
             for i in range((len(urls) + 9) // 10):
                 temp = urls[i * 10:i * 10 + 10]
@@ -1630,7 +1630,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     emb.remove_field(-1)
                 break
         if not emb.description:
-            urls = list(itertools.chain(("(" + e.url + ")" for e in message.embeds if e.url), ("[" + best_url(a) + "]" for a in message.attachments)))
+            urls = list(chain(("(" + e.url + ")" for e in message.embeds if e.url), ("[" + best_url(a) + "]" for a in message.attachments)))
             items = []
             for i in range((len(urls) + 9) // 10):
                 temp = urls[i * 10:i * 10 + 10]
@@ -1662,7 +1662,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         self.cache.users._feed = (self._users,)
         g = self._guilds.values()
         self.cache.members._feed = lambda: (guild._members for guild in g)
-        self.cache.channels._feed = lambda: itertools.chain((guild._channels for guild in g), (self._private_channels,), (self.sub_channels,))
+        self.cache.channels._feed = lambda: chain((guild._channels for guild in g), (self._private_channels,), (self.sub_channels,))
         self.cache.roles._feed = lambda: (guild._roles for guild in g)
 
     def update_usernames(self):
@@ -1671,7 +1671,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
     def update_subs(self):
         self.sub_guilds = dict(self._guilds) or self.sub_guilds
-        self.sub_channels = dict(itertools.chain(*(guild._channels.items() for guild in self.sub_guilds.values()))) or self.sub_channels
+        self.sub_channels = dict(chain.from_iterable(guild._channels.items() for guild in self.sub_guilds.values())) or self.sub_channels
 
     # Gets the target bot prefix for the target guild, return the default one if none exists.
     def get_prefix(self, guild):
@@ -4489,7 +4489,11 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                             if channel is None:
                                 channel = await self.get_dm(user)
                         message.channel = channel
-                        if custom_id.startswith("~"):
+                        if custom_id == "$":
+                            custom_id = cdata.get("values") or custom_id
+                            if type(custom_id) is list:
+                                custom_id = " ".join(custom_id)
+                        if type(custom_id) is str and custom_id.startswith("~"):
                             m_id, custom_id = custom_id[1:].split("~", 1)
                             custom_id = "~" + custom_id
                         else:

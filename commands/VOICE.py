@@ -2640,7 +2640,7 @@ class Queue(Command):
             return css_md(f"🎶 Added {sqr_md(names)} to the queue! Estimated time until playing: {sqr_md(time_until(utc() + total_duration))}. 🎶"), 1
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
-        u_id, pos, v = [int(i) for i in vals.split("_", 2)]
+        u_id, pos, v = list(map(int, vals.split("_", 2)))
         if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
             return
         if reaction not in self.directions and reaction is not None:
@@ -2845,7 +2845,7 @@ class Playlist(Command):
         return css_md(f"Added {sqr_md(stuff)} to the default playlist for {sqr_md(guild)}.")
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
-        u_id, pos = [int(i) for i in vals.split("_", 1)]
+        u_id, pos = list(map(int, vals.split("_", 1)))
         if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
             return
         if reaction not in self.directions and reaction is not None:
@@ -4215,7 +4215,7 @@ async def get_lyrics(item):
         header = {"User-Agent": "Mozilla/6.0"}
         data = {"q": item}
         rdata = await Request(url, data=data, headers=header, aio=True, json=True, timeout=18)
-        hits = itertools.chain(*(sect["hits"] for sect in rdata["response"]["sections"]))
+        hits = chain(*(sect["hits"] for sect in rdata["response"]["sections"]))
         name = None
         path = None
         for h in hits:

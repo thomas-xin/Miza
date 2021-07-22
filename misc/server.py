@@ -1460,6 +1460,8 @@ body {
     <img class="center" src="http://i.mizabot.xyz/mpins/4">
     Total use time: {sec2time(values[3])}
     <img class="center" src="http://i.mizabot.xyz/mpins/3">
+    Average playtime per user: {sec2time(values[5])}
+    <img class="center" src="http://i.mizabot.xyz/mpins/5">
 </body>
 </html>"""
 
@@ -1471,7 +1473,7 @@ body {
                 self.mpimg.clear()
                 self.ins_wait = concurrent.futures.Future()
                 k = self.mpact.keys()
-                data = [deque() for i in range(len(next(iter(self.mpact.values()))))]
+                data = [deque() for i in range(len(next(reversed(self.mpact.values()))))]
                 for i in range(min(k), max(k) + 1):
                     values = self.mpact.get(i) or values
                     for j, v in enumerate(values):
@@ -1513,16 +1515,17 @@ body {
         return cp.lib.static.serve_file(fn, content_type="image/png")
 
 
-    # names = ("total_users", "active_users", "live_users", "active_seconds", "live_seconds")
+    # names = ("total_users", "active_users", "live_users", "active_seconds", "live_seconds", "seconds_per_user")
     def mpget(self):
         mpdata = self.mpdata
-        values = [len(mpdata), 0, 0, 0, 0]
+        values = [len(mpdata), 0, 0, 0, 0, 0]
         t = utc()
         for active, atime, listen, ltime in mpdata.values():
             values[1] += t - atime < 60
             values[2] += t - ltime < 60
             values[3] += active
             values[4] += listen
+        values[5] = values[4] / values[0]
         return values
 
     def mpdata_update(self):

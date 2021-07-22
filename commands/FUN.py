@@ -347,7 +347,7 @@ class Text2048(Command):
 
     async def _callback_(self, bot, message, reaction, argv, user, perm, vals, **void):
         # print(user, message, reaction, argv)
-        u_id, mode = [int(x) for x in vals.split("_", 1)]
+        u_id, mode = list(map(int, vals.split("_", 1)))
         if reaction is not None and u_id != user.id and u_id != 0 and perm < 3:
             return
         spl = argv.split("-")
@@ -676,7 +676,7 @@ class SlotMachine(Command):
         return f"*```callback-fun-slotmachine-{user.id}_{bet}_{skip}-\nLoading Slot Machine...```*"
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
-        spl = [int(i) for i in vals.split("_", 2)]
+        spl = list(map(int, vals.split("_", 2)))
         if len(spl) < 3:
             spl.append(0)
         u_id, bet, skip = spl
@@ -885,13 +885,13 @@ class Uno(Command):
         bot = self.bot
         vals = vals.split("_")
         players = literal_eval(vals[0])
-        hands = [list(itertools.chain(x + y for x, y in zip(s[::2], s[1::2]))) for s in vals[1].split("x")]
+        hands = [list(chain(x + y for x, y in zip(s[::2], s[1::2]))) for s in vals[1].split("x")]
         winners = literal_eval(vals[2])
         turn = int(vals[3])
         last = vals[4]
         td = 1 if vals[5] == "0" else -1
         draw = int(vals[6])
-        played = list(itertools.chain(x + y for x, y in zip(vals[7][::2], vals[7][1::2])))
+        played = list(chain(x + y for x, y in zip(vals[7][::2], vals[7][1::2])))
         r = as_str(reaction)
         print(user, r, players, hands, winners, turn, last, td, draw, played)
         if r == "✋":
@@ -1494,7 +1494,7 @@ class React(Command):
         return css_md(f"Added {sqr_md(a)} ➡️ {sqr_md(emoji)} to the auto react list for {sqr_md(guild)}.")
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
-        u_id, pos = [int(i) for i in vals.split("_", 1)]
+        u_id, pos = list(map(int, vals.split("_", 1)))
         if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
             return
         if reaction not in self.directions and reaction is not None:
@@ -1623,7 +1623,7 @@ class EmojiList(Command):
         )
     
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
-        u_id, pos = [int(i) for i in vals.split("_", 1)]
+        u_id, pos = list(map(int, vals.split("_", 1)))
         if reaction not in (None, self.directions[-1]) and u_id != user.id and perm <= inf:
             return
         if reaction not in self.directions and reaction is not None:
@@ -2411,7 +2411,7 @@ class Mimic(Command):
         return css_md(out)
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
-        u_id, pos = [int(i) for i in vals.split("_", 1)]
+        u_id, pos = list(map(int, vals.split("_", 1)))
         if reaction not in (None, self.directions[-1]) and u_id != user.id and perm <= inf:
             return
         if reaction not in self.directions and reaction is not None:

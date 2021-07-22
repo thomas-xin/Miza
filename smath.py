@@ -129,6 +129,7 @@ from colormath import color_objects, color_conversions
 suppress = lambda *args, **kwargs: contextlib.suppress(BaseException) if not args and not kwargs else contextlib.suppress(*args + tuple(kwargs.values()))
 closing = contextlib.closing
 repeat = itertools.repeat
+chain = itertools.chain
 
 
 print_exc = lambda *args: sys.stdout.write(("\n".join(as_str(i) for i in args) + "\n" if args else "") + traceback.format_exc())
@@ -1211,15 +1212,18 @@ def round_at(num, prec):
 
 
 # Limits a string to a maximum length, cutting from the middle and replacing with ".." when possible.
-def lim_str(s, maxlen=10):
+def lim_str(s, maxlen=10, mode="centre"):
     if maxlen is None:
         return s
     if type(s) is not str:
         s = str(s)
     over = (len(s) - maxlen) / 2
     if over > 0:
-        half = len(s) / 2
-        s = s[:ceil(half - over - 1)] + ".." + s[ceil(half + over + 1):]
+        if mode == "centre":
+            half = len(s) / 2
+            s = s[:ceil(half - over - 1)] + ".." + s[ceil(half + over + 1):]
+        else:
+            s = s[:maxlen - 3] + "..."
     return s
 
 

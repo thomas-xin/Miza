@@ -719,7 +719,8 @@ def restructure_buttons(buttons):
         buttons = b
     for row in buttons:
         for button in row:
-            button["type"] = 2
+            if "type" not in button:
+                button["type"] = 2
             if "name" in button:
                 button["label"] = button["name"]
             try:
@@ -753,6 +754,10 @@ def restructure_buttons(buttons):
 def interaction_response(bot, message, content=None, embed=None, components=None, buttons=None):
     if hasattr(embed, "to_dict"):
         embed = embed.to_dict()
+    if not getattr(message, "int_id", None):
+        message.int_id = message.id
+    if not getattr(message, "int_token", None):
+        message.int_token = message.slash
     return Request(
         f"https://discord.com/api/v9/interactions/{message.int_id}/{message.int_token}/callback",
         data=json.dumps(dict(
@@ -776,6 +781,10 @@ def interaction_response(bot, message, content=None, embed=None, components=None
 def interaction_patch(bot, message, content=None, embed=None, components=None, buttons=None):
     if hasattr(embed, "to_dict"):
         embed = embed.to_dict()
+    if not getattr(message, "int_id", None):
+        message.int_id = message.id
+    if not getattr(message, "int_token", None):
+        message.int_token = message.slash
     return Request(
         f"https://discord.com/api/v9/interactions/{message.int_id}/{message.int_token}/callback",
         data=json.dumps(dict(
@@ -1201,7 +1210,7 @@ def as_embed(message, link=False):
                     return emb
     emb.description = message.content
     if len(message.embeds) > 1 or message.content:
-        urls = itertools.chain(("(" + e.url + ")" for e in message.embeds[1:] if e.url), ("[" + best_url(a) + "]" for a in message.attachments))
+        urls = chain(("(" + e.url + ")" for e in message.embeds[1:] if e.url), ("[" + best_url(a) + "]" for a in message.attachments))
         items = list(urls)
     else:
         items = None
@@ -1248,7 +1257,7 @@ def as_embed(message, link=False):
                 emb.remove_field(-1)
             break
     if not emb.description:
-        urls = itertools.chain(("(" + e.url + ")" for e in message.embeds if e.url), ("[" + best_url(a) + "]" for a in message.attachments))
+        urls = chain(("(" + e.url + ")" for e in message.embeds if e.url), ("[" + best_url(a) + "]" for a in message.attachments))
         emb.description = lim_str("\n".join(urls), 4096)
     if link:
         emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 4096)

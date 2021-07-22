@@ -17,85 +17,186 @@ help_colours = fcdict({
     "nsfw": 0xff9f9f,
     "misc": 0x007f00,
 })
+help_emojis = fcdict((
+    (None, "♾"),
+    ("main", "🌐"),
+    ("string", "🔢"),
+    ("admin", "🕵️‍♀️"),
+    ("voice", "🎼"),
+    ("image", "🖼"),
+    ("fun", "🙃"),
+    ("owner", "💜"),
+    ("nsfw", "🔞"),
+    ("misc", "🌌"),
+))
+help_descriptions = fcdict((
+    (None, "N/A"),
+    ("main", "General commands, mostly involves individual users"),
+    ("string", "Text-based commands, usually helper tools"),
+    ("admin", "Moderation-based, used to help staffing servers"),
+    ("voice", "Play, convert, or download songs through VC"),
+    ("image", "Create or edit images, animations, and videos"),
+    ("fun", "Text-based games and webhook management"),
+    ("owner", "Restricted owner-only commands; highly volatile"),
+    ("nsfw", "Not Safe For Work; only usable in 18+ channels"),
+    ("misc", "Miscellaneous; restricted to trusted servers"),
+))
 
 
 class Help(Command):
     name = ["❓", "❔", "?"]
     description = "Shows a list of usable commands, or gives a detailed description of a command."
-    usage = "<(command|category)>? <verbose{?v}>?"
+    usage = "<(command|category)>?"
     flags = "v"
     no_parse = True
     slash = True
 
-    async def __call__(self, args, user, channel, guild, message, flags, perm, **void):
+    async def __call__(self, bot, argv, user, message, original=None, **void):
         bot = self.bot
-        enabled = bot.data.enabled
-        g_id = guild.id
-        prefix = bot.get_prefix(g_id)
-        v = "v" in flags
-        author=dict(name="❓ Help ❓")
-        fields = deque()
-        found = {}
-        description = ""
-        colour = None
-        # Get help on categories, then commands
-        for a in args:
-            a = full_prune(a).replace("*", "").replace("_", "").replace("||", "")
-            if a in bot.categories:
-                coms = bot.categories[a]
-                colour = discord.Colour(help_colours[a])
-            elif a in bot.commands:
-                coms = bot.commands[a]
-                colour = discord.Colour(help_colours[coms[-1].catg])
-            else:
-                continue
-            for com in coms:
-                if com.parse_name() in found:
-                    found[com.parse_name()].append(com)
-                else:
-                    found[com.parse_name()] = alist((com,))
-        if found:
-            # Display list of found commands in an embed
-            for k in found:
-                coms = found[k]
-                for com in coms:
-                    a = ", ".join(n.strip("_") for n in com.name)
-                    if not a:
-                        a = "[none]"
-                    s = "```ini"
-                    if len(found) <= 1:
-                        s += f"\n[Category] {com.catg.capitalize()}"
-                    s += f"\n[Aliases] {a}"
-                    s += f"\n[Effect] {com.parse_description()}"
-                    if v or len(found) <= 1:
-                        s += f"\n[Usage] {prefix}{com.parse_name()} {com.usage}\n[Level] {com.min_display}"
-                    if len(found) <= 1:
-                        x = com.rate_limit
-                        if x:
-                            if issubclass(type(x), collections.abc.Sequence):
-                                x = x[not bot.is_trusted(getattr(guild, "id", 0))]
-                        s += f"\n[Rate Limit] {sec2time(x)}"
-                    s += "```"
-                    fields.append(dict(
-                        name=prefix + com.parse_name(),
-                        value=s,
-                        inline=False
-                    ))
+        guild = message.guild
+        channel = message.channel
+        prefix = "/" if getattr(message, "slash", None) else bot.get_prefix(guild.id)
+        if " " in prefix:
+            prefix += " "
+        embed = discord.Embed()
+        embed.set_author(name="❓ Help ❓", icon_url=best_url(user), url=bot.webserver)
+        argv = full_prune(argv).replace("*", "").replace("_", "").replace("||", "")
+        comm = None
+        if argv in bot.categories:
+            catg = argv
+        elif argv in bot.commands:
+            comm = argv
+            catg = bot.commands[argv][0].catg.casefold()
         else:
-            # Display main help page in an embed
-            colour = discord.Colour(help_colours[None])
-            p = prefix
-            description = (
-                f"Please enter a command category to display usable commands, or type a command name to view more info. Examples: `{p}help main` or `{p}help rainbow`\nAlternatively, visit "
-                + f"[`mizatlas`]({bot.webserver}/mizatlas) for a full command list and tester.\nUnsure about anything, or have a bug to report? Check out the [`support server`]({bot.rcc_invite})!"
-                + f"\nNeed a handy way to upload larger files? See [`upload`]({bot.webserver}/upload)!\nWant to enable/disable commands as an admin? See `{p}ec` for more!"
+            catg = None
+        if catg not in bot.categories:
+            catg = None
+        content = None
+        if comm:
+            com = bot.commands[comm][0]
+            a = ", ".join(n.strip("_") for n in com.name) or "[none]"
+            content = (
+                f"[Category] {com.catg.capitalize()}\n"
+                + f"[Usage] {prefix}{com.parse_name()} {com.usage}\n"
+                + f"[Aliases] {a}\n"
+                + f"[Effect] {com.parse_description()}\n"
+                + f"[Level] {com.min_display}"
             )
-            if bot.categories:
-                s = bold(ini_md(' '.join((sqr_md(c) for c in help_colours if c in standard_commands))))
-                fields.append(dict(name="Command category list", value=s))
-        if not channel.permissions_for(guild.me).send_messages:
-            channel = await bot.get_dm(user)
-        bot.send_as_embeds(channel, description, author=author, fields=fields, colour=colour, reacts="❎", reference=message)
+            x = com.rate_limit
+            if x:
+                if isinstance(x, collections.abc.Sequence):
+                    x = x[not bot.is_trusted(getattr(guild, "id", 0))]
+                content += f"\n[Rate Limit] {sec2time(x)}"
+            content = ini_md(content)
+        else:
+            if getattr(message, "slash", None):
+                content = (
+                    f"```callback-main-help-{user.id}-\n{user.display_name} has asked for help!```"
+                    + f"Yo! Use the menu below to select from my command list!\n"
+                    + f"Alternatively, visit <{bot.webserver}/mizatlas> for a full command list and tester.\n"
+                    + f"Unsure about anything, or have a bug to report? check out the support server: <{bot.rcc_invite}>!\n"
+                    + f"Finally, if you're an admin and wish to disable me in a particular channel, check out `{prefix}ec`!"
+                )
+            else:
+                embed.description = (
+                    f"```callback-main-help-{user.id}-\n{user.display_name} has asked for help!```"
+                    + f"Yo! Use the menu below to select from my command list!\n"
+                    + f"Alternatively, visit [`mizatlas`]({bot.webserver}/mizatlas) for a full command list and tester.\n"
+                    + f"Unsure about anything, or have a bug to report? check out the [`support server`]({bot.rcc_invite})!\n"
+                    + f"Finally, if you're an admin and wish to disable me in a particular channel, check out `{prefix}ec`!"
+                )
+        embed.colour = discord.Colour(help_colours[catg])
+        if not catg:
+            coms = chain.from_iterable(bot.categories.values())
+        else:
+            coms = bot.categories[catg]
+        catsel = [cdict(
+            emoji=cdict(id=None, name=help_emojis[c]),
+            label=c.capitalize(),
+            value=c,
+            description=help_descriptions[c],
+            default=catg == c,
+        ) for c in standard_commands if c in bot.categories]
+        comsel = [cdict(
+            emoji=cdict(id=None, name=c.emoji) if getattr(c, "emoji", None) else None,
+            label=lim_str(prefix + " " * (" " in prefix) + c.parse_name() + " " + c.usage, 25, mode=None),
+            value=c.parse_name().casefold(),
+            description=lim_str(c.parse_description(), 50, mode=None),
+            default=comm and com == c,
+        ) for i, c in enumerate(coms) if i < 25]
+        catmenu = cdict(
+            type=3,
+            custom_id="$",
+            options=catsel,
+            min_values=0,
+            placeholder=catg.capitalize() if catg else "Choose a category..."
+        )
+        commenu = cdict(
+            type=3,
+            custom_id="$",
+            options=comsel,
+            min_values=0,
+            placeholder=com.parse_name() if comm else "Choose a command..."
+        )
+        buttons = [[catmenu], [commenu]]
+        if original:
+            if not getattr(message, "slash", None) and content:
+                create_task(bot.ignore_interaction(original))
+                embed.description = f"```callback-main-help-{user.id}-\n{user.display_name} has asked for help!```" + content
+                try:
+                    sem = EDIT_SEM[message.channel.id]
+                except KeyError:
+                    sem = EDIT_SEM[message.channel.id] = Semaphore(5.1, 256, rate_limit=5)
+                async with sem:
+                    await Request(
+                        f"https://discord.com/api/v9/channels/{message.channel.id}/messages/{message.id}",
+                        data=json.dumps(dict(
+                            embed=embed.to_dict(),
+                            components=restructure_buttons(buttons),
+                        )),
+                        method="PATCH",
+                        headers={
+                            "Content-Type": "application/json",
+                            "Authorization": f"Bot {bot.token}",
+                        },
+                        bypass=False,
+                        aio=True,
+                    )
+            elif content:
+                create_task(interaction_response(bot, original, content))
+                if not getattr(message, "slash", None):
+                    try:
+                        sem = EDIT_SEM[message.channel.id]
+                    except KeyError:
+                        sem = EDIT_SEM[message.channel.id] = Semaphore(5.1, 256, rate_limit=5)
+                    async with sem:
+                        await Request(
+                            f"https://discord.com/api/v9/channels/{message.channel.id}/messages/{message.id}",
+                            data=json.dumps(dict(
+                                components=restructure_buttons(buttons),
+                            )),
+                            method="PATCH",
+                            headers={
+                                "Content-Type": "application/json",
+                                "Authorization": f"Bot {bot.token}",
+                            },
+                            bypass=False,
+                            aio=True,
+                        )
+            else:
+                await interaction_patch(bot, original, buttons=buttons)
+            return
+        elif getattr(message, "slash", None):
+            await interaction_response(bot, message, content, buttons=buttons)
+        else:
+            await send_with_reply(channel, message, embed=embed, buttons=buttons)
+        return
+
+    async def _callback_(self, message, reaction, user, vals, perm, **void):
+        u_id = int(vals)
+        if reaction is None or u_id != user.id and perm < 3:
+            return
+        await self.__call__(self.bot, as_str(reaction), user, message=message, original=message)
 
 
 class Hello(Command):
@@ -1217,7 +1318,7 @@ class Reminder(Command):
         return dict(content=out, embed=emb)
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
-        u_id, pos, s_id = [int(i) for i in vals.split("_", 2)]
+        u_id, pos, s_id = list(map(int, vals.split("_", 2)))
         if reaction not in (None, self.directions[-1]) and u_id != user.id:
             return
         if reaction not in self.directions and reaction is not None:
@@ -1944,7 +2045,7 @@ class UpdateUsers(Database):
                 else:
                     out = f"Yo, what's good, {user.display_name}? Need me for anything?"
                 prefix = bot.get_prefix(message.guild)
-                out += f" Use `{prefix}?` or `{prefix}help` for help!"
+                out += f" Use `{prefix}help` or `/help` for help!"
                 send = lambda *args, **kwargs: send_with_react(message.channel, *args, reacts="❎", reference=not flags and message, **kwargs)
             add_dict(self.data, {user.id: {"last_talk": 1, "last_mention": 1}})
             self.data[user.id]["last_used"] = utc()

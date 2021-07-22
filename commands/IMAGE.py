@@ -131,7 +131,7 @@ class IMG(Command):
         await bot.send_as_webhook(channel, msg, embed=emb, username=message.author.display_name, avatar_url=url2)
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
-        u_id, pos = [int(i) for i in vals.split("_", 1)]
+        u_id, pos = list(map(int, vals.split("_", 1)))
         if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
             return
         if reaction not in self.directions and reaction is not None:
@@ -185,138 +185,6 @@ class IMG(Command):
                 await message.add_reaction(as_str(react))
 
 
-class CreateEmoji(Command):
-    server_only = True
-    name = ["EmojiCreate", "EmojiCopy", "CopyEmoji", "Emoji"]
-    min_level = 2
-    description = "Creates a custom emoji from a URL or attached file."
-    usage = "<1:name>+ <0:url>"
-    flags = "aed"
-    no_parse = True
-    rate_limit = (3, 6)
-    _timeout_ = 3
-    typing = True
-    slash = ("Emoji",)
-
-    async def __call__(self, bot, user, guild, channel, message, args, argv, _timeout, **void):
-        # Take input from any attachments, or otherwise the message contents
-        if message.attachments:
-            args.extend(best_url(a) for a in message.attachments)
-            argv += " " * bool(argv) + " ".join(best_url(a) for a in message.attachments)
-        if not args:
-            raise ArgumentError("Please enter URL, emoji, or attached file to add.")
-        with discord.context_managers.Typing(channel):
-            try:
-                if len(args) > 1 and is_url(args[0]):
-                    args.append(args.pop(0))
-                url = args.pop(-1)
-                urls = await bot.follow_url(url, best=True, allow=True, limit=1)
-                if not urls:
-                    urls = await bot.follow_to_image(argv)
-                    if not urls:
-                        urls = await bot.follow_to_image(url)
-                        if not urls:
-                            raise ArgumentError
-                url = urls[0]
-            except ArgumentError:
-                if not argv:
-                    url = None
-                    try:
-                        url = await bot.get_last_image(message.channel)
-                    except FileNotFoundError:
-                        raise ArgumentError("Please input an image by URL or attachment.")
-                else:
-                    raise ArgumentError("Please input an image by URL or attachment.")
-            name = " ".join(args).strip()
-            if not name:
-                name = "emoji_" + str(len(guild.emojis))
-            # print(name, url)
-            image = resp = await bot.get_request(url)
-            if len(image) > 67108864:
-                raise OverflowError("Max file size to load is 64MB.")
-            if len(image) > 262144 or not is_image(url):
-                ts = ts_us()
-                path = "cache/" + str(ts)
-                f = await create_future(open, path, "wb", timeout=18)
-                await create_future(f.write, image, timeout=18)
-                await create_future(f.close, timeout=18)
-                try:
-                    resp = await process_image(path, "resize_max", [128], timeout=_timeout)
-                except:
-                    with suppress():
-                        os.remove(path)
-                    raise
-                else:
-                    fn = resp[0]
-                    f = await create_future(open, fn, "rb", timeout=18)
-                    image = await create_future(f.read, timeout=18)
-                    create_future_ex(f.close, timeout=18)
-                    with suppress():
-                        os.remove(fn)
-                with suppress():
-                    os.remove(path)
-            emoji = await guild.create_custom_emoji(image=image, name=name, reason="CreateEmoji command")
-            # This reaction indicates the emoji was created successfully
-            with suppress(discord.Forbidden):
-                await message.add_reaction(emoji)
-        return css_md(f"Successfully created emoji {sqr_md(emoji)} for {sqr_md(guild)}.")
-
-
-class ScanEmoji(Command):
-    name = ["EmojiScan", "ScanEmojis"]
-    min_level = 1
-    description = "Scans all the emojis in the current server for potential issues."
-    usage = "<count(inf)>"
-    no_parse = True
-    rate_limit = (4, 7)
-    _timeout_ = 4
-    typing = True
-
-    ffprobe_start = (
-        "ffprobe",
-        "-v",
-        "error",
-        "-hide_banner",
-        "-select_streams",
-        "v:0",
-        "-show_entries",
-        "stream=width,height",
-        "-of",
-        "default=nokey=1:noprint_wrappers=1",
-    )
-
-    async def __call__(self, bot, guild, channel, message, argv, **void):
-        # fut = create_task(send_with_reply(channel, message, "Emoji scan initiated. Delete the original message at any point in time to cancel."))
-        p = bot.get_prefix(guild)
-        if argv:
-            count = await bot.eval_math(argv)
-        else:
-            count = inf
-        found = 0
-        with discord.context_managers.Typing(channel):
-            for emoji in sorted(guild.emojis, key=lambda e: e.id):
-                url = str(emoji.url)
-                resp = await create_future(subprocess.run, self.ffprobe_start + (url,), stdout=subprocess.PIPE)
-                width, height = map(int, resp.stdout.splitlines())
-                if width < 128 or height < 128:
-                    found += 1
-                    w, h = width, height
-                    while w < 128 or h < 128:
-                        w, h = w << 1, h << 1
-                    colour = await create_future(bot.get_colour, url)
-                    bot.send_as_embeds(
-                        channel,
-                        description=f"{emoji} is {width}×{height}, which is below the recommended discord emoji size, and may appear blurry when scaled by Discord. Scaling the image using {p}resize, with filters `nearest`, `scale2x` or `lanczos` is advised.",
-                        fields=(("Example", f"{p}resize {emoji} {w}×{h} scale2x"),),
-                        title=f"⚠ Issue {found} ⚠",
-                        colour=discord.Colour(colour),
-                    )
-                    if found >= count:
-                        break
-        if not found:
-            return css_md(f"No emoji issues found for {guild}.")
-
-
 async def get_image(bot, user, message, args, argv, default=2, raw=False, ext="png"):
     try:
         # Take input from any attachments, or otherwise the message contents
@@ -366,151 +234,47 @@ async def get_image(bot, user, message, args, argv, default=2, raw=False, ext="p
     return name, value, url, ext
 
 
-class Saturation(Command):
-    name = ["Saturate", "ImageSaturate"]
-    description = "Changes colour saturation of supplied image."
+class ImageAdjust(Command):
+    name = [
+        "Saturation", "Saturate",
+        "Contrast",
+        "Brightness", "Brighten", "Lighten", "Lightness",
+        "Luminance", "Luminosity",
+        "Sharpness", "Sharpen",
+        "HueShift", "Hue",
+        "Blur", "Gaussian",
+    ]
+    description = "Applies an adjustment filter to the supplied image."
     usage = "<0:url> <1:multiplier(2)>?"
     no_parse = True
     rate_limit = (2, 5)
     _timeout_ = 3
     typing = True
 
-    async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url, fmt = await get_image(bot, user, message, args, argv)
+    async def __call__(self, bot, user, channel, message, args, argv, name, _timeout, **void):
+        if name.startswith("hue"):
+            default = 0.5
+        elif name in ("blur", "gaussian"):
+            default = 8
+        else:
+            default = 2
+        name, value, url, fmt = await get_image(bot, user, message, args, argv, default=default)
         with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "Enhance", ["Color", value, "-f", fmt], timeout=_timeout)
-            fn = resp[0]
-            if fn.endswith(".gif"):
-                if not name.endswith(".gif"):
-                    if "." in name:
-                        name = name[:name.rindex(".")]
-                    name += ".gif"
-        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
-
-
-class Contrast(Command):
-    name = ["ImageContrast"]
-    description = "Changes colour contrast of supplied image."
-    usage = "<0:url> <1:multiplier(2)>?"
-    no_parse = True
-    rate_limit = (2, 5)
-    _timeout_ = 3
-    typing = True
-
-    async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url, fmt = await get_image(bot, user, message, args, argv)
-        with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "Enhance", ["Contrast", value, "-f", fmt], timeout=_timeout)
-            fn = resp[0]
-            if fn.endswith(".gif"):
-                if not name.endswith(".gif"):
-                    if "." in name:
-                        name = name[:name.rindex(".")]
-                    name += ".gif"
-        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
-
-
-class Brightness(Command):
-    name = ["Brighten", "Lighten", "Lightness", "ImageBrightness"]
-    description = "Changes colour brightness of supplied image."
-    usage = "<0:url> <1:multiplier(2)>?"
-    no_parse = True
-    rate_limit = (2, 5)
-    _timeout_ = 3
-    typing = True
-
-    async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url, fmt = await get_image(bot, user, message, args, argv)
-        with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "brightness", [value, "-f", fmt], timeout=_timeout)
-            fn = resp[0]
-            if fn.endswith(".gif"):
-                if not name.endswith(".gif"):
-                    if "." in name:
-                        name = name[:name.rindex(".")]
-                    name += ".gif"
-        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
-
-
-class Luminance(Command):
-    name = ["Luminosity", "ImageLuminance"]
-    description = "Changes colour luminance of supplied image."
-    usage = "<0:url> <1:multiplier(2)>?"
-    no_parse = True
-    rate_limit = (2, 5)
-    _timeout_ = 3
-    typing = True
-
-    async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url, fmt = await get_image(bot, user, message, args, argv)
-        with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "luminance", [value, "-f", fmt], timeout=_timeout)
-            fn = resp[0]
-            if fn.endswith(".gif"):
-                if not name.endswith(".gif"):
-                    if "." in name:
-                        name = name[:name.rindex(".")]
-                    name += ".gif"
-        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
-
-
-class Sharpness(Command):
-    name = ["Sharpen", "ImageSharpness"]
-    description = "Changes colour sharpness of supplied image."
-    usage = "<0:url> <1:multiplier(2)>?"
-    no_parse = True
-    rate_limit = (2, 5)
-    _timeout_ = 3
-    typing = True
-
-    async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url, fmt = await get_image(bot, user, message, args, argv)
-        with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "Enhance", ["Sharpness", value, "-f", fmt], timeout=_timeout)
-            fn = resp[0]
-            if fn.endswith(".gif"):
-                if not name.endswith(".gif"):
-                    if "." in name:
-                        name = name[:name.rindex(".")]
-                    name += ".gif"
-        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
-
-
-class HueShift(Command):
-    name = ["Hue"]
-    description = "Changes colour hue of supplied image."
-    usage = "<0:url> <1:adjustment(0.5)>?"
-    no_parse = True
-    rate_limit = (2, 5)
-    _timeout_ = 3
-    typing = True
-
-    async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url, fmt = await get_image(bot, user, message, args, argv, default=0.5)
-        with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "hue_shift", [value, "-f", fmt], timeout=_timeout)
-            fn = resp[0]
-            if fn.endswith(".gif"):
-                if not name.endswith(".gif"):
-                    if "." in name:
-                        name = name[:name.rindex(".")]
-                    name += ".gif"
-        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
-
-
-class Blur(Command):
-    name = ["Gaussian", "GaussianBlur"]
-    description = "Applies Gaussian Blur to supplied image."
-    usage = "<0:url> <1:radius(8)>?"
-    no_parse = True
-    rate_limit = (2, 5)
-    _timeout_ = 3
-    typing = True
-
-    async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url, fmt = await get_image(bot, user, message, args, argv, default=8)
-        with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "blur", ["gaussian", value, "-f", fmt], timeout=_timeout)
+            if name.startswith("sat"):
+                argi = ("Enhance", ["Color", value, "-f", fmt])
+            elif name.startswith("con"):
+                argi = ("Enhance", ["Contrast", value, "-f", fmt])
+            elif name.startswith("bri") or name.startswith("lig"):
+                argi = ("brightness", [value, "-f", fmt])
+            elif name.startswith("lum"):
+                argi = ("luminance", [value, "-f", fmt])
+            elif name.startswith("sha"):
+                argi = ("Enhance", ["Sharpness", value, "-f", fmt])
+            elif name.startswith("hue"):
+                argi = ("hue_shift", [value, "-f", fmt])
+            elif name in ("blur", "gaussian"):
+                argi = ("blur", ["gaussian", value, "-f", fmt])
+            resp = await process_image(url, *argi, timeout=_timeout)
             fn = resp[0]
             if fn.endswith(".gif"):
                 if not name.endswith(".gif"):
@@ -592,63 +356,63 @@ class ColourDeficiency(Command):
         await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
-class RemoveMatte(Command):
-    name = ["RemoveColor", "RemoveColour"]
-    description = "Removes a colour from the supplied image."
-    usage = "<0:url> <colour(#FFFFFF)>?"
-    no_parse = True
-    rate_limit = (4, 9)
-    _timeout_ = 4.5
-    typing = True
+# class RemoveMatte(Command):
+#     name = ["RemoveColor", "RemoveColour"]
+#     description = "Removes a colour from the supplied image."
+#     usage = "<0:url> <colour(#FFFFFF)>?"
+#     no_parse = True
+#     rate_limit = (4, 9)
+#     _timeout_ = 4.5
+#     typing = True
 
-    async def __call__(self, bot, user, channel, message, name, args, argv, _timeout, **void):
-        # Take input from any attachments, or otherwise the message contents
-        if message.attachments:
-            args = [best_url(a) for a in message.attachments] + args
-            argv = " ".join(best_url(a) for a in message.attachments) + " " * bool(argv) + argv
-        try:
-            if not args:
-                raise ArgumentError
-            url = args.pop(0)
-            urls = await bot.follow_url(url, best=True, allow=True, limit=1)
-            if not urls:
-                urls = await bot.follow_to_image(argv)
-                if not urls:
-                    urls = await bot.follow_to_image(url)
-                    if not urls:
-                        raise ArgumentError
-            url = urls[0]
-        except ArgumentError:
-            if not argv:
-                url = None
-                try:
-                    url = await bot.get_last_image(message.channel)
-                except FileNotFoundError:
-                    raise ArgumentError("Please input an image by URL or attachment.")
-            else:
-                raise ArgumentError("Please input an image by URL or attachment.")
-        colour = parse_colour(" ".join(args), default=(255,) * 3)
-        # Try and find a good name for the output image
-        try:
-            name = url[url.rindex("/") + 1:]
-            if not name:
-                raise ValueError
-            if "." in name:
-                name = name[:name.rindex(".")]
-        except ValueError:
-            name = "unknown"
-        ext = "png"
-        if not name.endswith("." + ext):
-            name += "." + ext
-        with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "remove_matte", [colour], timeout=_timeout)
-            fn = resp[0]
-            if fn.endswith(".gif"):
-                if not name.endswith(".gif"):
-                    if "." in name:
-                        name = name[:name.rindex(".")]
-                    name += ".gif"
-        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
+#     async def __call__(self, bot, user, channel, message, name, args, argv, _timeout, **void):
+#         # Take input from any attachments, or otherwise the message contents
+#         if message.attachments:
+#             args = [best_url(a) for a in message.attachments] + args
+#             argv = " ".join(best_url(a) for a in message.attachments) + " " * bool(argv) + argv
+#         try:
+#             if not args:
+#                 raise ArgumentError
+#             url = args.pop(0)
+#             urls = await bot.follow_url(url, best=True, allow=True, limit=1)
+#             if not urls:
+#                 urls = await bot.follow_to_image(argv)
+#                 if not urls:
+#                     urls = await bot.follow_to_image(url)
+#                     if not urls:
+#                         raise ArgumentError
+#             url = urls[0]
+#         except ArgumentError:
+#             if not argv:
+#                 url = None
+#                 try:
+#                     url = await bot.get_last_image(message.channel)
+#                 except FileNotFoundError:
+#                     raise ArgumentError("Please input an image by URL or attachment.")
+#             else:
+#                 raise ArgumentError("Please input an image by URL or attachment.")
+#         colour = parse_colour(" ".join(args), default=(255,) * 3)
+#         # Try and find a good name for the output image
+#         try:
+#             name = url[url.rindex("/") + 1:]
+#             if not name:
+#                 raise ValueError
+#             if "." in name:
+#                 name = name[:name.rindex(".")]
+#         except ValueError:
+#             name = "unknown"
+#         ext = "png"
+#         if not name.endswith("." + ext):
+#             name += "." + ext
+#         with discord.context_managers.Typing(channel):
+#             resp = await process_image(url, "remove_matte", [colour], timeout=_timeout)
+#             fn = resp[0]
+#             if fn.endswith(".gif"):
+#                 if not name.endswith(".gif"):
+#                     if "." in name:
+#                         name = name[:name.rindex(".")]
+#                     name += ".gif"
+#         await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
 class Invert(Command):

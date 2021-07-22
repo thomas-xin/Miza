@@ -353,11 +353,17 @@ class Neko(Command):
                         raise PermissionError(f"This tag is only available in {uni_str('NSFW')} channels.")
                 selected.append(tag)
         if "r" in flags:
-            for _ in loop(flags["r"]):
-                possible = [k for k, v in neko_tags.items() if not v or isNSFW]
-                selected.append(choice(possible))
+            if guild and guild.owner_id == bot.id and isNSFW and not xrand(100):
+                selected = {}
+            else:
+                for _ in loop(flags["r"]):
+                    possible = [k for k, v in neko_tags.items() if not v or isNSFW]
+                    selected.append(choice(possible))
         if not selected:
-            if not argv:
+            if isinstance(selected, dict):
+                m = await bot.fetch_message(867429880596791327, channels[849651458495610910])
+                url = as_str(m.attachments[0].url)
+            elif not argv:
                 url = await self.img()
             else:
                 raise LookupError(f"Search tag {argv} not found. Use {bot.get_prefix(guild)}neko list for list.")
