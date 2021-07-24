@@ -1552,7 +1552,7 @@ class React(Command):
 class UpdateReacts(Database):
     name = "reacts"
 
-    async def _nocommand_(self, text, edit, orig, message, **void):
+    async def _nocommand_(self, text, text2, edit, orig, message, **void):
         if message.guild is None or not orig:
             return
         g_id = message.guild.id
@@ -1563,15 +1563,30 @@ class UpdateReacts(Database):
                 if type(following) != mdict:
                     following = self.data[g_id] = mdict(following)
                 reacting = {}
+                words = clean_words = None
+                full = clean_full = None
                 for k in following:
                     if is_alphanumeric(k) and " " not in k:
-                        words = text.split()
+                        if words is None:
+                            words = text.split()
+                        x = words
+                        if clean_words is None:
+                            clean_words = text2.split()
+                        y = clean_words
                     else:
-                        words = full_prune(message.content)
-                    if k in words:
+                        if full is None:
+                            full = full_prune(message.content)
+                        x = full
+                        if clean_full is None:
+                            clean_full = full_prune(message.clean_content)
+                        y = clean_full
+                    # Store position for each keyword found
+                    if k in x:
                         emojis = following[k]
-                        # Store position for each keyword found
-                        reacting[words.index(k) / len(words)] = emojis
+                        reacting[x.index(k) / len(x)] = emojis
+                    elif k in y:
+                        emojis = following[k]
+                        reacting[y.index(k) / len(y)] = emojis
                 # Reactions sorted by their order of appearance in the message
                 for r in sorted(reacting):
                     for react in reacting[r]:

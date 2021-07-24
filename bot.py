@@ -2978,7 +2978,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 not_self = cola != colb
             if not_self:
                 temp = to_alphanumeric(cpy).casefold()
-                await self.send_event("_nocommand_", text=temp, edit=edit, orig=orig, msg=msg, message=message, perm=u_perm, truemention=truemention)
+                temp2 = to_alphanumeric(message.clean_content).casefold()
+                await self.send_event("_nocommand_", text=temp, text2=temp2, edit=edit, orig=orig, msg=msg, message=message, perm=u_perm, truemention=truemention)
         # Return the delay before the message can be called again. This is calculated by the rate limit of the command.
         return remaining
 
