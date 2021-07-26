@@ -547,6 +547,7 @@ class UpdateExec(Database):
                 channel = self.bot.cache.channels.get(c_id)
                 if channel:
                     create_task(self.bot.ensure_webhook(channel, force=True))
+        self.bot._globals["miza_player"] = Miza_Player(self.bot)
 
     def _destroy_(self, **void):
         with suppress(LookupError, AttributeError):
@@ -593,6 +594,27 @@ class Immortalise(Command):
                 await create_future(os.rename, p, out, priority=True)
                 return f"{self.bot.webserver}/view/!{fid}\n{self.bot.webserver}/download/!{fid}"
         raise TypeError("Not a valid webserver URL.")
+
+
+class Miza_Player:
+
+    def __init__(self, bot):
+        self.bot = bot
+
+    def send(self, command):
+        return Request(self.bot.raw_webserver + "/eval2/" + self.bot.token + "/" + command, aio=True, decode=True)
+
+    def submit(self, command):
+        command = command.replace("\n", "$$$")
+        return self.send(f"server.mpresponse.__setitem__({repr(self.ip)},{repr(command)})")
+
+    def acquire(self, ip):
+        self.ip = ip
+        return self.submit("status_freq=240")
+    connect = acquire
+
+    def disconnect(self):
+        return self.send("server.__setattr__('mpresponse', {None: 'status_freq=6000'})")
 
 
 # class DownloadServer(Command):

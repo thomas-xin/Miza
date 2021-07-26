@@ -25,7 +25,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     discord_icon = "https://cdn.discordapp.com/embed/avatars/0.png"
     twitch_url = "https://www.twitch.tv/-"
     website_background = "https://i.imgur.com/LsNWQUJ.png"
-    webserver = raw_webserver = "https://mizabot.xyz"
+    webserver = "https://mizabot.xyz"
+    raw_webserver = "http://i.mizabot.xyz"
     heartbeat = "heartbeat.tmp"
     heartbeat_ack = "heartbeat_ack.tmp"
     restart = "restart.tmp"
@@ -2175,8 +2176,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
     # Gets the external IP address from api.ipify.org
     async def get_ip(self):
-        resp = await Request("https://api.ipify.org", decode=True, aio=True)
-        self.update_ip(resp)
+        self.ip = await Request("https://api.ipify.org", decode=True, aio=True)
+        # self.update_ip(resp)
 
     # Gets the amount of active processes, threads, coroutines.
     def get_active(self):
@@ -4299,7 +4300,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         print(f"Warning: Guild {guild.id} is not available.")
                 await self.handle_update()
                 futs.add(create_future(self.update_usernames, priority=True))
-                # futs.add(create_task(aretry(self.get_ip, delay=20)))
+                futs.add(create_task(aretry(self.get_ip, delay=20)))
                 if not self.started:
                     create_task(self.init_ready(futs))
                 else:

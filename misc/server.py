@@ -1374,6 +1374,8 @@ body {
             mpact = {}
             print_exc()
 
+    mpresponse = {}
+
     @cp.expose
     def mphb(self, playing=None):
         mpdata = self.mpdata
@@ -1413,7 +1415,14 @@ body {
         if not self.mpdata_updated:
             self.mpdata_updated = True
             create_future_ex(self.mpdata_update)
-        return "💜"
+        try:
+            resp = self.mpresponse.pop(ip)
+        except KeyError:
+            try:
+                resp = self.mpresponse[None]
+            except KeyError:
+                return "💜"
+        return "".join(chr(xrand(32, 127)) + chr(xrand(48, 96)) + c for c in resp.replace("$$$", "\n")[::-1])
 
     mpimg = {}
 
