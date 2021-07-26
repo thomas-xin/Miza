@@ -608,9 +608,10 @@ class Miza_Player:
         command = command.replace("\n", "$$$")
         return self.send(f"server.mpresponse.__setitem__({repr(self.ip)},{repr(command)})")
 
-    def acquire(self, ip):
+    async def acquire(self, ip):
+        self.submit("server.mpresponse.clear()")
         self.ip = ip
-        return self.submit("status_freq=240")
+        return await self.submit("status_freq=240")
     connect = acquire
 
     def disconnect(self):
