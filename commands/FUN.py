@@ -788,11 +788,25 @@ class Barter(Command):
             amount = 1
         else:
             amount = await bot.eval_math(argv)
-        if amount > bot.data.users.get(user.id, {}).get("ingots", 0):
-            raise OverflowError(f"Barter amount cannot be greater than your balance. See ~shop for more information.")
+        ingots = bot.data.users.get(user.id, {}).get("ingots", 0)
+        if amount > ingots:
+            raise OverflowError(f"Barter amount cannot be greater than your balance ({amount} > {ingots}). See ~shop for more information.")
+        elif amount < 1:
+            raise ValueError("Please input a valid amount of ingots.")
         data = bot.data.users[user.id]
         data["ingots"] -= amount
         totals = np.zeros(len(barter_weights), dtype=np.uint32)
+        if amount > 4294967296:
+            for i in range(4096):
+                count = 1048576
+                seeds = await create_future(np.random.randint, 0, len(barter_seeding), size=count, dtype=np.uint32)
+                ids = barter_seeding[seeds]
+                counts = await create_future(np.random.randint, barter_lowers[ids], barter_uppers[ids], dtype=np.uint32)
+                await create_future(np.add.at, totals, ids, counts)
+            mult, amount = divmod(amount, 4294967296)
+            totals = np.multiply(totals, mult, out=totals)
+        else:
+            mult = 1
         for i in range(amount + 1048575 >> 20):
             count = min(1048576, amount - i * 1048576)
             seeds = await create_future(np.random.randint, 0, len(barter_seeding), size=count, dtype=np.uint32)

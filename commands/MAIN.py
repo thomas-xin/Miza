@@ -107,9 +107,10 @@ class Help(Command):
                 )
         embed.colour = discord.Colour(help_colours[catg])
         if not catg:
-            coms = chain.from_iterable(bot.categories.values())
+            coms = chain.from_iterable(v for k, v in bot.categories.items() if k in standard_commands)
         else:
             coms = bot.categories[catg]
+        coms = sorted(coms, key=lambda c: c.parse_name())
         catsel = [cdict(
             emoji=cdict(id=None, name=help_emojis[c]),
             label=c.capitalize(),
