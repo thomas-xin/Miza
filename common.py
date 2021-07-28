@@ -1165,7 +1165,7 @@ def apply_stickers(message, data):
             if s.get("format_type") == 3:
                 a.url = f"https://discord.com/stickers/{a.id}.json"
             else:
-                a.url = f"https://media.discordapp.net/stickers/{a.id}"
+                a.url = f"https://media.discordapp.net/stickers/{a.id}.png"
             a.filename = a.name
             a.proxy_url = a.url
             message.attachments.append(a)
