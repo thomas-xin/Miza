@@ -3681,6 +3681,17 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 if not channel:
                     channel, _ = bot._get_guild_channel(data)
                 message = discord.Message(channel=channel, data=copy.deepcopy(data), state=bot._state)
+                if data.get("sticker_items"):
+                    for s in data["sticker_items"]:
+                        a = cdict(s)
+                        a.id = int(a.id)
+                        if s.get("format_type") == 3:
+                            a.url = f"https://discord.com/stickers/{a.id}.json"
+                        else:
+                            a.url = f"https://media.discordapp.net/stickers/{a.id}"
+                        a.filename = a.name
+                        a.proxy_url = a.url
+                        message.attachments.append(a)
                 self = cls(message)
                 self._data = data
                 return self
@@ -3916,6 +3927,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             self.dispatch("message", message)
             if self._messages is not None:
                 self._messages.append(message)
+            channel = message.channel
             if channel and isinstance(channel, discord.TextChannel):
                 channel.last_message_id = message.id
 
