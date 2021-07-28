@@ -3686,6 +3686,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
             def __init__(self, message):
                 self.message = message
+            
+            def __copy__(self):
+                return self.__class__(copy.copy(self.message))
 
             def __getattr__(self, k):
                 try:
