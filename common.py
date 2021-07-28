@@ -1157,6 +1157,21 @@ def message_repr(message, limit=1024, username=False, link=False):
     return lim_str(data, limit)
 
 
+def apply_stickers(message, data):
+    if data.get("sticker_items"):
+        for s in data["sticker_items"]:
+            a = cdict(s)
+            a.id = int(a.id)
+            if s.get("format_type") == 3:
+                a.url = f"https://discord.com/stickers/{a.id}.json"
+            else:
+                a.url = f"https://media.discordapp.net/stickers/{a.id}"
+            a.filename = a.name
+            a.proxy_url = a.url
+            message.attachments.append(a)
+    return message
+
+
 EmptyEmbed = discord.embeds._EmptyEmbed
 
 def as_embed(message, link=False):

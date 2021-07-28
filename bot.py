@@ -58,6 +58,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     def __init__(self, cache_size=1048576, timeout=24):
         # Initializes client (first in __mro__ of class inheritance)
         self.start_time = utc()
+        self.monkey_patch()
         super().__init__(
             max_messages=256,
             heartbeat_timeout=60,
@@ -72,7 +73,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.timeout = timeout
         self.set_classes()
         self.set_client_events()
-        self.monkey_patch()
         self.bot = self
         self.client = super()
         self.closed = False
@@ -2335,8 +2335,6 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             create_future_ex(self.start_audio_client)
             create_task(self.create_main_website())
             return all(fut.result() for fut in modload)
-        if mod.casefold() == "voice":
-            create_future_ex(self.start_audio_client)
         create_task(self.create_main_website())
         return self.get_module(mod + ".py")
 
@@ -3681,17 +3679,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 if not channel:
                     channel, _ = bot._get_guild_channel(data)
                 message = discord.Message(channel=channel, data=copy.deepcopy(data), state=bot._state)
-                if data.get("sticker_items"):
-                    for s in data["sticker_items"]:
-                        a = cdict(s)
-                        a.id = int(a.id)
-                        if s.get("format_type") == 3:
-                            a.url = f"https://discord.com/stickers/{a.id}.json"
-                        else:
-                            a.url = f"https://media.discordapp.net/stickers/{a.id}"
-                        a.filename = a.name
-                        a.proxy_url = a.url
-                        message.attachments.append(a)
+                apply_stickers(message, data)
                 self = cls(message)
                 self._data = data
                 return self
@@ -3711,7 +3699,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
         class CachedMessage(discord.abc.Snowflake):
 
-            __slots__ = ("_data", "id", "created_at", "author", "channel", "channel_id", "deleted")
+            __slots__ = ("_data", "id", "created_at", "author", "channel", "channel_id", "deleted", "attachments")
 
             def __init__(self, data):
                 self._data = data
@@ -3739,6 +3727,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 except KeyError:
                     pass
                 message = bot.LoadedMessage(state=bot._state, channel=channel, data=d)
+                apply_stickers(message, d)
                 message.author = author
                 return message
 
@@ -3783,7 +3772,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 if k == "type":
                     return discord.enums.try_enum(discord.MessageType, d.get("type", 0))
                 if k == "attachments":
-                    return [discord.Attachment(data=a, state=bot._state) for a in d.get("attachments", ())]
+                    self.attachments = [discord.Attachment(data=a, state=bot._state) for a in d.get("attachments", ())]
+                    apply_stickers(self, d)
                 if k == "embeds":
                     return [discord.Embed.from_dict(a) for a in d.get("embeds", ())]
                 if k == "system_content" and not d.get("type"):
@@ -3810,6 +3800,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 if "message_cache" in bot.data:
                     return bot.data.message_cache.load_message(k)
                 raise KeyError(k)
+            __call__ = __getitem__
 
             def __setitem__(self, k, v):
                 bot.add_message(v, force=True)
@@ -3896,12 +3887,12 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
             member_data = data.get("member")
             if member_data:
-                guild = self._connection._get_guild(raw.guild_id)
-                raw.member = discord.Member(data=member_data, guild=guild, state=self._connection)
+                guild = self._get_guild(raw.guild_id)
+                raw.member = discord.Member(data=member_data, guild=guild, state=self)
             else:
                 raw.member = None
             self.dispatch("raw_reaction_add", raw)
-            create_task(self.reaction_add(raw))
+            create_task(bot.reaction_add(raw, data))
 
         discord.state.ConnectionState.parse_message_reaction_add = lambda self, data: parse_message_reaction_add(self, data)
 
@@ -3909,16 +3900,16 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             emoji = data["emoji"]
             emoji_id = utils._get_as_snowflake(emoji, "id")
             emoji = discord.PartialEmoji.with_state(self, id=emoji_id, animated=emoji.get("animated", False), name=emoji["name"])
-            raw = RawReactionActionEvent(data, emoji, "REACTION_REMOVE")
+            raw = discord.RawReactionActionEvent(data, emoji, "REACTION_REMOVE")
             self.dispatch("raw_reaction_remove", raw)
-            create_task(self.reaction_remove(raw))
+            create_task(bot.reaction_remove(raw, data))
 
         discord.state.ConnectionState.parse_message_reaction_remove = lambda self, data: parse_message_reaction_remove(self, data)
 
         def parse_message_reaction_remove_all(self, data):
-            raw = RawReactionClearEvent(data)
+            raw = discord.RawReactionClearEvent(data)
             self.dispatch("raw_reaction_clear", raw)
-            create_task(self.reaction_clear(raw))
+            create_task(bot.reaction_clear(raw, data))
         
         discord.state.ConnectionState.parse_message_reaction_remove_all = lambda self, data: parse_message_reaction_remove_all(self, data)
 
@@ -4179,7 +4170,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             reference=reference,
         )
 
-    async def reaction_add(self, raw):
+    async def reaction_add(self, raw, data):
         channel = await self.fetch_channel(raw.channel_id)
         user = await self.fetch_user(raw.user_id)
         emoji = self._upgrade_partial_emoji(raw.emoji)
@@ -4195,7 +4186,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         self.dispatch("reaction_add", reaction, user)
         self.add_message(message, files=False, force=True)
 
-    async def reaction_remove(self, raw):
+    async def reaction_remove(self, raw, data):
         channel = await self.fetch_channel(raw.channel_id)
         user = await self.fetch_user(raw.user_id)
         emoji = self._upgrade_partial_emoji(raw.emoji)
@@ -4211,7 +4202,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         self.dispatch("reaction_remove", reaction, user)
         self.add_message(message, files=False, force=True)
     
-    async def reaction_clear(self, raw):
+    async def reaction_clear(self, raw, data):
         channel = await self.fetch_channel(raw.channel_id)
         user = await self.fetch_user(raw.user_id)
         emoji = self._upgrade_partial_emoji(raw.emoji)

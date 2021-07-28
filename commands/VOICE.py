@@ -3834,7 +3834,7 @@ class Party(Command):
     min_level = 2
     name = ["YTT"]
     description = "Generates an activity party link in the nearest voice channel!"
-    usage = "(poker|betrayal|youtube|fishington)?"
+    usage = "(poker|betrayal|youtube|fishington|chess)?"
     rate_limit = 5
     sem = Semaphore(2, 8, rate_limit=8)
     names = fcdict((
@@ -3846,6 +3846,7 @@ class Party(Command):
         ("Betrayal.io", 773336526917861400),
         ("Fishington", 814288819477020702),
         ("Fishington.io", 814288819477020702),
+        ("Chess", 832012586023256104),
     ))
 
     async def __call__(self, bot, guild, channel, user, argv, **void):
