@@ -946,6 +946,120 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             return as_fut(self.cache.channels[c_id])
         return self._fetch_channel(c_id)
 
+    def force_channel(self, data):
+        if isinstance(data, dict):
+            c_id = data["channel_id"]
+        else:
+            c_id = verify_id(data)
+        if type(c_id) is not int:
+            try:
+                c_id = int(c_id)
+            except (ValueError, TypeError):
+                raise TypeError(f"Invalid channel identifier: {c_id}")
+        with suppress(KeyError):
+            return self.cache.channels[c_id]
+        channel, _ = bot._get_guild_channel(dict(channel_id=c_id))
+        if channel and type(channel) is not discord.Object:
+            self.cache.channels[c_id] = channel
+            return channel
+        channel = self.cache.channels[c_id] = cdict(
+            id=c_id,
+            name=f"<#{c_id}>",
+            mention=f"<#{c_id}>",
+            guild=None,
+            _data=dict(id=c_id),
+            _state=self._state,
+            _members={self.id: self.user},
+            _type=11,
+            type=11,
+            guild_id=None,
+            owner_id=self.id,
+            owner=self.user,
+            parent_id=None,
+            parent=None,
+            last_message_id=None,
+            message_count=1,
+            member_count=1,
+            slowmode_delay=0,
+            me=self.user,
+            locked=False,
+            archived=False,
+            archiver_id=None,
+            auto_archive_duration=inf,
+            archive_timestamp=inf,
+            permissions_for=lambda *args: 0,
+            join=async_nop,
+            leave=async_nop,
+        )
+        channel.update(dict(
+            _get_channel=lambda: as_fut(channel),
+            is_private=lambda: channel._type == 12,
+            is_news=lambda: channel._type == 10,
+            is_nsfw=lambda: is_nsfw(channel.parent),
+            delete_messages=lambda *args, **kwargs: discord.channel.TextChannel.delete_messages(channel, *args, **kwargs),
+            purge=lambda *args, **kwargs: discord.channel.TextChannel.purge(channel, *args, **kwargs),
+            edit=lambda *args, **kwargs: discord.channel.TextChannel.edit(channel, *args, **kwargs),
+            add_user=lambda user: Request(
+                f"https://discord.com/api/v9/channels/{channel.id}/thread-members/{verify_id(user)}",
+                method="PUT",
+                headers={"Authorization": "Bot " + miza.token},
+                bypass=False,
+                aio=True,
+            ),
+            remove_user=lambda user: Request(
+                f"https://discord.com/api/v9/channels/{channel.id}/thread-members/{verify_id(user)}",
+                method="DELETE",
+                headers={"Authorization": "Bot " + miza.token},
+                bypass=False,
+                aio=True,
+            ),
+            delete=lambda reason=None: discord.abc.GuildChannel.delete(channel, reason=reason),
+            _add_member=lambda member: self._members.__setitem__(member.id, member),
+            _pop_member=lambda m_id: self._members.pop(m_id, None),
+            send=lambda *args, **kwargs: discord.abc.Messageable.send(channel, *args, **kwargs),
+            trigger_typing=lambda: discord.abc.Messageable.trigger_typing(channel),
+            typing=lambda: discord.abc.Messageable.typing(channel),
+            fetch_message=lambda id: discord.abc.Messageable.fetch_message(channel, id),
+            pins=lambda: discord.abc.Messageable.pins(channel),
+            history=lambda *args, **kwargs: discord.abc.Messageable.history(channel, *args, **kwargs),
+        ))
+        create_task(self.manage_thread(channel))
+        return channel
+
+    async def manage_thread(self, channel):
+        create_task(Request(
+            f"https://discord.com/api/v9/channels/{channel.id}/thread-members/@me",
+            method="POST",
+            headers={"Authorization": "Bot " + miza.token},
+            bypass=False,
+            aio=True,
+        ))
+        data = await Request(
+            f"https://discord.com/api/v9/channels/{channel.id}",
+            headers={"Authorization": "Bot " + miza.token},
+            bypass=False,
+            aio=True,
+            json=True,
+        )
+        channel.guild_id = int(data["guild_id"])
+        channel.guild = self.get_guild(channel.guild_id)
+        channel.parent_id = int(data.get("parent_id", 0))
+        channel.parent = channel.guild.get_channel(channel.parent_id) or self.get_channel(channel.parent_id)
+        channel.permissions_for = channel.parent.permissions_for
+        channel.owner_id = int(data.get("owner_id", 0))
+        channel.owner = channel.guild.get_member(channel.owner_id) or self.get_user(channel.owner_id)
+        channel.type = data["type"]
+        channel.name = data["name"]
+        channel.last_message_id = int(data.get("last_message_id") or 0) or None
+        channel.slowmode_delay = data.get("rate_limit_per_user") or 0
+        channel.message_count = data.get("message_count", 0)
+        channel.member_count = data.get("member_count", 0)
+        meta = data.get("thread_metadata", {})
+        channel.update(meta)
+        if channel.get("archiver_id"):
+            channel.archiver_id = int(channel.archiver_id)
+        channel.locked = channel.get("locked")
+
     # Fetches a message from ID and channel, using the bot cache when possible.
     async def _fetch_message(self, m_id, channel=None):
         if "message_cache" in self.data:
@@ -3677,7 +3791,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             @classmethod
             def new(cls, data, channel=None, **void):
                 if not channel:
-                    channel, _ = bot._get_guild_channel(data)
+                    try:
+                        channel = bot.force_channel(data)
+                    except:
+                        print_exc()
                 message = discord.Message(channel=channel, data=copy.deepcopy(data), state=bot._state)
                 apply_stickers(message, data)
                 self = cls(message)
@@ -4462,7 +4579,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         message.author = author
                         channel = None
                         try:
-                            channel = await self.fetch_channel(d["channel_id"])
+                            channel = self.force_channel(d["channel_id"])
                             guild = await self.fetch_guild(d["guild_id"])
                             message.guild = guild
                             author = guild.get_member(author.id)
@@ -4488,7 +4605,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         user = self._state.store_user(mdata)
                         channel = None
                         try:
-                            channel = await self.fetch_channel(d["channel_id"])
+                            channel = self.force_channel(d["channel_id"])
                             guild = await self.fetch_guild(d["guild_id"])
                             user = guild.get_member(user.id)
                         except KeyError:
@@ -4537,7 +4654,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     if not c_id:
                         return
                     before = self.GhostMessage()
-                    before.channel = channel = await self.fetch_channel(c_id)
+                    before.channel = channel = self.force_channel(c_id)
                     before.guild = guild = getattr(channel, "guild", None)
                     before.id = payload.message_id
                     try:
@@ -4570,7 +4687,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             with suppress(AttributeError):
                 before.deleted = True
             if after.channel is None:
-                after.channel = await self.fetch_channel(payload.channel_id)
+                after.channel = self.force_channel(payload.channel_id)
             self.add_message(after, files=False, force=True)
             if raw or before.content != after.content:
                 if "users" in self.data:
@@ -4878,7 +4995,8 @@ def update_file_cache(files=None, recursive=True):
         curr = files.popleft()
         ct = int(curr.rsplit(".", 1)[0].split("~", 1)[0])
         fn = "cache/" + IND + curr
-        if utc() - ct > 86400 * 60 and utc() - os.path.getatime(fn) > 86400 * 30:
+        t = utc()
+        if t - ct > 86400 * 60 and t - os.path.getatime(fn) > 86400 * 30:
             with tracebacksuppressor:
                 os.remove(fn)
                 print(curr, "deleted.")

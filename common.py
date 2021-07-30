@@ -1001,7 +1001,7 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
                     data=body,
                     headers={
                         "Content-Type": "application/json",
-                        "Authorization": f"Bot {channel._state.http.token}",
+                        "Authorization": f"Bot {bot.token}",
                     },
                     bypass=False,
                     aio=True,
@@ -1028,7 +1028,7 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
                 M = bot.ExtendedMessage.new
             else:
                 M = discord.Message
-            return M(state=channel._state, channel=channel, data=eval_json(resp))
+            return M(state=bot._state, channel=channel, data=eval_json(resp))
         await asyncio.sleep(i + 1)
     raise exc
 

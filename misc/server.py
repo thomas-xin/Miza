@@ -153,7 +153,7 @@ def estimate_life():
 
 estimate_life_after = lambda t: time.sleep(t) or estimate_life()
 
-create_future_ex(estimate_life_after, 10)
+# create_future_ex(estimate_life_after, 10)
 
 geo_sem = Semaphore(90, 256, rate_limit=60)
 geo_count = 0
@@ -180,6 +180,38 @@ last_image = [None] * 2
 
 
 class Server:
+
+    @cp.expose
+    def fileinfo(self, path, **void):
+        orig_path = path
+        ind = IND
+        p = None
+        cp.response.headers.update(CHEADERS)
+        if path.startswith("!"):
+            ind = "!"
+            path = path[1:]
+        elif not path.startswith("@"):
+            b = path.lstrip("~").split(".", 1)[0].encode("utf-8") + b"=="
+            if (len(b) - 1) & 3 == 0:
+                b += b"="
+            path = str(int.from_bytes(base64.urlsafe_b64decode(b), "big"))
+        if not p:
+            p = find_file(path, ind=ind)
+        mime = get_mime(p)
+        f_url = cp.url(qs=cp.request.query_string).replace("/fileinfo/", "/f/")
+        st = os.stat(p)
+        fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
+        t = utc()
+        ti = max(st.st_atime + 30 * 86400, st.st_ctime + 60 * 86400, t)
+        return json.dumps(dict(
+            id=p.rsplit("/", 1)[-1].split("~", 1)[0].lstrip(IND),
+            filename=fn,
+            ttl=ti - t,
+            size=st.st_size,
+            mimetype=mime,
+            raw=f_url,
+            dl=f_url.replace("/f/", "/d/", 1),
+        )).encode("utf-8")
 
     @cp.expose(("preview", "p", "animate", "animation", "a", "images", "image", "i", "view", "v", "files", "file", "f", "download", "d"))
     def files(self, path, filename=None, download=None, **void):
@@ -235,6 +267,7 @@ class Server:
                 mime = MIMES.get(p.rsplit("/", 1)[-1].rsplit(".", 1)[-1])
             else:
                 mime = get_mime(p)
+            st = os.stat(p)
             fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
             attachment = filename or fn
             if endpoint.startswith("p"):
@@ -283,9 +316,11 @@ class Server:
     </head>
     <body style="background-color:black;">
         <h1 style="color:white;">{attachment}</h1>"""
+                t = utc()
+                ti = max(st.st_atime + 30 * 86400, st.st_ctime + 60 * 86400, t)
                 s += f"""
-                <p style="color:#00ffff;">File size: {byte_scale(os.path.getsize(p))}B</p>
-                <p style="color:#bf7fff;">Estimated file lifetime: {sec2time(os.path.getctime(p) - est_time)}</p>"""
+                <p style="color:#00ffff;">File size: {byte_scale(st.st_size)}B</p>
+                <p style="color:#bf7fff;">Estimated file lifetime: {sec2time(ti - t)}</p>"""
                 s += f'\n<a href="{url}">{url}<br></a>'
                 preview = deque()
                 if mime.startswith("image/"):
@@ -724,7 +759,6 @@ class Server:
     @cp.config(**{"response.timeout": 7200})
     @cp.expose
     def upload_file(self, *args, **kwargs):
-        global est_time
         ip = cp.request.remote.ip
         files = args + tuple(kwargs.values())
         files = [file for file in files if file.filename]
@@ -787,7 +821,7 @@ class Server:
             fut.result()
         s += f"""
         <p style="color:#00ffff;">Total file size: {byte_scale(sum(os.path.getsize(f[2]) for f in urls))}B</p>
-        <p style="color:#bf7fff;">Estimated file lifetime: {sec2time(utc() - est_time)}</p>"""
+        <p style="color:#bf7fff;">Estimated file lifetime: 2 months</p>"""
         for fi in urls:
             s += f'\n<a href="{fi[0]}">{fi[1]}<br></a>'
         preview = deque()
