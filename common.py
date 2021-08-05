@@ -1232,7 +1232,7 @@ def as_embed(message, link=False):
     if items:
         if emb.description in items:
             emb.description = lim_str("\n".join(items), 4096)
-        elif description or items:
+        elif emb.description or items:
             emb.description = lim_str(emb.description + "\n" + "\n".join(items), 4096)
     image = None
     for a in message.attachments:
