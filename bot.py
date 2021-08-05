@@ -1635,7 +1635,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         return url
 
     async def as_embed(self, message, link=False, colour=False):
-        emb = discord.Embed().set_author(**get_author(message.author))
+        emb = discord.Embed(description="").set_author(**get_author(message.author))
         if colour:
             col = await self.get_colour(message.author)
             emb.colour = col
@@ -1705,7 +1705,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         if items:
             if emb.description in items:
                 emb.description = lim_str("\n".join(items), 4096)
-            else:
+            elif emb.description or items:
                 emb.description = lim_str(emb.description + "\n" + "\n".join(items), 4096)
         image = None
         for a in message.attachments:

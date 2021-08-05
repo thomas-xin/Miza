@@ -1175,7 +1175,7 @@ def apply_stickers(message, data):
 EmptyEmbed = discord.embeds._EmptyEmbed
 
 def as_embed(message, link=False):
-    emb = discord.Embed().set_author(**get_author(message.author))
+    emb = discord.Embed(description="").set_author(**get_author(message.author))
     if not message.content:
         if len(message.attachments) == 1:
             url = message.attachments[0].url
@@ -1232,7 +1232,7 @@ def as_embed(message, link=False):
     if items:
         if emb.description in items:
             emb.description = lim_str("\n".join(items), 4096)
-        else:
+        elif description or items:
             emb.description = lim_str(emb.description + "\n" + "\n".join(items), 4096)
     image = None
     for a in message.attachments:

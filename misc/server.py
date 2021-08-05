@@ -86,6 +86,8 @@ HEADERS = {
     "Server": "Miza",
     "Vary": "Accept-Encoding",
     "Accept-Ranges": "bytes",
+    "Access-Control-Allow-Headers": "*",
+    "Access-Control-Allow-Methods": "*",
     "Access-Control-Allow-Origin": "*",
 }
 
@@ -186,7 +188,7 @@ class Server:
         orig_path = path
         ind = IND
         p = None
-        cp.response.headers.update(CHEADERS)
+        cp.response.headers.update(SHEADERS)
         if path.startswith("!"):
             ind = "!"
             path = path[1:]
@@ -1650,6 +1652,7 @@ body {
         a = after - utc()
         if a > 0:
             cp.response.headers["Retry-After"] = a
+        cp.response.headers.update(HEADERS)
         return json.dumps(j)
 
     @cp.expose(("cat", "cats", "dog", "dogs", "neko", "nekos", "giphy"))
@@ -1672,6 +1675,7 @@ body {
         refresh = float(refresh or 60)
         if fcdict(cp.request.headers).get("Accept") == "application/json":
             return url
+        cp.response.headers.update(HEADERS)
         return f"""<!DOCTYPE html>
 <html>
 <head>

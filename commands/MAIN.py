@@ -130,14 +130,14 @@ class Help(Command):
             custom_id="$",
             options=catsel,
             min_values=0,
-            placeholder=catg.capitalize() if catg else "Choose a category..."
+            placeholder=catg.capitalize() if catg else "Choose a category...",
         )
         commenu = cdict(
             type=3,
             custom_id="$",
             options=comsel,
             min_values=0,
-            placeholder=com.parse_name() if comm else "Choose a command..."
+            placeholder=com.parse_name() if comm else "Choose a command...",
         )
         buttons = [[catmenu], [commenu]]
         if original:
@@ -190,6 +190,8 @@ class Help(Command):
         elif getattr(message, "slash", None):
             await interaction_response(bot, message, content, buttons=buttons)
         else:
+            if not embed.description:
+                embed.description = f"```callback-main-help-{user.id}-\n{user.display_name} has asked for help!```" + content
             await send_with_reply(channel, message, embed=embed, buttons=buttons)
         return
 

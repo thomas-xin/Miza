@@ -2157,12 +2157,14 @@ class Shop(Command):
                         return "```\nThis item can only be purchased in a server.```"
                     if bot.is_trusted(guild):
                         return "```\nThe current server's privilege level is already at the highest available level. However, you may still purchase this item for other servers.```"
-                    return await send_with_react(channel, f"```callback-fun-shop-{user.id}_{item}-\nYou are about to upgrade the server's privilege level from 0 to 1.\nThis is irreversible. Please choose wisely.```", reacts="✅", reference=message)
+                    await send_with_react(channel, f"```callback-fun-shop-{user.id}_{item}-\nYou are about to upgrade the server's privilege level from 0 to 1.\nThis is irreversible. Please choose wisely.```", reacts="✅", reference=message)
+                    return
                 if product.name == "Gold Ingots":
                     reacts = deque()
                     for i in range(5):
                         reacts.append(str(i) + as_str(b"\xef\xb8\x8f\xe2\x83\xa3"))
-                    return await send_with_react(channel, f"```callback-fun-shop-{user.id}_{item}-\nPlease choose how many ingots are desired;\n0: 100\n1: 1,000\n2: 10,000\n3: 100,000\n4: 1,000,000```", reacts=reacts, reference=message)
+                    await send_with_react(channel, f"```callback-fun-shop-{user.id}_{item}-\nPlease choose how many ingots are desired;\n0: 100\n1: 1,000\n2: 10,000\n3: 100,000\n4: 1,000,000```", reacts=reacts, reference=message)
+                    return
                 raise NotImplementedError(f"Target item {product.name} has not yet been implemented.")
         raise ValueError(f"Insufficient funds. Use {bot.get_prefix(guild)}shop for product list and cost.")
 
@@ -2185,11 +2187,13 @@ class Shop(Command):
             if gold >= product.cost[-1]:
                 if product.name == "Upgrade Server":
                     if bot.is_trusted(guild):
-                        return await message.channel.send("```\nThe current server's privilege level is already at the highest available level. However, you may still purchase this item for other servers.", reference=message)
+                        await message.channel.send("```\nThe current server's privilege level is already at the highest available level. However, you may still purchase this item for other servers.", reference=message)
+                        return
                     bot.data.users.add_diamonds(user, -product.cost[0])
                     bot.data.users.add_gold(user, -product.cost[-1])
                     bot.data.trusted[guild.id] = True
-                    return await message.channel.send(f"```{sqr_md(guild)} has been successfully elevated from 0 to 1 privilege level.```", reference=message)
+                    await message.channel.send(f"```{sqr_md(guild)} has been successfully elevated from 0 to 1 privilege level.```", reference=message)
+                    return
                 if product.name == "Gold Ingots":
                     magnitude = int(as_str(reaction)[0])
                     ingots = 10 ** (magnitude + 2)
