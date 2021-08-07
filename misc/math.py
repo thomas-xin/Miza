@@ -576,7 +576,13 @@ def evalSym(f, prec=64, r=False, variables=None):
         try:
             f = latex.parse_latex(y)
         except:
-            f = latex.parse_latex(f)
+            f = None
+            try:
+                f = latex.parse_latex(f)
+            except:
+                pass
+        if not f:
+            raise
     # Solve any sums and round off floats when possible
     for i in sympy.preorder_traversal(f):
         if issubclass(type(i), sympy.Number):

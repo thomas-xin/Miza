@@ -551,18 +551,19 @@ class RoleSelect(Command):
             raise ArgumentError("Please input one or more roles by name or ID.")
         roles = deque()
         for arg in args:
+            role = None
             r = verify_id(unicode_prune(arg))
             if len(guild.roles) <= 1:
                 guild.roles = await guild.fetch_roles()
                 guild.roles.sort()
                 guild._roles.update((r.id, r) for r in guild.roles)
             if type(r) is int:
-                role = guild.get_role(i)
-            else:
+                role = guild.get_role(r)
+            if not role:
                 role = await str_lookup(
                     guild.roles,
                     r,
-                    qkey=lambda x: [str(x), full_prune(x.replace(" ", ""))],
+                    qkey=lambda x: [str(x), full_prune(str(x).replace(" ", ""))],
                     fuzzy=0.125,
                 )
             # Must ensure that the user does not assign roles higher than their own

@@ -4324,9 +4324,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     
     async def reaction_clear(self, raw, data):
         channel = await self.fetch_channel(raw.channel_id)
-        user = await self.fetch_user(raw.user_id)
         emoji = self._upgrade_partial_emoji(raw.emoji)
         message = await self.fetch_message(raw.message_id, channel=channel)
+        user = message.author
         old_reactions = message.reactions.copy()
         message.reactions.clear()
         self.dispatch("reaction_clear", message, old_reactions)
@@ -4629,7 +4629,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                             self.add_message(m, force=True)
                         m.int_id = message.id
                         m.int_token = message.slash
-                        print(custom_id, user)
+                        # print(custom_id, user)
                         return await self.react_callback(m, custom_id, user)
                     print("Unknown interaction:\n" + str(data))
                 except:
