@@ -1622,7 +1622,7 @@ def intervals_intersect(line1, line2):
     if delta == 0:
         return False
     s = (dx1 * (y21 - y11) + dy1 * (x11 - x21)) / delta
-    t = (dx2 * (y11 - y21) + dy2 * (x21 - x11)) / (-delta)
+    t = (dx2 * (y11 - y21) + dy2 * (x21 - x11)) / -delta
     return (0 <= s <= 1) and (0 <= t <= 1)
 
 

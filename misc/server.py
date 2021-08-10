@@ -205,7 +205,7 @@ class Server:
         fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
         t = utc()
         ti = max(st.st_atime + 30 * 86400, st.st_ctime + 60 * 86400, t)
-        return json.dumps(dict(
+        d = dict(
             id=p.rsplit("/", 1)[-1].split("~", 1)[0].lstrip(IND),
             filename=fn,
             ttl=ti - t,
@@ -213,7 +213,23 @@ class Server:
             mimetype=mime,
             raw=f_url,
             dl=f_url.replace("/f/", "/d/", 1),
-        )).encode("utf-8")
+        )
+        if p.endswith("~.forward$") and mime == "text/html":
+            with open(p, "r", encoding="utf-8") as f:
+                resp = f.read(1048576)
+            s = resp
+            search = "<!DOCTYPE HTML><!--"
+            if s.startswith(search):
+                s = s[len(search):]
+                search = '--><html><meta http-equiv="refresh" content="0; URL='
+                try:
+                    s = s[:s.index(search)]
+                except ValueError:
+                    pass
+                else:
+                    url, code, ftype = json.loads(s)
+                    d["original_url"] = url
+        return json.dumps(d).encode("utf-8")
 
     @cp.expose(("preview", "p", "animate", "animation", "a", "images", "image", "i", "view", "v", "files", "file", "f", "download", "d"))
     def files(self, path, filename=None, download=None, **void):
@@ -395,7 +411,7 @@ class Server:
                 return b
             elif not os.path.exists(p):
                 raise FileNotFoundError(p)
-            elif p.endswith("~.forward$") and mime == "text/html":
+            elif not download and p.endswith("~.forward$") and mime == "text/html":
                 with open(p, "r", encoding="utf-8") as f:
                     resp = f.read(1048576)
                 s = resp
@@ -1467,6 +1483,32 @@ body {
         values = self.mpget()
         for i in range(3):
             values[i] = int(values[i])
+        if "text/html" not in cp.request.headers.get("Accept", ""):
+            self.ensure_mpins()
+            histories = [None] * len(values)
+            hours = histories.copy()
+            for k in range(len(histories)):
+                width = np.clip(len(self.ins_data[k]), 3, 960)
+                histories[k] = list(supersample(self.ins_data[k], width))
+                hours[k] = len(self.ins_data[k])
+            return json.dumps(dict(
+                current=dict(
+                    live_users=values[2],
+                    active_users=values[1],
+                    total_users=values[0],
+                    total_playtime=values[4],
+                    total_use_time=values[3],
+                    average_playtime=values[5],
+                ),
+                historical=dict(
+                    live_users=[histories[2], hours[2]],
+                    active_users=[histories[1], hours[2]],
+                    total_users=[histories[0], hours[2]],
+                    total_playtime=[histories[4], hours[2]],
+                    total_use_time=[histories[3], hours[2]],
+                    average_playtime=[histories[5], hours[2]],
+                ),
+            )).encode("utf-8")
         create_future_ex(self.ensure_mpins)
         return """<!DOCTYPE html><html>
 <head>

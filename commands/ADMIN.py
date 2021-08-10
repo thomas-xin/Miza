@@ -1387,7 +1387,7 @@ class UpdateAutoEmojis(Database):
             if m2:
                 found = False
                 ems = regexp("<a?:[A-Za-z0-9\\-~_]{1,32}").sub("", ems.replace(" ", "").replace("\\", "")).replace(">", ":")
-                for name in ems.split(":"):
+                for name in (n for n in ems.strip(":").split(":") if n):
                     emoji = None
                     if emojis is None:
                         emojis = self.guild_emoji_map(guild, dict(orig))
@@ -1413,9 +1413,8 @@ class UpdateAutoEmojis(Database):
                         if type(emoji) is int:
                             e_id = emoji
                             emoji = self.bot.cache.emojis.get(e_id)
-                            if emoji:
-                                found = True
-                                create_task(m2.add_reaction(emoji))
+                        found = True
+                        create_task(m2.add_reaction(emoji))
                 if found:
                     create_task(self.bot.silent_delete(message))
                     return
