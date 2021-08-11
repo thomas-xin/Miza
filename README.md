@@ -3,7 +3,7 @@ Welcome to Miza, a multipurpose Discord bot created by [Thomas Xin](https://gith
 
 ![Miza](https://github.com/thomas-xin/Miza/blob/e62dfccef0cce3b0fc3b8a09fb3ca3edfedd8ab0/misc/title-rainbow.gif?raw=true)
 
-## [Table of Contents](https://github.com/thomas-xin/Miza)
+## [Table of Contents](https://github.com/thomas-xin/Miza/blob/master/README.md)
 
 Headings | Explinations
 ------------ | -------------
