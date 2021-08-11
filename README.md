@@ -3,13 +3,13 @@ Welcome to Miza, a multipurpose Discord bot created by [Thomas Xin](https://gith
 
 ![Miza](https://github.com/thomas-xin/Miza/blob/e62dfccef0cce3b0fc3b8a09fb3ca3edfedd8ab0/misc/title-rainbow.gif?raw=true)
 
-## [Table of Contents](https://github.com/thomas-xin/Miza)
+## [Table of Contents](https://github.com/thomas-xin/Miza/blob/master/README.md)
 
 Headings | Explinations
 ------------ | -------------
-Where can I find what? | Will talk you through where everything within the code files can be found!
-How do I use the code? | Will talk you through the basics of how to host the code, covering potential error-prone areas!
-Support! | Links to where you can find Miza and get support!
+[Where can I find what?](https://github.com/thomas-xin/Miza/blob/master/README.md#L14) | Will talk you through where everything within the code files can be found!
+[How do I use the code?](https://github.com/thomas-xin/Miza/blob/master/README.md#L26) | Will talk you through the basics of how to host the code, covering potential error-prone areas!
+[Support!](https://github.com/thomas-xin/Miza/blob/master/README.md#L87) | Links to where you can find Miza and get support!
 
 ## [Where can I find what?](https://github.com/thomas-xin/Miza/tree/master/commands)
 
@@ -58,6 +58,8 @@ async def get_ip(self):
 ```
 
 Change `resp = await Request("https://api.ipify.org", decode=True, aio=True)` to `resp = "\u200b"` and it'll always appear as `None`.
+
+**Note that the IP Address no longer shows on ~status so this isn't as important anymore. However, if you intend to make use of Miza's webserver mechanic, then it may be of use to leave this code be.**
 
 - **OSError()**
 
