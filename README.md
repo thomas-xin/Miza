@@ -28,19 +28,21 @@ Misc contains all the different files that the bot needs to pull from, such as t
 <a id="p2"></a>
 ## [How do I use the code?](http://mizabot.xyz/apidoc)
 
-I'm just going to comment on what I personally found to be the most important things to know when hosting Miza. First of all, download this heccin chonka of a directory. How Miza is ran currently is through an *auth.json*, which automatically gets created if Miza is ran and cannot locate the file. Alternatively, as of 14/11/2020 (UTC), the general layout can be found at the top of *main.py* if you wish to host a Miza of your own and copy it exactly. **This file is necessary, as the bot cannot run without its token (obviosuly).** If you've successfully run the bot, you'll see some new folders in your front folder here. The most important to acknowledge are *saves* and *backup*. The saves folder is the entire databse, ~~enter with caution because wow if my file explorer doesn't hate loading this...~~ The backup folder automatically saves the current database to a zip file, going by date. If you want to export the database somewhere, the quickest way to do so is to just get rid of the day's backup zip, Miza will make a new one within a couple of minutes. Its what Thomas and I do. 🙃 Now to address some issues I've personally had hosting Miza, and solutions for if anybody experiences the same...
+I'm just going to comment on what I personally found to be the most important things to know when hosting Miza. First of all, download this heccin chonka of a directory. How Miza is ran currently is through an *auth.json*, which automatically gets created if Miza cannot locate the file. Alternatively, as of 14/11/2020 (UTC), the general layout can be found at the top of *main.py* if you wish to copy it exactly. **This file is necessary, as the bot cannot run without the token, and some features may not work correctly without their API Key (obviosuly).** If you've successfully run the bot, you'll see some new folders in your front folder here. The most important to acknowledge are *saves* and *backup*. The saves folder is the entire databse, ~~enter with caution because wow if my file explorer doesn't hate loading this...~~ The backup folder automatically saves the current database to a zip file, going by date. If you want to export the database somewhere, the quickest way to do so is to just get rid of the day's backup zip, Miza will make a new one within a couple of minutes. Its what Thomas and I do. 🙃 Now to address some issues I've personally had hosting Miza, and solutions for if anybody experiences the same...
+
+- **Dependencies...**
+
+Miza should automatically install all the dependencies necessary the first time you run her, so don't you worry about chasing after everything in *requirements.txt*. Miza will take whatever is in that file and download it all for you. However, you will still need to set up [FFmpeg](https://www.ffmpeg.org/) (more on that later). When you first run Miza, the program is going to look through the servers it is in to seek out open candidates for placing some emojis that Miza will also require for certain UI features, so make sure you have a good space set up too. Finally, all API Keys that Miza will require as located in *auth.json* you will have to obtain yourself.
 
 - **MemoryError()**
 
-Ah yes, the endless spam a few minutes after start-up... This is an issue I ran into initially, caused by Miza trying to cache too much at one time. Usually Miza only caches things in chunks if its necessary (like someone running a command on an attachement sent years ago for example). You can counter this issue by reducing how much content Miza caches, which is found right at the top of *bot.py*, in a function that looks like this:
+This used to be an issue caused by Miza trying to cache too much at one time. This caching system has been watered down significantly since the time this README was made, so this wont be as likely of an issue anymore. But in case it is still a problem, here's how to fix it. Head on over to the top of *bot.py*, and look for the following function:
 
 ```py
 def __init__(self, cache_size=4194304, timeout=24):
-        # Initializes client (first in __mro__ of class inheritance)
         self.start_time = utc()
         super().__init__(max_messages=256, heartbeat_timeout=60, guild_ready_timeout=5, intents=self.intents)
         self.cache_size = cache_size
-        # Base cache: contains all other caches
         self.cache = fcdict({c: {} for c in self.caches})
 
         # Code continues...
@@ -48,11 +50,11 @@ def __init__(self, cache_size=4194304, timeout=24):
 
 Just reduce the number in `cache_size=4194304` and you should be good to go.
 
-**Note that Miza's infinite message cache has since been removed, and the cache gets cleared after 2 weeks. It is unlikely that you will encounter this issue hence.**
+**Note that this memory cache gets cleared upon reset, and Miza has a seperate disk cache that doesn't upon reset, but all files in the caches get automtically cleared after 2 weeks.**
 
 - **IP Address exposure**
 
-So, the main Miza bot hosts a few Minecraft Servers, and in order to keep people up-to-date with the IP whenever there's a change, the ~status will show your IP Address. If you don't want your IP Address exposed publicly, you can change this in the same *bot.py* file as before, down in the `get_ip()` function at around line 1475. It should look like this:
+Miza used to host a few Minecraft Servers which is why this feature used to be a doxx moment for me. That is no longer a risk, but Miza will still obtain your IP Address to store it internally for features such as the webserver. If you don't want this, go back to *bot.py* and look for the `get_ip()` function at around line 1475. It should look like this:
 
 ```py
 async def get_ip(self):
@@ -60,22 +62,15 @@ async def get_ip(self):
     self.update_ip(resp)
 ```
 
-Change `resp = await Request("https://api.ipify.org", decode=True, aio=True)` to `resp = "\u200b"` and it'll always appear as `None`.
+Change `resp = await Request("https://api.ipify.org", decode=True, aio=True)` to `resp = "\u200b"` and it'll take your IP as `None`.
 
-**Note that the IP Address no longer shows on ~status so this isn't as important anymore. However, if you intend to make use of Miza's webserver mechanic, then it may be of use to leave this code be.**
-
-- **OSError()**
-
-In a nutshell, Miza needs to run various versions of Python in order to run certain voice, image, etc, commands. Because of this, if you encounter Miza erroring with an `OSError()` when you attempt to host the bot, chances are you may be missing `"python_path":"",` in your *auth.json.* However, for a while before this update to the README (written on 02/03/2020 (UTC)), Miza now adds this to the *auth.json* automatically.
-
-For more information written by Thomas Xin:
-> Invalid argument as a windows error (which is why it's OS error) means that the process being selected is invalid, which in this case, is caused by miza trying to send data to another process running on the computer that was closed or otherwise not open. The image and math commands (and in the latest version of miza, the webserver) run in separate processes entirely, in order to share CPU more fairly and not clog up the main bot when being used for time consuming operations. Because of the matplotlib compatibility issue with python 3.9, I had to effectively make miza run two different python versions, 3.9.0 and 3.8.5, because I'd already updated a lot to 3.9. So... in order to make that possible, I added a "python path" variable to my auth.json, which only worked for Miza. The latest version of miza should run perfectly fine now with python_path set to ""
-
-- **Voice commands still not working?**
+- **Voice commands not working?**
 
 Make sure you have *ffmpeg* and *Python* installed onto your computer and in your PATH (it doesn't need to be in the same directory as Miza). I uh... Actually have my ffmpeg pathed by pathing to the misc folder found in [Miza Player](https://github.com/thomas-xin/Miza-Player). 🙃
 
 ![ffmpeg](https://cdn.discordapp.com/attachments/688253918890688521/777473182294474753/image0.png)
+
+**Note that the voice commands run in a subprocess concurrently to the main program.**
 
 - **Where does Miza log?**
 
