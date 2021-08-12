@@ -1,6 +1,6 @@
-<a id="p1"><\a>
-<a id="p2"><\a>
-<a id="p3"><\a>
+<a id="p1"></a>
+<a id="p2"></a>
+<a id="p3"></a>
 
 # [Miza](http://mizabot.xyz)
 Welcome to Miza, a multipurpose Discord bot created by [Thomas Xin](https://github.com/thomas-xin). Writing this README is [smudgedpasta](https://github.com/smudgedpasta), Miza's secondary bot owner! :3
