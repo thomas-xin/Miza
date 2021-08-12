@@ -32,7 +32,15 @@ I'm just going to comment on what I personally found to be the most important th
 
 - **Dependencies...**
 
-Miza should automatically install all the dependencies necessary the first time you run her, so don't you worry about chasing after everything in *requirements.txt*. Miza will take whatever is in that file and download it all for you. However, you will still need to set up [FFmpeg](https://www.ffmpeg.org/) (more on that later). When you first run Miza, the program is going to look through the servers it is in to seek out open candidates for placing some emojis that Miza will also require for certain UI features, so make sure you have a good space set up too. Finally, all API Keys that Miza will require as located in *auth.json* you will have to obtain yourself.
+Miza should automatically install all the dependencies necessary the first time you run her, so don't you worry about chasing after everything in *requirements.txt*. Miza will take whatever is in that file and download it all for you. However, you will still need to set up [FFmpeg](https://www.ffmpeg.org/) for voice and image commands. When you first run Miza, the program is going to look through the servers it is in to seek out open candidates for placing some emojis that Miza will also require for certain UI features, so make sure you have a good space set up too. Finally, all API Keys that Miza will require as located in *auth.json* you will have to obtain yourself.
+
+- **Voice commands not working?**
+
+Make sure you have *FFmpeg* and *Python* installed onto your computer and in your PATH (it doesn't need to be in the same directory as Miza). I uh... Actually have my ffmpeg pathed by pathing to the misc folder found in [Miza Player](https://github.com/thomas-xin/Miza-Player) (an awesome program you should definitely try out!). 🙃
+
+![ffmpeg](https://cdn.discordapp.com/attachments/688253918890688521/777473182294474753/image0.png)
+
+**Note that the voice commands run in a subprocess concurrently to the main program. If you are still facing issues, this may be the cause, and I suggest asking for support from Thomas Xin.**
 
 - **MemoryError()**
 
@@ -64,14 +72,6 @@ async def get_ip(self):
 
 Change `resp = await Request("https://api.ipify.org", decode=True, aio=True)` to `resp = "\u200b"` and it'll take your IP as `None`.
 
-- **Voice commands not working?**
-
-Make sure you have *ffmpeg* and *Python* installed onto your computer and in your PATH (it doesn't need to be in the same directory as Miza). I uh... Actually have my ffmpeg pathed by pathing to the misc folder found in [Miza Player](https://github.com/thomas-xin/Miza-Player). 🙃
-
-![ffmpeg](https://cdn.discordapp.com/attachments/688253918890688521/777473182294474753/image0.png)
-
-**Note that the voice commands run in a subprocess concurrently to the main program.**
-
 - **Where does Miza log?**
 
 Miza logs up to three places: A *log.txt* (which the file gets refreshed upon restart), the console where you're running the code (we just use a *main.bat* file to run Miza through the Command Prompt on Windows usually, as none of Miza's subprocesses can run on Linux) and a log within Discord itself (which isn't hardcoded, you can enable it as displayed below.)
@@ -83,6 +83,10 @@ Miza logs up to three places: A *log.txt* (which the file gets refreshed upon re
 ![Screenshot1](https://cdn.discordapp.com/attachments/688253918890688521/804652403445727272/unknown.png)
 
 ![Screenshot4](https://cdn.discordapp.com/attachments/727087981285998593/777554358095183893/Capture8.PNG)
+
+- **Why wont Miza work on Linux?**
+
+Linux doesn't like her subprocesses, this has been an issue since the beginning. If you wish to host Miza, it is best you do so from a Windows OS, as Miza's infrastructure is designed on and for Windows.
 
 <a id="p3"></a>
 ## [Support!](http://mizabot.xyz)
