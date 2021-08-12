@@ -288,6 +288,7 @@ class Server:
             st = os.stat(p)
             fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
             attachment = filename or fn
+            cp.response.headers["Attachment-Filename"] = attachment
             if endpoint.startswith("p"):
                 s = """<!DOCTYPE html>
 <html>
@@ -461,7 +462,7 @@ class Server:
                             f = resp.raw
                             # f = ForwardedRequest(resp, 98304)
                             return cp.lib.file_generator(f, 65536)
-            return cp.lib.static.serve_file(p, content_type=mime, name=attachment, disposition="attachment" if download else None)
+            return cp.lib.static.serve_file(p, content_type=mime, disposition="attachment" if download else None)
     files._cp_config = {"response.stream": True}
 
     # @cp.expose
