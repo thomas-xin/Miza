@@ -3,7 +3,7 @@ Welcome to Miza, a multipurpose Discord bot created by [Thomas Xin](https://gith
 
 ![Miza](https://github.com/thomas-xin/Miza/blob/e62dfccef0cce3b0fc3b8a09fb3ca3edfedd8ab0/misc/title-rainbow.gif?raw=true)
 
-## [Table of Contents](https://github.com/thomas-xin/Miza/blob/master/README.md)
+## Table of Contents
 
 Headings | Explinations
 ------------ | -------------
@@ -12,7 +12,7 @@ Headings | Explinations
 [Support!](#p3) | Links to where you can find Miza and get support!
 
 <a id="p1"></a>
-## [Where can I find what?](https://github.com/thomas-xin/Miza/tree/master/commands)
+## Where can I find what?
 
 First and foremost, the front folder here contains all your generic license, requirements, etc... (Though requirements is necessary for the *install_update* funtionality which, automatically checks for and installs any missing modules.) But most significantly, the main files responsible for running the bots code. Throughout the code, you will frequently see `from common import *`, which is because *common.py* contains all the main necessary functions and imports to be used throughout. *main.py* is the main process, while everything else runs as a subprocess, so if you make any changes to main.py, it'll require a manual restart. Most of the bots optimization and data collection funtionaility can be found in these files, (such as running the bot of course, starting the heartbeat.tmp and other log related code, caching, assigning variables of the Github Directory link, default bot prefix, etc...) As for where things are located...
 
@@ -26,17 +26,17 @@ Misc contains all the different files that the bot needs to pull from, such as t
 
 
 <a id="p2"></a>
-## [How do I use the code?](http://mizabot.xyz/apidoc)
+## How do I use the code?
 
-I'm just going to comment on what I personally found to be the most important things to know when hosting Miza. First of all, download this heccin chonka of a directory. How Miza is ran currently is through an *auth.json*, which automatically gets created if Miza cannot locate the file. Alternatively, as of 14/11/2020 (UTC), the general layout can be found at the top of *main.py* if you wish to copy it exactly. **This file is necessary, as the bot cannot run without the token, and some features may not work correctly without their API Key (obviosuly).** If you've successfully run the bot, you'll see some new folders in your front folder here. The most important to acknowledge are *saves* and *backup*. The saves folder is the entire databse, ~~enter with caution because wow if my file explorer doesn't hate loading this...~~ The backup folder automatically saves the current database to a zip file, going by date. If you want to export the database somewhere, the quickest way to do so is to just get rid of the day's backup zip, Miza will make a new one within a couple of minutes. Its what Thomas and I do. 🙃 Now to address some issues I've personally had hosting Miza, and solutions for if anybody experiences the same...
+I'm just going to comment on what I personally found to be the most important things to know when hosting Miza. First of all, download this heccin chonka of a directory. How Miza is ran currently is through an *auth.json*, which automatically gets created if Miza cannot locate the file. Alternatively, as of 11/14/2020, the general layout can be found at the top of *main.py* if you wish to copy it exactly. **This file is necessary, as the bot cannot run without the token, and some features may not work correctly without their API Key (obviosuly).** If you've successfully run the bot, you'll see some new folders in your front folder here. The most important to acknowledge are *saves* and *backup*. The saves folder is the entire databse, ~~enter with caution because wow if my file explorer doesn't hate loading this...~~ The backup folder automatically saves the current database to a zip file, going by date. If you want to export the database somewhere, the quickest way to do so is to just get rid of the day's backup zip, Miza will make a new one within a couple of minutes. Its what Thomas and I do. 🙃 Now to address some issues I've personally had hosting Miza, and solutions for if anybody experiences the same...
 
 - **Dependencies...**
 
-Miza should automatically install all the dependencies necessary the first time you run her, so don't you worry about chasing after everything in *requirements.txt*. Miza will take whatever is in that file and download it all for you. However, you will still need to set up [FFmpeg](https://www.ffmpeg.org/) for voice and image commands. When you first run Miza, the program is going to look through the servers it is in to seek out open candidates for placing some emojis that Miza will also require for certain UI features, so make sure you have a good space set up too. Finally, all API Keys that Miza will require as located in *auth.json* you will have to obtain yourself.
+Miza should automatically install all the dependencies necessary the first time you run her, so don't you worry about chasing after everything in *requirements.txt*. Miza will take whatever is in that file and download it all for you. As of 08/12/2021, FFmpeg will also be installed when you first run Miza. During this first run, the program is also going to look through the servers it is in to seek out open candidates for placing some emojis that Miza will also require for certain UI features, so make sure you have a good space set up too. Finally, all API Keys that Miza will require as located in *auth.json* you will have to obtain yourself.
 
 - **Voice commands not working?**
 
-Make sure you have *FFmpeg* and *Python* installed onto your computer and in your PATH (it doesn't need to be in the same directory as Miza). I uh... Actually have my ffmpeg pathed by pathing to the misc folder found in [Miza Player](https://github.com/thomas-xin/Miza-Player) (an awesome program you should definitely try out!). 🙃
+Make sure you have [*FFmpeg*](https://www.ffmpeg.org/) and [*Python*](https://www.python.org/downloads/) installed onto your computer and in your PATH (it doesn't need to be in the same directory as Miza). I uh... Actually have my ffmpeg pathed by pathing to the misc folder found in [Miza Player](https://github.com/thomas-xin/Miza-Player) (an awesome program you should definitely try out!) 🙃
 
 ![ffmpeg](https://cdn.discordapp.com/attachments/688253918890688521/777473182294474753/image0.png)
 
@@ -89,7 +89,7 @@ Miza logs up to three places: A *log.txt* (which the file gets refreshed upon re
 Linux doesn't like her subprocesses, this has been an issue since the beginning. If you wish to host Miza, it is best you do so from a Windows OS, as Miza's infrastructure is designed on and for Windows.
 
 <a id="p3"></a>
-## [Support!](http://mizabot.xyz)
+## Support!
 
 With that concludes the basic introduction of hosting Miza. The code is commented and explaining where everything is, so feel free to explore further to see what you can change, and if you have any questions, [Thomas Xin](https://github.com/thomas-xin) is your guy to ask!
 
