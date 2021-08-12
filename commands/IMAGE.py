@@ -62,7 +62,7 @@ class IMG(Command):
     slash = True
 
     async def __call__(self, bot, flags, args, argv, user, message, channel, guild, perm, **void):
-        update = self.data.images.update
+        update = bot.data.images.update
         imglists = bot.data.images
         images = imglists.get(guild.id, {})
         if "a" in flags or "e" in flags or "d" in flags:
@@ -115,7 +115,7 @@ class IMG(Command):
                 sources.append(images[t])
         r = flags.get("r", 0)
         for _ in loop(r):
-            sources.append(choice(tuple(images)))
+            sources.append(choice(images.values()))
         if not len(sources):
             raise LookupError(f"Target image {argv} not found. Use img for list.")
         url = choice(sources)
