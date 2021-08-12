@@ -1,3 +1,7 @@
+<a id="p1"><\a>
+<a id="p2"><\a>
+<a id="p3"><\a>
+
 # [Miza](http://mizabot.xyz)
 Welcome to Miza, a multipurpose Discord bot created by [Thomas Xin](https://github.com/thomas-xin). Writing this README is [smudgedpasta](https://github.com/smudgedpasta), Miza's secondary bot owner! :3
 
@@ -7,10 +11,11 @@ Welcome to Miza, a multipurpose Discord bot created by [Thomas Xin](https://gith
 
 Headings | Explinations
 ------------ | -------------
-[Where can I find what?](https://github.com/thomas-xin/Miza/blob/master/README.md#L14) | Will talk you through where everything within the code files can be found!
-[How do I use the code?](https://github.com/thomas-xin/Miza/blob/master/README.md#L26) | Will talk you through the basics of how to host the code, covering potential error-prone areas!
-[Support!](https://github.com/thomas-xin/Miza/blob/master/README.md#L87) | Links to where you can find Miza and get support!
+[Where can I find what?](#p1) | Will talk you through where everything within the code files can be found!
+[How do I use the code?](#p2) | Will talk you through the basics of how to host the code, covering potential error-prone areas!
+[Support!](#p3) | Links to where you can find Miza and get support!
 
+<div id="p1"></div>
 ## [Where can I find what?](https://github.com/thomas-xin/Miza/tree/master/commands)
 
 First and foremost, the front folder here contains all your generic license, requirements, etc... (Though requirements is necessary for the *install_update* funtionality which, automatically checks for and installs any missing modules.) But most significantly, the main files responsible for running the bots code. Throughout the code, you will frequently see `from common import *`, which is because *common.py* contains all the main necessary functions and imports to be used throughout. *main.py* is the main process, while everything else runs as a subprocess, so if you make any changes to main.py, it'll require a manual restart. Most of the bots optimization and data collection funtionaility can be found in these files, (such as running the bot of course, starting the heartbeat.tmp and other log related code, caching, assigning variables of the Github Directory link, default bot prefix, etc...) As for where things are located...
@@ -23,6 +28,8 @@ You may think its unnecessary to explain all this, but before I learnt my way ar
 
 Misc contains all the different files that the bot needs to pull from, such as the avatar (which gets automatically uploaded to the Discord Developers Portal the first time the code is run), the rainbow bar emojis (which get automatically uploaded to a server Miza is in if it cannot find the emojis already), the code necessary for converting org files, computing math equations, finding timezones and etc. You can change the bots avatar and emojis if you want to; *but if you want the code to use them the same way, the filename must be kept the same.*
 
+
+<div id="p2"></div>
 ## [How do I use the code?](http://mizabot.xyz/apidoc)
 
 I'm just going to comment on what I personally found to be the most important things to know when hosting Miza. First of all, download this heccin chonka of a directory. How Miza is ran currently is through an *auth.json*, which automatically gets created if Miza is ran and cannot locate the file. Alternatively, as of 14/11/2020 (UTC), the general layout can be found at the top of *main.py* if you wish to host a Miza of your own and copy it exactly. **This file is necessary, as the bot cannot run without its token (obviosuly).** If you've successfully run the bot, you'll see some new folders in your front folder here. The most important to acknowledge are *saves* and *backup*. The saves folder is the entire databse, ~~enter with caution because wow if my file explorer doesn't hate loading this...~~ The backup folder automatically saves the current database to a zip file, going by date. If you want to export the database somewhere, the quickest way to do so is to just get rid of the day's backup zip, Miza will make a new one within a couple of minutes. Its what Thomas and I do. 🙃 Now to address some issues I've personally had hosting Miza, and solutions for if anybody experiences the same...
@@ -86,6 +93,7 @@ Miza logs up to three places: A *log.txt* (which the file gets refreshed upon re
 
 ![Screenshot4](https://cdn.discordapp.com/attachments/727087981285998593/777554358095183893/Capture8.PNG)
 
+<div id="p3"></div>
 ## [Support!](http://mizabot.xyz)
 
 With that concludes the basic introduction of hosting Miza. The code is commented and explaining where everything is, so feel free to explore further to see what you can change, and if you have any questions, [Thomas Xin](https://github.com/thomas-xin) is your guy to ask!
