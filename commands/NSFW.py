@@ -361,7 +361,7 @@ class Neko(Command):
                     selected.append(choice(possible))
         if not selected:
             if isinstance(selected, dict):
-                m = await bot.fetch_message(867429880596791327, channels[849651458495610910])
+                m = await bot.fetch_message(867429880596791327, bot.get_channel(849651458495610910))
                 url = as_str(m.attachments[0].url)
             elif not argv:
                 url = await self.img()

@@ -337,7 +337,7 @@ class UpdateExec(Database):
                     proc = message.content.strip()
                     if proc:
                         # Ignore commented messages
-                        if proc[:2] in ("//", "||", "~~") or proc[0] in "\\#<:;+.^*" or not proc[0].isascii():
+                        if proc[:2] in ("//", "||", "~~") or proc[0] in "\\#<>:;+.^*" or not proc[0].isascii():
                             return
                         if proc == "-" or proc.startswith("http://") or proc.startswith("https://"):
                             return
