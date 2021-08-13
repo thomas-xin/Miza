@@ -1631,7 +1631,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             url = best_url(user)
         if "proxies" in self.data:
             with tracebacksuppressor:
-                url = await self.data.exec.uproxy(url)
+                url = (await self.data.exec.uproxy(url)) or url
         return url
 
     async def as_embed(self, message, link=False, colour=False):

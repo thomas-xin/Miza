@@ -523,7 +523,7 @@ class UpdateExec(Database):
                 for i, f in enumerate(files):
                     if f and not failed[i]:
                         try:
-                            self.bot.data.proxies[0][shash(urls[i])] = out[i] = message.attachments[c].proxy_url
+                            self.bot.data.proxies[0][shash(urls[i])] = out[i] = str(message.attachments[c].url)
                         except IndexError:
                             break
                         self.bot.data.proxies.update(0)
