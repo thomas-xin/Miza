@@ -2458,12 +2458,13 @@ class UpdateMessageLogs(Database):
                                 self.dc[h] = cnt
                             else:
                                 self.dc[h] += cnt
-                        s = (5, 3600)[c >= 1]
+                        s = (3, 3600)[c >= 1]
                         cid = e.extra.channel.id
                         if now - h < datetime.timedelta(seconds=s):
-                            if (not e.target or e.target.id == u.id) and cid == message.channel.id:
+                            if (not e.target or e.target.id == u.id or u.id == self.bot.deleted_user) and cid == message.channel.id:
                                 t = e.user
                                 init = user_mention(t.id)
+                                message.author = e.target
             except (PermissionError, discord.Forbidden, discord.HTTPException):
                 init = "[UNKNOWN USER]"
             emb = await self.bot.as_embed(message, link=True)

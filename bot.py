@@ -4702,7 +4702,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         async def on_raw_message_delete(payload):
             try:
                 message = payload.cached_message
-                if message is None:
+                if not message:
                     raise LookupError
             except:
                 channel = await self.fetch_channel(payload.channel_id)
@@ -4735,7 +4735,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         async def on_raw_bulk_message_delete(payload):
             try:
                 messages = payload.cached_messages
-                if messages is None or len(messages) < len(payload.message_ids):
+                if not messages or len(messages) < len(payload.message_ids):
                     raise LookupError
             except:
                 messages = alist()
