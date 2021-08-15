@@ -127,14 +127,14 @@ class Help(Command):
         ) for i, c in enumerate(coms) if i < 25]
         catmenu = cdict(
             type=3,
-            custom_id="$",
+            custom_id="$0",
             options=catsel,
             min_values=0,
             placeholder=catg.capitalize() if catg else "Choose a category...",
         )
         commenu = cdict(
             type=3,
-            custom_id="$",
+            custom_id="$1",
             options=comsel,
             min_values=0,
             placeholder=com.parse_name() if comm else "Choose a command...",
