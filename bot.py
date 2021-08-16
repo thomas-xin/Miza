@@ -4617,7 +4617,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                             #     message.content += " " + m_id
                             #     user = await self.fetch_user(m_id)
                             for mdata in res.get("messages", {}).values():
-                                msg = self.ExtendedMessage(mdata)
+                                msg = self.ExtendedMessage.new(mdata)
                                 message.content += " " + msg.jump_url
                                 self.add_message(msg, force=True)
                                 message.channel = msg.channel or message.channel
