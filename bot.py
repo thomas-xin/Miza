@@ -4613,11 +4613,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                             for mdata in res.get("users", {}).values():
                                 message.content += " " + mdata["id"]
                                 user = self._state.store_user(mdata)
-                                message.channel = await self.get_dm(user)
                             for m_id in res.get("members", ()):
                                 message.content += " " + m_id
                                 user = await self.fetch_user(m_id)
-                                message.channel = await self.get_dm(user)
                             for mdata in res.get("messages", {}).values():
                                 msg = self.ExtendedMessage(mdata)
                                 message.content += " " + msg.jump_url
