@@ -227,7 +227,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 )
                 self.activity += 1
                 if resp.status_code == 429:
-                    time.sleep(2)
+                    time.sleep(20)
                     continue
                 if resp.status_code not in range(200, 400):
                     print("\n", data, " ", ConnectionError(f"Error {resp.status_code}", resp.text), "\n", sep="")

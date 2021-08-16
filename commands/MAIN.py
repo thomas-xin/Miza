@@ -1034,9 +1034,24 @@ class Invite(Command):
 class Upload(Command):
     name = ["Filehost"]
     description = "Sends a link to ⟨MIZA⟩'s webserver's upload page: ⟨WEBSERVER⟩/upload"
+    msgcmd = True
 
-    def __call__(self, **void):
-        return self.bot.webserver + "/upload"
+    async def __call__(self, message, argv, **void):
+        if message.attachments:
+            args.extend(best_url(a) for a in message.attachments)
+            argv += " " * bool(argv) + " ".join(best_url(a) for a in message.attachments)
+        args = await self.bot.follow_url(argv)
+        if not args:
+            return self.bot.webserver + "/upload"
+        futs = deque()
+        for url in args:
+            futs.append(create_task(Request(self.bot.webserver + "/upload_url?url=" + url, decode=True, aio=True)))
+            await asyncio.sleep(0.1)
+        out = deque()
+        for fut in futs:
+            url = await fut
+            out.append(url)
+        return "\n".join(out)
 
 
 class Reminder(Command):

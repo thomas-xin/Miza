@@ -1153,7 +1153,16 @@ function mergeFile(blob) {
                         shutil.copyfileobj(g, f)
                     os.remove(gn)
         b = ts.bit_length() + 7 >> 3
-        return f"/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
+        return "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
+
+    @cp.expose
+    def upload_url(self, **kwargs):
+        ts = time.time_ns() // 1000
+        url = kwargs["url"]
+        fn = f"../cache/{IND}{ts}~" + url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
+        subprocess.run([sys.executable, "downloader.py", url, fn], stdout=subprocess.DEVNULL, cwd="misc")
+        b = ts.bit_length() + 7 >> 3
+        return HOST + "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
 
     @cp.expose(("proxy",))
     def redirect(self):
