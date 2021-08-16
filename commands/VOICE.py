@@ -2507,7 +2507,7 @@ ytdl = AudioDownloader()
 
 class Queue(Command):
     server_only = True
-    name = ["▶️", "P", "Q", "Play", "Enqueue"]
+    name = ["▶️", "P", "Q", "Play", "Enqueue", "Search&Play"]
     alias = name + ["LS"]
     description = "Shows the music queue, or plays a song in voice."
     usage = "<search_links>* <force{?f}|budge{?b}|random{?r}|verbose{?v}|hide{?h}>*"
@@ -2555,6 +2555,11 @@ class Queue(Command):
             if urls:
                 if len(urls) == 1:
                     argv = urls[0]
+                    if is_discord_message_link(argv):
+                        spl = argv.rsplit("/", 2)
+                        channel = await bot.fetch_channel(spl[-2])
+                        msg = await bot.fetch_message(spl[-1], channel)
+                        argv = msg.content
                 else:
                     out = [create_future(ytdl.search, url) for url in urls]
             if out is None:

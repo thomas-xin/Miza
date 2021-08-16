@@ -848,6 +848,12 @@ class Follow(Command):
 
     async def __call__(self, channel, argv, message, **void):
         urls = find_urls(argv)
+        if len(urls) == 1 and is_discord_message_link(urls[0]):
+            spl = argv.rsplit("/", 2)
+            channel = await bot.fetch_channel(spl[-2])
+            msg = await bot.fetch_message(spl[-1], channel)
+            argv = msg.content
+            urls = find_urls(argv)
         out = set()
         for url in urls:
             if is_discord_message_link(url):
