@@ -2518,6 +2518,7 @@ class Queue(Command):
     rate_limit = (0.5, 3)
     typing = True
     slash = ("Play", "Queue")
+    msgcmd = ("Search & Play",)
 
     async def __call__(self, bot, user, perm, message, channel, guild, flags, name, argv, **void):
         # This command is a bit of a mess
@@ -4315,6 +4316,7 @@ class Download(Command):
     rate_limit = (7, 16)
     typing = True
     slash = True
+    msgcmd = ("Download as mp3",)
 
     async def __call__(self, bot, channel, guild, message, name, argv, flags, user, **void):
         fmt = default_fmt = "mp3"

@@ -1828,6 +1828,7 @@ class CreateEmoji(Command):
     _timeout_ = 3
     typing = True
     slash = ("Emoji",)
+    msgcmd = ("Create Emoji",)
 
     async def __call__(self, bot, user, guild, channel, message, args, argv, _timeout, **void):
         # Take input from any attachments, or otherwise the message contents
@@ -2825,7 +2826,7 @@ class UpdateNickPreservers(Database):
             pass
         else:
             if guild.me.guild_permissions.manage_nicknames:
-                await user.edit(nick=nick)
+                await user.edit(nick=nick, reason="NickPreserver")
                 self.data[guild.id].pop(user.id, None)
                 print(f"NickPreserver: Granted {nick} to {user} in {guild}.")
 

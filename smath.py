@@ -1151,7 +1151,7 @@ __scales = ("", "k", "M", "G", "T", "P", "E", "Z", "Y")
 
 def byte_scale(n, ratio=1024):
     e = 0
-    while n > ratio:
+    while n >= ratio:
         n /= ratio
         e += 1
         if e >= len(__scales) - 1:

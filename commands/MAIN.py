@@ -562,6 +562,7 @@ class Info(Command):
     rate_limit = 1
     multi = True
     slash = True
+    usercmd = True
 
     async def getGuildData(self, g, flags={}):
         bot = self.bot
@@ -820,6 +821,7 @@ class Profile(Command):
     rate_limit = 1
     no_parse = True
     slash = True
+    usercmd = True
 
     async def __call__(self, user, args, argv, flags, channel, guild, bot, **void):
         setting = None
@@ -895,6 +897,7 @@ class Activity(Command):
     rate_limit = (2, 9)
     typing = True
     slash = True
+    usercmd = True
 
     async def __call__(self, guild, user, argv, flags, channel, bot, _timeout, **void):
         u_id = None

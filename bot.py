@@ -243,24 +243,54 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             self.activity += 1
             if resp.status_code not in range(200, 400):
                 raise ConnectionError(f"Error {resp.status_code}", resp.text)
-            commands = alist(c for c in resp.json() if str(c.get("application_id")) == str(self.id))
-            print(f"Successfully loaded {len(commands)} slash command{'s' if len(commands) != 1 else ''}.")
+            commands = dict((int(c["id"]), c) for c in resp.json() if str(c.get("application_id")) == str(self.id))
+            print(f"Successfully loaded {len(commands)} application command{'s' if len(commands) != 1 else ''}.")
         sem = Semaphore(5, inf, 5)
         for catg in self.categories.values():
             for command in catg:
                 with tracebacksuppressor:
+                    if getattr(command, "msgcmd", None):
+                        with sem:
+                            aliases = command.msgcmd if type(command.msgcmd) is tuple else (command.parse_name(),)
+                            for name in aliases:
+                                command_data = dict(name=name, type=3)
+                                found = False
+                                for i, curr in list(commands.items()):
+                                    if curr["name"] == name and curr["type"] == command_data["type"]:
+                                        found = True
+                                        commands.pop(i)
+                                        break
+                                if not found:
+                                    print(f"creating new message command {command_data['name']}...")
+                                    print(command_data)
+                                    create_future_ex(self.create_command, command_data, priority=True)
+                    if getattr(command, "usercmd", None):
+                        with sem:
+                            aliases = command.usercmd if type(command.usercmd) is tuple else (command.parse_name(),)
+                            for name in aliases:
+                                command_data = dict(name=name, type=2)
+                                found = False
+                                for i, curr in list(commands.items()):
+                                    if curr["name"] == name and curr["type"] == command_data["type"]:
+                                        found = True
+                                        commands.pop(i)
+                                        break
+                                if not found:
+                                    print(f"creating new user command {command_data['name']}...")
+                                    print(command_data)
+                                    create_future_ex(self.create_command, command_data, priority=True)
                     if getattr(command, "slash", None):
                         with sem:
                             aliases = command.slash if type(command.slash) is tuple else (command.parse_name(),)
                             for name in (full_prune(i) for i in aliases):
                                 description = lim_str(command.parse_description(), 100)
                                 options = self.command_options(command.usage)
-                                command_data = dict(name=name, description=description)
+                                command_data = dict(name=name, description=description, type=1)
                                 if options:
                                     command_data["options"] = options
                                 found = False
-                                for i, curr in enumerate(commands):
-                                    if curr["name"] == name:
+                                for i, curr in list(commands.items()):
+                                    if curr["name"] == name and curr["type"] == command_data["type"]:
                                         compare = self.command_options(command.usage)
                                         if curr["description"] != description or (compare and curr["options"] != compare or not compare and curr.get("options")):
                                             print(curr)
@@ -284,10 +314,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                     print(command_data)
                                     create_future_ex(self.create_command, command_data, priority=True)
         time.sleep(3)
-        for curr in commands:
+        for curr in commands.values():
             with tracebacksuppressor:
                 print(curr)
-                print(f"{curr['name']}'s slash command does not exist, removing...")
+                print(f"{curr['name']}'s application command does not exist, removing...")
                 resp = requests.delete(f"https://discord.com/api/v9/applications/{self.id}/commands/{curr['id']}", headers=dict(Authorization="Bot " + self.token))
                 self.activity += 1
                 if resp.status_code not in range(200, 400):
@@ -4566,7 +4596,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     message.slash = d["token"]
                     cdata = d.get("data")
                     if d["type"] == 2:
-                        name = cdata["name"]
+                        name = cdata["name"].replace(" ", "")
                         args = [i.get("value", "") for i in cdata.get("options", ())]
                         argv = " ".join(i for i in args if i)
                         message.content = "/" + name + " " + argv
@@ -4578,6 +4608,21 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         author = self._state.store_user(mdata)
                         message.author = author
                         channel = None
+                        if "resolved" in cdata:
+                            res = d.get("resolved", {})
+                            for mdata in res.get("users", {}).values():
+                                message.content += " " + mdata["id"]
+                                user = self._state.store_user(mdata)
+                                message.channel = await self.get_dm(user)
+                            for m_id in res.get("members", ()):
+                                message.content += " " + m_id
+                                user = await self.fetch_user(m_id)
+                                message.channel = await self.get_dm(user)
+                            for mdata in res.get("messages", {}).values():
+                                msg = self.ExtendedMessage(mdata)
+                                message.content += " " + msg.jump_url
+                                self.add_message(msg, force=True)
+                                message.channel = msg.channel or message.channel
                         try:
                             channel = self.force_channel(d["channel_id"])
                             guild = await self.fetch_guild(d["guild_id"])
@@ -4590,6 +4635,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                                 raise
                             if channel is None:
                                 channel = await self.get_dm(author)
+                        if not getattr(message, "guild", None):
+                            message.guild = getattr(channel, "guild", None)
+                        message.content = single_space(message.content.strip())
                         message.channel = channel
                         message.noref = True
                         return await self.process_message(message, message.content, slash=True)

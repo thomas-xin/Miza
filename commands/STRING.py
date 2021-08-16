@@ -688,6 +688,7 @@ class Identify(Command):
     usage = "<url>*"
     rate_limit = (2, 7)
     mime = magic.Magic(mime=True, mime_encoding=True)
+    msgcmd = True
 
     def probe(self, url):
         command = ["ffprobe", "-hide_banner", url]
@@ -843,6 +844,7 @@ class Follow(Command):
     usage = "<url>*"
     rate_limit = (1, 5)
     slash = True
+    msgcmd = ("Follow URL",)
 
     async def __call__(self, channel, argv, message, **void):
         urls = find_urls(argv)
