@@ -4609,7 +4609,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         message.author = author
                         channel = None
                         if "resolved" in cdata:
-                            res = d.get("resolved", {})
+                            res = cdata.get("resolved", {})
                             for mdata in res.get("users", {}).values():
                                 message.content += " " + mdata["id"]
                                 user = self._state.store_user(mdata)
