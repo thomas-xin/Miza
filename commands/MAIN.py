@@ -1035,6 +1035,7 @@ class Upload(Command):
     name = ["Filehost"]
     description = "Sends a link to ⟨MIZA⟩'s webserver's upload page: ⟨WEBSERVER⟩/upload"
     msgcmd = True
+    _timeout_ = 50
 
     async def __call__(self, message, argv, **void):
         if message.attachments:
@@ -1045,7 +1046,7 @@ class Upload(Command):
             return self.bot.webserver + "/upload"
         futs = deque()
         for url in args:
-            futs.append(create_task(Request(self.bot.webserver + "/upload_url?url=" + url, decode=True, aio=True)))
+            futs.append(create_task(Request(self.bot.webserver + "/upload_url?url=" + url, decode=True, aio=True, timeout=1200)))
             await asyncio.sleep(0.1)
         out = deque()
         for fut in futs:
