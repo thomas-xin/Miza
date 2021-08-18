@@ -4660,7 +4660,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                             if channel is None:
                                 channel = await self.get_dm(user)
                         message.channel = channel
-                        if custom_id == "$":
+                        if custom_id.startswith("\x7f"):
                             custom_id = cdata.get("values") or custom_id
                             if type(custom_id) is list:
                                 custom_id = " ".join(custom_id)

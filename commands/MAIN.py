@@ -44,7 +44,7 @@ help_descriptions = fcdict((
 
 
 class Help(Command):
-    name = ["❓", "❔", "?"]
+    name = ["❓", "❔", "?", "Halp"]
     description = "Shows a list of usable commands, or gives a detailed description of a command."
     usage = "<(command|category)>?"
     flags = "v"
@@ -127,14 +127,14 @@ class Help(Command):
         ) for i, c in enumerate(coms) if i < 25]
         catmenu = cdict(
             type=3,
-            custom_id="$0",
+            custom_id="\x7f0",
             options=catsel,
             min_values=0,
             placeholder=catg.capitalize() if catg else "Choose a category...",
         )
         commenu = cdict(
             type=3,
-            custom_id="$1",
+            custom_id="\x7f1",
             options=comsel,
             min_values=0,
             placeholder=com.parse_name() if comm else "Choose a command...",
