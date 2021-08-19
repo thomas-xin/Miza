@@ -270,6 +270,8 @@ def integrate(*args, **kwargs):
 fac = sympy.factorial
 ncr = lambda n, k: 0 if k > n else fac(n) / fac(k) / fac(n - k)
 npr = lambda n, k: 0 if k > n else fac(n) / fac(n - k)
+normcdf = lambda x: 0.5 * sympy.erfc(-x / sympy.sqrt(2))
+norminv = lambda x: -sympy.sqrt(2) * sympy.erfcinv(2 * x)
 
 def lcm(*nums):
     while len(nums) > 1:
@@ -413,6 +415,8 @@ _globals.update({
     "nCr": ncr,
     "npr": npr,
     "nPr": npr,
+    "normcdf": normcdf,
+    "norminv": norminv,
     "lcm": lcm,
     "gcd": gcd,
     "hcf": gcd,
@@ -439,11 +443,59 @@ _globals.update({
     "Y": sympy.Integer(1 << 80),
     "c": sympy.Integer(299792458),
 })
-pop = (
-    "input",
-)
-for i in pop:
-    _globals["__builtins__"].pop(i)
+supported = set((
+    "all",
+    "any",
+    "ascii",
+    "bin",
+    "bool",
+    "bytearray",
+    "bytes",
+    "callable",
+    "chr",
+    "complex",
+    "dict",
+    "dir",
+    "divmod",
+    "enumerate",
+    "filter",
+    "float",
+    "format",
+    "frozenset",
+    "hash",
+    "hex",
+    "int",
+    "isinstance",
+    "issubclass",
+    "iter",
+    "len",
+    "list",
+    "map",
+    "max",
+    "memoryview",
+    "min",
+    "next",
+    "object",
+    "oct",
+    "ord",
+    "pow",
+    "property",
+    "range",
+    "repr",
+    "reversed",
+    "round",
+    "set",
+    "slice",
+    "sorted",
+    "str",
+    "sum",
+    "tuple",
+    "type",
+    "zip",
+))
+for k, v in list(__builtins__.__dict__.items()):
+    if k in supported:
+        _globals[k] = v
 
 sym_tr = parser.standard_transformations
 sym_tr += (
