@@ -206,6 +206,7 @@ sympy.Basic.__or__ = lambda self, other: ior(self, other)
 sympy.Basic.__xor__ = lambda self, other: ixor(self, other)
 sympy.core.numbers.Infinity.__str__ = lambda self: "inf"
 sympy.core.numbers.ComplexInfinity.__str__ = lambda self: "nan"
+sympy.erfcinv = lambda z: sympy.erfinv(1 - z)
 
 
 # Sympy plotting functions
