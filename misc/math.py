@@ -205,8 +205,11 @@ sympy.Basic.__and__ = lambda self, other: iand(self, other)
 sympy.Basic.__or__ = lambda self, other: ior(self, other)
 sympy.Basic.__xor__ = lambda self, other: ixor(self, other)
 sympy.core.numbers.Infinity.__str__ = lambda self: "inf"
-sympy.core.numbers.ComplexInfinity.__str__ = lambda self: "nan"
+sympy.core.numbers.NegativeInfinity.__str__ = lambda self: "-inf"
+sympy.core.numbers.ComplexInfinity.__str__ = lambda self: "ℂ∞"
 sympy.erfcinv = lambda z: sympy.erfinv(1 - z)
+sympy.erfcinv.inverse = sympy.erfc
+sympy.erfc.inverse = sympy.erfcinv
 
 
 # Sympy plotting functions
@@ -257,8 +260,26 @@ def plot3d_parametric_surface(*args, **kwargs):
 
 # Multiple variable limit
 def lim(f, **kwargs):
+    if hasattr(f, "subs"):
+        g = f.subs(kwargs)
+        try:
+            if not math.isnan(g):
+                return g
+        except TypeError:
+            return g
     for i in kwargs:
-        f = sympy.limit(f, i, kwargs[i])
+        g = sympy.limit(f, i, kwargs[i], "+")
+        h = sympy.limit(f, i, kwargs[i], "-")
+        if g != h:
+            try:
+                if not math.isfinite(g) and not math.isfinite(h) and g == -h:
+                    f = sympy.zoo
+                    continue
+            except TypeError:
+                pass
+            f = (g + h) / 2
+        else:
+            f = g
     return f
 
 # May integrate a spline
@@ -391,6 +412,8 @@ _globals.update({
     "dice": Random,
     "plt": plot,
     "lim": lim,
+    "sub": lim,
+    "subs": lim,
     "factorint": _factorint,
     "factors": _factorint,
     "factorise": factorize,
@@ -565,6 +588,7 @@ replacers = {
     "FALSE": "False",
     "coo": "zoo",
     "cinf": "zoo",
+    "ℂ∞": "zoo",
     "Dₓ": "diff 0+",
     "^^": "\x7f",
 }
