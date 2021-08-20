@@ -3305,9 +3305,9 @@ class Dump(Command):
                 auds.queue.clear()
             auds.stats.update(d["stats"])
             auds.seek_pos = d.get("pos", 0)
-            auds.queue.enqueue(q, -1)
             if d.get("paused"):
                 await create_future(auds.pause)
+            auds.queue.enqueue(q, -1)
             if "h" not in flags:
                 return italics(css_md(f"Successfully loaded audio data for {sqr_md(guild)}.")), 1
         else:
@@ -4685,7 +4685,7 @@ class UpdateAudio(Database):
     # Stores all currently playing audio data to temporary database when bot shuts down
     async def _destroy_(self, **void):
         for auds in tuple(self.players.values()):
-            d, _ = await create_future(auds.get_dump, True)
+            d, _ = await create_future(auds.get_dump, True, True)
             self.data[auds.acsi.channel.id] = {"dump": d, "channel": auds.text.id}
             await create_future(auds.kill, reason="")
             self.update(auds.acsi.channel.id)
