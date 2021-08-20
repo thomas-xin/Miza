@@ -444,13 +444,13 @@ def round(x, y=None):
 
 # Rounds a number to the nearest integer, with a probability determined by the fractional part.
 def round_random(x):
-    y = round_min(x)
-    if type(y) is int:
+    y = int(x)
+    if y == x:
         return y
-    x, y = divmod(x, 1)
-    if random.random() <= y:
-        x += 1
-    return int(x)
+    x %= 1
+    if random.random() <= x:
+        y += 1
+    return y
 
 # Rounds x to the nearest multiple of y.
 round_multiple = lambda x, y=1: round_min(math.round(x / y) * y) if y else x

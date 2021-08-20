@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import sympy, math, time, os, sys, subprocess, traceback, random, collections, psutil, concurrent.futures, pickle, ast #, gc
+import sympy, math, time, os, sys, subprocess, traceback, random, collections, psutil, concurrent.futures, pickle, ast, re #, gc
 import sympy.stats
 import numpy as np
 import sympy.parsing.sympy_parser as parser
@@ -259,6 +259,15 @@ def plot3d_parametric_surface(*args, **kwargs):
     kwargs.pop("show", None)
     return plotter.plot3d_parametric_surface(*plotArgs(args), show=False, **kwargs)
 
+def array(*args):
+    if len(args) == 1:
+        arr = args[0]
+        if type(arr) is str:
+            arr = re.split("[^0-9\\-+e./]+", arr)
+            arr = list(map(sympy.Rational, arr))
+        return np.asanyarray(arr, dtype=object)
+    return np.array(args, dtype=object)
+
 # Multiple variable limit
 def lim(f, **kwargs):
     if hasattr(f, "subs"):
@@ -371,13 +380,22 @@ def sort(*args):
         return sorted(args)
     return sorted(args[0])
 
+def round_random(x):
+    y = int(x)
+    if y == x:
+        return y
+    x %= 1
+    if random.random() <= x:
+        y += 1
+    return y
+
 def rounder(x):
     try:
-        if type(x) is int or x == int(x):
-            return int(x)
-        f = int(round(x))
-        if x == f:
-            return f
+        if type(x) is int:
+            return x
+        y = int(x)
+        if x == y:
+            return y
     except:
         pass
     return x
@@ -411,8 +429,9 @@ _globals.update({
     "random": Random,
     "rand": Random,
     "dice": Random,
+    "round_random": round_random,
     "plt": plot,
-    "array": lambda it: np.array(it, dtype=object),
+    "array": array,
     "rollaxis": np.rollaxis,
     "swapaxes": np.swapaxes,
     "transpose": np.transpose,
@@ -442,7 +461,7 @@ _globals.update({
     "ptp": np.ptp,
     "mean": np.mean,
     "median": np.median,
-    "std": np.std,
+    "std": lambda a: sympy.sqrt(np.var(a)),
     "var": np.var,
     "corrcoef": np.corrcoef,
     "correlate": np.correlate,
@@ -725,7 +744,7 @@ def evalSym(f, prec=64, r=False, variables=None):
             raise
     # Solve any sums and round off floats when possible
     for i in sympy.preorder_traversal(f):
-        if issubclass(type(i), sympy.Number):
+        if isinstance(i, (sympy.Number, float, np.floating)):
             try:
                 f = f.subs(i, rounder(i))
             except:
@@ -744,19 +763,20 @@ def evalSym(f, prec=64, r=False, variables=None):
         pass
     # Solve any sums and round off floats when possible
     for i in sympy.preorder_traversal(f):
-        try:
-            f = f.subs(i, rounder(i))
-        except:
-            pass
-        if hasattr(i, "doit"):
+        if isinstance(i, (sympy.Number, float, np.floating)):
+            try:
+                f = f.subs(i, rounder(i))
+            except:
+                pass
+        elif hasattr(i, "doit"):
             try:
                 f = f.subs(i, i.doit())
             except:
                 pass
     # Select list of answers to return based on the desired float precision level
+    if type(f) in (str, bool, tuple, list, dict, np.ndarray):
+        return [f]
     if prec:
-        if type(f) in (tuple, list, dict):
-            return [f]
         try:
             y = f.evalf(prec, chop=True)
         except:
@@ -770,18 +790,19 @@ def evalSym(f, prec=64, r=False, variables=None):
                     e = e.subs(i, rounder(i))
         if r:
             p = prettyAns(f)
-            if p == str(e):
+            if p == repr(e):
                 p = ""
             return [f, p]
         p = prettyAns(f)
-        if p == str(e):
+        f = repr(e)
+        if p == f:
             p = ""
-        if "." in str(e):
-            e = str(e).rstrip("0")
+        if "." in f:
+            e = f.rstrip("0")
         return [e, p]
     else:
         p = prettyAns(f)
-        if p == str(f):
+        if p == repr(f):
             p = ""
         return [f, p]
 
@@ -814,7 +835,7 @@ def procResp(resp):
     elif type(resp) is tuple:
         s = list(resp)
     else:
-        s = [str(i) for i in resp]
+        s = [repr(i) if type(i) is not str else i for i in resp]
     return s
 
 

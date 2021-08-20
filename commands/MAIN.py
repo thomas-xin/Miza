@@ -1318,7 +1318,9 @@ class Reminder(Command):
             # Remove existing schedule
             bot.data.reminders.listed.remove(sendable.id, key=lambda x: x[-1])
         # Insert back into bot schedule
-        bot.data.reminders.listed.insort((bot.data.reminders[sendable.id][0]["t"], sendable.id), key=lambda x: x[0])
+        tup = (bot.data.reminders[sendable.id][0]["t"], sendable.id)
+        if is_finite(tup[0]):
+            bot.data.reminders.listed.insort(tup, key=lambda x: x[0])
         update(sendable.id)
         emb = discord.Embed(description=msg)
         emb.colour = await bot.get_colour(remind_as)
