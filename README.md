@@ -27,7 +27,6 @@ Sections | Explanations
 #### Prerequisites:
 * [Git](https://git-scm.com/downloads)
 * [Python](https://www.python.org/downloads/)
-* [ffmpeg](https://www.ffmpeg.org/download.html)
 * [Discord Bot Token](https://discord.com/developers/) (_Choose your Desired Bot then go to **Bot** and under Token click **Copy**_)
 
 ### Installing Miza
@@ -44,12 +43,11 @@ git clone https://github.com/thomas-xin/Miza.git
 
 #### Dependencies:
 
-* Miza should automatically the required dependencies right after running her for the first time. 
-##### Additional Notes: 
+* Miza should automatically the required dependencies right after running her for the first time, notably the Python modules and FFmpeg.
+##### Additional Notes:
 _As of 08/12/2021, FFmpeg will be automatically installed after first run, Miza is also going to look through the servers it is in to seek out open candidates for placing some emojis that Miza will also require for certain UI features, so make sure you have a good space set up too. Finally, all API Keys that Miza will require as located in *auth.json* you will have to obtain yourself._ <br></br>
 
 #### Voice commands not working:
-
 * Make sure you have [FFmpeg](https://www.ffmpeg.org/download.html) and [Python](https://www.python.org/downloads/) installed onto your computer and in your PATH (it doesn't need to be in the same directory as Miza). I uh... Actually have my ffmpeg pathed by pathing to the misc folder found in [Miza Player](https://github.com/thomas-xin/Miza-Player) (an awesome program you should definitely try out!) 🙃
 
 ![ffmpeg](https://cdn.discordapp.com/attachments/688253918890688521/777473182294474753/image0.png)
@@ -76,15 +74,7 @@ _Note: memory cache gets cleared upon reset, and Miza has a seperate disk cache 
 
 ####  IP Address exposure:
 
-Miza used to host a few Minecraft Servers which is why this feature used to be a doxx moment for me. That is no longer a risk, but Miza will still obtain your IP Address to store it internally for features such as the webserver. If you don't want this, go back to *bot.py* and look for the `get_ip()` function at around line 1475. It should look like this:
-
-```py
-async def get_ip(self):
-    resp = await Request("https://api.ipify.org", decode=True, aio=True)
-    self.update_ip(resp)
-```
-
-Change `resp = await Request("https://api.ipify.org", decode=True, aio=True)` to `resp = "\u200b"` and it'll take your IP as `None`.
+Miza used to host a few Minecraft Servers which is why this feature used to be a doxx moment for me. That is no longer a risk, but Miza will still obtain your IP Address to store it internally for features such as the webserver.
 
 #### Where does Miza log?
 
@@ -111,7 +101,7 @@ Linux doesn't like her subprocesses, this has been an issue since the beginning.
 ## Folder Structure
 
 #### Project Directory:
-has all your generic license, requirements, etc... (Though requirements is necessary for the *install_update* funtionality which, automatically checks for and installs any missing modules.) But most significantly, the main files responsible for running the bots code. Throughout the code, you will frequently see `from common import *`, which is because *common.py* contains all the main necessary functions and imports to be used throughout. *main.py* is the main process, while everything else runs as a subprocess, so if you make any changes to main.py, it'll require a manual restart. Most of the bots optimization and data collection funtionaility can be found in these files, (such as running the bot of course, starting the heartbeat.tmp and other log related code, caching, assigning variables of the Github Directory link, default bot prefix, etc...) As for where things are located...
+Has all your generic license, requirements, etc... (Though requirements is necessary for the *install_update* funtionality which, automatically checks for and installs any missing modules.) But most significantly, the main files responsible for running the bots code. Throughout the code, you will frequently see `from common import *`, which is because *common.py* contains all the main necessary functions and imports to be used throughout. *main.py* is the main process, while everything else runs as a subprocess, so if you make any changes to main.py, it'll require a manual restart. Most of the bots optimization and data collection funtionaility can be found in these files, (such as running the bot of course, starting the heartbeat.tmp and other log related code, caching, assigning variables of the Github Directory link, default bot prefix, etc...) As for where things are located...
 
 #### Commands:
 
