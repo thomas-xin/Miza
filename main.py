@@ -46,7 +46,7 @@ with requests.get("https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.
         subprocess.run([sys.executable, "downloader.py", "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip", "ffmpeg.zip"], cwd="misc")
         import zipfile, io
         print("Download complete; extracting new FFmpeg installation...")
-        f = "ffmpeg.zip"
+        f = "misc/ffmpeg.zip"
         with zipfile.ZipFile(f) as z:
             names = [name for name in z.namelist() if "/bin/" in name and ".exe" in name]
             for i, name in enumerate(names):
