@@ -59,6 +59,7 @@ class IMG(Command):
     flags = "vraedhzfx"
     no_parse = True
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
+    dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
     slash = True
 
     async def __call__(self, bot, flags, args, argv, user, message, channel, guild, perm, **void):
@@ -103,11 +104,16 @@ class IMG(Command):
             return italics(css_md(f"Successfully removed {sqr_md(key)} from the image list for {sqr_md(guild)}."))
         if not argv and not "r" in flags:
             # Set callback message for scrollable list
-            return (
+            buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
+            await send_with_reply(
+                None,
+                message,
                 "*```" + "\n" * ("z" in flags) + "callback-image-img-"
                 + str(user.id) + "_0"
-                + "-\nLoading Image database...```*"
+                + "-\nLoading Image database...```*",
+                buttons=buttons,
             )
+            return
         sources = alist()
         for tag in args:
             t = tag.casefold()
@@ -180,9 +186,8 @@ class IMG(Command):
         if more > 0:
             emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
         create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
-        if reaction is None:
-            for react in self.directions:
-                await message.add_reaction(as_str(react))
+        if hasattr(message, "int_token"):
+            await bot.ignore_interaction(message)
 
 
 async def get_image(bot, user, message, args, argv, default=2, raw=False, ext="png"):

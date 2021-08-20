@@ -1061,6 +1061,7 @@ class Reminder(Command):
     usage = "<1:message>? <0:time>? <urgent{?u}>? <delete{?d}>?"
     flags = "aedu"
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
+    dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
     rate_limit = (1 / 3, 4)
     keywords = ["on", "at", "in", "when", "event"]
     keydict = {re.compile(f"(^|[^a-z0-9]){i[::-1]}([^a-z0-9]|$)", re.I): None for i in keywords}
@@ -1107,11 +1108,16 @@ class Reminder(Command):
             return ini_md(f"Successfully removed {sqr_md(lim_str(x['msg'], 128))} from {word} list for {sqr_md(sendable)}.")
         if not argv:
             # Set callback message for scrollable list
-            return (
+            buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
+            await send_with_reply(
+                None,
+                message,
                 "*```" + "\n" * ("z" in flags) + "callback-main-reminder-"
                 + str(user.id) + "_0_" + str(sendable.id)
-                + "-\nLoading Reminder database...```*"
+                + "-\nLoading Reminder database...```*",
+                buttons=buttons,
             )
+            return
         if len(rems) >= 64:
             raise OverflowError(f"You have reached the maximum of 64 {word}. Please remove one to add another.")
         for f in "aeu":
@@ -1396,9 +1402,8 @@ class Reminder(Command):
         if more > 0:
             emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
         create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
-        if reaction is None:
-            for react in self.directions:
-                await message.add_reaction(as_str(react))
+        if hasattr(message, "int_token"):
+            await bot.ignore_interaction(message)
 
 
 class UpdateUrgentReminders(Database):

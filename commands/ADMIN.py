@@ -102,6 +102,7 @@ class Mute(Command):
     usage = "<0:users>* <1:time>? (reason)? <2:reason>? <hide{?h}>?"
     flags = "fhz"
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
+    dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
     rate_limit = (2, 5)
     multi = True
     slash = True
@@ -109,11 +110,16 @@ class Mute(Command):
     async def __call__(self, bot, args, argl, message, channel, guild, flags, perm, user, name, **void):
         if not args and not argl:
             # Set callback message for scrollable list
-            return (
+            buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
+            await send_with_reply(
+                None,
+                message,
                 "*```" + "\n" * ("z" in flags) + "callback-admin-mute-"
                 + str(user.id) + "_0"
-                + "-\nLoading mute list...```*"
+                + "-\nLoading mute list...```*",
+                buttons=buttons,
             )
+            return
         update = self.bot.data.mutes.update
         ts = utc()
         mutelist = bot.data.mutes.get(guild.id, alist())
@@ -311,9 +317,8 @@ class Mute(Command):
         if more > 0:
             emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
         create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
-        if reaction is None:
-            for react in self.directions:
-                await message.add_reaction(as_str(react))
+        if hasattr(message, "int_token"):
+            await bot.ignore_interaction(message)
 
 
 class Ban(Command):
@@ -326,6 +331,7 @@ class Ban(Command):
     usage = "<0:users>* <1:time>? (reason)? <2:reason>? <hide{?h}>?"
     flags = "fhz"
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
+    dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
     rate_limit = (2, 5)
     multi = True
     slash = True
@@ -333,11 +339,16 @@ class Ban(Command):
     async def __call__(self, bot, args, argl, message, channel, guild, flags, perm, user, name, **void):
         if not args and not argl:
             # Set callback message for scrollable list
-            return (
+            buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
+            await send_with_reply(
+                None,
+                message,
                 "*```" + "\n" * ("z" in flags) + "callback-admin-ban-"
                 + str(user.id) + "_0"
-                + "-\nLoading ban list...```*"
+                + "-\nLoading ban list...```*",
+                buttons=buttons,
             )
+            return
         update = self.bot.data.bans.update
         ts = utc()
         banlist = bot.data.bans.get(guild.id, alist())
@@ -530,9 +541,8 @@ class Ban(Command):
         if more > 0:
             emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
         create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
-        if reaction is None:
-            for react in self.directions:
-                await message.add_reaction(as_str(react))
+        if hasattr(message, "int_token"):
+            await bot.ignore_interaction(message)
 
 
 class RoleSelect(Command):
@@ -1011,9 +1021,10 @@ class StarBoard(Command):
     usage = "<0:reaction> <1:react_count(1)>? <disable{?d}>?"
     flags = "d"
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
+    dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
     rate_limit = 1
 
-    async def __call__(self, bot, args, user, channel, guild, flags, **void):
+    async def __call__(self, bot, args, user, message, channel, guild, flags, **void):
         data = bot.data.starboards
         if "d" in flags:
             if args:
@@ -1039,11 +1050,16 @@ class StarBoard(Command):
                 data.pop(guild.id, None)
             return italics(css_md(f"Disabled all starboard reposting for {sqr_md(guild)}."))
         if not args:
-            return (
+            buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
+            await send_with_reply(
+                None,
+                message,
                 "*```" + "\n" * ("z" in flags) + "callback-admin-starboard-"
                 + str(user.id) + "_0"
-                + "-\nLoading Starboard database...```*"
+                + "-\nLoading Starboard database...```*",
+                buttons=buttons,
             )
+            return
         if not args:
             try:
                 e_id, count = data[channel.id]
@@ -1116,9 +1132,8 @@ class StarBoard(Command):
         if more > 0:
             emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
         create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
-        if reaction is None:
-            for react in self.directions:
-                await message.add_reaction(as_str(react))
+        if hasattr(message, "int_token"):
+            await bot.ignore_interaction(message)
 
 
 class Crosspost(Command):
@@ -1129,9 +1144,10 @@ class Crosspost(Command):
     usage = "<channel> <disable{?d}>?"
     flags = "aed"
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
+    dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
     rate_limit = 1
 
-    async def __call__(self, bot, argv, flags, user, channel, guild, **void):
+    async def __call__(self, bot, argv, flags, user, message, channel, guild, **void):
         data = bot.data.crossposts
         if "d" in flags:
             if argv:
@@ -1149,11 +1165,16 @@ class Crosspost(Command):
                     data.update(c_id)
             return italics(css_md(f"Disabled all message crossposting for {sqr_md(channel)}."))
         if not argv:
-            return (
+            buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
+            await send_with_reply(
+                None,
+                message,
                 "*```" + "\n" * ("z" in flags) + "callback-admin-crosspost-"
                 + str(user.id) + "_0"
-                + "-\nLoading Crosspost database...```*"
+                + "-\nLoading Crosspost database...```*",
+                buttons=buttons,
             )
+            return
         target = await bot.fetch_channel(argv)
         if not target.guild.get_member(user.id) or not target.permissions_for(target.guild.me).read_messages or not target.permissions_for(target.guild.get_member(user.id)).read_messages:
             raise PermissionError("Cannot follow channels without read message permissions.")
@@ -1212,9 +1233,8 @@ class Crosspost(Command):
         if more > 0:
             emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
         create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
-        if reaction is None:
-            for react in self.directions:
-                await message.add_reaction(as_str(react))
+        if hasattr(message, "int_token"):
+            await bot.ignore_interaction(message)
 
 
 class Publish(Command):
@@ -1251,9 +1271,10 @@ class AutoEmoji(Command):
     usage = "(enable|disable)?"
     flags = "aed"
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
+    dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
     rate_limit = 1
 
-    async def __call__(self, bot, flags, guild, user, name, perm, **void):
+    async def __call__(self, bot, flags, guild, message, user, name, perm, **void):
         data = bot.data.autoemojis
         if flags and perm < 3:
             reason = "to modify autoemoji for " + guild.name
@@ -1264,10 +1285,14 @@ class AutoEmoji(Command):
         elif "d" in flags:
             data.pop(guild.id, None)
             return italics(css_md(f"Disabled automatic emoji substitution for {sqr_md(guild)}."))
-        return (
+        buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
+        await send_with_reply(
+            None,
+            message,
             "*```" + "\n" * ("z" in flags) + "callback-admin-autoemoji-"
             + str(user.id) + "_0"
-            + "-\nLoading AutoEmoji database...```*"
+            + "-\nLoading AutoEmoji database...```*",
+            buttons=buttons,
         )
     
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
@@ -1322,9 +1347,8 @@ class AutoEmoji(Command):
         if more > 0:
             emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
         create_task(message.edit(content=content, embed=emb))
-        if reaction is None:
-            for react in self.directions:
-                await message.add_reaction(as_str(react))
+        if hasattr(message, "int_token"):
+            await bot.ignore_interaction(message)
 
 
 class UpdateAutoEmojis(Database):

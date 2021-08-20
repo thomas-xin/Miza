@@ -2514,6 +2514,7 @@ class Queue(Command):
     flags = "hvfbrz"
     no_parse = True
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
+    dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
     _timeout_ = 2
     rate_limit = (0.5, 3)
     typing = True
@@ -2535,11 +2536,16 @@ class Queue(Command):
                 auds.preparing = False
                 create_future_ex(auds.update, timeout=180)
             # Set callback message for scrollable list
-            return (
+            buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
+            await send_with_reply(
+                None,
+                message,
                 "*```" + "\n" * ("z" in flags) + "callback-voice-queue-"
                 + str(user.id) + "_0_" + str(int(v))
-                + "-\nLoading Queue...```*"
+                + "-\nLoading Queue...```*",
+                buttons=buttons,
             )
+            return
         # Get audio player as fast as possible, scheduling it to join asynchronously if necessary
         try:
             auds = bot.data.audio.players[guild.id]
@@ -2776,9 +2782,8 @@ class Queue(Command):
         if more > 0:
             emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
         create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
-        if reaction is None:
-            for react in self.directions:
-                await message.add_reaction(as_str(react))
+        if hasattr(message, "int_token"):
+            await bot.ignore_interaction(message)
 
 
 class Playlist(Command):
@@ -2789,11 +2794,12 @@ class Playlist(Command):
     usage = "(add|remove)? <search_links>*"
     flags = "aedzf"
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
+    dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
     rate_limit = 0.5
     typing = True
     slash = True
 
-    async def __call__(self, user, argv, guild, flags, channel, perm, **void):
+    async def __call__(self, user, argv, guild, flags, channel, message, perm, **void):
         update = self.bot.data.playlists.update
         bot = self.bot
         if argv or "d" in flags:
@@ -2810,11 +2816,16 @@ class Playlist(Command):
                 bot.data.playlists.pop(guild.id)
                 return italics(css_md(f"Successfully removed all {sqr_md(len(pl))} entries from the default playlist for {sqr_md(guild)}."))
             # Set callback message for scrollable list
-            return (
+            buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
+            await send_with_reply(
+                None,
+                message,
                 "*```" + "\n" * ("z" in flags) + "callback-voice-playlist-"
                 + str(user.id) + "_0"
-                + "-\nLoading Playlist database...```*"
+                + "-\nLoading Playlist database...```*",
+                buttons=buttons,
             )
+            return
         if "d" in flags:
             # Can only remove by index atm
             i = await bot.eval_math(argv)
@@ -2901,9 +2912,8 @@ class Playlist(Command):
         if more > 0:
             emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
         create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
-        if reaction is None:
-            for react in self.directions:
-                await message.add_reaction(as_str(react))
+        if hasattr(message, "int_token"):
+            await bot.ignore_interaction(message)
 
 
 class Connect(Command):

@@ -4637,8 +4637,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         message.content = single_space(message.content.strip())
                         message.channel = channel
                         message.noref = True
-                        return await self.process_message(message, message.content, slash=True)
-                    if d["type"] == 3:
+                        await self.process_message(message, message.content, slash=True)
+                    elif d["type"] == 3:
                         custom_id = cdata.get("custom_id", "")
                         if custom_id == "▪️":
                             return await self.ignore_interaction(message)
@@ -4675,8 +4675,14 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         m.int_id = message.id
                         m.int_token = message.slash
                         # print(custom_id, user)
-                        return await self.react_callback(m, custom_id, user)
-                    print("Unknown interaction:\n" + str(data))
+                        await self.react_callback(m, custom_id, user)
+                    else:
+                        print("Unknown interaction:\n" + str(data))
+                    for attr in ("slash", "int_id", "int_token"):
+                        try:
+                            delattr(message, attr)
+                        except AttributeError:
+                            pass
                 except:
                     print_exc()
                     print("Failed interaction:\n" + str(data))

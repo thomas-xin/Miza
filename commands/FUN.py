@@ -1458,6 +1458,7 @@ class React(Command):
     flags = "aedzf"
     no_parse = True
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
+    dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
     rate_limit = (1, 2)
     slash = True
 
@@ -1476,11 +1477,16 @@ class React(Command):
                     following.pop(guild.id)
                 return italics(css_md(f"Successfully removed all {sqr_md(len(curr))} auto reacts for {sqr_md(guild)}."))
             # Set callback message for scrollable list
-            return (
+            buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
+            await send_with_reply(
+                None,
+                message,
                 "*```" + "\n" * ("z" in flags) + "callback-fun-react-"
                 + str(user.id) + "_0"
-                + "-\nLoading React database...```*"
+                + "-\nLoading React database...```*",
+                buttons=buttons,
             )
+            return
         if "d" in flags:
             a = full_prune(args[0])
             if a in curr:
@@ -1558,9 +1564,8 @@ class React(Command):
         if more > 0:
             emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
         create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
-        if reaction is None:
-            for react in self.directions:
-                await message.add_reaction(as_str(react))
+        if hasattr(message, "int_token"):
+            await bot.ignore_interaction(message)
 
 
 class UpdateReacts(Database):
@@ -1618,8 +1623,9 @@ class EmojiList(Command):
     flags = "aed"
     no_parse = True
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
+    dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
 
-    async def __call__(self, bot, flags, user, name, argv, args, **void):
+    async def __call__(self, bot, flags, message, user, name, argv, args, **void):
         data = bot.data.emojilists
         if "d" in flags:
             try:
@@ -1645,10 +1651,14 @@ class EmojiList(Command):
             bot.data.emojilists.setdefault(user.id, {})[name] = e_id
             bot.data.emojilists.update(user.id)
             return ini_md(f"Successfully added emoji alias {sqr_md(name)}: {sqr_md(e_id)} for {sqr_md(user)}.")
-        return (
+        buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
+        await send_with_reply(
+            None,
+            message,
             "*```" + "\n" * ("z" in flags) + "callback-fun-emojilist-"
             + str(user.id) + "_0"
-            + "-\nLoading EmojiList database...```*"
+            + "-\nLoading EmojiList database...```*",
+            buttons=buttons,
         )
     
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
@@ -1709,9 +1719,8 @@ class EmojiList(Command):
         if more > 0:
             emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
         create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
-        if reaction is None:
-            for react in self.directions:
-                await message.add_reaction(as_str(react))
+        if hasattr(message, "int_token"):
+            await bot.ignore_interaction(message)
 
 
 class UpdateEmojiLists(Database):
@@ -2310,6 +2319,7 @@ class Mimic(Command):
     flags = "aedzf"
     no_parse = True
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
+    dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
     rate_limit = (1, 2)
 
     async def __call__(self, bot, message, user, perm, flags, args, argv, **void):
@@ -2327,11 +2337,16 @@ class Mimic(Command):
                 mimicdb.pop(user.id)
                 return italics(css_md(f"Successfully removed all {sqr_md(len(mimics))} webhook mimics for {sqr_md(user)}."))
             # Set callback message for scrollable list
-            return (
+            buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
+            await send_with_reply(
+                None,
+                message,
                 "*```" + "\n" * ("z" in flags) + "callback-fun-mimic-"
                 + str(user.id) + "_0"
-                + "-\nLoading Mimic database...```*"
+                + "-\nLoading Mimic database...```*",
+                buttons=buttons,
             )
+            return
         u_id = user.id
         prefix = args.pop(0)
         if "d" in flags:
@@ -2499,9 +2514,8 @@ class Mimic(Command):
         if more > 0:
             emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
         create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
-        if reaction is None:
-            for react in self.directions:
-                await message.add_reaction(as_str(react))
+        if hasattr(message, "int_token"):
+            await bot.ignore_interaction(message)
 
 
 class MimicSend(Command):
