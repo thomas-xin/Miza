@@ -7,8 +7,11 @@ from concurrent.futures import thread
 
 def _adjust_thread_count(self):
     # if idle threads are available, don't spin new threads
-    if self._idle_semaphore.acquire(timeout=0):
-        return
+    try:
+        if self._idle_semaphore.acquire(timeout=0):
+            return
+    except AttributeError:
+        pass
 
     # When the executor gets lost, the weakref callback will wake up
     # the worker threads.
