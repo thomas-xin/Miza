@@ -4,12 +4,11 @@
   "https://github.com/thomas-xin/Miza/blob/e62dfccef0cce3b0fc3b8a09fb3ca3edfedd8ab0/misc/title-rainbow.gif?raw=true">
   <br>
   <a href="http://mizabot.xyz"> Miza </a>
-  <br>
 </h1>
 
-<h4 align="center">A multipurpose Discord bot created by <a href="https://github.com/thomas-xin">Thomas Xin</a>.</h4> <br></br>
+<h4 align="center">A multipurpose Discord bot created by <a href="https://github.com/thomas-xin">Thomas Xin</a>.</h4> <br>
 <p align="center">
-Miza has so much to explore, with lots of functionalities including: <b>Moderation, Music, Fun, Image Manipulation, and more!</b> 
+Miza has so much to explore, with lots of functionalities including: <b>Moderation, Music, Fun, Image Manipulation, and more!</b><br>
 Miza's dedicated creator loves to find ways to make Miza bigger and better all the time, with lots of code, optimization and fun to be had!
 </p>
 <h2 align="center" href=""> Table of Contents </h2>
