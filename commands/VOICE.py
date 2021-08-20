@@ -2736,13 +2736,14 @@ class Queue(Command):
             embstr = ""
             currTime = startTime
             i = pos
-            maxlen = 48 - int(math.log10(len(q))) if q else 48
+            maxlen = 40 if icon else 48
+            maxlen = maxlen - int(math.log10(len(q))) if q else maxlen
             while i < min(pos + 10, len(q)):
                 e = q[i]
                 space = int(math.log10(len(q))) - int(math.log10(max(1, i)))
                 curr = "`" + " " * space
                 ename = no_md(e.name)
-                curr += f'【{i}】 `{"[`" + no_md(lim_str(ename + " " * (maxlen - len(ename)), maxlen)) + "`]"}({ensure_url(e.url)})` ({time_disp(e_dur(e.duration))})`'
+                curr += f'【{i}】`{"[`" + no_md(lim_str(ename + " " * (maxlen - len(ename)), maxlen)) + "`]"}({ensure_url(e.url)})` ({time_disp(e_dur(e.duration))})`'
                 if v:
                     try:
                         u = bot.cache.users[e.u_id]
@@ -3251,7 +3252,8 @@ class Dump(Command):
             if name == "load":
                 raise ArgumentError("Please input a file or URL to load.")
             async with discord.context_managers.Typing(channel):
-                resp, fn = await create_future(auds.get_dump, "x" in flags, paused=auds.paused, js=True, timeout=18)
+                x = "x" in flags
+                resp, fn = await create_future(auds.get_dump, x, paused=x and auds.paused, js=True, timeout=18)
                 f = CompatFile(io.BytesIO(resp), filename=fn)
             create_task(bot.send_with_file(channel, f"Queue data for {bold(str(guild))}:", f, reference=message))
             return
@@ -3303,9 +3305,9 @@ class Dump(Command):
                 auds.queue.clear()
             auds.stats.update(d["stats"])
             auds.seek_pos = d.get("pos", 0)
+            auds.queue.enqueue(q, -1)
             if d.get("paused"):
                 await create_future(auds.pause)
-            auds.queue.enqueue(q, -1)
             if "h" not in flags:
                 return italics(css_md(f"Successfully loaded audio data for {sqr_md(guild)}.")), 1
         else:
