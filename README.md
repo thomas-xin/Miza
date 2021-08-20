@@ -13,14 +13,16 @@ Miza's dedicated creator loves to find ways to make Miza bigger and better all t
 </p>
 <h2 align="center" href=""> Table of Contents </h2>
 
-
-Headings | Explanations
+<center>
+  
+Sections | Explanations
 ------------ | -------------
 [Hosting Miza!](#hosting-miza-section) | Will talk you through the basics of how to host the code, covering potential error-prone areas!
 [Folder Structure](#folder-structure-section) | Will talk you through where everything within the code files can be found!
 [Support!](#support-section) | Links to where you can find Miza and get support!
 [Credits](#credits-section) | Credits to all contributers
 
+</center>
 
 <a id="hosting-miza-section"></a>
 ## Hosting Miza!
