@@ -7,7 +7,7 @@
   <br>
 </h1>
 
-<h4 style="text-align: center;">A multipurpose Discord bot created by <a href="https://github.com/thomas-xin">Thomas Xin</a>.</h4> <br></br>
+<h4 align="center">A multipurpose Discord bot created by <a href="https://github.com/thomas-xin">Thomas Xin</a>.</h4> <br></br>
 <p style="text-align: center">
 Miza has so much to explore, with lots of functionalities including: <b>Moderation, Music, Fun, Image Manipulation, and more!</b> 
 Miza's dedicated creator loves to find ways to make Miza bigger and better all the time, with lots of code, optimization and fun to be had!
