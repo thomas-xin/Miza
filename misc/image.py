@@ -651,10 +651,7 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
         f_in = fn if direct else url
         command = ["ffmpeg", "-threads", "2", "-hide_banner", "-nostdin", "-loglevel", "error", "-y", "-i", f_in, "-an", "-vf"]
         w, h = max_size(*size, maxsize)
-        # Adjust FPS if duration is too long
         fps = fps or orig_fps or 16
-        # orig_fps = orig_fps or fps or 16
-        # fps = min(fps, orig_fps)
         vf = ""
         if w != size[0]:
             vf += "scale=" + str(round(w)) + ":-1:flags=lanczos,"
@@ -1690,7 +1687,7 @@ def colourspace(image, source, dest):
 # Autodetect max image size, keeping aspect ratio
 def max_size(w, h, maxsize, force=False):
     s = w * h
-    m = (maxsize * maxsize << 1) / 3
+    m = maxsize * maxsize
     if s > m or force:
         r = (m / s) ** 0.5
         w = round(w * r)
@@ -1742,12 +1739,8 @@ def resize_to(image, w, h, operation="auto"):
         n = min(image.width, image.height)
         if n > m:
             m = n
-        if m <= 64:
-            filt = Image.NEAREST
-        elif m <= 512:
+        if m <= 512:
             filt = "scale2x"
-        elif m <= 768:
-            filt = Image.HAMMING
         elif m <= 3072:
             filt = Image.LANCZOS
         elif m <= 4096:
@@ -1771,13 +1764,17 @@ def resize_to(image, w, h, operation="auto"):
                 image = image.convert("RGBA")
             b = image.tobytes()
             surf = pygame.image.frombuffer(b, image.size, image.mode)
+            factor = 0
             while w > surf.get_width() or h > surf.get_height():
                 surf = pygame.transform.scale2x(surf)
+                factor += 1
+                if factor >= 2:
+                    break
             b = pygame.image.tostring(surf, image.mode)
             image = Image.frombuffer(image.mode, surf.get_size(), b)
         if image.size == (w, h):
             return image
-        filt = Image.NEAREST
+        filt = Image.NEAREST if w > image.width and h > image.height else Image.HAMMING
     elif filt == "crop":
         if image.mode == "P":
             image = image.convert("RGBA")
@@ -2644,9 +2641,14 @@ def evalImg(url, operation, args):
             image = get_request(url)
         else:
             image = get_image(url, out)
-        # $%GIF%$ is a special case where the output is always a .gif image
+        # -gif is a special case where the output is always a .gif image
         if args and args[-1] == "-gif":
             args.pop(-1)
+            if fmt in ("png", "jpg", "jpeg", "bmp"):
+                fmt = "gif"
+            if fmt == "gif" and np.prod(image.size) > 262144:
+                size = max_size(*image.size, 512)
+                image = resize_to(image, *size)
             new = eval(operation)(image, *args)
         else:
             try:
@@ -2738,7 +2740,10 @@ def evalImg(url, operation, args):
                         command.extend(("-vf", vf))
                     command.extend(("-loop", "0"))
                 else:
-                    command.extend(("-b:v", "1M"))
+                    meg = round(np.prod(size) * 3 / 1e6, 4)
+                    if meg < 1:
+                        meg = 1
+                    command.extend(("-b:v", f"{meg}M"))
                 command.append(out)
                 print(command)
                 proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
