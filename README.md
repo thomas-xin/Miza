@@ -8,8 +8,8 @@
 
 <h4 align="center">A multipurpose Discord bot created by <a href="https://github.com/thomas-xin">Thomas Xin</a>.</h4> <br>
 <p align="center">
-Miza has so much to explore, with lots of functionalities including: <b>Moderation, Music, Fun, Image Manipulation, and more!</b><br>
 Miza's dedicated creator loves to find ways to make Miza bigger and better all the time, with lots of code, optimization and fun to be had!
+with Features Including: <b>Moderation, Music, Fun, Image Manipulation, and more!</b>
 </p>
 <h2 align="center" href=""> Table of Contents </h2>
 
@@ -58,7 +58,7 @@ _Note: voice commands run in a subprocess concurrently to the main program. If y
 
 #### MemoryError():
 
-This used to be an issue caused by Miza trying to cache too much at one time. This caching system has been watered down significantly since the time this README was made, so this wont be as likely of an issue anymore. But in case it is still a problem, here's how to fix it. Head on over to the top of *bot.py*, and look for the following function:
+* This used to be an issue caused by Miza trying to cache too much at one time. This caching system has been watered down significantly since the time this README was made, so this wont be as likely of an issue anymore. But in case it is still a problem, here's how to fix it. Head on over to the top of *bot.py*, and look for the following function:
 
 ```python
 def __init__(self, cache_size=4194304, timeout=24):
@@ -76,7 +76,7 @@ _Note: memory cache gets cleared upon reset, and Miza has a seperate disk cache 
 
 ####  IP Address exposure:
 
-Miza used to host a few Minecraft Servers which is why this feature used to be a doxx moment for me. That is no longer a risk, but Miza will still obtain your IP Address to store it internally for features such as the webserver. If you don't want this, go back to *bot.py* and look for the `get_ip()` function at around line 1475. It should look like this:
+* Miza used to host a few Minecraft Servers which is why this feature used to be a doxx moment for me. That is no longer a risk, but Miza will still obtain your IP Address to store it internally for features such as the webserver. If you don't want this, go back to *bot.py* and look for the `get_ip()` function at around line 1475. It should look like this:
 
 ```py
 async def get_ip(self):
@@ -105,21 +105,21 @@ _Note: execute the command `[prefix]exec -e log` to enable discord logging._
 
 #### Why wont Miza work on Linux?
 
-Linux doesn't like her subprocesses, this has been an issue since the beginning. If you wish to host Miza, it is best you do so from a Windows OS, as Miza's infrastructure is designed on and for Windows.
+* Linux doesn't like her subprocesses, this has been an issue since the beginning. If you wish to host Miza, it is best you do so from a Windows OS, as Miza's infrastructure is designed on and for Windows.
 
 <a id="folder-structure-section"></a>
 ## Folder Structure
 
 #### Project Directory:
-has all your generic license, requirements, etc... (Though requirements is necessary for the *install_update* funtionality which, automatically checks for and installs any missing modules.) But most significantly, the main files responsible for running the bots code. Throughout the code, you will frequently see `from common import *`, which is because *common.py* contains all the main necessary functions and imports to be used throughout. *main.py* is the main process, while everything else runs as a subprocess, so if you make any changes to main.py, it'll require a manual restart. Most of the bots optimization and data collection funtionaility can be found in these files, (such as running the bot of course, starting the heartbeat.tmp and other log related code, caching, assigning variables of the Github Directory link, default bot prefix, etc...) As for where things are located...
+* The main directory has all your generic license, requirements, etc... (Though requirements is necessary for the *install_update* funtionality which, automatically checks for and installs any missing modules.) But most significantly, the main files responsible for running the bots code. Throughout the code, you will frequently see `from common import *`, which is because *common.py* contains all the main necessary functions and imports to be used throughout. *main.py* is the main process, while everything else runs as a subprocess, so if you make any changes to main.py, it'll require a manual restart. Most of the bots optimization and data collection funtionaility can be found in these files, (such as running the bot of course, starting the heartbeat.tmp and other log related code, caching, assigning variables of the Github Directory link, default bot prefix, etc...) As for where things are located...
 
 #### Commands:
 
-You may think its unnecessary to explain all this, but before I learnt my way around, I got so lost in all of Miza's files, so hopefully this is helpful. The commands folder speaks for itself, all of the bots command categories can be found in here, and they are located in the same way they are categorized under ~help.
+* You may think its unnecessary to explain all this, but before I learnt my way around, I got so lost in all of Miza's files, so hopefully this is helpful. The commands folder speaks for itself, all of the bots command categories can be found in here, and they are located in the same way they are categorized under ~help.
 
 #### Misc:
 
-Misc has all the different files that the bot needs to pull from, such as the avatar (which gets automatically uploaded to the Discord Developers Portal the first time the code is run), the rainbow bar emojis (which get automatically uploaded to a server Miza is in if it cannot find the emojis already), the code necessary for converting org files, computing math equations, finding timezones and etc. You can change the bots avatar and emojis if you want to; *but if you want the code to use them the same way, the filename must be kept the same.*
+* Misc has all the different files that the bot needs to pull from, such as the avatar (which gets automatically uploaded to the Discord Developers Portal the first time the code is run), the rainbow bar emojis (which get automatically uploaded to a server Miza is in if it cannot find the emojis already), the code necessary for converting org files, computing math equations, finding timezones and etc. You can change the bots avatar and emojis if you want to; *but if you want the code to use them the same way, the filename must be kept the same.*
 
 
 <a id="support-section"></a>
