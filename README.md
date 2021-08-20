@@ -5,7 +5,7 @@ Welcome to Miza, a multipurpose Discord bot created by [Thomas Xin](https://gith
 
 ## Table of Contents
 
-Headings | Explinations
+Headings | Explanations
 ------------ | -------------
 [Where can I find what?](#p1) | Will talk you through where everything within the code files can be found!
 [How do I use the code?](#p2) | Will talk you through the basics of how to host the code, covering potential error-prone areas!
