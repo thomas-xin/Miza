@@ -137,7 +137,7 @@ With that concludes the basic introduction of hosting Miza. The code is commente
 <a id="credits-section"></a>
 ## Credits
 
-Thanks to all the [contributers](CONTRIBUTERS.md), for helping Miza grow!
+Thanks to all the [contributers](https://github.com/thomas-xin/Miza/graphs/contributors), for helping Miza grow!
 
 *Writing this README is [smudgedpasta](https://github.com/smudgedpasta), Miza's secondary bot owner! :3*
 <br></br>
