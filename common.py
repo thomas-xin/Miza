@@ -357,7 +357,7 @@ with tracebacksuppressor:
     enc_key = AUTH["encryption_key"]
 
 if not enc_key:
-    enc_key = AUTH["encryption_key"] = as_str(base64.b64encode(randbytes(32)).rstrip("="))
+    enc_key = AUTH["encryption_key"] = as_str(base64.b64encode(randbytes(32)).rstrip(b"="))
     with open("auth.json", "w", encoding="utf-8") as f:
         json.dump(AUTH, f, indent=4)
 

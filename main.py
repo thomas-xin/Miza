@@ -12,13 +12,10 @@ if not os.path.exists("auth.json") or not os.path.getsize("auth.json"):
         "owner_id": [],
         "google_api_key": "",
         "rapidapi_key": "",
-        "genius_key": "",
         "alexflipnote_key": "",
         "giphy_key": "",
         "papago_id": "",
         "papago_secret": "",
-        "knack_id": "",
-        "knack_secret": "",
     }
     import json
     with open("auth.json", "w", encoding="utf-8") as f:

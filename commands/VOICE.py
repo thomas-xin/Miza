@@ -388,7 +388,7 @@ class CustomAudio(collections.abc.Hashable):
         stats = self.stats
         return stats.volume != 1 or stats.reverb != 0 or stats.pitch != 0 or stats.speed != 1 or stats.pan != 1 or stats.bassboost != 0 or stats.compressor != 0 or stats.chorus != 0 or stats.resample != 0
 
-    def get_dump(self, position=False, js=False):
+    def get_dump(self, position=False, paused=False, js=False):
         with self.semaphore:
             lim = 1024
             q = [copy_entry(item) for item in self.queue.verify()]
@@ -399,6 +399,8 @@ class CustomAudio(collections.abc.Hashable):
             }
             if position:
                 d["pos"] = self.pos
+            if paused:
+                d["paused"] = True
             if js:
                 d = json.dumps(d).encode("utf-8")
                 if len(d) > 2097152:
@@ -3239,7 +3241,7 @@ class Dump(Command):
             if name == "load":
                 raise ArgumentError("Please input a file or URL to load.")
             async with discord.context_managers.Typing(channel):
-                resp, fn = await create_future(auds.get_dump, "x" in flags, js=True, timeout=18)
+                resp, fn = await create_future(auds.get_dump, "x" in flags, paused=auds.paused, js=True, timeout=18)
                 f = CompatFile(io.BytesIO(resp), filename=fn)
             create_task(bot.send_with_file(channel, f"Queue data for {bold(str(guild))}:", f, reference=message))
             return
@@ -3291,6 +3293,8 @@ class Dump(Command):
                 auds.queue.clear()
             auds.stats.update(d["stats"])
             auds.seek_pos = d.get("pos", 0)
+            if d.get("paused"):
+                await create_future(auds.pause)
             auds.queue.enqueue(q, -1)
             if "h" not in flags:
                 return italics(css_md(f"Successfully loaded audio data for {sqr_md(guild)}.")), 1
