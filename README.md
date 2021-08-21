@@ -53,7 +53,7 @@ git clone https://github.com/thomas-xin/Miza.git
 
 * Miza should automatically the required dependencies right after running her for the first time, notably the Python modules and FFmpeg.
 ##### Additional Notes:
-_As of 08/12/2021, FFmpeg will be automatically installed after first run, Miza is also going to look through the servers it is in to seek out open candidates for placing some emojis that Miza will also require for certain UI features, so make sure you have a good space set up too. Finally, all API Keys that Miza will require as located in *auth.json* you will have to obtain yourself._ <br></br>
+_As of 08/12/2021, FFmpeg will be automatically installed after first run, Miza is also going to look through the servers it is in to seek out open candidates for placing some emojis that Miza will also require for certain UI features, so make sure you have a good space set up too. Finally, all API Keys that Miza will require as located in *auth.json* you will have to obtain yourself._ <br>
 
 #### Voice commands not working:
 * Make sure you have [FFmpeg](https://www.ffmpeg.org/download.html) and [Python](https://www.python.org/downloads/) installed onto your computer and in your PATH (it doesn't need to be in the same directory as Miza). I uh... Actually have my ffmpeg pathed by pathing to the misc folder found in [Miza Player](https://github.com/thomas-xin/Miza-Player) (an awesome program you should definitely try out!) 🙃
@@ -82,11 +82,7 @@ _Note: memory cache gets cleared upon reset, and Miza has a seperate disk cache 
 
 ####  IP Address exposure:
 
-<<<<<<< HEAD
-* Miza used to host a few Minecraft Servers which is why this feature used to be a doxx moment for me. That is no longer a risk, but Miza will still obtain your IP Address to store it internally for features such as the webserver.
-=======
 Miza used to host a few Minecraft Servers which is why this feature used to be a doxx moment for me. That is no longer a risk, but Miza will still obtain your IP Address to store it internally for features such as the webserver.
->>>>>>> 380d503bac38f9c2d8ce79f6ed2e9df6e086356b
 
 #### Where does Miza log?
 
@@ -113,11 +109,7 @@ _Note: execute the command `[prefix]exec -e log` to enable discord logging._
 ## Folder Structure
 
 #### Project Directory:
-<<<<<<< HEAD
-* Has all your generic license, requirements, etc... (Though requirements is necessary for the *install_update* funtionality which, automatically checks for and installs any missing modules.) But most significantly, the main files responsible for running the bots code. Throughout the code, you will frequently see `from common import *`, which is because *common.py* contains all the main necessary functions and imports to be used throughout. *main.py* is the main process, while everything else runs as a subprocess, so if you make any changes to main.py, it'll require a manual restart. Most of the bots optimization and data collection funtionaility can be found in these files, (such as running the bot of course, starting the heartbeat.tmp and other log related code, caching, assigning variables of the Github Directory link, default bot prefix, etc...) As for where things are located...
-=======
 Has all your generic license, requirements, etc... (Though requirements is necessary for the *install_update* funtionality which, automatically checks for and installs any missing modules.) But most significantly, the main files responsible for running the bots code. Throughout the code, you will frequently see `from common import *`, which is because *common.py* contains all the main necessary functions and imports to be used throughout. *main.py* is the main process, while everything else runs as a subprocess, so if you make any changes to main.py, it'll require a manual restart. Most of the bots optimization and data collection funtionaility can be found in these files, (such as running the bot of course, starting the heartbeat.tmp and other log related code, caching, assigning variables of the Github Directory link, default bot prefix, etc...) As for where things are located...
->>>>>>> 380d503bac38f9c2d8ce79f6ed2e9df6e086356b
 
 #### Commands:
 
