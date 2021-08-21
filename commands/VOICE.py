@@ -677,12 +677,24 @@ class CustomAudio(collections.abc.Hashable):
                 )
         # Bassboost setting, the ratio is currently very unintuitive and definitely needs tweaking
         if stats.bassboost:
-            opt = "anequalizer="
-            width = 4096
-            x = round(sqrt(1 + abs(stats.bassboost)), 5)
-            coeff = width * max(0.03125, (0.25 / x))
-            ch = " f=" + str(coeff if stats.bassboost > 0 else width - coeff) + " w=" + str(coeff / 2) + " g=" + str(max(0.5, min(48, 4 * math.log2(x * 5))))
-            opt += "c0" + ch + "|c1" + ch
+            opt = "firequalizer=gain_entry="
+            entries = []
+            high = 24000
+            low = 13.75
+            bars = 4
+            small = 0
+            for i in range(bars):
+                freq = low * (high / low) ** (i / bars)
+                bb = -(i / (bars - 1) - 0.5) * stats.bassboost * 64
+                dB = log(abs(bb) + 1, 2)
+                if bb < 0:
+                    dB = -dB
+                if dB < small:
+                    small = dB
+                entries.append(f"entry({round(freq, 5)},{round(dB, 5)})")
+            entries.insert(0, f"entry(0,{round(small, 5)})")
+            entries.append(f"entry(24000,{round(small, 5)})")
+            opt += repr(";".join(entries))
             options.append(opt)
         # Reverb setting, using afir and aecho FFmpeg filters.
         if reverb:
