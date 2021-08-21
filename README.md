@@ -8,6 +8,16 @@
 
 <h4 align="center">A multipurpose Discord bot created by <a href="https://github.com/thomas-xin">Thomas Xin</a>.</h4> <br>
 
+<center>
+
+[![GitHub forks](https://img.shields.io/github/forks/thomas-xin/Miza?style=social)](https://github.com/thomas-xin/Miza/network/members)
+[![Github Stars](https://img.shields.io/github/stars/thomas-xin/Miza?label=Stars&style=social)](https://github.com/thomas-xin/Miza/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/thomas-xin/Miza)](https://github.com/thomas-xin/Miza/issues)
+[![GitHub contributors](https://img.shields.io/github/contributors/thomas-xin/Miza)](https://github.com/thomas-xin/Miza/graphs/contributors)
+[![Github License](https://img.shields.io/github/license/Thomas-Xin/Miza)](https://github.com/thomas-xin/Miza/blob/master/LICENSE.md)
+
+</center>
+
 <p align="center">
 Miza's dedicated creator loves to find ways to make Miza bigger and better all the time, with lots of code, optimization and fun to be had!
 with Features Including: <b>Moderation, Music, Fun, Image Manipulation, and more!</b>
