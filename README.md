@@ -11,6 +11,7 @@
 
 <h4 align="center">A multipurpose Discord bot created by <a href="https://github.com/thomas-xin">Thomas Xin</a>.</h4> <br>
 
+<p align="center">
 <a href="https://github.com/thomas-xin/Miza/network/members">
 <img alt="GitHub forks" src="https://img.shields.io/github/forks/thomas-xin/Miza?style=social">
 </a>
@@ -30,6 +31,8 @@
 <a href="https://github.com/thomas-xin/Miza/blob/master/LICENSE.md">
 <img alt="GitHub License" src="https://img.shields.io/github/license/Thomas-Xin/Miza">
 </a>
+
+</p>
 
 Miza's dedicated creator loves to find ways to make Miza bigger and better all the time, with lots of code, optimization
 and fun to be had! with Features Including: **Moderation, Music, Fun, Image Manipulation, and more!**
