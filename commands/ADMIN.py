@@ -640,7 +640,7 @@ class RoleGiver(Command):
     name = ["Verifier"]
     min_level = 3
     min_display = "3+"
-    description = "Adds an automated role giver to the current channel."
+    description = "Adds an automated role giver to the current channel. Triggered by a keyword in messages, only applicable to users with permission level >= 0."
     usage = "<0:react_to>? <1:role>? <delete_messages{?x}>? <disable{?d}>?"
     flags = "aedx"
     no_parse = True
@@ -2746,11 +2746,13 @@ class UpdateRolegivers(Database):
     name = "rolegivers"
 
     async def _nocommand_(self, text, message, orig, **void):
-        if message.guild is None or not orig:
+        if not message.guild or not orig:
             return
         user = message.author
         guild = message.guild
         bot = self.bot
+        if bot.get_perms(user, message.guild) < 0:
+            return
         assigned = self.data.get(message.channel.id, ())
         for k in assigned:
             if ((k in text) if is_alphanumeric(k) else (k in message.content.casefold())):
