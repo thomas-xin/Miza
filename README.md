@@ -11,13 +11,25 @@
 
 <h4 align="center">A multipurpose Discord bot created by <a href="https://github.com/thomas-xin">Thomas Xin</a>.</h4> <br>
 
-<center>
+<a href="https://github.com/thomas-xin/Miza/network/members">
+<img alt="GitHub forks" src="https://img.shields.io/github/forks/thomas-xin/Miza?style=social">
+</a>
 
-[![GitHub forks](https://img.shields.io/github/forks/thomas-xin/Miza?style=social)](https://github.com/thomas-xin/Miza/network/members)
-[![GitHub Stars](https://img.shields.io/github/stars/thomas-xin/Miza?label=Stars&style=social)](https://github.com/thomas-xin/Miza/stargazers)
-[![GitHub issues](https://img.shields.io/github/issues/thomas-xin/Miza)](https://github.com/thomas-xin/Miza/issues)
-[![GitHub contributors](https://img.shields.io/github/contributors/thomas-xin/Miza)](https://github.com/thomas-xin/Miza/graphs/contributors)
-[![GitHub License](https://img.shields.io/github/license/Thomas-Xin/Miza)](https://github.com/thomas-xin/Miza/blob/master/LICENSE.md)
+<a href="https://github.com/thomas-xin/Miza/stargazers">
+<img alt="GitHub Stars" src="https://img.shields.io/github/stars/thomas-xin/Miza?label=Stars&style=social">
+</a>
+
+<a href="https://github.com/thomas-xin/Miza/issues">
+<img alt="GitHub issues" src="https://img.shields.io/github/issues/thomas-xin/Miza">
+</a>
+
+<a href="https://github.com/thomas-xin/Miza/graphs/contributors">
+<img alt="GitHub contributors" src="https://img.shields.io/github/contributors/thomas-xin/Miza">
+</a>
+
+<a href="https://github.com/thomas-xin/Miza/blob/master/LICENSE.md">
+<img alt="GitHub License" src="https://img.shields.io/github/license/Thomas-Xin/Miza">
+</a>
 
 Miza's dedicated creator loves to find ways to make Miza bigger and better all the time, with lots of code, optimization
 and fun to be had! with Features Including: **Moderation, Music, Fun, Image Manipulation, and more!**
