@@ -1,14 +1,13 @@
+<center>
+
 <h1 align="center">
-  <br>
   <img src=
   "https://github.com/thomas-xin/Miza/blob/e62dfccef0cce3b0fc3b8a09fb3ca3edfedd8ab0/misc/title-rainbow.gif?raw=true">
   <br>
-  <a href="http://mizabot.xyz"> Miza </a>
+  <a href="http://mizabot.xyz">Miza</a>
 </h1>
 
-<h4 align="center">A multipurpose Discord bot created by <a href="https://github.com/thomas-xin">Thomas Xin</a>.</h4> <br>
-
-<center>
+#### A multipurpose Discord bot created by [Thomas Xin](https://github.com/thomas-xin). 
 
 [![GitHub forks](https://img.shields.io/github/forks/thomas-xin/Miza?style=social)](https://github.com/thomas-xin/Miza/network/members)
 [![Github Stars](https://img.shields.io/github/stars/thomas-xin/Miza?label=Stars&style=social)](https://github.com/thomas-xin/Miza/stargazers)
