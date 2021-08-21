@@ -12,10 +12,10 @@
 #### A multipurpose Discord bot created by [Thomas Xin](https://github.com/thomas-xin). 
 
 [![GitHub forks](https://img.shields.io/github/forks/thomas-xin/Miza?style=social)](https://github.com/thomas-xin/Miza/network/members)
-[![Github Stars](https://img.shields.io/github/stars/thomas-xin/Miza?label=Stars&style=social)](https://github.com/thomas-xin/Miza/stargazers)
+[![GitHub Stars](https://img.shields.io/github/stars/thomas-xin/Miza?label=Stars&style=social)](https://github.com/thomas-xin/Miza/stargazers)
 [![GitHub issues](https://img.shields.io/github/issues/thomas-xin/Miza)](https://github.com/thomas-xin/Miza/issues)
 [![GitHub contributors](https://img.shields.io/github/contributors/thomas-xin/Miza)](https://github.com/thomas-xin/Miza/graphs/contributors)
-[![Github License](https://img.shields.io/github/license/Thomas-Xin/Miza)](https://github.com/thomas-xin/Miza/blob/master/LICENSE.md)
+[![GitHub License](https://img.shields.io/github/license/Thomas-Xin/Miza)](https://github.com/thomas-xin/Miza/blob/master/LICENSE.md)
 
 Miza's dedicated creator loves to find ways to make Miza bigger and better all the time, with lots of code, optimization
 and fun to be had! with Features Including: **Moderation, Music, Fun, Image Manipulation, and more!**
@@ -62,7 +62,7 @@ git clone https://github.com/thomas-xin/Miza.git
 
 * Edit `auth.json` file (prefix, discord_token, etc)
 
-* Run `main.bat` again.  _(Miza should now start succesfully, and be ready for use.  if not read the [next section](#common-issues))_ 
+* Run `main.bat` again.  _(Miza should now start successfully, and be ready for use.  if not read the [next section](#common-issues))_ 
 
 <br>
 
@@ -103,7 +103,7 @@ def __init__(self, cache_size=4194304, timeout=24):
 
 Just reduce the number in `cache_size=4194304` and you should be good to go.
 
-_Note: memory cache gets cleared upon reset, and Miza has a seperate disk cache that doesn't upon reset, but all files in the caches get automtically cleared after 2 weeks._
+_Note: memory cache gets cleared upon reset, and Miza has a separate disk cache that doesn't upon reset, but all files in the caches get automtically cleared after 2 weeks._
 
 ####  IP Address exposure:
 
@@ -140,7 +140,7 @@ _Note: execute the command `[prefix]exec -e log` to enable discord logging._
 
 #### Project Directory:
 
-* Has all your generic license, requirements, etc... (Though requirements is necessary for the *install_update* funtionality which, automatically checks for and installs any missing modules.) But most significantly, the main files responsible for running the bots code. Throughout the code, you will frequently see `from common import *`, which is because *common.py* contains all the main necessary functions and imports to be used throughout. *main.py* is the main process, while everything else runs as a subprocess, so if you make any changes to main.py, it'll require a manual restart. Most of the bots optimization and data collection funtionaility can be found in these files, (such as running the bot of course, starting the heartbeat.tmp and other log related code, caching, assigning variables of the Github Directory link, default bot prefix, etc...) As for where things are located...
+* Has all your generic license, requirements, etc... (Though requirements is necessary for the *install_update* functionality which, automatically checks for and installs any missing modules.) But most significantly, the main files responsible for running the bots code. Throughout the code, you will frequently see `from common import *`, which is because *common.py* contains all the main necessary functions and imports to be used throughout. *main.py* is the main process, while everything else runs as a subprocess, so if you make any changes to main.py, it'll require a manual restart. Most of the bots optimization and data collection functionality can be found in these files, (such as running the bot of course, starting the heartbeat.tmp and other log related code, caching, assigning variables of the GitHub Directory link, default bot prefix, etc...) As for where things are located...
 
 #### Commands:
 
@@ -148,7 +148,7 @@ _Note: execute the command `[prefix]exec -e log` to enable discord logging._
 
 #### Misc:
 
-* Misc has all the different files that the bot needs to pull from, such as the avatar (which gets automatically uploaded to the Discord Developers Portal the first time the code is run), the rainbow bar emojis (which get automatically uploaded to a server Miza is in if it cannot find the emojis already), the code necessary for converting org files, computing math equations, finding timezones and etc. You can change the bots avatar and emojis if you want to; *but if you want the code to use them the same way, the filename must be kept the same.*
+* Misc has all the different files that the bot needs to pull from, such as the avatar (which gets automatically uploaded to the Discord Developers Portal the first time the code is run), the rainbow bar emojis (which get automatically uploaded to a server Miza is in if it cannot find the emojis already), the code necessary for converting org files, computing math equations, finding time zones and etc. You can change the bots avatar and emojis if you want to; *but if you want the code to use them the same way, the filename must be kept the same.*
 
 
 <a id="support-section"></a>
