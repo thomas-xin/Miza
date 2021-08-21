@@ -11,23 +11,23 @@
 
 <p align="center">
 <a href="https://github.com/thomas-xin/Miza/network/members">
-<img alt="GitHub forks" src="https://img.shields.io/github/forks/thomas-xin/Miza?style=plastic&label=forks">
+<img alt="GitHub forks" src="https://img.shields.io/github/forks/thomas-xin/Miza?style=plastic&label=Forks">
 </a>
 
 <a href="https://github.com/thomas-xin/Miza/stargazers">
-<img alt="GitHub Stars" src="https://img.shields.io/github/stars/thomas-xin/Miza?label=stars&style=plastic">
+<img alt="GitHub Stars" src="https://img.shields.io/github/stars/thomas-xin/Miza?label=Stars&style=plastic">
 </a>
 
 <a href="https://github.com/thomas-xin/Miza/issues">
-<img alt="GitHub issues" src="https://img.shields.io/github/issues/thomas-xin/Miza?style=plastic">
+<img alt="GitHub issues" src="https://img.shields.io/github/issues/thomas-xin/Miza?style=plastic&label=Issues">
 </a>
 
 <a href="https://github.com/thomas-xin/Miza/graphs/contributors">
-<img alt="GitHub contributors" src="https://img.shields.io/github/contributors/thomas-xin/Miza?style=plastic">
+<img alt="GitHub contributors" src="https://img.shields.io/github/contributors/thomas-xin/Miza?style=plastic&label=Contributors">
 </a>
 
 <a href="https://github.com/thomas-xin/Miza/blob/master/LICENSE.md">
-<img alt="GitHub License" src="https://img.shields.io/github/license/Thomas-Xin/Miza?style=plastic">
+<img alt="GitHub License" src="https://img.shields.io/github/license/Thomas-Xin/Miza?style=plastic&label=License">
 </a>
 
 </p>
