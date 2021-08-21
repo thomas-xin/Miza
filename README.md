@@ -34,8 +34,10 @@
 
 </p>
 
+<p align="center">
 Miza's dedicated creator loves to find ways to make Miza bigger and better all the time, with lots of code, optimization
-and fun to be had! with Features Including: **Moderation, Music, Fun, Image Manipulation, and more!**
+and fun to be had! with Features Including: <b>Moderation, Music, Fun, Image Manipulation, and more!</b>
+</p>
 
 <br>
 
