@@ -1,5 +1,3 @@
-<center>
-
 <h1 align="center">
   <img src=
   "https://github.com/thomas-xin/Miza/blob/e62dfccef0cce3b0fc3b8a09fb3ca3edfedd8ab0/misc/title-rainbow.gif?raw=true">
@@ -11,20 +9,40 @@
 
 <h4 align="center">A multipurpose Discord bot created by <a href="https://github.com/thomas-xin">Thomas Xin</a>.</h4> <br>
 
-<center>
+<p align="center">
+<a href="https://github.com/thomas-xin/Miza/network/members">
+<img alt="GitHub forks" src="https://img.shields.io/github/forks/thomas-xin/Miza?style=social">
+</a>
 
-[![GitHub forks](https://img.shields.io/github/forks/thomas-xin/Miza?style=social)](https://github.com/thomas-xin/Miza/network/members)
-[![GitHub Stars](https://img.shields.io/github/stars/thomas-xin/Miza?label=Stars&style=social)](https://github.com/thomas-xin/Miza/stargazers)
-[![GitHub issues](https://img.shields.io/github/issues/thomas-xin/Miza)](https://github.com/thomas-xin/Miza/issues)
-[![GitHub contributors](https://img.shields.io/github/contributors/thomas-xin/Miza)](https://github.com/thomas-xin/Miza/graphs/contributors)
-[![GitHub License](https://img.shields.io/github/license/Thomas-Xin/Miza)](https://github.com/thomas-xin/Miza/blob/master/LICENSE.md)
+<a href="https://github.com/thomas-xin/Miza/stargazers">
+<img alt="GitHub Stars" src="https://img.shields.io/github/stars/thomas-xin/Miza?label=Stars&style=social">
+</a>
 
+<a href="https://github.com/thomas-xin/Miza/issues">
+<img alt="GitHub issues" src="https://img.shields.io/github/issues/thomas-xin/Miza">
+</a>
+
+<a href="https://github.com/thomas-xin/Miza/graphs/contributors">
+<img alt="GitHub contributors" src="https://img.shields.io/github/contributors/thomas-xin/Miza">
+</a>
+
+<a href="https://github.com/thomas-xin/Miza/blob/master/LICENSE.md">
+<img alt="GitHub License" src="https://img.shields.io/github/license/Thomas-Xin/Miza">
+</a>
+
+</p>
+
+<p align="center">
 Miza's dedicated creator loves to find ways to make Miza bigger and better all the time, with lots of code, optimization
-and fun to be had! with Features Including: **Moderation, Music, Fun, Image Manipulation, and more!**
+and fun to be had! with Features Including: <b>Moderation, Music, Fun, Image Manipulation, and more!</b>
+</p>
 
 <br>
 
-## Table of Contents
+<h2 align="center">
+Table of Contents
+</h2>
+
 Sections     | Explanations
 ------------ | -------------
 [Hosting Miza!](#Hosting-Miza)        | Will talk you through the basics of how to host the code, covering potential error-prone areas!
@@ -32,7 +50,6 @@ Sections     | Explanations
 [Support!](#Support)                  | Links to where you can find Miza and get support!
 [Credits](#Credits)                   | Credits to all contributors
 
-</center>
 
 <a id="Hosting-Miza"></a>
 ## Hosting Miza!
