@@ -9,7 +9,9 @@
 
 
 
-#### A multipurpose Discord bot created by [Thomas Xin](https://github.com/thomas-xin). 
+<h4 align="center">A multipurpose Discord bot created by <a href="https://github.com/thomas-xin">Thomas Xin</a>.</h4> <br>
+
+<center>
 
 [![GitHub forks](https://img.shields.io/github/forks/thomas-xin/Miza?style=social)](https://github.com/thomas-xin/Miza/network/members)
 [![GitHub Stars](https://img.shields.io/github/stars/thomas-xin/Miza?label=Stars&style=social)](https://github.com/thomas-xin/Miza/stargazers)
