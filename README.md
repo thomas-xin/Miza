@@ -41,7 +41,10 @@ and fun to be had! with Features Including: <b>Moderation, Music, Fun, Image Man
 
 <br>
 
-## Table of Contents
+<h2 align="center">
+Table of Contents
+</h2>
+
 Sections     | Explanations
 ------------ | -------------
 [Hosting Miza!](#Hosting-Miza)        | Will talk you through the basics of how to host the code, covering potential error-prone areas!
