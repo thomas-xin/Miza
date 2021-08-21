@@ -25,14 +25,14 @@ and fun to be had! with Features Including: **Moderation, Music, Fun, Image Mani
 ## Table of Contents
 Sections     | Explanations
 ------------ | -------------
-[Hosting Miza!](#hosting-miza-section)        | Will talk you through the basics of how to host the code, covering potential error-prone areas!
-[Folder Structure](#folder-structure-section) | Will talk you through where everything within the code files can be found!
-[Support!](#support-section)                  | Links to where you can find Miza and get support!
-[Credits](#credits-section)                   | Credits to all contributors
+[Hosting Miza!](#Hosting-Miza)        | Will talk you through the basics of how to host the code, covering potential error-prone areas!
+[Folder Structure](#Folder-Structure) | Will talk you through where everything within the code files can be found!
+[Support!](#Support)                  | Links to where you can find Miza and get support!
+[Credits](#Credits)                   | Credits to all contributors
 
 </center>
 
-<a id="hosting-miza-section"></a>
+<a id="Hosting-Miza"></a>
 ## Hosting Miza!
 
 #### Prerequisites:
@@ -77,7 +77,9 @@ git clone https://github.com/thomas-xin/Miza.git
 
 ##### Additional Notes:
 
-_As of 08/12/2021, FFmpeg will be automatically installed after first run, Miza is also going to look through the servers it is in to seek out open candidates for placing some emojis that Miza will also require for certain UI features, so make sure you have a good space set up too. Finally, all API Keys that Miza will require as located in *auth.json* you will have to obtain yourself._ <br>
+> _As of 08/12/2021, FFmpeg will be automatically installed after first run, Miza is also going > to look through the servers it is in to seek out open candidates for placing some emojis that Miza will also require for certain UI features, so make sure you have a good space set up too. Finally, all API Keys that Miza will require as located in *auth.json* you will have to obtain yourself._
+
+<br>
 
 #### Voice commands not working:
 
@@ -85,7 +87,7 @@ _As of 08/12/2021, FFmpeg will be automatically installed after first run, Miza 
 
 ![ffmpeg](https://cdn.discordapp.com/attachments/688253918890688521/777473182294474753/image0.png)
 
-_Note: voice commands run in a subprocess concurrently to the main program. If you are still facing issues, check the [support](#support-section) section._
+_Note: voice commands run in a subprocess concurrently to the main program. If you are still facing issues, check the [support](#Support) section._
 
 #### MemoryError():
 
@@ -135,7 +137,7 @@ _Note: execute the command `[prefix]exec -e log` to enable discord logging._
 
 * Linux doesn't like her subprocesses, this has been an issue since the beginning. If you wish to host Miza, it is best you do so from a Windows OS, as Miza's infrastructure is designed on and for Windows.
 
-<a id="folder-structure-section"></a>
+<a id="Folder-Structure"></a>
 ## Folder Structure
 
 #### Project Directory:
@@ -151,7 +153,7 @@ _Note: execute the command `[prefix]exec -e log` to enable discord logging._
 * Misc has all the different files that the bot needs to pull from, such as the avatar (which gets automatically uploaded to the Discord Developers Portal the first time the code is run), the rainbow bar emojis (which get automatically uploaded to a server Miza is in if it cannot find the emojis already), the code necessary for converting org files, computing math equations, finding time zones and etc. You can change the bots avatar and emojis if you want to; *but if you want the code to use them the same way, the filename must be kept the same.*
 
 
-<a id="support-section"></a>
+<a id="Support"></a>
 ## Support!
 
 With that concludes the basic introduction of hosting Miza. The code is commented and explaining where everything is, so feel free to explore further to see what you can change, and if you have any questions, [Thomas Xin](https://github.com/thomas-xin) is your guy to ask!
@@ -163,7 +165,7 @@ With that concludes the basic introduction of hosting Miza. The code is commente
 
 
 
-<a id="credits-section"></a>
+<a id="Credits"></a>
 ## Credits
 
 Thanks to all the [contributers](https://github.com/thomas-xin/Miza/graphs/contributors), for helping Miza grow!
