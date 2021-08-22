@@ -240,7 +240,7 @@ async def get_image(bot, user, message, args, argv, default=2, raw=False, ext="p
     return name, value, url, ext
 
 class SetAvatar(Command):
-    name = ["ChangeAvatar", "UpdateAvatar", "sa"]
+    name = ["ChangeAvatar", "UpdateAvatar"]
     min_level = 4
     description = "Changes ⟨MIZA⟩'s current avatar."
     usage = "<avatar_url>?"
