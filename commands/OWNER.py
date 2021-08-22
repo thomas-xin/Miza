@@ -597,14 +597,14 @@ class Immortalise(Command):
         
         
 class SetAvatar(Command):
+    bot = self.bot
+    
     name = ["ChangeAvatar", "UpdateAvatar"]
     min_level = nan
     description = f"Changes {bot.user.name}'s current avatar."
     usage = "<avatar_url>?"
     rate_limit = 300
     slash = True
-    
-    bot = self.bot
 
     async def __call__(self, bot, user, message, channel, args, argv, perm, **void):
         # Checking if user has sufficent permissions
