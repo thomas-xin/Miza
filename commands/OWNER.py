@@ -609,8 +609,6 @@ class SetAvatar(Command):
         if perm < self.min_level:
             reason = "To edit ⟨MIZA⟩'s avatar."
             raise self.perm_error(perm=perm, req=self.min_level, reason=reason)   
-            
-        bot = self.bot
 
         # Checking if message has an attachment
         if message.attachments: url = message.attachments[0].url
