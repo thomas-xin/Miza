@@ -4308,8 +4308,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         discord.http.HTTPClient.request = lambda self, *args, **kwargs: request(self, *args, **kwargs)
 
     def send_exception(self, messageable, ex, reference=None):
-        it = iter(self.owners)
-        owners = self.get_user(next(it)).mention + ", " + self.get_user(next(it)).mention
+        owners_list = self.owners
+        owners = ', '.join([self.get_user(owner).mention for owner in owners_list])
         return self.send_as_embeds(
             messageable,
             description="\n".join(as_str(i) for i in ex.args),
