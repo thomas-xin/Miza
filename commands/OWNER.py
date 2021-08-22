@@ -597,11 +597,9 @@ class Immortalise(Command):
         
         
 class SetAvatar(Command):
-    bot = self.bot
-    
     name = ["ChangeAvatar", "UpdateAvatar"]
     min_level = nan
-    description = f"Changes {bot.user.name}'s current avatar."
+    description = "Changes ⟨MIZA⟩'s current avatar."
     usage = "<avatar_url>?"
     rate_limit = 300
     slash = True
@@ -609,8 +607,10 @@ class SetAvatar(Command):
     async def __call__(self, bot, user, message, channel, args, argv, perm, **void):
         # Checking if user has sufficent permissions
         if perm < self.min_level:
-            reason = f"to edit {bot.user.name}'s avatar'"
-            raise self.perm_error(perm=perm, req=self.min_level, reason=reason)
+            reason = "To edit ⟨MIZA⟩'s avatar."
+            raise self.perm_error(perm=perm, req=self.min_level, reason=reason)   
+            
+        bot = self.bot
 
         # Checking if message has an attachment
         if message.attachments: url = message.attachments[0].url
