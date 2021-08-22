@@ -927,7 +927,7 @@ def supersample(a, size):
     x = ceil(n / size)
     interp = np.linspace(0, n - 1, x * size)
     a = np.interp(interp, range(n), a)
-    return numpy.mean(a.reshape(-1, x), 1)
+    return np.mean(a.reshape(-1, x), 1)
 
 
 # Computes the mean of all numbers in an iterable.

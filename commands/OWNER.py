@@ -601,33 +601,21 @@ class SetAvatar(Command):
     min_level = nan
     description = "Changes ⟨MIZA⟩'s current avatar."
     usage = "<avatar_url>?"
-    rate_limit = 300
-    slash = True
 
-    async def __call__(self, bot, user, message, channel, args, argv, perm, **void):
-        # Checking if user has sufficent permissions
-        if perm < self.min_level:
-            reason = "To edit ⟨MIZA⟩'s avatar."
-            raise self.perm_error(perm=perm, req=self.min_level, reason=reason)   
-
+    async def __call__(self, bot, user, message, channel, args, **void):
         # Checking if message has an attachment
-        if message.attachments: url = message.attachments[0].url
-
+        if message.attachments:
+            url = str(message.attachments[0].url)
         # Checking if a url is provided
-        elif args: url = args[0]
-
+        elif args:
+            url = args[0]
         else:
             raise ArgumentError(f"Please input an image by URL or attachment.")
         with discord.context_managers.Typing(channel):
             # Initiating an aiohttp session
             try:
-                if message.attachments: await bot.edit(avatar= await res.read())
-                else:
-                    async with aiohttp.ClientSession() as session:
-                        # Fetching response
-                        async with session.get(url) as res:
-                            # Changing bot avatar to fetched image as bytes
-                            await bot.edit(avatar= await res.read())
+                data = await Request(url)
+                await bot.edit(avatar=data)
                 return css_md(f"✅ Succesfully Changed {bot.user.name}'s avatar!")
             # ClientResponseError: raised if server replied with forbidden status, or the link had too many redirects.
             except aiohttp.ClientResponseError:
