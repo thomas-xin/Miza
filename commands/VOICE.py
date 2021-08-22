@@ -593,7 +593,6 @@ class CustomAudio(collections.abc.Hashable):
         stats = self.stats
         # Pitch setting is in semitones, so frequency is on an exponential scale
         pitchscale = 2 ** ((stats.pitch + stats.resample) / 12)
-        chorus = min(16, abs(stats.chorus))
         reverb = stats.reverb
         volume = stats.volume
         # FIR sample for reverb
@@ -633,9 +632,11 @@ class CustomAudio(collections.abc.Hashable):
                 options.append("aresample=" + str(SAMPLE_RATE))
             options.append("asetrate=" + str(SAMPLE_RATE * pitchscale))
         # Chorus setting, this is a bit of a mess
-        if chorus:
+        if stats.chorus:
+            chorus = abs(stats.chorus)
+            ch = min(16, chorus)
             A = B = C = D = ""
-            for i in range(ceil(chorus)):
+            for i in range(ceil(ch)):
                 neg = ((i & 1) << 1) - 1
                 i = 1 + i >> 1
                 i *= stats.chorus / ceil(chorus)
@@ -644,15 +645,15 @@ class CustomAudio(collections.abc.Hashable):
                     B += "|"
                     C += "|"
                     D += "|"
-                delay = (25 + i * tau * neg) % 39 + 18
+                delay = (8 + 5 * i * tau * neg) % 39 + 19
                 A += str(round(delay, 3))
-                decay = (0.125 + i * 0.03 * neg) % 0.25 + 0.25
+                decay = (0.36 + i * 0.47 * neg) % 0.65 + 1.7
                 B += str(round(decay, 3))
-                speed = (2 + i * 0.61 * neg) % 4.5 + 0.5
+                speed = (0.27 + i * 0.573 * neg) % 0.3 + 0.02
                 C += str(round(speed, 3))
-                depth = (i * 0.43 * neg) % max(4, stats.chorus) + 0.5
+                depth = (0.55 + i * 0.25 * neg) % max(1, stats.chorus) + 0.15
                 D += str(round(depth, 3))
-            b = 0.5 / sqrt(ceil(chorus + 1))
+            b = 0.5 / sqrt(ceil(ch + 1))
             options.append(
                 "chorus=0.5:" + str(round(b, 3)) + ":"
                 + A + ":"
@@ -660,7 +661,6 @@ class CustomAudio(collections.abc.Hashable):
                 + C + ":"
                 + D
             )
-            volume *= 2
         # Compressor setting, this needs a bit of tweaking perhaps
         if stats.compressor:
             comp = min(8000, abs(stats.compressor * 10 + sgn(stats.compressor)))
@@ -704,16 +704,21 @@ class CustomAudio(collections.abc.Hashable):
             if wet != 1:
                 options.append("asplit[2]")
             volume *= 1.2
+            if reverb < 0:
+                volume = -volume
             options.append("afir=dry=10:wet=10")
             # Must include amix if asplit is used
             if wet != 1:
                 dry = 1 - wet
-                options.append("[2]amix=weights=" + str(round(dry, 6)) + " " + str(round(wet, 6)))
-            if coeff > 1:
-                decay = round(1 - 4 / (3 + coeff), 4)
-                options.append(f"aecho=1:1:400|600:{decay}|{decay / 2}")
-                if decay >= 0.25:
-                    options.append(f"aecho=1:1:800|1100:{decay / 4}|{decay / 8}")
+                options.append("[2]amix=weights=" + str(round(dry, 6)) + " " + str(round(-wet, 6)))
+            d = [round(1 - i ** 1.3 / (i ** 1.3 + coeff), 4) for i in range(2, 18, 2)]
+            options.append(f"aecho=1:1:400|630:{d[0]}|{d[1]}")
+            if d[2] >= 0.05:
+                options.append(f"aecho=1:1:870|1150:{d[2]}|{d[3]}")
+                if d[4] >= 0.06:
+                    options.append(f"aecho=1:1:1410|1760:{d[4]}|{d[5]}")
+                    if d[6] >= 0.07:
+                        options.append(f"aecho=1:1:2080|2320:{d[6]}|{d[7]}")
         # Pan setting, uses extrastereo and volume filters to balance
         if stats.pan != 1:
             pan = min(10000, max(-10000, stats.pan))
