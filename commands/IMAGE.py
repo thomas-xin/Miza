@@ -2,6 +2,7 @@ print = PRINT
 
 import youtube_dl
 # youtube_dl = youtube_dlc
+import aiohttp
 
 getattr(youtube_dl, "__builtins__", {})["print"] = print
 
@@ -237,6 +238,39 @@ async def get_image(bot, user, message, args, argv, default=2, raw=False, ext="p
     if not name.endswith("." + ext):
         name += "." + ext
     return name, value, url, ext
+
+class SetAvatar(Command):
+    name = ["ChangeAvatar", "UpdateAvatar", "sa"]
+    min_level = 4
+    description = "Changes ⟨MIZA⟩'s current avatar."
+    usage = "<avatar_url>?"
+    rate_limit = 300
+    slash = True
+
+    async def __call__(self, bot, user, message, channel, args, argv, perm, **void):
+        # Checking if user has sufficent permissions
+        if perm < self.min_level:
+            reason = f"to edit ⟨MIZA⟩'s avatar'"
+            raise self.perm_error(perm=perm, req=self.min_level, reason=reason)
+
+        # Checking if message has an attachment
+        if message.attachments: url = message.attachments[0].url
+
+        # Checking if a url is provided
+        elif args: url = args[0]
+
+        else:
+            raise ArgumentError(f"Please provide an image url or attach an image to the message.")
+        with discord.context_managers.Typing(channel):
+            # Initiating an aiohttp session
+            if message.attachments: await bot.edit(avatar= await res.read())
+            else:
+                async with aiohttp.ClientSession() as session:
+                    # Fetching response
+                    async with session.get(url) as res:
+                        # Changing bot avatar to fetched image as bytes
+                        await bot.edit(avatar= await res.read())
+            return css_md(f"✅ Succesfully Changed ⟨MIZA⟩'s avatar!")
 
 
 class ImageAdjust(Command):
