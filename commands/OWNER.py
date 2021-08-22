@@ -594,6 +594,55 @@ class Immortalise(Command):
                 await create_future(os.rename, p, out, priority=True)
                 return f"{self.bot.webserver}/view/!{fid}\n{self.bot.webserver}/download/!{fid}"
         raise TypeError("Not a valid webserver URL.")
+        
+        
+class SetAvatar(Command):
+    name = ["ChangeAvatar", "UpdateAvatar"]
+    min_level = nan
+    description = f"Changes {bot.user.name}'s current avatar."
+    usage = "<avatar_url>?"
+    rate_limit = 300
+    slash = True
+    
+    bot = self.bot
+
+    async def __call__(self, bot, user, message, channel, args, argv, perm, **void):
+        # Checking if user has sufficent permissions
+        if perm < self.min_level:
+            reason = f"to edit {bot.user.name}'s avatar'"
+            raise self.perm_error(perm=perm, req=self.min_level, reason=reason)
+
+        # Checking if message has an attachment
+        if message.attachments: url = message.attachments[0].url
+
+        # Checking if a url is provided
+        elif args: url = args[0]
+
+        else:
+            raise ArgumentError(f"Please input an image by URL or attachment.")
+        with discord.context_managers.Typing(channel):
+            # Initiating an aiohttp session
+            try:
+                if message.attachments: await bot.edit(avatar= await res.read())
+                else:
+                    async with aiohttp.ClientSession() as session:
+                        # Fetching response
+                        async with session.get(url) as res:
+                            # Changing bot avatar to fetched image as bytes
+                            await bot.edit(avatar= await res.read())
+                return css_md(f"✅ Succesfully Changed {bot.user.name}'s avatar!")
+            # ClientResponseError: raised if server replied with forbidden status, or the link had too many redirects.
+            except aiohttp.ClientResponseError:
+                raise ArgumentError(f"Failed to fetch image from provided URL, Please try again.")
+            # ClientConnectorError: raised if client failed to connect to URL/Server.
+            except aiohttp.ClientConnectorError:
+                raise ArgumentError(f"Failed to connnect to provided URL, Are you sure it's valid?")
+            # ClientPayloadError: raised if failed to compress image, or detected malformed data.
+            except aiohttp.ClientPayloadError:
+                raise ArgumentError(f"Failed to compress image, Please try again.")
+            # InvalidURL: raised when given URL is actually not a URL ("brain.exe crashed" )
+            except aiohttp.InvalidURL:
+                raise ArgumentError(f"Please input an image by URL or attachment.")
 
 
 class Miza_Player:
