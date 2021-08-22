@@ -614,7 +614,7 @@ class SetAvatar(Command):
         with discord.context_managers.Typing(channel):
             # Initiating an aiohttp session
             try:
-                data = await Request(url)
+                data = await Request(url, aio=True)
                 await bot.edit(avatar=data)
                 return css_md(f"✅ Succesfully Changed {bot.user.name}'s avatar!")
             # ClientResponseError: raised if server replied with forbidden status, or the link had too many redirects.
