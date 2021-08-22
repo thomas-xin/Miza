@@ -1498,7 +1498,7 @@ body {
             histories = [None] * len(values)
             hours = histories.copy()
             for k in range(len(histories)):
-                width = np.clip(len(self.ins_data[k]), 3, 960)
+                width = np.clip(len(self.ins_data[k]), 3, 96)
                 histories[k] = list(supersample(self.ins_data[k], width))
                 hours[k] = len(self.ins_data[k])
             return json.dumps(dict(
