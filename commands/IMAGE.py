@@ -254,8 +254,7 @@ class SetAvatar(Command):
             raise self.perm_error(perm=perm, req=self.min_level, reason=reason)
 
         # Checking if message has an attachment
-        if message.attachments:
-            url = message.attachments[0].url
+        if message.attachments: url = message.attachments[0].url
 
         # Checking if a url is provided
         elif args: url = args[0]
@@ -272,7 +271,7 @@ class SetAvatar(Command):
                         async with session.get(url) as res:
                             # Changing bot avatar to fetched image as bytes
                             await bot.edit(avatar= await res.read())
-                return css_md(f"✅ Succesfully Changed ⟨MIZA⟩'s avatar!")
+                return css_md(f"✅ Succesfully Changed {bot.user.name}'s avatar!")
             # ClientResponseError: raised if server replied with forbidden status, or the link had too many redirects.
             except aiohttp.ClientResponseError:
                 raise ArgumentError(f"Failed to fetch image from provided URL, Please try again.")
@@ -285,6 +284,7 @@ class SetAvatar(Command):
             # InvalidURL: raised when given URL is actually not a URL ("brain.exe crashed" )
             except aiohttp.InvalidURL:
                 raise ArgumentError(f"Please input an image by URL or attachment.")
+
 
 class ImageAdjust(Command):
     name = [
