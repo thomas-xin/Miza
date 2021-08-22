@@ -1524,8 +1524,12 @@ class AudioDownloader:
                     dur = time_parse(video["lengthText"]["simpleText"])
                 except KeyError:
                     dur = None
+            try:
+                name = video["title"]["runs"][0]["text"]
+            except LookupError:
+                name = v_id
             temp = cdict(
-                name=video["title"]["runs"][0]["text"],
+                name=name,
                 url=f"https://www.youtube.com/watch?v={v_id}",
                 duration=dur,
                 thumbnail=f"https://i.ytimg.com/vi/{v_id}/maxresdefault.jpg",
