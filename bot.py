@@ -1023,6 +1023,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             leave=async_nop,
         )
         channel.update(dict(
+            thread=channel,
             _get_channel=lambda: as_fut(channel),
             is_private=lambda: channel._type == 12,
             is_news=lambda: channel._type == 10,
@@ -3237,16 +3238,60 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 if not permissions.use_external_emojis:
                     permissions.use_external_emojis = True
                     await everyone.edit(permissions=permissions, reason="I need to send emojis :3")
-            w = await self.ensure_webhook(channel, bypass=True)
+            mchannel = None
+            while not mchannel:
+                mchannel = channel.parent if hasattr(channel, "thread") else channel
+                if not mchannel:
+                    await asyncio.sleep(0.2)
+            w = await self.ensure_webhook(mchannel, bypass=True)
             kwargs.pop("wait", None)
             reacts = kwargs.pop("reacts", None)
             try:
                 async with getattr(w, "semaphore", emptyctx):
-                    message = await w.send(*args, wait=True, **kwargs)
+                    w = getattr(w, "webhook", w)
+                    if hasattr(channel, "thread"):
+                        data = json.dumps(dict(
+                            content=args[0] if args else kwargs.get("content"),
+                            username=kwargs.get("username"),
+                            avatar_url=kwargs.get("avatar_url"),
+                            tts=kwargs.get("tts"),
+                            embeds=[emb.to_dict() for emb in kwargs.get("embeds", ())] or [kwargs["embed"].to_dict()] if kwargs.get("embed") is not None else None,
+                        ))
+                        resp = await Request(
+                            f"https://discord.com/api/v9/webhooks/{w.id}/{w.token}?wait=True&thread_id={channel.id}",
+                            method="POST",
+                            headers={
+                                "Content-Type": "application/json",
+                                "Authorization": f"Bot {self.token}",
+                            },
+                            data=data,
+                            bypass=False,
+                            aio=True,
+                            json=True,
+                        )
+                        message = self.ExtendedMessage.new(resp)
+                    else:
+                        message = await w.send(*args, wait=True, **kwargs)
             except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
-                w = await self.ensure_webhook(channel, force=True)
+                w = await self.ensure_webhook(mchannel, force=True)
                 async with getattr(w, "semaphore", emptyctx):
-                    message = await w.send(*args, wait=True, **kwargs)
+                    w = getattr(w, "webhook", w)
+                    if hasattr(channel, "thread"):
+                        resp = await Request(
+                            f"https://discord.com/api/v9/webhooks/{w.id}/{w.token}?wait=True&thread_id={channel.id}",
+                            method="POST",
+                            headers={
+                                "Content-Type": "application/json",
+                                "Authorization": f"Bot {self.token}",
+                            },
+                            data=data,
+                            bypass=False,
+                            aio=True,
+                            json=True,
+                        )
+                        message = self.ExtendedMessage.new(resp)
+                    else:
+                        message = await w.send(*args, wait=True, **kwargs)
             except discord.HTTPException as ex:
                 if "400 Bad Request" in repr(ex):
                     if "embeds" in kwargs:
