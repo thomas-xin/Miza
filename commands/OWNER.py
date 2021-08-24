@@ -80,7 +80,7 @@ class Restart(Command):
                 kill = create_future(bot.audio.kill, priority=True)
                 # Save any database that has not already been autosaved
                 print("Saving all databases...")
-                await create_future(bot.update, priority=True)
+                await create_future(bot.update, force=True, priority=True)
                 # Send the bot "offline"
                 print("Going offline...")
                 await bot.change_presence(status=discord.Status.invisible)

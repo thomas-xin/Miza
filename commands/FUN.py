@@ -1576,45 +1576,46 @@ class UpdateReacts(Database):
             return
         g_id = message.guild.id
         data = self.data
-        if g_id in data:
-            with tracebacksuppressor(ZeroDivisionError):
-                following = self.data[g_id]
-                if type(following) != mdict:
-                    following = self.data[g_id] = mdict(following)
-                reacting = {}
-                words = clean_words = None
-                full = clean_full = None
-                for k in following:
-                    if is_alphanumeric(k) and " " not in k:
-                        if words is None:
-                            words = text.split()
-                        x = words
-                        if clean_words is None:
-                            clean_words = text2.split()
-                        y = clean_words
-                    else:
-                        if full is None:
-                            full = full_prune(message.content)
-                        x = full
-                        if clean_full is None:
-                            clean_full = full_prune(message.clean_content)
-                        y = clean_full
-                    # Store position for each keyword found
-                    if k in x:
-                        emojis = following[k]
-                        reacting[x.index(k) / len(x)] = emojis
-                    elif k in y:
-                        emojis = following[k]
-                        reacting[y.index(k) / len(y)] = emojis
-                # Reactions sorted by their order of appearance in the message
-                for r in sorted(reacting):
-                    for react in reacting[r]:
-                        try:
-                            await message.add_reaction(react)
-                        except discord.HTTPException as ex:
-                            if "10014" in repr(ex):
-                                emojis.remove(react)
-                                self.update(g_id)
+        if g_id not in data:
+            return
+        with tracebacksuppressor(ZeroDivisionError):
+            following = self.data[g_id]
+            if type(following) != mdict:
+                following = self.data[g_id] = mdict(following)
+            reacting = {}
+            words = clean_words = None
+            full = clean_full = None
+            for k in following:
+                if is_alphanumeric(k) and " " not in k:
+                    if words is None:
+                        words = text.split()
+                    x = words
+                    if clean_words is None:
+                        clean_words = text2.split()
+                    y = clean_words
+                else:
+                    if full is None:
+                        full = full_prune(message.content)
+                    x = full
+                    if clean_full is None:
+                        clean_full = full_prune(message.clean_content)
+                    y = clean_full
+                # Store position for each keyword found
+                if k in x:
+                    emojis = following[k]
+                    reacting[x.index(k) / len(x)] = emojis
+                elif k in y:
+                    emojis = following[k]
+                    reacting[y.index(k) / len(y)] = emojis
+            # Reactions sorted by their order of appearance in the message
+            for r in sorted(reacting):
+                for react in reacting[r]:
+                    try:
+                        await message.add_reaction(react)
+                    except discord.HTTPException as ex:
+                        if "10014" in repr(ex):
+                            emojis.remove(react)
+                            self.update(g_id)
 
 
 class EmojiList(Command):
@@ -1757,100 +1758,100 @@ class UpdateDogpiles(Database):
     name = "dogpiles"
 
     async def _nocommand_(self, edit, message, **void):
-        if message.guild is None or not message.content:
+        if edit or message.guild is None or not message.content:
             return
         g_id = message.guild.id
         following = self.data
         dogpile = following.get(g_id)
-        if dogpile:
-            u_id = message.author.id
-            c_id = message.channel.id
-            if not edit:
-                content = zwremove(message.content)
+        if not dogpile:
+            return
+        u_id = message.author.id
+        c_id = message.channel.id
+        content = zwremove(message.content)
+        if not content:
+            return
+        try:
+            number = round_min(content)
+        except ValueError:
+            if len(content) == 1:
+                last_number = number = content
+                add = None
+            else:
+                number = None
+        else:
+            numbers = deque((number,))
+        curr = content
+        fix = None
+        mcount = 0
+        count = 0
+        last_author_id = u_id
+        stopped = False
+        async for m in self.bot.history(message.channel, limit=100):
+            if m.id == message.id:
+                continue
+            c = zwremove(m.content)
+            if not c:
+                break
+            if number is not None:
+                if type(number) is str:
+                    if len(c) != 1:
+                        break
+                    n = ord(c)
+                    if add is None:
+                        add = n - ord(number)
+                    elif n - add != ord(number):
+                        break
+                    number = c
+                else:
+                    try:
+                        n = round_min(c)
+                    except:
+                        break
+                    numbers.appendleft(n)
+            elif c not in curr:
+                break
+            else:
+                spl = curr.split(c)
+                if not fix:
+                    fix = spl
+                elif fix != spl:
+                    break
+                curr = c
+            if m.author.id == last_author_id:
+                break
+            if m.author.id == self.bot.id:
+                stopped = True
+            elif not stopped:
+                count += 1
+            mcount += 1
+            if mcount >= 11:
+                break
+            last_author_id = m.author.id
+        # print(content, count)
+        if count >= 2 and random.random() >= 2 / (count + 0.5):
+            if not xrand(4096):
+                content = "https://cdn.discordapp.com/attachments/321524006316539904/843707932989587476/secretsmall.gif"
+                create_task(message.add_reaction("💎"))
+                self.bot.data.users.add_diamonds(message.author, 1000)
+            elif number is not None:
+                if type(number) is str:
+                    content = chr(ord(last_number) - add)
+                else:
+                    n = await create_future(predict_next, numbers)
+                    if not n:
+                        return
+                    content = str(n)
+                content = content.strip()
                 if not content:
                     return
-                try:
-                    number = round_min(content)
-                except ValueError:
-                    if len(content) == 1:
-                        last_number = number = content
-                        add = None
-                    else:
-                        number = None
-                else:
-                    numbers = deque((number,))
-                curr = content
-                fix = None
-                mcount = 0
-                count = 0
-                last_author_id = u_id
-                stopped = False
-                async for m in self.bot.history(message.channel, limit=100):
-                    if m.id == message.id:
-                        continue
-                    c = zwremove(m.content)
-                    if not c:
-                        break
-                    if number is not None:
-                        if type(number) is str:
-                            if len(c) != 1:
-                                break
-                            n = ord(c)
-                            if add is None:
-                                add = n - ord(number)
-                            elif n - add != ord(number):
-                                break
-                            number = c
-                        else:
-                            try:
-                                n = round_min(c)
-                            except:
-                                break
-                            numbers.appendleft(n)
-                    elif c not in curr:
-                        break
-                    else:
-                        spl = curr.split(c)
-                        if not fix:
-                            fix = spl
-                        elif fix != spl:
-                            break
-                        curr = c
-                    if m.author.id == last_author_id:
-                        break
-                    if m.author.id == self.bot.id:
-                        stopped = True
-                    elif not stopped:
-                        count += 1
-                    mcount += 1
-                    if mcount >= 11:
-                        break
-                    last_author_id = m.author.id
-                # print(content, count)
-                if count >= 2 and random.random() >= 2 / (count + 0.5):
-                    if not xrand(4096):
-                        content = "https://cdn.discordapp.com/attachments/321524006316539904/843707932989587476/secretsmall.gif"
-                        create_task(message.add_reaction("💎"))
-                        self.bot.data.users.add_diamonds(message.author, 1000)
-                    elif number is not None:
-                        if type(number) is str:
-                            content = chr(ord(last_number) - add)
-                        else:
-                            n = await create_future(predict_next, numbers)
-                            if not n:
-                                return
-                            content = str(n)
-                        content = content.strip()
-                        if not content:
-                            return
-                    elif fix:
-                        content = content.join(fix)
-                    print(message.channel, content, mcount)
-                    if content[0].isascii() and content[:2] != "<:" and not is_url(content):
-                        content = lim_str("\u200b" + content, 2000)
-                    create_task(message.channel.send(content, tts=message.tts))
-                    self.bot.data.users.add_xp(message.author, len(content) / 2 + 16)
-                    self.bot.data.users.add_gold(message.author, len(content) / 4 + 32)
+            elif fix:
+                content = content.join(fix)
+            print(message.channel, content, mcount)
+            if content[0].isascii() and content[:2] != "<:" and not is_url(content):
+                content = lim_str("\u200b" + content, 2000)
+            create_task(message.channel.send(content, tts=message.tts))
+            self.bot.data.users.add_xp(message.author, len(content) / 2 + 16)
+            self.bot.data.users.add_gold(message.author, len(content) / 4 + 32)
 
 
 class Daily(Command):

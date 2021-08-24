@@ -2632,23 +2632,24 @@ class UpdateCrossposts(Database):
     async def _call_(self):
         if self.sem.is_busy():
             return
-        if self.stack:
-            with tracebacksuppressor:
-                async with self.sem:
-                    async with Delay(1):
-                        for c, s in self.stack.items():
-                            channel = self.bot.get_channel(c)
-                            for k, v in s.items():
-                                embs = deque()
-                                for emb in v:
-                                    if len(embs) > 9 or len(emb) + sum(len(e) for e in embs) > 6000:
-                                        create_task(self.bot.send_as_webhook(channel, embeds=embs, username=k[0], avatar_url=k[1]))
-                                        embs.clear()
-                                    embs.append(emb)
-                                    reacts = None
-                                if embs:
+        if not self.stack:
+            return
+        with tracebacksuppressor:
+            async with self.sem:
+                async with Delay(1):
+                    for c, s in self.stack.items():
+                        channel = self.bot.get_channel(c)
+                        for k, v in s.items():
+                            embs = deque()
+                            for emb in v:
+                                if len(embs) > 9 or len(emb) + sum(len(e) for e in embs) > 6000:
                                     create_task(self.bot.send_as_webhook(channel, embeds=embs, username=k[0], avatar_url=k[1]))
-                        self.stack.clear()
+                                    embs.clear()
+                                embs.append(emb)
+                                reacts = None
+                            if embs:
+                                create_task(self.bot.send_as_webhook(channel, embeds=embs, username=k[0], avatar_url=k[1]))
+                    self.stack.clear()
 
     async def _send_(self, message, **void):
         if message.channel.id in self.data and not message.flags.is_crossposted and "\u2009\u2009" not in message.author.name:

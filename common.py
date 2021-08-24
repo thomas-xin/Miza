@@ -504,7 +504,7 @@ class FileHashDict(collections.abc.MutableMapping):
 
     def keys(self):
         if self.iter is None or self.modified or self.deleted:
-            gen = (try_int(i) for i in os.listdir(self.path) if i not in self.deleted and not i.endswith("\x7f"))
+            gen = (try_int(i) for i in os.listdir(self.path) if not i.endswith("\x7f") and i not in self.deleted)
             if self.modified:
                 gen = set(gen)
                 gen.update(self.modified)
@@ -658,7 +658,7 @@ class FileHashDict(collections.abc.MutableMapping):
             with suppress(FileNotFoundError):
                 os.remove(fn + "\x7f")
             with suppress(FileNotFoundError):
-                os.remove(fn + "\x7f7f")
+                os.remove(fn + "\x7f\x7f")
         while len(self.data) > 1048576:
             self.data.pop(next(iter(self.data)), None)
         return modified.union(deleted)
@@ -2931,7 +2931,7 @@ class Database(collections.abc.MutableMapping, collections.abc.Hashable, collect
                 print(self, traceback.format_exc(), sep="\n", end="")
         else:
             if modified is None:
-                self.data.modified.update(self.data.keys())
+                self.data.modified = set(self.data.keys())
             else:
                 if issubclass(type(modified), collections.abc.Sized) and type(modified) not in (str, bytes):
                     self.data.modified.update(modified)

@@ -511,35 +511,36 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     async def garbage_collect(self, obj):
         if not self.ready or hasattr(obj, "no_delete"):
             return
-        with tracebacksuppressor(SemaphoreOverflowError):
-            async with obj._garbage_semaphore:
-                data = obj.data
-                if getattr(obj, "garbage_collect", None):
-                    return await obj.garbage_collect()
-                for key in tuple(data):
-                    if getattr(data, "unloaded", False):
-                        return
-                    if key != 0 and type(key) is not str:
-                        with suppress():
-                            # Database keys may be user, guild, or channel IDs
-                            if getattr(obj, "user", None):
-                                d = await self.fetch_user(key)
-                            if getattr(obj, "channel", None):
-                                d = await self.fetch_channel(key)
-                            else:
-                                tester = await create_future(data.__getitem__, key)
-                                if not getattr(obj, "no_garbage", None) and not tester and self.started:
-                                    raise LookupError
-                                with suppress(KeyError):
-                                    d = self.cache.guilds[key]
+        with MemoryTimer("gc_" + obj.name):
+            with tracebacksuppressor(SemaphoreOverflowError):
+                async with obj._garbage_semaphore:
+                    data = obj.data
+                    if getattr(obj, "garbage_collect", None):
+                        return await obj.garbage_collect()
+                    for key in tuple(data):
+                        if getattr(data, "unloaded", False):
+                            return
+                        if key != 0 and type(key) is not str:
+                            with suppress():
+                                # Database keys may be user, guild, or channel IDs
+                                if getattr(obj, "user", None):
+                                    d = await self.fetch_user(key)
+                                elif getattr(obj, "channel", None):
+                                    d = await self.fetch_channel(key)
+                                else:
+                                    tester = data[key]
+                                    if not getattr(obj, "no_garbage", None) and not tester and self.started:
+                                        raise LookupError
+                                    with suppress(KeyError):
+                                        d = self.cache.guilds[key]
+                                        continue
+                                    d = await self.fetch_messageable(key)
+                                if d is not None:
                                     continue
-                                d = await self.fetch_messageable(key)
-                            if d is not None:
-                                continue
-                        print(f"Deleting {key} from {str(obj)}...")
-                        await create_future(data.pop, key, None)
-                    if random.random() > 0.99:
-                        await asyncio.sleep(0.5)
+                            print(f"Deleting {key} from {str(obj)}...")
+                            data.pop(key, None)
+                        if random.random() > 0.99:
+                            await asyncio.sleep(0.5)
 
     # Calls a bot event, triggered by client events or others, across all bot databases. Calls may be sync or async.
     async def send_event(self, ev, *args, exc=False, **kwargs):
@@ -2530,7 +2531,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         return fn
 
     # Autosaves modified bot databases. Called once every minute and whenever the bot is about to shut down.
-    def update(self):
+    def update(self, force=False):
         self.update_embeds()
         saved = alist()
         with tracebacksuppressor:
@@ -2555,11 +2556,14 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         if not os.path.exists("backup"):
             os.mkdir("backup")
         fn = f"backup/saves.{datetime.datetime.utcnow().date()}.zip"
-        if not os.path.exists(fn):
+        day = not os.path.exists(fn)
+        if day:
             await_fut(self.send_event("_day_"))
             self.users_updated = True
+        if force or day:
             create_future_ex(self.clear_cache, priority=True)
             await_fut(self.send_event("_save_"))
+        if day:
             self.backup()
 
     async def as_rewards(self, diamonds, gold=Dummy):
