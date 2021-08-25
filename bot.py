@@ -1923,6 +1923,22 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         g_perm.pop(u_id, None)
         self.data.perms.update()
 
+    def get_enabled(self, channel):
+        guild = getattr(channel, "guild", None)
+        if not guild and hasattr(channel, "member_count"):
+            guild = channel
+        if guild:
+            try:
+                enabled = self.data.enabled[channel.id]
+            except KeyError:
+                try:
+                    enabled = self.data.enabled[guild.id]
+                except KeyError:
+                    enabled = ("main", "string", "admin", "voice", "image", "fun")
+        else:
+            enabled = self.categories.keys()
+        return enabled
+
     # Checks whether a member's status was changed.
     def status_changed(self, before, after):
         if before.activity != after.activity:
@@ -2763,19 +2779,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 # Strip code boxes from message.
                 msg = msg.replace("`", "").strip()
         # Get list of enabled commands for the channel.
-        if g_id:
-            try:
-                enabled = self.data.enabled[c_id]
-                if "game" in enabled:
-                    if type(enabled) is not set:
-                        enabled = set(enabled)
-                    enabled.remove("game")
-                    enabled.add("fun")
-                    self.data.enabled[c_id] = enabled
-            except KeyError:
-                enabled = ("main", "string", "admin", "voice", "image", "fun")
-        else:
-            enabled = self.categories.keys()
+        enabled = self.get_enabled(channel)
         u_perm = self.get_perms(u_id, guild)
         admin = not inf > u_perm
         # Gets prefix for current guild.
@@ -2984,6 +2988,11 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                                             args.pop(0)
                                             argv = argv.split(None, 1)[-1]
                                             inc_dict(flags, d=1)
+                                    if "r" in command.flags:
+                                        if args[0].lower() in ("clear", "reset"):
+                                            args.pop(0)
+                                            argv = argv.split(None, 1)[-1]
+                                            inc_dict(flags, r=1)
                             args = list(args)
                         # Assign "guild" as an object that mimics the discord.py guild if there is none
                         if guild is None:

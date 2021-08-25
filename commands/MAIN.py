@@ -72,11 +72,13 @@ class Help(Command):
         if catg not in bot.categories:
             catg = None
         content = None
+        enabled = bot.get_enabled(channel)
+        category_repr = lambda catg: catg.capitalize() + (" [DISABLED]" if catg.lower() not in enabled else "")
         if comm:
             com = bot.commands[comm][0]
             a = ", ".join(n.strip("_") for n in com.name) or "[none]"
             content = (
-                f"[Category] {com.catg.capitalize()}\n"
+                f"[Category] {category_repr(com.catg)}\n"
                 + f"[Usage] {prefix}{com.parse_name()} {com.usage}\n"
                 + f"[Aliases] {a}\n"
                 + f"[Effect] {com.parse_description()}\n"
@@ -113,7 +115,7 @@ class Help(Command):
         coms = sorted(coms, key=lambda c: c.parse_name())
         catsel = [cdict(
             emoji=cdict(id=None, name=help_emojis[c]),
-            label=c.capitalize(),
+            label=category_repr(c),
             value=c,
             description=help_descriptions[c],
             default=catg == c,
@@ -130,7 +132,7 @@ class Help(Command):
             custom_id="\x7f0",
             options=catsel,
             min_values=0,
-            placeholder=catg.capitalize() if catg else "Choose a category...",
+            placeholder=category_repr(catg) if catg else "Choose a category...",
         )
         commenu = cdict(
             type=3,
@@ -290,55 +292,72 @@ class EnabledCommands(Command):
     name = ["EC", "Enable"]
     min_display = "0~3"
     description = "Shows, enables, or disables a command category in the current channel."
-    usage = "(enable|disable)? <category>? <list{?l}>? <hide{?h}>?"
-    flags = "aedlh"
+    usage = "(enable|disable|clear)? <category>? <server-wide(?s)> <list{?l}>? <hide{?h}>?"
+    flags = "aedlhrs"
     slash = True
 
     def __call__(self, argv, args, flags, user, channel, guild, perm, name, **void):
-        update = self.data.enabled.update
         bot = self.bot
+        update = bot.data.enabled.update
         enabled = bot.data.enabled
+        if "s" in flags:
+            target = guild
+            mention = lambda *args: str(guild)
+        else:
+            target = channel
+            mention = channel_mention
         # Flags to change enabled commands list
-        if "a" in flags or "e" in flags or "d" in flags:
+        if any(k in flags for k in "acder"):
             req = 3
             if perm < req:
-                reason = f"to change enabled command list for {channel}"
+                reason = f"to change enabled command list for {channel_repr(target)}"
                 raise self.perm_error(perm, req, reason)
-        if not args or argv.casefold() == "all":
+        else:
+            req = 0
+        if not args or argv.casefold() == "all" or "r" in flags:
             if "l" in flags:
                 return css_md(f"Standard command categories:\n[{', '.join(standard_commands)}]")
             if "e" in flags or "a" in flags:
                 categories = set(standard_commands)
-                if channel.id in enabled:
-                    enabled[channel.id] = categories.union(enabled[channel.id])
+                if target.id in enabled:
+                    enabled[target.id] = categories.union(enabled[target.id])
                 else:
-                    enabled[channel.id] = categories
+                    enabled[target.id] = categories
                 if "h" in flags:
                     return
-                return css_md(f"Enabled all standard command categories in {sqr_md(channel)}.")
+                return css_md(f"Enabled all standard command categories in {sqr_md(target)}.")
+            if "r" in flags:
+                enabled.pop(target.id, None)
+                if "h" in flags:
+                    return
+                return css_md(f"Reset enabled status of all commands in {sqr_md(target)}.")
             if "d" in flags:
-                enabled[channel.id] = set()
+                enabled[target.id] = set()
                 if "h" in flags:
                     return
-                return css_md(f"Disabled all standard command categories in {sqr_md(channel)}.")
-            temp = enabled.get(channel.id, default_commands)
+                return css_md(f"Disabled all commands in {sqr_md(target)}.")
+            temp = bot.get_enabled(target)
             if not temp:
-                return ini_md(f"No currently enabled commands in {sqr_md(channel)}.")
-            return f"Currently enabled command categories in {channel_mention(channel.id)}:\n{ini_md(iter2str(temp))}"
-        if "e" not in flags and "a" not in flags and "d" not in flags:
+                return ini_md(f"No currently enabled commands in {sqr_md(target)}.")
+            return f"Currently enabled command categories in {mention(target.id)}:\n{ini_md(iter2str(temp))}"
+        if not req:
             catg = argv.casefold()
             if not bot.is_trusted(guild) and catg not in standard_commands:
                 raise PermissionError(f"Elevated server priviliges required for specified command category.")
             if catg not in bot.categories:
                 raise LookupError(f"Unknown command category {argv}.")
-            if catg in enabled:
-                return css_md(f"Command category {sqr_md(catg)} is currently enabled in {sqr_md(channel)}.")
-            return css_md(f'Command category {sqr_md(catg)} is currently disabled in {sqr_md(channel)}. Use "{bot.get_prefix(guild)}{name} enable" to enable.')
+            if catg in bot.get_enabled(target):
+                return css_md(f"Command category {sqr_md(catg)} is currently enabled in {sqr_md(target)}.")
+            return css_md(f'Command category {sqr_md(catg)} is currently disabled in {sqr_md(target)}. Use "{bot.get_prefix(guild)}{name} enable" to enable.')
         args = [i.casefold() for i in args]
         for catg in args:
+            if not bot.is_trusted(guild) and catg not in standard_commands:
+                raise PermissionError(f"Elevated server priviliges required for specified command category.")
             if not catg in bot.categories:
                 raise LookupError(f"Unknown command category {catg}.")
-        curr = set_dict(enabled, channel.id, set(default_commands))
+        curr = bot.get_enabled(target)
+        if target.id not in enabled:
+            enabled[target.id] = curr if type(curr) is set else set(curr)
         for catg in args:
             if "d" not in flags:
                 if catg not in curr:
@@ -346,19 +365,19 @@ class EnabledCommands(Command):
                         curr.add(catg)
                     else:
                         curr.append(catg)
-                    update(channel.id)
+                    update(target.id)
             else:
                 if catg in curr:
                     curr.remove(catg)
-                    update(channel.id)
+                    update(target.id)
         check = curr if type(curr) is set else frozenset(curr)
         if check == default_commands:
-            enabled.pop(channel.id)
+            enabled.pop(target.id)
         if "h" in flags:
             return
         category = "category" if len(args) == 1 else "categories"
         action = "Enabled" if "d" not in flags else "Disabled"
-        return css_md(f"{action} command {category} {sqr_md(', '.join(args))} in {sqr_md(channel)}.")
+        return css_md(f"{action} command {category} {sqr_md(', '.join(args))} in {sqr_md(target)}.")
 
 
 class Prefix(Command):
@@ -1565,6 +1584,7 @@ class UpdatePrefix(Database):
 
 class UpdateEnabled(Database):
     name = "enabled"
+    no_delete = True
 
 
 class UpdateMessages(Database):

@@ -2550,7 +2550,7 @@ class MimicSend(Command):
         try:
             enabled = bot.data.enabled[channel.id]
         except KeyError:
-            enabled = ()
+            enabled = bot.data.enabled.get(guild.id, ())
         # Because this command operates across channels and servers, we need to make sure these cannot be sent to channels without this command enabled
         if not admin and ("fun" not in enabled or perm < 1):
             raise PermissionError("Not permitted to send into target channel.")

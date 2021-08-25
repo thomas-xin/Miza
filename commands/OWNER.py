@@ -147,11 +147,14 @@ class Execute(Command):
             except IndexError:
                 pass
                 # raise ArgumentError('"run" must be specified as a separator.')
+            futs = deque()
             for u in users:
                 fake_message = copy.copy(message)
                 fake_message.content = argv
                 fake_message.author = u
-                create_task(bot.process_message(fake_message, argv))
+                futs.append(create_task(bot.process_message(fake_message, argv)))
+            for fut in futs:
+                await fut
 
 
 class Exec(Command):

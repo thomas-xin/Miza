@@ -828,7 +828,7 @@ __emap2 = "".maketrans(ESCAPE_T2)
 # Discord markdown format helper functions
 no_md = lambda s: str(s).translate(__emap)
 clr_md = lambda s: str(s).translate(__emap2)
-sqr_md = lambda s: f"[{no_md(s)}]" if not issubclass(type(s), discord.abc.GuildChannel) else f"[#{no_md(s)}]"
+sqr_md = lambda s: f"[{no_md(s)}]" if not isinstance(s, discord.abc.GuildChannel) else f"[#{no_md(s)}]"
 
 def italics(s):
     if type(s) is not str:
@@ -856,6 +856,8 @@ user_mention = lambda u_id: f"<@{u_id}>"
 user_pc_mention = lambda u_id: f"<@!{u_id}>"
 channel_mention = lambda c_id: f"<#{c_id}>"
 role_mention = lambda r_id: f"<@&{r_id}>"
+
+channel_repr = lambda s: as_str(s) if not isinstance(s, discord.abc.GuildChannel) else str(s)
 
 
 # Counts the number of lines in a file.
