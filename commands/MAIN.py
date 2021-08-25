@@ -622,6 +622,8 @@ class Info(Command):
         iterator = argl if argl else (argv,)
         embs = set()
         for argv in iterator:
+            if argv.startswith("<") and argv[-1] == ">":
+                argv = argv[1:-1]
             with self.bot.ExceptionSender(channel):
                 with suppress(StopIteration):
                     if argv:
