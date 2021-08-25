@@ -1508,7 +1508,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         size = 8388608
         with suppress(AttributeError):
             size = channel.guild.filesize_limit
-        if getattr(channel, "simulated", None):
+        if getattr(channel, "simulated", None) or getattr(channel, "guild", None) and not channel.permissions_for(channel.guild.me).attach_files:
             size = -1
         data = file
         if file and not hasattr(file, "fp"):
