@@ -744,7 +744,7 @@ def restructure_buttons(buttons):
                             button["custom_id"] = min_emoji(button["emoji"])
                         else:
                             button["custom_id"] = 0
-            if button["custom_id"] in used_custom_ids:
+            while button["custom_id"] in used_custom_ids:
                 if "?" in button["custom_id"]:
                     spl = button["custom_id"].rsplit("?", 1)
                     button["custom_id"] = spl[0] + f"?{int(spl[-1]) + 1}"
