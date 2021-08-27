@@ -73,8 +73,10 @@ class cdict(dict):
     __call__ = lambda self, k: self.__getitem__(k)
 
     def __getattr__(self, k):
-        with suppress(AttributeError):
+        try:
             return self.__getattribute__(k)
+        except AttributeError:
+            pass
         if not k.startswith("__") or not k.endswith("__"):
             try:
                 return self.__getitem__(k)
@@ -487,7 +489,7 @@ if __name__ == "__main__":
             # Initialize value of output image to be maximum
             self.val = self.sat
             # Amplitude scale from config, divided by DFT size
-            self.scale = (ascale / dfts)
+            self.scale = ascale / dfts
             self.fut = None
             self.playing = True
             proc = fut1.result()
@@ -573,14 +575,15 @@ if __name__ == "__main__":
             self.buffer = self.buffer[sample_rate // fps:]
             np.multiply(self.buffer, smudge_ratio, out=self.buffer)
             # Real fft algorithm returns complex numbers as polar coordinate pairs, initialize empty array to store their sums across a log scale
-            arr = np.zeros(screensize[1], dtype=np.complex128)
+            arr = np.zeros(screensize[1], dtype=np.complex64)
             # This function took me way too long to find lmao, extremely useful here as there may be more than one of the same output index per input position due to the log scale
             np.add.at(arr, self.fftrans, dft)
             arr[0] = 0
             # After the addition, we no longer require the phase of the complex numbers as their waves (and thus interference) have been summed, take absolute value of data array
-            amp = np.abs(arr, dtype=np.float32)
+            amp = np.abs(arr).astype(np.float32)
             # Multiply array by amplitude scale
-            amp = np.multiply(np.multiply(amp, self.scale, out=amp), 256, out=amp)
+            amp = np.multiply(amp, self.scale * 256, out=amp)
+            # amp = np.multiply(amp, 256, out=amp)
             # Saturation decreases when input is above 255, becoming fully desaturated and maxing out at 511
             sat = np.clip(511 - amp, 0, 255).astype(np.uint8)
             # Value increases as input is above 0, becoming full brightness and maxing out at 255
