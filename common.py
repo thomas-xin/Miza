@@ -717,6 +717,7 @@ def restructure_buttons(buttons):
             b.append(buttons[:5])
             buttons = buttons[5:]
         buttons = b
+    used_custom_ids = set()
     for row in buttons:
         for button in row:
             if "type" not in button:
@@ -743,6 +744,13 @@ def restructure_buttons(buttons):
                             button["custom_id"] = min_emoji(button["emoji"])
                         else:
                             button["custom_id"] = 0
+            if button["custom_id"] in used_custom_ids:
+                if "?" in button["custom_id"]:
+                    spl = button["custom_id"].rsplit("?", 1)
+                    button["custom_id"] = spl[0] + f"?{int(spl[-1]) + 1}"
+                else:
+                    button["custom_id"] = button["custom_id"] + "?0"
+            used_custom_ids.add(button["custom_id"])
             if "style" not in button:
                 button["style"] = 1
             if button.get("emoji"):

@@ -4698,7 +4698,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         await self.process_message(message, message.content, slash=True)
                     elif d["type"] == 3:
                         custom_id = cdata.get("custom_id", "")
-                        if custom_id == "▪️":
+                        if custom_id.startswith("▪️"):
                             return await self.ignore_interaction(message)
                         mdata = d.get("member")
                         if not mdata:
