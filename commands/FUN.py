@@ -1830,12 +1830,14 @@ class UpdateDogpiles(Database):
         # print(content, count)
         if count < 2:
             return
-        if number:
+        n = None
+        if number and type(number) is not str:
+            n = await create_future(predict_next, numbers)
             if type(number) is int:
                 s = str(number)
-                for i in range(3, min(8, len(s))):
+                for i in range(3, len(s) + 1):
                     if predict_next(list(map(int, s)), limit=i) is not None:
-                        count = 1 + count << 1
+                        count = (i if i < len(s) else 0) + count << 1
         if random.random() >= 3 / (count + 0.5):
             if not xrand(4096):
                 content = "https://cdn.discordapp.com/attachments/321524006316539904/843707932989587476/secretsmall.gif"
@@ -1845,7 +1847,8 @@ class UpdateDogpiles(Database):
                 if type(number) is str:
                     content = chr(ord(last_number) - add)
                 else:
-                    n = await create_future(predict_next, numbers)
+                    if n is None:
+                        n = await create_future(predict_next, numbers)
                     if not n:
                         return
                     content = str(n)
