@@ -1833,8 +1833,8 @@ class UpdateDogpiles(Database):
         n = None
         if number and type(number) is not str:
             n = await create_future(predict_next, numbers)
-            if type(number) is int:
-                s = str(number)
+            if type(n) is int:
+                s = str(n)
                 for i in range(3, len(s) + 1):
                     if predict_next(list(map(int, s)), limit=i) is not None:
                         count = (i if i < len(s) else 0) + count << 1
