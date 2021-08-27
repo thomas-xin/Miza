@@ -605,6 +605,131 @@ class Text2048(Command):
         await send_with_react(message.channel, content, embed=emb, reacts=reacts, buttons=buttons, reference=message)
 
 
+class Snake(Command):
+    time_consuming = True
+    rate_limit = (3, 9)
+    description = "Plays a game of Snake using reactions!"
+    slash = "snake"
+
+    async def generate_snake_game():
+        icons = {
+                0: "▪",
+                1: "🐍",
+                2: "🍎"
+            }
+        tail = "🟩"
+        snaek_colour = 7975512
+        size = 8
+        grid = [[0] * size for i in range(size)]
+
+        def snaek_bwain(grid):
+            output = ""
+            for y in grid:
+                line = ""
+                for x in y:
+                    line += icons.get(x, tail)
+                output += line + "\n"
+            return output
+        
+        async def spawn_apple(grid):
+            x = random.randint(0, size - 1)
+            y = random.randint(0, size - 1)
+            while grid[y][x] != 0:
+                x = random.randint(0, size - 1)
+                y = random.randint(0, size - 1)
+            grid[y][x] = 2
+
+        x = y = size >> 1
+        if not size & 1:
+            x -= random.randint(0, 1)
+            y -= random.randint(0, 1)
+        grid[y][x] = 1
+        snake_position = [x, y]
+        snake_direction = [None]
+        snake_length = [1]
+        snake_alive = [True]
+
+        spawn_apple(grid)
+
+        game = discord.Embed(colour=discord.Colour(snaek_colour))
+        game.set_author(name=message.author.display_name, url=str(message.author.avatar_url), icon_url=str(message.author.avatar_url))
+        game.description = snaek_bwain(grid)
+        message = await channel.send(embed=game)
+
+        await message.add_reaction("⬅️")
+        await message.add_reaction("⬆️")
+        await message.add_reaction("➡️")
+        await message.add_reaction("⬇️")
+
+        def user_check(reaction, user):
+            if reaction.message.id == message.id:
+                if user.id == message.author.id or user.id in owner_id:
+                    return True
+                if user.id != bot.user.id:
+                    guild = reaction.message.guild
+                    if guild is not None:
+                        member = guild.get_member(user.id)
+                        if member is not None:
+                            if member.guild_permissions.administrator:
+                                return True
+
+        async def snaek_reaction_listener(event_type="add"):
+            while snake_alive[0]:
+                react = await bot.wait_for(f"reaction_{event_type}", check=user_check)
+                emoji = str(react[0])
+                if emoji == "⬅️":
+                    snake_direction[0] = (-1, 0)
+                elif emoji == "➡️":
+                    snake_direction[0] = (1, 0)
+                elif emoji == "⬆️":
+                    snake_direction[0] = (0, -1)
+                elif emoji == "⬇️":
+                    snake_direction[0] = (0, 1)
+            create_task(snaek_reaction_listener("add"))
+            create_task(snaek_reaction_listener("remove"))
+
+            while snake_alive[0]:
+                if snake_direction[0]:
+                    for y, row in enumerate(grid):
+                        for x, v in enumerate(row):
+                            if v < 0:
+                                row[x] = v + 1
+                    grid[snake_position[1]][snake_position[0]] = 1 - snake_length[0]
+                    snake_position[0] += snake_direction[0][0]
+                    snake_position[1] += snake_direction[0][1]
+                    if snake_position[0] < 0 or snake_position[1] < 0:
+                        snake_alive[0] = False
+                        break
+                    try:
+                        colliding_with = grid[snake_position[1]][snake_position[0]]
+                    except IndexError:
+                        snake_alive[0] = False
+                        break
+                    if colliding_with == 2:
+                        snake_length[0] += 1
+                        spawn_apple(grid)
+                    elif colliding_with < 0:
+                        snake_alive[0] = False
+                        break
+                    grid[snake_position[1]][snake_position[0]] = 1
+                    game.description = snaek_bwain(grid)
+                    await message.edit(embed=game)
+                    tile_count = size ** 2 - 1
+                    for y in grid:
+                        for x in y:
+                            if x < 0:
+                                tile_count -= 1
+                    if tile_count <= 0:
+                        await channel.send(f"{message.author.mention}, congratulations, **you won**!")
+                        break 
+                await asyncio.sleep(1)
+            
+            if not snake_alive[0]:
+                await channel.send(f"{message.author.mention}, **game over**! Your score was {snake_length[0] - 1}.")
+            else:
+                snake_alive[0] = False
+
+
 class SlotMachine(Command):
     name = ["Slots"]
     description = "Plays a slot machine game. Costs gold to play, can yield gold and diamonds."
