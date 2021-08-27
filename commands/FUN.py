@@ -1836,8 +1836,9 @@ class UpdateDogpiles(Database):
             if type(n) is int:
                 s = str(n)
                 for i in range(3, len(s) + 1):
-                    if predict_next(list(map(int, s)), limit=i) is not None:
-                        count = (i if i < len(s) else 0) + count << 1
+                    x = predict_next(list(map(int, s)), limit=i)
+                    if x is not None:
+                        count = (not x) + count << 1
         if random.random() >= 3 / (count + 0.5):
             if not xrand(4096):
                 content = "https://cdn.discordapp.com/attachments/321524006316539904/843707932989587476/secretsmall.gif"
