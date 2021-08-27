@@ -1828,7 +1828,15 @@ class UpdateDogpiles(Database):
                 break
             last_author_id = m.author.id
         # print(content, count)
-        if count >= 2 and random.random() >= 2 / (count + 0.5):
+        if count < 2:
+            return
+        if number:
+            if type(number) is int:
+                s = str(number)
+                for i in range(3, min(8, len(s))):
+                    if predict_next(list(map(int, s)), limit=i) is not None:
+                        count = 1 + count << 1
+        if random.random() >= 2 / (count + 0.5):
             if not xrand(4096):
                 content = "https://cdn.discordapp.com/attachments/321524006316539904/843707932989587476/secretsmall.gif"
                 create_task(message.add_reaction("💎"))
