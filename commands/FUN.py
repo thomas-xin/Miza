@@ -1836,7 +1836,7 @@ class UpdateDogpiles(Database):
                 for i in range(3, min(8, len(s))):
                     if predict_next(list(map(int, s)), limit=i) is not None:
                         count = 1 + count << 1
-        if random.random() >= 2 / (count + 0.5):
+        if random.random() >= 3 / (count + 0.5):
             if not xrand(4096):
                 content = "https://cdn.discordapp.com/attachments/321524006316539904/843707932989587476/secretsmall.gif"
                 create_task(message.add_reaction("💎"))
