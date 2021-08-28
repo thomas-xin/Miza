@@ -1112,7 +1112,12 @@ find_users = lambda s: regexp("<@!?[0-9]+>").findall(s)
 
 def min_emoji(emoji):
     if not getattr(emoji, "id", None):
-        return emoji.name
+        if getattr(emoji, "name", None):
+            return emoji.name
+        emoji = as_str(emoji)
+        if emoji.isnumeric():
+            return f"<:_:{emoji}>"
+        return emoji
     if emoji.animated:
         return f"<a:_:{emoji.id}>"
     return f"<:_:{emoji.id}>"

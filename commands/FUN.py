@@ -619,7 +619,7 @@ class Snake(Command):
         ],
         [
             cdict(emoji="⬅️", style=1),
-            cdict(emoji="💠", style=1),
+            cdict(emoji="💠", style=1, disabled=True),
             cdict(emoji="➡️", style=1),
         ],
         [
@@ -633,7 +633,6 @@ class Snake(Command):
         1: "🐍",
         2: "🍎"
     }
-    tails = "🟦🟪🟥🟧🟨🟩"
     playing = {}
 
     async def __call__(self, bot, message, args, **void):
@@ -653,7 +652,7 @@ class Snake(Command):
             raise OverflowError(f"Board size too large ({cells} > 199)")
         elif cells < 2:
             raise ValueError(f"Board size too small ({cells} < 2)")
-        await self.generate_snaek_game(message, size)
+        create_task(self.generate_snaek_game(message, size))
 
     async def _callback_(self, bot, message, reaction, user, vals, perm, **void):
         if message.id not in self.playing:
@@ -681,6 +680,24 @@ class Snake(Command):
     async def generate_snaek_game(self, message, size):
         bot = self.bot
         user = message.author
+        try:
+            if np.prod(size) > 160:
+                raise KeyError
+            bot.cache.emojis[797359273914138625]
+        except KeyError:
+            tails = "🟦🟪🟥🟧🟨🟩"
+        else:
+            ids = (
+                797359354314620939,
+                797359351509549056,
+                797359341157482496,
+                797359328826490921,
+                797359322773454870,
+                797359309121519626,
+                797359306542284820,
+                797359273914138625,
+            )
+            tails = [f"<a:_:{e}>" for e in ids]
 
         def snaek_bwain(game):
             output = ""
@@ -690,8 +707,8 @@ class Snake(Command):
                     if x >= 0:
                         line += self.icons[x]
                     else:
-                        i = (x - game.tick) % len(self.tails)
-                        line += self.tails[i]
+                        i = (x - game.tick) % len(tails)
+                        line += tails[i]
                 output += line + "\n"
             return output
         
@@ -751,12 +768,12 @@ class Snake(Command):
                 embed.description = description + snaek_bwain(game)
                 embed.set_footer(text=f"Score: {game.len - 1}")
                 await message.edit(embed=embed)
-                tails = np.sum(game.grid < 0)
-                if tails >= np.prod(size) - 1:
+                tailc = np.sum(game.grid < 0)
+                if tailc >= np.prod(size) - 1:
                     await channel.send(f"{user.mention}, congratulations, **you won**!")
                     break
-                if tails:
-                    game.tick = (game.tick + 1) % 6
+                if tailc:
+                    game.tick = (game.tick + 2) % 6
             await asyncio.sleep(1)
         
         if not game.alive:
