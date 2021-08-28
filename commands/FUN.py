@@ -255,7 +255,7 @@ class ND2048(collections.abc.MutableSequence):
 class Text2048(Command):
     time_consuming = True
     name = ["2048", "🎮"]
-    description = "Plays a game of 2048 using reactions. Gained points are rewarded as gold."
+    description = "Plays a game of 2048 using buttons. Gained points are rewarded as gold."
     usage = "<0:dimension_sizes(4x4)>* <1:dimension_count(2)>? <public{?p}|special_tiles{?s}|insanity_mode{?i}|easy_mode{?e}>*"
     flags = "pies"
     rate_limit = (3, 9)
@@ -608,7 +608,7 @@ class Snake(Command):
     time_consuming = True
     name = ["Snaek", "🐍"]
     rate_limit = (3, 9)
-    description = "Plays a game of Snake using reactions!"
+    description = "Plays a game of Snake using buttons!"
     slash = True
 
     buttons = [
@@ -680,8 +680,9 @@ class Snake(Command):
     async def generate_snaek_game(self, message, size):
         bot = self.bot
         user = message.author
+        cells = np.prod(size)
         try:
-            if np.prod(size) > 160:
+            if cells > 160:
                 raise KeyError
             bot.cache.emojis[881073412297068575]
         except KeyError:
@@ -715,8 +716,10 @@ class Snake(Command):
         
         def spawn_apple(game):
             p = tuple(xrand(x) for x in game.size)
-            while game.grid[p] != 0:
+            i = 0
+            while game.grid[p] != 0 and i < 4096:
                 p = tuple(xrand(x) for x in game.size)
+                i += 1
             grid[p] = 2
 
         pos = tuple(x // 2 - (0 if x & 1 else random.randint(0, 1)) for x in size)
@@ -770,19 +773,25 @@ class Snake(Command):
                 embed.set_footer(text=f"Score: {game.len - 1}")
                 await message.edit(embed=embed)
                 tailc = np.sum(game.grid < 0)
-                if tailc >= np.prod(size) - 1:
-                    await channel.send(f"{user.mention}, congratulations, **you won**!")
+                if tailc >= cells - 1:
+                    rew = cells << 4
+                    s = await bot.as_rewards(rew, 0)
+                    bot.data.users.add_diamonds(user, rew)
+                    await send_with_reply(None, message, f"{user.mention}, congratulations, **you won**! You earned {s}!")
                     break
                 if tailc:
                     if len(tails) == 6:
-                        game.tick = game.tick + 2
+                        game.tick += 2
                     else:
-                        game.tick = game.tick + len(tails) // 2 + 2
+                        game.tick += len(tails) // 2 + 2
                     game.tick %= len(tails)
             await asyncio.sleep(1)
         
         if not game.alive:
-            await channel.send(f"{user.mention}, **game over**! Your score was {game.len - 1}.")
+            rew = np.sum(game.grid < 0) + 1 << 4
+            s = await bot.as_rewards(rew)
+            bot.data.users.add_gold(user, rew)
+            await send_with_reply(None, message, f"{user.mention}, **game over**! You earned {s}.")
         else:
             game.alive = False
         self.playing.pop(message.id, None)
