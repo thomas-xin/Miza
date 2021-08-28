@@ -683,9 +683,9 @@ class Snake(Command):
         try:
             if np.prod(size) > 160:
                 raise KeyError
-            bot.cache.emojis[797359273914138625]
+            bot.cache.emojis[881073412297068575]
         except KeyError:
-            tails = "🟦🟪🟥🟧🟨🟩"
+            tails = "💙💜❤🧡💛💚"
         else:
             ids = (
                 797359354314620939,
@@ -698,6 +698,7 @@ class Snake(Command):
                 797359273914138625,
             )
             tails = [f"<a:_:{e}>" for e in ids]
+            icons[1] = f"<a:_:881073412297068575>"
 
         def snaek_bwain(game):
             output = ""
@@ -773,7 +774,11 @@ class Snake(Command):
                     await channel.send(f"{user.mention}, congratulations, **you won**!")
                     break
                 if tailc:
-                    game.tick = (game.tick + 2) % 6
+                    if len(tails) == 6:
+                        game.tick = game.tick + 2
+                    else:
+                        game.tick = game.tick + len(tails) // 2 + 2
+                    game.tick %= len(tails)
             await asyncio.sleep(1)
         
         if not game.alive:
