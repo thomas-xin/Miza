@@ -346,7 +346,6 @@ class Text2048(Command):
     }
 
     async def _callback_(self, bot, message, reaction, argv, user, perm, vals, **void):
-        # print(user, message, reaction, argv)
         u_id, mode = list(map(int, vals.split("_", 1)))
         if reaction is not None and u_id != user.id and u_id != 0 and perm < 3:
             return
@@ -607,127 +606,164 @@ class Text2048(Command):
 
 class Snake(Command):
     time_consuming = True
+    name = ["Snaek", "🐍"]
     rate_limit = (3, 9)
     description = "Plays a game of Snake using reactions!"
-    slash = "snake"
+    slash = True
 
-    async def generate_snake_game():
-        icons = {
-                0: "▪",
-                1: "🐍",
-                2: "🍎"
-            }
-        tail = "🟩"
-        snaek_colour = 7975512
-        size = 8
-        grid = [[0] * size for i in range(size)]
+    buttons = [
+        [
+            cdict(emoji="▪️", style=2),
+            cdict(emoji="⬆️", style=1),
+            cdict(emoji="▪️", style=2),
+        ],
+        [
+            cdict(emoji="⬅️", style=1),
+            cdict(emoji="💠", style=1),
+            cdict(emoji="➡️", style=1),
+        ],
+        [
+            cdict(emoji="▪️", style=2),
+            cdict(emoji="⬇️", style=1),
+            cdict(emoji="▪️", style=2),
+        ],
+    ]
+    icons = {
+        0: "▪",
+        1: "🐍",
+        2: "🍎"
+    }
+    tails = "🟦🟪🟥🟧🟨🟩"
+    playing = {}
 
-        def snaek_bwain(grid):
+    async def __call__(self, bot, message, args, **void):
+        if len(args) >= 2:
+            size = list(map(int, args[:2]))
+        elif args:
+            argv = args[0]
+            if "x" in argv:
+                args = argv.split("x")
+                size = list(map(int, args[:2]))
+            else:
+                size = [int(argv)] * 2
+        else:
+            size = [8, 8]
+        cells = product(size)
+        if cells > 199:
+            raise OverflowError(f"Board size too large ({cells} > 199)")
+        elif cells < 2:
+            raise ValueError(f"Board size too small ({cells} < 2)")
+        await self.generate_snaek_game(message, size)
+
+    async def _callback_(self, bot, message, reaction, user, vals, perm, **void):
+        if message.id not in self.playing:
+            return
+        u_id = int(vals)
+        if u_id != user.id and u_id != 0 and perm < 3:
+            return
+        emoji = as_str(reaction)
+        game = self.playing[message.id]
+        if emoji == "⬅️":
+            d = (-1, 0)
+        elif emoji == "➡️":
+            d = (1, 0)
+        elif emoji == "⬆️":
+            d = (0, -1)
+        elif emoji == "⬇️":
+            d = (0, 1)
+        else:
+            return
+        d = np.array(d, dtype=np.int8)
+        if game.dir is None or np.any(game.dir + d):
+            game.dir = d
+        await bot.ignore_interaction(message)
+
+    async def generate_snaek_game(self, message, size):
+        bot = self.bot
+        user = message.author
+
+        def snaek_bwain(game):
             output = ""
-            for y in grid:
+            for y in game.grid.T:
                 line = ""
                 for x in y:
-                    line += icons.get(x, tail)
+                    if x >= 0:
+                        line += self.icons[x]
+                    else:
+                        i = (x - game.tick) % len(self.tails)
+                        line += self.tails[i]
                 output += line + "\n"
             return output
         
-        async def spawn_apple(grid):
-            x = random.randint(0, size - 1)
-            y = random.randint(0, size - 1)
-            while grid[y][x] != 0:
-                x = random.randint(0, size - 1)
-                y = random.randint(0, size - 1)
-            grid[y][x] = 2
+        def spawn_apple(game):
+            p = tuple(xrand(x) for x in game.size)
+            while game.grid[p] != 0:
+                p = tuple(xrand(x) for x in game.size)
+            grid[p] = 2
 
-        x = y = size >> 1
-        if not size & 1:
-            x -= random.randint(0, 1)
-            y -= random.randint(0, 1)
-        grid[y][x] = 1
-        snake_position = [x, y]
-        snake_direction = [None]
-        snake_length = [1]
-        snake_alive = [True]
+        pos = tuple(x // 2 - (0 if x & 1 else random.randint(0, 1)) for x in size)
+        game = cdict(
+            size=size,
+            grid=np.zeros(size, dtype=np.int8),
+            pos=pos,
+            tick=0,
+            dir=None,
+            len=1,
+            alive=True,
+        )
+        grid = game.grid
+        grid[game.pos] = 1
+        spawn_apple(game)
 
-        spawn_apple(grid)
+        colour = await bot.get_colour(user)
+        description = f"```callback-fun-snake-{user.id}-\nPlaying Snake...```"
+        embed = discord.Embed(
+            colour=colour,
+            title="🐍 Snake 🐍",
+            description=description + snaek_bwain(game),
+        )
+        embed.set_author(**get_author(user))
+        embed.set_footer(text="Score: 0")
+        message = await send_with_reply(None, message, embed=embed, buttons=self.buttons)
+        self.playing[message.id] = game
+        channel = message.channel
 
-        game = discord.Embed(colour=discord.Colour(snaek_colour))
-        game.set_author(name=message.author.display_name, url=str(message.author.avatar_url), icon_url=str(message.author.avatar_url))
-        game.description = snaek_bwain(grid)
-        message = await channel.send(embed=game)
-
-        await message.add_reaction("⬅️")
-        await message.add_reaction("⬆️")
-        await message.add_reaction("➡️")
-        await message.add_reaction("⬇️")
-
-        def user_check(reaction, user):
-            if reaction.message.id == message.id:
-                if user.id == message.author.id or user.id in owner_id:
-                    return True
-                if user.id != bot.user.id:
-                    guild = reaction.message.guild
-                    if guild is not None:
-                        member = guild.get_member(user.id)
-                        if member is not None:
-                            if member.guild_permissions.administrator:
-                                return True
-
-        async def snaek_reaction_listener(event_type="add"):
-            while snake_alive[0]:
-                react = await bot.wait_for(f"reaction_{event_type}", check=user_check)
-                emoji = str(react[0])
-                if emoji == "⬅️":
-                    snake_direction[0] = (-1, 0)
-                elif emoji == "➡️":
-                    snake_direction[0] = (1, 0)
-                elif emoji == "⬆️":
-                    snake_direction[0] = (0, -1)
-                elif emoji == "⬇️":
-                    snake_direction[0] = (0, 1)
-            create_task(snaek_reaction_listener("add"))
-            create_task(snaek_reaction_listener("remove"))
-
-            while snake_alive[0]:
-                if snake_direction[0]:
-                    for y, row in enumerate(grid):
-                        for x, v in enumerate(row):
-                            if v < 0:
-                                row[x] = v + 1
-                    grid[snake_position[1]][snake_position[0]] = 1 - snake_length[0]
-                    snake_position[0] += snake_direction[0][0]
-                    snake_position[1] += snake_direction[0][1]
-                    if snake_position[0] < 0 or snake_position[1] < 0:
-                        snake_alive[0] = False
-                        break
-                    try:
-                        colliding_with = grid[snake_position[1]][snake_position[0]]
-                    except IndexError:
-                        snake_alive[0] = False
-                        break
-                    if colliding_with == 2:
-                        snake_length[0] += 1
-                        spawn_apple(grid)
-                    elif colliding_with < 0:
-                        snake_alive[0] = False
-                        break
-                    grid[snake_position[1]][snake_position[0]] = 1
-                    game.description = snaek_bwain(grid)
-                    await message.edit(embed=game)
-                    tile_count = size ** 2 - 1
-                    for y in grid:
-                        for x in y:
-                            if x < 0:
-                                tile_count -= 1
-                    if tile_count <= 0:
-                        await channel.send(f"{message.author.mention}, congratulations, **you won**!")
-                        break 
-                await asyncio.sleep(1)
-            
-            if not snake_alive[0]:
-                await channel.send(f"{message.author.mention}, **game over**! Your score was {snake_length[0] - 1}.")
-            else:
-                snake_alive[0] = False
+        while game.alive:
+            if game.dir is not None:
+                grid[grid < 0] += 1
+                grid[game.pos] = 1 - game.len
+                game.pos = tuple(game.dir + game.pos)
+                if np.min(game.pos) < 0:
+                    game.alive = False
+                    break
+                try:
+                    colliding_with = grid[game.pos]
+                except IndexError:
+                    game.alive = False
+                    break
+                if colliding_with == 2:
+                    game.len += 1
+                    spawn_apple(game)
+                elif colliding_with < 0:
+                    game.alive = False
+                    break
+                grid[game.pos] = 1
+                embed.description = description + snaek_bwain(game)
+                embed.set_footer(text=f"Score: {game.len - 1}")
+                await message.edit(embed=embed)
+                tails = np.sum(game.grid < 0)
+                if tails >= np.prod(size) - 1:
+                    await channel.send(f"{user.mention}, congratulations, **you won**!")
+                    break
+                if tails:
+                    game.tick = (game.tick + 1) % 6
+            await asyncio.sleep(1)
+        
+        if not game.alive:
+            await channel.send(f"{user.mention}, **game over**! Your score was {game.len - 1}.")
+        else:
+            game.alive = False
+        self.playing.pop(message.id, None)
 
 
 class SlotMachine(Command):
@@ -1282,7 +1318,7 @@ class Uno(Command):
                 for card in played:
                     t += await create_future(bot.data.emojis.emoji_as, card + ".png")
                 embed.clear_fields()
-                embed.add_field(name="Previous turn", value=t)
+                embed.add_field(name="Previous turn", value=t or "\xad")
 
                 create_task(message.edit(content=content, embed=embed))
                 return await interaction_response(
@@ -1318,7 +1354,7 @@ class Uno(Command):
                 for card in played:
                     t += await create_future(bot.data.emojis.emoji_as, card + ".png")
                 embed.clear_fields()
-                embed.add_field(name="Previous turn", value=t)
+                embed.add_field(name="Previous turn", value=t or "\xad")
 
                 create_task(message.edit(content=content, embed=embed))
                 return await interaction_patch(
@@ -1355,7 +1391,7 @@ class Uno(Command):
             for card in played:
                 t += await create_future(bot.data.emojis.emoji_as, card + ".png")
             embed.clear_fields()
-            embed.add_field(name="Previous turn", value=t)
+            embed.add_field(name="Previous turn", value=t or "\xad")
             create_task(message.edit(content=content, embed=embed))
             return await interaction_patch(
                 bot=bot,
@@ -1400,7 +1436,7 @@ class Uno(Command):
                     for card in played:
                         t += await create_future(bot.data.emojis.emoji_as, card + ".png")
                     embed.clear_fields()
-                    embed.add_field(name="Previous turn", value=t)
+                    embed.add_field(name="Previous turn", value=t or "\xad")
                     create_task(message.edit(content=content, embed=embed))
                     return await interaction_patch(
                         bot=bot,
@@ -1452,7 +1488,7 @@ class Uno(Command):
                     for card in played:
                         t += await create_future(bot.data.emojis.emoji_as, card + ".png")
                     embed.clear_fields()
-                    embed.add_field(name="Previous turn", value=t)
+                    embed.add_field(name="Previous turn", value=t or "\xad")
 
                     create_task(message.edit(content=content, embed=embed))
                     return await interaction_patch(
@@ -1488,7 +1524,7 @@ class Uno(Command):
                 for card in played:
                     t += await create_future(bot.data.emojis.emoji_as, card + ".png")
                 embed.clear_fields()
-                embed.add_field(name="Previous turn", value=t)
+                embed.add_field(name="Previous turn", value=t or "\xad")
                 create_task(message.edit(content=content, embed=embed))
                 return await interaction_patch(
                     bot=bot,
@@ -1511,7 +1547,7 @@ class Uno(Command):
                 for card in played:
                     t += await create_future(bot.data.emojis.emoji_as, card + ".png")
                 embed.clear_fields()
-                embed.add_field(name="Previous turn", value=t)
+                embed.add_field(name="Previous turn", value=t or "\xad")
 
                 create_task(message.edit(content=content, embed=embed))
                 return await interaction_patch(
@@ -1536,7 +1572,7 @@ class Uno(Command):
             for card in played:
                 t += await create_future(bot.data.emojis.emoji_as, card + ".png")
             embed.clear_fields()
-            embed.add_field(name="Previous turn", value=t)
+            embed.add_field(name="Previous turn", value=t or "\xad")
 
             create_task(message.edit(content=content, embed=embed))
             return await interaction_patch(
@@ -2213,6 +2249,7 @@ class Wallet(Command):
     usage = "<users>*"
     rate_limit = 1
     multi = True
+    slash = ("Wallet", "Bal")
 
     async def __call__(self, bot, args, argv, argl, user, guild, channel, **void):
         users = await bot.find_users(argl, args, user, guild)

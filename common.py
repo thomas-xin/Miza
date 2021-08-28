@@ -932,7 +932,7 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
     if not channel:
         channel = reference.channel
     bot = BOT[0]
-    if getattr(reference, "slash", None):
+    if getattr(reference, "slash", None) and not embed:
         sem = emptyctx
         inter = True
         url = f"https://discord.com/api/v9/interactions/{reference.id}/{reference.slash}/callback"

@@ -4297,6 +4297,7 @@ class Lyrics(Command):
     flags = "v"
     rate_limit = (2, 6)
     typing = True
+    slash = True
 
     async def __call__(self, bot, guild, channel, message, argv, flags, user, **void):
         for a in message.attachments:

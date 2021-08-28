@@ -3369,8 +3369,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         with tracebacksuppressor:
             if hasattr(message, "int_id"):
                 int_id, int_token = message.int_id, message.int_token
-            else:
+            elif hasattr(message, "slash"):
                 int_id, int_token = message.id, message.slash
+            else:
+                return
             await Request(
                 f"https://discord.com/api/v9/interactions/{int_id}/{int_token}/callback",
                 method="POST",

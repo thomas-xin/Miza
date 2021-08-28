@@ -689,6 +689,7 @@ class Identify(Command):
     rate_limit = (2, 7)
     mime = magic.Magic(mime=True, mime_encoding=True)
     msgcmd = True
+    slash = True
 
     def probe(self, url):
         command = ["ffprobe", "-hide_banner", url]
