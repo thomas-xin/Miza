@@ -698,7 +698,7 @@ class Snake(Command):
                 797359273914138625,
             )
             tails = [f"<a:_:{e}>" for e in ids]
-            icons[1] = f"<a:_:881073412297068575>"
+            self.icons[1] = f"<a:_:881073412297068575>"
 
         def snaek_bwain(game):
             output = ""
