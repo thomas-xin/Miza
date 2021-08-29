@@ -4413,7 +4413,6 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     
     async def reaction_clear(self, raw, data):
         channel = await self.fetch_channel(raw.channel_id)
-        emoji = self._upgrade_partial_emoji(raw.emoji)
         message = await self.fetch_message(raw.message_id, channel=channel)
         user = message.author
         old_reactions = message.reactions.copy()
