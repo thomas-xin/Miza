@@ -618,7 +618,7 @@ class Info(Command):
         url = to_png(p.url)
         name = p.name
         colour = await self.bot.data.colours.get(to_png_ex(p.url))
-        emb = discord.Embed(colour=url)
+        emb = discord.Embed(colour=colour)
         emb.set_thumbnail(url=url)
         emb.set_author(name=name, icon_url=url, url=url)
         d = f"{user_mention(p.u_id)}{fix_md(p.id)}"

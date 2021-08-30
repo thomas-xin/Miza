@@ -762,7 +762,7 @@ class Snake(Command):
                 except IndexError:
                     game.alive = False
                     break
-                if colliding_with == 2:
+                if colliding_with == 2 and game.len < cells:
                     game.len += 1
                     spawn_apple(game)
                 elif colliding_with < 0:
@@ -2431,91 +2431,107 @@ class MimicConfig(Command):
     rate_limit = 1
 
     async def __call__(self, bot, user, message, perm, flags, args, **void):
-        update = self.data.mimics.update
+        update = bot.data.mimics.update
         mimicdb = bot.data.mimics
-        m_id = "&" + str(verify_id(args.pop(0)))
-        if m_id not in mimicdb:
-            raise LookupError("Target mimic ID not found.")
-        # Users are not allowed to modify mimics they do not control
-        if not isnan(perm):
-            u_id = user.id
-            mimics = set_dict(mimicdb, u_id, {})
-            found = 0
-            for prefix in mimics:
-                found += mimics[prefix].count(m_id)
-            if not found:
-                raise PermissionError("Target mimic does not belong to you.")
-        else:
-            u_id = mimicdb[m_id].u_id
-            mimics = mimicdb[u_id]
-            found = True
-        mimic = mimicdb[m_id]
-        opt = args.pop(0).casefold()
-        args.extend(best_url(a) for a in message.attachments)
-        if args:
-            new = " ".join(args)
-        else:
-            new = None
-        if opt in ("name", "username", "nickname", ""):
+        mimics = set_dict(mimicdb, user.id, {})
+        prefix = args.pop(0)
+        perm = bot.get_perms(user.id)
+        try:
+            mlist = mimics[prefix]
+            if mlist is None:
+                raise KeyError
+            mimlist = [bot.get_mimic(verify_id(p)) for p in mlist]
+        except KeyError:
+            mimic = bot.get_mimic(verify_id(prefix))
+            mimlist = [mimic]
+        try:
+            opt = args.pop(0).casefold()
+        except IndexError:
+            opt = None
+        if opt in ("name", "username", "nickname", "tag"):
             setting = "name"
-        elif opt in ("avatar", "icon", "url", "pfp", "image"):
+        elif opt in ("avatar", "icon", "url", "pfp", "image", "img"):
             setting = "url"
         elif opt in ("status", "description"):
             setting = "description"
         elif opt in ("gender", "birthday", "prefix"):
             setting = opt
-        elif opt in ("auto", "copy", "user", "auto"):
-            setting = "auto"
-        else:
+        elif opt in ("auto", "copy", "user", "auto", "user-id", "user_id"):
+            setting = "user"
+        elif is_url(opt):
+            args = [opt]
+            setting = "url"
+        elif opt:
             raise TypeError("Invalid target attribute.")
-        if new is None:
-            return ini_md(f"Current {setting} for {sqr_md(mimic.name)}: {sqr_md(mimic[setting])}.")
-        if setting == "birthday":
-            new = utc_ts(tzparse(new))
-        # This limit is actually to comply with webhook usernames
-        elif setting == "name":
-            if len(new) > 80:
-                raise OverflowError("Name must be 80 or fewer in length.")
-        # Prefixes must not be too long
-        elif setting == "prefix":
-            if len(new) > 16:
-                raise OverflowError("Prefix must be 16 or fewer in length.")
-            for prefix in mimics:
-                with suppress(ValueError, IndexError):
-                    mimics[prefix].remove(m_id)
-            if new in mimics:
-                mimics[new].append(m_id)
-            else:
-                mimics[new] = [m_id]
-        elif setting == "url":
-            urls = await bot.follow_url(new, best=True)
-            new = urls[0]
-        # May assign a user to the mimic
-        elif setting == "auto":
-            if new.casefold() in ("none", "null", "0", "false", "f"):
-                new = None
-            else:
-                mim = None
-                try:
-                    mim = verify_id(new)
-                    user = await bot.fetch_user(mim)
-                    if user is None:
-                        raise EOFError
-                    new = user.id
-                except:
+        if args:
+            new = " ".join(args)
+        else:
+            new = None
+        output = ""
+        noret = False
+        for mimic in mimlist:
+            await bot.data.mimics.updateMimic(mimic, message.guild)
+            if mimic.u_id != user.id and not isnan(perm):
+                raise PermissionError(f"Target mimic {mimic.name} does not belong to you.")
+            args.extend(best_url(a) for a in message.attachments)
+            if new is None:
+                if not opt:
+                    emb = await bot.commands.info[0].getMimicData(mimic, "v")
+                    bot.send_as_embeds(message.channel, emb)
+                    noret = True
+                else:
+                    output += f"Current {setting} for {sqr_md(mimic.name)}: {sqr_md(mimic[setting])}.\n"
+                continue
+            if setting == "birthday":
+                new = utc_ts(tzparse(new))
+            # This limit is actually to comply with webhook usernames
+            elif setting == "name":
+                if len(new) > 80:
+                    raise OverflowError("Name must be 80 or fewer in length.")
+            # Prefixes must not be too long
+            elif setting == "prefix":
+                if len(new) > 16:
+                    raise OverflowError("Prefix must be 16 or fewer in length.")
+                for prefix in mimics:
+                    with suppress(ValueError, IndexError):
+                        mimics[prefix].remove(m_id)
+                if new in mimics:
+                    mimics[new].append(m_id)
+                else:
+                    mimics[new] = [m_id]
+            elif setting == "url":
+                urls = await bot.follow_url(new, best=True)
+                new = urls[0]
+            # May assign a user to the mimic
+            elif setting == "user":
+                if new.casefold() in ("none", "null", "0", "false", "f"):
+                    new = None
+                else:
+                    mim = None
                     try:
-                        mimi = bot.get_mimic(mim, user)
-                        new = mimi.id
+                        mim = verify_id(new)
+                        user = await bot.fetch_user(mim)
+                        if user is None:
+                            raise EOFError
+                        new = user.id
                     except:
-                        raise LookupError("Target user or mimic ID not found.")
-        elif setting != "description":
-            if len(new) > 512:
-                raise OverflowError("Must be 512 or fewer in length.")
-        name = mimic.name
-        mimic[setting] = new
-        update(m_id)
-        update(u_id)
-        return css_md(f"Changed {setting} for {sqr_md(name)} to {sqr_md(new)}.")
+                        try:
+                            mimi = bot.get_mimic(mim, user)
+                            new = mimi.id
+                        except:
+                            raise LookupError("Target user or mimic ID not found.")
+            elif setting != "description":
+                if len(new) > 512:
+                    raise OverflowError("Must be 512 or fewer in length.")
+            name = mimic.name
+            mimic[setting] = new
+            update(m_id)
+            update(u_id)
+        if noret:
+            return
+        if output:
+            return ini_md(output.rstrip())
+        return css_md(f"Changed {setting} for {sqr_md(', '.join(m.name for m in mimlist))} to {sqr_md(new)}.")
 
 
 class Mimic(Command):
@@ -2732,7 +2748,7 @@ class MimicSend(Command):
     rate_limit = 0.5
 
     async def __call__(self, bot, channel, message, user, perm, argv, args, **void):
-        update = self.data.mimics.update
+        update = bot.data.mimics.update
         mimicdb = bot.data.mimics
         mimics = set_dict(mimicdb, user.id, {})
         prefix = args.pop(0)

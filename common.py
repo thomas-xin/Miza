@@ -1541,6 +1541,8 @@ def verify_id(obj):
         return obj.recipient.id
     with suppress(AttributeError):
         return obj.id
+    with suppress(AttributeError):
+        return obj.value
     return int(obj)
 
 

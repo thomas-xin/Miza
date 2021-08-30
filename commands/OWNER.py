@@ -719,7 +719,11 @@ class UpdateColours(Database):
             out = self.data["colours"][key]
         except KeyError:
             colours = self.data.setdefault("colours", {})
-            resp = await process_image(url, "get_colour", ["-nogif"], timeout=40)
+            try:
+                resp = await process_image(url, "get_colour", ["-nogif"], timeout=40)
+            except TypeError:
+                print_exc()
+                return 0
             colours[key] = out = [round(i) for i in eval_json(resp)]
             self.update()
         raw = colour2raw(out)

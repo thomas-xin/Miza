@@ -3420,17 +3420,19 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     def send_as_embeds(self, channel, description=None, title=None, fields=None, md=nofunc, author=None, footer=None, thumbnail=None, image=None, images=None, colour=None, reacts=None, reference=None):
         if type(description) is discord.Embed:
             emb = description
-            description = emb.description
-            title = emb.title
-            fields = emb.fields
-            author = emb.author
-            footer = emb.footer
-            thumbnail = emb.thumbnail
-            image = emb.image
+            description = emb.description or None
+            title = emb.title or None
+            fields = emb.fields or None
+            author = emb.author or None
+            footer = emb.footer or None
+            thumbnail = emb.thumbnail or None
+            image = emb.image or None
             if emb.colour:
-                colour = colorsys.rgb_to_hsv(alist(raw2colour(emb.colour)) / 255)[0] * 1536
-        if description is not None and type(description) is not str:
+                colour = colorsys.rgb_to_hsv(*(alist(raw2colour(verify_id(emb.colour))) / 255))[0] * 1536
+        if description and type(description) is not str:
             description = as_str(description)
+        elif not description:
+            description = None
         if not description and not fields and not thumbnail and not image and not images:
             return fut_nop
         return create_task(self._send_as_embeds(channel, description, title, fields, md, author, footer, thumbnail, image, images, colour, reacts, reference))
@@ -3461,7 +3463,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         if title:
             emb.title = title
         if author:
-            emb.set_author(**author)
+            try:
+                emb.set_author(**author)
+            except TypeError:
+                emb.set_author(name=author.name, url=author.url, icon_url=author.icon_url)
         if description:
             # Separate text into paragraphs, then lines, then words, then characters and attempt to add them one at a time, adding extra embeds when necessary
             curr = ""
@@ -3506,7 +3511,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 if issubclass(type(field), collections.abc.Mapping):
                     field = tuple(field.values())
                 elif not issubclass(type(field), collections.abc.Sequence):
-                    field = tuple(field)
+                    try:
+                        field = tuple(field)
+                    except TypeError:
+                        field = (field.name, field.value, getattr(field, "inline", None))
                 n = lim_str(field[0], 256)
                 v = lim_str(md(field[1]), 1024)
                 i = True if len(field) < 3 else field[2]

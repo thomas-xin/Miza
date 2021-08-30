@@ -1787,6 +1787,13 @@ class AudioDownloader:
                     key = url.split("/", 1)[0]
                     url = f"https://api.spotify.com/v1/tracks/{key}"
                     page = 1
+                # Single episode links also supported
+                elif "episode" in item:
+                    url = item[item.index("episode"):]
+                    url = url[url.index("/") + 1:]
+                    key = url.split("/", 1)[0]
+                    url = f"https://api.spotify.com/v1/episodes/{key}"
+                    page = 1
                 else:
                     raise TypeError("Unsupported Spotify URL.")
                 if page == 1:
@@ -1922,7 +1929,7 @@ class AudioDownloader:
                     else:
                         dur = None
                     temp = cdict({
-                        "name": resp["title"],
+                        "name": resp.get("title") or resp["webpage_url"].rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0],
                         "url": resp.get("webpage_url") or resp["url"],
                         "duration": dur,
                         "stream": get_best_audio(resp),
@@ -4333,7 +4340,11 @@ class Lyrics(Command):
             if not item:
                 item = search
         with discord.context_managers.Typing(channel):
-            name, lyrics = await get_lyrics(item)
+            try:
+                name, lyrics = await get_lyrics(item)
+            except KeyError:
+                print_exc()
+                raise KeyError(f"Invalid response from genius.com for {item}")
         # Escape colour markdown because that will interfere with the colours we want
         text = clr_md(lyrics.strip()).replace("#", "♯")
         msg = f"Lyrics for **{escape_markdown(name)}**:"
