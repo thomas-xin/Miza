@@ -1408,7 +1408,7 @@ class UpdateAutoEmojis(Database):
                 m_id = int(m_id)
             if not m2 and m_id:
                 try:
-                    m2 = await self.bot.fetch_message(m_id)
+                    m2 = await self.bot.fetch_message(m_id, message.channel)
                 except LookupError:
                     m2 = None
             if m2:
