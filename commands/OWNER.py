@@ -746,7 +746,7 @@ class UpdateWebhooks(Database):
         d.url = f"https://discord.com/api/webhooks/{d.id}/{d.token}"
         w = discord.Webhook.from_url(d.url, adapter=discord.AsyncWebhookAdapter(Request.session))
         d.send = w.send
-        d.avatar_url = f"https://cdn.discordapp.com/avatars/{d.id}/{d.avatar}.png?size=1024"
+        d.avatar_url = d.avatar and f"https://cdn.discordapp.com/avatars/{d.id}/{d.avatar}.png?size=1024"
         d.channel = self.CID(id=c_id)
         return self.add(d)
 

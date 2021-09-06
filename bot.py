@@ -3898,6 +3898,37 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 self._data = data
                 return self
 
+            async def edit(self, *args, **kwargs):
+                if not self.webhook_id:
+                    return await discord.Message.edit(self, *args, **kwargs)
+                try:
+                    w = bot.cache.users[self.webhook_id]
+                    webhook = getattr(w, "webhook", w)
+                except KeyError:
+                    webhook = await bot.fetch_webhook(self.webhook_id)
+                    w = bot.data.webhooks.add(webhook)
+                data = kwargs
+                if args:
+                    data["content"] = " ".join(args)
+                if "embed" in data:
+                    data["embeds"] = [data.pop("embed").to_dict()]
+                elif "embeds" in data:
+                    data["embeds"] = [emb.to_dict() for emb in data["embeds"]]
+                resp = await Request(
+                    f"https://discord.com/api/v9/webhooks/{webhook.id}/{webhook.token}/messages/{self.id}",
+                    data=json.dumps(data),
+                    headers={
+                        "Authorization": f"Bot {bot.token}",
+                        "Content-Type": "application/json",
+                    },
+                    method="PATCH",
+                    bypass=False,
+                    aio=True,
+                    json=True,
+                )
+                message = self.__class__.new(channel=self.channel, data=resp)
+                return bot.add_message(message, force=True)
+
             def __init__(self, message):
                 self.message = message
             

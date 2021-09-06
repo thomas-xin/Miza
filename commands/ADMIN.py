@@ -1394,6 +1394,7 @@ class UpdateAutoEmojis(Database):
         orig = self.bot.data.emojilists.get(message.author.id, {})
         emojis = None
         if msg.startswith("+"):
+            print(msg)
             emi = msg[1:].strip()
             spl = emi.rsplit(None, 1)
             if len(spl) > 1:
@@ -1412,13 +1413,17 @@ class UpdateAutoEmojis(Database):
                 except LookupError:
                     m2 = None
             if m2:
-                found = False
+                futs = deque()
                 ems = regexp("<a?:[A-Za-z0-9\\-~_]{1,32}").sub("", ems.replace(" ", "").replace("\\", "")).replace(">", ":")
-                for name in (n for n in ems.strip(":").split(":") if n):
+                possible = (n.strip(":") for n in regexp(":[A-Za-z0-9\\-~_]{1,32}:|[^\\x00-\\x7F]").findall(ems))
+                for name in (n for n in possible if n):
                     emoji = None
                     if emojis is None:
                         emojis = self.guild_emoji_map(guild, dict(orig))
-                    emoji = emojis.get(name)
+                    if ord(name[0]) >= 128:
+                        emoji = name
+                    else:
+                        emoji = emojis.get(name)
                     if not emoji:
                         r1 = regexp("^[A-Za-z0-9\\-~_]{1,32}$")
                         if r1.fullmatch(name):
@@ -1440,10 +1445,11 @@ class UpdateAutoEmojis(Database):
                         if type(emoji) is int:
                             e_id = emoji
                             emoji = self.bot.cache.emojis.get(e_id)
-                        found = True
-                        create_task(m2.add_reaction(emoji))
-                if found:
-                    create_task(self.bot.silent_delete(message))
+                        futs.append(create_task(m2.add_reaction(emoji)))
+                if futs:
+                    futs.append(create_task(self.bot.silent_delete(message)))
+                    for fut in futs:
+                        await fut
                     return
         regex = regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^a\\\\`])(:[A-Za-z0-9\\-~_]{1,32}:)(?:(?![^0-9]).)*(?:$|[^0-9>`])")
         pops = set()
