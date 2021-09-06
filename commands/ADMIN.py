@@ -559,7 +559,7 @@ class RoleSelect(Command):
     no_parse = True
     rate_limit = (1, 2)
 
-    async def __call__(self, args, message, guild, perm, **void):
+    async def __call__(self, args, message, guild, user, perm, **void):
         if not args:
             raise ArgumentError("Please input one or more roles by name or ID.")
         roles = deque()
