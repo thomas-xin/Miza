@@ -1372,7 +1372,7 @@ class UpdateAutoEmojis(Database):
         return emojis
 
     async def _nocommand_(self, message, recursive=True, **void):
-        if not message.content or getattr(message, "webhook_id", None) or message.content.count(":") < 2 or message.content.count("```") > 1:
+        if not message.content or getattr(message, "webhook_id", None) or message.content.count("```") > 1:
             return
         emojis = find_emojis(message.content)
         for e in emojis:
@@ -1394,7 +1394,6 @@ class UpdateAutoEmojis(Database):
         orig = self.bot.data.emojilists.get(message.author.id, {})
         emojis = None
         if msg.startswith("+"):
-            print(msg)
             emi = msg[1:].strip()
             spl = emi.rsplit(None, 1)
             if len(spl) > 1:
@@ -1451,6 +1450,8 @@ class UpdateAutoEmojis(Database):
                     for fut in futs:
                         await fut
                     return
+        if message.content.count(":") < 2:
+            return
         regex = regexp("(?:^|^[^<\\\\`]|[^<][^\\\\`]|.[^a\\\\`])(:[A-Za-z0-9\\-~_]{1,32}:)(?:(?![^0-9]).)*(?:$|[^0-9>`])")
         pops = set()
         offs = 0
