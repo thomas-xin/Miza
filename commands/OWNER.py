@@ -806,7 +806,7 @@ class UpdateWebhooks(Database):
                     webhooks = await guild.webhooks()
             if webhooks is None:
                 webhooks = await aretry(channel.webhooks, attempts=5, delay=15, exc=(discord.Forbidden, discord.NotFound))
-        self.temp[channel.id] = temp = alist(w for w in [self.add(w) for w in webhooks] if w.channel.id == channel.id)
+        self.temp[channel.id] = temp = alist(w for w in [self.add(w) for w in webhooks if w.token] if w.channel.id == channel.id)
         return temp
 
 
