@@ -117,7 +117,7 @@ att = 0
 while not os.path.exists(sd):
     delete(rs)
     delete(hb)
-    proc = psutil.Popen([python, "bot.py"], shell=True)
+    proc = psutil.Popen([python, "bot.py"])
     start = time.time()
     print("Bot started with PID \033[1;34;40m" + str(proc.pid) + "\033[1;37;40m.")
     time.sleep(12)
