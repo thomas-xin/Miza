@@ -24,34 +24,63 @@ if not os.path.exists("auth.json") or not os.path.getsize("auth.json"):
     raise SystemExit
 
 
-import requests, subprocess
-ffmpeg = "ffmpeg"
-print("Verifying FFmpeg installation...")
-with requests.get("https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip", stream=True) as resp:
+import time, datetime, psutil
+
+# Required on Windows to display terminal colour codes? 🤔
+if os.name == "nt":
     try:
-        v = resp.url.rsplit("/", 1)[-1].split("-", 1)[-1].rsplit(".", 1)[0].split("-", 1)[0]
-        r = subprocess.run(ffmpeg, stderr=subprocess.PIPE)
-        s = r.stderr[:r.stderr.index(b"\n")].decode("utf-8", "replace").strip().lower()
-        if s.startswith("ffmpeg"):
-            s = s[6:].lstrip()
-        if s.startswith("version"):
-            s = s[7:].lstrip()
-        s = s.split("-", 1)[0]
-        if s != v:
-            print(f"FFmpeg version outdated ({v} > {s})")
-            raise FileNotFoundError
-        print(f"FFmpeg version {s} found; skipping installation...")
-    except FileNotFoundError:
-        print(f"Downloading FFmpeg version {v}...")
-        subprocess.run([sys.executable, "downloader.py", "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip", "ffmpeg.zip"], cwd="misc")
+        os.system("color")
+    except:
+        traceback.print_exc()
+    import requests, subprocess
+    ffmpeg = "ffmpeg"
+    print("Verifying FFmpeg installation...")
+    with requests.get("https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip", stream=True) as resp:
+        try:
+            v = resp.url.rsplit("/", 1)[-1].split("-", 1)[-1].rsplit(".", 1)[0].split("-", 1)[0]
+            r = subprocess.run(ffmpeg, stderr=subprocess.PIPE)
+            s = r.stderr[:r.stderr.index(b"\n")].decode("utf-8", "replace").strip().lower()
+            if s.startswith("ffmpeg"):
+                s = s[6:].lstrip()
+            if s.startswith("version"):
+                s = s[7:].lstrip()
+            s = s.split("-", 1)[0]
+            if s != v:
+                print(f"FFmpeg version outdated ({v} > {s})")
+                raise FileNotFoundError
+            print(f"FFmpeg version {s} found; skipping installation...")
+        except FileNotFoundError:
+            print(f"Downloading FFmpeg version {v}...")
+            subprocess.run([sys.executable, "downloader.py", "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip", "ffmpeg.zip"], cwd="misc")
+            import zipfile, io
+            print("Download complete; extracting new FFmpeg installation...")
+            f = "misc/ffmpeg.zip"
+            with zipfile.ZipFile(f) as z:
+                names = [name for name in z.namelist() if "/bin/" in name and ".exe" in name]
+                for i, name in enumerate(names):
+                    print(f"{i}/{len(names)}")
+                    fn = name.rsplit("/", 1)[-1]
+                    with open(fn, "wb") as y:
+                        with z.open(name, "r") as x:
+                            while True:
+                                b = x.read(1048576)
+                                if not b:
+                                    break
+                                y.write(b)
+            print("FFmpeg extraction complete.")
+            os.remove(f)
+    if os.path.exists("misc") and not os.path.exists("misc/ffmpeg-c"):
+        print("Downloading ffmpeg version 4.2.2...")
+        os.mkdir("misc/ffmpeg-c")
+        subprocess.run([sys.executable, "downloader.py", "https://drive.google.com/u/0/uc?export=download&confirm=QLKC&id=168rCEMiRXi9X_o3pVEl_2cVWTcYGgR4N", "ffmpeg-c.zip"], cwd="misc")
         import zipfile, io
         print("Download complete; extracting new FFmpeg installation...")
-        f = "misc/ffmpeg.zip"
+        f = "misc/ffmpeg-c.zip"
         with zipfile.ZipFile(f) as z:
-            names = [name for name in z.namelist() if "/bin/" in name and ".exe" in name]
+            names = z.namelist()
             for i, name in enumerate(names):
                 print(f"{i}/{len(names)}")
-                fn = name.rsplit("/", 1)[-1]
+                fn = "misc/ffmpeg-c/" + name.rsplit("/", 1)[-1]
                 with open(fn, "wb") as y:
                     with z.open(name, "r") as x:
                         while True:
@@ -61,18 +90,7 @@ with requests.get("https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.
                             y.write(b)
         print("FFmpeg extraction complete.")
         os.remove(f)
-        if os.path.abspath("") not in os.getenv("PATH", "").split(os.pathsep):
-            subprocess.run(["setx", "path", os.path.abspath("") + os.pathsep + os.getenv("PATH", "")])
 
-
-import time, datetime, psutil
-
-# Required on Windows to display terminal colour codes? 🤔
-if os.name == "nt":
-    try:
-        os.system("color")
-    except:
-        traceback.print_exc()
 
 
 # Repeatedly attempts to delete a file, waiting 1 second between attempts.

@@ -150,6 +150,10 @@ def download(url, fn, resp=None, index=0, start=None, end=None):
                         rheader["Range"] = r
                     resp = requests.get(url, headers=rheader, timeout=32, stream=True)
                 with resp:
+                    if index and resp.status_code >= 400:
+                        if resp.status_code in (429, 503):
+                            time.sleep(7 + random.random() * 4 + index / 2)
+                        raise ConnectionError(resp.status_code, resp.text.rstrip())
                     try:
                         it = resp.iter_content(packet)
                     except requests.exceptions.StreamConsumedError:
@@ -179,7 +183,7 @@ def download(url, fn, resp=None, index=0, start=None, end=None):
             except:
                 print_exc()
                 time.sleep(5)
-                print(f"Thread {index} errored, retrying...")
+                print(f"\nThread {index} errored, retrying...")
                 packet = 65536
             resp = None
     return fn
@@ -216,7 +220,7 @@ resp = requests.get(url, headers=rheader, stream=True)
 url = resp.url
 head = cdict((k.casefold(), v) for k, v in resp.headers.items())
 progress = {}
-fsize = int(head.get("content-length", 0))
+fsize = int(head.get("content-length", 1073741824))
 if "bytes" in head.get("accept-ranges", ""):
     print("Accept-Ranges header found.")
     if threads == 1:
@@ -268,7 +272,8 @@ submit = exc.submit
 if threads > 1:
     print(f"Splitting into {threads} threads...")
     workers = [None] * threads
-    load = fsize // threads
+    load = math.ceil(fsize / threads)
+    delay = 1
     for i in range(threads):
         start = i * load
         if i == threads - 1:
@@ -277,6 +282,9 @@ if threads > 1:
             end = start + load
         workers[i] = submit(download, url, f"cache/thread-{i}", resp, index=i, start=start, end=end)
         resp = None
+        time.sleep(delay)
+        if workers[i].done():
+            delay /= 2
     fut = workers[0]
     if os.path.exists(fn):
         os.remove(fn)

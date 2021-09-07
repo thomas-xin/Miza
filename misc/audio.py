@@ -366,6 +366,8 @@ class AudioFile:
             self.webpage_url = webpage_url
         self.loading = True
         ffmpeg = "misc/ffmpeg-c/ffmpeg.exe" if check_fmt and is_url(stream) else "ffmpeg"
+        if not os.path.exists(ffmpeg):
+            ffmpeg = "ffmpeg"
         fmt = cdc = self.file.rsplit(".", 1)[-1]
         if fmt == "ogg":
             cdc = "libvorbis"
