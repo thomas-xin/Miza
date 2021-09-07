@@ -134,6 +134,9 @@ from dateutil import parser as tparser
 from sympy.parsing.sympy_parser import parse_expr
 from colormath import color_objects, color_conversions
 
+if not hasattr(time, "time_ns"):
+    time.time_ns = lambda: int(time.time() * 1e9)
+
 
 suppress = lambda *args, **kwargs: contextlib.suppress(BaseException) if not args and not kwargs else contextlib.suppress(*args + tuple(kwargs.values()))
 closing = contextlib.closing

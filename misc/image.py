@@ -14,6 +14,9 @@ write, sys.stdout.write = sys.stdout.write, lambda *args, **kwargs: None
 import pygame
 sys.stdout.write = write
 
+if not hasattr(time, "time_ns"):
+    time.time_ns = lambda: int(time.time() * 1e9)
+
 requests = requests.Session()
 
 

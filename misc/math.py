@@ -9,6 +9,9 @@ import matplotlib.pyplot as plt
 import sympy.plotting as plotter
 from sympy.plotting.plot import Plot
 
+if not hasattr(time, "time_ns"):
+    time.time_ns = lambda: int(time.time() * 1e9)
+
 deque = collections.deque
 
 getattr(latex, "__builtins__", {})["print"] = lambda *void1, **void2: None
