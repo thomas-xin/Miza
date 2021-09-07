@@ -2358,7 +2358,7 @@ class AudioDownloader:
                 br = round(br / 64000) * 64000
                 if not br:
                     br = 64000
-            elif fmt == "aac":
+            elif fmt in ("aac", "m4a"):
                 fmt = "adts"
             elif fmt == "8bit":
                 container = "wav"

@@ -2356,7 +2356,8 @@ class Shop(Command):
             for product in self.products.values():
                 cost = await bot.as_rewards(*product.cost)
                 desc.append(f"**{product.name}** {cost}\n{product.description}")
-            return bot.send_as_embeds(channel, "\n\n".join(desc), title="Shop", author=get_author(user), reference=message)
+            bot.send_as_embeds(channel, "\n\n".join(desc), title="Shop", author=get_author(user), reference=message)
+            return
         item = argv.replace("-", "").replace("_", "").replace(" ", "").casefold()
         try:
             product = self.products[item]
