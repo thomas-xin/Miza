@@ -69,15 +69,16 @@ https://github.com/mailopl/html5-xhr2-chunked-file-upload-slice
 MISC:
 
 smudgedpasta (https://github.com/smudgedpasta)
--Created art for the bot's profile picture, coin animation, and website
+-Created art for the bot's profile picture, coin animation, and website, wrote readme
 -Help with testing
+-Code from https://github.com/smudgedpasta/Dottie for certain commands
 
 Brayconn (https://github.com/Brayconn)
 -Help with finding APIs for functions
 -Help with testing
 
 Hucario/IdiocyMan (https://github.com/hucario)
--Help with main website design and scripting, including mizatlas
+-Created main website design and scripting, including mizatlas
 -Help with testing
 
 Gabriel Ravier (https://github.com/GabrielRavier)
@@ -88,3 +89,6 @@ pachuco (https://github.com/pachuco)
 Clownacy (https://github.com/Clownacy)
 Bombchu Link (https://github.com/BombchuLink)
 -Making and updating the org2xm program for converting org files to xm tracked music
+
+HypnotizedLeda (https://github.com/HypnotizedLeda)
+-Help with readme and minor additions
