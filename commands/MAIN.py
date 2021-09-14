@@ -1433,7 +1433,7 @@ class Note(Command):
     flags = "ed"
     slash = True
 
-    async def __call__(self, name, message, flags, bot, user, argv, **void):
+    async def __call__(self, name, message, channel, flags, bot, user, argv, **void):
         note_userbase = bot.data.notes
 
         if not argv:
@@ -1455,7 +1455,7 @@ class Note(Command):
                 argv = rank_format(int(argv))
                 if not note_userbase.get(user.id):
                     note_userbase.discard(user.id)
-                return css_md(f"Successfully removed {argv} note for [{user}]!", force=True)
+                return ini_md(f"Successfully removed {argv} note for [{user}]!")
 
         elif "e" in flags:
             None
@@ -1466,7 +1466,7 @@ class Note(Command):
                 note_userbase[user.id].append(argv)
             except KeyError:
                 note_userbase[user.id] = [argv]
-            return css_md(f"Successfully added note for [{user}]!", force=True)
+            return ini_md(f"Successfully added note for [{user}]!")
 
 
 class UpdateUrgentReminders(Database):
