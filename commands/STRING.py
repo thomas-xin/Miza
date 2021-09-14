@@ -1102,10 +1102,10 @@ class Rate(Command):
         elif re.fullmatch("<a?:[A-Za-z0-9\\-~_]+:[0-9]+>", argv):
             lego = argv
 
-        argv = argv.replace("'", "").replace("`", "")
+        lego = lego.replace("?", "").replace("!", "")
 
         argv = grammarly_2_point_0(argv)
-        return f"{lego}? I rate {pronoun} `{rate}/10`!"
+        return f"{lego}? I rate {pronoun} a `{rate}/10`!"
 
 
 class Topic(Command):
