@@ -122,7 +122,7 @@ class Help(Command):
         ) for c in standard_commands if c in bot.categories]
         comsel = [cdict(
             emoji=cdict(id=None, name=c.emoji) if getattr(c, "emoji", None) else None,
-            label=lim_str(prefix + " " * (" " in prefix) + c.parse_name() + " " + c.usage, 25, mode=None),
+            label=lim_str(prefix + " " * (" " in prefix) + c.parse_name(), 25, mode=None),
             value=c.parse_name().casefold(),
             description=lim_str(c.parse_description(), 50, mode=None),
             default=comm and com == c,
@@ -1427,6 +1427,45 @@ class Reminder(Command):
             await bot.ignore_interaction(message)
 
 
+class Note(Command):
+    description = "Takes note of a given string and allows you to view and edit a to-do list!"
+    usage = "(edit|delete)? <id|note>?"
+    flags = "ed"
+    slash = True
+
+    async def __call__(self, name, message, flags, bot, user, argv, **void):
+        note_userbase = bot.data.notes
+
+        if not argv:
+            user_notes = bot.data.notes.get(user.id, ["`No notes!`"])
+            description = iter2str(user_notes)
+            author = get_author(message.author)
+            author.name = f"{message.author.name}'s notes!"
+            colour = await bot.get_colour(message.author)
+            colour = discord.Colour(colour)
+            bot.send_as_embeds(channel, description, colour=colour, author=author, reference=message)
+            
+        elif "d" in flags:
+            try:
+                note_userbase[user.id].pop(int(argv))
+            except (KeyError, IndexError):
+                argv = rank_format(int(argv))
+                raise LookupError(f"You don't have a note {argv}!")
+            else:
+                if not note_userbase.get(user.id):
+                    note_userbase.discard(user.id)
+
+        elif "e" in flags:
+            # Kind of want to implement buttons for this one, so Miza will ask if the user wants to append below or to the side of an existing note in a less clunky way. Leaving this one to Txin. XD
+
+        elif argv:
+            try:
+                note_userbase[user.id].append(argv)
+            except KeyError:
+                note_userbase[user.id] = [argv]
+            return css_md(f"Successfully added note for [{user}]!", force=True)
+
+
 class UpdateUrgentReminders(Database):
     name = "urgentreminders"
     no_delete = True
@@ -1575,7 +1614,11 @@ class UpdateReminders(Database):
                     if not rems:
                         self.data.pop(u_id)
             with suppress(KeyError):
-                self.data.pop(s)      
+                self.data.pop(s)
+
+
+class UpdateNotes(Database):
+    name = "notes"
 
 
 class UpdatePrefix(Database):

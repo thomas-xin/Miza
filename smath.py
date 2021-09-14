@@ -1729,6 +1729,10 @@ def iter2str(it, key=None, limit=1728, offset=0, left="[", right="]", sep=" "):
     return lim_str(s, limit)
 
 
+# Recognises "st", "nd", "rd" and "th" in numbers.
+rank_format = lambda n: str(n) + "st nd rd th".split()[min((n - 1) % 10, 3)]
+
+
 # Returns a copy of a mapping object, with keys cast to integers where possible.
 def int_key(d):
     c = d.__class__(d)
