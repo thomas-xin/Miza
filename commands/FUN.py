@@ -613,7 +613,7 @@ class Matchmaking(Command):
 
     async def __call__(self, bot, message, channel, guild, args, **void):
         users = deque()
-        for u_id in args:
+        for u_id in map(verify_id, args):
             try:
                 user = await bot.fetch_member_ex(u_id, guild, allow_banned=False, fuzzy=0)
             except:

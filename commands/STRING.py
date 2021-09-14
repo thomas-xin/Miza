@@ -1081,15 +1081,13 @@ class Rate(Command):
         rate = random.randint(0, 10)
         pronoun = "that"
         lego = f"`{grammarly_2_point_0(argv)}`"
-
         try:
-            user = await bot.fetch_member_ex(u_id, guild, allow_banned=False, fuzzy=0)
+            user = await bot.fetch_member_ex(verify_id(argv), guild, allow_banned=False, fuzzy=0)
         except:
             if re.fullmatch("<a?:[A-Za-z0-9\\-~_]+:[0-9]+>", argv):
                 lego = argv
         else:
             lego = user.display_name
-
         lego = lego.replace("?", "").replace("!", "")
         return f"{lego}? I rate {pronoun} a `{rate}/10`!"
 
