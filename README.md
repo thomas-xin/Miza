@@ -62,6 +62,8 @@ Sections     | Explanations
 
 <br>
 
+Note: Miza is currently implemented and supported for **Windows only**. Linux and Docker support is planned for the future, but as of right now have not been put in place.
+
 ### Installing Miza
 
 * Launch Git Bash.
