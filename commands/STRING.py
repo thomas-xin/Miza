@@ -1073,38 +1073,24 @@ class Random(Command):
 
 class Rate(Command):
     name = ["Rating"]
-    description = "Rates a given object with a random percent!"
-    usage = "<object>"
+    description = "Rates a given object with a random value out of 10!"
+    usage = "<string>"
     slash = True
 
     async def __call__(self, guild, argv, **void):
         rate = random.randint(0, 10)
         pronoun = "that"
-        lego = f"`{argv}`"
+        lego = f"`{grammarly_2_point_0(argv)}`"
 
-        if re.fullmatch("<@[!&]?[0-9]+>", argv):
-            u_id = int(argv.strip("<@!&>"))
-            user = guild.get_member(u_id)
-            if user is None:
-                try:
-                    user = await bot.fetch_user(u_id)
-                except discord.NotFound:
-                    pass
-                else:
-                    argv = user.name
-                    rate = 10
-                    pronoun = "them"
-            else:
-                argv = user.display_name
-                rate = 10
-                pronoun = "them"
-            lego = f"`{argv}`"
-        elif re.fullmatch("<a?:[A-Za-z0-9\\-~_]+:[0-9]+>", argv):
-            lego = argv
+        try:
+            user = await bot.fetch_member_ex(u_id, guild, allow_banned=False, fuzzy=0)
+        except:
+            if re.fullmatch("<a?:[A-Za-z0-9\\-~_]+:[0-9]+>", argv):
+                lego = argv
+        else:
+            lego = user.display_name
 
         lego = lego.replace("?", "").replace("!", "")
-
-        argv = grammarly_2_point_0(argv)
         return f"{lego}? I rate {pronoun} a `{rate}/10`!"
 
 

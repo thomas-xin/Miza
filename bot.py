@@ -2539,7 +2539,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 if utc() - os.path.getmtime(fn) < 60:
                     return fn
                 os.remove(fn)
-            print(as_str(subprocess.check_output([sys.executable, "misc/neutrino.py", "-c", "saves", fn])))
+            print(as_str(subprocess.run([sys.executable, "misc/neutrino.py", "-c", "saves", fn], stderr=subprocess.PIPE).stdout))
         # zf = ZipFile(fn, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
         # for x, y, z in os.walk("saves"):
         #     for f in z:
@@ -2574,7 +2574,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     f.write(s)
         if not os.path.exists("backup"):
             os.mkdir("backup")
-        fn = f"backup/saves.{datetime.datetime.utcnow().date()}.zip"
+        fn = f"backup/saves.{datetime.datetime.utcnow().date()}.wb"
         day = not os.path.exists(fn)
         if day:
             await_fut(self.send_event("_day_"))

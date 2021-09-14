@@ -606,80 +606,41 @@ class Text2048(Command):
 
 class Matchmaking(Command):
     name = ["Ship", "❤️", "🧡", "💛", "💚", "💙", "💜", "💗", "💞", "🤍", "🖤", "🤎", "❣️", "💕", "💖"]
-    description = "Ships two provided objects by a randomised percent."
-    usage = "<0:object1> <1:object2>"
-    slash = True
+    description = "Ships two provided objects with a randomised percent."
+    usage = "<objects>*"
+    slash = "Ship"
+    heart_list = ["❤️", "🧡", "💛", "💚", "💙", "💜", "💗", "💞", "🤍", "🖤", "🤎", "❣️", "💕", "💖"]
 
     async def __call__(self, bot, message, channel, guild, args, **void):
-        arg, arg2 = args
-        heart_list = ["❤️", "🧡", "💛", "💚", "💙", "💜", "💗", "💞", "🤍", "🖤", "🤎", "❣️", "💕", "💖"]
-        if re.fullmatch("<@[!&]?[0-9]+>", arg):
-            u_id = int(arg.strip("<@!&>"))
-            user = guild.get_member(u_id)
-            if user is None:
-                try:
-                    user = await bot.fetch_user(u_id)
-                except discord.NotFound:
-                    pass
-                else:
-                    arg = user.name
+        users = deque()
+        for u_id in args:
+            try:
+                user = await bot.fetch_member_ex(u_id, guild, allow_banned=False, fuzzy=0)
+            except:
+                users.append(u_id)
             else:
-                arg = user.display_name
-        elif re.fullmatch("<a?:[A-Za-z0-9\\-~_]+:[0-9]+>", arg):
-            _, name, e_id = arg[:-1].rsplit(":", 2)
-            e_id = int(e_id)
-            emoji = bot._connection._emojis.get(e_id)
-            if emoji is not None:
-                name = emoji.name
-            arg = name
+                users.append(user.display_name)
+        while len(users) < 2:
+            users.append(choice(guild.members).display_name)
 
-        if re.fullmatch("<@[!&]?[0-9]+>", arg2):
-            u_id = int(arg2.strip("<@!&>"))
-            user = guild.get_member(u_id)
-            if user is None:
-                try:
-                    user = await bot.fetch_user(u_id)
-                except discord.NotFound:
-                    pass
-                else:
-                    arg2 = user.name
-            else:
-                arg2 = user.display_name
-        elif re.fullmatch("<a?:[A-Za-z0-9\\-~_]+:[0-9]+>", arg2):
-            _, name, e_id = arg2[:-1].rsplit(":", 2)
-            e_id = int(e_id)
-            emoji = bot._connection._emojis.get(e_id)
-            if emoji is not None:
-                name = emoji.name
-            arg2 = name
+        x = random.random()
+        users = sorted(map(unicode_prune, users))
+        seed = nhash("\x7f".join(users))
+        seed, percentage = divmod(seed, 100)
+        random.seed(seed)
+        shiptargets = uni_str(" ♡ ".join(map(sqr_md, users)), 1)
+        users = shuffle(users)
+        shipname = users[0][:len(users[0]) + 1 >> 1]
+        shipname += "".join(a[len(a) >> 2:len(a) - len(a) >> 2] for a in users[1:-1])
+        shipname += users[-1][len(users[-1]) >> 1:]
 
-        arg = arg.capitalize().replace("'", "").replace("`", "")
-        arg2 = arg2.capitalize().replace("'", "").replace("`", "")
-        arg, arg2 = sorted((arg, arg2))
-
-        random.seed((arg, arg2))
-        percentage = random.randint(0, 100)
-
-        start = len(arg) / 2
-        end = len(arg2) / 2
-        ship_beg = arg[:-int(start)]
-        ship_beg2 = arg2[:-int(end)]
-        ship_tail = arg[-int(start):]
-        ship_tail2 = arg2[-int(end):]
-        ship_start = random.choice([ship_beg, ship_tail])
-        ship_end = random.choice([ship_beg2, ship_tail2])
-        random.seed((ship_start, ship_end))
-        shipname = ship_start + ship_end
-
-        random.seed(time.time())
-        heart = random.choice(heart_list)
-
+        random.seed(utc() * x)
+        heart = choice(self.heart_list)
         bar = await bot.create_progress_bar(21, percentage / 100)
 
-        # markdown = lambda s: choice(ini_md, lambda s: css_md(s, force=True))(uni_str(s, 1))
         suspicious_function = lambda x: x / ((x ** 2 * 6254793562032913) // (7632048114126314 * 10 ** 24) - (x * 5638138161912547) // 2939758 + 1000000155240420236976462021787648)
         suspicious_function_2 = lambda x: int.from_bytes(bytes.fromhex(x.encode("utf-8").hex()), "little")
-        if round(suspicious_function(suspicious_function_2(arg + arg2))) in (13264547, 47787122) and suspicious_function(suspicious_function_2(arg2 + arg)) in (5.869437322867208e-09, 1.0000614609767725e-08):
+        if round(suspicious_function(suspicious_function_2("".join(a.capitalize() for a in args)))) in (13264547, 47787122) and suspicious_function(suspicious_function_2("".join(a.capitalize() for a in args))) in (5.869437322867208e-09, 1.0000614609767725e-08):
             inwards_heart = [
                 "00111011100",
                 "01122122110",
@@ -696,7 +657,7 @@ class Matchmaking(Command):
                 "2": "<a:_" + ":797359354314620939>",
                 "3": "<a:_" + ":797359351509549056>",
                 "4": "<a:_" + ":797359341157482496>",
-                "5": "<:_" + ":722354192995450912>"
+                "5": "<:_" + ":722354192995450912>",
             }
             e_calc = lambda x: (x * 15062629995394936) // 7155909327645687 - (x ** 2 * 3014475045596449) // (2062550437214859 * 10 ** 18) - 53
             e2 = bot.get_emoji(e_calc(guild.id))
@@ -705,13 +666,12 @@ class Matchmaking(Command):
 
             trans = "".maketrans(emoji)
             rainbow_heart = "\n".join(inwards_heart).translate(trans)
-            description = "```" + choice(["ini", "css"]) + f"\n[{uni_str(arg, 1)}] ♡ [{uni_str(arg2, 1)}]❔ They score an [{uni_str('infinite%', 1)}]❕ 💜```" + rainbow_heart
+            description = "```" + choice(["ini", "css"]) + f"\n{shiptargets}❔ They score an [{uni_str('infinite%', 1)}]❕ 💜```" + rainbow_heart
         else:
-            if arg == arg2:
-                description = "```" + choice(["ini", "css"]) + f"\n[{uni_str(arg, 1)}] ♡ [{uni_str(arg2, 1)}]❔ They [{percentage}%] love themselves❕ " + get_random_emoji() + "```" + bar
+            if all(a == users[0] for a in users[1:]):
+                description = "```" + choice(["ini", "css"]) + f"\n{shiptargets}❔ They [{percentage}%] love themselves❕ " + get_random_emoji() + "```" + bar
             else:
-                description = "```" + choice(["ini", "css"]) + f"\n[{uni_str(arg, 1)}] ♡ [{uni_str(arg2, 1)}] ({uni_str(shipname.capitalize(), 1)})❔ They score a [{percentage}%]❕ " + get_random_emoji() + "```" + bar
-        # footer = cdict(icon_url=best_url(message.author), text=f"Shipped by {message.author.display_name} 🤍")
+                description = "```" + choice(["ini", "css"]) + f"\n{shiptargets} ({uni_str(shipname.capitalize(), 1)})❔ They score a [{percentage}%]❕ " + get_random_emoji() + "```" + bar
         author = get_author(message.author)
         author.name = heart + uni_str(" MATCHMAKING ", 12) + heart
         colour = await bot.get_colour(message.author)
