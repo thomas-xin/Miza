@@ -1428,6 +1428,7 @@ class Reminder(Command):
 
 
 class Note(Command):
+    name = ["Notes"]
     description = "Takes note of a given string and allows you to view and edit a to-do list!"
     usage = "(edit|delete)? <id|note>?"
     flags = "ed"
