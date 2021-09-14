@@ -1431,7 +1431,6 @@ class Note(Command):
     description = "Takes note of a given string and allows you to view and edit a to-do list!"
     usage = "(edit|delete)? <id|note>?"
     flags = "ed"
-    slash = True
 
     async def __call__(self, name, message, channel, flags, bot, user, argv, **void):
         note_userbase = bot.data.notes
