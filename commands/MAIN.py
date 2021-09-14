@@ -1450,7 +1450,7 @@ class Note(Command):
                 note_userbase[user.id].pop(int(argv))
             except (KeyError, IndexError):
                 argv = rank_format(int(argv))
-                raise LookupError(f"You don't have a note {argv}!")
+                raise LookupError(f"You don't have a {argv} note!")
             else:
                 argv = rank_format(int(argv))
                 if not note_userbase.get(user.id):
