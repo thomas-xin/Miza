@@ -2539,7 +2539,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 if utc() - os.path.getmtime(fn) < 60:
                     return fn
                 os.remove(fn)
-            print(as_str(subprocess.run([sys.executable, "misc/neutrino.py", "-c", "saves", fn], stderr=subprocess.PIPE).stdout))
+            lines = as_str(subprocess.run([sys.executable, "misc/neutrino.py", "-c", "saves", fn], stderr=subprocess.PIPE).stdout).splitlines()
+            s = "\n".join(line for line in line if not line.startswith("\r"))
+            print(s)
         # zf = ZipFile(fn, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
         # for x, y, z in os.walk("saves"):
         #     for f in z:

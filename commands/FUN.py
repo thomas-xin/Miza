@@ -617,7 +617,7 @@ class Matchmaking(Command):
             try:
                 user = await bot.fetch_member_ex(u_id, guild, allow_banned=False, fuzzy=0)
             except:
-                users.append(u_id)
+                users.append(u_id.capitalize())
             else:
                 users.append(user.display_name)
         while len(users) < 2:
@@ -633,6 +633,7 @@ class Matchmaking(Command):
         shipname = users[0][:len(users[0]) + 1 >> 1]
         shipname += "".join(a[len(a) >> 2:len(a) - len(a) >> 2] for a in users[1:-1])
         shipname += users[-1][len(users[-1]) >> 1:]
+        shipname = shipname.strip().capitalize()
 
         random.seed(utc() * x)
         heart = choice(self.heart_list)
@@ -671,7 +672,7 @@ class Matchmaking(Command):
             if all(a == users[0] for a in users[1:]):
                 description = "```" + choice(["ini", "css"]) + f"\n{shiptargets}❔ They [{percentage}%] love themselves❕ " + get_random_emoji() + "```" + bar
             else:
-                description = "```" + choice(["ini", "css"]) + f"\n{shiptargets} ({uni_str(shipname.capitalize(), 1)})❔ They score a [{percentage}%]❕ " + get_random_emoji() + "```" + bar
+                description = "```" + choice(["ini", "css"]) + f"\n{shiptargets} ({uni_str(shipname, 1)})❔ They score a [{percentage}%]❕ " + get_random_emoji() + "```" + bar
         author = get_author(message.author)
         author.name = heart + uni_str(" MATCHMAKING ", 12) + heart
         colour = await bot.get_colour(message.author)
