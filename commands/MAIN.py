@@ -1934,9 +1934,9 @@ class UpdateUsers(Database):
         t = utc()
         out = None
         if len(mentions) >= xrand(8, 12) and self.data.get(user.id, EMPTY).get("last_mention", 0) > 3:
-            out = f"{choice('🥴😣😪😢')} please calm down a second, I'm only here to help..."
+            out = f"{choice('🥴😣😪😢')} Please calm down a second, I'm only here to help..."
         elif len(mentions) >= 3 and (self.data.get(user.id, EMPTY).get("last_mention", 0) > 2 or random.random() >= 2 / 3):
-            out = f"{choice('😟😦😓')} oh, that's a lot of mentions, is everything okay?"
+            out = f"{choice('😟😦😓')} Oh, that's a lot of mentions, is everything okay?"
         elif len(mentions) >= 2 and self.data.get(user.id, EMPTY).get("last_mention", 0) > 0 and random.random() >= 0.75:
             out = "One mention is enough, but I appreciate your enthusiasm 🙂"
         if out:

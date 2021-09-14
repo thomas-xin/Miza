@@ -1123,6 +1123,17 @@ def min_emoji(emoji):
     return f"<:_:{emoji.id}>"
 
 
+def get_random_emoji():
+    d = [chr(c) for c in range(128512, 128568)]
+    d.extend(chr(c) for c in range(128577, 128580))
+    d.extend(chr(c) for c in range(129296, 129302))
+    d.extend(chr(c) for c in range(129312, 129318))
+    d.extend(chr(c) for c in range(129319, 129328))
+    d.extend(chr(c) for c in range(129392, 129399))
+    d.extend(chr(c) for c in (129303, 129400, 129402))
+    return random.choice(d)
+
+
 def get_last_image(message, embeds=True):
     for a in reversed(message.attachments):
         url = a.url
