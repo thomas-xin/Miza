@@ -2540,7 +2540,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     return fn
                 os.remove(fn)
             lines = as_str(subprocess.run([sys.executable, "misc/neutrino.py", "-c", "saves", fn], stderr=subprocess.PIPE).stdout).splitlines()
-            s = "\n".join(line for line in line if not line.startswith("\r"))
+            s = "\n".join(line for line in lines if not line.startswith("\r"))
             print(s)
         # zf = ZipFile(fn, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
         # for x, y, z in os.walk("saves"):
