@@ -3395,7 +3395,6 @@ class AudioSettings(Command):
         "CH": "chorus",
         "📊": "chorus",
         "NC": "resample",
-        "Rate": "bitrate",
         "BPS": "bitrate",
         "BR": "bitrate",
         "LQ": "loop",

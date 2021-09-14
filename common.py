@@ -1134,6 +1134,55 @@ def get_random_emoji():
     return random.choice(d)
 
 
+def replace_map(s, mapping):
+    temps = {k: chr(65535 - i) for i, k in enumerate(mapping.keys())}
+    trans = "".maketrans({chr(65535 - i): mapping[k] for i, k in enumerate(mapping.keys())})
+    for key, value in temps.items():
+        s = s.replace(key, value)
+    for key, value in mapping.items():
+        s = s.replace(value, key)
+    return s.translate(trans)
+
+
+# You can easily tell I was the one to name this thing. 🍻 - smudgedpasta
+def grammarly_2_point_0(string):
+    s = string.lower().replace("am i", "are y\uf000ou").replace("i am", "y\uf000ou are")
+    s = replace_map(s, {
+        "yourself": "myself",
+        "your ": "my ",
+        "are you": "am I",
+        "you are": "I am",
+        "you're": "i'm",
+        "you'll": "i'll"
+    })
+    modal_verbs = "shall should shan't shalln't shouldn't must mustn't can could couldn't may might mightn't will would won't wouldn't have had haven't hadn't do did don't didn't"
+    r1 = re.compile(f"(?:{modal_verbs.replace(' ', '|')}) you")
+    r2 = re.compile(f"you (?:{modal_verbs.replace(' ', '|')})")
+    while True:
+        m = r1.search(s)
+        if not m:
+            m = r2.search(s)
+            if not m:
+                break
+            s = s[:m.start()] + "I" + s[m.start() + 3:]
+        else:
+            s = s[:m.end() - 3] + "I" + s[m.end():]
+    res = alist(s.split())
+    for sym in "!.,'":
+        if sym in s:
+            for word, rep in {"you": "m\uf000e", "me": "you", "i": "I"}.items():
+                src = word + sym
+                dest = rep + sym
+                if res[0] == src:
+                    res[0] = dest
+                res.replace(src, dest)
+    if res[0] == "you":
+        res[0] = "I"
+    s = " ".join(res.replace("you", "m\uf000e").replace("i", "you").replace("me", "you").replace("i", "I").replace("i'm", "I'm").replace("i'll", "I'll"))
+    string = s[0].upper() + s[1:].replace("\uf000", "")
+    return string
+
+
 def get_last_image(message, embeds=True):
     for a in reversed(message.attachments):
         url = a.url
