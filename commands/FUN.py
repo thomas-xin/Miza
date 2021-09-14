@@ -718,7 +718,7 @@ class Matchmaking(Command):
         colour = await bot.get_colour(message.author)
         colour = discord.Colour(colour)
 
-        bot.send_as_embeds(channel, description, colour=colour, author=author)
+        bot.send_as_embeds(channel, description, colour=colour, author=author, reference=message)
 
 
 class Snake(Command):
