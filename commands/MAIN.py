@@ -1452,10 +1452,13 @@ class Note(Command):
                 argv = rank_format(int(argv))
                 raise LookupError(f"You don't have a note {argv}!")
             else:
+                argv = rank_format(int(argv))
                 if not note_userbase.get(user.id):
                     note_userbase.discard(user.id)
+                return css_md(f"Successfully removed {argv} note for [{user}]!", force=True)
 
         elif "e" in flags:
+            None
             # Kind of want to implement buttons for this one, so Miza will ask if the user wants to append below or to the side of an existing note in a less clunky way. Leaving this one to Txin. XD
 
         elif argv:
