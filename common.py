@@ -547,9 +547,11 @@ class FileHashDict(collections.abc.MutableMapping):
         if data is BaseException:
             for file in sorted(os.listdir("backup"), reverse=True):
                 with tracebacksuppressor:
-                    with zipfile.ZipFile("backup/" + file, compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False) as z:
-                        time.sleep(0.03)
-                        s = z.read(fn)
+                    if file.endswith(".wb"):
+                        s = subprocess.check_output([sys.executable, "misc/neutrino.py", "backup/" + file, "-f", fn.split("/", 1)[-1]])
+                    else:
+                        with zipfile.ZipFile("backup/" + file, compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False) as z:
+                            s = z.read(fn)
                     data = select_and_loads(s, mode="unsafe")
                     self.modified.add(k)
                     print(f"Successfully recovered backup of {fn} from {file}.")

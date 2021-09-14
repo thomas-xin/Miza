@@ -933,10 +933,11 @@ def supersample(a, size):
     if n < size:
         interp = np.linspace(0, n - 1, size)
         return np.interp(interp, range(n), a)
+    dtype = a.dtype
     x = ceil(n / size)
     interp = np.linspace(0, n - 1, x * size)
     a = np.interp(interp, range(n), a)
-    return np.mean(a.reshape(-1, x), 1)
+    return np.mean(a.reshape(-1, x), 1, dtype=dtype)
 
 
 # Computes the mean of all numbers in an iterable.

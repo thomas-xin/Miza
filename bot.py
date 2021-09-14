@@ -2533,17 +2533,19 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         return i
 
     def backup(self):
-        fn = f"backup/saves.{datetime.datetime.utcnow().date()}.zip"
-        if os.path.exists(fn):
-            if utc() - os.path.getmtime(fn) < 60:
-                return fn
-            os.remove(fn)
-        zf = ZipFile(fn, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
-        for x, y, z in os.walk("saves"):
-            for f in z:
-                fp = os.path.join(x, f)
-                zf.write(fp, fp)
-        zf.close()
+        with tracebacksuppressor:
+            fn = f"backup/saves.{datetime.datetime.utcnow().date()}.wb"
+            if os.path.exists(fn):
+                if utc() - os.path.getmtime(fn) < 60:
+                    return fn
+                os.remove(fn)
+            print(as_str(subprocess.check_output([sys.executable, "misc/neutrino.py", "-c", "saves", fn])))
+        # zf = ZipFile(fn, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
+        # for x, y, z in os.walk("saves"):
+        #     for f in z:
+        #         fp = os.path.join(x, f)
+        #         zf.write(fp, fp)
+        # zf.close()
         print("Backup database created in", fn)
         return fn
 

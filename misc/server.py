@@ -1383,7 +1383,7 @@ body {
         j, after = fut.result()
         RESPONSES.pop(t, None)
         cp.response.headers.update(CHEADERS)
-        return cp.lib.static.serve_file(os.getcwd() + "/" + j["result"], content_type="application/zip", disposition="attachment")
+        return cp.lib.static.serve_file(os.getcwd() + "/" + j["result"], content_type="application/octet-stream", disposition="attachment")
     backup._cp_config = {"response.stream": True}
 
     @cp.expose(("eval", "exec"))
