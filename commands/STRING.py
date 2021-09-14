@@ -1077,7 +1077,7 @@ class Rate(Command):
     usage = "<string>"
     slash = True
 
-    async def __call__(self, guild, argv, **void):
+    async def __call__(self, bot, guild, argv, **void):
         rate = random.randint(0, 10)
         pronoun = "that"
         lego = f"`{grammarly_2_point_0(argv)}`"
@@ -1087,7 +1087,8 @@ class Rate(Command):
             if re.fullmatch("<a?:[A-Za-z0-9\\-~_]+:[0-9]+>", argv):
                 lego = argv
         else:
-            lego = user.display_name
+            lego = f"`{user.display_name}`"
+            rate = 10
         lego = lego.replace("?", "").replace("!", "")
         return f"{lego}? I rate {pronoun} a `{rate}/10`!"
 
