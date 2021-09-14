@@ -1411,8 +1411,8 @@ class Reminder(Command):
             msg = iter2str(
                 rems[pos:pos + page],
                 key=lambda x: lim_str(bot.get_user(x.get("user", -1), replace=True).mention + ": `" + no_md(x["msg"]), 96) + "` ➡️ " + (user_mention(x["u_id"]) if "u_id" in x else time_until(x["t"])),
-                left="`[",
-                right="]`",
+                left="`【",
+                right="】`",
             )
         colour = await self.bot.get_colour(user)
         emb = discord.Embed(
@@ -1431,42 +1431,103 @@ class Note(Command):
     name = ["Notes"]
     description = "Takes note of a given string and allows you to view and edit a to-do list!"
     usage = "(edit|delete)? <id|note>?"
-    flags = "ed"
+    flags = "aed"
+    directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
+    dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
 
     async def __call__(self, name, message, channel, flags, bot, user, argv, **void):
         note_userbase = bot.data.notes
-
-        if not argv:
-            user_notes = bot.data.notes.get(user.id, ["`No notes!`"])
-            description = iter2str(user_notes)
-            author = get_author(message.author)
-            author.name = f"{message.author.name}'s notes!"
-            colour = await bot.get_colour(message.author)
-            colour = discord.Colour(colour)
-            bot.send_as_embeds(channel, description, colour=colour, author=author, reference=message)
-            
-        elif "d" in flags:
+        if argv.startswith("edit "):
+            argv = argv.split(None, 1)[-1]
+            add_dict(flags, dict(e=1))
+        elif argv.startswith("delete ") or argv.startswith("remove "):
+            argv = argv.split(None, 1)[-1]
+            add_dict(flags, dict(d=1))
+        if "d" in flags:
             try:
                 note_userbase[user.id].pop(int(argv))
             except (KeyError, IndexError):
                 argv = rank_format(int(argv))
                 raise LookupError(f"You don't have a {argv} note!")
-            else:
-                argv = rank_format(int(argv))
-                if not note_userbase.get(user.id):
-                    note_userbase.discard(user.id)
-                return ini_md(f"Successfully removed {argv} note for [{user}]!")
-
+            argv = rank_format(int(argv))
+            if not note_userbase.get(user.id):
+                note_userbase.discard(user.id)
+            return ini_md(f"Successfully removed {argv} note for [{user}]!")
+        elif not argv:
+            # Set callback message for scrollable list
+            buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
+            await send_with_reply(
+                None,
+                message,
+                "*```" + "\n" * ("z" in flags) + "callback-main-note-"
+                + str(user.id) + "_0"
+                + "-\nLoading Notes database...```*",
+                buttons=buttons,
+            )
+            return
         elif "e" in flags:
-            None
+            pass
             # Kind of want to implement buttons for this one, so Miza will ask if the user wants to append below or to the side of an existing note in a less clunky way. Leaving this one to Txin. XD
+        try:
+            note_userbase[user.id].append(argv)
+        except KeyError:
+            note_userbase[user.id] = [argv]
+        else:
+            note_userbase.update(user.id)
+        return ini_md(f"Successfully added note for [{user}]!")
 
-        elif argv:
-            try:
-                note_userbase[user.id].append(argv)
-            except KeyError:
-                note_userbase[user.id] = [argv]
-            return ini_md(f"Successfully added note for [{user}]!")
+    async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
+        u_id, pos = list(map(int, vals.split("_", 1)))
+        if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
+            return
+        if reaction not in self.directions and reaction is not None:
+            return
+        guild = message.guild
+        user = await bot.fetch_user(u_id)
+        data = bot.data.notes
+        curr = data.get(user.id, ())
+        page = 16
+        last = max(0, len(curr) - page)
+        if reaction is not None:
+            i = self.directions.index(reaction)
+            if i == 0:
+                new = 0
+            elif i == 1:
+                new = max(0, pos - page)
+            elif i == 2:
+                new = min(last, pos + page)
+            elif i == 3:
+                new = last
+            else:
+                new = pos
+            pos = new
+        content = message.content
+        if not content:
+            content = message.embeds[0].description
+        i = content.index("callback")
+        content = "*```" + "\n" * ("\n" in content[:i]) + (
+            "callback-admin-autoemoji-"
+            + str(u_id) + "_" + str(pos)
+            + "-\n"
+        )
+        if not curr:
+            content += f"No currently assigned notes for {str(user).replace('`', '')}.```*"
+            msg = ""
+        else:
+            content += f"{len(curr)} notes currently assigned for {str(user).replace('`', '')}:```*"
+            msg = iter2str(tuple(curr)[pos:pos + page], left="`【", right="】`")
+        colour = await self.bot.data.colours.get(to_png_ex(guild.icon_url))
+        emb = discord.Embed(
+            description=content + msg,
+            colour=colour,
+        )
+        emb.set_author(**get_author(user))
+        more = len(curr) - pos - page
+        if more > 0:
+            emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
+        create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
+        if hasattr(message, "int_token"):
+            await bot.ignore_interaction(message)
 
 
 class UpdateUrgentReminders(Database):

@@ -639,9 +639,11 @@ class Matchmaking(Command):
         heart = choice(self.heart_list)
         bar = await bot.create_progress_bar(21, percentage / 100)
 
+        markdown = choice(ini_md, lambda s: css_md(s, force=True))
         suspicious_function = lambda x: x / ((x ** 2 * 6254793562032913) // (7632048114126314 * 10 ** 24) - (x * 5638138161912547) // 2939758 + 1000000155240420236976462021787648)
         suspicious_function_2 = lambda x: int.from_bytes(bytes.fromhex(x.encode("utf-8").hex()), "little")
-        if round(suspicious_function(suspicious_function_2("".join(a.capitalize() for a in args)))) in (13264547, 47787122) and suspicious_function(suspicious_function_2("".join(a.capitalize() for a in args))) in (5.869437322867208e-09, 1.0000614609767725e-08):
+        s = "".join(a.capitalize() for a in sorted(users))
+        if round(suspicious_function(suspicious_function_2(s))) in (13264547, 47787122):
             inwards_heart = [
                 "00111011100",
                 "01122122110",
@@ -667,12 +669,12 @@ class Matchmaking(Command):
 
             trans = "".maketrans(emoji)
             rainbow_heart = "\n".join(inwards_heart).translate(trans)
-            description = "```" + choice(["ini", "css"]) + f"\n{shiptargets}❔ They score an [{uni_str('infinite%', 1)}]❕ 💜```" + rainbow_heart
+            description = markdown(f"{shiptargets}❔ They score an [{uni_str('infinite%', 1)}]❕ 💜") + rainbow_heart
         else:
             if all(a == users[0] for a in users[1:]):
-                description = "```" + choice(["ini", "css"]) + f"\n{shiptargets}❔ They [{percentage}%] love themselves❕ " + get_random_emoji() + "```" + bar
+                description = markdown(f"{shiptargets}❔ They [{percentage}%] love themselves❕ " + get_random_emoji()) + bar
             else:
-                description = "```" + choice(["ini", "css"]) + f"\n{shiptargets} ({uni_str(shipname, 1)})❔ They score a [{percentage}%]❕ " + get_random_emoji() + "```" + bar
+                description = markdown(f"{shiptargets} ({uni_str(shipname, 1)})❔ They score a [{percentage}%]❕ " + get_random_emoji()) + bar
         author = get_author(message.author)
         author.name = heart + uni_str(" MATCHMAKING ", 12) + heart
         colour = await bot.get_colour(message.author)
@@ -1943,9 +1945,14 @@ class EmojiList(Command):
         curr = {}
         for k, v in sorted(following.get(user.id, {}).items(), key=lambda n: full_prune(n[0])):
             try:
-                me = await bot.min_emoji(v)
+                try:
+                    me = " " + str(bot.cache.emojis[v])
+                except KeyError:
+                    await bot.min_emoji(v)
+                    me = ""
             except LookupError:
                 following[user.id].pop(k)
+                following.update(user.id)
                 continue
             curr[f":{k}:"] = f"({v})` {me}"
         page = 16
