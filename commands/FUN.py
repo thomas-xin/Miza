@@ -606,7 +606,6 @@ class Text2048(Command):
 
 class Matchmaking(Command):
     name = ["Ship", "❤️", "🧡", "💛", "💚", "💙", "💜", "💗", "💞", "🤍", "🖤", "🤎", "❣️", "💕", "💖"]
-    rate_limit = (3, 9)
     description = "Ships two provided objects by a randomised percent."
     usage = "<0:object1> <1:object2>"
     slash = True
