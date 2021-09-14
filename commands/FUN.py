@@ -677,7 +677,7 @@ class Matchmaking(Command):
 
         bar = await bot.create_progress_bar(21, percentage / 100)
 
-        markdown = lambda s: choice(ini_md, lambda s: css_md(s, force=True))(uni_str(s, 1))
+        # markdown = lambda s: choice(ini_md, lambda s: css_md(s, force=True))(uni_str(s, 1))
         suspicious_function = lambda x: x / ((x ** 2 * 6254793562032913) // (7632048114126314 * 10 ** 24) - (x * 5638138161912547) // 2939758 + 1000000155240420236976462021787648)
         suspicious_function_2 = lambda x: int.from_bytes(bytes.fromhex(x.encode("utf-8").hex()), "little")
         if round(suspicious_function(suspicious_function_2(arg + arg2))) in (13264547, 47787122) and suspicious_function(suspicious_function_2(arg2 + arg)) in (5.869437322867208e-09, 1.0000614609767725e-08):
@@ -706,14 +706,15 @@ class Matchmaking(Command):
 
             trans = "".maketrans(emoji)
             rainbow_heart = "\n".join(inwards_heart).translate(trans)
-            description = markdown(f"\n[{arg}] ♡ [{arg2}]❔ They score an [infinite%]❕ 💜") + rainbow_heart
+            description = "```" + choice(["ini", "css"]) + f"\n[{uni_str(arg, 1)}] ♡ [{uni_str(arg2, 1)}]❔ They score an [{uni_str('infinite%', 1)}]❕ 💜```" + rainbow_heart
         else:
             if arg == arg2:
-                description = markdown(f"\n[{arg}] ♡ [{arg2}]❔ They [{percentage}%] love themselves❕ " + get_random_emoji()) + bar
+                description = "```" + choice(["ini", "css"]) + f"\n[{uni_str(arg, 1)}] ♡ [{uni_str(arg2, 1)}]❔ They [{percentage}%] love themselves❕ " + get_random_emoji() + "```" + bar
             else:
-                description = markdown(f"\n[{arg}] ♡ [{arg2}] ({shipname.capitalize()})❔ They score a [{percentage}%]❕ " + get_random_emoji()) + bar
+                description = "```" + choice(["ini", "css"]) + f"\n[{uni_str(arg, 1)}] ♡ [{uni_str(arg2, 1)}] ({uni_str(shipname.capitalize(), 1)})❔ They score a [{percentage}%]❕ " + get_random_emoji() + "```" + bar
         # footer = cdict(icon_url=best_url(message.author), text=f"Shipped by {message.author.display_name} 🤍")
-        author = cdict(icon_url=best_url(message.author), name=heart + uni_str(" MATCHMAKING ", 12) + heart)
+        author = get_author(message.author)
+        author.name = heart + uni_str(" MATCHMAKING ", 12) + heart
         colour = await bot.get_colour(message.author)
         colour = discord.Colour(colour)
 
