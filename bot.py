@@ -55,6 +55,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         replied_user=False,
     )
     connect_ready = concurrent.futures.Future()
+    guilds_ready = concurrent.futures.Future()
 
     def __init__(self, cache_size=1048576, timeout=24):
         # Initializes client (first in __mro__ of class inheritance)
@@ -63,6 +64,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         super().__init__(
             max_messages=256,
             heartbeat_timeout=64,
+            chunk_guilds_at_startup=False,
             guild_ready_timeout=8,
             intents=self.intents,
             allowed_mentions=self.allowed_mentions,
@@ -1565,12 +1567,12 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 if filename is not None:
                     if hasattr(filename, "filename"):
                         filename = filename.filename
-                    with tracebacksuppressor:
+                    with suppress():
                         os.remove(filename)
         except:
             if filename is not None:
                 print(filename, os.path.getsize(filename))
-                with tracebacksuppressor:
+                with suppress():
                     os.remove(filename)
             raise
         if message.attachments:
@@ -3221,6 +3223,46 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             # print(url, out)
         await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, bypass=False, decode=True, aio=True)
 
+    async def load_guild_http(self, guild):
+        x = 0
+        i = 1000
+        while i >= 1000:
+            for r in range(64):
+                try:
+                    memberdata = await Request(
+                        f"https://discord.com/api/v9/guilds/{guild.id}/members?limit=1000&after={x}",
+                        headers=dict(Authorization="Bot " + self.token),
+                        bypass=False,
+                        json=True,
+                        aio=True,
+                    )
+                except:
+                    print_exc()
+                    await asyncio.sleep(r + 2)
+                else:
+                    break
+            members = {int(m["user"]["id"]): discord.Member(guild=guild, data=m, state=self._connection) for m in memberdata}
+            guild._members.update(members)
+            i = len(memberdata)
+            x = max(members)
+
+    async def load_guilds(self):
+        funcs = [self._connection.chunk_guild, self.load_guild_http]
+        futs = alist([deque(), deque()])
+        for guild in self.client.guilds:
+            if self.is_ws_ratelimited():
+                i = bool(xrand(8))
+            else:
+                i = xrand(2)
+            fut = create_task(funcs[i](guild))
+            if len(futs[i]) >= 16:
+                await futs[i].popleft()
+            futs[i].append(fut)
+        for f in futs:
+            for fut in f:
+                await fut
+        self.guilds_ready.set_result(None)
+
     # Adds a webhook to the bot's user and webhook cache.
     def add_webhook(self, w):
         return self.data.webhooks.add(w)
@@ -4536,7 +4578,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             for fut in futs:
                 with tracebacksuppressor:
                     await fut
-            await create_future(self.connect_ready)
+            await wrap_future(self.connect_ready)
+            await wrap_future(self.guilds_ready)
             self.ready = True
             # Send ready event to all databases.
             print("Database ready.")
@@ -4564,6 +4607,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             if not self.started:
                 self.started = True
                 create_task(self.init_ready())
+                create_task(self.load_guilds())
             else:
                 print("Reconnected.")
             await self.handle_update()

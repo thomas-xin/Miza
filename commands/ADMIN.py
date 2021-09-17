@@ -2387,11 +2387,17 @@ class UpdateMessageLogs(Database):
             create_task(self.load_new_messages(t))
 
     async def save_channel(self, channel, t=None):
+        async for m in self.bot.data.channel_cache.get(channel, as_message=False):
+            if m == getattr(channel, "last_message_id"):
+                return
+            break
         async with self.bot.data.message_cache.search_sem:
             async for message in channel.history(limit=32768, after=t, oldest_first=False):
                 self.bot.add_message(message, files=False, force=True)
 
     async def load_new_messages(self, t):
+        while "channel_cache" not in self.bot.data:
+            await asyncio.sleep(0.5)
         print(f"Probing new messages from {len(self.bot.guilds)} guild{'s' if len(self.bot.guilds) != 1 else ''}...")
         with tracebacksuppressor:
             for guild in self.bot.guilds:
@@ -2399,7 +2405,7 @@ class UpdateMessageLogs(Database):
                 for channel in guild.text_channels:
                     if channel.permissions_for(guild.me).read_message_history:
                         futs.append(create_task(self.save_channel(channel, t)))
-                    if len(futs) >= 5:
+                    if len(futs) >= 4:
                         await futs.popleft()
         for fut in futs:
             await fut

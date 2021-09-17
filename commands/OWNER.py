@@ -815,25 +815,28 @@ class UpdateChannelCache(Database):
     name = "channel_cache"
     channel = True
 
-    async def get(self, channel):
+    async def get(self, channel, as_message=True):
         if hasattr(channel, "simulated"):
             yield channel.message
             return
         c_id = verify_id(channel)
         min_time = time_snowflake(utc_dt() - datetime.timedelta(days=14))
         for m_id in sorted(self.data.get(c_id, ()), reverse=True):
-            try:
-                if m_id < min_time:
-                    raise OverflowError
-                message = await self.bot.fetch_message(m_id, channel)
-                if getattr(message, "deleted", None):
-                    continue
-            except (discord.NotFound, discord.Forbidden, OverflowError):
-                self.data[c_id].discard(m_id)
-            except (TypeError, ValueError, discord.HTTPException):
-                print_exc()
+            if as_message:
+                try:
+                    if m_id < min_time:
+                        raise OverflowError
+                    message = await self.bot.fetch_message(m_id, channel)
+                    if getattr(message, "deleted", None):
+                        continue
+                except (discord.NotFound, discord.Forbidden, OverflowError):
+                    self.data[c_id].discard(m_id)
+                except (TypeError, ValueError, discord.HTTPException):
+                    print_exc()
+                else:
+                    yield message
             else:
-                yield message
+                yield m_id
 
     def add(self, c_id, m_id):
         s = self.data.setdefault(c_id, set())

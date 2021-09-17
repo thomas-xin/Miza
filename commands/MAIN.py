@@ -1567,7 +1567,7 @@ class UpdateUrgentReminders(Database):
     name = "urgentreminders"
     no_delete = True
 
-    async def _bot_ready_(self, **void):
+    async def _ready_(self, **void):
         if "listed" not in self.data:
             self.data["listed"] = alist()
         create_task(self.update_urgents())
@@ -1739,7 +1739,7 @@ class UpdateMessages(Database):
                 return await func(*args, **kwargs)
 
     async def __call__(self, **void):
-        if self.bot.bot_ready and not self.closed:
+        if self.bot.ready and not self.closed:
             self.hue += 128
             col = colour2raw(hue2colour(self.hue))
             t = utc()

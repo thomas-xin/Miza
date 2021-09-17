@@ -4166,7 +4166,7 @@ class Player(Command):
                 embed=emb,
             )
         else:
-            buttons = [cdict(emoji=as_str(s), custom_id=s, style=3 if i < 5 else 1 if i < 14 else 4) for s, i in self.buttons.items()]
+            buttons = [cdict(emoji=as_str(s), custom_id=s, style=3 if i < 5 else 1 if i < 14 else 4) for s, i in self.buttons.a.items()]
             auds.player.time = inf
             temp = message
             message = await send_with_reply(
