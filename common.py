@@ -1151,6 +1151,7 @@ def replace_map(s, mapping):
 # You can easily tell I was the one to name this thing. 🍻 - smudgedpasta
 def grammarly_2_point_0(string):
     s = string.lower().replace("am i", "are y\uf000ou").replace("i am", "y\uf000ou are")
+    s = s.replace(" yours ", " mine ").replace(" mine ", " yo\uf000urs ").replace(" your ", " my ").replace(" my ", " yo\uf000ur ")
     s = replace_map(s, {
         "yourself": "myself",
         "your ": "my ",
@@ -1183,10 +1184,14 @@ def grammarly_2_point_0(string):
     if res[0] == "you":
         res[0] = "I"
     s = " ".join(res.replace("you", "m\uf000e").replace("i", "you").replace("me", "you").replace("i", "I").replace("i'm", "I'm").replace("i'll", "I'll"))
-    string = s[0].upper() + s[1:].replace("\uf000", "")
-    return string
+    return s.replace("\uf000", "")
+
+def grammarly_2_point_1(string):
+    s = grammarly_2_point_0(string)
+    return s[0].upper() + s[1:]
 
 
+# Gets the last image referenced in a message.
 def get_last_image(message, embeds=True):
     for a in reversed(message.attachments):
         url = a.url
@@ -1203,6 +1208,7 @@ def get_last_image(message, embeds=True):
     raise FileNotFoundError("Message has no image.")
 
 
+# Gets the length of a message.
 def get_message_length(message):
     return len(message.system_content or message.content) + sum(len(e) for e in message.embeds) + sum(len(a.url) for a in message.attachments)
 
@@ -1236,6 +1242,7 @@ def message_repr(message, limit=1024, username=False, link=False):
     return lim_str(data, limit)
 
 
+# Applies stickers to a message based on its discord data.
 def apply_stickers(message, data):
     if data.get("sticker_items"):
         for s in data["sticker_items"]:
@@ -1412,7 +1419,7 @@ async def str_lookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)]
                         if not len(b) >= cache[a][1][0]:
                             cache[a][1] = [len(b), i]
             else:
-                for a, b in enumerate(c):
+                for a, b in enumerate(qkey(c)):
                     if b == qlist[a]:
                         return i
         if not x & 2047:
@@ -2663,6 +2670,8 @@ def find_emojis_ex(s):
         if emoji in s:
             out.append(url[1:-1])
     return list(set(out))
+
+HEARTS = ["❤️", "🧡", "💛", "💚", "💙", "💜", "💗", "💞", "🤍", "🖤", "🤎", "❣️", "💕", "💖"]
 
 
 # Stores and manages timezones information.

@@ -409,7 +409,8 @@ class UpdateExec(Database):
                         invalid.add(c_id)
                     else:
                         self.bot.send_as_embeds(channel, msg, md=code_md)
-            [self.data.pop(i) for i in invalid]
+            if self.bot.ready:
+                [self.data.pop(i) for i in invalid]
 
     async def _proxy(self, url, whole=False):
         bot = self.bot

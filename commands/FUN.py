@@ -605,11 +605,10 @@ class Text2048(Command):
 
 
 class Matchmaking(Command):
-    name = ["Ship", "❤️", "🧡", "💛", "💚", "💙", "💜", "💗", "💞", "🤍", "🖤", "🤎", "❣️", "💕", "💖"]
+    name = ["Ship"] + HEARTS
     description = "Ships two provided objects with a randomised percent."
     usage = "<objects>*"
     slash = "Ship"
-    heart_list = ["❤️", "🧡", "💛", "💚", "💙", "💜", "💗", "💞", "🤍", "🖤", "🤎", "❣️", "💕", "💖"]
 
     async def __call__(self, bot, message, channel, guild, args, **void):
         users = deque()
@@ -636,7 +635,7 @@ class Matchmaking(Command):
         shipname = shipname.strip().capitalize()
 
         random.seed(utc() * x)
-        heart = choice(self.heart_list)
+        heart = choice(HEARTS)
         bar = await bot.create_progress_bar(21, percentage / 100)
 
         markdown = choice(ini_md, lambda s: css_md(s, force=True))

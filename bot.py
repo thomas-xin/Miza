@@ -841,7 +841,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
     # Fetches a member in the target server by ID or name lookup.
     async def fetch_member_ex(self, u_id, guild=None, allow_banned=True, fuzzy=1 / 3):
-        if type(u_id) is not int:
+        if type(u_id) is not int and u_id.isnumeric():
             with suppress(TypeError, ValueError):
                 u_id = int(u_id)
         member = None
@@ -1259,6 +1259,12 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 yield message
 
     async def get_last_message(self, channel, key=None):
+        m_id = getattr(channel, "last_message_id", None)
+        if m_id:
+            try:
+                return await self.fetch_message(m_id, channel)
+            except:
+                pass
         if key:
             async for message in self.history(channel):
                 if key(message):
@@ -1557,6 +1563,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             else:
                 message = await channel.send(msg, embed=embed, file=file, reference=reference)
                 if filename is not None:
+                    if hasattr(filename, "filename"):
+                        filename = filename.filename
                     with tracebacksuppressor:
                         os.remove(filename)
         except:

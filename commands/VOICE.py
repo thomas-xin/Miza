@@ -401,7 +401,7 @@ class CustomAudio(collections.abc.Hashable):
             if position:
                 d["pos"] = self.pos
             if paused:
-                d["paused"] = True
+                d["paused"] = self.paused
             if js:
                 d = json.dumps(d).encode("utf-8")
                 if len(d) > 2097152:
@@ -545,7 +545,7 @@ class CustomAudio(collections.abc.Hashable):
             if getattr(self, "player", None) is not None:
                 if t - self.player.get("time", 0) >= 0:
                     self.player.time = t + 20
-                    create_task(bot.commands.player[0]._callback_(self.player.get("message"), guild, self.channel, None, self.bot, int))
+                    create_task(bot.commands.player[0]._callback_(self.player.get("message"), guild, self.text, None, self.bot, inf))
             if self.stats.stay:
                 cnt = inf
             else:
@@ -3285,7 +3285,7 @@ class Dump(Command):
                 raise ArgumentError("Please input a file or URL to load.")
             async with discord.context_managers.Typing(channel):
                 x = "x" in flags
-                resp, fn = await create_future(auds.get_dump, x, paused=x and auds.paused, js=True, timeout=18)
+                resp, fn = await create_future(auds.get_dump, x, paused=x, js=True, timeout=18)
                 f = CompatFile(io.BytesIO(resp), filename=fn)
             create_task(bot.send_with_file(channel, f"Queue data for {bold(str(guild))}:", f, reference=message))
             return
@@ -3965,7 +3965,7 @@ class Player(Command):
     name = ["NP", "NowPlaying", "Playing"]
     min_display = "0~3"
     description = "Creates an auto-updating virtual audio player for the current server."
-    usage = "<enable{?e}|disable{?d}>*"
+    usage = "<enable{?e}|disable{?d}>?"
     flags = "adez"
     rate_limit = (2, 7)
 
@@ -4062,8 +4062,6 @@ class Player(Command):
         auds = bot.data.audio.players[guild.id]
         if reaction is None:
             auds.player.time = inf
-            if auds.player.type:
-                auds.stats.quiet |= 2
         elif auds.player is None or auds.player.message.id != message.id:
             return
         if perm < 1:
@@ -4075,14 +4073,8 @@ class Player(Command):
         else:
             content = message.embeds[0].description
         orig = "\n".join(content.splitlines()[:1 + ("\n" == content[3])]) + "\n"
-        if reaction is None and auds.player.type:
-            buttons = []
-            for b in self.buttons:
-                create_task(message.add_reaction(as_str(b)))
-        else:
-            if not auds.player.type:
-                emoji = b""
-            elif type(reaction) is bytes:
+        if reaction:
+            if type(reaction) is bytes:
                 emoji = reaction
             else:
                 try:
@@ -4163,7 +4155,7 @@ class Player(Command):
                     return
         other = await self.show(auds)
         text = lim_str(orig + other, 4096)
-        last = channel.last_message
+        last = await self.bot.get_last_message(channel)
         emb = discord.Embed(
             description=text,
             colour=rand_colour(),
@@ -4174,7 +4166,7 @@ class Player(Command):
                 embed=emb,
             )
         else:
-            buttons = [cdict(emoji=as_str(s), custom_id=s, style=3 if i < 5 else 1 if i < 14 else 4) for s in self.buttons]
+            buttons = [cdict(emoji=as_str(s), custom_id=s, style=3 if i < 5 else 1 if i < 14 else 4) for s, i in self.buttons.items()]
             auds.player.time = inf
             temp = message
             message = await send_with_reply(

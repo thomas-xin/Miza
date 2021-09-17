@@ -214,18 +214,47 @@ class Hello(Command):
         if "dailies" in bot.data:
             bot.data.dailies.progress_quests(user, "talk")
         if argv:
-            user = await bot.fetch_user_member(argv, guild)
+            try:
+                u = await bot.fetch_user_member(argv, guild)
+            except:
+                u = None
+            if u and u.id != bot.id:
+                user = u
         elif bot.is_owner(user):
             return "👋"
         if name in ("bye", "cya", "goodbye"):
             start = choice("Bye", "Cya", "Goodbye")
         else:
+            if not argv and not xrand(5):
+                return choice(
+                    f"Hi, {user}. I'm feeling a little lonely, so I appreciate you talking to me. 😊",
+                    f"Hello? {get_random_emoji()}",
+                    "Hi! " + choice(HEARTS),
+                )
             start = choice("Hi", "Hello", "Hey", "'sup")
         middle = choice(user.name, user.display_name)
         if name in ("bye", "cya", "goodbye"):
-            end = choice("", "See you soon!", "Have a good one!", "Later!", "Talk to you again sometime!", "Was nice talking to you!")
+            end = choice(
+                "",
+                "See you soon!",
+                "See you around!",
+                "Have a good one!",
+                "Later!",
+                "Talk to you again sometime!",
+                "Was nice talking to you!",
+                "Peace!",
+            )
         else:
-            end = choice("", "How are you?", "Can I help you?", "What can I do for you today?", "Nice to see you!", "Great to see you!", "Always good to see you!")
+            end = choice(
+                "",
+                "How are you?",
+                "Can I help you?",
+                "What can I do for you today?",
+                "Nice to see you!",
+                "Great to see you!",
+                "Always good to see you!",
+                "Do you need something?",
+            )
         out = "👋 " + start + ", `" + middle + "`!"
         if end:
             out += " " + end
@@ -1444,15 +1473,19 @@ class Note(Command):
             argv = argv.split(None, 1)[-1]
             add_dict(flags, dict(d=1))
         if "d" in flags:
+            if not argv:
+                argv = 0
             try:
-                note_userbase[user.id].pop(int(argv))
+                n = note_userbase[user.id].pop(int(argv))
             except (KeyError, IndexError):
                 argv = rank_format(int(argv))
                 raise LookupError(f"You don't have a {argv} note!")
             argv = rank_format(int(argv))
             if not note_userbase.get(user.id):
                 note_userbase.discard(user.id)
-            return ini_md(f"Successfully removed {argv} note for [{user}]!")
+            else:
+                note_userbase.update(user.id)
+            return ini_md(f"Successfully removed {argv} note: {sqr_md(n)}")
         elif not argv:
             # Set callback message for scrollable list
             buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
@@ -1506,7 +1539,7 @@ class Note(Command):
             content = message.embeds[0].description
         i = content.index("callback")
         content = "*```" + "\n" * ("\n" in content[:i]) + (
-            "callback-admin-autoemoji-"
+            "callback-main-note-"
             + str(u_id) + "_" + str(pos)
             + "-\n"
         )
@@ -2132,7 +2165,7 @@ class UpdateUsers(Database):
             if count < 5:
                 create_task(message.add_reaction("👀"))
             if "?" in msg and "ask" in bot.commands and random.random() > math.atan(count / 16) / 4:
-                argv = self.mentionspam.sub("", msg).strip()
+                argv = self.mentionspam.sub("", msg).strip(" ,")
                 for ask in bot.commands.ask:
                     await ask(message, message.channel, user, argv, name="ask", flags=flags)
                 return
