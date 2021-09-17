@@ -328,6 +328,7 @@ class CustomAudio(collections.abc.Hashable):
     timeout = 0
     seek_pos = 0
     ts = None
+    player = None
 
     def __init__(self, text=None):
         with tracebacksuppressor:
@@ -540,6 +541,11 @@ class CustomAudio(collections.abc.Hashable):
         with tracebacksuppressor:
             self.fut.result(timeout=12)
             guild = self.guild
+            t = utc()
+            if getattr(self, "player", None) is not None:
+                if t - self.player.get("time", 0) >= 0:
+                    self.player.time = t + 20
+                    create_task(bot.commands.player[0]._callback_(self.player.get("message"), guild, self.channel, None, self.bot, int))
             if self.stats.stay:
                 cnt = inf
             else:
@@ -1200,9 +1206,9 @@ class AudioDownloader:
     youtube_dl_x = 0
     spotify_x = 0
     other_x = 0
+    bot = None
 
     def __init__(self):
-        self.bot = None
         self.lastclear = 0
         self.downloading = cdict()
         self.cache = cdict()
@@ -1210,13 +1216,9 @@ class AudioDownloader:
         self.semaphore = Semaphore(4, 128)
         self.download_sem = Semaphore(8, 64, rate_limit=0.5)
         self.keepvid_failed = 0
-
-    def __load__(self, **void):
-        print("Initializing audio downloader keys...")
-        fut = create_future_ex(self.update_dl)
-        self.setup_pages()
-        self.set_cookie()
-        return fut.result()
+        create_future_ex(self.update_dl)
+        create_future_ex(self.setup_pages)
+        create_future_ex(self.set_cookie)
 
     # Fetches youtube playlist page codes, split into pages of 10 items
     def setup_pages(self):
@@ -2683,7 +2685,7 @@ class Queue(Command):
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
         u_id, pos, v = list(map(int, vals.split("_", 2)))
-        if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
+        if reaction and u_id != user.id and perm < 1:
             return
         if reaction not in self.directions and reaction is not None:
             return
@@ -3366,6 +3368,7 @@ class AudioSettings(Command):
         "LoopQueue": "loop",
         "Repeat": "repeat",
         "ShuffleQueue": "shuffle",
+        "AutoShuffle": "shuffle",
         "Quiet": "quiet",
         "Stay": "stay",
         "Reset": "reset",
@@ -3938,293 +3941,266 @@ class Party(Command):
         return f"https://discord.gg/{data['code']}"
 
 
-# This whole thing is a mess, I can't be bothered cleaning this up lol
-# class Player(Command):
-#     server_only = True
-#     buttons = {
-# 	b'\xe2\x8f\xb8': 0,
-# 	b'\xf0\x9f\x94\x84': 1,
-# 	b'\xf0\x9f\x94\x80': 2,
-# 	b'\xe2\x8f\xae': 3,
-# 	b'\xe2\x8f\xad': 4,
-#         b'\xf0\x9f\x94\x8a': 5,
-#         b'\xf0\x9f\xa5\x81': 6,
-#         b'\xf0\x9f\x93\x89': 7,
-#         b'\xf0\x9f\x93\x8a': 8,
-#         b'\xe2\x8f\xaa': 9,
-#         b'\xe2\x8f\xa9': 10,
-#         b'\xe2\x8f\xab': 11,
-#         b'\xe2\x8f\xac': 12,
-#         b'\xe2\x99\xbb': 13,
-# 	b'\xe2\x8f\x8f': 14,
-#         b'\xe2\x9b\x94': 15,
-#         }
-#     barsize = 24
-#     name = ["NP", "NowPlaying", "Playing"]
-#     min_display = "0~3"
-#     description = "Creates an auto-updating virtual audio player for the current server."
-#     usage = "<enable{?e}|disable{?d}|controllable{?c}>*"
-#     flags = "cdez"
-#     rate_limit = (2, 7)
+class Player(Command):
+    server_only = True
+    buttons = demap({
+        b'\xe2\x8f\xb8': 0,
+        b'\xf0\x9f\x94\x84': 1,
+        b'\xf0\x9f\x94\x80': 2,
+        b'\xe2\x8f\xae': 3,
+        b'\xe2\x8f\xad': 4,
+        b'\xf0\x9f\x94\x8a': 5,
+        b'\xf0\x9f\xa5\x81': 6,
+        b'\xf0\x9f\x93\x89': 7,
+        b'\xf0\x9f\x93\x8a': 8,
+        b'\xe2\x8f\xaa': 9,
+        b'\xe2\x8f\xa9': 10,
+        b'\xe2\x8f\xab': 11,
+        b'\xe2\x8f\xac': 12,
+        b'\xe2\x99\xbb': 13,
+	    b'\xe2\x8f\x8f': 14,
+        b'\xe2\x9c\x96': 15,
+    })
+    barsize = 24
+    name = ["NP", "NowPlaying", "Playing"]
+    min_display = "0~3"
+    description = "Creates an auto-updating virtual audio player for the current server."
+    usage = "<enable{?e}|disable{?d}>*"
+    flags = "adez"
+    rate_limit = (2, 7)
 
-#     async def showCurr(self, auds):
-#         q = auds.queue
-#         if q:
-#             s = q[0].skips
-#             if s is not None:
-#                 skips = len(s)
-#             else:
-#                 skips = 0
-#             output = "Playing " + str(len(q)) + " item" + "s" * (len(q) != 1) + " "
-#             output += skips * "🚫"
-#         else:
-#             output = "Queue is currently empty. "
-#         if auds.stats.loop:
-#             output += "🔄"
-#         if auds.stats.shuffle:
-#             output += "🔀"
-#         if auds.stats.quiet:
-#             output += "🔕"
-#         if q:
-#             p = auds.epos
-#         else:
-#             p = [0, 1]
-#         output += "```"
-#         output += await self.bot.create_progress_bar(18, p[0] / p[1])
-#         if q:
-#             output += "\n[`" + no_md(q[0].name) + "`](" + ensure_url(q[0].url) + ")"
-#         output += "\n`"
-#         if auds.paused or not auds.stats.speed:
-#             output += "⏸️"
-#         elif auds.stats.speed > 0:
-#             output += "▶️"
-#         else:
-#             output += "◀️"
-#         if q:
-#             p = auds.epos
-#         else:
-#             p = [0, 0.25]
-#         output += (
-#             " (" + time_disp(p[0])
-#             + "/" + time_disp(p[1]) + ")`\n"
-#         )
-#         if auds.has_options():
-#             v = abs(auds.stats.volume)
-#             if v == 0:
-#                 output += "🔇"
-#             if v <= 0.5:
-#                 output += "🔉"
-#             elif v <= 1:
-#                 output += "🔊"
-#             elif v <= 5:
-#                 output += "📢"
-#             else:
-#                 output += "🌪️"
-#             b = auds.stats.bassboost
-#             if abs(b) > 1 / 6:
-#                 if abs(b) > 5:
-#                     output += "💥"
-#                 elif b > 0:
-#                     output += "🥁"
-#                 else:
-#                     output += "🎻"
-#             r = auds.stats.reverb
-#             if r:
-#                 if abs(r) >= 1:
-#                     output += "📈"
-#                 else:
-#                     output += "📉"
-#             u = auds.stats.chorus
-#             if u:
-#                 output += "📊"
-#             c = auds.stats.compressor
-#             if c:
-#                 output += "🗜️"
-#             e = auds.stats.pan
-#             if abs(e - 1) > 0.25:
-#                 output += "♒"
-#             s = auds.stats.speed * 2 ** (auds.stats.resample / 12)
-#             if s < 0:
-#                 output += "⏪"
-#             elif s > 1:
-#                 output += "⏩"
-#             elif s > 0 and s < 1:
-#                 output += "🐌"
-#             p = auds.stats.pitch + auds.stats.resample
-#             if p > 0:
-#                 output += "⏫"
-#             elif p < 0:
-#                 output += "⏬"
-#         return output
+    async def show(self, auds):
+        q = auds.queue
+        if q:
+            s = q[0].skips
+            if s is not None:
+                skips = len(s)
+            else:
+                skips = 0
+            output = "Playing " + str(len(q)) + " item" + "s" * (len(q) != 1) + " "
+            output += skips * "🚫"
+        else:
+            output = "Queue is currently empty. "
+        if auds.stats.loop:
+            output += "🔄"
+        if auds.stats.shuffle:
+            output += "🔀"
+        if auds.stats.quiet:
+            output += "🔕"
+        if q:
+            p = auds.epos
+        else:
+            p = [0, 1]
+        output += "```"
+        output += await self.bot.create_progress_bar(18, p[0] / p[1])
+        if q:
+            output += "\n[`" + no_md(q[0].name) + "`](" + ensure_url(q[0].url) + ")"
+        output += "\n`"
+        if auds.paused or not auds.stats.speed:
+            output += "⏸️"
+        elif auds.stats.speed > 0:
+            output += "▶️"
+        else:
+            output += "◀️"
+        if q:
+            p = auds.epos
+        else:
+            p = [0, 0.25]
+        output += uni_str(f" ({time_disp(p[0])}/{time_disp(p[1])})`\n")
+        if auds.has_options():
+            v = abs(auds.stats.volume)
+            if v == 0:
+                output += "🔇"
+            if v <= 0.5:
+                output += "🔉"
+            elif v <= 1.5:
+                output += "🔊"
+            elif v <= 5:
+                output += "📢"
+            else:
+                output += "🌪️"
+            b = auds.stats.bassboost
+            if abs(b) > 1 / 6:
+                if abs(b) > 5:
+                    output += "💥"
+                elif b > 0:
+                    output += "🥁"
+                else:
+                    output += "🎻"
+            r = auds.stats.reverb
+            if r:
+                if abs(r) >= 1:
+                    output += "📈"
+                else:
+                    output += "📉"
+            u = auds.stats.chorus
+            if u:
+                output += "📊"
+            c = auds.stats.compressor
+            if c:
+                output += "🗜️"
+            e = auds.stats.pan
+            if abs(e - 1) > 0.25:
+                output += "♒"
+            s = auds.stats.speed * 2 ** (auds.stats.resample / 12)
+            if s < 0:
+                output += "⏪"
+            elif s > 1:
+                output += "⏩"
+            elif s > 0 and s < 1:
+                output += "🐌"
+            p = auds.stats.pitch + auds.stats.resample
+            if p > 0:
+                output += "⏫"
+            elif p < 0:
+                output += "⏬"
+        return output
 
-#     async def _callback_(self, message, guild, channel, reaction, bot, perm, vals, **void):
-#         if message is None:
-#             return
-#         if not guild.id in bot.data.audio.players:
-#             with suppress(discord.NotFound, discord.Forbidden):
-#                 await message.clear_reactions()
-#             return
-#         auds = bot.data.audio.players[guild.id]
-#         if reaction is None:
-#             auds.player = cdict(
-#                 time=inf,
-#                 message=message,
-#                 type=int(vals),
-#                 events=0,
-#             )
-#             if auds.player.type:
-#                 auds.stats.quiet |= 2
-#         elif auds.player is None or auds.player.message.id != message.id:
-#             with suppress(discord.NotFound, discord.Forbidden):
-#                 await message.clear_reactions()
-#             return
-#         if perm < 1:
-#             return
-#         if message.content:
-#             content = message.content
-#         else:
-#             content = message.embeds[0].description
-#         orig = "\n".join(content.splitlines()[:1 + ("\n" == content[3])]) + "\n"
-#         if reaction is None and auds.player.type:
-#             for b in self.buttons:
-#                 async with Delay(0.5):
-#                     create_task(message.add_reaction(as_str(b)))
-#         else:
-#             if not auds.player.type:
-#                 emoji = bytes()
-#             elif type(reaction) is bytes:
-#                 emoji = reaction
-#             else:
-#                 try:
-#                     emoji = reaction.emoji
-#                 except:
-#                     emoji = str(reaction)
-#             if type(emoji) is str:
-#                 emoji = reaction.encode("utf-8")
-#             if emoji in self.buttons:
-#                 i = self.buttons[emoji]
-#                 if i == 0:
-#                     auds.paused ^= 1
-#                 elif i == 1:
-#                     auds.stats.loop = bool(auds.stats.loop ^ 1)
-#                 elif i == 2:
-#                     auds.stats.shuffle = bool(auds.stats.shuffle ^ 1)
-#                 elif i == 3 or i == 4:
-#                     if i == 3:
-#                         pos = 0
-#                     else:
-#                         pos = inf
-#                     auds.seek(pos)
-#                     if pos:
-#                         return
-#                 elif i == 5:
-#                     v = abs(auds.stats.volume)
-#                     if v < 0.25 or v >= 2:
-#                         v = 1 / 3
-#                     elif v < 1:
-#                         v = 1
-#                     else:
-#                         v = 2
-#                     auds.stats.volume = v
-#                 elif i == 6:
-#                     b = auds.stats.bassboost
-#                     if abs(b) < 1 / 3:
-#                         b = 1
-#                     elif b < 0:
-#                         b = 0
-#                     else:
-#                         b = -1
-#                     auds.stats.bassboost = b
-#                 elif i == 7:
-#                     r = auds.stats.reverb
-#                     if r:
-#                         r = 0
-#                     else:
-#                         r = 0.5
-#                     auds.stats.reverb = r
-#                 elif i == 8:
-#                     c = abs(auds.stats.chorus)
-#                     if c:
-#                         c = 0
-#                     else:
-#                         c = 1 / 3
-#                     auds.stats.chorus = c
-#                     await create_future(auds.play, auds.source, auds.pos, timeout=18)
-#                 elif i == 9 or i == 10:
-#                     s = (i * 2 - 19) * 2 / 11
-#                     auds.stats.speed = round(auds.stats.speed + s, 5)
-#                     await create_future(auds.play, auds.source, auds.pos, timeout=18)
-#                 elif i == 11 or i == 12:
-#                     p = i * 2 - 23
-#                     auds.stats.pitch -= p
-#                     await create_future(auds.play, auds.source, auds.pos, timeout=18)
-#                 elif i == 13:
-#                     pos = auds.pos
-#                     auds.stats = cdict(auds.defaults)
-#                     await create_future(auds.play, auds.source, pos, timeout=18)
-#                 elif i == 14:
-#                     auds.dead = True
-#                     auds.player = None
-#                     await bot.silent_delete(message)
-#                     return
-#                 else:
-#                     auds.player = None
-#                     await bot.silent_delete(message)
-#                     return
-#         other = await self.showCurr(auds)
-#         text = lim_str(orig + other, 2000)
-#         last = message.channel.last_message
-#         emb = discord.Embed(
-#             description=text,
-#             colour=rand_colour(),
-#             timestamp=utc_dt(),
-#         ).set_author(**get_author(self.bot.user))
-#         if last is not None and (auds.player.type or message.id == last.id):
-#             auds.player.events += 1
-#             await message.edit(
-#                 content=None,
-#                 embed=emb,
-#             )
-#         else:
-#             auds.player.time = inf
-#             auds.player.events += 2
-#             channel = message.channel
-#             temp = message
-#             message = await channel.send(
-#                 content=None,
-#                 embed=emb,
-#             )
-#             auds.player.message = message
-#             await bot.silent_delete(temp, no_log=True)
-#         if auds.queue and not auds.paused & 1:
-#             p = auds.epos
-#             maxdel = p[1] - p[0] + 2
-#             delay = min(maxdel, p[1] / self.barsize / abs(auds.stats.speed))
-#             if delay > 10:
-#                 delay = 10
-#             elif delay < 5:
-#                 delay = 5
-#         else:
-#             delay = inf
-#         auds.player.time = utc() + delay
+    async def _callback_(self, message, guild, channel, reaction, bot, perm, **void):
+        if not guild.id in bot.data.audio.players:
+            return
+        auds = bot.data.audio.players[guild.id]
+        if reaction is None:
+            auds.player.time = inf
+            if auds.player.type:
+                auds.stats.quiet |= 2
+        elif auds.player is None or auds.player.message.id != message.id:
+            return
+        if perm < 1:
+            return
+        if not message:
+            content = "```\n"
+        elif message.content:
+            content = message.content
+        else:
+            content = message.embeds[0].description
+        orig = "\n".join(content.splitlines()[:1 + ("\n" == content[3])]) + "\n"
+        if reaction is None and auds.player.type:
+            buttons = []
+            for b in self.buttons:
+                create_task(message.add_reaction(as_str(b)))
+        else:
+            if not auds.player.type:
+                emoji = b""
+            elif type(reaction) is bytes:
+                emoji = reaction
+            else:
+                try:
+                    emoji = reaction.emoji
+                except:
+                    emoji = str(reaction)
+            if type(emoji) is str:
+                emoji = reaction.encode("utf-8")
+            if emoji in self.buttons:
+                i = self.buttons[emoji]
+                if i == 0:
+                    await create_future(auds.pause, unpause=True)
+                elif i == 1:
+                    auds.stats.loop = bool(auds.stats.loop ^ 1)
+                elif i == 2:
+                    auds.stats.shuffle = bool(auds.stats.shuffle ^ 1)
+                elif i == 3 or i == 4:
+                    if i == 3:
+                        pos = 0
+                    else:
+                        pos = inf
+                    auds.seek(pos)
+                    if pos:
+                        return
+                elif i == 5:
+                    v = abs(auds.stats.volume)
+                    if v < 0.25 or v >= 2:
+                        v = 1 / 3
+                    elif v < 1:
+                        v = 1
+                    else:
+                        v = 2
+                    auds.stats.volume = v
+                elif i == 6:
+                    b = auds.stats.bassboost
+                    if abs(b) < 1 / 3:
+                        b = 1
+                    elif b < 0:
+                        b = 0
+                    else:
+                        b = -1
+                    auds.stats.bassboost = b
+                elif i == 7:
+                    r = auds.stats.reverb
+                    if r:
+                        r = 0
+                    else:
+                        r = 0.5
+                    auds.stats.reverb = r
+                elif i == 8:
+                    c = abs(auds.stats.chorus)
+                    if c:
+                        c = 0
+                    else:
+                        c = 1 / 3
+                    auds.stats.chorus = c
+                    await create_future(auds.play, auds.source, auds.pos, timeout=18)
+                elif i == 9 or i == 10:
+                    s = (i * 2 - 19) * 2 / 11
+                    auds.stats.speed = round(auds.stats.speed + s, 5)
+                    await create_future(auds.play, auds.source, auds.pos, timeout=18)
+                elif i == 11 or i == 12:
+                    p = i * 2 - 23
+                    auds.stats.pitch -= p
+                    await create_future(auds.play, auds.source, auds.pos, timeout=18)
+                elif i == 13:
+                    pos = auds.pos
+                    auds.stats = cdict(auds.defaults)
+                    await create_future(auds.play, auds.source, pos, timeout=18)
+                elif i == 14:
+                    auds.dead = True
+                    auds.player = None
+                    await bot.silent_delete(message)
+                    return
+                else:
+                    auds.player = None
+                    await bot.silent_delete(message)
+                    return
+        other = await self.show(auds)
+        text = lim_str(orig + other, 4096)
+        last = channel.last_message
+        emb = discord.Embed(
+            description=text,
+            colour=rand_colour(),
+            timestamp=utc_dt(),
+        ).set_author(**get_author(self.bot.user))
+        if message and last and message.id == last.id:
+            await message.edit(
+                embed=emb,
+            )
+        else:
+            buttons = [cdict(emoji=as_str(s), custom_id=s, style=3 if i < 5 else 1 if i < 14 else 4) for s in self.buttons]
+            auds.player.time = inf
+            temp = message
+            message = await send_with_reply(
+                channel,
+                reference=None,
+                embed=emb,
+                buttons=buttons,
+            )
+            auds.player.message = message
+            await bot.silent_delete(temp, no_log=True)
+        if auds.queue and not auds.paused & 1:
+            p = auds.epos
+            maxdel = p[1] - p[0] + 2
+            delay = min(maxdel, p[1] / self.barsize / abs(auds.stats.speed))
+            if delay > 10:
+                delay = 10
+            elif delay < 5:
+                delay = 5
+        else:
+            delay = inf
+        auds.player.time = utc() + delay
 
-#     async def __call__(self, guild, channel, user, bot, flags, perm, **void):
-#         auds = await auto_join(channel.guild, channel, user, bot)
-#         if "c" in flags or auds.stats.quiet & 2:
-#             req = 3
-#             if perm < req:
-#                 if auds.stats.quiet & 2:
-#                     if "d" in flags:
-#                         reason = "delete"
-#                     else:
-#                         reason = "override"
-#                 else:
-#                     reason = "create controllable"
-#                 raise self.perm_error(perm, req, f"to {reason} virtual audio player for {guild}")
-#         if "d" in flags:
-#             auds.player = None
-#             return italics(css_md(f"Disabled virtual audio players in {sqr_md(channel.guild)}.")), 1
-#         await create_player(auds, p_type="c" in flags, verbose="z" in flags)
+    async def __call__(self, guild, channel, user, bot, flags, perm, **void):
+        auds = await auto_join(channel.guild, channel, user, bot)
+        auds.player = cdict()
+        create_future_ex(auds.update)
 
 
 # Small helper function to fetch song lyrics from json data, because sometimes genius.com refuses to include it in the HTML
@@ -4631,24 +4607,24 @@ class UpdateAudio(Database):
                                 e["duration"] = await create_future(get_duration, e["stream"])
 
     # Delays audio player display message by 15 seconds when a user types in the target channel
-    # async def _typing_(self, channel, user, **void):
-    #     if getattr(channel, "guild", None) is None:
-    #         return
-    #     if channel.guild.id in self.players and user.id != self.bot.id:
-    #         auds = self.players[channel.guild.id]
-    #         if auds.player is not None and channel.id == auds.channel.id:
-    #             t = utc() + 15
-    #             if auds.player.time < t:
-    #                 auds.player.time = t
+    async def _typing_(self, channel, user, **void):
+        if getattr(channel, "guild", None) is None:
+            return
+        if channel.guild.id in self.players and user.id != self.bot.id:
+            auds = self.players[channel.guild.id]
+            if auds.player is not None and channel.id == auds.channel.id:
+                t = utc() + 15
+                if auds.player.time < t:
+                    auds.player.time = t
 
     # Delays audio player display message by 10 seconds when a user sends a message in the target channel
-    # async def _send_(self, message, **void):
-    #     if message.guild.id in self.players and message.author.id != self.bot.id:
-    #         auds = self.players[message.guild.id]
-    #         if auds.player is not None and message.channel.id == auds.channel.id:
-    #             t = utc() + 10
-    #             if auds.player.time < t:
-    #                 auds.player.time = t
+    async def _send_(self, message, **void):
+        if message.guild.id in self.players and message.author.id != self.bot.id:
+            auds = self.players[message.guild.id]
+            if auds.player is not None and message.channel.id == auds.channel.id:
+                t = utc() + 10
+                if auds.player.time < t:
+                    auds.player.time = t
 
     # Makes 1 attempt to disconnect a single member from voice.
     async def _dc(self, member):
@@ -4732,7 +4708,6 @@ class UpdateAudio(Database):
     async def _bot_ready_(self, bot, **void):
         globals()["bot"] = bot
         ytdl.bot = bot
-        create_future_ex(ytdl.__load__)
         try:
             await create_future(subprocess.check_output, "ffmpeg")
         except subprocess.CalledProcessError:

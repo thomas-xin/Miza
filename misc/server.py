@@ -1,10 +1,16 @@
 try:
     from common import *
 except ModuleNotFoundError:
-    import os, sys
-    sys.path.append(os.path.abspath('..'))
-    os.chdir("..")
-    from common import *
+    try:
+        f = open("common.py", "rb")
+    except FileNotFoundError:
+        import os, sys
+        sys.path.append(os.path.abspath('..'))
+        os.chdir("..")
+        f = open("common.py", "rb")
+    b = f.read()
+    code = compile(b, "common.py", "exec", optimize=1)
+    exec(code, globals())
 
 
 HOST = "https://mizabot.xyz"

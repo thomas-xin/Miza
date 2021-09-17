@@ -746,6 +746,8 @@ def restructure_buttons(buttons):
                             button["custom_id"] = min_emoji(button["emoji"])
                         else:
                             button["custom_id"] = 0
+            elif type(button["custom_id"]) is not str:
+                button["custom_id"] = as_str(button["custom_id"])
             while button["custom_id"] in used_custom_ids:
                 if "?" in button["custom_id"]:
                     spl = button["custom_id"].rsplit("?", 1)
@@ -930,7 +932,7 @@ REPLY_SEM = cdict()
 EDIT_SEM = cdict()
 # noreply = discord.AllowedMentions(replied_user=False)
 
-async def send_with_reply(channel, reference, content="", embed=None, tts=None, file=None, files=None, buttons=None, mention=False):
+async def send_with_reply(channel, reference=None, content="", embed=None, tts=None, file=None, files=None, buttons=None, mention=False):
     if not channel:
         channel = reference.channel
     bot = BOT[0]
@@ -1399,7 +1401,7 @@ async def str_lookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)]
                         return i
                     elif match >= fuzzy and not match <= cache[a][0][0]:
                         cache[a][0] = [match, i]
-            else:
+            elif fuzzy == 0:
                 for a, b in enumerate(qkey(c)):
                     if b == qlist[a]:
                         return i
@@ -1409,6 +1411,10 @@ async def str_lookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)]
                     elif loose and qlist[a] in b:
                         if not len(b) >= cache[a][1][0]:
                             cache[a][1] = [len(b), i]
+            else:
+                for a, b in enumerate(c):
+                    if b == qlist[a]:
+                        return i
         if not x & 2047:
             await asyncio.sleep(0.1)
     for c in cache:
@@ -2013,7 +2019,11 @@ class MultiThreadPool(collections.abc.Sized, concurrent.futures.Executor):
             self.pool_count = max(1, self.pool_count)
             self.thread_count = max(1, self.thread_count)
             while self.pool_count > len(self.pools):
-                self.pools.append(ThreadPoolExecutor(max_workers=self.thread_count, initializer=self.initializer))
+                pool = ThreadPoolExecutor(
+                    max_workers=self.thread_count,
+                    initializer=self.initializer,
+                )
+                self.pools.append(pool)
             while self.pool_count < len(self.pools):
                 func = self.pools.popright().shutdown
                 self.pools[-1].submit(func, wait=True)
@@ -2034,7 +2044,7 @@ class MultiThreadPool(collections.abc.Sized, concurrent.futures.Executor):
 
     shutdown = lambda self, wait=True: [exc.shutdown(wait) for exc in self.pools].append(self.pools.clear())
 
-pthreads = MultiThreadPool(pool_count=2, thread_count=48, initializer=__setloop__)
+pthreads = ThreadPoolExecutor(64, initializer=__setloop__)
 athreads = MultiThreadPool(pool_count=2, thread_count=64, initializer=__setloop__)
 
 def get_event_loop():

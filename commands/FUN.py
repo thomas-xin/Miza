@@ -615,7 +615,7 @@ class Matchmaking(Command):
         users = deque()
         for u_id in map(verify_id, args):
             try:
-                user = await bot.fetch_member_ex(u_id, guild, allow_banned=False, fuzzy=0)
+                user = await bot.fetch_member_ex(u_id, guild, allow_banned=False, fuzzy=None)
             except:
                 users.append(u_id.capitalize())
             else:
@@ -1891,7 +1891,7 @@ class UpdateReacts(Database):
 
 class EmojiList(Command):
     description = "Sets a custom alias for an emoji, usable by ~autoemoji."
-    usage = "(add|delete)? <name> <id>"
+    usage = "(add|delete)? <name>? <id>?"
     flags = "aed"
     no_parse = True
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
@@ -1942,21 +1942,9 @@ class EmojiList(Command):
         guild = message.guild
         user = await bot.fetch_user(u_id)
         following = bot.data.emojilists
-        curr = {}
-        for k, v in sorted(following.get(user.id, {}).items(), key=lambda n: full_prune(n[0])):
-            try:
-                try:
-                    me = " " + str(bot.cache.emojis[v])
-                except KeyError:
-                    await bot.min_emoji(v)
-                    me = ""
-            except LookupError:
-                following[user.id].pop(k)
-                following.update(user.id)
-                continue
-            curr[f":{k}:"] = f"({v})` {me}"
+        items = following.get(user.id, {}).items()
         page = 16
-        last = max(0, len(curr) - page)
+        last = max(0, len(items) - page)
         if reaction is not None:
             i = self.directions.index(reaction)
             if i == 0:
@@ -1970,6 +1958,22 @@ class EmojiList(Command):
             else:
                 new = pos
             pos = new
+        curr = {}
+        for k, v in sorted(items, key=lambda n: full_prune(n[0]))[pos:pos + page]:
+            try:
+                try:
+                    e = bot.cache.emojis[v]
+                    if not e.is_usable():
+                        raise LookupError
+                    me = " " + str(e)
+                except KeyError:
+                    await bot.min_emoji(v)
+                    me = ""
+            except LookupError:
+                following[user.id].pop(k)
+                following.update(user.id)
+                continue
+            curr[f":{k}:"] = f"({v})` {me}"
         content = message.content
         if not content:
             content = message.embeds[0].description
@@ -1979,13 +1983,13 @@ class EmojiList(Command):
             + str(u_id) + "_" + str(pos)
             + "-\n"
         )
-        if not curr:
+        if not items:
             content += f"No currently assigned emoji aliases for {str(user).replace('`', '')}.```*"
             msg = ""
         else:
-            content += f"{len(curr)} emoji aliases currently assigned for {str(user).replace('`', '')}:```*"
+            content += f"{len(items)} emoji aliases currently assigned for {str(user).replace('`', '')}:```*"
             key = lambda x: "\n" + ", ".join(x)
-            msg = iter2str({k + " " * (32 - len(k)): curr[k] for k in tuple(curr)[pos:pos + page]}, left="`", right="")
+            msg = iter2str({k + " " * (32 - len(k)): curr[k] for k in curr}, left="`", right="")
         colour = await self.bot.data.colours.get(to_png_ex(guild.icon_url))
         emb = discord.Embed(
             description=content + msg,
@@ -3104,23 +3108,6 @@ class Dog(ImagePool, Command):
         return url
 
 
-class Muffin(ImagePool, Command):
-    name = ["🧁", "Muffins"]
-    description = "Muffin time! What more is there to say? :D"
-    database = "muffins"
-
-    async def fetch_one(self):
-        if xrand(3):
-            s = await Request(f"https://www.gettyimages.co.uk/photos/muffin?page={random.randint(1, 100)}", decode=True, aio=True)
-            url = "https://media.gettyimages.com/photos/"
-            spl = s.split(url)[1:]
-            imageset = {url + i.split('"', 1)[0].split("?", 1)[0] for i in spl}
-        else:
-            d = await Request(f"https://unsplash.com/napi/search/photos?query=muffin&per_page=20&page={random.randint(1, 19)}", json=True, aio=True)
-            imageset = {result["urls"]["raw"] for result in d["results"]}
-        return imageset
-
-
 class XKCD(ImagePool, Command):
     description = "Pulls a random image from xkcd.com and embeds it."
     database = "xkcd"
@@ -3140,6 +3127,68 @@ class Inspiro(ImagePool, Command):
 
     def fetch_one(self):
         return Request("https://inspirobot.me/api?generate=true", decode=True, aio=True)
+
+
+class ImageSearch(ImagePool, Command):
+    name = ["🖼", "🧁", "ImgSearch", "Muffin", "Muffins"]
+    description = "Pulls a random image from a search on gettyimages.co.uk and unsplash.com, using tags."
+    threshold = 9
+    sem = Semaphore(5, 256, rate_limit=1)
+
+    def img(self, tag=None, search_tag=None):
+        file = f"imgsearch~{tag}"
+
+        async def fetch(tag, search_tag):
+            if xrand(3):
+                s = await Request(f"https://www.gettyimages.co.uk/photos/{tag}?page={random.randint(1, 100)}", decode=True, aio=True)
+                url = "https://media.gettyimages.com/photos/"
+                spl = s.split(url)[1:]
+                imageset = {url + i.split('"', 1)[0].split("?", 1)[0] for i in spl}
+            else:
+                d = await Request(f"https://unsplash.com/napi/search/photos?query={tag}&per_page=30&page={random.randint(1, 19)}", json=True, aio=True)
+                imageset = {result["urls"]["raw"] for result in d["results"]}
+            return imageset
+
+        async def fetchall(tag, search_tag):
+            await asyncio.sleep(1)
+            images = set()
+            for i in range(1, 100):
+                async with self.sem:
+                    if xrand(3):
+                        s = await Request(f"https://www.gettyimages.co.uk/photos/{tag}?page={i}", decode=True, aio=True)
+                        url = "https://media.gettyimages.com/photos/"
+                        spl = s.split(url)[1:]
+                        imageset = [url + i.split('"', 1)[0].split("?", 1)[0] for i in spl]
+                    else:
+                        d = await Request(f"https://unsplash.com/napi/search/photos?query={tag}&per_page=30&page={i}", json=True, aio=True)
+                        imageset = [result["urls"]["raw"] for result in d["results"]]
+                images.update(imageset)
+                if len(imageset) < 25:
+                    break
+            data = set_dict(self.bot.data.imagepools, file, alist())
+            for url in images:
+                if url not in data:
+                    data.add(url)
+                    self.bot.data.imagepools.update(file)
+            return images
+
+        if file not in self.bot.data.imagepools.finished:
+            create_task(fetchall(tag, search_tag))
+        return self.bot.data.imagepools.get(file, fetch, self.threshold, args=(tag, search_tag))
+    
+    async def __call__(self, bot, channel, flags, args, name, **void):
+        if not args:
+            if name == "muffin":
+                args = ["muffin"]
+            else:
+                raise ArgumentError("Input string is empty.")
+        args2 = ["".join(c for c in full_prune(w) if c.isalnum()) for w in args]
+        tag = "%20".join(sorted(args2))
+        search_tag = "%20".join(args2)
+        url = await self.img(tag, search_tag)
+        if "v" in flags:
+            return escape_roles(url)
+        self.bot.send_as_embeds(channel, image=url)
 
 
 class Giphy(ImagePool, Command):

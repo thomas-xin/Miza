@@ -2322,20 +2322,29 @@ def colour_deficiency(image, operation, value=None):
         colourmatrix.append(0)
     if image.mode == "P":
         image = image.convert("RGBA")
-    return image.convert(image.mode, colourmatrix)
-    channels = list(image.split())
-    out = [None] * len(channels)
-    if len(out) == 4:
-        out[-1] = channels[-1]
-    for i_ratio, ratio in enumerate(ratios):
-        for i_colour in range(3):
-            if ratio[i_colour]:
-                im = channels[i_colour].point(lambda x: x * ratio[i_colour])
-                if out[i_ratio] is None:
-                    out[i_ratio] = im
-                else:
-                    out[i_ratio] = ImageChops.add(out[i_ratio], im)
-    return Image.merge(image.mode, out)
+    if image.mode == "RGBA":
+        spl = image.split()
+        image = Image.merge("RGB", spl[:3])
+        A = spl[-1]
+    else:
+        A = None
+    image = image.convert(image.mode, colourmatrix)
+    if A:
+        image.putalpha(A)
+    return image
+    # channels = list(image.split())
+    # out = [None] * len(channels)
+    # if len(out) == 4:
+    #     out[-1] = channels[-1]
+    # for i_ratio, ratio in enumerate(ratios):
+    #     for i_colour in range(3):
+    #         if ratio[i_colour]:
+    #             im = channels[i_colour].point(lambda x: x * ratio[i_colour])
+    #             if out[i_ratio] is None:
+    #                 out[i_ratio] = im
+    #             else:
+    #                 out[i_ratio] = ImageChops.add(out[i_ratio], im)
+    # return Image.merge(image.mode, out)
 
 Enhance = lambda image, operation, value: getattr(ImageEnhance, operation)(image).enhance(value)
 

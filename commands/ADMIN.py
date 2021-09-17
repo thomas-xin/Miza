@@ -1307,7 +1307,7 @@ class AutoEmoji(Command):
         guild = message.guild
         user = await bot.fetch_user(u_id)
         data = bot.data.autoemojis
-        curr = {f":{e.name}:": f"({e.id})` {min_emoji(e)}" for e in sorted(guild.emojis, key=lambda e: full_prune(e.name))}
+        curr = {f":{e.name}:": f"({e.id})` {min_emoji(e)}" for e in sorted(guild.emojis, key=lambda e: full_prune(e.name)) if e.is_usable()}
         page = 16
         last = max(0, len(curr) - page)
         if reaction is not None:
@@ -1359,6 +1359,8 @@ class UpdateAutoEmojis(Database):
 
     def guild_emoji_map(self, guild, emojis={}):
         for e in sorted(guild.emojis, key=lambda e: e.id):
+            if not e.is_usable():
+                continue
             n = e.name
             while n in emojis:
                 if emojis[n] == e.id:
@@ -2397,8 +2399,10 @@ class UpdateMessageLogs(Database):
                 for channel in guild.text_channels:
                     if channel.permissions_for(guild.me).read_message_history:
                         futs.append(create_task(self.save_channel(channel, t)))
-                for fut in futs:
-                    await fut
+                    if len(futs) >= 5:
+                        await futs.popleft()
+        for fut in futs:
+            await fut
         self.bot.data.message_cache.finished = True
         self.bot.data.message_cache.setmtime()
         print("Loading new messages completed.")

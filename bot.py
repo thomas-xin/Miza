@@ -54,6 +54,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     allowed_mentions = discord.AllowedMentions(
         replied_user=False,
     )
+    connect_ready = concurrent.futures.Future()
 
     def __init__(self, cache_size=1048576, timeout=24):
         # Initializes client (first in __mro__ of class inheritance)
@@ -61,8 +62,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.monkey_patch()
         super().__init__(
             max_messages=256,
-            heartbeat_timeout=60,
-            guild_ready_timeout=5,
+            heartbeat_timeout=64,
+            guild_ready_timeout=8,
             intents=self.intents,
             allowed_mentions=self.allowed_mentions,
             assume_unsync_clock=True,
@@ -802,6 +803,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
     async def query_members(self, members, query, fuzzy=0.5):
         query = str(query)
+        fuz_base = None if fuzzy is None else 0
         with suppress(LookupError):
             return await str_lookup(
                 members,
@@ -809,6 +811,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 qkey=userQuery1,
                 ikey=userIter1,
                 loose=False,
+                fuzzy=fuz_base,
             )
         with suppress(LookupError):
             return await str_lookup(
@@ -816,6 +819,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 query,
                 qkey=userQuery2,
                 ikey=userIter2,
+                fuzzy=fuz_base,
             )
         with suppress(LookupError):
             return await str_lookup(
@@ -823,16 +827,16 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 query,
                 qkey=userQuery3,
                 ikey=userIter3,
+                fuzzy=fuz_base,
             )
-        if fuzzy is not None:
-            with suppress(LookupError):
-                return await str_lookup(
-                    members,
-                    query,
-                    qkey=userQuery4,
-                    ikey=userIter4,
-                    fuzzy=fuzzy,
-                )
+        with suppress(LookupError):
+            return await str_lookup(
+                members,
+                query,
+                qkey=userQuery4,
+                ikey=userIter4,
+                fuzzy=fuzzy,
+            )
         raise LookupError(f"No results for {query}.")
 
     # Fetches a member in the target server by ID or name lookup.
@@ -1553,11 +1557,13 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             else:
                 message = await channel.send(msg, embed=embed, file=file, reference=reference)
                 if filename is not None:
-                    create_future_ex(os.remove, filename, priority=True)
+                    with tracebacksuppressor:
+                        os.remove(filename)
         except:
             if filename is not None:
                 print(filename, os.path.getsize(filename))
-                create_future_ex(os.remove, filename, priority=True)
+                with tracebacksuppressor:
+                    os.remove(filename)
             raise
         if message.attachments:
             await self.add_attachment(message.attachments[0], data)
@@ -1974,6 +1980,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
     # Logs if a message has been deleted.
     def log_delete(self, message, no_log=False):
+        if not message:
+            return
         try:
             m_id = int(message.id)
         except AttributeError:
@@ -2527,7 +2535,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 pass
             else:
                 i += 1
-                create_future_ex(os.remove, "cache/" + f)
+                try:
+                    os.remove("cache/" + f)
+                except:
+                    print_exc()
         if i > 1:
             print(f"{i} cached files flagged for deletion.")
         return i
@@ -3687,10 +3698,11 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         print("Heartbeat Loop initiated.")
         with tracebacksuppressor:
             while not self.closed:
-                d = await delayed_coro(create_future(os.path.exists, self.heartbeat, priority=True), 1 / 12)
-                if d:
-                    with tracebacksuppressor(FileNotFoundError, PermissionError):
-                        await create_future(os.rename, self.heartbeat, self.heartbeat_ack, priority=True)
+                async with Delay(0.2):
+                    d = os.path.exists(self.heartbeat)
+                    if d:
+                        with tracebacksuppressor(FileNotFoundError, PermissionError):
+                            os.rename(self.heartbeat, self.heartbeat_ack)
 
     # User seen event
     async def seen(self, *args, delay=0, event=None, **kwargs):
@@ -4411,13 +4423,11 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         discord.http.HTTPClient.request = lambda self, *args, **kwargs: request(self, *args, **kwargs)
 
     def send_exception(self, messageable, ex, reference=None):
-        owners_list = self.owners
-        owners = ', '.join([self.get_user(owner).mention for owner in owners_list])
         return self.send_as_embeds(
             messageable,
             description="\n".join(as_str(i) for i in ex.args),
             title=f"⚠ {type(ex).__name__} ⚠",
-            fields=(("Unexpected or confusing error?", f"Message {owners}, or join the [support server]({self.rcc_invite})!"),),
+            fields=(("Unexpected or confusing error?", f"Consider joining the [support server]({self.rcc_invite}) for help and bug reports!"),),
             reacts="❎",
             reference=reference,
         )
@@ -4463,9 +4473,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         self.dispatch("reaction_clear", message, old_reactions)
         self.add_message(message, files=False, force=True)
 
-    async def init_ready(self, futs):
+    async def init_ready(self):
         with tracebacksuppressor:
-            self.started = True
             attachments = (file for file in sorted(set(file for file in os.listdir("cache") if file.startswith("attachment_"))))
             for file in attachments:
                 with tracebacksuppressor:
@@ -4490,8 +4499,6 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         if callable(func):
                             self.events.append(f, func)
             print(f"Database event count: {sum(len(v) for v in self.events.values())}")
-            for fut in futs:
-                await fut
             await self.fetch_user(self.deleted_user)
             # Set bot avatar if none has been set.
             if not os.path.exists("misc/init.tmp"):
@@ -4513,6 +4520,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             futs.add(create_future(self.update_slash_commands, priority=True))
             futs.add(create_task(self.create_main_website(first=True)))
             futs.add(self.audio_client_start)
+            await self.wait_until_ready()
             self.bot_ready = True
             print("Bot ready.")
             # Send bot_ready event to all databases.
@@ -4520,6 +4528,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             for fut in futs:
                 with tracebacksuppressor:
                     await fut
+            await create_future(self.connect_ready)
             self.ready = True
             # Send ready event to all databases.
             print("Database ready.")
@@ -4538,29 +4547,33 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 self.audio_client_start = create_future(self.start_audio_client, priority=True)
             return
 
-        # The event called when the bot starts up.
+        # The event called when the client first connects, starts initialisation of the other modules
+        @self.event
+        async def on_connect():
+            print("Successfully connected as " + str(self.user))
+            self.invite = f"https://discordapp.com/oauth2/authorize?permissions=8&client_id={self.id}&scope=bot%20applications.commands"
+            self.mention = (user_mention(self.id), user_pc_mention(self.id))
+            if not self.started:
+                self.started = True
+                create_task(self.init_ready())
+            else:
+                print("Reconnected.")
+            await self.handle_update()
+
+        # The event called when the discord.py state is fully ready.
         @self.event
         async def on_ready():
-            print("Successfully connected as " + str(self.user))
+            create_task(aretry(self.get_ip, delay=20))
             await create_future(self.update_subs, priority=True)
             self.update_cache_feed()
-            self.mention = (user_mention(self.id), user_pc_mention(self.id))
-            self.invite = f"https://discordapp.com/oauth2/authorize?permissions=8&client_id={self.id}&scope=bot%20applications.commands"
             with tracebacksuppressor:
-                futs = set()
-                futs.add(create_task(self.get_state()))
+                create_task(self.get_state())
                 for guild in self.guilds:
                     if guild.unavailable:
                         print(f"Warning: Guild {guild.id} is not available.")
                 await self.handle_update()
-                futs.add(create_future(self.update_usernames, priority=True))
-                futs.add(create_task(aretry(self.get_ip, delay=20)))
-                if not self.started:
-                    create_task(self.init_ready(futs))
-                else:
-                    for fut in futs:
-                        await fut
-                    print("Reinitialized.")
+                await create_future(self.update_usernames, priority=True)
+            self.connect_ready.set_result(True)
 
         # Server join message
         @self.event
