@@ -72,7 +72,7 @@ if os.name == "nt":
     if os.path.exists("misc") and not os.path.exists("misc/ffmpeg-c"):
         print("Downloading ffmpeg version 4.2.2...")
         os.mkdir("misc/ffmpeg-c")
-        subprocess.run([sys.executable, "downloader.py", "https://drive.google.com/u/0/uc?export=download&confirm=QLKC&id=168rCEMiRXi9X_o3pVEl_2cVWTcYGgR4N", "ffmpeg-c.zip"], cwd="misc")
+        subprocess.run([sys.executable, "downloader.py", "https://dl.dropboxusercontent.com/s/6vjpswpkxubnig4/ffmpeg-c.zip?dl=1", "ffmpeg-c.zip"], cwd="misc")
         import zipfile, io
         print("Download complete; extracting new FFmpeg installation...")
         f = "misc/ffmpeg-c.zip"
