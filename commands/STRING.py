@@ -1098,6 +1098,7 @@ class Random(Command):
             raise ArgumentError("Input string is empty.")
         return "\xadI choose `" + choice(args) + "`!"
 
+
 class Rate(Command):
     name = ["Rating"]
     description = "Rates a given object with a random value out of 10!"

@@ -165,9 +165,14 @@ estimate_life_after = lambda t: time.sleep(t) or estimate_life()
 
 geo_sem = Semaphore(90, 256, rate_limit=60)
 geo_count = 0
+IP = None
 
 def get_geo(ip):
-    global geo_count
+    global geo_count, IP
+    if ip.startswith("192.168."):
+        ip = IP
+        if not ip:
+            ip = IP = requests.get("https://api.ipify.org").text
     try:
         resp = TZCACHE[ip]
     except KeyError:
@@ -180,7 +185,10 @@ def get_geo(ip):
             resp = requests.get(url, headers={"DNT": "1", "User-Agent": f"Mozilla/5.{ip[-1]}", "Origin": "https://members.ip-api.com"})
         send("@@@", escape=False)
         resp.raise_for_status()
-        TZCACHE[ip] = resp = resp.json()
+        resp = cdict(resp.json())
+        if not resp.get("timezone"):
+            resp.timezone = "N/A"
+        TZCACHE[ip] = resp
         send(ip + "\t" + "\t".join(resp.values()))
     return resp
 
