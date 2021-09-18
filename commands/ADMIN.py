@@ -2387,7 +2387,7 @@ class UpdateMessageLogs(Database):
             create_task(self.load_new_messages(t))
 
     async def save_channel(self, channel, t=None):
-        i = getattr(channel, "last_message_id")
+        i = getattr(channel, "last_message_id", None)
         if i:
             if id2ts(i) < self.bot.data.message_cache.getmtime():
                 return
@@ -2412,7 +2412,8 @@ class UpdateMessageLogs(Database):
                     if len(futs) >= 4:
                         await futs.popleft()
         for fut in futs:
-            await fut
+            with tracebacksuppressor:
+                await fut
         self.bot.data.message_cache.finished = True
         self.bot.data.message_cache.setmtime()
         print("Loading new messages completed.")
