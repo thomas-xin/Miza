@@ -1005,6 +1005,9 @@ class Ask(Command):
                     "¯\_(ツ)_/¯",
                     "Hm, I dunno, have you tried asking Google?",
                     "Apologies, didn't quite catch that, could you repeat?",
+                    "Ay, ask me later, I'm busy with my 10 hour tunez! 🎧",
+                    "Eh?",
+                    f"My AI is ever growing, I think you should run. {get_random_emoji()}",
                     "Be sure to check out ~topic if you're ever in need of questions to answer! Oh, what was that again?",
                 )
                 if bots:
@@ -1054,16 +1057,13 @@ class Ask(Command):
                     return
         else:
             out = alist(
-                f"My AI is ever growing, I think you should run. {get_random_emoji()}",
                 "Yeah!",
                 "Heck yeah!",
                 "Uuuhhhmmm... Yes...?",
                 "Mhm! 😊",
                 "I believe so?",
                 "What? No!",
-                "Ay, ask me later, I'm busy with my 10 hour tunez! 🎧",
                 "Yeah!",
-                "Eh?",
                 "Yes :3",
                 "Totally!",
                 "Maybe?",
