@@ -886,8 +886,8 @@ class Profile(Command):
                 value = argv[len(setting) + 1:]
         else:
             target = await bot.fetch_user_member(" ".join(args), guild)
+        profile = bot.data.users.get(target.id, EMPTY)
         if setting is None:
-            profile = bot.data.users.get(target.id, EMPTY)
             description = profile.get("description", "")
             birthday = profile.get("birthday")
             timezone = profile.get("timezone")
@@ -911,12 +911,12 @@ class Profile(Command):
                     value = timezone_repr(value)
                 fields.add((field, value, False))
             return bot.send_as_embeds(channel, description, fields=fields, author=get_author(target))
-        if value is None:
-            return ini_md(f"Currently set {setting} for {sqr_md(user)}: {sqr_md(bot.data.users.get(user.id, EMPTY).get(setting))}.")
         if setting != "description" and value.casefold() in ("undefined", "remove", "rem", "reset", "unset", "delete", "clear", "null", "none") or "d" in flags:
             profile.pop(setting, None)
             bot.data.users.update(user.id)
             return css_md(f"Successfully removed {setting} for {sqr_md(user)}.")
+        if value is None:
+            return ini_md(f"Currently set {setting} for {sqr_md(user)}: {sqr_md(bot.data.users.get(user.id, EMPTY).get(setting))}.")
         if setting == "description":
             if len(value) > 1024:
                 raise OverflowError("Description must be 1024 or fewer in length.")
@@ -1457,7 +1457,7 @@ class Reminder(Command):
 
 
 class Note(Command):
-    name = ["Notes"]
+    name = ["Trash", "Notes"]
     description = "Takes note of a given string and allows you to view and edit a to-do list!"
     usage = "(edit|delete)? <id|note>?"
     flags = "aed"
@@ -1467,10 +1467,12 @@ class Note(Command):
     async def __call__(self, name, message, channel, flags, bot, user, argv, **void):
         note_userbase = bot.data.notes
         if argv.startswith("edit "):
-            argv = argv.split(None, 1)[-1]
+            if argv:
+                argv = argv.split(None, 1)[-1]
             add_dict(flags, dict(e=1))
-        elif argv.startswith("delete ") or argv.startswith("remove "):
-            argv = argv.split(None, 1)[-1]
+        elif argv.startswith("delete ") or argv.startswith("remove ") or name == "trash":
+            if argv:
+                argv = argv.split(None, 1)[-1]
             add_dict(flags, dict(d=1))
         if "d" in flags:
             if not argv:

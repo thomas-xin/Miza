@@ -2132,6 +2132,8 @@ def time_disp(s, rounded=True):
 
 # Converts a time interval represented using days:hours:minutes:seconds, to a value in seconds.
 def time_parse(ts):
+    if ts == "N/A":
+        return inf
     data = ts.split(":")
     if len(data) >= 5: 
         raise TypeError("Too many time arguments.")

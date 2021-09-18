@@ -88,11 +88,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.mention = ()
         self.user_loader = set()
         self.users_updated = True
-        self.semaphore = Semaphore(2, 1, delay=0.5)
-        self.ready_semaphore = Semaphore(1, inf, delay=0.5)
-        self.guild_semaphore = Semaphore(5, inf, delay=1, rate_limit=5)
-        self.user_semaphore = Semaphore(64, inf, delay=0.5, rate_limit=8)
-        self.disk_semaphore = Semaphore(1, 1, delay=0.5)
+        self.semaphore = Semaphore(2, 1)
+        self.ready_semaphore = Semaphore(1, inf)
+        self.guild_semaphore = Semaphore(5, inf, rate_limit=5)
+        self.load_semaphore = Semaphore(200, inf, rate_limit=10)
+        self.user_semaphore = Semaphore(64, inf, rate_limit=8)
+        self.disk_semaphore = Semaphore(1, 1, rate_limit=1)
         self.disk = 0
         self.storage_ratio = 0
         self.file_count = 0
@@ -2001,6 +2002,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
     # Silently deletes a message, bypassing logs.
     async def silent_delete(self, message, exc=False, no_log=False, delay=None):
+        if not message:
+            return
         if type(message) is int:
             message = await self.fetch_message(message)
         if delay:
@@ -2852,7 +2855,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             if truemention:
                 try:
                     await self.send_event("_mention_", user=user, message=message, msg=msg, exc=True)
-                except RuntimeError:
+                except CommandCancelledError:
                     return 0
         remaining = 0
         run = False
@@ -3229,13 +3232,14 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         while i >= 1000:
             for r in range(64):
                 try:
-                    memberdata = await Request(
-                        f"https://discord.com/api/v9/guilds/{guild.id}/members?limit=1000&after={x}",
-                        headers=dict(Authorization="Bot " + self.token),
-                        bypass=False,
-                        json=True,
-                        aio=True,
-                    )
+                    async with self.load_semaphore:
+                        memberdata = await Request(
+                            f"https://discord.com/api/v9/guilds/{guild.id}/members?limit=1000&after={x}",
+                            headers=dict(Authorization="Bot " + self.token),
+                            bypass=False,
+                            json=True,
+                            aio=True,
+                        )
                 except:
                     print_exc()
                     await asyncio.sleep(r + 2)
@@ -3255,12 +3259,11 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             else:
                 i = xrand(2)
             fut = create_task(funcs[i](guild))
-            if len(futs[i]) >= 16:
+            if len(futs[i]) >= 20:
                 await futs[i].popleft()
             futs[i].append(fut)
-        for f in futs:
-            for fut in f:
-                await fut
+        for f in itertools.chain(*futs):
+            await fut
         self.guilds_ready.set_result(None)
 
     # Adds a webhook to the bot's user and webhook cache.

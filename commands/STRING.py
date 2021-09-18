@@ -642,6 +642,8 @@ class Timezone(Command):
     usage = "<timezone> <list{?l}>?"
 
     async def __call__(self, channel, argv, message, **void):
+        if not argv:
+            return await self.bot.commands.time[0]("timezone", channel, channel.guild, "", [], message.author)
         if argv.startswith("-l") or argv.startswith("list"):
             fields = deque()
             for k, v in COUNTRIES.items():

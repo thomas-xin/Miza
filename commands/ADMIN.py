@@ -2387,10 +2387,14 @@ class UpdateMessageLogs(Database):
             create_task(self.load_new_messages(t))
 
     async def save_channel(self, channel, t=None):
-        async for m in self.bot.data.channel_cache.get(channel, as_message=False):
-            if m == getattr(channel, "last_message_id"):
+        i = getattr(channel, "last_message_id")
+        if i:
+            if id2ts(i) < self.bot.data.message_cache.getmtime():
                 return
-            break
+            async for m in self.bot.data.channel_cache.get(channel, as_message=False):
+                if m == i:
+                    return
+                break
         async with self.bot.data.message_cache.search_sem:
             async for message in channel.history(limit=32768, after=t, oldest_first=False):
                 self.bot.add_message(message, files=False, force=True)

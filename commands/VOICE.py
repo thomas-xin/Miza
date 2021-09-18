@@ -2024,13 +2024,13 @@ class AudioDownloader:
                         if "." in title:
                             title = title[:title.rindex(".")]
                         found = False
-                    if "duration" in entry:
-                        dur = float(entry["duration"])
-                    else:
-                        dur = None
                     url = entry.get("webpage_url", entry.get("url", entry.get("id")))
                     if not url:
                         continue
+                    if entry.get("duration"):
+                        dur = float(entry["duration"])
+                    else:
+                        dur = None
                     temp = cdict(name=title, url=url, duration=dur)
                     if not is_url(url):
                         if entry.get("ie_key", "").casefold() == "youtube":
@@ -3953,11 +3953,11 @@ class Player(Command):
         b'\xf0\x9f\xa5\x81': 6,
         b'\xf0\x9f\x93\x89': 7,
         b'\xf0\x9f\x93\x8a': 8,
-        b'\xe2\x8f\xaa': 9,
-        b'\xe2\x8f\xa9': 10,
-        b'\xe2\x8f\xab': 11,
-        b'\xe2\x8f\xac': 12,
-        b'\xe2\x99\xbb': 13,
+        b'\xe2\x99\xbb': 9,
+        b'\xe2\x8f\xaa': 10,
+        b'\xe2\x8f\xa9': 11,
+        b'\xe2\x8f\xab': 12,
+        b'\xe2\x8f\xac': 13,
 	    b'\xe2\x8f\x8f': 14,
         b'\xe2\x9c\x96': 15,
     })
@@ -4132,18 +4132,18 @@ class Player(Command):
                         c = 1 / 3
                     auds.stats.chorus = c
                     await create_future(auds.play, auds.source, auds.pos, timeout=18)
-                elif i == 9 or i == 10:
-                    s = (i * 2 - 19) * 2 / 11
-                    auds.stats.speed = round(auds.stats.speed + s, 5)
-                    await create_future(auds.play, auds.source, auds.pos, timeout=18)
-                elif i == 11 or i == 12:
-                    p = i * 2 - 23
-                    auds.stats.pitch -= p
-                    await create_future(auds.play, auds.source, auds.pos, timeout=18)
-                elif i == 13:
+                elif i == 9:
                     pos = auds.pos
                     auds.stats = cdict(auds.defaults)
                     await create_future(auds.play, auds.source, pos, timeout=18)
+                elif i == 10 or i == 11:
+                    s = (i * 2 - 19) * 2 / 11
+                    auds.stats.speed = round(auds.stats.speed + s, 5)
+                    await create_future(auds.play, auds.source, auds.pos, timeout=18)
+                elif i == 12 or i == 13:
+                    p = i * 2 - 23
+                    auds.stats.pitch -= p
+                    await create_future(auds.play, auds.source, auds.pos, timeout=18)
                 elif i == 14:
                     auds.dead = True
                     auds.player = None
@@ -4166,7 +4166,16 @@ class Player(Command):
                 embed=emb,
             )
         else:
-            buttons = [cdict(emoji=as_str(s), custom_id=s, style=3 if i < 5 else 1 if i < 14 else 4) for s, i in self.buttons.a.items()]
+            buttons = [[] for _ in loop(4)]
+            for s, i in self.buttons.a.items():
+                s = as_str(s)
+                if i < 5:
+                    buttons[0].append(cdict(emoji=s, custom_id=s, style=3))
+                elif i < 14:
+                    j = 1 if len(buttons[1]) < 5 else 2
+                    buttons[j].append(cdict(emoji=s, custom_id=s, style=1))
+                else:
+                    buttons[2].append(cdict(emoji=s, custom_id=s, style=4))
             auds.player.time = inf
             temp = message
             message = await send_with_reply(
