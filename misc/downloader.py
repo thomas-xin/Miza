@@ -1,8 +1,50 @@
 # Better than Curl 🥌
 
-import os, sys, requests, time, math, random, concurrent.futures
+import os, sys, subprocess, time, math, random, concurrent.futures
+
+try:
+    import requests
+except ModuleNotFoundError:
+    subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", "--user", "requests"])
+    import requests
+os.system("color")
+
 from traceback import print_exc
 from math import *
+from concurrent.futures import thread
+
+def _adjust_thread_count(self):
+    # if idle threads are available, don't spin new threads
+    try:
+        if self._idle_semaphore.acquire(timeout=0):
+            return
+    except AttributeError:
+        pass
+
+    # When the executor gets lost, the weakref callback will wake up
+    # the worker threads.
+    def weakref_cb(_, q=self._work_queue):
+        q.put(None)
+
+    num_threads = len(self._threads)
+    if num_threads < self._max_workers:
+        thread_name = '%s_%d' % (self._thread_name_prefix or self, num_threads)
+        t = thread.threading.Thread(
+            name=thread_name,
+            target=thread._worker,
+            args=(
+                thread.weakref.ref(self, weakref_cb),
+                self._work_queue,
+                self._initializer,
+                self._initargs,
+            ),
+            daemon=True
+        )
+        t.start()
+        self._threads.add(t)
+        thread._threads_queues[t] = self._work_queue
+
+concurrent.futures.ThreadPoolExecutor._adjust_thread_count = lambda self: _adjust_thread_count(self)
 
 utc = time.time
 math.round = round
@@ -83,47 +125,6 @@ def time_disp(s, rounded=True):
     return output
 
 
-class cdict(dict):
-
-    __slots__ = ()
-
-    __init__ = lambda self, *args, **kwargs: super().__init__(*args, **kwargs)
-    __repr__ = lambda self: f"{self.__class__.__name__}({super().__repr__() if super().__len__() else ''})"
-    __str__ = lambda self: super().__repr__()
-    __iter__ = lambda self: iter(tuple(super().__iter__()))
-    __call__ = lambda self, k: self.__getitem__(k)
-
-    def __getattr__(self, k):
-        try:
-            return self.__getattribute__(k)
-        except AttributeError:
-            pass
-        if not k.startswith("__") or not k.endswith("__"):
-            try:
-                return self.__getitem__(k)
-            except KeyError as ex:
-                raise AttributeError(*ex.args)
-        raise AttributeError(k)
-
-    def __setattr__(self, k, v):
-        if k.startswith("__") and k.endswith("__"):
-            return object.__setattr__(self, k, v)
-        return self.__setitem__(k, v)
-
-    def __dir__(self):
-        data = set(object.__dir__(self))
-        data.update(self)
-        return data
-
-    @property
-    def __dict__(self):
-        return self
-
-    ___repr__ = lambda self: super().__repr__()
-    to_dict = lambda self: dict(**self)
-    to_list = lambda self: list(super().values())
-
-
 def header():
     return {
         "User-Agent": f"Mozilla/5.{random.randint(1, 9)}",
@@ -132,10 +133,13 @@ def header():
     }
 
 
+COLOURS = ["\x1b[38;5;16m█"]
+COLOURS.extend(f"\x1b[38;5;{i}m█" for i in range(232, 256))
+COLOURS.append("\x1b[38;5;15m█")
 updated = False
 def download(url, fn, resp=None, index=0, start=None, end=None):
     size = 0
-    packet = 1048576
+    packet = 131072
     with open(fn, "wb") as f:
         while True:
             try:
@@ -160,8 +164,10 @@ def download(url, fn, resp=None, index=0, start=None, end=None):
                         break
                     while True:
                         try:
-                            #b = next(it)
                             fut = submit(next, it)
+                        except RuntimeError:
+                            return
+                        try:
                             b = fut.result(timeout=24)
                         except (ValueError, AttributeError):
                             raise StopIteration
@@ -175,7 +181,14 @@ def download(url, fn, resp=None, index=0, start=None, end=None):
                         total = sum(progress.values())
                         percentage = round(total / fsize * 100, 4)
                         s = f"\r{percentage}%"
-                        s += " " * (64 - len(s))
+                        box = lambda i: COLOURS[round(i * (len(COLOURS) - 1))]
+                        s += " " * (10 - len(s))
+                        prog = "".join(box(v * threads / fsize) for v in progress.values())
+                        s += prog
+                        if verbose and prog != last_progress:
+                            globals()["last_progress"] = prog
+                            s = "\n" + s[1:]
+                        s += "\x1b[38;5;7m"
                         print(s, end="")
                         updated = True
             except StopIteration:
@@ -184,17 +197,21 @@ def download(url, fn, resp=None, index=0, start=None, end=None):
                 print_exc()
                 time.sleep(5)
                 print(f"\nThread {index} errored, retrying...")
-                packet = 65536
+                packet = max(8192, packet >> 1)
             resp = None
     return fn
 
 
+verbose = False
 fn = None
 if len(sys.argv) < 2:
     url = input("Please enter a URL to download from: ")
     threads = 1
 else:
     args = list(sys.argv)
+    if "-v" in args[1:]:
+        args.remove("-v")
+        verbose = True
     url = args[1]
     if url == "-threads":
         args.pop(1)
@@ -218,8 +235,10 @@ t = utc()
 rheader = header()
 resp = requests.get(url, headers=rheader, stream=True)
 url = resp.url
-head = cdict((k.casefold(), v) for k, v in resp.headers.items())
+head = {k.casefold(): v for k, v in resp.headers.items()}
 progress = {}
+if verbose:
+    last_progress = ""
 fsize = int(head.get("content-length", 1073741824))
 if "bytes" in head.get("accept-ranges", ""):
     print("Accept-Ranges header found.")
@@ -244,7 +263,7 @@ if "bytes" in head.get("accept-ranges", ""):
         if decision:
             distances = ((abs(fs - fsize) / (2 + log(len(decision[fs]))), fs) for fs in decision)
             LS = sorted(distances)[0][1]
-            sizes = {sum(v) / len(v) * (6 + log(k)): k for k, v in decision[LS].items()}
+            sizes = {sum(v) / len(v) * (12 + log(k, 2)): k for k, v in decision[LS].items()}
             sizes = {k: v for k, v in sorted(sizes.items())}
             k = next(iter(sizes))
             threads = round(sizes[k] / LS * fsize)
@@ -257,6 +276,8 @@ if "bytes" in head.get("accept-ranges", ""):
             else:
                 lr = 0
             threads += random.randint(-lr, lr)
+            if threads <= 1:
+                threads = random.randint(1, 3)
         else:
             n = round(fsize / 4194304)
             print(f"Decision tree empty: {n}")
@@ -279,11 +300,14 @@ if threads > 1:
         if i == threads - 1:
             end = None
         else:
-            end = start + load
+            end = min(start + load, fsize)
         workers[i] = submit(download, url, f"cache/thread-{i}", resp, index=i, start=start, end=end)
         resp = None
-        time.sleep(delay)
-        if workers[i].done():
+        try:
+            workers[i].result(timeout=delay)
+        except concurrent.futures.TimeoutError:
+            pass
+        if workers[i].done() or i >= 1 and workers[i - 1].done() or i >= 2 and workers[i - 2].done():
             delay /= 2
     fut = workers[0]
     if os.path.exists(fn):

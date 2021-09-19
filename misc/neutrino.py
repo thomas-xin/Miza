@@ -218,9 +218,13 @@ if __name__ == "__main__":
 				elif f.is_dir(follow_symlinks=False):
 					fp = os.path.relpath(f.path, argv)
 					info[0].append(fp)
-					sub, pos = recursive_scan(path=f.path, pos=pos)
-					files.extend(sub)
-					pos = pos
+					try:
+						sub, pos = recursive_scan(path=f.path, pos=pos)
+					except PermissionError:
+						pass
+					else:
+						files.extend(sub)
+						pos = pos
 			return files, pos
 
 		sys.stdout.write("Scanning...")

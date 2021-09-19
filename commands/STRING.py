@@ -514,7 +514,7 @@ def _c2e(string, em1, em2):
 
 
 class Char2Emoji(Command):
-    name = ["C2E"]
+    name = ["C2E", "Char2Emoj"]
     description = "Makes emoji blocks using a string."
     usage = "<0:string> <1:emoji_1> <2:emoji_2>"
     no_parse = True

@@ -13,7 +13,7 @@ class Purge(Command):
     multi = True
     slash = True
 
-    async def __call__(self, bot, args, argl, user, channel, name, flags, perm, guild, **void):
+    async def __call__(self, bot, args, argl, user, message, channel, name, flags, perm, guild, **void):
         # print(self, bot, args, argl, user, channel, name, flags, perm, guild, void)
         end = None
         if args:
