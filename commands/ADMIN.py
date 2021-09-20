@@ -1827,29 +1827,42 @@ class ServerProtector(Database):
     async def _channel_delete_(self, channel, guild, **void):
         if channel.id in self.bot.cache.deleted:
             return
+        if not self.bot.is_trusted(guild.id) and guild.id not in self.bot.data.logU:
+            return
+        user = None
+        audits = guild.audit_logs(limit=5, action=discord.AuditLogAction.channel_delete)
+        ts = utc()
+        cnt = {}
+        async for log in audits:
+            if ts - utc_ts(log.created_at) < 120:
+                add_dict(cnt, {log.user.id: 1})
+                if user is None and log.target.id == channel.id:
+                    user = log.user
+            else:
+                break
         if self.bot.is_trusted(guild.id):
-            audits = guild.audit_logs(limit=5, action=discord.AuditLogAction.channel_delete)
-            ts = utc()
-            cnt = {}
-            async for log in audits:
-                if ts - utc_ts(log.created_at) < 120:
-                    add_dict(cnt, {log.user.id: 1})
             for u_id in cnt:
                 if cnt[u_id] > 2:
                     create_task(self.targetWarn(u_id, guild, f"channel deletions `({cnt[u_id]})`"))
+        if guild.id in self.bot.data.logU:
+            await self.bot.data.logU._channel_delete_2_(channel, guild, user)
 
     async def _ban_(self, user, guild, **void):
-        if not self.bot.recently_banned(user, guild):
-            if self.bot.is_trusted(guild.id):
-                audits = guild.audit_logs(limit=13, action=discord.AuditLogAction.ban)
-                ts = utc()
-                cnt = {}
-                async for log in audits:
-                    if ts - utc_ts(log.created_at) < 10:
-                        add_dict(cnt, {log.user.id: 1})
-                for u_id in cnt:
-                    if cnt[u_id] > 5:
-                        create_task(self.targetWarn(u_id, guild, f"banning `({cnt[u_id]})`"))
+        if self.bot.recently_banned(user, guild):
+            return
+        if not self.bot.is_trusted(guild.id):
+            return
+        audits = guild.audit_logs(limit=13, action=discord.AuditLogAction.ban)
+        ts = utc()
+        cnt = {}
+        async for log in audits:
+            if ts - utc_ts(log.created_at) < 10:
+                add_dict(cnt, {log.user.id: 1})
+            else:
+                break
+        for u_id in cnt:
+            if cnt[u_id] > 5:
+                create_task(self.targetWarn(u_id, guild, f"banning `({cnt[u_id]})`"))
 
 
 class CreateEmoji(Command):
@@ -1999,17 +2012,17 @@ class UpdateUserLogs(Database):
             if guild.get_member(after.id):
                 found = True
                 break
-        if found:
-            b_url = best_url(before)
-            a_url = best_url(after)
-            if b_url != a_url:
-                with tracebacksuppressor:
-                    urls = await self.bot.data.exec.uproxy(b_url, a_url)
-                    # print(after, after.id, *urls)
-            for g_id in self.data:
-                guild = self.bot.cache.guilds.get(g_id)
-                if guild:
-                    create_task(self._member_update_(before, after, guild))
+        if not found:
+            return
+        b_url = best_url(before)
+        a_url = best_url(after)
+        if b_url != a_url:
+            with tracebacksuppressor:
+                urls = await self.bot.data.exec.uproxy(b_url, a_url)
+        for g_id in self.data:
+            guild = self.bot.cache.guilds.get(g_id)
+            if guild:
+                create_task(self._member_update_(before, after, guild))
 
     async def _member_update_(self, before, after, guild=None):
         if guild is None:
@@ -2024,157 +2037,224 @@ class UpdateUserLogs(Database):
         except:
             print_exc()
             return
-        if guild.id in self.data:
-            c_id = self.data[guild.id]
-            try:
-                channel = await self.bot.fetch_channel(c_id)
-            except (EOFError, discord.NotFound):
-                self.data.pop(guild.id)
-                return
-            emb = discord.Embed()
-            emb.description = (
-                "<@" + str(after.id)
-                + "> has been updated:"
+        if guild.id not in self.data:
+            return
+        c_id = self.data[guild.id]
+        try:
+            channel = await self.bot.fetch_channel(c_id)
+        except (EOFError, discord.NotFound):
+            self.data.pop(guild.id)
+            return
+        emb = discord.Embed()
+        emb.description = f"{user_mention(after.id)} has been updated:"
+        colour = [0] * 3
+        # Add fields for every update to the member data
+        change = False
+        if str(before) != str(after):
+            emb.add_field(
+                name="Username",
+                value=escape_markdown(str(before)) + " ➡️ " + escape_markdown(str(after)),
             )
-            colour = [0] * 3
-            # Add fields for every update to the member data
-            change = False
-            if str(before) != str(after):
+            change = True
+            colour[0] += 255
+        if hasattr(before, "guild"):
+            if before.display_name != after.display_name:
                 emb.add_field(
-                    name="Username",
-                    value=escape_markdown(str(before)) + " ➡️ " + escape_markdown(str(after)),
+                    name="Nickname",
+                    value=escape_markdown(before.display_name) + " ➡️ " + escape_markdown(after.display_name),
                 )
                 change = True
                 colour[0] += 255
-            if hasattr(before, "guild"):
-                if before.display_name != after.display_name:
-                    emb.add_field(
-                        name="Nickname",
-                        value=escape_markdown(before.display_name) + " ➡️ " + escape_markdown(after.display_name),
+            if hash(tuple(r.id for r in before.roles)) != hash(tuple(r.id for r in after.roles)):
+                sub = alist()
+                add = alist()
+                for r in before.roles:
+                    if r not in after.roles:
+                        sub.append(r)
+                for r in after.roles:
+                    if r not in before.roles:
+                        add.append(r)
+                rchange = ""
+                if sub:
+                    rchange = "❌ " + escape_markdown(", ".join(role_mention(r.id) for r in sub))
+                if add:
+                    rchange += (
+                        "\n" * bool(rchange) + "✅ " 
+                        + escape_markdown(", ".join(role_mention(r.id) for r in add))
                     )
+                if rchange:
+                    emb.add_field(name="Roles", value=rchange)
                     change = True
-                    colour[0] += 255
-                if hash(tuple(r.id for r in before.roles)) != hash(tuple(r.id for r in after.roles)):
-                    sub = alist()
-                    add = alist()
-                    for r in before.roles:
-                        if r not in after.roles:
-                            sub.append(r)
-                    for r in after.roles:
-                        if r not in before.roles:
-                            add.append(r)
-                    rchange = ""
-                    if sub:
-                        rchange = "❌ " + escape_markdown(", ".join(role_mention(r.id) for r in sub))
-                    if add:
-                        rchange += (
-                            "\n" * bool(rchange) + "✅ " 
-                            + escape_markdown(", ".join(role_mention(r.id) for r in add))
-                        )
-                    if rchange:
-                        emb.add_field(name="Roles", value=rchange)
-                        change = True
-                        colour[1] += 255
-            if before.avatar != after.avatar:
-                b_url = best_url(before)
-                a_url = best_url(after)
-                if "exec" in self.bot.data:
-                    urls = ()
-                    with tracebacksuppressor:
-                        urls = await self.bot.data.exec.uproxy(b_url, a_url)
-                    for i, url in enumerate(urls):
-                        if url:
-                            if i:
-                                a_url = url
-                            else:
-                                b_url = url
-                emb.add_field(
-                    name="Avatar",
-                    value=f"[Before]({b_url}) ➡️ [After]({a_url})",
-                )
-                emb.set_thumbnail(url=a_url)
-                change = True
-                colour[2] += 255
-            if change:
-                b_url = await self.bot.get_proxy_url(before)
-                a_url = await self.bot.get_proxy_url(after)
-                emb.set_author(name=str(after), icon_url=a_url, url=a_url)
-                emb.colour = colour2raw(colour)
-                self.bot.send_embeds(channel, emb)
+                    colour[1] += 255
+        if before.avatar != after.avatar:
+            b_url = best_url(before)
+            a_url = best_url(after)
+            if "exec" in self.bot.data:
+                urls = ()
+                with tracebacksuppressor:
+                    urls = await self.bot.data.exec.uproxy(b_url, a_url)
+                for i, url in enumerate(urls):
+                    if url:
+                        if i:
+                            a_url = url
+                        else:
+                            b_url = url
+            emb.add_field(
+                name="Avatar",
+                value=f"[Before]({b_url}) ➡️ [After]({a_url})",
+            )
+            emb.set_thumbnail(url=a_url)
+            change = True
+            colour[2] += 255
+        if not change:
+            return
+        b_url = await self.bot.get_proxy_url(before)
+        a_url = await self.bot.get_proxy_url(after)
+        emb.set_author(name=str(after), icon_url=a_url, url=a_url)
+        emb.colour = colour2raw(colour)
+        self.bot.send_embeds(channel, emb)
+
+    async def _channel_delete_2_(self, ch, guild, user, **void):
+        if guild.id not in self.data:
+            return
+        c_id = self.data[guild.id]
+        try:
+            channel = await self.bot.fetch_channel(c_id)
+        except (EOFError, discord.NotFound):
+            self.data.pop(guild.id)
+            return
+        emb = discord.Embed(colour=8323072)
+        emb.set_author(**get_author(user))
+        mlist = self.bot.data.channel_cache.data.get(ch.id, ())
+        count = f" ({len(mlist)}+)" if mlist else ""
+        emb.description = f"{channel_mention(ch.id)}{count} was deleted by {user_mention(user.id)}."
+        self.bot.send_embeds(channel, emb)
+
+    async def _guild_update_(self, before, after, **void):
+        if after.id not in self.data:
+            return
+        c_id = self.data[after.id]
+        try:
+            channel = await self.bot.fetch_channel(c_id)
+        except (EOFError, discord.NotFound):
+            self.data.pop(after.id)
+            return
+        colour = await self.bot.get_colour(after)
+        emb = discord.Embed(colour=colour)
+        emb.description = f"{after} has been updated:"
+        if str(before) != str(after):
+            emb.add_field(
+                name="Name",
+                value=escape_markdown(str(before)) + " ➡️ " + escape_markdown(str(after)),
+            )
+            change = True
+        if before.icon != after.icon:
+            b_url = to_png(before.icon_url)
+            a_url = to_png(after.icon_url)
+            if "exec" in self.bot.data:
+                urls = ()
+                with tracebacksuppressor:
+                    urls = await self.bot.data.exec.uproxy(b_url, a_url)
+                for i, url in enumerate(urls):
+                    if url:
+                        if i:
+                            a_url = url
+                        else:
+                            b_url = url
+            emb.add_field(
+                name="Icon",
+                value=f"[Before]({b_url}) ➡️ [After]({a_url})",
+            )
+            emb.set_thumbnail(url=a_url)
+            change = True
+        if before.owner_id != after.owner_id:
+            emb.add_field(
+                name="Owner",
+                value=f"{user_mention(before.owner_id)} ➡️ {user_mention(after.owner_id)}",
+            )
+            change = True
+        if not change:
+            return
+        b_url = await self.bot.get_proxy_url(before)
+        a_url = await self.bot.get_proxy_url(after)
+        emb.set_author(name=str(after), icon_url=a_url, url=a_url)
+        self.bot.send_embeds(channel, emb)
 
     async def _join_(self, user, **void):
         guild = getattr(user, "guild", None)
-        if guild is not None and guild.id in self.data:
-            c_id = self.data[guild.id]
-            try:
-                channel = await self.bot.fetch_channel(c_id)
-            except (EOFError, discord.NotFound):
-                self.data.pop(guild.id)
-                return
-            # Colour: White
-            emb = discord.Embed(colour=16777214)
-            emb.set_author(**get_author(user))
-            emb.description = f"{user_mention(user.id)} has joined the server."
-            age = utc() - utc_ts(user.created_at)
-            if age < 86400 * 7:
-                emb.description += f"\n⚠️ Account is {time_diff(utc_dt(), user.created_at)} old. ⚠️"
-            self.bot.send_embeds(channel, emb)
+        if guild is None or guild.id not in self.data:
+            return
+        c_id = self.data[guild.id]
+        try:
+            channel = await self.bot.fetch_channel(c_id)
+        except (EOFError, discord.NotFound):
+            self.data.pop(guild.id)
+            return
+        # Colour: White
+        emb = discord.Embed(colour=16777214)
+        emb.set_author(**get_author(user))
+        emb.description = f"{user_mention(user.id)} has joined the server."
+        age = utc() - utc_ts(user.created_at)
+        if age < 86400 * 7:
+            emb.description += f"\n⚠️ Account is {time_diff(utc_dt(), user.created_at)} old. ⚠️"
+        self.bot.send_embeds(channel, emb)
 
     async def _leave_(self, user, **void):
         guild = getattr(user, "guild", None)
-        if guild is not None and guild.id in self.data:
-            c_id = self.data[guild.id]
-            try:
-                channel = await self.bot.fetch_channel(c_id)
-            except (EOFError, discord.NotFound):
-                self.data.pop(guild.id)
-                return
-            # Colour: Black
-            emb = discord.Embed(colour=1)
-            emb.set_author(**get_author(user))
-            # Check audit log to find whether user left or was kicked/banned
-            prune = None
-            kick = None
-            ban = None
-            with tracebacksuppressor(StopIteration):
-                ts = utc()
-                futs = [create_task(guild.audit_logs(limit=4, action=getattr(discord.AuditLogAction, action)).flatten()) for action in ("ban", "kick", "member_prune")]
-                bans = await futs[0]
-                kicks = await futs[1]
-                prunes = await futs[2]
-                for log in bans:
-                    if ts - utc_ts(log.created_at) < 3:
-                        if log.target.id == user.id:
-                            ban = cdict(id=log.user.id, reason=log.reason)
-                            raise StopIteration
-                for log in kicks:
-                    if ts - utc_ts(log.created_at) < 3:
-                        if log.target.id == user.id:
-                            kick = cdict(id=log.user.id, reason=log.reason)
-                            raise StopIteration
-                for log in prunes:
-                    if ts - utc_ts(log.created_at) < 3:
-                        try:
-                            reason = f"{log.extra.delete_member_days} days of inactivity"
-                        except AttributeError:
-                            reason = None
-                        prune = cdict(id=log.user.id, reason=reason)
+        if guild is None or guild.id not in self.data:
+            return
+        c_id = self.data[guild.id]
+        try:
+            channel = await self.bot.fetch_channel(c_id)
+        except (EOFError, discord.NotFound):
+            self.data.pop(guild.id)
+            return
+        # Colour: Black
+        emb = discord.Embed(colour=1)
+        emb.set_author(**get_author(user))
+        # Check audit log to find whether user left or was kicked/banned
+        prune = None
+        kick = None
+        ban = None
+        with tracebacksuppressor(StopIteration):
+            ts = utc()
+            futs = [create_task(guild.audit_logs(limit=4, action=getattr(discord.AuditLogAction, action)).flatten()) for action in ("ban", "kick", "member_prune")]
+            bans = await futs[0]
+            kicks = await futs[1]
+            prunes = await futs[2]
+            for log in bans:
+                if ts - utc_ts(log.created_at) < 3:
+                    if log.target.id == user.id:
+                        ban = cdict(id=log.user.id, reason=log.reason)
                         raise StopIteration
-            if ban is not None:
-                emb.description = f"{user_mention(user.id)} has been banned by {user_mention(ban.id)}."
-                if ban.reason:
-                    emb.description += f"\nReason: *`{no_md(ban.reason)}`*"
-            elif kick is not None:
-                emb.description = f"{user_mention(user.id)} has been kicked by {user_mention(kick.id)}."
-                if kick.reason:
-                    emb.description += f"\nReason: *`{no_md(kick.reason)}`*"
-            elif prune is not None:
-                emb.description = f"{user_mention(user.id)} has been pruned by {user_mention(prune.id)}."
-                if prune.reason:
-                    emb.description += f"\nReason: *`{no_md(prune.reason)}`*"
-            else:
-                emb.description = f"{user_mention(user.id)} has left the server."
-            self.bot.send_embeds(channel, emb)
+            for log in kicks:
+                if ts - utc_ts(log.created_at) < 3:
+                    if log.target.id == user.id:
+                        kick = cdict(id=log.user.id, reason=log.reason)
+                        raise StopIteration
+            for log in prunes:
+                if ts - utc_ts(log.created_at) < 3:
+                    try:
+                        reason = f"{log.extra.delete_member_days} days of inactivity"
+                    except AttributeError:
+                        reason = None
+                    prune = cdict(id=log.user.id, reason=reason)
+                    raise StopIteration
+        if ban is not None:
+            emb.description = f"{user_mention(user.id)} has been banned by {user_mention(ban.id)}."
+            if ban.reason:
+                emb.description += f"\nReason: *`{no_md(ban.reason)}`*"
+        elif kick is not None:
+            emb.description = f"{user_mention(user.id)} has been kicked by {user_mention(kick.id)}."
+            if kick.reason:
+                emb.description += f"\nReason: *`{no_md(kick.reason)}`*"
+        elif prune is not None:
+            emb.description = f"{user_mention(user.id)} has been pruned by {user_mention(prune.id)}."
+            if prune.reason:
+                emb.description += f"\nReason: *`{no_md(prune.reason)}`*"
+        else:
+            emb.description = f"{user_mention(user.id)} has left the server."
+        self.bot.send_embeds(channel, emb)
 
 
 class UpdateMessageCache(Database):

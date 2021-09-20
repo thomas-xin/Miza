@@ -717,7 +717,7 @@ class Rainbow(Command):
 class Scroll(Command):
     name = ["Parallax", "Offset", "ScrollGIF"]
     description = "Creates a .gif image from repeatedly shifting supplied image in a specified direction."
-    usage = "<0:url> <1:direction(left)>? <2:duration(2)>? <3:fps(25)>?"
+    usage = "<0:url> <1:direction(left)>? <2:duration(2)>? <3:fps(20)>?"
     no_parse = True
     rate_limit = (5, 11)
     _timeout_ = 8
@@ -883,7 +883,7 @@ class Liquefy(Command):
 class CreateGIF(Command):
     name = ["Animate", "GIF", "Frames", "ImageSequence"]
     description = "Combines multiple supplied images, and/or optionally a video, into an animated image, image sequence, or video."
-    usage = "<0:url>+ <-2:framerate(16)>? <-1:format(gif)>?"
+    usage = "<0:url>+ <-2:fps(20)>? <-1:format(gif)>?"
     no_parse = True
     rate_limit = (8, 24)
     _timeout_ = 20

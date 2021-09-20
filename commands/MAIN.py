@@ -152,7 +152,7 @@ class Help(Command):
                     sem = EDIT_SEM[message.channel.id] = Semaphore(5.1, 256, rate_limit=5)
                 async with sem:
                     await Request(
-                        f"https://discord.com/api/v9/channels/{message.channel.id}/messages/{message.id}",
+                        f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
                         data=json.dumps(dict(
                             embed=embed.to_dict(),
                             components=restructure_buttons(buttons),
@@ -174,7 +174,7 @@ class Help(Command):
                         sem = EDIT_SEM[message.channel.id] = Semaphore(5.1, 256, rate_limit=5)
                     async with sem:
                         await Request(
-                            f"https://discord.com/api/v9/channels/{message.channel.id}/messages/{message.id}",
+                            f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
                             data=json.dumps(dict(
                                 components=restructure_buttons(buttons),
                             )),

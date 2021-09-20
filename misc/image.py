@@ -654,8 +654,15 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
         f_in = fn if direct else url
         command = ["ffmpeg", "-threads", "2", "-hide_banner", "-nostdin", "-loglevel", "error", "-y", "-i", f_in, "-an", "-vf"]
         w, h = max_size(*size, maxsize)
-        fps = fps or orig_fps or 16
-        vf = ""
+        fps = fps or orig_fps or 20
+        step = 1
+        while fps > 24:
+            fps /= 2
+            step <<= 1
+        if step > 1:
+            vf = f'select="not(mod(n\\,{step}))",'
+        else:
+            vf = ""
         if w != size[0]:
             vf += "scale=" + str(round(w)) + ":-1:flags=lanczos,"
         vf += "split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle"
@@ -702,9 +709,14 @@ def create_gif(in_type, args, delay):
                 except EOFError:
                     break
             if length != 0 and not delay:
-                # maxsize = int(min(maxsize, 32768 / (len(images) + length) ** 0.5))
-                delay = img.info.get("duration") or delay or 0.0625
-            for f in range(2147483648):
+                delay = img.info.get("duration") or delay or 50
+            step = 1
+            fps = 1000 / delay
+            while fps > 24:
+                fps /= 2
+                step <<= 1
+            delay = 1000 / fps
+            for f in range(0, 2147483648, step):
                 try:
                     img.seek(f)
                 except EOFError:
@@ -730,7 +742,7 @@ def create_gif(in_type, args, delay):
     if len(imgs) == 1:
         imgs *= 2
     count = len(imgs)
-    delay = delay or 0.0625
+    delay = delay or 50
     return dict(duration=delay * count, count=count, frames=imgs)
 
 def rainbow_gif2(image, duration):
@@ -740,7 +752,7 @@ def rainbow_gif2(image, duration):
             image.seek(f)
         except EOFError:
             break
-        total += max(image.info.get("duration", 0), 1000 / 60)
+        total += max(image.info.get("duration", 0), 50)
     length = f
     loops = total / duration / 1000
     scale = 1
@@ -838,7 +850,7 @@ def spin_gif2(image, duration):
             image.seek(f)
         except EOFError:
             break
-        total += max(image.info.get("duration", 0), 1000 / 60)
+        total += max(image.info.get("duration", 0), 50)
     length = f
     loops = total / duration / 1000
     scale = 1
@@ -909,7 +921,7 @@ def orbit_gif2(image, orbitals, duration, extras):
             image.seek(f)
         except EOFError:
             break
-        total += max(image.info.get("duration", 0), 1000 / 60)
+        total += max(image.info.get("duration", 0), 50)
     length = f
     loops = total / duration / 1000
     scale = 1
@@ -1082,7 +1094,7 @@ def scroll_gif2(image, direction, duration):
             image.seek(f)
         except EOFError:
             break
-        dur = max(image.info.get("duration", 0), 1000 / 60)
+        dur = max(image.info.get("duration", 0), 50)
         total += dur
     count = f
 
@@ -1142,7 +1154,7 @@ def magik_gif2(image, cell_count, grid_distance, iterations):
             image.seek(f)
         except EOFError:
             break
-        total += max(image.info.get("duration", 0), 1000 / 60)
+        total += max(image.info.get("duration", 0), 50)
     length = f
     loops = total / 2 / 1000
     scale = 1
@@ -2019,7 +2031,7 @@ def blend_op(image, url, operation, amount, recursive=True):
                         image2.seek(f)
                     except EOFError:
                         break
-                    dur += max(image2.info.get("duration", 0), 1000 / 60)
+                    dur += max(image2.info.get("duration", 0), 50)
                 count = f
 
                 def blend_op_iterator(image, image2, operation, amount):
@@ -2690,10 +2702,10 @@ def evalImg(url, operation, args):
                         image.seek(f)
                     except EOFError:
                         break
-                    new["duration"] += max(image.info.get("duration", 0), 1000 / 60)
+                    new["duration"] += max(image.info.get("duration", 0), 50)
                 fps = 1000 * f / new["duration"]
                 step = 1
-                while f // step > 4096 and fps // step >= 24:
+                while fps / step > 24:
                     step += 1
                 new["count"] = f // step
                 new["frames"] = ImageOpIterator(image, step, operation=operation, ts=ts, args=args)

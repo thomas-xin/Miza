@@ -225,7 +225,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         with tracebacksuppressor:
             for i in range(16):
                 resp = requests.post(
-                    f"https://discord.com/api/v9/applications/{self.id}/commands",
+                    f"https://discord.com/api/{api}/applications/{self.id}/commands",
                     headers={"Content-Type": "application/json", "Authorization": "Bot " + self.token},
                     data=json.dumps(data),
                 )
@@ -243,7 +243,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             return
         print("Updating global slash commands...")
         with tracebacksuppressor:
-            resp = requests.get(f"https://discord.com/api/v9/applications/{self.id}/commands", headers=dict(Authorization="Bot " + self.token))
+            resp = requests.get(f"https://discord.com/api/{api}/applications/{self.id}/commands", headers=dict(Authorization="Bot " + self.token))
             self.activity += 1
             if resp.status_code not in range(200, 400):
                 raise ConnectionError(f"Error {resp.status_code}", resp.text)
@@ -300,7 +300,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                             print(curr)
                                             print(f"{curr['name']}'s slash command does not match, removing...")
                                             for i in range(16):
-                                                resp = requests.delete(f"https://discord.com/api/v9/applications/{self.id}/commands/{curr['id']}", headers=dict(Authorization="Bot " + self.token))
+                                                resp = requests.delete(f"https://discord.com/api/{api}/applications/{self.id}/commands/{curr['id']}", headers=dict(Authorization="Bot " + self.token))
                                                 self.activity += 1
                                                 if resp.status_code == 429:
                                                     time.sleep(1)
@@ -322,7 +322,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             with tracebacksuppressor:
                 print(curr)
                 print(f"{curr['name']}'s application command does not exist, removing...")
-                resp = requests.delete(f"https://discord.com/api/v9/applications/{self.id}/commands/{curr['id']}", headers=dict(Authorization="Bot " + self.token))
+                resp = requests.delete(f"https://discord.com/api/{api}/applications/{self.id}/commands/{curr['id']}", headers=dict(Authorization="Bot " + self.token))
                 self.activity += 1
                 if resp.status_code not in range(200, 400):
                     raise ConnectionError(f"Error {resp.status_code}", resp.text)
@@ -572,7 +572,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             member = guild.get_member(self.id)
             if member.guild_permissions.create_instant_invite:
                 invitedata = await Request(
-                    f"https://discord.com/api/v9/guilds/{guild.id}/invites",
+                    f"https://discord.com/api/{api}/guilds/{guild.id}/invites",
                     headers=dict(Authorization="Bot " + self.token),
                     bypass=False,
                     aio=True,
@@ -1039,14 +1039,14 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             purge=lambda *args, **kwargs: discord.channel.TextChannel.purge(channel, *args, **kwargs),
             edit=lambda *args, **kwargs: discord.channel.TextChannel.edit(channel, *args, **kwargs),
             add_user=lambda user: Request(
-                f"https://discord.com/api/v9/channels/{channel.id}/thread-members/{verify_id(user)}",
+                f"https://discord.com/api/{api}/channels/{channel.id}/thread-members/{verify_id(user)}",
                 method="PUT",
                 headers={"Authorization": "Bot " + miza.token},
                 bypass=False,
                 aio=True,
             ),
             remove_user=lambda user: Request(
-                f"https://discord.com/api/v9/channels/{channel.id}/thread-members/{verify_id(user)}",
+                f"https://discord.com/api/{api}/channels/{channel.id}/thread-members/{verify_id(user)}",
                 method="DELETE",
                 headers={"Authorization": "Bot " + miza.token},
                 bypass=False,
@@ -1067,14 +1067,14 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
     async def manage_thread(self, channel):
         create_task(Request(
-            f"https://discord.com/api/v9/channels/{channel.id}/thread-members/@me",
+            f"https://discord.com/api/{api}/channels/{channel.id}/thread-members/@me",
             method="POST",
             headers={"Authorization": "Bot " + miza.token},
             bypass=False,
             aio=True,
         ))
         data = await Request(
-            f"https://discord.com/api/v9/channels/{channel.id}",
+            f"https://discord.com/api/{api}/channels/{channel.id}",
             headers={"Authorization": "Bot " + miza.token},
             bypass=False,
             aio=True,
@@ -1670,7 +1670,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     def get_colour(self, user):
         if user is None:
             return as_fut(16777214)
-        url = worst_url(user)
+        try:
+            url = worst_url(user)
+        except AttributeError:
+            url = to_png_ex(user.icon_url)
         return self.data.colours.get(url)
 
     async def get_proxy_url(self, user):
@@ -3234,7 +3237,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 try:
                     async with self.load_semaphore:
                         memberdata = await Request(
-                            f"https://discord.com/api/v9/guilds/{guild.id}/members?limit=1000&after={x}",
+                            f"https://discord.com/api/{api}/guilds/{guild.id}/members?limit=1000&after={x}",
                             headers=dict(Authorization="Bot " + self.token),
                             bypass=False,
                             json=True,
@@ -3335,7 +3338,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                             embeds=[emb.to_dict() for emb in kwargs.get("embeds", ())] or [kwargs["embed"].to_dict()] if kwargs.get("embed") is not None else None,
                         ))
                         resp = await Request(
-                            f"https://discord.com/api/v9/webhooks/{w.id}/{w.token}?wait=True&thread_id={channel.id}",
+                            f"https://discord.com/api/{api}/webhooks/{w.id}/{w.token}?wait=True&thread_id={channel.id}",
                             method="POST",
                             headers={
                                 "Content-Type": "application/json",
@@ -3355,7 +3358,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     w = getattr(w, "webhook", w)
                     if hasattr(channel, "thread"):
                         resp = await Request(
-                            f"https://discord.com/api/v9/webhooks/{w.id}/{w.token}?wait=True&thread_id={channel.id}",
+                            f"https://discord.com/api/{api}/webhooks/{w.id}/{w.token}?wait=True&thread_id={channel.id}",
                             method="POST",
                             headers={
                                 "Content-Type": "application/json",
@@ -3442,7 +3445,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             else:
                 return
             await Request(
-                f"https://discord.com/api/v9/interactions/{int_id}/{int_token}/callback",
+                f"https://discord.com/api/{api}/interactions/{int_id}/{int_token}/callback",
                 method="POST",
                 headers={
                     "Content-Type": "application/json",
@@ -3704,7 +3707,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         self.bitrate = (self.net_bytes[-1] - self.net_bytes[0]) * 8 / len(self.net_bytes)
                         self.total_bytes = self.net_bytes[-1] + self.start_bytes
                     try:
-                        resp = await create_future(requests.head, "https://discord.com/api/v9", priority=True)
+                        resp = await create_future(requests.head, f"https://discord.com/api/{api}", priority=True)
                         self.activity += 1
                         self.api_latency = resp.elapsed.total_seconds()
                     except:
@@ -3984,7 +3987,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 elif "embeds" in data:
                     data["embeds"] = [emb.to_dict() for emb in data["embeds"]]
                 resp = await Request(
-                    f"https://discord.com/api/v9/webhooks/{webhook.id}/{webhook.token}/messages/{self.id}",
+                    f"https://discord.com/api/{api}/webhooks/{webhook.id}/{webhook.token}/messages/{self.id}",
                     data=json.dumps(data),
                     headers={
                         "Authorization": f"Bot {bot.token}",
@@ -4994,6 +4997,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 guild = getattr(message, "guild", None)
                 if guild:
                     await self.send_event("_delete_", message=message, bulk=True)
+
+        @self.event
+        async def on_guild_update(before, after):
+            await self.send_event("_guild_update_", before=before, after=after)
 
         # User update event: calls _user_update_ and _seen_ bot database events.
         @self.event

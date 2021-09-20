@@ -72,6 +72,8 @@ snowflake_time_3 = utils.snowflake_time
 
 ip2int = lambda ip: int.from_bytes(b"\x00" + bytes(int(i) for i in ip.split(".")), "big")
 
+api = "v9"
+
 emptyfut = fut_nop = asyncio.Future()
 fut_nop.set_result(None)
 newfut = concurrent.futures.Future()
@@ -771,7 +773,7 @@ def interaction_response(bot, message, content=None, embed=None, components=None
     if not getattr(message, "int_token", None):
         message.int_token = message.slash
     return Request(
-        f"https://discord.com/api/v9/interactions/{message.int_id}/{message.int_token}/callback",
+        f"https://discord.com/api/{api}/interactions/{message.int_id}/{message.int_token}/callback",
         data=json.dumps(dict(
             type=4,
             data=dict(
@@ -798,7 +800,7 @@ def interaction_patch(bot, message, content=None, embed=None, components=None, b
     if not getattr(message, "int_token", None):
         message.int_token = message.slash
     return Request(
-        f"https://discord.com/api/v9/interactions/{message.int_id}/{message.int_token}/callback",
+        f"https://discord.com/api/{api}/interactions/{message.int_id}/{message.int_token}/callback",
         data=json.dumps(dict(
             type=7,
             data=dict(
@@ -939,7 +941,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, tts=N
     if getattr(reference, "slash", None) and not embed:
         sem = emptyctx
         inter = True
-        url = f"https://discord.com/api/v9/interactions/{reference.id}/{reference.slash}/callback"
+        url = f"https://discord.com/api/{api}/interactions/{reference.id}/{reference.slash}/callback"
         data = dict(
             type=4,
             data=dict(
@@ -982,7 +984,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, tts=N
         except KeyError:
             sem = REPLY_SEM[channel.id] = Semaphore(5.1, buffer=256, delay=0.1, rate_limit=5)
         inter = False
-        url = f"https://discord.com/api/v9/channels/{channel.id}/messages"
+        url = f"https://discord.com/api/{api}/channels/{channel.id}/messages"
         if getattr(channel, "dm_channel", None):
             channel = channel.dm_channel
         elif not getattr(channel, "recipient", None) and not channel.permissions_for(channel.guild.me).read_message_history:

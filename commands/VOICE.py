@@ -3923,7 +3923,7 @@ class Party(Command):
         #                     return f"https://discord.gg/{invite.code}"
         async with self.sem:
             data = await Request(
-                f"https://discord.com/api/v9/channels/{vc.id}/invites",
+                f"https://discord.com/api/{api}/channels/{vc.id}/invites",
                 method="POST",
                 data=json.dumps(dict(
                     max_age=0,
