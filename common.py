@@ -35,8 +35,8 @@ requests = requests.Session()
 url_parse = urllib.parse.quote_plus
 escape_markdown = utils.escape_markdown
 escape_mentions = utils.escape_mentions
-escape_everyone = lambda s: s.replace("@everyone", "@\xadeveryone").replace("@here", "@\xadhere")
-escape_roles = lambda s: escape_everyone(s).replace("<@&", "<@\xad&")
+escape_everyone = lambda s: s#s.replace("@everyone", "@\xadeveryone").replace("@here", "@\xadhere")
+escape_roles = lambda s: s#escape_everyone(s).replace("<@&", "<@\xad&")
 
 DISCORD_EPOCH = 1420070400000 # 1 Jan 2015
 MIZA_EPOCH = 1577797200000 # 1 Jan 2020
@@ -965,7 +965,6 @@ async def send_with_reply(channel, reference=None, content="", embed=None, tts=N
                 else:
                     reference.to_message_reference_dict = lambda message: dict(message_id=message.id)
             fields["reference"] = reference
-            # fields["allowed_mentions"] = noreply
         if file:
             fields["file"] = file
         if files:
@@ -996,7 +995,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, tts=N
             return await channel.send(content, **fields)
         data = dict(
             content=content,
-            allowed_mentions=dict(parse=["users", "roles", "everyone"], replied_user=mention)
+            allowed_mentions=dict(parse=["users"], replied_user=mention)
         )
         if reference:
             data["message_reference"] = dict(message_id=verify_id(reference))

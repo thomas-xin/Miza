@@ -52,6 +52,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         typing=True,
     )
     allowed_mentions = discord.AllowedMentions(
+        everyone=False,
+        users=True,
+        roles=False,
         replied_user=False,
     )
     connect_ready = concurrent.futures.Future()
