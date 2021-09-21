@@ -33,6 +33,7 @@ import nacl.secret
 utils = discord.utils
 requests = requests.Session()
 url_parse = urllib.parse.quote_plus
+url_unparse = urllib.parse.unquote_plus
 escape_markdown = utils.escape_markdown
 escape_mentions = utils.escape_mentions
 escape_everyone = lambda s: s#s.replace("@everyone", "@\xadeveryone").replace("@here", "@\xadhere")

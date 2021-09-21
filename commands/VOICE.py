@@ -4340,7 +4340,7 @@ class Download(Command):
     time_consuming = True
     _timeout_ = 75
     name = ["📥", "Search", "YTDL", "Youtube_DL", "AF", "AudioFilter", "Trim", "Concat", "Concatenate", "ConvertORG", "Org2xm", "Convert"]
-    description = "Searches and/or downloads a song from a YouTube/SoundCloud query or audio file link."
+    description = "Searches and/or downloads a song from a YouTube/SoundCloud query or audio file link. Will extend (loop) if trimmed past the end."
     usage = "<0:search_links>* <trim{?t}>? <-3:trim_start|->? <-2:trim_end|->? <-1:out_format(mp4)>? <concatenate{?c}|remove_silence{?r}|apply_settings{?a}|verbose_search{?v}>*"
     flags = "avtzcr"
     rate_limit = (7, 16)

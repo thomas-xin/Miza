@@ -302,6 +302,7 @@ class Server:
             st = os.stat(p)
             fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
             attachment = filename or fn
+            a2 = url_unparse(attachment)
             cp.response.headers["Attachment-Filename"] = attachment
             if endpoint.startswith("p"):
                 s = """<!DOCTYPE html>
@@ -344,11 +345,11 @@ class Server:
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
         <meta name="twitter:image:src" content="{i_url}">
         <meta name="twitter:card" content="summary_large_image">
-        <meta name="twitter:title" content="{attachment}">
+        <meta name="twitter:title" content="{a2}">
         <meta property="og:image" content="{i_url}">
     </head>
     <body style="background-color:black;">
-        <h1 style="color:white;">{attachment}</h1>"""
+        <h1 style="color:white;">{a2}</h1>"""
                 t = utc()
                 ti = max(st.st_atime + 30 * 86400, st.st_ctime + 60 * 86400, t)
                 s += f"""
@@ -412,7 +413,7 @@ class Server:
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="twitter:image:src" content="{i_url}">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="{attachment}">
+<meta name="twitter:title" content="{a2}">
 <meta property="og:image" content="{i_url}">
 <body style="background-color:black;">
 <video class="center" playsinline autoplay muted loop>
