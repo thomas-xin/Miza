@@ -2757,7 +2757,8 @@ def parse_with_now(expr):
                 offs = offs * 400 - 2000
                 year += 2000
                 expr = regexp("0*" + s).sub(str(year), expr, 1)
-                return DynamicDT.fromdatetime(tparser.parse(expr)).set_offset(offs)
+                dt = tparser.parse(expr).replace(tzinfo=datetime.timezone.utc)
+                return DynamicDT.fromdatetime(dt).set_offset(offs)
         elif s.startswith("Python int too large to convert to C"):
             y = int(regexp("[0-9]{10,}").findall(expr)[0])
             if bc:
@@ -2766,7 +2767,8 @@ def parse_with_now(expr):
             offs = offs * 400 - 2000
             year += 2000
             expr = regexp("[0-9]{10,}").sub(str(year), expr, 1)
-            return DynamicDT.fromdatetime(tparser.parse(expr)).set_offset(offs)
+            dt = tparser.parse(expr).replace(tzinfo=datetime.timezone.utc)
+            return DynamicDT.fromdatetime(dt).set_offset(offs)
         elif s.startswith("Unknown string format") or s.startswith("month must be in"):
             try:
                 y = int(regexp("[0-9]{5,}").findall(expr)[0])
@@ -2780,7 +2782,8 @@ def parse_with_now(expr):
             offs = offs * 400 - 2000
             year += 2000
             expr = regexp("[0-9]{5,}").sub(str(year), expr, 1)
-            return DynamicDT.fromdatetime(tparser.parse(expr)).set_offset(offs)
+            dt = tparser.parse(expr).replace(tzinfo=datetime.timezone.utc)
+            return DynamicDT.fromdatetime(dt).set_offset(offs)
         raise
     if bc:
         y = -dt.year
