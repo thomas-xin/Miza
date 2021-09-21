@@ -656,9 +656,9 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
         w, h = max_size(*size, maxsize)
         fps = fps or orig_fps or 20
         step = 1
-        while fps > 24:
-            fps /= 2
-            step <<= 1
+        while fps / step >= 40:
+            step += 1
+        fps /= step
         if step > 1:
             vf = f'select="not(mod(n\\,{step}))",'
         else:
@@ -708,14 +708,14 @@ def create_gif(in_type, args, delay):
                     length = f
                 except EOFError:
                     break
-            if length != 0 and not delay:
+            if length and not delay:
                 delay = img.info.get("duration") or delay or 50
             step = 1
-            fps = 1000 / delay
-            while fps > 24:
-                fps /= 2
-                step <<= 1
-            delay = 1000 / fps
+            if length:
+                fps = 1000 / delay
+                while fps / step >= 40:
+                    step += 1
+                delay = 1000 / (fps / step)
             for f in range(0, 2147483648, step):
                 try:
                     img.seek(f)
@@ -2705,7 +2705,7 @@ def evalImg(url, operation, args):
                     new["duration"] += max(image.info.get("duration", 0), 50)
                 fps = 1000 * f / new["duration"]
                 step = 1
-                while fps / step > 24:
+                while fps / step >= 40:
                     step += 1
                 new["count"] = f // step
                 new["frames"] = ImageOpIterator(image, step, operation=operation, ts=ts, args=args)

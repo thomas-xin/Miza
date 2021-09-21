@@ -446,10 +446,10 @@ def select_and_loads(s, mode="safe", size=None):
             data = json.loads(s)
     return data
 
-def select_and_dumps(data, mode="safe"):
+def select_and_dumps(data, mode="safe", compress=True):
     if mode == "unsafe":
         s = pickle.dumps(data)
-        if len(s) > 32768:
+        if len(s) > 32768 and compress:
             s = bytes2zip(s)
         return s
     try:
@@ -647,7 +647,7 @@ class FileHashDict(collections.abc.MutableMapping):
             except KeyError:
                 self.deleted.add(k)
                 continue
-            s = select_and_dumps(d, mode="unsafe")
+            s = select_and_dumps(d, mode="unsafe", compress=False)
             with self.sem:
                 safe_save(fn, s)
         deleted = list(self.deleted)
@@ -1152,11 +1152,10 @@ def replace_map(s, mapping):
 
 # You can easily tell I was the one to name this thing. 🍻 - smudgedpasta
 def grammarly_2_point_0(string):
-    s = string.lower().replace("am i", "are y\uf000ou").replace("i am", "y\uf000ou are")
+    s = " " + string.lower().replace("am i", "are y\uf000ou").replace("i am", "y\uf000ou are") + " "
     s = s.replace(" yours ", " mine ").replace(" mine ", " yo\uf000urs ").replace(" your ", " my ").replace(" my ", " yo\uf000ur ")
-    s = replace_map(s, {
+    s = replace_map(s.strip(), {
         "yourself": "myself",
-        "your ": "my ",
         "are you": "am I",
         "you are": "I am",
         "you're": "i'm",
