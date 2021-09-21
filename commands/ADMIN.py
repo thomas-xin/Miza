@@ -1391,6 +1391,7 @@ class UpdateAutoEmojis(Database):
                 self.bot.data.emojilists.update(message.author.id)
         if not message.guild or message.guild.id not in self.data:
             return
+        m_id = None
         msg = message.content
         guild = message.guild
         orig = self.bot.data.emojilists.get(message.author.id, {})
@@ -1407,7 +1408,8 @@ class UpdateAutoEmojis(Database):
                 m2 = await self.bot.history(message.channel, limit=1, before=message.id).__anext__()
             else:
                 m2 = None
-                m_id = int(m_id)
+                if m_id:
+                    m_id = int(m_id)
             if not m2 and m_id:
                 try:
                     m2 = await self.bot.fetch_message(m_id, message.channel)

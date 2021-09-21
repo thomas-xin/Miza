@@ -524,11 +524,11 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     data = obj.data
                     if getattr(obj, "garbage_collect", None):
                         return await obj.garbage_collect()
-                    for key in tuple(data):
+                    for key in shuffle(list(data))[:1024]:
                         if getattr(data, "unloaded", False):
                             return
                         if key != 0 and type(key) is not str:
-                            with suppress():
+                            try:
                                 # Database keys may be user, guild, or channel IDs
                                 if getattr(obj, "user", None):
                                     d = await self.fetch_user(key)
@@ -544,10 +544,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                                     d = await self.fetch_messageable(key)
                                 if d is not None:
                                     continue
+                            except:
+                                print_exc()
                             print(f"Deleting {key} from {str(obj)}...")
                             data.pop(key, None)
-                        if random.random() > 0.99:
-                            await asyncio.sleep(0.5)
 
     # Calls a bot event, triggered by client events or others, across all bot databases. Calls may be sync or async.
     async def send_event(self, ev, *args, exc=False, **kwargs):
