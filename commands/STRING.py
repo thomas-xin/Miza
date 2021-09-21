@@ -676,7 +676,7 @@ class TimeCalc(Command):
                 spl = [argv]
             timestamps = [utc_ts(tzparse(t)) for t in spl]
         if len(timestamps) == 1:
-            out = f"{round_min(timestamps[0])} ({datetime.datetime.utcfromtimestamp(timestamps[0])} UTC)"
+            out = f"{round_min(timestamps[0])} ({DynamicDT.utcfromtimestamp(timestamps[0])} UTC)"
         elif "sum" not in name and "add" not in name:
             out = time_diff(max(timestamps), min(timestamps))
         else:
@@ -951,7 +951,7 @@ class Ask(Command):
         elif q[:3] == "how" and not q[3:4].isalpha() or q[:4] == "hows" and not q[4:5].isalpha():
             await send_with_reply(channel, "h" not in flags and message, "https://imgur.com/gallery/8cfRt")
             out = None
-        elif (q.startswith("what's ") or q.startswith("whats ") or q.startswith("what is ")) and is_numeric(q):
+        elif any(q.startswith(i) for i in ("what's ", "whats ", "what is ")) and regexp("[0-9]").search(q) and regexp("[+\\-*/\\\\^()").search(q):
             q = q[5:]
             q = q[q.index(" ") + 1:]
             try:
