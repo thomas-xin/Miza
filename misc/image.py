@@ -2110,23 +2110,15 @@ def blend_op(image, url, operation, amount, recursive=True):
                 if str(image.mode) == "P":
                     image = image.convert("RGBA")
                 if str(image.mode) == "RGBA":
-                    A1 = image.getchannel("A")
+                    A = image.getchannel("A")
                 else:
-                    A1 = None
-                if str(image2.mode) == "P" and "transparency" in image2.info:
-                    image2 = image2.convert("RGBA")
-                if str(image2.mode) == "RGBA":
-                    A2 = image2.getchannel("A")
-                else:
-                    A2 = None
+                    A = None
                 if f[0] == "L":
                     channels1 = hsl_split(image, convert=False)
                     channels2 = hsl_split(image2, convert=False)
                 else:
                     channels1 = image.convert("HSV").split()
                     channels2 = image2.convert("HSV").split()
-                    # channels1 = hsv_split(image, convert=False)
-                    # channels2 = hsv_split(image2, convert=False)
                 if f == "HUE":
                     channels = [channels2[0], channels1[1], channels1[2]]
                 elif f == "SAT":
@@ -2139,14 +2131,7 @@ def blend_op(image, url, operation, amount, recursive=True):
                     out = hsl_merge(*channels)
                 else:
                     out = Image.merge("HSV", channels).convert("RGB")
-                    # out = hsv_merge(*channels)
-                if A1 or A2:
-                    if not A1:
-                        A = A2
-                    elif not A2:
-                        A = A1
-                    else:
-                        A = ImageMath.eval("max(X,Y)", dict(X=A1, Y=A2)).convert("L")
+                if A:
                     out.putalpha(A)
         elif filt in ("OVERFLOW", "LIGHTING"):
             if str(image.mode) != str(image2.mode):
