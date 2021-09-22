@@ -210,12 +210,6 @@ def from_gradient(shape, count, colour):
     s = 960
     if shape == "linear":
         data = np.linspace(0, count, num=s, dtype=np.float32)
-        if count > 1:
-            data %= 1
-        data = [(data * c).astype(np.uint8) for c in colour]
-        spl = [fromarray(i) for i in data]
-        im = Image.merge(mode, spl)
-        return im.resize((s,) * 2, resample=Image.NEAREST)
     if shape == "radial":
         try:
             data = globals()["g-1"]
@@ -230,11 +224,6 @@ def from_gradient(shape, count, colour):
             globals()["g-1"] = data
         if count != 1:
             data = data * count
-            if count > 1:
-                data %= 1
-        data = [(data * c).astype(np.uint8) for c in colour]
-        spl = [fromarray(i) for i in data]
-        return Image.merge(mode, spl)
     if shape == "conical":
         try:
             data = globals()["g-2"]
@@ -250,13 +239,16 @@ def from_gradient(shape, count, colour):
             globals()["g-2"] = data
         if count != 1:
             data = data * count
-            if count > 1:
-                data %= 1
-        data = [(data * c).astype(np.uint8) for c in colour]
-        spl = [fromarray(i) for i in data]
-        return Image.merge(mode, spl)
     if shape == "polygon":
-        pass
+        raise NotImplementedError
+    if count > 1:
+        data %= 1
+    data = [(data * c).astype(np.uint8) for c in colour]
+    spl = [fromarray(i) for i in data]
+    im = Image.merge(mode, spl)
+    if im.width != s or im.height != s:
+        return im.resize((s,) * 2, resample=Image.NEAREST)
+    return im
 
 def rgb_split(image, dtype=np.uint8):
     channels = None

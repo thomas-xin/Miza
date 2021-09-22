@@ -1101,9 +1101,6 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
     # Fetches a message from ID and channel, using the bot cache when possible.
     async def _fetch_message(self, m_id, channel=None):
-        if "message_cache" in self.data:
-            with suppress(KeyError):
-                return await create_future(self.data.message_cache.load_message, m_id)
         if channel is None:
             raise LookupError("Message data not found.")
         with suppress(TypeError):
@@ -1121,6 +1118,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 raise TypeError(f"Invalid message identifier: {m_id}")
         with suppress(KeyError):
             return as_fut(self.cache.messages[m_id])
+        if "message_cache" in self.data:
+            with suppress(KeyError):
+                return as_fut(self.data.message_cache.load_message(m_id))
         return self._fetch_message(m_id, channel)
 
     # Fetches a role from ID and guild, using the bot cache when possible.
@@ -2566,7 +2566,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 if utc() - os.path.getmtime(fn) < 60:
                     return fn
                 os.remove(fn)
-            lines = as_str(subprocess.run([sys.executable, "misc/neutrino.py", "-c", "saves", fn], stderr=subprocess.PIPE).stdout).splitlines()
+            lines = as_str(subprocess.run([sys.executable, "misc/neutrino.py", "-c4", "saves", fn], stderr=subprocess.PIPE).stdout).splitlines()
             s = "\n".join(line for line in lines if not line.startswith("\r"))
             print(s)
         # zf = ZipFile(fn, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)

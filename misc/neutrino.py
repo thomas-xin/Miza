@@ -64,6 +64,20 @@ def inflate(fsrc, fdst, pos):
 				fi.seek(1)
 				copyfileobj(fi, fo)
 
+def ensure_compressor():
+	if os.path.exists("lzturbo") or os.path.exists("lzturbo.exe"):
+		return
+	if os.name == "nt":
+		url = "https://cdn.discordapp.com/attachments/682561514221338690/890225317090844692/4x4.zip"
+	else:
+		url = "https://cdn.discordapp.com/attachments/682561514221338690/890225686302851162/4x4.zip"
+	import urllib.request, zipfile, io
+	req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+	with urllib.request.urlopen(req) as resp:
+		b = io.BytesIO(resp.read())
+	with zipfile.ZipFile(b, "r") as z:
+		z.extractall()
+
 
 if __name__ == "__main__":
 	import sys, time, collections, pickle, zipfile, io, concurrent.futures, subprocess
@@ -116,24 +130,44 @@ if __name__ == "__main__":
 			subprocess.run(f"truncate -s {size} {name}", shell=True, stdout=subprocess.DEVNULL)
 
 	this = sys.argv[0]
+	lzt = None
 
-	if "-c" in sys.argv:
-		sys.argv.remove("-c")
-		compress = True
+	compress = None
+	for i, a in enumerate(sys.argv):
+		if a.startswith("-c"):
+			a = a[2:]
+			if a:
+				compress = int(a)
+			else:
+				compress = 5
+			sys.argv.pop(i)
+			break
+	if "-y" in sys.argv:
+		sys.argv.remove("-y")
+		yes = True
 	else:
-		compress = False
+		yes = False
 	if "-d" in sys.argv:
 		sys.argv.remove("-d")
 		decompress = True
 	else:
 		decompress = False
 	try:
+		i = sys.argv.index("-s")
+	except ValueError:
+		isize = None
+	else:
+		isize = int(sys.argv[i + 1])
+		sys.argv.pop(i)
+		sys.argv.pop(i)
+	try:
 		i = sys.argv.index("-f")
 	except ValueError:
 		target = None
 	else:
 		target = os.path.normcase(sys.argv[i + 1])
-		sys.argv = sys.argv[:i] + sys.argv[i + 1:]
+		sys.argv.pop(i)
+		sys.argv.pop(i)
 	argv = sys.argv[1] if len(sys.argv) > 1 else None
 
 	while not argv:
@@ -141,8 +175,11 @@ if __name__ == "__main__":
 	argv = argv.replace("\\", "/")
 
 	if os.path.isdir(argv):
-		out = sys.argv[2] if len(sys.argv) > 2 else argv.rsplit("/", 1)[-1].rsplit(".", 1)[0] + ".wb" or "output.wb"
-		if os.path.exists(out):
+		if compress:
+			lzt = ppe.submit(ensure_compressor)
+			lzt.result()
+		out = sys.argv[2] if len(sys.argv) > 2 else argv.rsplit("/", 1)[-1] + ".wb" or "output.wb"
+		if not yes and os.path.exists(out):
 			if "." in out:
 				out = "~1.".join(out.rsplit(".", 1))
 				while os.path.exists(out):
@@ -242,7 +279,7 @@ if __name__ == "__main__":
 		files, pos = fut.result()
 		info.extend(extras)
 
-		fs = pos
+		fs = fsize = pos
 		if decompress:
 			info.append(None)
 		infodata = pickle.dumps(info)
@@ -271,13 +308,6 @@ if __name__ == "__main__":
 			futs.append(submit(write_into, out, f, names[f]))
 		futs.extend(pfuts)
 
-		if compress:
-			if os.path.exists(".cache"):
-				for n in os.listdir(".cache"):
-					submit(os.remove, ".cache/" + n)
-			else:
-				os.mkdir(".cache")
-
 		offs = 0
 		for i, fut in enumerate(futs):
 			try:
@@ -294,51 +324,94 @@ if __name__ == "__main__":
 		print(f"{fs} bytes written in {round(time.time() - t, 4)} seconds; {len(files)} unique files/folders, {len(extras)} duplicate/empty files.")
 
 		if compress:
-			if os.path.exists(".cache"):
-				for n in os.listdir(".cache"):
-					submit(os.remove, ".cache/" + n)
-			else:
-				os.mkdir(".cache")
-
 			sys.stdout.write("Compressing...")
-			cc = fs / (1 << 28)
-			cc += bool(cc % 1)
-			futs = deque()
-			for i in range(int(cc)):
-				j = i << 28
-				futs.append(ppe.submit(deflate, out, f".cache/{j}", j, 1 << 28))
-			with open(f".cache/{fs}", "wb"):
-				pass
-			for i, fut in enumerate(futs):
-				fut.result()
-				sys.stdout.write(f"\rCompressing ({i}/{len(futs)})")
-			sys.stdout.write(f"\rCompressed ({len(futs)}/{len(futs)}) \n")
-			subprocess.run((sys.executable, this, "-d", ".cache", out + "c"))
-			os.remove(out)
+			try:
+				lzt.result()
+			except:
+				if os.path.exists(".cache"):
+					for n in os.listdir(".cache"):
+						submit(os.remove, ".cache/" + n)
+				else:
+					os.mkdir(".cache")
 
-			futs = deque()
+				cc = fs / (1 << 28)
+				cc += bool(cc % 1)
+				futs = deque()
+				for i in range(int(cc)):
+					j = i << 28
+					futs.append(ppe.submit(deflate, out, f".cache/{j}", j, 1 << 28))
+				with open(f".cache/{fs}", "wb"):
+					pass
+				for i, fut in enumerate(futs):
+					fut.result()
+					sys.stdout.write(f"\rCompressing ({i}/{len(futs)})")
+				sys.stdout.write(f"\rCompressed ({len(futs)}/{len(futs)}) \n")
+				ppe.shutdown(wait=True)
+				subprocess.run((sys.executable, this, "-d", ".cache", out + "c"))
+				os.remove(out)
+
+				futs = deque()
+				if os.path.exists(".cache"):
+					for n in os.listdir(".cache"):
+						futs.append(submit(os.remove, ".cache/" + n))
+				for fut in futs:
+					fut.result()
+				os.rename(out + "c", out)
+			else:
+				ppe.shutdown(wait=True)
+				tpe.shutdown(wait=True)
+				print()
+				if compress <= 1:
+					c = 1
+				elif compress == 2:
+					c = 2
+				elif compress == 3:
+					c = 4
+				elif compress == 4:
+					c = 6
+				elif compress >= 5:
+					c = min(12, compress + 3)
+				subprocess.run(("4x4", str(c), "-p16", "-i48", out, out + ".lz"))
+				os.remove(out)
+				os.rename(out + ".lz", out)
+				with open(out, "ab") as f:
+					f.write(b"\x80")
 			if os.path.exists(".cache"):
-				for n in os.listdir(".cache"):
-					futs.append(submit(os.remove, ".cache/" + n))
-			for fut in futs:
-				fut.result()
-			os.rmdir(".cache")
-			os.rename(out + "c", out)
+				os.rmdir(".cache")
+		osize = os.path.getsize(out)
 
 	else:
 		out = sys.argv[2] if len(sys.argv) > 2 else argv.rsplit(".", 1)[0] or "output"
-		if os.path.exists(out):
+		if not yes and os.path.exists(out):
 			out += "~1"
 			while os.path.exists(out):
 				spl = out.rsplit("~", 1)
 				out = spl[0] + "~" + str(int(spl[1]) + 1)
-		fs = os.path.getsize(argv)
+		fs = fsize = os.path.getsize(argv)
 		infolen = b""
 
 		if not target:
 			sys.stdout.write("Scanning...")
 
-		with open(argv, "rb") as f:
+		with open(argv, "rb+") as f:
+			f.seek(fs - 1)
+			if f.read(1) == b"\x80":
+				f.truncate(fs - 1)
+				f.close()
+				ensure_compressor()
+				if not target:
+					print("\nDecompressing...")
+				subprocess.run(("4x4", "d", "-p16", "-i48", argv, argv + ".lz"))
+				with open(argv, "ab") as f:
+					f.write(b"\x80")
+				args = (sys.executable, this, "-s", str(fs), argv + ".lz")
+				if target:
+					args += ("-f", target)
+				else:
+					args += (out,)
+				subprocess.run(args)
+				os.remove(argv + ".lz")
+				raise SystemExit
 			b = c = b""
 			for i in range(fs - 1, -1, -1):
 				f.seek(i)
@@ -399,34 +472,37 @@ if __name__ == "__main__":
 							pos += len(b)
 							sys.stdout.buffer.write(b)
 			raise FileNotFoundError(target)
-		else:
-			futs = deque()
-			pfuts = deque()
-			quarter = len(tuples) >> 2
-			for path, pos, size in reversed(tuples[-quarter:]):
-				if not size:
-					with open(os.path.join(out, path), "wb"):
-						extrac += 1
-				else:
-					pfuts.appendleft(ppe.submit(read_into, f"{out}/{path}", argv, pos, size))
-					filec += 1
-					fs += size
-			for path, pos, size in tuples[:-quarter]:
-				if not size:
-					with open(os.path.join(out, path), "wb"):
-						extrac += 1
-				else:
-					futs.append(submit(read_into, f"{out}/{path}", argv, pos, size))
-					filec += 1
-					fs += size
-			futs.extend(pfuts)
-			for i, fut in enumerate(futs):
-				fut.result()
-				if not target:
-					sys.stdout.write(f"\rExtracting {i}/{len(futs)}")
+
+		futs = deque()
+		pfuts = deque()
+		quarter = len(tuples) >> 2
+		osize = 0
+		for path, pos, size in reversed(tuples[-quarter:]):
+			if not size:
+				with open(os.path.join(out, path), "wb"):
+					extrac += 1
+			else:
+				pfuts.appendleft(ppe.submit(read_into, f"{out}/{path}", argv, pos, size))
+				filec += 1
+				fs += size
+				osize += size
+		for path, pos, size in tuples[:-quarter]:
+			if not size:
+				with open(os.path.join(out, path), "wb"):
+					extrac += 1
+			else:
+				futs.append(submit(read_into, f"{out}/{path}", argv, pos, size))
+				filec += 1
+				fs += size
+				osize += size
+		futs.extend(pfuts)
+		for i, fut in enumerate(futs):
+			fut.result()
 			if not target:
-				sys.stdout.write(f"\rExtracted {len(futs)}/{len(futs)} \n")
-				print(f"{fs} bytes written in {round(time.time() - t, 4)} seconds; {filec} valid files/folders, {extrac} empty files.")
+				sys.stdout.write(f"\rExtracting {i}/{len(futs)}")
+		if not target:
+			sys.stdout.write(f"\rExtracted {len(futs)}/{len(futs)} \n")
+			print(f"{fs} bytes written in {round(time.time() - t, 4)} seconds; {filec} valid files/folders, {extrac} empty files.")
 
 		if decompress:
 			if os.path.exists(f"{out}/.0"):
@@ -446,6 +522,7 @@ if __name__ == "__main__":
 					sys.stdout.write(f"\rDecompressing ({i}/{len(futs)})")
 			if not target:
 				sys.stdout.write(f"\rDecompressed ({len(futs)}/{len(futs)}) \n")
+			ppe.shutdown(wait=True)
 			args = (sys.executable, this, ".cache/.0", rout)
 			if target:
 				args += ("-f", target)
@@ -458,3 +535,6 @@ if __name__ == "__main__":
 			for fut in futs:
 				fut.result()
 			os.rmdir(".cache")
+			raise SystemExit
+
+	print(f"Total elapsed time: {round(time.time() - t, 4)} seconds, output size ratio: {round(osize / (isize or fsize), 4)}")
