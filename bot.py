@@ -2379,7 +2379,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             if not c:
                 await asyncio.sleep(1)
                 c = await create_future(proc.cpu_percent, priority=False)
-            m = await create_future(proc.memory_percent, priority=True)
+            m = proc.memory_percent()
             return float(c), float(m)
         return 0, 0
 
@@ -2400,8 +2400,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             tasks = [self.get_proc_state(p) for p in procs]
             resp = await recursive_coro(tasks)
             stats += [sum(st[0] for st in resp), sum(st[1] for st in resp), 0]
-            cpu = await create_future(psutil.cpu_count, logical=True, priority=False)
-            mem = await create_future(psutil.virtual_memory, priority=True)
+            cpu = psutil.cpu_count(logical=True)
+            mem = psutil.virtual_memory()
             disk = self.disk
             # CPU is totalled across all cores
             stats[0] /= cpu
@@ -2409,7 +2409,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             stats[1] *= mem.total / 100
             stats[2] = disk
             self.size2 = fcdict()
-            files = await create_future(os.listdir, "misc", priority=True)
+            files = os.listdir("misc")
             for f in files:
                 path = "misc/" + f
                 if is_code(path):
@@ -3686,7 +3686,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 async with tracebacksuppressor:
                     create_task(self.update_status())
                     with MemoryTimer("update_bytes"):
-                        net = await create_future(psutil.net_io_counters, timeout=8)
+                        net = psutil.net_io_counters()
                         net_bytes = net.bytes_sent + net.bytes_recv
                         if not hasattr(self, "net_bytes"):
                             self.net_bytes = deque(maxlen=3)
