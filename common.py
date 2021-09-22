@@ -890,8 +890,7 @@ def touch(file):
         pass
 
 
-def get_folder_size(path="."):
-    return sum(get_folder_size(f.path) if f.is_dir() else f.stat().st_size for f in os.scandir(path))
+get_folder_size = lambda path=".": sum(get_folder_size(f.path) if f.is_dir() else f.stat().st_size for f in os.scandir(path))
 
 
 # Checks if an object can be used in "await" operations.

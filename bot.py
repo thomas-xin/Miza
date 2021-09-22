@@ -2386,9 +2386,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     async def get_disk(self):
         with tracebacksuppressor(SemaphoreOverflowError):
             async with self.disk_semaphore:
-                disk = await create_future(get_folder_size, "cache", priority=False)
-                disk += await create_future(get_folder_size, "saves", priority=True)
-                self.disk = disk
+                self.disk = await create_future(get_folder_size, ".", priority=True)
         return self.disk
 
     # Gets the status of the bot.
