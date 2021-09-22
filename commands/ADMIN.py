@@ -21,7 +21,7 @@ class Purge(Command):
             if args and "r" in flags or "range" in name:
                 start = safe_eval(args.pop(-1))
                 end = count
-                if end < count:
+                if end < start:
                     start, end = end, start
                 start -= 1
                 end += 1
