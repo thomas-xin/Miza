@@ -2835,7 +2835,10 @@ def tzparse(expr):
                 t -= one_day
         return t
     if not is_finite(s) or abs(s) >= 1 << 31:
-        s = int(expr.split(".", 1)[0])
+        try:
+            s = int(expr.split(".", 1)[0])
+        except (TypeError, ValueError):
+            pass
     return utc_dft(s)
 
 

@@ -210,7 +210,6 @@ class Exec(Command):
 
 class UpdateExec(Database):
     name = "exec"
-    no_delete = True
     virtuals = cdict()
     listeners = cdict()
     qmap = {
@@ -560,7 +559,6 @@ class UpdateExec(Database):
 
 class UpdateProxies(Database):
     name = "proxies"
-    no_delete = True
     limit = 65536
 
     def __load__(self, **void):
@@ -706,7 +704,6 @@ class UpdateTrusted(Database):
 
 class UpdateColours(Database):
     name = "colours"
-    no_delete = True
     limit = 65536
 
     async def get(self, url, threshold=True):
@@ -882,12 +879,10 @@ class Suspend(Command):
 
 class UpdateBlacklist(Database):
     name = "blacklist"
-    no_delete = True
 
 
 class UpdateEmojis(Database):
     name = "emojis"
-    no_delete = True
 
     def get(self, name):
         while not self.bot.bot_ready:
@@ -930,7 +925,6 @@ class UpdateImagePools(Database):
     loading = set()
     finished = set()
     sem = Semaphore(8, 2, rate_limit=1)
-    no_delete = True
 
     def _bot_ready_(self, **void):
         finished = self.data.setdefault("finished", set())

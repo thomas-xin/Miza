@@ -194,7 +194,6 @@ class Math(Command):
 
 class UpdateVariables(Database):
     name = "variables"
-    user = True
 
 
 class Uni2Hex(Command):

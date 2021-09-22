@@ -2015,7 +2015,6 @@ class EmojiList(Command):
 
 class UpdateEmojiLists(Database):
     name = "emojilists"
-    user = True
 
 
 class Dogpile(Command):
@@ -2197,7 +2196,6 @@ class Daily(Command):
 
 class UpdateDailies(Database):
     name = "dailies"
-    no_delete = True
 
     def __load__(self, **void):
         self.typing = {}
@@ -2905,7 +2903,6 @@ class MimicSend(Command):
 
 class UpdateMimics(Database):
     name = "mimics"
-    user = True
 
     async def _nocommand_(self, message, **void):
         if not message.content:

@@ -516,7 +516,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
     # A garbage collector for empty and unassigned objects in the database.
     async def garbage_collect(self, obj):
-        if not self.ready or hasattr(obj, "no_delete"):
+        if not self.ready or hasattr(obj, "no_delete") or not any(hasattr(obj, i) for i in ("channel", "garbage")):
             return
         with MemoryTimer("gc_" + obj.name):
             with tracebacksuppressor(SemaphoreOverflowError):
@@ -527,16 +527,13 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     for key in shuffle(list(data))[:1024]:
                         if getattr(data, "unloaded", False):
                             return
-                        if key != 0 and type(key) is not str:
+                        if key and type(key) is not str:
                             try:
                                 # Database keys may be user, guild, or channel IDs
-                                if getattr(obj, "user", None):
-                                    d = await self.fetch_user(key)
-                                elif getattr(obj, "channel", None):
-                                    d = await self.fetch_channel(key)
+                                if getattr(obj, "channel", None):
+                                    d = self.get_channel(key)
                                 else:
-                                    tester = data[key]
-                                    if not getattr(obj, "no_garbage", None) and not tester and self.started:
+                                    if not data[key]:
                                         raise LookupError
                                     with suppress(KeyError):
                                         d = self.cache.guilds[key]

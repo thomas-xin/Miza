@@ -2911,7 +2911,6 @@ class UpdateAutoRoles(Database):
 
 class UpdateRolePreservers(Database):
     name = "rolepreservers"
-    no_delete = True
 
     async def _join_(self, user, guild, **void):
         if guild.id in self.data:
@@ -2951,7 +2950,6 @@ class UpdateRolePreservers(Database):
 
 class UpdateNickPreservers(Database):
     name = "nickpreservers"
-    no_delete = True
 
     async def _join_(self, user, guild, **void):
         try:

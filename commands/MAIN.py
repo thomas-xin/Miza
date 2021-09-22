@@ -1567,7 +1567,6 @@ class Note(Command):
 
 class UpdateUrgentReminders(Database):
     name = "urgentreminders"
-    no_delete = True
 
     async def _ready_(self, **void):
         if "listed" not in self.data:
@@ -1618,7 +1617,6 @@ class UpdateUrgentReminders(Database):
 # This database is such a hassle to manage, it has to be able to persist between bot restarts, and has to be able to update with O(1) time complexity when idle
 class UpdateReminders(Database):
     name = "reminders"
-    no_delete = True
 
     def __load__(self):
         d = self.data
@@ -1726,7 +1724,6 @@ class UpdatePrefix(Database):
 
 class UpdateEnabled(Database):
     name = "enabled"
-    no_delete = True
 
 
 class UpdateMessages(Database):
@@ -1775,7 +1772,6 @@ class UpdateMessages(Database):
 
 class UpdateFlavour(Database):
     name = "flavour"
-    no_delete = True
 
     async def get(self):
         out = x = None
