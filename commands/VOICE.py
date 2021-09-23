@@ -17,17 +17,6 @@ except:
     print("WARNING: google_api_key not found. Unable to use API to search youtube playlists.")
 
 
-async def create_player(auds, p_type=0, verbose=False):
-    auds.stats.quiet |= 2 * p_type
-    # Set callback message for updating audio player
-    text = (
-        "```" + "\n" * verbose + "callback-voice-player-" + str(int(bool(p_type)))
-        + "\nInitializing virtual audio player...```"
-    )
-    await auds.text.send(text)
-    await auds.update_player()
-
-
 # Gets estimated duration from duration stored in queue entry
 e_dur = lambda d: float(d) if type(d) is str else (d if d is not None else 300)
 
@@ -4169,13 +4158,14 @@ class Player(Command):
                 elif i == 9:
                     pos = auds.pos
                     auds.stats = cdict(auds.defaults)
+                    auds.stats.quiet = True
                     await create_future(auds.play, auds.source, pos, timeout=18)
                 elif i == 10 or i == 11:
-                    s = (i * 2 - 19) * 2 / 11
+                    s = 0.25 if i == 11 else -0.25
                     auds.stats.speed = round(auds.stats.speed + s, 5)
                     await create_future(auds.play, auds.source, auds.pos, timeout=18)
                 elif i == 12 or i == 13:
-                    p = i * 2 - 23
+                    p = 1 if i == 13 else -1
                     auds.stats.pitch -= p
                     await create_future(auds.play, auds.source, auds.pos, timeout=18)
                 elif i == 14:
@@ -4231,6 +4221,7 @@ class Player(Command):
         else:
             delay = inf
         auds.player.time = utc() + delay
+        auds.stats.quiet = True
 
     async def __call__(self, guild, channel, user, bot, flags, perm, **void):
         auds = await auto_join(channel.guild, channel, user, bot)
