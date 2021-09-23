@@ -4131,6 +4131,7 @@ class Player(Command):
                     else:
                         v = 2
                     auds.stats.volume = v
+                    await create_future(auds.play, auds.source, auds.pos, timeout=18)
                 elif i == 6:
                     b = auds.stats.bassboost
                     if abs(b) < 1 / 3:
@@ -4140,13 +4141,17 @@ class Player(Command):
                     else:
                         b = -1
                     auds.stats.bassboost = b
+                    await create_future(auds.play, auds.source, auds.pos, timeout=18)
                 elif i == 7:
                     r = auds.stats.reverb
-                    if r:
+                    if r >= 1:
                         r = 0
-                    else:
+                    elif r < 0.5:
                         r = 0.5
+                    else:
+                        r = 1
                     auds.stats.reverb = r
+                    await create_future(auds.play, auds.source, auds.pos, timeout=18)
                 elif i == 8:
                     c = abs(auds.stats.chorus)
                     if c:
