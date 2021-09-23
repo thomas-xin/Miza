@@ -582,7 +582,7 @@ class CustomAudio(collections.abc.Hashable):
     def connect_to(self, channel=None):
         if not self.acsi:
             try:
-                self.acsi = AudioClientSubInterface(channel)
+                self.acsi = AudioClientSubInterface(self, channel)
                 self.fut.set_result(self.acsi)
             except Exception as ex:
                 self.fut.set_exception(ex)
@@ -1111,9 +1111,13 @@ class AudioFileLink:
 class AudioClientSubInterface:
 
     afters = {}
+    bot = None
 
     @classmethod
     def from_guild(cls, guild):
+        bot = cls.bot
+        if bot.audio.players.get(guild.id):
+            self.auds = bot.audio.players[guild.id]
         if guild.me.voice:
             c_id = bot.audio.submit(f"getattr(getattr(client.get_guild({guild.id}).voice_client, 'channel', None), 'id', None)")
             if c_id:
@@ -1131,8 +1135,9 @@ class AudioClientSubInterface:
     def pos(self):
         return self.bot.audio.submit(f"AP.from_guild({self.guild.id}).pos")
 
-    def __init__(self, channel=None, reconnect=True):
-        self.bot = bot
+    def __init__(self, auds, channel=None, reconnect=True):
+        self.__class__.bot = bot = auds.bot
+        self.auds = auds
         self.user = bot.user
         if channel:
             self.channel = channel
@@ -1152,18 +1157,31 @@ class AudioClientSubInterface:
             return self.__getattribute__(k)
         except AttributeError:
             pass
-        if not bot.audio:
+        if not self.bot.audio:
             raise AttributeError("Audio client not active.")
-        return bot.audio.submit(f"AP.from_guild({self.guild.id}).{k}")
+        return self.bot.audio.submit(f"AP.from_guild({self.guild.id}).{k}")
 
     def enqueue(self, src, after=None):
         if src is None:
             return
+        if self.auds.source:
+            s1 = self.auds.source.stream
+            s2 = self.bot.audio.submit(f"AP.from_guild({self.guild.id}).queue[0][0].file.stream")
+            if s1 != s2:
+                print(f"{guild} ({guild.id}): ACSI stream mismatch! Attempting fix...")
+                if self.auds.next and s2 == self.auds.next.stream:
+                    self.auds.queue.advance()
+                else:
+                    print(f"{guild} ({guild.id}): Unable to find safe position, resetting ACSI queue...")
+                    self.clear()
+                    self.auds.play(self.auds.source, self.auds.pos)
+                    if not self.auds.next:
+                        return
         key = ts_us()
         if after:
             self.afters[key] = after
-            return create_future_ex(bot.audio.submit, f"AP.from_guild({self.guild.id}).enqueue(players[{repr(src)}], after=lambda *args: submit('VOICE.ACSI.after({key})'))")
-        return create_future_ex(bot.audio.submit, f"AP.from_guild({self.guild.id}).enqueue(players[{repr(src)}])")
+            return create_future_ex(self.bot.audio.submit, f"AP.from_guild({self.guild.id}).enqueue(players[{repr(src)}], after=lambda *args: submit('VOICE.ACSI.after({key})'))")
+        return create_future_ex(self.bot.audio.submit, f"AP.from_guild({self.guild.id}).enqueue(players[{repr(src)}])")
 
     def play(self, src, after=None):
         if src is None:
@@ -1171,27 +1189,27 @@ class AudioClientSubInterface:
         key = ts_us()
         if after:
             self.afters[key] = after
-            return bot.audio.submit(f"AP.from_guild({self.guild.id}).play(players[{repr(src)}], after=lambda *args: submit('VOICE.ACSI.after({key})'))")
-        return bot.audio.submit(f"AP.from_guild({self.guild.id}).play(players[{repr(src)}])")
+            return self.bot.audio.submit(f"AP.from_guild({self.guild.id}).play(players[{repr(src)}], after=lambda *args: submit('VOICE.ACSI.after({key})'))")
+        return self.bot.audio.submit(f"AP.from_guild({self.guild.id}).play(players[{repr(src)}])")
 
     def connect(self, reconnect=True, timeout=60):
-        return create_future(bot.audio.submit, f"!await AP.from_guild({self.guild.id}).connect(reconnect={reconnect}, timeout={timeout})")
+        return create_future(self.bot.audio.submit, f"!await AP.from_guild({self.guild.id}).connect(reconnect={reconnect}, timeout={timeout})")
 
     async def disconnect(self, force=False):
-        await create_future(bot.audio.submit, f"!await AP.from_guild({self.guild.id}).disconnect(force={force})")
-        bot.audio.clients.pop(self.guild.id)
+        await create_future(self.bot.audio.submit, f"!await AP.from_guild({self.guild.id}).disconnect(force={force})")
+        self.bot.audio.clients.pop(self.guild.id)
         self.channel = None
 
     async def move_to(self, channel=None):
         if not channel:
             return await self.disconnect(force=True)
-        await create_future(bot.audio.submit, f"!await AP.from_guild({self.guild.id}).move_to(client.get_channel({channel.id}))")
+        await create_future(self.bot.audio.submit, f"!await AP.from_guild({self.guild.id}).move_to(client.get_channel({channel.id}))")
         self.channel = channel
 
 ACSI = AudioClientSubInterface
 
 for attr in ("read", "skip", "stop", "pause", "resume", "clear_source", "clear_next", "clear", "kill", "is_connected", "is_paused", "is_playing"):
-    setattr(ACSI, attr, eval("""lambda self: bot.audio.submit(f"AP.from_guild({self.guild.id}).""" + f"""{attr}()")"""))
+    setattr(ACSI, attr, eval("""lambda self: self.bot.audio.submit(f"AP.from_guild({self.guild.id}).""" + f"""{attr}()")"""))
 
 
 # Manages all audio searching and downloading.
@@ -4174,8 +4192,7 @@ class Player(Command):
                     auds.stats.pitch -= p
                     await create_future(auds.play, auds.source, auds.pos, timeout=18)
                 elif i == 14:
-                    auds.dead = True
-                    auds.player = None
+                    await create_future(auds.kill)
                     await bot.silent_delete(message)
                     return
                 else:
