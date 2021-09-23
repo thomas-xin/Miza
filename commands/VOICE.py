@@ -459,7 +459,7 @@ class CustomAudio(collections.abc.Hashable):
             self.paused = False
             self.acsi.resume()
             self.queue.update_load()
-        if not self.paused:
+        elif not self.paused:
             self.paused = True
             self.acsi.pause()
 
@@ -545,7 +545,7 @@ class CustomAudio(collections.abc.Hashable):
             if getattr(self, "player", None) is not None:
                 if t - self.player.get("time", 0) >= 0:
                     self.player.time = t + 20
-                    create_task(bot.commands.player[0]._callback_(self.player.get("message"), guild, self.text, None, self.bot, inf))
+                    create_task(bot.commands.player[0]._callback_(self.player.get("message"), guild, self.text, 0, self.bot, inf))
             if self.stats.stay:
                 cnt = inf
             else:
@@ -572,16 +572,23 @@ class CustomAudio(collections.abc.Hashable):
                                     ch = channel
                         if ch:
                             with tracebacksuppressor(SemaphoreOverflowError):
-                                await_fut(self.acsi.move_to(ch))
+                                await_fut(self.move_unmute(self.acsi, ch))
                                 self.announce(ini_md(f"🎵 Detected {sqr_md(cnt)} user{'s' if cnt != 1 else ''} in {sqr_md(ch)}, automatically joined! 🎵"), aio=False)
             else:
                 self.timeout = utc()
             self.queue.update_load()
 
     # Moves to the target channel, unmuting self afterwards.
-    async def move_unmute(self, vc, channel):
-        await vc.move_to(channel)
-        await channel.guild.me.edit(mute=False, deafen=False)
+    async def move_unmute(self, vc, vc_):
+        await vc.move_to(vc_)
+        m = self.guild.me
+        perm = m.permissions_in(vc_)
+        if perm.mute_members:
+            if vc_.type is discord.ChannelType.stage_voice:
+                if m.voice.suppress or m.voice.requested_to_speak_at:
+                    await self.speak()
+            elif m.voice.deaf or m.voice.mute or m.voice.afk:
+                await m.edit(mute=False)
 
     def connect_to(self, channel=None):
         if not self.acsi:
@@ -593,6 +600,19 @@ class CustomAudio(collections.abc.Hashable):
         self.queue._init_(auds=self)
         self.timeout = utc()
         return self.acsi
+
+    def speak(self):
+        vc = self.channel
+        if not vc:
+            return
+        return Request(
+            f"https://discord.com/api/{api}/guilds/{vc.guild.id}/voice-states/@me",
+            method="PATCH",
+            headers={"Authorization": "Bot " + self.bot.token, "Content-Type": "application/json"},
+            data=json.dumps({"suppress": False, "request_to_speak_timestamp": None, "channel_id": vc.id}),
+            bypass=False,
+            aio=True,
+        )
 
     # Constructs array of FFmpeg options using the audio settings.
     def construct_options(self, full=True):
@@ -2555,6 +2575,7 @@ class Queue(Command):
 
     async def __call__(self, bot, user, perm, message, channel, guild, flags, name, argv, **void):
         # This command is a bit of a mess
+        ytdl.bot = bot
         argv += " ".join(best_url(a) for a in message.attachments)
         if not argv:
             auds = await auto_join(guild, channel, user, bot)
@@ -2951,7 +2972,7 @@ class Playlist(Command):
 
 class Connect(Command):
     server_only = True
-    name = ["📲", "🎤", "🎵", "🎶", "📴", "📛", "Summon", "Join", "DC", "Disconnect", "Leave", "Yeet", "Move", "Reconnect"]
+    name = ["📲", "🎤", "🎵", "🎶", "📴", "📛", "Summon", "J", "Join", "DC", "Disconnect", "Leave", "Yeet", "Move", "Reconnect"]
     # Because Rythm also has this alias :P
     alias = name + ["FuckOff"]
     description = "Summons the bot into a voice channel."
@@ -3024,9 +3045,15 @@ class Connect(Command):
                 br = round(bot.data.audio.players[guild.id].stats.bitrate * 100)
             else:
                 br = 196608
-            bitrate = min(br, guild.bitrate_limit)
+            if vc_.type is discord.ChannelType.stage_voice:
+                bitrate = min(br, 64000)
+            else:
+                bitrate = min(br, guild.bitrate_limit)
             if vc_.bitrate < bitrate:
-                await vc_.edit(bitrate=bitrate, reason="I deliver maximum quality audio only! :3")
+                try:
+                    await vc_.edit(bitrate=bitrate, reason="I deliver maximum quality audio only! :3")
+                except:
+                    print_exc()
         # Create audio source if none already exists
         if guild.id not in bot.data.audio.players:
             globals()["bot"] = bot
@@ -3036,14 +3063,17 @@ class Connect(Command):
         else:
             auds = bot.data.audio.players[guild.id]
             if auds.acsi.channel != vc_:
-                await auds.acsi.move_to(vc_)
+                await auds.move_unmute(auds.acsi, vc_)
                 joining = True
         if guild.me.voice is None:
             await bot.wait_for("voice_state_update", check=lambda member, before, after: member.id == bot.id and after, timeout=16)
         member = guild.me
-        if getattr(member, "voice", None) is not None:
-            if member.voice.deaf or member.voice.mute or member.voice.afk:
-                create_task(member.edit(mute=False, deafen=False))
+        if getattr(member, "voice", None) is not None and vc_.permissions_for(member).mute_members:
+            if vc_.type is discord.ChannelType.stage_voice:
+                if member.voice.suppress or member.voice.requested_to_speak_at:
+                    auds.speak()
+            elif member.voice.deaf or member.voice.mute or member.voice.afk:
+                create_task(member.edit(mute=False))
         if joining:
             # Send update event to bot audio database upon joining
             create_task(bot.data.audio(guild=guild))
@@ -3944,7 +3974,7 @@ class Party(Command):
 class Player(Command):
     server_only = True
     buttons = demap({
-        b'\xe2\x8f\xb8': 0,
+        b'\xe2\x8f\xaf\xef\xb8\x8f': 0,
         b'\xf0\x9f\x94\x84': 1,
         b'\xf0\x9f\x94\x80': 2,
         b'\xe2\x8f\xae': 3,
@@ -4061,18 +4091,20 @@ class Player(Command):
             return
         auds = bot.data.audio.players[guild.id]
         if reaction is None:
+            return
+        elif reaction == 0:
             auds.player.time = inf
         elif auds.player is None or auds.player.message.id != message.id:
             return
         if perm < 1:
             return
         if not message:
-            content = "```\n"
+            content = "```callback-voice-player-\n"
         elif message.content:
             content = message.content
         else:
             content = message.embeds[0].description
-        orig = "\n".join(content.splitlines()[:1 + ("\n" == content[3])]) + "\n"
+        orig = content.split("\n", 1)[0] + "\n"
         if reaction:
             if type(reaction) is bytes:
                 emoji = reaction
@@ -4084,6 +4116,8 @@ class Player(Command):
             if type(emoji) is str:
                 emoji = reaction.encode("utf-8")
             if emoji in self.buttons:
+                if hasattr(message, "int_token"):
+                    create_task(bot.ignore_interaction(message))
                 i = self.buttons[emoji]
                 if i == 0:
                     await create_future(auds.pause, unpause=True)
@@ -4175,7 +4209,7 @@ class Player(Command):
                     j = 1 if len(buttons[1]) < 5 else 2
                     buttons[j].append(cdict(emoji=s, custom_id=s, style=1))
                 else:
-                    buttons[2].append(cdict(emoji=s, custom_id=s, style=4))
+                    buttons[3].append(cdict(emoji=s, custom_id=s, style=4))
             auds.player.time = inf
             temp = message
             message = await send_with_reply(
@@ -4189,7 +4223,7 @@ class Player(Command):
         if auds.queue and not auds.paused & 1:
             p = auds.epos
             maxdel = p[1] - p[0] + 2
-            delay = min(maxdel, p[1] / self.barsize / abs(auds.stats.speed))
+            delay = min(maxdel, p[1] / self.barsize / 2 / abs(auds.stats.speed))
             if delay > 10:
                 delay = 10
             elif delay < 5:
@@ -4643,10 +4677,16 @@ class UpdateAudio(Database):
                     return guild.change_voice_state(channel=None)
             else:
                 if m.voice is not None:
-                    perm = m.permissions_in(m.voice.channel)
-                    if perm.mute_members and perm.deafen_members:
-                        if m.voice.deaf or m.voice.mute or m.voice.afk:
-                            return m.edit(mute=False, deafen=False)
+                    vc_ = m.voice.channel
+                    perm = m.permissions_in(vc_)
+                    if perm.mute_members:
+                        if vc_.type is discord.ChannelType.stage_voice:
+                            if m.voice.suppress or m.voice.requested_to_speak_at:
+                                return self.bot.audio.players[guild.id].speak()
+                        elif m.voice.deaf or m.voice.mute or m.voice.afk:
+                            if perm.deafen_members:
+                                return m.edit(mute=False, deafen=False)
+                            return m.edit(mute=False)
         return emptyfut
 
     # Updates all voice clients

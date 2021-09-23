@@ -1829,8 +1829,6 @@ class ServerProtector(Database):
     async def _channel_delete_(self, channel, guild, **void):
         if channel.id in self.bot.cache.deleted:
             return
-        if not self.bot.is_trusted(guild.id) and guild.id not in self.bot.data.logU:
-            return
         user = None
         audits = guild.audit_logs(limit=5, action=discord.AuditLogAction.channel_delete)
         ts = utc()
@@ -1842,9 +1840,9 @@ class ServerProtector(Database):
                     user = log.user
             else:
                 break
-        if self.bot.is_trusted(guild.id):
-            for u_id in cnt:
-                if cnt[u_id] > 2:
+        for u_id in cnt:
+            if cnt[u_id] > 2:
+                if self.bot.is_trusted(guild.id) or u_id == self.bot.user.id:
                     create_task(self.targetWarn(u_id, guild, f"channel deletions `({cnt[u_id]})`"))
         if guild.id in self.bot.data.logU:
             await self.bot.data.logU._channel_delete_2_(channel, guild, user)
