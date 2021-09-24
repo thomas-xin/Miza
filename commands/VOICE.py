@@ -1115,7 +1115,7 @@ class AudioClientSubInterface:
 
     @classmethod
     def from_guild(cls, guild):
-        cls.ensure_bot()
+        cls.ensure_bot(cls)
         bot = cls.bot
         if bot.audio.players.get(guild.id):
             self.auds = bot.audio.players[guild.id]
@@ -1143,12 +1143,15 @@ class AudioClientSubInterface:
             cls = self
         if auds:
             cls.bot = auds.bot
+        elif not cls.bot:
+            cls.bot = bot
         if cls.bot:
             cls.afters = cls.bot.audio.__dict__.setdefault("afters", {})
 
     def __init__(self, auds, channel=None, reconnect=True):
         self.ensure_bot(auds)
         self.auds = auds
+        bot = self.bot
         self.user = bot.user
         if channel:
             self.channel = channel
