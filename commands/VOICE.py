@@ -531,7 +531,7 @@ class CustomAudio(collections.abc.Hashable):
             self.fut.result(timeout=12)
             guild = self.guild
             t = utc()
-            if getattr(self, "player", None) is not None:
+            if getattr(self, "player", None) is not None and self.stats.speed and not self.paused:
                 if t - self.player.get("time", 0) >= 0:
                     self.player.time = t + 20
                     create_task(bot.commands.player[0]._callback_(self.player.get("message"), guild, self.text, 0, self.bot, inf))
@@ -1166,7 +1166,11 @@ class AudioClientSubInterface:
             return
         if self.auds.source:
             s1 = self.auds.source.stream
-            s2 = self.bot.audio.submit(f"AP.from_guild({self.guild.id}).queue[0][0].file.stream")
+            try:
+                s2 = self.bot.audio.submit(f"AP.from_guild({self.guild.id}).queue[0][0].af.stream")
+            except IndexError:
+                self.auds.play(self.auds.source, self.auds.pos)
+                s2 = self.bot.audio.submit(f"AP.from_guild({self.guild.id}).queue[0][0].af.stream")
             if s1 != s2:
                 print(f"{guild} ({guild.id}): ACSI stream mismatch! Attempting fix...")
                 if self.auds.next and s2 == self.auds.next.stream:
@@ -3991,10 +3995,10 @@ class Player(Command):
         b'\xf0\x9f\x93\x89': 7,
         b'\xf0\x9f\x93\x8a': 8,
         b'\xe2\x99\xbb': 9,
-        b'\xe2\x8f\xaa': 10,
-        b'\xe2\x8f\xa9': 11,
-        b'\xe2\x8f\xab': 12,
-        b'\xe2\x8f\xac': 13,
+        # b'\xe2\x8f\xaa': 10,
+        # b'\xe2\x8f\xa9': 11,
+        # b'\xe2\x8f\xab': 12,
+        # b'\xe2\x8f\xac': 13,
 	    b'\xe2\x8f\x8f': 14,
         b'\xe2\x9c\x96': 15,
     })
@@ -4212,7 +4216,7 @@ class Player(Command):
                 embed=emb,
             )
         else:
-            buttons = [[] for _ in loop(4)]
+            buttons = [[] for _ in loop(3)]
             for s, i in self.buttons.a.items():
                 s = as_str(s)
                 if i < 5:
@@ -4221,7 +4225,7 @@ class Player(Command):
                     j = 1 if len(buttons[1]) < 5 else 2
                     buttons[j].append(cdict(emoji=s, custom_id=s, style=1))
                 else:
-                    buttons[3].append(cdict(emoji=s, custom_id=s, style=4))
+                    buttons[-1].append(cdict(emoji=s, custom_id=s, style=4))
             auds.player.time = inf
             temp = message
             message = await send_with_reply(

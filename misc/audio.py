@@ -500,6 +500,7 @@ class AudioFile:
             is_opus=lambda self: True,
             key=key,
             duration=self.duration,
+            af=self,
         )
 
         def read():
@@ -632,6 +633,7 @@ class LoadedAudioReader(discord.AudioSource):
         self.proc = psutil.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
         self.packet_iter = discord.oggparse.OggStream(self.proc.stdout).iter_packets()
         self.file = file
+        self.af = file
         self.buffer = None
         self.callback = callback
         self.pos = 0
@@ -698,6 +700,7 @@ class BufferedAudioReader(discord.AudioSource):
         self.proc = psutil.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         self.packet_iter = discord.oggparse.OggStream(self.proc.stdout).iter_packets()
         self.file = file
+        self.af = file
         self.stream = open("cache/" + file.file, "rb")
         self.buffer = None
         self.callback = callback
