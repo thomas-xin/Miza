@@ -1136,9 +1136,8 @@ class AudioClientSubInterface:
         return self.bot.audio.submit(f"AP.from_guild({self.guild.id}).pos")
 
     def __init__(self, auds, channel=None, reconnect=True):
-        if not self.__class__.bot:
-            self.__class__.bot = bot = auds.bot
-            self.__class__.afters = bot.audio.__dict__.setdefault("afters", {})
+        self.__class__.bot = bot = auds.bot
+        self.__class__.afters = bot.audio.__dict__.setdefault("afters", {})
         self.auds = auds
         self.user = bot.user
         if channel:
