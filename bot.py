@@ -331,148 +331,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     raise ConnectionError(f"Error {resp.status_code}", resp.text)
 
     async def create_main_website(self, first=False):
-        with tracebacksuppressor:
-            print("Generating website html...")
-            html = f"""<!DOCTYPE html>
-<html>
-    <head>
-        <title>Miza</title>
-        <meta content="Miza" property="og:title">
-        <meta content="A multipurpose Discord bot." property="og:description">
-        <meta content="{self.webserver}" property="og:url">
-        <meta content="https://github.com/thomas-xin/Miza/raw/e62dfccef0cce3b0fc3b8a09fb3ca3edfedd8ab0/misc/sky-rainbow.gif" property="og:image">
-        <meta content="#BF7FFF" data-react-helmet="true" name="theme-color">
-        <link rel="preconnect" href="https://fonts.gstatic.com">
-        <link href="https://fonts.googleapis.com/css2?family=Balsamiq+Sans&amp;family=Pacifico&amp;display=swap" rel="stylesheet">
-        <link href="https://unpkg.com/boxicons@2.0.7/css/boxicons.min.css" rel="stylesheet">
-        <link href="{self.raw_webserver}/static/miza.css" rel="stylesheet">
-        <link rel="stylesheet" href="{self.raw_webserver}/static/swiper.min.css">
-    </head>
-    <body>
-        <link href="/static/hamburger.css" rel="stylesheet">
-        <div class="hamburger">
-            <input
-                type="checkbox"
-                title="Toggle menu"
-            />
-            <div class="items select">
-                <a href="/" data-popup="Home">
-                    <video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
-                        <source src="https://cdn.discordapp.com/attachments/691915140198826005/846592940075515904/miza_by_smudgedpasta_de1q8lu-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOj.mp4" type="video/mp4">
-                    </video>
-                </a>
-                <a href="/mizatlas" data-popup="Command Atlas">
-                    <video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
-                        <source src="https://cdn.discordapp.com/attachments/691915140198826005/846593904635281408/miza_has_a_leaf_blower_by_smudgedpasta_de6t2dl-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJz.mp4" type="video/mp4">
-                    </video>
-                </a>
-                <a href="/upload" data-popup="File Host">
-                    <video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
-                        <source src="https://cdn.discordapp.com/attachments/691915140198826005/846593561444745226/magical_babey_mode_by_smudgedpasta_de1q8ky-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIi.mp4" type="video/mp4">
-                    </video>
-                </a>
-                <a href="/apidoc" data-popup="API Documentation">
-                    <video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
-                        <source src="https://cdn.discordapp.com/attachments/691915140198826005/846590061901381632/deahc7l-a9773147-259d-4226-b0b6-195c6eb1f3c0.pngtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOi.mp4" type="video/mp4">
-                    </video>
-                </a>
-                <a 
-                    href="/time"
-                    data-popup="Clock"
-                    class='bx bx-time'></a>
-            </div>
-            <div class="hambg"></div>
-        </div>
-        <div class="hero">
-            <img class="hero-bg" src="{self.website_background}">
-            <div class="hero-text">
-                <video playsinline autoplay muted loop poster="https://cdn.discordapp.com/attachments/691915140198826005/846951020701679627/miza_by_smudgedpasta_de1q8lu-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOj.webp" style="height:10em;border-radius:100%;box-shadow:0 0 5px 0 white;">
-                    <source src="https://cdn.discordapp.com/attachments/691915140198826005/846592940075515904/miza_by_smudgedpasta_de1q8lu-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOj.mp4" type="video/mp4">
-                </video>
-                <h1 class="hero-text-text" data-upside-down-emoji-because-the-class-name="yea">Miza</h1>
-                <a class="buttonish" href="{self.invite}"><i class="bx bxs-plus-square"></i>Invite</a>
-                <div class="buttonsholder">
-                    <a class="buttonish" href="{self.github}"><i class="bx bxl-github"></i>Sauce</a>
-                    <a class="buttonish" href="{self.rcc_invite}"><i class="bx bxl-discord"></i>Discord</a>
-                </div>
-            </div>
-        </div>
-        <video class="bgimg" playsinline autoplay muted loop poster="https://cdn.discordapp.com/attachments/691915140198826005/846948803726016562/unknown.gif" style="position:fixed;right:0;bottom:0;min-width:100%;min-height:100%;z-index:-1;">
-            <source src="https://cdn.discordapp.com/attachments/691915140198826005/846611422649253899/unknown.gif" type="video/mp4">
-        </video>
-        <div class="bigboi">
-            <h2>What is Miza?</h2>
-            <p>Built on discord.py, Miza is a multipurpose Discord bot, fashioned after the character "Misery" from the platformer game Cave Story, and initially designed to help with Cave Story modding.<br>\
-She quickly branched out into all the areas you'd desire in a server, with careful attention to efficiency, performance, quality, and reliability.<br>\
-All of Miza's commands are easily accessible and manageable, with permission levels assignable on a user/role basis, as well as command category enabling/disabling at will per channel.<br>\
-The prefix is customizable, the command parser is intelligent, with the ability to recognize text in unicode fonts, the ability to parse and solve mathematical formulae for numerical inputs, in addition to fuzzy searching usernames.<br>\
-Sporting features from every category, Miza is capable of suiting just about anyone's needs, from invoking google translate, solving calculus equations, creating fancy unicode text, setting announcements, to temporarily muting/banning users, logging messages, to music and video filtering, playing, and downloading, image commands from magik distortion to rainbow gifs, webhook mimics/plurals, custom emojis, and much more!<br>\
-Above all else, Miza aims to provide users with a smooth, reliable and unique Discord experience, but the general premise for Miza is: "Fuck it, other bots can do it; Miza should be able to do it too" 🙃</p> 
-            <h2>What can Miza do?</h2>
-            <p>Oh, just a few things:</p>"""
-            commands = set()
-            for command in bot.commands.values():
-                commands.update(command)
-            com_count = 0
-            for category in ("main", "string", "admin", "voice", "image", "fun"):
-                c = f'\n<div class="carouselRight swiper-container"><div class="swiper-wrapper">'
-                for command in self.categories[category]:
-                    desc = command.parse_description()
-                    with suppress(ValueError):
-                        i = desc.index("http")
-                        if "://" in desc[i + 4:i + 8]:
-                            url = desc[i:]
-                            for x in range(len(url)):
-                                if url[x] in " !":
-                                    break
-                                x += 1
-                            desc = desc[:i] + f'<a href="{url[:x]}">{url[:x].rsplit("/", 1)[-1]}</a>' + url[x:]
-                    c += f'\n<div class="carouselItem swiper-slide"><h3>{command.parse_name()}</h3><p>{desc}</p></div>'
-                    com_count += 1
-                c += '</div><div class="swiper-pagination"></div></div>'
-                html += c
-            html += f"\n<p>...and {len(commands) - com_count} more!</p>"
-            html += f"""
-			<h2>Why should I choose Miza over other Discord bots?</h2>
-            <p>no fuckn clue lmao<br><br>\
-On a serious note, because Miza does most things you need.<br>\
-Miza doesn't just blend into the functionalities of any old Discord bot; she can do so much more with plenty of stability, at no cost to access some of the more advanced features you are not likely to see accessable for free on any bigger/more popular bot.<br>\
-Continuing on from the giant list of commands, Miza is supported by a webserver to handle files bigger than the Discord size limit, with various other features such as shifting messages to an embed if they breach the regular character limit, or sending embeds in a webhook to send a plethora at once if necessary, keeping things as clean as possible.<br>\
-Her creator introduces new features all the time, keeping up with the latest changes by Discord and often breaking away from what discord.py normally supports, while keeping compliant to the Discord TOS of course!<br>\
-For those of us who use Miza as a regular utility, we can safely say that she is an incredibly helpful Discord bot for all sorts of things, and is also very fun!<br></p>
-            <h2>What would I need to do in order to use Miza?</h2>
-            <p>First of all, you must have a Discord account, and a Discord server/guild to add Miza to.<br>\
-Use the <a href="{self.invite}">bot invite link</a> to invite her, and you will be able to access almost every feature immediately!<br>\
-The default prefix for a command is a ~ (tilde) character, followed by the name of the command (case-insensitive, with underscores optionally omitted), for example ~Hello, ~hello, or ~HELLO<br>\
-Commands may or may not require arguments, or input text after the command name. Some commands are able to take input from attached files or URL links (including Discord message links).<br>\
-To check the method of input for a particular command, use the ~Help command with said command's name as an argument.<br><br>\
-Optionally, most of miza's commands may be easily viewed and tested on the <a href="{self.raw_webserver}/mizatlas">command atlas</a>.<br>\
-For any further questions or issues, read the documentation on <a href="{self.github}">GitHub</a>, or join the <a href="{self.rcc_invite}">Support Server</a>!
-        </div>
-        <script src="{self.raw_webserver}/static/swiper.min.js"></script>
-        <script src="{self.raw_webserver}/static/pagination.js"></script>
-    </body>
-</html>"""
-            with open("misc/index.html", "w", encoding="utf-8") as f:
-                f.write(html)
-            print("Generating command json...")
-            j = {}
-            for category in ("MAIN", "STRING", "ADMIN", "VOICE", "IMAGE", "FUN", "OWNER", "NSFW", "MISC"):
-                k = j[category] = {}
-                for command in self.categories[category]:
-                    c = k[command.parse_name()] = dict(
-                        aliases=[n.strip("_") for n in command.alias],
-                        description=command.parse_description(),
-                        usage=command.usage,
-                        level=str(command.min_level),
-                        rate_limit=str(command.rate_limit),
-                        timeout=str(getattr(command, "_timeout_", 1) * self.timeout),
-                    )
-                    for attr in ("flags", "server_only", "slash"):
-                        with suppress(AttributeError):
-                            c[attr] = command.attr
-            with open("misc/help.json", "w", encoding="utf-8") as f:
-                f.write(json.dumps(j, indent=4))
         self.start_webserver()
         if first:
             create_thread(webserver_communicate, self)
@@ -780,7 +638,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     if member is not None:
                         return member
             with suppress():
-                return self.get_member(u_id, guild)
+                return self.get_member(u_id, guild, find_others=False)
             return user
         user = self.user_from_identifier(u_id)
         if user is not None:
@@ -853,7 +711,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         if member is None:
             if type(u_id) is int:
                 with suppress(LookupError):
-                    member = await self.fetch_member(u_id, guild)
+                    if guild:
+                        member = await self.fetch_member(u_id, guild)
+                    else:
+                        member = await self.fetch_user(u_id)
             if member is None:
                 if allow_banned:
                     members = await self.get_full_members(guild)
@@ -866,7 +727,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         return member
 
     # Fetches the first seen instance of the target user as a member in any shared server.
-    async def fetch_member(self, u_id, guild=None, find_others=False):
+    def fetch_member(self, u_id, guild=None, find_others=False):
+        return create_future(self.get_member, u_id, guild, find_others)
+
+    def get_member(self, u_id, guild=None, find_others=True):
         if type(u_id) is not int:
             try:
                 u_id = int(u_id)
@@ -878,45 +742,18 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 if member is None:
                     raise LookupError
                 return member
-        g = bot.cache.guilds
+        g = self.cache.guilds
         if guild is None:
-            guilds = deque(bot.cache.guilds.values())
+            if find_others:
+                guilds = deque(self.cache.guilds.values())
+            else:
+                return self.cache.users[u_id]
         else:
             if find_others:
                 guilds = deque(g[i] for i in g if g[i].id != guild.id)
                 guilds.appendleft(guild)
             else:
                 guilds = [guild]
-        member = None
-        for i, guild in enumerate(guilds, 1):
-            member = guild.get_member(u_id)
-            if member is not None:
-                break
-            if not i & 4095:
-                await asyncio.sleep(0.2)
-        if member is None:
-            raise LookupError("Unable to find member data.")
-        self.cache.members[u_id] = member
-        self.limit_cache("members")
-        return member
-
-    def get_member(self, u_id, guild=None):
-        if type(u_id) is not int:
-            try:
-                u_id = int(u_id)
-            except (ValueError, TypeError):
-                raise TypeError(f"Invalid user identifier: {u_id}")
-        with suppress(LookupError):
-            member = self.cache.members[u_id].guild.get_member(u_id)
-            if member is None:
-                raise LookupError
-            return member
-        g = bot.cache.guilds
-        if guild is None:
-            guilds = deque(bot.cache.guilds.values())
-        else:
-            guilds = deque(g[i] for i in g if g[i].id != guild.id)
-            guilds.appendleft(guild)
         member = None
         for guild in guilds:
             member = guild.get_member(u_id)
@@ -5336,13 +5173,16 @@ class SimulatedMessage:
             author = self.__class__(bot, content, (ip2int(name) + MIZA_EPOCH) * 1000, name, nick, recursive=False)
             author.response = self.response
             author.message = self
+            author.dm_channel = author
         else:
             author = self
         self.author = author
         self.channel = author
         self.guild = author
+        self.dm_channel = author
         self.name = name
-        self.discriminator = str(xrand(10000))
+        disc = str(xrand(10000))
+        self.discriminator = "0" * (4 - len(disc)) + disc
         self.nick = self.display_name = nick
         self.owner_id = self.id
         self.mention = f"<@{self.id}>"
@@ -5351,7 +5191,7 @@ class SimulatedMessage:
         self.channels = self.text_channels = self.voice_channels = [author]
         self.members = self._members = [author, bot.user]
         self.message = self
-        self.owner = self.author
+        self.owner = author
 
     avatar_url = icon_url = "https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/b9573a17-63e8-4ec1-9c97-2bd9a1e9b515/de1q8lu-eae6a001-6463-4abe-b23c-fc32111c6499.png?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOiIsImlzcyI6InVybjphcHA6Iiwib2JqIjpbW3sicGF0aCI6IlwvZlwvYjk1NzNhMTctNjNlOC00ZWMxLTljOTctMmJkOWExZTliNTE1XC9kZTFxOGx1LWVhZTZhMDAxLTY0NjMtNGFiZS1iMjNjLWZjMzIxMTFjNjQ5OS5wbmcifV1dLCJhdWQiOlsidXJuOnNlcnZpY2U6ZmlsZS5kb3dubG9hZCJdfQ.eih2c_r4mgWKzZx88GKXOd_5FhCSMSbX5qXGpRUMIsE"
     roles = []

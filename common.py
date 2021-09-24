@@ -1711,6 +1711,7 @@ MIMES = cdict(
     js="application/javascript",
     txt="text/plain",
     html="text/html",
+    svg="image/svg+xml",
     ico="image/x-icon",
     png="image/png",
     jpg="image/jpeg",
@@ -1758,6 +1759,10 @@ def from_file(path, mime=True):
     if out and out.split("/", 1)[-1] == "zip" and type(path) is str and path.endswith(".jar"):
         return "application/java-archive"
     if not out:
+        if type(path) is not bytes:
+            if type(path) is str:
+                raise TypeError(path)
+            path = bytes(path)
         out = simple_mimes(path, mime)
     return out
 
@@ -1783,9 +1788,9 @@ def get_mime(path):
         with open(path, "rb") as f:
             b = f.read(65536)
         mime = magic.from_buffer(b, mime=True)
-    if mime == "text/plain":
+    if mime.startswith("text/plain"):
         mime2 = MIMES.get(path.rsplit("/", 1)[-1].rsplit(".", 1)[-1], "")
-        if mime2.startswith("text/"):
+        if mime2:
             return mime2
     elif mime.split("/", 1)[-1] == "zip" and path.endswith(".jar"):
         return "application/java-archive"
@@ -2329,10 +2334,10 @@ class DownloadingFile(io.IOBase):
         if s < size:
             i = io.BytesIO(b)
             while s < size:
-                if self.af():
-                    break
                 time.sleep(2 / 3)
                 b = self._read(size - s)
+                if not b and self.af():
+                    break
                 s += len(b)
                 i.write(b)
             i.seek(0)

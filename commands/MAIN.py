@@ -1082,8 +1082,8 @@ class Invite(Command):
 
 
 class Upload(Command):
-    name = ["Filehost"]
-    description = "Sends a link to ⟨MIZA⟩'s webserver's upload page: ⟨WEBSERVER⟩/upload"
+    name = ["Filehost", "Files"]
+    description = "Sends a link to ⟨MIZA⟩'s webserver's upload page: ⟨WEBSERVER⟩/files"
     msgcmd = True
     _timeout_ = 50
 
@@ -1093,7 +1093,7 @@ class Upload(Command):
             argv += " " * bool(argv) + " ".join(best_url(a) for a in message.attachments)
         args = await self.bot.follow_url(argv)
         if not args:
-            return self.bot.webserver + "/upload"
+            return self.bot.webserver + "/files"
         futs = deque()
         for url in args:
             futs.append(create_task(Request(self.bot.webserver + "/upload_url?url=" + url, decode=True, aio=True, timeout=1200)))

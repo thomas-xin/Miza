@@ -35,7 +35,8 @@ def send(*args, escape=True):
 
 
 def create_etag(data):
-    s = str(ihash(data[:128] + data[-128:]) + len(data) & 4294967295)
+    n = len(data)
+    s = str(nhash(data[:128] + data[n // 2 - 128:(n + 1) // 2 + 128] + data[-128:]) + n & 4294967295)
     return '"' + "0" * (10 - len(s)) + s + '"'
 
 
@@ -54,6 +55,8 @@ import cherrypy
 from cherrypy._cpdispatch import Dispatcher
 cp = cherrypy
 
+actually_static = set(os.listdir("misc/static"))
+
 class EndpointRedirects(Dispatcher):
 
     def __call__(self, path):
@@ -65,7 +68,11 @@ class EndpointRedirects(Dispatcher):
         elif path == "/ip":
             path = "/get_ip"
         elif path[:3] == "/f/":
-            path = "/files/" + path[3:]
+            path = "/raw/" + path[3:]
+        else:
+            p = path.lstrip("/")
+            if p in actually_static:
+                path = "/static/" + p
         return Dispatcher.__call__(self, path)
 
 config = {
@@ -112,7 +119,7 @@ def fetch_static(path, ignore=False):
             data = STATIC[path]
         except KeyError:
             fn = f"misc/{path}"
-            fn2 = fn.rsplit(".", 1)[0] + ".zip"
+            fn2 = fn + ".zip"
             if os.path.exists(fn2) and zipfile.is_zipfile(fn2):
                 with ZipFile(fn2, compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False) as z:
                     data = z.read(path.rsplit("/", 1)[-1])
@@ -192,8 +199,6 @@ def get_geo(ip):
         send(ip + "\t" + "\t".join(resp.values()))
     return resp
 
-last_image = [None] * 2
-
 
 class Server:
 
@@ -245,7 +250,9 @@ class Server:
                     d["original_url"] = url
         return json.dumps(d).encode("utf-8")
 
-    @cp.expose(("preview", "p", "animate", "animation", "a", "images", "image", "i", "view", "v", "files", "file", "f", "download", "d"))
+    image_loaders = {}
+
+    @cp.expose(("animate", "animation", "a", "images", "image", "i", "view", "v", "raw", "f", "download", "d"))
     def files(self, path, filename=None, download=None, **void):
         if path in ("hacks", "mods", "files", "download", "static"):
             send(cp.request.remote.ip + " was rickrolled 🙃")
@@ -379,22 +386,44 @@ class Server:
                 cp.response.headers["Content-Length"] = len(b)
                 cp.response.headers["ETag"] = create_etag(b)
                 return b
-            elif endpoint.startswith("i") and (mime in ("image/webp", "image/gif", "image/apng") or mime.split("/", 1)[0] == "video"):
-                if p != last_image[0]:
-                    args = ["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+fastseek+genpts+igndts+flush_packets", "-an", "-i", p, "-frames:v", "1", "-f", "image2", "-c:v", "png", "-"]
+            elif endpoint.startswith("i") and (mime in ("image/webp", "image/apng") or mime.split("/", 1)[0] == "video"):
+                preview = "cache/%" + p.rsplit("/", 1)[-1].split(".", 1)[0] + ".gif"
+                image_loaders = self.image_loaders
+                if not os.path.exists(preview) and preview not in image_loaders:
+                    args = (
+                        "ffmpeg",
+                        "-nostdin",
+                        "-hide_banner",
+                        "-v",
+                        "error",
+                        "-err_detect",
+                        "ignore_err",
+                        "-fflags",
+                        "+discardcorrupt+genpts+igndts+flush_packets",
+                        "-an",
+                        "-i",
+                        p,
+                        "-loop",
+                        "0",
+                        "-vf",
+                        "scale=320:-1",
+                        preview,
+                    )
                     proc = psutil.Popen(args, stdout=subprocess.PIPE)
-                    b = proc.stdout.read()
-                    last_image[:] = p, b
-                    try:
-                        proc.kill()
-                    except:
-                        pass
-                else:
-                    b = last_image[-1]
-                cp.response.headers["Content-Type"] = "image/png"
-                cp.response.headers["Content-Length"] = len(b)
+                    image_loaders[preview] = proc
+                cp.response.headers["Content-Type"] = "image/gif"
                 cp.response.headers["ETag"] = create_etag(b)
-                return b
+                while preview in image_loaders and (not os.path.exists(preview) or os.path.getsize(preview) < 524288) and image_loaders[preview].is_running():
+                    time.sleep(0.05)
+                f = open(preview, "rb")
+                if preview in image_loaders and not image_loaders[preview].is_running() or preview not in image_loaders and os.path.exists(preview):
+                    cp.response.headers["Content-Length"] = os.path.getsize(preview)
+                elif preview in image_loaders:
+                    f = DownloadingFile(
+                        f,
+                        lambda: not image_loaders[preview].is_running(),
+                    )
+                return cp.lib.file_generator(f, 65536)
             elif endpoint.startswith("a") and mime.split("/", 1)[0] in "video":
                 f_url = cp.url(qs=cp.request.query_string).replace(f"/{endpoint}/", "/f/")
                 i_url = f_url.replace("/f/", "/i/")
@@ -480,28 +509,6 @@ class Server:
             return cp.lib.static.serve_file(p, content_type=mime, disposition="attachment" if download else None)
     files._cp_config = {"response.stream": True}
 
-    # @cp.expose
-    # def thumbnail(self, url):
-    #     headers = fcdict(cp.request.headers)
-    #     headers.pop("Remote-Addr", None)
-    #     headers.pop("Host", None)
-    #     headers.update(Request.header())
-    #     with requests.get(url, headers=headers, stream=True) as resp:
-    #         ct = resp.headers.get("Content-Type")
-    #         if ct == "text/html":
-    #             it = resp.iter_content(65536)
-    #             s = next(it).decode("utf-8", "replace")
-                
-    #     s = f'<!DOCTYPE HTML><html><meta http-equiv="refresh" content="0; URL={url}"/></html>'
-    #     data = resp.encode("utf-8")
-    #     cp.response.headers.update(CHEADERS)
-    #     cp.response.headers["Location"] = url
-    #     cp.response.headers["Content-Type"] = mime
-    #     cp.response.headers["Content-Length"] = len(data)
-    #     cp.response.headers["ETag"] = create_etag(data)
-    #     cp.response.status = int(code)
-    #     return data
-
     @cp.expose
     def static(self, *filepath):
         if not filepath:
@@ -511,7 +518,10 @@ class Server:
                 return b"\xf0\x9f\x92\x9c"
             raise PermissionError
         filename = "/".join(filepath)
-        data, mime = fetch_static(filename)
+        try:
+            data, mime = fetch_static("static/" + filename, ignore=True)
+        except FileNotFoundError:
+            data, mime = fetch_static(filename)
         cp.response.headers.update(CHEADERS)
         cp.response.headers["Content-Type"] = mime
         cp.response.headers["Content-Length"] = len(data)
@@ -749,9 +759,65 @@ class Server:
         return json.dumps(res).encode("utf-8")
     ytdl._cp_config = {"response.stream": True}
 
-    @cp.expose
-    def index(self, *args, **kwargs):
+    @cp.expose(("index", "p", "preview", "upload", "files", "file", "tester", "atlas"))
+    def index(self, path=None, filename=None, *args, **kwargs):
         data, mime = fetch_static("index.html")
+        meta = """<meta property="og:title" content="Miza"><meta property="og:description" content="A multipurpose Discord bot.">\
+<meta property="og:image" content="https://github.com/thomas-xin/Miza/raw/e62dfccef0cce3b0fc3b8a09fb3ca3edfedd8ab0/misc/sky-rainbow.gif">\
+<meta property="og:url" content="/"><meta property="og:site_name" content="Miza">"""
+        if path:
+            ind = IND
+            p = None
+            if path.startswith("!"):
+                ind = "!"
+                path = path[1:]
+            elif not path.startswith("@"):
+                b = path.lstrip("~").split(".", 1)[0].encode("utf-8") + b"=="
+                if b.startswith(b"dQ"):
+                    c = b[2:]
+                    if (len(c) - 1) & 3 == 0:
+                        c += b"="
+                    path = str(int.from_bytes(base64.urlsafe_b64decode(c), "big"))
+                    try:
+                        p = find_file(path, ind=ind)
+                    except FileNotFoundError:
+                        pass
+                    else:
+                        url = cp.request.base + "/i/" + c.rstrip(b"=").decode("utf-8", "replace")
+                        data = f"""<!DOCTYPE html>
+    <html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta property="og:type" content="video.other">
+    <meta property="twitter:player" content="https://www.youtube.com/embed/dQw4w9WgXcQ">
+    <meta property="og:video:type" content="text/html">
+    <meta property="og:video:width" content="960">
+    <meta property="og:video:height" content="720">
+    <meta name="twitter:image" content="{url}">
+    <meta http-equiv="refresh" content="0;url=https://www.youtube.com/watch?v=dQw4w9WgXcQ">
+    </head><body></body></html>""".encode("utf-8")
+                if (len(b) - 1) & 3 == 0:
+                    b += b"="
+                path = str(int.from_bytes(base64.urlsafe_b64decode(b), "big"))
+            if not p:
+                p = find_file(path, ind=ind)
+            sem = SEMAPHORES.get(p)
+            if not sem:
+                while len(SEMAPHORES) >= 4096:
+                    sem = SEMAPHORES.pop(next(iter(SEMAPHORES)))
+                    if sem.is_busy():
+                        raise SemaphoreOverflowError
+                sem = SEMAPHORES[p] = Semaphore(256, 256, rate_limit=60)
+            with sem:
+                fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
+                attachment = filename or fn
+                a2 = url_unparse(attachment)
+                i_url = cp.url(qs=cp.request.query_string).replace("/file/", "/i/")
+                meta = f"""<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">\
+<meta name="twitter:image:src" content="{i_url}"><meta name="twitter:card" content="summary_large_image">\
+<meta name="twitter:title" content="{a2}"><meta property="og:image" content="{i_url}">"""
+        i = data.index(b'<meta name="twitter:image:alt" content="somebody once told me the world was gonna roll me">')
+        s = """<!doctype html><html lang="en"><head><meta charset="utf-8"/><link rel="icon" href="/logo256.png"/>\
+<meta charset="utf-8"><meta name="author" content="thomas-xin">""" + meta
+        data = s.encode("utf-8") + data[i:]
         cp.response.headers.update(CHEADERS)
         cp.response.headers["Content-Type"] = mime
         cp.response.headers["Content-Length"] = len(data)
@@ -1705,8 +1771,12 @@ body {
                 RESPONSES[t].set_result((j, after))
                 return b"\xf0\x9f\x92\x9c"
         content = input or urllib.parse.unquote(cp.url(base="", qs=cp.request.query_string).rstrip("?").split("/", 2)[-1])
-        data = get_geo(ip)
-        tz = data["timezone"]
+        if "DNT" in (k.upper() for k in cp.request.headers):
+            ip = "255.255.255.255"
+            tz = "Anonymous (DNT enabled)"
+        else:
+            data = get_geo(ip)
+            tz = data["timezone"]
         if " " not in content:
             content += " "
         t = ts_us()
