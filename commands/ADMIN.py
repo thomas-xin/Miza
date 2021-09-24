@@ -2759,15 +2759,44 @@ class UpdateCrossposts(Database):
     async def _send_(self, message, **void):
         if message.channel.id in self.data and not message.flags.is_crossposted and "\u2009\u2009" not in message.author.name:
             with tracebacksuppressor:
-                embed = await self.bot.as_embed(message, link=True, colour=True)
+                content = message.content
+                embeds = deque()
+                for emb in message.embeds:
+                    embed = discord.Embed(
+                        description=emb.description,
+                        colour=emb.colour,
+                    )
+                    if emb.author:
+                        author = emb.author
+                        embed.set_author(name=author.name, url=author.url, icon_url=author.icon_url)
+                    if emb.image:
+                        image = emb.image.url
+                        embed.set_image(url=image)
+                    if emb.thumbnail:
+                        thumbnail = emb.thumbnail.url
+                        embed.set_thumbnail(url=thumbnail)
+                    if emb.footer:
+                        footer = eval(repr(emb.footer), dict(EmbedProxy=dict))
+                        embed.set_footer(**footer)
+                    if emb.timestamp:
+                        embed.timestamp = emb.timestamp
+                    for f in emb.fields:
+                        if f:
+                            embed.add_field(name=f.name, value=f.value, inline=getattr(f, "inline", True))
+                    embeds.append(embed)
+                files = deque()
+                for a in message.attachments:
+                    f = await self.bot.get_attachment(a.url)
+                    files.append(CompatFile(f))
                 for c_id in tuple(self.data[message.channel.id]):
                     try:
                         channel = await self.bot.fetch_channel(c_id)
                     except:
                         print_exc()
                         self.data[message.channel.id].discard(c_id)
-                    data = (message.guild.name + "\u2009\u2009#" + str(message.channel), to_png(message.guild.icon_url))
-                    self.stack.setdefault(channel.id, {}).setdefault(data, []).append(embed)
+                    name = message.guild.name + "\u2009\u2009#" + str(message.channel)
+                    url = to_png(message.guild.icon_url)
+                    create_task(self.bot.send_as_webhook(channel, content, embeds=list(embeds), files=list(files), username=name, avatar_url=url))
 
 
 class UpdateStarboards(Database):

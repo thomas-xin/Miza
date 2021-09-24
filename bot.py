@@ -593,7 +593,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             user.name = "Deleted User"
             user.display_name = "Deleted User"
             user.id = u_id
-            user.avatar_url = self.discord_icon
         else:
             try:
                 user = super().get_user(u_id)
@@ -1501,8 +1500,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                     self.cache.attachments[a_id] = data
                             print(f"Successfully loaded attachment {a_id} from cache.")
                             return data
-                        if i < 29:
-                            await asyncio.sleep(0.25)
+                        if i:
+                            await asyncio.sleep(0.25 * i)
                 data = await Request(url, aio=True)
                 await self.add_attachment(cdict(id=a_id), data=data)
                 return data
@@ -1535,7 +1534,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         if getattr(user, "icon_url", None):
             url = to_png(user.icon_url)
         else:
-            url = best_url(user)
+            if hasattr(user, "webhook"):
+                url = user.webhook.avatar_url
+            else:
+                url = best_url(user)
+        if not url:
+            return self.discord_icon
         if "proxies" in self.data:
             with tracebacksuppressor:
                 url = (await self.data.exec.uproxy(url)) or url
@@ -3747,6 +3751,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             is_friend = lambda self: None
             is_blocked = lambda self: None
             colour = color = discord.Colour(16777215)
+            avatar_url = icon_url = url = bot.discord_icon
 
             @property
             def mention(self):
