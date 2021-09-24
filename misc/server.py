@@ -389,7 +389,7 @@ class Server:
             elif endpoint.startswith("i") and (mime in ("image/webp", "image/apng") or mime.split("/", 1)[0] == "video"):
                 preview = "cache/%" + p.rsplit("/", 1)[-1].split(".", 1)[0] + ".gif"
                 image_loaders = self.image_loaders
-                if not os.path.exists(preview) and preview not in image_loaders:
+                if (not os.path.exists(preview) or not os.path.getsize(preview)) and preview not in image_loaders:
                     args = (
                         "ffmpeg",
                         "-nostdin",
