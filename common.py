@@ -2274,13 +2274,14 @@ class CompatFile(discord.File):
                 self.filename = getattr(fp, 'name', None)
         else:
             self.filename = filename
+        self.filename = self.filename or "untitled"
         if spoiler:
             if self.filename is not None:
                 if not self.filename.startswith("SPOILER_"):
                     self.filename = "SPOILER_" + self.filename
             else:
                 self.filename = "SPOILER_" + "UNKNOWN"
-        elif self.filename.startswith("SPOILER_"):
+        elif self.filename and self.filename.startswith("SPOILER_"):
             self.filename = self.filename[8:]
         self.clear = getattr(self.fp, "clear", lambda self: None)
 
