@@ -1,10 +1,8 @@
 <h1 align="center">
-  <img src=
-  "https://github.com/thomas-xin/Miza/blob/e62dfccef0cce3b0fc3b8a09fb3ca3edfedd8ab0/misc/title-rainbow.gif?raw=true">
+  <img src="https://raw.githubusercontent.com/thomas-xin/Image-Test/master/title-rainbow.webp">
   <br>
   <a href="http://mizabot.xyz">Miza</a>
 </h1>
-
 
 
 <h4 align="center">A multipurpose Discord bot created by <a href="https://github.com/thomas-xin">Thomas Xin</a>.</h4> <br>
