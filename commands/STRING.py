@@ -519,7 +519,7 @@ class Char2Emoji(Command):
     no_parse = True
     slash = True
 
-    def __call__(self, args, guild, **extra):
+    def __call__(self, args, guild, message, **extra):
         if len(args) != 3:
             raise ArgumentError(
                 "Exactly 3 arguments are required for this command.\n"
@@ -547,6 +547,8 @@ class Char2Emoji(Command):
                 else:
                     args[i] = f"<:_:{e_id}>"
         resp = _c2e(*args[:3])
+        if hasattr(message, "simulated"):
+            return resp
         out = []
         for line in resp:
             if not out or len(out[-1]) + len(line) + 1 > 2000:

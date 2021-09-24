@@ -334,6 +334,24 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.start_webserver()
         if first:
             create_thread(webserver_communicate, self)
+            print("Generating command json...")
+            j = {}
+            for category in ("MAIN", "STRING", "ADMIN", "VOICE", "IMAGE", "FUN", "OWNER", "NSFW", "MISC"):
+                k = j[category] = {}
+                for command in self.categories[category]:
+                    c = k[command.parse_name()] = dict(
+                        aliases=[n.strip("_") for n in command.alias],
+                        description=command.parse_description(),
+                        usage=command.usage,
+                        level=str(command.min_level),
+                        rate_limit=str(command.rate_limit),
+                        timeout=str(getattr(command, "_timeout_", 1) * self.timeout),
+                    )
+                    for attr in ("flags", "server_only", "slash"):
+                        with suppress(AttributeError):
+                            c[attr] = command.attr
+            with open("misc/help.json", "w", encoding="utf-8") as f:
+                f.write(json.dumps(j, indent=4))
 
     def start_webserver(self):
         if self.server:
