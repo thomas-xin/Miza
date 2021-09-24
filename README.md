@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="https://github.com/thomas-xin/Image-Test/blob/master/Bcy50a1tnA.webp?raw=true">
+  <img src="https://github.com/thomas-xin/Image-Test/blob/master/title-rainbow.webp?raw=true">
   <br>
   <a href="http://mizabot.xyz">Miza</a>
 </h1>
