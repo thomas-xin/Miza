@@ -771,7 +771,7 @@ class Server:
     def index(self, path=None, filename=None, *args, **kwargs):
         data, mime = fetch_static("index.html")
         meta = """<meta property="og:title" content="Miza"><meta property="og:description" content="A multipurpose Discord bot.">\
-<meta property="og:image" content="https://github.com/thomas-xin/Miza/raw/e62dfccef0cce3b0fc3b8a09fb3ca3edfedd8ab0/misc/sky-rainbow.gif">\
+<meta property="og:image" content="https://raw.githubusercontent.com/thomas-xin/Image-Test/master/sky-rainbow.gif">\
 <meta property="og:url" content="/"><meta property="og:site_name" content="Miza">"""
         if path:
             ind = IND
@@ -956,7 +956,6 @@ class Server:
 </html>"""
         return s
 
-    @cp.expose
     def upload(self):
         global est_last
         ip = cp.request.remote.ip
@@ -973,7 +972,7 @@ class Server:
     <meta content="Files" property="og:title">
     <meta content="Upload a file here!" property="og:description">
     <meta content="{cp.url()}" property="og:url">
-    <meta property="og:image" content="https://github.com/thomas-xin/Miza/raw/e62dfccef0cce3b0fc3b8a09fb3ca3edfedd8ab0/misc/sky-rainbow.gif">
+    <meta property="og:image" content="https://raw.githubusercontent.com/thomas-xin/Image-Test/master/sky-rainbow.gif">
     <meta content="#BF7FFF" data-react-helmet="true" name="theme-color">
     <link href="https://unpkg.com/boxicons@2.0.7/css/boxicons.min.css" rel="stylesheet">
 </head>""" + """
@@ -1398,7 +1397,7 @@ body {
         <meta content="Timezones" property="og:title">
         <meta content="Find your current timezone here!" property="og:description">
         <meta content=\"""" + cp.url() + """\" property="og:url">
-        <meta property="og:image" content="https://github.com/thomas-xin/Miza/raw/e62dfccef0cce3b0fc3b8a09fb3ca3edfedd8ab0/misc/sky-rainbow.gif">
+        <meta property="og:image" content="https://raw.githubusercontent.com/thomas-xin/Image-Test/master/sky-rainbow.gif">
         <meta content="#""" + colour + """\" data-react-helmet="true" name="theme-color">
         <meta http-equiv="refresh" content="60">
         <link rel="stylesheet" type="text/css" href="/static/timezonestyles.css">
@@ -1618,7 +1617,7 @@ body {
     <meta content="Miza Player Insights" property="og:title">
     <meta content="See the activity history for the Miza Player program!" property="og:description">
     <meta content="{cp.url()}" property="og:url">
-    <meta property="og:image" content="https://github.com/thomas-xin/Miza/raw/e62dfccef0cce3b0fc3b8a09fb3ca3edfedd8ab0/misc/sky-rainbow.gif">
+    <meta property="og:image" content="https://raw.githubusercontent.com/thomas-xin/Image-Test/master/sky-rainbow.gif">
     <meta content="#BF7FFF" data-react-helmet="true" name="theme-color">
     <style>
         body {

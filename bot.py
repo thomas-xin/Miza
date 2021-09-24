@@ -4942,6 +4942,10 @@ class AudioClientInterface:
     def __init__(self):
         self.proc = psutil.Popen([python, "audio.py"], cwd=os.getcwd() + "/misc", stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         create_thread(self.communicate)
+        if os.name == "nt":
+            self.proc.ionice(psutil.IOPRIO_HIGH)
+        else:
+            self.proc.ionice(psutil.IOPRIO_CLASS_RT, value=7)
         self.fut = concurrent.futures.Future()
 
     __bool__ = lambda self: self.written
