@@ -1130,18 +1130,21 @@ class AudioClientSubInterface:
 
     @classmethod
     def after(cls, key):
-        cls.ensure_bot()
+        cls.ensure_bot(cls)
         cls.afters[key]()
 
     @property
     def pos(self):
         return self.bot.audio.submit(f"AP.from_guild({self.guild.id}).pos")
 
-    def ensure_bot(self=None, auds=None):
+    def ensure_bot(self, auds=None):
+        cls = self.__class__
+        if type(cls) is type:
+            cls = self
         if auds:
-            self.__class__.bot = bot = auds.bot
-        if self.bot:
-            self.__class__.afters = bot.audio.__dict__.setdefault("afters", {})
+            cls.bot = bot = auds.bot
+        if cls.bot:
+            cls.afters = bot.audio.__dict__.setdefault("afters", {})
 
     def __init__(self, auds, channel=None, reconnect=True):
         self.ensure_bot(auds)
