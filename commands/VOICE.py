@@ -1142,9 +1142,9 @@ class AudioClientSubInterface:
         if type(cls) is type:
             cls = self
         if auds:
-            cls.bot = bot = auds.bot
+            cls.bot = auds.bot
         if cls.bot:
-            cls.afters = bot.audio.__dict__.setdefault("afters", {})
+            cls.afters = cls.bot.audio.__dict__.setdefault("afters", {})
 
     def __init__(self, auds, channel=None, reconnect=True):
         self.ensure_bot(auds)
