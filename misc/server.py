@@ -405,8 +405,10 @@ class Server:
                         p,
                         "-loop",
                         "0",
+                        "-fs",
+                        "1048576",
                         "-vf",
-                        "scale=320:-1",
+                        "scale=240:-1",
                         preview,
                     )
                     proc = psutil.Popen(args, stdout=subprocess.PIPE)
@@ -415,14 +417,20 @@ class Server:
                 cp.response.headers["ETag"] = create_etag(b)
                 while preview in image_loaders and (not os.path.exists(preview) or os.path.getsize(preview) < 524288) and image_loaders[preview].is_running():
                     time.sleep(0.05)
-                f = open(preview, "rb")
+                f = None
                 if preview in image_loaders and not image_loaders[preview].is_running() or preview not in image_loaders and os.path.exists(preview):
                     cp.response.headers["Content-Length"] = os.path.getsize(preview)
                 elif preview in image_loaders:
                     f = DownloadingFile(
-                        f,
+                        preview,
                         lambda: not image_loaders[preview].is_running(),
                     )
+                if not f:
+                    if os.path.getsize(preview):
+                        f = open(preview, "rb")
+                    else:
+                        cp.response.headers["Content-Type"] = get_mime(p)
+                        f = open(p, "rb")
                 return cp.lib.file_generator(f, 65536)
             elif endpoint.startswith("a") and mime.split("/", 1)[0] in "video":
                 f_url = cp.url(qs=cp.request.query_string).replace(f"/{endpoint}/", "/f/")
@@ -811,9 +819,11 @@ class Server:
                 attachment = filename or fn
                 a2 = url_unparse(attachment)
                 i_url = cp.url(qs=cp.request.query_string).replace("/file/", "/i/")
+                description = get_mime(p) + f", {byte_scale(os.path.getsize(p))}B"
                 meta = f"""<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">\
 <meta name="twitter:image:src" content="{i_url}"><meta name="twitter:card" content="summary_large_image">\
-<meta name="twitter:title" content="{a2}"><meta property="og:image" content="{i_url}">"""
+<meta name="twitter:title" content="{a2}"><meta property="og:image" content="{i_url}">
+<meta name="og:description" content="{description}">"""
         i = data.index(b'<meta name="twitter:image:alt" content="somebody once told me the world was gonna roll me">')
         s = """<!doctype html><html lang="en"><head><meta charset="utf-8"/><link rel="icon" href="/logo256.png"/>\
 <meta charset="utf-8"><meta name="author" content="thomas-xin">""" + meta

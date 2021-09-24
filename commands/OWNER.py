@@ -160,7 +160,7 @@ class Execute(Command):
 class Exec(Command):
     name = ["Eval"]
     min_level = nan
-    description = "Causes all messages by the bot owner in the current channel to be executed as python code on ⟨MIZA⟩."
+    description = "Causes all messages by the bot owner(s) in the current channel to be executed as python code on ⟨MIZA⟩."
     usage = "(enable|disable)? <type(virtual)>?"
     flags = "aed"
     # Different types of terminals for different purposes
