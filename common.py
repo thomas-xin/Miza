@@ -2594,6 +2594,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
         if bypass:
             if "user-agent" not in headers and "User-Agent" not in headers:
                 headers["User-Agent"] = f"Mozilla/5.{xrand(1, 10)}"
+                headers["X-Forwarded-For"] = ".".join(str(xrand(1, 255)) for _ in loop(4))
             headers["DNT"] = "1"
         method = method.casefold()
         if aio:
