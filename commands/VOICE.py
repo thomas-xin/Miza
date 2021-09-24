@@ -3617,9 +3617,9 @@ class AudioSettings(Command):
             return css_md(s), 1
 
 
-class Roll(Command):
+class Jump(Command):
     server_only = True
-    name = ["🔄", "Jump", "Next"]
+    name = ["🔄", "Roll", "Next"]
     min_display = "0~1"
     description = "Rotates the queue to the left by a certain amount of steps."
     usage = "<position>? <hide{?h}>?"
