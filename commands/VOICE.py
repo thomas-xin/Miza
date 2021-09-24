@@ -1115,6 +1115,7 @@ class AudioClientSubInterface:
 
     @classmethod
     def from_guild(cls, guild):
+        cls.ensure_bot()
         bot = cls.bot
         if bot.audio.players.get(guild.id):
             self.auds = bot.audio.players[guild.id]
@@ -1129,15 +1130,21 @@ class AudioClientSubInterface:
 
     @classmethod
     def after(cls, key):
+        cls.ensure_bot()
         cls.afters[key]()
 
     @property
     def pos(self):
         return self.bot.audio.submit(f"AP.from_guild({self.guild.id}).pos")
 
+    def ensure_bot(self=None, auds=None):
+        if auds:
+            self.__class__.bot = bot = auds.bot
+        if self.bot:
+            self.__class__.afters = bot.audio.__dict__.setdefault("afters", {})
+
     def __init__(self, auds, channel=None, reconnect=True):
-        self.__class__.bot = bot = auds.bot
-        self.__class__.afters = bot.audio.__dict__.setdefault("afters", {})
+        self.ensure_bot(auds)
         self.auds = auds
         self.user = bot.user
         if channel:
@@ -1163,6 +1170,7 @@ class AudioClientSubInterface:
         return self.bot.audio.submit(f"AP.from_guild({self.guild.id}).{k}")
 
     def enqueue(self, src, after=None):
+        self.ensure_bot()
         if src is None:
             return
         if self.auds.source:
@@ -1189,6 +1197,7 @@ class AudioClientSubInterface:
         return create_future_ex(self.bot.audio.submit, f"AP.from_guild({self.guild.id}).enqueue(players[{repr(src)}])")
 
     def play(self, src, after=None):
+        self.ensure_bot()
         if src is None:
             return
         key = ts_us()
