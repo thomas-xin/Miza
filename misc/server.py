@@ -769,6 +769,13 @@ class Server:
 
     @cp.expose(("index", "p", "preview", "upload", "files", "file", "tester", "atlas"))
     def index(self, path=None, filename=None, *args, **kwargs):
+        o_url = cp.url(qs=cp.request.query_string)
+        if "/p/" in o_url:
+            raise cp.HTTPRedirect(url.replace("/p/", "/file/"), status=307)
+        if "/preview/" in o_url:
+            raise cp.HTTPRedirect(url.replace("/preview/", "/file/"), status=307)
+        if "/upload" in o_url:
+            raise cp.HTTPRedirect(url.replace("/upload", "/files"), status=307)
         data, mime = fetch_static("index.html")
         meta = """<meta property="og:title" content="Miza"><meta property="og:description" content="A multipurpose Discord bot.">\
 <meta property="og:image" content="https://raw.githubusercontent.com/thomas-xin/Image-Test/master/sky-rainbow.gif">\
@@ -818,7 +825,7 @@ class Server:
                 fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
                 attachment = filename or fn
                 a2 = url_unparse(attachment)
-                i_url = cp.url(qs=cp.request.query_string).replace("/file/", "/i/")
+                i_url = o_url.replace("/file/", "/i/")
                 description = get_mime(p) + f", {byte_scale(os.path.getsize(p))}B"
                 meta = f"""<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">\
 <meta name="twitter:image:src" content="{i_url}"><meta name="twitter:card" content="summary_large_image">\
@@ -1218,7 +1225,7 @@ function mergeFile(blob) {
 
     @cp.expose
     def upload_chunk(self, **kwargs):
-        s = cp.request.remote.ip + "%" + cp.request.headers.get("x-file-name", "")
+        s = cp.request.remote.ip + "%" + cp.request.headers.get("x-file-name", "untitled")
         h = hash(s) % 2 ** 48
         fn = f"cache/{h}%" + cp.request.headers.get("x-index", "0")
         with open(fn, "wb") as f:
@@ -1228,12 +1235,12 @@ function mergeFile(blob) {
     @cp.tools.accept(media="multipart/form-data")
     def merge(self, **kwargs):
         ts = time.time_ns() // 1000
-        name = kwargs.get("name", "")
+        name = kwargs.get("name", "") or cp.request.headers.get("x-file-name", "untitled")
         s = cp.request.remote.ip + "%" + name
         h = hash(s) % 2 ** 48
         n = f"cache/{h}%"
         fn = f"cache/{IND}{ts}~" + name
-        high = int(kwargs.get("index", "0"))
+        high = int(kwargs.get("index") or cp.request.headers.get("x-index", "0"))
         os.rename(n + "0", fn)
         if high > 1:
             with open(fn, "ab") as f:

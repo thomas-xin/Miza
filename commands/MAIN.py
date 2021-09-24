@@ -1521,7 +1521,6 @@ class Note(Command):
             return
         if reaction not in self.directions and reaction is not None:
             return
-        guild = message.guild
         user = await bot.fetch_user(u_id)
         data = bot.data.notes
         curr = data.get(user.id, ())
@@ -1555,7 +1554,7 @@ class Note(Command):
         else:
             content += f"{len(curr)} notes currently assigned for {str(user).replace('`', '')}:```*"
             msg = iter2str(tuple(curr)[pos:pos + page], left="`【", right="】`")
-        colour = await self.bot.data.colours.get(to_png_ex(guild.icon_url))
+        colour = await self.bot.get_colour(user)
         emb = discord.Embed(
             description=content + msg,
             colour=colour,
