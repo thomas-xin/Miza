@@ -562,7 +562,7 @@ class AudioFile:
             options = auds.construct_options(full=self.live)
         speed = 1
         if options or auds.reverse or pos or auds.stats.bitrate != 1966.08 or self.live:
-            args = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-hwaccel", "auto", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets"]
+            args = ["./ffmpeg", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-hwaccel", "auto", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets"]
             if (pos or auds.reverse) and self.seekable:
                 arg = "-to" if auds.reverse else "-ss"
                 args += [arg, str(pos)]
