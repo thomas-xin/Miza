@@ -2454,7 +2454,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         f.write(s)
                     with suppress(FileNotFoundError):
                         os.remove(saves[:-5] + "\x7f\x7f.json")
-                    os.rename(saves, saves[:-5] + "\x7f\x7f.json")
+                    with suppress(FileNotFoundError):
+                        os.rename(saves, saves[:-5] + "\x7f\x7f.json")
                     os.rename(saves[:-5] + "\x7f.json", saves)
                 with open(saves, "w") as f:
                     f.write(s)
