@@ -53,8 +53,7 @@ class MultiThreadedImporter(contextlib.AbstractContextManager, contextlib.Contex
 
     def __init__(self, glob=None):
         self.glob = glob
-        if os.name == "nt":
-            self.exc = concurrent.futures.ThreadPoolExecutor(max_workers=12)
+        self.exc = concurrent.futures.ThreadPoolExecutor(max_workers=12)
         self.out = {}
 
     def __enter__(self):
