@@ -2,7 +2,7 @@
 Adds many useful math-related functions.
 """
 
-import contextlib, concurrent.futures
+import os, contextlib, concurrent.futures
 from concurrent.futures import thread
 
 def _adjust_thread_count(self):
@@ -49,10 +49,12 @@ class MultiThreadedImporter(contextlib.AbstractContextManager, contextlib.Contex
     """A context manager that enables concurrent imports."""
 
     closed = False
+    exc = None
 
     def __init__(self, glob=None):
         self.glob = glob
-        self.exc = concurrent.futures.ThreadPoolExecutor(max_workers=12)
+        if os.name == "nt":
+            self.exc = concurrent.futures.ThreadPoolExecutor(max_workers=12)
         self.out = {}
 
     def __enter__(self):
@@ -60,8 +62,13 @@ class MultiThreadedImporter(contextlib.AbstractContextManager, contextlib.Contex
 
     def __import__(self, *modules):
         self.closed = False
-        for module in modules:
-            self.out[module] = self.exc.submit(__import__, module)
+        if self.exc:
+            for module in modules:
+                self.out[module] = self.exc.submit(__import__, module)
+        else:
+            glob = self.glob if self.glob is not None else globals()
+            for module in modules:
+                glob[module] = __import__(module)
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.close()
@@ -75,12 +82,11 @@ class MultiThreadedImporter(contextlib.AbstractContextManager, contextlib.Contex
             glob = self.glob if self.glob is not None else globals()
             glob.update(self.out)
             self.closed = True
-        if shutdown:
+        if shutdown and self.exc:
             self.exc.shutdown(True)
 
 with MultiThreadedImporter() as importer:
     importer.__import__(
-        "os",
         "sys",
         "collections",
         "traceback",
