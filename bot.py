@@ -20,11 +20,9 @@ heartbeat_proc = psutil.Popen([python, "misc/heartbeat.py"])
 class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collections.abc.Callable):
 
     github = "https://github.com/thomas-xin/Miza"
-    raw_github = "https://raw.githubusercontent.com/thomas-xin/Miza"
     rcc_invite = "https://discord.gg/cbKQKAr"
     discord_icon = "https://cdn.discordapp.com/embed/avatars/0.png"
     twitch_url = "https://www.twitch.tv/-"
-    website_background = "https://i.imgur.com/LsNWQUJ.png"
     webserver = "https://mizabot.xyz"
     raw_webserver = "http://i.mizabot.xyz"
     heartbeat = "heartbeat.tmp"
@@ -629,8 +627,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
     def user_from_identifier(self, u_id):
         if "#" in u_id:
-            with suppress(KeyError):
+            try:
                 return self.usernames[u_id]
+            except:
+                pass
 
     async def fetch_user_member(self, u_id, guild=None):
         u_id = verify_id(u_id)
@@ -3563,6 +3563,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         self.net_bytes.append(net_bytes)
                         self.bitrate = (self.net_bytes[-1] - self.net_bytes[0]) * 8 / len(self.net_bytes)
                         self.total_bytes = self.net_bytes[-1] + self.start_bytes
+                    if xrand(2):
+                        continue
                     try:
                         resp = await create_future(requests.head, f"https://discord.com/api/{api}", priority=True)
                         self.activity += 1
@@ -3591,9 +3593,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 async with tracebacksuppressor:
                     with MemoryTimer("update"):
                         await create_future(self.update, priority=True)
-                    await asyncio.sleep(1)
-                    with MemoryTimer("update_usernames"):
-                        await create_future(self.update_usernames, priority=True)
                     await asyncio.sleep(1)
                     with MemoryTimer("update_file_cache"):
                         await create_future(update_file_cache, priority=True)
@@ -3836,7 +3835,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     webhook = getattr(w, "webhook", w)
                 except KeyError:
                     webhook = await bot.fetch_webhook(self.webhook_id)
-                    w = bot.data.webhooks.add(webhook)
+                    bot.data.webhooks.add(webhook)
+                if webhook.id == bot.id:
+                    return await discord.Message.edit(self, *args, **kwargs)
                 data = kwargs
                 if args:
                     data["content"] = " ".join(args)
@@ -4428,8 +4429,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             create_task(self.lazy_loop())
             create_task(self.fast_loop())
             print("Update loops initiated.")
-            # Load all webhooks from cached guilds.
-            # futs = alist(create_task(self.load_guild_webhooks(guild)) for guild in self.guilds)
             futs = alist()
             futs.add(create_future(self.update_slash_commands, priority=True))
             futs.add(create_task(self.create_main_website(first=True)))
@@ -4444,6 +4443,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     await fut
             await wrap_future(self.connect_ready)
             await wrap_future(self.guilds_ready)
+            await create_future(self.update_usernames, priority=True)
             self.ready = True
             # Send ready event to all databases.
             print("Database ready.")
@@ -4488,13 +4488,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     if guild.unavailable:
                         print(f"Warning: Guild {guild.id} is not available.")
                 await self.handle_update()
-                await create_future(self.update_usernames, priority=True)
             self.connect_ready.set_result(True)
 
         # Server join message
         @self.event
         async def on_guild_join(guild):
-            # create_task(self.load_guild_webhooks(guild))
             print(f"New server: {guild}")
             g = await self.fetch_guild(guild.id)
             self.sub_guilds[guild.id] = g
@@ -4505,12 +4503,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             emb.set_author(**get_author(self.user))
             emb.description = f"```callback-fun-wallet-{utc()}-\nHi there!```I'm {self.name}, a multipurpose discord bot created by <@201548633244565504>. Thanks for adding me"
             user = None
-            with suppress(discord.Forbidden):
-                a = guild.audit_logs(limit=5, action=discord.AuditLogAction.bot_add)
-                async for e in a:
-                    if e.target.id == self.id:
-                        user = e.user
-                        break
+            if guild.me.guild_permissions.view_audit_log:
+                with suppress(discord.Forbidden):
+                    a = guild.audit_logs(limit=5, action=discord.AuditLogAction.bot_add)
+                    async for e in a:
+                        if e.target.id == self.id:
+                            user = e.user
+                            break
             if user is not None:
                 emb.description += f", {user_mention(user.id)}"
                 if "dailies" in self.data:

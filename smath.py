@@ -119,7 +119,7 @@ with MultiThreadedImporter() as importer:
         with open(collections2f, "wb") as f:
             f.write(b)
         exec(compile(b, "collections2.py", "exec"), globals())
-        print("alist.tmp updated.")
+        print("collections2.py updated.")
 
     if not os.path.exists(collections2f):
         update_collections2()

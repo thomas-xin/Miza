@@ -3325,7 +3325,7 @@ class Seek(Command):
 class Dump(Command):
     server_only = True
     time_consuming = True
-    name = ["Save", "Load"]
+    name = ["Export", "Import", "Save", "Load"]
     alias = name + ["Dujmpö"]
     min_display = "0~1"
     description = "Saves or loads the currently playing audio queue state."
@@ -3337,8 +3337,8 @@ class Dump(Command):
     async def __call__(self, guild, channel, user, bot, perm, name, argv, flags, message, vc=None, **void):
         auds = await auto_join(guild, channel, user, bot, vc=vc)
         # ~save is the same as ~dump without an argument
-        if argv == "" and not message.attachments or name == "save":
-            if name == "load":
+        if argv == "" and not message.attachments or name in ("save", "export"):
+            if name in ("load", "import"):
                 raise ArgumentError("Please input a file or URL to load.")
             async with discord.context_managers.Typing(channel):
                 x = "x" in flags

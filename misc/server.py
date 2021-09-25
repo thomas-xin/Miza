@@ -769,12 +769,12 @@ class Server:
 
     @cp.expose(("index", "p", "preview", "upload", "files", "file", "tester", "atlas"))
     def index(self, path=None, filename=None, *args, **kwargs):
-        o_url = cp.url(qs=cp.request.query_string)
-        if "/p/" in o_url:
+        url = cp.url(qs=cp.request.query_string)
+        if "/p/" in url:
             raise cp.HTTPRedirect(url.replace("/p/", "/file/"), status=307)
-        if "/preview/" in o_url:
+        if "/preview/" in url:
             raise cp.HTTPRedirect(url.replace("/preview/", "/file/"), status=307)
-        if "/upload" in o_url:
+        if "/upload" in url:
             raise cp.HTTPRedirect(url.replace("/upload", "/files"), status=307)
         data, mime = fetch_static("index.html")
         meta = """<meta property="og:title" content="Miza"><meta property="og:description" content="A multipurpose Discord bot.">\
@@ -799,7 +799,7 @@ class Server:
                         pass
                     else:
                         url = cp.request.base + "/i/" + c.rstrip(b"=").decode("utf-8", "replace")
-                        data = f"""<!DOCTYPE html>
+                        return f"""<!DOCTYPE html>
     <html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta property="og:type" content="video.other">
     <meta property="twitter:player" content="https://www.youtube.com/embed/dQw4w9WgXcQ">
@@ -825,7 +825,7 @@ class Server:
                 fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
                 attachment = filename or fn
                 a2 = url_unparse(attachment)
-                i_url = o_url.replace("/file/", "/i/")
+                i_url = url.replace("/file/", "/i/")
                 description = get_mime(p) + f", {byte_scale(os.path.getsize(p))}B"
                 meta = f"""<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">\
 <meta name="twitter:image:src" content="{i_url}"><meta name="twitter:card" content="summary_large_image">\

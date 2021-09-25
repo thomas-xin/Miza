@@ -25,17 +25,6 @@ def as_str(s):
 literal_eval = lambda s: ast.literal_eval(as_str(s).lstrip())
 
 
-def logging(func):
-    def call(self, *args, **kwargs):
-        try:
-            output = func(self, *args, **kwargs)
-        except:
-            print(traceback.format_exc(), end="")
-            raise
-        return output
-    return call
-
-
 BF_PREC = 256
 BF_ALPHA = "0123456789abcdefghijklmnopqrstuvwxyz"
 
@@ -602,7 +591,8 @@ supported = set((
     "type",
     "zip",
 ))
-for k, v in list(__builtins__.__dict__.items()):
+builtins = getattr(__builtins__, "__dict__", __builtins__)
+for k, v in list(builtins.items()):
     if k in supported:
         _globals[k] = v
 
@@ -693,7 +683,6 @@ def prettyAns(f):
 
 
 # Main math equation solver
-@logging
 def evalSym(f, prec=64, r=False, variables=None):
     if variables is None:
         env = _globals
@@ -810,7 +799,6 @@ def evalSym(f, prec=64, r=False, variables=None):
         return [f, p]
 
 
-@logging
 def procResp(resp):
     # Return file path if necessary
     if isinstance(resp[0], Plot):
@@ -855,20 +843,18 @@ def evaluate(ts, args):
     sys.stdout.flush()
 
 
-def ensure_parent(proc, parent):
-    while True:
-        if not parent.is_running():
-            psutil.Process().kill()
-        # print(f"~GC.__setitem__({proc.pid}, {len(gc.get_objects())})")
-        time.sleep(12)
-
 if __name__ == "__main__":
-    pid = os.getpid()
-    ppid = os.getppid()
-    proc = psutil.Process(pid)
-    parent = psutil.Process(ppid)
-    exc = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-    exc.submit(ensure_parent)
+    def ensure_parent():
+        parent = psutil.Process(os.getppid())
+        while True:
+            if not parent.is_running():
+                p = psutil.Process()
+                for c in p.children(True):
+                    c.kill()
+                p.kill()
+            time.sleep(12)
+    import concurrent.futures.thread
+    concurrent.futures.thread.threading.Thread(target=ensure_parent, daemon=True).start()
     while True:
         argv = sys.stdin.readline().rstrip()
         if argv:

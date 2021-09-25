@@ -1851,11 +1851,11 @@ def proc_communicate(k, i):
                 proc = PROCS[k][i]
             except LookupError:
                 break
-            while not proc.is_running():
+            if not proc or not proc.is_running():
                 time.sleep(0.8)
+                continue
             s = as_str(proc.stdout.readline()).rstrip()
             if s:
-                # print(s)
                 if s[0] == "~":
                     c = as_str(eval(s[1:]))
                     create_future_ex(exec_tb, c, globals())
@@ -1868,51 +1868,32 @@ proc_args = cdict(
     image=[python, "misc/image.py"],
 )
 
-class Pillow_SIMD:
-    args = None
-    __bool__ = lambda self: bool(self.args)
-    get = lambda self: self.args or [python]
-
-    # def check(self):
-    #     for v in range(8, 4, -1):
-    #         print(f"Attempting to find/install pillow-simd for Python 3.{v}...")
-    #         args = ["py", f"-3.{v}", "misc/install_pillow_simd.py"]
-    #         print(args)
-    #         resp = subprocess.run(args, stdout=subprocess.PIPE)
-    #         out = as_str(resp.stdout).strip()
-    #         if not out.startswith(f"Python 3.{v} not found!"):
-    #             if out:
-    #                 print(out)
-    #             print(f"pillow-simd versioning successful for Python 3.{v}")
-    #             self.args = ["py", f"-3.{v}"]
-    #             return self.args
-    #     return [python]
-
-    check = lambda self: [sys.executable]
-
-pillow_simd = Pillow_SIMD()
+def start_proc(k, i):
+    proc = psutil.Popen(
+        proc_args[k],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+    )
+    proc.sem = Semaphore(1, inf)
+    proc.comm = create_thread(proc_communicate, k, i)
+    PROCS[k][i] = proc
+    return proc
 
 def proc_start():
     PROC_COUNT.math = 3
     PROC_COUNT.image = 7
     for k, v in PROC_COUNT.items():
-        if k == "image":
-            proc_args.image = pillow_simd.check() + ["misc/image.py"]
-        PROCS[k] = [psutil.Popen(
-            proc_args[k],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-        ) for _ in loop(v)]
-        PROC_COUNT[k] = 0
-        for i, proc in enumerate(PROCS[k]):
-            proc.sem = Semaphore(1, inf)
-            create_thread(proc_communicate, k, i)
+        PROCS[k] = [None] * v
+        start_proc(k, 0)
 
 def get_idle_proc(ptype):
-    p = [i for i in PROCS[ptype] if not i.sem.is_busy()]
+    p = [p for p in PROCS[ptype] if p and not p.sem.is_busy()]
     if not p:
-        proc = PROCS[ptype][PROC_COUNT[ptype]]
-        PROC_COUNT[ptype] = (PROC_COUNT[ptype] + 1) % len(PROCS[ptype])
+        if None in PROCS[ptype]:
+            i = PROCS[ptype].index(None)
+            proc = PROCS[ptype][i] = start_proc(ptype, i)
+        else:
+            proc = choice(PROCS[ptype])
     else:
         proc = p[0]
     return proc
@@ -1931,21 +1912,17 @@ def sub_submit(ptype, command, _timeout=12):
         if not proc.is_running():
             proc = get_idle_proc(ptype)
         try:
-            # print(s)
             proc.stdin.write(s)
             proc.stdin.flush()
             resp = PROC_RESP[ts].result(timeout=_timeout)
         except (BrokenPipeError, OSError, concurrent.futures.TimeoutError):
-            # print(proc, s)
-            print_exc()
+            i = PROCS[ptype].index(proc)
             proc.kill()
-            proc2 = psutil.Popen(
-                proc.args,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-            )
-            proc2.sem = proc.sem
-            PROCS[ptype][PROCS[ptype].index(proc)] = proc2
+            PROCS[ptype][i] = start_proc(ptype, i)
+            PROC_RESP.pop(ts, None)
+            raise
+        except:
+            PROC_RESP.pop(ts, None)
             raise
     PROC_RESP.pop(ts, None)
     return resp
@@ -2104,12 +2081,16 @@ def shutdown_thread_after(thread, fut):
     fut.result()
     return thread.shutdown(wait=True)
 
-def create_thread(func, *args, wait=False, **kwargs):
-    thread = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-    fut = thread.submit(func, *args, **kwargs)
-    if wait:
-        create_future_ex(shutdown_thread_after, thread, fut, priority=True)
-    return thread
+def create_thread(func, *args, **kwargs):
+    target = func
+    if args or kwargs:
+        target = lambda: func(*args, **kwargs)
+    t = threading.Thread(
+        target=target,
+        daemon=True,
+    )
+    t.start()
+    return t
 
 # Runs a function call in a parallel thread, returning a future object waiting on the output.
 def create_future_ex(func, *args, timeout=None, priority=False, **kwargs):

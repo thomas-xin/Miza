@@ -146,17 +146,6 @@ def to_qr(s, rainbow=False):
     return ImageChops.invert(im).convert("RGBA")
 
 
-def logging(func):
-    def call(self, *args, **kwargs):
-        try:
-            output = func(self, *args, **kwargs)
-        except:
-            print(traceback.format_exc(), end="")
-            raise
-        return output
-    return call
-
-
 # Converts a time interval represented using days:hours:minutes:seconds, to a value in seconds.
 def time_parse(ts):
     data = ts.split(":")
@@ -615,14 +604,13 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
         if direct:
             try:
                 command = ["ffprobe", "-hide_banner", "-v", "error", fn]
-                resp = bytes()
+                resp = b""
                 # Up to 3 attempts to get video duration
                 for _ in range(3):
                     try:
                         proc = psutil.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                        fut = exc.submit(proc.communicate, timeout=12)
-                        res = fut.result(timeout=12)
-                        resp = bytes().join(res)
+                        res = proc.communicate(timeout=12)
+                        resp = b"".join(res)
                         break
                     except:
                         try:
@@ -2626,7 +2614,6 @@ def get_image(url, out):
 
 
 # Main image operation function
-@logging
 def evalImg(url, operation, args):
     globals()["CURRENT_FRAME"] = 0
     ts = time.time_ns() // 1000
@@ -2804,20 +2791,19 @@ def evaluate(ts, args):
     sys.stdout.flush()
 
 
-def ensure_parent(proc, parent):
-    while True:
-        if not parent.is_running():
-            psutil.Process().kill()
-        # print(f"~GC.__setitem__({proc.pid}, {len(gc.get_objects())})")
-        time.sleep(12)
-
 if __name__ == "__main__":
-    pid = os.getpid()
-    ppid = os.getppid()
-    proc = psutil.Process(pid)
-    parent = psutil.Process(ppid)
+    def ensure_parent():
+        parent = psutil.Process(os.getppid())
+        while True:
+            if not parent.is_running():
+                p = psutil.Process()
+                for c in p.children(True):
+                    c.kill()
+                p.kill()
+            time.sleep(12)
+    import concurrent.futures.thread
+    concurrent.futures.thread.threading.Thread(target=ensure_parent, daemon=True).start()
     exc = concurrent.futures.ThreadPoolExecutor(max_workers=9)
-    exc.submit(ensure_parent)
     while True:
         argv = sys.stdin.readline().rstrip()
         if argv:
