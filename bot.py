@@ -355,9 +355,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         if self.server:
             with suppress():
                 self.server.kill()
-        if os.path.exists("misc/server.py") and PORT:
+        if os.path.exists("misc/x-server.py") and PORT:
             print("Starting webserver...")
-            self.server = psutil.Popen([python, "server.py"], cwd=os.getcwd() + "/misc", stderr=subprocess.PIPE)
+            self.server = psutil.Popen([python, "x-server.py"], cwd=os.getcwd() + "/misc", stderr=subprocess.PIPE)
         else:
             self.server = None
 
@@ -365,7 +365,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         if self.audio:
             with suppress():
                 self.audio.kill()
-        if os.path.exists("misc/audio.py"):
+        if os.path.exists("misc/x-audio.py"):
             print("Starting audio client...")
             self.audio = AudioClientInterface()
         else:
@@ -4944,7 +4944,7 @@ class AudioClientInterface:
     written = False
 
     def __init__(self):
-        self.proc = psutil.Popen([python, "audio.py"], cwd=os.getcwd() + "/misc", stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        self.proc = psutil.Popen([python, "x-audio.py"], cwd=os.getcwd() + "/misc", stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         create_thread(self.communicate)
         with suppress():
             if os.name == "nt":

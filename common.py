@@ -1864,8 +1864,8 @@ def proc_communicate(k, i):
         time.sleep(0.01)
 
 proc_args = cdict(
-    math=[python, "misc/math.py"],
-    image=[python, "misc/image.py"],
+    math=[python, "misc/x-math.py"],
+    image=[python, "misc/x-image.py"],
 )
 
 def start_proc(k, i):

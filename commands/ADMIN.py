@@ -2439,7 +2439,11 @@ class UpdateMessageCache(Database):
             if os.path.exists(self.files + "/-1"):
                 self.setmtime()
 
-    getmtime = lambda self: os.path.getmtime(self.files + "/-1")
+    def getmtime(self):
+        try:
+            return os.path.getmtime(self.files + "/-1")
+        except FileNotFoundError:
+            return 0
     setmtime = lambda self: open(self.files + "/-1", "wb").close()
 
     async def _minute_loop_(self):
