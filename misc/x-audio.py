@@ -90,7 +90,7 @@ async def communicate():
 # Runs ffprobe on a file or url, returning the duration if possible.
 def _get_duration(filename, _timeout=12):
     command = (
-        "ffprobe",
+        "./ffprobe",
         "-v",
         "error",
         "-select_streams",
@@ -371,9 +371,9 @@ class AudioFile:
         if webpage_url is not None:
             self.webpage_url = webpage_url
         self.loading = True
-        ffmpeg = "misc/ffmpeg-c/ffmpeg.exe" if check_fmt and is_url(stream) else "ffmpeg"
+        ffmpeg = "misc/ffmpeg-c/ffmpeg.exe" if check_fmt and is_url(stream) else "./ffmpeg"
         if not os.path.exists(ffmpeg):
-            ffmpeg = "ffmpeg"
+            ffmpeg = "./ffmpeg"
         fmt = cdc = self.file.rsplit(".", 1)[-1]
         if fmt == "ogg":
             cdc = "libvorbis"
@@ -388,9 +388,9 @@ class AudioFile:
         cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-hwaccel", "auto", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", fmt, "-c:a", cdc, "-ar", str(SAMPLE_RATE), "-ac", "2", "-b:a", "196608", "cache/" + self.file]
         if "https://cf-hls-media.sndcdn.com/" not in stream:
             with suppress():
-                fmt2 = as_str(subprocess.check_output(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name", "-of", "default=nokey=1:noprint_wrappers=1", stream])).strip()
+                fmt2 = as_str(subprocess.check_output(["./ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name", "-of", "default=nokey=1:noprint_wrappers=1", stream])).strip()
                 if fmt2 == cdc2:
-                    cmd = ["ffmpeg", "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-hwaccel", "auto", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-c:a", "copy", "cache/" + self.file]
+                    cmd = ["./ffmpeg", "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-hwaccel", "auto", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-c:a", "copy", "cache/" + self.file]
         self.proc = None
         try:
             try:

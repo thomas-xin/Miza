@@ -632,7 +632,7 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
                     size = (960, 540)
         fn2 = fn + ".gif"
         f_in = fn if direct else url
-        command = ["ffmpeg", "-threads", "2", "-hide_banner", "-nostdin", "-loglevel", "error", "-y", "-i", f_in, "-an", "-vf"]
+        command = ["./ffmpeg", "-threads", "2", "-hide_banner", "-nostdin", "-loglevel", "error", "-y", "-i", f_in, "-an", "-vf"]
         w, h = max_size(*size, maxsize)
         fps = fps or orig_fps or 20
         step = 1
@@ -2486,7 +2486,7 @@ def from_bytes(b, save=None):
         cmd = ("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,avg_frame_rate", "-of", "csv=s=x:p=0", fn)
         print(cmd)
         p = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        cmd2 = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-an", "-i", fn, "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0", "-"]
+        cmd2 = ["./ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-an", "-i", fn, "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0", "-"]
         print(cmd2)
         proc = psutil.Popen(cmd2, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         # exc.submit(write_video, proc, data)
@@ -2713,7 +2713,7 @@ def evalImg(url, operation, args):
             if fmt == "zip":
                 resp = zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
             else:
-                command = ["ffmpeg", "-threads", "2", "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", ("rgb24" if mode == "RGB" else "rgba"), "-video_size", "x".join(map(str, size)), "-i", "-", "-an"]
+                command = ["./ffmpeg", "-threads", "2", "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", ("rgb24" if mode == "RGB" else "rgba"), "-video_size", "x".join(map(str, size)), "-i", "-", "-an"]
                 if fmt in ("gif", "webp", "apng"):
                     command.extend(("-gifflags", "-offsetting"))
                     if new["count"] > 4096:

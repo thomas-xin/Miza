@@ -24,7 +24,7 @@ e_dur = lambda d: float(d) if type(d) is str else (d if d is not None else 300)
 # Runs ffprobe on a file or url, returning the duration if possible.
 def _get_duration(filename, _timeout=12):
     command = (
-        "ffprobe",
+        "./ffprobe",
         "-v",
         "error",
         "-select_streams",
@@ -2322,14 +2322,14 @@ class AudioDownloader:
                 ast.append(info)
             if not ast and not vst:
                 raise LookupError(f"No stream URLs found for {url}")
-            ffmpeg = "ffmpeg"
+            ffmpeg = "./ffmpeg"
             if len(ast) <= 1:
                 if ast:
                     if not is_youtube_stream(ast[0]["stream"]):
                         ffmpeg = "misc/ffmpeg-c/ffmpeg.exe"
                         if not os.path.exists(ffmpeg):
-                            ffmpeg = "ffmpeg"
-                    cdc = codec = as_str(subprocess.check_output(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "format=format_name", "-of", "default=nokey=1:noprint_wrappers=1", ast[0]["stream"]])).strip()
+                            ffmpeg = "./ffmpeg"
+                    cdc = codec = as_str(subprocess.check_output(["./ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "format=format_name", "-of", "default=nokey=1:noprint_wrappers=1", ast[0]["stream"]])).strip()
                     if fmt in cdc.split(","):
                         copy = True
             else:
@@ -2343,7 +2343,7 @@ class AudioDownloader:
                         try:
                             codec = codec_map[url]
                         except KeyError:
-                            codec = as_str(subprocess.check_output(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name,sample_rate,channels", "-of", "default=nokey=1:noprint_wrappers=1", url])).strip()
+                            codec = as_str(subprocess.check_output(["./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name,sample_rate,channels", "-of", "default=nokey=1:noprint_wrappers=1", url])).strip()
                             print(codec)
                             codec_map[url] = codec
                         add_dict(codecs, {codec: 1})
@@ -2497,7 +2497,7 @@ class AudioDownloader:
                         with open(loopf, "w", encoding="utf-8") as f:
                             f.write(f"file '{fn2.split('/', 1)[-1]}'\n" * times)
                         args = [
-                            "ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-hwaccel", "auto",
+                            "./ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-hwaccel", "auto",
                             "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets",
                             "-protocol_whitelist", "concat,tls,tcp,file,http,https",
                             "-to", str(odur), "-f", "concat", "-safe", "0",
@@ -4783,7 +4783,7 @@ class UpdateAudio(Database):
         globals()["bot"] = bot
         ytdl.bot = bot
         try:
-            await create_future(subprocess.check_output, "ffmpeg")
+            await create_future(subprocess.check_output, ("./ffmpeg",))
         except subprocess.CalledProcessError:
             pass
         except FileNotFoundError:

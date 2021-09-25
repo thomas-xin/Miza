@@ -695,7 +695,7 @@ class Identify(Command):
     slash = True
 
     def probe(self, url):
-        command = ["ffprobe", "-hide_banner", url]
+        command = ["./ffprobe", "-hide_banner", url]
         resp = None
         for _ in loop(3):
             try:
