@@ -31,7 +31,7 @@ def request(s):
     with tracebacksuppressor:
         PORT = AUTH["webserver_port"]
         token = AUTH["discord_token"]
-        return requests.get(f"http://127.0.0.1:{PORT}/eval/{token}/{url_parse(s)}").text
+        return reqs.next().get(f"http://127.0.0.1:{PORT}/eval/{token}/{url_parse(s)}").text
 
 def submit(s):
     b = "~" + repr(as_str(s).encode("utf-8")) + "\n"
@@ -131,7 +131,7 @@ def get_duration(filename):
             return DUR_CACHE[filename]
         dur, bps = _get_duration(filename, 4)
         if not dur and is_url(filename):
-            with requests.get(filename, headers=Request.header(), stream=True) as resp:
+            with reqs.next().get(filename, headers=Request.header(), stream=True) as resp:
                 head = fcdict(resp.headers)
                 if "Content-Length" not in head:
                     dur = _get_duration(filename, 20)[0]

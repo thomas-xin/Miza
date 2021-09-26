@@ -260,6 +260,31 @@ def array(*args):
         return np.asanyarray(arr, dtype=object)
     return np.array(args, dtype=object)
 
+def _predict_next(seq):
+	if len(seq) < 2:
+		return
+	if np.min(seq) == np.max(seq):
+		return round_min(seq[0])
+	if len(seq) < 3:
+		return
+	if len(seq) > 4 and all(seq[2:] - seq[1:-1] == seq[:-2]):
+		return round_min(seq[-1] + seq[-2])
+	a = _predict_next(seq[1:] - seq[:-1])
+	if a is not None:
+		return round_min(seq[-1] + a)
+	if len(seq) < 4 or 0 in seq[:-1]:
+		return
+	b = _predict_next(seq[1:] / seq[:-1])
+	if b is not None:
+		return round_min(seq[-1] * b)
+
+def predict_next(seq, limit=8):
+	seq = np.asarray(seq, dtype=np.float64)
+	for i in range(min(5, limit), 1 + max(5, min(len(seq), limit))):
+		temp = _predict_next(seq[-i:])
+		if temp is not None:
+			return temp
+
 # Multiple variable limit
 def lim(f, **kwargs):
     if hasattr(f, "subs"):
@@ -424,6 +449,8 @@ _globals.update({
     "round_random": round_random,
     "plt": plot,
     "array": array,
+    "predict": predict_next,
+    "predict_next": predict_next,
     "rollaxis": np.rollaxis,
     "swapaxes": np.swapaxes,
     "transpose": np.transpose,

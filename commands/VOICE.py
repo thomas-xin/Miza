@@ -65,7 +65,7 @@ def get_duration(filename):
             return DUR_CACHE[filename]
         dur, bps = _get_duration(filename, 4)
         if not dur and is_url(filename):
-            with requests.get(filename, headers=Request.header(), stream=True) as resp:
+            with reqs.next().get(filename, headers=Request.header(), stream=True) as resp:
                 head = fcdict(resp.headers)
                 if "Content-Length" not in head:
                     dur = _get_duration(filename, 20)[0]
@@ -1005,7 +1005,7 @@ CONVERTERS = {
 }
 
 def select_and_convert(stream):
-    with requests.get(stream, headers=Request.header(), timeout=8, stream=True) as resp:
+    with reqs.next().get(stream, headers=Request.header(), timeout=8, stream=True) as resp:
         it = resp.iter_content(4096)
         b = bytes()
         while len(b) < 4:
@@ -1262,7 +1262,6 @@ class AudioDownloader:
         self.searched = cdict()
         self.semaphore = Semaphore(4, 128)
         self.download_sem = Semaphore(8, 64, rate_limit=0.5)
-        self.keepvid_failed = 0
         create_future_ex(self.update_dl)
         create_future_ex(self.setup_pages)
         create_future_ex(self.set_cookie)
@@ -1275,7 +1274,7 @@ class AudioDownloader:
     
     def set_cookie(self):
         self.youtube_base = "CONSENT=YES+cb.20210328-17-p0.en+FX"
-        resp = requests.get("https://www.youtube.com").text
+        resp = reqs.next().get("https://www.youtube.com").text
         if "<title>Before you continue to YouTube</title>" in resp:
             resp = resp.split('<input type="hidden" name="v" value="', 1)[-1]
             resp = resp[:resp.index('">')].rsplit("+", 1)[0]
@@ -1298,83 +1297,68 @@ class AudioDownloader:
                 token = await_fut(aretry(Request, "https://open.spotify.com/get_access_token", aio=True, attempts=8, delay=0.5))
                 self.spotify_header = {"authorization": f"Bearer {json.loads(token[:512])['accessToken']}"}
                 self.other_x += 1
-                if self.keepvid_failed < 4:
-                    try:
-                        resp = Request("https://keepv.id", timeout=16)
-                        search = b"<script>apikey='"
-                        resp = resp[resp.rindex(search) + len(search):]
-                        search = b";sid='"
-                        resp = resp[resp.index(search) + len(search):]
-                        self.keepvid_token = as_str(resp[:resp.index(b"';</script>")])
-                        self.keepvid_failed = 0
-                    except:
-                        if not self.keepvid_failed:
-                            print_exc()
-                        self.keepvid_failed += 1
 
-    # Gets data from yt-download.org, keepv.id, or y2mate.guru, adjusts the format to ensure compatibility with results from youtube-dl. Used as backup.
+    # Gets data from yt-download.org, adjusts the format to ensure compatibility with results from youtube-dl. Used as backup.
     def extract_backup(self, url, video=False):
         url = verify_url(url)
         if is_url(url) and not is_youtube_url(url):
             raise TypeError("Not a youtube link.")
-        excs = alist()
         if ":" in url:
             url = url.rsplit("/", 1)[-1].split("v=", 1)[-1].split("&", 1)[0]
         webpage_url = f"https://www.youtube.com/watch?v={url}"
         resp = None
         try:
-            yt_url = f"https://www.yt-download.org/file/mp3/{url}"
             if video:
                 v_url = f"https://www.yt-download.org/file/mp4/{url}"
                 self.other_x += 1
-                fut = create_future_ex(Request, v_url, timeout=16)
-            self.other_x += 1
-            resp = Request(yt_url, timeout=16)
-            search = b'<img class="h-20 w-20 md:h-48 md:w-48 mt-0 md:mt-12 lg:mt-0 rounded-full mx-auto md:mx-0 md:mr-6" src="'
-            resp = resp[resp.index(search) + len(search):]
-            thumbnail = as_str(resp[:resp.index(b'"')])
-            search = b'<h2 class="text-lg text-teal-600 font-bold m-2 text-center">'
-            resp = resp[resp.index(search) + len(search):]
-            title = html_decode(as_str(resp[:resp.index(b"</h2>")]))
-            resp = resp[resp.index(f'<a href="https://www.yt-download.org/download/{url}/mp3/192'.encode("utf-8")) + 9:]
-            stream = as_str(resp[:resp.index(b'"')])
-            resp = resp[:resp.index(b"</a>")]
-            search = b'<div class="text-shadow-1">'
-            fs = parse_fs(resp[resp.rindex(search) + len(search):resp.rindex(b"</div>")])
-            dur = fs / 192000 * 8
-            entry = {
-                "formats": [
-                    {
-                        "abr": 192,
-                        "url": stream,
-                    },
-                ],
-                "duration": dur,
-                "thumbnail": thumbnail,
-                "title": title,
-                "webpage_url": webpage_url,
-            }
-            if video:
-                with tracebacksuppressor:
-                    resp = fut.result()
-                    while True:
-                        try:
-                            resp = resp[resp.index(f'<a href="https://www.yt-download.org/download/{url}/mp4/'.encode("utf-8")) + 9:]
-                            stream = as_str(resp[:resp.index(b'"')])
-                            search = b'<div class="text-shadow-1">'
-                            resp = resp[resp.index(search) + len(search):]
-                            height = int(resp[:resp.index(b"</div>")].strip().rstrip(b"p"))
-                        except ValueError:
-                            break
-                        else:
-                            entry["formats"].append(dict(
-                                abr=1,
-                                url=stream,
-                                height=height,
-                            ))
+                resp = requests.get(v_url, timeout=16).content
+                entry = cdict(formats=[])
+                while True:
+                    try:
+                        resp = resp[resp.index(f'<a href="https://www.yt-download.org/download/{url}/mp4/'.encode("utf-8")) + 9:]
+                        stream = as_str(resp[:resp.index(b'"')])
+                        search = b'<div class="text-shadow-1">'
+                        resp = resp[resp.index(search) + len(search):]
+                        height = int(resp[:resp.index(b"</div>")].strip().rstrip(b"p"))
+                    except ValueError:
+                        break
+                    else:
+                        entry["formats"].append(dict(
+                            abr=1,
+                            url=stream,
+                            height=height,
+                        ))
+            else:
+                yt_url = f"https://www.yt-download.org/file/mp3/{url}"
+                self.other_x += 1
+                resp = requests.get(yt_url, timeout=16).content
+                search = b'<img class="h-20 w-20 md:h-48 md:w-48 mt-0 md:mt-12 lg:mt-0 rounded-full mx-auto md:mx-0 md:mr-6" src="'
+                resp = resp[resp.index(search) + len(search):]
+                thumbnail = as_str(resp[:resp.index(b'"')])
+                search = b'<h2 class="text-lg text-teal-600 font-bold m-2 text-center">'
+                resp = resp[resp.index(search) + len(search):]
+                title = html_decode(as_str(resp[:resp.index(b"</h2>")]))
+                resp = resp[resp.index(f'<a href="https://www.yt-download.org/download/{url}/mp3/192'.encode("utf-8")) + 9:]
+                stream = as_str(resp[:resp.index(b'"')])
+                resp = resp[:resp.index(b"</a>")]
+                search = b'<div class="text-shadow-1">'
+                fs = parse_fs(resp[resp.rindex(search) + len(search):resp.rindex(b"</div>")])
+                dur = fs / 192000 * 8
+                entry = {
+                    "formats": [
+                        {
+                            "abr": 192,
+                            "url": stream,
+                        },
+                    ],
+                    "duration": dur,
+                    "thumbnail": thumbnail,
+                    "title": title,
+                    "webpage_url": webpage_url,
+                }
             print("Successfully resolved with yt-download.")
             return entry
-        except Exception as ex:
+        except:
             if resp:
                 try:
                     search = b'<h3 class="text-center text-xl">'
@@ -1383,93 +1367,7 @@ class AudioDownloader:
                 except ValueError:
                     pass
                 else:
-                    excs.append(as_str(resp))
-            excs.append(ex)
-        try:
-            self.other_x += 1
-            resp = Request(
-                "https://keepv.id",
-                headers={"Accept": "*/*", "Cookie": "PHPSESSID=" + self.keepvid_token, "X-Requested-With": "XMLHttpRequest"},
-                data=(("url", webpage_url), ("sid", self.keepvid_token)),
-                method="POST",
-                timeout=16,
-            )
-            search = b'<h2 class="mb-3">'
-            resp = resp[resp.index(search) + len(search):]
-            title = html_decode(as_str(resp[:resp.index(b"</h3>")]))
-            search = b'<img src="'
-            resp = resp[resp.index(search) + len(search):]
-            thumbnail = as_str(resp[:resp.index(b'"')])
-            entry = {
-                "formats": [],
-                "thumbnail": thumbnail,
-                "title": title,
-                "webpage_url": webpage_url,
-            }
-            with suppress(ValueError):
-                search = b"Download Video</a><br>"
-                resp = resp[resp.index(search) + len(search):]
-                search = b"Duration: "
-                resp = resp[resp.index(search) + len(search):]
-                entry["duration"] = dur = time_parse(as_str(resp[:resp.index(b"<br><br>")]))
-            resp = resp[resp.index(b"<body>") + 6:]
-            while resp:
-                try:
-                    search = b"<tr><td>"
-                    resp = resp[resp.index(search) + len(search):]
-                except ValueError:
-                    break
-                fmt = as_str(resp[:resp.index(b"</td>")])
-                if not fmt:
-                    form = {}
-                elif "x" in fmt:
-                    form = dict(zip(("width", "height"), (int(i) for i in fmt.split("x", 1))))
-                else:
-                    form = dict(abr=int(fmt.casefold().rstrip("kmgbps")))
-                search = b' shadow vdlbtn" href="'
-                resp = resp[resp.index(search) + len(search):]
-                stream = resp[:resp.index(b'"')]
-                form["url"] = stream
-                entry["formats"].append(form)
-            if not entry["formats"]:
-                raise FileNotFoundError
-            print("Successfully resolved with keepv.id.")
-            return entry
-        except Exception as ex:
-            if resp:
-                if b"our system was not able to detect any video at the adress you provided." in resp:
-                    excs.append("our system was not able to detect any video at the adress you provided.")
-                else:
-                    excs.append(resp)
-            excs.append(ex)
-        try:
-            resp = None
-            self.other_x += 1
-            resp = data = Request("https://y2mate.guru/api/convert", data={"url": webpage_url}, method="POST", json=True, timeout=16)
-            meta = data["meta"]
-            entry = {
-                "formats": [
-                    {
-                        "height": stream.get("height", 0),
-                        "abr": stream.get("quality", 0),
-                        "url": stream["url"],
-                    } for stream in data["url"] if "url" in stream and stream.get("audio")
-                ],
-                "thumbnail": data.get("thumb"),
-                "title": meta["title"],
-                "webpage_url": meta["source"],
-            }
-            if meta.get("duration"):
-                entry["duration"] = time_parse(meta["duration"])
-            if not entry["formats"]:
-                raise FileNotFoundError
-            print("Successfully resolved with y2mate.")
-            return entry
-        except Exception as ex:
-            if resp:
-                excs.append(resp)
-            excs.append(ex)
-            print("\n\n".join(as_str(e) for e in excs))
+                    print(as_str(resp))
             raise
 
     # Returns part of a spotify playlist.
@@ -1640,7 +1538,7 @@ class AudioDownloader:
             title = url.split("?", 1)[0].rsplit("/", 1)[-1]
             if title.rsplit(".", 1)[-1] in ("ogg", "webm", "mp4", "avi", "mov"):
                 url2 = url.replace("/cdn.discordapp.com/", "/media.discordapp.net/")
-                with requests.get(url2, headers=Request.header(), stream=True) as resp:
+                with reqs.next().get(url2, headers=Request.header(), stream=True) as resp:
                     if resp.status_code in range(200, 400):
                         url = url2
             if "." in title:
@@ -1692,7 +1590,7 @@ class AudioDownloader:
             title = url.split("?", 1)[0].rsplit("/", 1)[-1]
             if title.rsplit(".", 1)[-1] in ("ogg", "webm", "mp4", "avi", "mov"):
                 url2 = url.replace("/cdn.discordapp.com/", "/media.discordapp.net/")
-                with requests.get(url2, headers=Request.header(), stream=True) as resp:
+                with reqs.next().get(url2, headers=Request.header(), stream=True) as resp:
                     if resp.status_code in range(200, 400):
                         url = url2
             if "." in title:
@@ -1743,7 +1641,7 @@ class AudioDownloader:
             return self.extract_from(item)
         if item[:9] == "spsearch:":
             query = "https://api.spotify.com/v1/search?type=track%2Cshow_audio%2Cepisode_audio&include_external=audio&limit=1&q=" + url_parse(item[9:])
-            resp = requests.get(query, headers=self.spotify_header).json()
+            resp = reqs.next().get(query, headers=self.spotify_header).json()
             try:
                 track = resp["tracks"]["items"][0]
                 name = track.get("name", track["id"])
@@ -1756,7 +1654,7 @@ class AudioDownloader:
                 self.spotify_x += 1
         elif item[:9] == "bcsearch:":
             query = "https://bandcamp.com/search?q=" + url_parse(item[9:])
-            resp = requests.get(query, headers=self.spotify_header).content
+            resp = reqs.next().get(query, headers=self.spotify_header).content
             try:
                 resp = resp.split(b'<ul class="result-items">', 1)[1]
                 tracks = resp.split(b"<!-- search result type=")
@@ -2322,7 +2220,8 @@ class AudioDownloader:
                     print(url)
                     print_exc()
                     continue
-                self.get_stream(info, video=fmt in videos, force=True, download=False)
+                if not (fmt in videos and info.get("video") and info["video"].startswith("https://www.yt-download.org/download/")):
+                    self.get_stream(info, video=fmt in videos, force=True, download=False)
                 if not outf:
                     outf = f"{info['name']}.{fmt}"
                     outft = outf.translate(filetrans)
@@ -2332,15 +2231,30 @@ class AudioDownloader:
                         fn = f"cache/\x7f{ts}~{outft}"
                 if vst or fmt in videos:
                     video = info["video"]
-                    if video == info["stream"]:
+                    if video == info["stream"] and not (video.startswith("https://www.yt-download.org/download/") and size):
                         data = self.extract_backup(info["url"], video=True)
-                        info = info["video"] = get_best_video(data)
+                        video = info["video"] = get_best_video(data)
+                        if len(urls) == 1:
+                            ft = f"cache/-{ts}-.mp4"
+                            with requests.get(video, stream=True) as resp:
+                                with open(ft, "wb") as f:
+                                    it = resp.iter_content(262144)
+                                    try:
+                                        while True:
+                                            b = next(it)
+                                            if not b:
+                                                break
+                                            f.write(b)
+                                    except StopIteration:
+                                        pass
+                            video = ft
+                            info["stream"] = video
                     vst.append(video)
                 ast.append(info)
             if not ast and not vst:
                 raise LookupError(f"No stream URLs found for {url}")
             ffmpeg = "./ffmpeg"
-            if len(ast) <= 1:
+            if len(ast) <= 1 and not vst:
                 if ast:
                     if not is_youtube_stream(ast[0]["stream"]):
                         ffmpeg = "misc/ffmpeg-c/ffmpeg.exe"
@@ -2400,7 +2314,7 @@ class AudioDownloader:
             else:
                 end = None
                 if len(ast) == 1:
-                    args.extend(("-to", "86400"))
+                    args.extend(("-to", "604800"))
             if vst and vsf != asf:
                 args.extend(("-i", vsf))
                 if start:
@@ -2488,6 +2402,8 @@ class AudioDownloader:
                     url = ast[0]
                     if type(url) is not str:
                         url = url["url"]
+                    if is_youtube_url(url):
+                        raise ex
                     new = select_and_convert(url)
                 except ValueError:
                     if resp.stderr:

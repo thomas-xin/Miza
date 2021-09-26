@@ -908,7 +908,7 @@ def _predict_next(seq):
 	if len(seq) < 2:
 		return
 	if np.min(seq) == np.max(seq):
-		return seq[0]
+		return round_min(seq[0])
 	if len(seq) < 3:
 		return
 	if len(seq) > 4 and all(seq[2:] - seq[1:-1] == seq[:-2]):

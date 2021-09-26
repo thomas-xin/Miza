@@ -225,7 +225,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     def create_command(self, data):
         with tracebacksuppressor:
             for i in range(16):
-                resp = requests.post(
+                resp = reqs.next().post(
                     f"https://discord.com/api/{api}/applications/{self.id}/commands",
                     headers={"Content-Type": "application/json", "Authorization": "Bot " + self.token},
                     data=json.dumps(data),
@@ -244,7 +244,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             return
         print("Updating global slash commands...")
         with tracebacksuppressor:
-            resp = requests.get(f"https://discord.com/api/{api}/applications/{self.id}/commands", headers=dict(Authorization="Bot " + self.token))
+            resp = reqs.next().get(f"https://discord.com/api/{api}/applications/{self.id}/commands", headers=dict(Authorization="Bot " + self.token))
             self.activity += 1
             if resp.status_code not in range(200, 400):
                 raise ConnectionError(f"Error {resp.status_code}", resp.text)
@@ -301,7 +301,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                             print(curr)
                                             print(f"{curr['name']}'s slash command does not match, removing...")
                                             for i in range(16):
-                                                resp = requests.delete(f"https://discord.com/api/{api}/applications/{self.id}/commands/{curr['id']}", headers=dict(Authorization="Bot " + self.token))
+                                                resp = reqs.next().delete(f"https://discord.com/api/{api}/applications/{self.id}/commands/{curr['id']}", headers=dict(Authorization="Bot " + self.token))
                                                 self.activity += 1
                                                 if resp.status_code == 429:
                                                     time.sleep(1)
@@ -323,7 +323,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             with tracebacksuppressor:
                 print(curr)
                 print(f"{curr['name']}'s application command does not exist, removing...")
-                resp = requests.delete(f"https://discord.com/api/{api}/applications/{self.id}/commands/{curr['id']}", headers=dict(Authorization="Bot " + self.token))
+                resp = reqs.next().delete(f"https://discord.com/api/{api}/applications/{self.id}/commands/{curr['id']}", headers=dict(Authorization="Bot " + self.token))
                 self.activity += 1
                 if resp.status_code not in range(200, 400):
                     raise ConnectionError(f"Error {resp.status_code}", resp.text)
@@ -1218,7 +1218,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     if url in self.mimes:
                         skip = "text/html" not in self.mimes[url]
                     if not skip:
-                        resp = await create_future(requests.get, url, headers=Request.header(), stream=True)
+                        resp = await create_future(reqs.next().get, url, headers=Request.header(), stream=True)
                         self.activity += 1
                         with resp:
                             url = resp.url
@@ -1268,7 +1268,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             return self.mimes[url]
         except KeyError:
             pass
-        with requests.get(url, stream=True) as resp:
+        with reqs.next().get(url, stream=True) as resp:
             self.activity += 1
             head = fcdict(resp.headers)
             try:
@@ -1297,7 +1297,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 if verify:
                     fut = create_future_ex(Request, base + "png")
                 url = base + "gif"
-                with requests.head(url, stream=True) as resp:
+                with reqs.next().head(url, stream=True) as resp:
                     self.activity += 1
                     if resp.status_code in range(400, 500):
                         if not verify:
@@ -1318,7 +1318,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     def emoji_exists(self, e):
         if type(e) in (int, str):
             url = f"https://cdn.discordapp.com/emojis/{e}.png"
-            with requests.head(url, stream=True) as resp:
+            with reqs.next().head(url, stream=True) as resp:
                 self.activity += 1
                 if resp.status_code in range(400, 500):
                     self.emoji_stuff.pop(int(e), None)
@@ -1587,7 +1587,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             if urls:
                 with tracebacksuppressor:
                     url = urls[0]
-                    resp = requests.get(url, headers=Request.header(), timeout=8)
+                    resp = reqs.next().get(url, headers=Request.header(), timeout=8)
                     self.activity += 1
                     headers = fcdict(resp.headers)
                     if headers.get("Content-Type", "").split("/", 1)[0] == "image":
@@ -2307,7 +2307,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             dataitems = deque()
             items = mod
             for var in items.values():
-                if callable(var) and var not in (Command, Database):
+                if callable(var) and var is not Command and var is not Database:
                     load_type = 0
                     with suppress(TypeError):
                         if issubclass(var, Command):
@@ -2774,7 +2774,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                             d.pop(next(iter(d)))
                                     d[u_id] = max(t, utc())
                                 else:
-                                    raise TooManyRequests(f"Command has a rate limit of {sec2time(x)}; please wait {sec2time(-wait)}.")
+                                    raise TooManyreqs.next()(f"Command has a rate limit of {sec2time(x)}; please wait {sec2time(-wait)}.")
                         flags = {}
                         if loop:
                             inc_dict(flags, h=1)
@@ -2994,7 +2994,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                             await fut
                         print(msg)
                         raise TimeoutError("Request timed out.")
-                    except (ArgumentError, TooManyRequests) as ex:
+                    except (ArgumentError, TooManyreqs.next()) as ex:
                         if fut is not None:
                             await fut
                         command.used.pop(u_id, None)
@@ -3567,7 +3567,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     if xrand(2):
                         continue
                     try:
-                        resp = await create_future(requests.head, f"https://discord.com/api/{api}", priority=True)
+                        resp = await create_future(reqs.next().head, f"https://discord.com/api/{api}", priority=True)
                         self.activity += 1
                         self.api_latency = resp.elapsed.total_seconds()
                     except:
@@ -5338,6 +5338,7 @@ if __name__ == "__main__":
             sys.stdout = sys.stderr = print = PRINT
             print("Logging started.")
             create_future_ex(proc_start)
+            create_task(Request._init_())
             self = miza = bot = client = BOT[0] = Bot()
             miza.http.user_agent = "Miza"
             miza.miza = miza

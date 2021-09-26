@@ -737,7 +737,7 @@ class Identify(Command):
 
     def identify(self, url):
         out = deque()
-        with requests.get(url, headers=Request.header(), stream=True) as resp:
+        with reqs.next().get(url, headers=Request.header(), stream=True) as resp:
             head = fcdict(resp.headers)
             it = resp.iter_content(262144)
             data = next(it)

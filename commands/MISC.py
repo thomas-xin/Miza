@@ -1012,7 +1012,7 @@ class UpdateDeviantArt(Database):
                 items = await self.fetch_gallery(folder, username)
                 total[folder] = items
         # if attempts:
-        #     print(successes, "of", attempts, "DeviantArt requests executed successfully.")
+        #     print(successes, "of", attempts, "DeviantArt reqs.next() executed successfully.")
         for c_id in tuple(self.data):
             create_task(self.processPart(total, c_id))
         self.time = utc()

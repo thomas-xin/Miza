@@ -31,7 +31,7 @@ import urllib.request, urllib.parse
 import nacl.secret
 
 utils = discord.utils
-requests = requests.Session()
+reqs = alist(requests.Session() for i in range(6))
 url_parse = urllib.parse.quote_plus
 url_unparse = urllib.parse.unquote_plus
 escape_markdown = utils.escape_markdown
@@ -1296,7 +1296,7 @@ def as_embed(message, link=False):
         if urls:
             with tracebacksuppressor:
                 url = urls[0]
-                resp = requests.get(url, headers=Request.header(), timeout=8)
+                resp = reqs.next().get(url, headers=Request.header(), timeout=8)
                 if BOT[0]:
                     BOT[0].activity += 1
                 headers = fcdict(resp.headers)
@@ -2520,7 +2520,7 @@ class Stream(io.IOBase):
         if self.resp:
             with suppress():
                 self.resp.close()
-        self.resp = requests.get(url, stream=True)
+        self.resp = reqs.next().get(url, stream=True)
         if BOT[0]:
             BOT[0].activity += 1
         self.iter = self.resp.iter_content(self.BUF)
@@ -2559,13 +2559,14 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
     headers = header
 
     async def _init_(self):
-        self.session = aiohttp.ClientSession(loop=eloop)
+        self.sessions = alist(aiohttp.ClientSession(loop=eloop) for i in range(6))
+        self.session = choice(self.sessions)
 
     async def aio_call(self, url, headers, files, data, method, decode=False, json=False):
         if files is not None:
             raise NotImplementedError("Unable to send multipart files asynchronously.")
         async with self.semaphore:
-            async with getattr(self.session, method)(url, headers=headers, data=data) as resp:
+            async with getattr(self.sessions.next(), method)(url, headers=headers, data=data) as resp:
                 if BOT[0]:
                     BOT[0].activity += 1
                 if resp.status >= 400:
@@ -2588,7 +2589,11 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
         if aio:
             return create_task(asyncio.wait_for(self.aio_call(url, headers, files, data, method, decode, json), timeout=timeout))
         with self.semaphore:
-            with getattr(requests, method)(url, headers=headers, files=files, data=data, stream=True, timeout=timeout) as resp:
+            if bypass:
+                req = reqs.next()
+            else:
+                req = requests
+            with getattr(req, method)(url, headers=headers, files=files, data=data, stream=True, timeout=timeout) as resp:
                 if BOT[0]:
                     BOT[0].activity += 1
                 if resp.status_code >= 400:
@@ -2611,7 +2616,6 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
         return async_nop()
 
 Request = RequestManager()
-create_task(Request._init_())
 
 
 def load_emojis():

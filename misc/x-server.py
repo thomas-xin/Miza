@@ -179,7 +179,7 @@ def get_geo(ip):
     if ip.startswith("192.168."):
         ip = IP
         if not ip:
-            ip = IP = requests.get("https://api.ipify.org").text
+            ip = IP = reqs.next().get("https://api.ipify.org").text
     try:
         resp = TZCACHE[ip]
     except KeyError:
@@ -189,7 +189,7 @@ def get_geo(ip):
             url = f"https://demo.ip-api.com/json/{ip}?fields=256&key=test-demo-pro"
         geo_count += 1
         with geo_sem:
-            resp = requests.get(url, headers={"DNT": "1", "User-Agent": f"Mozilla/5.{ip[-1]}", "Origin": "https://members.ip-api.com"})
+            resp = reqs.next().get(url, headers={"DNT": "1", "User-Agent": f"Mozilla/5.{ip[-1]}", "Origin": "https://members.ip-api.com"})
         send("@@@", escape=False)
         resp.raise_for_status()
         resp = cdict(resp.json())
@@ -491,7 +491,7 @@ class Server:
                             headers.pop("Remote-Addr", None)
                             headers.pop("Host", None)
                             headers.update(Request.header())
-                            resp = requests.get(url, headers=headers, stream=True)
+                            resp = reqs.next().get(url, headers=headers, stream=True)
                             resp.raw.decode_content = False
                             headers = fcdict(resp.headers)
                             cd = headers.get("Content-Disposition")
