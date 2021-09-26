@@ -1126,7 +1126,7 @@ class Rate(Command):
     
 class Wordcount(Command):
     name = ["Wc", "Cc", "Charactercount"]
-    description = "Simple command that returns the word and character count of a supplied message."
+    description = "Simple command that returns the word and character count of a supplied message. message.txt files work too!"
     usage = "<string>"
     slash = True
 
