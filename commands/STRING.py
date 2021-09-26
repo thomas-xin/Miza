@@ -1092,6 +1092,18 @@ class Rate(Command):
         lego = lego.replace("?", "").replace("!", "")
         return f"{lego}? I rate {pronoun} a `{rate}/10`!"
 
+    
+class Wordcount(Command):
+    name = ["Wc", "Cc", "Charactercount"]
+    description = "Simple command that returns the word and character count of a supplied message."
+    usage = "<string>"
+    slash = True
+
+    async def __call__(self, argv, **void):
+        wc = argv.split()
+        cc = argv
+        return f"Word count: `{len(wc)}`\nCharacter count: `{len(cc)}`"
+
 
 class Topic(Command):
     name = ["Question"]
