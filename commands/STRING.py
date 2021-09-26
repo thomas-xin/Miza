@@ -196,65 +196,88 @@ class UpdateVariables(Database):
     name = "variables"
 
 
-class Uni2Hex(Command):
-    name = ["U2H", "HexEncode"]
-    description = "Converts unicode text to hexadecimal numbers."
+class Unicode(Command):
+    name = [
+        "Uni2Hex", "U2H", "HexEncode",
+        "Hex2Uni", "H2U", "HexDecode",
+        "Uni2Bin", "U2B", "BinEncode",
+        "Bin2Uni", "B2U", "BinDecode",
+        "Uni2B64", "U64", "B64Encode",
+        "B642Uni", "64U", "B64Decode",
+        "Uni2B32", "U32", "B32Encode",
+        "B322Uni", "32U", "B32Decode",
+    ]
+    description = "Converts unicode text to hexadecimal or binary numbers."
     usage = "<string>"
     no_parse = True
 
-    def __call__(self, argv, **void):
+    def __call__(self, argv, name, **void):
         if not argv:
             raise ArgumentError("Input string is empty.")
-        b = bytes(argv, "utf-8")
-        return fix_md(bytes2hex(b))
-
-
-class Hex2Uni(Command):
-    name = ["H2U", "HexDecode"]
-    description = "Converts hexadecimal numbers to unicode text."
-    usage = "<string>"
-
-    def __call__(self, argv, **void):
-        if not argv:
-            raise ArgumentError("Input string is empty.")
-        b = hex2bytes(to_alphanumeric(argv).replace("0x", "").replace(" ", ""))
-        return fix_md(as_str(b))
+        if name in ("uni2hex", "u2h", "hexencode"):
+            b = bytes2hex(argv.encode("utf-8"))
+            return fix_md(b)
+        if name in ("hex2uni", "h2u", "hexdecode"):
+            b = as_str(hex2bytes(to_alphanumeric(argv).replace("0x", "")))
+            return fix_md(b)
+        if name in ("uni2bin", "u2b", "binencode"):
+            b = " ".join(f"{ord(c):08b}" for c in argv)
+            return fix_md(b)
+        if name in ("bin2uni", "b2u", "bindecode"):
+            b = to_alphanumeric(argv).replace("0x", "").replace(" ", "").encode("ascii")
+            b = (np.frombuffer(b, dtype=np.uint8) - 48).astype(bool)
+            if len(b) & 7:
+                a = np.zeros(8 - len(b) % 8, dtype=bool)
+                if len(b) < 8:
+                    b = np.append(a, b)
+                else:
+                    b = np.append(b, a)
+            a = np.zeros(len(b) >> 3, dtype=np.uint8)
+            for i in range(8):
+                c = b[i::8]
+                if i < 7:
+                    c = c.astype(np.uint8)
+                    c <<= 7 - i
+                a += c
+            b = as_str(a.tobytes())
+            return fix_md(b)
+        if name in ("uni2b64", "u64", "b64encode"):
+            b = as_str(base64.b64encode(argv.encode("utf-8")).rstrip(b"="))
+            return fix_md(b)
+        if name in ("b642uni", "64u", "b64decode"):
+            b = unicode_prune(argv).encode("utf-8") + b"=="
+            if (len(b) - 1) & 3 == 0:
+                b += b"="
+            b = as_str(base64.b64decode(b))
+            return fix_md(b)
+        if name in ("uni2b32", "u32", "b32encode"):
+            b = as_str(base64.b32encode(argv.encode("utf-8")).rstrip(b"="))
+            return fix_md(b)
+        if name in ("b322uni", "32u", "b32decode"):
+            b = unicode_prune(argv).encode("utf-8")
+            if len(b) & 7:
+                b += b"=" * (8 - len(b) % 8)
+            b = as_str(base64.b32decode(b))
+            return fix_md(b)
+        b = shash(argv)
+        return fix_md(b)
 
 
 class ID2Time(Command):
-    name = ["I2T", "CreateTime", "Timestamp"]
+    name = ["I2T", "CreateTime", "Timestamp", "Time2ID", "T2I"]
     description = "Converts a discord ID to its corresponding UTC time."
     usage = "<string>"
 
-    def __call__(self, argv, **void):
+    def __call__(self, argv, name, **void):
         if not argv:
             raise ArgumentError("Input string is empty.")
-        argv = int(verify_id("".join(c for c in argv if c.isnumeric() or c == "-")))
-        return fix_md(snowflake_time(argv))
-
-
-class Time2ID(Command):
-    name = ["T2I", "RTimestamp"]
-    description = "Converts a UTC time to its corresponding discord ID."
-    usage = "<string>"
-
-    def __call__(self, argv, **void):
-        if not argv:
-            raise ArgumentError("Input string is empty.")
-        argv = tzparse(argv)
-        return fix_md(time_snowflake(argv))
-
-
-class SHA256(Command):
-    name = ["SHA"]
-    description = "Computes the SHA256 hash of a string."
-    usage = "<string>"
-
-    def __call__(self, argv, **void):
-        if not argv:
-            raise ArgumentError("Input string is empty.")
-        result = bytes2hex(hashlib.sha256(argv.encode("utf-8")).digest())
-        return fix_md(result)
+        if name in ("time2id", "t2i"):
+            argv = tzparse(argv)
+            s = time_snowflake(argv)
+        else:
+            argv = int(verify_id("".join(c for c in argv if c.isnumeric() or c == "-")))
+            s = snowflake_time(argv)
+        return fix_md(s)
 
 
 class Fancy(Command):
@@ -1124,13 +1147,15 @@ class Rate(Command):
         return f"{lego}? I rate {pronoun} a `{rate}/10`!"
 
     
-class Wordcount(Command):
+class WordCount(Command):
     name = ["Wc", "Cc", "Charactercount"]
     description = "Simple command that returns the word and character count of a supplied message. message.txt files work too!"
     usage = "<string>"
     slash = True
 
     async def __call__(self, argv, **void):
+        if not argv:
+            raise ArgumentError("Input string is empty.")
         wc = argv.split()
         cc = argv
         return f"Word count: `{len(wc)}`\nCharacter count: `{len(cc)}`"

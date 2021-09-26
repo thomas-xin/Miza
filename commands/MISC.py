@@ -926,6 +926,78 @@ class UpdateDeviantArt(Database):
         else:
             bot.send_embeds(channel, embs)
 
+    async def fetch_gallery(self, folder, username):
+        base = "https://www.deviantart.com/_napi/da-user-profile/api/gallery/contents?username="
+        # "all" galleries require different URL options
+        if type(folder) is str:
+            f_id = "&all_folder=true&mode=oldest"
+        else:
+            f_id = "&folderid=" + str(folder)
+        url = base + username + f_id
+        # New binary search algorithm to improve search time for entire galleries
+        maxitems = 2147483647
+        r = 0
+        t = utc()
+        found = {}
+        futs = deque()
+        page = 24
+        # Begin with quaternary search (powers of 4) to estimate lowest power of 2 greater than or equal to gallery page count
+        with suppress(StopIteration):
+            for i in range(2 + int(math.log2(maxitems / page))):
+                curr = 1 << i
+                search = url + f"&offset={curr * page}&limit={page}"
+                futs.append((curr, create_task(Request(search, timeout=20, json=True, aio=True))))
+                if i & 1:
+                    for x, fut in futs:
+                        resp = await fut
+                        if resp.get("results"):
+                            found[x] = resp
+                        if not resp.get("hasMore"):
+                            curr = x
+                            raise StopIteration
+                r += 1
+        # Once the end has been reached, use binary search to estimate the page count again, being off by at most 8 pages
+        check = 1 << max(0, i - 2)
+        while check > 4:
+            x = curr - check
+            search = url + f"&offset={x * page}&limit={page}"
+            resp = await Request(search, json=True, aio=True)
+            if resp.get("results"):
+                found[x] = resp
+            r += 1
+            if not resp.get("hasMore"):
+                curr = x
+            check >>= 1
+        futs = deque()
+        for i in range(curr + 1):
+            if i not in found:
+                search = url + f"&offset={i * page}&limit={page}"
+                futs.append((i, create_task(Request(search, json=True, aio=True))))
+                r += 1
+        for x, fut in futs:
+            resp = await fut
+            if resp.get("results"):
+                found[x] = resp
+        # Collect all page results into a single list
+        results = (resp.get("results", ()) for resp in found.values())
+        items = {}
+        for res in itertools.chain(*results):
+            deviation = res["deviation"]
+            media = deviation["media"]
+            prettyName = media["prettyName"]
+            orig = media["baseUri"]
+            extra = ""
+            token = "?token=" + media["token"][0]
+            # Attempt to find largest available format for media
+            for t in reversed(media["types"]):
+                if t["t"].casefold() == "fullview":
+                    if "c" in t:
+                        extra = "/" + t["c"].replace("<prettyName>", prettyName)
+                        break
+            image_url = orig + extra + token
+            items[deviation["deviationId"]] = (deviation["url"], image_url, deviation["author"]["username"], deviation["author"]["usericon"])
+        return items
+
     async def __call__(self):
         t = set_dict(self.__dict__, "time", 0)
         # Fetches once every 5 minutes
@@ -934,81 +1006,11 @@ class UpdateDeviantArt(Database):
         self.time = inf
         conts = {i: a[i]["user"] for a in tuple(self.data.values()) for i in a}
         total = {}
-        base = "https://www.deviantart.com/_napi/da-user-profile/api/gallery/contents?username="
         attempts, successes = 0, 0
-        for content, user in conts.items():
+        for folder, username in conts.items():
             with tracebacksuppressor:
-                # "all" galleries require different URL options
-                if type(content) is str:
-                    f_id = "&all_folder=true&mode=oldest"
-                else:
-                    f_id = "&folderid=" + str(content)
-                url = base + user + f_id
-                # New binary search algorithm to improve search time for entire galleries
-                maxitems = 2147483647
-                r = 0
-                t = utc()
-                found = {}
-                futs = deque()
-                page = 24
-                # Begin with quaternary search (powers of 4) to estimate lowest power of 2 greater than or equal to gallery page count
-                with suppress(StopIteration):
-                    for i in range(2 + int(math.log2(maxitems / page))):
-                        curr = 1 << i
-                        search = url + f"&offset={curr * page}&limit={page}"
-                        futs.append((curr, create_task(Request(search, timeout=20, json=True, aio=True))))
-                        if i & 1:
-                            for x, fut in futs:
-                                resp = await fut
-                                if resp.get("results"):
-                                    found[x] = resp
-                                if not resp.get("hasMore"):
-                                    curr = x
-                                    raise StopIteration
-                        r += 1
-                # Once the end has been reached, use binary search to estimate the page count again, being off by at most 8 pages
-                check = 1 << max(0, i - 2)
-                while check > 4:
-                    x = curr - check
-                    search = url + f"&offset={x * page}&limit={page}"
-                    resp = await Request(search, json=True, aio=True)
-                    if resp.get("results"):
-                        found[x] = resp
-                    r += 1
-                    if not resp.get("hasMore"):
-                        curr = x
-                    check >>= 1
-                futs = deque()
-                for i in range(curr + 1):
-                    if i not in found:
-                        search = url + f"&offset={i * page}&limit={page}"
-                        futs.append((i, create_task(Request(search, json=True, aio=True))))
-                        r += 1
-                for x, fut in futs:
-                    resp = await fut
-                    if resp.get("results"):
-                        found[x] = resp
-                # Collect all page results into a single list
-                results = alist()
-                for resp in found.values():
-                    results.extend(resp.get("results", ()))
-                items = {}
-                for res in results:
-                    deviation = res["deviation"]
-                    media = deviation["media"]
-                    prettyName = media["prettyName"]
-                    orig = media["baseUri"]
-                    extra = ""
-                    token = "?token=" + media["token"][0]
-                    # Attempt to find largest available format for media
-                    for t in reversed(media["types"]):
-                        if t["t"].casefold() == "fullview":
-                            if "c" in t:
-                                extra = "/" + t["c"].replace("<prettyName>", prettyName)
-                                break
-                    image_url = orig + extra + token
-                    items[deviation["deviationId"]] = (deviation["url"], image_url, deviation["author"]["username"], deviation["author"]["usericon"])
-                total[content] = items
+                items = await self.fetch_gallery(folder, username)
+                total[folder] = items
         # if attempts:
         #     print(successes, "of", attempts, "DeviantArt requests executed successfully.")
         for c_id in tuple(self.data):
