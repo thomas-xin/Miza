@@ -2291,7 +2291,11 @@ class AudioDownloader:
                                 width, height, selc = selcodec.splitlines()
                                 t += 1
                                 w2, h2, s2 = codec_map[url].splitlines()
-                                vst[i] = self.download_file(url, selc, size=((w2, h2), (width, height)), auds=auds, ts=t, silenceremove=silenceremove)[0].rsplit("/", 1)[-1]
+                                if selc == "av1" or selc.startswith("vp"):
+                                    container = "mkv"
+                                elif selc.startswith("h26"):
+                                    container = "mp4"
+                                vst[i] = self.download_file(url, selc, size=((w2, h2), (width, height)), auds=auds, ts=t, silenceremove=silenceremove, container=container)[0].rsplit("/", 1)[-1]
                     vsc = "\n".join(f"file '{i}'" for i in vst)
                     vsf = f"cache/{ts}~video.concat"
                     with open(vsf, "w", encoding="utf-8") as f:
@@ -2331,8 +2335,8 @@ class AudioDownloader:
             if silenceremove and len(ast) == 1:
                 args.extend(("-af", "silenceremove=start_periods=1:start_duration=0.015625:start_threshold=-50dB:start_silence=0.015625:stop_periods=-9000:stop_threshold=-50dB:window=0.015625"))
             if size:
-                w1, h1 = size[0]
-                w2, h2 = size[1]
+                w1, h1 = map(int, size[0])
+                w2, h2 = map(int, size[1])
                 r = min(w2 / w1, h2 / h1)
                 w, h = round(w1 * r), round(h1 * r)
                 args.extend(("-vf", f"scale=w:h,pad=width={w2}:height={h2}:x=-1:y=-1:color=black"))
