@@ -160,7 +160,7 @@ class Execute(Command):
 class Exec(Command):
     name = ["Eval"]
     min_level = nan
-    description = "Causes all messages by the bot owner in the current channel to be executed as python code on ⟨MIZA⟩."
+    description = "Causes all messages by the bot owner(s) in the current channel to be executed as python code on ⟨MIZA⟩."
     usage = "(enable|disable)? <type(virtual)>?"
     flags = "aed"
     # Different types of terminals for different purposes
@@ -210,7 +210,6 @@ class Exec(Command):
 
 class UpdateExec(Database):
     name = "exec"
-    no_delete = True
     virtuals = cdict()
     listeners = cdict()
     qmap = {
@@ -409,7 +408,8 @@ class UpdateExec(Database):
                         invalid.add(c_id)
                     else:
                         self.bot.send_as_embeds(channel, msg, md=code_md)
-            [self.data.pop(i) for i in invalid]
+            if self.bot.ready:
+                [self.data.pop(i) for i in invalid]
 
     async def _proxy(self, url, whole=False):
         bot = self.bot
@@ -559,7 +559,6 @@ class UpdateExec(Database):
 
 class UpdateProxies(Database):
     name = "proxies"
-    no_delete = True
     limit = 65536
 
     def __load__(self, **void):
@@ -705,7 +704,6 @@ class UpdateTrusted(Database):
 
 class UpdateColours(Database):
     name = "colours"
-    no_delete = True
     limit = 65536
 
     async def get(self, url, threshold=True):
@@ -814,25 +812,31 @@ class UpdateChannelCache(Database):
     name = "channel_cache"
     channel = True
 
-    async def get(self, channel):
+    async def get(self, channel, as_message=True):
         if hasattr(channel, "simulated"):
             yield channel.message
             return
         c_id = verify_id(channel)
         min_time = time_snowflake(utc_dt() - datetime.timedelta(days=14))
+        deletable = False
         for m_id in sorted(self.data.get(c_id, ()), reverse=True):
-            try:
-                if m_id < min_time:
-                    raise OverflowError
-                message = await self.bot.fetch_message(m_id, channel)
-                if getattr(message, "deleted", None):
-                    continue
-            except (discord.NotFound, discord.Forbidden, OverflowError):
-                self.data[c_id].discard(m_id)
-            except (TypeError, ValueError, discord.HTTPException):
-                print_exc()
+            if as_message:
+                try:
+                    if m_id < min_time:
+                        raise OverflowError
+                    message = await self.bot.fetch_message(m_id, channel)
+                    if getattr(message, "deleted", None):
+                        continue
+                except (discord.NotFound, discord.Forbidden, OverflowError):
+                    if deletable:
+                        self.data[c_id].discard(m_id)
+                except (TypeError, ValueError, discord.HTTPException):
+                    print_exc()
+                else:
+                    yield message
+                deletable = True
             else:
-                yield message
+                yield m_id
 
     def add(self, c_id, m_id):
         s = self.data.setdefault(c_id, set())
@@ -875,12 +879,10 @@ class Suspend(Command):
 
 class UpdateBlacklist(Database):
     name = "blacklist"
-    no_delete = True
 
 
 class UpdateEmojis(Database):
     name = "emojis"
-    no_delete = True
 
     def get(self, name):
         while not self.bot.bot_ready:
@@ -923,7 +925,6 @@ class UpdateImagePools(Database):
     loading = set()
     finished = set()
     sem = Semaphore(8, 2, rate_limit=1)
-    no_delete = True
 
     def _bot_ready_(self, **void):
         finished = self.data.setdefault("finished", set())

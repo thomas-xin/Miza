@@ -33,10 +33,11 @@ import nacl.secret
 utils = discord.utils
 requests = requests.Session()
 url_parse = urllib.parse.quote_plus
+url_unparse = urllib.parse.unquote_plus
 escape_markdown = utils.escape_markdown
 escape_mentions = utils.escape_mentions
-escape_everyone = lambda s: s.replace("@everyone", "@\xadeveryone").replace("@here", "@\xadhere")
-escape_roles = lambda s: escape_everyone(s).replace("<@&", "<@\xad&")
+escape_everyone = lambda s: s#s.replace("@everyone", "@\xadeveryone").replace("@here", "@\xadhere")
+escape_roles = lambda s: s#escape_everyone(s).replace("<@&", "<@\xad&")
 
 DISCORD_EPOCH = 1420070400000 # 1 Jan 2015
 MIZA_EPOCH = 1577797200000 # 1 Jan 2020
@@ -71,6 +72,8 @@ snowflake_time_2 = lambda id: datetime.datetime.fromtimestamp(id2ts(id))
 snowflake_time_3 = utils.snowflake_time
 
 ip2int = lambda ip: int.from_bytes(b"\x00" + bytes(int(i) for i in ip.split(".")), "big")
+
+api = "v9"
 
 emptyfut = fut_nop = asyncio.Future()
 fut_nop.set_result(None)
@@ -444,10 +447,10 @@ def select_and_loads(s, mode="safe", size=None):
             data = json.loads(s)
     return data
 
-def select_and_dumps(data, mode="safe"):
+def select_and_dumps(data, mode="safe", compress=True):
     if mode == "unsafe":
         s = pickle.dumps(data)
-        if len(s) > 32768:
+        if len(s) > 32768 and compress:
             s = bytes2zip(s)
         return s
     try:
@@ -645,7 +648,7 @@ class FileHashDict(collections.abc.MutableMapping):
             except KeyError:
                 self.deleted.add(k)
                 continue
-            s = select_and_dumps(d, mode="unsafe")
+            s = select_and_dumps(d, mode="unsafe", compress=False)
             with self.sem:
                 safe_save(fn, s)
         deleted = list(self.deleted)
@@ -746,6 +749,8 @@ def restructure_buttons(buttons):
                             button["custom_id"] = min_emoji(button["emoji"])
                         else:
                             button["custom_id"] = 0
+            elif type(button["custom_id"]) is not str:
+                button["custom_id"] = as_str(button["custom_id"])
             while button["custom_id"] in used_custom_ids:
                 if "?" in button["custom_id"]:
                     spl = button["custom_id"].rsplit("?", 1)
@@ -769,7 +774,7 @@ def interaction_response(bot, message, content=None, embed=None, components=None
     if not getattr(message, "int_token", None):
         message.int_token = message.slash
     return Request(
-        f"https://discord.com/api/v9/interactions/{message.int_id}/{message.int_token}/callback",
+        f"https://discord.com/api/{api}/interactions/{message.int_id}/{message.int_token}/callback",
         data=json.dumps(dict(
             type=4,
             data=dict(
@@ -796,7 +801,7 @@ def interaction_patch(bot, message, content=None, embed=None, components=None, b
     if not getattr(message, "int_token", None):
         message.int_token = message.slash
     return Request(
-        f"https://discord.com/api/v9/interactions/{message.int_id}/{message.int_token}/callback",
+        f"https://discord.com/api/{api}/interactions/{message.int_id}/{message.int_token}/callback",
         data=json.dumps(dict(
             type=7,
             data=dict(
@@ -885,8 +890,7 @@ def touch(file):
         pass
 
 
-def get_folder_size(path="."):
-    return sum(get_folder_size(f.path) if f.is_dir() else f.stat().st_size for f in os.scandir(path))
+get_folder_size = lambda path=".": sum(get_folder_size(f.path) if f.is_dir() else f.stat().st_size for f in os.scandir(path))
 
 
 # Checks if an object can be used in "await" operations.
@@ -930,14 +934,14 @@ REPLY_SEM = cdict()
 EDIT_SEM = cdict()
 # noreply = discord.AllowedMentions(replied_user=False)
 
-async def send_with_reply(channel, reference, content="", embed=None, tts=None, file=None, files=None, buttons=None, mention=False):
+async def send_with_reply(channel, reference=None, content="", embed=None, tts=None, file=None, files=None, buttons=None, mention=False):
     if not channel:
         channel = reference.channel
     bot = BOT[0]
     if getattr(reference, "slash", None) and not embed:
         sem = emptyctx
         inter = True
-        url = f"https://discord.com/api/v9/interactions/{reference.id}/{reference.slash}/callback"
+        url = f"https://discord.com/api/{api}/interactions/{reference.id}/{reference.slash}/callback"
         data = dict(
             type=4,
             data=dict(
@@ -961,7 +965,6 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
                 else:
                     reference.to_message_reference_dict = lambda message: dict(message_id=message.id)
             fields["reference"] = reference
-            # fields["allowed_mentions"] = noreply
         if file:
             fields["file"] = file
         if files:
@@ -980,7 +983,7 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
         except KeyError:
             sem = REPLY_SEM[channel.id] = Semaphore(5.1, buffer=256, delay=0.1, rate_limit=5)
         inter = False
-        url = f"https://discord.com/api/v9/channels/{channel.id}/messages"
+        url = f"https://discord.com/api/{api}/channels/{channel.id}/messages"
         if getattr(channel, "dm_channel", None):
             channel = channel.dm_channel
         elif not getattr(channel, "recipient", None) and not channel.permissions_for(channel.guild.me).read_message_history:
@@ -992,7 +995,7 @@ async def send_with_reply(channel, reference, content="", embed=None, tts=None, 
             return await channel.send(content, **fields)
         data = dict(
             content=content,
-            allowed_mentions=dict(parse=["users", "roles", "everyone"], replied_user=mention)
+            allowed_mentions=dict(parse=["users"], replied_user=mention)
         )
         if reference:
             data["message_reference"] = dict(message_id=verify_id(reference))
@@ -1148,10 +1151,10 @@ def replace_map(s, mapping):
 
 # You can easily tell I was the one to name this thing. 🍻 - smudgedpasta
 def grammarly_2_point_0(string):
-    s = string.lower().replace("am i", "are y\uf000ou").replace("i am", "y\uf000ou are")
-    s = replace_map(s, {
+    s = " " + string.lower().replace("am i", "are y\uf000ou").replace("i am", "y\uf000ou are") + " "
+    s = s.replace(" yours ", " mine ").replace(" mine ", " yo\uf000urs ").replace(" your ", " my ").replace(" my ", " yo\uf000ur ")
+    s = replace_map(s.strip(), {
         "yourself": "myself",
-        "your ": "my ",
         "are you": "am I",
         "you are": "I am",
         "you're": "i'm",
@@ -1181,10 +1184,14 @@ def grammarly_2_point_0(string):
     if res[0] == "you":
         res[0] = "I"
     s = " ".join(res.replace("you", "m\uf000e").replace("i", "you").replace("me", "you").replace("i", "I").replace("i'm", "I'm").replace("i'll", "I'll"))
-    string = s[0].upper() + s[1:].replace("\uf000", "")
-    return string
+    return s.replace("\uf000", "")
+
+def grammarly_2_point_1(string):
+    s = grammarly_2_point_0(string)
+    return s[0].upper() + s[1:]
 
 
+# Gets the last image referenced in a message.
 def get_last_image(message, embeds=True):
     for a in reversed(message.attachments):
         url = a.url
@@ -1201,6 +1208,7 @@ def get_last_image(message, embeds=True):
     raise FileNotFoundError("Message has no image.")
 
 
+# Gets the length of a message.
 def get_message_length(message):
     return len(message.system_content or message.content) + sum(len(e) for e in message.embeds) + sum(len(a.url) for a in message.attachments)
 
@@ -1234,6 +1242,7 @@ def message_repr(message, limit=1024, username=False, link=False):
     return lim_str(data, limit)
 
 
+# Applies stickers to a message based on its discord data.
 def apply_stickers(message, data):
     if data.get("sticker_items"):
         for s in data["sticker_items"]:
@@ -1399,7 +1408,7 @@ async def str_lookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)]
                         return i
                     elif match >= fuzzy and not match <= cache[a][0][0]:
                         cache[a][0] = [match, i]
-            else:
+            elif fuzzy == 0:
                 for a, b in enumerate(qkey(c)):
                     if b == qlist[a]:
                         return i
@@ -1409,6 +1418,10 @@ async def str_lookup(it, query, ikey=lambda x: [str(x)], qkey=lambda x: [str(x)]
                     elif loose and qlist[a] in b:
                         if not len(b) >= cache[a][1][0]:
                             cache[a][1] = [len(b), i]
+            else:
+                for a, b in enumerate(qkey(c)):
+                    if b == qlist[a]:
+                        return i
         if not x & 2047:
             await asyncio.sleep(0.1)
     for c in cache:
@@ -1698,6 +1711,7 @@ MIMES = cdict(
     js="application/javascript",
     txt="text/plain",
     html="text/html",
+    svg="image/svg+xml",
     ico="image/x-icon",
     png="image/png",
     jpg="image/jpeg",
@@ -1745,6 +1759,10 @@ def from_file(path, mime=True):
     if out and out.split("/", 1)[-1] == "zip" and type(path) is str and path.endswith(".jar"):
         return "application/java-archive"
     if not out:
+        if type(path) is not bytes:
+            if type(path) is str:
+                raise TypeError(path)
+            path = bytes(path)
         out = simple_mimes(path, mime)
     return out
 
@@ -1770,9 +1788,9 @@ def get_mime(path):
         with open(path, "rb") as f:
             b = f.read(65536)
         mime = magic.from_buffer(b, mime=True)
-    if mime == "text/plain":
+    if mime.startswith("text/plain"):
         mime2 = MIMES.get(path.rsplit("/", 1)[-1].rsplit(".", 1)[-1], "")
-        if mime2.startswith("text/"):
+        if mime2:
             return mime2
     elif mime.split("/", 1)[-1] == "zip" and path.endswith(".jar"):
         return "application/java-archive"
@@ -1833,11 +1851,11 @@ def proc_communicate(k, i):
                 proc = PROCS[k][i]
             except LookupError:
                 break
-            while not proc.is_running():
+            if not proc or not proc.is_running():
                 time.sleep(0.8)
+                continue
             s = as_str(proc.stdout.readline()).rstrip()
             if s:
-                # print(s)
                 if s[0] == "~":
                     c = as_str(eval(s[1:]))
                     create_future_ex(exec_tb, c, globals())
@@ -1846,55 +1864,36 @@ def proc_communicate(k, i):
         time.sleep(0.01)
 
 proc_args = cdict(
-    math=[python, "misc/math.py"],
-    image=[python, "misc/image.py"],
+    math=[python, "misc/x-math.py"],
+    image=[python, "misc/x-image.py"],
 )
 
-class Pillow_SIMD:
-    args = None
-    __bool__ = lambda self: bool(self.args)
-    get = lambda self: self.args or [python]
-
-    # def check(self):
-    #     for v in range(8, 4, -1):
-    #         print(f"Attempting to find/install pillow-simd for Python 3.{v}...")
-    #         args = ["py", f"-3.{v}", "misc/install_pillow_simd.py"]
-    #         print(args)
-    #         resp = subprocess.run(args, stdout=subprocess.PIPE)
-    #         out = as_str(resp.stdout).strip()
-    #         if not out.startswith(f"Python 3.{v} not found!"):
-    #             if out:
-    #                 print(out)
-    #             print(f"pillow-simd versioning successful for Python 3.{v}")
-    #             self.args = ["py", f"-3.{v}"]
-    #             return self.args
-    #     return [python]
-
-    check = lambda self: [sys.executable]
-
-pillow_simd = Pillow_SIMD()
+def start_proc(k, i):
+    proc = psutil.Popen(
+        proc_args[k],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+    )
+    proc.sem = Semaphore(1, inf)
+    proc.comm = create_thread(proc_communicate, k, i)
+    PROCS[k][i] = proc
+    return proc
 
 def proc_start():
     PROC_COUNT.math = 3
     PROC_COUNT.image = 7
     for k, v in PROC_COUNT.items():
-        if k == "image":
-            proc_args.image = pillow_simd.check() + ["misc/image.py"]
-        PROCS[k] = [psutil.Popen(
-            proc_args[k],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-        ) for _ in loop(v)]
-        PROC_COUNT[k] = 0
-        for i, proc in enumerate(PROCS[k]):
-            proc.sem = Semaphore(1, inf)
-            create_thread(proc_communicate, k, i)
+        PROCS[k] = [None] * v
+        start_proc(k, 0)
 
 def get_idle_proc(ptype):
-    p = [i for i in PROCS[ptype] if not i.sem.is_busy()]
+    p = [p for p in PROCS[ptype] if p and not p.sem.is_busy()]
     if not p:
-        proc = PROCS[ptype][PROC_COUNT[ptype]]
-        PROC_COUNT[ptype] = (PROC_COUNT[ptype] + 1) % len(PROCS[ptype])
+        if None in PROCS[ptype]:
+            i = PROCS[ptype].index(None)
+            proc = PROCS[ptype][i] = start_proc(ptype, i)
+        else:
+            proc = choice(PROCS[ptype])
     else:
         proc = p[0]
     return proc
@@ -1913,21 +1912,17 @@ def sub_submit(ptype, command, _timeout=12):
         if not proc.is_running():
             proc = get_idle_proc(ptype)
         try:
-            # print(s)
             proc.stdin.write(s)
             proc.stdin.flush()
             resp = PROC_RESP[ts].result(timeout=_timeout)
         except (BrokenPipeError, OSError, concurrent.futures.TimeoutError):
-            # print(proc, s)
-            print_exc()
+            i = PROCS[ptype].index(proc)
             proc.kill()
-            proc2 = psutil.Popen(
-                proc.args,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-            )
-            proc2.sem = proc.sem
-            PROCS[ptype][PROCS[ptype].index(proc)] = proc2
+            PROCS[ptype][i] = start_proc(ptype, i)
+            PROC_RESP.pop(ts, None)
+            raise
+        except:
+            PROC_RESP.pop(ts, None)
             raise
     PROC_RESP.pop(ts, None)
     return resp
@@ -2013,7 +2008,11 @@ class MultiThreadPool(collections.abc.Sized, concurrent.futures.Executor):
             self.pool_count = max(1, self.pool_count)
             self.thread_count = max(1, self.thread_count)
             while self.pool_count > len(self.pools):
-                self.pools.append(ThreadPoolExecutor(max_workers=self.thread_count, initializer=self.initializer))
+                pool = ThreadPoolExecutor(
+                    max_workers=self.thread_count,
+                    initializer=self.initializer,
+                )
+                self.pools.append(pool)
             while self.pool_count < len(self.pools):
                 func = self.pools.popright().shutdown
                 self.pools[-1].submit(func, wait=True)
@@ -2034,7 +2033,7 @@ class MultiThreadPool(collections.abc.Sized, concurrent.futures.Executor):
 
     shutdown = lambda self, wait=True: [exc.shutdown(wait) for exc in self.pools].append(self.pools.clear())
 
-pthreads = MultiThreadPool(pool_count=2, thread_count=48, initializer=__setloop__)
+pthreads = ThreadPoolExecutor(64, initializer=__setloop__)
 athreads = MultiThreadPool(pool_count=2, thread_count=64, initializer=__setloop__)
 
 def get_event_loop():
@@ -2082,12 +2081,16 @@ def shutdown_thread_after(thread, fut):
     fut.result()
     return thread.shutdown(wait=True)
 
-def create_thread(func, *args, wait=False, **kwargs):
-    thread = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-    fut = thread.submit(func, *args, **kwargs)
-    if wait:
-        create_future_ex(shutdown_thread_after, thread, fut, priority=True)
-    return thread
+def create_thread(func, *args, **kwargs):
+    target = func
+    if args or kwargs:
+        target = lambda: func(*args, **kwargs)
+    t = threading.Thread(
+        target=target,
+        daemon=True,
+    )
+    t.start()
+    return t
 
 # Runs a function call in a parallel thread, returning a future object waiting on the output.
 def create_future_ex(func, *args, timeout=None, priority=False, **kwargs):
@@ -2252,13 +2255,14 @@ class CompatFile(discord.File):
                 self.filename = getattr(fp, 'name', None)
         else:
             self.filename = filename
+        self.filename = self.filename or "untitled"
         if spoiler:
             if self.filename is not None:
                 if not self.filename.startswith("SPOILER_"):
                     self.filename = "SPOILER_" + self.filename
             else:
                 self.filename = "SPOILER_" + "UNKNOWN"
-        elif self.filename.startswith("SPOILER_"):
+        elif self.filename and self.filename.startswith("SPOILER_"):
             self.filename = self.filename[8:]
         self.clear = getattr(self.fp, "clear", lambda self: None)
 
@@ -2312,10 +2316,10 @@ class DownloadingFile(io.IOBase):
         if s < size:
             i = io.BytesIO(b)
             while s < size:
-                if self.af():
-                    break
                 time.sleep(2 / 3)
                 b = self._read(size - s)
+                if not b and self.af():
+                    break
                 s += len(b)
                 i.write(b)
             i.seek(0)
@@ -2577,6 +2581,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
         if bypass:
             if "user-agent" not in headers and "User-Agent" not in headers:
                 headers["User-Agent"] = f"Mozilla/5.{xrand(1, 10)}"
+                headers["X-Forwarded-For"] = ".".join(str(xrand(1, 255)) for _ in loop(4))
             headers["DNT"] = "1"
         method = method.casefold()
         if aio:
@@ -2653,6 +2658,8 @@ def find_emojis_ex(s):
         if emoji in s:
             out.append(url[1:-1])
     return list(set(out))
+
+HEARTS = ["❤️", "🧡", "💛", "💚", "💙", "💜", "💗", "💞", "🤍", "🖤", "🤎", "❣️", "💕", "💖"]
 
 
 # Stores and manages timezones information.
@@ -2737,7 +2744,8 @@ def parse_with_now(expr):
                 offs = offs * 400 - 2000
                 year += 2000
                 expr = regexp("0*" + s).sub(str(year), expr, 1)
-                return DynamicDT.fromdatetime(tparser.parse(expr)).set_offset(offs)
+                dt = tparser.parse(expr).replace(tzinfo=datetime.timezone.utc)
+                return DynamicDT.fromdatetime(dt).set_offset(offs)
         elif s.startswith("Python int too large to convert to C"):
             y = int(regexp("[0-9]{10,}").findall(expr)[0])
             if bc:
@@ -2746,7 +2754,8 @@ def parse_with_now(expr):
             offs = offs * 400 - 2000
             year += 2000
             expr = regexp("[0-9]{10,}").sub(str(year), expr, 1)
-            return DynamicDT.fromdatetime(tparser.parse(expr)).set_offset(offs)
+            dt = tparser.parse(expr).replace(tzinfo=datetime.timezone.utc)
+            return DynamicDT.fromdatetime(dt).set_offset(offs)
         elif s.startswith("Unknown string format") or s.startswith("month must be in"):
             try:
                 y = int(regexp("[0-9]{5,}").findall(expr)[0])
@@ -2760,7 +2769,8 @@ def parse_with_now(expr):
             offs = offs * 400 - 2000
             year += 2000
             expr = regexp("[0-9]{5,}").sub(str(year), expr, 1)
-            return DynamicDT.fromdatetime(tparser.parse(expr)).set_offset(offs)
+            dt = tparser.parse(expr).replace(tzinfo=datetime.timezone.utc)
+            return DynamicDT.fromdatetime(dt).set_offset(offs)
         raise
     if bc:
         y = -dt.year
@@ -2812,7 +2822,10 @@ def tzparse(expr):
                 t -= one_day
         return t
     if not is_finite(s) or abs(s) >= 1 << 31:
-        s = int(expr.split(".", 1)[0])
+        try:
+            s = int(expr.split(".", 1)[0])
+        except (TypeError, ValueError):
+            pass
     return utc_dft(s)
 
 

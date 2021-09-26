@@ -20,11 +20,9 @@ heartbeat_proc = psutil.Popen([python, "misc/heartbeat.py"])
 class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collections.abc.Callable):
 
     github = "https://github.com/thomas-xin/Miza"
-    raw_github = "https://raw.githubusercontent.com/thomas-xin/Miza"
     rcc_invite = "https://discord.gg/cbKQKAr"
     discord_icon = "https://cdn.discordapp.com/embed/avatars/0.png"
     twitch_url = "https://www.twitch.tv/-"
-    website_background = "https://i.imgur.com/LsNWQUJ.png"
     webserver = "https://mizabot.xyz"
     raw_webserver = "http://i.mizabot.xyz"
     heartbeat = "heartbeat.tmp"
@@ -52,8 +50,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         typing=True,
     )
     allowed_mentions = discord.AllowedMentions(
+        everyone=False,
+        users=True,
+        roles=False,
         replied_user=False,
     )
+    connect_ready = concurrent.futures.Future()
+    guilds_ready = concurrent.futures.Future()
 
     def __init__(self, cache_size=1048576, timeout=24):
         # Initializes client (first in __mro__ of class inheritance)
@@ -61,8 +64,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.monkey_patch()
         super().__init__(
             max_messages=256,
-            heartbeat_timeout=60,
-            guild_ready_timeout=5,
+            heartbeat_timeout=64,
+            chunk_guilds_at_startup=False,
+            guild_ready_timeout=8,
             intents=self.intents,
             allowed_mentions=self.allowed_mentions,
             assume_unsync_clock=True,
@@ -85,11 +89,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.mention = ()
         self.user_loader = set()
         self.users_updated = True
-        self.semaphore = Semaphore(2, 1, delay=0.5)
-        self.ready_semaphore = Semaphore(1, inf, delay=0.5)
-        self.guild_semaphore = Semaphore(5, inf, delay=1, rate_limit=5)
-        self.user_semaphore = Semaphore(64, inf, delay=0.5, rate_limit=8)
-        self.disk_semaphore = Semaphore(1, 1, delay=0.5)
+        self.semaphore = Semaphore(2, 1)
+        self.ready_semaphore = Semaphore(1, inf)
+        self.guild_semaphore = Semaphore(5, inf, rate_limit=5)
+        self.load_semaphore = Semaphore(200, inf, rate_limit=10)
+        self.user_semaphore = Semaphore(64, inf, rate_limit=8)
+        self.disk_semaphore = Semaphore(1, 1, rate_limit=1)
         self.disk = 0
         self.storage_ratio = 0
         self.file_count = 0
@@ -221,7 +226,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         with tracebacksuppressor:
             for i in range(16):
                 resp = requests.post(
-                    f"https://discord.com/api/v9/applications/{self.id}/commands",
+                    f"https://discord.com/api/{api}/applications/{self.id}/commands",
                     headers={"Content-Type": "application/json", "Authorization": "Bot " + self.token},
                     data=json.dumps(data),
                 )
@@ -239,7 +244,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             return
         print("Updating global slash commands...")
         with tracebacksuppressor:
-            resp = requests.get(f"https://discord.com/api/v9/applications/{self.id}/commands", headers=dict(Authorization="Bot " + self.token))
+            resp = requests.get(f"https://discord.com/api/{api}/applications/{self.id}/commands", headers=dict(Authorization="Bot " + self.token))
             self.activity += 1
             if resp.status_code not in range(200, 400):
                 raise ConnectionError(f"Error {resp.status_code}", resp.text)
@@ -296,7 +301,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                             print(curr)
                                             print(f"{curr['name']}'s slash command does not match, removing...")
                                             for i in range(16):
-                                                resp = requests.delete(f"https://discord.com/api/v9/applications/{self.id}/commands/{curr['id']}", headers=dict(Authorization="Bot " + self.token))
+                                                resp = requests.delete(f"https://discord.com/api/{api}/applications/{self.id}/commands/{curr['id']}", headers=dict(Authorization="Bot " + self.token))
                                                 self.activity += 1
                                                 if resp.status_code == 429:
                                                     time.sleep(1)
@@ -318,136 +323,15 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             with tracebacksuppressor:
                 print(curr)
                 print(f"{curr['name']}'s application command does not exist, removing...")
-                resp = requests.delete(f"https://discord.com/api/v9/applications/{self.id}/commands/{curr['id']}", headers=dict(Authorization="Bot " + self.token))
+                resp = requests.delete(f"https://discord.com/api/{api}/applications/{self.id}/commands/{curr['id']}", headers=dict(Authorization="Bot " + self.token))
                 self.activity += 1
                 if resp.status_code not in range(200, 400):
                     raise ConnectionError(f"Error {resp.status_code}", resp.text)
 
     async def create_main_website(self, first=False):
-        with tracebacksuppressor:
-            print("Generating website html...")
-            html = f"""<!DOCTYPE html>
-<html>
-    <head>
-        <title>Miza</title>
-        <meta content="Miza" property="og:title">
-        <meta content="A multipurpose Discord bot." property="og:description">
-        <meta content="{self.webserver}" property="og:url">
-        <meta content="https://github.com/thomas-xin/Miza/raw/e62dfccef0cce3b0fc3b8a09fb3ca3edfedd8ab0/misc/sky-rainbow.gif" property="og:image">
-        <meta content="#BF7FFF" data-react-helmet="true" name="theme-color">
-        <link rel="preconnect" href="https://fonts.gstatic.com">
-        <link href="https://fonts.googleapis.com/css2?family=Balsamiq+Sans&amp;family=Pacifico&amp;display=swap" rel="stylesheet">
-        <link href="https://unpkg.com/boxicons@2.0.7/css/boxicons.min.css" rel="stylesheet">
-        <link href="{self.raw_webserver}/static/miza.css" rel="stylesheet">
-        <link rel="stylesheet" href="{self.raw_webserver}/static/swiper.min.css">
-    </head>
-    <body>
-        <link href="/static/hamburger.css" rel="stylesheet">
-        <div class="hamburger">
-            <input
-                type="checkbox"
-                title="Toggle menu"
-            />
-            <div class="items select">
-                <a href="/" data-popup="Home">
-                    <video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
-                        <source src="https://cdn.discordapp.com/attachments/691915140198826005/846592940075515904/miza_by_smudgedpasta_de1q8lu-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOj.mp4" type="video/mp4">
-                    </video>
-                </a>
-                <a href="/mizatlas" data-popup="Command Atlas">
-                    <video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
-                        <source src="https://cdn.discordapp.com/attachments/691915140198826005/846593904635281408/miza_has_a_leaf_blower_by_smudgedpasta_de6t2dl-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJz.mp4" type="video/mp4">
-                    </video>
-                </a>
-                <a href="/upload" data-popup="File Host">
-                    <video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
-                        <source src="https://cdn.discordapp.com/attachments/691915140198826005/846593561444745226/magical_babey_mode_by_smudgedpasta_de1q8ky-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIi.mp4" type="video/mp4">
-                    </video>
-                </a>
-                <a href="/apidoc" data-popup="API Documentation">
-                    <video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
-                        <source src="https://cdn.discordapp.com/attachments/691915140198826005/846590061901381632/deahc7l-a9773147-259d-4226-b0b6-195c6eb1f3c0.pngtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOi.mp4" type="video/mp4">
-                    </video>
-                </a>
-                <a 
-                    href="/time"
-                    data-popup="Clock"
-                    class='bx bx-time'></a>
-            </div>
-            <div class="hambg"></div>
-        </div>
-        <div class="hero">
-            <img class="hero-bg" src="{self.website_background}">
-            <div class="hero-text">
-                <video playsinline autoplay muted loop poster="https://cdn.discordapp.com/attachments/691915140198826005/846951020701679627/miza_by_smudgedpasta_de1q8lu-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOj.webp" style="height:10em;border-radius:100%;box-shadow:0 0 5px 0 white;">
-                    <source src="https://cdn.discordapp.com/attachments/691915140198826005/846592940075515904/miza_by_smudgedpasta_de1q8lu-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOj.mp4" type="video/mp4">
-                </video>
-                <h1 class="hero-text-text" data-upside-down-emoji-because-the-class-name="yea">Miza</h1>
-                <a class="buttonish" href="{self.invite}"><i class="bx bxs-plus-square"></i>Invite</a>
-                <div class="buttonsholder">
-                    <a class="buttonish" href="{self.github}"><i class="bx bxl-github"></i>Sauce</a>
-                    <a class="buttonish" href="{self.rcc_invite}"><i class="bx bxl-discord"></i>Discord</a>
-                </div>
-            </div>
-        </div>
-        <video class="bgimg" playsinline autoplay muted loop poster="https://cdn.discordapp.com/attachments/691915140198826005/846948803726016562/unknown.gif" style="position:fixed;right:0;bottom:0;min-width:100%;min-height:100%;z-index:-1;">
-            <source src="https://cdn.discordapp.com/attachments/691915140198826005/846611422649253899/unknown.gif" type="video/mp4">
-        </video>
-        <div class="bigboi">
-            <h2>What is Miza?</h2>
-            <p>Built on discord.py, Miza is a multipurpose Discord bot, fashioned after the character "Misery" from the platformer game Cave Story, and initially designed to help with Cave Story modding.<br>\
-She quickly branched out into all the areas you'd desire in a server, with careful attention to efficiency, performance, quality, and reliability.<br>\
-All of Miza's commands are easily accessible and manageable, with permission levels assignable on a user/role basis, as well as command category enabling/disabling at will per channel.<br>\
-The prefix is customizable, the command parser is intelligent, with the ability to recognize text in unicode fonts, the ability to parse and solve mathematical formulae for numerical inputs, in addition to fuzzy searching usernames.<br>\
-Sporting features from every category, Miza is capable of suiting just about anyone's needs, from invoking google translate, solving calculus equations, creating fancy unicode text, setting announcements, to temporarily muting/banning users, logging messages, to music and video filtering, playing, and downloading, image commands from magik distortion to rainbow gifs, webhook mimics/plurals, custom emojis, and much more!<br>\
-Above all else, Miza aims to provide users with a smooth, reliable and unique Discord experience, but the general premise for Miza is: "Fuck it, other bots can do it; Miza should be able to do it too" 🙃</p> 
-            <h2>What can Miza do?</h2>
-            <p>Oh, just a few things:</p>"""
-            commands = set()
-            for command in bot.commands.values():
-                commands.update(command)
-            com_count = 0
-            for category in ("main", "string", "admin", "voice", "image", "fun"):
-                c = f'\n<div class="carouselRight swiper-container"><div class="swiper-wrapper">'
-                for command in self.categories[category]:
-                    desc = command.parse_description()
-                    with suppress(ValueError):
-                        i = desc.index("http")
-                        if "://" in desc[i + 4:i + 8]:
-                            url = desc[i:]
-                            for x in range(len(url)):
-                                if url[x] in " !":
-                                    break
-                                x += 1
-                            desc = desc[:i] + f'<a href="{url[:x]}">{url[:x].rsplit("/", 1)[-1]}</a>' + url[x:]
-                    c += f'\n<div class="carouselItem swiper-slide"><h3>{command.parse_name()}</h3><p>{desc}</p></div>'
-                    com_count += 1
-                c += '</div><div class="swiper-pagination"></div></div>'
-                html += c
-            html += f"\n<p>...and {len(commands) - com_count} more!</p>"
-            html += f"""
-			<h2>Why should I choose Miza over other Discord bots?</h2>
-            <p>no fuckn clue lmao<br><br>\
-On a serious note, because Miza does most things you need.<br>\
-Miza doesn't just blend into the functionalities of any old Discord bot; she can do so much more with plenty of stability, at no cost to access some of the more advanced features you are not likely to see accessable for free on any bigger/more popular bot.<br>\
-Continuing on from the giant list of commands, Miza is supported by a webserver to handle files bigger than the Discord size limit, with various other features such as shifting messages to an embed if they breach the regular character limit, or sending embeds in a webhook to send a plethora at once if necessary, keeping things as clean as possible.<br>\
-Her creator introduces new features all the time, keeping up with the latest changes by Discord and often breaking away from what discord.py normally supports, while keeping compliant to the Discord TOS of course!<br>\
-For those of us who use Miza as a regular utility, we can safely say that she is an incredibly helpful Discord bot for all sorts of things, and is also very fun!<br></p>
-            <h2>What would I need to do in order to use Miza?</h2>
-            <p>First of all, you must have a Discord account, and a Discord server/guild to add Miza to.<br>\
-Use the <a href="{self.invite}">bot invite link</a> to invite her, and you will be able to access almost every feature immediately!<br>\
-The default prefix for a command is a ~ (tilde) character, followed by the name of the command (case-insensitive, with underscores optionally omitted), for example ~Hello, ~hello, or ~HELLO<br>\
-Commands may or may not require arguments, or input text after the command name. Some commands are able to take input from attached files or URL links (including Discord message links).<br>\
-To check the method of input for a particular command, use the ~Help command with said command's name as an argument.<br><br>\
-Optionally, most of miza's commands may be easily viewed and tested on the <a href="{self.raw_webserver}/mizatlas">command atlas</a>.<br>\
-For any further questions or issues, read the documentation on <a href="{self.github}">GitHub</a>, or join the <a href="{self.rcc_invite}">Support Server</a>!
-        </div>
-        <script src="{self.raw_webserver}/static/swiper.min.js"></script>
-        <script src="{self.raw_webserver}/static/pagination.js"></script>
-    </body>
-</html>"""
-            with open("misc/index.html", "w", encoding="utf-8") as f:
-                f.write(html)
+        self.start_webserver()
+        if first:
+            create_thread(webserver_communicate, self)
             print("Generating command json...")
             j = {}
             for category in ("MAIN", "STRING", "ADMIN", "VOICE", "IMAGE", "FUN", "OWNER", "NSFW", "MISC"):
@@ -466,17 +350,14 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                             c[attr] = command.attr
             with open("misc/help.json", "w", encoding="utf-8") as f:
                 f.write(json.dumps(j, indent=4))
-        self.start_webserver()
-        if first:
-            create_thread(webserver_communicate, self)
 
     def start_webserver(self):
         if self.server:
             with suppress():
                 self.server.kill()
-        if os.path.exists("misc/server.py") and PORT:
+        if os.path.exists("misc/x-server.py") and PORT:
             print("Starting webserver...")
-            self.server = psutil.Popen([python, "server.py"], cwd=os.getcwd() + "/misc", stderr=subprocess.PIPE)
+            self.server = psutil.Popen([python, "x-server.py"], cwd=os.getcwd() + "/misc", stderr=subprocess.PIPE)
         else:
             self.server = None
 
@@ -484,7 +365,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         if self.audio:
             with suppress():
                 self.audio.kill()
-        if os.path.exists("misc/audio.py"):
+        if os.path.exists("misc/x-audio.py"):
             print("Starting audio client...")
             self.audio = AudioClientInterface()
         else:
@@ -509,7 +390,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
     # A garbage collector for empty and unassigned objects in the database.
     async def garbage_collect(self, obj):
-        if not self.ready or hasattr(obj, "no_delete"):
+        if not self.ready or hasattr(obj, "no_delete") or not any(hasattr(obj, i) for i in ("channel", "garbage")):
             return
         with MemoryTimer("gc_" + obj.name):
             with tracebacksuppressor(SemaphoreOverflowError):
@@ -517,19 +398,16 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     data = obj.data
                     if getattr(obj, "garbage_collect", None):
                         return await obj.garbage_collect()
-                    for key in tuple(data):
+                    for key in shuffle(list(data))[:1024]:
                         if getattr(data, "unloaded", False):
                             return
-                        if key != 0 and type(key) is not str:
-                            with suppress():
+                        if key and type(key) is not str:
+                            try:
                                 # Database keys may be user, guild, or channel IDs
-                                if getattr(obj, "user", None):
-                                    d = await self.fetch_user(key)
-                                elif getattr(obj, "channel", None):
-                                    d = await self.fetch_channel(key)
+                                if getattr(obj, "channel", None):
+                                    d = self.get_channel(key)
                                 else:
-                                    tester = data[key]
-                                    if not getattr(obj, "no_garbage", None) and not tester and self.started:
+                                    if not data[key]:
                                         raise LookupError
                                     with suppress(KeyError):
                                         d = self.cache.guilds[key]
@@ -537,10 +415,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                                     d = await self.fetch_messageable(key)
                                 if d is not None:
                                     continue
+                            except:
+                                print_exc()
                             print(f"Deleting {key} from {str(obj)}...")
                             data.pop(key, None)
-                        if random.random() > 0.99:
-                            await asyncio.sleep(0.5)
 
     # Calls a bot event, triggered by client events or others, across all bot databases. Calls may be sync or async.
     async def send_event(self, ev, *args, exc=False, **kwargs):
@@ -568,7 +446,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             member = guild.get_member(self.id)
             if member.guild_permissions.create_instant_invite:
                 invitedata = await Request(
-                    f"https://discord.com/api/v9/guilds/{guild.id}/invites",
+                    f"https://discord.com/api/{api}/guilds/{guild.id}/invites",
                     headers=dict(Authorization="Bot " + self.token),
                     bypass=False,
                     aio=True,
@@ -713,7 +591,6 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             user.name = "Deleted User"
             user.display_name = "Deleted User"
             user.id = u_id
-            user.avatar_url = self.discord_icon
         else:
             try:
                 user = super().get_user(u_id)
@@ -750,8 +627,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
     def user_from_identifier(self, u_id):
         if "#" in u_id:
-            with suppress(KeyError):
+            try:
                 return self.usernames[u_id]
+            except:
+                pass
 
     async def fetch_user_member(self, u_id, guild=None):
         u_id = verify_id(u_id)
@@ -776,7 +655,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     if member is not None:
                         return member
             with suppress():
-                return self.get_member(u_id, guild)
+                return self.get_member(u_id, guild, find_others=False)
             return user
         user = self.user_from_identifier(u_id)
         if user is not None:
@@ -802,6 +681,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
     async def query_members(self, members, query, fuzzy=0.5):
         query = str(query)
+        fuz_base = None if fuzzy is None else 0
         with suppress(LookupError):
             return await str_lookup(
                 members,
@@ -809,6 +689,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 qkey=userQuery1,
                 ikey=userIter1,
                 loose=False,
+                fuzzy=fuz_base,
             )
         with suppress(LookupError):
             return await str_lookup(
@@ -816,6 +697,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 query,
                 qkey=userQuery2,
                 ikey=userIter2,
+                fuzzy=fuz_base,
             )
         with suppress(LookupError):
             return await str_lookup(
@@ -823,21 +705,21 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 query,
                 qkey=userQuery3,
                 ikey=userIter3,
+                fuzzy=fuz_base,
             )
-        if fuzzy is not None:
-            with suppress(LookupError):
-                return await str_lookup(
-                    members,
-                    query,
-                    qkey=userQuery4,
-                    ikey=userIter4,
-                    fuzzy=fuzzy,
-                )
+        with suppress(LookupError):
+            return await str_lookup(
+                members,
+                query,
+                qkey=userQuery4,
+                ikey=userIter4,
+                fuzzy=fuzzy,
+            )
         raise LookupError(f"No results for {query}.")
 
     # Fetches a member in the target server by ID or name lookup.
     async def fetch_member_ex(self, u_id, guild=None, allow_banned=True, fuzzy=1 / 3):
-        if type(u_id) is not int:
+        if type(u_id) is not int and u_id.isnumeric():
             with suppress(TypeError, ValueError):
                 u_id = int(u_id)
         member = None
@@ -846,7 +728,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         if member is None:
             if type(u_id) is int:
                 with suppress(LookupError):
-                    member = await self.fetch_member(u_id, guild)
+                    if guild:
+                        member = await self.fetch_member(u_id, guild)
+                    else:
+                        member = await self.fetch_user(u_id)
             if member is None:
                 if allow_banned:
                     members = await self.get_full_members(guild)
@@ -859,7 +744,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         return member
 
     # Fetches the first seen instance of the target user as a member in any shared server.
-    async def fetch_member(self, u_id, guild=None, find_others=False):
+    def fetch_member(self, u_id, guild=None, find_others=False):
+        return create_future(self.get_member, u_id, guild, find_others)
+
+    def get_member(self, u_id, guild=None, find_others=True):
         if type(u_id) is not int:
             try:
                 u_id = int(u_id)
@@ -871,45 +759,18 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 if member is None:
                     raise LookupError
                 return member
-        g = bot.cache.guilds
+        g = self.cache.guilds
         if guild is None:
-            guilds = deque(bot.cache.guilds.values())
+            if find_others:
+                guilds = deque(self.cache.guilds.values())
+            else:
+                return self.cache.users[u_id]
         else:
             if find_others:
                 guilds = deque(g[i] for i in g if g[i].id != guild.id)
                 guilds.appendleft(guild)
             else:
                 guilds = [guild]
-        member = None
-        for i, guild in enumerate(guilds, 1):
-            member = guild.get_member(u_id)
-            if member is not None:
-                break
-            if not i & 4095:
-                await asyncio.sleep(0.2)
-        if member is None:
-            raise LookupError("Unable to find member data.")
-        self.cache.members[u_id] = member
-        self.limit_cache("members")
-        return member
-
-    def get_member(self, u_id, guild=None):
-        if type(u_id) is not int:
-            try:
-                u_id = int(u_id)
-            except (ValueError, TypeError):
-                raise TypeError(f"Invalid user identifier: {u_id}")
-        with suppress(LookupError):
-            member = self.cache.members[u_id].guild.get_member(u_id)
-            if member is None:
-                raise LookupError
-            return member
-        g = bot.cache.guilds
-        if guild is None:
-            guilds = deque(bot.cache.guilds.values())
-        else:
-            guilds = deque(g[i] for i in g if g[i].id != guild.id)
-            guilds.appendleft(guild)
         member = None
         for guild in guilds:
             member = guild.get_member(u_id)
@@ -1032,14 +893,14 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             purge=lambda *args, **kwargs: discord.channel.TextChannel.purge(channel, *args, **kwargs),
             edit=lambda *args, **kwargs: discord.channel.TextChannel.edit(channel, *args, **kwargs),
             add_user=lambda user: Request(
-                f"https://discord.com/api/v9/channels/{channel.id}/thread-members/{verify_id(user)}",
+                f"https://discord.com/api/{api}/channels/{channel.id}/thread-members/{verify_id(user)}",
                 method="PUT",
                 headers={"Authorization": "Bot " + miza.token},
                 bypass=False,
                 aio=True,
             ),
             remove_user=lambda user: Request(
-                f"https://discord.com/api/v9/channels/{channel.id}/thread-members/{verify_id(user)}",
+                f"https://discord.com/api/{api}/channels/{channel.id}/thread-members/{verify_id(user)}",
                 method="DELETE",
                 headers={"Authorization": "Bot " + miza.token},
                 bypass=False,
@@ -1060,14 +921,14 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
     async def manage_thread(self, channel):
         create_task(Request(
-            f"https://discord.com/api/v9/channels/{channel.id}/thread-members/@me",
+            f"https://discord.com/api/{api}/channels/{channel.id}/thread-members/@me",
             method="POST",
             headers={"Authorization": "Bot " + miza.token},
             bypass=False,
             aio=True,
         ))
         data = await Request(
-            f"https://discord.com/api/v9/channels/{channel.id}",
+            f"https://discord.com/api/{api}/channels/{channel.id}",
             headers={"Authorization": "Bot " + miza.token},
             bypass=False,
             aio=True,
@@ -1094,9 +955,6 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
     # Fetches a message from ID and channel, using the bot cache when possible.
     async def _fetch_message(self, m_id, channel=None):
-        if "message_cache" in self.data:
-            with suppress(KeyError):
-                return await create_future(self.data.message_cache.load_message, m_id)
         if channel is None:
             raise LookupError("Message data not found.")
         with suppress(TypeError):
@@ -1114,6 +972,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 raise TypeError(f"Invalid message identifier: {m_id}")
         with suppress(KeyError):
             return as_fut(self.cache.messages[m_id])
+        if "message_cache" in self.data:
+            with suppress(KeyError):
+                return as_fut(self.data.message_cache.load_message(m_id))
         return self._fetch_message(m_id, channel)
 
     # Fetches a role from ID and guild, using the bot cache when possible.
@@ -1255,6 +1116,12 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 yield message
 
     async def get_last_message(self, channel, key=None):
+        m_id = getattr(channel, "last_message_id", None)
+        if m_id:
+            try:
+                return await self.fetch_message(m_id, channel)
+            except:
+                pass
         if key:
             async for message in self.history(channel):
                 if key(message):
@@ -1553,11 +1420,15 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             else:
                 message = await channel.send(msg, embed=embed, file=file, reference=reference)
                 if filename is not None:
-                    create_future_ex(os.remove, filename, priority=True)
+                    if hasattr(filename, "filename"):
+                        filename = filename.filename
+                    with suppress():
+                        os.remove(filename)
         except:
             if filename is not None:
                 print(filename, os.path.getsize(filename))
-                create_future_ex(os.remove, filename, priority=True)
+                with suppress():
+                    os.remove(filename)
             raise
         if message.attachments:
             await self.add_attachment(message.attachments[0], data)
@@ -1629,8 +1500,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                                     self.cache.attachments[a_id] = data
                             print(f"Successfully loaded attachment {a_id} from cache.")
                             return data
-                        if i < 29:
-                            await asyncio.sleep(0.25)
+                        if i:
+                            await asyncio.sleep(0.25 * i)
                 data = await Request(url, aio=True)
                 await self.add_attachment(cdict(id=a_id), data=data)
                 return data
@@ -1653,14 +1524,22 @@ For any further questions or issues, read the documentation on <a href="{self.gi
     def get_colour(self, user):
         if user is None:
             return as_fut(16777214)
-        url = worst_url(user)
+        try:
+            url = worst_url(user)
+        except AttributeError:
+            url = to_png_ex(user.icon_url)
         return self.data.colours.get(url)
 
     async def get_proxy_url(self, user):
         if getattr(user, "icon_url", None):
             url = to_png(user.icon_url)
         else:
-            url = best_url(user)
+            if hasattr(user, "webhook"):
+                url = user.webhook.avatar_url
+            else:
+                url = best_url(user)
+        if not url:
+            return self.discord_icon
         if "proxies" in self.data:
             with tracebacksuppressor:
                 url = (await self.data.exec.uproxy(url)) or url
@@ -1974,6 +1853,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
     # Logs if a message has been deleted.
     def log_delete(self, message, no_log=False):
+        if not message:
+            return
         try:
             m_id = int(message.id)
         except AttributeError:
@@ -1983,6 +1864,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
     # Silently deletes a message, bypassing logs.
     async def silent_delete(self, message, exc=False, no_log=False, delay=None):
+        if not message:
+            return
         if type(message) is int:
             message = await self.fetch_message(message)
         if delay:
@@ -2355,16 +2238,14 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             if not c:
                 await asyncio.sleep(1)
                 c = await create_future(proc.cpu_percent, priority=False)
-            m = await create_future(proc.memory_percent, priority=True)
+            m = proc.memory_percent()
             return float(c), float(m)
         return 0, 0
 
     async def get_disk(self):
         with tracebacksuppressor(SemaphoreOverflowError):
             async with self.disk_semaphore:
-                disk = await create_future(get_folder_size, "cache", priority=False)
-                disk += await create_future(get_folder_size, "saves", priority=True)
-                self.disk = disk
+                self.disk = await create_future(get_folder_size, ".", priority=True)
         return self.disk
 
     # Gets the status of the bot.
@@ -2376,8 +2257,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             tasks = [self.get_proc_state(p) for p in procs]
             resp = await recursive_coro(tasks)
             stats += [sum(st[0] for st in resp), sum(st[1] for st in resp), 0]
-            cpu = await create_future(psutil.cpu_count, logical=True, priority=False)
-            mem = await create_future(psutil.virtual_memory, priority=True)
+            cpu = psutil.cpu_count(logical=True)
+            mem = psutil.virtual_memory()
             disk = self.disk
             # CPU is totalled across all cores
             stats[0] /= cpu
@@ -2385,7 +2266,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             stats[1] *= mem.total / 100
             stats[2] = disk
             self.size2 = fcdict()
-            files = await create_future(os.listdir, "misc", priority=True)
+            files = os.listdir("misc")
             for f in files:
                 path = "misc/" + f
                 if is_code(path):
@@ -2527,7 +2408,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 pass
             else:
                 i += 1
-                create_future_ex(os.remove, "cache/" + f)
+                try:
+                    os.remove("cache/" + f)
+                except:
+                    print_exc()
         if i > 1:
             print(f"{i} cached files flagged for deletion.")
         return i
@@ -2539,7 +2423,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 if utc() - os.path.getmtime(fn) < 60:
                     return fn
                 os.remove(fn)
-            lines = as_str(subprocess.run([sys.executable, "misc/neutrino.py", "-c", "saves", fn], stderr=subprocess.PIPE).stdout).splitlines()
+            lines = as_str(subprocess.run([sys.executable, "misc/neutrino.py", "-c4", "saves", fn], stderr=subprocess.PIPE).stdout).splitlines()
             s = "\n".join(line for line in lines if not line.startswith("\r"))
             print(s)
         # zf = ZipFile(fn, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
@@ -2570,7 +2454,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         f.write(s)
                     with suppress(FileNotFoundError):
                         os.remove(saves[:-5] + "\x7f\x7f.json")
-                    os.rename(saves, saves[:-5] + "\x7f\x7f.json")
+                    with suppress(FileNotFoundError):
+                        os.rename(saves, saves[:-5] + "\x7f\x7f.json")
                     os.rename(saves[:-5] + "\x7f.json", saves)
                 with open(saves, "w") as f:
                     f.write(s)
@@ -2831,7 +2716,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             if truemention:
                 try:
                     await self.send_event("_mention_", user=user, message=message, msg=msg, exc=True)
-                except RuntimeError:
+                except CommandCancelledError:
                     return 0
         remaining = 0
         run = False
@@ -3202,6 +3087,46 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             # print(url, out)
         await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, bypass=False, decode=True, aio=True)
 
+    async def load_guild_http(self, guild):
+        x = 0
+        i = 1000
+        while i >= 1000:
+            for r in range(64):
+                try:
+                    async with self.load_semaphore:
+                        memberdata = await Request(
+                            f"https://discord.com/api/{api}/guilds/{guild.id}/members?limit=1000&after={x}",
+                            headers=dict(Authorization="Bot " + self.token),
+                            bypass=False,
+                            json=True,
+                            aio=True,
+                        )
+                except:
+                    print_exc()
+                    await asyncio.sleep(r + 2)
+                else:
+                    break
+            members = {int(m["user"]["id"]): discord.Member(guild=guild, data=m, state=self._connection) for m in memberdata}
+            guild._members.update(members)
+            i = len(memberdata)
+            x = max(members)
+
+    async def load_guilds(self):
+        funcs = [self._connection.chunk_guild, self.load_guild_http]
+        futs = alist([deque(), deque()])
+        for guild in self.client.guilds:
+            if self.is_ws_ratelimited():
+                i = bool(xrand(8))
+            else:
+                i = xrand(2)
+            fut = create_task(funcs[i](guild))
+            if len(futs[i]) >= 20:
+                await futs[i].popleft()
+            futs[i].append(fut)
+        for f in itertools.chain(*futs):
+            await fut
+        self.guilds_ready.set_result(None)
+
     # Adds a webhook to the bot's user and webhook cache.
     def add_webhook(self, w):
         return self.data.webhooks.add(w)
@@ -3271,7 +3196,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                             embeds=[emb.to_dict() for emb in kwargs.get("embeds", ())] or [kwargs["embed"].to_dict()] if kwargs.get("embed") is not None else None,
                         ))
                         resp = await Request(
-                            f"https://discord.com/api/v9/webhooks/{w.id}/{w.token}?wait=True&thread_id={channel.id}",
+                            f"https://discord.com/api/{api}/webhooks/{w.id}/{w.token}?wait=True&thread_id={channel.id}",
                             method="POST",
                             headers={
                                 "Content-Type": "application/json",
@@ -3291,7 +3216,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     w = getattr(w, "webhook", w)
                     if hasattr(channel, "thread"):
                         resp = await Request(
-                            f"https://discord.com/api/v9/webhooks/{w.id}/{w.token}?wait=True&thread_id={channel.id}",
+                            f"https://discord.com/api/{api}/webhooks/{w.id}/{w.token}?wait=True&thread_id={channel.id}",
                             method="POST",
                             headers={
                                 "Content-Type": "application/json",
@@ -3378,7 +3303,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             else:
                 return
             await Request(
-                f"https://discord.com/api/v9/interactions/{int_id}/{int_token}/callback",
+                f"https://discord.com/api/{api}/interactions/{int_id}/{int_token}/callback",
                 method="POST",
                 headers={
                     "Content-Type": "application/json",
@@ -3619,7 +3544,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 async with tracebacksuppressor:
                     create_task(self.update_status())
                     with MemoryTimer("update_bytes"):
-                        net = await create_future(psutil.net_io_counters, timeout=8)
+                        net = psutil.net_io_counters()
                         net_bytes = net.bytes_sent + net.bytes_recv
                         if not hasattr(self, "net_bytes"):
                             self.net_bytes = deque(maxlen=3)
@@ -3639,8 +3564,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         self.net_bytes.append(net_bytes)
                         self.bitrate = (self.net_bytes[-1] - self.net_bytes[0]) * 8 / len(self.net_bytes)
                         self.total_bytes = self.net_bytes[-1] + self.start_bytes
+                    if xrand(2):
+                        continue
                     try:
-                        resp = await create_future(requests.head, "https://discord.com/api/v9", priority=True)
+                        resp = await create_future(requests.head, f"https://discord.com/api/{api}", priority=True)
                         self.activity += 1
                         self.api_latency = resp.elapsed.total_seconds()
                     except:
@@ -3668,9 +3595,6 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     with MemoryTimer("update"):
                         await create_future(self.update, priority=True)
                     await asyncio.sleep(1)
-                    with MemoryTimer("update_usernames"):
-                        await create_future(self.update_usernames, priority=True)
-                    await asyncio.sleep(1)
                     with MemoryTimer("update_file_cache"):
                         await create_future(update_file_cache, priority=True)
                     await asyncio.sleep(1)
@@ -3687,10 +3611,11 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         print("Heartbeat Loop initiated.")
         with tracebacksuppressor:
             while not self.closed:
-                d = await delayed_coro(create_future(os.path.exists, self.heartbeat, priority=True), 1 / 12)
-                if d:
-                    with tracebacksuppressor(FileNotFoundError, PermissionError):
-                        await create_future(os.rename, self.heartbeat, self.heartbeat_ack, priority=True)
+                async with Delay(0.2):
+                    d = os.path.exists(self.heartbeat)
+                    if d:
+                        with tracebacksuppressor(FileNotFoundError, PermissionError):
+                            os.rename(self.heartbeat, self.heartbeat_ack)
 
     # User seen event
     async def seen(self, *args, delay=0, event=None, **kwargs):
@@ -3722,13 +3647,13 @@ For any further questions or issues, read the documentation on <a href="{self.gi
 
     # Handles a new sent message, calls process_message and sends an error if an exception occurs.
     async def handle_message(self, message, edit=True):
+        for i, a in enumerate(message.attachments):
+            if a.filename == "message.txt":
+                b = await self.get_request(message.attachments.pop(i).url)
+                if message.content:
+                    message.content += " "
+                message.content += as_str(b)
         cpy = msg = message.content
-        if not msg:
-            for i, a in enumerate(message.attachments):
-                if a.filename == "message.txt":
-                    b = await message.attachments.pop(i).read()
-                    cpy = msg = message.content = as_str(b)
-                    break
         with self.ExceptionSender(message.channel, reference=message):
             if msg and msg[0] == "\\":
                 cpy = msg[1:]
@@ -3826,6 +3751,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             is_friend = lambda self: None
             is_blocked = lambda self: None
             colour = color = discord.Colour(16777215)
+            avatar_url = icon_url = url = bot.discord_icon
 
             @property
             def mention(self):
@@ -3910,7 +3836,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                     webhook = getattr(w, "webhook", w)
                 except KeyError:
                     webhook = await bot.fetch_webhook(self.webhook_id)
-                    w = bot.data.webhooks.add(webhook)
+                    bot.data.webhooks.add(webhook)
+                if webhook.id == bot.id:
+                    return await discord.Message.edit(self, *args, **kwargs)
                 data = kwargs
                 if args:
                     data["content"] = " ".join(args)
@@ -3919,7 +3847,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 elif "embeds" in data:
                     data["embeds"] = [emb.to_dict() for emb in data["embeds"]]
                 resp = await Request(
-                    f"https://discord.com/api/v9/webhooks/{webhook.id}/{webhook.token}/messages/{self.id}",
+                    f"https://discord.com/api/{api}/webhooks/{webhook.id}/{webhook.token}/messages/{self.id}",
                     data=json.dumps(data),
                     headers={
                         "Authorization": f"Bot {bot.token}",
@@ -4411,13 +4339,11 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         discord.http.HTTPClient.request = lambda self, *args, **kwargs: request(self, *args, **kwargs)
 
     def send_exception(self, messageable, ex, reference=None):
-        owners_list = self.owners
-        owners = ', '.join([self.get_user(owner).mention for owner in owners_list])
         return self.send_as_embeds(
             messageable,
             description="\n".join(as_str(i) for i in ex.args),
             title=f"⚠ {type(ex).__name__} ⚠",
-            fields=(("Unexpected or confusing error?", f"Message {owners}, or join the [support server]({self.rcc_invite})!"),),
+            fields=(("Unexpected or confusing error?", f"Consider joining the [support server]({self.rcc_invite}) for help and bug reports!"),),
             reacts="❎",
             reference=reference,
         )
@@ -4463,9 +4389,8 @@ For any further questions or issues, read the documentation on <a href="{self.gi
         self.dispatch("reaction_clear", message, old_reactions)
         self.add_message(message, files=False, force=True)
 
-    async def init_ready(self, futs):
+    async def init_ready(self):
         with tracebacksuppressor:
-            self.started = True
             attachments = (file for file in sorted(set(file for file in os.listdir("cache") if file.startswith("attachment_"))))
             for file in attachments:
                 with tracebacksuppressor:
@@ -4490,8 +4415,6 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                         if callable(func):
                             self.events.append(f, func)
             print(f"Database event count: {sum(len(v) for v in self.events.values())}")
-            for fut in futs:
-                await fut
             await self.fetch_user(self.deleted_user)
             # Set bot avatar if none has been set.
             if not os.path.exists("misc/init.tmp"):
@@ -4507,12 +4430,11 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             create_task(self.lazy_loop())
             create_task(self.fast_loop())
             print("Update loops initiated.")
-            # Load all webhooks from cached guilds.
-            # futs = alist(create_task(self.load_guild_webhooks(guild)) for guild in self.guilds)
             futs = alist()
             futs.add(create_future(self.update_slash_commands, priority=True))
             futs.add(create_task(self.create_main_website(first=True)))
             futs.add(self.audio_client_start)
+            await self.wait_until_ready()
             self.bot_ready = True
             print("Bot ready.")
             # Send bot_ready event to all databases.
@@ -4520,6 +4442,9 @@ For any further questions or issues, read the documentation on <a href="{self.gi
             for fut in futs:
                 with tracebacksuppressor:
                     await fut
+            await wrap_future(self.connect_ready)
+            await wrap_future(self.guilds_ready)
+            await create_future(self.update_usernames, priority=True)
             self.ready = True
             # Send ready event to all databases.
             print("Database ready.")
@@ -4538,50 +4463,54 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 self.audio_client_start = create_future(self.start_audio_client, priority=True)
             return
 
-        # The event called when the bot starts up.
+        # The event called when the client first connects, starts initialisation of the other modules
+        @self.event
+        async def on_connect():
+            print("Successfully connected as " + str(self.user))
+            self.invite = f"https://discordapp.com/oauth2/authorize?permissions=8&client_id={self.id}&scope=bot%20applications.commands"
+            self.mention = (user_mention(self.id), user_pc_mention(self.id))
+            if not self.started:
+                self.started = True
+                create_task(self.init_ready())
+                create_task(self.load_guilds())
+            else:
+                print("Reconnected.")
+            await self.handle_update()
+
+        # The event called when the discord.py state is fully ready.
         @self.event
         async def on_ready():
-            print("Successfully connected as " + str(self.user))
+            create_task(aretry(self.get_ip, delay=20))
             await create_future(self.update_subs, priority=True)
             self.update_cache_feed()
-            self.mention = (user_mention(self.id), user_pc_mention(self.id))
-            self.invite = f"https://discordapp.com/oauth2/authorize?permissions=8&client_id={self.id}&scope=bot%20applications.commands"
             with tracebacksuppressor:
-                futs = set()
-                futs.add(create_task(self.get_state()))
+                create_task(self.get_state())
                 for guild in self.guilds:
                     if guild.unavailable:
                         print(f"Warning: Guild {guild.id} is not available.")
                 await self.handle_update()
-                futs.add(create_future(self.update_usernames, priority=True))
-                futs.add(create_task(aretry(self.get_ip, delay=20)))
-                if not self.started:
-                    create_task(self.init_ready(futs))
-                else:
-                    for fut in futs:
-                        await fut
-                    print("Reinitialized.")
+            self.connect_ready.set_result(True)
 
         # Server join message
         @self.event
         async def on_guild_join(guild):
-            # create_task(self.load_guild_webhooks(guild))
             print(f"New server: {guild}")
-            g = await self.fetch_guild(guild.id)
-            self.sub_guilds[guild.id] = g
+            guild = await self.fetch_guild(guild.id)
+            self.sub_guilds[guild.id] = guild
             m = guild.me
-            await self.send_event("_join_", user=m, guild=g)
-            channel = self.get_first_sendable(g, m)
+            await self.send_event("_join_", user=m, guild=guild)
+            channel = self.get_first_sendable(guild, m)
             emb = discord.Embed(colour=discord.Colour(8364031))
             emb.set_author(**get_author(self.user))
             emb.description = f"```callback-fun-wallet-{utc()}-\nHi there!```I'm {self.name}, a multipurpose discord bot created by <@201548633244565504>. Thanks for adding me"
             user = None
-            with suppress(discord.Forbidden):
-                a = guild.audit_logs(limit=5, action=discord.AuditLogAction.bot_add)
-                async for e in a:
-                    if e.target.id == self.id:
-                        user = e.user
-                        break
+            if guild.me.guild_permissions.view_audit_log:
+                with suppress(discord.Forbidden):
+                    a = guild.audit_logs(limit=5, action=discord.AuditLogAction.bot_add)
+                    async for e in a:
+                        if e.target.id == self.id:
+                            user = e.user
+                            break
             if user is not None:
                 emb.description += f", {user_mention(user.id)}"
                 if "dailies" in self.data:
@@ -4600,6 +4529,7 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 ))
             message = await channel.send(embed=emb)
             await message.add_reaction("✅")
+            await self.load_guild_http(guild)
             for member in guild.members:
                 name = str(member)
                 self.usernames[name] = self.cache.users[member.id]
@@ -4927,6 +4857,10 @@ For any further questions or issues, read the documentation on <a href="{self.gi
                 if guild:
                     await self.send_event("_delete_", message=message, bulk=True)
 
+        @self.event
+        async def on_guild_update(before, after):
+            await self.send_event("_guild_update_", before=before, after=after)
+
         # User update event: calls _user_update_ and _seen_ bot database events.
         @self.event
         async def on_user_update(before, after):
@@ -5012,8 +4946,13 @@ class AudioClientInterface:
     written = False
 
     def __init__(self):
-        self.proc = psutil.Popen([python, "audio.py"], cwd=os.getcwd() + "/misc", stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        self.proc = psutil.Popen([python, "x-audio.py"], cwd=os.getcwd() + "/misc", stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         create_thread(self.communicate)
+        with suppress():
+            if os.name == "nt":
+                self.proc.ionice(psutil.IOPRIO_HIGH)
+            else:
+                self.proc.ionice(psutil.IOPRIO_CLASS_RT, value=7)
         self.fut = concurrent.futures.Future()
 
     __bool__ = lambda self: self.written
@@ -5263,13 +5202,16 @@ class SimulatedMessage:
             author = self.__class__(bot, content, (ip2int(name) + MIZA_EPOCH) * 1000, name, nick, recursive=False)
             author.response = self.response
             author.message = self
+            author.dm_channel = author
         else:
             author = self
         self.author = author
         self.channel = author
         self.guild = author
+        self.dm_channel = author
         self.name = name
-        self.discriminator = str(xrand(10000))
+        disc = str(xrand(10000))
+        self.discriminator = "0" * (4 - len(disc)) + disc
         self.nick = self.display_name = nick
         self.owner_id = self.id
         self.mention = f"<@{self.id}>"
@@ -5278,7 +5220,7 @@ class SimulatedMessage:
         self.channels = self.text_channels = self.voice_channels = [author]
         self.members = self._members = [author, bot.user]
         self.message = self
-        self.owner = self.author
+        self.owner = author
 
     avatar_url = icon_url = "https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/b9573a17-63e8-4ec1-9c97-2bd9a1e9b515/de1q8lu-eae6a001-6463-4abe-b23c-fc32111c6499.png?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOiIsImlzcyI6InVybjphcHA6Iiwib2JqIjpbW3sicGF0aCI6IlwvZlwvYjk1NzNhMTctNjNlOC00ZWMxLTljOTctMmJkOWExZTliNTE1XC9kZTFxOGx1LWVhZTZhMDAxLTY0NjMtNGFiZS1iMjNjLWZjMzIxMTFjNjQ5OS5wbmcifV1dLCJhdWQiOlsidXJuOnNlcnZpY2U6ZmlsZS5kb3dubG9hZCJdfQ.eih2c_r4mgWKzZx88GKXOd_5FhCSMSbX5qXGpRUMIsE"
     roles = []

@@ -427,7 +427,7 @@ class Text2048(Command):
                     sem = EDIT_SEM[message.channel.id] = Semaphore(5.1, 256, rate_limit=5)
                 async with sem:
                     return await Request(
-                        f"https://discord.com/api/v9/channels/{message.channel.id}/messages/{message.id}",
+                        f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
                         data=json.dumps(dict(
                             content="**```\n2048: GAME OVER```**",
                             embed=emb.to_dict(),
@@ -524,7 +524,7 @@ class Text2048(Command):
                 sem = EDIT_SEM[message.channel.id] = Semaphore(5.1, 256, rate_limit=5)
             async with sem:
                 return await Request(
-                    f"https://discord.com/api/v9/channels/{message.channel.id}/messages/{message.id}",
+                    f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
                     data=json.dumps(dict(
                         content=content,
                         embed=emb.to_dict(),
@@ -604,90 +604,13 @@ class Text2048(Command):
         await send_with_react(message.channel, content, embed=emb, reacts=reacts, buttons=buttons, reference=message)
 
 
-class Matchmaking(Command):
-    name = ["Ship", "❤️", "🧡", "💛", "💚", "💙", "💜", "💗", "💞", "🤍", "🖤", "🤎", "❣️", "💕", "💖"]
-    description = "Ships two provided objects with a randomised percent."
-    usage = "<objects>*"
-    slash = "Ship"
-    heart_list = ["❤️", "🧡", "💛", "💚", "💙", "💜", "💗", "💞", "🤍", "🖤", "🤎", "❣️", "💕", "💖"]
-
-    async def __call__(self, bot, message, channel, guild, args, **void):
-        users = deque()
-        for u_id in map(verify_id, args):
-            try:
-                user = await bot.fetch_member_ex(u_id, guild, allow_banned=False, fuzzy=0)
-            except:
-                users.append(u_id.capitalize())
-            else:
-                users.append(user.display_name)
-        while len(users) < 2:
-            users.append(choice(guild.members).display_name)
-
-        x = random.random()
-        users = sorted(map(unicode_prune, users))
-        seed = nhash("\x7f".join(users))
-        seed, percentage = divmod(seed, 100)
-        random.seed(seed)
-        shiptargets = uni_str(" ♡ ".join(map(sqr_md, users)), 1)
-        users = shuffle(users)
-        shipname = users[0][:len(users[0]) + 1 >> 1]
-        shipname += "".join(a[len(a) >> 2:len(a) - len(a) >> 2] for a in users[1:-1])
-        shipname += users[-1][len(users[-1]) >> 1:]
-        shipname = shipname.strip().capitalize()
-
-        random.seed(utc() * x)
-        heart = choice(self.heart_list)
-        bar = await bot.create_progress_bar(21, percentage / 100)
-
-        markdown = choice(ini_md, lambda s: css_md(s, force=True))
-        suspicious_function = lambda x: x / ((x ** 2 * 6254793562032913) // (7632048114126314 * 10 ** 24) - (x * 5638138161912547) // 2939758 + 1000000155240420236976462021787648)
-        suspicious_function_2 = lambda x: int.from_bytes(bytes.fromhex(x.encode("utf-8").hex()), "little")
-        s = "".join(a.capitalize() for a in sorted(users))
-        if round(suspicious_function(suspicious_function_2(s))) in (13264547, 47787122):
-            inwards_heart = [
-                "00111011100",
-                "01122122110",
-                "01223232210",
-                "01234543210",
-                "00123432100",
-                "00012321000",
-                "00001210000",
-                "00000100000"
-            ]
-            emoji = {
-                "0": "▪",
-                "1": "<a:_" + ":797359273914138625>",
-                "2": "<a:_" + ":797359354314620939>",
-                "3": "<a:_" + ":797359351509549056>",
-                "4": "<a:_" + ":797359341157482496>",
-                "5": "<:_" + ":722354192995450912>",
-            }
-            e_calc = lambda x: (x * 15062629995394936) // 7155909327645687 - (x ** 2 * 3014475045596449) // (2062550437214859 * 10 ** 18) - 53
-            e2 = bot.get_emoji(e_calc(guild.id))
-            if e2:
-                emoji["5"] = f"<:_:{e2.id}>"
-
-            trans = "".maketrans(emoji)
-            rainbow_heart = "\n".join(inwards_heart).translate(trans)
-            description = markdown(f"{shiptargets}❔ They score an [{uni_str('infinite%', 1)}]❕ 💜") + rainbow_heart
-        else:
-            if all(a == users[0] for a in users[1:]):
-                description = markdown(f"{shiptargets}❔ They [{percentage}%] love themselves❕ " + get_random_emoji()) + bar
-            else:
-                description = markdown(f"{shiptargets} ({uni_str(shipname, 1)})❔ They score a [{percentage}%]❕ " + get_random_emoji()) + bar
-        author = get_author(message.author)
-        author.name = heart + uni_str(" MATCHMAKING ", 12) + heart
-        colour = await bot.get_colour(message.author)
-        colour = discord.Colour(colour)
-
-        bot.send_as_embeds(channel, description, colour=colour, author=author, reference=message)
-
-
 class Snake(Command):
     time_consuming = True
     name = ["Snaek", "🐍"]
     rate_limit = (3, 9)
     description = "Plays a game of Snake using buttons!"
+    usage = "<dimensions(8x8)>* <public{?p}|insanity_mode{?i}>*"
+    flags = "pi"
     slash = True
 
     buttons = [
@@ -710,11 +633,12 @@ class Snake(Command):
     icons = {
         0: "▪",
         1: "🐍",
-        2: "🍎"
+        2: "🍎",
+        4: "🍏",
     }
     playing = {}
 
-    async def __call__(self, bot, message, args, **void):
+    async def __call__(self, bot, message, args, flags, **void):
         if len(args) >= 2:
             size = list(map(int, args[:2]))
         elif args:
@@ -731,7 +655,7 @@ class Snake(Command):
             raise OverflowError(f"Board size too large ({cells} > 199)")
         elif cells < 2:
             raise ValueError(f"Board size too small ({cells} < 2)")
-        create_task(self.generate_snaek_game(message, size))
+        create_task(self.generate_snaek_game(message, size, flags))
 
     async def _callback_(self, bot, message, reaction, user, vals, perm, **void):
         if message.id not in self.playing:
@@ -756,7 +680,7 @@ class Snake(Command):
             game.dir = d
         await bot.ignore_interaction(message)
 
-    async def generate_snaek_game(self, message, size):
+    async def generate_snaek_game(self, message, size, flags):
         bot = self.bot
         user = message.author
         cells = np.prod(size)
@@ -795,11 +719,14 @@ class Snake(Command):
         
         def spawn_apple(game):
             p = tuple(xrand(x) for x in game.size)
-            i = 0
-            while game.grid[p] != 0 and i < 4096:
+            for i in range(4096):
+                if not game.grid[p]:
+                    break
                 p = tuple(xrand(x) for x in game.size)
-                i += 1
-            grid[p] = 2
+            t = 2
+            if "i" in flags and xrand(2):
+                t = 4
+            grid[p] = t
 
         pos = tuple(x // 2 - (0 if x & 1 else random.randint(0, 1)) for x in size)
         game = cdict(
@@ -815,8 +742,9 @@ class Snake(Command):
         grid[game.pos] = 1
         spawn_apple(game)
 
+        u_id = user.id if "p" not in flags else 0
         colour = await bot.get_colour(user)
-        description = f"```callback-fun-snake-{user.id}-\nPlaying Snake...```"
+        description = f"```callback-fun-snake-{u_id}-\nPlaying Snake...```"
         embed = discord.Embed(
             colour=colour,
             title="🐍 Snake 🐍",
@@ -841,7 +769,10 @@ class Snake(Command):
                 except IndexError:
                     game.alive = False
                     break
-                if colliding_with == 2 and game.len < cells:
+                if colliding_with == 4 and game.len < cells:
+                    spawn_apple(game)
+                    spawn_apple(game)
+                elif colliding_with == 2 and game.len < cells:
                     game.len += 1
                     spawn_apple(game)
                 elif colliding_with < 0:
@@ -1282,7 +1213,7 @@ class Uno(Command):
                     sem = EDIT_SEM[message.channel.id] = Semaphore(5.1, 256, rate_limit=5)
                 async with sem:
                     return await Request(
-                        f"https://discord.com/api/v9/channels/{message.channel.id}/messages/{message.id}",
+                        f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
                         data=json.dumps(dict(
                             content=content,
                             embed=embed.to_dict(),
@@ -1693,6 +1624,84 @@ class Uno(Command):
             )
 
 
+class Matchmaking(Command):
+    name = ["Ship"] + HEARTS
+    description = "Ships two provided objects with a randomised percent."
+    usage = "<objects>*"
+    slash = "Ship"
+
+    async def __call__(self, bot, message, channel, guild, args, **void):
+        users = deque()
+        for u_id in map(verify_id, args):
+            try:
+                user = await bot.fetch_member_ex(u_id, guild, allow_banned=False, fuzzy=None)
+            except:
+                users.append(u_id.capitalize())
+            else:
+                users.append(user.display_name)
+        while len(users) < 2:
+            users.append(choice(guild.members).display_name)
+
+        x = random.random()
+        users = sorted(map(unicode_prune, users))
+        seed = nhash("\x7f".join(users))
+        seed, percentage = divmod(seed, 100)
+        random.seed(seed)
+        shiptargets = uni_str(" ♡ ".join(map(sqr_md, users)), 1)
+        users = shuffle(users)
+        shipname = users[0][:len(users[0]) + 1 >> 1]
+        shipname += "".join(a[len(a) >> 2:len(a) - len(a) >> 2] for a in users[1:-1])
+        shipname += users[-1][len(users[-1]) >> 1:]
+        shipname = shipname.strip().capitalize()
+
+        random.seed(utc() * x)
+        heart = choice(HEARTS)
+        bar = await bot.create_progress_bar(21, percentage / 100)
+
+        markdown = choice(ini_md, lambda s: css_md(s, force=True))
+        suspicious_function = lambda x: x / ((x ** 2 * 6254793562032913) // (7632048114126314 * 10 ** 24) - (x * 5638138161912547) // 2939758 + 1000000155240420236976462021787648)
+        suspicious_function_2 = lambda x: int.from_bytes(bytes.fromhex(x.encode("utf-8").hex()), "little")
+        s = "".join(a.capitalize() for a in sorted(users))
+        if round(suspicious_function(suspicious_function_2(s))) in (13264547, 47787122):
+            inwards_heart = [
+                "00111011100",
+                "01122122110",
+                "01223232210",
+                "01234543210",
+                "00123432100",
+                "00012321000",
+                "00001210000",
+                "00000100000"
+            ]
+            emoji = {
+                "0": "▪",
+                "1": "<a:_" + ":797359273914138625>",
+                "2": "<a:_" + ":797359354314620939>",
+                "3": "<a:_" + ":797359351509549056>",
+                "4": "<a:_" + ":797359341157482496>",
+                "5": "<:_" + ":722354192995450912>",
+            }
+            e_calc = lambda x: (x * 15062629995394936) // 7155909327645687 - (x ** 2 * 3014475045596449) // (2062550437214859 * 10 ** 18) + 123795804094758818
+            e2 = bot.get_emoji(e_calc(guild.id))
+            if e2:
+                emoji["5"] = f"<:_:{e2.id}>"
+
+            trans = "".maketrans(emoji)
+            rainbow_heart = "\n".join(inwards_heart).translate(trans)
+            description = markdown(f"{shiptargets}❔ They score an [{uni_str('infinite%', 1)}]❕ 💜") + rainbow_heart
+        else:
+            if all(a == users[0] for a in users[1:]):
+                description = markdown(f"{shiptargets}❔ They [{percentage}%] love themselves❕ " + get_random_emoji()) + bar
+            else:
+                description = markdown(f"{shiptargets} ({uni_str(shipname, 1)})❔ They score a [{percentage}%]❕ " + get_random_emoji()) + bar
+        author = get_author(message.author)
+        author.name = heart + uni_str(" MATCHMAKING ", 12) + heart
+        colour = await bot.get_colour(message.author)
+        colour = discord.Colour(colour)
+
+        bot.send_as_embeds(channel, description, colour=colour, author=author, reference=message)
+
+
 class Pay(Command):
     name = ["GiveCoins", "GiveGold"]
     description = "Pays a specified amount of coins to the target user."
@@ -1891,7 +1900,7 @@ class UpdateReacts(Database):
 
 class EmojiList(Command):
     description = "Sets a custom alias for an emoji, usable by ~autoemoji."
-    usage = "(add|delete)? <name> <id>"
+    usage = "(add|delete)? <name>? <id>?"
     flags = "aed"
     no_parse = True
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
@@ -1942,21 +1951,9 @@ class EmojiList(Command):
         guild = message.guild
         user = await bot.fetch_user(u_id)
         following = bot.data.emojilists
-        curr = {}
-        for k, v in sorted(following.get(user.id, {}).items(), key=lambda n: full_prune(n[0])):
-            try:
-                try:
-                    me = " " + str(bot.cache.emojis[v])
-                except KeyError:
-                    await bot.min_emoji(v)
-                    me = ""
-            except LookupError:
-                following[user.id].pop(k)
-                following.update(user.id)
-                continue
-            curr[f":{k}:"] = f"({v})` {me}"
+        items = following.get(user.id, {}).items()
         page = 16
-        last = max(0, len(curr) - page)
+        last = max(0, len(items) - page)
         if reaction is not None:
             i = self.directions.index(reaction)
             if i == 0:
@@ -1970,6 +1967,22 @@ class EmojiList(Command):
             else:
                 new = pos
             pos = new
+        curr = {}
+        for k, v in sorted(items, key=lambda n: full_prune(n[0]))[pos:pos + page]:
+            try:
+                try:
+                    e = bot.cache.emojis[v]
+                    if not e.is_usable():
+                        raise LookupError
+                    me = " " + str(e)
+                except KeyError:
+                    await bot.min_emoji(v)
+                    me = ""
+            except LookupError:
+                following[user.id].pop(k)
+                following.update(user.id)
+                continue
+            curr[f":{k}:"] = f"({v})` {me}"
         content = message.content
         if not content:
             content = message.embeds[0].description
@@ -1979,13 +1992,13 @@ class EmojiList(Command):
             + str(u_id) + "_" + str(pos)
             + "-\n"
         )
-        if not curr:
+        if not items:
             content += f"No currently assigned emoji aliases for {str(user).replace('`', '')}.```*"
             msg = ""
         else:
-            content += f"{len(curr)} emoji aliases currently assigned for {str(user).replace('`', '')}:```*"
+            content += f"{len(items)} emoji aliases currently assigned for {str(user).replace('`', '')}:```*"
             key = lambda x: "\n" + ", ".join(x)
-            msg = iter2str({k + " " * (32 - len(k)): curr[k] for k in tuple(curr)[pos:pos + page]}, left="`", right="")
+            msg = iter2str({k + " " * (32 - len(k)): curr[k] for k in curr}, left="`", right="")
         colour = await self.bot.data.colours.get(to_png_ex(guild.icon_url))
         emb = discord.Embed(
             description=content + msg,
@@ -2002,7 +2015,6 @@ class EmojiList(Command):
 
 class UpdateEmojiLists(Database):
     name = "emojilists"
-    user = True
 
 
 class Dogpile(Command):
@@ -2184,7 +2196,6 @@ class Daily(Command):
 
 class UpdateDailies(Database):
     name = "dailies"
-    no_delete = True
 
     def __load__(self, **void):
         self.typing = {}
@@ -2892,7 +2903,6 @@ class MimicSend(Command):
 
 class UpdateMimics(Database):
     name = "mimics"
-    user = True
 
     async def _nocommand_(self, message, **void):
         if not message.content:
@@ -3104,23 +3114,6 @@ class Dog(ImagePool, Command):
         return url
 
 
-class Muffin(ImagePool, Command):
-    name = ["🧁", "Muffins"]
-    description = "Muffin time! What more is there to say? :D"
-    database = "muffins"
-
-    async def fetch_one(self):
-        if xrand(3):
-            s = await Request(f"https://www.gettyimages.co.uk/photos/muffin?page={random.randint(1, 100)}", decode=True, aio=True)
-            url = "https://media.gettyimages.com/photos/"
-            spl = s.split(url)[1:]
-            imageset = {url + i.split('"', 1)[0].split("?", 1)[0] for i in spl}
-        else:
-            d = await Request(f"https://unsplash.com/napi/search/photos?query=muffin&per_page=20&page={random.randint(1, 19)}", json=True, aio=True)
-            imageset = {result["urls"]["raw"] for result in d["results"]}
-        return imageset
-
-
 class XKCD(ImagePool, Command):
     description = "Pulls a random image from xkcd.com and embeds it."
     database = "xkcd"
@@ -3140,6 +3133,68 @@ class Inspiro(ImagePool, Command):
 
     def fetch_one(self):
         return Request("https://inspirobot.me/api?generate=true", decode=True, aio=True)
+
+
+class ImageSearch(ImagePool, Command):
+    name = ["🖼", "🧁", "ImgSearch", "Muffin", "Muffins"]
+    description = "Pulls a random image from a search on gettyimages.co.uk and unsplash.com, using tags."
+    threshold = 9
+    sem = Semaphore(5, 256, rate_limit=1)
+
+    def img(self, tag=None, search_tag=None):
+        file = f"imgsearch~{tag}"
+
+        async def fetch(tag, search_tag):
+            if xrand(3):
+                s = await Request(f"https://www.gettyimages.co.uk/photos/{tag}?page={random.randint(1, 100)}", decode=True, aio=True)
+                url = "https://media.gettyimages.com/photos/"
+                spl = s.split(url)[1:]
+                imageset = {url + i.split('"', 1)[0].split("?", 1)[0] for i in spl}
+            else:
+                d = await Request(f"https://unsplash.com/napi/search/photos?query={tag}&per_page=30&page={random.randint(1, 19)}", json=True, aio=True)
+                imageset = {result["urls"]["raw"] for result in d["results"]}
+            return imageset
+
+        async def fetchall(tag, search_tag):
+            await asyncio.sleep(1)
+            images = set()
+            for i in range(1, 100):
+                async with self.sem:
+                    if xrand(3):
+                        s = await Request(f"https://www.gettyimages.co.uk/photos/{tag}?page={i}", decode=True, aio=True)
+                        url = "https://media.gettyimages.com/photos/"
+                        spl = s.split(url)[1:]
+                        imageset = [url + i.split('"', 1)[0].split("?", 1)[0] for i in spl]
+                    else:
+                        d = await Request(f"https://unsplash.com/napi/search/photos?query={tag}&per_page=30&page={i}", json=True, aio=True)
+                        imageset = [result["urls"]["raw"] for result in d["results"]]
+                images.update(imageset)
+                if len(imageset) < 25:
+                    break
+            data = set_dict(self.bot.data.imagepools, file, alist())
+            for url in images:
+                if url not in data:
+                    data.add(url)
+                    self.bot.data.imagepools.update(file)
+            return images
+
+        if file not in self.bot.data.imagepools.finished:
+            create_task(fetchall(tag, search_tag))
+        return self.bot.data.imagepools.get(file, fetch, self.threshold, args=(tag, search_tag))
+    
+    async def __call__(self, bot, channel, flags, args, name, **void):
+        if not args:
+            if name == "muffin":
+                args = ["muffin"]
+            else:
+                raise ArgumentError("Input string is empty.")
+        args2 = ["".join(c for c in full_prune(w) if c.isalnum()) for w in args]
+        tag = "%20".join(sorted(args2))
+        search_tag = "%20".join(args2)
+        url = await self.img(tag, search_tag)
+        if "v" in flags:
+            return escape_roles(url)
+        self.bot.send_as_embeds(channel, image=url)
 
 
 class Giphy(ImagePool, Command):

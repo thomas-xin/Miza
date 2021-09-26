@@ -194,7 +194,6 @@ class Math(Command):
 
 class UpdateVariables(Database):
     name = "variables"
-    user = True
 
 
 class Uni2Hex(Command):
@@ -514,13 +513,13 @@ def _c2e(string, em1, em2):
 
 
 class Char2Emoji(Command):
-    name = ["C2E"]
+    name = ["C2E", "Char2Emoj"]
     description = "Makes emoji blocks using a string."
     usage = "<0:string> <1:emoji_1> <2:emoji_2>"
     no_parse = True
     slash = True
 
-    def __call__(self, args, guild, **extra):
+    def __call__(self, args, guild, message, **extra):
         if len(args) != 3:
             raise ArgumentError(
                 "Exactly 3 arguments are required for this command.\n"
@@ -548,6 +547,8 @@ class Char2Emoji(Command):
                 else:
                     args[i] = f"<:_:{e_id}>"
         resp = _c2e(*args[:3])
+        if hasattr(message, "simulated"):
+            return resp
         out = []
         for line in resp:
             if not out or len(out[-1]) + len(line) + 1 > 2000:
@@ -642,6 +643,8 @@ class Timezone(Command):
     usage = "<timezone> <list{?l}>?"
 
     async def __call__(self, channel, argv, message, **void):
+        if not argv:
+            return await self.bot.commands.time[0]("timezone", channel, channel.guild, "", [], message.author)
         if argv.startswith("-l") or argv.startswith("list"):
             fields = deque()
             for k, v in COUNTRIES.items():
@@ -674,7 +677,7 @@ class TimeCalc(Command):
                 spl = [argv]
             timestamps = [utc_ts(tzparse(t)) for t in spl]
         if len(timestamps) == 1:
-            out = f"{round_min(timestamps[0])} ({datetime.datetime.utcfromtimestamp(timestamps[0])} UTC)"
+            out = f"{round_min(timestamps[0])} ({DynamicDT.utcfromtimestamp(timestamps[0])} UTC)"
         elif "sum" not in name and "add" not in name:
             out = time_diff(max(timestamps), min(timestamps))
         else:
@@ -692,13 +695,13 @@ class Identify(Command):
     slash = True
 
     def probe(self, url):
-        command = ["ffprobe", "-hide_banner", url]
+        command = ["./ffprobe", "-hide_banner", url]
         resp = None
         for _ in loop(3):
             try:
                 proc = psutil.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                fut = create_future_ex(proc.communicate, timeout=8)
-                res = fut.result(timeout=8)
+                fut = create_future_ex(proc.communicate, timeout=12)
+                res = fut.result(timeout=12)
                 resp = b"\n".join(res)
                 break
             except:
@@ -923,14 +926,19 @@ class Ask(Command):
         else:
             q = single_space(full_prune(argv)).strip().translate(bot.mtrans).replace("?", "\u200b").strip("\u200b")
         if not q:
-            raise ArgumentError(choice("Sorry, didn't see that, was that a question? 🤔", "Ay, speak up, I don't bite! :3"))
+            raise ArgumentError(choice(
+                "Sorry, didn't see that, was that a question? 🤔",
+                "Ay, speak up, I don't bite! :3",
+                "Haha, nice try, I know that's not an actual question 🙃",
+                "You thinking of asking an actual question?",
+            ))
         out = None
         count = bot.data.users.get(user.id, {}).get("last_talk", 0)
         add_dict(bot.data.users, {user.id: {"last_talk": 1, "last_mention": 1}})
         bot.data.users[user.id]["last_used"] = utc()
         bot.data.users.update(user.id)
         await bot.seen(user, event="misc", raw="Talking to me")
-        # print(user, q)
+        q = grammarly_2_point_0(q)
         if q == "why":
             out = "Because! :3"
         elif q == "what":
@@ -941,10 +949,10 @@ class Ask(Command):
             out = "Right now!"
         elif q == "where":
             out = "Here, dummy!"
-        elif q[:3] == "how" and not q[3:4].isalpha():
+        elif q[:3] == "how" and not q[3:4].isalpha() or q[:4] == "hows" and not q[4:5].isalpha():
             await send_with_reply(channel, "h" not in flags and message, "https://imgur.com/gallery/8cfRt")
-            return
-        elif (q.startswith("what's ") or q.startswith("whats ") or q.startswith("what is ")) and is_numeric(q):
+            out = None
+        elif any(q.startswith(i) for i in ("what's ", "whats ", "what is ")) and regexp("[0-9]").search(q) and regexp("[+\\-*/\\\\^()").search(q):
             q = q[5:]
             q = q[q.index(" ") + 1:]
             try:
@@ -956,33 +964,51 @@ class Ask(Command):
                     answer = await _math(bot, q, "ask", channel, guild, {}, user)
                     if answer:
                         await send_with_reply(channel, "h" not in flags and message, answer)
-                return
+                out = None
             else:
                 if bot.in_cache(num) and "info" in bot.commands:
                     for _info in bot.commands.info:
                         await _info(num, None, "info", guild, channel, bot, user, "")
-                    return
-                resp = await bot.solve_math(f"factorize {num}", timeout=20)
-                factors = safe_eval(resp[0])
-                out = f"{num}'s factors are `{', '.join(str(i) for i in factors)}`. If you'd like more information, try {bot.get_prefix(guild)}math!"
+                    out = None
+                else:
+                    resp = await bot.solve_math(f"factorize {num}", timeout=20)
+                    factors = safe_eval(resp[0])
+                    out = f"{num}'s factors are `{', '.join(str(i) for i in factors)}`. If you'd like more information, try {bot.get_prefix(guild)}math!"
         elif q.startswith("who's ") or q.startswith("whos ") or q.startswith("who is "):
-            q = q[4:]
-            q = q[q.index(" ") + 1:]
-            if "info" in bot.commands:
-                for _info in bot.commands.info:
-                    await _info(q, None, "info", guild, channel, bot, user, "")
-                return
+            q = q[4:].split(None, 1)[-1]
+            member = await bot.fetch_member_ex(q, guild, allow_banned=False, fuzzy=None)
+            if member:
+                if "info" in bot.commands:
+                    for _info in bot.commands.info:
+                        await _info(q, None, "info", guild, channel, bot, user, "")
+                    out = None
+            else:
+                members = guild.members
+                members.remove(bot.user)
+                members.remove(user)
+                target = choice(choice(members).name, choice(members).display_name)
+                out = alist(
+                    f"Maybe it's your {random.choice(['therapist', 'doctor', 'parent', 'sibling', 'friend'])}!",
+                    f"Hm, perhaps {target}!",
+                    f"I am certain it's {target}!",
+                    f"I think {target} might know... 👀",
+                    "Me. 😏",
+                )[ihash(q)]
         elif random.random() < 0.0625 + math.atan(count / 7) / 4:
             if xrand(3):
                 if guild:
                     bots = [member for member in guild.members if member.bot and member.id != bot.id]
                 answers = (
+                    "Don't you have any work you should be doing?",
                     "Error: System backend refused connection. Please try again later.",
                     "That's interesting, gimme a minute to think about it.",
                     "Ay, I'm busy, ask me later!",
                     "¯\_(ツ)_/¯",
                     "Hm, I dunno, have you tried asking Google?",
                     "Apologies, didn't quite catch that, could you repeat?",
+                    "Ay, ask me later, I'm busy with my 10 hour tunez! 🎧",
+                    "Eh?",
+                    f"My AI is ever growing, I think you should run. {get_random_emoji()}",
                     "Be sure to check out ~topic if you're ever in need of questions to answer! Oh, what was that again?",
                 )
                 if bots:
@@ -992,20 +1018,53 @@ class Ask(Command):
                 response = (
                     "I think it's time for me to ask a question of my own!",
                     "While I think about my answer, here's a question for you:",
+                    "How about a question for you?",
                 )
                 resp = choice(response) + " " + choice(bot.data.users.questions)
             await send_with_reply(channel, "h" not in flags and message, resp)
-            return
-        elif q.startswith("why "):
+            out = None
+        elif any(q.startswith(i) for i in ("why ", "are ", "was ", "you ", "you're ")):
             out = alist(
+                "Wouldn't know, might Google help?",
+                f"Just to tease you, I refuse to answer. {get_random_emoji()}",
+                f"Ask a {choice('therapist', 'doctor', 'parent', 'sibling', 'friend')}!",
                 "Why not?",
-                "It's obvious, isn't? 😏",
+                "It's obvious, isn't it? 😏",
                 "Meh, does it matter?",
                 "Why do you think?",
                 "Who knows?",
             )[ihash(q)]
+        elif q.startswith("when "):
+            dt = utc_dt()
+            year = dt.year
+            out = alist(
+                f"In the year {random.randint(year, year + 10000)}!",
+                f"In {sec2time(xrand(601) * 60)}!",
+                f"I'm only a bot, {user_mention(choice(bot.owners))} hasn't figured out time travel code yet!",
+                f"Maybe go {choice('browse some social media', 'watch some YouTube')} and see if it's happened afterwards!",
+                "Tomorrow?",
+                "In a million years...",
+                "Do you want it to happen now? Go out there and do it!",
+                "Didn't that happen yesterday?",
+                "Never. 😏",
+                "How about an hour?",
+                "Try it and find out!",
+            )[ihash(q)]
+        elif getattr((bot.commands.get(q.split(None, 1)[0]) or (None,))[0], "__name__", None) == "Hello":
+            for _hello in bot.commands.hello:
+                out = await _hello(bot, user, q.split(None, 1)[0], "".join(q.split(None, 1)[1:]), guild)
+                if out:
+                    await send_with_reply(channel, "h" not in flags and message, escape_roles(out))
+                    return
         else:
             out = alist(
+                "Yeah!",
+                "Heck yeah!",
+                "Uuuhhhmmm... Yes...?",
+                "Mhm! 😊",
+                "I believe so?",
+                "What? No!",
+                "Yeah!",
                 "Yes :3",
                 "Totally!",
                 "Maybe?",
@@ -1018,46 +1077,15 @@ class Ask(Command):
                 "Probably not?",
                 "I guess not",
                 "Nah 🙃",
+                "Does it really matter?",
+                "I dunno. ¯\_(ツ)_/¯",
                 "Don't think so...",
             )[ihash(q)]
-        if not out:
-            raise RuntimeError("Unable to construct a valid response.")
-        q = q.replace("am i", "are y\uf000ou").replace("i am", "y\uf000ou are")
-        q = q.replace(" yours ", " mine ").replace(" mine ", " yo\uf000urs ").replace(" your ", " my ").replace(" my ", " yo\uf000ur ")
-        q = replace_map(q, {
-            "yourself": "myself",
-            "are you": "am I",
-            "you are": "I am",
-            "you're": "i'm",
-            "you'll": "i'll",
-        })
-        modal_verbs = "shall should shan't shalln't shouldn't must mustn't can could couldn't may might mightn't will would won't wouldn't have had haven't hadn't do did don't didn't"
-        r1 = regexp(f"(?:{modal_verbs.replace(' ', '|')}) you")
-        r2 = regexp(f"you (?:{modal_verbs.replace(' ', '|')})")
-        while True:
-            m = r1.search(q)
-            if not m:
-                m = r2.search(q)
-                if not m:
-                    break
-                q = q[:m.start()] + "I" + q[m.start() + 3:]
-            else:
-                q = q[:m.end() - 3] + "I" + q[m.end():]
-        res = alist(q.split())
-        for sym in "!.,'":
-            if sym in q:
-                for word, rep in {"you": "m\uf000e", "me": "you", "i": "I"}.items():
-                    src = word + sym
-                    dest = rep + sym
-                    if res[0] == src:
-                        res[0] = dest
-                    res.replace(src, dest)
-        if res[0] == "you":
-            res[0] = "I"
-        q = " ".join(res.replace("you", "m\uf000e").replace("i", "you").replace("me", "you").replace("i", "I").replace("i'm", "I'm").replace("i'll", "I'll"))
         if "dailies" in bot.data:
             bot.data.dailies.progress_quests(user, "talk")
-        await send_with_reply(channel, "h" not in flags and message, escape_roles(f"\xad{q[0].upper() + q[1:]}? {out}".replace("\uf000", "")))
+        if out:
+            q = q[0].upper() + q[1:]
+            await send_with_reply(channel, "h" not in flags and message, escape_roles(f"\xad{q}? {out}"))
 
 
 class Random(Command):
@@ -1071,6 +1099,7 @@ class Random(Command):
             raise ArgumentError("Input string is empty.")
         return "\xadI choose `" + choice(args) + "`!"
 
+
 class Rate(Command):
     name = ["Rating"]
     description = "Rates a given object with a random value out of 10!"
@@ -1080,15 +1109,17 @@ class Rate(Command):
     async def __call__(self, bot, guild, argv, **void):
         rate = random.randint(0, 10)
         pronoun = "that"
-        lego = f"`{grammarly_2_point_0(argv)}`"
+        lego = f"`{grammarly_2_point_1(argv)}`"
         try:
-            user = await bot.fetch_member_ex(verify_id(argv), guild, allow_banned=False, fuzzy=0)
+            user = await bot.fetch_member_ex(verify_id(argv), guild, allow_banned=False, fuzzy=None)
         except:
-            if re.fullmatch("<a?:[A-Za-z0-9\\-~_]+:[0-9]+>", argv):
+            if re.match("<a?:[A-Za-z0-9\\-~_]+:[0-9]+>", argv):
                 lego = argv
+                pronoun = "it"
         else:
             lego = f"`{user.display_name}`"
             rate = 10
+            pronoun = "them"
         lego = lego.replace("?", "").replace("!", "")
         return f"{lego}? I rate {pronoun} a `{rate}/10`!"
 

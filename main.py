@@ -24,17 +24,16 @@ if not os.path.exists("auth.json") or not os.path.getsize("auth.json"):
     raise SystemExit
 
 
-import time, datetime, psutil
+import time, datetime, psutil, subprocess
+ffmpeg = "ffmpeg"
+print("Verifying FFmpeg installation...")
 
-# Required on Windows to display terminal colour codes? 🤔
 if os.name == "nt":
+    import requests
     try:
         os.system("color")
     except:
         traceback.print_exc()
-    import requests, subprocess
-    ffmpeg = "ffmpeg"
-    print("Verifying FFmpeg installation...")
     with requests.get("https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip", stream=True) as resp:
         try:
             v = resp.url.rsplit("/", 1)[-1].split("-", 1)[-1].rsplit(".", 1)[0].split("-", 1)[0]
@@ -72,7 +71,7 @@ if os.name == "nt":
     if os.path.exists("misc") and not os.path.exists("misc/ffmpeg-c"):
         print("Downloading ffmpeg version 4.2.2...")
         os.mkdir("misc/ffmpeg-c")
-        subprocess.run([sys.executable, "downloader.py", "https://drive.google.com/u/0/uc?export=download&confirm=QLKC&id=168rCEMiRXi9X_o3pVEl_2cVWTcYGgR4N", "ffmpeg-c.zip"], cwd="misc")
+        subprocess.run([sys.executable, "downloader.py", "https://dl.dropboxusercontent.com/s/6vjpswpkxubnig4/ffmpeg-c.zip?dl=1", "ffmpeg-c.zip"], cwd="misc")
         import zipfile, io
         print("Download complete; extracting new FFmpeg installation...")
         f = "misc/ffmpeg-c.zip"
@@ -90,7 +89,20 @@ if os.name == "nt":
                             y.write(b)
         print("FFmpeg extraction complete.")
         os.remove(f)
-
+else:
+    try:
+        subprocess.run(ffmpeg)
+    except FileNotFoundError:
+        print(f"Downloading FFmpeg...")
+        subprocess.run(("wget", "https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-amd64-static.tar.xz"))
+        print("Download complete; extracting new FFmpeg installation...")
+        os.mkdir(".temp")
+        subprocess.run(("tar", "-xf", "ffmpeg-git-amd64-static.tar.xz", "-C", ".temp"))
+        fi = os.listdir(".temp")[0]
+        os.rename(f".temp/{fi}/ffmpeg", "ffmpeg")
+        os.rename(f".temp/{fi}/ffprobe", "ffprobe")
+        os.rename(f".temp/{fi}/qt-faststart", "qt-faststart")
+        subprocess.run(("rm", "-rf", ".temp"))
 
 
 # Repeatedly attempts to delete a file, waiting 1 second between attempts.

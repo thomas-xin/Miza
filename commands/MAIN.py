@@ -152,7 +152,7 @@ class Help(Command):
                     sem = EDIT_SEM[message.channel.id] = Semaphore(5.1, 256, rate_limit=5)
                 async with sem:
                     await Request(
-                        f"https://discord.com/api/v9/channels/{message.channel.id}/messages/{message.id}",
+                        f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
                         data=json.dumps(dict(
                             embed=embed.to_dict(),
                             components=restructure_buttons(buttons),
@@ -174,7 +174,7 @@ class Help(Command):
                         sem = EDIT_SEM[message.channel.id] = Semaphore(5.1, 256, rate_limit=5)
                     async with sem:
                         await Request(
-                            f"https://discord.com/api/v9/channels/{message.channel.id}/messages/{message.id}",
+                            f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
                             data=json.dumps(dict(
                                 components=restructure_buttons(buttons),
                             )),
@@ -214,18 +214,47 @@ class Hello(Command):
         if "dailies" in bot.data:
             bot.data.dailies.progress_quests(user, "talk")
         if argv:
-            user = await bot.fetch_user_member(argv, guild)
+            try:
+                u = await bot.fetch_user_member(argv, guild)
+            except:
+                u = None
+            if u and u.id != bot.id:
+                user = u
         elif bot.is_owner(user):
             return "👋"
         if name in ("bye", "cya", "goodbye"):
             start = choice("Bye", "Cya", "Goodbye")
         else:
+            if not argv and not xrand(5):
+                return choice(
+                    f"Hi, {user}. I'm feeling a little lonely, so I appreciate you talking to me. 😊",
+                    f"Hello? {get_random_emoji()}",
+                    "Hi! " + choice(HEARTS),
+                )
             start = choice("Hi", "Hello", "Hey", "'sup")
         middle = choice(user.name, user.display_name)
         if name in ("bye", "cya", "goodbye"):
-            end = choice("", "See you soon!", "Have a good one!", "Later!", "Talk to you again sometime!", "Was nice talking to you!")
+            end = choice(
+                "",
+                "See you soon!",
+                "See you around!",
+                "Have a good one!",
+                "Later!",
+                "Talk to you again sometime!",
+                "Was nice talking to you!",
+                "Peace!",
+            )
         else:
-            end = choice("", "How are you?", "Can I help you?", "What can I do for you today?", "Nice to see you!", "Great to see you!", "Always good to see you!")
+            end = choice(
+                "",
+                "How are you?",
+                "Can I help you?",
+                "What can I do for you today?",
+                "Nice to see you!",
+                "Great to see you!",
+                "Always good to see you!",
+                "Do you need something?",
+            )
         out = "👋 " + start + ", `" + middle + "`!"
         if end:
             out += " " + end
@@ -458,7 +487,10 @@ class Loop(Command):
         fake_message = copy.copy(message)
         fake_message.content = func2
         for i in range(iters):
-            curr_message = await bot.fetch_message(message.id, channel)
+            if hasattr(message, "simulated"):
+                curr_message = message
+            else:
+                curr_message = await bot.fetch_message(message.id, channel)
             if getattr(message, "deleted", None) or getattr(curr_message, "deleted", None):
                 break
             loop = i < iters - 1
@@ -857,8 +889,8 @@ class Profile(Command):
                 value = argv[len(setting) + 1:]
         else:
             target = await bot.fetch_user_member(" ".join(args), guild)
+        profile = bot.data.users.get(target.id, EMPTY)
         if setting is None:
-            profile = bot.data.users.get(target.id, EMPTY)
             description = profile.get("description", "")
             birthday = profile.get("birthday")
             timezone = profile.get("timezone")
@@ -882,12 +914,12 @@ class Profile(Command):
                     value = timezone_repr(value)
                 fields.add((field, value, False))
             return bot.send_as_embeds(channel, description, fields=fields, author=get_author(target))
-        if value is None:
-            return ini_md(f"Currently set {setting} for {sqr_md(user)}: {sqr_md(bot.data.users.get(user.id, EMPTY).get(setting))}.")
         if setting != "description" and value.casefold() in ("undefined", "remove", "rem", "reset", "unset", "delete", "clear", "null", "none") or "d" in flags:
             profile.pop(setting, None)
             bot.data.users.update(user.id)
             return css_md(f"Successfully removed {setting} for {sqr_md(user)}.")
+        if value is None:
+            return ini_md(f"Currently set {setting} for {sqr_md(user)}: {sqr_md(bot.data.users.get(user.id, EMPTY).get(setting))}.")
         if setting == "description":
             if len(value) > 1024:
                 raise OverflowError("Description must be 1024 or fewer in length.")
@@ -950,6 +982,7 @@ class Status(Command):
     usage = "(enable|disable)?"
     flags = "aed"
     slash = True
+    rate_limit = (0.15, 0.25)
 
     async def __call__(self, perm, flags, channel, bot, **void):
         if "d" in flags:
@@ -1053,8 +1086,8 @@ class Invite(Command):
 
 
 class Upload(Command):
-    name = ["Filehost"]
-    description = "Sends a link to ⟨MIZA⟩'s webserver's upload page: ⟨WEBSERVER⟩/upload"
+    name = ["Filehost", "Files"]
+    description = "Sends a link to ⟨MIZA⟩'s webserver's upload page: ⟨WEBSERVER⟩/files"
     msgcmd = True
     _timeout_ = 50
 
@@ -1064,7 +1097,7 @@ class Upload(Command):
             argv += " " * bool(argv) + " ".join(best_url(a) for a in message.attachments)
         args = await self.bot.follow_url(argv)
         if not args:
-            return self.bot.webserver + "/upload"
+            return self.bot.webserver + "/files"
         futs = deque()
         for url in args:
             futs.append(create_task(Request(self.bot.webserver + "/upload_url?url=" + url, decode=True, aio=True, timeout=1200)))
@@ -1428,7 +1461,7 @@ class Reminder(Command):
 
 
 class Note(Command):
-    name = ["Notes"]
+    name = ["Trash", "Notes"]
     description = "Takes note of a given string and allows you to view and edit a to-do list!"
     usage = "(edit|delete)? <id|note>?"
     flags = "aed"
@@ -1438,21 +1471,27 @@ class Note(Command):
     async def __call__(self, name, message, channel, flags, bot, user, argv, **void):
         note_userbase = bot.data.notes
         if argv.startswith("edit "):
-            argv = argv.split(None, 1)[-1]
+            if argv:
+                argv = argv.split(None, 1)[-1]
             add_dict(flags, dict(e=1))
-        elif argv.startswith("delete ") or argv.startswith("remove "):
-            argv = argv.split(None, 1)[-1]
+        elif argv.startswith("delete ") or argv.startswith("remove ") or name == "trash":
+            if argv:
+                argv = argv.split(None, 1)[-1]
             add_dict(flags, dict(d=1))
         if "d" in flags:
+            if not argv:
+                argv = 0
             try:
-                note_userbase[user.id].pop(int(argv))
+                n = note_userbase[user.id].pop(int(argv))
             except (KeyError, IndexError):
                 argv = rank_format(int(argv))
                 raise LookupError(f"You don't have a {argv} note!")
             argv = rank_format(int(argv))
             if not note_userbase.get(user.id):
                 note_userbase.discard(user.id)
-            return ini_md(f"Successfully removed {argv} note for [{user}]!")
+            else:
+                note_userbase.update(user.id)
+            return ini_md(f"Successfully removed {argv} note: {sqr_md(n)}")
         elif not argv:
             # Set callback message for scrollable list
             buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
@@ -1482,7 +1521,6 @@ class Note(Command):
             return
         if reaction not in self.directions and reaction is not None:
             return
-        guild = message.guild
         user = await bot.fetch_user(u_id)
         data = bot.data.notes
         curr = data.get(user.id, ())
@@ -1506,7 +1544,7 @@ class Note(Command):
             content = message.embeds[0].description
         i = content.index("callback")
         content = "*```" + "\n" * ("\n" in content[:i]) + (
-            "callback-admin-autoemoji-"
+            "callback-main-note-"
             + str(u_id) + "_" + str(pos)
             + "-\n"
         )
@@ -1516,7 +1554,7 @@ class Note(Command):
         else:
             content += f"{len(curr)} notes currently assigned for {str(user).replace('`', '')}:```*"
             msg = iter2str(tuple(curr)[pos:pos + page], left="`【", right="】`")
-        colour = await self.bot.data.colours.get(to_png_ex(guild.icon_url))
+        colour = await self.bot.get_colour(user)
         emb = discord.Embed(
             description=content + msg,
             colour=colour,
@@ -1532,9 +1570,8 @@ class Note(Command):
 
 class UpdateUrgentReminders(Database):
     name = "urgentreminders"
-    no_delete = True
 
-    async def _bot_ready_(self, **void):
+    async def _ready_(self, **void):
         if "listed" not in self.data:
             self.data["listed"] = alist()
         create_task(self.update_urgents())
@@ -1583,7 +1620,6 @@ class UpdateUrgentReminders(Database):
 # This database is such a hassle to manage, it has to be able to persist between bot restarts, and has to be able to update with O(1) time complexity when idle
 class UpdateReminders(Database):
     name = "reminders"
-    no_delete = True
 
     def __load__(self):
         d = self.data
@@ -1691,7 +1727,6 @@ class UpdatePrefix(Database):
 
 class UpdateEnabled(Database):
     name = "enabled"
-    no_delete = True
 
 
 class UpdateMessages(Database):
@@ -1706,7 +1741,7 @@ class UpdateMessages(Database):
                 return await func(*args, **kwargs)
 
     async def __call__(self, **void):
-        if self.bot.bot_ready and not self.closed:
+        if self.bot.ready and not self.closed:
             self.hue += 128
             col = colour2raw(hue2colour(self.hue))
             t = utc()
@@ -1740,7 +1775,6 @@ class UpdateMessages(Database):
 
 class UpdateFlavour(Database):
     name = "flavour"
-    no_delete = True
 
     async def get(self):
         out = x = None
@@ -2132,7 +2166,7 @@ class UpdateUsers(Database):
             if count < 5:
                 create_task(message.add_reaction("👀"))
             if "?" in msg and "ask" in bot.commands and random.random() > math.atan(count / 16) / 4:
-                argv = self.mentionspam.sub("", msg).strip()
+                argv = self.mentionspam.sub("", msg).strip(" ,")
                 for ask in bot.commands.ask:
                     await ask(message, message.channel, user, argv, name="ask", flags=flags)
                 return

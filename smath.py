@@ -2,7 +2,7 @@
 Adds many useful math-related functions.
 """
 
-import contextlib, concurrent.futures
+import os, contextlib, concurrent.futures
 from concurrent.futures import thread
 
 def _adjust_thread_count(self):
@@ -49,6 +49,7 @@ class MultiThreadedImporter(contextlib.AbstractContextManager, contextlib.Contex
     """A context manager that enables concurrent imports."""
 
     closed = False
+    exc = None
 
     def __init__(self, glob=None):
         self.glob = glob
@@ -60,8 +61,13 @@ class MultiThreadedImporter(contextlib.AbstractContextManager, contextlib.Contex
 
     def __import__(self, *modules):
         self.closed = False
-        for module in modules:
-            self.out[module] = self.exc.submit(__import__, module)
+        if self.exc:
+            for module in modules:
+                self.out[module] = self.exc.submit(__import__, module)
+        else:
+            glob = self.glob if self.glob is not None else globals()
+            for module in modules:
+                glob[module] = __import__(module)
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.close()
@@ -75,12 +81,11 @@ class MultiThreadedImporter(contextlib.AbstractContextManager, contextlib.Contex
             glob = self.glob if self.glob is not None else globals()
             glob.update(self.out)
             self.closed = True
-        if shutdown:
+        if shutdown and self.exc:
             self.exc.shutdown(True)
 
 with MultiThreadedImporter() as importer:
     importer.__import__(
-        "os",
         "sys",
         "collections",
         "traceback",
@@ -119,7 +124,7 @@ with MultiThreadedImporter() as importer:
         with open(collections2f, "wb") as f:
             f.write(b)
         exec(compile(b, "collections2.py", "exec"), globals())
-        print("alist.tmp updated.")
+        print("collections2.py updated.")
 
     if not os.path.exists(collections2f):
         update_collections2()
@@ -2132,6 +2137,8 @@ def time_disp(s, rounded=True):
 
 # Converts a time interval represented using days:hours:minutes:seconds, to a value in seconds.
 def time_parse(ts):
+    if ts == "N/A":
+        return inf
     data = ts.split(":")
     if len(data) >= 5: 
         raise TypeError("Too many time arguments.")

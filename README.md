@@ -1,10 +1,8 @@
 <h1 align="center">
-  <img src=
-  "https://github.com/thomas-xin/Miza/blob/e62dfccef0cce3b0fc3b8a09fb3ca3edfedd8ab0/misc/title-rainbow.gif?raw=true">
+  <img src="https://raw.githubusercontent.com/thomas-xin/Image-Test/master/title-rainbow.webp">
   <br>
   <a href="http://mizabot.xyz">Miza</a>
 </h1>
-
 
 
 <h4 align="center">A multipurpose Discord bot created by <a href="https://github.com/thomas-xin">Thomas Xin</a>.</h4> <br>
@@ -62,7 +60,7 @@ Sections     | Explanations
 
 <br>
 
-**Note: Miza is currently implemented and supported for *Windows only*. Linux and Docker support is planned for the future, but as of right now have not been put in place.**
+As of 26 September 2021, Miza now fully works on Windows and Linux. If you're planning to run Miza through a Docker container, there is a working [Dockerfile](https://cdn.discordapp.com/attachments/731709481863479436/891402916265594980/Dockerfile) provided that you may use as a template. Note that if you choose to use this, all other installation steps may be skipped, as said Dockerfile includes all necessary installation preparations.
 
 ### Installing Miza
 
