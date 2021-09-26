@@ -1930,7 +1930,8 @@ def sub_submit(ptype, command, _timeout=12):
 def sub_kill(start=True):
     for v in PROCS.values():
         for p in v:
-            create_future_ex(force_kill, p, priority=True)
+            if p:
+                create_future_ex(force_kill, p, priority=True)
     PROCS.clear()
     if start:
         return proc_start()

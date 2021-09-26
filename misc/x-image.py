@@ -2133,6 +2133,13 @@ def blend_op(image, url, operation, amount, recursive=True):
                     image2 = image2.convert(mode)
                     if image.mode != mode:
                         image = image.convert(mode)
+            if "A" in image.mode:
+                spl, spl2 = image.split(), image2.split()
+                A = ImageChops.add(spl[-1], spl2[-1])
+                image = Image.merge("RGB", spl[:-1])
+                image2 = Image.merge("RGB", spl2[:-1])
+            else:
+                A = None
             image = Image.blend(image, image2, 0.5)
             spl = hsl_split(image, convert=False, dtype=np.uint32)
             if filt == "OVERFLOW":
@@ -2140,6 +2147,8 @@ def blend_op(image, url, operation, amount, recursive=True):
             else:
                 spl[-1] += (255 ^ spl[-1]) * spl[-1] // 255
             out = hsl_merge(*spl)
+            if A:
+                out.putalpha(A)
         # Otherwise attempt to find as ImageChops filter
         else:
             if str(image.mode) != str(image2.mode):
