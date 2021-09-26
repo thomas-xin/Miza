@@ -2110,9 +2110,9 @@ class AudioDownloader:
                 raise
             else:
                 if video:
-                    stream = entry.get("stream")
-                else:
                     stream = entry.get("video")
+                else:
+                    stream = entry.get("stream")
                 icon = entry.get("icon", None)
         # If stream is still not found or is a soundcloud audio fragment playlist file, perform secondary youtube-dl search
         if stream in (None, "none"):
