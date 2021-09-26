@@ -3650,6 +3650,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         for i, a in enumerate(message.attachments):
             if a.filename == "message.txt":
                 b = await self.get_request(message.attachments.pop(i).url)
+                if message.content:
+                    message.content += " "
                 message.content += as_str(b)
         cpy = msg = message.content
         with self.ExceptionSender(message.channel, reference=message):
