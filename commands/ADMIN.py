@@ -2770,6 +2770,8 @@ class UpdateCrossposts(Database):
                         description=emb.description,
                         colour=emb.colour,
                     )
+                    if emb.title:
+                        embed.title = emb.title
                     if emb.author:
                         author = emb.author
                         embed.set_author(name=author.name, url=author.url, icon_url=author.icon_url)
