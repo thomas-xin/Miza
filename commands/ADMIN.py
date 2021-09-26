@@ -1373,8 +1373,8 @@ class UpdateAutoEmojis(Database):
             emojis[n] = e
         return emojis
 
-    async def _nocommand_(self, message, recursive=True, **void):
-        if not message.content or getattr(message, "webhook_id", None) or message.content.count("```") > 1:
+    async def _nocommand_(self, message, recursive=True, edit=False, **void):
+        if edit or not message.content or getattr(message, "webhook_id", None) or message.content.count("```") > 1:
             return
         emojis = find_emojis(message.content)
         for e in emojis:
@@ -1529,9 +1529,13 @@ class UpdateAutoEmojis(Database):
             return
         if not recursive:
             return msg
+        files = deque()
+        for a in message.attachments:
+            b = await self.bot.get_request(a.url)
+            files.append(discord.File(io.BytesIO(b), filename=a.filename))
         create_task(self.bot.silent_delete(message))
         url = await self.bot.get_proxy_url(message.author)
-        m = await self.bot.send_as_webhook(message.channel, msg, username=message.author.display_name, avatar_url=url)
+        m = await self.bot.send_as_webhook(message.channel, msg, files=files, username=message.author.display_name, avatar_url=url)
         if recursive and regex.search(m.content):
             for k in tuple(pops):
                 if str(k[1]) not in m.content:
@@ -1543,7 +1547,7 @@ class UpdateAutoEmojis(Database):
                 msg = await self._nocommand_(message, recursive=False)
                 if msg and msg != m.content:
                     create_task(self.bot.silent_delete(m))
-                    await self.bot.send_as_webhook(message.channel, msg, username=message.author.display_name, avatar_url=url)
+                    await self.bot.send_as_webhook(message.channel, msg, files=files, username=message.author.display_name, avatar_url=url)
 
 
 # TODO: Stop being lazy and finish this damn command
