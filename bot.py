@@ -3647,13 +3647,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
     # Handles a new sent message, calls process_message and sends an error if an exception occurs.
     async def handle_message(self, message, edit=True):
+        for i, a in enumerate(message.attachments):
+            if a.filename == "message.txt":
+                b = await self.get_request(message.attachments.pop(i).url)
+                message.content += as_str(b)
         cpy = msg = message.content
-        if not msg:
-            for i, a in enumerate(message.attachments):
-                if a.filename == "message.txt":
-                    b = await message.attachments.pop(i).read()
-                    cpy = msg = message.content = as_str(b)
-                    break
         with self.ExceptionSender(message.channel, reference=message):
             if msg and msg[0] == "\\":
                 cpy = msg[1:]
@@ -4495,11 +4493,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         @self.event
         async def on_guild_join(guild):
             print(f"New server: {guild}")
-            g = await self.fetch_guild(guild.id)
-            self.sub_guilds[guild.id] = g
+            guild = await self.fetch_guild(guild.id)
+            self.sub_guilds[guild.id] = guild
             m = guild.me
-            await self.send_event("_join_", user=m, guild=g)
-            channel = self.get_first_sendable(g, m)
+            await self.send_event("_join_", user=m, guild=guild)
+            channel = self.get_first_sendable(guild, m)
             emb = discord.Embed(colour=discord.Colour(8364031))
             emb.set_author(**get_author(self.user))
             emb.description = f"```callback-fun-wallet-{utc()}-\nHi there!```I'm {self.name}, a multipurpose discord bot created by <@201548633244565504>. Thanks for adding me"
@@ -4529,6 +4527,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 ))
             message = await channel.send(embed=emb)
             await message.add_reaction("✅")
+            await self.load_guild_http(guild)
             for member in guild.members:
                 name = str(member)
                 self.usernames[name] = self.cache.users[member.id]
