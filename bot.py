@@ -2303,8 +2303,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             code = compile(b, fn, "exec", optimize=1)
             exec(code, mod)
             self._globals[module] = mod
-            commands = alist()
-            dataitems = alist()
+            commands = deque()
+            dataitems = deque()
             items = mod
             for var in items.values():
                 if callable(var) and var not in (Command, Database):
@@ -2318,10 +2318,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         obj = var(self, module)
                         if load_type == 1:
                             commands.append(obj)
-                            # print(f"Successfully loaded command {obj}.")
                         elif load_type == 2:
                             dataitems.append(obj)
-                            # print(f"Successfully loaded database {obj}.")
+            commands = alist(commands)
+            dataitems = alist(dataitems)
             for u in dataitems:
                 for c in commands:
                     c.data[u.name] = u

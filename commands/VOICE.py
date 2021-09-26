@@ -1362,7 +1362,8 @@ class AudioDownloader:
                             resp = resp[resp.index(f'<a href="https://www.yt-download.org/download/{url}/mp4/'.encode("utf-8")) + 9:]
                             stream = as_str(resp[:resp.index(b'"')])
                             search = b'<div class="text-shadow-1">'
-                            height = int(resp[resp.rindex(search) + len(search):resp.rindex(b"</div>")].strip().rstrip("p"))
+                            resp = resp[resp.index(search) + len(search):]
+                            height = int(resp[:resp.index(b"</div>")].strip().rstrip(b"p"))
                         except ValueError:
                             break
                         else:
@@ -2193,7 +2194,10 @@ class AudioDownloader:
         # "none" indicates stream is currently loading
         if stream == "none" and not force:
             return
-        entry["stream"] = "none"
+        if video:
+            entry["video"] = "none"
+        else:
+            entry["stream"] = "none"
         searched = False
         # If "research" tag is set, entry does not contain full data and requires another search
         if "research" in entry:
@@ -2207,7 +2211,10 @@ class AudioDownloader:
                 entry["url"] = ""
                 raise
             else:
-                stream = entry.get("stream", None)
+                if video:
+                    stream = entry.get("stream")
+                else:
+                    stream = entry.get("video")
                 icon = entry.get("icon", None)
         # If stream is still not found or is a soundcloud audio fragment playlist file, perform secondary youtube-dl search
         if stream in (None, "none"):
@@ -2230,10 +2237,16 @@ class AudioDownloader:
         try:
             if stream.startswith("ytsearch:") or stream in (None, "none"):
                 self.extract_single(entry, force=True)
-                stream = entry.get("stream")
+                if video:
+                    stream = entry.get("video")
+                else:
+                    stream = entry.get("stream")
                 if stream in (None, "none"):
                     raise FileNotFoundError("Unable to locate appropriate file stream.")
-            entry["stream"] = stream
+            if video:
+                entry["video"] = stream
+            else:
+                entry["stream"] = stream
             entry["icon"] = icon
             if "googlevideo" in stream[:64]:
                 durstr = regexp("[&?]dur=([0-9\\.]+)").findall(stream)
@@ -2274,7 +2287,7 @@ class AudioDownloader:
     emptybuff = b"\x00" * (48000 * 2 * 2)
     # codec_map = {}
     # For ~download
-    def download_file(self, url, fmt, start=None, end=None, auds=None, ts=None, copy=False, ar=SAMPLE_RATE, ac=2, container=None, child=False, silenceremove=False):
+    def download_file(self, url, fmt, start=None, end=None, auds=None, ts=None, copy=False, ar=SAMPLE_RATE, ac=2, size=None, container=None, child=False, silenceremove=False):
         if child:
             ctx = emptyctx
         else:
@@ -2318,7 +2331,11 @@ class AudioDownloader:
                     else:
                         fn = f"cache/\x7f{ts}~{outft}"
                 if vst or fmt in videos:
-                    vst.append(info["video"])
+                    video = info["video"]
+                    if video == info["stream"]:
+                        data = self.extract_backup(info["url"], video=True)
+                        info = info["video"] = get_best_video(data)
+                    vst.append(video)
                 ast.append(info)
             if not ast and not vst:
                 raise LookupError(f"No stream URLs found for {url}")
@@ -2343,7 +2360,7 @@ class AudioDownloader:
                         try:
                             codec = codec_map[url]
                         except KeyError:
-                            codec = as_str(subprocess.check_output(["./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name,sample_rate,channels", "-of", "default=nokey=1:noprint_wrappers=1", url])).strip()
+                            codec = as_str(subprocess.check_output(["./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,codec_name", "-of", "default=nokey=1:noprint_wrappers=1", url])).strip()
                             print(codec)
                             codec_map[url] = codec
                         add_dict(codecs, {codec: 1})
@@ -2353,8 +2370,10 @@ class AudioDownloader:
                         t = ts
                         for i, url in enumerate(vst):
                             if codec_map[url] != selcodec:
+                                width, height, selc = selcodec.splitlines()
                                 t += 1
-                                vst[i] = self.download_file(url, selcodec, auds=auds, ts=t, silenceremove=silenceremove)[0].rsplit("/", 1)[-1]
+                                w2, h2, s2 = codec_map[url].splitlines()
+                                vst[i] = self.download_file(url, selc, size=((w2, h2), (width, height)), auds=auds, ts=t, silenceremove=silenceremove)[0].rsplit("/", 1)[-1]
                     vsc = "\n".join(f"file '{i}'" for i in vst)
                     vsf = f"cache/{ts}~video.concat"
                     with open(vsf, "w", encoding="utf-8") as f:
@@ -2393,6 +2412,12 @@ class AudioDownloader:
                 args.extend(auds.construct_options(full=True))
             if silenceremove and len(ast) == 1:
                 args.extend(("-af", "silenceremove=start_periods=1:start_duration=0.015625:start_threshold=-50dB:start_silence=0.015625:stop_periods=-9000:stop_threshold=-50dB:window=0.015625"))
+            if size:
+                w1, h1 = size[0]
+                w2, h2 = size[1]
+                r = min(w2 / w1, h2 / h1)
+                w, h = round(w1 * r), round(h1 * r)
+                args.extend(("-vf", f"scale=w:h,pad=width={w2}:height={h2}:x=-1:y=-1:color=black"))
             br = 196608
             if auds and br > auds.stats.bitrate:
                 br = max(4096, auds.stats.bitrate)
@@ -4406,7 +4431,7 @@ class Lyrics(Command):
 class Download(Command):
     time_consuming = True
     _timeout_ = 75
-    name = ["📥", "Search", "YTDL", "Youtube_DL", "AF", "AudioFilter", "Trim", "Concat", "Concatenate", "ConvertORG", "Org2xm", "Convert"]
+    name = ["📥", "Search", "YTDL", "Youtube_DL", "AF", "AudioFilter", "Trim", "Concat", "Concatenate", "🌽🐱", "ConvertORG", "Org2xm", "Convert"]
     description = "Searches and/or downloads a song from a YouTube/SoundCloud query or audio file link. Will extend (loop) if trimmed past the end."
     usage = "<0:search_links>* <trim{?t}>? <-3:trim_start|->? <-2:trim_end|->? <-1:out_format(mp4)>? <concatenate{?c}|remove_silence{?r}|apply_settings{?a}|verbose_search{?v}>*"
     flags = "avtzcr"
@@ -4423,7 +4448,7 @@ class Download(Command):
         for a in message.attachments:
             argv = a.url + " " + argv
         direct = getattr(message, "simulated", None)
-        concat = "concat" in name or "c" in flags
+        concat = "concat" in name or "c" in flags or name == "🌽🐱"
         start = end = None
         # Attempt to download items in queue if no search query provided
         if not argv:

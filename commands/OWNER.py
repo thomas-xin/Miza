@@ -164,14 +164,14 @@ class Exec(Command):
     usage = "(enable|disable)? <type(virtual)>?"
     flags = "aed"
     # Different types of terminals for different purposes
-    terminal_types = demap({
-        "null": 0,
-        "main": 1,
-        "relay": 2,
-        "virtual": 4,
-        "log": 8,
-        "proxy": 16,
-    })
+    terminal_types = demap(dict(
+        null=0,
+        main=1,
+        relay=2,
+        virtual=4,
+        log=8,
+        proxy=16,
+    ))
 
     def __call__(self, bot, flags, argv, message, channel, guild, **void):
         if not argv:
