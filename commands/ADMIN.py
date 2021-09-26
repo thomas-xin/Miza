@@ -2772,6 +2772,8 @@ class UpdateCrossposts(Database):
                     )
                     if emb.title:
                         embed.title = emb.title
+                    if emb.url:
+                        embed.url = emb.url
                     if emb.author:
                         author = emb.author
                         embed.set_author(name=author.name, url=author.url, icon_url=author.icon_url)
