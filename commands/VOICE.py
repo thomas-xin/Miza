@@ -2278,7 +2278,7 @@ class AudioDownloader:
                         try:
                             codec = codec_map[url]
                         except KeyError:
-                            codec = as_str(subprocess.check_output(["./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,codec_name", "-of", "default=nokey=1:noprint_wrappers=1", url])).strip()
+                            codec = as_str(subprocess.check_output(["./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name,width,height", "-of", "default=nokey=1:noprint_wrappers=1", url])).strip()
                             print(codec)
                             codec_map[url] = codec
                         add_dict(codecs, {codec: 1})
@@ -2288,9 +2288,9 @@ class AudioDownloader:
                         t = ts
                         for i, url in enumerate(vst):
                             if codec_map[url] != selcodec:
-                                width, height, selc = selcodec.splitlines()
+                                selc, width, height = selcodec.splitlines()
                                 t += 1
-                                w2, h2, s2 = codec_map[url].splitlines()
+                                s2, w2, h2 = codec_map[url].splitlines()
                                 if selc == "av1" or selc.startswith("vp"):
                                     container = "mkv"
                                 elif selc.startswith("h26"):
