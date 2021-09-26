@@ -2220,8 +2220,9 @@ class AudioDownloader:
                     print(url)
                     print_exc()
                     continue
-                if not (fmt in videos and info.get("video") and info["video"].startswith("https://www.yt-download.org/download/")):
-                    self.get_stream(info, video=fmt in videos, force=True, download=False)
+                vid = fmt in videos or container and container in videos
+                if not (vid and info.get("video") and info["video"].startswith("https://www.yt-download.org/download/")):
+                    self.get_stream(info, video=vid, force=True, download=False)
                 if not outf:
                     outf = f"{info['name']}.{fmt}"
                     outft = outf.translate(filetrans)
@@ -2229,9 +2230,9 @@ class AudioDownloader:
                         fn = f"cache/C{ts}~{outft}"
                     else:
                         fn = f"cache/\x7f{ts}~{outft}"
-                if vst or fmt in videos:
+                if vst or vid:
                     video = info["video"]
-                    if video == info["stream"] and not (video.startswith("https://www.yt-download.org/download/") and size):
+                    if video == info["stream"] and is_youtube_url(info["url"]):
                         data = self.extract_backup(info["url"], video=True)
                         video = info["video"] = get_best_video(data)
                         try:
@@ -2295,7 +2296,7 @@ class AudioDownloader:
                                     container = "mkv"
                                 elif selc.startswith("h26"):
                                     container = "mp4"
-                                vst[i] = self.download_file(url, selc, size=((w2, h2), (width, height)), auds=auds, ts=t, silenceremove=silenceremove, container=container)[0].rsplit("/", 1)[-1]
+                                vst[i] = self.download_file(url, selc, size=((w2, h2), (width, height)), auds=auds, ts=t, container=container)[0].rsplit("/", 1)[-1]
                     vsc = "\n".join(f"file '{i}'" for i in vst)
                     vsf = f"cache/{ts}~video.concat"
                     with open(vsf, "w", encoding="utf-8") as f:
@@ -2307,7 +2308,7 @@ class AudioDownloader:
                 asf = "-"
             else:
                 asf = asc = ast[0]["stream"]
-            if not vst:
+            if not vst and not size:
                 args.append("-vn")
             elif fmt == "gif":
                 args.append("-an")
@@ -2371,7 +2372,10 @@ class AudioDownloader:
             if copy:
                 args.extend(("-c", "copy", fn))
             elif container:
-                args.extend(("-f", container, "-c", fmt, "-strict", "-2", fn))
+                outf = f"{info['name']}.{container}"
+                fn = f"cache/\x7f{ts}~" + outf.translate(filetrans)
+                c = "-c:v" if size else "-c"
+                args.extend(("-f", container, c, fmt, "-strict", "-2", fn))
             else:
                 args.extend(("-f", fmt, fn))
             print(args)
