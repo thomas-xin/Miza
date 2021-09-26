@@ -2774,7 +2774,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                             d.pop(next(iter(d)))
                                     d[u_id] = max(t, utc())
                                 else:
-                                    raise TooManyreqs.next()(f"Command has a rate limit of {sec2time(x)}; please wait {sec2time(-wait)}.")
+                                    raise TooManyRequests(f"Command has a rate limit of {sec2time(x)}; please wait {sec2time(-wait)}.")
                         flags = {}
                         if loop:
                             inc_dict(flags, h=1)
@@ -2994,7 +2994,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                             await fut
                         print(msg)
                         raise TimeoutError("Request timed out.")
-                    except (ArgumentError, TooManyreqs.next()) as ex:
+                    except (ArgumentError, TooManyRequests) as ex:
                         if fut is not None:
                             await fut
                         command.used.pop(u_id, None)

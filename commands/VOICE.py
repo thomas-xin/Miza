@@ -2234,7 +2234,11 @@ class AudioDownloader:
                     if video == info["stream"] and not (video.startswith("https://www.yt-download.org/download/") and size):
                         data = self.extract_backup(info["url"], video=True)
                         video = info["video"] = get_best_video(data)
-                        if len(urls) == 1:
+                        try:
+                            c = len(urls)
+                        except:
+                            c = 0
+                        if c == 1:
                             ft = f"cache/-{ts}-.mp4"
                             with requests.get(video, stream=True) as resp:
                                 with open(ft, "wb") as f:
@@ -4442,7 +4446,7 @@ class Download(Command):
         a = flags.get("a", 0)
         b = flags.get("r", 0)
         if concat:
-            entry = (e["url"] for e in res) if concat else res[0]["url"]
+            entry = [e["url"] for e in res] if concat else res[0]["url"]
             print(entry)
             with discord.context_managers.Typing(channel):
                 try:
