@@ -274,7 +274,7 @@ class UpdateExec(Database):
             code = await create_future(compile, proc, "<terminal>", "eval", optimize=2, priority=True)
         if code is None:
             with suppress(SyntaxError):
-                code = await create_future(compile, proc, "<terminal>", "exec", optimize=2, priority=True)
+                code = await create_future(compile, proc, "<terminal>", "exec", optimize=2)
             if code is None:
                 _ = glob.get("_")
                 defs = False
@@ -286,7 +286,7 @@ class UpdateExec(Database):
                 func += "\n".join(("\tglobals().update(locals())\n" if not defs and line.strip().startswith("return") else "") + "\t" + line for line in lines)
                 func += "\n\tglobals().update(locals())"
                 code2 = await create_future(compile, func, "<terminal>", "exec", optimize=2, priority=True)
-                await create_future(eval, code2, glob, priority=True)
+                await create_future(eval, code2, glob)
                 output = await glob["_"]()
                 glob["_"] = _
         if code is not None:
@@ -593,7 +593,7 @@ class Immortalise(Command):
                     if fi.startswith(f"!{fid}~"):
                         fid += 1
                 out = f"cache/!{fid}~{fn}"
-                await create_future(os.rename, p, out, priority=True)
+                os.rename(p, out)
                 return f"{self.bot.webserver}/view/!{fid}\n{self.bot.webserver}/download/!{fid}"
         raise TypeError("Not a valid webserver URL.")
         

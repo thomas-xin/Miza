@@ -2182,6 +2182,85 @@ class AudioDownloader:
             print_exc()
             entry["url"] = ""
 
+    def concat_video(self, urls, fmt, start, end, auds):
+        ts = ts_us()
+        url = urls[0]
+        res = self.search(url)
+        if type(res) is str:
+            raise evalex(res)
+        info = res[0]
+        if not (info.get("video") and info["video"].startswith("https://www.yt-download.org/download/")):
+            self.get_stream(info, video=True, force=True, download=False)
+        video = info["video"]
+        if video == info["stream"] and is_youtube_url(info["url"]):
+            data = self.extract_backup(info["url"], video=True)
+            video = info["video"] = get_best_video(data)
+        vidinfo = as_str(subprocess.check_output(["./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name,width,height,avg_frame_rate", "-of", "default=nokey=1:noprint_wrappers=1", video])).strip()
+        codec, *size, fps = vidinfo.splitlines()
+        size = [int(x) for x in size]
+        w2, h2 = size
+        try:
+            fps = eval(fps, {}, {})
+        except:
+            fps = 30
+        args = alist(("ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-hwaccel", "auto", "-y"))
+        args.extend(("-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", "rgb24", "-video_size", "x".join(map(str, size)), "-i", "-"))
+        afile = f"cache/-{ts}-.pcm"
+        args.extend(("-f", "s16le", "-ac", "2", "-ar", str(SAMPLE_RATE), "-i", afile))
+        args.extend(("-map", "0:v:0", "-map", "1:a:0", "-b:v", "2M", "-b:a", "192k"))
+        outf = f"{info['name']} +{len(urls) - 1}.{fmt}"
+        fn = f"cache/\x7f{ts}~" + outf.translate(filetrans)
+        args.append(fn)
+        with open(afile, "wb") as p:
+            for t, url in enumerate(urls, ts + 1):
+                cfn = None
+                try:
+                    cfn = self.download_file(url, "pcm", auds=None, ts=t, child=True)[0]
+                except:
+                    print_exc()
+                if cfn and os.path.exists(cfn):
+                    if os.path.getsize(cfn):
+                        with open(cfn, "rb") as f:
+                            while True:
+                                b = f.read(1048576)
+                                if not b:
+                                    break
+                                p.write(b)
+                    create_future_ex(os.remove, cfn)
+        proc = psutil.Popen(args, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+        for url in urls:
+            res = self.search(url)
+            if type(res) is str:
+                raise evalex(res)
+            info = res[0]
+            if not (info.get("video") and info["video"].startswith("https://www.yt-download.org/download/")):
+                self.get_stream(info, video=True, force=True, download=False)
+            video = info["video"]
+            if video == info["stream"] and is_youtube_url(info["url"]):
+                data = self.extract_backup(info["url"], video=True)
+                video = info["video"] = get_best_video(data)
+            vidinfo = as_str(subprocess.check_output(["./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "default=nokey=1:noprint_wrappers=1", video])).strip()
+            args = alist(("ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y"))
+            args.extend(("-i", video))
+            w1, h1 = map(int, vidinfo.splitlines())
+            if w1 != w2 or h1 != h2:
+                r = min(w2 / w1, h2 / h1)
+                w, h = round(w1 * r), round(h1 * r)
+                vf = f"scale={w}:{h}"
+                if w != w2 or h != h2:
+                    vf += f",pad=width={w2}:height={h2}:x=-1:y=-1:color=black"
+                args.extend(("-vf", vf))
+            args.extend(("-f", "rawvideo", "-pix_fmt", "rgb24", "-"))
+            pin = psutil.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+            while True:
+                b = pin.stdout.read(1048576)
+                if not b:
+                    break
+                proc.stdin.write(b)
+        proc.stdin.close()
+        proc.wait()
+        return fn, outf
+
     emptybuff = b"\x00" * (48000 * 2 * 2)
     # codec_map = {}
     # For ~download
@@ -2197,11 +2276,18 @@ class AudioDownloader:
                 fmt = "mp3"
             else:
                 mid = False
-            videos = ("webm", "mkv", "f4v", "flv", "mov", "qt", "wmv", "mp4", "m4v", "mpv", "gif")
+            videos = {"webm", "mkv", "f4v", "flv", "mov", "qt", "wmv", "mp4", "m4v", "mpv", "gif", "apng", "webp"}
+            vid = fmt in videos or container and container in videos
             if type(url) is str:
                 urls = (url,)
             else:
                 urls = url
+                if vid:
+                    try:
+                        if len(urls) > 1:
+                            return self.concat_video(urls, fmt, start, end, auds)
+                    except TypeError:
+                        pass
             vst = deque()
             ast = deque()
             if not ts:
@@ -2220,7 +2306,6 @@ class AudioDownloader:
                     print(url)
                     print_exc()
                     continue
-                vid = fmt in videos or container and container in videos
                 if not (vid and info.get("video") and info["video"].startswith("https://www.yt-download.org/download/")):
                     self.get_stream(info, video=vid, force=True, download=False)
                 if not outf:
@@ -2270,7 +2355,7 @@ class AudioDownloader:
                         copy = True
             else:
                 copy = False
-            args = alist((ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y"))
+            args = alist((ffmpeg, "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y"))
             if vst:
                 if len(vst) > 1:
                     codec_map = {}
@@ -2310,7 +2395,7 @@ class AudioDownloader:
                 asf = asc = ast[0]["stream"]
             if not vst and not size:
                 args.append("-vn")
-            elif fmt == "gif":
+            elif fmt in ("gif", "apng", "webp"):
                 args.append("-an")
             if str(start) != "None":
                 start = round_min(float(start))
@@ -2333,14 +2418,17 @@ class AudioDownloader:
             args.extend(("-i", asf, "-map_metadata", "-1"))
             if auds:
                 args.extend(auds.construct_options(full=True))
-            if silenceremove and len(ast) == 1:
+            if silenceremove and len(ast) == 1 and not vid:
                 args.extend(("-af", "silenceremove=start_periods=1:start_duration=0.015625:start_threshold=-50dB:start_silence=0.015625:stop_periods=-9000:stop_threshold=-50dB:window=0.015625"))
             if size:
                 w1, h1 = map(int, size[0])
                 w2, h2 = map(int, size[1])
                 r = min(w2 / w1, h2 / h1)
                 w, h = round(w1 * r), round(h1 * r)
-                args.extend(("-vf", f"scale=w:h,pad=width={w2}:height={h2}:x=-1:y=-1:color=black"))
+                vf = f"scale={w}:{h}"
+                if w != w2 or h != h2:
+                    vf += f",pad=width={w2}:height={h2}:x=-1:y=-1:color=black"
+                args.extend(("-vf", vf))
             br = 196608
             if auds and br > auds.stats.bitrate:
                 br = max(4096, auds.stats.bitrate)
@@ -2367,6 +2455,8 @@ class AudioDownloader:
                 br = "256"
                 outf = f"{info['name']}.wav"
                 fn = f"cache/\x7f{ts}~" + outf.translate(filetrans)
+            elif fmt == "mkv":
+                fmt = "matroska"
             if not copy and ast:
                 args.extend(("-ar", sr, "-ac", ac, "-b:a", str(br)))
             if copy:
@@ -2375,6 +2465,8 @@ class AudioDownloader:
                 outf = f"{info['name']}.{container}"
                 fn = f"cache/\x7f{ts}~" + outf.translate(filetrans)
                 c = "-c:v" if size else "-c"
+                if container == "mkv":
+                    container = "matroska"
                 args.extend(("-f", container, c, fmt, "-strict", "-2", fn))
             else:
                 args.extend(("-f", fmt, fn))
@@ -2384,7 +2476,6 @@ class AudioDownloader:
                     proc = psutil.Popen(args, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
                     for t, info in enumerate(ast, ts + 1):
                         cfn = None
-                        fut = create_future_ex(proc.stdin.write, self.emptybuff)
                         if type(info) is not str:
                             url = info.get("url")
                         else:
@@ -2393,7 +2484,6 @@ class AudioDownloader:
                             cfn = self.download_file(url, "pcm", auds=None, ts=t, child=True, silenceremove=silenceremove)[0]
                         except:
                             print_exc()
-                        fut.result()
                         if cfn and os.path.exists(cfn):
                             if os.path.getsize(cfn):
                                 with open(cfn, "rb") as f:
@@ -2403,6 +2493,7 @@ class AudioDownloader:
                                             break
                                         proc.stdin.write(b)
                             create_future_ex(os.remove, cfn)
+                    proc.stdin.flush()
                     proc.stdin.close()
                     proc.wait()
                 else:
@@ -2414,7 +2505,7 @@ class AudioDownloader:
                     url = ast[0]
                     if type(url) is not str:
                         url = url["url"]
-                    if is_youtube_url(url):
+                    if is_youtube_url(url) or is_youtube_stream(url) or vid:
                         raise ex
                     new = select_and_convert(url)
                 except ValueError:
@@ -2433,11 +2524,6 @@ class AudioDownloader:
                 if not is_url(new):
                     with suppress():
                         os.remove(new)
-            # with tracebacksuppressor:
-            #     if len(ast) > 1:
-            #         os.remove(asf)
-            #     if len(vst) > 1:
-            #         os.remove(vsf)
             if end:
                 odur = end - start
                 if odur:
@@ -4398,7 +4484,7 @@ class Download(Command):
                     spl = argv.split(" ")
                 if len(spl) >= 1:
                     fmt = spl[-1].lstrip(".")
-                    if fmt.casefold() not in ("mp3", "ogg", "opus", "m4a", "flac", "wav", "wma", "mp2", "weba", "vox", "adpcm", "pcm", "8bit", "mid", "midi", "webm", "mp4", "avi", "mov", "m4v", "mkv", "f4v", "flv", "wmv", "gif"):
+                    if fmt.casefold() not in ("mp3", "ogg", "opus", "m4a", "flac", "wav", "wma", "mp2", "weba", "vox", "adpcm", "pcm", "8bit", "mid", "midi", "webm", "mp4", "avi", "mov", "m4v", "mkv", "f4v", "flv", "wmv", "gif", "apng", "webp"):
                         fmt = default_fmt
                     else:
                         if spl[-2] in ("as", "to"):
@@ -4593,7 +4679,10 @@ class Download(Command):
                             reference=reference,
                         )
                         if resp.attachments and type(f) is str:
-                            create_future_ex(os.remove, f, timeout=18, priority=True)
+                            try:
+                                os.remove(f)
+                            except:
+                                pass
                         create_task(bot.silent_delete(message, no_log=True))
 
 
@@ -4689,7 +4778,7 @@ class UpdateAudio(Database):
             if guild is not None:
                 if guild.id in self.players:
                     auds = self.players[guild.id]
-                    create_future_ex(auds.update, priority=True)
+                    create_future_ex(auds.update)
             else:
                 a = 1
                 async with Delay(0.5):
@@ -4723,7 +4812,7 @@ class UpdateAudio(Database):
     async def _destroy_(self, **void):
         for auds in tuple(self.players.values()):
             d, _ = await create_future(auds.get_dump, True, True)
-            self.data[auds.acsi.channel.id] = {"dump": d, "channel": auds.text.id}
+            self.data[auds.acsi.channel.id] = dict(dump=d, channel=auds.text.id)
             await create_future(auds.kill, reason="")
             self.update(auds.acsi.channel.id)
         for file in tuple(ytdl.cache.values()):

@@ -2767,7 +2767,7 @@ class UpdateCrossposts(Database):
     async def _send_(self, message, **void):
         if message.channel.id in self.data and not message.flags.is_crossposted and "\u2009\u2009" not in message.author.name:
             with tracebacksuppressor:
-                content = message.content
+                content = message.content or message.system_content
                 embeds = deque()
                 for emb in message.embeds:
                     embed = discord.Embed(

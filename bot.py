@@ -5,9 +5,9 @@
 import common
 from common import *
 
-create_future_ex(get_colour_list, priority=False)
-create_future_ex(load_emojis, priority=False)
-create_future_ex(load_timezones, priority=False)
+create_future_ex(get_colour_list)
+create_future_ex(load_emojis)
+create_future_ex(load_timezones)
 
 # Allows importing from commands and misc directories.
 sys.path.insert(1, "commands")
@@ -317,7 +317,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                                 if not found:
                                     print(f"creating new slash command {command_data['name']}...")
                                     print(command_data)
-                                    create_future_ex(self.create_command, command_data, priority=True)
+                                    create_future_ex(self.create_command, command_data)
         time.sleep(3)
         for curr in commands.values():
             with tracebacksuppressor:
@@ -1550,7 +1550,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         if colour:
             col = await self.get_colour(message.author)
             emb.colour = col
-        if not message.content:
+        content = message.content or message.system_content
+        if not content:
             if len(message.attachments) == 1:
                 url = message.attachments[0].url
                 if is_image(url):
@@ -1583,7 +1584,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     emb.timestamp = message.edited_at or message.created_at
                 return emb
         else:
-            urls = await self.follow_url(message.content)
+            urls = await self.follow_url(content)
             if urls:
                 with tracebacksuppressor:
                     url = urls[0]
@@ -1597,14 +1598,14 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                             url = await self.data.exec.aproxy(url)
                         emb.url = url
                         emb.set_image(url=url)
-                        if url != message.content:
-                            emb.description = message.content
+                        if url != content:
+                            emb.description = content
                         if link:
                             emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 4096)
                             emb.timestamp = message.edited_at or message.created_at
                         return emb
-        emb.description = message.content
-        if len(message.embeds) > 1 or message.content:
+        emb.description = content
+        if len(message.embeds) > 1 or content:
             urls = list(chain(("(" + e.url + ")" for e in message.embeds[1:] if e.url), ("[" + best_url(a) + "]" for a in message.attachments)))
             items = []
             for i in range((len(urls) + 9) // 10):
@@ -2237,7 +2238,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             c = await create_future(proc.cpu_percent, priority=True)
             if not c:
                 await asyncio.sleep(1)
-                c = await create_future(proc.cpu_percent, priority=False)
+                c = await create_future(proc.cpu_percent)
             m = proc.memory_percent()
             return float(c), float(m)
         return 0, 0
@@ -2345,7 +2346,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     for e in ("_bot_ready_", "_ready_"):
                         func = getattr(db, e, None)
                         if callable(func):
-                            await_fut(create_future(func, bot=self, priority=True))
+                            await_fut(create_future(func, bot=self))
             print(f"Successfully loaded module {module}.")
             return True
 
@@ -2423,7 +2424,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 if utc() - os.path.getmtime(fn) < 60:
                     return fn
                 os.remove(fn)
-            lines = as_str(subprocess.run([sys.executable, "misc/neutrino.py", "-c4", "saves", fn], stderr=subprocess.PIPE).stdout).splitlines()
+            lines = as_str(subprocess.run([sys.executable, "neutrino.py", "-c4", "../saves", "../" + fn], stderr=subprocess.PIPE, cwd="misc").stdout).splitlines()
             s = "\n".join(line for line in lines if not line.startswith("\r"))
             print(s)
         # zf = ZipFile(fn, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
@@ -2467,8 +2468,9 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             await_fut(self.send_event("_day_"))
             self.users_updated = True
         if force or day:
-            create_future_ex(self.clear_cache, priority=True)
-            await_fut(self.send_event("_save_"))
+            fut = self.send_event("_save_")
+            self.clear_cache()
+            await_fut(fut)
         if day:
             self.backup()
 
@@ -3059,7 +3061,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 code = await create_future(compile, proc, "<webserver>", "eval", optimize=2, priority=True)
             if code is None:
                 with suppress(SyntaxError):
-                    code = await create_future(compile, proc, "<webserver>", "exec", optimize=2, priority=True)
+                    code = await create_future(compile, proc, "<webserver>", "exec", optimize=2)
                 if code is None:
                     _ = glob.get("_")
                     defs = False
@@ -3071,7 +3073,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     func += "\n".join(("\tglobals().update(locals())\n" if not defs and line.strip().startswith("return") else "") + "\t" + line for line in lines)
                     func += "\n\tglobals().update(locals())"
                     code2 = await create_future(compile, func, "<webserver>", "exec", optimize=2, priority=True)
-                    await create_future(eval, code2, glob, priority=True)
+                    await create_future(eval, code2, glob)
                     output = await glob["_"]()
                     glob["_"] = _
             if code is not None:
@@ -3567,9 +3569,10 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     if xrand(2):
                         continue
                     try:
-                        resp = await create_future(reqs.next().head, f"https://discord.com/api/{api}", priority=True)
+                        t = utc()
+                        resp = await Request.sessions.next().head(f"https://discord.com/api/{api}")
                         self.activity += 1
-                        self.api_latency = resp.elapsed.total_seconds()
+                        self.api_latency = utc() - t
                     except:
                         if hasattr(self, "api_latency"):
                             self.api_latency *= 2
@@ -3596,7 +3599,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                         await create_future(self.update, priority=True)
                     await asyncio.sleep(1)
                     with MemoryTimer("update_file_cache"):
-                        await create_future(update_file_cache, priority=True)
+                        await create_future(update_file_cache)
                     await asyncio.sleep(1)
                     with MemoryTimer("get_disk"):
                         await self.get_disk()
@@ -4421,7 +4424,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                 print("Setting bot avatar...")
                 f = await create_future(open, "misc/avatar.png", "rb", priority=True)
                 with closing(f):
-                    b = await create_future(f.read, priority=True)
+                    b = await create_future(f.read)
                 await self.user.edit(avatar=b)
                 await self.seen(self.user, event="misc", raw="Editing their profile")
                 touch("misc/init.tmp")
@@ -4444,7 +4447,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                     await fut
             await wrap_future(self.connect_ready)
             await wrap_future(self.guilds_ready)
-            await create_future(self.update_usernames, priority=True)
+            await create_future(self.update_usernames)
             self.ready = True
             # Send ready event to all databases.
             print("Database ready.")

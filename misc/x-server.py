@@ -216,6 +216,8 @@ class Server:
             if (len(b) - 1) & 3 == 0:
                 b += b"="
             path = str(int.from_bytes(base64.urlsafe_b64decode(b), "big"))
+        else:
+            path = path[1:]
         if not p:
             p = find_file(path, ind=ind)
         mime = get_mime(p)
@@ -290,6 +292,8 @@ class Server:
             if (len(b) - 1) & 3 == 0:
                 b += b"="
             path = str(int.from_bytes(base64.urlsafe_b64decode(b), "big"))
+        else:
+            path = path[1:]
         if not p:
             p = find_file(path, ind=ind)
         sem = SEMAPHORES.get(p)
@@ -401,6 +405,8 @@ class Server:
                         "-fflags",
                         "+discardcorrupt+genpts+igndts+flush_packets",
                         "-an",
+                        "-hwaccel",
+                        "auto",
                         "-i",
                         p,
                         "-loop",
@@ -812,6 +818,8 @@ class Server:
                 if (len(b) - 1) & 3 == 0:
                     b += b"="
                 path = str(int.from_bytes(base64.urlsafe_b64decode(b), "big"))
+            else:
+                path = path[1:]
             if not p:
                 p = find_file(path, ind=ind)
             sem = SEMAPHORES.get(p)

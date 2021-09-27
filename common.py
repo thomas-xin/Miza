@@ -551,7 +551,7 @@ class FileHashDict(collections.abc.MutableMapping):
             for file in sorted(os.listdir("backup"), reverse=True):
                 with tracebacksuppressor:
                     if file.endswith(".wb"):
-                        s = subprocess.check_output([sys.executable, "misc/neutrino.py", "backup/" + file, "-f", fn.split("/", 1)[-1]])
+                        s = subprocess.check_output([sys.executable, "neutrino.py", "../backup/" + file, "-f", fn.split("/", 1)[-1]], cwd="misc")
                     else:
                         with zipfile.ZipFile("backup/" + file, compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False) as z:
                             s = z.read(fn)
@@ -1262,7 +1262,8 @@ EmptyEmbed = discord.embeds._EmptyEmbed
 
 def as_embed(message, link=False):
     emb = discord.Embed(description="").set_author(**get_author(message.author))
-    if not message.content:
+    content = message.content or message.system_content
+    if not content:
         if len(message.attachments) == 1:
             url = message.attachments[0].url
             if is_image(url):
@@ -1292,7 +1293,7 @@ def as_embed(message, link=False):
                 emb.timestamp = message.edited_at or message.created_at
             return emb
     else:
-        urls = find_urls(message.content)
+        urls = find_urls(content)
         if urls:
             with tracebacksuppressor:
                 url = urls[0]
@@ -1303,14 +1304,14 @@ def as_embed(message, link=False):
                 if headers.get("Content-Type").split("/", 1)[0] == "image":
                     emb.url = url
                     emb.set_image(url=url)
-                    if url != message.content:
-                        emb.description = message.content
+                    if url != content:
+                        emb.description = content
                     if link:
                         emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 4096)
                         emb.timestamp = message.edited_at or message.created_at
                     return emb
-    emb.description = message.content
-    if len(message.embeds) > 1 or message.content:
+    emb.description = content
+    if len(message.embeds) > 1 or content:
         urls = chain(("(" + e.url + ")" for e in message.embeds[1:] if e.url), ("[" + best_url(a) + "]" for a in message.attachments))
         items = list(urls)
     else:
@@ -2034,7 +2035,7 @@ class MultiThreadPool(collections.abc.Sized, concurrent.futures.Executor):
 
     shutdown = lambda self, wait=True: [exc.shutdown(wait) for exc in self.pools].append(self.pools.clear())
 
-pthreads = ThreadPoolExecutor(64, initializer=__setloop__)
+pthreads = ThreadPoolExecutor(32, initializer=__setloop__)
 athreads = MultiThreadPool(pool_count=2, thread_count=64, initializer=__setloop__)
 
 def get_event_loop():

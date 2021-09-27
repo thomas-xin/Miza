@@ -386,11 +386,14 @@ class AudioFile:
             cdc2 = "opus"
         # Collects data from source, converts to 48khz 192kbps opus format, outputting to target file
         cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-hwaccel", "auto", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", fmt, "-c:a", cdc, "-ar", str(SAMPLE_RATE), "-ac", "2", "-b:a", "196608", "cache/" + self.file]
-        if "https://cf-hls-media.sndcdn.com/" not in stream:
-            with suppress():
+        # if not stream.startswith("https://cf-hls-media.sndcdn.com/"):
+        with suppress():
+            if stream.startswith("https://www.yt-download.org/download/"):
+                fmt2 = "mp3"
+            else:
                 fmt2 = as_str(subprocess.check_output(["./ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name", "-of", "default=nokey=1:noprint_wrappers=1", stream])).strip()
-                if fmt2 == cdc2:
-                    cmd = ["./ffmpeg", "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-hwaccel", "auto", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-c:a", "copy", "cache/" + self.file]
+            if fmt2 == cdc2:
+                cmd = ["./ffmpeg", "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-hwaccel", "auto", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-c:a", "copy", "cache/" + self.file]
         self.proc = None
         try:
             try:
