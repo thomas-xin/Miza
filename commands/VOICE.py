@@ -2259,6 +2259,8 @@ class AudioDownloader:
                 proc.stdin.write(b)
         proc.stdin.close()
         proc.wait()
+        with suppress():
+            os.remove(afile)
         return fn, outf
 
     emptybuff = b"\x00" * (48000 * 2 * 2)
