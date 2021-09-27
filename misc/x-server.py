@@ -405,8 +405,6 @@ class Server:
                         "-fflags",
                         "+discardcorrupt+genpts+igndts+flush_packets",
                         "-an",
-                        "-hwaccel",
-                        "auto",
                         "-i",
                         p,
                         "-loop",

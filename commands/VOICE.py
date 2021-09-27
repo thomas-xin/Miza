@@ -2538,7 +2538,7 @@ class AudioDownloader:
                         with open(loopf, "w", encoding="utf-8") as f:
                             f.write(f"file '{fn2.split('/', 1)[-1]}'\n" * times)
                         args = [
-                            "./ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-hwaccel", "auto",
+                            "./ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
                             "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets",
                             "-protocol_whitelist", "concat,tls,tcp,file,http,https",
                             "-to", str(odur), "-f", "concat", "-safe", "0",
