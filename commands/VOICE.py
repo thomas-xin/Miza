@@ -2203,62 +2203,67 @@ class AudioDownloader:
             fps = eval(fps, {}, {})
         except:
             fps = 30
-        args = alist(("ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-hwaccel", "auto", "-y"))
-        args.extend(("-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", "rgb24", "-video_size", "x".join(map(str, size)), "-i", "-"))
+        args = ["ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-hwaccel", "auto", "-y"]
+        args.extend(("-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", "rgb24", "-video_size", "x".join(map(str, size)), "-i", "-", "-an", "-b:v", "2M"))
         afile = f"cache/-{ts}-.pcm"
-        args.extend(("-f", "s16le", "-ac", "2", "-ar", str(SAMPLE_RATE), "-i", afile))
-        args.extend(("-map", "0:v:0", "-map", "1:a:0", "-b:v", "2M", "-b:a", "192k"))
         outf = f"{info['name']} +{len(urls) - 1}.{fmt}"
         fn = f"cache/\x7f{ts}~" + outf.translate(filetrans)
-        args.append(fn)
-        with open(afile, "wb") as p:
+        fnv = f"cache/V{ts}~" + outf.translate(filetrans)
+        args.append(fnv)
+        print(args)
+        proc = psutil.Popen(args, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+        audios = deque()
+        with open(afile, "wb") as afp:
             for t, url in enumerate(urls, ts + 1):
-                cfn = None
-                try:
-                    cfn = self.download_file(url, "pcm", auds=None, ts=t, child=True)[0]
-                except:
-                    print_exc()
-                if cfn and os.path.exists(cfn):
+                with tracebacksuppressor:
+                    fut = create_future_ex(self.download_file, url, "pcm", auds=None, ts=t, child=True)
+                    res = self.search(url)
+                    if type(res) is str:
+                        raise evalex(res)
+                    info = res[0]
+                    if not (info.get("video") and info["video"].startswith("https://www.yt-download.org/download/")):
+                        self.get_stream(info, video=True, force=True, download=False)
+                    video = info["video"]
+                    if video == info["stream"] and is_youtube_url(info["url"]):
+                        data = self.extract_backup(info["url"], video=True)
+                        video = info["video"] = get_best_video(data)
+                    vidinfo = as_str(subprocess.check_output(["./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "default=nokey=1:noprint_wrappers=1", video])).strip()
+                    args = alist(("ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y"))
+                    args.extend(("-i", video))
+                    w1, h1 = map(int, vidinfo.splitlines())
+                    if w1 != w2 or h1 != h2:
+                        r = min(w2 / w1, h2 / h1)
+                        w, h = round(w1 * r), round(h1 * r)
+                        vf = f"scale={w}:{h}"
+                        if w != w2 or h != h2:
+                            vf += f",pad=width={w2}:height={h2}:x=-1:y=-1:color=black"
+                        args.extend(("-vf", vf))
+                    args.extend(("-f", "rawvideo", "-pix_fmt", "rgb24", "-"))
+                    cfn = fut.result()[0]
+                    print(args)
+                    pin = psutil.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+                    audios.append(cfn)
+                    while True:
+                        b = pin.stdout.read(1048576)
+                        if not b:
+                            break
+                        proc.stdin.write(b)
                     if os.path.getsize(cfn):
                         with open(cfn, "rb") as f:
                             while True:
                                 b = f.read(1048576)
                                 if not b:
                                     break
-                                p.write(b)
-                    create_future_ex(os.remove, cfn)
-        proc = psutil.Popen(args, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
-        for url in urls:
-            res = self.search(url)
-            if type(res) is str:
-                raise evalex(res)
-            info = res[0]
-            if not (info.get("video") and info["video"].startswith("https://www.yt-download.org/download/")):
-                self.get_stream(info, video=True, force=True, download=False)
-            video = info["video"]
-            if video == info["stream"] and is_youtube_url(info["url"]):
-                data = self.extract_backup(info["url"], video=True)
-                video = info["video"] = get_best_video(data)
-            vidinfo = as_str(subprocess.check_output(["./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "default=nokey=1:noprint_wrappers=1", video])).strip()
-            args = alist(("ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y"))
-            args.extend(("-i", video))
-            w1, h1 = map(int, vidinfo.splitlines())
-            if w1 != w2 or h1 != h2:
-                r = min(w2 / w1, h2 / h1)
-                w, h = round(w1 * r), round(h1 * r)
-                vf = f"scale={w}:{h}"
-                if w != w2 or h != h2:
-                    vf += f",pad=width={w2}:height={h2}:x=-1:y=-1:color=black"
-                args.extend(("-vf", vf))
-            args.extend(("-f", "rawvideo", "-pix_fmt", "rgb24", "-"))
-            pin = psutil.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-            while True:
-                b = pin.stdout.read(1048576)
-                if not b:
-                    break
-                proc.stdin.write(b)
+                                afp.write(b)
+                    with suppress():
+                        os.remove(cfn)
         proc.stdin.close()
         proc.wait()
+        args = ["ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y"]
+        args.extend(("-i", fnv, "-f", "s16le", "-ac", "2", "-ar", str(SAMPLE_RATE), "-i", afile))
+        args.extend(("-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-b:a", "192k", fn))
+        print(args)
+        subprocess.run(args, stderr=subprocess.PIPE)
         with suppress():
             os.remove(afile)
         return fn, outf

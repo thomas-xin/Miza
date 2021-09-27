@@ -418,7 +418,7 @@ class Server:
                     proc = psutil.Popen(args, stdout=subprocess.PIPE)
                     image_loaders[preview] = proc
                 cp.response.headers["Content-Type"] = "image/gif"
-                cp.response.headers["ETag"] = create_etag(b)
+                cp.response.headers["ETag"] = create_etag(p)
                 while preview in image_loaders and (not os.path.exists(preview) or os.path.getsize(preview) < 524288) and image_loaders[preview].is_running():
                     time.sleep(0.05)
                 f = None
@@ -468,7 +468,7 @@ class Server:
                 return b
             elif not os.path.exists(p):
                 raise FileNotFoundError(p)
-            elif not download and p.endswith("~.forward$") and mime == "text/html":
+            elif not download and p.endswith("~.forward$") and mime == "text/html" and os.path.getsize(p) < 8192:
                 with open(p, "r", encoding="utf-8") as f:
                     resp = f.read(1048576)
                 s = resp
