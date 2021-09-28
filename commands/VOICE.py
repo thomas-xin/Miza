@@ -2182,8 +2182,11 @@ class AudioDownloader:
             print_exc()
             entry["url"] = ""
 
+    # Video concatenation algorithm; supports different formats, codecs, resolutions, aspect ratios and framerates
     def concat_video(self, urls, fmt, start, end, auds):
+        urls = list(urls)
         ts = ts_us()
+        # Collect information on first video stream; use this as the baseline for all other streams to concatenate
         url = urls[0]
         res = self.search(url)
         if type(res) is str:
@@ -2199,23 +2202,28 @@ class AudioDownloader:
         codec, *size, fps = vidinfo.splitlines()
         size = [int(x) for x in size]
         w2, h2 = size
+        # FFprobe returns fps as a fraction
         try:
             fps = eval(fps, {}, {})
         except:
             fps = 30
+        # First produce a silent video file (I would have stored it as raw, except that overflows storage really bad)
         args = ["ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-hwaccel", "auto", "-y"]
         args.extend(("-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", "rgb24", "-video_size", "x".join(map(str, size)), "-i", "-", "-an", "-b:v", "2M"))
         afile = f"cache/-{ts}-.pcm"
-        outf = f"{info['name']} +{len(urls) - 1}.{fmt}"
+        if len(urls) > 1:
+            outf = f"{info['name']} +{len(urls) - 1}.{fmt}"
+        else:
+            outf = f"{info['name']}.{fmt}"
         fn = f"cache/\x7f{ts}~" + outf.translate(filetrans)
         fnv = f"cache/V{ts}~" + outf.translate(filetrans)
         args.append(fnv)
         print(args)
         proc = psutil.Popen(args, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
-        audios = deque()
         with open(afile, "wb") as afp:
             for t, url in enumerate(urls, ts + 1):
                 with tracebacksuppressor:
+                    # Download and convert the raw audio as pcm in background
                     fut = create_future_ex(self.download_file, url, "pcm", auds=None, ts=t, child=True)
                     res = self.search(url)
                     if type(res) is str:
@@ -2230,8 +2238,10 @@ class AudioDownloader:
                     vidinfo = as_str(subprocess.check_output(["./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "default=nokey=1:noprint_wrappers=1", video])).strip()
                     args = alist(("ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y"))
                     args.extend(("-i", video))
+                    # Tell FFmpeg to match fps/frame count as much as possible
                     vf = f"fps={fps}"
                     w1, h1 = map(int, vidinfo.splitlines())
+                    # If video needs resizing, keep aspect ratio while adding black padding as required
                     if w1 != w2 or h1 != h2:
                         r = min(w2 / w1, h2 / h1)
                         w, h = round(w1 * r), round(h1 * r)
@@ -2239,11 +2249,12 @@ class AudioDownloader:
                         if w != w2 or h != h2:
                             vf += f",pad=width={w2}:height={h2}:x=-1:y=-1:color=black"
                     args.extend(("-vf", vf))
+                    # Pipe to main process, as raw video is extremely bloated and easily overflows hundreds of GB data
                     args.extend(("-f", "rawvideo", "-pix_fmt", "rgb24", "-"))
                     cfn = fut.result()[0]
                     print(args)
                     pin = psutil.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-                    audios.append(cfn)
+                    # Count amount of data for the raw video input, while piping to FFmpeg to encode
                     fsize = 0
                     while True:
                         b = pin.stdout.read(1048576)
@@ -2251,8 +2262,10 @@ class AudioDownloader:
                             break
                         proc.stdin.write(b)
                         fsize += len(b)
+                    # Calculate duration and exact amount of audio samples to use, minimising possibility of desyncs
                     duration = fsize / np.prod(size) / 3 / fps
                     amax = round_random(duration * SAMPLE_RATE) * 2 * 2
+                    # Write audio to the raw pcm as desired; trim if there is too much, pad with zeros if not enough
                     asize = 0
                     if os.path.getsize(cfn):
                         with open(cfn, "rb") as f:
@@ -2279,6 +2292,7 @@ class AudioDownloader:
                         os.remove(cfn)
         proc.stdin.close()
         proc.wait()
+        # Add the audio to the rendered video, without re-encoding the entire frames
         args = ["ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y"]
         args.extend(("-i", fnv, "-f", "s16le", "-ac", "2", "-ar", str(SAMPLE_RATE), "-i", afile))
         args.extend(("-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-b:a", "192k", fn))
@@ -2310,12 +2324,8 @@ class AudioDownloader:
                 urls = (url,)
             else:
                 urls = url
-                if vid:
-                    try:
-                        if len(urls) > 1:
-                            return self.concat_video(urls, fmt, start, end, auds)
-                    except TypeError:
-                        pass
+            if vid:
+                return self.concat_video(urls, fmt, start, end, auds)
             vst = deque()
             ast = deque()
             if not ts:
