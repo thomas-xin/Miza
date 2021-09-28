@@ -136,13 +136,13 @@ updated = False
 def download(url, fn, resp=None, index=0, start=None, end=None):
 	size = 0
 	packet = 131072
-	# if not random.randint(0, 16):
-	# 	print(f"Intentionally blocking thread {index}...")
-	# 	time.sleep(86400)
 	try:
 		f = open(fn, "wb")
 	except:
 		f = open(fn, "rb+")
+	# if not random.randint(0, 16):
+	# 	print(f"Intentionally blocking thread {index}...")
+	# 	time.sleep(86400)
 	with f:
 		while True:
 			try:
@@ -448,6 +448,11 @@ if threads > 1:
 					if i + 2 >= len(workers) or workers[i + 2].done() or x > 2:
 						print(f"Thread {i + 1} timed out, restarting...")
 						tt += 5
+						start = (i + 1) * load
+						if i + 1 == threads - 1:
+							end = None
+						else:
+							end = min(start + load, fsize)
 						fut = workers[i + 1] = prio.submit(download, url, f"cache/thread-{i + 1}", resp, index=i + 1, start=start, end=end)
 					continue
 				else:
