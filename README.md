@@ -96,7 +96,7 @@ git clone https://github.com/thomas-xin/Miza.git
 
 ##### Additional Notes:
 
-> _As of 08/12/2021, FFmpeg will be automatically installed after first run, Miza is also going > to look through the servers it is in to seek out open candidates for placing some emojis that Miza will also require for certain UI features, so make sure you have a good space set up too. Finally, all API Keys that Miza will require as located in *auth.json* you will have to obtain yourself._
+> _As of 08/12/2021, FFmpeg will be automatically installed after first run, Miza is also going to look through the servers it is in to seek out open candidates for placing some emojis that Miza will also require for certain UI features, so make sure you have a good space set up too. Finally, all API Keys that Miza will require as located in *auth.json* you will have to obtain yourself._
 
 <br>
 
