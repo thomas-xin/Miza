@@ -65,7 +65,7 @@ def inflate(fsrc, fdst, pos):
 				copyfileobj(fi, fo)
 
 def ensure_compressor():
-	if os.path.exists("lzturbo") or os.path.exists("lzturbo.exe"):
+	if os.path.exists("4x4") or os.path.exists("4x4.exe"):
 		return
 	if os.name == "nt":
 		url = "https://cdn.discordapp.com/attachments/682561514221338690/890225317090844692/4x4.zip"
@@ -80,7 +80,9 @@ def ensure_compressor():
 
 
 if __name__ == "__main__":
-	import sys, time, collections, pickle, zipfile, io, concurrent.futures, subprocess
+	import time
+	orig = time.time()
+	import sys, collections, pickle, zipfile, io, concurrent.futures, subprocess
 	from concurrent.futures import thread
 	from collections import deque
 
@@ -224,8 +226,9 @@ if __name__ == "__main__":
 					s = f.stat()
 					size = s.st_size
 					if size:
-						if compress and size in sizes:
+						if compress:
 							h = get_hash(f.path, size=size)
+						if compress and size in sizes:
 							try:
 								for f2 in sizes[size]:
 									try:
@@ -537,4 +540,4 @@ if __name__ == "__main__":
 			os.rmdir(".cache")
 			raise SystemExit
 
-	print(f"Total elapsed time: {round(time.time() - t, 4)} seconds, output size ratio: {round(osize / (isize or fsize), 4)}")
+	print(f"Total elapsed time: {round(time.time() - orig, 4)} seconds, output size ratio: {round(osize / (isize or fsize), 4)}")

@@ -2265,6 +2265,7 @@ class AudioDownloader:
         print(args)
         subprocess.run(args, stderr=subprocess.PIPE)
         with suppress():
+            os.remove(fnv)
             os.remove(afile)
         return fn, outf
 
@@ -2351,7 +2352,7 @@ class AudioDownloader:
             if not ast and not vst:
                 raise LookupError(f"No stream URLs found for {url}")
             ffmpeg = "./ffmpeg"
-            if len(ast) <= 1 and not vst:
+            if len(ast) <= 1 and not vst and fmt != "pcm":
                 if ast:
                     if not is_youtube_stream(ast[0]["stream"]):
                         ffmpeg = "misc/ffmpeg-c/ffmpeg.exe"

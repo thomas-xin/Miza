@@ -1093,7 +1093,6 @@ class Upload(Command):
 
     async def __call__(self, message, argv, **void):
         if message.attachments:
-            args.extend(best_url(a) for a in message.attachments)
             argv += " " * bool(argv) + " ".join(best_url(a) for a in message.attachments)
         args = await self.bot.follow_url(argv)
         if not args:

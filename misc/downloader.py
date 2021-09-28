@@ -136,7 +136,14 @@ updated = False
 def download(url, fn, resp=None, index=0, start=None, end=None):
 	size = 0
 	packet = 131072
-	with open(fn, "wb") as f:
+	# if not random.randint(0, 16):
+	# 	print(f"Intentionally blocking thread {index}...")
+	# 	time.sleep(86400)
+	try:
+		f = open(fn, "wb")
+	except:
+		f = open(fn, "rb+")
+	with f:
 		while True:
 			try:
 				if not resp:
@@ -154,7 +161,8 @@ def download(url, fn, resp=None, index=0, start=None, end=None):
 					if index and resp.code >= 400:
 						if resp.code in (429, 500, 503):
 							time.sleep(7 + random.random() * 4 + index / 2)
-						raise ConnectionError(resp.code, resp.read().decode("utf-8").rstrip())
+						err = prio.submit(resp.read)
+						raise ConnectionError(resp.code, err.result(timeout=4).decode("utf-8").rstrip())
 					while True:
 						try:
 							fut = submit(resp.read, packet)
@@ -395,13 +403,15 @@ else:
 if not fn:
 	fn = head.get("attachment-filename") or url.rstrip("/").rsplit("/", 1)[-1].split("?", 1)[0] or "file"
 	fn = "files/" + fn.rsplit("/", 1)[-1]
-exc = concurrent.futures.ThreadPoolExecutor(max_workers=threads + 3)
+exc = concurrent.futures.ThreadPoolExecutor(max_workers=threads + 1 << 1)
+prio = concurrent.futures.ThreadPoolExecutor(max_workers=8)
 submit = exc.submit
 if threads > 1:
 	print(f"Splitting into {threads} threads...")
 	workers = [None] * threads
 	load = math.ceil(fsize / threads)
 	delay = 1
+	tt = None
 	for i in range(threads):
 		start = i * load
 		if i == threads - 1:
@@ -411,29 +421,49 @@ if threads > 1:
 		workers[i] = submit(download, url, f"cache/thread-{i}", resp, index=i, start=start, end=end)
 		resp = None
 		try:
-			workers[i].result(timeout=delay)
+			j = max(0, i - 2)
+			workers[j].result(timeout=delay)
 		except concurrent.futures.TimeoutError:
 			pass
 		if workers[i].done() or i >= 1 and workers[i - 1].done() or i >= 2 and workers[i - 2].done():
 			delay /= 2
 		else:
 			delay *= math.sqrt(2)
-	fut = workers[0]
+		time.sleep(0.5)
+		fut = workers[0]
+		if tt is None and fut.done():
+			tt = utc() - t
 	if os.path.exists(fn):
 		os.remove(fn)
 	fi = fut.result()
+	if tt is None:
+		tt = utc() - t + 20
 	os.rename(fi, fn)
 	with open(fn, "ab") as f:
-		for fut in workers[1:]:
-			fi = fut.result()
+		for i, fut in enumerate(workers[1:]):
+			for x in range(2147483648):
+				try:
+					fi = fut.result(timeout=tt)
+				except concurrent.futures.TimeoutError:
+					if i + 2 >= len(workers) or workers[i + 2].done() or x > 2:
+						print(f"Thread {i + 1} timed out, restarting...")
+						tt += 5
+						fut = workers[i + 1] = prio.submit(download, url, f"cache/thread-{i + 1}", resp, index=i + 1, start=start, end=end)
+					continue
+				else:
+					if x:
+						tt = 20
+					break
 			with open(fi, "rb") as g:
 				while True:
 					b = g.read(4194304)
 					if not b:
 						break
 					f.write(b)
-			submit(os.remove, fi)
-	exc.shutdown(wait=True)
+			try:
+				os.remove(fi)
+			except:
+				pass
 else:
 	print("Resuming request using 1 thread...")
 	download(url, fn, resp)
@@ -470,3 +500,17 @@ try:
 	os.rmdir("files")
 except:
 	pass
+
+try:
+	prio.submit(exc.shutdown, wait=True).result(timeout=1)
+except:
+	pass
+else:
+	raise SystemExit(0)
+print("Force killing due to frozen threads...")
+try:
+	import psutil
+except ModuleNotFoundError:
+	subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", "--user", "psutil"])
+	import psutil
+psutil.Process().kill()
