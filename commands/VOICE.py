@@ -2230,31 +2230,51 @@ class AudioDownloader:
                     vidinfo = as_str(subprocess.check_output(["./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "default=nokey=1:noprint_wrappers=1", video])).strip()
                     args = alist(("ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y"))
                     args.extend(("-i", video))
+                    vf = f"fps={fps}"
                     w1, h1 = map(int, vidinfo.splitlines())
                     if w1 != w2 or h1 != h2:
                         r = min(w2 / w1, h2 / h1)
                         w, h = round(w1 * r), round(h1 * r)
-                        vf = f"scale={w}:{h}"
+                        vf += f",scale={w}:{h}"
                         if w != w2 or h != h2:
                             vf += f",pad=width={w2}:height={h2}:x=-1:y=-1:color=black"
-                        args.extend(("-vf", vf))
+                    args.extend(("-vf", vf))
                     args.extend(("-f", "rawvideo", "-pix_fmt", "rgb24", "-"))
                     cfn = fut.result()[0]
                     print(args)
                     pin = psutil.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
                     audios.append(cfn)
+                    fsize = 0
                     while True:
                         b = pin.stdout.read(1048576)
                         if not b:
                             break
                         proc.stdin.write(b)
+                        fsize += len(b)
+                    duration = fsize / np.prod(size) / 3 / fps
+                    amax = round_random(duration * SAMPLE_RATE) * 2 * 2
+                    asize = 0
                     if os.path.getsize(cfn):
                         with open(cfn, "rb") as f:
                             while True:
                                 b = f.read(1048576)
                                 if not b:
                                     break
+                                if asize + len(b) > amax:
+                                    b = b[:amax - asize]
+                                    afp.write(b)
+                                    asize += len(b)
+                                    break
                                 afp.write(b)
+                                asize += len(b)
+                    print(asize, amax)
+                    while asize < amax:
+                        if amax - asize < len(self.emptybuff):
+                            buf = self.emptybuff[amax - asize]
+                        else:
+                            buf = self.emptybuff
+                        afp.write(buf)
+                        asize += len(buf)
                     with suppress():
                         os.remove(cfn)
         proc.stdin.close()
