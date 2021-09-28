@@ -2270,7 +2270,7 @@ class AudioDownloader:
                     print(asize, amax)
                     while asize < amax:
                         if amax - asize < len(self.emptybuff):
-                            buf = self.emptybuff[amax - asize]
+                            buf = self.emptybuff[:amax - asize]
                         else:
                             buf = self.emptybuff
                         afp.write(buf)
