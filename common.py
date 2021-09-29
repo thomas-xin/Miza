@@ -1853,6 +1853,7 @@ sub_count = lambda: sum(sum(1 for p in v if p.is_running()) for v in PROCS.value
 
 def force_kill(proc):
     with tracebacksuppressor(psutil.NoSuchProcess):
+        proc = psutil.Process(proc.pid)
         for child in proc.children(recursive=True):
             with suppress():
                 child.kill()
@@ -1860,7 +1861,7 @@ def force_kill(proc):
         print(proc, "killed.")
         return proc.kill()
 
-def proc_communicate(k, i):
+async def proc_communicate(k, i):
     while True:
         with tracebacksuppressor:
             try:
@@ -1868,30 +1869,31 @@ def proc_communicate(k, i):
             except LookupError:
                 break
             if not proc or not proc.is_running():
-                time.sleep(0.8)
+                await asyncio.sleep(0.8)
                 continue
-            s = as_str(proc.stdout.readline()).rstrip()
+            b = await proc.stdout.readline()
+            s = as_str(b).rstrip()
             if s:
                 if s[0] == "~":
                     c = as_str(eval(s[1:]))
-                    create_future_ex(exec_tb, c, globals())
+                    exec_tb(c, globals())
                 else:
                     print(s)
-        time.sleep(0.01)
 
 proc_args = cdict(
     math=[python, "misc/x-math.py"],
     image=[python, "misc/x-image.py"],
 )
 
-def start_proc(k, i):
-    proc = psutil.Popen(
-        proc_args[k],
+async def start_proc(k, i):
+    proc = await asyncio.create_subprocess_exec(
+        *proc_args[k],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
     )
+    proc.is_running = lambda: not proc.returncode
     proc.sem = Semaphore(1, inf)
-    proc.comm = create_thread(proc_communicate, k, i)
+    proc.comm = create_task(proc_communicate(k, i))
     PROCS[k][i] = proc
     return proc
 
@@ -1900,41 +1902,42 @@ def proc_start():
     PROC_COUNT.image = 7
     for k, v in PROC_COUNT.items():
         PROCS[k] = [None] * v
-        start_proc(k, 0)
+        create_task(start_proc(k, 0))
 
-def get_idle_proc(ptype):
+async def get_idle_proc(ptype):
     p = [p for p in PROCS[ptype] if p and not p.sem.is_busy()]
     if not p:
         if None in PROCS[ptype]:
             i = PROCS[ptype].index(None)
-            proc = PROCS[ptype][i] = start_proc(ptype, i)
+            proc = await start_proc(ptype, i)
         else:
             proc = choice(PROCS[ptype])
     else:
         proc = p[0]
     return proc
 
-def sub_submit(ptype, command, _timeout=12):
+async def sub_submit(ptype, command, _timeout=12):
     if BOT[0]:
         BOT[0].activity += 1
     ts = ts_us()
-    proc = get_idle_proc(ptype)
+    proc = await get_idle_proc(ptype)
     while ts in PROC_RESP:
         ts += 1
     PROC_RESP[ts] = concurrent.futures.Future()
     command = "[" + ",".join(map(repr, command[:2])) + "," + ",".join(map(str, command[2:])) + "]"
     s = f"~{ts}~{repr(command.encode('utf-8'))}\n".encode("utf-8")
-    with proc.sem:
-        if not proc.is_running():
-            proc = get_idle_proc(ptype)
+    await proc.sem()
+    if not proc.is_running():
+        proc = await get_idle_proc(ptype)
+    async with proc.sem:
         try:
             proc.stdin.write(s)
-            proc.stdin.flush()
-            resp = PROC_RESP[ts].result(timeout=_timeout)
-        except (BrokenPipeError, OSError, concurrent.futures.TimeoutError):
+            await proc.stdin.drain()
+            resp = await asyncio.wait_for(wrap_future(PROC_RESP[ts]), timeout=_timeout)
+        except (BrokenPipeError, OSError, asyncio.TimeoutError):
             i = PROCS[ptype].index(proc)
             proc.kill()
-            PROCS[ptype][i] = start_proc(ptype, i)
+            PROCS[ptype][i] = await start_proc(ptype, i)
             raise
         finally:
             PROC_RESP.pop(ts, None)
@@ -1944,7 +1947,7 @@ def sub_kill(start=True):
     for v in PROCS.values():
         for p in v:
             if p:
-                create_future_ex(force_kill, p, priority=True)
+                create_future_ex(force_kill, p)
     PROCS.clear()
     if start:
         return proc_start()
@@ -1952,7 +1955,7 @@ def sub_kill(start=True):
 
 # Sends an operation to the math subprocess pool.
 def process_math(expr, prec=64, rat=False, timeout=12, variables=None):
-    return create_future(sub_submit, "math", (expr, prec, rat, variables), _timeout=timeout)
+    return sub_submit("math", (expr, prec, rat, variables), _timeout=timeout)
 
 # Sends an operation to the image subprocess pool.
 def process_image(image, operation, args, timeout=24):
@@ -1970,7 +1973,7 @@ def process_image(image, operation, args, timeout=24):
         return repr(arg)
 
     command = "[" + ",".join(map(as_arg, args)) + "]"
-    return create_future(sub_submit, "image", (image, operation, command), _timeout=timeout)
+    return sub_submit("image", (image, operation, command), _timeout=timeout)
 
 
 def evalex(exc):

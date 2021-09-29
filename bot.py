@@ -3063,10 +3063,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         with tracebacksuppressor:
             code = None
             with suppress(SyntaxError):
-                code = await create_future(compile, proc, "<webserver>", "eval", optimize=2, priority=True)
+                code = compile(proc, "<webserver>", "eval", optimize=2)
             if code is None:
                 with suppress(SyntaxError):
-                    code = await create_future(compile, proc, "<webserver>", "exec", optimize=2)
+                    code = compile(proc, "<webserver>", "exec", optimize=2)
                 if code is None:
                     _ = glob.get("_")
                     defs = False
@@ -3077,7 +3077,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     func = "async def _():\n\tlocals().update(globals())\n"
                     func += "\n".join(("\tglobals().update(locals())\n" if not defs and line.strip().startswith("return") else "") + "\t" + line for line in lines)
                     func += "\n\tglobals().update(locals())"
-                    code2 = await create_future(compile, func, "<webserver>", "exec", optimize=2, priority=True)
+                    code2 = compile(func, "<webserver>", "exec", optimize=2)
                     await create_future(eval, code2, glob)
                     output = await glob["_"]()
                     glob["_"] = _
@@ -4493,7 +4493,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             print("Database ready.")
             await self.send_event("_ready_", bot=self)
             create_task(self.heartbeat_loop())
-            await create_future(self.heartbeat_proc.kill)
+            self.heartbeat_proc.kill()
             print("Initialization complete.")
 
     def set_client_events(self):

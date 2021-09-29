@@ -61,12 +61,12 @@ async def respond(s):
                 except SyntaxError:
                     pass
                 else:
-                    resp = await create_future(eval, code, client._globals, priority=True)
+                    resp = await create_future(eval, code, client._globals)
                 if code is None:
-                    resp = await create_future(exec, c, client._globals, priority=True)
+                    resp = await create_future(exec, c, client._globals)
         except Exception as ex:
             sys.stdout.write(traceback.format_exc())
-            await create_future(submit, f"bot.audio.returns[{k}].set_exception(pickle.loads({repr(pickle.dumps(ex))}))", priority=True)
+            await create_future(submit, f"bot.audio.returns[{k}].set_exception(pickle.loads({repr(pickle.dumps(ex))}))")
             return
     if not res:
         res = repr(resp)
@@ -75,13 +75,13 @@ async def respond(s):
                 compile(res, "miza2", "eval")
             except SyntaxError:
                 res = repr(str(resp))
-    await create_future(submit, f"bot.audio.returns[{k}].set_result({res})", priority=True)
+    await create_future(submit, f"bot.audio.returns[{k}].set_result({res})")
 
 async def communicate():
     print("Audio client successfully connected.")
     while True:
         with tracebacksuppressor:
-            s = await create_future(sys.stdin.readline, priority=True)
+            s = await create_future(sys.stdin.readline)
             # send(s)
             if s.startswith("~"):
                 create_task(respond(s))
@@ -751,7 +751,7 @@ class BufferedAudioReader(discord.AudioSource):
 
     def start(self):
         # Run loading loop in parallel thread obviously
-        create_future_ex(self.run, timeout=86400, priority=True)
+        create_future_ex(self.run, timeout=86400)
         self.buffer = None
         with tracebacksuppressor():
             self.buffer = self.read()

@@ -271,10 +271,10 @@ class UpdateExec(Database):
         # Attempt eval first, then exec
         code = None
         with suppress(SyntaxError):
-            code = await create_future(compile, proc, "<terminal>", "eval", optimize=2, priority=True)
+            compile(proc, "<terminal>", "eval", optimize=2)
         if code is None:
             with suppress(SyntaxError):
-                code = await create_future(compile, proc, "<terminal>", "exec", optimize=2)
+                code = compile(proc, "<terminal>", "exec", optimize=2)
             if code is None:
                 _ = glob.get("_")
                 defs = False
@@ -285,7 +285,7 @@ class UpdateExec(Database):
                 func = "async def _():\n\tlocals().update(globals())\n"
                 func += "\n".join(("\tglobals().update(locals())\n" if not defs and line.strip().startswith("return") else "") + "\t" + line for line in lines)
                 func += "\n\tglobals().update(locals())"
-                code2 = await create_future(compile, func, "<terminal>", "exec", optimize=2, priority=True)
+                code2 = compile(func, "<terminal>", "exec", optimize=2)
                 await create_future(eval, code2, glob)
                 output = await glob["_"]()
                 glob["_"] = _
