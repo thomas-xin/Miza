@@ -2728,8 +2728,8 @@ class UpdatePublishers(Database):
     async def _nocommand_(self, message, **void):
         if message.channel.id in self.data and not message.flags.crossposted and not message.flags.is_crossposted and not message.reference and "\u2009\u2009" not in message.author.name:
             try:
-                if not message.channel.permissions_for(message.guild.me).manage_messages:
-                    raise PermissionError("Manage messages permission missing from channel.")
+                # if not message.channel.permissions_for(message.guild.me).manage_messages:
+                #     raise PermissionError("Manage messages permission missing from channel.")
                 await message.publish()
             except Exception as ex:
                 if "invalid message type" not in repr(ex).lower():
