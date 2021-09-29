@@ -2724,7 +2724,7 @@ class UpdateFileLogs(Database):
 class UpdatePublishers(Database):
     name = "publishers"
 
-    async def _nocommand_(self, bot, message, **void):
+    async def _nocommand_(self, message, **void):
         if message.channel.id in self.data and not message.flags.crossposted and not message.flags.is_crossposted and not message.reference and "\u2009\u2009" not in message.author.name:
             try:
                 if not message.channel.permissions_for(message.guild.me).manage_messages:
@@ -2734,7 +2734,7 @@ class UpdatePublishers(Database):
                 if "invalid message type" not in repr(ex).lower():
                     self.data.pop(message.channel.id, None)
                     print_exc()
-                    bot.send_exception(message.channel, ex)
+                    self.bot.send_exception(message.channel, ex)
 
 
 class UpdateCrossposts(Database):
