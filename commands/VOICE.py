@@ -114,6 +114,8 @@ def get_best_icon(entry):
             url = entry["webpage_url"]
         except KeyError:
             url = entry["url"]
+        if not url:
+            return ""
         if is_discord_url(url):
             if not is_image(url):
                 return "https://cdn.discordapp.com/embed/avatars/0.png"
@@ -1647,8 +1649,7 @@ class AudioDownloader:
                 name = track.get("name", track["id"])
                 artists = ", ".join(a["name"] for a in track.get("artists", ()))
             except LookupError:
-                print(resp)
-                raise LookupError(f"No results found for {item[9:]}.")
+                return dict(_type="playlist", entries=[])
             else:
                 item = "ytsearch:" + "".join(c if c.isascii() and c != ":" else "_" for c in f"{name} ~ {artists}")
                 self.spotify_x += 1
@@ -1674,11 +1675,9 @@ class AudioDownloader:
                             break
                 if not result:
                     raise LookupError
-                print(result)
                 return result
             except (LookupError, ValueError):
-                print(resp)
-                raise LookupError(f"No results found for {item[9:]}.")
+                return dict(_type="playlist", entries=[])
             else:
                 item = "ytsearch:" + "".join(c if c.isascii() and c != ":" else "_" for c in f"{name} ~ {artists}")
                 self.other_x += 1
@@ -4443,6 +4442,8 @@ class Lyrics(Command):
         urls = await bot.follow_url(argv, allow=True, images=False)
         if urls:
             resp = await create_future(ytdl.search, urls[0], timeout=18)
+            if type(resp) is str:
+                raise evalEX(resp)
             search = resp[0].name
         else:
             search = argv
@@ -4493,6 +4494,7 @@ class Download(Command):
     msgcmd = ("Download as mp3",)
 
     async def __call__(self, bot, channel, guild, message, name, argv, flags, user, **void):
+        ytdl.bot = bot
         fmt = default_fmt = "mp3"
         if name in ("af", "audiofilter"):
             set_dict(flags, "a", 1)
@@ -4559,17 +4561,15 @@ class Download(Command):
                 # 2 youtube results per soundcloud result, increased with verbose flag, followed by 1 spotify and 1 bandcamp
                 sc = min(4, flags.get("v", 0) + 1)
                 yt = min(6, sc << 1)
-                res = []
-                temp = await create_future(ytdl.search, argv, mode="yt", count=yt)
-                res.extend(temp)
-                temp = await create_future(ytdl.search, argv, mode="sc", count=sc)
-                res.extend(temp)
-                with tracebacksuppressor:
-                    temp = await create_future(ytdl.search, "spsearch:" + argv.split("spsearch:", 1)[-1].replace(":", "-"))
-                    res.extend(temp)
-                with tracebacksuppressor:
-                    temp = await create_future(ytdl.search, "bcsearch:" + argv.split("bcsearch:", 1)[-1].replace(":", "-"))
-                    res.extend(temp)
+                futs = deque()
+                futs.append(create_future(ytdl.search, argv, mode="yt", count=yt))
+                futs.append(create_future(ytdl.search, argv, mode="sc", count=sc))
+                futs.append(create_future(ytdl.search, "spsearch:" + argv.split("spsearch:", 1)[-1].replace(":", "-"), mode="sp"))
+                futs.append(create_future(ytdl.search, "bcsearch:" + argv.split("bcsearch:", 1)[-1].replace(":", "-"), mode="bc"))
+                for fut in futs:
+                    temp = await fut
+                    if type(temp) is not str:
+                        res.extend(temp)
             if not res:
                 raise LookupError(f"No results for {argv}.")
             if not concat:
