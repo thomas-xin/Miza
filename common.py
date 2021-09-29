@@ -394,7 +394,7 @@ def bytes2zip(data):
     return b.read()
 
 
-# Safer than raw eval, more powerful than json.decode
+# Safer than raw eval, more powerful than json.loads
 def eval_json(s):
     if type(s) is memoryview:
         s = bytes(s)
@@ -440,7 +440,7 @@ def select_and_loads(s, mode="safe", size=None):
             data = pickle.loads(s)
     if data is None:
         if mode == "unsafe":
-            data = eval(compile(s.strip(b"\0"), "<loader>", "eval", optimize=2, dont_inherit=False))
+            data = eval(compile(s.strip(b"\x00"), "<loader>", "eval", optimize=2, dont_inherit=False))
         else:
             if b"{" in s:
                 s = s[s.index(b"{"):s.rindex(b"}") + 1]
