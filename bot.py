@@ -4979,7 +4979,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if guild:
                 await self.send_event("_channel_delete_", channel=channel, guild=guild)
 
-        # Thread delete event: calls _channel_delete_ bot database event.
+        # Thread update event: calls _thread_update_ bot database event.
         @self.event
         async def on_thread_update(before, after):
             await self.send_event("_thread_update_", before=before, after=after)
