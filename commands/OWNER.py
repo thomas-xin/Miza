@@ -60,7 +60,7 @@ class Restart(Command):
                 emb.set_author(name=str(bot.user), url=bot.github, icon_url=url)
                 emb.description = f"I will be {'shutting down' if name == 'shutdown' else 'restarting'} in {sec2time(wait)}, apologies for any inconvenience..."
                 await bot.send_event("_announce_", embed=emb)
-                save = create_task(bot.send_event("_save_", force=True))
+                save = create_task(bot.send_event("_save_"))
                 if wait > 0:
                     await asyncio.sleep(wait)
         if name == "shutdown":
@@ -69,7 +69,7 @@ class Restart(Command):
             await send_with_reply(channel, content="Restarting... :wave:", reference=message)
         if save is None:
             print("Saving message cache...")
-            save = create_task(bot.send_event("_save_", force=False))
+            save = create_task(bot.send_event("_save_"))
         async with Delay(1):
             with discord.context_managers.Typing(channel):
                 # Call _destroy_ bot event to indicate to all databases the imminent shutdown
@@ -765,7 +765,7 @@ class UpdateWebhooks(Database):
         user.name = w.name
         user.display_name = w.name
         user.joined_at = w.created_at
-        user.avatar = w.avatar
+        user.avatar = w.avatar and w.avatar.key
         user.display_avatar = user.avatar_url = w.avatar_url
         user.bot = True
         user.send = w.send

@@ -1833,21 +1833,22 @@ class ServerProtector(Database):
     async def _channel_delete_(self, channel, guild, **void):
         if channel.id in self.bot.cache.deleted:
             return
-        user = None
-        audits = guild.audit_logs(limit=5, action=discord.AuditLogAction.channel_delete)
-        ts = utc()
-        cnt = {}
-        async for log in audits:
-            if ts - utc_ts(log.created_at) < 120:
-                add_dict(cnt, {log.user.id: 1})
-                if user is None and log.target.id == channel.id:
-                    user = log.user
-            else:
-                break
-        for u_id in cnt:
-            if cnt[u_id] > 2:
-                if self.bot.is_trusted(guild.id) or u_id == self.bot.user.id:
-                    create_task(self.targetWarn(u_id, guild, f"channel deletions `({cnt[u_id]})`"))
+        if not isinstance(channel, discord.Thread):
+            user = None
+            audits = guild.audit_logs(limit=5, action=discord.AuditLogAction.channel_delete)
+            ts = utc()
+            cnt = {}
+            async for log in audits:
+                if ts - utc_ts(log.created_at) < 120:
+                    add_dict(cnt, {log.user.id: 1})
+                    if user is None and log.target.id == channel.id:
+                        user = log.user
+                else:
+                    break
+            for u_id in cnt:
+                if cnt[u_id] > 2:
+                    if self.bot.is_trusted(guild.id) or u_id == self.bot.user.id:
+                        create_task(self.targetWarn(u_id, guild, f"channel deletions `({cnt[u_id]})`"))
         if guild.id in self.bot.data.logU:
             await self.bot.data.logU._channel_delete_2_(channel, guild, user)
 
@@ -2090,7 +2091,7 @@ class UpdateUserLogs(Database):
                     emb.add_field(name="Roles", value=rchange)
                     change = True
                     colour[1] += 255
-        if before.avatar != after.avatar:
+        if before.avatar.key != after.avatar.key:
             b_url = best_url(before)
             a_url = best_url(after)
             if "exec" in self.bot.data:
@@ -2354,7 +2355,7 @@ class UpdateMessageCache(Database):
                 m = message._data
                 if "author" not in m:
                     author = message.author
-                    m["author"] = dict(id=author.id, s=str(author), avatar=author.avatar)
+                    m["author"] = dict(id=author.id, s=str(author), avatar=author.avatar.key)
                 if "channel_id" not in m:
                     try:
                         m["channel_id"] = message.channel.id
@@ -2369,7 +2370,7 @@ class UpdateMessageCache(Database):
                 author = message.author
                 m = dict(
                     id=message.id,
-                    author=dict(id=author.id, s=str(author), avatar=author.avatar),
+                    author=dict(id=author.id, s=str(author), avatar=author.avatar.key),
                     webhook_id=message.webhook_id,
                     reactions=reactions,
                     attachments=attachments,

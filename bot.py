@@ -852,7 +852,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             return self.cache.channels[c_id]
         channel, _ = bot._get_guild_channel(dict(channel_id=c_id))
         if channel and type(channel) is not discord.Object:
-            self.cache.channels[c_id] = channel
+            if not isinstance(channel, discord.abc.PrivateChannel):
+                self.cache.channels[c_id] = channel
             return channel
         channel = self.cache.channels[c_id] = cdict(
             id=c_id,
@@ -1040,7 +1041,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
     # Gets the DM channel for the target user, creating a new one if none exists.
     async def get_dm(self, user):
-        if isinstance(user, discord.DMChannel):
+        if isinstance(user, discord.abc.PrivateChannel):
             return user
         with suppress(TypeError):
             int(user)
@@ -4962,8 +4963,17 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         # Channel delete event: calls _channel_delete_ bot database event.
         @self.event
         async def on_guild_channel_delete(channel):
-            print(channel, "was deleted from", channel.guild)
             self.sub_channels.pop(channel.id, None)
+            self.channels.pop(channel.id, None)
+            guild = channel.guild
+            if guild:
+                await self.send_event("_channel_delete_", channel=channel, guild=guild)
+
+        # Thread delete event: calls _channel_delete_ bot database event.
+        @self.event
+        async def on_guild_thread_delete(channel):
+            self.sub_channels.pop(channel.id, None)
+            self.channels.pop(channel.id, None)
             guild = channel.guild
             if guild:
                 await self.send_event("_channel_delete_", channel=channel, guild=guild)
@@ -4976,9 +4986,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         # User ban event: calls _ban_ bot database event.
         @self.event
         async def on_member_ban(guild, user):
-            print(user, "was banned from", guild)
-            if guild:
-                await self.send_event("_ban_", user=user, guild=guild)
+            await self.send_event("_ban_", user=user, guild=guild)
 
 
 class AudioClientInterface:
