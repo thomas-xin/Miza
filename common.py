@@ -1861,18 +1861,15 @@ def force_kill(proc):
         print(proc, "killed.")
         return proc.kill()
 
-async def proc_communicate(k, i):
+async def proc_communicate(proc):
     while True:
         with tracebacksuppressor:
-            try:
-                proc = PROCS[k][i]
-            except LookupError:
-                break
             if not proc or not proc.is_running():
-                await asyncio.sleep(0.8)
-                continue
+                return
             b = await proc.stdout.readline()
-            s = as_str(b).rstrip()
+            if not b:
+                return
+            s = as_str(b.rstrip())
             if s:
                 if s[0] == "~":
                     c = as_str(eval(s[1:]))
@@ -1893,7 +1890,7 @@ async def start_proc(k, i):
     )
     proc.is_running = lambda: not proc.returncode
     proc.sem = Semaphore(1, inf)
-    proc.comm = create_task(proc_communicate(k, i))
+    proc.comm = create_task(proc_communicate(proc))
     PROCS[k][i] = proc
     return proc
 
@@ -1934,8 +1931,11 @@ async def sub_submit(ptype, command, _timeout=12):
             proc.stdin.write(s)
             await proc.stdin.drain()
             resp = await asyncio.wait_for(wrap_future(PROC_RESP[ts]), timeout=_timeout)
-        except (BrokenPipeError, OSError, asyncio.TimeoutError):
-            i = PROCS[ptype].index(proc)
+        except (BrokenPipeError, OSError, asyncio.TimeoutError) as ex:
+            try:
+                i = PROCS[ptype].index(proc)
+            except LookupError:
+                raise ex
             proc.kill()
             PROCS[ptype][i] = await start_proc(ptype, i)
             raise
@@ -1944,10 +1944,9 @@ async def sub_submit(ptype, command, _timeout=12):
     return resp
 
 def sub_kill(start=True):
-    for v in PROCS.values():
-        for p in v:
-            if p:
-                create_future_ex(force_kill, p)
+    for p in itertools.chain(*PROCS.values()):
+        if p and p.is_running():
+            create_future_ex(force_kill, p)
     PROCS.clear()
     if start:
         return proc_start()

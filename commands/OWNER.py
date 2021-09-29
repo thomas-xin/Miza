@@ -271,7 +271,7 @@ class UpdateExec(Database):
         # Attempt eval first, then exec
         code = None
         with suppress(SyntaxError):
-            compile(proc, "<terminal>", "eval", optimize=2)
+            code = compile(proc, "<terminal>", "eval", optimize=2)
         if code is None:
             with suppress(SyntaxError):
                 code = compile(proc, "<terminal>", "exec", optimize=2)
