@@ -117,8 +117,12 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
         classname = classname[classname.index("'") + 1:]
         return f"<{classname} object at {hex(id(self)).upper().replace('X', 'x')}>: {self.active}/{self.limit}, {self.passive}/{self.buffer}, {len(self.rate_bin)}/{self.rate_limit}"
 
-    async def _update_bin_after(self, t):
+    async def _update_bin_after_a(self, t):
         await asyncio.sleep(t)
+        self._update_bin()
+
+    def _update_bin_after(self, t):
+        time.sleep(t)
         self._update_bin()
 
     def _update_bin(self):
@@ -165,7 +169,10 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
         if self.rate_bin:
             t = self.rate_bin[0 - self.last] + self.rate_limit - time.time()
             if t > 0:
-                create_task(self._update_bin_after(t))
+                if get_event_loop().is_running():
+                    create_task(self._update_bin_after_a(t))
+                else:
+                    create_future_ex(self._update_bin_after, t)
             else:
                 self._update_bin()
         elif self.active < self.limit:
@@ -399,6 +406,7 @@ def eval_json(s):
     try:
         return json.loads(s)
     except:
+        pass
         try:
             return safe_eval(s)
         except:
@@ -1927,12 +1935,9 @@ def sub_submit(ptype, command, _timeout=12):
             i = PROCS[ptype].index(proc)
             proc.kill()
             PROCS[ptype][i] = start_proc(ptype, i)
-            PROC_RESP.pop(ts, None)
             raise
-        except:
+        finally:
             PROC_RESP.pop(ts, None)
-            raise
-    PROC_RESP.pop(ts, None)
     return resp
 
 def sub_kill(start=True):
@@ -1984,7 +1989,6 @@ def evalEX(exc):
     try:
         ex = evalex(exc)
     except:
-        print(exc)
         raise
     if issubclass(type(ex), BaseException):
         raise ex

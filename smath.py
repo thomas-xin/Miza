@@ -1749,7 +1749,7 @@ def int_key(d):
             continue
         with suppress(TypeError, ValueError):
             k = int(k)
-        if type(t) is dict:
+        if isinstance(t, dict):
             t = int_key(t)
         c[k] = t
     return c
@@ -2348,7 +2348,7 @@ def regexp(s, flags=0):
         return RE[t]
     except KeyError:
         RE[t] = re.compile(s, flags)
-        return RE[t]
+    return RE[t]
 
 
 word_count = lambda s: 1 + sum(1 for _ in regexp("\\W+").finditer(s))

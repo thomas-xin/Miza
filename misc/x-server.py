@@ -27,7 +27,7 @@ def send(*args, escape=True):
             if s[-1] != "\n":
                 s += "\n"
             s = s.encode("utf-8")
-            sys.stdout.buffer.write(s)
+            # sys.stdout.buffer.write(s)
             sys.__stderr__.buffer.write(s)
             sys.__stderr__.flush()
     except OSError:
