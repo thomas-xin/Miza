@@ -872,6 +872,34 @@ class NickPreserver(Command):
         return ini_md(f"Nickname preservation is currently enabled in {sqr_md(guild)}.")
 
 
+class ThreadPreserver(Command):
+    server_only = True
+    name = ["KeepAlive", "ThreadBump", "AutoBump"]
+    min_level = 3
+    min_display = "3+"
+    description = 'Causes ⟨MIZA⟩ to "bump" (revive) the current thread when auto-archived.'
+    usage = "(enable|disable)?"
+    flags = "aed"
+
+    async def __call__(self, bot, guild, channel, name, argv, flags, **void):
+        if argv:
+            thr = await bot.fetch_channel(verify_id(argv))
+        else:
+            thr = channel
+        if not isinstance(thr, discord.Thread) and not hasattr(thr, "archived"):
+            raise TypeError("This command can only be used in threads.")
+        if "d" in flags:
+            bot.data.threadpreservers.pop(thr.id, None)
+            return italics(css_md(f"Disabled thread preservation for {sqr_md(thr)}."))
+        elif "e" in flags or "a" in flags:
+            bot.data.threadpreservers[thr.id] = True
+            return italics(css_md(f"Enabled thread preservation for {sqr_md(thr)}."))
+        curr = bot.data.threadpreservers.get(thr.id)
+        if curr is None:
+            return ini_md(f'Thread preservation is currently disabled for {sqr_md(thr)}. Use "{bot.get_prefix(guild)}{name} enable" to enable.')
+        return ini_md(f"Thread preservation is currently enabled for {sqr_md(thr)}.")
+
+
 class Lockdown(Command):
     server_only = True
     _timeout_ = 16
@@ -2495,7 +2523,7 @@ class UpdateMessageLogs(Database):
         with tracebacksuppressor:
             for guild in self.bot.guilds:
                 futs = deque()
-                for channel in guild.text_channels:
+                for channel in itertools.chain(guild.text_channels, guild.threads):
                     if channel.permissions_for(guild.me).read_message_history:
                         futs.append(create_task(self.save_channel(channel, t)))
                     if len(futs) >= 4:
@@ -3009,6 +3037,33 @@ class UpdateNickPreservers(Database):
             else:
                 if self.data[guild.id].pop(user.id, None):
                     self.update(guild.id)
+
+
+class UpdateThreadPreservers(Database):
+    name = "threadpreservers"
+
+    async def _ready_(self, **void):
+        for k in self.keys():
+            await self._thread_update_(k, k)
+
+    async def _thread_update_(self, before, after):
+        if type(after) is int:
+            try:
+                after = await self.bot.fetch_channel(after)
+            except:
+                print_exc()
+                self.pop(after)
+        if after.archived:
+            if after.permissions_for(after.guild.me).manage_channels:
+                await after.edit(archived=False, locked=False)
+            else:
+                m = await after.send("\xad")
+                await self.bot.silent_delete(m)
+
+    async def _channel_delete_(self, channel):
+        if isinstance(channel, discord.Thread):
+            with suppress():
+                self.pop(channel.id)
 
 
 class UpdatePerms(Database):

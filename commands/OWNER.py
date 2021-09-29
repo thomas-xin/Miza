@@ -753,7 +753,7 @@ class UpdateWebhooks(Database):
             id=user.id,
             name=user.name,
             created_at=user.created_at,
-            avatar=user.avatar,
+            avatar=getattr(user, "avatar_url", as_str(user.avatar)),
             token=user.token,
         )
 
@@ -766,7 +766,7 @@ class UpdateWebhooks(Database):
         user.display_name = w.name
         user.joined_at = w.created_at
         user.avatar = w.avatar and w.avatar.key
-        user.display_avatar = user.avatar_url = w.avatar_url
+        user.display_avatar = user.avatar_url = str(w.avatar)
         user.bot = True
         user.send = w.send
         user.dm_channel = getattr(w, "channel", None)
