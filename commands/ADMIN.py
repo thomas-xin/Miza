@@ -905,7 +905,7 @@ class Lockdown(Command):
     _timeout_ = 16
     name = ["🔒", "☣️"]
     min_level = inf
-    description = "Completely locks down the server by removing send message permissions for all users and revoking all invites."
+    description = "Completely locks down the server by removing send message permissions for all users, revoking all invites, and archiving all threads."
     flags = "f"
     rate_limit = 30
 
@@ -920,6 +920,10 @@ class Lockdown(Command):
         with self.bot.ExceptionSender(channel):
             await inv.delete(reason="Server Lockdown.")
 
+    async def threadLock(self, thread, channel):
+        with self.bot.ExceptionSender(channel):
+            await thread.edit(archived=True, locked=True)
+
     async def __call__(self, guild, channel, flags, **void):
         if "f" not in flags:
             return self.bot.dangerous_command
@@ -927,6 +931,8 @@ class Lockdown(Command):
         for role in guild.roles:
             if len(role.members) != 1 or role.members[-1].id not in (u_id, guild.owner_id):
                 create_task(self.roleLock(role, channel))
+        for thread in guild.threads:
+            create_task(self.threadLock(thread, channel))
         invites = await guild.invites()
         for inv in invites:
             create_task(self.invLock(inv, channel))
