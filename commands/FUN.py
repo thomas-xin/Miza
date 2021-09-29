@@ -1834,7 +1834,7 @@ class React(Command):
             content += f"{len(curr)} auto reactions currently assigned for {str(guild).replace('`', '')}:```*"
             key = lambda x: "\n" + ", ".join(x)
             msg = ini_md(iter2str({k: curr[k] for k in tuple(curr)[pos:pos + page]}, key=key))
-        colour = await self.bot.data.colours.get(to_png_ex(guild.icon_url))
+        colour = await self.bot.data.colours.get(worst_url(guild))
         emb = discord.Embed(
             description=content + msg,
             colour=colour,

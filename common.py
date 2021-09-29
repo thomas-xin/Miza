@@ -1112,7 +1112,7 @@ def to_png_ex(url):
 def get_url(obj, f=to_png):
     if type(obj) is str:
         return obj
-    for attr in ("display_avatar", "avatar_url", "icon_url"):
+    for attr in ("display_avatar", "avatar_url", "icon_url", "icon"):
         url = getattr(obj, "display_avatar", None)
         if url:
             return f(url)

@@ -1529,20 +1529,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     def get_colour(self, user):
         if user is None:
             return as_fut(16777214)
-        try:
-            url = worst_url(user)
-        except AttributeError:
-            url = to_png_ex(user.icon_url)
+        url = worst_url(user)
         return self.data.colours.get(url)
 
     async def get_proxy_url(self, user):
-        if getattr(user, "icon_url", None):
-            url = to_png(user.icon_url)
+        if hasattr(user, "webhook"):
+            url = user.webhook.avatar_url
         else:
-            if hasattr(user, "webhook"):
-                url = user.webhook.avatar_url
-            else:
-                url = best_url(user)
+            url = best_url(user)
         if not url:
             return self.discord_icon
         if "proxies" in self.data:

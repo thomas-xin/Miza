@@ -512,9 +512,9 @@ class Avatar(Command):
 
     async def getGuildData(self, g):
         # Gets icon display of a server and returns as an embed.
-        url = to_png(g.icon_url)
+        url = best_url(g)
         name = g.name
-        colour = await self.bot.data.colours.get(to_png_ex(g.icon_url))
+        colour = await self.bot.data.colours.get(worst_url(g))
         emb = discord.Embed(colour=colour)
         emb.set_thumbnail(url=url)
         emb.set_image(url=url)
@@ -524,9 +524,9 @@ class Avatar(Command):
 
     async def getMimicData(self, p):
         # Gets icon display of a mimic and returns as an embed.
-        url = to_png(p.url)
+        url = best_url(p)
         name = p.name
-        colour = await self.bot.data.colours.get(to_png_ex(p.url))
+        colour = await self.bot.data.colours.get(worst_url(p))
         emb = discord.Embed(colour=colour)
         emb.set_thumbnail(url=url)
         emb.set_image(url=url)
@@ -623,7 +623,7 @@ class Info(Command):
             u = g.owner
         except (AttributeError, KeyError):
             u = None
-        colour = await self.bot.data.colours.get(to_png_ex(g.icon_url))
+        colour = await self.bot.data.colours.get(worst_url(g))
         emb = discord.Embed(colour=colour)
         emb.set_thumbnail(url=url)
         emb.set_author(name=name, icon_url=url, url=url)

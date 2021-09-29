@@ -1125,7 +1125,7 @@ class StarBoard(Command):
         else:
             content += f"{len(curr)} starboard triggers currently assigned for {str(guild).replace('`', '')}:```*"
             msg = ini_md(iter2str({k: curr[k] for k in tuple(curr)[pos:pos + page]}, key=lambda t: f"×{t[0]} {sqr_md(bot.get_channel(t[1]))}"))
-        colour = await self.bot.data.colours.get(to_png_ex(guild.icon_url))
+        colour = await self.bot.data.colours.get(worst_url(guild))
         emb = discord.Embed(
             description=content + msg,
             colour=colour,
@@ -1226,7 +1226,7 @@ class Crosspost(Command):
         else:
             content += f"{len(curr)} crosspost subscriptions currently assigned for #{str(message.channel).replace('`', '')}:```*"
             msg = ini_md(iter2str({k: curr[k] for k in tuple(curr)[pos:pos + page]}))
-        colour = await self.bot.data.colours.get(to_png_ex(guild.icon_url))
+        colour = await self.bot.data.colours.get(worst_url(guild))
         emb = discord.Embed(
             description=content + msg,
             colour=colour,
@@ -1340,7 +1340,7 @@ class AutoEmoji(Command):
             msg = italics(code_md(f"No custom emojis found for {str(message.guild).replace('`', '')}."))
         else:
             msg = italics(code_md(f"{len(curr)} custom emojis currently assigned for {str(message.guild).replace('`', '')}:")) + "\n" + iter2str({k + " " * (32 - len(k)): curr[k] for k in tuple(curr)[pos:pos + page]}, left="`", right="")
-        colour = await self.bot.data.colours.get(to_png_ex(guild.icon_url))
+        colour = await self.bot.data.colours.get(worst_url(guild))
         emb = discord.Embed(
             description=msg,
             colour=colour,
@@ -2153,8 +2153,8 @@ class UpdateUserLogs(Database):
             )
             change = True
         if before.icon != after.icon:
-            b_url = to_png(before.icon_url)
-            a_url = to_png(after.icon_url)
+            b_url = best_url(before)
+            a_url = best_url(after)
             if "exec" in self.bot.data:
                 urls = ()
                 with tracebacksuppressor:
@@ -2807,7 +2807,7 @@ class UpdateCrossposts(Database):
                         print_exc()
                         self.data[message.channel.id].discard(c_id)
                     name = message.guild.name + "\u2009\u2009#" + str(message.channel)
-                    url = to_png(message.guild.icon_url)
+                    url = best_url(message.guild)
                     create_task(self.bot.send_as_webhook(channel, content, embeds=list(embeds), files=list(files), username=name, avatar_url=url))
 
 
@@ -2830,7 +2830,6 @@ class UpdateStarboards(Database):
                         text, link = embed.description.rsplit("\n\n", 1)
                         description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in sorted(message.reactions, key=lambda r: -r.count) if str(r.emoji) in table) + "   " + link
                         embed.description = lim_str(description, 4096)
-                        # data = ("#" + str(message.channel), to_png(message.guild.icon_url))
                         try:
                             channel = await self.bot.fetch_channel(table[react][1])
                             m = await channel.send(embed=embed)
