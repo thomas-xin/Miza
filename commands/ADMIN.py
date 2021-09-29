@@ -881,9 +881,9 @@ class ThreadPreserver(Command):
     usage = "(enable|disable)?"
     flags = "aed"
 
-    async def __call__(self, bot, guild, channel, name, argv, flags, **void):
-        if argv:
-            thr = await bot.fetch_channel(verify_id(argv))
+    async def __call__(self, bot, guild, channel, name, args, flags, **void):
+        if args:
+            thr = await bot.fetch_channel(verify_id(args[0]))
         else:
             thr = channel
         if not isinstance(thr, discord.Thread) and not hasattr(thr, "archived"):
