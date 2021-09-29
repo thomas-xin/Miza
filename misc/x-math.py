@@ -797,9 +797,11 @@ def evalSym(f, prec=64, r=False, variables=None):
         return [f]
     if prec:
         try:
+            if isinstance(f, sympy.Integer):
+                return [f]
             y = f.evalf(prec, chop=True)
         except:
-            y = [f]
+            y = f
         try:
             e = rounder(y)
         except TypeError:
