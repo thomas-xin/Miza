@@ -3059,6 +3059,7 @@ class UpdateThreadPreservers(Database):
             except:
                 print_exc()
                 self.pop(after)
+                return
         if after.archived:
             if after.permissions_for(after.guild.me).manage_channels:
                 await after.edit(archived=False, locked=False)

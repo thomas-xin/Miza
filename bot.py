@@ -4965,7 +4965,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         @self.event
         async def on_guild_channel_delete(channel):
             self.sub_channels.pop(channel.id, None)
-            self.channels.pop(channel.id, None)
+            self.cache.channels.pop(channel.id, None)
             guild = channel.guild
             if guild:
                 await self.send_event("_channel_delete_", channel=channel, guild=guild)
@@ -4974,7 +4974,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         @self.event
         async def on_thread_delete(channel):
             self.sub_channels.pop(channel.id, None)
-            self.channels.pop(channel.id, None)
+            self.cache.channels.pop(channel.id, None)
             guild = channel.guild
             if guild:
                 await self.send_event("_channel_delete_", channel=channel, guild=guild)
