@@ -95,7 +95,7 @@ class EmptyContext(contextlib.AbstractContextManager):
 emptyctx = EmptyContext()
 
 
-# Manages concurrency limits, similar to asyncio.Semaphore, but has a secondary threshold for enqueued tasks.
+# Manages concurrency limits, similar to asyncio.Semaphore, but has a secondary threshold for enqueued tasks, as well as an optional rate limiter.
 class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
 
     __slots__ = ("limit", "buffer", "fut", "active", "passive", "rate_limit", "rate_bin", "last", "trace")
@@ -117,8 +117,8 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
         classname = classname[classname.index("'") + 1:]
         return f"<{classname} object at {hex(id(self)).upper().replace('X', 'x')}>: {self.active}/{self.limit}, {self.passive}/{self.buffer}, {len(self.rate_bin)}/{self.rate_limit}"
 
-    def _update_bin_after(self, t):
-        time.sleep(t)
+    async def _update_bin_after(self, t):
+        await asyncio.sleep(t)
         self._update_bin()
 
     def _update_bin(self):
@@ -145,8 +145,6 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
         self.active += 1
         if self.rate_limit:
             self._update_bin().append(time.time())
-        if self.fut.done() and (self.active >= self.limit or self.rate_limit and len(self.rate_bin) >= self.limit):
-            self.fut = concurrent.futures.Future()
         return self
 
     def check_overflow(self):
@@ -167,7 +165,7 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
         if self.rate_bin:
             t = self.rate_bin[0 - self.last] + self.rate_limit - time.time()
             if t > 0:
-                create_future_ex(self._update_bin_after, t, priority=True)
+                create_task(self._update_bin_after(t))
             else:
                 self._update_bin()
         elif self.active < self.limit:
