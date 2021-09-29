@@ -4971,7 +4971,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
         # Thread delete event: calls _channel_delete_ bot database event.
         @self.event
-        async def on_guild_thread_delete(channel):
+        async def on_thread_delete(channel):
             self.sub_channels.pop(channel.id, None)
             self.channels.pop(channel.id, None)
             guild = channel.guild
