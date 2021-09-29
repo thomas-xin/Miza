@@ -1684,7 +1684,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
     # Updates bot cache from the discord.py client cache, using automatic feeding to mitigate the need for slow dict.update() operations.
     def update_cache_feed(self):
-        self.cache.guilds._feed = (self._guilds, self.sub_guilds)
+        self.cache.guilds._feed = (self._guilds, getattr(self, "sub_guilds", {}))
         self.cache.emojis._feed = (self._emojis,)
         self.cache.users._feed = (self._users,)
         g = self._guilds.values()
@@ -1693,7 +1693,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             (guild._channels for guild in g),
             (guild._threads for guild in g),
             (self._private_channels,),
-            (self.sub_channels,),
+            (getattr(self, "sub_channels", {}),),
         )
         self.cache.roles._feed = lambda: (guild._roles for guild in g)
 
@@ -4516,6 +4516,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 self.started = True
                 create_task(self.init_ready())
                 create_task(self.load_guilds())
+                self.update_cache_feed()
             else:
                 print("Reconnected.")
             await self.handle_update()
