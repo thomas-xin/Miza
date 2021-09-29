@@ -817,13 +817,9 @@ async def mobile_identify(self):
             },
             'compress': True,
             'large_threshold': 250,
-            'guild_subscriptions': self._connection.guild_subscriptions,
             'v': 3
         }
     }
-
-    if not self._connection.is_bot:
-        payload['d']['synced_guilds'] = []
 
     if self.shard_id is not None and self.shard_count is not None:
         payload['d']['shard'] = [self.shard_id, self.shard_count]
@@ -870,7 +866,6 @@ def ensure_parent(proc, parent):
         if not parent.is_running():
             await_fut(kill())
             psutil.Process().kill()
-        # submit(f"GC.__setitem__({proc.pid}, {len(gc.get_objects())})")
         time.sleep(6)
 
 

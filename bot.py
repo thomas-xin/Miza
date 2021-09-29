@@ -17,7 +17,7 @@ heartbeat_proc = psutil.Popen([python, "misc/heartbeat.py"])
 
 
 # Main class containing all global bot data.
-class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collections.abc.Callable):
+class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Callable):
 
     github = "https://github.com/thomas-xin/Miza"
     rcc_invite = "https://discord.gg/cbKQKAr"
@@ -803,7 +803,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
                             guild.icon_url = f"https://cdn.discordapp.com/icons/{guild.id}/{icon}"
                             if icon.startswith("a_"):
                                 guild.icon_url += ".gif"
-                            guild.created_at = snowflake_time_3(guild.id)
+                            guild.created_at = snowflake_time_2(guild.id)
                         else:
                             guild = g
                         return guild
@@ -1040,6 +1040,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
     # Gets the DM channel for the target user, creating a new one if none exists.
     async def get_dm(self, user):
+        if isinstance(user, discord.DMChannel):
+            return user
         with suppress(TypeError):
             int(user)
             user = await self.fetch_user(user)
@@ -1440,15 +1442,18 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         if self.closed:
             return message
         if cache and message.id not in self.cache.messages or force:
+            created_at = message.created_at
+            if created_at.tzinfo:
+                created_at = created_at.replace(tzinfo=None)
             if not getattr(message, "simulated", None) and "channel_cache" in self.data:
                 self.data.channel_cache.add(message.channel.id, message.id)
             if files and not message.author.bot:
-                if (utc_dt() - message.created_at).total_seconds() < 7200:
+                if (utc_dt() - created_at).total_seconds() < 7200:
                     for attachment in message.attachments:
                         if getattr(attachment, "size", inf) <= 1048576:
                             create_task(self.add_attachment(attachment))
             self.cache.messages[message.id] = message
-            if (utc_dt() - message.created_at).total_seconds() < 86400 * 14 and "message_cache" in self.data and not getattr(message, "simulated", None):
+            if (utc_dt() - created_at).total_seconds() < 86400 * 14 and "message_cache" in self.data and not getattr(message, "simulated", None):
                 self.data.message_cache.save_message(message)
         if ts_us() % 16 == 0:
             self.limit_cache("messages")
@@ -1689,7 +1694,12 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         self.cache.users._feed = (self._users,)
         g = self._guilds.values()
         self.cache.members._feed = lambda: (guild._members for guild in g)
-        self.cache.channels._feed = lambda: chain((guild._channels for guild in g), (self._private_channels,), (self.sub_channels,))
+        self.cache.channels._feed = lambda: chain(
+            (guild._channels for guild in g),
+            (guild._threads for guild in g),
+            (self._private_channels,),
+            (self.sub_channels,),
+        )
         self.cache.roles._feed = lambda: (guild._roles for guild in g)
 
     def update_usernames(self):
@@ -3735,15 +3745,6 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
         # Represents a deleted/not found user.
         class GhostUser(discord.abc.Snowflake):
 
-            def __init__(self):
-                self.id = 0
-                self.name = "[USER DATA NOT FOUND]"
-                self.discriminator = "0000"
-                self.avatar = ""
-                self.avatar_url = ""
-                self.bot = False
-                self.display_name = ""
-
             __repr__ = lambda self: f"<Ghost User id={self.id} name='{self.name}' discriminator='{self.discriminator}' bot=False>"
             __str__ = lambda self: f"{self.name}#{self.discriminator}"
             system = False
@@ -3754,7 +3755,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             is_friend = lambda self: None
             is_blocked = lambda self: None
             colour = color = discord.Colour(16777215)
-            avatar_url = icon_url = url = bot.discord_icon
+            avatar = ""
+            display_name = name = "[USER DATA NOT FOUND]"
+            discriminator = "0000"
+            id = 0
+            display_avatar = avatar_url = icon_url = url = bot.discord_icon
 
             @property
             def mention(self):
@@ -3762,9 +3767,11 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
             @property
             def created_at(self):
-                return snowflake_time_3(self.id)
+                return snowflake_time_2(self.id)
 
             ghost = True
+
+        GhostUser.bot = False
 
         # Represents a deleted/not found message.
         class GhostMessage(discord.abc.Snowflake):
@@ -3802,7 +3809,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
 
             @property
             def created_at(self):
-                return snowflake_time_3(self.id)
+                return snowflake_time_2(self.id)
 
             edit = delete
             publish = delete
@@ -3817,6 +3824,8 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             deleted = True
 
         class ExtendedMessage:
+
+            __slots__ = ("__dict__",)
 
             @classmethod
             def new(cls, data, channel=None, **void):
@@ -3887,7 +3896,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             def __init__(self, data):
                 self._data = data
                 self.id = int(data["id"])
-                self.created_at = snowflake_time_3(self.id)
+                self.created_at = snowflake_time_2(self.id)
                 author = data["author"]
                 if author["id"] not in bot.cache.users:
                     bot.user2cache(author)
@@ -4042,6 +4051,37 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
     def monkey_patch(self):
         bot = self
 
+        discord.http.Route.BASE = f"https://discord.com/api/{api}"
+        discord.utils.snowflake_time = snowflake_time_2
+        discord.Member.permissions_in = lambda self, channel: discord.Permissions.none() if not getattr(channel, "permissions_for", None) else channel.permissions_for(self)
+
+        def _get_guild_channel(self, data):
+            channel_id = int(data["channel_id"])
+            try:
+                return self.cache.channels[channel_id]
+            except KeyError:
+                pass
+            try:
+                guild = self._get_guild(int(data["guild_id"]))
+            except KeyError:
+                channel = discord.DMChannel._from_message(self, channel_id)
+                guild = None
+            else:
+                channel = guild and guild._resolve_channel(channel_id)
+            return channel or discord.PartialMessageable(state=self, id=channel_id), guild
+
+        async def get_gateway(self, *, encoding="json", zlib=True):
+            try:
+                data = await self.request(discord.http.Route("GET", "/gateway"))
+            except discord.HTTPException as exc:
+                raise discord.GatewayNotFound() from exc
+            value = "{0}?encoding={1}&v=" + api[1:]
+            if zlib:
+                value += "&compress=zlib-stream"
+            return value.format(data["url"], encoding)
+
+        discord.http.HTTPClient.get_gateway = lambda self, *args, **kwargs: get_gateway(self, *args, **kwargs)
+
         async def fill_messages(self):
             if not getattr(self, "channel", None):
                 self.channel = await self.messageable._get_channel()
@@ -4102,8 +4142,13 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             if self._messages is not None:
                 self._messages.append(message)
             channel = message.channel
-            if channel and isinstance(channel, discord.TextChannel):
-                channel.last_message_id = message.id
+            if channel:
+                try:
+                    if not getattr(channel, "guild", None):
+                        channel.guild = message.guild
+                    channel.last_message_id = message.id
+                except AttributeError:
+                    pass
 
         discord.state.ConnectionState.parse_message_create = lambda self, data: parse_message_create(self, data)
 
@@ -4145,7 +4190,7 @@ class Bot(discord.AutoShardedClient, contextlib.AbstractContextManager, collecti
             # some checking if it's a JSON request
             if 'json' in kwargs:
                 headers['Content-Type'] = 'application/json'
-                kwargs['data'] = utils.to_json(kwargs.pop('json'))
+                kwargs['data'] = utils._to_json(kwargs.pop('json'))
 
             try:
                 reason = kwargs.pop('reason')
@@ -5225,7 +5270,7 @@ class SimulatedMessage:
         self.message = self
         self.owner = author
 
-    avatar_url = icon_url = "https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/b9573a17-63e8-4ec1-9c97-2bd9a1e9b515/de1q8lu-eae6a001-6463-4abe-b23c-fc32111c6499.png?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOiIsImlzcyI6InVybjphcHA6Iiwib2JqIjpbW3sicGF0aCI6IlwvZlwvYjk1NzNhMTctNjNlOC00ZWMxLTljOTctMmJkOWExZTliNTE1XC9kZTFxOGx1LWVhZTZhMDAxLTY0NjMtNGFiZS1iMjNjLWZjMzIxMTFjNjQ5OS5wbmcifV1dLCJhdWQiOlsidXJuOnNlcnZpY2U6ZmlsZS5kb3dubG9hZCJdfQ.eih2c_r4mgWKzZx88GKXOd_5FhCSMSbX5qXGpRUMIsE"
+    display_avatar = avatar_url = icon_url = "https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/b9573a17-63e8-4ec1-9c97-2bd9a1e9b515/de1q8lu-eae6a001-6463-4abe-b23c-fc32111c6499.png?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOiIsImlzcyI6InVybjphcHA6Iiwib2JqIjpbW3sicGF0aCI6IlwvZlwvYjk1NzNhMTctNjNlOC00ZWMxLTljOTctMmJkOWExZTliNTE1XC9kZTFxOGx1LWVhZTZhMDAxLTY0NjMtNGFiZS1iMjNjLWZjMzIxMTFjNjQ5OS5wbmcifV1dLCJhdWQiOlsidXJuOnNlcnZpY2U6ZmlsZS5kb3dubG9hZCJdfQ.eih2c_r4mgWKzZx88GKXOd_5FhCSMSbX5qXGpRUMIsE"
     roles = []
     emojis = []
     mentions = []
@@ -5302,13 +5347,9 @@ async def desktop_identify(self):
             },
             'compress': True,
             'large_threshold': 250,
-            'guild_subscriptions': self._connection.guild_subscriptions,
             'v': 3
         }
     }
-
-    if not self._connection.is_bot:
-        payload['d']['synced_guilds'] = []
 
     if self.shard_id is not None and self.shard_count is not None:
         payload['d']['shard'] = [self.shard_id, self.shard_count]

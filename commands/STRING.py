@@ -872,7 +872,7 @@ class Follow(Command):
     rate_limit = (1, 5)
     slash = True
 
-    async def __call__(self, channel, argv, message, **void):
+    async def __call__(self, bot, channel, argv, message, **void):
         urls = find_urls(argv)
         if len(urls) == 1 and is_discord_message_link(urls[0]):
             spl = argv.rsplit("/", 2)

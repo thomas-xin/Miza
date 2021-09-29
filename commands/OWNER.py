@@ -742,9 +742,9 @@ class UpdateWebhooks(Database):
     def from_dict(self, d, c_id):
         d = copy.copy(d)
         d.url = f"https://discord.com/api/webhooks/{d.id}/{d.token}"
-        w = discord.Webhook.from_url(d.url, adapter=discord.AsyncWebhookAdapter(Request.sessions.next()))
+        w = discord.Webhook.from_url(d.url, session=self.bot._connection.http._HTTPClient__session, bot_token=self.bot.token)
         d.send = w.send
-        d.avatar_url = d.avatar and f"https://cdn.discordapp.com/avatars/{d.id}/{d.avatar}.png?size=1024"
+        d.display_avatar = d.avatar_url = d.avatar and f"https://cdn.discordapp.com/avatars/{d.id}/{d.avatar}.png?size=1024"
         d.channel = self.CID(id=c_id)
         return self.add(d)
 
@@ -766,7 +766,7 @@ class UpdateWebhooks(Database):
         user.display_name = w.name
         user.joined_at = w.created_at
         user.avatar = w.avatar
-        user.avatar_url = w.avatar_url
+        user.display_avatar = user.avatar_url = w.avatar_url
         user.bot = True
         user.send = w.send
         user.dm_channel = getattr(w, "channel", None)
@@ -777,7 +777,7 @@ class UpdateWebhooks(Database):
             sem = None
         self.bot.cache.users[w.id] = user
         if w.token:
-            webhooks = set_dict(self.data, w.channel.id, cdict())
+            webhooks = self.data.setdefault(w.channel.id, cdict())
             webhooks[w.id] = self.to_dict(w)
             if sem is None:
                 sem = Semaphore(5, 256, rate_limit=5)

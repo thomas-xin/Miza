@@ -56,4 +56,18 @@ try:
     pkg_resources.get_distribution("colorspace")
 except pkg_resources.DistributionNotFound:
     subprocess.run([python, "-m", "pip", "install", "git+https://github.com/retostauffer/python-colorspace", "--user"])
+
+try:
+    v = pkg_resources.get_distribution("discord.py").version
+    assert v >= "2.0.0"
+except:
+    print_exc()
+    import requests, io, zipfile
+    with requests.get("https://codeload.github.com/Rapptz/discord.py/zip/refs/heads/master") as r:
+        with io.BytesIO(r.content) as b:
+            with zipfile.ZipFile(b) as z:
+                z.extractall("discord")
+    subprocess.run([python, "-m", "pip", "install", "discord/discord.py-master", "--user", "--use-feature=in-tree-build"])
+    subprocess.run([python, "misc/deleter.py", "discord"])
+
 print("Installer terminated.")

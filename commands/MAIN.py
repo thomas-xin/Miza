@@ -641,9 +641,24 @@ class Info(Command):
                 emb.add_field(name="Region", value=str(g.region), inline=1)
                 emb.add_field(name="Nitro boosts", value=str(g.premium_subscription_count), inline=1)
         with suppress(AttributeError):
-            emb.add_field(name="Text channels", value=str(len(g.text_channels)), inline=1)
-            emb.add_field(name="Voice channels", value=str(len(g.voice_channels)), inline=1)
-        emb.add_field(name="Member count", value=str(g.member_count), inline=1)
+            x = len(g.channels)
+            t = len(g.text_channels)
+            v = len(voice_channels(g))
+            c = len(g.categories)
+            channelinfo = f"Text: {t}\nVoice: {v}\nCategory: {c}"
+            if x > t + v + c:
+                channelinfo += f"\nOther: {t + v + c - x}"
+            emb.add_field(name=f"Channels ({x})", value=channelinfo, inline=1)
+        with suppress(AttributeError):
+            a = r = 0
+            m = len(g._members)
+            for member in g.members:
+                if member.guild_permissions.administrator:
+                    a += 1
+                else:
+                    r += len(member.roles) > 1
+            memberinfo = f"Admins: {a}\nOther roles: {r}\nNo roles: {m - a - r}"
+            emb.add_field(name=f"Member count ({m})", value=memberinfo, inline=1)
         return emb
 
     async def getMimicData(self, p, flags={}):

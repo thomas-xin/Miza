@@ -921,7 +921,7 @@ async def recursive_coro(item):
     return item
 
 
-is_channel = lambda channel: issubclass(type(channel), discord.abc.GuildChannel) or type(channel) is discord.abc.PrivateChannel
+is_channel = lambda channel: isinstance(channel, discord.abc.GuildChannel) or isinstance(channel, discord.abc.PrivateChannel) or isinstance(channel, discord.Thread)
 
 def is_nsfw(channel):
     try:
@@ -1060,6 +1060,8 @@ async def send_with_react(channel, *args, reacts=None, reference=None, mention=F
         return sent
 
 
+voice_channels = lambda guild: [channel for channel in guild.channels if getattr(channel, "type", None) in (discord.ChannelType.voice, discord.ChannelType.stage_voice)]
+
 def select_voice_channel(user, channel):
     # Attempt to match user's currently connected voice channel
     voice = user.voice
@@ -1068,13 +1070,13 @@ def select_voice_channel(user, channel):
         # Otherwise attempt to find closest voice channel to current text channel
         catg = channel.category
         if catg is not None:
-            channels = catg.voice_channels
+            channels = voice_channels(catg)
         else:
             channels = None
         if not channels:
             pos = 0 if channel.category is None else channel.category.position
             # Sort by distance from text channel
-            channels = sorted(tuple(channel for channel in channel.guild.voice_channels if channel.permissions_for(member).connect and channel.permissions_for(member).speak and channel.permissions_for(member).use_voice_activation), key=lambda channel: (abs(pos - (channel.position if channel.category is None else channel.category.position)), abs(channel.position)))
+            channels = sorted(tuple(channel for channel in voice_channels(channel.guild) if channel.permissions_for(member).connect and channel.permissions_for(member).speak and channel.permissions_for(member).use_voice_activation), key=lambda channel: (abs(pos - (channel.position if channel.category is None else channel.category.position)), abs(channel.position)))
         if channels:
             vc = channels[0]
         else:
@@ -1088,12 +1090,39 @@ def select_voice_channel(user, channel):
 typing = lambda self: create_task(self.trigger_typing())
 
 
+# Gets the string representation of a url object with the maximum allowed image size for discord, replacing webp with png format when possible.
+def to_png(url):
+    if type(url) is not str:
+        url = str(url)
+    if url.endswith("?size=1024"):
+        url = url[:-10] + "?size=4096"
+    if "/embed/" not in url[:48]:
+        url = url.replace("/cdn.discordapp.com/", "/media.discordapp.net/")
+    return url.replace(".webp", ".png")
+
+def to_png_ex(url):
+    if type(url) is not str:
+        url = str(url)
+    if url.endswith("?size=1024"):
+        url = url[:-10] + "?size=256"
+    if "/embed/" not in url[:48]:
+        url = url.replace("/cdn.discordapp.com/", "/media.discordapp.net/")
+    return url.replace(".webp", ".png")
+
+def get_url(obj, f=to_png):
+    if type(obj) is str:
+        return obj
+    for attr in ("display_avatar", "avatar_url", "icon_url"):
+        url = getattr(obj, "display_avatar", None)
+        if url:
+            return f(url)
+
 # Finds the best URL for a discord object's icon, prioritizing proxy_url for images if applicable.
-proxy_url = lambda obj: obj if type(obj) is str else (to_png(obj.avatar_url) if getattr(obj, "avatar_url", None) else (obj.proxy_url if is_image(obj.proxy_url) else obj.url))
+proxy_url = lambda obj: get_url(obj) or (obj.proxy_url if is_image(obj.proxy_url) else obj.url)
 # Finds the best URL for a discord object's icon.
-best_url = lambda obj: obj if type(obj) is str else (to_png(obj.avatar_url) if getattr(obj, "avatar_url", None) else obj.url)
+best_url = lambda obj: get_url(obj) or obj.url
 # Finds the worst URL for a discord object's icon.
-worst_url = lambda obj: obj if type(obj) is str else (to_png_ex(obj.avatar_url) if getattr(obj, "avatar_url", None) else obj.url)
+worst_url = lambda obj: get_url(obj, to_png_ex) or obj.url
 
 def get_author(user, u_id=None):
     url = best_url(user)
@@ -1573,26 +1602,6 @@ def parse_colour(s, default=None):
         except ValueError:
             raise ArgumentError("Please input a valid colour identifier.")
     return channels
-
-
-# Gets the string representation of a url object with the maximum allowed image size for discord, replacing webp with png format when possible.
-def to_png(url):
-    if type(url) is not str:
-        url = str(url)
-    if url.endswith("?size=1024"):
-        url = url[:-10] + "?size=4096"
-    if "/embed/" not in url[:48]:
-        url = url.replace("/cdn.discordapp.com/", "/media.discordapp.net/")
-    return url.replace(".webp", ".png")
-
-def to_png_ex(url):
-    if type(url) is not str:
-        url = str(url)
-    if url.endswith("?size=1024"):
-        url = url[:-10] + "?size=256"
-    if "/embed/" not in url[:48]:
-        url = url.replace("/cdn.discordapp.com/", "/media.discordapp.net/")
-    return url.replace(".webp", ".png")
 
 
 # A translator to stip all characters from mentions.

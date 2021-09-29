@@ -555,7 +555,7 @@ class CustomAudio(collections.abc.Hashable):
                     else:
                         cnt = 0
                         ch = None
-                        for channel in guild.voice_channels:
+                        for channel in voice_channels(guild):
                             if not guild.afk_channel or channel.id != guild.afk_channel.id:
                                 c = sum(1 for m in channel.members if not m.bot)
                                 if c > cnt:
@@ -3807,7 +3807,7 @@ class VoiceNuke(Command):
 
     async def __call__(self, guild, flags, **void):
         connected = set()
-        for vc in guild.voice_channels:
+        for vc in voice_channels(guild):
             for user in vc.members:
                 if user.id != self.bot.id:
                     if user.voice is not None:
