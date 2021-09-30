@@ -22,7 +22,7 @@ class PapagoTrans:
         }
         print(url, headers)
         resp = Request(url, headers=headers, timeout=16)
-        r = json.loads(resp)
+        r = orjson.loads(resp)
         t = r["message"]["result"]["translatedText"]
         output = cdict(text=t)
         return output
@@ -629,7 +629,6 @@ class Time(Command):
                 argv = None
         elif name in TIMEZONES:
             s = TIMEZONES.get(name, 0)
-        t = utc_dt()
         estimated = None
         if argv:
             h = await self.bot.eval_math(argv)
@@ -648,9 +647,14 @@ class Time(Command):
                 estimated = False
         else:
             h = 0
-        if h or s:
-            t += datetime.timedelta(hours=h, seconds=s)
         hrs = round_min(h + s / 3600)
+        if hrs:
+            if abs(hrs) > 17531640:
+                t = utc_ddt()
+                t += hrs * 3600
+            else:
+                t = utc_dt()
+                t += datetime.timedelta(hours=hrs)
         if hrs >= 0:
             hrs = "+" + str(hrs)
         out = f"Current time at UTC/GMT{hrs}: {sqr_md(t)}."

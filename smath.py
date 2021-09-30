@@ -938,7 +938,10 @@ def supersample(a, size):
     if n < size:
         interp = np.linspace(0, n - 1, size)
         return np.interp(interp, range(n), a)
-    dtype = a.dtype
+    try:
+        dtype = a.dtype
+    except TypeError:
+        dtype = object
     x = ceil(n / size)
     interp = np.linspace(0, n - 1, x * size)
     a = np.interp(interp, range(n), a)
@@ -1984,11 +1987,9 @@ class DynamicDT:
         offs, ots = divmod(ts, 12622780800)
         if abs(offs) >= 64:
             ots = round(ots)
-            ts = round(ts)
         d = utc_ft(ots)
         dt = cls(*d.timetuple()[:6], d.microsecond)
-        dt._offset += round(offs * 400)
-        dt._ts = ts
+        dt.set_offset(dt._offset + round(offs * 400))
         return dt
 
     @classmethod

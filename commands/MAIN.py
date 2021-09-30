@@ -153,7 +153,7 @@ class Help(Command):
                 async with sem:
                     await Request(
                         f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
-                        data=json.dumps(dict(
+                        data=orjson.dumps(dict(
                             embed=embed.to_dict(),
                             components=restructure_buttons(buttons),
                         )),
@@ -175,7 +175,7 @@ class Help(Command):
                     async with sem:
                         await Request(
                             f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
-                            data=json.dumps(dict(
+                            data=orjson.dumps(dict(
                                 components=restructure_buttons(buttons),
                             )),
                             method="PATCH",
@@ -659,6 +659,11 @@ class Info(Command):
                     r += len(member.roles) > 1
             memberinfo = f"Admins: {a}\nOther roles: {r}\nNo roles: {m - a - r}"
             emb.add_field(name=f"Member count ({m})", value=memberinfo, inline=1)
+        with suppress(AttributeError):
+            c = len(g.emojis)
+            a = sum(getattr(e, "animated", False) for e in g.emojis)
+            emojiinfo = f"Animated: {a}\nRegular: {c - a}"
+            emb.add_field(name=f"Emoji count ({c})", value=emojiinfo, inline=1)
         return emb
 
     async def getMimicData(self, p, flags={}):

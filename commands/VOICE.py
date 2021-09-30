@@ -394,17 +394,11 @@ class CustomAudio(collections.abc.Hashable):
             if paused:
                 d["paused"] = self.paused
             if js:
-                d = json.dumps(d).encode("utf-8")
+                d = orjson.dumps(d)
                 if len(d) > 2097152:
                     d = bytes2zip(d)
                     return d, "dump.zip"
                 return d, "dump.json"
-                # if len(q) > lim:
-                #     s = pickle.dumps(d)
-                #     if len(s) > 262144:
-                #         return encrypt(bytes2zip(s)), "dump.bin"
-                #     return encrypt(s), "dump.bin"
-                # return json.dumps(d).encode("utf-8"), "dump.json"
             return d, None
 
     def _reverse(self):
@@ -600,7 +594,7 @@ class CustomAudio(collections.abc.Hashable):
             f"https://discord.com/api/{api}/guilds/{vc.guild.id}/voice-states/@me",
             method="PATCH",
             headers={"Authorization": "Bot " + self.bot.token, "Content-Type": "application/json"},
-            data=json.dumps({"suppress": False, "request_to_speak_timestamp": None, "channel_id": vc.id}),
+            data=orjson.dumps({"suppress": False, "request_to_speak_timestamp": None, "channel_id": vc.id}),
             bypass=False,
             aio=True,
         )
@@ -1297,7 +1291,7 @@ class AudioDownloader:
                 self.downloader = youtube_dl.YoutubeDL(self.ydl_opts)
                 self.spotify_x += 1
                 token = await_fut(aretry(Request, "https://open.spotify.com/get_access_token", aio=True, attempts=8, delay=0.5))
-                self.spotify_header = {"authorization": f"Bearer {json.loads(token[:512])['accessToken']}"}
+                self.spotify_header = {"authorization": f"Bearer {orjson.loads(token[:512])['accessToken']}"}
                 self.other_x += 1
 
     # Gets data from yt-download.org, adjusts the format to ensure compatibility with results from youtube-dl. Used as backup.
@@ -3090,6 +3084,8 @@ class Connect(Command):
             vc_ = None
         elif argv or name == "move":
             c_id = verify_id(argv)
+            if not isinstance(c_id, int):
+                raise TypeError(f"Invalid channel identifier: {c_id}")
             if not c_id > 0:
                 vc_ = None
             else:
@@ -4058,7 +4054,7 @@ class Party(Command):
             data = await Request(
                 f"https://discord.com/api/{api}/channels/{vc.id}/invites",
                 method="POST",
-                data=json.dumps(dict(
+                data=orjson.dumps(dict(
                     max_age=0,
                     max_uses=0,
                     target_application_id=aid,

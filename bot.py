@@ -57,6 +57,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     )
     connect_ready = concurrent.futures.Future()
     guilds_ready = concurrent.futures.Future()
+    socket_responses = deque(maxlen=256)
 
     def __init__(self, cache_size=1048576, timeout=24):
         # Initializes client (first in __mro__ of class inheritance)
@@ -228,7 +229,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 resp = reqs.next().post(
                     f"https://discord.com/api/{api}/applications/{self.id}/commands",
                     headers={"Content-Type": "application/json", "Authorization": "Bot " + self.token},
-                    data=json.dumps(data),
+                    data=orjson.dumps(data),
                 )
                 self.activity += 1
                 if resp.status_code == 429:
@@ -349,7 +350,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         with suppress(AttributeError):
                             c[attr] = command.attr
             with open("misc/help.json", "w", encoding="utf-8") as f:
-                f.write(json.dumps(j, indent=4))
+                json.dump(j, f, indent="\t")
 
     def start_webserver(self):
         if self.server:
@@ -3052,7 +3053,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         break
                     await asyncio.sleep(0.1)
                 await self.react_callback(message, None, message.author)
-                out = json.dumps(list(message.response))
+                out = orjson.dumps(list(message.response))
             url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f{after}"
         await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, bypass=False, decode=True, aio=True)
 
@@ -3088,9 +3089,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if output is not None:
                 glob["_"] = output
             try:
-                out = json.dumps(dict(result=output))
+                out = orjson.dumps(dict(result=output))
             except TypeError:
-                out = json.dumps(dict(result=repr(output)))
+                out = orjson.dumps(dict(result=repr(output)))
             # print(url, out)
         await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, bypass=False, decode=True, aio=True)
 
@@ -3195,7 +3196,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 async with getattr(w, "semaphore", emptyctx):
                     w = getattr(w, "webhook", w)
                     if hasattr(channel, "thread"):
-                        data = json.dumps(dict(
+                        data = orjson.dumps(dict(
                             content=args[0] if args else kwargs.get("content"),
                             username=kwargs.get("username"),
                             avatar_url=kwargs.get("avatar_url"),
@@ -3855,7 +3856,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     data["embeds"] = [emb.to_dict() for emb in data["embeds"]]
                 resp = await Request(
                     f"https://discord.com/api/{api}/webhooks/{webhook.id}/{webhook.token}/messages/{self.id}",
-                    data=json.dumps(data),
+                    data=orjson.dumps(data),
                     headers={
                         "Authorization": f"Bot {bot.token}",
                         "Content-Type": "application/json",
@@ -3875,6 +3876,24 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 return self.__class__(copy.copy(self.message))
 
             def __getattr__(self, k):
+                if k == "channel":
+                    m = object.__getattribute__(self, "message")
+                    c = getattr(m, "channel")
+                    if isinstance(c, discord.abc.PrivateChannel):
+                        try:
+                            c = bot.cache.channels[c.id]
+                        except KeyError:
+                            pass
+                        else:
+                            m.channel = c
+                    return c
+                elif k == "guild":
+                    m = object.__getattribute__(self, "message")
+                    g = getattr(m, "guild")
+                    if not g:
+                        c = self.channel
+                        m.guild = getattr(c, "guild", None)
+                    return m.guild
                 try:
                     return self.__getattribute__(k)
                 except AttributeError:
@@ -4050,12 +4069,96 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         discord.utils.snowflake_time = snowflake_time_2
         discord.Member.permissions_in = lambda self, channel: discord.Permissions.none() if not getattr(channel, "permissions_for", None) else channel.permissions_for(self)
 
+        async def received_message(self, msg, /):
+            if type(msg) is bytes:
+                self._buffer.extend(msg)
+                if len(msg) < 4 or msg[-4:] != b"\x00\x00\xff\xff":
+                    return
+                msg = self._zlib.decompress(self._buffer)
+                self._buffer = bytearray()
+            msg = utils._from_json(msg)
+            bot.socket_responses.append(msg)
+            self._dispatch("socket_response", msg)
+            event = msg.get("t")
+            op = msg.get("op")
+            data = msg.get("d")
+            seq = msg.get("s")
+            if seq is not None:
+                self.sequence = seq
+            if self._keep_alive:
+                self._keep_alive.tick()
+            if op != self.DISPATCH:
+                if op == self.RECONNECT:
+                    await self.close()
+                    raise discord.gateway.ReconnectWebSocket(self.shard_id)
+                if op == self.HEARTBEAT_ACK:
+                    if self._keep_alive:
+                        self._keep_alive.ack()
+                    return
+                if op == self.HEARTBEAT:
+                    if self._keep_alive:
+                        beat = self._keep_alive.get_payload()
+                        await self.send_as_json(beat)
+                    return
+                if op == self.HELLO:
+                    interval = data["heartbeat_interval"] / 1000
+                    self._keep_alive = discord.gateway.KeepAliveHandler(ws=self, interval=interval, shard_id=self.shard_id)
+                    await self.send_as_json(self._keep_alive.get_payload())
+                    return self._keep_alive.start()
+                if op == self.INVALIDATE_SESSION:
+                    if data is True:
+                        await self.close()
+                        raise discord.gateway.ReconnectWebSocket(self.shard_id)
+                    self.sequence = None
+                    self.session_id = None
+                    print(f"Shard ID {self.shard_id} session has been invalidated.")
+                    await self.close(code=1000)
+                    raise discord.gateway.ReconnectWebSocket(self.shard_id, resume=False)
+                return print(f"Unknown OP code {op}.")
+            if event == "READY":
+                self._trace = trace = data.get("_trace", [])
+                self.session_id = data["session_id"]
+                data["__shard_id__"] = self.shard_id
+            elif event == "RESUMED":
+                self._trace = trace = data.get("_trace", [])
+                data["__shard_id__"] = self.shard_id
+            try:
+                func = self._discord_parsers[event]
+            except KeyError:
+                print(f"Unknown event {event}.")
+            else:
+                func(data)
+            removed = deque()
+            for index, entry in enumerate(self._dispatch_listeners):
+                if entry.event != event:
+                    continue
+                future = entry.future
+                if future.cancelled():
+                    removed.append(index)
+                    continue
+                try:
+                    valid = entry.predicate(data)
+                except Exception as exc:
+                    future.set_exception(exc)
+                    removed.append(index)
+                else:
+                    if valid:
+                        ret = data if entry.result is None else entry.result(data)
+                        future.set_result(ret)
+                        removed.append(index)
+            for index in reversed(removed):
+                del self._dispatch_listeners[index]
+
+        discord.gateway.DiscordWebSocket.received_message = lambda self, msg: received_message(self, msg)
+
         def _get_guild_channel(self, data):
             channel_id = int(data["channel_id"])
             try:
-                return self.cache.channels[channel_id]
+                channel = bot.cache.channels[channel_id]
             except KeyError:
                 pass
+            else:
+                return channel, getattr(channel, "guild", None)
             try:
                 guild = self._get_guild(int(data["guild_id"]))
             except KeyError:
@@ -4064,6 +4167,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             else:
                 channel = guild and guild._resolve_channel(channel_id)
             return channel or discord.PartialMessageable(state=self, id=channel_id), guild
+
+        discord.state.ConnectionState._get_guild_channel = lambda self, data: _get_guild_channel(self, data)
 
         async def get_gateway(self, *, encoding="json", zlib=True):
             try:
@@ -4662,7 +4767,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         @self.event
         async def on_socket_response(data):
             self.activity += 1
-            if data.get("t") == "INTERACTION_CREATE" and "d" in data:
+            if not data.get("op") and data.get("t") == "INTERACTION_CREATE" and "d" in data:
                 try:
                     dt = utc_dt()
                     message = self.GhostMessage()

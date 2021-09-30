@@ -248,9 +248,9 @@ class Server:
                 except ValueError:
                     pass
                 else:
-                    url, code, ftype = json.loads(s)
+                    url, code, ftype = orjson.loads(s)
                     d["original_url"] = url
-        return json.dumps(d).encode("utf-8")
+        return orjson.dumps(d)
 
     image_loaders = {}
 
@@ -481,7 +481,7 @@ class Server:
                     except ValueError:
                         pass
                     else:
-                        url, code, ftype = json.loads(s)
+                        url, code, ftype = orjson.loads(s)
                         if ftype == 1:
                             data = resp.encode("utf-8")
                             cp.response.headers["Location"] = url
@@ -768,7 +768,7 @@ class Server:
             res = j["result"]
         cp.response.headers.update(CHEADERS)
         cp.response.headers["Content-Type"] = "application/json"
-        return json.dumps(res).encode("utf-8")
+        return orjson.dumps(res)
     ytdl._cp_config = {"response.stream": True}
 
     @cp.expose(("index", "p", "preview", "upload", "files", "file", "tester", "atlas"))
@@ -869,10 +869,10 @@ class Server:
     @cp.expose
     def get_ip(self, *args, **kwargs):
         self.get_ip_ex()
-        data = json.dumps(dict(
+        data = orjson.dumps(dict(
             remote=cp.request.remote.ip,
             host=getattr(self, "ip", "127.0.0.1"),
-        )).encode("utf-8")
+        ))
         cp.response.headers.update(SHEADERS)
         cp.response.headers["Content-Type"] = "application/json"
         cp.response.headers["Content-Length"] = len(data)
@@ -1502,7 +1502,7 @@ body {
         send(f"!{t}\x7f{content}", escape=False)
         j, after = fut.result()
         RESPONSES.pop(t, None)
-        return json.dumps(j["result"])
+        return orjson.dumps(j["result"])
 
     @cp.expose
     def eval2(self, token, *args, **kwargs):
@@ -1604,7 +1604,7 @@ body {
                 width = np.clip(len(self.ins_data[k]), 3, 96)
                 histories[k] = list(supersample(self.ins_data[k], width))
                 hours[k] = len(self.ins_data[k])
-            return json.dumps(dict(
+            return orjson.dumps(dict(
                 current=dict(
                     live_users=values[2],
                     active_users=values[1],
@@ -1621,7 +1621,7 @@ body {
                     total_use_time=[histories[3], hours[2]],
                     average_playtime=[histories[5], hours[2]],
                 ),
-            )).encode("utf-8")
+            ))
         create_future_ex(self.ensure_mpins)
         return """<!DOCTYPE html><html>
 <head>
@@ -1788,7 +1788,7 @@ body {
             t = int(t)
             after = float(after)
             cl = int(cp.request.headers["Content-Length"])
-            j = json.loads(cp.request.body.read(cl))
+            j = orjson.loads(cp.request.body.read(cl))
             if t in RESPONSES:
                 RESPONSES[t].set_result((j, after))
                 return b"\xf0\x9f\x92\x9c"
@@ -1812,7 +1812,7 @@ body {
         if a > 0:
             cp.response.headers["Retry-After"] = a
         cp.response.headers.update(HEADERS)
-        return json.dumps(j)
+        return orjson.dumps(j)
 
     @cp.expose(("cat", "cats", "dog", "dogs", "neko", "nekos", "giphy"))
     def imagepool(self, tag="", refresh=60):

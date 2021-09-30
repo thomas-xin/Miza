@@ -296,7 +296,7 @@ class Neko(Command):
                     async with self.moe_sem:
                         resp = await Request(
                             "https://nekos.moe/api/v1/images/search",
-                            data=json.dumps(dict(nsfw=False, limit=50, skip=xrand(10) * 50, sort="newest", artist="", uploader="")),
+                            data=orjson.dumps(dict(nsfw=False, limit=50, skip=xrand(10) * 50, sort="newest", artist="", uploader="")),
                             headers={"Content-Type": "application/json"},
                             method="POST",
                             json=True,

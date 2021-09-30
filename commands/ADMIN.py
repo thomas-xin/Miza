@@ -2125,7 +2125,12 @@ class UpdateUserLogs(Database):
                     emb.add_field(name="Roles", value=rchange)
                     change = True
                     colour[1] += 255
-        if before.avatar.key != after.avatar.key:
+        bk, ak = before.avatar, after.avatar
+        if bk:
+            bk = bk.key
+        if ak:
+            ak = ak.key
+        if bk != ak:
             b_url = best_url(before)
             a_url = best_url(after)
             if "exec" in self.bot.data:
@@ -2418,7 +2423,7 @@ class UpdateMessageCache(Database):
                     channel_id=message.channel.id,
                 )
                 for reaction in message.reactions:
-                    if not reaction.custom_emoji:
+                    if not reaction.is_custom_emoji():
                         r = dict(emoji=dict(id=None, name=str(reaction)))
                         if reaction.count != 1:
                             r["count"] = reaction.count
@@ -3067,7 +3072,7 @@ class UpdateThreadPreservers(Database):
                 m = await after.send("\xad")
                 await self.bot.silent_delete(m)
 
-    async def _channel_delete_(self, channel):
+    async def _channel_delete_(self, channel, **void):
         if isinstance(channel, discord.Thread):
             with suppress():
                 self.pop(channel.id)

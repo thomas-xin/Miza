@@ -428,7 +428,7 @@ class Text2048(Command):
                 async with sem:
                     return await Request(
                         f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
-                        data=json.dumps(dict(
+                        data=orjson.dumps(dict(
                             content="**```\n2048: GAME OVER```**",
                             embed=emb.to_dict(),
                             components=None,
@@ -525,7 +525,7 @@ class Text2048(Command):
             async with sem:
                 return await Request(
                     f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
-                    data=json.dumps(dict(
+                    data=orjson.dumps(dict(
                         content=content,
                         embed=emb.to_dict(),
                         components=restructure_buttons(buttons),
@@ -1214,7 +1214,7 @@ class Uno(Command):
                 async with sem:
                     return await Request(
                         f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
-                        data=json.dumps(dict(
+                        data=orjson.dumps(dict(
                             content=content,
                             embed=embed.to_dict(),
                             components=restructure_buttons([[

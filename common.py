@@ -11,6 +11,7 @@ with MultiThreadedImporter(globals()) as importer:
         "asyncio",
         "discord",
         "json",
+        "orjson",
         "aiohttp",
         "threading",
         "urllib",
@@ -387,13 +388,14 @@ def decrypt(s):
 def zip2bytes(data):
     if not hasattr(data, "read"):
         data = io.BytesIO(data)
-    with ZipFile(data, compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False) as z:
+    with ZipFile(data, allowZip64=True, strict_timestamps=False) as z:
         b = z.read("DATA")
     return b
 
-def bytes2zip(data):
+def bytes2zip(data, lzma=False):
     b = io.BytesIO()
-    with ZipFile(b, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True) as z:
+    ctype = zipfile.ZIP_LZMA if lzma else zipfile.ZIP_DEFLATED
+    with ZipFile(b, "w", compression=compression, allowZip64=True) as z:
         z.writestr("DATA", data=data)
     b.seek(0)
     return b.read()
@@ -404,7 +406,7 @@ def eval_json(s):
     if type(s) is memoryview:
         s = bytes(s)
     try:
-        return json.loads(s)
+        return orjson.loads(s)
     except:
         pass
         try:
@@ -450,21 +452,21 @@ def select_and_loads(s, mode="safe", size=None):
         else:
             if b"{" in s:
                 s = s[s.index(b"{"):s.rindex(b"}") + 1]
-            data = json.loads(s)
+            data = orjson.loads(s)
     return data
 
 def select_and_dumps(data, mode="safe", compress=True):
     if mode == "unsafe":
         s = pickle.dumps(data)
         if len(s) > 32768 and compress:
-            s = bytes2zip(s)
+            s = bytes2zip(s, lzma=True)
         return s
     try:
-        s = json.dumps(data).encode("utf-8")
+        s = orjson.dumps(data)
     except:
         s = None
     if len(s) > 262144:
-        return bytes2zip(s)
+        return bytes2zip(s, lzma=True)
     return s
 
 
@@ -781,7 +783,7 @@ def interaction_response(bot, message, content=None, embed=None, components=None
         message.int_token = message.slash
     return Request(
         f"https://discord.com/api/{api}/interactions/{message.int_id}/{message.int_token}/callback",
-        data=json.dumps(dict(
+        data=orjson.dumps(dict(
             type=4,
             data=dict(
                 flags=64,
@@ -808,7 +810,7 @@ def interaction_patch(bot, message, content=None, embed=None, components=None, b
         message.int_token = message.slash
     return Request(
         f"https://discord.com/api/{api}/interactions/{message.int_id}/{message.int_token}/callback",
-        data=json.dumps(dict(
+        data=orjson.dumps(dict(
             type=7,
             data=dict(
                 flags=64,
@@ -1011,7 +1013,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, tts=N
             data["embed"] = embed.to_dict()
         if tts is not None:
             data["tts"] = tts
-    body = json.dumps(data)
+    body = orjson.dumps(data)
     exc = RuntimeError
     for i in range(xrand(12, 17)):
         try:
