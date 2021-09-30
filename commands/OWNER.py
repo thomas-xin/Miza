@@ -765,7 +765,7 @@ class UpdateWebhooks(Database):
         user.name = w.name
         user.display_name = w.name
         user.joined_at = w.created_at
-        user.avatar = w.avatar and w.avatar.key
+        user.avatar = w.avatar and (w.avatar if isinstance(w.avatar, str) else w.avatar.key)
         user.display_avatar = user.avatar_url = str(w.avatar)
         user.bot = True
         user.send = w.send

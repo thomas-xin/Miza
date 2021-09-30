@@ -1589,7 +1589,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if urls:
                 with tracebacksuppressor:
                     url = urls[0]
-                    resp = reqs.next().get(url, headers=Request.header(), timeout=8)
+                    resp = reqs.next().get(url, headers=Request.header(), timeout=12)
                     self.activity += 1
                     headers = fcdict(resp.headers)
                     if headers.get("Content-Type", "").split("/", 1)[0] == "image":
