@@ -2394,7 +2394,7 @@ class UpdateMessageCache(Database):
                 m = message._data
                 if "author" not in m:
                     author = message.author
-                    m["author"] = dict(id=author.id, s=str(author), avatar=author.avatar.key)
+                    m["author"] = dict(id=author.id, s=str(author), avatar=author.avatar and author.avatar.key)
                 if "channel_id" not in m:
                     try:
                         m["channel_id"] = message.channel.id
@@ -2409,7 +2409,7 @@ class UpdateMessageCache(Database):
                 author = message.author
                 m = dict(
                     id=message.id,
-                    author=dict(id=author.id, s=str(author), avatar=author.avatar.key),
+                    author=dict(id=author.id, s=str(author), avatar=author.avatar and author.avatar.key),
                     webhook_id=message.webhook_id,
                     reactions=reactions,
                     attachments=attachments,
