@@ -2735,6 +2735,16 @@ def timezone_repr(tz):
         return capwords(tz)
     return tz.upper()
 
+def time_repr(t, mode=None):
+    if hasattr(t, "timestamp"):
+        t = t.timestamp
+        if callable(t):
+            t = t()
+    t = round(t)
+    if not mode:
+        mode = "R"
+    return f"<t:{t}:{mode}>"
+
 def parse_with_now(expr):
     if not expr or expr.strip().casefold() == "now":
         return utc_ddt()

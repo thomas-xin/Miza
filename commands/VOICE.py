@@ -3546,7 +3546,7 @@ class AudioSettings(Command):
         self.alias = list(self.aliasMap) + list(self.aliasExt)[1:]
         self.name = list(self.aliasMap)
         self.min_display = "0~2"
-        self.description = "Changes the current audio settings for this server."
+        self.description = "Changes the current audio settings for this server. Some settings are very flexible; volume and bassboost are unlimited, speed and nightcore can be negative, etc."
         self.usage = "<value>? <volume(?v)|speed(?s)|pitch(?p)|pan(?e)|bassboost(?b)|reverb(?r)|compressor(?c)|chorus(?u)|nightcore(?n)|bitrate(?i)|loop(?l)|repeat(?1)|shuffle(?x)|quiet(?q)|stay(?t)|force_permanent(?f)|disable(?d)|hide(?h)>*"
         self.flags = "vspebrcunil1xqtfdh"
         self.map = {k.casefold(): self.aliasMap[k] for k in self.aliasMap}
@@ -3815,7 +3815,7 @@ class VoiceNuke(Command):
 
 class Radio(Command):
     name = ["FM"]
-    description = "Searches for a radio station livestream on http://worldradiomap.com that can be played on ⟨MIZA⟩."
+    description = "Searches for a radio station livestream on https://worldradiomap.com that can be played on ⟨MIZA⟩."
     usage = "<0:country>? <2:state>? <1:city>?"
     rate_limit = (2, 6)
     slash = True
@@ -3843,7 +3843,7 @@ class Radio(Command):
 
     def get_countries(self):
         with tracebacksuppressor:
-            resp = Request("http://worldradiomap.com", timeout=24)
+            resp = Request("https://worldradiomap.com", timeout=24)
             search = b'<option value="selector/_blank.htm">- Select a country -</option>'
             resp = resp[resp.index(search) + len(search):]
             resp = resp[:resp.index(b"</select>")]
@@ -3854,7 +3854,7 @@ class Radio(Command):
                     search = b'">'
                     href = as_str(resp[:resp.index(search)])
                     if not href.startswith("http"):
-                        href = "http://worldradiomap.com/" + href.lstrip("/")
+                        href = "https://worldradiomap.com/" + href.lstrip("/")
                     if href.endswith(".htm"):
                         href = href[:-4]
                     resp = resp[resp.index(search) + len(search):]
@@ -3872,7 +3872,7 @@ class Radio(Command):
                         search = '<img src="'
                         resp = resp[resp.index(search) + len(search):]
                         icon, resp = resp.split('"', 1)
-                        icon = icon.replace("../", "http://worldradiomap.com/")
+                        icon = icon.replace("../", "https://worldradiomap.com/")
                         country.icon = icon
                         search = '<option selected value="_blank.htm">- Select a city -</option>'
                         try:
@@ -3888,7 +3888,7 @@ class Radio(Command):
                                     search = '">'
                                     href = as_str(resp[:resp.index(search)])
                                     if not href.startswith("http"):
-                                        href = "http://worldradiomap.com/selector/" + href
+                                        href = "https://worldradiomap.com/selector/" + href
                                     if href.endswith(".htm"):
                                         href = href[:-4]
                                     search = "<!--"
@@ -3904,7 +3904,7 @@ class Radio(Command):
                                     search = '">'
                                     href = as_str(resp[:resp.index(search)])
                                     if href.startswith("../"):
-                                        href = "http://worldradiomap.com/" + href[3:]
+                                        href = "https://worldradiomap.com/" + href[3:]
                                     if href.endswith(".htm"):
                                         href = href[:-4]
                                     resp = resp[resp.index(search) + len(search):]
@@ -4000,7 +4000,7 @@ class Radio(Command):
                             field[1] += "\n"
                         href, station = station.split('"', 1)
                         if not href.startswith("http"):
-                            href = "http://worldradiomap.com/" + href.lstrip("/")
+                            href = "https://worldradiomap.com/" + href.lstrip("/")
                             if href.endswith(".htm"):
                                 href = href[:-4]
                         search = "class=station>"

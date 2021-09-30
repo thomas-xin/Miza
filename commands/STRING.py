@@ -67,8 +67,8 @@ class Translate(Command):
     time_consuming = True
     name = ["TR"]
     description = "Translates a string into another language."
-    usage = "<0:language> <1:string> <verbose{?v}>? <papago{?p}>?"
-    flags = "pv"
+    usage = "<0:language> <1:string> <verbose{?v}>?"
+    flags = "v"
     no_parse = True
     rate_limit = (2, 7)
     slash = True
@@ -82,9 +82,7 @@ class Translate(Command):
             dest = LANGS[dest]
         with discord.context_managers.Typing(channel):
             source = None
-            trans = ["Google Translate", "Papago"]
-            if "p" in flags:
-                trans = trans[::-1]
+            trans = ["Papago", "Google Translate"]
             used = None
             response = ""
             count = ("v" in flags) + 1
@@ -92,7 +90,6 @@ class Translate(Command):
             with suppress(StopIteration):
                 for i in range(count):
                     for t in trans:
-                        # try:
                         print(string, dest, source)
                         resp = await create_future(getTranslate, translators[t], string, dest, source, timeout=20)
                         try:
@@ -110,9 +107,6 @@ class Translate(Command):
                             flags.pop("v", None)
                             raise StopIteration
                         break
-                        # except:
-                        #     if t == trans[-1] and i == count - 1:
-                        #         raise
             if "v" in flags:
                 end = f"Detected language: {dest}"
             else:

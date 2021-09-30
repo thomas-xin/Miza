@@ -635,7 +635,7 @@ class Info(Command):
             d += code_md(g.description)
         emb.description = d
         emb.add_field(name="Server ID", value=str(g.id), inline=0)
-        emb.add_field(name="Creation time", value=str(g.created_at) + "\n" + dyn_time_diff(utc_dt().timestamp(), g.created_at.timestamp()) + " ago", inline=1)
+        emb.add_field(name="Creation time", value=time_repr(g.created_at), inline=1)
         if "v" in flags:
             with suppress(AttributeError, KeyError):
                 emb.add_field(name="Region", value=str(g.region), inline=1)
@@ -643,12 +643,13 @@ class Info(Command):
         with suppress(AttributeError):
             x = len(g.channels)
             t = len(g.text_channels)
+            t2 = len(g._threads)
             v = len(voice_channels(g))
             c = len(g.categories)
-            channelinfo = f"Text: {t}\nVoice: {v}\nCategory: {c}"
+            channelinfo = f"Text: {t}\nThreads: {t2}\nVoice: {v}\nCategory: {c}"
             if x > t + v + c:
                 channelinfo += f"\nOther: {t + v + c - x}"
-            emb.add_field(name=f"Channels ({x})", value=channelinfo, inline=1)
+            emb.add_field(name=f"Channels ({x + t2})", value=channelinfo, inline=1)
         with suppress(AttributeError):
             a = r = 0
             m = len(g._members)
@@ -659,6 +660,11 @@ class Info(Command):
                     r += len(member.roles) > 1
             memberinfo = f"Admins: {a}\nOther roles: {r}\nNo roles: {m - a - r}"
             emb.add_field(name=f"Member count ({m})", value=memberinfo, inline=1)
+        with suppress(AttributeError):
+            r = len(g._roles)
+            a = sum(1 for r in g._roles.values() if r.permissions.administrator and not r.is_default())
+            roleinfo = f"Admins: {a}\nOther: {r - a}"
+            emb.add_field(name=f"Role count ({r})", value=roleinfo, inline=1)
         with suppress(AttributeError):
             c = len(g.emojis)
             a = sum(getattr(e, "animated", False) for e in g.emojis)
@@ -680,11 +686,11 @@ class Info(Command):
         emb.add_field(name="Mimic ID", value=str(p.id), inline=0)
         emb.add_field(name="Name", value=str(p.name), inline=0)
         emb.add_field(name="Prefix", value=str(p.prefix), inline=1)
-        emb.add_field(name="Creation time", value=str(datetime.datetime.fromtimestamp(p.created_at)) + "\n" + dyn_time_diff(utc_dt().timestamp(), p.created_at) + " ago", inline=1)
+        emb.add_field(name="Creation time", value=time_repr(p.created_at), inline=1)
         if "v" in flags:
             emb.add_field(name="Gender", value=str(p.gender), inline=1)
-            ctime = datetime.datetime.fromtimestamp(p.birthday)
-            age = (utc_dt() - ctime).total_seconds() / TIMEUNITS["year"]
+            ctime = DynamicDT.fromtimestamp(p.birthday)
+            age = (DynamicDT.now() - ctime).total_seconds() / TIMEUNITS["year"]
             emb.add_field(name="Birthday", value=str(ctime), inline=1)
             emb.add_field(name="Age", value=str(round_min(round(age, 1))), inline=1)
         return emb
@@ -838,13 +844,12 @@ class Info(Command):
                     seen = None
                     zone = None
                     with suppress(LookupError):
-                        ts = utc()
                         ls = bot.data.users[u.id]["last_seen"]
                         la = bot.data.users[u.id].get("last_action")
                         if type(ls) is str:
                             seen = ls
                         else:
-                            seen = f"{dyn_time_diff(ts, min(ts, ls))} ago"
+                            seen = time_repr(ls, mode="R")
                         if la:
                             seen = f"{la}, {seen}"
                         if "v" in flags:
@@ -871,9 +876,9 @@ class Info(Command):
                         d += "```**"
                     emb.description = d
                     emb.add_field(name="User ID", value="`" + str(u.id) + "`", inline=0)
-                    emb.add_field(name="Creation time", value=str(created) + "\n" + dyn_time_diff(utc_dt().timestamp(), created.timestamp()) + " ago", inline=1)
+                    emb.add_field(name="Creation time", value=time_repr(created), inline=1)
                     if joined:
-                        emb.add_field(name="Join time", value=str(joined) + "\n" + dyn_time_diff(utc_dt().timestamp(), joined.timestamp()) + " ago", inline=1)
+                        emb.add_field(name="Join time", value=time_repr(joined), inline=1)
                     if zone:
                         emb.add_field(name="Estimated timezone", value=str(zone), inline=1)
                     if seen:

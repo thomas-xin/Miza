@@ -49,7 +49,7 @@ class Purge(Command):
                 async with bot.guild_semaphore:
                     async for m in bot.history(channel, limit=None, before=dt, after=after):
                         found = True
-                        dt = m.created_at
+                        dt = m.id
                         if uset is None and m.author.bot or uset and m.author.id in uset:
                             delD.append(m)
                             count -= 1
@@ -2596,7 +2596,7 @@ class UpdateMessageLogs(Database):
             except (EOFError, discord.NotFound):
                 self.data.pop(guild.id)
                 return
-            now = utc_dt()
+            now = utc()
             u = message.author
             name_id = str(u)
             url = await self.bot.get_proxy_url(u)
@@ -2622,13 +2622,12 @@ class UpdateMessageLogs(Database):
                         action=action,
                     ).flatten()
                     for e in reversed(al):
-                        # print(e, e.target, now - e.created_at)
                         # This is because message delete events stack
                         try:
                             cnt = e.extra.count
                         except AttributeError:
                             cnt = int(e.extra.get("count", 1))
-                        h = e.created_at
+                        h = e.created_at.timestamp()
                         cs = set_dict(self.dc, h, 0)
                         c = cnt - cs
                         if c >= 1:
@@ -2638,7 +2637,7 @@ class UpdateMessageLogs(Database):
                                 self.dc[h] += cnt
                         s = (3, 3600)[c >= 1]
                         cid = e.extra.channel.id
-                        if now - h < datetime.timedelta(seconds=s):
+                        if now - h < s:
                             if (not e.target or e.target.id == u.id or u.id == self.bot.deleted_user) and cid == message.channel.id:
                                 t = e.user
                                 init = user_mention(t.id)
@@ -2663,7 +2662,7 @@ class UpdateMessageLogs(Database):
             except (EOFError, discord.NotFound):
                 self.data.pop(guild.id)
                 return
-            now = utc_dt()
+            now = utc()
             action = discord.AuditLogAction.message_bulk_delete
             try:
                 init = "[UNKNOWN USER]"
@@ -2679,13 +2678,12 @@ class UpdateMessageLogs(Database):
                         action=action,
                     ).flatten()
                     for e in reversed(al):
-                        # print(e, e.target, now - e.created_at)
                         # For some reason bulk message delete events stack too
                         try:
                             cnt = e.extra.count
                         except AttributeError:
                             cnt = int(e.extra.get("count", 1))
-                        h = e.created_at
+                        h = e.created_at.timestamp()
                         cs = set_dict(self.dc, h, 0)
                         c = cnt - cs
                         if c >= len(messages):
@@ -2694,7 +2692,7 @@ class UpdateMessageLogs(Database):
                             else:
                                 self.dc[h] += cnt
                         s = (5, 3600)[c >= len(messages)]
-                        if now - h < datetime.timedelta(seconds=s):
+                        if now - h < s:
                             if (not e.target or e.target.id == messages[-1].channel.id):
                                 t = e.user
                                 init = user_mention(t.id)

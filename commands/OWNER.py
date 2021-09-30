@@ -746,13 +746,13 @@ class UpdateWebhooks(Database):
         d.send = w.send
         d.display_avatar = d.avatar_url = d.avatar and f"https://cdn.discordapp.com/avatars/{d.id}/{d.avatar}.png?size=1024"
         d.channel = self.CID(id=c_id)
+        d.created_at = snowflake_time_3(w.id)
         return self.add(d)
 
     def to_dict(self, user):
         return cdict(
             id=user.id,
             name=user.name,
-            created_at=user.created_at,
             avatar=getattr(user, "avatar_url", as_str(user.avatar)),
             token=user.token,
         )

@@ -804,7 +804,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                             guild.icon_url = f"https://cdn.discordapp.com/icons/{guild.id}/{icon}"
                             if icon.startswith("a_"):
                                 guild.icon_url += ".gif"
-                            guild.created_at = snowflake_time_2(guild.id)
+                            guild.created_at = snowflake_time_3(guild.id)
                         else:
                             guild = g
                         return guild
@@ -3763,7 +3763,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
             @property
             def created_at(self):
-                return snowflake_time_2(self.id)
+                return snowflake_time_3(self.id)
 
             ghost = True
 
@@ -3805,7 +3805,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
             @property
             def created_at(self):
-                return snowflake_time_2(self.id)
+                return snowflake_time_3(self.id)
 
             edit = delete
             publish = delete
@@ -3910,7 +3910,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             def __init__(self, data):
                 self._data = data
                 self.id = int(data["id"])
-                self.created_at = snowflake_time_2(self.id)
+                self.created_at = snowflake_time_3(self.id)
                 author = data["author"]
                 if author["id"] not in bot.cache.users:
                     bot.user2cache(author)
@@ -4066,7 +4066,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         bot = self
 
         discord.http.Route.BASE = f"https://discord.com/api/{api}"
-        discord.utils.snowflake_time = snowflake_time_2
         discord.Member.permissions_in = lambda self, channel: discord.Permissions.none() if not getattr(channel, "permissions_for", None) else channel.permissions_for(self)
 
         async def received_message(self, msg, /):
@@ -5355,7 +5354,7 @@ class SimulatedMessage:
 
     def __init__(self, bot, content, t, name, nick, recursive=True):
         self._state = bot._state
-        self.created_at = datetime.datetime.fromtimestamp(int(t) / 1e6)
+        self.created_at = datetime.datetime.utcfromtimestamp(int(t) / 1e6)
         self.id = time_snowflake(self.created_at, high=True)
         self.content = content
         self.response = deque()
