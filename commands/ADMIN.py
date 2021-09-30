@@ -2501,7 +2501,11 @@ class UpdateMessageLogs(Database):
 
     async def __call__(self):
         for h in tuple(self.dc):
-            if utc_dt() - h > datetime.timedelta(seconds=3600):
+            if isinstance(h, datetime.datetime):
+                x = h.timestamp()
+            else:
+                x = h
+            if utc() - x > 3600:
                 self.dc.pop(h)
 
     async def _bot_ready_(self, **void):
