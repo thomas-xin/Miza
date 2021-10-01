@@ -874,7 +874,7 @@ class NickPreserver(Command):
 
 class ThreadPreserver(Command):
     server_only = True
-    name = ["KeepAlive", "ThreadBump", "AutoBump"]
+    name = ["KeepAlive", "ThreadBump", "AutoBump", "UnArchive"]
     min_level = 3
     min_display = "3+"
     description = 'Causes ⟨MIZA⟩ to "bump" (revive) the current thread when auto-archived.'
@@ -1565,8 +1565,8 @@ class UpdateAutoEmojis(Database):
             return msg
         files = deque()
         for a in message.attachments:
-            b = await self.bot.get_request(a.url)
-            files.append(discord.File(io.BytesIO(b), filename=a.filename))
+            b = await self.bot.get_request(a.url, full=False)
+            files.append(CompatFile(seq(b), filename=a.filename))
         create_task(self.bot.silent_delete(message))
         url = await self.bot.get_proxy_url(message.author)
         m = await self.bot.send_as_webhook(message.channel, msg, files=files, username=message.author.display_name, avatar_url=url)
@@ -1957,9 +1957,8 @@ class CreateEmoji(Command):
             if len(image) > 262144 or not is_image(url):
                 ts = ts_us()
                 path = "cache/" + str(ts)
-                f = await create_future(open, path, "wb", timeout=18)
-                await create_future(f.write, image, timeout=18)
-                await create_future(f.close, timeout=18)
+                with open(path, "wb") as f:
+                    await create_future(f.write, image, timeout=18)
                 try:
                     resp = await process_image(path, "resize_max", [128], timeout=_timeout)
                 except:
@@ -2737,17 +2736,8 @@ class UpdateFileLogs(Database):
                 fils = []
                 for a in message.attachments:
                     try:
-                        try:
-                            b = self.bot.cache.attachments[a.id]
-                        except KeyError:
-                            b = await a.read(use_cached=True)
-                        else:
-                            for i in range(30):
-                                if b:
-                                    break
-                                with Delay(1):
-                                    b = self.bot.cache.attachments[a.id]
-                        fil = CompatFile(io.BytesIO(b), filename=str(a).rsplit("/", 1)[-1])
+                        b = await self.bot.get_attachment(a.url, full=False)
+                        fil = CompatFile(seq(b), filename=str(a).rsplit("/", 1)[-1])
                         fils.append(fil)
                     except:
                         msg.append(proxy_url(a))
@@ -2840,8 +2830,8 @@ class UpdateCrossposts(Database):
                     embeds.append(embed)
                 files = deque()
                 for a in message.attachments:
-                    f = await self.bot.get_attachment(a.url)
-                    files.append(CompatFile(f))
+                    b = await self.bot.get_attachment(a.url, full=False)
+                    files.append(CompatFile(seq(b)))
                 for c_id in tuple(self.data[message.channel.id]):
                     try:
                         channel = await self.bot.fetch_channel(c_id)
@@ -3061,12 +3051,16 @@ class UpdateThreadPreservers(Database):
 
     async def _thread_update_(self, before, after):
         if type(after) is int:
+            if after not in self.data:
+                return
             try:
                 after = await self.bot.fetch_channel(after)
             except:
                 print_exc()
                 self.pop(after)
                 return
+        if after.id not in self.data:
+            return
         if after.archived:
             if after.permissions_for(after.guild.me).manage_channels:
                 await after.edit(archived=False, locked=False)

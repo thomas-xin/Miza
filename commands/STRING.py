@@ -579,6 +579,60 @@ class Char2Emoji(Command):
         return out
 
 
+class EmojiCrypt(Command):
+    name = ["EncryptEmoji", "DecryptEmoji", "EmojiEncrypt", "EmojiDecrypt"]
+    description = "Encrypts the input text or file into smileys."
+    usage = "<string> <encrypt{?e}|decrypt{?d}> <encrypted{?p}>? <-1:password>"
+    no_parse = True
+    slash = True
+    flags = "ed"
+
+    async def __call__(self, args, name, flags, message, **extra):
+        password = None
+        for flag in ("+p", "-p", "?p"):
+            try:
+                i = args.index(flag)
+            except ValueError:
+                continue
+            password = args[i + 1]
+            args = args[:i] + args[i + 2:]
+        msg = " ".join(args)
+        fi = f"cache/temp-{ts_us()}"
+        if not msg:
+            msg = message.attachments[0].url
+        if is_url(msg):
+            args = (python, "downloader.py", msg, "../" + fi)
+            proc = await asyncio.create_subprocess_exec(*args, cwd="misc")
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=48)
+            except (T0, T1, T2):
+                with tracebacksuppressor:
+                    proc.kill()
+                raise
+        else:
+            with open(fi, "wb") as f:
+                await create_future(f.write, msg.encode("utf-8"))
+        fs = os.path.getsize(fi)
+        args = [python, "neutrino.py", "-y", "../" + fi, "../" + fi + "-"]
+        if "d" in flags or "decrypt" in name:
+            args.append("--decrypt")
+        else:
+            c = round_random(27 - math.log(fs, 2))
+            c = max(min(c, 9), 0)
+            args.extend((f"-c{c}", "--encrypt"))
+        args.append(password or "\x7f")
+        proc = await asyncio.create_subprocess_exec(*args, cwd="misc")
+        try:
+            await asyncio.wait_for(proc.wait(), timeout=60)
+        except (T0, T1, T2):
+            with tracebacksuppressor:
+                proc.kill()
+            raise
+        fn = "message.txt"
+        f = CompatFile(fi + "-", filename=fn)
+        return dict(file=f, filename=fn)
+
+
 class Time(Command):
     name = ["🕰️", "⏰", "⏲️", "UTC", "GMT", "T", "EstimateTime", "EstimateTimezone"]
     description = "Shows the current time at a certain GMT/UTC offset, or the current time for a user. Be sure to check out ⟨WEBSERVER⟩/time!"

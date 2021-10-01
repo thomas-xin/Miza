@@ -122,14 +122,14 @@ class ND2048(collections.abc.MutableSequence):
                 raise IndexError
             if flags & 4:
                 # Scale possible number spawns to highest number on board
-                high = max(4, numpy.max(self.data)) - 1
+                high = max(4, np.max(self.data)) - 1
                 choices = [np.min(self.data[self.data > 0])] + [max(1, i) for i in range(high - 4, high)]
             else:
                 # Default 2048 probabilities: 90% ==> 2, 10% ==> 4
                 choices = [1] * 9 + [2]
             if flags & 2:
                 # May spawn negative numbers if special tiles mode is on
-                neg = max(1, numpy.max(self.data))
+                neg = max(1, np.max(self.data))
                 neg = 1 if neg <= 1 else random.randint(1, neg)
                 neg = -1 if neg <= 1 else -random.randint(1, neg)
                 for i in range(len(choices) >> 2):

@@ -307,9 +307,7 @@ class CS_hex2xml(Command):
             + '\t</panel>\n'
             + '</hack>'
         )
-        # This probably doesn't need to run concurrently
-        data = await create_future(bytes, output, "utf-8", timeout=8)
-        b = io.BytesIO(data)
+        b = output.encode("utf-8")
         f = CompatFile(b, filename="patch.xml")
         create_task(bot.send_with_file(channel, "Patch successfully converted!", f, reference=message))
 

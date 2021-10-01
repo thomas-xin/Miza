@@ -1374,6 +1374,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
         # Sends a message to a channel, then edits to add links to all attached files.
     async def send_with_file(self, channel, msg=None, file=None, filename=None, embed=None, best=False, rename=True, reference=None):
+        if not msg:
+            msg = ""
         f = None
         fsize = 0
         size = 8388608
@@ -1430,6 +1432,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         os.remove(filename)
         except:
             if filename is not None:
+                if type(filename) is not str:
+                    filename = filename.name
                 print(filename, os.path.getsize(filename))
                 with suppress():
                     os.remove(filename)
@@ -1486,7 +1490,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         a_id = int(file.split(".", 1)[0][11:])
         self.cache.attachments[a_id] = a_id
 
-    async def get_attachment(self, url):
+    async def get_attachment(self, url, full=True):
         if is_discord_url(url) and "attachments/" in url[:64]:
             with suppress(ValueError):
                 a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
@@ -1500,9 +1504,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                                     with open(f"cache/attachment_{data}.bin", "rb") as f:
                                         data = await create_future(f.read)
                                 except FileNotFoundError:
-                                    data = await Request(url, aio=True)
-                                    await self.add_attachment(cdict(id=a_id), data=data)
-                                    return data
+                                    if full:
+                                        data = await Request(url, aio=True)
+                                        await self.add_attachment(cdict(id=a_id), data=data)
+                                        return data
+                                    return await create_future(reqs.next().get, url, stream=True)
                                 else:
                                     self.cache.attachments[a_id] = data
                             print(f"Successfully loaded attachment {a_id} from cache.")
@@ -1514,18 +1520,22 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 return data
         return None
 
-    async def get_request(self, url, limit=None):
+    async def get_request(self, url, limit=None, full=True):
         fn = is_file(url)
         if fn:
             if limit:
                 size = os.path.getsize(fn)
                 if size > limit:
                     raise OverflowError(f"Supplied file too large ({size}) > ({limit})")
+            if not full:
+                return open(url, "rb")
             with open(url, "rb") as f:
                 return await create_future(f.read)
-        data = await self.get_attachment(url)
+        data = await self.get_attachment(url, full=full)
         if data is not None:
             return data
+        if not full:
+            return await create_future(reqs.next().get, url, stream=True)
         return await Request(url, aio=True)
 
     def get_colour(self, user):
@@ -2971,7 +2981,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                                     for fut in futs:
                                         await fut
                                 # Process dict as kwargs for a message send
-                                elif issubclass(type(response), collections.abc.Mapping):
+                                elif isinstance(response, collections.abc.Mapping):
                                     if "file" in response:
                                         sent = await self.send_with_file(channel, response.get("content", ""), **response, reference=message)
                                     else:

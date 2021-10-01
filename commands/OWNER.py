@@ -367,7 +367,7 @@ class UpdateExec(Database):
                             result = await self.procFunc(message, proc, bot, term=f)
                             output = str(result)
                             if len(output) > 54000:
-                                f = CompatFile(io.BytesIO(output.encode("utf-8")), filename="message.txt")
+                                f = CompatFile(output.encode("utf-8"), filename="message.txt")
                                 await bot.send_with_file(channel, "Response over 54,000 characters.", file=f, reference=message)
                             elif len(output) > 1993:
                                 bot.send_as_embeds(channel, output, md=code_md)
@@ -496,7 +496,7 @@ class UpdateExec(Database):
                         fn = url.rsplit("/", 1)[-1].split("?", 1)[0]
                         if "." not in fn:
                             fn += ".png"
-                        files[i] = cdict(fut=create_task(Request(url, aio=True)), filename="SPOILER_" + fn, url=url)
+                        files[i] = cdict(fut=create_future(reqs.next().get, url, stream=True), filename="SPOILER_" + fn, url=url)
                     else:
                         out[i] = url
         bot = self.bot
@@ -505,9 +505,12 @@ class UpdateExec(Database):
             if fut:
                 try:
                     data = await fut.fut
-                    if len(data) > 8388608:
-                        raise ConnectionError
-                    files[i] = CompatFile(data, filename=fut.filename)
+                    try:
+                        if len(data) > 8388608:
+                            raise ConnectionError
+                    except TypeError:
+                        pass
+                    files[i] = CompatFile(seq(data), filename=fut.filename)
                 except ConnectionError:
                     files[i] = None
                     failed[i] = True

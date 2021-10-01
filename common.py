@@ -1806,6 +1806,15 @@ def get_mime(path):
         with open(path, "rb") as f:
             b = f.read(65536)
         mime = magic.from_buffer(b, mime=True)
+        if mime == "application/octet-stream":
+            if path.endswith(".txt"):
+                return "text/plain"
+            try:
+                s = b.decode("utf-8")
+            except:
+                pass
+            else:
+                return "text/plain"
     if mime.startswith("text/plain"):
         mime2 = MIMES.get(path.rsplit("/", 1)[-1].rsplit(".", 1)[-1], "")
         if mime2:
@@ -2255,7 +2264,7 @@ class CompatFile(discord.File):
         if type(fp) is bytes:
             fp = io.BytesIO(fp)
         self.fp = self._fp = fp
-        if issubclass(type(fp), io.IOBase):
+        if isinstance(fp, io.IOBase):
             self.fp = fp
             self._original_pos = fp.tell()
             self._owner = False
@@ -2269,7 +2278,7 @@ class CompatFile(discord.File):
             if isinstance(fp, str):
                 _, self.filename = os.path.split(fp)
             else:
-                self.filename = getattr(fp, 'name', None)
+                self.filename = getattr(fp, "name", None)
         else:
             self.filename = filename
         self.filename = self.filename or "untitled"
@@ -2348,7 +2357,6 @@ class DownloadingFile(io.IOBase):
             self.fp.close()
         self.fp = None
 
-
 class ForwardedRequest(io.IOBase):
 
     __slots__ = ("fp", "resp", "size", "pos", "it")
@@ -2412,24 +2420,25 @@ class ForwardedRequest(io.IOBase):
             self.fp.close()
         self.fp = None
 
-
-class seq(io.IOBase, collections.abc.MutableSequence, contextlib.AbstractContextManager):
+class seq(io.BufferedRandom, collections.abc.MutableSequence, contextlib.AbstractContextManager):
 
     BUF = 262144
 
-    def __init__(self, obj, filename=None):
+    def __init__(self, obj, filename=None, buffer_size=None):
+        if buffer_size:
+            self.BUF = buffer_size
         self.iter = None
         self.closer = getattr(obj, "close", None)
-        if issubclass(type(obj), io.IOBase):
-            if issubclass(type(obj), io.BytesIO):
+        if isinstance(obj, io.IOBase):
+            if isinstance(obj, io.BytesIO):
                 self.data = obj
             else:
                 obj.seek(0)
                 self.data = io.BytesIO(obj.read())
                 obj.seek(0)
-        elif issubclass(type(obj), bytes) or issubclass(type(obj), bytearray) or issubclass(type(obj), memoryview):
+        elif isinstance(obj, bytes) or isinstance(obj, bytearray) or isinstance(obj, memoryview):
             self.data = io.BytesIO(obj)
-        elif issubclass(type(obj), collections.abc.Iterator):
+        elif isinstance(obj, collections.abc.Iterable):
             self.iter = iter(obj)
             self.data = io.BytesIO()
             self.high = 0
@@ -2441,6 +2450,38 @@ class seq(io.IOBase, collections.abc.MutableSequence, contextlib.AbstractContext
             raise TypeError(f"a bytes-like object is required, not '{type(obj)}'")
         self.filename = filename
         self.buffer = {}
+        self.pos = 0
+        self.limit = None
+
+    seekable = lambda self: True
+    readable = lambda self: True
+    writable = lambda self: False
+    isatty = lambda self: False
+    flush = lambda self: None
+    tell = lambda self: self.pos
+
+    def seek(self, pos=0):
+        self.pos = pos
+
+    def read(self, size=None):
+        out = self.peek(size)
+        self.pos += len(out)
+        return out
+
+    def peek(self, size=None):
+        if not size:
+            if self.limit is not None:
+                return self[self.pos:self.limit]
+            return self[self.pos:]
+        if self.limit is not None:
+            return self[self.pos:min(self.pos + size, self.limit)]
+        return self[self.pos:self.pos + size]
+
+    def truncate(self, limit=None):
+        self.limit = limit
+
+    def fileno(self):
+        raise OSError
 
     def __getitem__(self, k):
         if type(k) is slice:
@@ -2487,9 +2528,17 @@ class seq(io.IOBase, collections.abc.MutableSequence, contextlib.AbstractContext
                 break
             i += 1
 
-    def __getattr__(self, k):
-        if k in ("data", "filename"):
-            return self.data
+    def __getattribute__(self, k):
+        if k in ("name", "filename"):
+            try:
+                return object.__getattribute__(self, "filename")
+            except AttributeError:
+                k = "name"
+        else:
+            try:
+                return object.__getattribute__(self, k)
+            except AttributeError:
+                pass
         return object.__getattribute__(self.data, k)
 
     close = lambda self: self.closer() if self.closer else None
@@ -2518,7 +2567,6 @@ class seq(io.IOBase, collections.abc.MutableSequence, contextlib.AbstractContext
                     self.buffer[self.high] = temp
                     self.high += self.BUF
         return self.buffer.get(k, b"")
-
 
 class Stream(io.IOBase):
 

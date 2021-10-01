@@ -568,7 +568,7 @@ class CustomAudio(collections.abc.Hashable):
         await vc.move_to(vc_)
         m = self.guild.me
         perm = m.permissions_in(vc_)
-        if perm.mute_members:
+        if m.voice and perm.mute_members:
             if vc_.type is discord.ChannelType.stage_voice:
                 if m.voice.suppress or m.voice.requested_to_speak_at:
                     await self.speak()
