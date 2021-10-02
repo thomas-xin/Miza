@@ -543,23 +543,6 @@ class Server:
         return data
 
     @cp.expose
-    def mizatlas(self, *filepath):
-        filename = "/".join(filepath)
-        data = None
-        if filename:
-            with suppress(FileNotFoundError):
-                data, mime = fetch_static(f"mizatlas/{filename}")
-                if filename == "static/js/main.312a0124.chunk.js":
-                    data = data.replace("⟨MIZA⟩".encode("utf-8"), cp.request.base.encode("utf-8"))
-        if not data:
-            data, mime = fetch_static("mizatlas/index.html")
-        cp.response.headers.update(CHEADERS)
-        cp.response.headers["Content-Type"] = mime
-        cp.response.headers["Content-Length"] = len(data)
-        cp.response.headers["ETag"] = create_etag(data)
-        return data
-
-    @cp.expose
     def apidoc(self):
         apidoc = getattr(self, "api", None)
         if not apidoc:
@@ -773,7 +756,7 @@ class Server:
         return orjson.dumps(res)
     ytdl._cp_config = {"response.stream": True}
 
-    @cp.expose(("index", "p", "preview", "files", "file", "tester", "atlas"))
+    @cp.expose(("index", "p", "preview", "files", "file", "tester", "atlas", "mizatlas"))
     def index(self, path=None, filename=None, *args, **kwargs):
         url = cp.url(qs=cp.request.query_string)
         if "/p/" in url:

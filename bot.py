@@ -4574,15 +4574,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                             self.events.append(f, func)
             print(f"Database event count: {sum(len(v) for v in self.events.values())}")
             await self.fetch_user(self.deleted_user)
-            # Set bot avatar if none has been set.
-            if not os.path.exists("misc/init.tmp"):
-                print("Setting bot avatar...")
-                f = await create_future(open, "misc/avatar.png", "rb", priority=True)
-                with closing(f):
-                    b = await create_future(f.read)
-                await self.user.edit(avatar=b)
-                await self.seen(self.user, event="misc", raw="Editing their profile")
-                touch("misc/init.tmp")
             create_task(self.minute_loop())
             create_task(self.slow_loop())
             create_task(self.lazy_loop())

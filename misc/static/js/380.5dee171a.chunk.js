@@ -1,0 +1,2 @@
+(this.webpackJsonpmizaweb2=this.webpackJsonpmizaweb2||[]).push([[380],{641:function(e,i,n){!function e(){e.warned||(e.warned=!0,console.log('Deprecation (warning): Using file extension in specifier is deprecated, use "highlight.js/lib/languages/gml" instead of "highlight.js/lib/languages/gml.js"'))}(),e.exports=n(271)}}]);
+//# sourceMappingURL=380.5dee171a.chunk.js.map
