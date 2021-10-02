@@ -601,6 +601,7 @@ class EmojiCrypt(Command):
         if not msg:
             msg = message.attachments[0].url
         if is_url(msg):
+            msg = await self.bot.follow_url(msg, allow=True, limit=1)
             args = (python, "downloader.py", msg, "../" + fi)
             proc = await asyncio.create_subprocess_exec(*args, cwd="misc")
             try:
@@ -610,8 +611,8 @@ class EmojiCrypt(Command):
                     proc.kill()
                 raise
         else:
-            with open(fi, "wb") as f:
-                await create_future(f.write, msg.encode("utf-8"))
+            with open(fi, "w", encoding="utf-8") as f:
+                await create_future(f.write, msg)
         fs = os.path.getsize(fi)
         args = [python, "neutrino.py", "-y", "../" + fi, "../" + fi + "-"]
         if "d" in flags or "decrypt" in name:
@@ -703,6 +704,8 @@ class Time(Command):
             else:
                 t = utc_dt()
                 t += datetime.timedelta(hours=hrs)
+        else:
+            t = utc_dt()
         if hrs >= 0:
             hrs = "+" + str(hrs)
         out = f"Current time at UTC/GMT{hrs}: {sqr_md(t)}."

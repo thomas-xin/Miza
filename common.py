@@ -942,10 +942,15 @@ REPLY_SEM = cdict()
 EDIT_SEM = cdict()
 # noreply = discord.AllowedMentions(replied_user=False)
 
-async def send_with_reply(channel, reference=None, content="", embed=None, tts=None, file=None, files=None, buttons=None, mention=False):
+async def send_with_reply(channel, reference=None, content="", embed=None, embeds=None, tts=None, file=None, files=None, buttons=None, mention=False):
     if not channel:
         channel = reference.channel
     bot = BOT[0]
+    if embed:
+        if not embeds:
+            embeds = (embed,)
+        else:
+            embeds = (embed,) + tuple(embeds)
     if getattr(reference, "slash", None) and not embed:
         sem = emptyctx
         inter = True
@@ -957,13 +962,13 @@ async def send_with_reply(channel, reference=None, content="", embed=None, tts=N
                 content=content,
             ),
         )
-        if embed:
-            data["data"]["embed"] = embed.to_dict()
+        if embeds:
+            data["data"]["embeds"] = [embed.to_dict() for embed in embeds]
             data["data"].pop("flags", None)
     else:
         fields = {}
-        if embed:
-            fields["embed"] = embed
+        if embeds:
+            fields["embeds"] = [embed.to_dict() for embed in embeds]
         if tts:
             fields["tts"] = tts
         if not (not reference or getattr(reference, "noref", None) or getattr(bot.messages.get(verify_id(reference)), "deleted", None) or getattr(channel, "simulated", None)): 
@@ -977,7 +982,10 @@ async def send_with_reply(channel, reference=None, content="", embed=None, tts=N
             fields["file"] = file
         if files:
             fields["files"] = files
-        if not buttons:
+        if not buttons and (not embeds or len(embeds) <= 1):
+            if embeds:
+                fields["embed"] = embeds[0]
+            fields.pop("embeds", None)
             try:
                 return await channel.send(content, **fields)
             except discord.HTTPException as ex:
@@ -985,7 +993,10 @@ async def send_with_reply(channel, reference=None, content="", embed=None, tts=N
                     fields.pop("reference")
                     return await channel.send(content, **fields)
                 raise
-        components = restructure_buttons(buttons)
+        if buttons:
+            components = restructure_buttons(buttons)
+        else:
+            components = ()
         try:
             sem = REPLY_SEM[channel.id]
         except KeyError:
@@ -996,8 +1007,8 @@ async def send_with_reply(channel, reference=None, content="", embed=None, tts=N
             channel = channel.dm_channel
         elif not getattr(channel, "recipient", None) and not channel.permissions_for(channel.guild.me).read_message_history:
             fields = {}
-            if embed:
-                fields["embed"] = embed
+            if embeds:
+                fields["embeds"] = [embed.to_dict() for embed in embeds]
             if tts:
                 fields["tts"] = tts
             return await channel.send(content, **fields)
@@ -1009,8 +1020,8 @@ async def send_with_reply(channel, reference=None, content="", embed=None, tts=N
             data["message_reference"] = dict(message_id=verify_id(reference))
         if components:
             data["components"] = components
-        if embed is not None:
-            data["embed"] = embed.to_dict()
+        if embeds:
+            data["embeds"] = [embed.to_dict() for embed in embeds]
         if tts is not None:
             data["tts"] = tts
     body = orjson.dumps(data)
@@ -1038,8 +1049,8 @@ async def send_with_reply(channel, reference=None, content="", embed=None, tts=N
                     continue
                 # print_exc()
                 fields = {}
-                if embed:
-                    fields["embed"] = embed
+                if embeds:
+                    fields["embeds"] = [embed.to_dict() for embed in embeds]
                 if tts:
                     fields["tts"] = tts
                 return await channel.send(content, **fields)
@@ -1058,7 +1069,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, tts=N
 # Sends a message to a channel, then adds reactions accordingly.
 async def send_with_react(channel, *args, reacts=None, reference=None, mention=False, **kwargs):
     with tracebacksuppressor:
-        if reference or "buttons" in kwargs:
+        if reference or "buttons" in kwargs or "embeds" in kwargs:
             sent = await send_with_reply(channel, reference, *args, mention=mention, **kwargs)
         else:
             sent = await channel.send(*args, **kwargs)
@@ -2424,11 +2435,11 @@ class ForwardedRequest(io.IOBase):
 class seq(io.BufferedRandom, collections.abc.MutableSequence, contextlib.AbstractContextManager):
 
     BUF = 262144
+    iter = None
 
     def __init__(self, obj, filename=None, buffer_size=None):
         if buffer_size:
             self.BUF = buffer_size
-        self.iter = None
         self.closer = getattr(obj, "close", None)
         if isinstance(obj, io.IOBase):
             if isinstance(obj, io.BytesIO):
@@ -2439,6 +2450,7 @@ class seq(io.BufferedRandom, collections.abc.MutableSequence, contextlib.Abstrac
                 obj.seek(0)
         elif isinstance(obj, bytes) or isinstance(obj, bytearray) or isinstance(obj, memoryview):
             self.data = io.BytesIO(obj)
+            self.high = len(data)
         elif isinstance(obj, collections.abc.Iterable):
             self.iter = iter(obj)
             self.data = io.BytesIO()
@@ -2697,18 +2709,6 @@ def load_emojis():
         e_ids = [url.rsplit("_", 1)[-1].split(".", 1)[0].split("-") for url in urls]
         emojis = ["".join(chr(int(i, 16)) for i in e_id) for e_id in e_ids]
         etrans = dict(zip(emojis, urls))
-
-        # resp = Request("https://raw.githubusercontent.com/twitter/twemoji/master/src/test/preview-svg.html", decode=True, timeout=None)
-        # emojis = [html_decode(line) for line in lines]
-        # e_ids = ["-".join(hex(ord(c))[2:] for c in emoji) for emoji in emojis]
-        # etrans = {k: f"https://github.com/twitter/twemoji/raw/master/assets/72x72/{v}.png" for k, v in zip(emojis, e_ids)}
-
-        # resp = Request("https://raw.githubusercontent.com/BreadMoirai/DiscordEmoji/master/src/main/java/com/github/breadmoirai/Emoji.java", decode=True, timeout=None)
-        # e_resp = [line.strip()[:-1] for line in resp[resp.index("public enum Emoji {") + len("public enum Emoji {"):resp.index("private static final Emoji[] SORTED;")].strip().split("\n")]
-        # etrans = {literal_eval(words[0]).encode("utf-16", "surrogatepass").decode("utf-16"): f" {literal_eval(words[2][:-1])} " for emoji in e_resp for words in (emoji.strip(";")[emoji.index("\\u") - 1:].split(","),) if words[2][:-1].strip() != "null"}
-        # with open("misc/emojis.txt", "r", encoding="utf-8") as f:
-        #     resp = f.read()
-        # etrans.update({k: v for k, v in (line.split(" ", 1) for line in resp.splitlines())})
 
         emoji_translate = {k: v for k, v in etrans.items() if len(k) == 1}
         emoji_replace = {k: v for k, v in etrans.items() if len(k) > 1}

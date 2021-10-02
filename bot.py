@@ -3283,7 +3283,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     else:
                         with suppress(AttributeError):
                             if not m.guild_permissions.manage_webhooks:
-                                single = True
+                                return await send_with_react(sendable, embeds=embeds, reacts=reacts, reference=reference)
             if single:
                 for emb in embeds:
                     async with Delay(1 / 3):
@@ -3296,6 +3296,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         else:
                             create_task(sendable.send(embed=emb))
                 return
+            if xrand(2):
+                return await send_with_react(sendable, embeds=embeds, reacts=reacts, reference=reference)
             embs = deque()
             for emb in embeds:
                 if type(emb) is not discord.Embed:
@@ -3539,10 +3541,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
         async def event_call(freq):
             for i in range(freq):
-                async with Delay(1 / freq):
+                async with Delay(0.5 / freq):
                     await self.send_event("_call_")
 
-        freq = 24
+        freq = 12
         sent = 0
         while not self.closed:
             with tracebacksuppressor:
@@ -3550,7 +3552,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 if sent:
                     await event_call(freq)
                 else:
-                    async with Delay(1 / freq):
+                    async with Delay(0.5 / freq):
                         await self.send_event("_call_")
                 self.update_users()
 
