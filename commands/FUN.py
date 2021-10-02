@@ -1014,7 +1014,7 @@ class Barter(Command):
                 counts = await create_future(rand.integers, barter_lowers[ids], barter_uppers[ids], dtype=itype)
                 await create_future(np.add.at, totals, ids, counts)
             mult, amount = divmod(amount, 268435456)
-            if not isfinite(amount):
+            if not is_finite(amount):
                 amount = 0
             totals = np.multiply(totals, mult, out=totals)
         else:
