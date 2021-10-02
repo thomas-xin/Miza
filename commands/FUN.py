@@ -1014,6 +1014,8 @@ class Barter(Command):
                 counts = await create_future(rand.integers, barter_lowers[ids], barter_uppers[ids], dtype=itype)
                 await create_future(np.add.at, totals, ids, counts)
             mult, amount = divmod(amount, 268435456)
+            if not isfinite(amount):
+                amount = 0
             totals = np.multiply(totals, mult, out=totals)
         else:
             mult = 1
@@ -1027,10 +1029,12 @@ class Barter(Command):
         data.setdefault("minecraft", {})
         for i, c in enumerate(totals):
             if c:
+                with suppress(TypeError, OverflowError, ValueError):
+                    c = round_random(c)
                 try:
-                    data["minecraft"][i] += round_random(c)
+                    data["minecraft"][i] += c
                 except KeyError:
-                    data["minecraft"][i] = round_random(c)
+                    data["minecraft"][i] = c
                 s = await create_future(bot.data.emojis.emoji_as, barter_values[i] + ".gif")
                 if c > 1:
                     s += f" {c}"
