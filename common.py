@@ -2450,7 +2450,7 @@ class seq(io.BufferedRandom, collections.abc.MutableSequence, contextlib.Abstrac
                 obj.seek(0)
         elif isinstance(obj, bytes) or isinstance(obj, bytearray) or isinstance(obj, memoryview):
             self.data = io.BytesIO(obj)
-            self.high = len(data)
+            self.high = len(obj)
         elif isinstance(obj, collections.abc.Iterable):
             self.iter = iter(obj)
             self.data = io.BytesIO()
