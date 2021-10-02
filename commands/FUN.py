@@ -997,32 +997,40 @@ class Barter(Command):
             raise ValueError("Please input a valid amount of ingots.")
         data = bot.data.users[user.id]
         data["ingots"] -= amount
-        totals = np.zeros(len(barter_weights), dtype=np.uint32)
-        if amount > 4294967296:
-            for i in range(4096):
+        if amount >= 18446744073709551616:
+            dtype = np.float64
+        elif amount >= 4294967296:
+            dtype = np.uint64
+        else:
+            dtype = np.uint32
+        itype = np.uint64 if dtype is not np.uint32 else np.uint32
+        totals = np.zeros(len(barter_weights), dtype=dtype)
+        rand = np.random.default_rng(ts_us())
+        if amount > 268435456:
+            for i in range(256):
                 count = 1048576
-                seeds = await create_future(np.random.randint, 0, len(barter_seeding), size=count, dtype=np.uint32)
+                seeds = await create_future(rand.integers, 0, len(barter_seeding), size=count, dtype=itype)
                 ids = barter_seeding[seeds]
-                counts = await create_future(np.random.randint, barter_lowers[ids], barter_uppers[ids], dtype=np.uint32)
+                counts = await create_future(rand.integers, barter_lowers[ids], barter_uppers[ids], dtype=itype)
                 await create_future(np.add.at, totals, ids, counts)
-            mult, amount = divmod(amount, 4294967296)
+            mult, amount = divmod(amount, 268435456)
             totals = np.multiply(totals, mult, out=totals)
         else:
             mult = 1
         for i in range(amount + 1048575 >> 20):
             count = min(1048576, amount - i * 1048576)
-            seeds = await create_future(np.random.randint, 0, len(barter_seeding), size=count, dtype=np.uint32)
+            seeds = await create_future(rand.integers, 0, len(barter_seeding), size=count, dtype=itype)
             ids = barter_seeding[seeds]
-            counts = await create_future(np.random.randint, barter_lowers[ids], barter_uppers[ids], dtype=np.uint32)
+            counts = await create_future(rand.integers, barter_lowers[ids], barter_uppers[ids], dtype=itype)
             await create_future(np.add.at, totals, ids, counts)
         rewards = deque()
         data.setdefault("minecraft", {})
         for i, c in enumerate(totals):
             if c:
                 try:
-                    data["minecraft"][i] += c
+                    data["minecraft"][i] += round_random(c)
                 except KeyError:
-                    data["minecraft"][i] = c
+                    data["minecraft"][i] = round_random(c)
                 s = await create_future(bot.data.emojis.emoji_as, barter_values[i] + ".gif")
                 if c > 1:
                     s += f" {c}"

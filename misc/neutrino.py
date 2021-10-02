@@ -182,9 +182,15 @@ def decrypt(fsrc, fdst, pos, size=None, password="", total=-1, emoji=True):
 if __name__ == "__main__":
 	import time
 	orig = time.time()
-	import sys, collections, pickle, zipfile, io, concurrent.futures, subprocess
+	import sys, collections, zipfile, io, concurrent.futures, subprocess
 	from concurrent.futures import thread
 	from collections import deque
+
+	try:
+		import orjson
+	except ModuleNotFoundError:
+		subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", "--user", "orjson"])
+		import orjson
 
 	def _adjust_thread_count(self):
 		# if idle threads are available, don't spin new threads
@@ -409,7 +415,9 @@ if __name__ == "__main__":
 			fs = fsize = pos
 			if decompress:
 				info.append(None)
-			infodata = pickle.dumps(info)
+			info[0] = list(info[0])
+			info = list(info)
+			infodata = orjson.dumps(info)
 			if not compress:
 				b = io.BytesIO()
 				with zipfile.ZipFile(b, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9, strict_timestamps=False) as z:
@@ -626,7 +634,7 @@ if __name__ == "__main__":
 				os.remove(argv + ".lz")
 				raise SystemExit
 			if b == b"\x01\x80":
-				infodata = pickle.dumps(deque(((), [out, 0, fs - 2],)))
+				infodata = orjson.dumps([(), [out, 0, fs - 2]])
 				out = "./"
 			else:
 				b = c = b""
@@ -641,11 +649,16 @@ if __name__ == "__main__":
 				i -= infolen
 				f.seek(i)
 				infodata = f.read(infolen)
-		if infodata[0] != 128:
+		if infodata[0] not in (91, 123, 128):
 			b = io.BytesIO(infodata)
 			with zipfile.ZipFile(b, "r") as z:
 				infodata = z.read("M")
-		info = pickle.loads(infodata)
+		if infodata[0] == 128:
+			import pickle
+			info = pickle.loads(infodata)
+		else:
+			info = orjson.loads(infodata)
+			info = deque(info)
 
 		if not target:
 			sys.stdout.write(f"\rScanned ({len(info) - 1 + len(info[0])}) \n")
