@@ -2167,15 +2167,16 @@ async def _await_fut(fut, ret):
 
 # Blocking call that waits for a single asyncio future to complete, do *not* call from main asyncio loop
 def await_fut(fut, timeout=None):
+    loop = get_event_loop()
     if is_main_thread():
         if not isinstance(fut, asyncio.Task):
             fut = create_task(fut, loop=loop)
         raise RuntimeError("This function must not be called from the main thread's asyncio loop.")
     try:
-        ret = asyncio.run_coroutine_threadsafe(fut, loop=get_event_loop())
+        ret = asyncio.run_coroutine_threadsafe(fut, loop=loop)
     except:
         ret = concurrent.futures.Future()
-        create_task(_await_fut(fut, ret))
+        loop.create_task(_await_fut(fut, ret))
     return ret.result(timeout=timeout)
 
 is_main_thread = lambda: threading.current_thread() is threading.main_thread()
@@ -2567,6 +2568,11 @@ class seq(io.BufferedRandom, collections.abc.MutableSequence, contextlib.Abstrac
                     self.buffer[self.high] = temp
                     self.high += self.BUF
         return self.buffer.get(k, b"")
+
+    def clear(self):
+        self.buffer.clear()
+        self.data = io.BytesIO()
+        self.iter = iter(())
 
 class Stream(io.IOBase):
 

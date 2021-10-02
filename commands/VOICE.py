@@ -1370,7 +1370,13 @@ class AudioDownloader:
     def get_spotify_part(self, url):
         out = deque()
         self.spotify_x += 1
-        d = Request(url, headers=self.spotify_header, json=True)
+        try:
+            d = Request(url, headers=self.spotify_header, json=True)
+        except ConnectionError:
+            d = None
+        if not d:
+            self.update_dl()
+            d = Request(url, headers=self.spotify_header, json=True)
         with suppress(KeyError):
             d = d["tracks"]
         try:
@@ -1649,7 +1655,7 @@ class AudioDownloader:
                 self.spotify_x += 1
         elif item[:9] == "bcsearch:":
             query = "https://bandcamp.com/search?q=" + url_parse(item[9:])
-            resp = reqs.next().get(query, headers=self.spotify_header).content
+            resp = reqs.next().get(query).content
             try:
                 resp = resp.split(b'<ul class="result-items">', 1)[1]
                 tracks = resp.split(b"<!-- search result type=")

@@ -69,6 +69,8 @@ class EndpointRedirects(Dispatcher):
             path = "/get_ip"
         elif path[:3] == "/f/":
             path = "/raw/" + path[3:]
+        elif path == "/upload":
+            path = "/files"
         else:
             p = path.lstrip("/")
             if p in actually_static:
@@ -771,7 +773,7 @@ class Server:
         return orjson.dumps(res)
     ytdl._cp_config = {"response.stream": True}
 
-    @cp.expose(("index", "p", "preview", "upload", "files", "file", "tester", "atlas"))
+    @cp.expose(("index", "p", "preview", "files", "file", "tester", "atlas"))
     def index(self, path=None, filename=None, *args, **kwargs):
         url = cp.url(qs=cp.request.query_string)
         if "/p/" in url:

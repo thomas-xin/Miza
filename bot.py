@@ -3041,7 +3041,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 not_self = cola != colb
             if not_self:
                 temp = to_alphanumeric(cpy).casefold()
-                temp2 = to_alphanumeric(message.clean_content).casefold()
+                temp2 = to_alphanumeric(message.clean_content or message.content).casefold()
                 await self.send_event("_nocommand_", text=temp, text2=temp2, edit=edit, orig=orig, msg=msg, message=message, perm=u_perm, truemention=truemention)
         # Return the delay before the message can be called again. This is calculated by the rate limit of the command.
         return remaining
@@ -3807,8 +3807,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             flags = None
             reactions = ()
             activity = None
-            clean_content = ""
-            system_content = ""
+            system_content = clean_content = ""
             edited_at = None
             jump_url = "https://discord.com/channels/-1/-1/-1"
             is_system = lambda self: None
@@ -5392,6 +5391,7 @@ class SimulatedMessage:
         self.message = self
         self.owner = author
 
+    system_content = clean_content = ""
     display_avatar = avatar_url = icon_url = "https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/b9573a17-63e8-4ec1-9c97-2bd9a1e9b515/de1q8lu-eae6a001-6463-4abe-b23c-fc32111c6499.png?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOiIsImlzcyI6InVybjphcHA6Iiwib2JqIjpbW3sicGF0aCI6IlwvZlwvYjk1NzNhMTctNjNlOC00ZWMxLTljOTctMmJkOWExZTliNTE1XC9kZTFxOGx1LWVhZTZhMDAxLTY0NjMtNGFiZS1iMjNjLWZjMzIxMTFjNjQ5OS5wbmcifV1dLCJhdWQiOlsidXJuOnNlcnZpY2U6ZmlsZS5kb3dubG9hZCJdfQ.eih2c_r4mgWKzZx88GKXOd_5FhCSMSbX5qXGpRUMIsE"
     roles = []
     emojis = []
