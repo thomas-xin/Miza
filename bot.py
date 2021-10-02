@@ -3296,7 +3296,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         else:
                             create_task(sendable.send(embed=emb))
                 return
-            if xrand(2):
+            if xrand(7) >= 3:
                 return await send_with_react(sendable, embeds=embeds, reacts=reacts, reference=reference)
             embs = deque()
             for emb in embeds:

@@ -282,7 +282,7 @@ class Neko(Command):
     description = "Pulls a random image from nekos.life and embeds it."
     usage = "<tags(neko)>? <verbose{?v}|random{?r}|list{?l}>?"
     flags = "lrv"
-    rate_limit = (0.05, 4)
+    rate_limit = (0, 4)
     threshold = 256
     moe_sem = Semaphore(1, 0, rate_limit=10)
     nekobot_sem = cdict()

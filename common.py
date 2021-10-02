@@ -1050,7 +1050,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
                 # print_exc()
                 fields = {}
                 if embeds:
-                    fields["embeds"] = [embed.to_dict() for embed in embeds]
+                    fields["embeds"] = embeds
                 if tts:
                     fields["tts"] = tts
                 return await channel.send(content, **fields)
