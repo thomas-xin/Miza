@@ -2305,10 +2305,10 @@ class UpdateDailies(Database):
 
     def generate(self, user):
         if user.id == self.bot.id or self.bot.is_blacklisted(user.id):
-            return dict(quests=(), time=inf)
+            return ()
         xp = self.bot.data.users.get_xp(user)
         if not is_finite(xp):
-            return dict(quests=(), time=inf)
+            return ()
         level = self.bot.data.users.xp_to_level(xp)
         quests = alist()
         req = min(20, level + 5 >> 1)
