@@ -2216,7 +2216,7 @@ class UpdateDailies(Database):
 
     def get(self, user):
         data = self.data.get(user.id)
-        if data is None or utc() - data["time"] >= 86400:
+        if not data or utc() - data.get("time", 0) >= 86400:
             data = self.data[user.id] = dict(quests=self.generate(user), time=zerot())
         return data
 
