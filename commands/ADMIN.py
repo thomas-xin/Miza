@@ -2471,7 +2471,7 @@ class UpdateMessageCache(Database):
             if len(saving) >= 8:
                 print(f"Message Database: {len(saving)} files updated.")
             deleted = 0
-            limit = str(self.get_fn(time_snowflake(utc_dt() - datetime.timedelta(days=28))))
+            limit = str(self.get_fn(time_snowflake(dtn() - datetime.timedelta(days=28))))
             for f in os.listdir(self.files):
                 if f.isnumeric() and f < limit or f.endswith("\x7f"):
                     with tracebacksuppressor(FileNotFoundError):

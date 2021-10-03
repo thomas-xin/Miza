@@ -993,7 +993,7 @@ class Barter(Command):
         ingots = bot.data.users.get(user.id, {}).get("ingots", 0)
         if amount > ingots:
             raise OverflowError(f"Barter amount cannot be greater than your balance ({amount} > {ingots}). See ~shop for more information.")
-        elif amount < 1:
+        elif not amount >= 1:
             raise ValueError("Please input a valid amount of ingots.")
         data = bot.data.users[user.id]
         data["ingots"] -= amount
@@ -1036,7 +1036,7 @@ class Barter(Command):
                 except KeyError:
                     data["minecraft"][i] = c
                 s = await create_future(bot.data.emojis.emoji_as, barter_values[i] + ".gif")
-                if c > 1:
+                if c != 1:
                     s += f" {c}"
                 rewards.append(s)
         out = "\n".join(rewards)
@@ -2306,7 +2306,10 @@ class UpdateDailies(Database):
     def generate(self, user):
         if user.id == self.bot.id or self.bot.is_blacklisted(user.id):
             return dict(quests=(), time=inf)
-        level = self.bot.data.users.xp_to_level(self.bot.data.users.get_xp(user))
+        xp = self.bot.data.users.get_xp(user)
+        if not is_finite(xp):
+            return dict(quests=(), time=inf)
+        level = self.bot.data.users.xp_to_level(xp)
         quests = alist()
         req = min(20, level + 5 >> 1)
         att = 0
@@ -2717,8 +2720,7 @@ class Mimic(Command):
         if sum(len(i) for i in iter(mimics.values())) >= 32768:
             raise OverflowError(f"Mimic list for {user} has reached the maximum of 32768 items. Please remove an item to add another.")
         dop = None
-        utcn = utc_dt()
-        mid = discord.utils.time_snowflake(utcn)
+        mid = discord.utils.time_snowflake(dtn())
         ctime = utc()
         m_id = "&" + str(mid)
         mimic = None

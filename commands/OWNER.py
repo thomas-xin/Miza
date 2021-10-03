@@ -366,9 +366,9 @@ class UpdateExec(Database):
                             create_task(message.add_reaction("❗"))
                             result = await self.procFunc(message, proc, bot, term=f)
                             output = str(result)
-                            if len(output) > 54000:
+                            if len(output) > 24000:
                                 f = CompatFile(output.encode("utf-8"), filename="message.txt")
-                                await bot.send_with_file(channel, "Response over 54,000 characters.", file=f, reference=message)
+                                await bot.send_with_file(channel, "Response over 24,000 characters.", file=f, reference=message)
                             elif len(output) > 1993:
                                 bot.send_as_embeds(channel, output, md=code_md)
                             else:
@@ -820,7 +820,7 @@ class UpdateChannelCache(Database):
             yield channel.message
             return
         c_id = verify_id(channel)
-        min_time = time_snowflake(utc_dt() - datetime.timedelta(days=14))
+        min_time = time_snowflake(dtn() - datetime.timedelta(days=14))
         deletable = False
         for m_id in sorted(self.data.get(c_id, ()), reverse=True):
             if as_message:

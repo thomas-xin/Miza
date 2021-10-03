@@ -1291,7 +1291,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 emoji = self.cache.emojis[e]
             except KeyError:
                 e = int(e)
-                if e <= 0 or e > time_snowflake(utc_dt(), high=True):
+                if e <= 0 or e > time_snowflake(dtn(), high=True):
                     return
                 try:
                     return self.emoji_stuff[e]
@@ -5356,7 +5356,7 @@ class SimulatedMessage:
 
     def __init__(self, bot, content, t, name, nick, recursive=True):
         self._state = bot._state
-        self.created_at = datetime.datetime.utcfromtimestamp(int(t) / 1e6)
+        self.created_at = datetime.datetime.fromtimestamp(int(t) / 1e6)
         self.id = time_snowflake(self.created_at, high=True)
         self.content = content
         self.response = deque()

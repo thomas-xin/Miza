@@ -2014,7 +2014,12 @@ class DynamicDT:
     def utcnow(cls):
         return cls.utcfromtimestamp(utc())
 
+    @classmethod
+    def now(cls):
+        return cls.fromtimestamp(utc())
 
+
+dtn = datetime.datetime.now
 utc_dt = datetime.datetime.utcnow
 utc_ft = datetime.datetime.utcfromtimestamp
 utc_ddt = DynamicDT.utcnow
