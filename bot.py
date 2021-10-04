@@ -3134,9 +3134,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         futs = alist([deque(), deque()])
         for i, guild in enumerate(self.client.guilds):
             if self.is_ws_ratelimited():
-                i = not i & 7
+                i = bool(i & 7)
             else:
-                i = not i & 1
+                i = i & 1
             fut = create_task(funcs[i](guild))
             if len(futs[i]) >= 16:
                 await futs[i].popleft()
