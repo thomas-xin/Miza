@@ -756,7 +756,7 @@ class Server:
         return orjson.dumps(res)
     ytdl._cp_config = {"response.stream": True}
 
-    @cp.expose(("index", "p", "preview", "files", "file", "tester", "atlas", "mizatlas"))
+    @cp.expose(("index", "p", "preview", "files", "file", "tester", "atlas", "mizatlas", "time"))
     def index(self, path=None, filename=None, *args, **kwargs):
         url = cp.url(qs=cp.request.query_string)
         if "/p/" in url:
@@ -767,7 +767,7 @@ class Server:
             raise cp.HTTPRedirect(url.replace("/upload", "/files"), status=307)
         data, mime = fetch_static("index.html")
         meta = """<meta property="og:title" content="Miza"><meta property="og:description" content="A multipurpose Discord bot.">\
-<meta property="og:image" content="https://raw.githubusercontent.com/thomas-xin/Image-Test/master/sky-rainbow.gif">\
+<meta property="og:image" content="/logo256.png">\
 <meta property="og:url" content="/"><meta property="og:site_name" content="Miza">"""
         if path:
             ind = IND
@@ -1379,7 +1379,7 @@ body {
         url = f"/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
         raise cp.HTTPRedirect(url, status=307)
 
-    @cp.expose(("time", "timezones"))
+    @cp.expose(("timezones",))
     def timezone(self):
         ip = cp.request.remote.ip
         try:

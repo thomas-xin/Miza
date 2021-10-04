@@ -940,7 +940,7 @@ def supersample(a, size):
         return np.interp(interp, range(n), a)
     try:
         dtype = a.dtype
-    except TypeError:
+    except AttributeError:
         dtype = object
     x = ceil(n / size)
     interp = np.linspace(0, n - 1, x * size)

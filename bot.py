@@ -3131,7 +3131,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
     async def load_guilds(self):
         funcs = [self._connection.chunk_guild, self.load_guild_http]
-        futs = alist([deque(), deque()])
+        futs = [deque(), deque()]
         for i, guild in enumerate(self.client.guilds):
             if self.is_ws_ratelimited():
                 i = bool(i & 7)
