@@ -279,7 +279,9 @@ class AudioPlayer(discord.AudioSource):
 
     def clear_source(self):
         if self.queue:
-            self.queue[0][0].close()
+            source = self.queue[0][0]
+            if source:
+                source.close()
             self.queue[0] = None
     
     def clear_next(self):

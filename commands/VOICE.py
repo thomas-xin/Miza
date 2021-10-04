@@ -4345,7 +4345,7 @@ class Player(Command):
 
     async def __call__(self, guild, channel, user, bot, flags, perm, **void):
         auds = await auto_join(channel.guild, channel, user, bot)
-        auds.player = cdict()
+        auds.player = cdict(time=0)
         create_future_ex(auds.update)
 
 

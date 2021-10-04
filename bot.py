@@ -3132,13 +3132,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     async def load_guilds(self):
         funcs = [self._connection.chunk_guild, self.load_guild_http]
         futs = alist([deque(), deque()])
-        for guild in self.client.guilds:
+        for i, guild in enumerate(self.client.guilds):
             if self.is_ws_ratelimited():
-                i = bool(xrand(8))
+                i = not i & 7
             else:
-                i = xrand(2)
+                i = not i & 1
             fut = create_task(funcs[i](guild))
-            if len(futs[i]) >= 20:
+            if len(futs[i]) >= 16:
                 await futs[i].popleft()
             futs[i].append(fut)
         for f in itertools.chain(*futs):

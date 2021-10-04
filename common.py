@@ -395,7 +395,7 @@ def zip2bytes(data):
 def bytes2zip(data, lzma=False):
     b = io.BytesIO()
     ctype = zipfile.ZIP_LZMA if lzma else zipfile.ZIP_DEFLATED
-    with ZipFile(b, "w", compression=compression, allowZip64=True) as z:
+    with ZipFile(b, "w", compression=ctype, allowZip64=True) as z:
         z.writestr("DATA", data=data)
     b.seek(0)
     return b.read()
@@ -436,7 +436,7 @@ def select_and_loads(s, mode="safe", size=None):
         if len(s) > 1048576:
             print(f"Loading zip file of size {len(s)}...")
         b.seek(0)
-        with ZipFile(b, compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False) as z:
+        with ZipFile(b, allowZip64=True, strict_timestamps=False) as z:
             if size:
                 x = z.getinfo("DATA").file_size
                 if size < x:
@@ -448,7 +448,10 @@ def select_and_loads(s, mode="safe", size=None):
             data = pickle.loads(s)
     if data is None:
         if mode == "unsafe":
-            data = eval(compile(s.strip(b"\x00"), "<loader>", "eval", optimize=2, dont_inherit=False))
+            s = s.strip(b"\x00")
+            if not s:
+                raise FileNotFoundError
+            data = eval(compile(s, "<loader>", "eval", optimize=2, dont_inherit=False))
         else:
             if b"{" in s:
                 s = s[s.index(b"{"):s.rindex(b"}") + 1]
@@ -551,24 +554,24 @@ class FileHashDict(collections.abc.MutableMapping):
         with self.sem:
             with open(fn, "rb") as f:
                 s = f.read()
-        fn = fn.rstrip("\x7f")
         data = BaseException
         with tracebacksuppressor:
             data = select_and_loads(s, mode="unsafe")
         if data is BaseException:
+            fn = fn.rstrip("\x7f")
             for file in sorted(os.listdir("backup"), reverse=True):
                 with tracebacksuppressor:
                     if file.endswith(".wb"):
                         s = subprocess.check_output([sys.executable, "neutrino.py", "../backup/" + file, "-f", fn.split("/", 1)[-1]], cwd="misc")
                     else:
-                        with zipfile.ZipFile("backup/" + file, compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False) as z:
+                        with zipfile.ZipFile("backup/" + file, allowZip64=True, strict_timestamps=False) as z:
                             s = z.read(fn)
                     data = select_and_loads(s, mode="unsafe")
                     self.modified.add(k)
                     print(f"Successfully recovered backup of {fn} from {file}.")
                     break
         if data is BaseException:
-            raise BaseException(k)
+            raise KeyError(k)
         self.data[k] = data
         return data
 
@@ -576,11 +579,6 @@ class FileHashDict(collections.abc.MutableMapping):
         with suppress(ValueError):
             k = int(k)
         self.deleted.discard(k)
-        # try:
-        #     if self.data[k] is v:
-        #         return
-        # except (TypeError, KeyError, ValueError):
-        #     pass
         self.data[k] = v
         self.modified.add(k)
 

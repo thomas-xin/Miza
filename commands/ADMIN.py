@@ -1867,7 +1867,7 @@ class ServerProtector(Database):
     async def _channel_delete_(self, channel, guild, **void):
         if channel.id in self.bot.cache.deleted:
             return
-        if not isinstance(channel, discord.Thread):
+        if not isinstance(channel, discord.Thread) and channel.permissions_for(guild.me).view_audit_log:
             user = None
             audits = guild.audit_logs(limit=5, action=discord.AuditLogAction.channel_delete)
             ts = utc()
@@ -1889,7 +1889,7 @@ class ServerProtector(Database):
     async def _ban_(self, user, guild, **void):
         if self.bot.recently_banned(user, guild):
             return
-        if not self.bot.is_trusted(guild.id):
+        if not self.bot.is_trusted(guild.id) or not guild.me.guild_permissions.view_audit_log:
             return
         audits = guild.audit_logs(limit=13, action=discord.AuditLogAction.ban)
         ts = utc()
@@ -2135,7 +2135,7 @@ class UpdateUserLogs(Database):
             if "exec" in self.bot.data:
                 urls = ()
                 with tracebacksuppressor:
-                    urls = await self.bot.data.exec.uproxy(b_url, a_url)
+                    urls = await self.bot.data.exec.uproxy(b_url, a_url, collapse=False)
                 for i, url in enumerate(urls):
                     if url:
                         if i:
@@ -2197,7 +2197,7 @@ class UpdateUserLogs(Database):
             if "exec" in self.bot.data:
                 urls = ()
                 with tracebacksuppressor:
-                    urls = await self.bot.data.exec.uproxy(b_url, a_url)
+                    urls = await self.bot.data.exec.uproxy(b_url, a_url, collapse=False)
                 for i, url in enumerate(urls):
                     if url:
                         if i:
@@ -2961,61 +2961,79 @@ class UpdateAutoRoles(Database):
     name = "autoroles"
 
     async def _join_(self, user, guild, **void):
-        if guild.id in self.data and guild.me.guild_permissions.manage_roles:
-            # Do not apply autorole to users who have roles from role preservers
-            with suppress(KeyError):
-                return self.bot.data.rolepreservers[guild.id][user.id]
-            roles = deque()
-            assigned = self.data[guild.id]
-            for rolelist in assigned:
-                with tracebacksuppressor:
-                    role = await self.bot.fetch_role(rolelist.next(), guild)
-                    roles.append(role)
-            # Attempt to add all roles in one API call
-            try:
-                await user.add_roles(*roles, reason="AutoRole", atomic=False)
-            except discord.Forbidden:
-                await user.add_roles(*roles, reason="AutoRole", atomic=True)
-            print(f"AutoRole: Granted {roles} to {user} in {guild}.")
+        if guild.id not in self.data:
+            return
+        if not guild.me.guild_permissions.manage_roles:
+            return
+        # Do not apply autorole to users who have roles from role preservers
+        with suppress(KeyError):
+            return self.bot.data.rolepreservers[guild.id][user.id]
+        roles = deque()
+        assigned = self.data[guild.id]
+        for rolelist in assigned:
+            with tracebacksuppressor:
+                r = rolelist.next() if hasattr(rolelist, "next") else choice(rolelist)
+                role = await self.bot.fetch_role(r, guild)
+                roles.append(role)
+                if len(rolelist) > 1 and hasattr(rolelist, "next"):
+                    self.update(guild.id)
+        # Attempt to add all roles in one API call
+        try:
+            await user.add_roles(*roles, reason="AutoRole", atomic=False)
+        except discord.Forbidden:
+            await user.add_roles(*roles, reason="AutoRole", atomic=True)
+        print(f"AutoRole: Granted {roles} to {user} in {guild}.")
 
 
 class UpdateRolePreservers(Database):
     name = "rolepreservers"
 
     async def _join_(self, user, guild, **void):
-        if guild.id in self.data:
-            if user.id in self.data[guild.id] and guild.me.guild_permissions.manage_roles:
-                if guild.id not in self.bot.data.mutes or user.id not in (x["u"] for x in self.bot.data.mutes[guild.id]):
-                    roles = deque()
-                    assigned = self.data[guild.id][user.id]
-                    for r_id in assigned:
-                        with tracebacksuppressor:
-                            role = await self.bot.fetch_role(r_id, guild)
-                            roles.append(role)
-                    roles = [role for role in roles if role < guild.me.top_role]
-                    # Attempt to add all roles in one API call
-                    try:
-                        await user.edit(roles=roles, reason="RolePreserver")
-                    except discord.Forbidden:
-                        try:
-                            await user.add_roles(*roles, reason="RolePreserver", atomic=False)
-                        except discord.Forbidden:
-                            await user.add_roles(*roles, reason="RolePreserver", atomic=True)
-                    self.data[guild.id].pop(user.id, None)
-                    print(f"RolePreserver: Granted {roles} to {user} in {guild}.")
+        try:
+            assigned = self.data[guild.id][user.id]
+        except KeyError:
+            return
+        if not guild.me.guild_permissions.manage_roles:
+            return
+        if guild.id in self.bot.data.mutes and user.id in (x["u"] for x in self.bot.data.mutes[guild.id]):
+            return
+        roles = deque()
+        assigned = self.data[guild.id][user.id]
+        for r_id in assigned:
+            with tracebacksuppressor:
+                role = await self.bot.fetch_role(r_id, guild)
+                roles.append(role)
+        roles = [role for role in roles if role < guild.me.top_role]
+        # Attempt to add all roles in one API call
+        try:
+            nick = cdict(nick=self.bot.data.nickpreservers[guild.id][user.id])
+        except KeyError:
+            nick = {}
+        try:
+            await user.edit(roles=roles, reason="RolePreserver", **nick)
+        except discord.Forbidden:
+            if nick:
+                create_task(user.edit(nick=nick.nick, reason="NickPreserver"))
+            try:
+                await user.add_roles(*roles, reason="RolePreserver", atomic=False)
+            except discord.Forbidden:
+                await user.add_roles(*roles, reason="RolePreserver", atomic=True)
+        self.data[guild.id].pop(user.id, None)
+        print(f"RolePreserver: Granted {roles} to {user} in {guild}.")
 
     async def _leave_(self, user, guild, **void):
-        if guild.id in self.data:
-            # roles[0] is always @everyone
-            roles = user.roles[1:]
-            if roles:
-                assigned = [role.id for role in roles]
-                print("_leave_", guild, user, assigned)
-                self.data[guild.id][user.id] = assigned
-            else:
-                print("_leave_", guild, user, None)
-                self.data[guild.id].pop(user.id, None)
-            self.update(guild.id)
+        if guild.id not in self.data:
+            return
+        # roles[0] is always @everyone
+        roles = user.roles[1:]
+        if roles:
+            assigned = [role.id for role in roles]
+            print("_leave_", guild, user, assigned)
+            self.data[guild.id][user.id] = assigned
+        else:
+            print("_leave_", guild, user, None)
+            self.data[guild.id].pop(user.id, None)
+        self.update(guild.id)
 
 
 class UpdateNickPreservers(Database):
@@ -3025,21 +3043,24 @@ class UpdateNickPreservers(Database):
         try:
             nick = self.data[guild.id][user.id]
         except KeyError:
-            pass
-        else:
-            if guild.me.guild_permissions.manage_nicknames:
-                await user.edit(nick=nick, reason="NickPreserver")
-                self.data[guild.id].pop(user.id, None)
-                print(f"NickPreserver: Granted {nick} to {user} in {guild}.")
+            return
+        if not guild.me.guild_permissions.manage_nicknames:
+            return
+        with suppress(KeyError):
+            return self.bot.data.rolepreservers[guild.id][user.id]
+        await user.edit(nick=nick, reason="NickPreserver")
+        self.data[guild.id].pop(user.id, None)
+        print(f"NickPreserver: Granted {nick} to {user} in {guild}.")
 
     async def _leave_(self, user, guild, **void):
-        if guild.id in self.data:
-            if getattr(user, "nick", None):
-                self.data[guild.id][user.id] = user.nick
+        if guild.id not in self.data:
+            return
+        if getattr(user, "nick", None):
+            self.data[guild.id][user.id] = user.nick
+            self.update(guild.id)
+        else:
+            if self.data[guild.id].pop(user.id, None):
                 self.update(guild.id)
-            else:
-                if self.data[guild.id].pop(user.id, None):
-                    self.update(guild.id)
 
 
 class UpdateThreadPreservers(Database):
@@ -3069,9 +3090,10 @@ class UpdateThreadPreservers(Database):
                 await self.bot.silent_delete(m)
 
     async def _channel_delete_(self, channel, **void):
-        if isinstance(channel, discord.Thread):
-            with suppress():
-                self.pop(channel.id)
+        if not isinstance(channel, discord.Thread):
+            return
+        with suppress():
+            self.pop(channel.id)
 
 
 class UpdatePerms(Database):

@@ -481,43 +481,45 @@ class UpdateExec(Database):
         files = [None] * len(urls)
         sendable = list(c_id for c_id, flag in self.data.items() if flag & 16)
         for i, url in enumerate(urls):
-            if is_url(url):
+            if not is_url(url):
+                continue
+            try:
+                out[i] = self.bot.data.proxies[0][shash(url)]
+            except KeyError:
+                if not sendable:
+                    out[i] = url
+                    continue
                 try:
-                    out[i] = self.bot.data.proxies[0][shash(url)]
-                except KeyError:
-                    if not sendable:
-                        out[i] = url
-                        continue
-                    try:
-                        url = await asyncio.wait_for(wrap_future(self.temp[url], shield=True), timeout=12)
-                    except (KeyError, T1):
-                        if url not in self.temp:
-                            self.temp[url] = concurrent.futures.Future()
-                        fn = url.rsplit("/", 1)[-1].split("?", 1)[0]
-                        if "." not in fn:
-                            fn += ".png"
-                        files[i] = cdict(fut=create_future(reqs.next().get, url, stream=True), filename="SPOILER_" + fn, url=url)
-                    else:
-                        out[i] = url
+                    url = await asyncio.wait_for(wrap_future(self.temp[url], shield=True), timeout=12)
+                except (KeyError, T1):
+                    if url not in self.temp:
+                        self.temp[url] = concurrent.futures.Future()
+                    fn = url.rsplit("/", 1)[-1].split("?", 1)[0]
+                    if "." not in fn:
+                        fn += ".png"
+                    files[i] = cdict(fut=create_future(reqs.next().get, url, stream=True), filename="SPOILER_" + fn, url=url)
+                else:
+                    out[i] = url
         bot = self.bot
         failed = [None] * len(urls)
         for i, fut in enumerate(files):
-            if fut:
+            if not fut:
+                continue
+            try:
+                data = await fut.fut
                 try:
-                    data = await fut.fut
-                    try:
-                        if len(data) > 8388608:
-                            raise ConnectionError
-                    except TypeError:
-                        pass
-                    files[i] = CompatFile(seq(data), filename=fut.filename)
-                except ConnectionError:
-                    files[i] = None
-                    failed[i] = True
-                except:
-                    files[i] = None
-                    failed[i] = True
-                    print_exc()
+                    if len(data) > 8388608:
+                        raise ConnectionError
+                except TypeError:
+                    pass
+                files[i] = CompatFile(seq(data), filename=fut.filename)
+            except ConnectionError:
+                files[i] = None
+                failed[i] = True
+            except:
+                files[i] = None
+                failed[i] = True
+                print_exc()
         fs = [i for i in files if i]
         if fs:
             with tracebacksuppressor:
@@ -527,15 +529,20 @@ class UpdateExec(Database):
                 message = await bot.send_as_webhook(channel, files=fs, username=m.display_name, avatar_url=best_url(m), recurse=False)
                 c = 0
                 for i, f in enumerate(files):
-                    if f and not failed[i]:
-                        try:
-                            self.bot.data.proxies[0][shash(urls[i])] = out[i] = str(message.attachments[c].url)
-                        except IndexError:
-                            break
-                        self.bot.data.proxies.update(0)
-                        with suppress(KeyError, RuntimeError):
-                            self.temp.pop(urls[i]).set_result(out[i])
-                        c += 1
+                    if not f or failed[i]:
+                        continue
+                    if not message.attachments[c].size:
+                        url = urls[i]
+                    else:
+                        url = str(message.attachments[c].url)
+                    try:
+                        self.bot.data.proxies[0][shash(urls[i])] = out[i] = url
+                    except IndexError:
+                        break
+                    self.bot.data.proxies.update(0)
+                    with suppress(KeyError, RuntimeError):
+                        self.temp.pop(urls[i]).set_result(out[i])
+                    c += 1
         if collapse:
             return out if len(out) > 1 else out[0]
         return out
