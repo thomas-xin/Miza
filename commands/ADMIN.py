@@ -1159,7 +1159,7 @@ class StarBoard(Command):
         else:
             content += f"{len(curr)} starboard triggers currently assigned for {str(guild).replace('`', '')}:```*"
             msg = ini_md(iter2str({k: curr[k] for k in tuple(curr)[pos:pos + page]}, key=lambda t: f"×{t[0]} {sqr_md(bot.get_channel(t[1]))}"))
-        colour = await self.bot.data.colours.get(worst_url(guild))
+        colour = await self.bot.get_colour(guild)
         emb = discord.Embed(
             description=content + msg,
             colour=colour,
@@ -1260,7 +1260,7 @@ class Crosspost(Command):
         else:
             content += f"{len(curr)} crosspost subscriptions currently assigned for #{str(message.channel).replace('`', '')}:```*"
             msg = ini_md(iter2str({k: curr[k] for k in tuple(curr)[pos:pos + page]}))
-        colour = await self.bot.data.colours.get(worst_url(guild))
+        colour = await self.bot.get_colour(guild)
         emb = discord.Embed(
             description=content + msg,
             colour=colour,
@@ -1374,7 +1374,7 @@ class AutoEmoji(Command):
             msg = italics(code_md(f"No custom emojis found for {str(message.guild).replace('`', '')}."))
         else:
             msg = italics(code_md(f"{len(curr)} custom emojis currently assigned for {str(message.guild).replace('`', '')}:")) + "\n" + iter2str({k + " " * (32 - len(k)): curr[k] for k in tuple(curr)[pos:pos + page]}, left="`", right="")
-        colour = await self.bot.data.colours.get(worst_url(guild))
+        colour = await self.bot.get_colour(guild)
         emb = discord.Embed(
             description=msg,
             colour=colour,

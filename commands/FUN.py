@@ -2011,7 +2011,7 @@ class EmojiList(Command):
             content += f"{len(items)} emoji aliases currently assigned for {str(user).replace('`', '')}:```*"
             key = lambda x: "\n" + ", ".join(x)
             msg = iter2str({k + " " * (32 - len(k)): curr[k] for k in curr}, left="`", right="")
-        colour = await self.bot.data.colours.get(to_png_ex(guild.icon_url))
+        colour = await self.bot.get_colour(user)
         emb = discord.Embed(
             description=content + msg,
             colour=colour,

@@ -514,7 +514,7 @@ class Avatar(Command):
         # Gets icon display of a server and returns as an embed.
         url = best_url(g)
         name = g.name
-        colour = await self.bot.data.colours.get(worst_url(g))
+        colour = await self.bot.get_colour(g)
         emb = discord.Embed(colour=colour)
         emb.set_thumbnail(url=url)
         emb.set_image(url=url)
@@ -526,7 +526,7 @@ class Avatar(Command):
         # Gets icon display of a mimic and returns as an embed.
         url = best_url(p)
         name = p.name
-        colour = await self.bot.data.colours.get(worst_url(p))
+        colour = await self.bot.get_colour(p)
         emb = discord.Embed(colour=colour)
         emb.set_thumbnail(url=url)
         emb.set_image(url=url)
@@ -623,7 +623,7 @@ class Info(Command):
             u = g.owner
         except (AttributeError, KeyError):
             u = None
-        colour = await self.bot.data.colours.get(worst_url(g))
+        colour = await self.bot.get_colour(g)
         emb = discord.Embed(colour=colour)
         emb.set_thumbnail(url=url)
         emb.set_author(name=name, icon_url=url, url=url)
@@ -675,7 +675,7 @@ class Info(Command):
     async def getMimicData(self, p, flags={}):
         url = to_png(p.url)
         name = p.name
-        colour = await self.bot.data.colours.get(to_png_ex(p.url))
+        colour = await self.bot.get_colour(p)
         emb = discord.Embed(colour=colour)
         emb.set_thumbnail(url=url)
         emb.set_author(name=name, icon_url=url, url=url)

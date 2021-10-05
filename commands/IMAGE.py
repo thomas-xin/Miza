@@ -177,7 +177,7 @@ class IMG(Command):
         else:
             content += f"{len(images)} images currently assigned for {str(guild).replace('`', '')}:```*"
             msg = ini_md(iter2str({k: "\n" + images[k] for k in tuple(images)[pos:pos + page]}))
-        colour = await self.bot.data.colours.get(worst_url(guild))
+        colour = await self.bot.get_colour(guild)
         emb = discord.Embed(
             description=content + msg,
             colour=colour,

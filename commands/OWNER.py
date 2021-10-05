@@ -439,7 +439,7 @@ class UpdateExec(Database):
 
     def proxy(self, url):
         if is_url(url) and not regexp("https:\\/\\/images-ext-[0-9]+\\.discordapp\\.net\\/external\\/").match(url) and not url.startswith("https://media.discordapp.net/") and not self.bot.is_webserver_url(url):
-            h = shash(url)
+            h = uhash(url)
             try:
                 return self.bot.data.proxies[0][h]
             except KeyError:
@@ -456,7 +456,7 @@ class UpdateExec(Database):
         for i, url in enumerate(urls):
             if is_url(url):
                 try:
-                    out[i] = self.bot.data.proxies[0][shash(url)]
+                    out[i] = self.bot.data.proxies[0][uhash(url)]
                 except KeyError:
                     if not sendable:
                         out[i] = url
@@ -469,7 +469,7 @@ class UpdateExec(Database):
             for i, f in enumerate(files):
                 if f:
                     try:
-                        self.bot.data.proxies[0][shash(urls[i])] = out[i] = message.embeds[c].thumbnail.proxy_url
+                        self.bot.data.proxies[0][uhash(urls[i])] = out[i] = message.embeds[c].thumbnail.proxy_url
                     except IndexError:
                         break
                     self.bot.data.proxies.update(0)
@@ -484,7 +484,7 @@ class UpdateExec(Database):
             if not is_url(url):
                 continue
             try:
-                out[i] = self.bot.data.proxies[0][shash(url)]
+                out[i] = self.bot.data.proxies[0][uhash(url)]
             except KeyError:
                 if not sendable:
                     out[i] = url
@@ -536,7 +536,7 @@ class UpdateExec(Database):
                     else:
                         url = str(message.attachments[c].url)
                     try:
-                        self.bot.data.proxies[0][shash(urls[i])] = out[i] = url
+                        self.bot.data.proxies[0][uhash(urls[i])] = out[i] = url
                     except IndexError:
                         break
                     self.bot.data.proxies.update(0)
@@ -722,7 +722,7 @@ class UpdateColours(Database):
         if is_discord_url(url) and "avatars" in url[:48]:
             key = url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
         else:
-            key = shash(url.split("?", 1)[0])
+            key = uhash(url.split("?", 1)[0])
         try:
             out = self.data["colours"][key]
         except KeyError:

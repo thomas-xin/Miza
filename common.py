@@ -1956,7 +1956,7 @@ async def sub_submit(ptype, command, _timeout=12):
                 i = PROCS[ptype].index(proc)
             except LookupError:
                 raise ex
-            proc.kill()
+            force_kill(proc)
             PROCS[ptype][i] = await start_proc(ptype, i)
             raise
         finally:

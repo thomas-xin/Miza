@@ -2451,6 +2451,7 @@ else:
 
 # SHA256 operations: base64 and base16.
 shash = lambda s: as_str(base64.urlsafe_b64encode(hashlib.sha256(s if type(s) is bytes else as_str(s).encode("utf-8")).digest()).rstrip(b"="))
+uhash = lambda s: shash(s) if len(s) > 43 else s
 hhash = lambda s: bytes2hex(hashlib.sha256(s if type(s) is bytes else as_str(s).encode("utf-8")).digest(), space=False)
 ihash = lambda s: int.from_bytes(hashlib.md5(s if type(s) is bytes else as_str(s).encode("utf-8")).digest(), "little") % 4294967296 - 2147483648
 nhash = lambda s: int.from_bytes(hashlib.md5(s if type(s) is bytes else as_str(s).encode("utf-8")).digest(), "little")
