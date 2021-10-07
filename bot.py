@@ -23,8 +23,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     rcc_invite = "https://discord.gg/cbKQKAr"
     discord_icon = "https://cdn.discordapp.com/embed/avatars/0.png"
     twitch_url = "https://www.twitch.tv/-"
-    webserver = "https://mizabot.xyz"
+    # webserver = "https://mizabot.xyz"
     raw_webserver = "http://i.mizabot.xyz"
+    webserver = raw_webserver
     heartbeat = "heartbeat.tmp"
     heartbeat_ack = "heartbeat_ack.tmp"
     restart = "restart.tmp"

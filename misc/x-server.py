@@ -13,7 +13,7 @@ except ModuleNotFoundError:
     exec(code, globals())
 
 
-HOST = "https://mizabot.xyz"
+HOST = "http://i.mizabot.xyz"
 PORT = AUTH.get("webserver_port", 80)
 IND = "\x7f"
 
@@ -735,7 +735,7 @@ class Server:
             f = DownloadingFile(fni, af=af)
             cp.response.headers["Accept-Ranges"] = "bytes"
             cp.response.headers.update(CHEADERS)
-            cp.response.headers["Content-Disposition"] = "attachment; " * bool(d) + "filename=" + name + fmt
+            cp.response.headers["Content-Disposition"] = "attachment; " * bool(d) + "filename=" + json.dumps(name + fmt)
             if af():
                 count = 1048576
                 cp.response.headers["Content-Length"] = os.path.getsize(fni)
@@ -768,7 +768,7 @@ class Server:
         data, mime = fetch_static("index.html")
         meta = """<meta property="og:title" content="Miza"><meta property="og:description" content="A multipurpose Discord bot.">\
 <meta property="og:image" content="/logo256.png">\
-<meta property="og:url" content="/"><meta property="og:site_name" content="Miza">"""
+<meta property="og:site_name" content="Miza">"""
         if path:
             ind = IND
             p = None
@@ -790,6 +790,7 @@ class Server:
                         url = cp.request.base + "/i/" + c.rstrip(b"=").decode("utf-8", "replace") + ".gif"
                         return f"""<!DOCTYPE html>
     <html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta property="og:url" content="/">
     <meta property="og:type" content="video.other">
     <meta property="twitter:player" content="https://www.youtube.com/embed/dQw4w9WgXcQ">
     <meta property="og:video:type" content="text/html">
@@ -817,14 +818,15 @@ class Server:
                 attachment = filename or fn
                 a2 = url_unparse(attachment)
                 i_url = url.replace("/file/", "/i/") + ".gif"
+                f_url = url.replace("/file/", "/f/")
                 description = get_mime(p) + f", {byte_scale(os.path.getsize(p))}B"
                 meta = f"""<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">\
 <meta name="twitter:image:src" content="{i_url}"><meta name="twitter:card" content="summary_large_image">\
-<meta name="twitter:title" content="{a2}"><meta property="og:image" content="{i_url}">
-<meta name="og:description" content="{description}">"""
+<meta name="twitter:title" content="{a2}"><meta property="twitter:url" content="{f_url}"><meta property="og:image" content="{i_url}">
+<meta property="og:url" content="{f_url}"><meta name="og:description" content="{description}">"""
         i = data.index(b'<meta name="twitter:image:alt" content="somebody once told me the world was gonna roll me">')
         s = """<!doctype html><html lang="en"><head><meta charset="utf-8"/><link rel="icon" href="/logo256.png"/>\
-<meta charset="utf-8"><meta name="author" content="thomas-xin">""" + meta
+<meta charset="utf-8"><meta name="author" content="Miza">""" + meta
         data = s.encode("utf-8") + data[i:]
         cp.response.headers.update(CHEADERS)
         cp.response.headers["Content-Type"] = mime

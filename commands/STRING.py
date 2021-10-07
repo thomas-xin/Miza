@@ -757,7 +757,7 @@ class TimeCalc(Command):
         if len(timestamps) == 1:
             out = f"{round_min(timestamps[0])} ({DynamicDT.utcfromtimestamp(timestamps[0])} UTC)"
         elif "sum" not in name and "add" not in name:
-            out = time_diff(max(timestamps), min(timestamps))
+            out = dyn_time_diff(max(timestamps), min(timestamps))
         else:
             out = time_sum(*timestamps)
         return code_md(out)
