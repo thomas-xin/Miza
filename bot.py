@@ -3262,8 +3262,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 await message.add_reaction(react)
         return message
 
+    embed_calls = 0
+
     # Sends a list of embeds to the target sendable, using a webhook when possible.
     async def _send_embeds(self, sendable, embeds, reacts=None, reference=None):
+        self.embed_calls += 1
         s_id = verify_id(sendable)
         sendable = await self.fetch_messageable(s_id)
         with self.ExceptionSender(sendable, reference=reference):
@@ -3296,7 +3299,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         else:
                             create_task(sendable.send(embed=emb))
                 return
-            if xrand(7) >= 3:
+            if self.embed_calls & 1:
                 return await send_with_react(sendable, embeds=embeds, reacts=reacts, reference=reference)
             embs = deque()
             for emb in embeds:
@@ -3392,7 +3395,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if author:
                 url = author.get("icon_url")
                 if url:
-                    fin_col = await self.data.colours.get(url)
+                    with suppress():
+                        fin_col = await self.data.colours.get(url)
         if fin_col is None:
             if type(colour) is discord.Colour:
                 fin_col = colour

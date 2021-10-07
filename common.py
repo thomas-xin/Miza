@@ -1145,7 +1145,7 @@ def get_author(user, u_id=None):
     url = best_url(user)
     bot = BOT[0]
     if bot and "proxies" in bot.data:
-        url2 = bot.data.proxies[0].get(shash(url))
+        url2 = bot.data.proxies[0].get(uhash(url))
         if url2:
             url = url2
         else:
@@ -2515,8 +2515,11 @@ class seq(io.BufferedRandom, collections.abc.MutableSequence, contextlib.Abstrac
                     break
                 out.write(temp)
                 curr += self.BUF
-            out.seek(0)
-            return out.read()[k]
+            out.seek(start % self.BUF)
+            b = out.read(stop - start)
+            if step != 1:
+                return b[::step]
+            return b
         base = k // self.BUF
         with suppress(KeyError):
             return self.load(base)[k % self.BUF]

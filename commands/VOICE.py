@@ -1294,10 +1294,36 @@ class AudioDownloader:
                 self.spotify_header = {"authorization": f"Bearer {orjson.loads(token[:512])['accessToken']}"}
                 self.other_x += 1
 
-    # Gets data from yt-download.org, adjusts the format to ensure compatibility with results from youtube-dl. Used as backup.
+    # Gets data from yt-download.org, and adjusts the format to ensure compatibility with results from youtube-dl. Used as backup.
     def extract_backup(self, url, video=False):
         url = verify_url(url)
         if is_url(url) and not is_youtube_url(url):
+            with requests.head(url) as resp:
+                url = resp.url
+                name = url.rsplit("/", 1)[-1].rsplit(".", 1)[0]
+                ctype = resp.headers.get("Content-Type")
+                if ctype.startswith("video") or ctype.startswith("audio"):
+                    return dict(
+                        id=name,
+                        title=name,
+                        direct=True,
+                        url=url,
+                        webpage_url=url,
+                        extractor="generic",
+                    )
+                elif ctype == "application/octet-stream":
+                    dur = get_duration(url)
+                    d = dict(
+                        id=name,
+                        title=name,
+                        direct=True,
+                        url=url,
+                        webpage_url=url,
+                        extractor="generic",
+                    )
+                    if dur:
+                        d["duration"] = dur
+                    return d
             raise TypeError("Not a youtube link.")
         if ":" in url:
             url = url.rsplit("/", 1)[-1].split("v=", 1)[-1].split("&", 1)[0]
@@ -4345,7 +4371,7 @@ class Player(Command):
 
     async def __call__(self, guild, channel, user, bot, flags, perm, **void):
         auds = await auto_join(channel.guild, channel, user, bot)
-        auds.player = cdict(time=0)
+        auds.player = cdict(time=0, message=None)
         create_future_ex(auds.update)
 
 
