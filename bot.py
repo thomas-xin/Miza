@@ -898,14 +898,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             add_user=lambda user: Request(
                 f"https://discord.com/api/{api}/channels/{channel.id}/thread-members/{verify_id(user)}",
                 method="PUT",
-                headers={"Authorization": "Bot " + miza.token},
+                headers={"Authorization": "Bot " + bot.token},
                 bypass=False,
                 aio=True,
             ),
             remove_user=lambda user: Request(
                 f"https://discord.com/api/{api}/channels/{channel.id}/thread-members/{verify_id(user)}",
                 method="DELETE",
-                headers={"Authorization": "Bot " + miza.token},
+                headers={"Authorization": "Bot " + bot.token},
                 bypass=False,
                 aio=True,
             ),
@@ -923,16 +923,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         return channel
 
     async def manage_thread(self, channel):
-        create_task(Request(
+        Request(
             f"https://discord.com/api/{api}/channels/{channel.id}/thread-members/@me",
             method="POST",
-            headers={"Authorization": "Bot " + miza.token},
+            headers={"Authorization": "Bot " + bot.token},
             bypass=False,
             aio=True,
-        ))
+        )
         data = await Request(
             f"https://discord.com/api/{api}/channels/{channel.id}",
-            headers={"Authorization": "Bot " + miza.token},
+            headers={"Authorization": "Bot " + bot.token},
             bypass=False,
             aio=True,
             json=True,
@@ -3194,10 +3194,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 permissions = everyone.permissions
                 if not permissions.use_external_emojis:
                     permissions.use_external_emojis = True
-                    await everyone.edit(permissions=permissions, reason="I need to send emojis :3")
+                    await everyone.edit(permissions=permissions, reason="I need to send emojis 🙃")
             mchannel = None
             while not mchannel:
-                mchannel = channel.parent if hasattr(channel, "thread") else channel
+                mchannel = channel.parent if hasattr(channel, "thread") or isinstance(channel, discord.Thread) else channel
                 if not mchannel:
                     await asyncio.sleep(0.2)
             w = await self.ensure_webhook(mchannel, bypass=True)
@@ -3206,7 +3206,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             try:
                 async with getattr(w, "semaphore", emptyctx):
                     w = getattr(w, "webhook", w)
-                    if hasattr(channel, "thread"):
+                    if hasattr(channel, "thread") or isinstance(channel, discord.Thread):
                         data = orjson.dumps(dict(
                             content=args[0] if args else kwargs.get("content"),
                             username=kwargs.get("username"),

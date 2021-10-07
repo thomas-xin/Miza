@@ -3063,6 +3063,70 @@ class UpdateNickPreservers(Database):
                 self.update(guild.id)
 
 
+class ThreadList(Command):
+    name = ["ListThreads", "Threads", "ReviveThreads", "ReviveAll"]
+    description = "Shows or revives all threads in the current server."
+    flags = "r"
+    no_parse = True
+    time_consuming = True
+    _timeout_ = 8
+    rate_limit = (8, 30)
+
+    async def __call__(self, bot, channel, flags, guild, name, perm, **void):
+        revive = "r" in flags or "revive" in name
+        if revive and perm < 3:
+            raise self.perm_error(perm, 3, f"to revive all threads for {guild.name}")
+        sem = Semaphore(3, 480, rate_limit=5)
+        threads = guild.threads
+        futs = deque()
+        for c in sorted(guild.text_channels, key=lambda c: c.id):
+            if c.type is not discord.ChannelType.text:
+                continue
+            for mode in ("public", "private"):
+                async with sem:
+                    url = f"https://discord.com/api/{api}/channels/{c.id}/threads/archived/{mode}"
+                    futs.append(Request(
+                        url,
+                        method="GET",
+                        headers={"Authorization": "Bot " + bot.token},
+                        bypass=False,
+                        aio=True,
+                        json=True,
+                    ))
+        for fut in futs:
+            await fut
+        for data in itertools.chain(*(fut.result().get("threads", ()) for fut in futs)):
+            factory, ch_type = discord.client._threaded_channel_factory(data['type'])
+            if factory is None:
+                raise discord.InvalidData('Unknown channel type {type} for channel ID {id}.'.format_map(data))
+            if ch_type in (discord.ChannelType.group, discord.ChannelType.private):
+                c = factory(me=bot.user, data=data, state=bot._connection)
+            else:
+                guild_id = int(data["guild_id"])
+                guild = bot.get_guild(guild_id) or Object(id=guild_id)
+                c = factory(guild=guild, state=bot._connection, data=data)
+            threads.append(c)
+        threads = {c.id: c for c in threads}
+        guild._threads.update(threads)
+        if threads:
+            title = f"{len(threads)} threads found:"
+        else:
+            title = "No threads found."
+        def chm(c):
+            s = channel_mention(c.id)
+            n = "9" * 32
+            return f"[{s}](https://discord.com/channels/{c.guild.id}/{c.id}/{n})"
+        description = "\n".join(chm(c) for c in threads.values()) or "\xad"
+        bot.send_as_embeds(channel, author=get_author(bot.user), title=title, description=description, thumbnail=best_url(guild))
+        if revive:
+            for thread in threads.values():
+                if thread.permissions_for(guild.me).manage_channels:
+                    await thread.edit(archived=False, locked=False)
+                else:
+                    m = await thread.send("\xad")
+                    create_task(bot.silent_delete(m))
+
+
 class UpdateThreadPreservers(Database):
     name = "threadpreservers"
 

@@ -1124,7 +1124,7 @@ class Upload(Command):
             return self.bot.webserver + "/files"
         futs = deque()
         for url in args:
-            futs.append(create_task(Request(self.bot.raw_webserver + "/upload_url?url=" + url, decode=True, aio=True, timeout=1200)))
+            futs.append(Request(self.bot.raw_webserver + "/upload_url?url=" + url, decode=True, aio=True, timeout=1200))
             await asyncio.sleep(0.1)
         out = deque()
         for fut in futs:

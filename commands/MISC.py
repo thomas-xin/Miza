@@ -944,7 +944,7 @@ class UpdateDeviantArt(Database):
             for i in range(2 + int(math.log2(maxitems / page))):
                 curr = 1 << i
                 search = url + f"&offset={curr * page}&limit={page}"
-                futs.append((curr, create_task(Request(search, timeout=20, json=True, aio=True))))
+                futs.append((curr, Request(search, timeout=20, json=True, aio=True)))
                 if i & 1:
                     for x, fut in futs:
                         resp = await fut
@@ -970,7 +970,7 @@ class UpdateDeviantArt(Database):
         for i in range(curr + 1):
             if i not in found:
                 search = url + f"&offset={i * page}&limit={page}"
-                futs.append((i, create_task(Request(search, json=True, aio=True))))
+                futs.append((i, Request(search, json=True, aio=True)))
                 r += 1
         for x, fut in futs:
             resp = await fut
