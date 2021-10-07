@@ -280,7 +280,7 @@ class Server:
                 except FileNotFoundError:
                     pass
                 else:
-                    url = cp.request.base + "/i/" + c.rstrip(b"=").decode("utf-8", "replace")
+                    url = cp.request.base + "/i/" + c.rstrip(b"=").decode("utf-8", "replace") + ".gif"
                     return f"""<!DOCTYPE html>
 <html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta property="og:type" content="video.other">
@@ -352,7 +352,7 @@ class Server:
                 f_url = cp.url(qs=cp.request.query_string).replace("/preview/", "/p/")
                 o_url = HOST + cp.url(qs=cp.request.query_string, base="").replace("/preview/", "/p/")
                 s_url = f_url.replace("/p/", "/f/")
-                i_url = f_url.replace("/p/", "/i/")
+                i_url = f_url.replace("/p/", "/i/") + ".gif"
                 url = o_url.replace("/p/", "/f/")
                 s += f"""
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
@@ -440,7 +440,7 @@ class Server:
                 return cp.lib.file_generator(f, 65536)
             elif endpoint.startswith("a") and mime.split("/", 1)[0] in "video":
                 f_url = cp.url(qs=cp.request.query_string).replace(f"/{endpoint}/", "/f/")
-                i_url = f_url.replace("/f/", "/i/")
+                i_url = f_url.replace("/f/", "/i/") + ".gif"
                 b = ("""<!DOCTYPE html>
 <html>
 <style>
@@ -787,7 +787,7 @@ class Server:
                     except FileNotFoundError:
                         pass
                     else:
-                        url = cp.request.base + "/i/" + c.rstrip(b"=").decode("utf-8", "replace")
+                        url = cp.request.base + "/i/" + c.rstrip(b"=").decode("utf-8", "replace") + ".gif"
                         return f"""<!DOCTYPE html>
     <html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta property="og:type" content="video.other">
@@ -816,7 +816,7 @@ class Server:
                 fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
                 attachment = filename or fn
                 a2 = url_unparse(attachment)
-                i_url = url.replace("/file/", "/i/")
+                i_url = url.replace("/file/", "/i/") + ".gif"
                 description = get_mime(p) + f", {byte_scale(os.path.getsize(p))}B"
                 meta = f"""<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">\
 <meta name="twitter:image:src" content="{i_url}"><meta name="twitter:card" content="summary_large_image">\
