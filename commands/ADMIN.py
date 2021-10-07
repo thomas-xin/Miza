@@ -3072,7 +3072,7 @@ class ThreadList(Command):
     _timeout_ = 8
     rate_limit = (8, 30)
 
-    async def __call__(self, bot, channel, flags, guild, name, perm, **void):
+    async def __call__(self, bot, channel, flags, guild, user, name, perm, **void):
         revive = "r" in flags or "revive" in name
         if revive and perm < 3:
             raise self.perm_error(perm, 3, f"to revive all threads for {guild.name}")
@@ -3117,7 +3117,7 @@ class ThreadList(Command):
             n = "9" * 32
             return f"[{s}](https://discord.com/channels/{c.guild.id}/{c.id}/{n})"
         description = "\n".join(chm(c) for c in threads.values()) or "\xad"
-        bot.send_as_embeds(channel, author=get_author(bot.user), title=title, description=description, thumbnail=best_url(guild))
+        bot.send_as_embeds(channel, author=get_author(user), title=title, description=description, thumbnail=best_url(guild))
         if revive:
             for thread in threads.values():
                 if thread.permissions_for(guild.me).manage_channels:
