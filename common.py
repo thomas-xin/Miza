@@ -2516,7 +2516,10 @@ class seq(io.BufferedRandom, collections.abc.MutableSequence, contextlib.Abstrac
                 out.write(temp)
                 curr += self.BUF
             out.seek(start % self.BUF)
-            b = out.read(stop - start)
+            if not is_finite(stop):
+                b = out.read()
+            else:
+                b = out.read(stop - start)
             if step != 1:
                 return b[::step]
             return b
