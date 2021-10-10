@@ -2482,7 +2482,7 @@ class AudioDownloader:
             if auds:
                 args.extend(auds.construct_options(full=True))
             if silenceremove and len(ast) == 1 and not vid:
-                args.extend(("-af", "silenceremove=start_periods=1:start_duration=0.015625:start_threshold=-50dB:start_silence=0.015625:stop_periods=-9000:stop_threshold=-50dB:window=0.015625"))
+                args.extend(("-af", "silenceremove=start_periods=1:start_duration=1:start_threshold=-50dB:start_silence=0.5:stop_periods=-9000:stop_threshold=-50dB:window=0.015625"))
             if size:
                 w1, h1 = map(int, size[0])
                 w2, h2 = map(int, size[1])

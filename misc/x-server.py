@@ -71,6 +71,8 @@ class EndpointRedirects(Dispatcher):
             path = "/raw/" + path[3:]
         elif path == "/upload":
             path = "/files"
+        elif path == "/api/mpinsights":
+            path = "/api_mpinsights"
         else:
             p = path.lstrip("/")
             if p in actually_static:
@@ -756,7 +758,7 @@ class Server:
         return orjson.dumps(res)
     ytdl._cp_config = {"response.stream": True}
 
-    @cp.expose(("index", "p", "preview", "files", "file", "tester", "atlas", "mizatlas", "time"))
+    @cp.expose(("index", "p", "preview", "files", "file", "tester", "atlas", "mizatlas", "time", "mpinsights"))
     def index(self, path=None, filename=None, *args, **kwargs):
         url = cp.url(qs=cp.request.query_string)
         if "/p/" in url:
@@ -1579,78 +1581,35 @@ body {
     mpimg = {}
 
     @cp.expose
-    def mpinsights(self):
+    def api_mpinsights(self):
         values = self.mpget()
         for i in range(3):
             values[i] = int(values[i])
-        if "text/html" not in cp.request.headers.get("Accept", ""):
-            self.ensure_mpins()
-            histories = [None] * len(values)
-            hours = histories.copy()
-            for k in range(len(histories)):
-                width = np.clip(len(self.ins_data[k]), 3, 96)
-                histories[k] = list(supersample(self.ins_data[k], width))
-                hours[k] = len(self.ins_data[k])
-            return orjson.dumps(dict(
-                current=dict(
-                    live_users=values[2],
-                    active_users=values[1],
-                    total_users=values[0],
-                    total_playtime=values[4],
-                    total_use_time=values[3],
-                    average_playtime=values[5],
-                ),
-                historical=dict(
-                    live_users=[histories[2], hours[2]],
-                    active_users=[histories[1], hours[2]],
-                    total_users=[histories[0], hours[2]],
-                    total_playtime=[histories[4], hours[2]],
-                    total_use_time=[histories[3], hours[2]],
-                    average_playtime=[histories[5], hours[2]],
-                ),
-            ))
-        create_future_ex(self.ensure_mpins)
-        return """<!DOCTYPE html><html>
-<head>
-    <meta charset="utf-8">
-    <title>Insights</title>
-    <meta content="Miza Player Insights" property="og:title">
-    <meta content="See the activity history for the Miza Player program!" property="og:description">
-    <meta content="{cp.url()}" property="og:url">
-    <meta property="og:image" content="https://raw.githubusercontent.com/thomas-xin/Image-Test/master/sky-rainbow.gif">
-    <meta content="#BF7FFF" data-react-helmet="true" name="theme-color">
-    <style>
-        body {
-            font-family:Rockwell;
-            background:black;
-            color:#bfbfbf;
-            text-align:center;
-        }
-        .center {
-            display: block;
-            margin-left: auto;
-            margin-right: auto;
-            max-width: 100%;
-        }
-    </style>
-</head>""" + f"""
-<body>
-    <h1 style="color:white;">Miza Player Insights</h1>
-    Live users: {values[2]}
-    <img class="center" src="http://i.mizabot.xyz/mpins/2">
-    Active users: {values[1]}
-    <img class="center" src="http://i.mizabot.xyz/mpins/1">
-    Total users: {values[0]}
-    <img class="center" src="http://i.mizabot.xyz/mpins/0">
-    <br>
-    Total playtime: {sec2time(values[4])}
-    <img class="center" src="http://i.mizabot.xyz/mpins/4">
-    Total use time: {sec2time(values[3])}
-    <img class="center" src="http://i.mizabot.xyz/mpins/3">
-    Average playtime per user: {sec2time(values[5])}
-    <img class="center" src="http://i.mizabot.xyz/mpins/5">
-</body>
-</html>"""
+        self.ensure_mpins()
+        histories = [None] * len(values)
+        hours = histories.copy()
+        for k in range(len(histories)):
+            width = np.clip(len(self.ins_data[k]), 3, 96)
+            histories[k] = list(supersample(self.ins_data[k], width))
+            hours[k] = len(self.ins_data[k])
+        return orjson.dumps(dict(
+            current=dict(
+                live_users=values[2],
+                active_users=values[1],
+                total_users=values[0],
+                total_playtime=values[4],
+                total_use_time=values[3],
+                average_playtime=values[5],
+            ),
+            historical=dict(
+                live_users=[histories[2], hours[2]],
+                active_users=[histories[1], hours[2]],
+                total_users=[histories[0], hours[2]],
+                total_playtime=[histories[4], hours[2]],
+                total_use_time=[histories[3], hours[2]],
+                average_playtime=[histories[5], hours[2]],
+            ),
+        ))
 
     def ensure_mpins(self):
         try:
