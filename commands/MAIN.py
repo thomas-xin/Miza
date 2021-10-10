@@ -1538,7 +1538,7 @@ class Note(Command):
         else:
             note_userbase.update(user.id)
         notecount = rank_format(len(note_userbase[user.id]) - 1)
-        return ini_md(f"Successfully added note {notecount} for [{user}]!")
+        return ini_md(f"Successfully added {notecount} note for [{user}]!")
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
         u_id, pos = list(map(int, vals.split("_", 1)))
