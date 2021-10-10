@@ -1711,7 +1711,7 @@ def remove_str(s, arg):
 
 
 # Returns a string representation of an iterable, with options.
-def iter2str(it, key=None, limit=1728, offset=0, left="[", right="]", sep=" "):
+def iter2str(it, key=None, limit=3840, offset=0, left="[", right="]", sep=" "):
     try:
         try:
             len(it)
@@ -1739,7 +1739,8 @@ def iter2str(it, key=None, limit=1728, offset=0, left="[", right="]", sep=" "):
 
 
 # Recognises "st", "nd", "rd" and "th" in numbers.
-rank_format = lambda n: str(n) + "st nd rd th".split()[min((n - 1) % 10, 3)]
+_ith = "st nd rd th".split()
+rank_format = lambda n: str(n) + (_ith[min((n - 1) % 10, 3)] if n not in range(11, 14) else "th")
 
 
 # Returns a copy of a mapping object, with keys cast to integers where possible.

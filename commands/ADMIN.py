@@ -2185,6 +2185,7 @@ class UpdateUserLogs(Database):
         colour = await self.bot.get_colour(after)
         emb = discord.Embed(colour=colour)
         emb.description = f"{after} has been updated:"
+        change = False
         if str(before) != str(after):
             emb.add_field(
                 name="Name",
