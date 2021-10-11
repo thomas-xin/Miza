@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import sympy, math, time, os, sys, subprocess, traceback, random, collections, psutil, concurrent.futures, pickle, ast, re #, gc
+import sympy, mpmath, math, time, os, sys, subprocess, traceback, random, collections, psutil, concurrent.futures, pickle, ast, re
 import sympy.stats
 import numpy as np
 import sympy.parsing.sympy_parser as parser
@@ -27,6 +27,18 @@ literal_eval = lambda s: ast.literal_eval(as_str(s).lstrip())
 
 BF_PREC = 256
 BF_ALPHA = "0123456789abcdefghijklmnopqrstuvwxyz"
+
+mp = mpmath.mp
+mp.dps = BF_PREC
+mpf = mpmath.mpf
+mpf.__floordiv__ = lambda x, y: int(x / y)
+mpf.__rfloordiv__ = lambda y, x: int(x / y)
+mpf.__lshift__ = lambda x, y: x * (1 << y if type(y) is int else 2 ** y)
+mpf.__rshift__ = lambda x, y: x // (1 << y if type(y) is int else 2 ** y)
+mpf.__rlshift__ = lambda y, x: x * (1 << y if type(y) is int else 2 ** y)
+mpf.__rrshift__ = lambda y, x: x * (1 << y if type(y) is int else 2 ** y)
+mpc = mpmath.mpc
+Mat = mat = matrix = mpmath.matrix
 
 def TryWrapper(func):
     def __call__(*args, **kwargs):
@@ -164,39 +176,64 @@ class Random(sympy.Basic):
     __str__ = __repr__
 
 
+def astype(obj, t, *args, **kwargs):
+    try:
+        if not isinstance(obj, t):
+            if callable(t):
+                return t(obj, *args, **kwargs)
+            return t
+    except TypeError:
+        if callable(t):
+            return t(obj, *args, **kwargs)
+        return t
+    return obj
+
+
+RI = 1 << 256
+
 def iand(a, b):
     if a == b:
         return a
     if hasattr(a, "p") and getattr(a, "q", 1) == 1 and hasattr(b, "p") and getattr(b, "q", 1) == 1:
         return sympy.Integer(a.p & b.p)
-    r = 1 << 256
-    x = round(a * r)
-    y = round(b * r)
-    return sympy.Integer(x & y) / r
+    x = round(a * RI)
+    y = round(b * RI)
+    return sympy.Integer(x & y) / RI
 
 def ior(a, b):
     if a == b:
         return a
     if hasattr(a, "p") and getattr(a, "q", 1) == 1 and hasattr(b, "p") and getattr(b, "q", 1) == 1:
         return sympy.Integer(a.p | b.p)
-    r = 1 << 256
-    x = round(a * r)
-    y = round(b * r)
-    return sympy.Integer(x | y) / r
+    x = round(a * RI)
+    y = round(b * RI)
+    return sympy.Integer(x | y) / RI
 
 def ixor(a, b):
     if a == b:
         return sympy.Integer(0)
     if hasattr(a, "p") and getattr(a, "q", 1) == 1 and hasattr(b, "p") and getattr(b, "q", 1) == 1:
         return sympy.Integer(a.p ^ b.p)
-    r = 1 << 256
-    x = round(a * r)
-    y = round(b * r)
-    return sympy.Integer(x ^ y) / r
+    x = round(a * RI)
+    y = round(b * RI)
+    return sympy.Integer(x ^ y) / RI
+
+_pow = sympy.Float.__pow__
+
+def pow(a, b):
+    if hasattr(a, "p") and getattr(a, "q", 1) == 1 and hasattr(b, "p") and getattr(b, "q", 1) == 1:
+        exponent = mpmath.log(a.p, 2) * b.p
+        if exponent > 256:
+            return sympy.Float(2 ** exponent)
+        return a.p ** b.p
+    a = astype(a, sympy.Float)
+    return _pow(a, b)
 
 sympy.Basic.__and__ = lambda self, other: iand(self, other)
 sympy.Basic.__or__ = lambda self, other: ior(self, other)
 sympy.Basic.__xor__ = lambda self, other: ixor(self, other)
+sympy.Basic.__pow__ = lambda self, other: pow(self, other)
+sympy.Basic.__rpow__ = lambda self, other: pow(other, self)
 sympy.core.numbers.Infinity.__str__ = lambda self: "inf"
 sympy.core.numbers.NegativeInfinity.__str__ = lambda self: "-inf"
 sympy.core.numbers.ComplexInfinity.__str__ = lambda self: "ℂ∞"

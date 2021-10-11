@@ -1623,7 +1623,7 @@ body {
         send(f"!{t}\x7f{content}", escape=False)
         j, after = fut.result()
         RESPONSES.pop(t, None)
-        return orjson.dumps(j)
+        return orjson.dumps(j["result"])
 
     def ensure_mpins(self):
         try:

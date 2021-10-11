@@ -2250,7 +2250,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     def get_active(self):
         procs = 2 + sum(1 for c in self.proc.children(True))
         thrds = self.proc.num_threads()
-        coros = sum(1 for i in asyncio.all_tasks())
+        coros = sum(1 for i in asyncio.all_tasks(self.loop))
         return alist((procs, thrds, coros))
 
     # Gets the CPU and memory usage of a process over a period of 1 second.
@@ -2303,7 +2303,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             return self.status_data
         with self.status_sem:
             active = self.get_active()
-            size = sum(self.size.values()) + sum(self.size2.values())
+            size = (
+                np.sum(deque(self.size.values()), dtype=np.uint32, axis=0)
+                + np.sum(deque(self.size2.values()), dtype=np.uint32, axis=0)
+            )
             stats = self.curr_state
             commands = set(itertools.chain(*self.commands.values()))
             self.status_data = {
@@ -2311,7 +2314,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     "Process count": active[0],
                     "Thread count": active[1],
                     "Coroutine count": active[2],
-                    "CPU usage": round(stats[0], 3),
+                    "CPU usage": f"{round(stats[0], 3)}%",
                     "RAM usage": byte_scale(stats[1]) + "B",
                     "Disk usage": byte_scale(stats[2]) + "B",
                     "Network usage": byte_scale(bot.bitrate) + "bps",
@@ -2335,7 +2338,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     "Activity count": self.activity,
                 },
                 "Code info": {
-                    "Code size": list(size),
+                    "Code size": [x.item() for x in size],
                     "Command count": len(commands),
                     "Website URL": self.webserver,
                 },

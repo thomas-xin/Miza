@@ -998,12 +998,13 @@ class Barter(Command):
         data = bot.data.users[user.id]
         data["ingots"] -= amount
         if amount >= 18446744073709551616:
-            dtype = np.float64
+            dtype = np.float80
         elif amount >= 4294967296:
             dtype = np.uint64
         else:
             dtype = np.uint32
         itype = np.uint64 if dtype is not np.uint32 else np.uint32
+        ftype = np.float64 if dtype is not np.uint32 else np.float32
         totals = np.zeros(len(barter_weights), dtype=dtype)
         rand = np.random.default_rng(ts_us())
         if amount > 268435456:
@@ -1012,6 +1013,7 @@ class Barter(Command):
                 seeds = await create_future(rand.integers, 0, len(barter_seeding), size=count, dtype=itype)
                 ids = barter_seeding[seeds]
                 counts = await create_future(rand.integers, barter_lowers[ids], barter_uppers[ids], dtype=itype)
+                counts = counts.astype(np.ftype)
                 await create_future(np.add.at, totals, ids, counts)
             mult, amount = divmod(amount, 268435456)
             if not is_finite(amount):
@@ -1024,6 +1026,7 @@ class Barter(Command):
             seeds = await create_future(rand.integers, 0, len(barter_seeding), size=count, dtype=itype)
             ids = barter_seeding[seeds]
             counts = await create_future(rand.integers, barter_lowers[ids], barter_uppers[ids], dtype=itype)
+            counts = counts.astype(np.ftype)
             await create_future(np.add.at, totals, ids, counts)
         rewards = deque()
         data.setdefault("minecraft", {})

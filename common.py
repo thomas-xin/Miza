@@ -885,7 +885,7 @@ channel_repr = lambda s: as_str(s) if not isinstance(s, discord.abc.GuildChannel
 def line_count(fn):
     with open(fn, "r", encoding="utf-8") as f:
         data = f.read()
-        return alist((len(data), data.count("\n") + 1))
+    return (len(data), data.count("\n") + 1)
 
 
 # Checks if a file is a python code file using its filename extension.
@@ -1892,7 +1892,7 @@ async def proc_communicate(proc):
             s = as_str(b.rstrip())
             if s:
                 if s[0] == "~":
-                    c = as_str(eval(s[1:]))
+                    c = as_str(evalEX(s[1:]))
                     exec_tb(c, globals())
                 else:
                     print(s)
@@ -1978,8 +1978,7 @@ def process_math(expr, prec=64, rat=False, timeout=12, variables=None):
 
 # Sends an operation to the image subprocess pool.
 def process_image(image, operation, args, timeout=24):
-    if type(args) is tuple:
-        args = list(args)
+    args = astype(args, list)
     for i, a in enumerate(args):
         if type(a) is mpf:
             args[i] = float(a)
@@ -2000,7 +1999,7 @@ def evalex(exc):
         ex = eval(exc)
     except (SyntaxError, NameError):
         exc = as_str(exc)
-        s = exc[exc.index("(") + 1:exc.index(")")]
+        s = exc[exc.index("(") + 1:exc.rindex(")")]
         with suppress(TypeError, SyntaxError, ValueError):
             s = ast.literal_eval(s)
         ex = RuntimeError(s)
@@ -2008,10 +2007,7 @@ def evalex(exc):
 
 # Evaluates an an expression, raising it if it is an exception.
 def evalEX(exc):
-    try:
-        ex = evalex(exc)
-    except:
-        raise
+    ex = evalex(exc)
     if issubclass(type(ex), BaseException):
         raise ex
     return ex

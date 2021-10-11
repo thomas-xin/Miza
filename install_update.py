@@ -70,4 +70,16 @@ except:
     subprocess.run([python, "-m", "pip", "install", "discord/discord.py-master", "--user", "--use-feature=in-tree-build"])
     subprocess.run([python, "misc/deleter.py", "discord"])
 
+if os.name == "nt":
+    try:
+        pkg_resources.get_distribution("gmpy2")
+    except pkg_resources.DistributionNotFound:
+        subprocess.run([python, "-m", "pip", "install", "pipwin", "--upgrade", "--user"])
+        subprocess.run([python, "-m", "pipwin", "install", "gmpy2"])
+else:
+    try:
+        pkg_resources.get_distribution("gmpy2")
+    except pkg_resources.DistributionNotFound:
+        subprocess.run([python, "-m", "pip", "install", "gmpy2", "--upgrade", "--user"])
+
 print("Installer terminated.")
