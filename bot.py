@@ -59,6 +59,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     connect_ready = concurrent.futures.Future()
     guilds_ready = concurrent.futures.Future()
     socket_responses = deque(maxlen=256)
+    try:
+        shards = int(sys.argv[1])
+    except IndexError:
+        shards = 1
 
     def __init__(self, cache_size=1048576, timeout=24):
         # Initializes client (first in __mro__ of class inheritance)
@@ -2291,6 +2295,52 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     self.size2[f] = line_count(path)
             self.curr_state = stats
             return stats
+
+    status_sem = Semaphore(1, inf, rate_limit=1)
+
+    def status(self):
+        if self.status_sem.busy:
+            return self.status_data
+        with self.status_sem:
+            active = self.get_active()
+            size = sum(self.size.values()) + sum(self.size2.values())
+            stats = self.curr_state
+            commands = set(itertools.chain(*self.commands.values()))
+            self.status_data = {
+                "Bot info": {
+                    "Process count": active[0],
+                    "Thread count": active[1],
+                    "Coroutine count": active[2],
+                    "CPU usage": round(stats[0], 3),
+                    "RAM usage": byte_scale(stats[1]) + "B",
+                    "Disk usage": byte_scale(stats[2]) + "B",
+                    "Network usage": byte_scale(bot.bitrate) + "bps",
+                },
+                "Discord info": {
+                    "Shard count": self.shards,
+                    "Server count": len(self._guilds),
+                    "User count": len(self.cache.users),
+                    "Channel count": len(self.cache.channels),
+                    "Role count": len(self.cache.roles),
+                    "Emoji count": len(self.cache.emojis),
+                    "Cached messages": len(self.cache.messages),
+                },
+                "Misc info": {
+                    "Cached files": self.file_count,
+                    "Audio players": len(self.audio.players),
+                    "Total data transmission": byte_scale(bot.total_bytes) + "B",
+                    "System time": datetime.datetime.now(),
+                    "API latency": sec2time(self.api_latency),
+                    "Current uptime": dyn_time_diff(utc(), bot.start_time),
+                    "Activity count": self.activity,
+                },
+                "Code info": {
+                    "Code size": list(size),
+                    "Command count": len(commands),
+                    "Website URL": self.webserver,
+                },
+            }
+        return self.status_data
 
     # Loads a module containing commands and databases by name.
     def get_module(self, module):

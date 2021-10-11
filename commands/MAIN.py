@@ -1033,39 +1033,19 @@ class Status(Command):
         emb.set_author(name="Status", url=bot.webserver, icon_url=url)
         emb.timestamp = utc_dt()
         if msg is None:
-            active = bot.get_active()
-            try:
-                shards = len(bot.latencies)
-            except AttributeError:
-                shards = 1
-            size = sum(bot.size.values()) + sum(bot.size2.values())
-            stats = bot.curr_state
-
-            bot_info = (
-                f"Process count\n`{active[0]}`\nThread count\n`{active[1]}`\nCoroutine count\n`{active[2]}`\n"
-                + f"CPU usage\n`{round(stats[0], 3)}%`\nRAM usage\n`{byte_scale(stats[1])}B`\nDisk usage\n`{byte_scale(stats[2])}B`\nNetwork usage\n`{byte_scale(bot.bitrate)}bps`"
-            )
-            emb.add_field(name="Bot info", value=bot_info)
-
-            discord_info = (
-                f"Shard count\n`{shards}`\nServer count\n`{len(tuple(bot.cache.guilds.keys()))}`\nUser count\n`{len(tuple(bot.cache.users.keys()))}`\n"
-                + f"Channel count\n`{len(tuple(bot.cache.channels.keys()))}`\nRole count\n`{len(tuple(bot.cache.roles.keys()))}`\nEmoji count\n`{len(tuple(bot.cache.emojis.keys()))}`\nCached messages\n`{len(bot.cache.messages)}`"
-            )
-            emb.add_field(name="Discord info", value=discord_info)
-
-            misc_info = (
-                f"Cached files\n`{bot.file_count}`\nConnected voice channels\n`{len(bot.audio.players)}`\nTotal data sent/received\n`{byte_scale(bot.total_bytes)}B`\n"
-                + f"System time\n`{datetime.datetime.now()}`\nAPI latency\n`{sec2time(bot.api_latency)}`\nCurrent uptime\n`{dyn_time_diff(utc(), bot.start_time)}`\nActivity count since startup\n`{bot.activity}`"
-            )
-            emb.add_field(name="Misc info", value=misc_info)
-            commands = set()
-            for command in bot.commands.values():
-                commands.update(command)
-            code_info = (
-                f"Code size\n[`{byte_scale(size[0])}B, {size[1]} lines`]({bot.github})\nCommand count\n[`{len(commands)}`](https://github.com/thomas-xin/Miza/wiki/Commands)\n"
-                + f"Website URL\n[`{bot.webserver}`]({bot.webserver})"
-            )
-            emb.add_field(name="Code info", value=code_info)
+            def subs(n, x):
+                if n == "Code size":
+                    return f"{n}\n[`{byte_scale(x[0])}B, {x[1]} lines`]({bot.github})"
+                if n == "Command count":
+                    return f"{n}\n[`{x}`](https://github.com/thomas-xin/Miza/wiki/Commands)"
+                if n == "Website URL":
+                    return f"{n}\n[`{x}`]({x})"
+                return f"{n}\n`{x}`"
+            for k, v in bot.status().items():
+                emb.add_field(
+                    name=k,
+                    value="\n".join(subs(n, x) for n, x in v.items()),
+                )
         else:
             emb.description = msg
         func = channel.send

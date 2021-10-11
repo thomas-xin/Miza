@@ -73,6 +73,8 @@ class EndpointRedirects(Dispatcher):
             path = "/files"
         elif path == "/api/mpinsights":
             path = "/api_mpinsights"
+        elif path == "/api/status":
+            path = "/api_status"
         else:
             p = path.lstrip("/")
             if p in actually_static:
@@ -1610,6 +1612,18 @@ body {
                 average_playtime=[histories[5], hours[2]],
             ),
         ))
+
+    @cp.expose
+    def api_status(self):
+        t = ts_us()
+        while t in RESPONSES:
+            t += 1
+        RESPONSES[t] = fut = concurrent.futures.Future()
+        content = f'bot.status()'
+        send(f"!{t}\x7f{content}", escape=False)
+        j, after = fut.result()
+        RESPONSES.pop(t, None)
+        return orjson.dumps(j)
 
     def ensure_mpins(self):
         try:
