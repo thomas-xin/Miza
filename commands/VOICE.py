@@ -782,7 +782,7 @@ class AudioQueue(alist):
                 except KeyError:
                     name = "Deleted User"
                 self.lastsent = utc()
-                auds.announce(italics(ini_md(f"🎵 Now playing {sqr_md(e.name)}, added by {sqr_md(name)}! 🎵")))
+                auds.announce(italics(ini_md(f"🎵 Now playing {sqr_md(e.name)}, added by {sqr_md(name)}! 🎵")), aio=True)
 
     def start_queue(self):
         if self.sem.is_busy():

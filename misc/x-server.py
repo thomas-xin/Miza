@@ -1485,7 +1485,7 @@ body {
         if token != AUTH.get("discord_token"):
             raise InterruptedError
         url = cp.url(base="", qs=cp.request.query_string)
-        content = urllib.parse.unquote(url.split("?", 1)[0].lstrip("/").split("/", 2)[-1])
+        content = urllib.parse.unquote(url.lstrip("/").split("/", 2)[-1])
         t = ts_us()
         while t in RESPONSES:
             t += 1
