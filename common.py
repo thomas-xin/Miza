@@ -757,13 +757,14 @@ def restructure_buttons(buttons):
                             button["custom_id"] = 0
             elif type(button["custom_id"]) is not str:
                 button["custom_id"] = as_str(button["custom_id"])
-            while button["custom_id"] in used_custom_ids:
-                if "?" in button["custom_id"]:
-                    spl = button["custom_id"].rsplit("?", 1)
-                    button["custom_id"] = spl[0] + f"?{int(spl[-1]) + 1}"
-                else:
-                    button["custom_id"] = button["custom_id"] + "?0"
-            used_custom_ids.add(button["custom_id"])
+            if "custom_id" in button:
+                while button["custom_id"] in used_custom_ids:
+                    if "?" in button["custom_id"]:
+                        spl = button["custom_id"].rsplit("?", 1)
+                        button["custom_id"] = spl[0] + f"?{int(spl[-1]) + 1}"
+                    else:
+                        button["custom_id"] = button["custom_id"] + "?0"
+                used_custom_ids.add(button["custom_id"])
             if "style" not in button:
                 button["style"] = 1
             if button.get("emoji"):

@@ -1665,8 +1665,6 @@ class AudioDownloader:
                 return self.downloader.extract_info(f"scsearch{c}:{item}", download=False, process=False)
             except Exception as ex:
                 raise ConnectionError(exc + repr(ex))
-        if is_url(item) or not search:
-            return self.extract_from(item)
         if item[:9] == "spsearch:":
             query = "https://api.spotify.com/v1/search?type=track%2Cshow_audio%2Cepisode_audio&include_external=audio&limit=1&q=" + url_parse(item[9:])
             resp = reqs.next().get(query, headers=self.spotify_header).json()
@@ -1707,6 +1705,8 @@ class AudioDownloader:
             else:
                 item = "ytsearch:" + "".join(c if c.isascii() and c != ":" else "_" for c in f"{name} ~ {artists}")
                 self.other_x += 1
+        elif is_url(item) or not search:
+            return self.extract_from(item)
         self.youtube_dl_x += 1
         return self.downloader.extract_info(item, download=False, process=False)
 
@@ -4705,10 +4705,39 @@ class Download(Command):
                             if len(spl) >= 6:
                                 start, end = spl[4:6]
                             if tuple(map(str, (start, end))) == ("None", "None") and not silenceremove and not auds and fmt in ("mp3", "opus", "ogg", "wav"):
-                                content = bot.webserver + "/ytdl?fmt=" + fmt + "&view=" + url + "\n" + bot.webserver + "/ytdl?fmt=" + fmt + "&download=" + url
+                                view = bot.webserver + "/ytdl?fmt=" + fmt + "&view=" + url
+                                download = bot.webserver + "/ytdl?fmt=" + fmt + "&download=" + url
+                                # content = view + "\n" + download
                                 # if message.guild and message.guild.get_member(bot.client.user.id).permissions_in(message.channel).manage_messages:
                                 #     create_task(message.clear_reactions())
-                                return create_task(message.channel.send(content))
+                                entries = await create_future(ytdl.search, url)
+                                if entries:
+                                    name = entries[0].get("name")
+                                else:
+                                    name = None
+                                name = name or url.rsplit("/", 1)[-1].rsplit(".", 1)[0]
+                                try:
+                                    sem = EDIT_SEM[message.channel.id]
+                                except KeyError:
+                                    sem = EDIT_SEM[message.channel.id] = Semaphore(5.1, 256, rate_limit=5)
+                                async with sem:
+                                    return await Request(
+                                        f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
+                                        data=orjson.dumps(dict(
+                                            components=restructure_buttons([[
+                                                cdict(emoji="🔊", name=name, url=view),
+                                                cdict(emoji="📥", name=name, url=download),
+                                            ]]),
+                                        )),
+                                        method="PATCH",
+                                        headers={
+                                            "Content-Type": "application/json",
+                                            "Authorization": f"Bot {bot.token}",
+                                        },
+                                        bypass=False,
+                                        aio=True,
+                                    )
+                                # return create_task(message.channel.send(content))
                             if len(data) <= 1:
                                 create_task(message.edit(
                                     content=ini_md(f"Downloading and converting {sqr_md(ensure_url(url))}..."),
