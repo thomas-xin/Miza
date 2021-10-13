@@ -1741,7 +1741,7 @@ body {
             time.sleep(60)
 
     @cp.expose(("commands",))
-    def command(self, content="", input=""):
+    def command(self, content="", input="", timeout=420):
         ip = cp.request.remote.ip
         if ip == "127.0.0.1":
             t, after = content.split("\x7f", 1)
@@ -1766,7 +1766,7 @@ body {
             t += 1
         RESPONSES[t] = fut = concurrent.futures.Future()
         send(f"~{t}\x7f{ip}\x7f{tz}\x7f{content}", escape=False)
-        j, after = fut.result(timeout=420)
+        j, after = fut.result(timeout=max(1, float(timeout)))
         RESPONSES.pop(t, None)
         a = after - utc()
         if a > 0:
