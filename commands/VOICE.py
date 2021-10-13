@@ -4535,9 +4535,9 @@ class Download(Command):
         # Attempt to download items in queue if no search query provided
         if not argv:
             try:
-                auds = await auto_join(guild, channel, user, bot)
+                auds = bot.data.audio.players[guild.id]
                 if not auds.queue:
-                    raise EOFError
+                    raise LookupError
                 res = [{"name": e.name, "url": e.url} for e in auds.queue[:10]]
                 fmt = "mp3"
                 desc = f"Current items in queue for {guild}:"
@@ -4716,6 +4716,7 @@ class Download(Command):
                                 else:
                                     name = None
                                 name = name or url.rsplit("/", 1)[-1].rsplit(".", 1)[0]
+                                name = f"【{num}】{name}"
                                 try:
                                     sem = EDIT_SEM[message.channel.id]
                                 except KeyError:
