@@ -1394,8 +1394,6 @@ class AudioDownloader:
 
     # Returns part of a spotify playlist.
     def get_spotify_part(self, url):
-        out = deque()
-        self.spotify_x += 1
         try:
             d = Request(url, headers=self.spotify_header, json=True)
         except ConnectionError:
@@ -1403,6 +1401,21 @@ class AudioDownloader:
         if not d:
             self.update_dl()
             d = Request(url, headers=self.spotify_header, json=True)
+        return self.export_spotify_part(d)
+
+    async def get_spotify_part_async(self, url):
+        try:
+            d = await Request(url, headers=self.spotify_header, json=True, aio=True)
+        except ConnectionError:
+            d = None
+        if not d:
+            await create_future(self.update_dl)
+            d = await Request(url, headers=self.spotify_header, json=True, aio=True)
+        return self.export_spotify_part(d)
+
+    def export_spotify_part(self, d):
+        self.spotify_x += 1
+        out = deque()
         with suppress(KeyError):
             d = d["tracks"]
         try:
@@ -1442,10 +1455,9 @@ class AudioDownloader:
         return out, total
 
     # Returns part of a youtube playlist.
-    def get_youtube_part(self, url):
-        out = deque()
+    def export_youtube_part(self, d):
         self.youtube_x += 1
-        d = Request(url, json=True)
+        out = deque()
         items = d["items"]
         total = d.get("pageInfo", {}).get("totalResults", 0)
         for item in items:
@@ -1464,6 +1476,14 @@ class AudioDownloader:
             )
             out.append(temp)
         return out, total
+
+    def get_youtube_part(self, url):
+        d = Request(url, json=True)
+        return self.export_youtube_part(d)
+
+    async def get_youtube_part_async(self, url):
+        d = await Request(url, aio=True, json=True)
+        return self.export_youtube_part(d)
 
     # Returns a full youtube playlist.
     def get_youtube_playlist(self, p_id):
@@ -1522,7 +1542,11 @@ class AudioDownloader:
             futs = deque()
             for curr in range(100, page * ceil(count / page), page):
                 search = f"{url}&pageToken={self.yt_pages[curr]}"
-                futs.append(create_future_ex(self.get_youtube_part, search))
+                if is_main_thread() or curr < 500:
+                    fut = create_future_ex(self.get_youtube_part, search)
+                else:
+                    fut = convert_fut(self.get_youtube_part_async(search))
+                futs.append(fut)
             for fut in futs:
                 out.extend(fut.result()[0])
         return out
@@ -1780,7 +1804,10 @@ class AudioDownloader:
                             if curr >= maxitems:
                                 break
                             search = f"{url}&offset={curr}&limit={page}"
-                            fut = create_future_ex(self.get_spotify_part, search, timeout=90)
+                            if is_main_thread() or i < 8:
+                                fut = create_future_ex(self.get_spotify_part, search, timeout=90)
+                            else:
+                                fut = convert_fut(self.get_spotify_part_async(search))
                             print("Sent 1 spotify search.")
                             futs.append(fut)
                             if not (i < 1 or math.log2(i + 1) % 1) or not i & 7:
@@ -2555,7 +2582,8 @@ class AudioDownloader:
                                         if not b:
                                             break
                                         proc.stdin.write(b)
-                            create_future_ex(os.remove, cfn)
+                            with suppress():
+                                os.remove(cfn)
                     proc.stdin.flush()
                     proc.stdin.close()
                     proc.wait()

@@ -2173,6 +2173,9 @@ async def _await_fut(fut, ret):
 
 # Blocking call that waits for a single asyncio future to complete, do *not* call from main asyncio loop
 def await_fut(fut, timeout=None):
+    return convert_fut(fut).result(timeout=timeout)
+
+def convert_fut(fut):
     loop = get_event_loop()
     if is_main_thread():
         if not isinstance(fut, asyncio.Task):
@@ -2183,7 +2186,7 @@ def await_fut(fut, timeout=None):
     except:
         ret = concurrent.futures.Future()
         loop.create_task(_await_fut(fut, ret))
-    return ret.result(timeout=timeout)
+    return ret
 
 is_main_thread = lambda: threading.current_thread() is threading.main_thread()
 

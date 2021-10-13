@@ -5236,10 +5236,10 @@ class AudioClientInterface:
 
     def kill(self):
         if self.proc.is_running():
-            create_future_ex(self.submit, "await kill()")
-        time.sleep(1)
-        with tracebacksuppressor(psutil.NoSuchProcess):
-            return self.proc.kill()
+            with tracebacksuppressor:
+                create_future_ex(self.submit, "await kill()", priority=True).result(timeout=2)
+            with tracebacksuppressor(psutil.NoSuchProcess):
+                return self.proc.kill()
 
 
 # Queries for searching members
