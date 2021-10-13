@@ -399,7 +399,7 @@ class AudioFile:
         self.proc = None
         try:
             try:
-                self.proc = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                self.proc = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, bufsize=1048576)
             except:
                 print(cmd)
                 raise
@@ -635,7 +635,7 @@ class LoadedAudioReader(discord.AudioSource):
         self.closed = False
         self.advanced = False
         self.args = args
-        self.proc = psutil.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
+        self.proc = psutil.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, bufsize=192000)
         self.packet_iter = discord.oggparse.OggStream(self.proc.stdout).iter_packets()
         self.file = file
         self.af = file
@@ -669,7 +669,7 @@ class LoadedAudioReader(discord.AudioSource):
                             self.args[i + 1] = str(float(self.args[i + 1]) - pos)
                     else:
                         self.args[i + 1] = str(float(self.args[i + 1]) + pos)
-                self.proc = psutil.Popen(self.args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
+                self.proc = psutil.Popen(self.args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, bufsize=192000)
                 self.packet_iter = discord.oggparse.OggStream(self.proc.stdout).iter_packets()
             else:
                 self.pos += self.speed
@@ -702,7 +702,7 @@ class BufferedAudioReader(discord.AudioSource):
     def __init__(self, file, args, callback=None, key=None):
         self.closed = False
         self.advanced = False
-        self.proc = psutil.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        self.proc = psutil.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=192000)
         self.packet_iter = discord.oggparse.OggStream(self.proc.stdout).iter_packets()
         self.file = file
         self.af = file

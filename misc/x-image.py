@@ -2497,7 +2497,7 @@ def from_bytes(b, save=None):
         p = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         cmd2 = ["./ffmpeg", "-hide_banner", "-v", "error", "-y", "-an", "-i", fn, "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0", "-"]
         print(cmd2)
-        proc = psutil.Popen(cmd2, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        proc = psutil.Popen(cmd2, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0)
         bcount = 4 if fmt == "rgba" else 3
         mode = "RGBA" if fmt == "rgba" else "RGB"
         try:
@@ -2740,7 +2740,7 @@ def evalImg(url, operation, args):
                     command.extend(("-b:v", f"{meg}M"))
                 command.append(out)
                 print(command)
-                proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, bufsize=0)
             for i, frame in enumerate(frames):
                 if fmt == "zip":
                     b = io.BytesIO()

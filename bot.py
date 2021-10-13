@@ -363,7 +363,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 self.server.kill()
         if os.path.exists("misc/x-server.py") and PORT:
             print("Starting webserver...")
-            self.server = psutil.Popen([python, "x-server.py"], cwd=os.getcwd() + "/misc", stderr=subprocess.PIPE)
+            self.server = psutil.Popen([python, "x-server.py"], cwd=os.getcwd() + "/misc", stderr=subprocess.PIPE, bufsize=65536)
         else:
             self.server = None
 
@@ -1427,7 +1427,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 else:
                     ext = None
                 urls = await create_future(as_file, file if getattr(file, "_fp", None) else f, filename=filename, ext=ext, rename=rename)
-                message = await channel.send(msg + ("" if msg.endswith("```") else "\n") + urls[0], embed=embed, reference=reference) #, embed=discord.Embed(colour=discord.Colour(1)).set_image(url=urls[-1]))
+                message = await channel.send((msg + ("" if msg.endswith("```") else "\n") + urls[0]).strip(), embed=embed, reference=reference) #, embed=discord.Embed(colour=discord.Colour(1)).set_image(url=urls[-1]))
             else:
                 message = await channel.send(msg, embed=embed, file=file, reference=reference)
                 if filename is not None:
@@ -1445,7 +1445,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             raise
         if message.attachments:
             await self.add_attachment(message.attachments[0], data)
-            await message.edit(content=message.content + ("" if message.content.endswith("```") else "\n") + ("\n".join("<" + best_url(a) + ">" for a in message.attachments) if best else "\n".join("<" + a.url + ">" for a in message.attachments)))
+            content = message.content + ("" if message.content.endswith("```") else "\n") + ("\n".join("<" + best_url(a) + ">" for a in message.attachments) if best else "\n".join("<" + a.url + ">" for a in message.attachments))
+            await message.edit(content=content.strip())
         return message
 
     # Inserts a message into the bot cache, discarding existing ones if full.
@@ -5166,7 +5167,7 @@ class AudioClientInterface:
     written = False
 
     def __init__(self):
-        self.proc = psutil.Popen([python, "x-audio.py"], cwd=os.getcwd() + "/misc", stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        self.proc = psutil.Popen([python, "x-audio.py"], cwd=os.getcwd() + "/misc", stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=65536)
         create_thread(self.communicate)
         with suppress():
             if os.name == "nt":
@@ -5412,9 +5413,10 @@ def webserver_communicate(bot):
 
 class SimulatedMessage:
 
-    def __init__(self, bot, content, t, name, nick, recursive=True):
+    def __init__(self, bot, content, t, name, nick=None, recursive=True):
         self._state = bot._state
-        self.created_at = datetime.datetime.fromtimestamp(int(t) / 1e6)
+        self.created_at = datetime.datetime.utcfromtimestamp(int(t) / 1e6)
+        self.ip = name
         self.id = time_snowflake(self.created_at, high=True)
         self.content = content
         self.response = deque()
@@ -5432,7 +5434,7 @@ class SimulatedMessage:
         self.name = name
         disc = str(xrand(10000))
         self.discriminator = "0" * (4 - len(disc)) + disc
-        self.nick = self.display_name = nick
+        self.nick = self.display_name = nick or name
         self.owner_id = self.id
         self.mention = f"<@{self.id}>"
         self.recipient = author
@@ -5457,7 +5459,10 @@ class SimulatedMessage:
 
     async def send(self, *args, **kwargs):
         if args:
-            kwargs["content"] = args[0]
+            try:
+                kwargs["content"] = args[0]
+            except IndexError:
+                kwargs["content"] = ""
         try:
             embed = kwargs.pop("embed")
         except KeyError:
@@ -5487,7 +5492,7 @@ class SimulatedMessage:
 
     def edit(self, **kwargs):
         self.response[-1].update(kwargs)
-        return emptyfut
+        return as_fut(self)
 
     async def history(self, *args, **kwargs):
         yield self

@@ -421,7 +421,7 @@ class Server:
                         "scale=240:-1",
                         preview,
                     )
-                    proc = psutil.Popen(args, stdout=subprocess.PIPE)
+                    proc = psutil.Popen(args)
                     image_loaders[preview] = proc
                 cp.response.headers["Content-Type"] = "image/gif"
                 cp.response.headers["ETag"] = create_etag(p)

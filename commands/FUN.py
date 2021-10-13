@@ -3136,7 +3136,7 @@ class XKCD(ImagePool, Command):
     database = "xkcd"
 
     async def fetch_one(self):
-        s = await Request("https://c.xkcd.com/random/comic", decode=True, aio=True)
+        s = await create_future(Request, "https://c.xkcd.com/random/comic", decode=True)
         search = "Image URL (for hotlinking/embedding): "
         s = s[s.index(search) + len(search):]
         url = s[:s.index("<")].strip()

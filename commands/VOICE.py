@@ -2244,7 +2244,7 @@ class AudioDownloader:
         fnv = f"cache/V{ts}~" + outf.translate(filetrans)
         args.append(fnv)
         print(args)
-        proc = psutil.Popen(args, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+        proc = psutil.Popen(args, stdin=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1048576)
         with open(afile, "wb") as afp:
             for t, url in enumerate(urls, ts + 1):
                 with tracebacksuppressor:
@@ -2278,7 +2278,7 @@ class AudioDownloader:
                     args.extend(("-f", "rawvideo", "-pix_fmt", "rgb24", "-"))
                     cfn = fut.result()[0]
                     print(args)
-                    pin = psutil.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+                    pin = psutil.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=1048576)
                     # Count amount of data for the raw video input, while piping to FFmpeg to encode
                     fsize = 0
                     while True:
@@ -2536,7 +2536,7 @@ class AudioDownloader:
             print(args)
             try:
                 if len(ast) > 1:
-                    proc = psutil.Popen(args, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+                    proc = psutil.Popen(args, stdin=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1048576)
                     for t, info in enumerate(ast, ts + 1):
                         cfn = None
                         if type(info) is not str:
@@ -4650,10 +4650,15 @@ class Download(Command):
         emb = discord.Embed(colour=rand_colour())
         emb.set_author(**get_author(user))
         emb.description = "\n".join(f"`【{i}】` [{escape_markdown(e['name'])}]({ensure_url(e['url'])})" for i, e in enumerate(res))
-        sent = await send_with_reply(channel, message, msg, embed=emb)
+        if getattr(message, "simulated", None):
+            sent = bot._globals["SimulatedMessage"](bot, msg, ts_us(), message.name, message.nick)
+            sent.embeds = [emb]
+            sent.edit = sent.send = message.send
+        else:
+            sent = await send_with_reply(channel, message, msg, embed=emb)
         if direct:
             # Automatically proceed to download and convert immediately
-            create_task(self._callback_(
+            await self._callback_(
                 message=sent,
                 guild=guild,
                 channel=channel,
@@ -4663,123 +4668,128 @@ class Download(Command):
                 vals=vals,
                 argv=url_enc,
                 user=user
-            ))
-        else:
-            # Add reaction numbers corresponding to search results for selection
-            for i in range(len(res)):
-                await sent.add_reaction(str(i) + as_str(b"\xef\xb8\x8f\xe2\x83\xa3"))
-        # await sent.add_reaction("❎")
+            )
+            return
+        # Add reaction numbers corresponding to search results for selection
+        for i in range(len(res)):
+            await sent.add_reaction(str(i) + as_str(b"\xef\xb8\x8f\xe2\x83\xa3"))
 
     async def _callback_(self, message, guild, channel, reaction, bot, perm, vals, argv, user, **void):
         if reaction is None or user.id == bot.id:
             return
         spl = vals.split("_")
         u_id = int(spl[0])
-        if user.id == u_id or not perm < 3:
-            # Make sure reaction is a valid number
-            if b"\xef\xb8\x8f\xe2\x83\xa3" in reaction:
-                with bot.ExceptionSender(channel):
-                    # Make sure selected index is valid
-                    num = int(as_str(reaction)[0])
-                    if num < int(spl[1]):
-                        # Reconstruct list of URLs from hidden encoded data
-                        data = literal_eval(as_str(b642bytes(argv, True)))
-                        url = data[num]
-                        # Perform all these tasks asynchronously to save time
-                        with discord.context_managers.Typing(channel):
-                            fmt = spl[2]
-                            try:
-                                if int(spl[3]):
-                                    auds = bot.data.audio.players[guild.id]
-                                else:
-                                    auds = None
-                            except LookupError:
-                                auds = None
-                            silenceremove = False
-                            try:
-                                if int(spl[6]):
-                                    silenceremove = True
-                            except IndexError:
-                                pass
-                            start = end = None
-                            if len(spl) >= 6:
-                                start, end = spl[4:6]
-                            if tuple(map(str, (start, end))) == ("None", "None") and not silenceremove and not auds and fmt in ("mp3", "opus", "ogg", "wav"):
-                                view = bot.webserver + "/ytdl?fmt=" + fmt + "&view=" + url
-                                download = bot.webserver + "/ytdl?fmt=" + fmt + "&download=" + url
-                                # content = view + "\n" + download
-                                # if message.guild and message.guild.get_member(bot.client.user.id).permissions_in(message.channel).manage_messages:
-                                #     create_task(message.clear_reactions())
-                                entries = await create_future(ytdl.search, url)
-                                if entries:
-                                    name = entries[0].get("name")
-                                else:
-                                    name = None
-                                name = name or url.rsplit("/", 1)[-1].rsplit(".", 1)[0]
-                                name = f"【{num}】{name}"
-                                try:
-                                    sem = EDIT_SEM[message.channel.id]
-                                except KeyError:
-                                    sem = EDIT_SEM[message.channel.id] = Semaphore(5.1, 256, rate_limit=5)
-                                async with sem:
-                                    return await Request(
-                                        f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
-                                        data=orjson.dumps(dict(
-                                            components=restructure_buttons([[
-                                                cdict(emoji="🔊", name=name, url=view),
-                                                cdict(emoji="📥", name=name, url=download),
-                                            ]]),
-                                        )),
-                                        method="PATCH",
-                                        headers={
-                                            "Content-Type": "application/json",
-                                            "Authorization": f"Bot {bot.token}",
-                                        },
-                                        bypass=False,
-                                        aio=True,
-                                    )
-                                # return create_task(message.channel.send(content))
-                            if len(data) <= 1:
-                                create_task(message.edit(
-                                    content=ini_md(f"Downloading and converting {sqr_md(ensure_url(url))}..."),
-                                    embed=None,
-                                ))
-                            else:
-                                message = await message.channel.send(
-                                    ini_md(f"Downloading and converting {sqr_md(ensure_url(url))}..."),
-                                )
-                            f, out = await create_future(
-                                ytdl.download_file,
-                                url,
-                                fmt=fmt,
-                                start=start,
-                                end=end,
-                                auds=auds,
-                                silenceremove=silenceremove,
+        if user.id != u_id and perm < 3:
+            return
+        # Make sure reaction is a valid number
+        if b"\xef\xb8\x8f\xe2\x83\xa3" not in reaction:
+            return
+        simulated = getattr(message, "simulated", None)
+        with bot.ExceptionSender(channel):
+            # Make sure selected index is valid
+            num = int(as_str(reaction)[0])
+            if num >= int(spl[1]):
+                return
+            # Reconstruct list of URLs from hidden encoded data
+            data = literal_eval(as_str(b642bytes(argv, True)))
+            url = data[num]
+            # Perform all these tasks asynchronously to save time
+            with discord.context_managers.Typing(channel):
+                fmt = spl[2]
+                try:
+                    if int(spl[3]):
+                        auds = bot.data.audio.players[guild.id]
+                    else:
+                        auds = None
+                except LookupError:
+                    auds = None
+                silenceremove = False
+                try:
+                    if int(spl[6]):
+                        silenceremove = True
+                except IndexError:
+                    pass
+                start = end = None
+                if len(spl) >= 6:
+                    start, end = spl[4:6]
+                if not simulated:
+                    if tuple(map(str, (start, end))) == ("None", "None") and not silenceremove and not auds and fmt in ("mp3", "opus", "ogg", "wav"):
+                        view = bot.webserver + "/ytdl?fmt=" + fmt + "&view=" + url
+                        download = bot.webserver + "/ytdl?fmt=" + fmt + "&download=" + url
+                        # content = view + "\n" + download
+                        # if message.guild and message.guild.get_member(bot.client.user.id).permissions_in(message.channel).manage_messages:
+                        #     create_task(message.clear_reactions())
+                        entries = await create_future(ytdl.search, url)
+                        if entries:
+                            name = entries[0].get("name")
+                        else:
+                            name = None
+                        name = name or url.rsplit("/", 1)[-1].rsplit(".", 1)[0]
+                        name = f"【{num}】{name}"
+                        try:
+                            sem = EDIT_SEM[message.channel.id]
+                        except KeyError:
+                            sem = EDIT_SEM[message.channel.id] = Semaphore(5.1, 256, rate_limit=5)
+                        async with sem:
+                            return await Request(
+                                f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
+                                data=orjson.dumps(dict(
+                                    components=restructure_buttons([[
+                                        cdict(emoji="🔊", name=name, url=view),
+                                        cdict(emoji="📥", name=name, url=download),
+                                    ]]),
+                                )),
+                                method="PATCH",
+                                headers={
+                                    "Content-Type": "application/json",
+                                    "Authorization": f"Bot {bot.token}",
+                                },
+                                bypass=False,
+                                aio=True,
                             )
-                            create_task(message.edit(
-                                content=css_md(f"Uploading {sqr_md(out)}..."),
-                                embed=None,
-                            ))
-                            create_task(channel.trigger_typing())
-                        reference = getattr(message, "reference", None)
-                        if reference:
-                            r_id = getattr(reference, "message_id", None) or getattr(reference, "id", None)
-                            reference = bot.cache.messages.get(r_id)
-                        resp = await bot.send_with_file(
-                            channel=channel,
-                            msg="",
-                            file=f,
-                            filename=out,
-                            rename=False,
-                            reference=reference,
+                    if len(data) <= 1:
+                        create_task(message.edit(
+                            content=ini_md(f"Downloading and converting {sqr_md(ensure_url(url))}..."),
+                            embed=None,
+                        ))
+                    else:
+                        message = await message.channel.send(
+                            ini_md(f"Downloading and converting {sqr_md(ensure_url(url))}..."),
                         )
-                        if resp.attachments and type(f) is str:
-                            try:
-                                os.remove(f)
-                            except:
-                                pass
-                        create_task(bot.silent_delete(message, no_log=True))
+                f, out = await create_future(
+                    ytdl.download_file,
+                    url,
+                    fmt=fmt,
+                    start=start,
+                    end=end,
+                    auds=auds,
+                    silenceremove=silenceremove,
+                )
+                if not simulated:
+                    create_task(message.edit(
+                        content=css_md(f"Uploading {sqr_md(out)}..."),
+                        embed=None,
+                    ))
+                    create_task(channel.trigger_typing())
+            reference = getattr(message, "reference", None)
+            if reference:
+                r_id = getattr(reference, "message_id", None) or getattr(reference, "id", None)
+                reference = bot.cache.messages.get(r_id)
+            resp = await bot.send_with_file(
+                channel=channel,
+                msg="",
+                file=f,
+                filename=out,
+                rename=False,
+                reference=reference,
+            )
+            if resp.attachments and type(f) is str:
+                try:
+                    os.remove(f)
+                except:
+                    pass
+            if not simulated:
+                create_task(bot.silent_delete(message, no_log=True))
 
 
 class UpdateAudio(Database):
