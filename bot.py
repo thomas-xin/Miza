@@ -1398,7 +1398,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 f = file
             else:
                 data  = file
-                file = CompatFile(io.BytesIO(data), filename)
+                file = CompatFile(data, filename)
                 fsize = len(data)
         if fsize <= size:
             if not hasattr(file, "fp"):
@@ -1498,36 +1498,39 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         self.cache.attachments[a_id] = a_id
 
     async def get_attachment(self, url, full=True, allow_proxy=False):
-        if is_discord_url(url) and "attachments/" in url[:64]:
-            with suppress(ValueError):
-                a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
-                with suppress(LookupError):
-                    for i in range(30):
-                        data = self.cache.attachments[a_id]
-                        if data is not None:
-                            if type(data) is not bytes:
-                                self.cache.attachments[a_id] = None
-                                try:
-                                    with open(f"cache/attachment_{data}.bin", "rb") as f:
-                                        data = await create_future(f.read)
-                                except FileNotFoundError:
-                                    if allow_proxy and is_image(url):
-                                        url = to_png(url)
-                                    if full:
-                                        data = await Request(url, aio=True)
-                                        await self.add_attachment(cdict(id=a_id), data=data)
-                                        return data
-                                    return await create_future(reqs.next().get, url, stream=True)
-                                else:
-                                    self.cache.attachments[a_id] = data
-                            print(f"Successfully loaded attachment {a_id} from cache.")
-                            return data
-                        if i:
-                            await asyncio.sleep(0.25 * i)
+        if not is_discord_url(url) or "attachments/" not in url[:64]:
+            return
+        with suppress(ValueError):
+            a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
+            with suppress(LookupError):
+                for i in range(30):
+                    data = self.cache.attachments[a_id]
+                    if data is not None:
+                        if not isinstance(data, bytes):
+                            self.cache.attachments[a_id] = None
+                            try:
+                                with open(f"cache/attachment_{data}.bin", "rb") as f:
+                                    data = await create_future(f.read)
+                            except FileNotFoundError:
+                                if allow_proxy and is_image(url):
+                                    url = to_png(url)
+                                data = await Request(url, aio=True)
+                                await self.add_attachment(cdict(id=a_id), data=data)
+                                return data
+                            else:
+                                self.cache.attachments[a_id] = data
+                        print(f"Successfully loaded attachment {a_id} from cache.")
+                        return data
+                    if i:
+                        await asyncio.sleep(0.25 * i)
+            if allow_proxy and is_image(url):
+                url = to_png(url)
+            if full:
                 data = await Request(url, aio=True)
                 await self.add_attachment(cdict(id=a_id), data=data)
                 return data
-        return None
+            return await create_future(reqs.next().get, url, stream=True)
+        return
 
     async def get_request(self, url, limit=None, full=True):
         fn = is_file(url)
@@ -3062,8 +3065,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                                             filemsg = "Response too long for message."
                                         else:
                                             filemsg = "Response data:"
-                                        b = io.BytesIO(response)
-                                        f = CompatFile(b, filename="message.txt")
+                                        f = CompatFile(response, filename="message.txt")
                                         sent = await self.send_with_file(channel, filemsg, f, reference=message)
                                 # Add targeted react if there is one
                                 if react and sent:

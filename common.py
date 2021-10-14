@@ -397,8 +397,7 @@ def bytes2zip(data, lzma=False):
     ctype = zipfile.ZIP_LZMA if lzma else zipfile.ZIP_DEFLATED
     with ZipFile(b, "w", compression=ctype, allowZip64=True) as z:
         z.writestr("DATA", data=data)
-    b.seek(0)
-    return b.read()
+    return b.getbuffer()
 
 
 # Safer than raw eval, more powerful than json.loads
@@ -2271,7 +2270,7 @@ class open2(io.IOBase):
 class CompatFile(discord.File):
 
     def __init__(self, fp, filename=None, spoiler=False):
-        if type(fp) is bytes:
+        if type(fp) in (bytes, memoryview):
             fp = io.BytesIO(fp)
         self.fp = self._fp = fp
         if isinstance(fp, io.IOBase):
@@ -2358,8 +2357,7 @@ class DownloadingFile(io.IOBase):
                     break
                 s += len(b)
                 i.write(b)
-            i.seek(0)
-            b = i.read()
+            b += i.getbuffer()
         return b
 
     def clear(self):
@@ -2439,24 +2437,28 @@ class seq(io.BufferedRandom, collections.abc.MutableSequence, contextlib.Abstrac
         if buffer_size:
             self.BUF = buffer_size
         self.closer = getattr(obj, "close", None)
+        self.high = 0
+        self.finished = False
         if isinstance(obj, io.IOBase):
             if isinstance(obj, io.BytesIO):
                 self.data = obj
+            elif hasattr(obj, "getbuffer"):
+                self.data = io.BytesIO(obj.getbuffer())
             else:
                 obj.seek(0)
                 self.data = io.BytesIO(obj.read())
                 obj.seek(0)
+            self.finished = True
         elif isinstance(obj, bytes) or isinstance(obj, bytearray) or isinstance(obj, memoryview):
             self.data = io.BytesIO(obj)
             self.high = len(obj)
+            self.finished = True
         elif isinstance(obj, collections.abc.Iterable):
             self.iter = iter(obj)
             self.data = io.BytesIO()
-            self.high = 0
         elif getattr(obj, "iter_content", None):
             self.iter = obj.iter_content(self.BUF)
             self.data = io.BytesIO()
-            self.high = 0
         else:
             raise TypeError(f"a bytes-like object is required, not '{type(obj)}'")
         self.filename = filename
@@ -2495,6 +2497,8 @@ class seq(io.BufferedRandom, collections.abc.MutableSequence, contextlib.Abstrac
         raise OSError
 
     def __getitem__(self, k):
+        if self.finished:
+            return self.data.getbuffer()[k]
         if type(k) is slice:
             out = io.BytesIO()
             start = k.start or 0
@@ -2515,13 +2519,13 @@ class seq(io.BufferedRandom, collections.abc.MutableSequence, contextlib.Abstrac
                     break
                 out.write(temp)
                 curr += self.BUF
-            out.seek(start % self.BUF)
-            if not is_finite(stop):
-                b = out.read()
-            else:
-                b = out.read(stop - start)
+            b = out.getbuffer()[start % self.BUF:]
+            if is_finite(stop):
+                b = b[:stop - start]
             if step != 1:
-                return b[::step]
+                b = b[::step]
+            if rev:
+                b = b[::-1]
             return b
         base = k // self.BUF
         with suppress(KeyError):
@@ -2562,33 +2566,56 @@ class seq(io.BufferedRandom, collections.abc.MutableSequence, contextlib.Abstrac
     __exit__ = lambda self, *args: self.close()
 
     def load(self, k):
+        if self.finished:
+            return self.data.getbuffer()[k:k + self.BUF]
         with suppress(KeyError):
             return self.buffer[k]
         seek = getattr(self.data, "seek", None)
         if seek:
             if self.iter is not None and k + self.BUF >= self.high:
                 seek(self.high)
-                with suppress(StopIteration):
+                try:
                     while k + self.BUF >= self.high:
                         temp = next(self.iter)
+                        if not temp:
+                            raise StopIteration
                         self.data.write(temp)
                         self.high += len(temp)
-            seek(k)
-            self.buffer[k] = self.data.read(self.BUF)
+                except StopIteration:
+                    self.data = io.BytesIO()
+                    for b in self.buffer.values():
+                        self.data.write(b)
+                    self.finished = True
+                    return self.data.getbuffer()[k:k + self.BUF]
+            b = self.data.getbuffer()[k:k + self.BUF]
+            if k in self.buffer:
+                self.buffer[k] += b
+            else:
+                self.buffer[k] = astype(b, bytes)
         else:
-            with suppress(StopIteration):
+            try:
                 while self.high < k:
                     temp = next(self.data)
                     if not temp:
-                        return b""
-                    self.buffer[self.high] = temp
+                        raise StopIteration
+                    if self.high in self.buffer:
+                        self.buffer[self.high] += temp
+                    else:
+                        self.buffer[self.high] = temp
                     self.high += self.BUF
+            except StopIteration:
+                self.data = io.BytesIO()
+                for b in self.buffer.values():
+                    self.data.write(b)
+                self.finished = True
+                return self.data.getbuffer()[k:k + self.BUF]
         return self.buffer.get(k, b"")
 
-    def clear(self):
-        self.buffer.clear()
-        self.data = io.BytesIO()
-        self.iter = iter(())
+    # def clear(self):
+    #     self.buffer.clear()
+    #     self.data = io.BytesIO()
+    #     self.iter = iter(())
+    #     self.high = 0
 
 class Stream(io.IOBase):
 

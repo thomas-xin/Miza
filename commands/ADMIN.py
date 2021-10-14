@@ -2438,8 +2438,6 @@ class UpdateMessageCache(Database):
             if os.path.exists(path):
                 return os.remove(path)
         out = data = pickle.dumps(saved)
-        # if len(data) > 32768:
-        #     out = bytes2zip(data)
         out = encrypt(out)
         safe_save(path, out)
         return len(saved)
@@ -2753,10 +2751,7 @@ class UpdateFileLogs(Database):
         colour = await self.bot.get_colour(message.author)
         emb = discord.Embed(colour=colour)
         emb.description = f"File{'s' if len(fils) + len(msg) != 1 else ''} deleted from {user_mention(message.author.id)}"
-        if not msg:
-            msg = None
-        else:
-            msg = "\n".join(msg)
+        msg = "\n".join(msg) if msg else None
         if len(fils) == 1:
             return await self.bot.send_with_file(channel, msg, embed=emb, file=fils[0])
         await channel.send(msg, embed=emb, files=fils)
