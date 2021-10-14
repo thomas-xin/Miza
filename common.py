@@ -2571,17 +2571,21 @@ class seq(io.BufferedRandom, collections.abc.MutableSequence, contextlib.Abstrac
         seek = getattr(self.data, "seek", None)
         if seek:
             if self.iter is not None and k + self.BUF >= self.high:
-                seek(self.high)
+                out = deque()
                 try:
                     while k + self.BUF >= self.high:
                         temp = next(self.iter)
                         if not temp:
                             raise StopIteration
-                        self.data.write(temp)
+                        out.append(temp)
                         self.high += len(temp)
                 except StopIteration:
+                    out.appendleft(self.data.getbuffer())
+                    self.data = io.BytesIO(b"".join(out))
                     self.finished = True
                     return self.data.getbuffer()[k:k + self.BUF]
+                out.appendleft(self.data.getbuffer())
+                self.data = io.BytesIO(b"".join(out))
             self.buffer[k] = b = self.data.getbuffer()[k:k + self.BUF]
             return b
         try:
