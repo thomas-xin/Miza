@@ -12,6 +12,7 @@ if not os.path.exists("auth.json") or not os.path.getsize("auth.json"):
         "owner_id": [],
         "google_api_key": "",
         "rapidapi_key": "",
+        "rapidapi_secret": "",
         "alexflipnote_key": "",
         "giphy_key": "",
     }

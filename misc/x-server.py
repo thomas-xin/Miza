@@ -13,6 +13,12 @@ except ModuleNotFoundError:
     exec(code, globals())
 
 
+try:
+    RAPIDAPI_SECRET = AUTH["rapidapi_secret"]
+except KeyError:
+    RAPIDAPI_SECRET = None
+
+
 HOST = "http://i.mizabot.xyz"
 PORT = AUTH.get("webserver_port", 80)
 IND = "\x7f"
@@ -1740,6 +1746,7 @@ body {
                 send(traceback.format_exc())
             time.sleep(60)
 
+    rapidapi = 0
     @cp.expose(("commands",))
     def command(self, content="", input="", timeout=420):
         ip = cp.request.remote.ip
@@ -1757,8 +1764,17 @@ body {
             ip = "255.255.255.255"
             tz = "Anonymous (DNT enabled)"
         else:
-            data = get_geo(ip)
-            tz = data["timezone"]
+            try:
+                secret = cp.request.headers["X-RapidAPI-Proxy-Secret"]
+                if secret != RAPIDAPI_SECRET:
+                    raise KeyError
+            except KeyError:
+                data = get_geo(ip)
+                tz = data["timezone"]
+            else:
+                ip = ".".join(str(xrand(256)) for _ in loop(4))
+                tz = "Anonymous (DNT enabled)"
+                self.rapidapi += 1
         if " " not in content:
             content += " "
         t = ts_us()
