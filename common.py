@@ -2350,6 +2350,7 @@ class DownloadingFile(io.IOBase):
         s = len(b)
         if s < size:
             buf = deque()
+            buf.append(b)
             while s < size:
                 time.sleep(2 / 3)
                 b = self._read(size - s)
@@ -2357,7 +2358,7 @@ class DownloadingFile(io.IOBase):
                     break
                 s += len(b)
                 buf.append(b)
-            b += b"".join(buf)
+            b = b"".join(buf)
         return b
 
     def clear(self):

@@ -736,14 +736,14 @@ class Server:
                     return True
                 return j["result"] is not False
 
-            f = DownloadingFile(fni, af=af)
             cp.response.headers["Accept-Ranges"] = "bytes"
             cp.response.headers.update(CHEADERS)
             cp.response.headers["Content-Disposition"] = "attachment; " * bool(d) + "filename=" + json.dumps(name + fmt)
             if af():
+                f = open(fni, "rb")
                 count = 1048576
-                cp.response.headers["Content-Length"] = os.path.getsize(fni)
             else:
+                f = DownloadingFile(fni, af=af)
                 if d:
                     cp.response.status = 202
                 count = 262144

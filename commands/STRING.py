@@ -1178,5 +1178,6 @@ class Urban(Command):
             fields.append(dict(
                 name=e.get("word", argv),
                 value=ini_md(e.get("definition", "")),
+                inline=False,
             ))
         self.bot.send_as_embeds(channel, title=title, fields=fields, author=get_author(user), reference=message)
