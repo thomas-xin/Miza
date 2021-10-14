@@ -1497,7 +1497,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         a_id = int(file.split(".", 1)[0][11:])
         self.cache.attachments[a_id] = a_id
 
-    async def get_attachment(self, url, full=True):
+    async def get_attachment(self, url, full=True, allow_proxy=False):
         if is_discord_url(url) and "attachments/" in url[:64]:
             with suppress(ValueError):
                 a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
@@ -1511,6 +1511,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                                     with open(f"cache/attachment_{data}.bin", "rb") as f:
                                         data = await create_future(f.read)
                                 except FileNotFoundError:
+                                    if allow_proxy and is_image(url):
+                                        url = to_png(url)
                                     if full:
                                         data = await Request(url, aio=True)
                                         await self.add_attachment(cdict(id=a_id), data=data)

@@ -316,7 +316,7 @@ def _predict_next(seq):
         return round_min(seq[-1] * b)
 
 def predict_next(seq, limit=8):
-    seq = np.fromiter(deque(astype(x, mpf) for x in seq), dtype=object)
+    seq = np.array(deque(astype(x, mpf) for x in seq), dtype=object)
     for i in range(min(5, limit), 1 + max(5, min(len(seq), limit))):
         temp = _predict_next(seq[-i:])
         if temp is not None:

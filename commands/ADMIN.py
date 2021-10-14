@@ -2551,41 +2551,45 @@ class UpdateMessageLogs(Database):
         print("Loading new messages completed.")
 
     async def _command_(self, message, **void):
-        if getattr(message, "slash", None):
-            guild = message.guild
-            if guild and guild.id in self.data:
-                c_id = self.data[guild.id]
-                try:
-                    channel = await self.bot.fetch_channel(c_id)
-                except (EOFError, discord.NotFound):
-                    self.data.pop(guild.id)
-                    return
-                emb = as_embed(message, link=True)
-                emb.colour = discord.Colour(0x00FFFF)
-                action = f"**Slash command executed in** {channel_mention(message.channel.id)}:\n"
-                emb.description = lim_str(action + (emb.description or ""), 4096)
-                self.bot.send_embeds(channel, emb)
+        if not getattr(message, "slash", None):
+            return
+        guild = message.guild
+        if guild.id not in self.data:
+            return
+        c_id = self.data[guild.id]
+        try:
+            channel = await self.bot.fetch_channel(c_id)
+        except (EOFError, discord.NotFound):
+            self.data.pop(guild.id)
+            return
+        emb = as_embed(message, link=True)
+        emb.colour = discord.Colour(0x00FFFF)
+        action = f"**Slash command executed in** {channel_mention(message.channel.id)}:\n"
+        emb.description = lim_str(action + (emb.description or ""), 4096)
+        self.bot.send_embeds(channel, emb)
 
     # Edit events are rather straightforward to log
     async def _edit_(self, before, after, **void):
-        if not after.author.bot:
-            guild = before.guild
-            if guild and guild.id in self.data:
-                c_id = self.data[guild.id]
-                try:
-                    channel = await self.bot.fetch_channel(c_id)
-                except (EOFError, discord.NotFound):
-                    self.data.pop(guild.id)
-                    return
-                emb = as_embed(after)
-                emb2 = await self.bot.as_embed(before)
-                emb.colour = discord.Colour(0x0000FF)
-                action = f"**Message edited in** {channel_mention(after.channel.id)}:\n[View Message](https://discord.com/channels/{guild.id}/{after.channel.id}/{after.id})"
-                emb.add_field(name="Before", value=lim_str(emb2.description, 1024))
-                emb.add_field(name="After", value=lim_str(emb.description, 1024))
-                emb.description = action
-                emb.timestamp = before.edited_at or after.created_at
-                self.bot.send_embeds(channel, emb)
+        if after.author.bot:
+            return
+        guild = before.guild
+        if guild.id not in self.data:
+            return
+        c_id = self.data[guild.id]
+        try:
+            channel = await self.bot.fetch_channel(c_id)
+        except (EOFError, discord.NotFound):
+            self.data.pop(guild.id)
+            return
+        emb = as_embed(after)
+        emb2 = await self.bot.as_embed(before)
+        emb.colour = discord.Colour(0x0000FF)
+        action = f"**Message edited in** {channel_mention(after.channel.id)}:\n[View Message](https://discord.com/channels/{guild.id}/{after.channel.id}/{after.id})"
+        emb.add_field(name="Before", value=lim_str(emb2.description, 1024))
+        emb.add_field(name="After", value=lim_str(emb.description, 1024))
+        emb.description = action
+        emb.timestamp = before.edited_at or after.created_at
+        self.bot.send_embeds(channel, emb)
 
     # Delete events must attempt to find the user who deleted the message
     async def _delete_(self, message, bulk=False, **void):
@@ -2593,128 +2597,130 @@ class UpdateMessageLogs(Database):
         if bulk:
             return
         guild = message.guild
-        if guild and guild.id in self.data:
-            c_id = self.data[guild.id]
-            try:
-                channel = await self.bot.fetch_channel(c_id)
-            except (EOFError, discord.NotFound):
-                self.data.pop(guild.id)
-                return
-            now = utc()
-            u = message.author
-            name_id = str(u)
-            url = await self.bot.get_proxy_url(u)
-            action = discord.AuditLogAction.message_delete
-            try:
-                t = u
+        if guild.id not in self.data:
+            return
+        c_id = self.data[guild.id]
+        try:
+            channel = await self.bot.fetch_channel(c_id)
+        except (EOFError, discord.NotFound):
+            self.data.pop(guild.id)
+            return
+        now = utc()
+        u = message.author
+        name_id = str(u)
+        url = await self.bot.get_proxy_url(u)
+        action = discord.AuditLogAction.message_delete
+        try:
+            t = u
+            init = user_mention(t.id)
+            d_level = self.bot.is_deleted(message)
+            if d_level:
+                if d_level > 1:
+                    if d_level < 3:
+                        pass
+                        # self.logDeleted(message)
+                    return
+                t = self.bot.user
                 init = user_mention(t.id)
-                d_level = self.bot.is_deleted(message)
-                if d_level:
-                    if d_level > 1:
-                        if d_level < 3:
-                            pass
-                            # self.logDeleted(message)
-                        return
-                    t = self.bot.user
-                    init = user_mention(t.id)
-                else:
-                    # Attempt to find who deleted the message
-                    if not guild.get_member(cu_id).guild_permissions.view_audit_log:
-                        raise PermissionError
-                    al = await guild.audit_logs(
-                        limit=5,
-                        action=action,
-                    ).flatten()
-                    for e in reversed(al):
-                        # This is because message delete events stack
-                        try:
-                            cnt = e.extra.count
-                        except AttributeError:
-                            cnt = int(e.extra.get("count", 1))
-                        h = e.created_at.timestamp()
-                        cs = set_dict(self.dc, h, 0)
-                        c = cnt - cs
-                        if c >= 1:
-                            if self.dc[h] == 0:
-                                self.dc[h] = cnt
-                            else:
-                                self.dc[h] += cnt
-                        s = (3, 3600)[c >= 1]
-                        cid = e.extra.channel.id
-                        if now - h < s:
-                            if (not e.target or e.target.id == u.id or u.id == self.bot.deleted_user) and cid == message.channel.id:
-                                t = e.user
-                                init = user_mention(t.id)
-                                message.author = e.target
-            except (PermissionError, discord.Forbidden, discord.HTTPException):
-                init = "[UNKNOWN USER]"
-            emb = await self.bot.as_embed(message, link=True)
-            emb.colour = discord.Colour(0xFF0000)
-            action = f"{init} **deleted message from** {channel_mention(message.channel.id)}:\n"
-            emb.description = lim_str(action + (emb.description or ""), 4096)
-            self.bot.send_embeds(channel, emb)
+            else:
+                # Attempt to find who deleted the message
+                if not guild.get_member(cu_id).guild_permissions.view_audit_log:
+                    raise PermissionError
+                al = await guild.audit_logs(
+                    limit=5,
+                    action=action,
+                ).flatten()
+                for e in reversed(al):
+                    # This is because message delete events stack
+                    try:
+                        cnt = e.extra.count
+                    except AttributeError:
+                        cnt = int(e.extra.get("count", 1))
+                    h = e.created_at.timestamp()
+                    cs = set_dict(self.dc, h, 0)
+                    c = cnt - cs
+                    if c >= 1:
+                        if self.dc[h] == 0:
+                            self.dc[h] = cnt
+                        else:
+                            self.dc[h] += cnt
+                    s = (3, 3600)[c >= 1]
+                    cid = e.extra.channel.id
+                    if now - h < s:
+                        if (not e.target or e.target.id == u.id or u.id == self.bot.deleted_user) and cid == message.channel.id:
+                            t = e.user
+                            init = user_mention(t.id)
+                            message.author = e.target
+        except (PermissionError, discord.Forbidden, discord.HTTPException):
+            init = "[UNKNOWN USER]"
+        emb = await self.bot.as_embed(message, link=True)
+        emb.colour = discord.Colour(0xFF0000)
+        action = f"{init} **deleted message from** {channel_mention(message.channel.id)}:\n"
+        emb.description = lim_str(action + (emb.description or ""), 4096)
+        self.bot.send_embeds(channel, emb)
 
     # Thanks to the embed sender feature, which allows this feature to send up to 10 logs in one message
     async def _bulk_delete_(self, messages, **void):
         cu = self.bot.user
         cu_id = cu.id
         guild = messages[0].guild
-        if guild.id in self.data:
-            c_id = self.data[guild.id]
-            try:
-                channel = await self.bot.fetch_channel(c_id)
-            except (EOFError, discord.NotFound):
-                self.data.pop(guild.id)
-                return
-            now = utc()
-            action = discord.AuditLogAction.message_bulk_delete
-            try:
-                init = "[UNKNOWN USER]"
-                if self.bot.is_deleted(messages[-1]):
-                    t = self.bot.user
-                    init = user_mention(t.id)
-                else:
-                    # Attempt to find who deleted the messages
-                    if not guild.get_member(cu_id).guild_permissions.view_audit_log:
-                        raise PermissionError
-                    al = await guild.audit_logs(
-                        limit=5,
-                        action=action,
-                    ).flatten()
-                    for e in reversed(al):
-                        # For some reason bulk message delete events stack too
-                        try:
-                            cnt = e.extra.count
-                        except AttributeError:
-                            cnt = int(e.extra.get("count", 1))
-                        h = e.created_at.timestamp()
-                        cs = set_dict(self.dc, h, 0)
-                        c = cnt - cs
-                        if c >= len(messages):
-                            if self.dc[h] == 0:
-                                self.dc[h] = cnt
-                            else:
-                                self.dc[h] += cnt
-                        s = (5, 3600)[c >= len(messages)]
-                        if now - h < s:
-                            if (not e.target or e.target.id == messages[-1].channel.id):
-                                t = e.user
-                                init = user_mention(t.id)
-            except (PermissionError, discord.Forbidden, discord.HTTPException):
-                init = "[UNKNOWN USER]"
-            emb = discord.Embed(colour=0xFF00FF)
-            emb.description = f"{init} **deleted {len(messages)} message{'s' if len(messages) != 1 else ''} from** {channel_mention(messages[-1].channel.id)}:\n"
-            # for message in messages:
-            #     nextline = f"\nhttps://discord.com/channels/{guild.id}/{message.channel.id}/{message.id}"
-            #     if len(emb.description) + len(nextline) > 2048:
-            #         break
-            #     emb.description += nextline
-            embs = deque((emb,))
-            for message in messages:
-                emb = await self.bot.as_embed(message, link=True)
-                emb.colour = discord.Colour(0x7F007F)
-                embs.append(emb)
-            self.bot.send_embeds(channel, embs)
+        if guild.id not in self.data:
+            return
+        c_id = self.data[guild.id]
+        try:
+            channel = await self.bot.fetch_channel(c_id)
+        except (EOFError, discord.NotFound):
+            self.data.pop(guild.id)
+            return
+        now = utc()
+        action = discord.AuditLogAction.message_bulk_delete
+        try:
+            init = "[UNKNOWN USER]"
+            if self.bot.is_deleted(messages[-1]):
+                t = self.bot.user
+                init = user_mention(t.id)
+            else:
+                # Attempt to find who deleted the messages
+                if not guild.get_member(cu_id).guild_permissions.view_audit_log:
+                    raise PermissionError
+                al = await guild.audit_logs(
+                    limit=5,
+                    action=action,
+                ).flatten()
+                for e in reversed(al):
+                    # For some reason bulk message delete events stack too
+                    try:
+                        cnt = e.extra.count
+                    except AttributeError:
+                        cnt = int(e.extra.get("count", 1))
+                    h = e.created_at.timestamp()
+                    cs = set_dict(self.dc, h, 0)
+                    c = cnt - cs
+                    if c >= len(messages):
+                        if self.dc[h] == 0:
+                            self.dc[h] = cnt
+                        else:
+                            self.dc[h] += cnt
+                    s = (5, 3600)[c >= len(messages)]
+                    if now - h < s:
+                        if (not e.target or e.target.id == messages[-1].channel.id):
+                            t = e.user
+                            init = user_mention(t.id)
+        except (PermissionError, discord.Forbidden, discord.HTTPException):
+            init = "[UNKNOWN USER]"
+        emb = discord.Embed(colour=0xFF00FF)
+        emb.description = f"{init} **deleted {len(messages)} message{'s' if len(messages) != 1 else ''} from** {channel_mention(messages[-1].channel.id)}:\n"
+        # for message in messages:
+        #     nextline = f"\nhttps://discord.com/channels/{guild.id}/{message.channel.id}/{message.id}"
+        #     if len(emb.description) + len(nextline) > 2048:
+        #         break
+        #     emb.description += nextline
+        embs = deque((emb,))
+        for message in messages:
+            emb = await self.bot.as_embed(message, link=True)
+            emb.colour = discord.Colour(0x7F007F)
+            embs.append(emb)
+        self.bot.send_embeds(channel, embs)
 
 
 class UpdateFileLogs(Database):
@@ -2723,51 +2729,60 @@ class UpdateFileLogs(Database):
     async def _delete_(self, message, **void):
         if self.bot.is_deleted(message) > 1:
             return
+        if not message.attachments:
+            return
         guild = message.guild
-        if guild.id in self.data:
-            c_id = self.data[guild.id]
-            if message.attachments:
-                try:
-                    channel = await self.bot.fetch_channel(c_id)
-                except (EOFError, discord.NotFound):
-                    self.data.pop(guild.id)
-                    return
-                # Attempt to recover files from their proxy URLs, otherwise send the original URLs
-                msg = deque()
-                fils = []
-                for a in message.attachments:
-                    try:
-                        b = await self.bot.get_attachment(a.url, full=False)
-                        fil = CompatFile(seq(b), filename=str(a).rsplit("/", 1)[-1])
-                        fils.append(fil)
-                    except:
-                        msg.append(proxy_url(a))
-                colour = await self.bot.get_colour(message.author)
-                emb = discord.Embed(colour=colour)
-                emb.description = f"File{'s' if len(fils) + len(msg) != 1 else ''} deleted from {user_mention(message.author.id)}"
-                if not msg:
-                    msg = None
-                else:
-                    msg = "\n".join(msg)
-                if len(fils) == 1:
-                    return await self.bot.send_with_file(channel, msg, embed=emb, file=fils[0])
-                await channel.send(msg, embed=emb, files=fils)
+        if guild.id not in self.data:
+            return
+        c_id = self.data[guild.id]
+        try:
+            channel = await self.bot.fetch_channel(c_id)
+        except (EOFError, discord.NotFound):
+            self.data.pop(guild.id)
+            return
+        # Attempt to recover files from their proxy URLs, otherwise send the original URLs
+        msg = deque()
+        fils = []
+        for a in message.attachments:
+            try:
+                b = await self.bot.get_attachment(a.url, full=False, allow_proxy=True)
+                fil = CompatFile(seq(b), filename=str(a).rsplit("/", 1)[-1])
+                fils.append(fil)
+            except:
+                msg.append(proxy_url(a))
+        colour = await self.bot.get_colour(message.author)
+        emb = discord.Embed(colour=colour)
+        emb.description = f"File{'s' if len(fils) + len(msg) != 1 else ''} deleted from {user_mention(message.author.id)}"
+        if not msg:
+            msg = None
+        else:
+            msg = "\n".join(msg)
+        if len(fils) == 1:
+            return await self.bot.send_with_file(channel, msg, embed=emb, file=fils[0])
+        await channel.send(msg, embed=emb, files=fils)
 
 
 class UpdatePublishers(Database):
     name = "publishers"
 
     async def _nocommand_(self, message, **void):
-        if message.channel.id in self.data and not message.flags.crossposted and not message.flags.is_crossposted and not message.reference and "\u2009\u2009" not in message.author.name:
-            try:
-                # if not message.channel.permissions_for(message.guild.me).manage_messages:
-                #     raise PermissionError("Manage messages permission missing from channel.")
-                await message.publish()
-            except Exception as ex:
-                if "invalid message type" not in repr(ex).lower():
-                    self.data.pop(message.channel.id, None)
-                    print_exc()
-                    self.bot.send_exception(message.channel, ex)
+        if message.channel.id not in self.data:
+            return
+        if message.flags.crossposted or message.flags.is_crossposted:
+            return
+        if message.reference:
+            return
+        if "\u2009\u2009" in message.author.name:
+            return
+        try:
+            # if not message.channel.permissions_for(message.guild.me).manage_messages:
+            #     raise PermissionError("Manage messages permission missing from channel.")
+            await message.publish()
+        except Exception as ex:
+            if "invalid message type" in repr(ex).lower():
+                return
+            print_exc()
+            self.bot.send_exception(message.channel, ex)
 
 
 class UpdateCrossposts(Database):
@@ -2798,117 +2813,98 @@ class UpdateCrossposts(Database):
                     self.stack.clear()
 
     async def _send_(self, message, **void):
-        if message.channel.id in self.data and not message.flags.is_crossposted and "\u2009\u2009" not in message.author.name:
-            with tracebacksuppressor:
-                content = message.content or message.system_content
-                embeds = deque()
-                for emb in message.embeds:
-                    embed = discord.Embed(
-                        description=emb.description,
-                        colour=emb.colour,
-                    )
-                    if emb.title:
-                        embed.title = emb.title
-                    if emb.url:
-                        embed.url = emb.url
-                    if emb.author:
-                        author = emb.author
-                        embed.set_author(name=author.name, url=author.url, icon_url=author.icon_url)
-                    if emb.image:
-                        image = emb.image.url
-                        embed.set_image(url=image)
-                    if emb.thumbnail:
-                        thumbnail = emb.thumbnail.url
-                        embed.set_thumbnail(url=thumbnail)
-                    if emb.footer:
-                        footer = eval(repr(emb.footer), dict(EmbedProxy=dict))
-                        embed.set_footer(**footer)
-                    if emb.timestamp:
-                        embed.timestamp = emb.timestamp
-                    for f in emb.fields:
-                        if f:
-                            embed.add_field(name=f.name, value=f.value, inline=getattr(f, "inline", True))
-                    embeds.append(embed)
-                files = deque()
-                for a in message.attachments:
-                    b = await self.bot.get_attachment(a.url, full=False)
-                    files.append(CompatFile(seq(b)))
-                for c_id in tuple(self.data[message.channel.id]):
-                    try:
-                        channel = await self.bot.fetch_channel(c_id)
-                    except:
-                        print_exc()
-                        self.data[message.channel.id].discard(c_id)
-                    name = message.guild.name + "\u2009\u2009#" + str(message.channel)
-                    url = best_url(message.guild)
-                    create_task(self.bot.send_as_webhook(channel, content, embeds=list(embeds), files=list(files), username=name, avatar_url=url))
+        if message.channel.id not in self.data:
+            return
+        if message.flags.is_crossposted:
+            return
+        if "\u2009\u2009" in message.author.name:
+            return
+        with tracebacksuppressor:
+            content = message.content or message.system_content
+            embeds = deque()
+            for emb in message.embeds:
+                embed = discord.Embed(
+                    description=emb.description,
+                    colour=emb.colour,
+                )
+                if emb.title:
+                    embed.title = emb.title
+                if emb.url:
+                    embed.url = emb.url
+                if emb.author:
+                    author = emb.author
+                    embed.set_author(name=author.name, url=author.url, icon_url=author.icon_url)
+                if emb.image:
+                    image = emb.image.url
+                    embed.set_image(url=image)
+                if emb.thumbnail:
+                    thumbnail = emb.thumbnail.url
+                    embed.set_thumbnail(url=thumbnail)
+                if emb.footer:
+                    footer = eval(repr(emb.footer), dict(EmbedProxy=dict))
+                    embed.set_footer(**footer)
+                if emb.timestamp:
+                    embed.timestamp = emb.timestamp
+                for f in emb.fields:
+                    if f:
+                        embed.add_field(name=f.name, value=f.value, inline=getattr(f, "inline", True))
+                embeds.append(embed)
+            files = deque()
+            for a in message.attachments:
+                b = await self.bot.get_attachment(a.url, full=False)
+                files.append(CompatFile(seq(b)))
+            for c_id in tuple(self.data[message.channel.id]):
+                try:
+                    channel = await self.bot.fetch_channel(c_id)
+                except:
+                    print_exc()
+                    self.data[message.channel.id].discard(c_id)
+                name = message.guild.name + "\u2009\u2009#" + str(message.channel)
+                url = best_url(message.guild)
+                create_task(self.bot.send_as_webhook(channel, content, embeds=list(embeds), files=list(files), username=name, avatar_url=url))
 
 
 class UpdateStarboards(Database):
     name = "starboards"
 
     async def _reaction_add_(self, message, react, **void):
-        if message.guild and message.guild.id in self.data and message.channel.id != self.data[message.guild.id].get(react, (message.channel.id,))[-1]:
-            table = self.data[message.guild.id]
-            req = table[react][0]
-            if req < inf:
-                count = sum(r.count for r in message.reactions if str(r.emoji) == react)
-                if count <= 1:
-                    message = await message.channel.fetch_message(message.id)
-                    self.bot.add_message(message, files=False, force=True)
-                    count = sum(r.count for r in message.reactions if str(r.emoji) == react)
-                if message.id not in table.setdefault(None, {}):
-                    if count >= req and count < req + 2:
-                        embed = await self.bot.as_embed(message, link=True, colour=True)
-                        text, link = embed.description.rsplit("\n\n", 1)
-                        description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in sorted(message.reactions, key=lambda r: -r.count) if str(r.emoji) in table) + "   " + link
-                        embed.description = lim_str(description, 4096)
-                        try:
-                            channel = await self.bot.fetch_channel(table[react][1])
-                            m = await channel.send(embed=embed)
-                        except (discord.NotFound, discord.Forbidden):
-                            table.pop(react)
-                        else:
-                            table[None][message.id] = m.id
-                            with tracebacksuppressor(RuntimeError, KeyError):
-                                while len(table[None]) > 16384:
-                                    table[None].pop(next(iter(table[None])))
-                            self.update(message.guild.id)
-                else:
-                    try:
-                        channel = await self.bot.fetch_channel(table[react][1])
-                        m = await self.bot.fetch_message(table[None][message.id], channel)
-                        embed = await self.bot.as_embed(message, link=True, colour=True)
-                        text, link = embed.description.rsplit("\n\n", 1)
-                        description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in sorted(message.reactions, key=lambda r: -r.count) if str(r.emoji) in table) + "   " + link
-                        embed.description = lim_str(description, 4096)
-                        await m.edit(content=None, embed=embed)
-                    except (discord.NotFound, discord.Forbidden):
-                        table[None].pop(message.id, None)
-                    else:
-                        table[None][message.id] = m.id
-                        with tracebacksuppressor(RuntimeError, KeyError):
-                            while len(table[None]) > 16384:
-                                table[None].pop(next(iter(table[None])))
-                        self.update(message.guild.id)
-
-    async def _edit_(self, after, **void):
-        message = after
-        try:
-            table = self.data[message.guild.id]
-        except KeyError:
+        if not message.guild or message.guild.id not in self.data:
             return
-        if message.id in table.setdefault(None, {}):
+        if message.channel.id == self.data[message.guild.id].get(react, (message.channel.id,))[-1]:
+            return
+        table = self.data[message.guild.id]
+        req = table[react][0]
+        if not req < inf:
+            return
+        count = sum(r.count for r in message.reactions if str(r.emoji) == react)
+        if count <= 1:
+            message = await message.channel.fetch_message(message.id)
+            self.bot.add_message(message, files=False, force=True)
+            count = sum(r.count for r in message.reactions if str(r.emoji) == react)
+        if message.id not in table.setdefault(None, {}):
+            if count >= req and count < req + 2:
+                embed = await self.bot.as_embed(message, link=True, colour=True)
+                text, link = embed.description.rsplit("\n\n", 1)
+                description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in sorted(message.reactions, key=lambda r: -r.count) if str(r.emoji) in table) + "   " + link
+                embed.description = lim_str(description, 4096)
+                try:
+                    channel = await self.bot.fetch_channel(table[react][1])
+                    m = await channel.send(embed=embed)
+                except (discord.NotFound, discord.Forbidden):
+                    table.pop(react)
+                else:
+                    table[None][message.id] = m.id
+                    with tracebacksuppressor(RuntimeError, KeyError):
+                        while len(table[None]) > 16384:
+                            table[None].pop(next(iter(table[None])))
+                    self.update(message.guild.id)
+        else:
             try:
-                reacts = sorted(map(str, message.reactions), key=lambda r: -r.count)
-                if not reacts:
-                    return
-                react = reacts[0]
                 channel = await self.bot.fetch_channel(table[react][1])
                 m = await self.bot.fetch_message(table[None][message.id], channel)
                 embed = await self.bot.as_embed(message, link=True, colour=True)
                 text, link = embed.description.rsplit("\n\n", 1)
-                description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in reacts if str(r.emoji) in table) + "   " + link
+                description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in sorted(message.reactions, key=lambda r: -r.count) if str(r.emoji) in table) + "   " + link
                 embed.description = lim_str(description, 4096)
                 await m.edit(content=None, embed=embed)
             except (discord.NotFound, discord.Forbidden):
@@ -2919,6 +2915,35 @@ class UpdateStarboards(Database):
                     while len(table[None]) > 16384:
                         table[None].pop(next(iter(table[None])))
                 self.update(message.guild.id)
+
+    async def _edit_(self, after, **void):
+        message = after
+        try:
+            table = self.data[message.guild.id]
+        except KeyError:
+            return
+        if message.id not in table.get(None, {}):
+            return
+        try:
+            reacts = sorted(map(str, message.reactions), key=lambda r: -r.count)
+            if not reacts:
+                return
+            react = reacts[0]
+            channel = await self.bot.fetch_channel(table[react][1])
+            m = await self.bot.fetch_message(table[None][message.id], channel)
+            embed = await self.bot.as_embed(message, link=True, colour=True)
+            text, link = embed.description.rsplit("\n\n", 1)
+            description = text + "\n\n" + " ".join(f"{r.emoji} {r.count}" for r in reacts if str(r.emoji) in table) + "   " + link
+            embed.description = lim_str(description, 4096)
+            await m.edit(content=None, embed=embed)
+        except (discord.NotFound, discord.Forbidden):
+            table[None].pop(message.id, None)
+        else:
+            table[None][message.id] = m.id
+            with tracebacksuppressor(RuntimeError, KeyError):
+                while len(table[None]) > 16384:
+                    table[None].pop(next(iter(table[None])))
+            self.update(message.guild.id)
 
 
 class UpdateRolegivers(Database):
@@ -2934,28 +2959,29 @@ class UpdateRolegivers(Database):
             return
         assigned = self.data.get(message.channel.id, ())
         for k in assigned:
-            if ((k in text) if is_alphanumeric(k) else (k in message.content.casefold())):
-                al = assigned[k]
-                for r in al[0]:
-                    try:
-                        role = await bot.fetch_role(r, guild)
-                        if role is None:
-                            raise LookupError
-                    except LookupError:
-                        al[0].remove(r)
-                        bot.data.rolegivers.update(message.channel.id)
-                        continue
-                    if role in user.roles:
-                        continue
-                    with bot.ExceptionSender(message.channel):
-                        await user.add_roles(
-                            role,
-                            reason=f'Keyword "{k}" found in message "{message.content}".',
-                            atomic=True,
-                        )
-                        print(f"RoleGiver: Granted {role} to {user} in {guild}.")
-                if alist[1]:
-                    await bot.silent_delete(message)
+            if not ((k in text) if is_alphanumeric(k) else (k in message.content.casefold())):
+                continue
+            al = assigned[k]
+            for r in al[0]:
+                try:
+                    role = await bot.fetch_role(r, guild)
+                    if role is None:
+                        raise LookupError
+                except LookupError:
+                    al[0].remove(r)
+                    bot.data.rolegivers.update(message.channel.id)
+                    continue
+                if role in user.roles:
+                    continue
+                with bot.ExceptionSender(message.channel):
+                    await user.add_roles(
+                        role,
+                        reason=f'Keyword "{k}" found in message "{message.content}".',
+                        atomic=True,
+                    )
+                    print(f"RoleGiver: Granted {role} to {user} in {guild}.")
+            if alist[1]:
+                await bot.silent_delete(message)
 
 
 class UpdateAutoRoles(Database):
