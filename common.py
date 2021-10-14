@@ -2349,15 +2349,15 @@ class DownloadingFile(io.IOBase):
         b = self._read(size)
         s = len(b)
         if s < size:
-            i = io.BytesIO(b)
+            buf = deque()
             while s < size:
                 time.sleep(2 / 3)
                 b = self._read(size - s)
                 if not b and self.af():
                     break
                 s += len(b)
-                i.write(b)
-            b += i.getbuffer()
+                buf.append(b)
+            b += b"".join(buf)
         return b
 
     def clear(self):
@@ -2500,26 +2500,24 @@ class seq(io.BufferedRandom, collections.abc.MutableSequence, contextlib.Abstrac
         if self.finished:
             return self.data.getbuffer()[k]
         if type(k) is slice:
-            out = io.BytesIO()
             start = k.start or 0
             stop = k.stop or inf
             step = k.step or 1
-            if step < 0:
+            rev = step < 0
+            if rev:
                 start, stop, step = stop + 1, start + 1, -step
-                rev = True
-            else:
-                rev = False
             curr = start // self.BUF * self.BUF
-            offs = start % self.BUF
-            out.write(self.load(curr))
+            out = deque()
+            out.append(self.load(curr))
             curr += self.BUF
             while curr < stop:
                 temp = self.load(curr)
                 if not temp:
                     break
-                out.write(temp)
+                out.append(temp)
                 curr += self.BUF
-            b = out.getbuffer()[start % self.BUF:]
+            b = memoryview(b"".join(out))
+            b = b[start % self.BUF:]
             if is_finite(stop):
                 b = b[:stop - start]
             if step != 1:
@@ -2582,40 +2580,26 @@ class seq(io.BufferedRandom, collections.abc.MutableSequence, contextlib.Abstrac
                         self.data.write(temp)
                         self.high += len(temp)
                 except StopIteration:
-                    self.data = io.BytesIO()
-                    for b in self.buffer.values():
-                        self.data.write(b)
                     self.finished = True
                     return self.data.getbuffer()[k:k + self.BUF]
-            b = self.data.getbuffer()[k:k + self.BUF]
-            if k in self.buffer:
-                self.buffer[k] += b
-            else:
-                self.buffer[k] = astype(b, bytes)
-        else:
-            try:
-                while self.high < k:
-                    temp = next(self.data)
-                    if not temp:
-                        raise StopIteration
-                    if self.high in self.buffer:
-                        self.buffer[self.high] += temp
-                    else:
-                        self.buffer[self.high] = temp
-                    self.high += self.BUF
-            except StopIteration:
-                self.data = io.BytesIO()
-                for b in self.buffer.values():
-                    self.data.write(b)
-                self.finished = True
-                return self.data.getbuffer()[k:k + self.BUF]
+            self.buffer[k] = b = self.data.getbuffer()[k:k + self.BUF]
+            return b
+        try:
+            while self.high < k:
+                temp = next(self.data)
+                if not temp:
+                    raise StopIteration
+                if self.high in self.buffer:
+                    self.buffer[self.high] += temp
+                else:
+                    self.buffer[self.high] = temp
+                self.high += self.BUF
+        except StopIteration:
+            self.data = io.BytesIO(b"".join(self.buffer.values()))
+            self.finished = True
+            return self.data.getbuffer()[k:k + self.BUF]
         return self.buffer.get(k, b"")
 
-    # def clear(self):
-    #     self.buffer.clear()
-    #     self.data = io.BytesIO()
-    #     self.iter = iter(())
-    #     self.high = 0
 
 class Stream(io.IOBase):
 

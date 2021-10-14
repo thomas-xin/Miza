@@ -503,7 +503,7 @@ class CustomAudio(collections.abc.Hashable):
     def announce(self, *args, aio=False, dump=False, **kwargs):
         if self.queue and dump and (len(self.queue) > 1 or self.queue[0].get("skips") != ()):
             resp, fn = self.get_dump(js=True)
-            f = CompatFile(io.BytesIO(resp), filename=fn)
+            f = CompatFile(resp, filename=fn)
         else:
             f = None
         if aio:
@@ -3475,7 +3475,7 @@ class Dump(Command):
             async with discord.context_managers.Typing(channel):
                 x = "x" in flags
                 resp, fn = await create_future(auds.get_dump, x, paused=x, js=True, timeout=18)
-                f = CompatFile(io.BytesIO(resp), filename=fn)
+                f = CompatFile(resp, filename=fn)
             create_task(bot.send_with_file(channel, f"Queue data for {bold(str(guild))}:", f, reference=message))
             return
         if not is_alone(auds, user) and perm < 1:

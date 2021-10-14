@@ -441,7 +441,7 @@ class Server:
                     else:
                         cp.response.headers["Content-Type"] = get_mime(p)
                         f = open(p, "rb")
-                return cp.lib.file_generator(f, 65536)
+                return cp.lib.file_generator(f, 262144)
             elif endpoint.startswith("a") and mime.split("/", 1)[0] in "video":
                 f_url = cp.url(qs=cp.request.query_string).replace(f"/{endpoint}/", "/f/")
                 i_url = f_url.replace("/f/", "/i/") + ".gif"
@@ -523,7 +523,7 @@ class Server:
                                 return b
                             f = resp.raw
                             # f = ForwardedRequest(resp, 98304)
-                            return cp.lib.file_generator(f, 65536)
+                            return cp.lib.file_generator(f, 262144)
             return cp.lib.static.serve_file(p, content_type=mime, disposition="attachment" if download else None)
     files._cp_config = {"response.stream": True}
 
@@ -746,7 +746,7 @@ class Server:
             else:
                 if d:
                     cp.response.status = 202
-                count = 65536
+                count = 262144
             cp.response.headers["Content-Type"] = f"audio/{fmt[1:]}"
             return cp.lib.file_generator(f, count)
         else:
