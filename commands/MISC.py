@@ -28,29 +28,21 @@ class DouClub:
         # This string search algorithm could be better
         output = []
         query = query.casefold()
-        for l in self.data:
-            found = True
-            qlist = set(query.split())
-            for q in qlist:
-                tag = False
-                for k in l:
-                    i = str(l[k])
-                    if q in i.casefold():
-                        tag = True
-                        break
-                if not tag:
-                    found = False
-                    break
-            if found:
-                output.append({
-                    "author": l["Author"]["identifierdata[0]['title'"],
-                    "name": l["Title"],
-                    "description": l["Description"],
-                    "url": (
-                        "https://doukutsuclub.knack.com/database#search-database/mod-details/"
-                        + l["id"] + "/"
-                    ),
-                })
+        qlist = set(query.split())
+        for res in self.data:
+            author = res["Author"][0]["identifier"]
+            name = res["Title"]
+            description = res["Description"]
+            s = (name, description, author)
+            if not all(any(q in v for v in s) for q in qlist):
+                continue
+            url = f"https://doukutsuclub.knack.com/database#search-database/mod-details/{res['id']}"
+            output.append({
+                "author": author,
+                "name": name,
+                "description": description,
+                "url": url,
+            })
         return output
 
 try:
@@ -64,11 +56,12 @@ except KeyError:
 
 
 async def searchForums(query):
-    url = (
-        "https://www.cavestory.org/forums/search/1/?q=" + query.replace(" ", "+")
-        + "&t=post&c[child_nodes]=1&c[nodes][0]=33&o=date&g=1"
-    )
-    s = await Request(url, aio=True, timeout=16, decode=True)
+    try:
+        _session = globals()["-session"]
+    except KeyError:
+        _session = globals()["-session"] = aiohttp.ClientSession(connector=aiohttp.TCPConnector(verify_ssl=False))
+    url = f"https://forum.cavestory.org/search/320966/?q={url_parse(query)}"
+    s = await Request(url, aio=True, timeout=16, session=_session, decode=True)
     output = []
     i = 0
     while i < len(s):
@@ -81,10 +74,10 @@ async def searchForums(query):
         j = s.index('">')
         curr = {"author": s[:j]}
         s = s[s.index('<h3 class="contentRow-title">'):]
-        search = '<a href="/forums/'
+        search = '<a href="/'
         s = s[s.index(search) + len(search):]
         j = s.index('">')
-        curr["url"] = 'https://www.cavestory.org/forums/' + s[:j]
+        curr["url"] = 'https://www.cavestory.org/forums/' + s[:j].lstrip("/")
         s = s[j + 2:]
         j = s.index('</a>')
         curr["name"] = s[:j]
@@ -93,7 +86,7 @@ async def searchForums(query):
         j = s.index('</div>')
         curr["description"] = s[:j]
         for elem in curr:
-            temp = curr[elem].replace('<em class="textHighlight">', "").replace('</em>', "")
+            temp = curr[elem].replace('<em class="textHighlight">', "**").replace("</em>", "**")
             temp = html_decode(temp)
             curr[elem] = temp
         output.append(curr)
@@ -395,34 +388,22 @@ class CS_mod(Command):
     no_parse = True
     rate_limit = (3, 7)
 
-    async def __call__(self, args, **void):
+    async def __call__(self, channel, user, args, **void):
         argv = " ".join(args)
+        fut = create_future(douclub.search, argv, timeout=8)
         data = await searchForums(argv)
-        data += await create_future(douclub.search, argv, timeout=8)
-        # Sends multiple messages up to 20000 characters total
-        if len(data):
-            response = f"Search results for `{argv}`:\n"
-            for l in data:
-                line = (
-                    "\n<" + str(l["url"]) + ">\n"
-                    + "```css\nName: [" + no_md(l["name"])
-                    + "]\nAuthor: [" + no_md(l["author"].strip(" "))
-                    + "]\n" + lim_str(l["description"].replace("\n", " "), 128)
-                    + "```\r"
-                )
-                response += line
-            if len(response) < 20000 and len(response) > 1900:
-                output = response.split("\r")
-                response = []
-                curr = ""
-                for line in output:
-                    if len(curr) + len(line) > 1900:
-                        response.append(curr)
-                        curr = line
-                    else:
-                        curr += line
-            return response
-        raise LookupError(f"No results for {argv}.")
+        data += await fut
+        if not data:
+            raise LookupError(f"No results for {argv}.")
+        description = f"Search results for `{argv}`:\n"
+        fields = deque()
+        for res in data:
+            fields.append(dict(
+                name=res["name"],
+                value=res["url"] + "\n" + lim_str(res["description"], 128).replace("\n", " ") + f"\n> {res['author']}",
+                inline=False,
+            ))
+        self.bot.send_as_embeds(channel, description=description, fields=fields, author=get_author(user))
 
 
 class CS_Database(Database):
