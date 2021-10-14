@@ -50,18 +50,14 @@ try:
 except KeyError:
     douclub = cdict(
         search=lambda *void1, **void2: exec('raise FileNotFoundError("Unable to search Doukutsu Club.")'),
-        update=lambda: None
+        update=lambda: None,
+        pull=lambda: None,
     )
-    print("WARNING: knack_id/knack_secret not found. Unable to search Doukutsu Club.")
 
 
 async def searchForums(query):
-    try:
-        _session = globals()["-session"]
-    except KeyError:
-        _session = globals()["-session"] = aiohttp.ClientSession(connector=aiohttp.TCPConnector(verify_ssl=False))
     url = f"https://forum.cavestory.org/search/320966/?q={url_parse(query)}"
-    s = await Request(url, aio=True, timeout=16, session=_session, decode=True)
+    s = await Request(url, aio=True, timeout=16, ssl=False, decode=True)
     output = []
     i = 0
     while i < len(s):

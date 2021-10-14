@@ -2647,6 +2647,7 @@ class Stream(io.IOBase):
 # Manages both sync and async get requests.
 class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, collections.abc.Callable):
 
+    nossl = aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False))
     session = None
     semaphore = Semaphore(512, 256, delay=0.25)
 
@@ -2663,11 +2664,11 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
         self.sessions = alist(aiohttp.ClientSession(loop=eloop) for i in range(6))
         self.session = choice(self.sessions)
 
-    async def aio_call(self, url, headers, files, data, method, decode=False, json=False, session=None):
+    async def aio_call(self, url, headers, files, data, method, decode=False, json=False, session=None, ssl=True):
         if files is not None:
             raise NotImplementedError("Unable to send multipart files asynchronously.")
         async with self.semaphore:
-            req = session or self.sessions.next()
+            req = session or (self.sessions.next() if ssl else self.nossl)
             async with getattr(req, method)(url, headers=headers, data=data) as resp:
                 if BOT[0]:
                     BOT[0].activity += 1
@@ -2681,7 +2682,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
                     return as_str(data)
                 return data
 
-    def __call__(self, url, headers={}, files=None, data=None, raw=False, timeout=8, method="get", decode=False, json=False, bypass=True, aio=False, session=None):
+    def __call__(self, url, headers={}, files=None, data=None, raw=False, timeout=8, method="get", decode=False, json=False, bypass=True, aio=False, session=None, ssl=True):
         if bypass:
             if "user-agent" not in headers and "User-Agent" not in headers:
                 headers["User-Agent"] = f"Mozilla/5.{xrand(1, 10)}"
@@ -2689,7 +2690,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
             headers["DNT"] = "1"
         method = method.casefold()
         if aio:
-            return create_task(asyncio.wait_for(self.aio_call(url, headers, files, data, method, decode, json, session), timeout=timeout))
+            return create_task(asyncio.wait_for(self.aio_call(url, headers, files, data, method, decode, json, session, ssl), timeout=timeout))
         with self.semaphore:
             if session:
                 req = session

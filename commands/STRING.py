@@ -1,51 +1,6 @@
 print = PRINT
 
-import pygoogletranslation
 
-
-# This is a bit of a mess
-class PapagoTrans:
-
-    def __init__(self, c_id, c_sec):
-        self.id = c_id
-        self.secret = c_sec
-
-    def translate(self, string, dest, src="en"):
-        if dest == src:
-            raise ValueError("Source language is the same as destination.")
-        url = "https://openapi.naver.com/v1/papago/n2mt"
-        enc = verify_url(string)
-        url += "?source=" + src + "&target=" + dest + "&text=" + enc
-        headers = {
-            "X-Naver-Client-Id": self.id,
-            "X-Naver-Client-Secret": self.secret,
-        }
-        print(url, headers)
-        resp = Request(url, headers=headers, timeout=16)
-        r = orjson.loads(resp)
-        t = r["message"]["result"]["translatedText"]
-        output = cdict(text=t)
-        return output
-
-
-LANGS = {}
-def get_languages():
-    global LANGS
-    languages = translator.glanguage()
-    LANGS = fcdict((v.split("(", 1)[0].rstrip("( )").casefold(), k) for k, v in languages["sl"].items())
-
-
-translator = pygoogletranslation.Translator(retry=3, sleep=5)
-create_future_ex(get_languages)
-translators = {"Google Translate": translator}
-
-try:
-    translators["Papago"] = PapagoTrans(AUTH["papago_id"], AUTH["papago_secret"])
-except KeyError:
-    translators["Papago"] = cdict(
-        translate=lambda *void1, **void2: exec('raise FileNotFoundError("Unable to use Papago Translate.")'),
-    )
-    print("WARNING: papago_id/papago_secret not found. Unable to use Papago Translate.")
 try:
     rapidapi_key = AUTH["rapidapi_key"]
     if not rapidapi_key:
@@ -55,69 +10,26 @@ except:
     print("WARNING: rapidapi_key not found. Unable to search Urban Dictionary.")
 
 
-def getTranslate(translator, string, dest, src):
-    if src:
-        resp = translator.translate(string, dest=dest, src=src)
-    else:
-        resp = translator.translate(string, dest=dest)
-    return resp
+# class Translate(Command):
+#     time_consuming = True
+#     name = ["TR"]
+#     description = "Translates a string into another language."
+#     usage = "<0:language> <1:string>"
+#     flags = "v"
+#     no_parse = True
+#     rate_limit = (2, 7)
+#     slash = True
+#     header = {
+#         "accept-encoding": "application/gzip",
+#         "x-rapidapi-host": "google-translate1.p.rapidapi.com",
+#         "x-rapidapi-key": rapidapi_key,
+#     }
 
-
-class Translate(Command):
-    time_consuming = True
-    name = ["TR"]
-    description = "Translates a string into another language."
-    usage = "<0:language> <1:string> <verbose{?v}>?"
-    flags = "v"
-    no_parse = True
-    rate_limit = (2, 7)
-    slash = True
-
-    async def __call__(self, channel, args, argv, flags, user, message, **void):
-        if not args:
-            raise ArgumentError("Input string is empty.")
-        dest = args[0]
-        string = argv[len(dest):].strip()
-        with suppress(KeyError):
-            dest = LANGS[dest]
-        with discord.context_managers.Typing(channel):
-            source = None
-            trans = ["Papago", "Google Translate"]
-            used = None
-            response = ""
-            count = ("v" in flags) + 1
-            # Attempt to use all available translators if possible
-            with suppress(StopIteration):
-                for i in range(count):
-                    for t in trans:
-                        print(string, dest, source)
-                        resp = await create_future(getTranslate, translators[t], string, dest, source, timeout=20)
-                        try:
-                            output = resp.text
-                        except AttributeError:
-                            output = resp
-                        with suppress(AttributeError):
-                            source = resp.src
-                        if not used:
-                            used = t
-                        response += f"\n{output}"
-                        if source and source.casefold() != "auto":
-                            source, dest = dest, source
-                        else:
-                            flags.pop("v", None)
-                            raise StopIteration
-                        break
-            if "v" in flags:
-                end = f"Detected language: {dest}"
-            else:
-                end = None
-            if end:
-                footer = dict(text=f"{used}\n{end}")
-            elif used:
-                footer = dict(text=used)
-            else:
-                footer = None
-        self.bot.send_as_embeds(channel, response, author=get_author(user), footer=footer, reference=message)
+#     async def __call__(self, channel, argv, user, message, **void):
+#         if not args:
+#             raise ArgumentError("Input string is empty.")
+#         url = f"https://google-translate1.p.rapidapi.com/language/translate/v2?q={url_parse(argv"
+#         self.bot.send_as_embeds(channel, response, author=get_author(user), footer=footer, reference=message)
 
 
 class Math(Command):
@@ -1237,47 +1149,34 @@ class Topic(Command):
 
 class Urban(Command):
     time_consuming = True
-    header = {
-	"x-rapidapi-host": "mashape-community-urban-dictionary.p.rapidapi.com",
-	"x-rapidapi-key": rapidapi_key,
-    }
     name = ["📖", "UrbanDictionary"]
     description = "Searches Urban Dictionary for an item."
-    usage = "<string> <verbose{?v}>*"
+    usage = "<string>"
     flags = "v"
     rate_limit = (2, 8)
     typing = True
     slash = True
+    header = {
+        "accept-encoding": "application/gzip",
+        "x-rapidapi-host": "mashape-community-urban-dictionary.p.rapidapi.com",
+        "x-rapidapi-key": rapidapi_key,
+    }
 
-    async def __call__(self, channel, argv, flags, _timeout, **void):
-        url = (
-            "https://mashape-community-urban-dictionary.p.rapidapi.com/define?term="
-            + argv.replace(" ", "%20")
+    async def __call__(self, channel, user, argv, message, **void):
+        url = f"https://mashape-community-urban-dictionary.p.rapidapi.com/define?term={url_parse(argv)}"
+        d = await Request(url, headers=self.header, timeout=12, json=True, aio=True)
+        resp = d["list"]
+        if not resp:
+            raise LookupError(f"No results for {argv}.")
+        resp.sort(
+            key=lambda e: scale_ratio(e.get("thumbs_up", 0), e.get("thumbs_down", 0)),
+            reverse=True,
         )
-        with discord.context_managers.Typing(channel):
-            d = await Request(url, headers=self.header, timeout=_timeout, json=True, aio=True)
-            l = d["list"]
-            if not l:
-                raise LookupError(f"No results for {argv}.")
-            l.sort(
-                key=lambda e: scale_ratio(e.get("thumbs_up", 0), e.get("thumbs_down", 0)),
-                reverse=True,
-            )
-            if "v" in flags:
-                output = (
-                    "```ini\n[" + no_md(argv) + "]\n"
-                    + clr_md("\n".join(
-                        "[" + str(i + 1) + "] " + l[i].get(
-                            "definition", "",
-                        ).replace("\n", " ").replace("\r", "") for i in range(
-                            min(len(l), 1 + 2 * flags["v"])
-                        )
-                    )).replace("#", "♯")
-                    + "```"
-                )
-            else:
-                output = (
-                    "```ini\n[" + no_md(argv) + "]\n"
-                    + clr_md(l[0].get("definition", "")).replace("#", "♯") + "```"
-                )
-        return output
+        title = argv
+        fields = deque()
+        for e in resp:
+            fields.append(dict(
+                name=e.get("word", argv),
+                value=ini_md(e.get("definition", "")),
+            ))
+        self.bot.send_as_embeds(channel, title=title, fields=fields, author=get_author(user), reference=message)
