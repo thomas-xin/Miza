@@ -938,7 +938,7 @@ def _predict_next(seq):
         return round_min(seq[-1] * b)
 
 def predict_next(seq, limit=8):
-    seq = np.fromiter((astype(x, mpf) for x in seq), dtype=object)
+    seq = np.fromiter(deque(astype(x, mpf) for x in seq), dtype=object)
     for i in range(min(5, limit), 1 + max(5, min(len(seq), limit))):
         temp = _predict_next(seq[-i:])
         if temp is not None:
@@ -957,8 +957,9 @@ def supersample(a, size):
         dtype = a.dtype
     except AttributeError:
         dtype = object
+    ftype = np.float64 if dtype is object or issubclass(dtype.type, np.integer) else dtype
     x = ceil(n / size)
-    interp = np.linspace(0, n - 1, x * size)
+    interp = np.linspace(0, n - 1, x * size, dtype=ftype)
     a = np.interp(interp, range(n), a)
     return np.mean(a.reshape(-1, x), 1, dtype=dtype)
 

@@ -1013,7 +1013,7 @@ class Barter(Command):
                 seeds = await create_future(rand.integers, 0, len(barter_seeding), size=count, dtype=itype)
                 ids = barter_seeding[seeds]
                 counts = await create_future(rand.integers, barter_lowers[ids], barter_uppers[ids], dtype=itype)
-                counts = counts.astype(np.ftype)
+                counts = counts.astype(ftype)
                 await create_future(np.add.at, totals, ids, counts)
             mult, amount = divmod(amount, 268435456)
             if not is_finite(amount):
@@ -1026,7 +1026,7 @@ class Barter(Command):
             seeds = await create_future(rand.integers, 0, len(barter_seeding), size=count, dtype=itype)
             ids = barter_seeding[seeds]
             counts = await create_future(rand.integers, barter_lowers[ids], barter_uppers[ids], dtype=itype)
-            counts = counts.astype(np.ftype)
+            counts = counts.astype(ftype)
             await create_future(np.add.at, totals, ids, counts)
         rewards = deque()
         data.setdefault("minecraft", {})

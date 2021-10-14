@@ -784,7 +784,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 break
         if member is None:
             raise LookupError("Unable to find member data.")
-        self.cache.members[u_id] = member
+        if find_others:
+            self.cache.members[u_id] = member
         self.limit_cache("members")
         return member
 
@@ -1721,6 +1722,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     def update_subs(self):
         self.sub_guilds = dict(self._guilds) or self.sub_guilds
         self.sub_channels = dict(chain.from_iterable(guild._channels.items() for guild in self.sub_guilds.values())) or self.sub_channels
+        for guild in self.guilds:
+            if len(guild._members) != guild.member_count:
+                print("Incorrect member count:", guild, len(guild._members), guild.member_count)
+                create_task(self.load_guild(guild))
 
     # Gets the target bot prefix for the target guild, return the default one if none exists.
     def get_prefix(self, guild):
@@ -3183,6 +3188,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             guild._members.update(members)
             i = len(memberdata)
             x = max(members)
+        guild._member_count = len(guild._members)
+
+    async def load_guild(guild):
+        await choice(self._connection.chunk_guild, self.load_guild_http)(guild)
+        guild._member_count = len(guild._members)
+        return guild
 
     async def load_guilds(self):
         funcs = [self._connection.chunk_guild, self.load_guild_http]
@@ -4698,7 +4709,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     if guild.unavailable:
                         print(f"Warning: Guild {guild.id} is not available.")
                 await self.handle_update()
-            self.connect_ready.set_result(True)
+            try:
+                self.connect_ready.set_result(True)
+            except concurrent.futures.InvalidStateError:
+                pass
 
         # Server join message
         @self.event
@@ -5107,6 +5121,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         async def on_member_join(member):
             name = str(member)
             self.usernames[name] = self.cache.users[member.id]
+            if member.guild.id in self._guilds:
+                member.guild._member_count = len(member.guild._members)
             await self.send_event("_join_", user=member, guild=member.guild)
             await self.seen(member, member.guild, event="misc", raw=f"Joining a server")
 
@@ -5116,6 +5132,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if member.id not in self.cache.members:
                 name = str(member)
                 self.usernames.pop(name, None)
+            if member.guild.id in self._guilds:
+                member.guild._member_count = len(member.guild._members)
             await self.send_event("_leave_", user=member, guild=member.guild)
 
         # Channel create event: calls _channel_create_ bot database event.
