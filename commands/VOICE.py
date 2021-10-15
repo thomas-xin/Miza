@@ -2132,13 +2132,16 @@ class AudioDownloader:
                 entry["file"] = f
                 # Assign file duration estimate to queue entry
                 # This could be done better, this current implementation is technically not thread-safe
-                if f.loaded:
-                    entry["duration"] = f.duration()
-                else:
-                    f.assign.append(entry)
-                # Touch file to indicate usage
-                f.ensure_time()
-                f.readable.result(timeout=16)
+                try:
+                    if f.loaded:
+                        entry["duration"] = f.duration()
+                    else:
+                        f.assign.append(entry)
+                    # Touch file to indicate usage
+                    f.ensure_time()
+                    f.readable.result(timeout=16)
+                except KeyError:
+                    f = None
             if f or (not force and not download):
                 return f
         # "none" indicates stream is currently loading
