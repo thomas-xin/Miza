@@ -695,7 +695,8 @@ class Server:
         v = d or kwargs.get("v") or kwargs.get("view")
         q = d or v or kwargs.get("q") or kwargs.get("query") or kwargs.get("s") or kwargs.get("search")
         if not q:
-            raise EOFError
+            cp.response.status = 204
+            return
         t = ts_us()
         while t in RESPONSES:
             t += 1
