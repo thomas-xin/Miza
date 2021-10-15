@@ -2554,20 +2554,37 @@ def ImageOpIterator(image, step, operation, ts, args):
             temp = image
         func = getattr(temp, operation, None)
         if func is None:
-            res = eval(operation)(temp, *args)
+            func = operation if callable(operation) else eval(operation)
+            res = func(temp, *args)
         else:
             res = func(*args)
         yield res
 
+def ImageIterator(image):
+    for i in range(2147483648):
+        try:
+            image.seek(i)
+        except EOFError:
+            break
+        yield image
+
 
 class ImageSequence(Image.Image):
 
-    def __init__(self, *images, copy=False):
-        if copy:
+    def __init__(self, *images, copy=False, func=None, args=()):
+        if len(images) == 1:
+            images = ImageIterator(images[0])
+            if not func and not copy:
+                copy = True
+        if func:
+            self._images = [func(image, *args) for image in images]
+        elif copy:
             self._images = [image.copy() for image in images]
         else:
             self._images = images
         self._position = 0
+
+    __len__ = lambda self: len(self._images)
 
     def seek(self, position):
         if position >= len(self._images):
@@ -2642,7 +2659,8 @@ def evalImg(url, operation, args):
                 fmt = "gif"
             if fmt == "gif" and np.prod(image.size) > 262144:
                 size = max_size(*image.size, 512)
-                image = resize_to(image, *size)
+                if size != image.size:
+                    image = ImageSequence(image, func=resize_to, args=size)
             new = eval(operation)(image, *args)
         else:
             try:
