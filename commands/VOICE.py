@@ -3783,7 +3783,7 @@ class Jump(Command):
 
 class Shuffle(Command):
     server_only = True
-    name = ["🔀"]
+    name = ["🔀", "Scramble"]
     min_display = "0~1"
     description = "Shuffles the audio queue."
     usage = "<force_full_shuffle{?f}|hide{?h}>*"
