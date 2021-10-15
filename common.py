@@ -2648,8 +2648,6 @@ class Stream(io.IOBase):
 # Manages both sync and async get requests.
 class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, collections.abc.Callable):
 
-    nossl = aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False))
-    session = None
     semaphore = Semaphore(512, 256, delay=0.25)
 
     @classmethod
@@ -2663,7 +2661,11 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 
     async def _init_(self):
         self.sessions = alist(aiohttp.ClientSession(loop=eloop) for i in range(6))
-        self.session = choice(self.sessions)
+        self.nossl = aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False))
+
+    @property
+    def session(self):
+        return choice(self.sessions)
 
     async def aio_call(self, url, headers, files, data, method, decode=False, json=False, session=None, ssl=True):
         if files is not None:

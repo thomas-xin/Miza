@@ -35,7 +35,7 @@ except:
 class Math(Command):
     _timeout_ = 4
     name = ["🔢", "M", "PY", "Sympy", "Plot", "Calc"]
-    alias = name + ["Plot3d"]
+    alias = name + ["Plot3D", "Factor", "Factorise", "Factorize"]
     description = "Evaluates a math formula."
     usage = "<string> <verbose{?v}>? <rationalize{?r}>? <show_variables{?l}>? <clear_variables{?c}>?"
     flags = "rvlcd"
@@ -56,7 +56,7 @@ class Math(Command):
         r = "r" in flags
         p = flags.get("v", 0) * 2 + 1 << 7
         var = None
-        if "plot" in name and not argv.lower().startswith("plot"):
+        if "plot" in name and not argv.lower().startswith("plot") or "factor" in name:
             argv = f"{name}({argv})"
         elif name.startswith("m"):
             for equals in ("=", ":="):

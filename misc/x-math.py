@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
-import sympy, mpmath, math, time, os, sys, subprocess, traceback, random, collections, psutil, concurrent.futures, pickle, ast, re
+import sympy, mpmath, math, time, os, sys, subprocess, psutil, traceback, random
+import collections, itertools, pickle, ast, re
 import sympy.stats
 import numpy as np
 import sympy.parsing.sympy_parser as parser
@@ -382,6 +383,7 @@ def gcd(*nums):
     return nums[0]
 
 if os.name == "nt":
+    _fcache = {}
     def _factorint(n, **kwargs):
         try:
             s = str(n)
@@ -391,6 +393,10 @@ if os.name == "nt":
                 raise ValueError
         except (TypeError, ValueError):
             return sympy.factorint(n, **kwargs)
+        try:
+            return _fcache[s]
+        except KeyError:
+            pass
         args = ["misc/ecm.exe", s]
         proc = subprocess.run(args, stdout=subprocess.PIPE)
         data = proc.stdout.decode("utf-8", "replace").replace(" ", "")
@@ -418,16 +424,14 @@ if os.name == "nt":
             else:
                 k, v = factor, 1
             factors[int(k)] = int(v)
+        _fcache[s] = factors
         return factors
 else:
     _factorint = sympy.factorint
 
 def factorize(*args, **kwargs):
     temp = _factorint(*args, **kwargs)
-    output = []
-    for k in sorted(temp):
-        output.extend([k] * temp[k])
-    return output
+    return list(itertools.chain(*((k,) * v for k, v in sorted(temp.items()))))
 
 def sort(*args):
     if len(args) != 1:
@@ -919,8 +923,8 @@ if __name__ == "__main__":
                     c.kill()
                 p.kill()
             time.sleep(12)
-    import concurrent.futures.thread
-    concurrent.futures.thread.threading.Thread(target=ensure_parent, daemon=True).start()
+    import threading
+    threading.Thread(target=ensure_parent, daemon=True).start()
     while True:
         argv = sys.stdin.readline().rstrip()
         if argv:
