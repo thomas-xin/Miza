@@ -1428,6 +1428,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 else:
                     ext = None
                 urls = await create_future(as_file, file if getattr(file, "_fp", None) else f, filename=filename, ext=ext, rename=rename)
+                if hasattr(channel, "simulated"):
+                    urls = (urls[1],)
                 message = await channel.send((msg + ("" if msg.endswith("```") else "\n") + urls[0]).strip(), embed=embed, reference=reference) #, embed=discord.Embed(colour=discord.Colour(1)).set_image(url=urls[-1]))
             else:
                 message = await channel.send(msg, embed=embed, file=file, reference=reference)
