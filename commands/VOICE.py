@@ -1188,11 +1188,11 @@ class AudioClientSubInterface:
                 self.auds.play(self.auds.source, self.auds.pos)
                 s2 = self.bot.audio.submit(f"AP.from_guild({self.guild.id}).queue[0][0].af.stream")
             if s1 != s2:
-                print(f"{guild} ({guild.id}): ACSI stream mismatch! Attempting fix...")
+                print(f"{self.guild} ({self.guild.id}): ACSI stream mismatch! Attempting fix...")
                 if self.auds.next and s2 == self.auds.next.stream:
                     self.auds.queue.advance()
                 else:
-                    print(f"{guild} ({guild.id}): Unable to find safe position, resetting ACSI queue...")
+                    print(f"{self.guild} ({self.guild.id}): Unable to find safe position, resetting ACSI queue...")
                     self.clear()
                     self.auds.play(self.auds.source, self.auds.pos)
                     if not self.auds.next:
