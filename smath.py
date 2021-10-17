@@ -157,13 +157,13 @@ def try_int(i):
     except:
         return i
 
-np = numpy.force()
+array = numpy.array
+np = numpy
 exec(compile(b, "collections2.py", "exec"), globals())
 try:
     np.float80 = np.longdouble
 except AttributeError:
     np.float80 = np.float64
-array = np.array
 deque = collections.deque
 
 ts_us = lambda: time.time_ns() // 1000
