@@ -388,15 +388,15 @@ def decrypt(s):
 def zip2bytes(data):
     if not hasattr(data, "read"):
         data = io.BytesIO(data)
-    with ZipFile(data, allowZip64=True, strict_timestamps=False) as z:
-        b = z.read("DATA")
+    with zipfile.ZipFile(data, allowZip64=True, strict_timestamps=False) as z:
+        b = z.read(z.namelist()[0])
     return b
 
 def bytes2zip(data, lzma=False):
     b = io.BytesIO()
     ctype = zipfile.ZIP_LZMA if lzma else zipfile.ZIP_DEFLATED
     with ZipFile(b, "w", compression=ctype, allowZip64=True) as z:
-        z.writestr("DATA", data=data)
+        z.writestr("D", data=data)
     return b.getbuffer()
 
 
@@ -436,11 +436,12 @@ def select_and_loads(s, mode="safe", size=None):
             print(f"Loading zip file of size {len(s)}...")
         b.seek(0)
         with ZipFile(b, allowZip64=True, strict_timestamps=False) as z:
+            n = z.namelist()[0]
             if size:
-                x = z.getinfo("DATA").file_size
+                x = z.getinfo(n).file_size
                 if size < x:
                     raise OverflowError(f"Data input size too large ({x} > {size}).")
-            s = z.read("DATA")
+            s = z.read(n)
     data = None
     with tracebacksuppressor:
         if s[0] == 128:

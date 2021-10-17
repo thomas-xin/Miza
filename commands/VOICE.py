@@ -296,6 +296,7 @@ lyric_trans = re.compile(
 class CustomAudio(collections.abc.Hashable):
 
     # Default player settings
+    max_bitrate = 229376
     defaults = {
         "volume": 1,
         "reverb": 0,
@@ -306,7 +307,7 @@ class CustomAudio(collections.abc.Hashable):
         "compressor": 0,
         "chorus": 0,
         "resample": 0,
-        "bitrate": 1966.08,
+        "bitrate": max_bitrate / 100,
         "loop": False,
         "repeat": False,
         "shuffle": False,
@@ -584,6 +585,8 @@ class CustomAudio(collections.abc.Hashable):
                 self.fut.set_exception(ex)
         self.queue._init_(auds=self)
         self.timeout = utc()
+        if channel:
+            self.max_bitrate = channel.bitrate
         return self.acsi
 
     def speak(self):
@@ -1068,7 +1071,9 @@ class AudioFileLink:
         if auds is not None:
             if auds.paused or abs(auds.stats.speed) < 0.005:
                 return
-            ident = cdict(stats=auds.stats, args=[], guild_id=auds.guild.id)
+            stats = cdict(auds.stats)
+            stats.max_bitrate = auds.max_bitrate
+            ident = cdict(stats=stats, args=[], guild_id=auds.guild.id)
             options=auds.construct_options(full=self.live)
         else:
             ident = None
@@ -2350,7 +2355,7 @@ class AudioDownloader:
         # Add the audio to the rendered video, without re-encoding the entire frames
         args = ["ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y"]
         args.extend(("-i", fnv, "-f", "s16le", "-ac", "2", "-ar", str(SAMPLE_RATE), "-i", afile))
-        args.extend(("-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-b:a", "192k", fn))
+        args.extend(("-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-b:a", "224k", fn))
         print(args)
         subprocess.run(args, stderr=subprocess.PIPE)
         with suppress():
@@ -2522,7 +2527,7 @@ class AudioDownloader:
                 if w != w2 or h != h2:
                     vf += f",pad=width={w2}:height={h2}:x=-1:y=-1:color=black"
                 args.extend(("-vf", vf))
-            br = 196608
+            br = CustomAudio.max_bitrate
             if auds and br > auds.stats.bitrate:
                 br = max(4096, auds.stats.bitrate)
             sr = str(SAMPLE_RATE)
@@ -3206,7 +3211,7 @@ class Connect(Command):
             if guild.id in bot.data.audio.players:
                 br = round(bot.data.audio.players[guild.id].stats.bitrate * 100)
             else:
-                br = 196608
+                br = CustomAudio.max_bitrate
             if vc_.type is discord.ChannelType.stage_voice:
                 bitrate = min(br, 64000)
             else:
@@ -3722,8 +3727,8 @@ class AudioSettings(Command):
                     bot.data.audiosettings.update(guild.id)
             else:
                 if op == "bitrate":
-                    if val > 1966.08:
-                        raise PermissionError("Maximum allowed bitrate is 196608.")
+                    if val > CustomAudio.max_bitrate:
+                        raise PermissionError(f"Maximum allowed bitrate is {CustomAudio.max_bitrate}.")
                     elif val < 5.12:
                         raise ValueError("Bitrate must be equal to or above 512.")
                 elif op == "speed":

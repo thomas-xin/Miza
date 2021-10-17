@@ -2994,11 +2994,11 @@ class UpdateAutoRoles(Database):
         assigned = self.data[guild.id]
         for rolelist in assigned:
             with tracebacksuppressor:
-                r = rolelist.next() if hasattr(rolelist, "next") else choice(rolelist)
+                r = choice(rolelist)
                 role = await self.bot.fetch_role(r, guild)
                 roles.append(role)
-                if len(rolelist) > 1 and hasattr(rolelist, "next"):
-                    self.update(guild.id)
+                # if len(rolelist) > 1 and hasattr(rolelist, "next"):
+                #     self.update(guild.id)
         # Attempt to add all roles in one API call
         try:
             await user.add_roles(*roles, reason="AutoRole", atomic=False)
