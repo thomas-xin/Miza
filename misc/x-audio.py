@@ -541,7 +541,7 @@ class AudioFile:
                 if not self.live:
                     retry(os.remove, "cache/" + self.file, attempts=8, delay=5, exc=(FileNotFoundError,))
                 # File is removed from cache data
-                request(f"VOICE.ytdl.cache.pop({repr(self.file)}, None)")
+                request(f"VOICE.ytdl.cache.pop({repr(self.file)},None)")
                 ytdl.cache.pop(self.file, None)
                 # print(self.file, "deleted.")
 
