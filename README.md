@@ -179,9 +179,13 @@ With that concludes the basic introduction of hosting Miza. The code is commente
 
 [Read our Wiki!](https://github.com/thomas-xin/Miza/wiki) • [Join our Discord Support Server!](https://discord.gg/cbKQKAr) • [Check out our Website!](http://mizabot.xyz)
 
-*The domain redirects to a webserver which includes: a command tester within the comforts of your browser, documentation on the API, a free file host, and more!*
+*The domain redirects to a webserver which includes: a command tester within the comforts of your browser, a free file host, and more!*
 
 
+<a id="API"></a>
+## API
+
+Miza has a public API that has now been moved to [RapidAPI](https://rapidapi.com/thomas-xin/api/miza). Currently not all endpoints and possible features in the API are accessible from there, but it will be updated over time.
 
 
 <a id="Credits"></a>
