@@ -44,97 +44,95 @@ def _adjust_thread_count(self):
 
 concurrent.futures.ThreadPoolExecutor._adjust_thread_count = lambda self: _adjust_thread_count(self)
 
-class MultiThreadedImporter(contextlib.AbstractContextManager, contextlib.ContextDecorator):
+import_exc = concurrent.futures.ThreadPoolExecutor(max_workers=12)
 
-    """A context manager that enables concurrent imports."""
+class MultiAutoImporter:
 
-    closed = False
-    exc = None
+    class ImportedModule:
 
-    def __init__(self, glob=None):
-        self.glob = glob
-        self.exc = concurrent.futures.ThreadPoolExecutor(max_workers=12)
-        self.out = {}
+        def __init__(self, module, pool, _globals):
+            object.__setattr__(self, "__module", module)
+            object.__setattr__(self, "__fut", pool.submit(__import__, module))
+            object.__setattr__(self, "__globals", _globals)
 
-    def __enter__(self):
-        return self
+        def __getattr__(self, k):
+            m = self.force()
+            return getattr(m, k)
 
-    def __import__(self, *modules):
-        self.closed = False
-        if self.exc:
-            for module in modules:
-                self.out[module] = self.exc.submit(__import__, module)
+        def __setattr__(self, k, v):
+            m = self.force()
+            return setattr(m, k, v)
+
+        def force(self):
+            module = object.__getattribute__(self, "__module")
+            _globals = object.__getattribute__(self, "__globals")
+            _globals[module] = m = object.__getattribute__(self, "__fut").result()
+            return m
+
+    def __init__(self, *args, pool=None, _globals=None):
+        self.pool = pool
+        if not _globals:
+            _globals = globals()
+        args = " ".join(args).replace(",", " ").split()
+        if not pool:
+            _globals.update((k, __import__(k)) for k in args)
         else:
-            glob = self.glob if self.glob is not None else globals()
-            for module in modules:
-                glob[module] = __import__(module)
+            futs = []
+            for arg in args:
+                futs.append(self.ImportedModule(arg, pool, _globals))
+            _globals.update(zip(args, futs))
 
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.close()
-        if exc_type and exc_value:
-            raise exc_value
+MultiAutoImporter(
+    "sys",
+    "collections",
+    "time",
+    "requests",
+    "traceback",
+    "numpy",
+    "sympy",
+    "dateutil",
+    "datetime",
+    "colormath",
+    "pytz",
+    "ast",
+    "copy",
+    "pickle",
+    "io",
+    "random",
+    "math",
+    "cmath",
+    "fractions",
+    "mpmath",
+    "shlex",
+    "colorsys",
+    "re",
+    "hashlib",
+    "base64",
+    "itertools",
+    pool=import_exc,
+    _globals=globals(),
+)
+collections2f = "misc/collections2.py"
 
-    def close(self, shutdown=True):
-        if not self.closed:
-            for k in tuple(self.out):
-                self.out[k] = self.out[k].result()
-            glob = self.glob if self.glob is not None else globals()
-            glob.update(self.out)
-            self.closed = True
-        if shutdown and self.exc:
-            self.exc.shutdown(True)
-
-with MultiThreadedImporter() as importer:
-    importer.__import__(
-        "sys",
-        "collections",
-        "traceback",
-        "time",
-        "datetime",
-        "pytz",
-        "ast",
-        "copy",
-        "pickle",
-        "io",
-        "random",
-        "math",
-        "cmath",
-        "fractions",
-        "mpmath",
-        "sympy",
-        "shlex",
-        "numpy",
-        "colorsys",
-        "re",
-        "hashlib",
-        "base64",
-        "dateutil",
-        "itertools",
-        "colormath",
-        "requests",
-    )
-
-    importer.close(shutdown=False)
-
-    collections2f = "misc/collections2.py"
-
-    def update_collections2():
-        with requests.get("https://raw.githubusercontent.com/thomas-xin/Python-Extra-Classes/main/full.py") as resp:
-            b = resp.content
-        with open(collections2f, "wb") as f:
-            f.write(b)
-        exec(compile(b, "collections2.py", "exec"), globals())
-        print("collections2.py updated.")
-
-    if not os.path.exists(collections2f):
-        update_collections2()
-    with open(collections2f, "rb") as f:
-        b = f.read()
+def update_collections2():
+    with requests.get("https://raw.githubusercontent.com/thomas-xin/Python-Extra-Classes/main/full.py") as resp:
+        b = resp.content
+    with open(collections2f, "wb") as f:
+        f.write(b)
     exec(compile(b, "collections2.py", "exec"), globals())
-    if time.time() - os.path.getmtime(collections2f) > 3600:
-        importer.exc.submit(update_collections2)
+    print("collections2.py updated.")
+
+if not os.path.exists(collections2f):
+    update_collections2()
+with open(collections2f, "rb") as f:
+    b = f.read()
+if time.time() - os.path.getmtime(collections2f) > 3600:
+    import_exc.submit(update_collections2)
 
 
+dateutil.force()
+sympy.force()
+colormath.force()
 from dateutil import parser as tparser
 from sympy.parsing.sympy_parser import parse_expr
 from colormath import color_objects, color_conversions
@@ -159,7 +157,8 @@ def try_int(i):
     except:
         return i
 
-np = numpy
+np = numpy.force()
+exec(compile(b, "collections2.py", "exec"), globals())
 try:
     np.float80 = np.longdouble
 except AttributeError:
@@ -463,10 +462,13 @@ def round(x, y=None):
 
 # Rounds a number to the nearest integer, with a probability determined by the fractional part.
 def round_random(x):
-    y = int(x)
+    try:
+        y = int(x)
+    except (ValueError, TypeError):
+        return x
     if y == x:
         return y
-    x %= 1
+    x -= y
     if random.random() <= x:
         y += 1
     return y

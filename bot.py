@@ -3159,7 +3159,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     output = await glob["_"]()
                     glob["_"] = _
             if code is not None:
-                output = await create_future(eval, code, glob, priority=True)
+                try:
+                    output = await create_future(eval, code, glob, priority=True)
+                except:
+                    print(proc)
+                    raise
             if type(output) in (deque, alist):
                 output = list(output)
             if output is not None:

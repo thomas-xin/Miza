@@ -409,7 +409,7 @@ class AudioFile:
                 with Delay(0.1):
                     if not self.proc.is_running():
                         err = as_str(self.proc.stderr.read())
-                        if check_fmt:
+                        if check_fmt is not None:
                             if self.webpage_url and ("Server returned 5XX Server Error reply" in err or "Server returned 404 Not Found" in err or "Server returned 403 Forbidden" in err):
                                 print(err)
                                 with tracebacksuppressor:
@@ -418,12 +418,12 @@ class AudioFile:
                                     else:
                                         new_stream = request(f"VOICE.get_best_audio(VOICE.ytdl.extract_backup({repr(self.webpage_url)}))")
                                     if new_stream:
-                                        return self.load(eval_json(new_stream), check_fmt=False, force=True)
+                                        return self.load(eval_json(new_stream), check_fmt=None, force=True)
                             new = None
                             with suppress(ValueError):
                                 new = request(f"VOICE.select_and_convert({repr(stream)})")
                             if new not in (None, "null"):
-                                return self.load(eval_json(new), check_fmt=False, force=True)
+                                return self.load(eval_json(new), check_fmt=None, force=True)
                         print(self.proc.args)
                         if err:
                             ex = RuntimeError(err)

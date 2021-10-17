@@ -1,25 +1,25 @@
 import smath
 from smath import *
 
-with MultiThreadedImporter(globals()) as importer:
-    importer.__import__(
-        # "importlib",
-        "inspect",
-        "tracemalloc",
-        "psutil",
-        "subprocess",
-        "asyncio",
-        "discord",
-        "json",
-        "orjson",
-        "aiohttp",
-        "threading",
-        "urllib",
-        "zipfile",
-        "nacl",
-        "shutil",
-        "filetype",
-    )
+MultiAutoImporter(
+    "psutil",
+    "subprocess",
+    "tracemalloc",
+    "zipfile",
+    "urllib",
+    "nacl",
+    "discord",
+    "asyncio",
+    "json",
+    "orjson",
+    "aiohttp",
+    "threading",
+    "shutil",
+    "filetype",
+    "inspect",
+    pool=import_exc,
+    _globals=globals(),
+)
 
 PROC = psutil.Process()
 quit = lambda *args, **kwargs: PROC.kill()
