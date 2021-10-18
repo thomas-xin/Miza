@@ -3200,7 +3200,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             x = max(members)
         guild._member_count = len(guild._members)
 
-    async def load_guild(guild):
+    async def load_guild(self, guild):
         await choice(self._connection.chunk_guild, self.load_guild_http)(guild)
         guild._member_count = len(guild._members)
         return guild
