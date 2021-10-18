@@ -119,8 +119,10 @@ def update_collections2():
         b = resp.content
     with open(collections2f, "wb") as f:
         f.write(b)
-    exec(compile(b, "collections2.py", "exec"), globals())
     print("collections2.py updated.")
+    if "alist" in globals():
+        return
+    exec(compile(b, "collections2.py", "exec"), globals())
 
 if not os.path.exists(collections2f):
     update_collections2()
