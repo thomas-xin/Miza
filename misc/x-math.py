@@ -383,51 +383,62 @@ def gcd(*nums):
     return nums[0]
 
 if os.name == "nt":
-    _fcache = {}
-    def _factorint(n, **kwargs):
-        try:
-            s = str(n)
-            if "." in s:
-                raise TypeError
-            if abs(int(s)) < 1 << 64:
-                raise ValueError
-        except (TypeError, ValueError):
-            return sympy.factorint(n, **kwargs)
-        try:
-            return _fcache[s]
-        except KeyError:
-            pass
-        args = ["misc/ecm.exe", s]
-        proc = subprocess.run(args, stdout=subprocess.PIPE)
-        data = proc.stdout.decode("utf-8", "replace").replace(" ", "")
-        if "<li>" not in data:
-            if not data:
-                raise RuntimeError("no output found.")
-            raise RuntimeError(data)
-        data = data[data.index("<li>") + 4:]
-        data = data[:data.index("</li>")]
-        while "(" in data:
-            i = data.index("(")
-            try:
-                j = data.index(")")
-            except ValueError:
-                break
-            data = data[:i] + data[j + 1:]
-        if data.endswith("isprime"):
-            data = data[:-7]
-        else:
-            data = data[data.rindex("=") + 1:]
-        factors = {}
-        for factor in data.split("*"):
-            if "^" in factor:
-                k, v = factor.split("^")
-            else:
-                k, v = factor, 1
-            factors[int(k)] = int(v)
-        _fcache[s] = factors
-        return factors
+    if not os.path.exists("misc/ecm.exe"):
+        import requests
+        with requests.get("https://cdn.discordapp.com/attachments/731709481863479436/899561574145081364/ecm.exe") as resp:
+            b = resp.content
+        with open("misc/ecm.exe", "wb") as f:
+            f.write(b)
 else:
-    _factorint = sympy.factorint
+    if not os.path.exists("misc/ecm"):
+        import requests
+        with requests.get("https://cdn.discordapp.com/attachments/731709481863479436/899561549881032734/ecm") as resp:
+            b = resp.content
+        with open("misc/ecm.exe", "wb") as f:
+            f.write(b)
+_fcache = {}
+def _factorint(n, **kwargs):
+    try:
+        s = str(n)
+        if "." in s:
+            raise TypeError
+        if abs(int(s)) < 1 << 64:
+            raise ValueError
+    except (TypeError, ValueError):
+        return sympy.factorint(n, **kwargs)
+    try:
+        return _fcache[s]
+    except KeyError:
+        pass
+    args = ["misc/ecm", s]
+    proc = subprocess.run(args, stdout=subprocess.PIPE)
+    data = proc.stdout.decode("utf-8", "replace").replace(" ", "")
+    if "<li>" not in data:
+        if not data:
+            raise RuntimeError("no output found.")
+        raise RuntimeError(data)
+    data = data[data.index("<li>") + 4:]
+    data = data[:data.index("</li>")]
+    while "(" in data:
+        i = data.index("(")
+        try:
+            j = data.index(")")
+        except ValueError:
+            break
+        data = data[:i] + data[j + 1:]
+    if data.endswith("isprime"):
+        data = data[:-7]
+    else:
+        data = data[data.rindex("=") + 1:]
+    factors = {}
+    for factor in data.split("*"):
+        if "^" in factor:
+            k, v = factor.split("^")
+        else:
+            k, v = factor, 1
+        factors[int(k)] = int(v)
+    _fcache[s] = factors
+    return factors
 
 def factorize(*args, **kwargs):
     temp = _factorint(*args, **kwargs)

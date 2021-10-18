@@ -740,7 +740,7 @@ class Wav2Png(Command):
         ext = "png" if name == "wav2png" else "wav"
         dest = f"cache/&{ts}." + ext
         w2p = "wav2png" if name == "wav2png" else "png2wav"
-        args = pillow_simd.get() + [w2p + ".py", url, "../" + dest]
+        args = [python, w2p + ".py", url, "../" + dest]
         with discord.context_managers.Typing(channel):
             print(args)
             proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc", stdout=subprocess.DEVNULL)

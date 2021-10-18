@@ -2478,7 +2478,11 @@ def from_bytes(b, save=None):
         if save and data and not os.path.exists(save):
             exc.submit(write_to, save, data)
     elif b[:4] == b"%PDF":
-        return ImageSequence(*pdf2image.convert_from_bytes(b, poppler_path="misc/poppler", use_pdftocairo=True), copy=True)
+        if os.name == "nt":
+            pages = pdf2image.convert_from_bytes(b, poppler_path="misc/poppler", use_pdftocairo=True)
+        else:
+            pages = pdf2image.convert_from_bytes(b, use_pdftocairo=True)
+        return ImageSequence(*pages, copy=True)
     else:
         data = b
         out = io.BytesIO(b) if type(b) is bytes else b

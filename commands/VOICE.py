@@ -883,7 +883,7 @@ class AudioQueue(alist):
         return self
 
     # Enqueue items at target position, starting audio playback if queue was previously empty.
-    def enqueue(self, items, position):
+    def enqueue(self, items, position=-1):
         with self.auds.semaphore:
             if len(items) > self.maxitems:
                 items = items[:self.maxitems]

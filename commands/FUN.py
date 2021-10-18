@@ -1651,7 +1651,7 @@ class Matchmaking(Command):
             try:
                 user = await bot.fetch_member_ex(u_id, guild, allow_banned=False, fuzzy=None)
             except:
-                users.append(u_id.capitalize())
+                users.append(as_str(u_id).capitalize())
             else:
                 users.append(user.display_name)
         while len(users) < 2:
