@@ -66,14 +66,23 @@ As of 26 September 2021, Miza now fully works on Windows and Linux. If you're pl
 
 * Launch Git Bash.
 
-* Navigate to your desired directory, by typing this command in Git Bash:
-```
+* Navigate to your desired directory, by typing this command in Git Bash (or Linux terminal):
+```bash
 cd [Desired Directory]
 Example: cd /C/Users/Miza/Documents/Projects/
 ```
 
-* Clone this Repository, by typing this command in Git Bash:
+* If on Linux, the following must be installed (use `yum install` on other distributions of Linux as required):
+```bash
+sudo apt install git
+sudo apt install python3
+sudo apt install python3-pip
+sudo apt install python3-tk
+sudo apt install libgmp-dev libmpfr-dev libmpc-dev
 ```
+
+* Clone this Repository, by typing this command:
+```bash
 git clone https://github.com/thomas-xin/Miza.git
 ```
 
