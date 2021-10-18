@@ -396,7 +396,7 @@ else:
             b = resp.content
         with open("misc/ecm", "wb") as f:
             f.write(b)
-        os.chmod("misc/ecm", 777)
+        subprocess.run(("chmod", "777", "misc/ecm"))
 _fcache = {}
 def _factorint(n, **kwargs):
     try:
