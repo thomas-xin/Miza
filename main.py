@@ -24,7 +24,7 @@ if not os.path.exists("auth.json") or not os.path.getsize("auth.json"):
 
 
 import time, datetime, psutil, subprocess
-ffmpeg = "ffmpeg"
+ffmpeg = "./ffmpeg"
 print("Verifying FFmpeg installation...")
 
 if os.name == "nt":
