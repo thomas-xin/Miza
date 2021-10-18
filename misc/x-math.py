@@ -394,7 +394,7 @@ else:
         import requests
         with requests.get("https://cdn.discordapp.com/attachments/731709481863479436/899561549881032734/ecm") as resp:
             b = resp.content
-        with open("misc/ecm.exe", "wb") as f:
+        with open("misc/ecm", "wb") as f:
             f.write(b)
 _fcache = {}
 def _factorint(n, **kwargs):

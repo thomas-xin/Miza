@@ -983,7 +983,8 @@ class Ask(Command):
                     f"I am certain it's {target}!",
                     f"I think {target} might know... 👀",
                     "Me. 😏",
-                )[ihash(q)]
+                )
+                out = out[ihash(q) % len(out)]
         elif random.random() < 0.0625 + math.atan(count / 7) / 4:
             if xrand(3):
                 if guild:
@@ -1023,7 +1024,8 @@ class Ask(Command):
                 "Meh, does it matter?",
                 "Why do you think?",
                 "Who knows?",
-            )[ihash(q)]
+            )
+            out = out[ihash(q) % len(out)]
         elif q.startswith("when "):
             dt = utc_dt()
             year = dt.year
@@ -1039,7 +1041,8 @@ class Ask(Command):
                 "Never. 😏",
                 "How about an hour?",
                 "Try it and find out!",
-            )[ihash(q)]
+            )
+            out = out[ihash(q) % len(out)]
         elif getattr((bot.commands.get(q.split(None, 1)[0]) or (None,))[0], "__name__", None) == "Hello":
             for _hello in bot.commands.hello:
                 out = await _hello(bot, user, q.split(None, 1)[0], "".join(q.split(None, 1)[1:]), guild)
@@ -1070,7 +1073,8 @@ class Ask(Command):
                 "Does it really matter?",
                 "I dunno. ¯\_(ツ)_/¯",
                 "Don't think so...",
-            )[ihash(q)]
+            )
+            out = out[ihash(q) % len(out)]
         if "dailies" in bot.data:
             bot.data.dailies.progress_quests(user, "talk")
         if out:
