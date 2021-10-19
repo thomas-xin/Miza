@@ -3159,13 +3159,13 @@ class Turnoff(ImagePool, Command):
         s = s[:s.index(b'$("#random-link").attr("href", pages[parseInt(Math.random(1)*(pages.length - 1))]);')].rstrip(b" \r\n\t;")
         hrefs = orjson.loads(s)
         urls = alist("https://turnoff.us" + href.rstrip("/") + "/" for href in hrefs if href)
-        futs = deque()
+        data = self.bot.data.imagepools.setdefault(self.database, alist())
         for url in urls[:-1]:
             s = await Request(url, aio=True)
             search = b'<meta property="og:image" content="'
             s = s[s.index(search) + len(search):]
             url = as_str(s[:s.index(b'"')])
-            self.data.add(url)
+            data.add(url)
         url = url[-1]
         s = await Request(url, aio=True)
         search = b'<meta property="og:image" content="'
