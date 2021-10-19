@@ -389,8 +389,7 @@ def zip2bytes(data):
     if not hasattr(data, "read"):
         data = io.BytesIO(data)
     with zipfile.ZipFile(data, allowZip64=True, strict_timestamps=False) as z:
-        b = z.read(z.namelist()[0])
-    return b
+        return z.read(z.namelist()[0])
 
 def bytes2zip(data, lzma=False):
     b = io.BytesIO()
@@ -462,14 +461,18 @@ def select_and_dumps(data, mode="safe", compress=True):
     if mode == "unsafe":
         s = pickle.dumps(data)
         if len(s) > 32768 and compress:
-            s = bytes2zip(s, lzma=True)
+            t = bytes2zip(s, lzma=len(s) < 16777216)
+            if len(t) < len(s):
+                s = t
         return s
     try:
         s = orjson.dumps(data)
     except:
         s = None
     if len(s) > 262144:
-        return bytes2zip(s, lzma=False)
+        t = bytes2zip(s, lzma=False)
+        if len(t) < len(s):
+            s = t
     return s
 
 

@@ -2335,7 +2335,8 @@ class UpdateMessageCache(Database):
                     return
             try:
                 with open(path, "rb") as f:
-                    out = zipped = decrypt(f.read())
+                    b = f.read()
+                out = zipped = decrypt(b)
                 with tracebacksuppressor(zipfile.BadZipFile):
                     out = zip2bytes(zipped)
                 data = pickle.loads(out)
@@ -2438,8 +2439,11 @@ class UpdateMessageCache(Database):
             if os.path.exists(path):
                 return os.remove(path)
         data = pickle.dumps(saved)
-        out = bytes2zip(data)
-        out = encrypt(out)
+        if len(data) > 32768:
+            out = bytes2zip(data, lzma=len(data) < 16777216)
+            if len(out) < len(data):
+                data = out
+        out = encrypt(data)
         safe_save(path, out)
         return len(saved)
 

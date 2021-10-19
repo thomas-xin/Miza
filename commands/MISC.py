@@ -339,7 +339,8 @@ class CS_npc(Command):
         raise LookupError(f"No results for {argv}.")
 
 
-class CS_tsc(Command):
+class CS_flag(Command):
+    name = ["CS_OOB", "CS_flags"]
     description = "Searches the Cave Story OOB flags list for a memory variable."
     usage = "<query> <condensed{?c}>?"
     flags = "c"
@@ -387,7 +388,12 @@ class CS_mod(Command):
     async def __call__(self, channel, user, args, **void):
         argv = " ".join(args)
         fut = create_future(douclub.search, argv, timeout=8)
-        data = await searchForums(argv)
+        try:
+            data = await searchForums(argv)
+        except ConnectionError as ex:
+            if ex.errno != 404:
+                raise
+            data = []
         data += await fut
         if not data:
             raise LookupError(f"No results for {argv}.")
