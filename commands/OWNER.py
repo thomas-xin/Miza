@@ -944,7 +944,7 @@ class UpdateImagePools(Database):
         self.finished = finished
 
     async def load_until(self, key, func, threshold, args=()):
-        with tracebacksuppressor:
+        with tracebacksuppressor(TooManyRequests):
             async with self.sem:
                 data = set_dict(self.data, key, alist())
                 failed = 0
