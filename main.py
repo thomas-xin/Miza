@@ -161,10 +161,12 @@ while not os.path.exists(sd):
             for child in proc.children(recursive=True):
                 try:
                     child.kill()
+                    child.wait()
                 except:
                     traceback.print_exc()
             try:
                 proc.kill()
+                proc.wait()
             except psutil.NoSuchProcess:
                 pass
             if os.path.exists(sd):
@@ -191,9 +193,11 @@ if proc.is_running():
     try:
         for child in proc.children():
             child.kill()
+            child.wait()
     except:
         traceback.print_exc()
     proc.kill()
+    proc.wait()
 
 delete(sd)
 delete(rs)

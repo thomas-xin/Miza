@@ -748,7 +748,7 @@ class Wav2Png(Command):
                 await asyncio.wait_for(proc.wait(), timeout=3200)
             except (T0, T1, T2):
                 with tracebacksuppressor:
-                    proc.kill()
+                    force_kill(proc)
                 raise
         await bot.send_with_file(channel, "", dest, filename=fn + "." + ext, reference=message)
 
@@ -788,7 +788,7 @@ class SpectralPulse(Command):
                     await asyncio.wait_for(proc.wait(), timeout=3200)
                 except (T0, T1, T2):
                     with tracebacksuppressor:
-                        proc.kill()
+                        force_kill(proc)
                     raise
                 for ext in ("pcm", "riff"):
                     await create_future(os.remove, f"{dest}.{ext}")

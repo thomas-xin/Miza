@@ -360,7 +360,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     def start_webserver(self):
         if self.server:
             with suppress():
-                self.server.kill()
+                force_kill(self.server)
         if os.path.exists("misc/x-server.py") and PORT:
             print("Starting webserver...")
             self.server = psutil.Popen([python, "x-server.py"], cwd=os.getcwd() + "/misc", stderr=subprocess.PIPE, bufsize=65536)
@@ -4680,7 +4680,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             print("Database ready.")
             await self.send_event("_ready_", bot=self)
             create_task(self.heartbeat_loop())
-            self.heartbeat_proc.kill()
+            force_kill(self.heartbeat_proc)
             print("Initialization complete.")
 
     def set_client_events(self):
@@ -5268,7 +5268,7 @@ class AudioClientInterface:
             with tracebacksuppressor:
                 create_future_ex(self.submit, "await kill()", priority=True).result(timeout=2)
             with tracebacksuppressor(psutil.NoSuchProcess):
-                return self.proc.kill()
+                return force_kill(self.proc)
 
 
 # Queries for searching members
@@ -5595,7 +5595,7 @@ if __name__ == "__main__":
             miza.miza = miza
             with miza:
                 miza.run()
-            miza.server.kill()
+            force_kill(miza.server)
             miza.audio.kill()
             sub_kill(start=False)
     print = _print

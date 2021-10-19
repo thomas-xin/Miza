@@ -22,7 +22,7 @@ MultiAutoImporter(
 )
 
 PROC = psutil.Process()
-quit = lambda *args, **kwargs: PROC.kill()
+quit = lambda *args, **kwargs: force_kill(PROC)
 BOT = [None]
 
 tracemalloc.start()
@@ -1874,13 +1874,23 @@ sub_count = lambda: sum(sum(1 for p in v if p.is_running()) for v in PROCS.value
 
 def force_kill(proc):
     with tracebacksuppressor(psutil.NoSuchProcess):
+        killed = deque()
         proc = psutil.Process(proc.pid)
         for child in proc.children(recursive=True):
             with suppress():
                 child.kill()
+                killed.append(child)
                 print(child, "killed.")
+        proc.kill()
         print(proc, "killed.")
-        return proc.kill()
+        for child in killed:
+            w = child.wait()
+            if awaitable(w):
+                create_task(w)
+        w = proc.wait()
+        if awaitable(w):
+            return create_task(w)
+        return w
 
 async def proc_communicate(proc):
     while True:

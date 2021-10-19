@@ -109,7 +109,7 @@ def _get_duration(filename, _timeout=12):
         resp = proc.stdout.read().split()
     except:
         with suppress():
-            proc.kill()
+            force_kill(proc)
         with suppress():
             resp = proc.stdout.read().split()
         print_exc()
@@ -443,7 +443,7 @@ class AudioFile:
             ytdl.cache.pop(self.file, None)
             if self.proc is not None:
                 with suppress():
-                    self.proc.kill()
+                    force_kill(self.proc)
             with suppress():
                 os.remove("cache/" + self.file)
             self.readable.set_exception(ex)
@@ -535,7 +535,7 @@ class AudioFile:
         self.expired = True
         if self.proc and self.proc.is_running():
             with suppress():
-                self.proc.kill()
+                force_kill(self.proc)
         with suppress():
             with self.semaphore:
                 if not self.live:
@@ -687,7 +687,7 @@ class LoadedAudioReader(discord.AudioSource):
     def close(self, *void1, **void2):
         self.closed = True
         with suppress():
-            self.proc.kill()
+            force_kill(self.proc)
         players.pop(self.key, None)
         if callable(self.callback):
             self.callback()
@@ -727,7 +727,7 @@ class BufferedAudioReader(discord.AudioSource):
                 out = fut.result(timeout=0.1)
             except concurent.futures.TimeoutError:
                 with suppress():
-                    self.proc.kill()
+                    force_kill(self.proc)
                 out = b""
         else:
             out = next(self.packet_iter, b"")
@@ -766,7 +766,7 @@ class BufferedAudioReader(discord.AudioSource):
         with suppress():
             self.stream.close()
         with suppress():
-            self.proc.kill()
+            force_kill(self.proc)
         players.pop(self.key, None)
         if callable(self.callback):
             self.callback()
@@ -869,7 +869,7 @@ def ensure_parent(proc, parent):
     while True:
         if not parent.is_running():
             await_fut(kill())
-            psutil.Process().kill()
+            force_kill(psutil.Process())
         time.sleep(6)
 
 

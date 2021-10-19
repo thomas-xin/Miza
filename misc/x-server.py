@@ -37,7 +37,7 @@ def send(*args, escape=True):
             sys.__stderr__.buffer.write(s)
             sys.__stderr__.flush()
     except OSError:
-        psutil.Process().kill()
+        force_kill(psutil.Process())
 
 
 def create_etag(data):
@@ -1857,7 +1857,7 @@ def ensure_parent(proc, parent):
             except:
                 pass
         if not parent.is_running():
-            psutil.Process().kill()
+            force_kill(psutil.Process())
         time.sleep(6)
 
 if __name__ == "__main__":

@@ -43,7 +43,7 @@ def _get_duration(filename, _timeout=12):
         resp = proc.stdout.read().split()
     except:
         with suppress():
-            proc.kill()
+            force_kill(proc)
         with suppress():
             resp = proc.stdout.read().split()
         print_exc()

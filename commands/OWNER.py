@@ -91,7 +91,7 @@ class Restart(Command):
                 # Kill the webserver
                 print("Killing webserver...")
                 with tracebacksuppressor:
-                    await create_future(bot.server.kill, priority=True)
+                    await create_future(force_kill, bot.server, priority=True)
                 # Disconnect as many voice clients as possible
                 print("Disconnecting remaining voice clients...")
                 futs = deque()

@@ -615,6 +615,7 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
                     except:
                         try:
                             proc.kill()
+                            proc.wait()
                         except:
                             pass
                 s = resp.decode("utf-8", "replace")
@@ -2827,7 +2828,9 @@ if __name__ == "__main__":
                 p = psutil.Process()
                 for c in p.children(True):
                     c.kill()
+                    c.wait()
                 p.kill()
+                p.wait()
             time.sleep(12)
     import concurrent.futures.thread
     concurrent.futures.thread.threading.Thread(target=ensure_parent, daemon=True).start()

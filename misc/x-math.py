@@ -936,7 +936,9 @@ if __name__ == "__main__":
                 p = psutil.Process()
                 for c in p.children(True):
                     c.kill()
+                    c.wait()
                 p.kill()
+                p.wait()
             time.sleep(12)
     import threading
     threading.Thread(target=ensure_parent, daemon=True).start()

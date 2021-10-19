@@ -520,7 +520,7 @@ class EmojiCrypt(Command):
                 await asyncio.wait_for(proc.wait(), timeout=48)
             except (T0, T1, T2):
                 with tracebacksuppressor:
-                    proc.kill()
+                    force_kill(proc)
                 raise
         else:
             with open(fi, "w", encoding="utf-8") as f:
@@ -539,7 +539,7 @@ class EmojiCrypt(Command):
             await asyncio.wait_for(proc.wait(), timeout=60)
         except (T0, T1, T2):
             with tracebacksuppressor:
-                proc.kill()
+                force_kill(proc)
             raise
         fn = "message.txt"
         f = CompatFile(fi + "-", filename=fn)
@@ -696,7 +696,7 @@ class Identify(Command):
                 break
             except:
                 with suppress():
-                    proc.kill()
+                    force_kill(proc)
                 print_exc()
         if not resp:
             raise RuntimeError
