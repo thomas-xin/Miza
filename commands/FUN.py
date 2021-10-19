@@ -3166,6 +3166,12 @@ class Turnoff(ImagePool, Command):
             s = s[s.index(search) + len(search):]
             url = as_str(s[:s.index(b'"')])
             self.data.add(url)
+        url = url[-1]
+        s = await Request(url, aio=True)
+        search = b'<meta property="og:image" content="'
+        s = s[s.index(search) + len(search):]
+        url = as_str(s[:s.index(b'"')])
+        return url
 
 
 class Inspiro(ImagePool, Command):
