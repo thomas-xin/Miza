@@ -3146,17 +3146,26 @@ class XKCD(ImagePool, Command):
 class Turnoff(ImagePool, Command):
     description = "Pulls a random image from turnoff.us and embeds it."
     database = "turnoff"
-    threshold = 256
+    threshold = 1
 
     async def fetch_one(self):
+        if self.data and xrand(64):
+            raise TooManyRequests
         s = await Request("https://turnoff.us", aio=True)
         search = b"$(function() {"
         s = s[s.rindex(search) + len(search):]
         search = b"var pages = "
         s = s[s.index(search) + len(search):]
         s = s[:s.index(b'$("#random-link").attr("href", pages[parseInt(Math.random(1)*(pages.length - 1))]);')].rstrip(b" \r\n\t;")
-        urls = orjson.loads(s)
-        return ["https://turnoff.us" + href for href in urls if href]
+        hrefs = orjson.loads(s)
+        urls = alist("https://turnoff.us" + href.rstrip("/") + "/" for href in hrefs if href)
+        futs = deque()
+        for url in urls[:-1]:
+            s = await Request(url, aio=True)
+            search = b'<meta property="og:image" content="'
+            s = s[s.index(search) + len(search):]
+            url = as_str(s[:s.index(b'"')])
+            self.data.add(url)
 
 
 class Inspiro(ImagePool, Command):
