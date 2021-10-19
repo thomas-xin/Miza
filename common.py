@@ -376,9 +376,9 @@ if (len(enc_key) - 1) & 3 == 0:
 
 enc_box = nacl.secret.SecretBox(base64.b64decode(enc_key)[:32])
 
-encrypt = lambda s: b">~MIZA~>" + enc_box.encrypt(s if type(s) is bytes else str(s).encode("utf-8"))
+encrypt = lambda s: b">~MIZA~>" + enc_box.encrypt(s if type(s) in (bytes, memoryview) else str(s).encode("utf-8"))
 def decrypt(s):
-    if type(s) is not bytes:
+    if type(s) not in (bytes, memoryview):
         s = str(s).encode("utf-8")
     if s[:8] == b">~MIZA~>":
         return enc_box.decrypt(s[8:])
