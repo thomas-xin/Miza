@@ -953,15 +953,12 @@ class UpdateImagePools(Database):
                         break
                     try:
                         out = await func(*args)
-                        if type(out) is str:
+                        if isinstance(out, str):
                             out = (out,)
                         for url in out:
                             url = url.strip()
                             if url not in data:
-                                if i & 1:
-                                    data.appendleft(url)
-                                else:
-                                    data.append(url)
+                                data.add(url)
                                 failed = 0
                                 self.update(key)
                             else:

@@ -3136,11 +3136,27 @@ class XKCD(ImagePool, Command):
     database = "xkcd"
 
     async def fetch_one(self):
-        s = await create_future(Request, "https://c.xkcd.com/random/comic", decode=True)
-        search = "Image URL (for hotlinking/embedding): "
+        s = await create_future(Request, "https://c.xkcd.com/random/comic")
+        search = b"Image URL (for hotlinking/embedding): "
         s = s[s.index(search) + len(search):]
-        url = s[:s.index("<")].strip()
-        return url
+        url = s[:s.index(b"<")].strip()
+        return as_str(url)
+
+
+class Turnoff(ImagePool, Command):
+    description = "Pulls a random image from turnoff.us and embeds it."
+    database = "turnoff"
+    threshold = 256
+
+    async def fetch_one(self):
+        s = await Request("https://turnoff.us", aio=True)
+        search = b"$(function() {"
+        s = s[s.rindex(search) + len(search):]
+        search = b"var pages = "
+        s = s[s.index(search) + len(search):]
+        s = s[:s.index(b'$("#random-link").attr("href", pages[parseInt(Math.random(1)*(pages.length - 1))]);')].rstrip(b" \r\n\t;")
+        urls = orjson.loads(s)
+        return ["https://turnoff.us" + href for href in urls if href]
 
 
 class Inspiro(ImagePool, Command):
