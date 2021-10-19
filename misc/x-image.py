@@ -614,10 +614,10 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
                         break
                     except:
                         try:
-                            proc.kill()
-                            proc.wait()
+                            proc.terminate()
+                            proc.wait(timeout=2)
                         except:
-                            pass
+                            proc.kill()
                 s = resp.decode("utf-8", "replace")
                 if orig_fps is None:
                     f = re.findall(fpscheck, s)[0][:-4]
@@ -2827,9 +2827,12 @@ if __name__ == "__main__":
             if not parent.is_running():
                 p = psutil.Process()
                 for c in p.children(True):
-                    c.kill()
-                    c.wait()
-                p.kill()
+                    c.terminate()
+                    try:
+                        c.wait(timeout=2)
+                    except psutil.TimeoutExpired:
+                        c.kill()
+                p.terminate()
                 p.wait()
             time.sleep(12)
     import concurrent.futures.thread

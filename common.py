@@ -1878,19 +1878,19 @@ def force_kill(proc):
         proc = psutil.Process(proc.pid)
         for child in proc.children(recursive=True):
             with suppress():
-                child.kill()
+                child.terminate()
                 killed.append(child)
                 print(child, "killed.")
-        proc.kill()
+        proc.terminate()
         print(proc, "killed.")
-        for child in killed:
-            w = child.wait()
-            if awaitable(w):
-                create_task(w)
-        w = proc.wait()
-        if awaitable(w):
-            return create_task(w)
-        return w
+        _, alive = psutil.wait_procs(killed, timeout=2)
+        for child in alive:
+            with suppress():
+                child.kill()
+        try:
+            proc.wait(timeout=2)
+        except psutil.TimeoutExpired:
+            proc.kill()
 
 async def proc_communicate(proc):
     while True:

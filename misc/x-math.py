@@ -935,9 +935,12 @@ if __name__ == "__main__":
             if not parent.is_running():
                 p = psutil.Process()
                 for c in p.children(True):
-                    c.kill()
-                    c.wait()
-                p.kill()
+                    c.terminate()
+                    try:
+                        c.wait(timeout=2)
+                    except psutil.TimeoutExpired:
+                        c.kill()
+                p.terminate()
                 p.wait()
             time.sleep(12)
     import threading
