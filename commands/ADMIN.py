@@ -2437,7 +2437,8 @@ class UpdateMessageCache(Database):
         if not saved:
             if os.path.exists(path):
                 return os.remove(path)
-        out = data = pickle.dumps(saved)
+        data = pickle.dumps(saved)
+        out = bytes2zip(data)
         out = encrypt(out)
         safe_save(path, out)
         return len(saved)

@@ -469,7 +469,7 @@ def select_and_dumps(data, mode="safe", compress=True):
     except:
         s = None
     if len(s) > 262144:
-        return bytes2zip(s, lzma=True)
+        return bytes2zip(s, lzma=False)
     return s
 
 
@@ -654,7 +654,7 @@ class FileHashDict(collections.abc.MutableMapping):
             except KeyError:
                 self.deleted.add(k)
                 continue
-            s = select_and_dumps(d, mode="unsafe", compress=False)
+            s = select_and_dumps(d, mode="unsafe", compress=True)
             with self.sem:
                 safe_save(fn, s)
         deleted = list(self.deleted)
