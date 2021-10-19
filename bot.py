@@ -2278,7 +2278,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         return 0, 0
 
     async def get_disk(self):
-        with tracebacksuppressor(SemaphoreOverflowError):
+        with tracebacksuppressor(SemaphoreOverflowError, FileNotFoundError):
             async with self.disk_semaphore:
                 self.disk = await create_future(get_folder_size, ".", priority=True)
         return self.disk

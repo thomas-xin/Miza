@@ -297,7 +297,7 @@ class AudioPlayer(discord.AudioSource):
                 create_future_ex(after)
 
     def clear(self):
-        for entry in self.queue:
+        for entry in tuple(self.queue):
             if entry:
                 entry[0].close()
         self.queue.clear()

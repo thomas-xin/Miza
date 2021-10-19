@@ -2268,7 +2268,7 @@ class AudioDownloader:
         except:
             fps = 30
         # First produce a silent video file (I would have stored it as raw, except that overflows storage really bad)
-        args = ["ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-hwaccel", "auto", "-y"]
+        args = ["./ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-hwaccel", "auto", "-y"]
         args.extend(("-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", "rgb24", "-video_size", "x".join(map(str, size)), "-i", "-", "-an", "-b:v", "2M"))
         afile = f"cache/-{ts}-.pcm"
         if len(urls) > 1:
@@ -2296,7 +2296,7 @@ class AudioDownloader:
                         data = self.extract_backup(info["url"], video=True)
                         video = info["video"] = get_best_video(data)
                     vidinfo = as_str(subprocess.check_output(["./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "default=nokey=1:noprint_wrappers=1", video])).strip()
-                    args = alist(("ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y"))
+                    args = alist(("./ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y"))
                     args.extend(("-i", video))
                     # Tell FFmpeg to match fps/frame count as much as possible
                     vf = f"fps={fps}"
@@ -2353,7 +2353,7 @@ class AudioDownloader:
         proc.stdin.close()
         proc.wait()
         # Add the audio to the rendered video, without re-encoding the entire frames
-        args = ["ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y"]
+        args = ["./ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y"]
         args.extend(("-i", fnv, "-f", "s16le", "-ac", "2", "-ar", str(SAMPLE_RATE), "-i", afile))
         args.extend(("-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-b:a", "224k", fn))
         print(args)
