@@ -3149,7 +3149,7 @@ class Turnoff(ImagePool, Command):
     threshold = 1
 
     async def fetch_one(self):
-        if self.bot.data.imagepools.get(self.database) and xrand(64):
+        if self.bot.data.imagepools.data.get(self.database) and xrand(64):
             return choice(self.bot.data.imagepools[self.database])
         s = await Request("https://turnoff.us", aio=True)
         search = b"$(function() {"
