@@ -3997,7 +3997,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
         class CachedMessage(discord.abc.Snowflake):
 
-            __slots__ = ("_data", "id", "created_at", "author", "channel", "channel_id", "deleted", "attachments")
+            __slots__ = ("_data", "id", "created_at", "author", "channel", "channel_id", "deleted", "attachments", "message")
 
             def __init__(self, data):
                 self._data = data
@@ -4029,6 +4029,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 message = bot.LoadedMessage(state=bot._state, channel=channel, data=d)
                 apply_stickers(message, d)
                 message.author = author
+                self.message = message
                 return message
 
             def __getattr__(self, k):
@@ -4038,6 +4039,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     except AttributeError:
                         if k == "deleted":
                             raise
+                if hasattr(self, "message"):
+                    try:
+                        return getattr(self.message, k)
+                    except AttributeError:
+                        raise
                 if k in ("simulated", "slash"):
                     raise AttributeError
                 d = self.__getattribute__("_data")
