@@ -4040,10 +4040,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         if k == "deleted":
                             raise
                 if hasattr(self, "message"):
-                    try:
-                        return getattr(self.message, k)
-                    except AttributeError:
-                        raise
+                    return getattr(self.message, k)
                 if k in ("simulated", "slash"):
                     raise AttributeError
                 d = self.__getattribute__("_data")
