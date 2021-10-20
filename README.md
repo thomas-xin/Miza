@@ -75,9 +75,7 @@ Example: cd /C/Users/Miza/Documents/Projects/
 * If on Linux, the following must be installed (use `yum install` on other distributions of Linux as required):
 ```bash
 sudo apt install git
-sudo apt install python3
-sudo apt install python3-pip
-sudo apt install python3-tk
+sudo apt install python3 python3-pip python3-tk
 sudo apt install libgmp-dev libmpfr-dev libmpc-dev
 ```
 
