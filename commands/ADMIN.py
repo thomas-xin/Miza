@@ -86,6 +86,7 @@ class Purge(Command):
             except:
                 for _ in loop(min(5, len(delM))):
                     m = delM.popleft()
+                    m.channel = channel
                     with tracebacksuppressor:
                         await bot.silent_delete(m, no_log=-1, exc=True)
                     deleted += 1

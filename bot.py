@@ -4289,6 +4289,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 for element in data:
                     element["channel_id"] = c_id
                     message = CM(element)
+                    message.channel = self.channel
                     await self.messages.put(message)
         
         discord.iterators.HistoryIterator.fill_messages = lambda self: fill_messages(self)
