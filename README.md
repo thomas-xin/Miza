@@ -99,7 +99,7 @@ git clone https://github.com/thomas-xin/Miza.git
 
 #### Dependencies:
 
-* Miza should automatically the required dependencies right after running her for the first time, notably the Python modules and FFmpeg.
+* Miza should automatically download and install the required dependencies immediately after running her for the first time, notably the Python modules and FFmpeg.
 
 ##### Additional Notes:
 
