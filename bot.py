@@ -3997,7 +3997,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
         class CachedMessage(discord.abc.Snowflake):
 
-            __slots__ = ("_data", "id", "created_at", "author", "channel", "channel_id", "deleted", "attachments", "message")
+            __slots__ = ("_data", "id", "created_at", "author", "channel", "channel_id", "deleted", "attachments")
 
             def __init__(self, data):
                 self._data = data
@@ -4029,7 +4029,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 message = bot.LoadedMessage(state=bot._state, channel=channel, data=d)
                 apply_stickers(message, d)
                 message.author = author
-                self.message = message
                 return message
 
             def __getattr__(self, k):
@@ -4039,8 +4038,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     except AttributeError:
                         if k == "deleted":
                             raise
-                if hasattr(self, "message"):
-                    return getattr(self.message, k)
                 if k in ("simulated", "slash"):
                     raise AttributeError
                 d = self.__getattribute__("_data")
@@ -4082,7 +4079,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 if k == "system_content" and not d.get("type"):
                     return self.content
                 m = bot.cache.messages.get(d["id"])
-                if m is None or m is self or not issubclass(type(m), bot.LoadedMessage):
+                if m is None or m is self or not isinstance(m, bot.LoadedMessage):
                     message = self.__copy__()
                     if type(m) not in (discord.Message, bot.ExtendedMessage):
                         bot.add_message(message, files=False)
@@ -4092,7 +4089,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         if k == "mentions":
                             return ()
                         raise
-                return getattr(m, k)
+                try:
+                    return getattr(m, k)
+                except AttributeError:
+                    if k == "mentions":
+                        return ()
+                    raise
 
         class MessageCache(collections.abc.Mapping):
             data = bot.cache.messages
