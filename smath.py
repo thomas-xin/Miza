@@ -2468,7 +2468,7 @@ def b642bytes(b, alt_char_set=False):
 if sys.version_info[0] >= 3 and sys.version_info[1] >= 9:
     randbytes = random.randbytes
 else:
-    randbytes = lambda size: (np.random.random_sample(size) * 256).astype(np.uint8).tobytes()
+    randbytes = lambda size: np.random.randint(0, 256, size=size).data
 
 # SHA256 operations: base64 and base16.
 shash = lambda s: as_str(base64.urlsafe_b64encode(hashlib.sha256(s if type(s) is bytes else as_str(s).encode("utf-8")).digest()).rstrip(b"="))

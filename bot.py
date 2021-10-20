@@ -1234,7 +1234,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                             url = resp.url
                             head = fcdict(resp.headers)
                             ctype = [t.strip() for t in head.get("Content-Type", "").split(";")]
-                            print(head, ctype, sep="\n")
                             if "text/html" in ctype:
                                 it = resp.iter_content(65536)
                                 data = await create_future(next, it)
@@ -2323,7 +2322,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             stats = self.curr_state
             commands = set(itertools.chain(*self.commands.values()))
             self.status_data = {
-                "Bot info": {
+                "System info": {
                     "Process count": active[0],
                     "Thread count": active[1],
                     "Coroutine count": active[2],
@@ -2331,6 +2330,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     "RAM usage": byte_scale(stats[1]) + "B",
                     "Disk usage": byte_scale(stats[2]) + "B",
                     "Network usage": byte_scale(bot.bitrate) + "bps",
+                    "Stored files": self.file_count,
                 },
                 "Discord info": {
                     "Shard count": self.shards,
@@ -2340,15 +2340,15 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     "Role count": len(self.cache.roles),
                     "Emoji count": len(self.cache.emojis),
                     "Cached messages": len(self.cache.messages),
+                    "API latency": sec2time(self.api_latency),
                 },
                 "Misc info": {
-                    "Cached files": self.file_count,
-                    "Audio players": len(self.audio.players),
-                    "Total data transmission": byte_scale(bot.total_bytes) + "B",
-                    "System time": datetime.datetime.now(),
-                    "API latency": sec2time(self.api_latency),
-                    "Current uptime": dyn_time_diff(utc(), bot.start_time),
+                    "Connected voice channels": len(self.audio.players),
+                    "Active audio players": sum(auds.queue and not auds.paused for auds in self.audio.players.values()),
                     "Activity count": self.activity,
+                    "Total data transmitted": byte_scale(bot.total_bytes) + "B",
+                    "System time": datetime.datetime.now(),
+                    "Current uptime": dyn_time_diff(utc(), bot.start_time),
                 },
                 "Code info": {
                     "Code size": [x.item() for x in size],

@@ -738,6 +738,8 @@ def restructure_buttons(buttons):
                 button["type"] = 2
             if "name" in button:
                 button["label"] = button["name"]
+            if "label" in button:
+                button["label"] = lim_str(button["label"], 80)
             try:
                 if type(button["emoji"]) is str:
                     button["emoji"] = cdict(id=None, name=button["emoji"])

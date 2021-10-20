@@ -213,7 +213,7 @@ class AudioPlayer(discord.AudioSource):
         except AttributeError:
             pass
         if k == "pos":
-            if not self.queue or not self.queue[0]:
+            if not self.queue or not self.queue[0] or not self.queue[0][0]:
                 return 0, 0
             p = self.queue[0][0].pos / 50
             d = self.queue[0][0].duration() or inf
