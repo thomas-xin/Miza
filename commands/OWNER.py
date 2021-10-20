@@ -141,20 +141,21 @@ class Execute(Command):
         users = await bot.find_users(argl, args, user, guild)
         if not users:
             raise LookupError("No results found.")
-        if args:
-            try:
-                argv = message.content.split("run ", 1)[1]
-            except IndexError:
-                pass
-                # raise ArgumentError('"run" must be specified as a separator.')
-            futs = deque()
-            for u in users:
-                fake_message = copy.copy(message)
-                fake_message.content = argv
-                fake_message.author = u
-                futs.append(create_task(bot.process_message(fake_message, argv)))
-            for fut in futs:
-                await fut
+        if not args:
+            return
+        try:
+            argv = message.content.split("run ", 1)[1]
+        except IndexError:
+            pass
+            # raise ArgumentError('"run" must be specified as a separator.')
+        futs = deque()
+        for u in users:
+            fake_message = copy.copy(message)
+            fake_message.content = argv
+            fake_message.author = u
+            futs.append(create_task(bot.process_message(fake_message, argv)))
+        for fut in futs:
+            await fut
 
 
 class Exec(Command):

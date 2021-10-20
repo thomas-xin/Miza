@@ -289,14 +289,16 @@ def plot3d_parametric_surface(*args, **kwargs):
     kwargs.pop("show", None)
     return plotter.plot3d_parametric_surface(*plotArgs(args), show=False, **kwargs)
 
-def array(*args):
+def array(*args, **kwargs):
+    if not kwargs.get("dtype"):
+        kwargs["dtype"] = object
     if len(args) == 1:
         arr = args[0]
         if type(arr) is str:
             arr = re.split("[^0-9\\-+e./]+", arr)
             arr = list(map(sympy.Rational, arr))
-        return np.asanyarray(arr, dtype=object)
-    return np.array(args, dtype=object)
+        return np.asanyarray(arr, **kwargs)
+    return np.array(args, **kwargs)
 
 def _predict_next(seq):
     if len(seq) < 2:

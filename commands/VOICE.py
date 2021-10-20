@@ -514,7 +514,8 @@ class CustomAudio(collections.abc.Hashable):
 
     # Kills this audio player, stopping audio playback. Will cause bot to leave voice upon next update event.
     def kill(self, reason=None):
-        self.acsi.kill()
+        with tracebacksuppressor:
+            self.acsi.kill()
         self.bot.data.audio.players.pop(self.guild.id, None)
         with suppress(LookupError):
             if reason is None:

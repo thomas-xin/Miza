@@ -1906,7 +1906,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             await asyncio.sleep(float(delay))
         try:
             self.log_delete(message, no_log)
-            await message.delete()
+            await discord.Message.delete(message)
         except:
             self.cache.deleted.pop(message.id, None)
             if exc:
@@ -4010,6 +4010,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             def __copy__(self):
                 d = dict(self.__getattribute__("_data"))
                 channel = self.channel
+                if "channel_id" not in d:
+                    d["channel_id"] = channel.id
                 author = self.author
                 d.pop("author", None)
                 if "tts" not in d:
