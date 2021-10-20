@@ -159,10 +159,6 @@ _<a id="discordlog-image"><sup><a href="#discordlog-image">[3]</a></sup> Image s
 
 _Note: execute the command `[prefix]exec -e log` to enable discord logging._
 
-#### Why wont Miza work on cloud services or Linux?
-
-* They don't like her subprocesses, this has been an issue since the beginning. If you wish to host Miza, it is best you do so from a Windows OS, as Miza's infrastructure is designed on and for Windows.
-
 <a id="Folder-Structure"></a>
 ## Folder Structure
 
