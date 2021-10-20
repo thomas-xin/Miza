@@ -906,8 +906,8 @@ class AudioQueue(alist):
 
 # runs org2xm on a file, with an optional custom sample bank.
 def org2xm(org, dat=None):
-    if os.name != "nt":
-        raise OSError("org2xm is only available on Windows.")
+    # if os.name != "nt":
+    #     raise OSError("org2xm is only available on Windows.")
     if not org or type(org) is not bytes:
         if not is_url(org):
             raise TypeError("Invalid input URL.")
@@ -941,7 +941,7 @@ def org2xm(org, dat=None):
         else:
             r_dat = "misc/ORG210EN.DAT"
             orig = True
-    args = ["misc/org2xm.exe", r_org, r_dat]
+    args = ["misc/org2xm", r_org, r_dat]
     if compat:
         args.append("c")
     subprocess.check_output(args)

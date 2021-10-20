@@ -2344,7 +2344,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 },
                 "Misc info": {
                     "Connected voice channels": len(self.audio.players),
-                    "Active audio players": sum(auds.queue and not auds.paused for auds in self.audio.players.values()),
+                    "Active audio players": sum(bool(auds.queue and not auds.paused) for auds in self.audio.players.values()),
                     "Activity count": self.activity,
                     "Total data transmitted": byte_scale(bot.total_bytes) + "B",
                     "System time": datetime.datetime.now(),
