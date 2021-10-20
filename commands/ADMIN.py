@@ -70,9 +70,9 @@ class Purge(Command):
                 if hasattr(channel, "delete_messages") and channel.permissions_for(channel.guild.me).manage_messages:
                     dels = delM[:100]
                     t = utc()
-                    if t - dels[0].created_at.timestamp() > 14 * 86400:
+                    if t - discord.utils.snowflake_time(dels[0].id).timestamp() > 14 * 86400:
                         raise
-                    if t - dels[-1].created_at.timestamp() > 14 * 86400:
+                    if t - discord.utils.snowflake_time(dels[-1].id).timestamp() > 14 * 86400:
                         raise
                     # bot.logDelete(dels[-1], -1)
                     await channel.delete_messages(dels)
