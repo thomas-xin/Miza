@@ -75,9 +75,7 @@ Example: cd /C/Users/Miza/Documents/Projects/
 * If on Linux, the following must be installed (use `yum install` on other distributions of Linux as required):
 ```bash
 sudo apt install git
-sudo apt install python3
-sudo apt install python3-pip
-sudo apt install python3-tk
+sudo apt install python3 python3-pip python3-tk
 sudo apt install libgmp-dev libmpfr-dev libmpc-dev
 ```
 
@@ -101,7 +99,7 @@ git clone https://github.com/thomas-xin/Miza.git
 
 #### Dependencies:
 
-* Miza should automatically the required dependencies right after running her for the first time, notably the Python modules and FFmpeg.
+* Miza should automatically download and install the required dependencies immediately after running her for the first time, notably the Python modules and FFmpeg.
 
 ##### Additional Notes:
 
@@ -160,10 +158,6 @@ _<a id="discordlog-image"><sup><a href="#discordlog-image">[3]</a></sup> Image s
 ![Screenshot4](https://cdn.discordapp.com/attachments/727087981285998593/777554358095183893/Capture8.PNG) 
 
 _Note: execute the command `[prefix]exec -e log` to enable discord logging._
-
-#### Why wont Miza work on cloud services or Linux?
-
-* They don't like her subprocesses, this has been an issue since the beginning. If you wish to host Miza, it is best you do so from a Windows OS, as Miza's infrastructure is designed on and for Windows.
 
 <a id="Folder-Structure"></a>
 ## Folder Structure
