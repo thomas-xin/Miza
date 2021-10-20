@@ -84,6 +84,11 @@ class IMG(Command):
                     raise ArgumentError("Image tag too long.")
                 elif not key:
                     raise ArgumentError("Image tag must not be empty.")
+                if is_url(args[0]):
+                    if len(args) > 1:
+                        args = (args[-1], args[0])
+                    else:
+                        args = (args[0].split("?", 1)[0].rsplit("/", 1)[-1].rsplit(".", 1)[0], args[0])
                 urls = await bot.follow_url(args[-1], best=True, allow=True, limit=1)
                 url = urls[0]
                 if len(url) > 2000:

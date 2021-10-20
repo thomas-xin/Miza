@@ -69,6 +69,11 @@ class Purge(Command):
             try:
                 if hasattr(channel, "delete_messages") and channel.permissions_for(channel.guild.me).manage_messages:
                     dels = delM[:100]
+                    t = utc()
+                    if t - dels[0].created_at.timestamp() > 14 * 86400:
+                        raise
+                    if t - dels[-1].created_at.timestamp() > 14 * 86400:
+                        raise
                     # bot.logDelete(dels[-1], -1)
                     await channel.delete_messages(dels)
                     deleted += len(dels)
@@ -79,10 +84,10 @@ class Purge(Command):
                     deleted += 1
                     delM.popleft()
             except:
-                print_exc()
                 for _ in loop(min(5, len(delM))):
                     m = delM.popleft()
-                    await bot.silent_delete(m, no_log=-1, exc=True)
+                    with tracebacksuppressor:
+                        await bot.silent_delete(m, no_log=-1, exc=True)
                     deleted += 1
         s = italics(css_md(f"Deleted {sqr_md(deleted)} message{'s' if deleted != 1 else ''}!", force=True))
         if getattr(message, "slash", None):
