@@ -1728,6 +1728,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     def update_subs(self):
         self.sub_guilds = dict(self._guilds) or self.sub_guilds
         self.sub_channels = dict(chain.from_iterable(guild._channels.items() for guild in self.sub_guilds.values())) or self.sub_channels
+        if not self.guilds_ready.done():
+            return
         for guild in self.guilds:
             if len(guild._members) != guild.member_count:
                 print("Incorrect member count:", guild, len(guild._members), guild.member_count)
@@ -3196,9 +3198,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     break
             members = {int(m["user"]["id"]): discord.Member(guild=guild, data=m, state=self._connection) for m in memberdata}
             guild._members.update(members)
+            guild._member_count = len(guild._members)
             i = len(memberdata)
             x = max(members)
-        guild._member_count = len(guild._members)
 
     async def load_guild(self, guild):
         await choice(self._connection.chunk_guild, self.load_guild_http)(guild)
@@ -4684,7 +4686,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 with tracebacksuppressor:
                     await fut
             await wrap_future(self.connect_ready)
+            print("Connect ready.")
             await wrap_future(self.guilds_ready)
+            print("Guilds ready.")
             await create_future(self.update_usernames)
             self.ready = True
             # Send ready event to all databases.
@@ -4692,7 +4696,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             await self.send_event("_ready_", bot=self)
             create_task(self.heartbeat_loop())
             force_kill(self.heartbeat_proc)
-            print("Initialization complete.")
+            print("Initialisation complete.")
 
     def set_client_events(self):
 

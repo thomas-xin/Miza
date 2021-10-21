@@ -74,13 +74,14 @@ class Purge(Command):
                         raise
                     if t - discord.utils.snowflake_time(dels[-1].id).timestamp() > 14 * 86400:
                         raise
-                    # bot.logDelete(dels[-1], -1)
                     await channel.delete_messages(dels)
                     deleted += len(dels)
                     for _ in loop(len(dels)):
                         delM.popleft()
                 else:
-                    await bot.silent_delete(delM[0], no_log=-1, exc=True)
+                    m = delM[0]
+                    m.channel = channel
+                    await bot.silent_delete(m, no_log=-1, exc=True)
                     deleted += 1
                     delM.popleft()
             except:
@@ -90,15 +91,16 @@ class Purge(Command):
                     with tracebacksuppressor:
                         await bot.silent_delete(m, no_log=-1, exc=True)
                     deleted += 1
+        if "h" in flags:
+            return
         s = italics(css_md(f"Deleted {sqr_md(deleted)} message{'s' if deleted != 1 else ''}!", force=True))
         if getattr(message, "slash", None):
             return s
-        if not "h" in flags:
-            create_task(send_with_react(
-                channel,
-                s,
-                reacts="❎",
-            ))
+        create_task(send_with_react(
+            channel,
+            s,
+            reacts="❎",
+        ))
 
 
 class Mute(Command):
