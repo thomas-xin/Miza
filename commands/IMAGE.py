@@ -269,7 +269,7 @@ class ImageAdjust(Command):
             default = 8
         else:
             default = 2
-        name, value, url, fmt = await get_image(bot, user, message, args, argv, default=default)
+        name2, value, url, fmt = await get_image(bot, user, message, args, argv, default=default)
         with discord.context_managers.Typing(channel):
             if name.startswith("sat"):
                 argi = ("Enhance", ["Color", value, "-f", fmt])
@@ -285,14 +285,16 @@ class ImageAdjust(Command):
                 argi = ("hue_shift", [value, "-f", fmt])
             elif name in ("blur", "gaussian"):
                 argi = ("blur", ["gaussian", value, "-f", fmt])
+            else:
+                raise RuntimeError(name)
             resp = await process_image(url, *argi, timeout=_timeout)
             fn = resp[0]
             if fn.endswith(".gif"):
-                if not name.endswith(".gif"):
-                    if "." in name:
-                        name = name[:name.rindex(".")]
-                    name += ".gif"
-        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
+                if not name2.endswith(".gif"):
+                    if "." in name2:
+                        name2 = name2[:name2.rindex(".")]
+                    name2 += ".gif"
+        await bot.send_with_file(channel, "", fn, filename=name2, reference=message)
 
 
 class ColourDeficiency(Command):
