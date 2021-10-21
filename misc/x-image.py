@@ -217,12 +217,12 @@ def from_gradient(shape, count, colour):
     mode = "RGB" + "A" * (len(colour) > 3)
     s = 960
     if shape == "linear":
-        data = np.linspace(0, count, num=s, dtype=np.float32)
+        data = np.linspace(0, count, num=s, dtype=np.float16)
     if shape == "radial":
         try:
             data = globals()["g-1"]
         except KeyError:
-            data = np.linspace(-1, 1, num=s, dtype=np.float32)
+            data = np.linspace(-1, 1, num=s, dtype=np.float16)
             data **= 2
             data = np.array([data] * s)
             data += data.T
@@ -237,13 +237,13 @@ def from_gradient(shape, count, colour):
             data = globals()["g-2"]
         except KeyError:
             m = (s - 1) / 2
-            row = np.arange(s, dtype=np.float32)
+            row = np.arange(s, dtype=np.float16)
             row -= m
             data = [None] * s
             for i in range(s):
                 data[i] = a = np.arctan2(i - m, row)
                 a *= 1 / tau
-            data = np.float32(data).T
+            data = np.float16(data).T
             globals()["g-2"] = data
         if count != 1:
             data = data * count
@@ -262,11 +262,11 @@ def rgb_split(image, dtype=np.uint8):
     channels = None
     if "RGB" not in str(image.mode):
         if str(image.mode) == "L":
-            channels = [np.asarray(image, dtype=dtype)] * 3
+            channels = [np.asanyarray(image, dtype=dtype)] * 3
         else:
             image = image.convert("RGB")
     if channels is None:
-        a = np.asarray(image, dtype=dtype)
+        a = np.asanyarray(image, dtype=dtype)
         channels = np.moveaxis(a, -1, 0)[:3]
     return channels
 
@@ -287,11 +287,11 @@ def xyz_split(image, convert=True, dtype=np.uint8):
     if convert:
         out = list(fromarray(a, "L") for a in out)
     else:
-        out = np.asarray(out, dtype=dtype)
+        out = np.asanyarray(out, dtype=dtype)
     return out
 
 def hsv_split(image, convert=True, partial=False, dtype=np.uint8):
-    channels = rgb_split(image, dtype=np.uint32)
+    channels = rgb_split(image, dtype=np.uint16)
     R, G, B = channels
     m = np.min(channels, 0)
     M = np.max(channels, 0)
@@ -299,17 +299,17 @@ def hsv_split(image, convert=True, partial=False, dtype=np.uint8):
     Cmsk = C != 0
 
     # Hue
-    H = np.zeros(R.shape, dtype=np.float32)
+    H = np.zeros(R.shape, dtype=np.float16)
     for i, colour in enumerate(channels):
         mask = (M == colour) & Cmsk
-        hm = channels[i - 2][mask].astype(np.float32)
+        hm = np.asanyarray(channels[i - 2][mask], dtype=np.float16)
         hm -= channels[i - 1][mask]
         hm /= C[mask]
         if i:
             hm += i << 1
         H[mask] = hm
     H *= 256 / 6
-    H = H.astype(dtype)
+    H = np.asanyarray(H, dtype=dtype)
 
     if partial:
         return H, M, m, C, Cmsk, channels
@@ -320,7 +320,7 @@ def hsv_split(image, convert=True, partial=False, dtype=np.uint8):
     S[Mmsk] = np.clip(256 * C[Mmsk] // M[Mmsk], None, 255)
 
     # Value
-    V = M.astype(dtype)
+    V = np.asanyarray(M, dtype=dtype)
 
     out = [H, S, V]
     if convert:
@@ -328,49 +328,29 @@ def hsv_split(image, convert=True, partial=False, dtype=np.uint8):
     return out
 
 def hsl_split(image, convert=True, dtype=np.uint8):
-    out = rgb_split(image, dtype=np.float32)
-    out *= 1 / 255
-    for r, g, b in zip(*out):
-        h, l, s = colorlib.RGB_to_HLS(r, g, b)
-        r[:] = h
-        g[:] = s
-        b[:] = l
-    H, L, S = out
-    H *= 255 / 360
-    S *= 255
-    L *= 255
-    for c in out:
-        np.round(c, out=c)
+    H, M, m, C, Cmsk, channels = hsv_split(image, partial=True, dtype=dtype)
+
+    # Luminance
+    L = np.mean((M, m), 0, dtype=np.int16)
+
+    # Saturation
+    S = np.zeros(H.shape, dtype=dtype)
+    Lmsk = Cmsk
+    Lmsk &= (L != 1) & (L != 0)
+    S[Lmsk] = np.clip((C[Lmsk] << 8) // (255 - np.abs((L[Lmsk] << 1) - 255)), None, 255)
+
+    L = L.astype(dtype)
+
+    out = [H, S, L]
     if convert:
         out = list(fromarray(a, "L") for a in out)
-    else:
-        out = np.asarray(out, dtype=dtype)
-    out = [out[0], out[2], out[1]]
     return out
-
-    # H, M, m, C, Cmsk, channels = hsv_split(image, partial=True, dtype=dtype)
-
-    # # Luminance
-    # L = np.mean((M, m), 0, dtype=np.int32)
-
-    # # Saturation
-    # S = np.zeros(H.shape, dtype=dtype)
-    # Lmsk = Cmsk
-    # Lmsk &= (L != 1) & (L != 0)
-    # S[Lmsk] = np.clip((C[Lmsk] << 8) // (255 - np.abs((L[Lmsk] << 1) - 255)), None, 255)
-
-    # L = L.astype(dtype)
-
-    # out = [H, S, L]
-    # if convert:
-    #     out = list(fromarray(a, "L") for a in out)
-    # return out
 
 def hsi_split(image, convert=True, dtype=np.uint8):
     H, M, m, C, Cmsk, channels = hsv_split(image, partial=True, dtype=dtype)
 
     # Intensity
-    I = np.mean(channels, 0, dtype=np.float32).astype(dtype)
+    I = np.asanyarray(np.mean(channels, 0, dtype=np.float16), dtype=dtype)
 
     # Saturation
     S = np.zeros(H.shape, dtype=dtype)
@@ -401,7 +381,7 @@ def hcl_split(image, convert=True, dtype=np.uint8):
     if convert:
         out = list(fromarray(a, "L") for a in out)
     else:
-        out = np.asarray(out, dtype=dtype)
+        out = np.asanyarray(out, dtype=dtype)
     return out
 
 def luv_split(image, convert=True, dtype=np.uint8):
@@ -424,7 +404,7 @@ def luv_split(image, convert=True, dtype=np.uint8):
     if convert:
         out = list(fromarray(a, "L") for a in out)
     else:
-        out = np.asarray(out, dtype=dtype)
+        out = np.asanyarray(out, dtype=dtype)
     return out
 
 def rgb_merge(R, G, B, convert=True):
@@ -454,59 +434,31 @@ def xyz_merge(X, Y, Z, convert=True):
     return rgb_merge(*out, convert=convert)
 
 def hsv_merge(H, S, V, convert=True):
-    H = H.astype(np.float32)
-    S = S.astype(np.float32)
-    V = V.astype(np.float32)
-    H *= 360 / 255
-    S *= 1 / 255
-    V *= 1 / 255
-    for h, s, v in zip(H, S, V):
-        r, g, b = colorlib.HSV_to_RGB(h, s, v)
-        h[:] = r
-        s[:] = g
-        v[:] = b
-    out = (H, S, V)
-    for c in out:
-        c *= 255
-        np.round(c, out=c)
-    return rgb_merge(*out, convert=convert)
+    return hsl_merge(H, S, V, convert, value=True)
 
-def hsl_merge(H, S, L, convert=True):
-    H = H.astype(np.float32)
-    S = S.astype(np.float32)
-    L = L.astype(np.float32)
-    H *= 360 / 255
-    S *= 1 / 255
-    L *= 1 / 255
-    for h, s, l in zip(H, S, L):
-        r, g, b = colorlib.HLS_to_RGB(h, l, s)
-        h[:] = r
-        s[:] = g
-        l[:] = b
-    out = (H, S, L)
-    for c in out:
-        c *= 255
-        np.round(c, out=c)
-    return rgb_merge(*out, convert=convert)
-
-def hsi_merge(H, S, V, convert=True):
-    S = np.asarray(S, dtype=np.float32)
+def hsl_merge(H, S, L, convert=True, value=False, intensity=False):
+    S = np.asanyarray(S, dtype=np.float16)
     S *= 1 / 255
     np.clip(S, None, 1, out=S)
-    L = np.asarray(L, dtype=np.float32)
+    L = np.asanyarray(L, dtype=np.float16)
     L *= 1 / 255
     np.clip(L, None, 1, out=L)
-    H = np.asarray(H, dtype=np.uint8)
+    H = np.asanyarray(H, dtype=np.uint8)
 
-    Hp = H.astype(np.float32) * (6 / 256)
+    Hp = H.astype(np.float16) * (6 / 256)
     Z = (1 - np.abs(Hp % 2 - 1))
-    C = (3 * L * S) / (Z + 1)
+    if intensity:
+        C = (3 * L * S) / (Z + 1)
+    elif value:
+        C = L * S
+    else:
+        C = (1 - np.abs(2 * L - 1)) * S
     X = C * Z
 
     # initilize with zero
-    R = np.zeros(H.shape, dtype=np.float32)
-    G = np.zeros(H.shape, dtype=np.float32)
-    B = np.zeros(H.shape, dtype=np.float32)
+    R = np.zeros(H.shape, dtype=np.float16)
+    G = np.zeros(H.shape, dtype=np.float16)
+    B = np.zeros(H.shape, dtype=np.float16)
 
     # handle each case:
     mask = (Hp < 1)
@@ -534,7 +486,12 @@ def hsi_merge(H, S, V, convert=True):
     B[mask] = X[mask]
     R[mask] = C[mask]
 
-    m = L * (1 - S)
+    if intensity:
+        m = L * (1 - S)
+    elif value:
+        m = L - C
+    else:
+        m = L - 0.5 * C
     R += m
     G += m
     B += m
@@ -542,6 +499,9 @@ def hsi_merge(H, S, V, convert=True):
     G *= 255
     B *= 255
     return rgb_merge(R, G, B, convert)
+
+def hsi_merge(H, S, V, convert=True):
+    return hsl_merge(H, S, V, convert, intensity=True)
 
 def hcl_merge(H, C, L, convert=True):
     H = H.astype(np.float32)
@@ -2161,7 +2121,7 @@ def blend_op(image, url, operation, amount, recursive=True):
             else:
                 A = None
             image = Image.blend(image, image2, 0.5)
-            spl = hsl_split(image, convert=False, dtype=np.uint32)
+            spl = hsl_split(image, convert=False, dtype=np.uint16)
             if filt == "OVERFLOW":
                 spl[2] <<= 1
                 spl[1] <<= 1
@@ -2217,7 +2177,7 @@ def remove_matte(image, colour):
         image = image.convert("RGBA")
     if str(image.mode) != "RGBA":
         image = image.convert("RGBA")
-    arr = np.array(image).astype(np.float32)
+    arr = np.asanyarrayarray(image, dtype=np.float16)
     col = np.array(colour)
     t = len(col)
     for row in arr:
@@ -2373,7 +2333,7 @@ def brightness(image, value):
             A = image.getchannel("A")
         else:
             A = None
-        H, S, L = hsl_split(image, convert=False, dtype=np.uint32)
+        H, S, L = hsl_split(image, convert=False, dtype=np.uint16)
         np.multiply(L, value, out=L, casting="unsafe")
         image = hsl_merge(H, S, L)
         if A:
