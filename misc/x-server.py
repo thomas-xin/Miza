@@ -407,7 +407,7 @@ class Server:
                 image_loaders = self.image_loaders
                 if (not os.path.exists(preview) or not os.path.getsize(preview)) and preview not in image_loaders:
                     args = (
-                        "ffmpeg",
+                        "./ffmpeg",
                         "-nostdin",
                         "-hide_banner",
                         "-v",

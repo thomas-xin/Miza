@@ -61,12 +61,12 @@ async def respond(s):
                 except SyntaxError:
                     pass
                 else:
-                    resp = await create_future(eval, code, client._globals)
+                    resp = eval(code, client._globals)
                 if code is None:
-                    resp = await create_future(exec, c, client._globals)
+                    resp = exec(c, client._globals)
         except Exception as ex:
             sys.stdout.write(traceback.format_exc())
-            await create_future(submit, f"bot.audio.returns[{k}].set_exception(pickle.loads({repr(pickle.dumps(ex))}))")
+            submit(f"bot.audio.returns[{k}].set_exception(pickle.loads({repr(pickle.dumps(ex))}))")
             return
     if not res:
         res = repr(resp)
@@ -75,7 +75,7 @@ async def respond(s):
                 compile(res, "miza2", "eval")
             except SyntaxError:
                 res = repr(str(resp))
-    await create_future(submit, f"bot.audio.returns[{k}].set_result({res})")
+    submit(f"bot.audio.returns[{k}].set_result({res})")
 
 async def communicate():
     print("Audio client successfully connected.")
@@ -743,7 +743,7 @@ class BufferedAudioReader(discord.AudioSource):
         if self.full:
             fut = create_future_ex(next, self.packet_iter, b"")
             try:
-                out = fut.result(timeout=0.1)
+                out = fut.result(timeout=0.8)
             except concurent.futures.TimeoutError:
                 with suppress():
                     force_kill(self.proc)
