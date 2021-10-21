@@ -1848,7 +1848,7 @@ def blend_op(image, url, operation, amount, recursive=True):
                     A = image.getchannel("A")
                 else:
                     A = None
-                if f == "LUM"
+                if f == "LUM":
                     channels1 = yuv_split(image, convert=False)
                     channels2 = yuv_split(image2, convert=False)
                 elif f == "LIT":
