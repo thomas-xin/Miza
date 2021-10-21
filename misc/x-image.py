@@ -426,8 +426,8 @@ def yiq_split(image, convert=True):
 
 mat_rgb2yuv = (
     (0.299, 0.587, 0.114),
-    (-0.147, -0.289, -0.436),
-    (0.615, -0.515, -0.1),
+    (-0.14713, -0.28886, -0.436),
+    (0.615, -0.51499, -0.10001),
 )
 def yuv_split(image, convert=True):
     out = np.swapaxes(rgb_split(image, dtype=np.float16), 0, 2)
@@ -444,8 +444,9 @@ def yuv_split(image, convert=True):
 def rgb_merge(R, G, B, convert=True):
     out = np.empty(R.shape + (3,), dtype=np.uint8)
     outT = np.swapaxes(out, 2, 0)
-    for a in (R, G, B):
-        np.clip(a, None, 255, out=a)
+    if R.dtype in (np.float16, np.float32, np.float64):
+        for a in (R, G, B):
+            np.clip(a, 0, 255, out=a)
     outT[:] = (R, G, B)
     if convert:
         out = fromarray(out, "RGB")
@@ -601,9 +602,9 @@ def yiq_merge(yiq, convert=True):
     return out
 
 mat_yuv2rgb = (
-    (1, 0, 1.34),
-    (1, -0.395, -0.647),
-    (1, 2.032, 0),
+    (1, 0, 1.13983),
+    (1, -0.39465, -0.5806),
+    (1, 2.03211, 0),
 )
 def yuv_merge(yuv, convert=True):
     yuv = np.asanyarray(yuv, dtype=np.float16)
@@ -1857,11 +1858,11 @@ def blend_op(image, url, operation, amount, recursive=True):
                 else:
                     channels1 = image.convert("HSV").split()
                     channels2 = image2.convert("HSV").split()
-                if f == "HUE":
+                if f in ("HUE", "LUM"):
                     channels = [channels2[0], channels1[1], channels1[2]]
                 elif f == "SAT":
                     channels = [channels1[0], channels2[1], channels1[2]]
-                elif f in ("LIT", "LUM", "VAL"):
+                elif f in ("LIT", "VAL"):
                     channels = [channels1[0], channels1[1], channels2[2]]
                 elif f == "COL":
                     channels = [channels2[0], channels2[1], channels1[2]]
@@ -2121,7 +2122,7 @@ def luminance(image, value):
         else:
             A = None
         yuv = yuv_split(image, convert=False)
-        np.multiply(yuv[-1], value, out=yuv[-1])
+        np.multiply(yuv[0], value, out=yuv[0])
         image = yuv_merge(yuv)
         if A:
             image.putalpha(A)
