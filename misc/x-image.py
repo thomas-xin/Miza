@@ -267,7 +267,7 @@ def rgb_split(image, dtype=np.uint8):
             image = image.convert("RGB")
     if channels is None:
         a = np.asanyarray(image, dtype=dtype)
-        channels = np.rollaxis(a, 2, 0)[:3]
+        channels = np.swapaxes(a, 2, 0)[:3]
     return channels
 
 def xyz_split(image, convert=True, dtype=np.uint8):
@@ -413,13 +413,13 @@ mat_rgb2yiq = (
     (0.212, -0.523, 0.311),
 )
 def yiq_split(image, convert=True):
-    out = np.rollaxis(rgb_split(image, dtype=np.float16), 2, 0)
+    out = np.swapaxes(rgb_split(image, dtype=np.float16), 0, 2)
     out *= 1 / 255
     try:
         out @= mat_rgb2yiq
     except TypeError:
         out = out @ mat_rgb2yiq
-    out = np.rollaxis(out, 0, 2)
+    out = np.swapaxes(out, 2, 0)
     if convert:
         out = list(fromarray(a, "L") for a in out)
     return out
@@ -430,20 +430,20 @@ mat_rgb2yuv = (
     (0.615, -0.515, -0.1),
 )
 def yuv_split(image, convert=True):
-    out = np.rollaxis(rgb_split(image, dtype=np.float16), 2, 0)
+    out = np.swapaxes(rgb_split(image, dtype=np.float16), 0, 2)
     out *= 1 / 255
     try:
         out @= mat_rgb2yuv
     except TypeError:
         out = out @ mat_rgb2yuv
-    out = np.rollaxis(out, 0, 2)
+    out = np.swapaxes(out, 2, 0)
     if convert:
         out = list(fromarray(a, "L") for a in out)
     return out
 
 def rgb_merge(R, G, B, convert=True):
     out = np.empty(R.shape + (3,), dtype=np.uint8)
-    outT = np.rollaxis(out, 2, 0)
+    outT = np.swapaxes(out, 2, 0)
     for a in (R, G, B):
         np.clip(a, None, 255, out=a)
     outT[:] = (R, G, B)
@@ -587,7 +587,7 @@ mat_yiq2rgb = (
 )
 def yiq_merge(yiq, convert=True):
     yiq = np.asanyarray(yiq, dtype=np.float16)
-    out = np.rollaxis(yiq, 2, 0)
+    out = np.swapaxes(yiq, 0, 2)
     try:
         out @= mat_yiq2rgb
     except TypeError:
@@ -597,7 +597,7 @@ def yiq_merge(yiq, convert=True):
         out = out.astype(np.uint8)
         out = fromarray(out, "RGB")
     else:
-        out = np.rollaxis(out, 0, 2)
+        out = np.swapaxes(out, 2, 0)
     return out
 
 mat_yuv2rgb = (
@@ -607,7 +607,7 @@ mat_yuv2rgb = (
 )
 def yuv_merge(yuv, convert=True):
     yuv = np.asanyarray(yuv, dtype=np.float16)
-    out = np.rollaxis(yuv, 2, 0)
+    out = np.swapaxes(yuv, 0, 2)
     try:
         out @= mat_yuv2rgb
     except TypeError:
@@ -617,7 +617,7 @@ def yuv_merge(yuv, convert=True):
         out = out.astype(np.uint8)
         out = fromarray(out, "RGB")
     else:
-        out = np.rollaxis(out, 0, 2)
+        out = np.swapaxes(out, 2, 0)
     return out
 
 srgb_p = ImageCms.createProfile("sRGB")
