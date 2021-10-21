@@ -515,7 +515,7 @@ class ColourSpace(Command):
         if source == dest:
             raise TypeError("Colour spaces must be different.")
         for i in (source, dest):
-            if i not in ("rgb", "cmy", "hsv", "hsl", "hsi", "hcl", "lab", "luv", "xyz"):
+            if i not in ("rgb", "cmy", "xyz", "hsv", "hsl", "hsi", "hcl", "lab", "luv", "yiq", "yuv"):
                 raise TypeError(f"Invalid colour space {i}.")
         with discord.context_managers.Typing(channel):
             resp = await process_image(url, "colourspace", [source, dest, "-f", fmt], timeout=_timeout)

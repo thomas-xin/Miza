@@ -267,11 +267,11 @@ def rgb_split(image, dtype=np.uint8):
             image = image.convert("RGB")
     if channels is None:
         a = np.asanyarray(image, dtype=dtype)
-        channels = np.moveaxis(a, -1, 0)[:3]
+        channels = np.rollaxis(a, 2, 0)[:3]
     return channels
 
 def xyz_split(image, convert=True, dtype=np.uint8):
-    out = rgb_split(image, dtype=np.float32)
+    out = rgb_split(image, dtype=np.float16)
     out *= 1 / 255
     for r, g, b in zip(*out):
         x, y, z = colorlib.RGB_to_XYZ(r, g, b)
@@ -363,7 +363,7 @@ def hsi_split(image, convert=True, dtype=np.uint8):
     return out
 
 def hcl_split(image, convert=True, dtype=np.uint8):
-    out = rgb_split(image, dtype=np.float32)
+    out = rgb_split(image, dtype=np.float16)
     out *= 1 / 255
     for r, g, b in zip(*out):
         temp = colorlib.RGB_to_XYZ(r, g, b)
@@ -385,7 +385,7 @@ def hcl_split(image, convert=True, dtype=np.uint8):
     return out
 
 def luv_split(image, convert=True, dtype=np.uint8):
-    out = rgb_split(image, dtype=np.float32)
+    out = rgb_split(image, dtype=np.float16)
     out *= 1 / 255
     for r, g, b in zip(*out):
         temp = colorlib.RGB_to_XYZ(r, g, b)
@@ -407,18 +407,54 @@ def luv_split(image, convert=True, dtype=np.uint8):
         out = np.asanyarray(out, dtype=dtype)
     return out
 
+mat_rgb2yiq = (
+    (0.299, 0.587, 0.114),
+    (0.596, -0.275, -0.321),
+    (0.212, -0.523, 0.311),
+)
+def yiq_split(image, convert=True):
+    out = rgb_split(image, dtype=np.float16).rollaxis(0, 2)
+    out *= 1 / 255
+    try:
+        out @= mat_rgb2yiq
+    except TypeError:
+        out = out @ mat_rgb2yiq
+    out = out.rollaxis(2, 0)
+    if convert:
+        out = list(fromarray(a, "L") for a in out)
+    return out
+
+mat_rgb2yuv = (
+    (0.299, 0.587, 0.114),
+    (-0.147, -0.289, -0.436),
+    (0.615, -0.515, -0.1),
+)
+def yuv_split(image, convert=True):
+    out = rgb_split(image, dtype=np.float16).rollaxis(0, 2)
+    out *= 1 / 255
+    try:
+        out @= mat_rgb2yuv
+    except TypeError:
+        out = out @ mat_rgb2yuv
+    out = out.rollaxis(2, 0)
+    if convert:
+        out = list(fromarray(a, "L") for a in out)
+    return out
+
 def rgb_merge(R, G, B, convert=True):
     out = np.empty(R.shape + (3,), dtype=np.uint8)
-    outT = np.moveaxis(out, -1, 0)
-    outT[:] = [np.clip(a, None, 255) for a in (R, G, B)]
+    outT = np.rollaxis(out, 2, 0)
+    for a in (R, G, B):
+        np.clip(a, None, 255, out=a)
+    outT[:] = (R, G, B)
     if convert:
         out = fromarray(out, "RGB")
     return out
 
 def xyz_merge(X, Y, Z, convert=True):
-    X = X.astype(np.float32)
-    Y = Y.astype(np.float32)
-    Z = Z.astype(np.float32)
+    X = np.asanyarray(X, np.float16)
+    Y = np.asanyarray(Y, np.float16)
+    Z = np.asanyarray(Z, np.float16)
     X *= 96 / 255
     Y *= 100 / 255
     Z *= 109 / 255
@@ -504,9 +540,9 @@ def hsi_merge(H, S, V, convert=True):
     return hsl_merge(H, S, V, convert, intensity=True)
 
 def hcl_merge(H, C, L, convert=True):
-    H = H.astype(np.float32)
-    C = C.astype(np.float32)
-    L = L.astype(np.float32)
+    H = np.asanyarray(H, np.float16)
+    C = np.asanyarray(C, np.float16)
+    L = np.asanyarray(L, np.float16)
     H *= 360 / 255
     C *= 180 / 255
     L *= 100 / 255
@@ -524,9 +560,9 @@ def hcl_merge(H, C, L, convert=True):
     return rgb_merge(*out, convert=convert)
 
 def luv_merge(L, U, V, convert=True):
-    L = L.astype(np.float32)
-    U = U.astype(np.float32)
-    V = V.astype(np.float32)
+    L = np.asanyarray(L, np.float16)
+    U = np.asanyarray(U, np.float16)
+    V = np.asanyarray(V, np.float16)
     U -= 127.5
     V -= 127.5
     L *= 100 / 255
@@ -543,6 +579,46 @@ def luv_merge(L, U, V, convert=True):
         c *= 255
         np.round(c, out=c)
     return rgb_merge(*out, convert=convert)
+
+mat_yiq2rgb = (
+    (1, 0.956, 0.621),
+    (1, -0.272, -0.647),
+    (1, -1.107, 1.704),
+)
+def yiq_merge(yiq, convert=True):
+    yiq = np.asanyarray(yiq, dtype=np.float16)
+    out = yiq.rollaxis(0, 2)
+    try:
+        out @= mat_yiq2rgb
+    except TypeError:
+        out = out @ mat_yiq2rgb
+    if convert:
+        np.clip(out, 0, 255, out=out)
+        out = out.astype(np.uint8)
+        out = fromarray(out, "RGB")
+    else:
+        out = out.rollaxis(2, 0)
+    return out
+
+mat_yuv2rgb = (
+    (1, 0, 1.34),
+    (1, -0.395, -0.647),
+    (1, 2.032, 0),
+)
+def yuv_merge(yuv, convert=True):
+    yuv = np.asanyarray(yuv, dtype=np.float16)
+    out = yuv.rollaxis(0, 2)
+    try:
+        out @= mat_yuv2rgb
+    except TypeError:
+        out = out @ mat_yuv2rgb
+    if convert:
+        np.clip(out, 0, 255, out=out)
+        out = out.astype(np.uint8)
+        out = fromarray(out, "RGB")
+    else:
+        out = out.rollaxis(2, 0)
+    return out
 
 srgb_p = ImageCms.createProfile("sRGB")
 lab_p  = ImageCms.createProfile("LAB")
@@ -1302,356 +1378,45 @@ def colourspace(image, source, dest):
         A = image.getchannel("A")
     else:
         A = None
+    im = None
     out = None
-    if source == "rgb":
-        if dest == "cmy":
-            out = invert(image)
-        elif dest == "xyz":
-            spl = xyz_split(image, convert=False)
-            out = rgb_merge(*spl)
-        elif dest == "hsv":
-            spl = image.convert("HSV").tobytes()
-            out = Image.frombytes("RGB", image.size, spl)
-        elif dest == "hsl":
-            spl = hsl_split(image, convert=False)
-            out = rgb_merge(*spl)
-        elif dest == "hsi":
-            spl = hsi_split(image, convert=False)
-            out = rgb_merge(*spl)
-        elif dest == "hcl":
-            spl = hcl_split(image, convert=False)
-            out = rgb_merge(*spl)
-        elif dest == "lab":
-            spl = ImageCms.applyTransform(image, rgb2lab).tobytes()
-            out = Image.frombytes("RGB", image.size, spl)
-        elif dest == "luv":
-            spl = luv_split(image, convert=False)
-            out = rgb_merge(*spl)
-    elif source == "cmy":
+    if source in ("xyz", "hsl", "hsi", "hcl", "luv", "yiq", "yuv"):
+        spl = rgb_split(image)
+        try:
+            im = globals()[source + "_merge"](*spl, convert=True)
+        except TypeError:
+            im = globals()[source + "_merge"](spl)
+    else:
+        if source == "rgb":
+            im = image
+        elif source == "cmy":
+            im = invert(image)
+        elif source == "hsv":
+            if image.mode != "RGB":
+                image = image.convert("RGB")
+            out = Image.frombuffer("HSV", image.size, image.tobytes())
+            im = im.convert("RGB")
+        elif source == "lab":
+            if image.mode != "RGB":
+                image = image.convert("RGB")
+            im = Image.frombuffer("LAB", image.size, image.tobytes())
+            im = ImageCms.applyTransform(im, lab2rgb)
+    if not im:
+        raise NotImplementedError(f"Colourspace {source} is not currently supported.")
+    if dest in ("xyz", "hsl", "hsi", "hcl", "luv", "yiq", "yuv"):
+        spl = globals()[dest + "_split"](im, convert=False)
+        out = rgb_merge(*spl)
+    else:
         if dest == "rgb":
-            out = invert(image)
-        elif dest == "xyz":
-            image = invert(image)
-            spl = xyz_split(image, convert=False)
-            out = rgb_merge(*spl)
-        elif dest == "hsv":
-            spl = invert(image).convert("HSV").tobytes()
-            out = Image.frombytes("RGB", image.size, spl)
-        elif dest == "hsl":
-            image = invert(image)
-            spl = hsl_split(image, convert=False)
-            out = rgb_merge(*spl)
-        elif dest == "hsi":
-            image = invert(image)
-            spl = hsi_split(image, convert=False)
-            out = rgb_merge(*spl)
-        elif dest == "hcl":
-            image = invert(image)
-            spl = hcl_split(image, convert=False)
-            out = rgb_merge(*spl)
-        elif dest == "lab":
-            spl = ImageCms.applyTransform(invert(image), rgb2lab).tobytes()
-            out = Image.frombytes("RGB", image.size, spl)
-        elif dest == "luv":
-            image = invert(image)
-            spl = luv_split(image, convert=False)
-            out = rgb_merge(*spl)
-    elif source == "xyz":
-        if dest == "rgb":
-            spl = rgb_split(image)
-            out = xyz_merge(*spl)
+            out = im
         elif dest == "cmy":
-            spl = rgb_split(image)
-            out = xyz_merge(*spl, convert=False)
-            out ^= 255
-            out = fromarray(out, "RGB")
+            out = invert(im)
         elif dest == "hsv":
-            spl = rgb_split(image)
-            im = xyz_merge(*spl)
-            out = im.convert("HSV")
-        elif dest == "hsl":
-            spl = rgb_split(image)
-            im = xyz_merge(*spl)
-            spl = hsl_split(im, convert=False)
-            out = rgb_merge(*spl)
-        elif dest == "hsi":
-            spl = rgb_split(image)
-            im = xyz_merge(*spl)
-            spl = hsi_split(im, convert=False)
-            out = rgb_merge(*spl)
-        elif dest == "hcl":
-            spl = rgb_split(image)
-            im = xyz_merge(*spl)
-            spl = hcl_split(im, convert=False)
-            out = rgb_merge(*spl)
+            im = im.convert("HSV")
+            out = Image.frombuffer("RGB", im.size, im.tobytes())
         elif dest == "lab":
-            spl = rgb_split(image)
-            im = xyz_merge(*spl)
-            spl = ImageCms.applyTransform(im, rgb2lab).tobytes()
-            out = Image.frombytes("RGB", image.size, spl)
-        elif dest == "luv":
-            spl = rgb_split(image)
-            im = xyz_merge(*spl)
-            spl = luv_split(im, convert=False)
-            out = rgb_merge(*spl)
-    elif source == "hsv":
-        if dest == "rgb":
-            if image.mode != "RGB":
-                image = image.convert("RGB")
-            spl = image.tobytes()
-            out = Image.frombytes("HSV", image.size, spl).convert("RGB")
-        elif dest == "cmy":
-            if image.mode != "RGB":
-                image = image.convert("RGB")
-            spl = image.tobytes()
-            out = invert(Image.frombytes("HSV", image.size, spl).convert("RGB"))
-        elif dest == "xyz":
-            if image.mode != "RGB":
-                image = image.convert("RGB")
-            spl = image.tobytes()
-            im = Image.frombytes("HSV", image.size, spl).convert("RGB")
-            spl = xyz_split(im, convert=False)
-            out = rgb_merge(*spl)
-        elif dest == "hsl":
-            if image.mode != "RGB":
-                image = image.convert("RGB")
-            spl = image.tobytes()
-            im = Image.frombytes("HSV", image.size, spl).convert("RGB")
-            spl = hsl_split(im, convert=False)
-            out = rgb_merge(*spl)
-        elif dest == "hsi":
-            if image.mode != "RGB":
-                image = image.convert("RGB")
-            spl = image.tobytes()
-            im = Image.frombytes("HSV", image.size, spl).convert("RGB")
-            spl = hsi_split(im, convert=False)
-            out = rgb_merge(*spl)
-        elif dest == "hcl":
-            if image.mode != "RGB":
-                image = image.convert("RGB")
-            spl = image.tobytes()
-            im = Image.frombytes("HSV", image.size, spl).convert("RGB")
-            spl = hcl_split(im, convert=False)
-            out = rgb_merge(*spl)
-        elif dest == "lab":
-            if image.mode != "RGB":
-                image = image.convert("RGB")
-            spl = image.tobytes()
-            im = Image.frombytes("HSV", image.size, spl)
-            spl = ImageCms.applyTransform(im.convert("RGB"), rgb2lab).tobytes()
-            out = Image.frombytes("RGB", image.size, spl)
-        elif dest == "luv":
-            if image.mode != "RGB":
-                image = image.convert("RGB")
-            spl = image.tobytes()
-            im = Image.frombytes("HSV", image.size, spl).convert("RGB")
-            spl = luv_split(im, convert=False)
-            out = rgb_merge(*spl)
-    elif source == "hsl":
-        if dest == "rgb":
-            spl = rgb_split(image)
-            out = hsl_merge(*spl)
-        elif dest == "cmy":
-            spl = rgb_split(image)
-            out = hsl_merge(*spl, convert=False)
-            out ^= 255
-            out = fromarray(out, "RGB")
-        elif dest == "xyz":
-            spl = rgb_split(image)
-            im = hsl_merge(*spl)
-            spl = xyz_split(im, convert=False)
-            out = rgb_merge(*spl)
-        elif dest == "hsv":
-            spl = rgb_split(image)
-            im = hsl_merge(*spl)
-            out = im.convert("HSV")
-        elif dest == "hsi":
-            spl = rgb_split(image)
-            im = hsl_merge(*spl)
-            spl = hsi_split(im, convert=False)
-            out = rgb_merge(*spl)
-        elif dest == "hcl":
-            spl = rgb_split(image)
-            im = hsl_merge(*spl)
-            spl = hcl_split(im, convert=False)
-            out = rgb_merge(*spl)
-        elif dest == "lab":
-            spl = rgb_split(image)
-            im = hsl_merge(*spl)
-            spl = ImageCms.applyTransform(im, rgb2lab).tobytes()
-            out = Image.frombytes("RGB", image.size, spl)
-        elif dest == "luv":
-            spl = rgb_split(image)
-            im = hsl_merge(*spl)
-            spl = luv_split(im, convert=False)
-            out = rgb_merge(*spl)
-    elif source == "hsi":
-        if dest == "rgb":
-            spl = rgb_split(image)
-            out = hsi_merge(*spl)
-        elif dest == "cmy":
-            spl = rgb_split(image)
-            out = hsi_merge(*spl, convert=False)
-            out ^= 255
-            out = fromarray(out, "RGB")
-        elif dest == "xyz":
-            spl = rgb_split(image)
-            im = hsi_merge(*spl)
-            spl = xyz_split(im, convert=False)
-            out = rgb_merge(*spl)
-        elif dest == "hsv":
-            spl = rgb_split(image)
-            im = hsi_merge(*spl)
-            out = im.convert("HSV")
-        elif dest == "hsl":
-            spl = rgb_split(image)
-            im = hsi_merge(*spl)
-            spl = hsl_split(im, convert=False)
-            out = rgb_merge(*spl)
-        elif dest == "hcl":
-            spl = rgb_split(image)
-            im = hsi_merge(*spl)
-            spl = hcl_split(im, convert=False)
-            out = rgb_merge(*spl)
-        elif dest == "lab":
-            spl = rgb_split(image)
-            im = hsi_merge(*spl)
-            spl = ImageCms.applyTransform(im, rgb2lab).tobytes()
-            out = Image.frombytes("RGB", image.size, spl)
-        elif dest == "luv":
-            spl = rgb_split(image)
-            im = hsi_merge(*spl)
-            spl = luv_split(im, convert=False)
-            out = rgb_merge(*spl)
-    elif source == "hcl":
-        if dest == "rgb":
-            spl = rgb_split(image)
-            out = hcl_merge(*spl)
-        elif dest == "cmy":
-            spl = rgb_split(image)
-            out = hcl_merge(*spl, convert=False)
-            out ^= 255
-            out = fromarray(out, "RGB")
-        elif dest == "xyz":
-            spl = rgb_split(image)
-            im = hcl_merge(*spl)
-            spl = xyz_split(im, convert=False)
-            out = rgb_merge(*spl)
-        elif dest == "hsv":
-            spl = rgb_split(image)
-            im = hcl_merge(*spl)
-            out = im.convert("HSV")
-        elif dest == "hsl":
-            spl = rgb_split(image)
-            im = hcl_merge(*spl)
-            spl = hsl_split(im, convert=False)
-            out = rgb_merge(*spl)
-        elif dest == "hsi":
-            spl = rgb_split(image)
-            im = hcl_merge(*spl)
-            spl = hsi_split(im, convert=False)
-            out = rgb_merge(*spl)
-        elif dest == "lab":
-            spl = rgb_split(image)
-            im = hcl_merge(*spl)
-            spl = ImageCms.applyTransform(im, rgb2lab).tobytes()
-            out = Image.frombytes("RGB", image.size, spl)
-        elif dest == "luv":
-            spl = rgb_split(image)
-            im = hcl_merge(*spl)
-            spl = luv_split(im, convert=False)
-            out = rgb_merge(*spl)
-    elif source == "lab":
-        if dest == "rgb":
-            if image.mode != "RGB":
-                image = image.convert("RGB")
-            spl = image.tobytes()
-            out = ImageCms.applyTransform(Image.frombytes("LAB", image.size, spl), lab2rgb)
-        elif dest == "cmy":
-            if image.mode != "RGB":
-                image = image.convert("RGB")
-            spl = image.tobytes()
-            out = invert(ImageCms.applyTransform(Image.frombytes("LAB", image.size, spl), lab2rgb))
-        elif dest == "xyz":
-            if image.mode != "RGB":
-                image = image.convert("RGB")
-            spl = image.tobytes()
-            im = ImageCms.applyTransform(Image.frombytes("LAB", image.size, spl), lab2rgb)
-            spl = xyz_split(im, convert=False)
-            out = rgb_merge(*spl)
-        elif dest == "hsv":
-            if image.mode != "RGB":
-                image = image.convert("RGB")
-            spl = image.tobytes()
-            im = ImageCms.applyTransform(Image.frombytes("LAB", image.size, spl), lab2rgb)
-            spl = im.convert("HSV").tobytes()
-            out = Image.frombytes("RGB", image.size, spl)
-        elif dest == "hsl":
-            if image.mode != "RGB":
-                image = image.convert("RGB")
-            spl = image.tobytes()
-            im = ImageCms.applyTransform(Image.frombytes("LAB", image.size, spl), lab2rgb)
-            spl = hsl_split(im, convert=False)
-            out = rgb_merge(*spl)
-        elif dest == "hsi":
-            if image.mode != "RGB":
-                image = image.convert("RGB")
-            spl = image.tobytes()
-            im = ImageCms.applyTransform(Image.frombytes("LAB", image.size, spl), lab2rgb)
-            spl = hsi_split(im, convert=False)
-            out = rgb_merge(*spl)
-        elif dest == "hcl":
-            if image.mode != "RGB":
-                image = image.convert("RGB")
-            spl = image.tobytes()
-            im = ImageCms.applyTransform(Image.frombytes("LAB", image.size, spl), lab2rgb)
-            spl = hcl_split(im, convert=False)
-            out = rgb_merge(*spl)
-        elif dest == "luv":
-            if image.mode != "RGB":
-                image = image.convert("RGB")
-            spl = image.tobytes()
-            im = ImageCms.applyTransform(Image.frombytes("LAB", image.size, spl), lab2rgb)
-            spl = luv_split(im, convert=False)
-            out = rgb_merge(*spl)
-    elif source == "luv":
-        if dest == "rgb":
-            spl = rgb_split(image)
-            out = luv_merge(*spl)
-        elif dest == "cmy":
-            spl = rgb_split(image)
-            out = luv_merge(*spl, convert=False)
-            out ^= 255
-            out = fromarray(out, "RGB")
-        elif dest == "xyz":
-            spl = rgb_split(image)
-            im = luv_merge(*spl)
-            spl = xyz_split(im, convert=False)
-            out = rgb_merge(*spl)
-        elif dest == "hsv":
-            spl = rgb_split(image)
-            im = luv_merge(*spl)
-            out = im.convert("HSV")
-        elif dest == "hsl":
-            spl = rgb_split(image)
-            im = luv_merge(*spl)
-            spl = hsl_split(im, convert=False)
-            out = rgb_merge(*spl)
-        elif dest == "hsi":
-            spl = rgb_split(image)
-            im = luv_merge(*spl)
-            spl = hsi_split(im, convert=False)
-            out = rgb_merge(*spl)
-        elif dest == "hcl":
-            spl = rgb_split(image)
-            im = luv_merge(*spl)
-            spl = hcl_split(im, convert=False)
-            out = rgb_merge(*spl)
-        elif dest == "lab":
-            spl = rgb_split(image)
-            im = luv_merge(*spl)
-            spl = ImageCms.applyTransform(im, rgb2lab).tobytes()
-            out = Image.frombytes("RGB", image.size, spl)
+            im = ImageCms.applyTransform(im, rgb2lab)
+            out = Image.frombuffer("RGB", im.size, im.tobytes())
     if not out:
         raise NotImplementedError(f"Image conversion from {source} to {dest} is not currently supported.")
     if A is not None:
@@ -1958,6 +1723,8 @@ blenders = {
     "hue": "SP_HUE",
     "sat": "SP_SAT",
     "saturation": "SP_SAT",
+    "lightness": "SP_LIT",
+    "brightness": "SP_LIT",
     "lum": "SP_LUM",
     "luminosity": "SP_LUM",
     "val": "SP_VAL",
@@ -2081,7 +1848,10 @@ def blend_op(image, url, operation, amount, recursive=True):
                     A = image.getchannel("A")
                 else:
                     A = None
-                if f[0] == "L":
+                if f == "LUM"
+                    channels1 = yuv_split(image, convert=False)
+                    channels2 = yuv_split(image2, convert=False)
+                elif f == "LIT":
                     channels1 = hsl_split(image, convert=False)
                     channels2 = hsl_split(image2, convert=False)
                 else:
@@ -2091,11 +1861,13 @@ def blend_op(image, url, operation, amount, recursive=True):
                     channels = [channels2[0], channels1[1], channels1[2]]
                 elif f == "SAT":
                     channels = [channels1[0], channels2[1], channels1[2]]
-                elif f in ("LUM", "VAL"):
+                elif f in ("LIT", "LUM", "VAL"):
                     channels = [channels1[0], channels1[1], channels2[2]]
                 elif f == "COL":
                     channels = [channels2[0], channels2[1], channels1[2]]
-                if f[0] == "L":
+                if f == "LUM":
+                    out = yuv_merge(channels)
+                elif f == "LIT":
                     out = hsl_merge(*channels)
                 else:
                     out = Image.merge("HSV", channels).convert("RGB")
@@ -2348,9 +2120,9 @@ def luminance(image, value):
             A = image.getchannel("A")
         else:
             A = None
-        H, S, L = hcl_split(image, convert=False, dtype=np.float32)
-        np.multiply(L, value, out=L, casting="unsafe")
-        image = hcl_merge(H, S, L)
+        yuv = yuv_split(image, convert=False)
+        np.multiply(yuv[-1], value, out=yuv[-1])
+        image = yuv_merge(yuv)
         if A:
             image.putalpha(A)
     return image

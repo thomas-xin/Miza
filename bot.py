@@ -2524,7 +2524,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
     # Autosaves modified bot databases. Called once every minute and whenever the bot is about to shut down.
     def update(self, force=False):
-        self.update_embeds(True)
+        if force:
+            self.update_embeds(True)
         saved = alist()
         with tracebacksuppressor:
             for i, u in self.data.items():
@@ -3623,12 +3624,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             sent = True
         return sent
 
-    # The fast update loop that runs 24 times per second. Used for events where timing is important.
+    # The fast update loop that runs almost 24 times per second. Used for events where timing is important.
     async def fast_loop(self):
 
         async def event_call(freq):
             for i in range(freq):
-                async with Delay(0.5 / freq):
+                async with Delay(0.51 / freq):
                     await self.send_event("_call_")
 
         freq = 12
@@ -3639,7 +3640,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 if sent:
                     await event_call(freq)
                 else:
-                    async with Delay(0.5 / freq):
+                    async with Delay(0.51 / freq):
                         await self.send_event("_call_")
                 self.update_users()
 
