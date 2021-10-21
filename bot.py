@@ -4372,14 +4372,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if "/reactions" in route.path:
                 rtype = 2
             elif "/messages" in route.path:
-                rtype = 1
+                rtype = 1 if method != "delete" else 3
 
             lock = self._locks.get(bucket)
             if lock is None:
-                if rtype == 2:
+                if rtype == 3:
+                    lock = Semaphore(3, 256, rate_limit=1.1)
+                elif rtype == 2:
                     lock = Semaphore(1, 16, rate_limit=0.55)
-                if rtype == 1:
-                    lock = Semaphore(5, 256, rate_limit=5.1)
+                elif rtype == 1:
+                    lock = Semaphore(5, 256, rate_limit=5.15)
                 else:
                     lock = asyncio.Lock()
                 if bucket is not None:
