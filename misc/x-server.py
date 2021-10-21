@@ -416,6 +416,8 @@ class Server:
                         "ignore_err",
                         "-fflags",
                         "+discardcorrupt+genpts+igndts+flush_packets",
+                        "-hwaccel",
+                        "auto",
                         "-an",
                         "-i",
                         p,

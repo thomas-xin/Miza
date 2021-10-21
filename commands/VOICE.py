@@ -2292,7 +2292,7 @@ class AudioDownloader:
                         data = self.extract_backup(info["url"], video=True)
                         video = info["video"] = get_best_video(data)
                     vidinfo = as_str(subprocess.check_output(["./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "default=nokey=1:noprint_wrappers=1", video])).strip()
-                    args = alist(("./ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y"))
+                    args = alist(("./ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y", "-hwaccel", "auto"))
                     args.extend(("-i", video))
                     # Tell FFmpeg to match fps/frame count as much as possible
                     vf = f"fps={fps}"
