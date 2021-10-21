@@ -82,7 +82,8 @@ async def communicate():
     while True:
         with tracebacksuppressor:
             s = await create_future(sys.stdin.readline)
-            # send(s)
+            if not s:
+                break
             if s.startswith("~"):
                 create_task(respond(s))
 

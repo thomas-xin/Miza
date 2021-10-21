@@ -172,6 +172,7 @@ class Exec(Command):
         virtual=4,
         log=8,
         proxy=16,
+        shell=32,
     ))
 
     def __call__(self, bot, flags, argv, message, channel, guild, **void):
@@ -247,6 +248,11 @@ class UpdateExec(Database):
         proc = as_str(proc)
         # Main terminal uses bot's global variables, virtual one uses a shallow copy per channel
         channel = message.channel
+        if term & 32:
+            proc = await asyncio.create_subprocess_shell(proc, limit=65536)
+            if output is not None:
+                glob["_"] = output
+            return output
         if term & 1:
             glob = bot._globals
         else:
@@ -294,7 +300,7 @@ class UpdateExec(Database):
             output = await create_future(eval, code, glob, priority=True)
         # Output sent to "_" variable if used
         if output is not None:
-            glob["_"] = output 
+            glob["_"] = output
         return output
 
     async def sendDeleteID(self, c_id, delete_after=20, **kwargs):
@@ -335,47 +341,49 @@ class UpdateExec(Database):
         if bot.is_owner(message.author.id) and channel.id in self.data:
             flag = self.data[channel.id]
             # Both main and virtual terminals may be active simultaneously
-            for f in (flag & 1, flag & 4):
-                if f:
-                    proc = message.content.strip()
-                    if proc:
-                        # Ignore commented messages
-                        if proc[:2] in ("//", "||", "~~") or proc[0] in "\\#<>:;+.^*" or not proc[0].isascii():
-                            return
-                        if proc == "-" or proc.startswith("http://") or proc.startswith("https://"):
-                            return
-                        if proc.startswith("`") and proc.endswith("`"):
-                            if proc.startswith("```"):
-                                proc = proc[3:]
-                                spl = proc.splitlines()
-                                if spl[0].isalnum():
-                                    spl.pop(0)
-                                proc = "\n".join(spl)
-                            proc = proc.strip("`").strip()
-                        if not proc:
-                            return
-                        with suppress(KeyError):
-                            # Write to input() listener if required
-                            if self.listeners[channel.id] is None:
-                                create_task(message.add_reaction("👀"))
-                                self.listeners[channel.id] = proc
-                                return
-                        if not proc:
-                            return
-                        proc = proc.translate(self.qtrans)
-                        try:
-                            create_task(message.add_reaction("❗"))
-                            result = await self.procFunc(message, proc, bot, term=f)
-                            output = str(result)
-                            if len(output) > 24000:
-                                f = CompatFile(output.encode("utf-8"), filename="message.txt")
-                                await bot.send_with_file(channel, "Response over 24,000 characters.", file=f, reference=message)
-                            elif len(output) > 1993:
-                                bot.send_as_embeds(channel, output, md=code_md)
-                            else:
-                                await send_with_reply(channel, message, self.prepare_string(output, fmt=""))
-                        except:
-                            await send_with_react(channel, self.prepare_string(traceback.format_exc()), reacts="❎", reference=message)
+            for f in (flag & 1, flag & 4, flag & 32):
+                if not f:
+                    continue
+                proc = message.content.strip()
+                if not proc:
+                    return
+                # Ignore commented messages
+                if proc[:2] in ("//", "||", "~~") or proc[0] in "\\#<>:;+.^*" or not proc[0].isascii():
+                    return
+                if proc == "-" or proc.startswith("http://") or proc.startswith("https://"):
+                    return
+                if proc.startswith("`") and proc.endswith("`"):
+                    if proc.startswith("```"):
+                        proc = proc[3:]
+                        spl = proc.splitlines()
+                        if spl[0].isalnum():
+                            spl.pop(0)
+                        proc = "\n".join(spl)
+                    proc = proc.strip("`").strip()
+                if not proc:
+                    return
+                with suppress(KeyError):
+                    # Write to input() listener if required
+                    if self.listeners[channel.id] is None:
+                        create_task(message.add_reaction("👀"))
+                        self.listeners[channel.id] = proc
+                        return
+                if not proc:
+                    return
+                proc = proc.translate(self.qtrans)
+                try:
+                    create_task(message.add_reaction("❗"))
+                    result = await self.procFunc(message, proc, bot, term=f)
+                    output = str(result)
+                    if len(output) > 24000:
+                        f = CompatFile(output.encode("utf-8"), filename="message.txt")
+                        await bot.send_with_file(channel, "Response over 24,000 characters.", file=f, reference=message)
+                    elif len(output) > 1993:
+                        bot.send_as_embeds(channel, output, md=code_md)
+                    else:
+                        await send_with_reply(channel, message, self.prepare_string(output, fmt=""))
+                except:
+                    await send_with_react(channel, self.prepare_string(traceback.format_exc()), reacts="❎", reference=message)
         # Relay DM messages
         elif message.guild is None:
             if bot.is_blacklisted(message.author.id):
@@ -386,7 +394,7 @@ class UpdateExec(Database):
             user = message.author
             if "dailies" in bot.data:
                 bot.data.dailies.progress_quests(user, "talk")
-            emb = as_embed(message)
+            emb = await bot.as_embed(message)
             col = await bot.get_colour(user)
             emb.colour = discord.Colour(col)
             url = await bot.get_proxy_url(user)

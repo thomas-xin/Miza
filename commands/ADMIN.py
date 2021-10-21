@@ -2577,7 +2577,7 @@ class UpdateMessageLogs(Database):
         except (EOFError, discord.NotFound):
             self.data.pop(guild.id)
             return
-        emb = as_embed(message, link=True)
+        emb = await self.bot.as_embed(message, link=True)
         emb.colour = discord.Colour(0x00FFFF)
         action = f"**Slash command executed in** {channel_mention(message.channel.id)}:\n"
         emb.description = lim_str(action + (emb.description or ""), 4096)
@@ -2596,7 +2596,7 @@ class UpdateMessageLogs(Database):
         except (EOFError, discord.NotFound):
             self.data.pop(guild.id)
             return
-        emb = as_embed(after)
+        emb = await self.bot.as_embed(after)
         emb2 = await self.bot.as_embed(before)
         emb.colour = discord.Colour(0x0000FF)
         action = f"**Message edited in** {channel_mention(after.channel.id)}:\n[View Message](https://discord.com/channels/{guild.id}/{after.channel.id}/{after.id})"

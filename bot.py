@@ -380,6 +380,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     # Starts up client.
     def run(self):
         print(f"Logging in...")
+        self.audio_client_start = create_future(self.start_audio_client, priority=True)
         with closing(get_event_loop()):
             with tracebacksuppressor():
                 get_event_loop().run_until_complete(self.start(self.token))
@@ -1612,7 +1613,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if urls:
                 with tracebacksuppressor:
                     url = urls[0]
-                    resp = reqs.next().get(url, headers=Request.header(), timeout=12)
+                    resp = await create_future(reqs.next().get, url, headers=Request.header(), _timeout_=12)
                     self.activity += 1
                     headers = fcdict(resp.headers)
                     if headers.get("Content-Type", "").split("/", 1)[0] == "image":
@@ -4682,12 +4683,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             futs.add(self.audio_client_start)
             await self.wait_until_ready()
             self.bot_ready = True
-            print("Bot ready.")
             # Send bot_ready event to all databases.
             await self.send_event("_bot_ready_", bot=self)
             for fut in futs:
                 with tracebacksuppressor:
                     await fut
+            print("Bot ready.")
             await wrap_future(self.connect_ready)
             print("Connect ready.")
             await wrap_future(self.guilds_ready)
@@ -4704,12 +4705,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     def set_client_events(self):
 
         print("Setting client events...")
-
-        @self.event
-        async def before_identify_hook(shard_id, initial=False):
-            if not getattr(self, "audio_client_start", None):
-                self.audio_client_start = create_future(self.start_audio_client, priority=True)
-            return
 
         # The event called when the client first connects, starts initialisation of the other modules
         @self.event

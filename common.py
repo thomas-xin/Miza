@@ -1346,22 +1346,22 @@ def as_embed(message, link=False):
             return emb
     else:
         urls = find_urls(content)
-        if urls:
-            with tracebacksuppressor:
-                url = urls[0]
-                resp = reqs.next().get(url, headers=Request.header(), timeout=8)
-                if BOT[0]:
-                    BOT[0].activity += 1
-                headers = fcdict(resp.headers)
-                if headers.get("Content-Type").split("/", 1)[0] == "image":
-                    emb.url = url
-                    emb.set_image(url=url)
-                    if url != content:
-                        emb.description = content
-                    if link:
-                        emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 4096)
-                        emb.timestamp = message.edited_at or message.created_at
-                    return emb
+        # if urls:
+        #     with tracebacksuppressor:
+        #         url = urls[0]
+        #         resp = reqs.next().get(url, headers=Request.header(), timeout=8)
+        #         if BOT[0]:
+        #             BOT[0].activity += 1
+        #         headers = fcdict(resp.headers)
+        #         if headers.get("Content-Type").split("/", 1)[0] == "image":
+        #             emb.url = url
+        #             emb.set_image(url=url)
+        #             if url != content:
+        #                 emb.description = content
+        #             if link:
+        #                 emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 4096)
+        #                 emb.timestamp = message.edited_at or message.created_at
+        #             return emb
     emb.description = content
     if len(message.embeds) > 1 or content:
         urls = chain(("(" + e.url + ")" for e in message.embeds[1:] if e.url), ("[" + best_url(a) + "]" for a in message.attachments))
