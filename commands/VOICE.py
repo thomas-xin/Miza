@@ -991,11 +991,6 @@ def png2wav(png):
         f.write(png)
     print(args)
     subprocess.run(args, cwd="misc", stderr=subprocess.PIPE)
-    # while True:
-    #     if os.path.exists(r_wav) and os.path.getsize(r_wav) >= 96000:
-    #         break
-    #     if not proc.is_running():
-    #         raise RuntimeError(as_str(proc.stderr.read()))
     return r_wav
 
 

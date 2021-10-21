@@ -934,7 +934,7 @@ if __name__ == "__main__":
     def ensure_parent():
         parent = psutil.Process(os.getppid())
         while True:
-            if not parent.is_running():
+            if not parent.is_running() or parent.status() == "zombie":
                 p = psutil.Process()
                 for c in p.children(True):
                     c.terminate()

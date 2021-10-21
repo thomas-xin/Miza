@@ -19,6 +19,25 @@ if not hasattr(time, "time_ns"):
 
 requests = requests.Session()
 
+def is_strict_running(proc):
+    if not proc:
+        return
+    try:
+        if not proc.is_running():
+            return False
+        if proc.status() == "zombie":
+            proc.wait()
+            return
+        return True
+    except AttributeError:
+        proc = psutil.Process(proc.pid)
+    if not proc.is_running():
+        return False
+    if proc.status() == "zombie":
+        proc.wait()
+        return
+    return True
+
 
 def as_str(s):
     if type(s) in (bytes, bytearray, memoryview):
@@ -2524,7 +2543,7 @@ def from_bytes(b, save=None):
         while True:
             b = proc.stdout.read(bcount)
             while len(b) < bcount:
-                if not proc.is_running():
+                if not b or not is_strict_running(proc):
                     break
                 b += proc.stdout.read(bcount - len(b))
             if len(b) < bcount:
@@ -2532,6 +2551,7 @@ def from_bytes(b, save=None):
             img = Image.frombuffer(mode, size, b)
             img.info["duration"] = duration
             images.append(img)
+        proc.wait(timeout=2)
         return ImageSequence(*images)
     try:
         return Image.open(out)
@@ -2824,7 +2844,7 @@ if __name__ == "__main__":
     def ensure_parent():
         parent = psutil.Process(os.getppid())
         while True:
-            if not parent.is_running():
+            if not is_strict_running(parent):
                 p = psutil.Process()
                 for c in p.children(True):
                     c.terminate()

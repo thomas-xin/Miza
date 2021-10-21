@@ -1856,19 +1856,6 @@ status_icon = {
 status_order = tuple(status_text)
 
 
-# GC = cdict()
-
-# def var_count():
-#     count = len(gc.get_objects())
-#     for k, v in deque(GC.items()):
-#         with suppress(psutil.NoSuchProcess):
-#             if not psutil.Process(k).is_running():
-#                 GC.pop(k, None)
-#             else:
-#                 count += v
-#     return count
-
-
 # Subprocess pool for resource-consuming operations.
 PROC_COUNT = cdict()
 PROCS = cdict()
@@ -1876,6 +1863,25 @@ PROC_RESP = {}
 
 # Gets amount of processes running in pool.
 sub_count = lambda: sum(sum(1 for p in v if p.is_running()) for v in PROCS.values())
+
+def is_strict_running(proc):
+    if not proc:
+        return
+    try:
+        if not proc.is_running():
+            return False
+        if proc.status() == "zombie":
+            proc.wait()
+            return
+        return True
+    except AttributeError:
+        proc = psutil.Process(proc.pid)
+    if not proc.is_running():
+        return False
+    if proc.status() == "zombie":
+        proc.wait()
+        return
+    return True
 
 def force_kill(proc):
     with tracebacksuppressor(psutil.NoSuchProcess):
@@ -1900,7 +1906,7 @@ def force_kill(proc):
 async def proc_communicate(proc):
     while True:
         with tracebacksuppressor:
-            if not proc or not proc.is_running():
+            if not is_strict_running(proc):
                 return
             b = await proc.stdout.readline()
             if not b:
@@ -1960,7 +1966,7 @@ async def sub_submit(ptype, command, _timeout=12):
     command = "[" + ",".join(map(repr, command[:2])) + "," + ",".join(map(str, command[2:])) + "]"
     s = f"~{ts}~{repr(command.encode('utf-8'))}\n".encode("utf-8")
     await proc.sem()
-    if not proc.is_running():
+    if not is_strict_running(proc):
         proc = await get_idle_proc(ptype)
     async with proc.sem:
         try:
@@ -1981,7 +1987,7 @@ async def sub_submit(ptype, command, _timeout=12):
 
 def sub_kill(start=True):
     for p in itertools.chain(*PROCS.values()):
-        if p and p.is_running():
+        if is_strict_running(p):
             create_future_ex(force_kill, p)
     PROCS.clear()
     if start:

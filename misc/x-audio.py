@@ -86,6 +86,25 @@ async def communicate():
             if s.startswith("~"):
                 create_task(respond(s))
 
+def is_strict_running(proc):
+    if not proc:
+        return
+    try:
+        if not proc.is_running():
+            return False
+        if proc.status() == "zombie":
+            proc.wait()
+            return
+        return True
+    except AttributeError:
+        proc = psutil.Process(proc.pid)
+    if not proc.is_running():
+        return False
+    if proc.status() == "zombie":
+        proc.wait()
+        return
+    return True
+
 
 # Runs ffprobe on a file or url, returning the duration if possible.
 def _get_duration(filename, _timeout=12):
@@ -340,7 +359,7 @@ class AudioFile:
         self.wasfile = False
         self.loading = self.buffered = self.loaded = wasfile
         if wasfile:
-            self.proc = cdict(is_running=lambda: False, kill=lambda: None)
+            self.proc = cdict(is_running=lambda: False, kill=lambda: None, status=lambda: None)
         self.expired = False
         self.readers = cdict()
         self.semaphore = Semaphore(1, 1, delay=5)
@@ -407,7 +426,7 @@ class AudioFile:
             # Attempt to monitor status of output file
             while fl < 4096:
                 with Delay(0.1):
-                    if not self.proc.is_running():
+                    if not is_strict_running(self.proc):
                         err = as_str(self.proc.stderr.read())
                         if check_fmt is not None:
                             if self.webpage_url and ("Server returned 5XX Server Error reply" in err or "Server returned 404 Not Found" in err or "Server returned 403 Forbidden" in err):
@@ -458,7 +477,7 @@ class AudioFile:
     def update(self):
         if not self.live:
             # Check when file has been fully loaded
-            if self.buffered and not self.proc.is_running():
+            if self.buffered and not is_strict_running(self.proc):
                 if not self.loaded:
                     self.loaded = True
                     if not is_url(self.stream):
@@ -533,7 +552,7 @@ class AudioFile:
     # Destroys the file object, killing associated FFmpeg process and removing from cache.
     def destroy(self):
         self.expired = True
-        if self.proc and self.proc.is_running():
+        if is_strict_running(self.proc):
             with suppress():
                 force_kill(self.proc)
         with suppress():
@@ -867,7 +886,7 @@ async def on_ready():
 
 def ensure_parent(proc, parent):
     while True:
-        if not parent.is_running():
+        if not is_strict_running(parent):
             await_fut(kill())
             force_kill(psutil.Process())
         time.sleep(6)

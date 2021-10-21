@@ -5251,7 +5251,7 @@ class AudioClientInterface:
         self.written = True
         self.fut.set_result(self)
         with tracebacksuppressor:
-            while not bot.closed and proc.is_running():
+            while not bot.closed and is_strict_running(proc):
                 s = as_str(proc.stdout.readline()).rstrip()
                 if s:
                     if s[0] == "~":
@@ -5275,11 +5275,12 @@ class AudioClientInterface:
                         print(s)
 
     def kill(self):
-        if self.proc.is_running():
-            with tracebacksuppressor:
-                create_future_ex(self.submit, "await kill()", priority=True).result(timeout=2)
-            with tracebacksuppressor(psutil.NoSuchProcess):
-                return force_kill(self.proc)
+        if not is_strict_running(self.proc):
+            return
+        with tracebacksuppressor:
+            create_future_ex(self.submit, "await kill()", priority=True).result(timeout=2)
+        with tracebacksuppressor(psutil.NoSuchProcess):
+            return force_kill(self.proc)
 
 
 # Queries for searching members

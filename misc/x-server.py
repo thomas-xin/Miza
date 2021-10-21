@@ -431,15 +431,15 @@ class Server:
                     image_loaders[preview] = proc
                 cp.response.headers["Content-Type"] = "image/gif"
                 cp.response.headers["ETag"] = create_etag(p)
-                while preview in image_loaders and (not os.path.exists(preview) or os.path.getsize(preview) < 524288) and image_loaders[preview].is_running():
+                while preview in image_loaders and (not os.path.exists(preview) or os.path.getsize(preview) < 524288) and is_strict_running(image_loaders[preview]):
                     time.sleep(0.05)
                 f = None
-                if preview in image_loaders and not image_loaders[preview].is_running() or preview not in image_loaders and os.path.exists(preview):
+                if preview in image_loaders and not is_strict_running(image_loaders[preview]) or preview not in image_loaders and os.path.exists(preview):
                     cp.response.headers["Content-Length"] = os.path.getsize(preview)
                 elif preview in image_loaders:
                     f = DownloadingFile(
                         preview,
-                        lambda: not image_loaders[preview].is_running(),
+                        lambda: not is_strict_running(image_loaders[preview]),
                     )
                 if not f:
                     if os.path.getsize(preview):
@@ -1856,7 +1856,7 @@ def ensure_parent(proc, parent):
                 RESPONSES.pop(next(iter(RESPONSES)))
             except:
                 pass
-        if not parent.is_running():
+        if not is_strict_running(parent):
             force_kill(psutil.Process())
         time.sleep(6)
 
