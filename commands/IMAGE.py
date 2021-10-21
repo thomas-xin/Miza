@@ -229,8 +229,8 @@ async def get_image(bot, user, message, args, argv, default=2, raw=False, ext="p
         value = default
     elif not raw:
         value = await bot.eval_math(value)
-        if not abs(value) <= 64:
-            raise OverflowError("Maximum multiplier input is 64.")
+        if not abs(value) <= 256:
+            raise OverflowError("Maximum multiplier input is 256.")
     # Try and find a good name for the output image
     try:
         name = url[url.rindex("/") + 1:]

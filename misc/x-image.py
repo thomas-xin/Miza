@@ -217,12 +217,12 @@ def from_gradient(shape, count, colour):
     mode = "RGB" + "A" * (len(colour) > 3)
     s = 960
     if shape == "linear":
-        data = np.linspace(0, count, num=s, dtype=np.float16)
+        data = np.linspace(0, count, num=s, dtype=np.float32)
     if shape == "radial":
         try:
             data = globals()["g-1"]
         except KeyError:
-            data = np.linspace(-1, 1, num=s, dtype=np.float16)
+            data = np.linspace(-1, 1, num=s, dtype=np.float32)
             data **= 2
             data = np.array([data] * s)
             data += data.T
@@ -237,13 +237,13 @@ def from_gradient(shape, count, colour):
             data = globals()["g-2"]
         except KeyError:
             m = (s - 1) / 2
-            row = np.arange(s, dtype=np.float16)
+            row = np.arange(s, dtype=np.float32)
             row -= m
             data = [None] * s
             for i in range(s):
                 data[i] = a = np.arctan2(i - m, row)
                 a *= 1 / tau
-            data = np.float16(data).T
+            data = np.float32(data).T
             globals()["g-2"] = data
         if count != 1:
             data = data * count
@@ -271,7 +271,7 @@ def rgb_split(image, dtype=np.uint8):
     return channels
 
 def xyz_split(image, convert=True, dtype=np.uint8):
-    out = rgb_split(image, dtype=np.float16)
+    out = rgb_split(image, dtype=np.float32)
     out *= 1 / 255
     for r, g, b in zip(*out):
         x, y, z = colorlib.RGB_to_XYZ(r, g, b)
@@ -299,10 +299,10 @@ def hsv_split(image, convert=True, partial=False, dtype=np.uint8):
     Cmsk = C != 0
 
     # Hue
-    H = np.zeros(R.shape, dtype=np.float16)
+    H = np.zeros(R.shape, dtype=np.float32)
     for i, colour in enumerate(channels):
         mask = (M == colour) & Cmsk
-        hm = np.asanyarray(channels[i - 2][mask], dtype=np.float16)
+        hm = np.asanyarray(channels[i - 2][mask], dtype=np.float32)
         hm -= channels[i - 1][mask]
         hm /= C[mask]
         if i:
@@ -350,7 +350,7 @@ def hsi_split(image, convert=True, dtype=np.uint8):
     H, M, m, C, Cmsk, channels = hsv_split(image, partial=True, dtype=dtype)
 
     # Intensity
-    I = np.asanyarray(np.mean(channels, 0, dtype=np.float16), dtype=dtype)
+    I = np.asanyarray(np.mean(channels, 0, dtype=np.float32), dtype=dtype)
 
     # Saturation
     S = np.zeros(H.shape, dtype=dtype)
@@ -363,7 +363,7 @@ def hsi_split(image, convert=True, dtype=np.uint8):
     return out
 
 def hcl_split(image, convert=True, dtype=np.uint8):
-    out = rgb_split(image, dtype=np.float16)
+    out = rgb_split(image, dtype=np.float32)
     out *= 1 / 255
     for r, g, b in zip(*out):
         temp = colorlib.RGB_to_XYZ(r, g, b)
@@ -385,7 +385,7 @@ def hcl_split(image, convert=True, dtype=np.uint8):
     return out
 
 def luv_split(image, convert=True, dtype=np.uint8):
-    out = rgb_split(image, dtype=np.float16)
+    out = rgb_split(image, dtype=np.float32)
     out *= 1 / 255
     for r, g, b in zip(*out):
         temp = colorlib.RGB_to_XYZ(r, g, b)
@@ -413,7 +413,7 @@ mat_rgb2yiq = (
     (0.212, -0.523, 0.311),
 )
 def yiq_split(image, convert=True):
-    out = np.swapaxes(rgb_split(image, dtype=np.float16), 0, 2)
+    out = np.swapaxes(rgb_split(image, dtype=np.float32), 0, 2)
     out *= 1 / 255
     try:
         out @= mat_rgb2yiq
@@ -426,11 +426,11 @@ def yiq_split(image, convert=True):
 
 mat_rgb2yuv = (
     (0.299, 0.587, 0.114),
-    (-0.14713, -0.28886, -0.436),
+    (-0.14713, -0.28886, 0.436),
     (0.615, -0.51499, -0.10001),
 )
 def yuv_split(image, convert=True):
-    out = np.swapaxes(rgb_split(image, dtype=np.float16), 0, 2)
+    out = np.swapaxes(rgb_split(image, dtype=np.float32), 0, 2)
     out *= 1 / 255
     try:
         out @= mat_rgb2yuv
@@ -453,9 +453,9 @@ def rgb_merge(R, G, B, convert=True):
     return out
 
 def xyz_merge(X, Y, Z, convert=True):
-    X = np.asanyarray(X, np.float16)
-    Y = np.asanyarray(Y, np.float16)
-    Z = np.asanyarray(Z, np.float16)
+    X = np.asanyarray(X, np.float32)
+    Y = np.asanyarray(Y, np.float32)
+    Z = np.asanyarray(Z, np.float32)
     X *= 96 / 255
     Y *= 100 / 255
     Z *= 109 / 255
@@ -474,15 +474,15 @@ def hsv_merge(H, S, V, convert=True):
     return hsl_merge(H, S, V, convert, value=True)
 
 def hsl_merge(H, S, L, convert=True, value=False, intensity=False):
-    S = np.asanyarray(S, dtype=np.float16)
+    S = np.asanyarray(S, dtype=np.float32)
     S *= 1 / 255
     np.clip(S, None, 1, out=S)
-    L = np.asanyarray(L, dtype=np.float16)
+    L = np.asanyarray(L, dtype=np.float32)
     L *= 1 / 255
     np.clip(L, None, 1, out=L)
     H = np.asanyarray(H, dtype=np.uint8)
 
-    Hp = H.astype(np.float16) * (6 / 256)
+    Hp = H.astype(np.float32) * (6 / 256)
     Z = (1 - np.abs(Hp % 2 - 1))
     if intensity:
         C = (3 * L * S) / (Z + 1)
@@ -493,9 +493,9 @@ def hsl_merge(H, S, L, convert=True, value=False, intensity=False):
     X = C * Z
 
     # initilize with zero
-    R = np.zeros(H.shape, dtype=np.float16)
-    G = np.zeros(H.shape, dtype=np.float16)
-    B = np.zeros(H.shape, dtype=np.float16)
+    R = np.zeros(H.shape, dtype=np.float32)
+    G = np.zeros(H.shape, dtype=np.float32)
+    B = np.zeros(H.shape, dtype=np.float32)
 
     # handle each case:
     mask = (Hp < 1)
@@ -541,9 +541,9 @@ def hsi_merge(H, S, V, convert=True):
     return hsl_merge(H, S, V, convert, intensity=True)
 
 def hcl_merge(H, C, L, convert=True):
-    H = np.asanyarray(H, np.float16)
-    C = np.asanyarray(C, np.float16)
-    L = np.asanyarray(L, np.float16)
+    H = np.asanyarray(H, np.float32)
+    C = np.asanyarray(C, np.float32)
+    L = np.asanyarray(L, np.float32)
     H *= 360 / 255
     C *= 180 / 255
     L *= 100 / 255
@@ -561,9 +561,9 @@ def hcl_merge(H, C, L, convert=True):
     return rgb_merge(*out, convert=convert)
 
 def luv_merge(L, U, V, convert=True):
-    L = np.asanyarray(L, np.float16)
-    U = np.asanyarray(U, np.float16)
-    V = np.asanyarray(V, np.float16)
+    L = np.asanyarray(L, np.float32)
+    U = np.asanyarray(U, np.float32)
+    V = np.asanyarray(V, np.float32)
     U -= 127.5
     V -= 127.5
     L *= 100 / 255
@@ -587,7 +587,7 @@ mat_yiq2rgb = (
     (1, -1.107, 1.704),
 )
 def yiq_merge(yiq, convert=True):
-    yiq = np.asanyarray(yiq, dtype=np.float16)
+    yiq = np.asanyarray(yiq, dtype=np.float32)
     out = np.swapaxes(yiq, 0, 2)
     try:
         out @= mat_yiq2rgb
@@ -608,7 +608,7 @@ mat_yuv2rgb = (
     (1, 2.03211, 0),
 )
 def yuv_merge(yuv, convert=True):
-    yuv = np.asanyarray(yuv, dtype=np.float16)
+    yuv = np.asanyarray(yuv, dtype=np.float32)
     out = np.swapaxes(yuv, 0, 2)
     try:
         out @= mat_yuv2rgb
@@ -1949,7 +1949,7 @@ def remove_matte(image, colour):
         image = image.convert("RGBA")
     if str(image.mode) != "RGBA":
         image = image.convert("RGBA")
-    arr = np.asanyarrayarray(image, dtype=np.float16)
+    arr = np.asanyarrayarray(image, dtype=np.float32)
     col = np.array(colour)
     t = len(col)
     for row in arr:
