@@ -593,6 +593,7 @@ def yiq_merge(yiq, convert=True):
         out @= mat_yiq2rgb
     except TypeError:
         out = out @ mat_yiq2rgb
+    out *= 255
     if convert:
         np.clip(out, 0, 255, out=out)
         out = out.astype(np.uint8)
@@ -613,6 +614,7 @@ def yuv_merge(yuv, convert=True):
         out @= mat_yuv2rgb
     except TypeError:
         out = out @ mat_yuv2rgb
+    out *= 255
     if convert:
         np.clip(out, 0, 255, out=out)
         out = out.astype(np.uint8)
