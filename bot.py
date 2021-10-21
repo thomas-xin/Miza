@@ -3340,10 +3340,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 await message.add_reaction(react)
         return message
 
-    embed_calls = 0
-
     # Sends a list of embeds to the target sendable, using a webhook when possible.
-    async def _send_embeds(self, sendable, embeds, reacts=None, reference=None):
+    async def _send_embeds(self, sendable, embeds, reacts=None, reference=None, force=True):
         s_id = verify_id(sendable)
         sendable = await self.fetch_messageable(s_id)
         with self.ExceptionSender(sendable, reference=reference):
@@ -3351,8 +3349,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 return
             guild = getattr(sendable, "guild", None)
             # Determine whether to send embeds individually or as blocks of up to 10, based on whether it is possible to use webhooks
+            if not guild:
+                return await send_with_react(sendable, embeds=embeds, reacts=reacts, reference=reference)
             single = False
-            if guild is None or (not hasattr(guild, "simulated") and hasattr(guild, "ghost")) or len(embeds) <= 1:
+            if not hasattr(guild, "simulated") and hasattr(guild, "ghost") or len(embeds) <= 1:
                 single = True
             else:
                 m = guild.me
@@ -3376,8 +3376,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         else:
                             create_task(sendable.send(embed=emb))
                 return
-            self.embed_calls += 1
-            if self.embed_calls & 1:
+            if force:
                 return await send_with_react(sendable, embeds=embeds, reacts=reacts, reference=reference)
             embs = deque()
             for emb in embeds:
@@ -3619,7 +3618,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             self.embed_senders[s_id] = embeds = embeds[len(embs):]
             if not embeds:
                 self.embed_senders.pop(s_id)
-            create_task(self._send_embeds(s_id, embs))
+            create_task(self._send_embeds(s_id, embs, force=force))
             sent = True
         return sent
 
