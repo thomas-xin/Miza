@@ -429,6 +429,7 @@ class Server:
                         "scale=240:-1",
                         preview,
                     )
+                    print(args)
                     proc = psutil.Popen(args)
                     image_loaders[preview] = proc
                 cp.response.headers["Content-Type"] = "image/gif"

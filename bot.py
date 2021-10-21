@@ -3344,7 +3344,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
     # Sends a list of embeds to the target sendable, using a webhook when possible.
     async def _send_embeds(self, sendable, embeds, reacts=None, reference=None):
-        self.embed_calls += 1
         s_id = verify_id(sendable)
         sendable = await self.fetch_messageable(s_id)
         with self.ExceptionSender(sendable, reference=reference):
@@ -3353,7 +3352,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             guild = getattr(sendable, "guild", None)
             # Determine whether to send embeds individually or as blocks of up to 10, based on whether it is possible to use webhooks
             single = False
-            if guild is None or (not hasattr(guild, "simulated") and hasattr(guild, "ghost")) or len(embeds) == 1:
+            if guild is None or (not hasattr(guild, "simulated") and hasattr(guild, "ghost")):
                 single = True
             else:
                 m = guild.me
@@ -3377,6 +3376,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         else:
                             create_task(sendable.send(embed=emb))
                 return
+            self.embed_calls += 1
             if self.embed_calls & 1:
                 return await send_with_react(sendable, embeds=embeds, reacts=reacts, reference=reference)
             embs = deque()
