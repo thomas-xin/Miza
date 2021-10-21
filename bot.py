@@ -2681,8 +2681,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             guild_count = len(self.guilds)
             changed = guild_count != self.guild_count
             if changed or utc() > self.stat_timer:
-                # Status changes every 2 seconds
-                self.stat_timer = utc() + 1.5
+                # Status changes every 3 seconds (1 cps, threshold 2.5s)
+                self.stat_timer = utc() + 2.5
                 self.guild_count = guild_count
                 self.status_iter = (self.status_iter + 1) % (len(self.statuses) - (not self.audio))
                 with suppress(discord.NotFound):
