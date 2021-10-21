@@ -2163,9 +2163,17 @@ def blend_op(image, url, operation, amount, recursive=True):
             image = Image.blend(image, image2, 0.5)
             spl = hsl_split(image, convert=False, dtype=np.uint32)
             if filt == "OVERFLOW":
-                spl[-1] <<= 1
+                spl[2] <<= 1
+                spl[1] <<= 1
             else:
-                spl[-1] += (255 ^ spl[-1]) * spl[-1] // 255
+                temp = 255 ^ spl[2]
+                temp *= spl[2]
+                temp //= 255
+                spl[2] += temp
+                temp = 255 ^ spl[1]
+                temp *= spl[1]
+                temp //= 255
+                spl[1] += temp
             out = hsl_merge(*spl)
             if A:
                 out.putalpha(A)
