@@ -1967,21 +1967,25 @@ class CreateEmoji(Command):
                 path = "cache/" + str(ts)
                 with open(path, "wb") as f:
                     await create_future(f.write, image, timeout=18)
-                try:
-                    resp = await process_image(path, "resize_max", [128], timeout=_timeout)
-                except:
-                    with suppress():
-                        os.remove(path)
-                    raise
-                else:
-                    fn = resp[0]
-                    f = await create_future(open, fn, "rb", timeout=18)
-                    image = await create_future(f.read, timeout=18)
-                    create_future_ex(f.close, timeout=18)
-                    with suppress():
-                        os.remove(fn)
-                with suppress():
-                    os.remove(path)
+                width = 128
+                while len(image) > 262144:
+                    try:
+                        resp = await process_image(path, "resize_max", [width], timeout=_timeout)
+                    except:
+                        raise
+                    else:
+                        fn = resp[0]
+                        if not os.path.exists(fn) or not os.path.getsize(fn):
+                            break
+                        r = os.path.getsize(fn) / 262144
+                        if r > 1:
+                            width = floor(width / sqrt(r))
+                            continue
+                        with open(fn, "rb") as f:
+                            image = await create_future(f.read, timeout=18)
+                    finally:
+                        with suppress():
+                            os.remove(fn)
             emoji = await guild.create_custom_emoji(image=image, name=name, reason="CreateEmoji command")
             # This reaction indicates the emoji was created successfully
             with suppress(discord.Forbidden):
