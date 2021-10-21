@@ -3469,7 +3469,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         fin_col = col = None
         if colour is None:
             if author:
-                url = author.get("icon_url")
+                try:
+                    url = author.icon_url
+                except:
+                    url = author.get("icon_url")
                 if url:
                     with suppress():
                         fin_col = await self.data.colours.get(url)
