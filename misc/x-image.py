@@ -2126,14 +2126,11 @@ def blend_op(image, url, operation, amount, recursive=True):
                 spl[2] <<= 1
                 spl[1] <<= 1
             else:
-                temp = 255 ^ spl[2]
+                temp = spl[2] ^ 255
                 temp *= spl[2]
                 temp //= 255
                 spl[2] += temp
-                temp = 255 ^ spl[1]
-                temp *= spl[1]
-                temp //= 255
-                spl[1] += temp
+                spl[1] <<= 1
             out = hsl_merge(*spl)
             if A:
                 out.putalpha(A)
