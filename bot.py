@@ -2523,7 +2523,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
     # Autosaves modified bot databases. Called once every minute and whenever the bot is about to shut down.
     def update(self, force=False):
-        self.update_embeds()
+        self.update_embeds(True)
         saved = alist()
         with tracebacksuppressor:
             for i, u in self.data.items():
@@ -3352,7 +3352,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             guild = getattr(sendable, "guild", None)
             # Determine whether to send embeds individually or as blocks of up to 10, based on whether it is possible to use webhooks
             single = False
-            if guild is None or (not hasattr(guild, "simulated") and hasattr(guild, "ghost")):
+            if guild is None or (not hasattr(guild, "simulated") and hasattr(guild, "ghost")) or len(embeds) <= 1:
                 single = True
             else:
                 m = guild.me
@@ -3601,10 +3601,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         return self.send_embeds(channel, embeds=embs, reacts=reacts, reference=reference)
 
     # Updates all embed senders.
-    def update_embeds(self):
+    def update_embeds(self, force=False):
         sent = False
         for s_id in self.embed_senders:
             embeds = self.embed_senders[s_id]
+            if not force and len(embeds) <= 10:
+                continue
             embs = deque()
             for emb in embeds:
                 if type(emb) is not discord.Embed:
@@ -3633,7 +3635,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         sent = 0
         while not self.closed:
             with tracebacksuppressor:
-                sent = self.update_embeds()
+                sent = self.update_embeds(utc() % 1 < 0.5)
                 if sent:
                     await event_call(freq)
                 else:
