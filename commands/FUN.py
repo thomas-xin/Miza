@@ -424,7 +424,7 @@ class Text2048(Command):
                 try:
                     sem = EDIT_SEM[message.channel.id]
                 except KeyError:
-                    sem = EDIT_SEM[message.channel.id] = Semaphore(5.1, 256, rate_limit=5)
+                    sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
                 async with sem:
                     return await Request(
                         f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
@@ -521,7 +521,7 @@ class Text2048(Command):
             try:
                 sem = EDIT_SEM[message.channel.id]
             except KeyError:
-                sem = EDIT_SEM[message.channel.id] = Semaphore(5.1, 256, rate_limit=5)
+                sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
             async with sem:
                 return await Request(
                     f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
@@ -1225,7 +1225,7 @@ class Uno(Command):
                 try:
                     sem = EDIT_SEM[message.channel.id]
                 except KeyError:
-                    sem = EDIT_SEM[message.channel.id] = Semaphore(5.1, 256, rate_limit=5)
+                    sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
                 async with sem:
                     return await Request(
                         f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",

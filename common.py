@@ -82,6 +82,8 @@ newfut = concurrent.futures.Future()
 newfut.set_result(None)
 
 def as_fut(obj):
+    if obj is None:
+        return emptyfut
     fut = asyncio.Future()
     eloop.call_soon_threadsafe(fut.set_result, obj)
     return fut
@@ -96,12 +98,14 @@ class EmptyContext(contextlib.AbstractContextManager):
 emptyctx = EmptyContext()
 
 
+SEMS = {}
+
 # Manages concurrency limits, similar to asyncio.Semaphore, but has a secondary threshold for enqueued tasks, as well as an optional rate limiter.
 class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
 
-    __slots__ = ("limit", "buffer", "fut", "active", "passive", "rate_limit", "rate_bin", "last", "trace")
+    __slots__ = ("limit", "buffer", "fut", "active", "passive", "rate_limit", "rate_bin", "last", "trace", "weak")
 
-    def __init__(self, limit=256, buffer=32, delay=0.05, rate_limit=None, randomize_ratio=2, last=False, trace=False):
+    def __init__(self, limit=256, buffer=32, delay=0.05, rate_limit=None, randomize_ratio=2, last=False, trace=False, weak=False):
         self.limit = limit
         self.buffer = buffer
         self.active = 0
@@ -112,6 +116,7 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
         self.fut.set_result(None)
         self.last = last
         self.trace = trace and inspect.stack()[1]
+        self.weak = weak
 
     def __str__(self):
         classname = str(self.__class__).replace("'>", "")
@@ -142,6 +147,8 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
                     self.fut.set_result(None)
                 except concurrent.futures.InvalidStateError:
                     pass
+        if self.weak and not self.rate_bin:
+            SEMS.pop(id(self), None)
         return self.rate_bin
 
     def enter(self):
@@ -150,6 +157,8 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
         self.active += 1
         if self.rate_limit:
             self._update_bin().append(time.time())
+            if self.weak:
+                SEMS[id(self)] = self
         return self
 
     def check_overflow(self):
@@ -187,7 +196,10 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
             self.check_overflow()
             self.passive += 1
             while self.is_busy():
-                await wrap_future(self.fut)
+                if self.fut.done():
+                    await asyncio.sleep(0.08)
+                else:
+                    await wrap_future(self.fut)
             self.passive -= 1
         self.enter()
         return self
@@ -202,7 +214,10 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
 
     async def __call__(self):
         while self.is_busy():
-            await wrap_future(self.fut)
+            if self.fut.done():
+                await asyncio.sleep(0.08)
+            else:
+                await wrap_future(self.fut)
     
     acquire = __call__
 
@@ -1004,7 +1019,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
         try:
             sem = REPLY_SEM[channel.id]
         except KeyError:
-            sem = REPLY_SEM[channel.id] = Semaphore(5.1, buffer=256, delay=0.1, rate_limit=5)
+            sem = REPLY_SEM[channel.id] = Semaphore(5.15, buffer=256, delay=0.1, rate_limit=5)
         inter = False
         url = f"https://discord.com/api/{api}/channels/{channel.id}/messages"
         if getattr(channel, "dm_channel", None):
@@ -2097,6 +2112,11 @@ def get_event_loop():
 
 # Creates an asyncio Future that waits on a multithreaded one.
 def wrap_future(fut, loop=None, shield=False, thread_safe=True):
+    if getattr(fut, "done", None) and fut.done():
+        res = fut.result()
+        if res is None:
+            return emptyfut
+        return as_fut(res)
     if loop is None:
         loop = get_event_loop()
     wrapper = None
@@ -2667,6 +2687,21 @@ class Stream(io.IOBase):
             self.resp.close()
 
 
+def parse_ratelimit_header(headers):
+    try:
+        reset = headers.get('X-Ratelimit-Reset')
+        if reset:
+            delta = float(reset) - utc()
+        else:
+            reset_after = headers.get('X-Ratelimit-Reset-After')
+            delta = float(reset_after)
+        if not delta:
+            raise
+    except:
+        delta = float(headers['retry_after'])
+    return max(0.001, delta)
+
+
 # Manages both sync and async get requests.
 class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, collections.abc.Callable):
 
@@ -2743,7 +2778,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 
     def __aexit__(self, *args):
         self.session.close()
-        return async_nop()
+        return emptyfut
 
 Request = RequestManager()
 

@@ -249,8 +249,9 @@ class UpdateExec(Database):
         # Main terminal uses bot's global variables, virtual one uses a shallow copy per channel
         channel = message.channel
         if term & 32:
-            proc = await asyncio.create_subprocess_shell(proc, limit=65536)
-            if output is not None:
+            proc = await asyncio.create_subprocess_shell(proc, stdout=subprocess.PIPE, limit=65536)
+            output = await proc.stdout.read()
+            if output:
                 glob["_"] = output
             return output
         if term & 1:

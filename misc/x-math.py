@@ -414,7 +414,13 @@ def _factorint(n, **kwargs):
     except KeyError:
         pass
     args = ["misc/ecm", s]
-    proc = subprocess.run(args, stdout=subprocess.PIPE)
+    try:
+        proc = subprocess.run(args, stdout=subprocess.PIPE)
+    except PermissionError:
+        if os.name == "nt":
+            raise
+        subprocess.run(("chmod", "777", "misc/ecm"))
+        proc = subprocess.run(args, stdout=subprocess.PIPE)
     data = proc.stdout.decode("utf-8", "replace").replace(" ", "")
     if "<li>" not in data:
         if not data:
@@ -628,7 +634,29 @@ _globals.update({
     "Z": sympy.Integer(1 << 70),
     "Y": sympy.Integer(1 << 80),
     "c": sympy.Integer(299792458),
+    "bool_": np.bool_,
+    "uint8": np.uint8,
+    "uint16": np.uint16,
+    "uint32": np.uint32,
+    "uint64": np.uint64,
+    "int8": np.int8,
+    "int16": np.int16,
+    "int32": np.int32,
+    "int64": np.int64,
+    "float16": np.float16,
+    "float32": np.float32,
+    "float64": np.float64,
+    "complex64": np.complex64,
+    "complex128": np.complex128,
 })
+if hasattr(np, "ulonglong"):
+    _globals["uint128"] = np.ulonglong
+if hasattr(np, "longlong"):
+    _globals["int128"] = np.longlong
+if hasattr(np, "longdouble"):
+    _globals["float80"] = np.longdouble
+if hasattr(np, "clongdouble"):
+    _globals["complex160"] = np.clongdouble
 supported = set((
     "all",
     "any",

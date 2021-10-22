@@ -34,25 +34,28 @@ def request(s):
         return reqs.next().get(f"http://127.0.0.1:{PORT}/eval/{token}/{url_parse(s)}").text
 
 def submit(s):
-    b = "~" + repr(as_str(s).encode("utf-8")) + "\n"
-    resp = sys.__stdout__.write(b)
+    if type(s) not in (bytes, memoryview):
+        s = as_str(s).encode("utf-8")
+    b = b"~" + base64.b85encode(s) + b"\n"
+    resp = sys.__stdout__.buffer.write(b)
     sys.__stdout__.flush()
     return resp
 
 async def respond(s):
-    k, c = as_str(s[1:]).split("~", 1)
-    c = as_str(literal_eval(c))
-    if c == "ytdl.update()":
+    k, c = s[1:].rstrip().split(b"~", 1)
+    c = memoryview(base64.b85decode(c))
+    k = k.decode("ascii")
+    if c == b"ytdl.update()":
         with tracebacksuppressor:
             await create_future(update_cache)
         res = "None"
-    else:
+    elif c:
         res = None
         try:
-            if c[0] == "!":
+            if c[:1] == b"!":
                 c = c[1:]
                 res = "None"
-            if c.startswith("await "):
+            if c[:6] == b"await ":
                 resp = await eval(c[6:], client._globals)
             else:
                 code = None
@@ -61,13 +64,16 @@ async def respond(s):
                 except SyntaxError:
                     pass
                 else:
-                    resp = eval(code, client._globals)
+                    resp = await create_future(eval, code, client._globals)
                 if code is None:
-                    resp = exec(c, client._globals)
+                    resp = await create_future(exec, c, client._globals)
         except Exception as ex:
             sys.stdout.write(traceback.format_exc())
-            submit(f"bot.audio.returns[{k}].set_exception(pickle.loads({repr(pickle.dumps(ex))}))")
+            s = f"bot.audio.returns[{k}].set_exception(pickle.loads({repr(pickle.dumps(ex))}))"
+            submit(s)
             return
+    else:
+        return
     if not res:
         res = repr(resp)
         if type(resp) not in (bool, int, float, str, bytes):
@@ -75,17 +81,19 @@ async def respond(s):
                 compile(res, "miza2", "eval")
             except SyntaxError:
                 res = repr(str(resp))
-    submit(f"bot.audio.returns[{k}].set_result({res})")
+    s = f"bot.audio.returns[{k}].set_result({res})"
+    create_future_ex(submit, s)
 
 async def communicate():
     print("Audio client successfully connected.")
     while True:
         with tracebacksuppressor:
-            s = await create_future(sys.stdin.readline)
+            s = await create_future(sys.stdin.buffer.readline)
             if not s:
                 break
-            if s.startswith("~"):
+            if s.startswith(b"~"):
                 create_task(respond(s))
+    print("Audio client successfully disconnected.")
 
 def is_strict_running(proc):
     if not proc:
@@ -874,11 +882,6 @@ async def kill():
     for fut in futs:
         await fut
     return await client.close()
-
-
-@client.event
-async def before_identify_hook(shard_id, initial=False):
-    pass
 
 @client.event
 async def on_ready():

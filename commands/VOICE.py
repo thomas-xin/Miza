@@ -1210,17 +1210,17 @@ class AudioClientSubInterface:
         return self.bot.audio.submit(f"AP.from_guild({self.guild.id}).play(players[{repr(src)}])")
 
     def connect(self, reconnect=True, timeout=60):
-        return create_future(self.bot.audio.submit, f"!await AP.from_guild({self.guild.id}).connect(reconnect={reconnect}, timeout={timeout})")
+        return create_task(self.bot.audio.asubmit(f"!await AP.from_guild({self.guild.id}).connect(reconnect={reconnect}, timeout={timeout})"))
 
     async def disconnect(self, force=False):
-        await create_future(self.bot.audio.submit, f"!await AP.from_guild({self.guild.id}).disconnect(force={force})")
+        await self.bot.audio.asubmit(f"!await AP.from_guild({self.guild.id}).disconnect(force={force})")
         self.bot.audio.clients.pop(self.guild.id)
         self.channel = None
 
     async def move_to(self, channel=None):
         if not channel:
             return await self.disconnect(force=True)
-        await create_future(self.bot.audio.submit, f"!await AP.from_guild({self.guild.id}).move_to(client.get_channel({channel.id}))")
+        await self.bot.audio.asubmit(f"!await AP.from_guild({self.guild.id}).move_to(client.get_channel({channel.id}))")
         self.channel = channel
 
 ACSI = AudioClientSubInterface
@@ -4939,7 +4939,7 @@ class UpdateAudio(Database):
                         if not a & 15:
                             await asyncio.sleep(0.2)
                         a += 1
-                await create_future(bot.audio.submit, "ytdl.update()", priority=True)
+                await bot.audio.asubmit("ytdl.update()")
             create_future_ex(ytdl.update_dl, priority=True)
 
     def _announce_(self, *args, **kwargs):
