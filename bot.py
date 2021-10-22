@@ -101,6 +101,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         self.load_semaphore = Semaphore(200, inf, rate_limit=10)
         self.user_semaphore = Semaphore(64, inf, rate_limit=8)
         self.disk_semaphore = Semaphore(1, 1, rate_limit=1)
+        self.command_semaphore = Semaphore(262144, 16384)
         self.disk = 0
         self.storage_ratio = 0
         self.file_count = 0
@@ -405,27 +406,33 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     data = obj.data
                     if getattr(obj, "garbage_collect", None):
                         return await obj.garbage_collect()
-                    for key in shuffle(list(data))[:1024]:
+                    if len(data) <= 1024:
+                        keys = data.keys()
+                    else:
+                        low = xrand(ceil(len(data) / 1024)) << 10
+                        keys = astype(data, alist).view[low:low + 1024]
+                    for key in keys:
                         if getattr(data, "unloaded", False):
                             return
-                        if key and type(key) is not str:
-                            try:
-                                # Database keys may be user, guild, or channel IDs
-                                if getattr(obj, "channel", None):
-                                    d = self.get_channel(key)
-                                else:
-                                    if not data[key]:
-                                        raise LookupError
-                                    with suppress(KeyError):
-                                        d = self.cache.guilds[key]
-                                        continue
-                                    d = await self.fetch_messageable(key)
-                                if d is not None:
+                        if not key or type(key) is str:
+                            continue
+                        try:
+                            # Database keys may be user, guild, or channel IDs
+                            if getattr(obj, "channel", None):
+                                d = self.get_channel(key)
+                            else:
+                                if not data[key]:
+                                    raise LookupError
+                                with suppress(KeyError):
+                                    d = self.cache.guilds[key]
                                     continue
-                            except:
-                                print_exc()
-                            print(f"Deleting {key} from {str(obj)}...")
-                            data.pop(key, None)
+                                d = await self.fetch_messageable(key)
+                            if d is not None:
+                                continue
+                        except:
+                            print_exc()
+                        print(f"Deleting {key} from {str(obj)}...")
+                        data.pop(key, None)
 
     # Calls a bot event, triggered by client events or others, across all bot databases. Calls may be sync or async.
     async def send_event(self, ev, *args, exc=False, **kwargs):
@@ -454,8 +461,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if member.guild_permissions.create_instant_invite:
                 invitedata = await Request(
                     f"https://discord.com/api/{api}/guilds/{guild.id}/invites",
-                    headers=dict(Authorization="Bot " + self.token),
-                    bypass=False,
+                    authorise=True,
                     aio=True,
                     json=True,
                 )
@@ -904,15 +910,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             add_user=lambda user: Request(
                 f"https://discord.com/api/{api}/channels/{channel.id}/thread-members/{verify_id(user)}",
                 method="PUT",
-                headers={"Authorization": "Bot " + bot.token},
-                bypass=False,
+                authorise=True,
                 aio=True,
             ),
             remove_user=lambda user: Request(
                 f"https://discord.com/api/{api}/channels/{channel.id}/thread-members/{verify_id(user)}",
                 method="DELETE",
-                headers={"Authorization": "Bot " + bot.token},
-                bypass=False,
+                authorise=True,
                 aio=True,
             ),
             delete=lambda reason=None: discord.abc.GuildChannel.delete(channel, reason=reason),
@@ -932,14 +936,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         Request(
             f"https://discord.com/api/{api}/channels/{channel.id}/thread-members/@me",
             method="POST",
-            headers={"Authorization": "Bot " + bot.token},
-            bypass=False,
+            authorise=True,
             aio=True,
         )
         data = await Request(
             f"https://discord.com/api/{api}/channels/{channel.id}",
-            headers={"Authorization": "Bot " + bot.token},
-            bypass=False,
+            authorise=True,
             aio=True,
             json=True,
         )
@@ -1534,7 +1536,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             return await create_future(reqs.next().get, url, stream=True)
         return
 
-    async def get_request(self, url, limit=None, full=True):
+    async def get_request(self, url, limit=None, full=True, timeout=12):
         fn = is_file(url)
         if fn:
             if limit:
@@ -1550,7 +1552,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             return data
         if not full:
             return await create_future(reqs.next().get, url, stream=True)
-        return await Request(url, aio=True)
+        return await Request(url, timeout=timeout, aio=True)
 
     def get_colour(self, user):
         if user is None:
@@ -1699,7 +1701,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         if limit is None:
             limit = self.cache_size
         if cache is not None:
-            caches = [self.cache[cache]]
+            caches = (self.cache[cache],)
         else:
             caches = self.cache.values()
         for c in caches:
@@ -2346,6 +2348,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     "API latency": sec2time(self.api_latency),
                 },
                 "Misc info": {
+                    "Active commands": self.command_semaphore.active,
                     "Connected voice channels": len(self.audio.players),
                     "Active audio players": sum(bool(auds.queue and not auds.paused) for auds in self.audio.players.values()),
                     "Activity count": self.activity,
@@ -3011,8 +3014,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         )
                         # Add a callback to typing in the channel if the command takes too long
                         if fut is None and not hasattr(command, "typing"):
-                            create_task(delayed_callback(future, 2, typing, channel))
-                        response = await future
+                            create_task(delayed_callback(future, sqrt(3), typing, channel))
+                        with self.command_semaphore:
+                            response = await future
                         # Send bot event: user has executed command
                         await self.send_event("_command_", user=user, command=command, loop=loop, message=message)
                         # Process response to command if there is one
@@ -3188,8 +3192,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     async with self.load_semaphore:
                         memberdata = await Request(
                             f"https://discord.com/api/{api}/guilds/{guild.id}/members?limit=1000&after={x}",
-                            headers=dict(Authorization="Bot " + self.token),
-                            bypass=False,
+                            authorise=True,
                             json=True,
                             aio=True,
                         )
@@ -3286,22 +3289,18 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 async with getattr(w, "semaphore", emptyctx):
                     w = getattr(w, "webhook", w)
                     if hasattr(channel, "thread") or isinstance(channel, discord.Thread):
-                        data = orjson.dumps(dict(
+                        data = dict(
                             content=args[0] if args else kwargs.get("content"),
                             username=kwargs.get("username"),
                             avatar_url=kwargs.get("avatar_url"),
                             tts=kwargs.get("tts"),
                             embeds=[emb.to_dict() for emb in kwargs.get("embeds", ())] or [kwargs["embed"].to_dict()] if kwargs.get("embed") is not None else None,
-                        ))
+                        )
                         resp = await Request(
                             f"https://discord.com/api/{api}/webhooks/{w.id}/{w.token}?wait=True&thread_id={channel.id}",
                             method="POST",
-                            headers={
-                                "Content-Type": "application/json",
-                                "Authorization": f"Bot {self.token}",
-                            },
+                            authorise=True,
                             data=data,
-                            bypass=False,
                             aio=True,
                             json=True,
                         )
@@ -3316,12 +3315,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         resp = await Request(
                             f"https://discord.com/api/{api}/webhooks/{w.id}/{w.token}?wait=True&thread_id={channel.id}",
                             method="POST",
-                            headers={
-                                "Content-Type": "application/json",
-                                "Authorization": f"Bot {self.token}",
-                            },
+                            authorise=True,
                             data=data,
-                            bypass=False,
                             aio=True,
                             json=True,
                         )
@@ -3407,12 +3402,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             await Request(
                 f"https://discord.com/api/{api}/interactions/{int_id}/{int_token}/callback",
                 method="POST",
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bot {self.token}",
-                },
-                data='{"type": 6}',
-                bypass=False,
+                authorise=True,
+                data='{"type":6}',
                 aio=True,
             )
 
@@ -3959,13 +3950,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     data["embeds"] = [emb.to_dict() for emb in data["embeds"]]
                 resp = await Request(
                     f"https://discord.com/api/{api}/webhooks/{webhook.id}/{webhook.token}/messages/{self.id}",
-                    data=orjson.dumps(data),
-                    headers={
-                        "Authorization": f"Bot {bot.token}",
-                        "Content-Type": "application/json",
-                    },
+                    data=data,
+                    authorise=True,
                     method="PATCH",
-                    bypass=False,
                     aio=True,
                     json=True,
                 )

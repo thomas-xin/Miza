@@ -597,9 +597,8 @@ class CustomAudio(collections.abc.Hashable):
         return Request(
             f"https://discord.com/api/{api}/guilds/{vc.guild.id}/voice-states/@me",
             method="PATCH",
-            headers={"Authorization": "Bot " + self.bot.token, "Content-Type": "application/json"},
-            data=orjson.dumps({"suppress": False, "request_to_speak_timestamp": None, "channel_id": vc.id}),
-            bypass=False,
+            authorise=True,
+            data={"suppress": False, "request_to_speak_timestamp": None, "channel_id": vc.id},
             aio=True,
         )
 
@@ -1000,17 +999,13 @@ CONVERTERS = {
 }
 
 def select_and_convert(stream):
-    with reqs.next().get(stream, headers=Request.header(), timeout=8, stream=True) as resp:
-        it = resp.iter_content(4096)
-        b = bytes()
-        while len(b) < 4:
-            b += next(it)
-        try:
-            convert = CONVERTERS[b[:4]]
-        except KeyError:
-            convert = png2wav
-            # raise ValueError("Invalid file header.")
-        b += resp.content
+    resp = reqs.next().get(stream, headers=Request.header(), timeout=8, stream=True)
+    b = seq(resp)
+    try:
+        convert = CONVERTERS[b[:4]]
+    except KeyError:
+        convert = png2wav
+    b = b.read()
     return convert(b)
 
 
@@ -2380,7 +2375,7 @@ class AudioDownloader:
                 urls = (url,)
             else:
                 urls = url
-            if vid:
+            if vid and any(is_youtube_url(url) for url in urls):
                 return self.concat_video(urls, fmt, start, end, auds)
             vst = deque()
             ast = deque()
@@ -4118,17 +4113,16 @@ class Party(Command):
             data = await Request(
                 f"https://discord.com/api/{api}/channels/{vc.id}/invites",
                 method="POST",
-                data=orjson.dumps(dict(
+                data=dict(
                     max_age=0,
                     max_uses=0,
                     target_application_id=aid,
                     target_type=2,
                     temporary=False,
                     validate=None,
-                )),
-                headers={"Content-Type": "application/json", "Authorization": "Bot " + bot.token},
+                ),
+                authorise=True,
                 aio=True,
-                bypass=False,
                 json=True
             )
         return f"https://discord.gg/{data['code']}"
@@ -4761,22 +4755,18 @@ class Download(Command):
                         try:
                             sem = EDIT_SEM[message.channel.id]
                         except KeyError:
-                            sem = EDIT_SEM[message.channel.id] = Semaphore(5.1, 256, rate_limit=5)
+                            sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
                         async with sem:
                             return await Request(
                                 f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
-                                data=orjson.dumps(dict(
+                                data=dict(
                                     components=restructure_buttons([[
                                         cdict(emoji="🔊", name=name, url=view),
                                         cdict(emoji="📥", name=name, url=download),
                                     ]]),
-                                )),
+                                ),
                                 method="PATCH",
-                                headers={
-                                    "Content-Type": "application/json",
-                                    "Authorization": f"Bot {bot.token}",
-                                },
-                                bypass=False,
+                                authorise=True,
                                 aio=True,
                             )
                     if len(data) <= 1:

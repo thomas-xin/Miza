@@ -1481,8 +1481,8 @@ def resize_to(image, w, h, operation="auto"):
         m = min(abs(w), abs(h))
         n = min(image.width, image.height)
         if n > m:
-            m = n
-        if m <= 512:
+            filt = Image.LANCZOS
+        elif m <= 512:
             filt = "scale2x"
         elif m <= 3072:
             filt = Image.LANCZOS
@@ -2406,18 +2406,21 @@ def evalImg(url, operation, args):
     globals()["CURRENT_FRAME"] = 0
     ts = time.time_ns() // 1000
     out = "cache/" + str(ts) + ".png"
+    fmt = "gif"
+    dur = None
     if len(args) > 1 and args[-2] == "-f":
         fmt = args.pop(-1)
         args.pop(-1)
-    else:
-        fmt = "gif"
+    if len(args) > 1 and args[-2] == "-d":
+        dur = args.pop(-1)
+        args.pop(-1)
     if operation != "$":
         if args and args[-1] == "-raw":
             args.pop(-1)
             image = get_request(url)
         else:
             image = get_image(url, out)
-        # -gif is a special case where the output is always a .gif image
+        # -gif is a special case where the output is always an animated format (gif, mp4, mkv etc)
         if args and args[-1] == "-gif":
             args.pop(-1)
             if fmt in ("png", "jpg", "jpeg", "bmp"):
@@ -2466,6 +2469,8 @@ def evalImg(url, operation, args):
         new = eval(url)(*args)
     if type(new) is dict:
         duration = new["duration"]
+        if dur and duration > dur:
+            duration = dur
         frames = new["frames"]
         if not frames:
             raise EOFError("No image output detected.")
@@ -2502,7 +2507,11 @@ def evalImg(url, operation, args):
             if fmt == "zip":
                 resp = zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
             else:
-                command = ["./ffmpeg", "-threads", "2", "-hide_banner", "-v", "error", "-y", "-hwaccel", "auto", "-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", ("rgb24" if mode == "RGB" else "rgba"), "-video_size", "x".join(map(str, size)), "-i", "-", "-an"]
+                command = [
+                    "./ffmpeg", "-threads", "2", "-hide_banner", "-v", "error", "-y", "-hwaccel", "auto",
+                    "-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", ("rgb24" if mode == "RGB" else "rgba"),
+                    "-video_size", "x".join(map(str, size)), "-i", "-", "-an"
+                ]
                 if fmt in ("gif", "webp", "apng"):
                     command.extend(("-gifflags", "-offsetting"))
                     if new["count"] > 4096:

@@ -494,6 +494,7 @@ def select_and_dumps(data, mode="safe", compress=True):
 class FileHashDict(collections.abc.MutableMapping):
 
     sem = Semaphore(64, 128, 0.3, 1)
+    cache_size = 4096
 
     def __init__(self, *args, path="", **kwargs):
         if not kwargs and len(args) == 1:
@@ -688,8 +689,9 @@ class FileHashDict(collections.abc.MutableMapping):
                 os.remove(fn + "\x7f")
             with suppress(FileNotFoundError):
                 os.remove(fn + "\x7f\x7f")
-        while len(self.data) > 1048576:
-            self.data.pop(next(iter(self.data)), None)
+        while len(self.data) > self.cache_size:
+            with suppress(RuntimeError):
+                self.data.pop(next(iter(self.data)))
         return modified.union(deleted)
 
 
@@ -812,11 +814,7 @@ def interaction_response(bot, message, content=None, embed=None, components=None
             ),
         )),
         method="POST",
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bot {bot.token}",
-        },
-        bypass=False,
+        authorise=True,
         aio=True,
     )
 
@@ -839,11 +837,7 @@ def interaction_patch(bot, message, content=None, embed=None, components=None, b
             ),
         )),
         method="POST",
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bot {bot.token}",
-        },
-        bypass=False,
+        authorise=True,
         aio=True,
     )
 
@@ -1052,11 +1046,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
                     url,
                     method="post",
                     data=body,
-                    headers={
-                        "Content-Type": "application/json",
-                        "Authorization": f"Bot {bot.token}",
-                    },
-                    bypass=False,
+                    authorise=True,
                     aio=True,
                 )
         except Exception as ex:
@@ -1899,6 +1889,8 @@ def is_strict_running(proc):
     return True
 
 def force_kill(proc):
+    if not proc:
+        return
     with tracebacksuppressor(psutil.NoSuchProcess):
         killed = deque()
         proc = psutil.Process(proc.pid)
@@ -2742,8 +2734,17 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
                     return as_str(data)
                 return data
 
-    def __call__(self, url, headers={}, files=None, data=None, raw=False, timeout=8, method="get", decode=False, json=False, bypass=True, aio=False, session=None, ssl=True):
-        if bypass:
+    def __call__(self, url, headers=None, files=None, data=None, raw=False, timeout=8, method="get", decode=False, json=False, bypass=True, aio=False, session=None, ssl=True, authorise=False):
+        if headers is None:
+            headers = {}
+        if authorise:
+            token = AUTH["discord_token"]
+            headers["Authorization"] = f"Bot {token}"
+            if data:
+                headers["Content-Type"] = "application/json"
+                if not isinstance(data, (str, bytes, memoryview)):
+                    data = orjson.dumps(data)
+        elif bypass:
             if "user-agent" not in headers and "User-Agent" not in headers:
                 headers["User-Agent"] = f"Mozilla/5.{xrand(1, 10)}"
                 headers["X-Forwarded-For"] = ".".join(str(xrand(1, 255)) for _ in loop(4))

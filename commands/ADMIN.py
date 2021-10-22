@@ -1921,10 +1921,9 @@ class CreateEmoji(Command):
     flags = "aed"
     no_parse = True
     rate_limit = (3, 6)
-    _timeout_ = 3
+    _timeout_ = 6
     typing = True
     slash = ("Emoji",)
-    msgcmd = ("Create Emoji",)
 
     async def __call__(self, bot, user, guild, channel, message, args, argv, _timeout, **void):
         # Take input from any attachments, or otherwise the message contents
@@ -1959,7 +1958,7 @@ class CreateEmoji(Command):
             if not name:
                 name = "emoji_" + str(len(guild.emojis))
             # print(name, url)
-            image = resp = await bot.get_request(url)
+            image = resp = await bot.get_request(url, timeout=20)
             if len(image) > 67108864:
                 raise OverflowError("Max file size to load is 64MB.")
             if len(image) > 262144 or not is_image(url):
@@ -1991,6 +1990,113 @@ class CreateEmoji(Command):
             with suppress(discord.Forbidden):
                 await message.add_reaction(emoji)
         return css_md(f"Successfully created emoji {sqr_md(emoji)} for {sqr_md(guild)}.")
+
+
+class CreateSticker(Command):
+    server_only = True
+    name = ["StickerCreate", "StickerCopy", "CopySticker", "Sticker"]
+    min_level = 2
+    description = "Creates a custom sticker from a URL or attached file."
+    usage = "<1:name>+ <0:url>"
+    flags = "aed"
+    no_parse = True
+    rate_limit = (3, 6)
+    _timeout_ = 8
+    typing = True
+    slash = ("Sticker",)
+
+    async def __call__(self, bot, user, guild, channel, message, args, argv, _timeout, **void):
+        # Take input from any attachments, or otherwise the message contents
+        if message.attachments:
+            args.extend(best_url(a) for a in message.attachments)
+            argv += " " * bool(argv) + " ".join(best_url(a) for a in message.attachments)
+        if not args:
+            raise ArgumentError("Please enter URL, emoji, or attached file to add.")
+        with discord.context_managers.Typing(channel):
+            try:
+                if len(args) > 1 and is_url(args[0]):
+                    args.append(args.pop(0))
+                url = args.pop(-1)
+                urls = await bot.follow_url(url, best=True, allow=True, limit=1)
+                if not urls:
+                    urls = await bot.follow_to_image(argv)
+                    if not urls:
+                        urls = await bot.follow_to_image(url)
+                        if not urls:
+                            raise ArgumentError
+                url = urls[0]
+            except ArgumentError:
+                if not argv:
+                    url = None
+                    try:
+                        url = await bot.get_last_image(message.channel)
+                    except FileNotFoundError:
+                        raise ArgumentError("Please input an image by URL or attachment.")
+                else:
+                    raise ArgumentError("Please input an image by URL or attachment.")
+            name = " ".join(args).strip()
+            if not name:
+                name = "emoji_" + str(len(guild.emojis))
+            # print(name, url)
+            image = resp = await bot.get_request(url, timeout=28)
+            if len(image) > 268435456:
+                raise OverflowError("Max file size to load is 256MB.")
+            # if len(image) > 512000 or not is_image(url):
+            ts = ts_us()
+            path = "cache/" + str(ts)
+            with open(path, "wb") as f:
+                await create_future(f.write, image, timeout=18)
+            verified = False
+            width = 320
+            while len(image) > 512000 and not verified:
+                try:
+                    resp = await process_image(path, "resize_max", [width, "-d", 5, "-f", "apng"], timeout=_timeout)
+                except:
+                    raise
+                else:
+                    fn = resp[0]
+                    if not os.path.exists(fn) or not os.path.getsize(fn):
+                        break
+                    r = os.path.getsize(fn) / 512000
+                    if r > 1:
+                        width = floor(width / sqrt(r))
+                        continue
+                    with open(fn, "rb") as f:
+                        image = await create_future(f.read, timeout=18)
+                    verified = True
+                finally:
+                    with suppress():
+                        os.remove(fn)
+            try:
+                data = await create_future(
+                    Request,
+                    f"https://discord.com/api/{api}/guilds/{guild.id}/stickers",
+                    method="POST",
+                    files=dict(
+                        name=(None, name),
+                        tags=(None, "upside_down"),
+                        file=image,
+                    ),
+                    authorise=True,
+                    json=True,
+                )
+            except Exception as ex:
+                if isinstance(ex, ConnectionError):
+                    msg = f"Unable to create sticker (Error {ex.errno}). Please download and add manually."
+                else:
+                    msg = "Unable to create sticker (Unknown error). Please download and add manually."
+                print_exc()
+                await bot.send_with_file(
+                    channel,
+                    msg,
+                    file=CompatFile(image, filename=name + ".png"),
+                )
+                return
+            sticker = f"https://media.discordapp.net/stickers/{data['id']}"
+            embed = discord.Embed(colour=colour)
+            embed.set_image(url=sticker)
+            content = css_md(f"Successfully created sticker {sqr_md(name)} for {sqr_md(guild)}.")
+        await send_with_reply(channel, message, content, embed=embed)
 
 
 class ScanEmoji(Command):
@@ -3127,8 +3233,7 @@ class ThreadList(Command):
                     futs.append(Request(
                         url,
                         method="GET",
-                        headers={"Authorization": "Bot " + bot.token},
-                        bypass=False,
+                        authorise=True,
                         aio=True,
                         json=True,
                     ))

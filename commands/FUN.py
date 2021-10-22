@@ -428,17 +428,13 @@ class Text2048(Command):
                 async with sem:
                     return await Request(
                         f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
-                        data=orjson.dumps(dict(
+                        data=dict(
                             content="**```\n2048: GAME OVER```**",
                             embed=emb.to_dict(),
                             components=None,
-                        )),
+                        ),
                         method="PATCH",
-                        headers={
-                            "Content-Type": "application/json",
-                            "Authorization": f"Bot {bot.token}",
-                        },
-                        bypass=False,
+                        authorise=True,
                         aio=True,
                     )
         if data is not None:
@@ -525,17 +521,13 @@ class Text2048(Command):
             async with sem:
                 return await Request(
                     f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
-                    data=orjson.dumps(dict(
+                    data=dict(
                         content=content,
                         embed=emb.to_dict(),
                         components=restructure_buttons(buttons),
-                    )),
+                    ),
                     method="PATCH",
-                    headers={
-                        "Content-Type": "application/json",
-                        "Authorization": f"Bot {bot.token}",
-                    },
-                    bypass=False,
+                    authorise=True,
                     aio=True,
                 )
         return await bot.ignore_interaction(message)
@@ -1229,20 +1221,16 @@ class Uno(Command):
                 async with sem:
                     return await Request(
                         f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
-                        data=orjson.dumps(dict(
+                        data=dict(
                             content=content,
                             embed=embed.to_dict(),
                             components=restructure_buttons([[
                                 cdict(emoji="🔻", style=1),
                                 cdict(emoji="✖", style=4),
                             ]]),
-                        )),
+                        ),
                         method="PATCH",
-                        headers={
-                            "Content-Type": "application/json",
-                            "Authorization": f"Bot {bot.token}",
-                        },
-                        bypass=False,
+                        authorise=True,
                         aio=True,
                     )
             # Does not have permission to start game

@@ -67,6 +67,13 @@ class Help(Command):
         elif argv in bot.commands:
             comm = argv
             catg = bot.commands[argv][0].catg.casefold()
+        elif argv.startswith(prefix):
+            argv = argv[len(prefix):].lstrip()
+            if argv in bot.categories:
+                catg = argv
+            elif argv in bot.commands:
+                comm = argv
+                catg = bot.commands[argv][0].catg.casefold()
         else:
             catg = None
         if catg not in bot.categories:
@@ -149,20 +156,16 @@ class Help(Command):
                 try:
                     sem = EDIT_SEM[message.channel.id]
                 except KeyError:
-                    sem = EDIT_SEM[message.channel.id] = Semaphore(5.1, 256, rate_limit=5)
+                    sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
                 async with sem:
                     await Request(
                         f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
-                        data=orjson.dumps(dict(
+                        data=dict(
                             embed=embed.to_dict(),
                             components=restructure_buttons(buttons),
-                        )),
+                        ),
                         method="PATCH",
-                        headers={
-                            "Content-Type": "application/json",
-                            "Authorization": f"Bot {bot.token}",
-                        },
-                        bypass=False,
+                        authorise=True,
                         aio=True,
                     )
             elif content:
@@ -171,19 +174,15 @@ class Help(Command):
                     try:
                         sem = EDIT_SEM[message.channel.id]
                     except KeyError:
-                        sem = EDIT_SEM[message.channel.id] = Semaphore(5.1, 256, rate_limit=5)
+                        sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
                     async with sem:
                         await Request(
                             f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
-                            data=orjson.dumps(dict(
+                            data=dict(
                                 components=restructure_buttons(buttons),
-                            )),
+                            ),
                             method="PATCH",
-                            headers={
-                                "Content-Type": "application/json",
-                                "Authorization": f"Bot {bot.token}",
-                            },
-                            bypass=False,
+                            authorise=True,
                             aio=True,
                         )
             else:
