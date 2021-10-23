@@ -480,6 +480,7 @@ def rounder(x):
     except:
         pass
     return x
+round_min = rounder
 
 
 # Allowed functions for ~math
@@ -532,6 +533,7 @@ _globals.update({
     "append": np.append,
     "resize": np.resize,
     "unique": np.unique,
+    "uniq": np.unique,
     "flip": np.flip,
     "reshape": np.reshape,
     "roll": np.roll,

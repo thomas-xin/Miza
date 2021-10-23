@@ -237,11 +237,8 @@ class UpdateExec(Database):
     _print = lambda self, *args, sep=" ", end="\n", prefix="", channel=None, **void: self.bot.send_as_embeds(channel, "```\n" + str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix) + "```")
     def _input(self, *args, channel=None, **kwargs):
         self._print(*args, channel=channel, **kwargs)
-        self.listeners.__setitem__(channel.id, None)
-        t = utc()
-        while self.listeners[channel.id] is None and utc() - t < 86400:
-            time.sleep(0.2)
-        return self.listeners.pop(channel.id, None)
+        self.listeners[channel.id] = fut = concurent.futures.Future()
+        return fut.result(timeout=86400)
 
     # Asynchronously evaluates Python code
     async def procFunc(self, message, proc, bot, term=0):
@@ -366,9 +363,9 @@ class UpdateExec(Database):
                     return
                 with suppress(KeyError):
                     # Write to input() listener if required
-                    if self.listeners[channel.id] is None:
+                    if self.listeners[channel.id]:
                         create_task(message.add_reaction("👀"))
-                        self.listeners[channel.id] = proc
+                        self.listeners.pop(channel.id).set_result(proc)
                         return
                 if not proc:
                     return
