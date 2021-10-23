@@ -269,6 +269,7 @@ class UpdateExec(Database):
             if term & 32:
                 proc = await asyncio.create_subprocess_shell(proc, stdout=subprocess.PIPE, limit=65536)
                 output = await proc.stdout.read()
+                output = as_str(output)
                 if output:
                     glob["_"] = output
                 return output
