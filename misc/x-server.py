@@ -1776,7 +1776,7 @@ body {
                 data = get_geo(ip)
                 tz = data["timezone"]
             else:
-                ip = ".".join(str(xrand(256)) for _ in loop(4))
+                ip = ".".join(str(xrand(1, 255)) for _ in loop(4))
                 tz = "Anonymous (DNT enabled)"
                 self.rapidapi += 1
         if " " not in content:
