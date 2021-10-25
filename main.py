@@ -10,7 +10,6 @@ if not os.path.exists("auth.json") or not os.path.getsize("auth.json"):
         "webserver_port": "",
         "discord_token": "",
         "owner_id": [],
-        "google_api_key": "",
         "rapidapi_key": "",
         "rapidapi_secret": "",
         "alexflipnote_key": "",

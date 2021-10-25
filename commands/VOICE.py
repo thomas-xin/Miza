@@ -8,15 +8,6 @@ from bs4 import BeautifulSoup
 SAMPLE_RATE = 48000
 
 
-try:
-    google_api_key = AUTH["google_api_key"]
-    if not google_api_key:
-        raise
-except:
-    google_api_key = None
-    print("WARNING: google_api_key not found. Unable to use API to search youtube playlists.")
-
-
 # Gets estimated duration from duration stored in queue entry
 e_dur = lambda d: float(d) if type(d) is str else (d if d is not None else 300)
 
@@ -1450,38 +1441,7 @@ class AudioDownloader:
             out.append(temp)
         return out, total
 
-    # Returns part of a youtube playlist.
-    def export_youtube_part(self, d):
-        self.youtube_x += 1
-        out = deque()
-        items = d["items"]
-        total = d.get("pageInfo", {}).get("totalResults", 0)
-        for item in items:
-            try:
-                snip = item["snippet"]
-                v_id = snip["resourceId"]["videoId"]
-            except KeyError:
-                continue
-            name = snip.get("title", v_id)
-            url = f"https://www.youtube.com/watch?v={v_id}"
-            temp = cdict(
-                name=name,
-                url=url,
-                duration=None,
-                research=True,
-            )
-            out.append(temp)
-        return out, total
-
-    def get_youtube_part(self, url):
-        d = Request(url, json=True)
-        return self.export_youtube_part(d)
-
-    async def get_youtube_part_async(self, url):
-        d = await Request(url, aio=True, json=True)
-        return self.export_youtube_part(d)
-
-        # Returns a list of formatted queue entries from a YouTube playlist renderer.
+    # Returns a list of formatted queue entries from a YouTube playlist renderer.
     def extract_playlist_items(self, items):
         token = None
         out = deque()
@@ -1517,6 +1477,7 @@ class AudioDownloader:
 
     # Returns a subsequent page of a youtube playlist from a page token.
     def get_youtube_continuation(self, token, ctx):
+        self.youtube_x += 1
         data = Request(
             "https://www.youtube.com/youtubei/v1/browse?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
             method="POST",
@@ -1529,9 +1490,57 @@ class AudioDownloader:
         items = data["onResponseReceivedActions"][0]["appendContinuationItemsAction"]["continuationItems"]
         return self.extract_playlist_items(items)
 
+    # Async version of the previous function, used when possible to minimise thread pool wastage.
+    async def get_youtube_continuation_async(self, token, ctx):
+        self.youtube_x += 1
+        data = await Request(
+            "https://www.youtube.com/youtubei/v1/browse?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
+            method="POST",
+            data=orjson.dumps(dict(
+                context=ctx,
+                continuation=token,
+            )),
+            json=True,
+            aio=True,
+        )
+        items = data["onResponseReceivedActions"][0]["appendContinuationItemsAction"]["continuationItems"]
+        return self.extract_playlist_items(items)
+
+    # Generates a playlist continuation token purely from ID and page number.
+    def produce_continuation(self, p, i):
+        if not isinstance(p, (bytes, bytearray, memoryview)):
+            p = str(p).encode("ascii")
+        parts = []
+        if i == 1:
+            parts.append(b"\xe2\xa9\x85\xb2\x02a\x12$VL")
+        else:
+            parts.append(b"\xe2\xa9\x85\xb2\x02_\x12$VL")
+        parts.append(p)
+        if i == 1:
+            parts.append(b"\x1a\x14")
+        else:
+            parts.append(b"\x1a\x12")
+        import base64
+        def base128(n):
+            data = bytearray()
+            while n:
+                data.append(n & 127)
+                n >>= 7
+                if n:
+                    data[-1] |= 128
+            if not data:
+                data = b"\x00"
+            return data
+        key = bytes((8, i, 0x7a, (i != 1) + 6)) + b"PT:" + base64.b64encode(b"\x08" + base128(i * 100)).rstrip(b"=")
+        obj = base64.b64encode(key).replace(b"=", b"%3D")
+        parts.append(obj)
+        parts.append(b"\x9a\x02\x22")
+        parts.append(p)
+        code = b"".join(parts)
+        return base64.b64encode(code).replace(b"=", b"%3D").decode("ascii")
+
     # Returns a full youtube playlist.
     def get_youtube_playlist(self, p_id):
-        out = deque()
         self.youtube_x += 1
         resp = Request(f"https://www.youtube.com/playlist?list={p_id}", headers=self.youtube_header())
         client = {}
@@ -1570,26 +1579,25 @@ class AudioDownloader:
         count = int(data["sidebar"]["playlistSidebarRenderer"]["items"][0]["playlistSidebarPrimaryInfoRenderer"]["stats"][0]["runs"][0]["text"].replace(",", ""))
         items = data["contents"]["twoColumnBrowseResultsRenderer"]["tabs"][0]["tabRenderer"]["content"]["sectionListRenderer"]["contents"][0]["itemSectionRenderer"]["contents"][0]["playlistVideoListRenderer"]["contents"]
         entries, token = self.extract_playlist_items(items)
-        out.extend(entries)
         if count > 100:
             futs = deque()
-            if token:
-                after = 200
-                futs.append(create_future_ex(self.get_youtube_continuation, token, context, priority=True))
-            else:
-                after = 100
-            if count > after:
-                page = 50
-                url = f"https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults={page}&key={google_api_key}&playlistId={p_id}"
-                for curr in range(after, page * ceil(count / page), page):
-                    search = f"{url}&pageToken={self.yt_pages[curr]}"
-                    if is_main_thread() or curr < after + 300:
-                        fut = create_future_ex(self.get_youtube_part, search)
-                    else:
-                        fut = convert_fut(self.get_youtube_part_async(search))
-                    futs.append(fut)
+            if not token:
+                token = self.produce_continuation(p_id, 1)
+            for page in range(1, ceil(count / 100)):
+                if is_main_thread():
+                    fut = create_future_ex(self.get_youtube_continuation, token, context)
+                else:
+                    fut = convert_fut(self.get_youtube_continuation_async(token, context))
+                futs.append(fut)
+                token = self.produce_continuation(p_id, page + 1)
             for fut in futs:
                 out.extend(fut.result()[0])
+        out = deque()
+        urls = set()
+        for entry in entries:
+            if entry.url not in urls:
+                urls.add(entry.url)
+                out.append(entry)
         return out
 
     def ydl_errors(self, s):
@@ -1780,7 +1788,7 @@ class AudioDownloader:
         try:
             page = None
             output = deque()
-            if google_api_key and ("youtube.com" in item or "youtu.be/" in item):
+            if "youtube.com" in item or "youtu.be/" in item:
                 p_id = None
                 for x in ("?list=", "&list="):
                     if x in item:
