@@ -1536,8 +1536,8 @@ class AudioDownloader:
         resp = Request(f"https://www.youtube.com/playlist?list={p_id}", headers=self.youtube_header())
         client = {}
         try:
-            resp = resp[resp.index(b"ytcfg.set"):]
-            ytcfg = resp[:resp.index(b";")]
+            ytcfg = resp[resp.index(b"ytcfg.set"):]
+            ytcfg = ytcfg[:ytcfg.index(b";")]
             ytcfg = eval(ytcfg.split(b"(", 1)[-1].rsplit(b")", 1)[0], {}, {})[-1] + "&"
             end = "&"
             start = "client.name="
@@ -1575,7 +1575,7 @@ class AudioDownloader:
             futs = deque()
             if token:
                 after = 200
-                futs.append(create_future_ex(self.get_youtube_continuation, token, context))
+                futs.append(create_future_ex(self.get_youtube_continuation, token, context, priority=True))
             else:
                 after = 100
             if count > after:
@@ -1587,6 +1587,7 @@ class AudioDownloader:
                         fut = create_future_ex(self.get_youtube_part, search)
                     else:
                         fut = convert_fut(self.get_youtube_part_async(search))
+                    futs.append(fut)
             for fut in futs:
                 out.extend(fut.result()[0])
         return out

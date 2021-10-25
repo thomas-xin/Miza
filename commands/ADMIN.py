@@ -944,7 +944,7 @@ class Lockdown(Command):
         invites = await guild.invites()
         for inv in invites:
             create_task(self.invLock(inv, channel))
-        return bold(css_md(sqr_md(uni_str("LOCKDOWN REQUESTED."))))
+        return bold(css_md(sqr_md(uni_str("LOCKDOWN REQUESTED.")), force=True))
 
 
 class SaveChannel(Command):
