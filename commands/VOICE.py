@@ -1481,36 +1481,17 @@ class AudioDownloader:
         d = await Request(url, aio=True, json=True)
         return self.export_youtube_part(d)
 
-    # Returns a full youtube playlist.
-    def get_youtube_playlist(self, p_id):
+        # Returns a list of formatted queue entries from a YouTube playlist renderer.
+    def extract_playlist_items(self, items):
+        token = None
         out = deque()
-        self.youtube_x += 1
-        resp = Request(f"https://www.youtube.com/playlist?list={p_id}", headers=self.youtube_header())
-        try:
-            search = b'window["ytInitialData"] = '
-            try:
-                resp = resp[resp.index(search) + len(search):]
-            except ValueError:
-                search = b"var ytInitialData = "
-                resp = resp[resp.index(search) + len(search):]
-            try:
-                resp = resp[:resp.index(b'window["ytInitialPlayerResponse"] = null;')]
-                resp = resp[:resp.rindex(b";")]
-            except ValueError:
-                try:
-                    resp = resp[:resp.index(b";</script><title>")]
-                except:
-                    resp = resp[:resp.index(b';</script><link rel="')]
-            data = eval_json(resp)
-        except:
-            print(resp)
-            raise
-        count = int(data["sidebar"]["playlistSidebarRenderer"]["items"][0]["playlistSidebarPrimaryInfoRenderer"]["stats"][0]["runs"][0]["text"].replace(",", ""))
-        for part in data["contents"]["twoColumnBrowseResultsRenderer"]["tabs"][0]["tabRenderer"]["content"]["sectionListRenderer"]["contents"][0]["itemSectionRenderer"]["contents"][0]["playlistVideoListRenderer"]["contents"]:
+        for part in items:
             try:
                 video = part["playlistVideoRenderer"]
             except KeyError:
-                if "continuationItemRenderer" not in part:
+                try:
+                    token = part["continuationItemRenderer"]["continuationEndpoint"]["continuationCommand"]["token"]
+                except KeyError:
                     print(part)
                 continue
             v_id = video['videoId']
@@ -1532,17 +1513,81 @@ class AudioDownloader:
                 thumbnail=f"https://i.ytimg.com/vi/{v_id}/maxresdefault.jpg",
             )
             out.append(temp)
+        return out, token
+
+    # Returns a subsequent page of a youtube playlist from a page token.
+    def get_youtube_continuation(self, token, ctx):
+        data = Request(
+            "https://www.youtube.com/youtubei/v1/browse?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
+            method="POST",
+            data=orjson.dumps(dict(
+                context=ctx,
+                continuation=token,
+            )),
+            json=True,
+        )
+        items = data["onResponseReceivedActions"][0]["appendContinuationItemsAction"]["continuationItems"]
+        return self.extract_playlist_items(items)
+
+    # Returns a full youtube playlist.
+    def get_youtube_playlist(self, p_id):
+        out = deque()
+        self.youtube_x += 1
+        resp = Request(f"https://www.youtube.com/playlist?list={p_id}", headers=self.youtube_header())
+        client = {}
+        try:
+            resp = resp[resp.index(b"ytcfg.set"):]
+            ytcfg = resp[:resp.index(b";")]
+            ytcfg = eval(ytcfg.split(b"(", 1)[-1].rsplit(b")", 1)[0], {}, {})[-1] + "&"
+            end = "&"
+            start = "client.name="
+            cname = ytcfg[ytcfg.index(start) + len(start):]
+            client["clientName"] = cname[:cname.index(end)]
+            start = "client.version="
+            cversion = ytcfg[ytcfg.index(start) + len(start):]
+            client["clientVersion"] = cversion[:cversion.index(end)]
+        except ValueError:
+            pass
+        client.setdefault("clientName", "WEB")
+        client.setdefault("clientVersion", "2.20211019")
+        context = dict(client=client)
+        try:
+            search = b"var ytInitialData = "
+            try:
+                resp = resp[resp.index(search) + len(search):]
+            except ValueError:
+                search = b'window["ytInitialData"] = '
+                resp = resp[resp.index(search) + len(search):]
+            try:
+                resp = resp[:resp.index(b';</script><')]
+            except ValueError:
+                resp = resp[:resp.index(b'window["ytInitialPlayerResponse"] = null;')]
+                resp = resp[:resp.rindex(b";")]
+            data = orjson.loads(resp)
+        except:
+            print(resp)
+            raise
+        count = int(data["sidebar"]["playlistSidebarRenderer"]["items"][0]["playlistSidebarPrimaryInfoRenderer"]["stats"][0]["runs"][0]["text"].replace(",", ""))
+        items = data["contents"]["twoColumnBrowseResultsRenderer"]["tabs"][0]["tabRenderer"]["content"]["sectionListRenderer"]["contents"][0]["itemSectionRenderer"]["contents"][0]["playlistVideoListRenderer"]["contents"]
+        entries, token = self.extract_playlist_items(items)
+        out.extend(entries)
         if count > 100:
-            page = 50
-            url = f"https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults={page}&key={google_api_key}&playlistId={p_id}"
             futs = deque()
-            for curr in range(100, page * ceil(count / page), page):
-                search = f"{url}&pageToken={self.yt_pages[curr]}"
-                if is_main_thread() or curr < 500:
-                    fut = create_future_ex(self.get_youtube_part, search)
-                else:
-                    fut = convert_fut(self.get_youtube_part_async(search))
-                futs.append(fut)
+            if token:
+                after = 200
+                futs.append(create_future_ex(self.get_youtube_continuation, token, context))
+            else:
+                after = 100
+            if count > after:
+                page = 50
+                url = f"https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults={page}&key={google_api_key}&playlistId={p_id}"
+                self.paging.result()
+                for curr in range(after, page * ceil(count / page), page):
+                    search = f"{url}&pageToken={self.yt_pages[curr]}"
+                    if is_main_thread() or curr < after + 300:
+                        fut = create_future_ex(self.get_youtube_part, search)
+                    else:
+                        fut = convert_fut(self.get_youtube_part_async(search))
             for fut in futs:
                 out.extend(fut.result()[0])
         return out
