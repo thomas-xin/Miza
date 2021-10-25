@@ -1591,7 +1591,7 @@ class AudioDownloader:
                 futs.append(fut)
                 token = self.produce_continuation(p_id, page + 1)
             for fut in futs:
-                out.extend(fut.result()[0])
+                entries.extend(fut.result()[0])
         out = deque()
         urls = set()
         for entry in entries:
