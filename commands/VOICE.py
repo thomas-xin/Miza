@@ -1581,7 +1581,6 @@ class AudioDownloader:
             if count > after:
                 page = 50
                 url = f"https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults={page}&key={google_api_key}&playlistId={p_id}"
-                self.paging.result()
                 for curr in range(after, page * ceil(count / page), page):
                     search = f"{url}&pageToken={self.yt_pages[curr]}"
                     if is_main_thread() or curr < after + 300:
