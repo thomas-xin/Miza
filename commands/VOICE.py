@@ -1680,8 +1680,6 @@ class AudioDownloader:
                 durstr = regexp("[&?]dur=([0-9\\.]+)").findall(stream)
                 if durstr:
                     temp.duration = round_min(durstr[0])
-            if not temp.duration:
-                temp.research = True
             out.append(temp)
         return out
 
@@ -1968,7 +1966,6 @@ class AudioDownloader:
                                     if not is_url(url):
                                         if entry.get("ie_key", "").casefold() == "youtube":
                                             temp["url"] = f"https://www.youtube.com/watch?v={url}"
-                                    temp["research"] = True
                             output.append(cdict(temp))
                 else:
                     # Single item results must contain full data, we take advantage of that here
@@ -2082,7 +2079,6 @@ class AudioDownloader:
                     if not is_url(url):
                         if entry.get("ie_key", "").casefold() == "youtube":
                             temp["url"] = f"https://www.youtube.com/watch?v={url}"
-                    temp["research"] = True
                     out.append(temp)
         if not out:
             url = f"https://www.youtube.com/results?search_query={verify_url(query)}"
@@ -2756,7 +2752,7 @@ class AudioDownloader:
                 try:
                     out[0].duration = data["duration"]
                 except KeyError:
-                    out[0].research = True
+                    pass
                 self.searched[item] = obj
                 it = out[0]
                 i.update(it)
@@ -3561,8 +3557,6 @@ class Dump(Command):
                     e = q[i - 1] = cdict(e)
                 e.u_id = user.id
                 e.skips = deque()
-                if i > 2:
-                    e.research = True
                 if not i & 8191:
                     await asyncio.sleep(0.1)
             # Shuffle newly loaded dump if autoshuffle is on
@@ -4885,7 +4879,7 @@ class UpdateAudio(Database):
                     q = auds.queue
                     async with Delay(2):
                         for i, e in enumerate(q, 1):
-                            if searched >= 1 or i > 5:
+                            if searched >= 1 or i > 12:
                                 break
                             if "research" in e:
                                 try:
