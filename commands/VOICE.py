@@ -1272,9 +1272,10 @@ class AudioDownloader:
             self.youtube_x += 1
 
     def youtube_header(self):
+        headers = Request.header()
         if self.youtube_base:
-            return dict(cookie=self.youtube_base + "%03d" % random.randint(0, 999) + ";")
-        return {}
+            headers["Cookie"] = self.youtube_base + "%03d" % random.randint(0, 999) + ";"
+        return headers
 
     # Initializes youtube_dl object as well as spotify tokens, every 720 seconds.
     def update_dl(self):
@@ -1452,12 +1453,12 @@ class AudioDownloader:
     def extract_playlist_items(self, items):
         token = None
         out = deque()
-        for part in items:
+        for data in items:
             try:
-                video = part["playlistVideoRenderer"]
+                video = data["playlistVideoRenderer"]
             except KeyError:
                 try:
-                    token = part["continuationItemRenderer"]["continuationEndpoint"]["continuationCommand"]["token"]
+                    token = data["continuationItemRenderer"]["continuationEndpoint"]["continuationCommand"]["token"]
                 except KeyError:
                     print(part)
                 continue
@@ -1486,6 +1487,7 @@ class AudioDownloader:
         self.youtube_x += 1
         data = Request(
             "https://www.youtube.com/youtubei/v1/browse?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
+            headers=self.youtube_header(),
             method="POST",
             data=orjson.dumps(dict(
                 context=ctx,
@@ -1501,6 +1503,7 @@ class AudioDownloader:
         self.youtube_x += 1
         data = await Request(
             "https://www.youtube.com/youtubei/v1/browse?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
+            headers=self.youtube_header(),
             method="POST",
             data=orjson.dumps(dict(
                 context=ctx,
@@ -1567,12 +1570,15 @@ class AudioDownloader:
         client.setdefault("clientVersion", "2.20211019")
         context = dict(client=client)
         try:
-            search = b"var ytInitialData = "
             try:
-                resp = resp[resp.index(search) + len(search):]
+                resp = resp[resp.index(b'{"responseContext":{'):]
             except ValueError:
-                search = b'window["ytInitialData"] = '
-                resp = resp[resp.index(search) + len(search):]
+                search = b"var ytInitialData = "
+                try:
+                    resp = resp[resp.index(search) + len(search):]
+                except ValueError:
+                    search = b'window["ytInitialData"] = '
+                    resp = resp[resp.index(search) + len(search):]
             try:
                 resp = resp[:resp.index(b';</script><')]
             except ValueError:
