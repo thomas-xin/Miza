@@ -2999,7 +2999,7 @@ class Queue(Command):
         )
         emb.set_author(**get_author(user))
         if q:
-            icon = q[0].get("icon", "")
+            icon = get_best_icon(q[0])
         else:
             icon = ""
         if icon:
