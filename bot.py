@@ -3349,7 +3349,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if not guild:
                 return await send_with_react(sendable, embeds=embeds, reacts=reacts, reference=reference)
             single = False
-            if not hasattr(guild, "simulated") and hasattr(guild, "ghost") or len(embeds) <= 1:
+            if not hasattr(guild, "simulated") and hasattr(guild, "ghost"):
                 single = True
             else:
                 m = guild.me
