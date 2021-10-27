@@ -505,6 +505,8 @@ class UpdateExec(Database):
                     fn = url.rsplit("/", 1)[-1].split("?", 1)[0]
                     if "." not in fn:
                         fn += ".png"
+                    elif fn.endswith(".pnglarge") or fn.endswith(".jpglarge"):
+                        fn = fn[:-5]
                     files[i] = cdict(fut=create_future(reqs.next().get, url, stream=True), filename="SPOILER_" + fn, url=url)
                 else:
                     out[i] = url
