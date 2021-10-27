@@ -242,6 +242,7 @@ neko_tags = {
     "erok": True,
     "fox_girl": False,
     "boobs": True,
+    "pussy": True,
     "random_hentai_gif": True,
     "hug": False,
     "ero": True,
@@ -269,7 +270,7 @@ neko_tags = {
     "yaoi": True,
 }
 nekobot_shared = {
-    "hentai", "holo", "neko", "pussy", "anal", "boobs"
+    "hentai", "holo", "neko", "anal", "boobs"
 }
 nekobot_exclusive = {
     "ass", "hass", "hmidriff", "pgif", "4k", "hneko", "hkitsune", "kemonomimi", "hanal", "gonewild", "kanna",
@@ -317,7 +318,7 @@ class Neko(Command):
                 if tag not in self.nekobot_sem:
                     self.nekobot_sem[tag] = Semaphore(56, 56, rate_limit=61, last=True)
                 nekobot_sem = self.nekobot_sem[tag]
-                if tag in ("ass", "pussy", "anal", "boobs", "thigh"):
+                if tag in ("ass", "anal", "boobs", "thigh"):
                     tag = "h" + tag
                 with suppress(SemaphoreOverflowError):
                     async with nekobot_sem:

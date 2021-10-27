@@ -4367,7 +4367,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     kwargs['data'] = form_data
 
                 try:
-                    async with Request.sessions.next().request(method, url, **kwargs) as r:
+                    async with Request.sessions.next().request(method.upper(), url, **kwargs) as r:
                         bot.activity += 1
                         # log.debug('%s %s with %s has returned %s', method, url, kwargs.get('data'), r.status)
                         # even errors have text involved in them so this is safe to call

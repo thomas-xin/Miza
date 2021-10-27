@@ -13,6 +13,7 @@ MultiAutoImporter(
     "json",
     "orjson",
     "aiohttp",
+    "httpx",
     "threading",
     "shutil",
     "filetype",
@@ -33,6 +34,10 @@ import nacl.secret
 
 utils = discord.utils
 reqs = alist(requests.Session() for i in range(6))
+try:
+    reqx = alist(httpx.Client(http2=True) for i in range(6))
+except:
+    reqx = alist(httpx.Client(http2=False) for i in range(6))
 url_parse = urllib.parse.quote_plus
 url_unparse = urllib.parse.unquote_plus
 escape_markdown = utils.escape_markdown
@@ -1351,22 +1356,6 @@ def as_embed(message, link=False):
             return emb
     else:
         urls = find_urls(content)
-        # if urls:
-        #     with tracebacksuppressor:
-        #         url = urls[0]
-        #         resp = reqs.next().get(url, headers=Request.header(), timeout=8)
-        #         if BOT[0]:
-        #             BOT[0].activity += 1
-        #         headers = fcdict(resp.headers)
-        #         if headers.get("Content-Type").split("/", 1)[0] == "image":
-        #             emb.url = url
-        #             emb.set_image(url=url)
-        #             if url != content:
-        #                 emb.description = content
-        #             if link:
-        #                 emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 4096)
-        #                 emb.timestamp = message.edited_at or message.created_at
-        #             return emb
     emb.description = content
     if len(message.embeds) > 1 or content:
         urls = chain(("(" + e.url + ")" for e in message.embeds[1:] if e.url), ("[" + best_url(a) + "]" for a in message.attachments))
@@ -2694,7 +2683,7 @@ def parse_ratelimit_header(headers):
     return max(0.001, delta)
 
 
-# Manages both sync and async get requests.
+# Manages both sync and async web requests.
 class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, collections.abc.Callable):
 
     semaphore = Semaphore(512, 256, delay=0.25)
@@ -2709,7 +2698,10 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
     headers = header
 
     async def _init_(self):
-        self.sessions = alist(aiohttp.ClientSession(loop=eloop) for i in range(6))
+        try:
+            self.sessions = alist(httpx.AsyncClient(http2=True) for i in range(6))
+        except:
+            self.sessions = alist(aiohttp.ClientSession(loop=eloop) for i in range(6))
         self.nossl = aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False))
 
     @property
@@ -2744,6 +2736,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
                 headers["Content-Type"] = "application/json"
                 if not isinstance(data, (str, bytes, memoryview)):
                     data = orjson.dumps(data)
+            session = httpx
         elif bypass:
             if "user-agent" not in headers and "User-Agent" not in headers:
                 headers["User-Agent"] = f"Mozilla/5.{xrand(1, 10)}"
@@ -2755,18 +2748,21 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
         with self.semaphore:
             if session:
                 req = session
+                resp = req.request(method.upper(), url, headers=headers, files=files, data=data, follow_redirects=True, timeout=timeout)
             elif bypass:
-                req = reqs.next()
+                req = reqx.next()
+                resp = req.request(method.upper(), url, headers=headers, files=files, data=data, follow_redirects=True, timeout=timeout)
             else:
                 req = requests
-            with getattr(req, method)(url, headers=headers, files=files, data=data, stream=True, timeout=timeout) as resp:
+                resp = getattr(req, method)(url, headers=headers, files=files, data=data, timeout=timeout)
+            with resp:
                 if BOT[0]:
                     BOT[0].activity += 1
                 if resp.status_code >= 400:
                     raise ConnectionError(resp.status_code, url, resp.text)
                 if json:
                     return resp.json()
-                if raw:
+                if raw and getattr(resp, "raw", None):
                     data = resp.raw.read()
                 else:
                     data = resp.content

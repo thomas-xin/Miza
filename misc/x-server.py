@@ -780,9 +780,12 @@ class Server:
         if "/upload" in url:
             raise cp.HTTPRedirect(url.replace("/upload", "/files"), status=307)
         data, mime = fetch_static("index.html")
-        meta = """<meta property="og:title" content="Miza"><meta property="og:description" content="A multipurpose Discord bot.">\
-<meta property="og:image" content="/logo256.png">\
-<meta property="og:site_name" content="Miza">"""
+        meta = '<meta property="og:title" content="Miza"><meta property="og:description" content="A multipurpose Discord bot.">'
+        if "/file/" in url or "/files/" in url:
+            meta += '<meta property="og:image" content="/mizaleaf.png">'
+        else:
+            meta += '<meta property="og:image" content="/logo256.png">'
+        meta += '<meta property="og:site_name" content="Miza">'
         if path:
             ind = IND
             p = None
@@ -1765,7 +1768,9 @@ body {
                 return b"\xf0\x9f\x92\x9c"
         content = input or urllib.parse.unquote(cp.url(base="", qs=cp.request.query_string).rstrip("?").split("/", 2)[-1])
         if "DNT" in (k.upper() for k in cp.request.headers):
-            ip = "255.255.255.255"
+            random.seed(ip)
+            ip = ".".join(str(xrand(1, 255)) for _ in loop(4))
+            random.seed(ts_us())
             tz = "Anonymous (DNT enabled)"
         else:
             try:

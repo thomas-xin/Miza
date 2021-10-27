@@ -878,6 +878,8 @@ class UpdateDeviantArt(Database):
                 return
             embs = deque()
             for content in assigned:
+                if content not in found:
+                    continue
                 items = found[content]
                 entries = assigned[content]["entries"]
                 new = tuple(items)
@@ -915,7 +917,7 @@ class UpdateDeviantArt(Database):
         else:
             f_id = "&folderid=" + str(folder)
         url = base + username + f_id
-        # New binary search algorithm to improve search time for entire galleries
+        # Binary search algorithm to improve search time for entire galleries to O(log n)
         maxitems = 2147483647
         r = 0
         t = utc()
@@ -930,7 +932,12 @@ class UpdateDeviantArt(Database):
                 futs.append((curr, Request(search, timeout=20, json=True, aio=True)))
                 if i & 1:
                     for x, fut in futs:
-                        resp = await fut
+                        try:
+                            resp = await fut
+                        except ConnectionError as ex:
+                            if ex.errno >= 500:
+                                return
+                            raise
                         if resp.get("results"):
                             found[x] = resp
                         if not resp.get("hasMore"):
@@ -991,7 +998,8 @@ class UpdateDeviantArt(Database):
         for folder, username in conts.items():
             with tracebacksuppressor:
                 items = await self.fetch_gallery(folder, username)
-                total[folder] = items
+                if items:
+                    total[folder] = items
         # if attempts:
         #     print(successes, "of", attempts, "DeviantArt reqs.next() executed successfully.")
         for c_id in tuple(self.data):

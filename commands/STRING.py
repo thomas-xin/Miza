@@ -1,5 +1,6 @@
 print = PRINT
 
+import googletrans
 
 try:
     rapidapi_key = AUTH["rapidapi_key"]
@@ -10,26 +11,34 @@ except:
     print("WARNING: rapidapi_key not found. Unable to search Urban Dictionary.")
 
 
-# class Translate(Command):
-#     time_consuming = True
-#     name = ["TR"]
-#     description = "Translates a string into another language."
-#     usage = "<0:language> <1:string>"
-#     flags = "v"
-#     no_parse = True
-#     rate_limit = (2, 7)
-#     slash = True
-#     header = {
-#         "accept-encoding": "application/gzip",
-#         "x-rapidapi-host": "google-translate1.p.rapidapi.com",
-#         "x-rapidapi-key": rapidapi_key,
-#     }
+class Translate(Command):
+    time_consuming = True
+    name = ["TR"]
+    description = "Translates a string into another language."
+    usage = "<0:language>? <1:string>"
+    flags = "v"
+    no_parse = True
+    rate_limit = (2, 7)
+    slash = True
+    languages = demap(googletrans.LANGUAGES)
+    trans = googletrans.Translator()
+    trans.client.headers["DNT"] = "1"
 
-#     async def __call__(self, channel, argv, user, message, **void):
-#         if not args:
-#             raise ArgumentError("Input string is empty.")
-#         url = f"https://google-translate1.p.rapidapi.com/language/translate/v2?q={url_parse(argv"
-#         self.bot.send_as_embeds(channel, response, author=get_author(user), footer=footer, reference=message)
+    async def __call__(self, channel, argv, user, message, **void):
+        if not args:
+            raise ArgumentError("Input string is empty.")
+        trans.client.headers["X-Forwarded-For"] = ".".join(str(xrand(1, 255)) for _ in loop(4))
+        lang, arg = argv.split(None, 1)[0]
+        if lang.casefold() not in self.languages:
+            arg = argv
+            lang = "en"
+        resp = await create_future(self.trans.translate, argv, dest=lang)
+        footer = dict(text=f"Detected language: {resp.src}")
+        if getattr(resp, "pronunciation", None):
+            fields = (("Pronunciation", resp.pronunciation),)
+        else:
+            fields = None
+        self.bot.send_as_embeds(channel, resp.text, fields=fields, author=get_author(user), footer=footer, reference=message)
 
 
 class Math(Command):
