@@ -4377,8 +4377,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                             data = orjson.loads(data)
                     except:
                         pass
+                    status = r.status_code
 
-                    if maybe_lock and r.status != 429:
+                    if maybe_lock and status != 429:
                         # check if we have rate limit header information
                         remaining = r.headers.get('X-Ratelimit-Remaining')
                         if remaining == '0':
@@ -4406,11 +4407,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                                     # print("Successfully registered hard rate limit", sem, "for", bucket)
 
                     # the request was successful so just return the text/json
-                    if r.status in range(200, 400):
+                    if status in range(200, 400):
                         return data
 
                     # we are being rate limited
-                    if r.status == 429:
+                    if status == 429:
                         if not r.headers.get('Via'):
                             # Banned by Cloudflare more than likely.
                             raise discord.HTTPException(r, data)
@@ -4431,16 +4432,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         continue
 
                     # we've received a 500 or 502, unconditional retry
-                    if r.status >= 500 and tries < 3:
+                    if status >= 500 and tries < 3:
                         await asyncio.sleep(1 + tries * 2)
                         continue
 
                     # the usual error cases
-                    if r.status == 403:
+                    if status == 403:
                         raise discord.Forbidden(r, data)
-                    elif r.status == 404:
+                    elif status == 404:
                         raise discord.NotFound(r, data)
-                    elif r.status == 503:
+                    elif status == 503:
                         raise discord.DiscordServerError(r, data)
                     else:
                         raise discord.HTTPException(r, data)
