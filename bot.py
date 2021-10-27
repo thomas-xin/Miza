@@ -3597,7 +3597,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         sent = False
         for s_id in self.embed_senders:
             embeds = self.embed_senders[s_id]
-            if not force and len(embeds) <= 10:
+            if not force and len(embeds) <= 10 and sum(len(e) for e in embeds) <= 6000:
                 continue
             embs = deque()
             for emb in embeds:

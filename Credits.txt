@@ -1,13 +1,20 @@
 ﻿Python:
 
+Harris, C.R., Millman, K.J., van der Walt, S.J. et al.
+- Array programming with NumPy. Nature 585, 357–362 (2020). DOI: 10.1038/s41586-020-2649-2. (Publisher link)
+{https://github.com/numpy/numpy}
+
 Meurer A, Smith CP, Paprocki M, Čertík O, Kirpichev SB, Rocklin M, Kumar A, Ivanov S, Moore JK, Singh S, Rathnayake T, Vig S, Granger BE, Muller RP, Bonazzi F, Gupta H, Vats S, Johansson F, Pedregosa F, Curry MJ, Terrel AR, Roučka Š, Saboo A, Fernando I, Kulal S, Cimrman R, Scopatz A.
--SymPy: symbolic computing in Python. PeerJ Computer Science 3:e103 {https://doi.org/10.7717/peerj-cs.103}
+-SymPy: symbolic computing in Python. PeerJ Computer Science 3:e103
+{https://doi.org/10.7717/peerj-cs.103}
 
 Rapptz and others
--discord.py: A modern, easy to use, feature-rich, and async ready API wrapper for Discord written in Python. {https://github.com/Rapptz/discord.py}
+-discord.py: A modern, easy to use, feature-rich, and async ready API wrapper for Discord written in Python.
+{https://github.com/Rapptz/discord.py}
 
 Sergey M. and others
--youtube_dl: Command-line program to download videos from YouTube.com and other video sites {https://github.com/ytdl-org/youtube-dl}
+-youtube_dl: Command-line program to download videos from YouTube.com and other video sites
+{https://github.com/ytdl-org/youtube-dl}
 
 -CherryPy: A Minimalist Python Web Framework
 {https://github.com/cherrypy/cherrypy}
@@ -43,9 +50,6 @@ https://www.djtech.net/humor/useless_facts.htm
 https://github.com/sameerkumar18/useless-facts-api
 -Used by the fun facts flavour text generator
 
-https://github.com/Quihico/handy.stuff/blob/master/yt.pagetokens.x10
--Used for the fast YouTube playlist scraper
-
 https://github.com/pocmo/Python-Brainfuck
 -Used for the ~math Brainfuck interpreter
 
@@ -57,9 +61,7 @@ https://gitlab.com/20kdc/waifu2x-upconv7-webgl
 https://stackoverflow.com/a/37350619
 -Used for the image transform filter
 
-https://yt-download.org/
-https://keepv.id/
-https://y2mate.guru/en8/
+https://yt-download.org
 -Used for the backup youtube downloader
 
 https://github.com/mailopl/html5-xhr2-chunked-file-upload-slice
