@@ -2735,7 +2735,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
                 if not isinstance(data, (str, bytes, memoryview)):
                     data = orjson.dumps(data)
             if aio:
-                session = reqx.next()
+                session = self.sessions.next()
             else:
                 session = httpx
         elif bypass:
