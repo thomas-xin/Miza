@@ -25,7 +25,7 @@ class Translate(Command):
     trans.client.headers["DNT"] = "1"
 
     async def __call__(self, channel, argv, user, message, **void):
-        if not args:
+        if not argv:
             raise ArgumentError("Input string is empty.")
         trans.client.headers["X-Forwarded-For"] = ".".join(str(xrand(1, 255)) for _ in loop(4))
         lang, arg = argv.split(None, 1)[0]
