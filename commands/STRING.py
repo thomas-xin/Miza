@@ -37,7 +37,7 @@ class Translate(Command):
             if lang.casefold() not in self.languages:
                 arg = argv
                 lang = "en"
-        resp = await create_future(self.trans.translate, argv, dest=lang)
+        resp = await create_future(self.trans.translate, arg, dest=lang)
         footer = dict(text=f"Detected language: {resp.src}")
         if getattr(resp, "pronunciation", None):
             fields = (("Pronunciation", resp.pronunciation),)
