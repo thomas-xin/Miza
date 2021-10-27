@@ -4367,17 +4367,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     kwargs['data'] = form_data
 
                 try:
+                    bot.activity += 1
                     if form:
                         r = await self._HTTPClient__session.request(method.upper(), url, **kwargs)
-                    else:
-                        r = await Request.sessions.next().request(method.upper(), url, **kwargs)
-                    bot.activity += 1
-                    # log.debug('%s %s with %s has returned %s', method, url, kwargs.get('data'), r.status)
-                    # even errors have text involved in them so this is safe to call
-                    if form:
                         data = await discord.http.json_or_text(r)
                         status = r.status
                     else:
+                        r = await Request.sessions.next().request(method.upper(), url, **kwargs)
                         data = r.text
                         try:
                             if r.headers["Content-Type"] == "application/json":
