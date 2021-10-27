@@ -1151,6 +1151,16 @@ class Topic(Command):
         return "\u200b" + choice(bot.data.users.questions)
 
 
+class Fact(Command):
+    name = ["DailyFact", "UselessFact"]
+    description = "Provides a random fact."
+
+    async def __call__(self, bot, user, **void):
+        create_task(bot.seen(user, event="misc", raw="Talking to me"))
+        fact = await bot.data.flavour.get(p=False, q=False)
+        return "\u200b" + fact
+
+
 class Urban(Command):
     time_consuming = True
     name = ["📖", "UrbanDictionary"]

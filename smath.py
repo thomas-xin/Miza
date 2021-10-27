@@ -533,7 +533,7 @@ def xrand(x, y=None, z=0):
         y = 0
     if x == y:
         return x
-    return random.randint(floor(min(x, y)), ceil(max(x, y)) - 1) + z
+    return random.randint(round_random(min(x, y)), round_random(max(x, y)) - 1) + z
 
 # Returns a floating point number reduced to a power.
 rrand = lambda x=1, y=0: frand(x) ** (1 - y)

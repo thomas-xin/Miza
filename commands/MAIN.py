@@ -1780,60 +1780,44 @@ class UpdateMessages(Database):
 class UpdateFlavour(Database):
     name = "flavour"
 
-    async def get(self):
-        out = x = None
+    async def get(self, p=True, q=True):
+        out = None
         i = xrand(7)
         facts = self.bot.data.users.facts
         questions = self.bot.data.users.questions
-        useless = self.bot.data.users.useless
-        if i < 2 and facts:
-            with tracebacksuppressor:
+        useless = self.bot.data.useless.setdefault(0, alist())
+        with tracebacksuppressor:
+            if i < 3 - q and facts:
                 text = choice(facts)
+                if not p:
+                    return text
                 fact = choice(("Fun fact:", "Did you know?", "Useless fact:", "Random fact:"))
                 out = f"\n{fact} `{text}`"
-        elif i < 4 and questions:
-            with tracebacksuppressor:
+            elif i < 4 and questions and q:
                 text = choice(questions)
+                if not p:
+                    return text
                 out = f"\nRandom question: `{text}`"
-        # elif i == 2:
-        #     x = "affirmations"
-        #     with tracebacksuppressor:
-        #         if self.data.get(x) and len(self.data[x]) > 64 and xrand(2):
-        #             return choice(self.data[x])
-        #         data = await Request("https://www.affirmations.dev/", json=True, aio=True)
-        #         text = data["affirmation"].replace("`", "")
-        #         out = f"\nAffirmation: `{text}`"
-        # elif i == 3:
-        #     x = "geek_jokes"
-        #     with tracebacksuppressor:
-        #         if self.data.get(x) and len(self.data[x]) > 64 and xrand(2):
-        #             return choice(self.data[x])
-        #         data = await Request("https://geek-jokes.sameerkumar.website/api", json=True, aio=True)
-        #         text = data.replace("`", "")
-        #         out = f"\nGeek joke: `{text}`"
-        else:
-            x = "useless_facts"
-            with tracebacksuppressor:
-                if self.data.get(x) and len(self.data[x]) > 256 and xrand(2):
-                    return choice(self.data[x])
-                if len(useless) < 128 and (not useless or random.random() > 0.75):
-                    data = await Request("https://www.uselessfacts.net/api/posts?d=" + str(datetime.datetime.fromtimestamp(xrand(1462456800, utc())).date()), json=True, aio=True)
-                    factlist = [fact["title"].replace("`", "") for fact in data if "title" in fact]
-                    random.shuffle(factlist)
-                    useless.clear()
-                    for text in factlist:
-                        fact = choice(("Fun fact:", "Did you know?", "Useless fact:", "Random fact:"))
-                        out = f"\n{fact} `{text}`"
-                        useless.append(out)
-                out = useless.popleft()
-        if x and out:
-            if x in self.data:
-                if out not in self.data[x]:
-                    self.data[x].add(out)
-                    self.update(x)
             else:
-                self.data[x] = alist((out,))
+                try:
+                    if not useless or not xrand(len(useless) / 8):
+                        raise KeyError
+                except KeyError:
+                    s = str(datetime.datetime.fromtimestamp(xrand(1462456800, utc())).date())
+                    data = await Request("https://www.uselessfacts.net/api/posts?d=" + s, json=True, aio=True)
+                    factlist = [fact["title"].replace("`", "") for fact in data if "title" in fact]
+                    useless.extend(factlist)
+                    useless.uniq()
+                text = choice(useless)
+                if not p:
+                    return text
+                fact = choice(("Fun fact:", "Did you know?", "Useless fact:", "Random fact:"))
+                out = f"\n{fact} `{text}`"
         return out
+
+
+class UpdateUseless(Database):
+    name = "useless"
 
 
 EMPTY = {}
