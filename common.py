@@ -2714,8 +2714,11 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
             resp = await req.request(method.upper(), url, headers=headers, files=files, data=data)
             if BOT[0]:
                 BOT[0].activity += 1
-            if getattr(resp, "status_code") or getattr(resp, "status", 400) >= 400:
-                data = await resp.read()
+            if (getattr(resp, "status_code") or getattr(resp, "status", 400)) >= 400:
+                try:
+                    data = await resp.read()
+                except (TypeError, AttributeError):
+                    data = resp.text
                 raise ConnectionError(resp.status, url, as_str(data))
             if json:
                 return await resp.json()

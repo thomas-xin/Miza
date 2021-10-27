@@ -70,6 +70,13 @@ except:
     subprocess.run([python, "-m", "pip", "install", "discord/discord.py-master", "--user", "--use-feature=in-tree-build"])
     subprocess.run([python, "misc/deleter.py", "discord"])
 
+try:
+    v = pkg_resources.get_distribution("googletrans").version
+    assert v >= "4.0.0rc1"
+except:
+    print_exc()
+    subprocess.run([python, "-m", "pip", "install", "googletrans==4.0.0rc1", "--upgrade", "--user"])
+
 if os.name == "nt":
     try:
         pkg_resources.get_distribution("gmpy2")

@@ -8,7 +8,7 @@ cython>=0.29.23
 discord.py>=1.7.3
 filetype>=1.0.7
 flask>=2.0.1
-googletrans==4.0.0rc1
+googletrans>=3.0.0
 httpx>=0.20.0
 inspiro>=0.0.2
 knackpy>=1.0.18
