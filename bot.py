@@ -4371,7 +4371,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     bot.activity += 1
                     # log.debug('%s %s with %s has returned %s', method, url, kwargs.get('data'), r.status)
                     # even errors have text involved in them so this is safe to call
-                    data = await discord.http.json_or_text(r)
+                    data = r.text
+                    try:
+                        if r.headers["Content-Type"] == "application/json":
+                            data = orjson.loads(data)
+                    except:
+                        pass
 
                     if maybe_lock and r.status != 429:
                         # check if we have rate limit header information

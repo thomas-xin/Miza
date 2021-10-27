@@ -2701,7 +2701,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
         try:
             self.sessions = alist(httpx.AsyncClient(http2=True) for i in range(6))
         except:
-            self.sessions = alist(aiohttp.ClientSession(loop=eloop) for i in range(6))
+            self.sessions = alist(httpx.AsyncClient(http2=False) for i in range(6))
         self.nossl = aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False))
 
     @property
