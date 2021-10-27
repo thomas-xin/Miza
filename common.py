@@ -2734,7 +2734,10 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
                 headers["Content-Type"] = "application/json"
                 if not isinstance(data, (str, bytes, memoryview)):
                     data = orjson.dumps(data)
-            session = httpx
+            if aio:
+                session = reqx.next()
+            else:
+                session = httpx
         elif bypass:
             if "user-agent" not in headers and "User-Agent" not in headers:
                 headers["User-Agent"] = f"Mozilla/5.{xrand(1, 10)}"

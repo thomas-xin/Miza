@@ -232,7 +232,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     def create_command(self, data):
         with tracebacksuppressor:
             for i in range(16):
-                resp = reqs.next().post(
+                resp = reqx.next().post(
                     f"https://discord.com/api/{api}/applications/{self.id}/commands",
                     headers={"Content-Type": "application/json", "Authorization": "Bot " + self.token},
                     data=orjson.dumps(data),
@@ -251,7 +251,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             return
         print("Updating global slash commands...")
         with tracebacksuppressor:
-            resp = reqs.next().get(f"https://discord.com/api/{api}/applications/{self.id}/commands", headers=dict(Authorization="Bot " + self.token))
+            resp = reqx.next().get(f"https://discord.com/api/{api}/applications/{self.id}/commands", headers=dict(Authorization="Bot " + self.token))
             self.activity += 1
             if resp.status_code not in range(200, 400):
                 raise ConnectionError(f"Error {resp.status_code}", resp.text)
@@ -308,7 +308,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                                             print(curr)
                                             print(f"{curr['name']}'s slash command does not match, removing...")
                                             for i in range(16):
-                                                resp = reqs.next().delete(f"https://discord.com/api/{api}/applications/{self.id}/commands/{curr['id']}", headers=dict(Authorization="Bot " + self.token))
+                                                resp = reqx.next().delete(f"https://discord.com/api/{api}/applications/{self.id}/commands/{curr['id']}", headers=dict(Authorization="Bot " + self.token))
                                                 self.activity += 1
                                                 if resp.status_code == 429:
                                                     time.sleep(1)
@@ -330,7 +330,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             with tracebacksuppressor:
                 print(curr)
                 print(f"{curr['name']}'s application command does not exist, removing...")
-                resp = reqs.next().delete(f"https://discord.com/api/{api}/applications/{self.id}/commands/{curr['id']}", headers=dict(Authorization="Bot " + self.token))
+                resp = reqx.next().delete(f"https://discord.com/api/{api}/applications/{self.id}/commands/{curr['id']}", headers=dict(Authorization="Bot " + self.token))
                 self.activity += 1
                 if resp.status_code not in range(200, 400):
                     raise ConnectionError(f"Error {resp.status_code}", resp.text)
@@ -1615,7 +1615,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if urls:
                 with tracebacksuppressor:
                     url = urls[0]
-                    resp = await create_future(reqs.next().get, url, headers=Request.header(), _timeout_=12)
+                    resp = await create_future(reqx.next().get, url, headers=Request.header(), _timeout_=12)
                     self.activity += 1
                     headers = fcdict(resp.headers)
                     if headers.get("Content-Type", "").split("/", 1)[0] == "image":

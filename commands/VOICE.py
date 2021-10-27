@@ -1264,7 +1264,7 @@ class AudioDownloader:
     
     def set_cookie(self):
         self.youtube_base = "CONSENT=YES+cb.20210328-17-p0.en+FX"
-        resp = reqs.next().get("https://www.youtube.com").text
+        resp = reqx.next().get("https://www.youtube.com").text
         if "<title>Before you continue to YouTube</title>" in resp:
             resp = resp.split('<input type="hidden" name="v" value="', 1)[-1]
             resp = resp[:resp.index('">')].rsplit("+", 1)[0]
@@ -1750,7 +1750,7 @@ class AudioDownloader:
                 raise ConnectionError(exc + repr(ex))
         if item[:9] == "spsearch:":
             query = "https://api.spotify.com/v1/search?type=track%2Cshow_audio%2Cepisode_audio&include_external=audio&limit=1&q=" + url_parse(item[9:])
-            resp = reqs.next().get(query, headers=self.spotify_header).json()
+            resp = reqx.next().get(query, headers=self.spotify_header).json()
             try:
                 track = resp["tracks"]["items"][0]
                 name = track.get("name", track["id"])
@@ -1762,7 +1762,7 @@ class AudioDownloader:
                 self.spotify_x += 1
         elif item[:9] == "bcsearch:":
             query = "https://bandcamp.com/search?q=" + url_parse(item[9:])
-            resp = reqs.next().get(query).content
+            resp = reqx.next().get(query).content
             try:
                 resp = resp.split(b'<ul class="result-items">', 1)[1]
                 tracks = resp.split(b"<!-- search result type=")
