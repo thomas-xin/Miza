@@ -4367,78 +4367,78 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     kwargs['data'] = form_data
 
                 try:
-                    async with Request.sessions.next().request(method.upper(), url, **kwargs) as r:
-                        bot.activity += 1
-                        # log.debug('%s %s with %s has returned %s', method, url, kwargs.get('data'), r.status)
-                        # even errors have text involved in them so this is safe to call
-                        data = await discord.http.json_or_text(r)
+                    r = await Request.sessions.next().request(method.upper(), url, **kwargs)
+                    bot.activity += 1
+                    # log.debug('%s %s with %s has returned %s', method, url, kwargs.get('data'), r.status)
+                    # even errors have text involved in them so this is safe to call
+                    data = await discord.http.json_or_text(r)
 
-                        if maybe_lock and r.status != 429:
-                            # check if we have rate limit header information
-                            remaining = r.headers.get('X-Ratelimit-Remaining')
-                            if remaining == '0':
-                                # we've depleted our current bucket
-                                delta = parse_ratelimit_header(r.headers)
-                                # log.debug('A rate limit bucket has been exhausted (bucket: %s, retry: %s).', bucket, delta)
-                                maybe_lock.defer()
-                                self.loop.call_later(delta, lock.release)
-                            if remaining:
-                                limit = r.headers.get('X-Ratelimit-Limit')
-                                if limit and int(limit) == int(remaining) + 1:
-                                    retry_after = r.headers.get("Retry-After") or r.headers.get("X-Ratelimit-Reset-After")
-                                    if retry_after and float(retry_after):
-                                        limit = int(limit)
-                                        retry_after = round_min(retry_after) + limit * 0.03
-                                        sem = Semaphore(
-                                            limit,
-                                            256,
-                                            rate_limit=retry_after,
-                                            weak=True,
-                                        )
-                                        async with sem:
-                                            self._locks[bucket] = sem
-                                        maybe_lock = None
-                                        # print("Successfully registered hard rate limit", sem, "for", bucket)
-
-                        # the request was successful so just return the text/json
-                        if r.status in range(200, 400):
-                            return data
-
-                        # we are being rate limited
-                        if r.status == 429:
-                            if not r.headers.get('Via'):
-                                # Banned by Cloudflare more than likely.
-                                raise discord.HTTPException(r, data)
-                            # fmt = 'We are being rate limited. Retrying in %.2f seconds. Handled under the bucket "%s"'
+                    if maybe_lock and r.status != 429:
+                        # check if we have rate limit header information
+                        remaining = r.headers.get('X-Ratelimit-Remaining')
+                        if remaining == '0':
+                            # we've depleted our current bucket
                             delta = parse_ratelimit_header(r.headers)
-                            is_global = data.get('global', False)
-                            if is_global:
-                                # log.warning('Global rate limit has been hit. Retrying in %.2f seconds.', retry_after)
-                                self._global_over.clear()
-                            await asyncio.sleep(delta)
-                            if not maybe_lock:
-                                fut = create_task(lock.__aenter__())
-                                lock.__exit__()
-                                await fut
-                            if is_global:
-                                self._global_over.set()
-                                # log.debug('Global rate limit is now over.')
-                            continue
+                            # log.debug('A rate limit bucket has been exhausted (bucket: %s, retry: %s).', bucket, delta)
+                            maybe_lock.defer()
+                            self.loop.call_later(delta, lock.release)
+                        if remaining:
+                            limit = r.headers.get('X-Ratelimit-Limit')
+                            if limit and int(limit) == int(remaining) + 1:
+                                retry_after = r.headers.get("Retry-After") or r.headers.get("X-Ratelimit-Reset-After")
+                                if retry_after and float(retry_after):
+                                    limit = int(limit)
+                                    retry_after = round_min(retry_after) + limit * 0.03
+                                    sem = Semaphore(
+                                        limit,
+                                        256,
+                                        rate_limit=retry_after,
+                                        weak=True,
+                                    )
+                                    async with sem:
+                                        self._locks[bucket] = sem
+                                    maybe_lock = None
+                                    # print("Successfully registered hard rate limit", sem, "for", bucket)
 
-                        # we've received a 500 or 502, unconditional retry
-                        if r.status >= 500 and tries < 3:
-                            await asyncio.sleep(1 + tries * 2)
-                            continue
+                    # the request was successful so just return the text/json
+                    if r.status in range(200, 400):
+                        return data
 
-                        # the usual error cases
-                        if r.status == 403:
-                            raise discord.Forbidden(r, data)
-                        elif r.status == 404:
-                            raise discord.NotFound(r, data)
-                        elif r.status == 503:
-                            raise discord.DiscordServerError(r, data)
-                        else:
+                    # we are being rate limited
+                    if r.status == 429:
+                        if not r.headers.get('Via'):
+                            # Banned by Cloudflare more than likely.
                             raise discord.HTTPException(r, data)
+                        # fmt = 'We are being rate limited. Retrying in %.2f seconds. Handled under the bucket "%s"'
+                        delta = parse_ratelimit_header(r.headers)
+                        is_global = data.get('global', False)
+                        if is_global:
+                            # log.warning('Global rate limit has been hit. Retrying in %.2f seconds.', retry_after)
+                            self._global_over.clear()
+                        await asyncio.sleep(delta)
+                        if not maybe_lock:
+                            fut = create_task(lock.__aenter__())
+                            lock.__exit__()
+                            await fut
+                        if is_global:
+                            self._global_over.set()
+                            # log.debug('Global rate limit is now over.')
+                        continue
+
+                    # we've received a 500 or 502, unconditional retry
+                    if r.status >= 500 and tries < 3:
+                        await asyncio.sleep(1 + tries * 2)
+                        continue
+
+                    # the usual error cases
+                    if r.status == 403:
+                        raise discord.Forbidden(r, data)
+                    elif r.status == 404:
+                        raise discord.NotFound(r, data)
+                    elif r.status == 503:
+                        raise discord.DiscordServerError(r, data)
+                    else:
+                        raise discord.HTTPException(r, data)
 
                 # This is handling exceptions from the request
                 except OSError as e:

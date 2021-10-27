@@ -2709,22 +2709,20 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
         return choice(self.sessions)
 
     async def aio_call(self, url, headers, files, data, method, decode=False, json=False, session=None, ssl=True):
-        if files is not None:
-            raise NotImplementedError("Unable to send multipart files asynchronously.")
         async with self.semaphore:
             req = session or (self.sessions.next() if ssl else self.nossl)
-            async with getattr(req, method)(url, headers=headers, data=data) as resp:
-                if BOT[0]:
-                    BOT[0].activity += 1
-                if resp.status >= 400:
-                    data = await resp.read()
-                    raise ConnectionError(resp.status, url, as_str(data))
-                if json:
-                    return await resp.json()
+            resp = await req.request(method.upper(), url, headers=headers, files=files, data=data)
+            if BOT[0]:
+                BOT[0].activity += 1
+            if resp.status >= 400:
                 data = await resp.read()
-                if decode:
-                    return as_str(data)
-                return data
+                raise ConnectionError(resp.status, url, as_str(data))
+            if json:
+                return await resp.json()
+            data = await resp.read()
+            if decode:
+                return as_str(data)
+            return data
 
     def __call__(self, url, headers=None, files=None, data=None, raw=False, timeout=8, method="get", decode=False, json=False, bypass=True, aio=False, session=None, ssl=True, authorise=False):
         if headers is None:
