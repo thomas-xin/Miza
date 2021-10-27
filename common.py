@@ -2714,7 +2714,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
             resp = await req.request(method.upper(), url, headers=headers, files=files, data=data)
             if BOT[0]:
                 BOT[0].activity += 1
-            if resp.status >= 400:
+            if getattr(resp, "status_code") or getattr(resp, "status", 400) >= 400:
                 data = await resp.read()
                 raise ConnectionError(resp.status, url, as_str(data))
             if json:
@@ -2756,20 +2756,19 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
             else:
                 req = requests
                 resp = getattr(req, method)(url, headers=headers, files=files, data=data, timeout=timeout)
-            with resp:
-                if BOT[0]:
-                    BOT[0].activity += 1
-                if resp.status_code >= 400:
-                    raise ConnectionError(resp.status_code, url, resp.text)
-                if json:
-                    return resp.json()
-                if raw and getattr(resp, "raw", None):
-                    data = resp.raw.read()
-                else:
-                    data = resp.content
-                if decode:
-                    return as_str(data)
-                return data
+            if BOT[0]:
+                BOT[0].activity += 1
+            if resp.status_code >= 400:
+                raise ConnectionError(resp.status_code, url, resp.text)
+            if json:
+                return resp.json()
+            if raw and getattr(resp, "raw", None):
+                data = resp.raw.read()
+            else:
+                data = resp.content
+            if decode:
+                return as_str(data)
+            return data
 
     def __exit__(self, *args):
         self.session.close()
