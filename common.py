@@ -2721,11 +2721,19 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
                     data = resp.text
                 raise ConnectionError(resp.status, url, as_str(data))
             if json:
-                return await resp.json()
-            data = await resp.read()
-            if decode:
-                return as_str(data)
-            return data
+                data = resp.json()
+                if awaitable(data):
+                    return await data
+                return data
+            try:
+                if awaitable(resp.content):
+                    raise
+            except:
+                data = await resp.read()
+                if decode:
+                    return as_str(data)
+                return data
+            return resp.content
 
     def __call__(self, url, headers=None, files=None, data=None, raw=False, timeout=8, method="get", decode=False, json=False, bypass=True, aio=False, session=None, ssl=True, authorise=False):
         if headers is None:
