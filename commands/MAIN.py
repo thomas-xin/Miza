@@ -55,7 +55,7 @@ class Help(Command):
         bot = self.bot
         guild = message.guild
         channel = message.channel
-        prefix = "/" if getattr(message, "slash", None) else bot.get_prefix(guild.id)
+        prefix = "/" if getattr(message, "slash", None) else bot.get_prefix(guild)
         if " " in prefix:
             prefix += " "
         embed = discord.Embed()

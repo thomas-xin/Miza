@@ -1224,9 +1224,26 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 first = url.split("?", 1)[0]
                 item = first[first.rindex("/") + 1:]
                 out.append(f"https://media2.giphy.com/media/{item}/giphy.gif")
-            elif images:
+            elif images and is_reddit_url(url):
+                first = url.split("?", 1)[0]
+                b = await Request(url, aio=True, timeout=16)
+                search = b'<script id="data">window.___r = '
+                with tracebacksuppressor:
+                    b = b[b.index(search) + len(search):]
+                    b = b[:b.index(b";</script><")]
+                    data = orjson.loads(b)
+                    for model in data["posts"]["models"].values():
+                        try:
+                            stream = ["media"]["scrubberThumbSource"]
+                        except KeyError:
+                            continue
+                        else:
+                            found = True
+                            out.append(stream)
+                            break
+            elif images and not any(maps((is_discord_url, is_youtube_url, is_youtube_stream), url)):
                 found = False
-                if not is_discord_url(url) and (images or is_tenor_url(url) or is_deviantart_url(url) or self.is_webserver_url(url)):
+                if images or is_tenor_url(url) or is_deviantart_url(url) or self.is_webserver_url(url):
                     skip = False
                     if url in self.mimes:
                         skip = "text/html" not in self.mimes[url]
@@ -4373,14 +4390,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         data = await discord.http.json_or_text(r)
                         status = r.status
                     else:
-                        r = await Request.sessions.next().request(method.upper(), url, **kwargs)
+                        r = await Request.sessions.next().request(method.upper(), url, timeout=16, **kwargs)
                         data = r.text
                         try:
                             if r.headers["Content-Type"] == "application/json":
                                 data = orjson.loads(data)
                         except:
                             pass
-                        status = r.status_code
+                        status = r.status = r.status_code
 
                     if maybe_lock and status != 429:
                         # check if we have rate limit header information
@@ -4450,9 +4467,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         raise discord.HTTPException(r, data)
 
                 # This is handling exceptions from the request
-                except OSError as e:
+                except (OSError, httpx.ReadTimeout, httpx.RemoteProtocolError):
                     # Connection reset by peer
-                    if tries < 4 and e.errno in (54, 10054):
+                    if tries < 4:
                         await asyncio.sleep(1 + tries * 2)
                         continue
                     raise

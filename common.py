@@ -1669,6 +1669,7 @@ is_giphy_url = lambda url: url and regexp("^https?:\\/\\/giphy.com/gifs/[a-zA-Z0
 is_youtube_url = lambda url: url and regexp("^https?:\\/\\/(?:www\\.)?youtu(?:\\.be|be\\.com)\\/[^\\s<>`|\"']+").findall(url)
 is_youtube_stream = lambda url: url and regexp("^https?:\\/\\/r[0-9]+---.{2}-\\w+-\\w{4,}\\.googlevideo\\.com").findall(url)
 is_deviantart_url = lambda url: url and regexp("^https?:\\/\\/(?:www\\.)?deviantart\\.com\\/[^\\s<>`|\"']+").findall(url)
+is_reddit_url = lambda url: url and regexp("^https?:\\/\\/(?:www\\.)?reddit.com\\/r\\/[^/]+\\/").findall(url)
 
 def expired(stream):
     if is_youtube_url(stream):
@@ -1685,6 +1686,11 @@ def is_discord_message_link(url):
     return "channels/" in check and "discord" in check
 
 verify_url = lambda url: url if is_url(url) else url_parse(url)
+
+
+def maps(funcs, *args, **kwargs):
+    for func in funcs:
+        yield func(*args, **kwargs)
 
 
 # Checks if a URL contains a valid image extension, and removes it if possible.
@@ -2702,6 +2708,8 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
             self.sessions = alist(httpx.AsyncClient(http2=True) for i in range(6))
         except:
             self.sessions = alist(httpx.AsyncClient(http2=False) for i in range(6))
+        for session in self.sessions:
+            session.__enter__()
         self.nossl = aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False))
 
     @property
@@ -2714,12 +2722,13 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
             resp = await req.request(method.upper(), url, headers=headers, files=files, data=data)
             if BOT[0]:
                 BOT[0].activity += 1
-            if (getattr(resp, "status_code") or getattr(resp, "status", 400)) >= 400:
+            status = getattr(resp, "status_code") or getattr(resp, "status", 400)
+            if status >= 400:
                 try:
                     data = await resp.read()
                 except (TypeError, AttributeError):
                     data = resp.text
-                raise ConnectionError(resp.status, url, as_str(data))
+                raise ConnectionError(status, url, as_str(data))
             if json:
                 data = resp.json()
                 if awaitable(data):
