@@ -2140,7 +2140,8 @@ class AudioDownloader:
     def search(self, item, force=False, mode=None, count=1):
         item = verify_search(item)
         if not is_main_thread():
-            item = await_fut(self.bot.follow_url(item))
+            with tracebacksuppressor:
+                item = await_fut(self.bot.follow_url(item))[0]
         if mode is None and count == 1 and item in self.searched:
             if utc() - self.searched[item].t < 60:
                 return self.searched[item].data
