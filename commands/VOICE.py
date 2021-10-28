@@ -2141,7 +2141,9 @@ class AudioDownloader:
         item = verify_search(item)
         if not is_main_thread():
             with tracebacksuppressor:
-                item = await_fut(self.bot.follow_url(item))[0]
+                items = await_fut(self.bot.follow_url(item, images=True))
+                if items:
+                    item = items[0]
         if mode is None and count == 1 and item in self.searched:
             if utc() - self.searched[item].t < 60:
                 return self.searched[item].data
