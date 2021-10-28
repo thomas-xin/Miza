@@ -1234,7 +1234,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     data = orjson.loads(b)
                     for model in data["posts"]["models"].values():
                         try:
-                            stream = ["media"]["scrubberThumbSource"]
+                            stream = model["media"]["scrubberThumbSource"]
                         except KeyError:
                             continue
                         else:
