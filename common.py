@@ -1023,7 +1023,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
         url = f"https://discord.com/api/{api}/channels/{channel.id}/messages"
         if getattr(channel, "dm_channel", None):
             channel = channel.dm_channel
-        elif not getattr(channel, "recipient", None) and not channel.permissions_for(channel.guild.me).read_message_history:
+        elif getattr(channel, "guild", None) and not channel.permissions_for(channel.guild.me).read_message_history:
             fields = {}
             if embeds:
                 fields["embeds"] = [embed.to_dict() for embed in embeds]
