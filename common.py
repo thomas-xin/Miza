@@ -2709,7 +2709,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
         except:
             self.sessions = alist(httpx.AsyncClient(http2=False) for i in range(6))
         for session in self.sessions:
-            session.__enter__()
+            await session.__aenter__()
         self.nossl = aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False))
 
     @property
