@@ -1397,7 +1397,7 @@ def colourspace(image, source, dest):
         elif source == "hsv":
             if image.mode != "RGB":
                 image = image.convert("RGB")
-            out = Image.frombuffer("HSV", image.size, image.tobytes())
+            im = Image.frombuffer("HSV", image.size, image.tobytes())
             im = im.convert("RGB")
         elif source == "lab":
             if image.mode != "RGB":
