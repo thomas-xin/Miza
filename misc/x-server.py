@@ -781,7 +781,7 @@ class Server:
             raise cp.HTTPRedirect(url.replace("/upload", "/files"), status=307)
         data, mime = fetch_static("index.html")
         meta = '<meta property="og:title" content="Miza"><meta property="og:description" content="A multipurpose Discord bot.">'
-        if "/file/" in url or "/files/" in url:
+        if "/file" in url or "/files" in url:
             meta += '<meta property="og:image" content="/mizaleaf.png">'
         else:
             meta += '<meta property="og:image" content="/logo256.png">'
