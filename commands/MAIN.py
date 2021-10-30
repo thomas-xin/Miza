@@ -688,8 +688,8 @@ class Info(Command):
         emb.add_field(name="Creation time", value=time_repr(p.created_at), inline=1)
         if "v" in flags:
             emb.add_field(name="Gender", value=str(p.gender), inline=1)
-            ctime = DynamicDT.fromtimestamp(p.birthday)
-            age = (DynamicDT.now() - ctime).total_seconds() / TIMEUNITS["year"]
+            ctime = DynamicDT.utcfromtimestamp(p.birthday)
+            age = (DynamicDT.utcnow() - ctime).total_seconds() / TIMEUNITS["year"]
             emb.add_field(name="Birthday", value=str(ctime), inline=1)
             emb.add_field(name="Age", value=str(round_min(round(age, 1))), inline=1)
         return emb
@@ -919,20 +919,20 @@ class Profile(Command):
             birthday = profile.get("birthday")
             timezone = profile.get("timezone")
             if timezone:
-                td = datetime.timedelta(seconds=as_timezone(timezone))
+                td = as_timezone(timezone)
                 description += ini_md(f"Current time: {sqr_md(utc_dt() + td)}")
             if birthday:
-                if type(birthday) is not DynamicDT:
+                if not isinstance(birthday, DynamicDT):
                     birthday = profile["birthday"] = DynamicDT.fromdatetime(birthday)
                     bot.data.users.update(target.id)
-                t = utc_dt()
+                now = DynamicDT.utcnow()
                 if timezone:
                     birthday -= td
-                description += ini_md(f"Age: {sqr_md(time_diff(t, birthday))}\nBirthday in: {sqr_md(time_diff(next_date(birthday), t))}")
+                description += ini_md(f"Age: {sqr_md(time_diff(now, birthday))}\nBirthday in: {sqr_md(time_diff(next_date(birthday), now))}")
             fields = set()
             for field in ("timezone", "birthday"):
                 value = profile.get(field)
-                if type(value) is DynamicDT:
+                if isinstance(value, DynamicDT):
                     value = value.as_date()
                 elif field == "timezone" and value is not None:
                     value = timezone_repr(value)
@@ -956,7 +956,7 @@ class Profile(Command):
         else:
             dt = tzparse(value)
             offs, year = divmod(dt.year, 400)
-            value = DynamicDT(year + 2000, dt.month, dt.day).set_offset(offs * 400 - 2000)
+            value = DynamicDT(year + 2000, dt.month, dt.day, tzinfo=datetime.timezone.utc).set_offset(offs * 400 - 2000)
         bot.data.users.setdefault(user.id, {})[setting] = value
         bot.data.users.update(user.id)
         if type(value) is DynamicDT:
