@@ -2252,7 +2252,10 @@ def time_diff(t2, t1):
     days = t2.day - t1.day
     hours = getattr(t2, "hour", 0) - getattr(t1, "hour", 0)
     minutes = getattr(t2, "minute", 0) - getattr(t1, "minute", 0)
-    seconds = round(getattr(t2, "second", 0) - getattr(t1, "second", 0) + (getattr(t2, "microsecond", 0) - getattr(t1, "microsecond", 0)) / 1000000, 6)
+    microsecond = (getattr(t2, "microsecond", 0) - getattr(t1, "microsecond", 0)) / 1000000
+    if abs(microsecond) < 0.002:
+        microsecond = 0
+    seconds = round(getattr(t2, "second", 0) - getattr(t1, "second", 0) + microsecond, 6)
     while seconds < 0:
         minutes -= 1
         seconds += 60
@@ -2338,6 +2341,8 @@ def next_date(dt):
     new = datetime.datetime(t.year, dt.month, dt.day)
     while new < t:
         new = new.replace(year=new.year + 1)
+    if dt.tzinfo:
+        return new.replace(tzinfo=dt.tzinfo)
     return new
 
 
