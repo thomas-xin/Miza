@@ -1782,7 +1782,7 @@ def int_key(d):
 # Time functions
 class DynamicDT:
 
-    __slots__ = ("_dt", "_offset", "_ts")
+    __slots__ = ("_dt", "_offset", "_ts", "tzinfo")
 
     def __getstate__(self):
         return self.timestamp(), getattr(self, "tzinfo", None)
@@ -1791,22 +1791,22 @@ class DynamicDT:
         if len(s) == 2:
             ts, tzinfo = s
             offs, ots = divmod(ts, 12622780800)
-            self._dt = datetime.datetime.fromtimestamp(ots)
-            if tzinfo:
-                self._dt = self._dt.replace(tzinfo=tzinfo)
+            self._dt = datetime.datetime.fromtimestamp(ots, tz=tzinfo)
+            self.tzinfo = tzinfo
             self._offset = round(offs * 400)
             return
         raise TypeError("Unpickling failed:", s)
 
     def __init__(self, *args, **kwargs):
+        tzinfo = kwargs.pop("tzinfo", None)
         if type(args[0]) is bytes:
-            self._dt = datetime.datetime(args[0])
+            self._dt = datetime.datetime(args[0], tzinfo=tzinfo)
             return
         offs, y = divmod(args[0], 400)
         y += 2000
         offs *= 400
         offs -= 2000
-        self._dt = datetime.datetime(y, *args[1:], **kwargs)
+        self._dt = datetime.datetime(y, *args[1:], tzinfo=tzinfo, **kwargs)
         self.set_offset(offs)
 
     def __getattr__(self, k):
@@ -1857,29 +1857,29 @@ class DynamicDT:
 
     def __add__(self, other):
         if type(other) is not datetime.timedelta:
-            return self.__class__.fromtimestamp(self.timestamp() + other)
-        ts = (self._dt + other).timestamp()
+            return self.__class__.fromtimestamp(self.timestamp() + other, tzinfo=self.tzinfo)
+        ts = self._dt.timestamp() + other.timestamp()
         if abs(self.offset()) >= 25600:
             ts = round(ts)
-        return self.__class__.fromtimestamp(ts + self.offset() * 31556952)
+        return self.__class__.fromtimestamp(ts + self.offset() * 31556952, tzinfo=self.tzinfo)
     __radd__ = __add__
 
     def __sub__(self, other):
-        if type(other) not in (datetime.timedelta, datetime.datetime, datetime.date, self.__class__):
-            return self.__class__.fromtimestamp(self.timestamp() - other)
         if isinstance(other, self.__class__):
             return datetime.timedelta(seconds=self.offset() - other.offset() + (self._dt - other._dt).total_seconds())
-        out = (self._dt - other)
-        ts = getattr(out, "timestamp", None)
-        if ts is None:
-            if isinstance(out, datetime.timedelta):
-                return out
-            return self.__class__.fromdatetime(out).set_offset(self.offset())
-        ts = ts()
+        if type(other) not in (datetime.timedelta, datetime.datetime, datetime.date):
+            return self.__class__.fromtimestamp(self.timestamp() - other, tzinfo=self.tzinfo)
+        ts = other.total_seconds() if isinstance(other, datetime.timedelta) else other.timestamp()
+        ts = self._dt.timestamp() - ts
         if abs(self.offset()) >= 25600:
             ts = round(ts)
-        return self.__class__.fromtimestamp(ts + self.offset() * 31556952)
-    __rsub__ = __sub__
+        ts = ts + self.offset() * 31556952
+        if isinstance(other, (DynamicDT, datetime.datetime, datetime.date)):
+            return datetime.timedelta(seconds=ts)
+        tzinfo = self.tzinfo if isinstance(self, DynamicDT) else other.tzinfo
+        return self.__class__.fromtimestamp(ts, tzinfo=tzinfo)
+
+    __rsub__ = lambda self, other: self.__class__.fromtimestamp(other.timestamp()) - self
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
@@ -2005,22 +2005,16 @@ class DynamicDT:
 
     @classmethod
     def utcfromtimestamp(cls, ts):
-        offs, ots = divmod(ts, 12622780800)
-        if abs(offs) >= 64:
-            ots = round(ots)
-        d = utc_ft(ots)
-        dt = cls(*d.timetuple()[:6], d.microsecond)
-        dt.set_offset(dt._offset + round(offs * 400))
-        return dt
+        return cls.fromtimestamp(ts, tzinfo=datetime.timezone.utc)
 
     @classmethod
-    def fromtimestamp(cls, ts):
+    def fromtimestamp(cls, ts, tzinfo=None):
         offs, ots = divmod(ts, 12622780800)
-        if abs(offs) >= 4:
+        if abs(offs) >= 400:
             ots = round(ots)
             ts = round(ts)
-        d = datetime.datetime.fromtimestamp(ots)
-        dt = cls(*d.timetuple()[:6], d.microsecond)
+        d = datetime.datetime.fromtimestamp(ots, tz=tzinfo)
+        dt = cls(*d.timetuple()[:6], d.microsecond, tzinfo=tzinfo)
         dt._offset += round(offs * 400)
         dt._ts = ts
         return dt
