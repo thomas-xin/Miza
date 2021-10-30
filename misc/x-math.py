@@ -453,7 +453,8 @@ round_min = rounder
 def _unsafe(ufunc, *args, **kwargs):
     try:
         return ufunc(*args, **kwargs)
-    except Exception as ex:
+    except Exception as ex2:
+        ex = ex2
         if "has no attribute 'dtype'" in str(ex):
             try:
                 args = [np.asanyarray(a) for a in args]
@@ -887,7 +888,7 @@ def evalSym(f, prec=64, r=False, variables=None):
         return [f]
     if prec:
         try:
-            if isinstance(f, sympy.Integer):
+            if isinstance(f, (sympy.Integer, float, int, np.number)):
                 return [f]
             y = f.evalf(prec, chop=True)
         except:
@@ -897,7 +898,7 @@ def evalSym(f, prec=64, r=False, variables=None):
         except TypeError:
             e = y
             for i in sympy.preorder_traversal(e):
-                if isinstance(i, sympy.Float):
+                if isinstance(i, (sympy.Float, float, np.floating)):
                     e = e.subs(i, rounder(i))
         if r:
             p = prettyAns(f)
