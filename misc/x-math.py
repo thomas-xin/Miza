@@ -467,14 +467,14 @@ def _unsafe(ufunc, *args, **kwargs):
                 ex = ex2
                 ex2 = str(ex2)
                 pass
-        if "casting rule" not in ex2:
+        if "casting rule" not in ex2 and "has no callable" not in ex2:
             raise
     kwargs["casting"] = "unsafe"
     try:
         return ufunc(*args, **kwargs)
     except TypeError as ex2:
         ex2 = str(ex2)
-        if "unexpected keyword" not in ex2 and "has no callable" not in ex2:
+        if "unexpected keyword" not in ex2:
             raise ex
     kwargs.pop("casting", None)
     try:
