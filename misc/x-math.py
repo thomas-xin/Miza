@@ -565,13 +565,21 @@ _globals.update({
     "matrix_power": np.linalg.matrix_power,
     "einsum": np.einsum,
     "eig": autocast(np.linalg.eig),
-    "eigvals": autocast(np.linalg.eigvals),
+    "eigvals": lambda a: np.asanyarray(sympy.Matrix(a).eigenvals(), dtype=object),
+    "eigenvals": lambda a: np.asanyarray(sympy.Matrix(a).eigenvals(), dtype=object),
+    "eigvects": lambda a: lambda a: np.asanyarray(sympy.Matrix(a).eigenvects(), dtype=object),
+    "eigenvects": lambda a: lambda a: np.asanyarray(sympy.Matrix(a).eigenvects(), dtype=object),
     "svd": autocast(np.linalg.svd),
     "norm": np.linalg.norm,
     "cond": autocast(np.linalg.cond),
-    "det": autocast(np.linalg.det),
+    "det": lambda a, method="bareiss": sympy.Matrix(a).det(method),
     "adj": autocast(np.matrix.getH),
     "adjoint": autocast(np.matrix.getH),
+    "adjugate": lambda a: np.asanyarray(sympy.Matrix(a).adjugate(), dtype=object),
+    "diagonalise": lambda a: np.asanyarray(sympy.Matrix(a).diagonalize(), dtype=object),
+    "diagonalize": lambda a: np.asanyarray(sympy.Matrix(a).diagonalize(), dtype=object),
+    "charpoly": lambda a, x="x": sympy.Matrix(a).charpoly(x),
+    "cofactor": lambda a, method="berkowitz": np.asanyarray(sympy.Matrix(a).cofactor_matrix(method), dtype=object),
     "trace": np.trace,
     "histogram": np.histogram,
     "average": np.average,
@@ -884,7 +892,7 @@ def evalSym(f, prec=64, r=False, variables=None):
             except:
                 pass
     # Select list of answers to return based on the desired float precision level
-    if type(f) in (str, bool, tuple, list, dict, np.ndarray):
+    if isinstance(f, (str, bool, tuple, list, dict, np.ndarray)):
         return [f]
     if isinstance(f, (sympy.Integer, float, int)):
         return [f]
@@ -909,10 +917,10 @@ def evalSym(f, prec=64, r=False, variables=None):
             return [f, p]
         p = prettyAns(f)
         f = repr(e)
+        if re.fullmatch(f"-?[0-9]*\.[0-9]*0", f):
+            return [f.rstrip(".0")]
         if p == f:
             p = ""
-        if "." in f:
-            e = f.rstrip("0")
         return [e, p]
     else:
         p = prettyAns(f)
