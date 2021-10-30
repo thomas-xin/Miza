@@ -1485,16 +1485,22 @@ class AudioDownloader:
     # Returns a subsequent page of a youtube playlist from a page token.
     def get_youtube_continuation(self, token, ctx):
         self.youtube_x += 1
-        data = Request(
-            "https://www.youtube.com/youtubei/v1/browse?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
-            headers=self.youtube_header(),
-            method="POST",
-            data=orjson.dumps(dict(
-                context=ctx,
-                continuation=token,
-            )),
-            json=True,
-        )
+        for i in range(3):
+            try:
+                data = Request(
+                    "https://www.youtube.com/youtubei/v1/browse?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
+                    headers=self.youtube_header(),
+                    method="POST",
+                    data=orjson.dumps(dict(
+                        context=ctx,
+                        continuation=token,
+                    )),
+                    json=True,
+                )
+            except:
+                print_exc()
+                if i:
+                    time.sleep(i)
         items = data["onResponseReceivedActions"][0]["appendContinuationItemsAction"]["continuationItems"]
         return self.extract_playlist_items(items)
 
