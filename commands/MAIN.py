@@ -930,7 +930,7 @@ class Profile(Command):
                 birthday_in = next_date(birthday)
                 if timezone:
                     birthday -= td
-                    birthday_in -= td
+                    birthday_in -= datetime.timedelta(td)
                 description += ini_md(f"Age: {sqr_md(time_diff(now, birthday))}\nBirthday in: {sqr_md(time_diff(birthday_in, now))}")
             fields = set()
             for field in ("timezone", "birthday"):
