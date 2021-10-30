@@ -1105,6 +1105,7 @@ class Random(Command):
     def __call__(self, args, **void):
         if not args:
             raise ArgumentError("Input string is empty.")
+        random.seed(ts_us())
         return "\xadI choose `" + choice(args) + "`!"
 
 
