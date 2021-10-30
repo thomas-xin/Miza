@@ -918,9 +918,10 @@ class Profile(Command):
             description = profile.get("description", "")
             birthday = profile.get("birthday")
             timezone = profile.get("timezone")
+            t = utc()
             if timezone:
                 td = as_timezone(timezone)
-                description += ini_md(f"Current time: {sqr_md(utc_dt() + td)}")
+                description += ini_md(f"Current time: {sqr_md(utc_ft(t + td))}")
             if birthday:
                 if not isinstance(birthday, DynamicDT):
                     birthday = profile["birthday"] = DynamicDT.fromdatetime(birthday)
