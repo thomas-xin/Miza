@@ -574,7 +574,7 @@ _globals.update({
     "eigvects": lambda a: lambda a: np.asanyarray(sympy.Matrix(a).eigenvects(), dtype=object),
     "eigenvects": lambda a: lambda a: np.asanyarray(sympy.Matrix(a).eigenvects(), dtype=object),
     "svd": autocast(np.linalg.svd),
-    "norm": np.linalg.norm,
+    "norm": autocast(np.linalg.norm),
     "cond": autocast(np.linalg.cond),
     "det": lambda a, method="bareiss": sympy.Matrix(a).det(method),
     "adj": autocast(np.matrix.getH),
