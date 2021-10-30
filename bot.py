@@ -1250,38 +1250,38 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     if not skip:
                         resp = await create_future(reqx.next().stream, "GET", url, headers=Request.header())
                         self.activity += 1
-                        with resp:
-                            url = resp.url
-                            head = fcdict(resp.headers)
-                            ctype = [t.strip() for t in head.get("Content-Type", "").split(";")]
-                            if "text/html" in ctype:
-                                it = resp.iter_bytes()
-                                data = await create_future(next, it)
-                                s = as_str(data)
+                        resp = resp.__enter__()
+                        url = resp.url
+                        head = fcdict(resp.headers)
+                        ctype = [t.strip() for t in head.get("Content-Type", "").split(";")]
+                        if "text/html" in ctype:
+                            it = resp.iter_bytes()
+                            data = await create_future(next, it)
+                            s = as_str(data)
+                            try:
+                                s = s[s.index("<meta") + 5:]
+                                search = 'http-equiv="refresh" content="'
                                 try:
-                                    s = s[s.index("<meta") + 5:]
-                                    search = 'http-equiv="refresh" content="'
-                                    try:
-                                        s = s[s.index(search) + len(search):]
-                                        s = s[:s.index('"')]
-                                        res = None
-                                        for k in s.split(";"):
-                                            temp = k.strip()
-                                            if temp.casefold().startswith("url="):
-                                                res = temp[4:]
-                                                break
-                                        if not res:
-                                            raise ValueError
-                                    except ValueError:
-                                        search ='property="og:image" content="'
-                                        s = s[s.index(search) + len(search):]
-                                        res = s[:s.index('"')]
+                                    s = s[s.index(search) + len(search):]
+                                    s = s[:s.index('"')]
+                                    res = None
+                                    for k in s.split(";"):
+                                        temp = k.strip()
+                                        if temp.casefold().startswith("url="):
+                                            res = temp[4:]
+                                            break
+                                    if not res:
+                                        raise ValueError
                                 except ValueError:
-                                    pass
-                                else:
-                                    found = True
-                                    print(res)
-                                    out.append(res)
+                                    search ='property="og:image" content="'
+                                    s = s[s.index(search) + len(search):]
+                                    res = s[:s.index('"')]
+                            except ValueError:
+                                pass
+                            else:
+                                found = True
+                                print(res)
+                                out.append(res)
                 if not found:
                     out.append(url)
         if lost:
@@ -1297,13 +1297,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             return self.mimes[url]
         except KeyError:
             pass
-        resp = reqx.next().stream(url, follow_redirects=True)
+        resp = reqx.next().stream("GET", url, follow_redirects=True)
         self.activity += 1
+        resp = resp.__enter___()
         head = fcdict(resp.headers)
         try:
             mime = [t.strip() for t in head.get("Content-Type", "").split(";")]
         except KeyError:
-            it = resp.iter_content(65536)
+            it = resp.iter_bytes()
             data = next(it)
             mime = [t.strip() for t in self.mime.from_buffer(data).split(";")]
         self.mimes[url] = mime
