@@ -455,22 +455,26 @@ def _unsafe(ufunc, *args, **kwargs):
         return ufunc(*args, **kwargs)
     except Exception as ex2:
         ex = ex2
-        if "has no attribute 'dtype'" in str(ex):
+        ex2 = str(ex2)
+        if "has no attribute 'dtype'" in ex2:
             try:
                 args = [np.asanyarray(a) for a in args]
             except:
                 raise ex
             try:
                 return ufunc(*args, **kwargs)
-            except Exception as ex:
+            except Exception as ex2:
+                ex = ex2
+                ex2 = str(ex2)
                 pass
-        if "casting rule" not in str(ex):
+        if "casting rule" not in ex2:
             raise
     kwargs["casting"] = "unsafe"
     try:
         return ufunc(*args, **kwargs)
     except TypeError as ex2:
-        if "unexpected keyword" not in str(ex2):
+        ex2 = str(ex2)
+        if "unexpected keyword" not in ex2 and "has no callable" not in ex2:
             raise ex
     kwargs.pop("casting", None)
     try:
@@ -894,10 +898,8 @@ def evalSym(f, prec=64, r=False, variables=None):
     # Select list of answers to return based on the desired float precision level
     if isinstance(f, (str, bool, tuple, list, dict, np.ndarray)):
         return [f]
-    if isinstance(f, (sympy.Integer, float, int)):
+    if isinstance(f, (sympy.Integer, float, int, np.number)):
         return [f]
-    if isinstance(f, np.number):
-        f = sympy.Float(f)
     if prec:
         try:
             y = f.evalf(prec, chop=True)
