@@ -1248,14 +1248,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     if url in self.mimes:
                         skip = "text/html" not in self.mimes[url]
                     if not skip:
-                        resp = await create_future(reqs.next().get, url, headers=Request.header(), stream=True)
+                        resp = await create_future(reqx.next().stream, "GET", url, headers=Request.header())
                         self.activity += 1
                         with resp:
                             url = resp.url
                             head = fcdict(resp.headers)
                             ctype = [t.strip() for t in head.get("Content-Type", "").split(";")]
                             if "text/html" in ctype:
-                                it = resp.iter_content(65536)
+                                it = resp.iter_bytes()
                                 data = await create_future(next, it)
                                 s = as_str(data)
                                 try:
@@ -1297,16 +1297,17 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             return self.mimes[url]
         except KeyError:
             pass
-        with reqs.next().get(url, stream=True) as resp:
-            self.activity += 1
-            head = fcdict(resp.headers)
-            try:
-                mime = [t.strip() for t in head.get("Content-Type", "").split(";")]
-            except KeyError:
-                it = resp.iter_content(65536)
-                mime = [t.strip() for t in self.mime.from_buffer(data).split(";")]
-            self.mimes[url] = mime
-            return mime
+        resp = reqx.next().stream(url, follow_redirects=True)
+        self.activity += 1
+        head = fcdict(resp.headers)
+        try:
+            mime = [t.strip() for t in head.get("Content-Type", "").split(";")]
+        except KeyError:
+            it = resp.iter_content(65536)
+            data = next(it)
+            mime = [t.strip() for t in self.mime.from_buffer(data).split(";")]
+        self.mimes[url] = mime
+        return mime
 
     emoji_stuff = {}
 
@@ -2730,7 +2731,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                             if status == discord.Status.online:
                                 create_task(self.audio.asubmit(audio_status + "dnd)"))
                             create_task(self.seen(self.user, event="misc", raw="Changing their status"))
-                    await self.change_presence(activity=activity, status=status)
+                    with suppress(ConnectionResetError):
+                        await self.change_presence(activity=activity, status=status)
                     # Member update events are not sent through for the current user, so manually send a _seen_ event
                     await self.seen(self.user, event="misc", raw="Changing their status")
 
@@ -4456,6 +4458,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         await asyncio.sleep(1 + tries * 2)
                         continue
 
+                    if not hasattr(r, "reason"):
+                        r.reason = as_str(data)
                     # the usual error cases
                     if status == 403:
                         raise discord.Forbidden(r, data)
@@ -4467,7 +4471,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         raise discord.HTTPException(r, data)
 
                 # This is handling exceptions from the request
-                except (OSError, httpx.ReadTimeout, httpx.RemoteProtocolError):
+                except (OSError, httpx.ConnectTimeout, httpx.ReadTimeout, httpx.RemoteProtocolError):
                     # Connection reset by peer
                     if tries < 4:
                         await asyncio.sleep(1 + tries * 2)
