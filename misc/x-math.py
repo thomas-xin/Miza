@@ -135,46 +135,14 @@ def bf_parse(s):
 _bf = lambda s: bf_evaluate(s)
 
 
-# Randomizer
-class Random(sympy.Basic):
-
-    def __init__(self, a=None, b=None):
-        if a is None:
-            self.a = 0
-            self.b = 1
-            self.isint = False
-        elif b is None:
-            self.a = 0
-            self.b = a
-            self.isint = True
-        else:
-            sgn = sympy.sign(b - a)
-            self.a = sgn * a + (1 - sgn) * b
-            self.b = sgn * b + (1 - sgn) * a + 1
-            self.isint = True
-
-    def evalf(self, prec):
-        randfloat = sympy.Float(random.random(), dps=prec) / 2.7 ** (prec / 7 - random.random())
-        temp = (sympy.Float(random.random(), dps=prec) / (randfloat + time.time() % 1)) % 1
-        temp *= self.b - self.a
-        temp += self.a
-        if self.isint:
-            temp = sympy.Integer(temp)
-        return temp
-
-    gcd = lambda self, other, *gens, **args: sympy.gcd(self.evalf(BF_PREC), other, *gens, **args)
-    lcm = lambda self, other, *gens, **args: sympy.lcm(self.evalf(BF_PREC), other, *gens, **args)
-    is_Rational = lambda self: True
-    expand = lambda self, **void: self.evalf(BF_PREC)
-    nsimplify = lambda self, **void: self.evalf(BF_PREC)
-    as_coeff_Add = lambda self, *void: (0, self.evalf(BF_PREC))
-    as_coeff_Mul = lambda self, *void: (0, self.evalf(BF_PREC))
-    _eval_power = lambda *void: None
-    _eval_evalf = evalf
-    __abs__ = lambda self: abs(self.evalf(BF_PREC))
-    __neg__ = lambda self: -self.evalf(BF_PREC)
-    __repr__ = lambda self, *void: str(self.evalf(BF_PREC))
-    __str__ = __repr__
+def Random(a=None, b=None):
+    random.seed(time.time_ns())
+    if a is None:
+        return random.random()
+    elif b is None:
+        return random.randint(0, round_random(a) - 1)
+    else:
+        return random.randint(round_random(a), round_random(b) - 1)
 
 
 def astype(obj, t, *args, **kwargs):
@@ -482,6 +450,36 @@ def rounder(x):
     return x
 round_min = rounder
 
+def _unsafe(ufunc, *args, **kwargs):
+    try:
+        return ufunc(*args, **kwargs)
+    except Exception as ex:
+        if "has no attribute 'dtype'" in str(ex):
+            try:
+                args = [np.asanyarray(a) for a in args]
+            except:
+                raise ex
+            try:
+                return ufunc(*args, **kwargs)
+            except Exception as ex:
+                pass
+        if "casting rule" not in str(ex):
+            raise
+    kwargs["casting"] = "unsafe"
+    try:
+        return ufunc(*args, **kwargs)
+    except TypeError as ex2:
+        if "unexpected keyword" not in str(ex2):
+            raise ex
+    kwargs.pop("casting", None)
+    try:
+        args = [a if not isinstance(a, np.ndarray) else np.asanyarray(a, np.float64) for a in args]
+        kwargs = {k: (v if not isinstance(v, np.ndarray) else np.asanyarray(v, np.float64)) for k, v in kwargs.items()}
+        return ufunc(*args, **kwargs)
+    except:
+        raise ex
+autocast = lambda ufunc: lambda *args, **kwargs: _unsafe(ufunc, *args, **kwargs)
+
 
 # Allowed functions for ~math
 _globals = dict(sympy.stats.__dict__)
@@ -510,6 +508,7 @@ _globals.update({
     "brainfuck": _bf,
     "random": Random,
     "rand": Random,
+    "randint": Random,
     "dice": Random,
     "round_random": round_random,
     "plt": plot,
@@ -538,6 +537,7 @@ _globals.update({
     "reshape": np.reshape,
     "roll": np.roll,
     "rot90": np.rot90,
+    "conjugate": np.conjugate,
     "sum": np.sum,
     "max": np.nanmax,
     "min": np.nanmin,
@@ -557,18 +557,20 @@ _globals.update({
     "inner": np.inner,
     "outer": np.outer,
     "matmul": np.matmul,
-    "inv": np.linalg.inv,
-    "matinv": np.linalg.inv,
-    "pinv": np.linalg.pinv,
+    "inv": autocast(np.linalg.inv),
+    "matinv": autocast(np.linalg.inv),
+    "pinv": autocast(np.linalg.pinv),
     "matpwr": np.linalg.matrix_power,
     "matrix_power": np.linalg.matrix_power,
     "einsum": np.einsum,
-    "eig": np.linalg.eig,
-    "eigvals": np.linalg.eigvals,
-    "svd": np.linalg.svd,
+    "eig": autocast(np.linalg.eig),
+    "eigvals": autocast(np.linalg.eigvals),
+    "svd": autocast(np.linalg.svd),
     "norm": np.linalg.norm,
-    "cond": np.linalg.cond,
-    "det": np.linalg.det,
+    "cond": autocast(np.linalg.cond),
+    "det": autocast(np.linalg.det),
+    "adj": autocast(np.matrix.H),
+    "adjoint": autocast(np.matrix.H),
     "trace": np.trace,
     "histogram": np.histogram,
     "average": np.average,
