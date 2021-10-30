@@ -570,8 +570,8 @@ _globals.update({
     "norm": np.linalg.norm,
     "cond": autocast(np.linalg.cond),
     "det": autocast(np.linalg.det),
-    "adj": autocast(np.matrix.H),
-    "adjoint": autocast(np.matrix.H),
+    "adj": autocast(np.matrix.getH),
+    "adjoint": autocast(np.matrix.getH),
     "trace": np.trace,
     "histogram": np.histogram,
     "average": np.average,
@@ -886,10 +886,12 @@ def evalSym(f, prec=64, r=False, variables=None):
     # Select list of answers to return based on the desired float precision level
     if type(f) in (str, bool, tuple, list, dict, np.ndarray):
         return [f]
+    if isinstance(f, (sympy.Integer, float, int)):
+        return [f]
+    if isinstance(f, np.number):
+        f = sympy.Float(f)
     if prec:
         try:
-            if isinstance(f, (sympy.Integer, float, int, np.number)):
-                return [f]
             y = f.evalf(prec, chop=True)
         except:
             y = f
