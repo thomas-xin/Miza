@@ -62,7 +62,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     try:
         shards = int(sys.argv[1])
     except IndexError:
-        shards = 1
+        shards = 2
 
     def __init__(self, cache_size=1048576, timeout=24):
         # Initializes client (first in __mro__ of class inheritance)
