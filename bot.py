@@ -1251,7 +1251,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         resp = await create_future(reqx.next().stream, "GET", url, headers=Request.header())
                         self.activity += 1
                         resp = resp.__enter__()
-                        url = resp.url
+                        url = as_str(resp.url)
                         head = fcdict(resp.headers)
                         ctype = [t.strip() for t in head.get("Content-Type", "").split(";")]
                         if "text/html" in ctype:
