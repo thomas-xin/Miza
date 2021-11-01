@@ -2513,7 +2513,6 @@ class UpdateMessageCache(Database):
         for i, message in enumerate(tuple(messages.values()), 1):
             m = getattr(message, "_data", None)
             if m:
-                m = message._data
                 if "author" not in m:
                     author = message.author
                     m["author"] = dict(id=author.id, s=str(author), avatar=author.avatar and author.avatar.key)
@@ -2552,7 +2551,7 @@ class UpdateMessageCache(Database):
                         if reaction.me:
                             r["me"] = reaction.me
                         reactions.append(r)
-            saved[m["id"]] = m
+            saved[as_str(m["id"])] = m
             if not i & 1023:
                 time.sleep(0.1)
         path = self.files + "/" + str(fn)
