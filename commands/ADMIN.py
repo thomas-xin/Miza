@@ -2441,8 +2441,6 @@ class UpdateMessageCache(Database):
         if not raw:
             with suppress(KeyError):
                 return self.loaded[fn]
-            found = {}
-            self.loaded[fn] = found
         try:
             data = self.raws[fn]
         except KeyError:
