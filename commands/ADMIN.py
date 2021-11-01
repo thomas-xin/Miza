@@ -2465,6 +2465,7 @@ class UpdateMessageCache(Database):
             # if raw:
                 # print(f"{len(data)} message{'s' if len(data) != 1 else ''} temporarily read from {fn}")
         if not raw:
+            found = self.loaded.setdefault(fn, {})
             bot = self.bot
             i = 0
             for k, m in deque(data.items()):
