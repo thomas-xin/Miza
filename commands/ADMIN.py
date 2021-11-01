@@ -2455,7 +2455,10 @@ class UpdateMessageCache(Database):
                 out = zipped = decrypt(b)
                 with tracebacksuppressor(zipfile.BadZipFile):
                     out = zip2bytes(zipped)
-                data = pickle.loads(out)
+                if out[0] == 128:
+                    data = pickle.loads(out)
+                else:
+                    data = orjson.loads(out)
             except:
                 print_exc()
                 data = {}
@@ -2476,6 +2479,7 @@ class UpdateMessageCache(Database):
                 except:
                     print(m)
                     print_exc()
+                k = int(K)
                 bot.cache.messages[k] = found[k] = message
                 i += 1
                 if not i & 2047:
@@ -2555,7 +2559,11 @@ class UpdateMessageCache(Database):
         if not saved:
             if os.path.exists(path):
                 return os.remove(path)
-        data = pickle.dumps(saved)
+        try:
+            data = orjson.dumps(saved)
+        except:
+            print_exc()
+            data = pickle.dumps(saved)
         if len(data) > 32768:
             out = bytes2zip(data, lzma=len(data) < 16777216)
             if len(out) < len(data):
