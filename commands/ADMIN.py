@@ -2479,7 +2479,7 @@ class UpdateMessageCache(Database):
                 except:
                     print(m)
                     print_exc()
-                k = int(K)
+                k = int(k)
                 bot.cache.messages[k] = found[k] = message
                 i += 1
                 if not i & 2047:
