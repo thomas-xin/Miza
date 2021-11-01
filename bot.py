@@ -4031,7 +4031,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 if "channel_id" not in d:
                     d["channel_id"] = channel.id
                 author = self.author
-                d.pop("author", None)
                 if "tts" not in d:
                     d["tts"] = False
                 try:
@@ -4046,7 +4045,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     pass
                 message = bot.LoadedMessage(state=bot._state, channel=channel, data=d)
                 apply_stickers(message, d)
-                message.author = author
+                if not getattr(message, "author", None):
+                    message.author = author
                 return message
 
             def __getattr__(self, k):
