@@ -7,7 +7,7 @@ class Purge(Command):
     name = ["🗑", "Del", "Delete", "Purge_Range"]
     min_level = 3
     description = "Deletes a number of messages from a certain user in current channel."
-    usage = "<1:users(bots)|?a>? <0:count(1)>? <ignore{?i}|range{?r}|hide{?h}>*"
+    usage = "<1:users>? <0:count(1)>? <ignore{?i}|range{?r}|hide{?h}>*"
     flags = "fiaehr"
     rate_limit = (2, 4)
     multi = True
@@ -27,10 +27,8 @@ class Purge(Command):
                 end += 1
         else:
             count = 1
-        if "a" in flags:
+        if not argl and not args:
             uset = universal_set
-        elif not argl and not args:
-            uset = None
         else:
             users = await bot.find_users(argl, args, user, guild)
             uset = {u.id for u in users}
@@ -2510,7 +2508,7 @@ class UpdateMessageCache(Database):
         if fn in self.loaded:
             self.loaded[fn].update(messages)
         saved = self.raws.setdefault(fn, {})
-        for i, message in enumerate(tuple(messages.values()), 1):
+        for i, m_id, message in zip(range(1, len(messages) + 1), messages.keys(), messages.values()):
             m = getattr(message, "_data", None)
             if m:
                 if "author" not in m:
@@ -2529,7 +2527,6 @@ class UpdateMessageCache(Database):
                 embeds = [e.to_dict() for e in message.embeds]
                 author = message.author
                 m = dict(
-                    id=message.id,
                     author=dict(id=author.id, s=str(author), avatar=author.avatar and author.avatar.key),
                     webhook_id=message.webhook_id,
                     reactions=reactions,
@@ -2551,7 +2548,8 @@ class UpdateMessageCache(Database):
                         if reaction.me:
                             r["me"] = reaction.me
                         reactions.append(r)
-            saved[as_str(m["id"])] = m
+            m["id"] = str(m_id)
+            saved[m["id"]] = m
             if not i & 1023:
                 time.sleep(0.1)
         path = self.files + "/" + str(fn)
