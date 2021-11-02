@@ -2463,7 +2463,7 @@ class UpdateMessageCache(Database):
                 print_exc()
                 data = {}
             if type(data) is not dict:
-                data = {m["id"]: m for m in data}
+                data = {as_str(m["id"]): m for m in data}
             self.raws[fn] = data
             # if raw:
                 # print(f"{len(data)} message{'s' if len(data) != 1 else ''} temporarily read from {fn}")
