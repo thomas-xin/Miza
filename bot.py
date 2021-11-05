@@ -537,10 +537,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         except (LookupError, discord.NotFound):
             channel = await super().fetch_channel(s_id)
             self.cache.channels[s_id] = channel
-            self.limit_cache("channels")
             return channel
         self.cache.users[u_id] = user
-        self.limit_cache("users")
         return user
 
     # Fetches a user from ID, using the bot cache when possible.
@@ -548,7 +546,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         async with self.user_semaphore:
             user = await super().fetch_user(u_id)
             self.cache.users[u_id] = user
-            self.limit_cache("users")
             return user
     def fetch_user(self, u_id):
         with suppress(KeyError):
@@ -614,7 +611,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     return self.get_user(self.deleted_user)
                 raise KeyError("Target user ID not found.")
         self.cache.users[u_id] = user
-        self.limit_cache("users")
         return user
 
     async def find_users(self, argl, args, user, guild, roles=False):
@@ -793,7 +789,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             raise LookupError("Unable to find member data.")
         if find_others:
             self.cache.members[u_id] = member
-        self.limit_cache("members")
         return member
 
     # Fetches a guild from ID, using the bot cache when possible.
@@ -833,14 +828,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         except:
             guild = await super().fetch_guild(g_id)
         # self.cache.guilds[g_id] = guild
-        self.limit_cache("guilds")
         return guild
 
     # Fetches a channel from ID, using the bot cache when possible.
     async def _fetch_channel(self, c_id):
         channel = await super().fetch_channel(c_id)
         self.cache.channels[c_id] = channel
-        self.limit_cache("channels")
         return channel
     def fetch_channel(self, c_id):
         if type(c_id) is not int:
@@ -1009,7 +1002,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if role is None:
                 raise LookupError("Role not found.")
         self.cache.roles[r_id] = role
-        self.limit_cache("roles")
         return role
 
     # Fetches an emoji from ID and guild, using the bot cache when possible.
@@ -1031,7 +1023,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             else:
                 raise LookupError("Emoji not found.")
         self.cache.emojis[e_id] = emoji
-        self.limit_cache("emojis")
         return emoji
 
     # Searches the bot database for a webhook mimic from ID.
@@ -1491,8 +1482,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             self.cache.messages[message.id] = message
             if (utc_dt() - created_at).total_seconds() < 86400 * 14 and "message_cache" in self.data and not getattr(message, "simulated", None):
                 self.data.message_cache.save_message(message)
-        if ts_us() % 16 == 0:
-            self.limit_cache("messages")
         return message
 
     # Deletes a message from the bot cache.
@@ -1513,7 +1502,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if not os.path.exists(fn):
                 with open(fn, "wb") as f:
                     await create_future(f.write, data)
-            self.limit_cache("attachments", 256)
         return attachment
 
     def attachment_from_file(self, file):
@@ -1728,6 +1716,18 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 with suppress(RuntimeError):
                     c.pop(next(iter(c)))
 
+    def cache_reduce(self):
+        self.limit_cache("messages")
+        self.limit_cache("attachments", 256)
+        self.limit_cache("guilds")
+        self.limit_cache("channels")
+        self.limit_cache("users")
+        self.limit_cache("members")
+        self.limit_cache("roles")
+        self.limit_cache("emojis")
+        self.limit_cache("deleted", limit=4096)
+        self.limit_cache("banned", 4096)
+
     # Updates bot cache from the discord.py client cache, using automatic feeding to mitigate the need for slow dict.update() operations.
     def update_cache_feed(self):
         self.cache.guilds._feed = (self._guilds, getattr(self, "sub_guilds", {}))
@@ -1918,7 +1918,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         except AttributeError:
             m_id = int(message)
         self.cache.deleted[m_id] = no_log + 2
-        self.limit_cache("deleted", limit=4096)
 
     # Silently deletes a message, bypassing logs.
     async def silent_delete(self, message, exc=False, no_log=False, delay=None):
@@ -1944,7 +1943,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             self.cache.banned.pop((guild.id, user.id), None)
             raise
         self.cache.banned[(guild.id, user.id)] = utc()
-        self.limit_cache("banned", 4096)
 
     def recently_banned(self, user, guild, duration=20):
         return utc() - self.cache.banned.get((verify_id(guild), verify_id(user)), 0) < duration
@@ -3731,6 +3729,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     if SEMS:
                         for sem in tuple(SEMS.values()):
                             sem._update_bin()
+                    create_future_ex(self.cache_reduce, priority=True)
 
     # Heartbeat loop: Repeatedly deletes a file to inform the watchdog process that the bot's event loop is still running.
     async def heartbeat_loop(self):
@@ -5002,7 +5001,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     message.id = payload.message_id
                     message.author = await self.fetch_user(self.deleted_user)
                     history = channel.history(limit=101, around=message)
-                    create_task(history.flatten())
+                    async def flatten_into_cache(history):
+                        messages = await history.flatten()
+                        data = {m.id: m for m in messages}
+                        create_future_ex(self.cache.messages.update, data)
+                    create_task(flatten_into_cache(history))
             try:
                 message.deleted = True
             except AttributeError:
