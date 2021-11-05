@@ -2099,7 +2099,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     try:
                         return round_min(f)
                     except:
-                        return ast.literal_eval(f)
+                        try:
+                            return orjson.loads(f)
+                        except:
+                            return ast.literal_eval(f)
         except (ValueError, TypeError, SyntaxError):
             r = await self.solve_math(f, 128, 0)
         x = r[0]
@@ -4998,6 +5001,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         message.guild = None
                     message.id = payload.message_id
                     message.author = await self.fetch_user(self.deleted_user)
+                    history = channel.history(limit=101, around=message)
+                    create_task(history.flatten())
             try:
                 message.deleted = True
             except AttributeError:
