@@ -10,12 +10,10 @@ if not os.path.exists("auth.json") or not os.path.getsize("auth.json"):
         "webserver_port": "",
         "discord_token": "",
         "owner_id": [],
-        "google_api_key": "",
         "rapidapi_key": "",
+        "rapidapi_secret": "",
         "alexflipnote_key": "",
         "giphy_key": "",
-        "papago_id": "",
-        "papago_secret": "",
     }
     import json
     with open("auth.json", "w", encoding="utf-8") as f:
@@ -25,7 +23,7 @@ if not os.path.exists("auth.json") or not os.path.getsize("auth.json"):
 
 
 import time, datetime, psutil, subprocess
-ffmpeg = "ffmpeg"
+ffmpeg = "./ffmpeg"
 print("Verifying FFmpeg installation...")
 
 if os.name == "nt":
@@ -68,27 +66,29 @@ if os.name == "nt":
                                 y.write(b)
             print("FFmpeg extraction complete.")
             os.remove(f)
-    if os.path.exists("misc") and not os.path.exists("misc/ffmpeg-c"):
-        print("Downloading ffmpeg version 4.2.2...")
-        os.mkdir("misc/ffmpeg-c")
-        subprocess.run([sys.executable, "downloader.py", "https://dl.dropboxusercontent.com/s/6vjpswpkxubnig4/ffmpeg-c.zip?dl=1", "ffmpeg-c.zip"], cwd="misc")
-        import zipfile, io
-        print("Download complete; extracting new FFmpeg installation...")
-        f = "misc/ffmpeg-c.zip"
-        with zipfile.ZipFile(f) as z:
-            names = z.namelist()
-            for i, name in enumerate(names):
-                print(f"{i}/{len(names)}")
-                fn = "misc/ffmpeg-c/" + name.rsplit("/", 1)[-1]
-                with open(fn, "wb") as y:
-                    with z.open(name, "r") as x:
-                        while True:
-                            b = x.read(1048576)
-                            if not b:
-                                break
-                            y.write(b)
-        print("FFmpeg extraction complete.")
-        os.remove(f)
+    if os.path.exists("misc"):
+        if not os.path.exists("misc/ffmpeg-c"):
+            print("Downloading ffmpeg version 4.2.2...")
+            os.mkdir("misc/ffmpeg-c")
+            subprocess.run([sys.executable, "downloader.py", "https://dl.dropboxusercontent.com/s/6vjpswpkxubnig4/ffmpeg-c.zip?dl=1", "ffmpeg-c.zip"], cwd="misc")
+            import zipfile, io
+            print("Download complete; extracting new FFmpeg installation...")
+            f = "misc/ffmpeg-c.zip"
+            with zipfile.ZipFile(f) as z:
+                z.extractall("misc/ffmpeg-c")
+            print("FFmpeg extraction complete.")
+            os.remove(f)
+        if not os.path.exists("misc/poppler"):
+            print("Downloading Poppler version 21.10.0...")
+            os.mkdir("misc/poppler")
+            subprocess.run([sys.executable, "downloader.py", "https://cdn.discordapp.com/attachments/731709481863479436/899556463016554496/Poppler.zip", "poppler.zip"], cwd="misc")
+            import zipfile, io
+            print("Download complete; extracting new Poppler installation...")
+            f = "misc/poppler.zip"
+            with zipfile.ZipFile(f) as z:
+                z.extractall("misc/poppler")
+            print("Poppler extraction complete.")
+            os.remove(f)
 else:
     try:
         subprocess.run(ffmpeg)
@@ -159,11 +159,19 @@ while not os.path.exists(sd):
                     break
             for child in proc.children(recursive=True):
                 try:
-                    child.kill()
+                    child.terminate()
+                    try:
+                        child.wait(timeout=2)
+                    except psutil.TimeoutExpired:
+                        child.kill()
                 except:
                     traceback.print_exc()
             try:
-                proc.kill()
+                proc.terminate()
+                try:
+                    proc.wait(timeout=2)
+                except psutil.TimeoutExpired:
+                    proc.kill()
             except psutil.NoSuchProcess:
                 pass
             if os.path.exists(sd):
@@ -189,10 +197,18 @@ while not os.path.exists(sd):
 if proc.is_running():
     try:
         for child in proc.children():
-            child.kill()
+            child.terminate()
+            try:
+                child.wait(timeout=2)
+            except psutil.TimeoutExpired:
+                child.kill()
     except:
         traceback.print_exc()
-    proc.kill()
+    proc.terminate()
+    try:
+        proc.wait(timeout=2)
+    except psutil.TimeoutExpired:
+        proc.kill()
 
 delete(sd)
 delete(rs)

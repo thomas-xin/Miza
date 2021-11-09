@@ -28,29 +28,21 @@ class DouClub:
         # This string search algorithm could be better
         output = []
         query = query.casefold()
-        for l in self.data:
-            found = True
-            qlist = set(query.split())
-            for q in qlist:
-                tag = False
-                for k in l:
-                    i = str(l[k])
-                    if q in i.casefold():
-                        tag = True
-                        break
-                if not tag:
-                    found = False
-                    break
-            if found:
-                output.append({
-                    "author": l["Author"]["identifierdata[0]['title'"],
-                    "name": l["Title"],
-                    "description": l["Description"],
-                    "url": (
-                        "https://doukutsuclub.knack.com/database#search-database/mod-details/"
-                        + l["id"] + "/"
-                    ),
-                })
+        qlist = set(query.split())
+        for res in self.data:
+            author = res["Author"][0]["identifier"]
+            name = res["Title"]
+            description = res["Description"]
+            s = (name, description, author)
+            if not all(any(q in v for v in s) for q in qlist):
+                continue
+            url = f"https://doukutsuclub.knack.com/database#search-database/mod-details/{res['id']}"
+            output.append({
+                "author": author,
+                "name": name,
+                "description": description,
+                "url": url,
+            })
         return output
 
 try:
@@ -58,17 +50,14 @@ try:
 except KeyError:
     douclub = cdict(
         search=lambda *void1, **void2: exec('raise FileNotFoundError("Unable to search Doukutsu Club.")'),
-        update=lambda: None
+        update=lambda: None,
+        pull=lambda: None,
     )
-    print("WARNING: knack_id/knack_secret not found. Unable to search Doukutsu Club.")
 
 
 async def searchForums(query):
-    url = (
-        "https://www.cavestory.org/forums/search/1/?q=" + query.replace(" ", "+")
-        + "&t=post&c[child_nodes]=1&c[nodes][0]=33&o=date&g=1"
-    )
-    s = await Request(url, aio=True, timeout=16, decode=True)
+    url = f"https://forum.cavestory.org/search/320966/?q={url_parse(query)}"
+    s = await Request(url, aio=True, timeout=16, ssl=False, decode=True)
     output = []
     i = 0
     while i < len(s):
@@ -81,10 +70,10 @@ async def searchForums(query):
         j = s.index('">')
         curr = {"author": s[:j]}
         s = s[s.index('<h3 class="contentRow-title">'):]
-        search = '<a href="/forums/'
+        search = '<a href="/'
         s = s[s.index(search) + len(search):]
         j = s.index('">')
-        curr["url"] = 'https://www.cavestory.org/forums/' + s[:j]
+        curr["url"] = 'https://www.cavestory.org/forums/' + s[:j].lstrip("/")
         s = s[j + 2:]
         j = s.index('</a>')
         curr["name"] = s[:j]
@@ -93,7 +82,7 @@ async def searchForums(query):
         j = s.index('</div>')
         curr["description"] = s[:j]
         for elem in curr:
-            temp = curr[elem].replace('<em class="textHighlight">', "").replace('</em>', "")
+            temp = curr[elem].replace('<em class="textHighlight">', "**").replace("</em>", "**")
             temp = html_decode(temp)
             curr[elem] = temp
         output.append(curr)
@@ -350,7 +339,8 @@ class CS_npc(Command):
         raise LookupError(f"No results for {argv}.")
 
 
-class CS_tsc(Command):
+class CS_flag(Command):
+    name = ["CS_OOB", "CS_flags"]
     description = "Searches the Cave Story OOB flags list for a memory variable."
     usage = "<query> <condensed{?c}>?"
     flags = "c"
@@ -395,34 +385,27 @@ class CS_mod(Command):
     no_parse = True
     rate_limit = (3, 7)
 
-    async def __call__(self, args, **void):
+    async def __call__(self, channel, user, args, **void):
         argv = " ".join(args)
-        data = await searchForums(argv)
-        data += await create_future(douclub.search, argv, timeout=8)
-        # Sends multiple messages up to 20000 characters total
-        if len(data):
-            response = f"Search results for `{argv}`:\n"
-            for l in data:
-                line = (
-                    "\n<" + str(l["url"]) + ">\n"
-                    + "```css\nName: [" + no_md(l["name"])
-                    + "]\nAuthor: [" + no_md(l["author"].strip(" "))
-                    + "]\n" + lim_str(l["description"].replace("\n", " "), 128)
-                    + "```\r"
-                )
-                response += line
-            if len(response) < 20000 and len(response) > 1900:
-                output = response.split("\r")
-                response = []
-                curr = ""
-                for line in output:
-                    if len(curr) + len(line) > 1900:
-                        response.append(curr)
-                        curr = line
-                    else:
-                        curr += line
-            return response
-        raise LookupError(f"No results for {argv}.")
+        fut = create_future(douclub.search, argv, timeout=8)
+        try:
+            data = await searchForums(argv)
+        except ConnectionError as ex:
+            if ex.errno != 404:
+                raise
+            data = []
+        data += await fut
+        if not data:
+            raise LookupError(f"No results for {argv}.")
+        description = f"Search results for `{argv}`:\n"
+        fields = deque()
+        for res in data:
+            fields.append(dict(
+                name=res["name"],
+                value=res["url"] + "\n" + lim_str(res["description"], 128).replace("\n", " ") + f"\n> {res['author']}",
+                inline=False,
+            ))
+        self.bot.send_as_embeds(channel, description=description, fields=fields, author=get_author(user))
 
 
 class CS_Database(Database):
@@ -763,7 +746,7 @@ class Wav2Png(Command):
         ext = "png" if name == "wav2png" else "wav"
         dest = f"cache/&{ts}." + ext
         w2p = "wav2png" if name == "wav2png" else "png2wav"
-        args = pillow_simd.get() + [w2p + ".py", url, "../" + dest]
+        args = [python, w2p + ".py", url, "../" + dest]
         with discord.context_managers.Typing(channel):
             print(args)
             proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc", stdout=subprocess.DEVNULL)
@@ -771,7 +754,7 @@ class Wav2Png(Command):
                 await asyncio.wait_for(proc.wait(), timeout=3200)
             except (T0, T1, T2):
                 with tracebacksuppressor:
-                    proc.kill()
+                    force_kill(proc)
                 raise
         await bot.send_with_file(channel, "", dest, filename=fn + "." + ext, reference=message)
 
@@ -811,7 +794,7 @@ class SpectralPulse(Command):
                     await asyncio.wait_for(proc.wait(), timeout=3200)
                 except (T0, T1, T2):
                     with tracebacksuppressor:
-                        proc.kill()
+                        force_kill(proc)
                     raise
                 for ext in ("pcm", "riff"):
                     await create_future(os.remove, f"{dest}.{ext}")
@@ -895,6 +878,8 @@ class UpdateDeviantArt(Database):
                 return
             embs = deque()
             for content in assigned:
+                if content not in found:
+                    continue
                 items = found[content]
                 entries = assigned[content]["entries"]
                 new = tuple(items)
@@ -932,7 +917,7 @@ class UpdateDeviantArt(Database):
         else:
             f_id = "&folderid=" + str(folder)
         url = base + username + f_id
-        # New binary search algorithm to improve search time for entire galleries
+        # Binary search algorithm to improve search time for entire galleries to O(log n)
         maxitems = 2147483647
         r = 0
         t = utc()
@@ -947,7 +932,12 @@ class UpdateDeviantArt(Database):
                 futs.append((curr, Request(search, timeout=20, json=True, aio=True)))
                 if i & 1:
                     for x, fut in futs:
-                        resp = await fut
+                        try:
+                            resp = await fut
+                        except ConnectionError as ex:
+                            if ex.errno >= 500:
+                                return
+                            raise
                         if resp.get("results"):
                             found[x] = resp
                         if not resp.get("hasMore"):
@@ -1008,9 +998,8 @@ class UpdateDeviantArt(Database):
         for folder, username in conts.items():
             with tracebacksuppressor:
                 items = await self.fetch_gallery(folder, username)
-                total[folder] = items
-        # if attempts:
-        #     print(successes, "of", attempts, "DeviantArt reqs.next() executed successfully.")
+                if items:
+                    total[folder] = items
         for c_id in tuple(self.data):
             create_task(self.processPart(total, c_id))
         self.time = utc()

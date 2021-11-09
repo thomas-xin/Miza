@@ -77,6 +77,8 @@ def ensure_compressor():
 		b = io.BytesIO(resp.read())
 	with zipfile.ZipFile(b, "r") as z:
 		z.extractall()
+	if os.name != "nt":
+		subprocess.run(("chmod", "777", "4x4"))
 
 def encrypt(fsrc, fdst, pos, size=None, password="", total=-1, emoji=True):
 	import base64, hashlib, itertools
@@ -187,10 +189,14 @@ if __name__ == "__main__":
 	from collections import deque
 
 	try:
-		import orjson
+		import orjson as json
 	except ModuleNotFoundError:
 		subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", "--user", "orjson"])
-		import orjson
+		try:
+			import orjson as json
+		except ModuleNotFoundError:
+			import json
+	as_bytes = lambda s: s.encode("utf-8") if isinstance(s, str) else s
 
 	def _adjust_thread_count(self):
 		# if idle threads are available, don't spin new threads
@@ -417,10 +423,14 @@ if __name__ == "__main__":
 				info.append(None)
 			info[0] = list(info[0])
 			info = list(info)
-			infodata = orjson.dumps(info)
+			infodata = as_bytes(json.dumps(info))
 			if not compress:
 				b = io.BytesIO()
-				with zipfile.ZipFile(b, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9, strict_timestamps=False) as z:
+				try:
+					z = zipfile.ZipFile(b, "w", compression=zipfile.ZIP_LZMA, compresslevel=9, strict_timestamps=False)
+				except:
+					z = zipfile.ZipFile(b, "w", compression=zipfile.ZIP_LZMA, compresslevel=9)
+				with z:
 					z.writestr("M", infodata)
 				b.seek(0)
 				infodata = b.read()
@@ -525,7 +535,7 @@ if __name__ == "__main__":
 					c = 6
 				elif compress >= 5:
 					c = min(12, compress + 3)
-				subprocess.run(("4x4", str(c), "-p16", "-i48", out, out + ".lz"))
+				subprocess.run(("./4x4", str(c), "-p16", "-i48", out, out + ".lz"))
 				if os.path.getsize(out + ".lz") + 2 < fs:
 					os.remove(out)
 					os.rename(out + ".lz", out)
@@ -620,7 +630,7 @@ if __name__ == "__main__":
 				f.close()
 				if not target:
 					print("\nDecompressing...")
-				subprocess.run(("4x4", "d", "-p16", "-i48", argv, argv + ".lz"))
+				subprocess.run(("./4x4", "d", "-p16", "-i48", argv, argv + ".lz"))
 				with open(argv, "ab") as f:
 					f.write(b"\00\x80")
 				args = (sys.executable, this, "-s", str(fs), argv + ".lz")
@@ -634,7 +644,7 @@ if __name__ == "__main__":
 				os.remove(argv + ".lz")
 				raise SystemExit
 			if b == b"\x01\x80":
-				infodata = orjson.dumps([(), [out, 0, fs - 2]])
+				infodata = as_bytes(json.dumps([(), [out, 0, fs - 2]]))
 				out = "./"
 			else:
 				b = c = b""
@@ -657,7 +667,7 @@ if __name__ == "__main__":
 			import pickle
 			info = pickle.loads(infodata)
 		else:
-			info = orjson.loads(infodata)
+			info = json.loads(infodata)
 			info = deque(info)
 
 		if not target:

@@ -1,28 +1,29 @@
 import smath
 from smath import *
 
-with MultiThreadedImporter(globals()) as importer:
-    importer.__import__(
-        # "importlib",
-        "inspect",
-        "tracemalloc",
-        "psutil",
-        "subprocess",
-        "asyncio",
-        "discord",
-        "json",
-        "orjson",
-        "aiohttp",
-        "threading",
-        "urllib",
-        "zipfile",
-        "nacl",
-        "shutil",
-        "filetype",
-    )
+MultiAutoImporter(
+    "psutil",
+    "subprocess",
+    "tracemalloc",
+    "zipfile",
+    "urllib",
+    "nacl",
+    "discord",
+    "asyncio",
+    "json",
+    "orjson",
+    "aiohttp",
+    "httpx",
+    "threading",
+    "shutil",
+    "filetype",
+    "inspect",
+    pool=import_exc,
+    _globals=globals(),
+)
 
 PROC = psutil.Process()
-quit = lambda *args, **kwargs: PROC.kill()
+quit = lambda *args, **kwargs: force_kill(PROC)
 BOT = [None]
 
 tracemalloc.start()
@@ -33,6 +34,10 @@ import nacl.secret
 
 utils = discord.utils
 reqs = alist(requests.Session() for i in range(6))
+try:
+    reqx = alist(httpx.Client(http2=True) for i in range(6))
+except:
+    reqx = alist(httpx.Client(http2=False) for i in range(6))
 url_parse = urllib.parse.quote_plus
 url_unparse = urllib.parse.unquote_plus
 escape_markdown = utils.escape_markdown
@@ -82,6 +87,8 @@ newfut = concurrent.futures.Future()
 newfut.set_result(None)
 
 def as_fut(obj):
+    if obj is None:
+        return emptyfut
     fut = asyncio.Future()
     eloop.call_soon_threadsafe(fut.set_result, obj)
     return fut
@@ -96,12 +103,14 @@ class EmptyContext(contextlib.AbstractContextManager):
 emptyctx = EmptyContext()
 
 
+SEMS = {}
+
 # Manages concurrency limits, similar to asyncio.Semaphore, but has a secondary threshold for enqueued tasks, as well as an optional rate limiter.
 class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
 
-    __slots__ = ("limit", "buffer", "fut", "active", "passive", "rate_limit", "rate_bin", "last", "trace")
+    __slots__ = ("limit", "buffer", "fut", "active", "passive", "rate_limit", "rate_bin", "last", "trace", "weak")
 
-    def __init__(self, limit=256, buffer=32, delay=0.05, rate_limit=None, randomize_ratio=2, last=False, trace=False):
+    def __init__(self, limit=256, buffer=32, delay=0.05, rate_limit=None, randomize_ratio=2, last=False, trace=False, weak=False):
         self.limit = limit
         self.buffer = buffer
         self.active = 0
@@ -112,6 +121,7 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
         self.fut.set_result(None)
         self.last = last
         self.trace = trace and inspect.stack()[1]
+        self.weak = weak
 
     def __str__(self):
         classname = str(self.__class__).replace("'>", "")
@@ -142,6 +152,8 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
                     self.fut.set_result(None)
                 except concurrent.futures.InvalidStateError:
                     pass
+        if self.weak and not self.rate_bin:
+            SEMS.pop(id(self), None)
         return self.rate_bin
 
     def enter(self):
@@ -150,6 +162,8 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
         self.active += 1
         if self.rate_limit:
             self._update_bin().append(time.time())
+            if self.weak:
+                SEMS[id(self)] = self
         return self
 
     def check_overflow(self):
@@ -187,7 +201,10 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
             self.check_overflow()
             self.passive += 1
             while self.is_busy():
-                await wrap_future(self.fut)
+                if self.fut.done():
+                    await asyncio.sleep(0.08)
+                else:
+                    await wrap_future(self.fut)
             self.passive -= 1
         self.enter()
         return self
@@ -202,7 +219,10 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
 
     async def __call__(self):
         while self.is_busy():
-            await wrap_future(self.fut)
+            if self.fut.done():
+                await asyncio.sleep(0.08)
+            else:
+                await wrap_future(self.fut)
     
     acquire = __call__
 
@@ -376,9 +396,9 @@ if (len(enc_key) - 1) & 3 == 0:
 
 enc_box = nacl.secret.SecretBox(base64.b64decode(enc_key)[:32])
 
-encrypt = lambda s: b">~MIZA~>" + enc_box.encrypt(s if type(s) is bytes else str(s).encode("utf-8"))
+encrypt = lambda s: b">~MIZA~>" + enc_box.encrypt(s if type(s) in (bytes, memoryview) else str(s).encode("utf-8"))
 def decrypt(s):
-    if type(s) is not bytes:
+    if type(s) not in (bytes, memoryview):
         s = str(s).encode("utf-8")
     if s[:8] == b">~MIZA~>":
         return enc_box.decrypt(s[8:])
@@ -388,17 +408,15 @@ def decrypt(s):
 def zip2bytes(data):
     if not hasattr(data, "read"):
         data = io.BytesIO(data)
-    with ZipFile(data, allowZip64=True, strict_timestamps=False) as z:
-        b = z.read("DATA")
-    return b
+    with zipfile.ZipFile(data, allowZip64=True, strict_timestamps=False) as z:
+        return z.read(z.namelist()[0])
 
 def bytes2zip(data, lzma=False):
     b = io.BytesIO()
     ctype = zipfile.ZIP_LZMA if lzma else zipfile.ZIP_DEFLATED
     with ZipFile(b, "w", compression=ctype, allowZip64=True) as z:
-        z.writestr("DATA", data=data)
-    b.seek(0)
-    return b.read()
+        z.writestr("D", data=data)
+    return b.getbuffer()
 
 
 # Safer than raw eval, more powerful than json.loads
@@ -437,11 +455,12 @@ def select_and_loads(s, mode="safe", size=None):
             print(f"Loading zip file of size {len(s)}...")
         b.seek(0)
         with ZipFile(b, allowZip64=True, strict_timestamps=False) as z:
+            n = z.namelist()[0]
             if size:
-                x = z.getinfo("DATA").file_size
+                x = z.getinfo(n).file_size
                 if size < x:
                     raise OverflowError(f"Data input size too large ({x} > {size}).")
-            s = z.read("DATA")
+            s = z.read(n)
     data = None
     with tracebacksuppressor:
         if s[0] == 128:
@@ -462,20 +481,25 @@ def select_and_dumps(data, mode="safe", compress=True):
     if mode == "unsafe":
         s = pickle.dumps(data)
         if len(s) > 32768 and compress:
-            s = bytes2zip(s, lzma=True)
+            t = bytes2zip(s, lzma=len(s) < 16777216)
+            if len(t) < len(s):
+                s = t
         return s
     try:
         s = orjson.dumps(data)
     except:
         s = None
     if len(s) > 262144:
-        return bytes2zip(s, lzma=True)
+        t = bytes2zip(s, lzma=False)
+        if len(t) < len(s):
+            s = t
     return s
 
 
 class FileHashDict(collections.abc.MutableMapping):
 
     sem = Semaphore(64, 128, 0.3, 1)
+    cache_size = 4096
 
     def __init__(self, *args, path="", **kwargs):
         if not kwargs and len(args) == 1:
@@ -654,7 +678,7 @@ class FileHashDict(collections.abc.MutableMapping):
             except KeyError:
                 self.deleted.add(k)
                 continue
-            s = select_and_dumps(d, mode="unsafe", compress=False)
+            s = select_and_dumps(d, mode="unsafe", compress=True)
             with self.sem:
                 safe_save(fn, s)
         deleted = list(self.deleted)
@@ -670,8 +694,9 @@ class FileHashDict(collections.abc.MutableMapping):
                 os.remove(fn + "\x7f")
             with suppress(FileNotFoundError):
                 os.remove(fn + "\x7f\x7f")
-        while len(self.data) > 1048576:
-            self.data.pop(next(iter(self.data)), None)
+        while len(self.data) > self.cache_size:
+            with suppress(RuntimeError):
+                self.data.pop(next(iter(self.data)))
         return modified.union(deleted)
 
 
@@ -735,6 +760,8 @@ def restructure_buttons(buttons):
                 button["type"] = 2
             if "name" in button:
                 button["label"] = button["name"]
+            if "label" in button:
+                button["label"] = lim_str(button["label"], 80)
             try:
                 if type(button["emoji"]) is str:
                     button["emoji"] = cdict(id=None, name=button["emoji"])
@@ -757,13 +784,14 @@ def restructure_buttons(buttons):
                             button["custom_id"] = 0
             elif type(button["custom_id"]) is not str:
                 button["custom_id"] = as_str(button["custom_id"])
-            while button["custom_id"] in used_custom_ids:
-                if "?" in button["custom_id"]:
-                    spl = button["custom_id"].rsplit("?", 1)
-                    button["custom_id"] = spl[0] + f"?{int(spl[-1]) + 1}"
-                else:
-                    button["custom_id"] = button["custom_id"] + "?0"
-            used_custom_ids.add(button["custom_id"])
+            if "custom_id" in button:
+                while button["custom_id"] in used_custom_ids:
+                    if "?" in button["custom_id"]:
+                        spl = button["custom_id"].rsplit("?", 1)
+                        button["custom_id"] = spl[0] + f"?{int(spl[-1]) + 1}"
+                    else:
+                        button["custom_id"] = button["custom_id"] + "?0"
+                used_custom_ids.add(button["custom_id"])
             if "style" not in button:
                 button["style"] = 1
             if button.get("emoji"):
@@ -791,11 +819,7 @@ def interaction_response(bot, message, content=None, embed=None, components=None
             ),
         )),
         method="POST",
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bot {bot.token}",
-        },
-        bypass=False,
+        authorise=True,
         aio=True,
     )
 
@@ -818,11 +842,7 @@ def interaction_patch(bot, message, content=None, embed=None, components=None, b
             ),
         )),
         method="POST",
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bot {bot.token}",
-        },
-        bypass=False,
+        authorise=True,
         aio=True,
     )
 
@@ -885,7 +905,7 @@ channel_repr = lambda s: as_str(s) if not isinstance(s, discord.abc.GuildChannel
 def line_count(fn):
     with open(fn, "r", encoding="utf-8") as f:
         data = f.read()
-        return alist((len(data), data.count("\n") + 1))
+    return (len(data), data.count("\n") + 1)
 
 
 # Checks if a file is a python code file using its filename extension.
@@ -998,12 +1018,12 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
         try:
             sem = REPLY_SEM[channel.id]
         except KeyError:
-            sem = REPLY_SEM[channel.id] = Semaphore(5.1, buffer=256, delay=0.1, rate_limit=5)
+            sem = REPLY_SEM[channel.id] = Semaphore(5.15, buffer=256, delay=0.1, rate_limit=5)
         inter = False
         url = f"https://discord.com/api/{api}/channels/{channel.id}/messages"
         if getattr(channel, "dm_channel", None):
             channel = channel.dm_channel
-        elif not getattr(channel, "recipient", None) and not channel.permissions_for(channel.guild.me).read_message_history:
+        elif getattr(channel, "guild", None) and not channel.permissions_for(channel.guild.me).read_message_history:
             fields = {}
             if embeds:
                 fields["embeds"] = [embed.to_dict() for embed in embeds]
@@ -1031,11 +1051,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
                     url,
                     method="post",
                     data=body,
-                    headers={
-                        "Content-Type": "application/json",
-                        "Authorization": f"Bot {bot.token}",
-                    },
-                    bypass=False,
+                    authorise=True,
                     aio=True,
                 )
         except Exception as ex:
@@ -1340,22 +1356,6 @@ def as_embed(message, link=False):
             return emb
     else:
         urls = find_urls(content)
-        if urls:
-            with tracebacksuppressor:
-                url = urls[0]
-                resp = reqs.next().get(url, headers=Request.header(), timeout=8)
-                if BOT[0]:
-                    BOT[0].activity += 1
-                headers = fcdict(resp.headers)
-                if headers.get("Content-Type").split("/", 1)[0] == "image":
-                    emb.url = url
-                    emb.set_image(url=url)
-                    if url != content:
-                        emb.description = content
-                    if link:
-                        emb.description = lim_str(f"{emb.description}\n\n[View Message](https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id})", 4096)
-                        emb.timestamp = message.edited_at or message.created_at
-                    return emb
     emb.description = content
     if len(message.embeds) > 1 or content:
         urls = chain(("(" + e.url + ")" for e in message.embeds[1:] if e.url), ("[" + best_url(a) + "]" for a in message.attachments))
@@ -1669,6 +1669,7 @@ is_giphy_url = lambda url: url and regexp("^https?:\\/\\/giphy.com/gifs/[a-zA-Z0
 is_youtube_url = lambda url: url and regexp("^https?:\\/\\/(?:www\\.)?youtu(?:\\.be|be\\.com)\\/[^\\s<>`|\"']+").findall(url)
 is_youtube_stream = lambda url: url and regexp("^https?:\\/\\/r[0-9]+---.{2}-\\w+-\\w{4,}\\.googlevideo\\.com").findall(url)
 is_deviantart_url = lambda url: url and regexp("^https?:\\/\\/(?:www\\.)?deviantart\\.com\\/[^\\s<>`|\"']+").findall(url)
+is_reddit_url = lambda url: url and regexp("^https?:\\/\\/(?:www\\.)?reddit.com\\/r\\/[^/]+\\/").findall(url)
 
 def expired(stream):
     if is_youtube_url(stream):
@@ -1685,6 +1686,11 @@ def is_discord_message_link(url):
     return "channels/" in check and "discord" in check
 
 verify_url = lambda url: url if is_url(url) else url_parse(url)
+
+
+def maps(funcs, *args, **kwargs):
+    for func in funcs:
+        yield func(*args, **kwargs)
 
 
 # Checks if a URL contains a valid image extension, and removes it if possible.
@@ -1850,19 +1856,6 @@ status_icon = {
 status_order = tuple(status_text)
 
 
-# GC = cdict()
-
-# def var_count():
-#     count = len(gc.get_objects())
-#     for k, v in deque(GC.items()):
-#         with suppress(psutil.NoSuchProcess):
-#             if not psutil.Process(k).is_running():
-#                 GC.pop(k, None)
-#             else:
-#                 count += v
-#     return count
-
-
 # Subprocess pool for resource-consuming operations.
 PROC_COUNT = cdict()
 PROCS = cdict()
@@ -1871,20 +1864,51 @@ PROC_RESP = {}
 # Gets amount of processes running in pool.
 sub_count = lambda: sum(sum(1 for p in v if p.is_running()) for v in PROCS.values())
 
+def is_strict_running(proc):
+    if not proc:
+        return
+    try:
+        if not proc.is_running():
+            return False
+        if proc.status() == "zombie":
+            proc.wait()
+            return
+        return True
+    except AttributeError:
+        proc = psutil.Process(proc.pid)
+    if not proc.is_running():
+        return False
+    if proc.status() == "zombie":
+        proc.wait()
+        return
+    return True
+
 def force_kill(proc):
+    if not proc:
+        return
     with tracebacksuppressor(psutil.NoSuchProcess):
+        killed = deque()
         proc = psutil.Process(proc.pid)
         for child in proc.children(recursive=True):
             with suppress():
-                child.kill()
+                child.terminate()
+                killed.append(child)
                 print(child, "killed.")
+        proc.terminate()
         print(proc, "killed.")
-        return proc.kill()
+        _, alive = psutil.wait_procs(killed, timeout=2)
+        for child in alive:
+            with suppress():
+                child.kill()
+        try:
+            proc.wait(timeout=2)
+        except psutil.TimeoutExpired:
+            proc.kill()
 
 async def proc_communicate(proc):
     while True:
         with tracebacksuppressor:
-            if not proc or not proc.is_running():
+            if not is_strict_running(proc):
                 return
             b = await proc.stdout.readline()
             if not b:
@@ -1892,7 +1916,7 @@ async def proc_communicate(proc):
             s = as_str(b.rstrip())
             if s:
                 if s[0] == "~":
-                    c = as_str(eval(s[1:]))
+                    c = as_str(evalEX(s[1:]))
                     exec_tb(c, globals())
                 else:
                     print(s)
@@ -1944,7 +1968,7 @@ async def sub_submit(ptype, command, _timeout=12):
     command = "[" + ",".join(map(repr, command[:2])) + "," + ",".join(map(str, command[2:])) + "]"
     s = f"~{ts}~{repr(command.encode('utf-8'))}\n".encode("utf-8")
     await proc.sem()
-    if not proc.is_running():
+    if not is_strict_running(proc):
         proc = await get_idle_proc(ptype)
     async with proc.sem:
         try:
@@ -1965,7 +1989,7 @@ async def sub_submit(ptype, command, _timeout=12):
 
 def sub_kill(start=True):
     for p in itertools.chain(*PROCS.values()):
-        if p and p.is_running():
+        if is_strict_running(p):
             create_future_ex(force_kill, p)
     PROCS.clear()
     if start:
@@ -1978,8 +2002,7 @@ def process_math(expr, prec=64, rat=False, timeout=12, variables=None):
 
 # Sends an operation to the image subprocess pool.
 def process_image(image, operation, args, timeout=24):
-    if type(args) is tuple:
-        args = list(args)
+    args = astype(args, list)
     for i, a in enumerate(args):
         if type(a) is mpf:
             args[i] = float(a)
@@ -2000,7 +2023,7 @@ def evalex(exc):
         ex = eval(exc)
     except (SyntaxError, NameError):
         exc = as_str(exc)
-        s = exc[exc.index("(") + 1:exc.index(")")]
+        s = exc[exc.index("(") + 1:exc.rindex(")")]
         with suppress(TypeError, SyntaxError, ValueError):
             s = ast.literal_eval(s)
         ex = RuntimeError(s)
@@ -2008,10 +2031,7 @@ def evalex(exc):
 
 # Evaluates an an expression, raising it if it is an exception.
 def evalEX(exc):
-    try:
-        ex = evalex(exc)
-    except:
-        raise
+    ex = evalex(exc)
     if issubclass(type(ex), BaseException):
         raise ex
     return ex
@@ -2079,6 +2099,11 @@ def get_event_loop():
 
 # Creates an asyncio Future that waits on a multithreaded one.
 def wrap_future(fut, loop=None, shield=False, thread_safe=True):
+    if getattr(fut, "done", None) and fut.done():
+        res = fut.result()
+        if res is None:
+            return emptyfut
+        return as_fut(res)
     if loop is None:
         loop = get_event_loop()
     wrapper = None
@@ -2176,6 +2201,9 @@ async def _await_fut(fut, ret):
 
 # Blocking call that waits for a single asyncio future to complete, do *not* call from main asyncio loop
 def await_fut(fut, timeout=None):
+    return convert_fut(fut).result(timeout=timeout)
+
+def convert_fut(fut):
     loop = get_event_loop()
     if is_main_thread():
         if not isinstance(fut, asyncio.Task):
@@ -2186,7 +2214,7 @@ def await_fut(fut, timeout=None):
     except:
         ret = concurrent.futures.Future()
         loop.create_task(_await_fut(fut, ret))
-    return ret.result(timeout=timeout)
+    return ret
 
 is_main_thread = lambda: threading.current_thread() is threading.main_thread()
 
@@ -2271,7 +2299,7 @@ class open2(io.IOBase):
 class CompatFile(discord.File):
 
     def __init__(self, fp, filename=None, spoiler=False):
-        if type(fp) is bytes:
+        if type(fp) in (bytes, memoryview):
             fp = io.BytesIO(fp)
         self.fp = self._fp = fp
         if isinstance(fp, io.IOBase):
@@ -2350,16 +2378,16 @@ class DownloadingFile(io.IOBase):
         b = self._read(size)
         s = len(b)
         if s < size:
-            i = io.BytesIO(b)
+            buf = deque()
+            buf.append(b)
             while s < size:
                 time.sleep(2 / 3)
                 b = self._read(size - s)
                 if not b and self.af():
                     break
                 s += len(b)
-                i.write(b)
-            i.seek(0)
-            b = i.read()
+                buf.append(b)
+            b = b"".join(buf)
         return b
 
     def clear(self):
@@ -2439,24 +2467,28 @@ class seq(io.BufferedRandom, collections.abc.MutableSequence, contextlib.Abstrac
         if buffer_size:
             self.BUF = buffer_size
         self.closer = getattr(obj, "close", None)
+        self.high = 0
+        self.finished = False
         if isinstance(obj, io.IOBase):
             if isinstance(obj, io.BytesIO):
                 self.data = obj
+            elif hasattr(obj, "getbuffer"):
+                self.data = io.BytesIO(obj.getbuffer())
             else:
                 obj.seek(0)
                 self.data = io.BytesIO(obj.read())
                 obj.seek(0)
+            self.finished = True
         elif isinstance(obj, bytes) or isinstance(obj, bytearray) or isinstance(obj, memoryview):
             self.data = io.BytesIO(obj)
             self.high = len(obj)
+            self.finished = True
         elif isinstance(obj, collections.abc.Iterable):
             self.iter = iter(obj)
             self.data = io.BytesIO()
-            self.high = 0
         elif getattr(obj, "iter_content", None):
             self.iter = obj.iter_content(self.BUF)
             self.data = io.BytesIO()
-            self.high = 0
         else:
             raise TypeError(f"a bytes-like object is required, not '{type(obj)}'")
         self.filename = filename
@@ -2495,30 +2527,33 @@ class seq(io.BufferedRandom, collections.abc.MutableSequence, contextlib.Abstrac
         raise OSError
 
     def __getitem__(self, k):
+        if self.finished:
+            return self.data.getbuffer()[k]
         if type(k) is slice:
-            out = io.BytesIO()
             start = k.start or 0
             stop = k.stop or inf
             step = k.step or 1
-            if step < 0:
+            rev = step < 0
+            if rev:
                 start, stop, step = stop + 1, start + 1, -step
-                rev = True
-            else:
-                rev = False
             curr = start // self.BUF * self.BUF
-            offs = start % self.BUF
-            out.write(self.load(curr))
+            out = deque()
+            out.append(self.load(curr))
             curr += self.BUF
             while curr < stop:
                 temp = self.load(curr)
                 if not temp:
                     break
-                out.write(temp)
+                out.append(temp)
                 curr += self.BUF
-            out.seek(start % self.BUF)
-            b = out.read(stop - start)
+            b = memoryview(b"".join(out))
+            b = b[start % self.BUF:]
+            if is_finite(stop):
+                b = b[:stop - start]
             if step != 1:
-                return b[::step]
+                b = b[::step]
+            if rev:
+                b = b[::-1]
             return b
         base = k // self.BUF
         with suppress(KeyError):
@@ -2559,33 +2594,46 @@ class seq(io.BufferedRandom, collections.abc.MutableSequence, contextlib.Abstrac
     __exit__ = lambda self, *args: self.close()
 
     def load(self, k):
+        if self.finished:
+            return self.data.getbuffer()[k:k + self.BUF]
         with suppress(KeyError):
             return self.buffer[k]
         seek = getattr(self.data, "seek", None)
         if seek:
             if self.iter is not None and k + self.BUF >= self.high:
-                seek(self.high)
-                with suppress(StopIteration):
+                out = deque()
+                try:
                     while k + self.BUF >= self.high:
                         temp = next(self.iter)
-                        self.data.write(temp)
+                        if not temp:
+                            raise StopIteration
+                        out.append(temp)
                         self.high += len(temp)
-            seek(k)
-            self.buffer[k] = self.data.read(self.BUF)
-        else:
-            with suppress(StopIteration):
-                while self.high < k:
-                    temp = next(self.data)
-                    if not temp:
-                        return b""
+                except StopIteration:
+                    out.appendleft(self.data.getbuffer())
+                    self.data = io.BytesIO(b"".join(out))
+                    self.finished = True
+                    return self.data.getbuffer()[k:k + self.BUF]
+                out.appendleft(self.data.getbuffer())
+                self.data = io.BytesIO(b"".join(out))
+            self.buffer[k] = b = self.data.getbuffer()[k:k + self.BUF]
+            return b
+        try:
+            while self.high < k:
+                temp = next(self.data)
+                if not temp:
+                    raise StopIteration
+                if self.high in self.buffer:
+                    self.buffer[self.high] += temp
+                else:
                     self.buffer[self.high] = temp
-                    self.high += self.BUF
+                self.high += self.BUF
+        except StopIteration:
+            self.data = io.BytesIO(b"".join(self.buffer.values()))
+            self.finished = True
+            return self.data.getbuffer()[k:k + self.BUF]
         return self.buffer.get(k, b"")
 
-    def clear(self):
-        self.buffer.clear()
-        self.data = io.BytesIO()
-        self.iter = iter(())
 
 class Stream(io.IOBase):
 
@@ -2626,10 +2674,24 @@ class Stream(io.IOBase):
             self.resp.close()
 
 
-# Manages both sync and async get requests.
+def parse_ratelimit_header(headers):
+    try:
+        reset = headers.get('X-Ratelimit-Reset')
+        if reset:
+            delta = float(reset) - utc()
+        else:
+            reset_after = headers.get('X-Ratelimit-Reset-After')
+            delta = float(reset_after)
+        if not delta:
+            raise
+    except:
+        delta = float(headers['retry_after'])
+    return max(0.001, delta)
+
+
+# Manages both sync and async web requests.
 class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, collections.abc.Callable):
 
-    session = None
     semaphore = Semaphore(512, 256, delay=0.25)
 
     @classmethod
@@ -2642,61 +2704,98 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
     headers = header
 
     async def _init_(self):
-        self.sessions = alist(aiohttp.ClientSession(loop=eloop) for i in range(6))
-        self.session = choice(self.sessions)
+        try:
+            self.sessions = alist(httpx.AsyncClient(http2=True) for i in range(6))
+        except:
+            self.sessions = alist(httpx.AsyncClient(http2=False) for i in range(6))
+        for session in self.sessions:
+            await session.__aenter__()
+        self.nossl = aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False))
 
-    async def aio_call(self, url, headers, files, data, method, decode=False, json=False):
-        if files is not None:
-            raise NotImplementedError("Unable to send multipart files asynchronously.")
+    @property
+    def session(self):
+        return choice(self.sessions)
+
+    async def aio_call(self, url, headers, files, data, method, decode=False, json=False, session=None, ssl=True):
         async with self.semaphore:
-            async with getattr(self.sessions.next(), method)(url, headers=headers, data=data) as resp:
-                if BOT[0]:
-                    BOT[0].activity += 1
-                if resp.status >= 400:
+            req = session or (self.sessions.next() if ssl else self.nossl)
+            resp = await req.request(method.upper(), url, headers=headers, files=files, data=data)
+            if BOT[0]:
+                BOT[0].activity += 1
+            status = getattr(resp, "status_code") or getattr(resp, "status", 400)
+            if status >= 400:
+                try:
                     data = await resp.read()
-                    raise ConnectionError(resp.status, url, as_str(data))
-                if json:
-                    return await resp.json()
+                except (TypeError, AttributeError):
+                    data = resp.text
+                raise ConnectionError(status, url, as_str(data))
+            if json:
+                data = resp.json()
+                if awaitable(data):
+                    return await data
+                return data
+            try:
+                if awaitable(resp.content):
+                    raise
+            except:
                 data = await resp.read()
                 if decode:
                     return as_str(data)
                 return data
+            return resp.content
 
-    def __call__(self, url, headers={}, files=None, data=None, raw=False, timeout=8, method="get", decode=False, json=False, bypass=True, aio=False):
-        if bypass:
+    def __call__(self, url, headers=None, files=None, data=None, raw=False, timeout=8, method="get", decode=False, json=False, bypass=True, aio=False, session=None, ssl=True, authorise=False):
+        if headers is None:
+            headers = {}
+        if authorise:
+            token = AUTH["discord_token"]
+            headers["Authorization"] = f"Bot {token}"
+            if data:
+                headers["Content-Type"] = "application/json"
+                if not isinstance(data, (str, bytes, memoryview)):
+                    data = orjson.dumps(data)
+            if aio:
+                session = self.sessions.next()
+            else:
+                session = httpx
+        elif bypass:
             if "user-agent" not in headers and "User-Agent" not in headers:
                 headers["User-Agent"] = f"Mozilla/5.{xrand(1, 10)}"
                 headers["X-Forwarded-For"] = ".".join(str(xrand(1, 255)) for _ in loop(4))
             headers["DNT"] = "1"
         method = method.casefold()
         if aio:
-            return create_task(asyncio.wait_for(self.aio_call(url, headers, files, data, method, decode, json), timeout=timeout))
+            return create_task(asyncio.wait_for(self.aio_call(url, headers, files, data, method, decode, json, session, ssl), timeout=timeout))
         with self.semaphore:
-            if bypass:
-                req = reqs.next()
+            if session:
+                req = session
+                resp = req.request(method.upper(), url, headers=headers, files=files, data=data, follow_redirects=True, timeout=timeout)
+            elif bypass:
+                req = reqx.next()
+                resp = req.request(method.upper(), url, headers=headers, files=files, data=data, follow_redirects=True, timeout=timeout)
             else:
                 req = requests
-            with getattr(req, method)(url, headers=headers, files=files, data=data, stream=True, timeout=timeout) as resp:
-                if BOT[0]:
-                    BOT[0].activity += 1
-                if resp.status_code >= 400:
-                    raise ConnectionError(resp.status_code, url, resp.text)
-                if json:
-                    return resp.json()
-                if raw:
-                    data = resp.raw.read()
-                else:
-                    data = resp.content
-                if decode:
-                    return as_str(data)
-                return data
+                resp = getattr(req, method)(url, headers=headers, files=files, data=data, timeout=timeout)
+            if BOT[0]:
+                BOT[0].activity += 1
+            if resp.status_code >= 400:
+                raise ConnectionError(resp.status_code, url, resp.text)
+            if json:
+                return resp.json()
+            if raw and getattr(resp, "raw", None):
+                data = resp.raw.read()
+            else:
+                data = resp.content
+            if decode:
+                return as_str(data)
+            return data
 
     def __exit__(self, *args):
         self.session.close()
 
     def __aexit__(self, *args):
         self.session.close()
-        return async_nop()
+        return emptyfut
 
 Request = RequestManager()
 

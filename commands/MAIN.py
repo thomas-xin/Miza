@@ -55,7 +55,7 @@ class Help(Command):
         bot = self.bot
         guild = message.guild
         channel = message.channel
-        prefix = "/" if getattr(message, "slash", None) else bot.get_prefix(guild.id)
+        prefix = "/" if getattr(message, "slash", None) else bot.get_prefix(guild)
         if " " in prefix:
             prefix += " "
         embed = discord.Embed()
@@ -67,6 +67,13 @@ class Help(Command):
         elif argv in bot.commands:
             comm = argv
             catg = bot.commands[argv][0].catg.casefold()
+        elif argv.startswith(prefix):
+            argv = argv[len(prefix):].lstrip()
+            if argv in bot.categories:
+                catg = argv
+            elif argv in bot.commands:
+                comm = argv
+                catg = bot.commands[argv][0].catg.casefold()
         else:
             catg = None
         if catg not in bot.categories:
@@ -149,20 +156,16 @@ class Help(Command):
                 try:
                     sem = EDIT_SEM[message.channel.id]
                 except KeyError:
-                    sem = EDIT_SEM[message.channel.id] = Semaphore(5.1, 256, rate_limit=5)
+                    sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
                 async with sem:
                     await Request(
                         f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
-                        data=orjson.dumps(dict(
+                        data=dict(
                             embed=embed.to_dict(),
                             components=restructure_buttons(buttons),
-                        )),
+                        ),
                         method="PATCH",
-                        headers={
-                            "Content-Type": "application/json",
-                            "Authorization": f"Bot {bot.token}",
-                        },
-                        bypass=False,
+                        authorise=True,
                         aio=True,
                     )
             elif content:
@@ -171,19 +174,15 @@ class Help(Command):
                     try:
                         sem = EDIT_SEM[message.channel.id]
                     except KeyError:
-                        sem = EDIT_SEM[message.channel.id] = Semaphore(5.1, 256, rate_limit=5)
+                        sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
                     async with sem:
                         await Request(
                             f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
-                            data=orjson.dumps(dict(
+                            data=dict(
                                 components=restructure_buttons(buttons),
-                            )),
+                            ),
                             method="PATCH",
-                            headers={
-                                "Content-Type": "application/json",
-                                "Authorization": f"Bot {bot.token}",
-                            },
-                            bypass=False,
+                            authorise=True,
                             aio=True,
                         )
             else:
@@ -689,8 +688,8 @@ class Info(Command):
         emb.add_field(name="Creation time", value=time_repr(p.created_at), inline=1)
         if "v" in flags:
             emb.add_field(name="Gender", value=str(p.gender), inline=1)
-            ctime = DynamicDT.fromtimestamp(p.birthday)
-            age = (DynamicDT.now() - ctime).total_seconds() / TIMEUNITS["year"]
+            ctime = DynamicDT.utcfromtimestamp(p.birthday)
+            age = (DynamicDT.utcnow() - ctime).total_seconds() / TIMEUNITS["year"]
             emb.add_field(name="Birthday", value=str(ctime), inline=1)
             emb.add_field(name="Age", value=str(round_min(round(age, 1))), inline=1)
         return emb
@@ -919,21 +918,24 @@ class Profile(Command):
             description = profile.get("description", "")
             birthday = profile.get("birthday")
             timezone = profile.get("timezone")
+            t = utc()
             if timezone:
-                td = datetime.timedelta(seconds=as_timezone(timezone))
-                description += ini_md(f"Current time: {sqr_md(utc_dt() + td)}")
+                td = as_timezone(timezone)
+                description += ini_md(f"Current time: {sqr_md(utc_ft(t + td))}")
             if birthday:
-                if type(birthday) is not DynamicDT:
+                if not isinstance(birthday, DynamicDT):
                     birthday = profile["birthday"] = DynamicDT.fromdatetime(birthday)
                     bot.data.users.update(target.id)
-                t = utc_dt()
+                now = DynamicDT.utcfromtimestamp(t)
+                birthday_in = next_date(birthday)
                 if timezone:
                     birthday -= td
-                description += ini_md(f"Age: {sqr_md(time_diff(t, birthday))}\nBirthday in: {sqr_md(time_diff(next_date(birthday), t))}")
+                    birthday_in -= datetime.timedelta(seconds=td)
+                description += ini_md(f"Age: {sqr_md(time_diff(now, birthday))}\nBirthday in: {sqr_md(time_diff(birthday_in, now))}")
             fields = set()
             for field in ("timezone", "birthday"):
                 value = profile.get(field)
-                if type(value) is DynamicDT:
+                if isinstance(value, DynamicDT):
                     value = value.as_date()
                 elif field == "timezone" and value is not None:
                     value = timezone_repr(value)
@@ -957,7 +959,7 @@ class Profile(Command):
         else:
             dt = tzparse(value)
             offs, year = divmod(dt.year, 400)
-            value = DynamicDT(year + 2000, dt.month, dt.day).set_offset(offs * 400 - 2000)
+            value = DynamicDT(year + 2000, dt.month, dt.day, tzinfo=datetime.timezone.utc).set_offset(offs * 400 - 2000)
         bot.data.users.setdefault(user.id, {})[setting] = value
         bot.data.users.update(user.id)
         if type(value) is DynamicDT:
@@ -1033,39 +1035,19 @@ class Status(Command):
         emb.set_author(name="Status", url=bot.webserver, icon_url=url)
         emb.timestamp = utc_dt()
         if msg is None:
-            active = bot.get_active()
-            try:
-                shards = len(bot.latencies)
-            except AttributeError:
-                shards = 1
-            size = sum(bot.size.values()) + sum(bot.size2.values())
-            stats = bot.curr_state
-
-            bot_info = (
-                f"Process count\n`{active[0]}`\nThread count\n`{active[1]}`\nCoroutine count\n`{active[2]}`\n"
-                + f"CPU usage\n`{round(stats[0], 3)}%`\nRAM usage\n`{byte_scale(stats[1])}B`\nDisk usage\n`{byte_scale(stats[2])}B`\nNetwork usage\n`{byte_scale(bot.bitrate)}bps`"
-            )
-            emb.add_field(name="Bot info", value=bot_info)
-
-            discord_info = (
-                f"Shard count\n`{shards}`\nServer count\n`{len(tuple(bot.cache.guilds.keys()))}`\nUser count\n`{len(tuple(bot.cache.users.keys()))}`\n"
-                + f"Channel count\n`{len(tuple(bot.cache.channels.keys()))}`\nRole count\n`{len(tuple(bot.cache.roles.keys()))}`\nEmoji count\n`{len(tuple(bot.cache.emojis.keys()))}`\nCached messages\n`{len(bot.cache.messages)}`"
-            )
-            emb.add_field(name="Discord info", value=discord_info)
-
-            misc_info = (
-                f"Cached files\n`{bot.file_count}`\nConnected voice channels\n`{len(bot.audio.players)}`\nTotal data sent/received\n`{byte_scale(bot.total_bytes)}B`\n"
-                + f"System time\n`{datetime.datetime.now()}`\nAPI latency\n`{sec2time(bot.api_latency)}`\nCurrent uptime\n`{dyn_time_diff(utc(), bot.start_time)}`\nActivity count since startup\n`{bot.activity}`"
-            )
-            emb.add_field(name="Misc info", value=misc_info)
-            commands = set()
-            for command in bot.commands.values():
-                commands.update(command)
-            code_info = (
-                f"Code size\n[`{byte_scale(size[0])}B, {size[1]} lines`]({bot.github})\nCommand count\n[`{len(commands)}`](https://github.com/thomas-xin/Miza/wiki/Commands)\n"
-                + f"Website URL\n[`{bot.webserver}`]({bot.webserver})"
-            )
-            emb.add_field(name="Code info", value=code_info)
+            def subs(n, x):
+                if n == "Code size":
+                    return f"{n}\n[`{byte_scale(x[0])}B, {x[1]} lines`]({bot.github})"
+                if n == "Command count":
+                    return f"{n}\n[`{x}`](https://github.com/thomas-xin/Miza/wiki/Commands)"
+                if n == "Website URL":
+                    return f"{n}\n[`{x}`]({x})"
+                return f"{n}\n`{x}`"
+            for k, v in bot.status().items():
+                emb.add_field(
+                    name=k,
+                    value="\n".join(subs(n, x) for n, x in v.items()),
+                )
         else:
             emb.description = msg
         func = channel.send
@@ -1537,7 +1519,8 @@ class Note(Command):
             note_userbase[user.id] = [argv]
         else:
             note_userbase.update(user.id)
-        return ini_md(f"Successfully added note for [{user}]!")
+        notecount = rank_format(len(note_userbase[user.id]) - 1)
+        return ini_md(f"Successfully added {notecount} note for [{user}]!")
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
         u_id, pos = list(map(int, vals.split("_", 1)))
@@ -1800,60 +1783,44 @@ class UpdateMessages(Database):
 class UpdateFlavour(Database):
     name = "flavour"
 
-    async def get(self):
-        out = x = None
+    async def get(self, p=True, q=True):
+        out = None
         i = xrand(7)
         facts = self.bot.data.users.facts
         questions = self.bot.data.users.questions
-        useless = self.bot.data.users.useless
-        if i < 2 and facts:
-            with tracebacksuppressor:
+        useless = self.bot.data.useless.setdefault(0, alist())
+        with tracebacksuppressor:
+            if i < 3 - q and facts:
                 text = choice(facts)
+                if not p:
+                    return text
                 fact = choice(("Fun fact:", "Did you know?", "Useless fact:", "Random fact:"))
                 out = f"\n{fact} `{text}`"
-        elif i < 4 and questions:
-            with tracebacksuppressor:
+            elif i < 4 and questions and q:
                 text = choice(questions)
+                if not p:
+                    return text
                 out = f"\nRandom question: `{text}`"
-        # elif i == 2:
-        #     x = "affirmations"
-        #     with tracebacksuppressor:
-        #         if self.data.get(x) and len(self.data[x]) > 64 and xrand(2):
-        #             return choice(self.data[x])
-        #         data = await Request("https://www.affirmations.dev/", json=True, aio=True)
-        #         text = data["affirmation"].replace("`", "")
-        #         out = f"\nAffirmation: `{text}`"
-        # elif i == 3:
-        #     x = "geek_jokes"
-        #     with tracebacksuppressor:
-        #         if self.data.get(x) and len(self.data[x]) > 64 and xrand(2):
-        #             return choice(self.data[x])
-        #         data = await Request("https://geek-jokes.sameerkumar.website/api", json=True, aio=True)
-        #         text = data.replace("`", "")
-        #         out = f"\nGeek joke: `{text}`"
-        else:
-            x = "useless_facts"
-            with tracebacksuppressor:
-                if self.data.get(x) and len(self.data[x]) > 256 and xrand(2):
-                    return choice(self.data[x])
-                if len(useless) < 128 and (not useless or random.random() > 0.75):
-                    data = await Request("https://www.uselessfacts.net/api/posts?d=" + str(datetime.datetime.fromtimestamp(xrand(1462456800, utc())).date()), json=True, aio=True)
-                    factlist = [fact["title"].replace("`", "") for fact in data if "title" in fact]
-                    random.shuffle(factlist)
-                    useless.clear()
-                    for text in factlist:
-                        fact = choice(("Fun fact:", "Did you know?", "Useless fact:", "Random fact:"))
-                        out = f"\n{fact} `{text}`"
-                        useless.append(out)
-                out = useless.popleft()
-        if x and out:
-            if x in self.data:
-                if out not in self.data[x]:
-                    self.data[x].add(out)
-                    self.update(x)
             else:
-                self.data[x] = alist((out,))
+                try:
+                    if not useless or not xrand(len(useless) / 8):
+                        raise KeyError
+                except KeyError:
+                    s = str(datetime.datetime.fromtimestamp(xrand(1462456800, utc())).date())
+                    data = await Request("https://www.uselessfacts.net/api/posts?d=" + s, json=True, aio=True)
+                    factlist = [fact["title"].replace("`", "") for fact in data if "title" in fact]
+                    useless.extend(factlist)
+                    useless.uniq()
+                text = choice(useless)
+                if not p:
+                    return text
+                fact = choice(("Fun fact:", "Did you know?", "Useless fact:", "Random fact:"))
+                out = f"\n{fact} `{text}`"
         return out
+
+
+class UpdateUseless(Database):
+    name = "useless"
 
 
 EMPTY = {}

@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
-import sympy, math, time, os, sys, subprocess, traceback, random, collections, psutil, concurrent.futures, pickle, ast, re #, gc
+import sympy, mpmath, math, time, os, sys, subprocess, psutil, traceback, random
+import collections, itertools, pickle, ast, re
 import sympy.stats
 import numpy as np
 import sympy.parsing.sympy_parser as parser
@@ -27,6 +28,18 @@ literal_eval = lambda s: ast.literal_eval(as_str(s).lstrip())
 
 BF_PREC = 256
 BF_ALPHA = "0123456789abcdefghijklmnopqrstuvwxyz"
+
+mp = mpmath.mp
+mp.dps = BF_PREC
+mpf = mpmath.mpf
+mpf.__floordiv__ = lambda x, y: int(x / y)
+mpf.__rfloordiv__ = lambda y, x: int(x / y)
+mpf.__lshift__ = lambda x, y: x * (1 << y if type(y) is int else 2 ** y)
+mpf.__rshift__ = lambda x, y: x // (1 << y if type(y) is int else 2 ** y)
+mpf.__rlshift__ = lambda y, x: x * (1 << y if type(y) is int else 2 ** y)
+mpf.__rrshift__ = lambda y, x: x * (1 << y if type(y) is int else 2 ** y)
+mpc = mpmath.mpc
+Mat = mat = matrix = mpmath.matrix
 
 def TryWrapper(func):
     def __call__(*args, **kwargs):
@@ -122,81 +135,74 @@ def bf_parse(s):
 _bf = lambda s: bf_evaluate(s)
 
 
-# Randomizer
-class Random(sympy.Basic):
+def Random(a=None, b=None):
+    random.seed(time.time_ns())
+    if a is None:
+        return random.random()
+    elif b is None:
+        return random.randint(0, round_random(a) - 1)
+    else:
+        return random.randint(round_random(a), round_random(b) - 1)
 
-    def __init__(self, a=None, b=None):
-        if a is None:
-            self.a = 0
-            self.b = 1
-            self.isint = False
-        elif b is None:
-            self.a = 0
-            self.b = a
-            self.isint = True
-        else:
-            sgn = sympy.sign(b - a)
-            self.a = sgn * a + (1 - sgn) * b
-            self.b = sgn * b + (1 - sgn) * a + 1
-            self.isint = True
 
-    def evalf(self, prec):
-        randfloat = sympy.Float(random.random(), dps=prec) / 2.7 ** (prec / 7 - random.random())
-        temp = (sympy.Float(random.random(), dps=prec) / (randfloat + time.time() % 1)) % 1
-        temp *= self.b - self.a
-        temp += self.a
-        if self.isint:
-            temp = sympy.Integer(temp)
-        return temp
+def astype(obj, t, *args, **kwargs):
+    try:
+        if not isinstance(obj, t):
+            if callable(t):
+                return t(obj, *args, **kwargs)
+            return t
+    except TypeError:
+        if callable(t):
+            return t(obj, *args, **kwargs)
+        return t
+    return obj
 
-    gcd = lambda self, other, *gens, **args: sympy.gcd(self.evalf(BF_PREC), other, *gens, **args)
-    lcm = lambda self, other, *gens, **args: sympy.lcm(self.evalf(BF_PREC), other, *gens, **args)
-    is_Rational = lambda self: True
-    expand = lambda self, **void: self.evalf(BF_PREC)
-    nsimplify = lambda self, **void: self.evalf(BF_PREC)
-    as_coeff_Add = lambda self, *void: (0, self.evalf(BF_PREC))
-    as_coeff_Mul = lambda self, *void: (0, self.evalf(BF_PREC))
-    _eval_power = lambda *void: None
-    _eval_evalf = evalf
-    __abs__ = lambda self: abs(self.evalf(BF_PREC))
-    __neg__ = lambda self: -self.evalf(BF_PREC)
-    __repr__ = lambda self, *void: str(self.evalf(BF_PREC))
-    __str__ = __repr__
 
+RI = 1 << 256
 
 def iand(a, b):
     if a == b:
         return a
     if hasattr(a, "p") and getattr(a, "q", 1) == 1 and hasattr(b, "p") and getattr(b, "q", 1) == 1:
         return sympy.Integer(a.p & b.p)
-    r = 1 << 256
-    x = round(a * r)
-    y = round(b * r)
-    return sympy.Integer(x & y) / r
+    x = round(a * RI)
+    y = round(b * RI)
+    return sympy.Integer(x & y) / RI
 
 def ior(a, b):
     if a == b:
         return a
     if hasattr(a, "p") and getattr(a, "q", 1) == 1 and hasattr(b, "p") and getattr(b, "q", 1) == 1:
         return sympy.Integer(a.p | b.p)
-    r = 1 << 256
-    x = round(a * r)
-    y = round(b * r)
-    return sympy.Integer(x | y) / r
+    x = round(a * RI)
+    y = round(b * RI)
+    return sympy.Integer(x | y) / RI
 
 def ixor(a, b):
     if a == b:
         return sympy.Integer(0)
     if hasattr(a, "p") and getattr(a, "q", 1) == 1 and hasattr(b, "p") and getattr(b, "q", 1) == 1:
         return sympy.Integer(a.p ^ b.p)
-    r = 1 << 256
-    x = round(a * r)
-    y = round(b * r)
-    return sympy.Integer(x ^ y) / r
+    x = round(a * RI)
+    y = round(b * RI)
+    return sympy.Integer(x ^ y) / RI
+
+_pow = sympy.Float.__pow__
+
+def pow(a, b):
+    if hasattr(a, "p") and getattr(a, "q", 1) == 1 and hasattr(b, "p") and getattr(b, "q", 1) == 1:
+        exponent = mpmath.log(a.p, 2) * b.p
+        if exponent > 256:
+            return sympy.Float(2 ** exponent)
+        return a.p ** b.p
+    a = astype(a, sympy.Float)
+    return _pow(a, b)
 
 sympy.Basic.__and__ = lambda self, other: iand(self, other)
 sympy.Basic.__or__ = lambda self, other: ior(self, other)
 sympy.Basic.__xor__ = lambda self, other: ixor(self, other)
+sympy.Basic.__pow__ = lambda self, other: pow(self, other)
+sympy.Basic.__rpow__ = lambda self, other: pow(other, self)
 sympy.core.numbers.Infinity.__str__ = lambda self: "inf"
 sympy.core.numbers.NegativeInfinity.__str__ = lambda self: "-inf"
 sympy.core.numbers.ComplexInfinity.__str__ = lambda self: "ℂ∞"
@@ -251,39 +257,41 @@ def plot3d_parametric_surface(*args, **kwargs):
     kwargs.pop("show", None)
     return plotter.plot3d_parametric_surface(*plotArgs(args), show=False, **kwargs)
 
-def array(*args):
+def array(*args, **kwargs):
+    if not kwargs.get("dtype"):
+        kwargs["dtype"] = object
     if len(args) == 1:
         arr = args[0]
         if type(arr) is str:
             arr = re.split("[^0-9\\-+e./]+", arr)
             arr = list(map(sympy.Rational, arr))
-        return np.asanyarray(arr, dtype=object)
-    return np.array(args, dtype=object)
+        return np.asanyarray(arr, **kwargs)
+    return np.array(args, **kwargs)
 
 def _predict_next(seq):
-	if len(seq) < 2:
-		return
-	if np.min(seq) == np.max(seq):
-		return round_min(seq[0])
-	if len(seq) < 3:
-		return
-	if len(seq) > 4 and all(seq[2:] - seq[1:-1] == seq[:-2]):
-		return round_min(seq[-1] + seq[-2])
-	a = _predict_next(seq[1:] - seq[:-1])
-	if a is not None:
-		return round_min(seq[-1] + a)
-	if len(seq) < 4 or 0 in seq[:-1]:
-		return
-	b = _predict_next(seq[1:] / seq[:-1])
-	if b is not None:
-		return round_min(seq[-1] * b)
+    if len(seq) < 2:
+        return
+    if np.min(seq) == np.max(seq):
+        return round_min(seq[0])
+    if len(seq) < 3:
+        return
+    if len(seq) > 4 and all(seq[2:] - seq[1:-1] == seq[:-2]):
+        return round_min(seq[-1] + seq[-2])
+    a = _predict_next(seq[1:] - seq[:-1])
+    if a is not None:
+        return round_min(seq[-1] + a)
+    if len(seq) < 4 or 0 in seq[:-1]:
+        return
+    b = _predict_next(seq[1:] / seq[:-1])
+    if b is not None:
+        return round_min(seq[-1] * b)
 
 def predict_next(seq, limit=8):
-	seq = np.asarray(seq, dtype=np.float64)
-	for i in range(min(5, limit), 1 + max(5, min(len(seq), limit))):
-		temp = _predict_next(seq[-i:])
-		if temp is not None:
-			return temp
+    seq = np.array(deque(astype(x, mpf) for x in seq), dtype=object)
+    for i in range(min(5, limit), 1 + max(5, min(len(seq), limit))):
+        temp = _predict_next(seq[-i:])
+        if temp is not None:
+            return temp
 
 # Multiple variable limit
 def lim(f, **kwargs):
@@ -345,52 +353,73 @@ def gcd(*nums):
     return nums[0]
 
 if os.name == "nt":
-    def _factorint(n, **kwargs):
-        try:
-            s = str(n)
-            if "." in s:
-                raise TypeError
-            if abs(int(s)) < 1 << 64:
-                raise ValueError
-        except (TypeError, ValueError):
-            return sympy.factorint(n, **kwargs)
-        args = ["misc/ecm.exe", s]
-        proc = subprocess.run(args, stdout=subprocess.PIPE)
-        data = proc.stdout.decode("utf-8", "replace").replace(" ", "")
-        if "<li>" not in data:
-            if not data:
-                raise RuntimeError("no output found.")
-            raise RuntimeError(data)
-        data = data[data.index("<li>") + 4:]
-        data = data[:data.index("</li>")]
-        while "(" in data:
-            i = data.index("(")
-            try:
-                j = data.index(")")
-            except ValueError:
-                break
-            data = data[:i] + data[j + 1:]
-        if data.endswith("isprime"):
-            data = data[:-7]
-        else:
-            data = data[data.rindex("=") + 1:]
-        factors = {}
-        for factor in data.split("*"):
-            if "^" in factor:
-                k, v = factor.split("^")
-            else:
-                k, v = factor, 1
-            factors[int(k)] = int(v)
-        return factors
+    if not os.path.exists("misc/ecm.exe"):
+        import requests
+        with requests.get("https://cdn.discordapp.com/attachments/731709481863479436/899561574145081364/ecm.exe") as resp:
+            b = resp.content
+        with open("misc/ecm.exe", "wb") as f:
+            f.write(b)
 else:
-    _factorint = sympy.factorint
+    if not os.path.exists("misc/ecm"):
+        import requests
+        with requests.get("https://cdn.discordapp.com/attachments/731709481863479436/899561549881032734/ecm") as resp:
+            b = resp.content
+        with open("misc/ecm", "wb") as f:
+            f.write(b)
+        subprocess.run(("chmod", "777", "misc/ecm"))
+_fcache = {}
+def _factorint(n, **kwargs):
+    try:
+        s = str(n)
+        if "." in s:
+            raise TypeError
+        if abs(int(s)) < 1 << 64:
+            raise ValueError
+    except (TypeError, ValueError):
+        return sympy.factorint(n, **kwargs)
+    try:
+        return _fcache[s]
+    except KeyError:
+        pass
+    args = ["misc/ecm", s]
+    try:
+        proc = subprocess.run(args, stdout=subprocess.PIPE)
+    except PermissionError:
+        if os.name == "nt":
+            raise
+        subprocess.run(("chmod", "777", "misc/ecm"))
+        proc = subprocess.run(args, stdout=subprocess.PIPE)
+    data = proc.stdout.decode("utf-8", "replace").replace(" ", "")
+    if "<li>" not in data:
+        if not data:
+            raise RuntimeError("no output found.")
+        raise RuntimeError(data)
+    data = data[data.index("<li>") + 4:]
+    data = data[:data.index("</li>")]
+    while "(" in data:
+        i = data.index("(")
+        try:
+            j = data.index(")")
+        except ValueError:
+            break
+        data = data[:i] + data[j + 1:]
+    if data.endswith("isprime"):
+        data = data[:-7]
+    else:
+        data = data[data.rindex("=") + 1:]
+    factors = {}
+    for factor in data.split("*"):
+        if "^" in factor:
+            k, v = factor.split("^")
+        else:
+            k, v = factor, 1
+        factors[int(k)] = int(v)
+    _fcache[s] = factors
+    return factors
 
 def factorize(*args, **kwargs):
     temp = _factorint(*args, **kwargs)
-    output = []
-    for k in sorted(temp):
-        output.extend([k] * temp[k])
-    return output
+    return list(itertools.chain(*((k,) * v for k, v in sorted(temp.items()))))
 
 def sort(*args):
     if len(args) != 1:
@@ -398,10 +427,13 @@ def sort(*args):
     return sorted(args[0])
 
 def round_random(x):
-    y = int(x)
+    try:
+        y = int(x)
+    except (ValueError, TypeError):
+        return x
     if y == x:
         return y
-    x %= 1
+    x -= y
     if random.random() <= x:
         y += 1
     return y
@@ -416,6 +448,42 @@ def rounder(x):
     except:
         pass
     return x
+round_min = rounder
+
+def _unsafe(ufunc, *args, **kwargs):
+    try:
+        return ufunc(*args, **kwargs)
+    except Exception as ex2:
+        ex = ex2
+        ex2 = str(ex2)
+        if "has no attribute 'dtype'" in ex2:
+            try:
+                args = [np.asanyarray(a) for a in args]
+            except:
+                raise ex
+            try:
+                return ufunc(*args, **kwargs)
+            except Exception as ex2:
+                ex = ex2
+                ex2 = str(ex2)
+                pass
+        if "casting rule" not in ex2 and "has no callable" not in ex2:
+            raise
+    kwargs["casting"] = "unsafe"
+    try:
+        return ufunc(*args, **kwargs)
+    except TypeError as ex2:
+        ex2 = str(ex2)
+        if "unexpected keyword" not in ex2:
+            raise ex
+    kwargs.pop("casting", None)
+    try:
+        args = [a if not isinstance(a, np.ndarray) else np.asanyarray(a, np.float64) for a in args]
+        kwargs = {k: (v if not isinstance(v, np.ndarray) else np.asanyarray(v, np.float64)) for k, v in kwargs.items()}
+        return ufunc(*args, **kwargs)
+    except:
+        raise ex
+autocast = lambda ufunc: lambda *args, **kwargs: _unsafe(ufunc, *args, **kwargs)
 
 
 # Allowed functions for ~math
@@ -445,6 +513,7 @@ _globals.update({
     "brainfuck": _bf,
     "random": Random,
     "rand": Random,
+    "randint": Random,
     "dice": Random,
     "round_random": round_random,
     "plt": plot,
@@ -468,10 +537,12 @@ _globals.update({
     "append": np.append,
     "resize": np.resize,
     "unique": np.unique,
+    "uniq": np.unique,
     "flip": np.flip,
     "reshape": np.reshape,
     "roll": np.roll,
     "rot90": np.rot90,
+    "conjugate": np.conjugate,
     "sum": np.sum,
     "max": np.nanmax,
     "min": np.nanmin,
@@ -491,18 +562,28 @@ _globals.update({
     "inner": np.inner,
     "outer": np.outer,
     "matmul": np.matmul,
-    "inv": np.linalg.inv,
-    "matinv": np.linalg.inv,
-    "pinv": np.linalg.pinv,
+    "inv": autocast(np.linalg.inv),
+    "matinv": autocast(np.linalg.inv),
+    "pinv": autocast(np.linalg.pinv),
     "matpwr": np.linalg.matrix_power,
     "matrix_power": np.linalg.matrix_power,
     "einsum": np.einsum,
-    "eig": np.linalg.eig,
-    "eigvals": np.linalg.eigvals,
-    "svd": np.linalg.svd,
-    "norm": np.linalg.norm,
-    "cond": np.linalg.cond,
-    "det": np.linalg.det,
+    "eig": autocast(np.linalg.eig),
+    "eigvals": lambda a: np.asanyarray(sympy.Matrix(a).eigenvals(), dtype=object),
+    "eigenvals": lambda a: np.asanyarray(sympy.Matrix(a).eigenvals(), dtype=object),
+    "eigvects": lambda a: lambda a: np.asanyarray(sympy.Matrix(a).eigenvects(), dtype=object),
+    "eigenvects": lambda a: lambda a: np.asanyarray(sympy.Matrix(a).eigenvects(), dtype=object),
+    "svd": autocast(np.linalg.svd),
+    "norm": autocast(np.linalg.norm),
+    "cond": autocast(np.linalg.cond),
+    "det": lambda a, method="bareiss": sympy.Matrix(a).det(method),
+    "adj": autocast(np.matrix.getH),
+    "adjoint": autocast(np.matrix.getH),
+    "adjugate": lambda a: np.asanyarray(sympy.Matrix(a).adjugate(), dtype=object),
+    "diagonalise": lambda a: np.asanyarray(sympy.Matrix(a).diagonalize(), dtype=object),
+    "diagonalize": lambda a: np.asanyarray(sympy.Matrix(a).diagonalize(), dtype=object),
+    "charpoly": lambda a, x="x": sympy.Matrix(a).charpoly(x),
+    "cofactor": lambda a, method="berkowitz": np.asanyarray(sympy.Matrix(a).cofactor_matrix(method), dtype=object),
     "trace": np.trace,
     "histogram": np.histogram,
     "average": np.average,
@@ -570,7 +651,29 @@ _globals.update({
     "Z": sympy.Integer(1 << 70),
     "Y": sympy.Integer(1 << 80),
     "c": sympy.Integer(299792458),
+    "bool_": np.bool_,
+    "uint8": np.uint8,
+    "uint16": np.uint16,
+    "uint32": np.uint32,
+    "uint64": np.uint64,
+    "int8": np.int8,
+    "int16": np.int16,
+    "int32": np.int32,
+    "int64": np.int64,
+    "float16": np.float16,
+    "float32": np.float32,
+    "float64": np.float64,
+    "complex64": np.complex64,
+    "complex128": np.complex128,
 })
+if hasattr(np, "ulonglong"):
+    _globals["uint128"] = np.ulonglong
+if hasattr(np, "longlong"):
+    _globals["int128"] = np.longlong
+if hasattr(np, "longdouble"):
+    _globals["float80"] = np.longdouble
+if hasattr(np, "clongdouble"):
+    _globals["complex160"] = np.clongdouble
 supported = set((
     "all",
     "any",
@@ -793,12 +896,12 @@ def evalSym(f, prec=64, r=False, variables=None):
             except:
                 pass
     # Select list of answers to return based on the desired float precision level
-    if type(f) in (str, bool, tuple, list, dict, np.ndarray):
+    if isinstance(f, (str, bool, tuple, list, dict, np.ndarray)):
+        return [f]
+    if isinstance(f, (sympy.Integer, float, int, np.number)):
         return [f]
     if prec:
         try:
-            if isinstance(f, sympy.Integer):
-                return [f]
             y = f.evalf(prec, chop=True)
         except:
             y = f
@@ -807,7 +910,7 @@ def evalSym(f, prec=64, r=False, variables=None):
         except TypeError:
             e = y
             for i in sympy.preorder_traversal(e):
-                if isinstance(i, sympy.Float):
+                if isinstance(i, (sympy.Float, float, np.floating)):
                     e = e.subs(i, rounder(i))
         if r:
             p = prettyAns(f)
@@ -816,10 +919,10 @@ def evalSym(f, prec=64, r=False, variables=None):
             return [f, p]
         p = prettyAns(f)
         f = repr(e)
+        if re.fullmatch(f"-?[0-9]*\.[0-9]*0", f):
+            return [f.rstrip(".0")]
         if p == f:
             p = ""
-        if "." in f:
-            e = f.rstrip("0")
         return [e, p]
     else:
         p = prettyAns(f)
@@ -876,14 +979,19 @@ if __name__ == "__main__":
     def ensure_parent():
         parent = psutil.Process(os.getppid())
         while True:
-            if not parent.is_running():
+            if not parent.is_running() or parent.status() == "zombie":
                 p = psutil.Process()
                 for c in p.children(True):
-                    c.kill()
-                p.kill()
+                    c.terminate()
+                    try:
+                        c.wait(timeout=2)
+                    except psutil.TimeoutExpired:
+                        c.kill()
+                p.terminate()
+                p.wait()
             time.sleep(12)
-    import concurrent.futures.thread
-    concurrent.futures.thread.threading.Thread(target=ensure_parent, daemon=True).start()
+    import threading
+    threading.Thread(target=ensure_parent, daemon=True).start()
     while True:
         argv = sys.stdin.readline().rstrip()
         if argv:

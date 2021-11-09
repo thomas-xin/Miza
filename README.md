@@ -66,14 +66,21 @@ As of 26 September 2021, Miza now fully works on Windows and Linux. If you're pl
 
 * Launch Git Bash.
 
-* Navigate to your desired directory, by typing this command in Git Bash:
-```
+* Navigate to your desired directory, by typing this command in Git Bash (or Linux terminal):
+```bash
 cd [Desired Directory]
 Example: cd /C/Users/Miza/Documents/Projects/
 ```
 
-* Clone this Repository, by typing this command in Git Bash:
+* If on Linux, the following must be installed (use `yum install` on other distributions of Linux as required):
+```bash
+sudo apt install git
+sudo apt install python3 python3-pip python3-tk
+sudo apt install libgmp-dev libmpfr-dev libmpc-dev
 ```
+
+* Clone this Repository, by typing this command:
+```bash
 git clone https://github.com/thomas-xin/Miza.git
 ```
 
@@ -92,7 +99,7 @@ git clone https://github.com/thomas-xin/Miza.git
 
 #### Dependencies:
 
-* Miza should automatically the required dependencies right after running her for the first time, notably the Python modules and FFmpeg.
+* Miza should automatically download and install the required dependencies immediately after running her for the first time, notably the Python modules and FFmpeg.
 
 ##### Additional Notes:
 
@@ -152,10 +159,6 @@ _<a id="discordlog-image"><sup><a href="#discordlog-image">[3]</a></sup> Image s
 
 _Note: execute the command `[prefix]exec -e log` to enable discord logging._
 
-#### Why wont Miza work on cloud services or Linux?
-
-* They don't like her subprocesses, this has been an issue since the beginning. If you wish to host Miza, it is best you do so from a Windows OS, as Miza's infrastructure is designed on and for Windows.
-
 <a id="Folder-Structure"></a>
 ## Folder Structure
 
@@ -179,9 +182,13 @@ With that concludes the basic introduction of hosting Miza. The code is commente
 
 [Read our Wiki!](https://github.com/thomas-xin/Miza/wiki) • [Join our Discord Support Server!](https://discord.gg/cbKQKAr) • [Check out our Website!](http://mizabot.xyz)
 
-*The domain redirects to a webserver which includes: a command tester within the comforts of your browser, documentation on the API, a free file host, and more!*
+*The domain redirects to a webserver which includes: a command tester within the comforts of your browser, a free file host, and more!*
 
 
+<a id="API"></a>
+## API
+
+Miza has a public API that has now been moved to [RapidAPI](https://rapidapi.com/thomas-xin/api/miza). Currently not all endpoints and possible features in the API are accessible from there, but it will be updated over time.
 
 
 <a id="Credits"></a>

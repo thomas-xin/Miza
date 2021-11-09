@@ -44,97 +44,97 @@ def _adjust_thread_count(self):
 
 concurrent.futures.ThreadPoolExecutor._adjust_thread_count = lambda self: _adjust_thread_count(self)
 
-class MultiThreadedImporter(contextlib.AbstractContextManager, contextlib.ContextDecorator):
+import_exc = concurrent.futures.ThreadPoolExecutor(max_workers=12)
 
-    """A context manager that enables concurrent imports."""
+class MultiAutoImporter:
 
-    closed = False
-    exc = None
+    class ImportedModule:
 
-    def __init__(self, glob=None):
-        self.glob = glob
-        self.exc = concurrent.futures.ThreadPoolExecutor(max_workers=12)
-        self.out = {}
+        def __init__(self, module, pool, _globals):
+            object.__setattr__(self, "__module", module)
+            object.__setattr__(self, "__fut", pool.submit(__import__, module))
+            object.__setattr__(self, "__globals", _globals)
 
-    def __enter__(self):
-        return self
+        def __getattr__(self, k):
+            m = self.force()
+            return getattr(m, k)
 
-    def __import__(self, *modules):
-        self.closed = False
-        if self.exc:
-            for module in modules:
-                self.out[module] = self.exc.submit(__import__, module)
+        def __setattr__(self, k, v):
+            m = self.force()
+            return setattr(m, k, v)
+
+        def force(self):
+            module = object.__getattribute__(self, "__module")
+            _globals = object.__getattribute__(self, "__globals")
+            _globals[module] = m = object.__getattribute__(self, "__fut").result()
+            return m
+
+    def __init__(self, *args, pool=None, _globals=None):
+        self.pool = pool
+        if not _globals:
+            _globals = globals()
+        args = " ".join(args).replace(",", " ").split()
+        if not pool:
+            _globals.update((k, __import__(k)) for k in args)
         else:
-            glob = self.glob if self.glob is not None else globals()
-            for module in modules:
-                glob[module] = __import__(module)
+            futs = []
+            for arg in args:
+                futs.append(self.ImportedModule(arg, pool, _globals))
+            _globals.update(zip(args, futs))
 
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.close()
-        if exc_type and exc_value:
-            raise exc_value
+MultiAutoImporter(
+    "sys",
+    "collections",
+    "time",
+    "requests",
+    "traceback",
+    "numpy",
+    "sympy",
+    "dateutil",
+    "datetime",
+    "colormath",
+    "pytz",
+    "ast",
+    "copy",
+    "pickle",
+    "io",
+    "random",
+    "math",
+    "cmath",
+    "fractions",
+    "mpmath",
+    "shlex",
+    "colorsys",
+    "re",
+    "hashlib",
+    "base64",
+    "itertools",
+    pool=import_exc,
+    _globals=globals(),
+)
+collections2f = "misc/collections2.py"
 
-    def close(self, shutdown=True):
-        if not self.closed:
-            for k in tuple(self.out):
-                self.out[k] = self.out[k].result()
-            glob = self.glob if self.glob is not None else globals()
-            glob.update(self.out)
-            self.closed = True
-        if shutdown and self.exc:
-            self.exc.shutdown(True)
-
-with MultiThreadedImporter() as importer:
-    importer.__import__(
-        "sys",
-        "collections",
-        "traceback",
-        "time",
-        "datetime",
-        "pytz",
-        "ast",
-        "copy",
-        "pickle",
-        "io",
-        "random",
-        "math",
-        "cmath",
-        "fractions",
-        "mpmath",
-        "sympy",
-        "shlex",
-        "numpy",
-        "colorsys",
-        "re",
-        "hashlib",
-        "base64",
-        "dateutil",
-        "itertools",
-        "colormath",
-        "requests",
-    )
-
-    importer.close(shutdown=False)
-
-    collections2f = "misc/collections2.py"
-
-    def update_collections2():
-        with requests.get("https://raw.githubusercontent.com/thomas-xin/Python-Extra-Classes/main/full.py") as resp:
-            b = resp.content
-        with open(collections2f, "wb") as f:
-            f.write(b)
-        exec(compile(b, "collections2.py", "exec"), globals())
-        print("collections2.py updated.")
-
-    if not os.path.exists(collections2f):
-        update_collections2()
-    with open(collections2f, "rb") as f:
-        b = f.read()
+def update_collections2():
+    with requests.get("https://raw.githubusercontent.com/thomas-xin/Python-Extra-Classes/main/full.py") as resp:
+        b = resp.content
+    with open(collections2f, "wb") as f:
+        f.write(b)
+    print("collections2.py updated.")
+    if "alist" in globals():
+        return
     exec(compile(b, "collections2.py", "exec"), globals())
-    if time.time() - os.path.getmtime(collections2f) > 3600:
-        importer.exc.submit(update_collections2)
+
+if not os.path.exists(collections2f):
+    update_collections2()
+with open(collections2f, "rb") as f:
+    b = f.read()
+if time.time() - os.path.getmtime(collections2f) > 3600:
+    import_exc.submit(update_collections2)
 
 
+dateutil.force()
+sympy.force()
+colormath.force()
 from dateutil import parser as tparser
 from sympy.parsing.sympy_parser import parse_expr
 from colormath import color_objects, color_conversions
@@ -159,8 +159,13 @@ def try_int(i):
     except:
         return i
 
+array = numpy.array
 np = numpy
-array = np.array
+exec(compile(b, "collections2.py", "exec"), globals())
+try:
+    np.float80 = np.longdouble
+except AttributeError:
+    np.float80 = np.float64
 deque = collections.deque
 
 ts_us = lambda: time.time_ns() // 1000
@@ -169,9 +174,6 @@ utc = lambda: time.time_ns() / 1e9
 random.seed(random.randint(0, (1 << 32) - 1) - time.time_ns())
 mp = mpmath.mp
 mp.dps = 128
-
-math.round = round
-
 mpf = mpmath.mpf
 mpf.__floordiv__ = lambda x, y: int(x / y)
 mpf.__rfloordiv__ = lambda y, x: int(x / y)
@@ -182,6 +184,7 @@ mpf.__rrshift__ = lambda y, x: x * (1 << y if type(y) is int else 2 ** y)
 mpc = mpmath.mpc
 Mat = mat = matrix = mpmath.matrix
 
+math.round = round
 inf = Infinity = math.inf
 nan = math.nan
 eval_const = {
@@ -461,10 +464,13 @@ def round(x, y=None):
 
 # Rounds a number to the nearest integer, with a probability determined by the fractional part.
 def round_random(x):
-    y = int(x)
+    try:
+        y = int(x)
+    except (ValueError, TypeError):
+        return x
     if y == x:
         return y
-    x %= 1
+    x -= y
     if random.random() <= x:
         y += 1
     return y
@@ -527,7 +533,7 @@ def xrand(x, y=None, z=0):
         y = 0
     if x == y:
         return x
-    return random.randint(floor(min(x, y)), ceil(max(x, y)) - 1) + z
+    return random.randint(round_random(min(x, y)), round_random(max(x, y)) - 1) + z
 
 # Returns a floating point number reduced to a power.
 rrand = lambda x=1, y=0: frand(x) ** (1 - y)
@@ -861,6 +867,19 @@ def to_frac(num, limit=2147483647):
     return frac
 
 
+def astype(obj, t, *args, **kwargs):
+    try:
+        if not isinstance(obj, t):
+            if callable(t):
+                return t(obj, *args, **kwargs)
+            return t
+    except TypeError:
+        if callable(t):
+            return t(obj, *args, **kwargs)
+        return t
+    return obj
+
+
 gcd = math.gcd
 
 if sys.version_info[1] >= 9:
@@ -905,29 +924,29 @@ def lcmRange(x):
 
 
 def _predict_next(seq):
-	if len(seq) < 2:
-		return
-	if np.min(seq) == np.max(seq):
-		return round_min(seq[0])
-	if len(seq) < 3:
-		return
-	if len(seq) > 4 and all(seq[2:] - seq[1:-1] == seq[:-2]):
-		return round_min(seq[-1] + seq[-2])
-	a = _predict_next(seq[1:] - seq[:-1])
-	if a is not None:
-		return round_min(seq[-1] + a)
-	if len(seq) < 4 or 0 in seq[:-1]:
-		return
-	b = _predict_next(seq[1:] / seq[:-1])
-	if b is not None:
-		return round_min(seq[-1] * b)
+    if len(seq) < 2:
+        return
+    if np.min(seq) == np.max(seq):
+        return round_min(seq[0])
+    if len(seq) < 3:
+        return
+    if len(seq) > 4 and all(seq[2:] - seq[1:-1] == seq[:-2]):
+        return round_min(seq[-1] + seq[-2])
+    a = _predict_next(seq[1:] - seq[:-1])
+    if a is not None:
+        return round_min(seq[-1] + a)
+    if len(seq) < 4 or 0 in seq[:-1]:
+        return
+    b = _predict_next(seq[1:] / seq[:-1])
+    if b is not None:
+        return round_min(seq[-1] * b)
 
 def predict_next(seq, limit=8):
-	seq = np.asarray(seq, dtype=np.float64)
-	for i in range(min(5, limit), 1 + max(5, min(len(seq), limit))):
-		temp = _predict_next(seq[-i:])
-		if temp is not None:
-			return temp
+    seq = np.array(deque(astype(x, mpf) for x in seq), dtype=object)
+    for i in range(min(5, limit), 1 + max(5, min(len(seq), limit))):
+        temp = _predict_next(seq[-i:])
+        if temp is not None:
+            return temp
 
 
 # Performs super-sampling linear interpolation.
@@ -942,8 +961,9 @@ def supersample(a, size):
         dtype = a.dtype
     except AttributeError:
         dtype = object
+    ftype = np.float64 if dtype is object or issubclass(dtype.type, np.integer) else dtype
     x = ceil(n / size)
-    interp = np.linspace(0, n - 1, x * size)
+    interp = np.linspace(0, n - 1, x * size, dtype=ftype)
     a = np.interp(interp, range(n), a)
     return np.mean(a.reshape(-1, x), 1, dtype=dtype)
 
@@ -1711,7 +1731,7 @@ def remove_str(s, arg):
 
 
 # Returns a string representation of an iterable, with options.
-def iter2str(it, key=None, limit=1728, offset=0, left="[", right="]", sep=" "):
+def iter2str(it, key=None, limit=3840, offset=0, left="[", right="]", sep=" "):
     try:
         try:
             len(it)
@@ -1739,7 +1759,8 @@ def iter2str(it, key=None, limit=1728, offset=0, left="[", right="]", sep=" "):
 
 
 # Recognises "st", "nd", "rd" and "th" in numbers.
-rank_format = lambda n: str(n) + "st nd rd th".split()[min((n - 1) % 10, 3)]
+_ith = "st nd rd th".split()
+rank_format = lambda n: str(n) + (_ith[min((n - 1) % 10, 3)] if n not in range(11, 14) else "th")
 
 
 # Returns a copy of a mapping object, with keys cast to integers where possible.
@@ -1761,7 +1782,7 @@ def int_key(d):
 # Time functions
 class DynamicDT:
 
-    __slots__ = ("_dt", "_offset", "_ts")
+    __slots__ = ("_dt", "_offset", "_ts", "tzinfo")
 
     def __getstate__(self):
         return self.timestamp(), getattr(self, "tzinfo", None)
@@ -1770,22 +1791,22 @@ class DynamicDT:
         if len(s) == 2:
             ts, tzinfo = s
             offs, ots = divmod(ts, 12622780800)
-            self._dt = datetime.datetime.fromtimestamp(ots)
-            if tzinfo:
-                self._dt = self._dt.replace(tzinfo=tzinfo)
+            self._dt = datetime.datetime.fromtimestamp(ots, tz=tzinfo)
+            self.tzinfo = tzinfo
             self._offset = round(offs * 400)
             return
         raise TypeError("Unpickling failed:", s)
 
     def __init__(self, *args, **kwargs):
+        tzinfo = kwargs.pop("tzinfo", None)
         if type(args[0]) is bytes:
-            self._dt = datetime.datetime(args[0])
+            self._dt = datetime.datetime(args[0], tzinfo=tzinfo)
             return
         offs, y = divmod(args[0], 400)
         y += 2000
         offs *= 400
         offs -= 2000
-        self._dt = datetime.datetime(y, *args[1:], **kwargs)
+        self._dt = datetime.datetime(y, *args[1:], tzinfo=tzinfo, **kwargs)
         self.set_offset(offs)
 
     def __getattr__(self, k):
@@ -1797,7 +1818,7 @@ class DynamicDT:
 
     def __str__(self):
         y = self.year_repr()
-        return y + str(self._dt)[4:]
+        return y + str(self._dt)[4:].rsplit("+", 1)[0]
 
     def __repr__(self):
         return self.__class__.__name__ + "(" + ", ".join(str(i) for i in self._dt.timetuple()[:6]) + (f", microsecond={self._dt.microsecond}" if getattr(self._dt, "microsecond", 0) else "") + ").set_offset(" + str(self.offset()) + ")"
@@ -1836,29 +1857,29 @@ class DynamicDT:
 
     def __add__(self, other):
         if type(other) is not datetime.timedelta:
-            return self.__class__.fromtimestamp(self.timestamp() + other)
-        ts = (self._dt + other).timestamp()
+            return self.__class__.fromtimestamp(self.timestamp() + other, tzinfo=self.tzinfo)
+        ts = self._dt.timestamp() + other.timestamp()
         if abs(self.offset()) >= 25600:
             ts = round(ts)
-        return self.__class__.fromtimestamp(ts + self.offset() * 31556952)
+        return self.__class__.fromtimestamp(ts + self.offset() * 31556952, tzinfo=self.tzinfo)
     __radd__ = __add__
 
     def __sub__(self, other):
-        if type(other) not in (datetime.timedelta, datetime.datetime, datetime.date, self.__class__):
-            return self.__class__.fromtimestamp(self.timestamp() - other)
         if isinstance(other, self.__class__):
             return datetime.timedelta(seconds=self.offset() - other.offset() + (self._dt - other._dt).total_seconds())
-        out = (self._dt - other)
-        ts = getattr(out, "timestamp", None)
-        if ts is None:
-            if isinstance(out, datetime.timedelta):
-                return out
-            return self.__class__.fromdatetime(out).set_offset(self.offset())
-        ts = ts()
+        if type(other) not in (datetime.timedelta, datetime.datetime, datetime.date):
+            return self.__class__.fromtimestamp(self.timestamp() - other, tzinfo=self.tzinfo)
+        ts = other.total_seconds() if isinstance(other, datetime.timedelta) else other.timestamp()
+        ts = self._dt.timestamp() - ts
         if abs(self.offset()) >= 25600:
             ts = round(ts)
-        return self.__class__.fromtimestamp(ts + self.offset() * 31556952)
-    __rsub__ = __sub__
+        ts = ts + self.offset() * 31556952
+        if isinstance(other, (DynamicDT, datetime.datetime, datetime.date)):
+            return datetime.timedelta(seconds=ts)
+        tzinfo = self.tzinfo if isinstance(self, DynamicDT) else other.tzinfo
+        return self.__class__.fromtimestamp(ts, tzinfo=tzinfo)
+
+    __rsub__ = lambda self, other: self.__class__.fromtimestamp(other.timestamp()) - self
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
@@ -1984,22 +2005,16 @@ class DynamicDT:
 
     @classmethod
     def utcfromtimestamp(cls, ts):
-        offs, ots = divmod(ts, 12622780800)
-        if abs(offs) >= 64:
-            ots = round(ots)
-        d = utc_ft(ots)
-        dt = cls(*d.timetuple()[:6], d.microsecond)
-        dt.set_offset(dt._offset + round(offs * 400))
-        return dt
+        return cls.fromtimestamp(ts, tzinfo=datetime.timezone.utc)
 
     @classmethod
-    def fromtimestamp(cls, ts):
+    def fromtimestamp(cls, ts, tzinfo=None):
         offs, ots = divmod(ts, 12622780800)
-        if abs(offs) >= 4:
+        if abs(offs) >= 400:
             ots = round(ots)
             ts = round(ts)
-        d = datetime.datetime.fromtimestamp(ots)
-        dt = cls(*d.timetuple()[:6], d.microsecond)
+        d = datetime.datetime.fromtimestamp(ots, tz=tzinfo)
+        dt = cls(*d.timetuple()[:6], d.microsecond, tzinfo=tzinfo)
         dt._offset += round(offs * 400)
         dt._ts = ts
         return dt
@@ -2237,7 +2252,10 @@ def time_diff(t2, t1):
     days = t2.day - t1.day
     hours = getattr(t2, "hour", 0) - getattr(t1, "hour", 0)
     minutes = getattr(t2, "minute", 0) - getattr(t1, "minute", 0)
-    seconds = round(getattr(t2, "second", 0) - getattr(t1, "second", 0) + (getattr(t2, "microsecond", 0) - getattr(t1, "microsecond", 0)) / 1000000, 6)
+    microsecond = (getattr(t2, "microsecond", 0) - getattr(t1, "microsecond", 0)) / 1000000
+    if abs(microsecond) < 0.002:
+        microsecond = 0
+    seconds = round(getattr(t2, "second", 0) - getattr(t1, "second", 0) + microsecond, 6)
     while seconds < 0:
         minutes -= 1
         seconds += 60
@@ -2323,6 +2341,8 @@ def next_date(dt):
     new = datetime.datetime(t.year, dt.month, dt.day)
     while new < t:
         new = new.replace(year=new.year + 1)
+    if dt.tzinfo:
+        return new.replace(tzinfo=dt.tzinfo)
     return new
 
 
@@ -2447,7 +2467,7 @@ def b642bytes(b, alt_char_set=False):
 if sys.version_info[0] >= 3 and sys.version_info[1] >= 9:
     randbytes = random.randbytes
 else:
-    randbytes = lambda size: (np.random.random_sample(size) * 256).astype(np.uint8).tobytes()
+    randbytes = lambda size: np.random.randint(0, 256, size=size).data
 
 # SHA256 operations: base64 and base16.
 shash = lambda s: as_str(base64.urlsafe_b64encode(hashlib.sha256(s if type(s) is bytes else as_str(s).encode("utf-8")).digest()).rstrip(b"="))

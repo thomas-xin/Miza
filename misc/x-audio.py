@@ -34,25 +34,28 @@ def request(s):
         return reqs.next().get(f"http://127.0.0.1:{PORT}/eval/{token}/{url_parse(s)}").text
 
 def submit(s):
-    b = "~" + repr(as_str(s).encode("utf-8")) + "\n"
-    resp = sys.__stdout__.write(b)
+    if type(s) not in (bytes, memoryview):
+        s = as_str(s).encode("utf-8")
+    b = b"~" + base64.b85encode(s) + b"\n"
+    resp = sys.__stdout__.buffer.write(b)
     sys.__stdout__.flush()
     return resp
 
 async def respond(s):
-    k, c = as_str(s[1:]).split("~", 1)
-    c = as_str(literal_eval(c))
-    if c == "ytdl.update()":
+    k, c = s[1:].rstrip().split(b"~", 1)
+    c = memoryview(base64.b85decode(c))
+    k = k.decode("ascii")
+    if c == b"ytdl.update()":
         with tracebacksuppressor:
             await create_future(update_cache)
         res = "None"
-    else:
+    elif c:
         res = None
         try:
-            if c[0] == "!":
+            if c[:1] == b"!":
                 c = c[1:]
                 res = "None"
-            if c.startswith("await "):
+            if c[:6] == b"await ":
                 resp = await eval(c[6:], client._globals)
             else:
                 code = None
@@ -66,8 +69,11 @@ async def respond(s):
                     resp = await create_future(exec, c, client._globals)
         except Exception as ex:
             sys.stdout.write(traceback.format_exc())
-            await create_future(submit, f"bot.audio.returns[{k}].set_exception(pickle.loads({repr(pickle.dumps(ex))}))")
+            s = f"bot.audio.returns[{k}].set_exception(pickle.loads({repr(pickle.dumps(ex))}))"
+            submit(s)
             return
+    else:
+        return
     if not res:
         res = repr(resp)
         if type(resp) not in (bool, int, float, str, bytes):
@@ -75,16 +81,38 @@ async def respond(s):
                 compile(res, "miza2", "eval")
             except SyntaxError:
                 res = repr(str(resp))
-    await create_future(submit, f"bot.audio.returns[{k}].set_result({res})")
+    s = f"bot.audio.returns[{k}].set_result({res})"
+    create_future_ex(submit, s)
 
 async def communicate():
     print("Audio client successfully connected.")
     while True:
         with tracebacksuppressor:
-            s = await create_future(sys.stdin.readline)
-            # send(s)
-            if s.startswith("~"):
+            s = await create_future(sys.stdin.buffer.readline)
+            if not s:
+                break
+            if s.startswith(b"~"):
                 create_task(respond(s))
+    print("Audio client successfully disconnected.")
+
+def is_strict_running(proc):
+    if not proc:
+        return
+    try:
+        if not proc.is_running():
+            return False
+        if proc.status() == "zombie":
+            proc.wait()
+            return
+        return True
+    except AttributeError:
+        proc = psutil.Process(proc.pid)
+    if not proc.is_running():
+        return False
+    if proc.status() == "zombie":
+        proc.wait()
+        return
+    return True
 
 
 # Runs ffprobe on a file or url, returning the duration if possible.
@@ -109,7 +137,7 @@ def _get_duration(filename, _timeout=12):
         resp = proc.stdout.read().split()
     except:
         with suppress():
-            proc.kill()
+            force_kill(proc)
         with suppress():
             resp = proc.stdout.read().split()
         print_exc()
@@ -213,7 +241,7 @@ class AudioPlayer(discord.AudioSource):
         except AttributeError:
             pass
         if k == "pos":
-            if not self.queue or not self.queue[0]:
+            if not self.queue or not self.queue[0] or not self.queue[0][0]:
                 return 0, 0
             p = self.queue[0][0].pos / 50
             d = self.queue[0][0].duration() or inf
@@ -297,7 +325,7 @@ class AudioPlayer(discord.AudioSource):
                 create_future_ex(after)
 
     def clear(self):
-        for entry in self.queue:
+        for entry in tuple(self.queue):
             if entry:
                 entry[0].close()
         self.queue.clear()
@@ -340,7 +368,7 @@ class AudioFile:
         self.wasfile = False
         self.loading = self.buffered = self.loaded = wasfile
         if wasfile:
-            self.proc = cdict(is_running=lambda: False, kill=lambda: None)
+            self.proc = cdict(is_running=lambda: False, kill=lambda: None, status=lambda: None)
         self.expired = False
         self.readers = cdict()
         self.semaphore = Semaphore(1, 1, delay=5)
@@ -386,8 +414,8 @@ class AudioFile:
         elif fmt == "opus":
             cdc = "libopus"
             cdc2 = "opus"
-        # Collects data from source, converts to 48khz 192kbps opus format, outputting to target file
-        cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", fmt, "-c:a", cdc, "-ar", str(SAMPLE_RATE), "-ac", "2", "-b:a", "196608", "cache/" + self.file]
+        # Collects data from source, converts to 48khz 224kbps opus format, outputting to target file
+        cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", fmt, "-c:a", cdc, "-ar", str(SAMPLE_RATE), "-ac", "2", "-b:a", "229376", "cache/" + self.file]
         # if not stream.startswith("https://cf-hls-media.sndcdn.com/"):
         with suppress():
             if stream.startswith("https://www.yt-download.org/download/"):
@@ -399,7 +427,7 @@ class AudioFile:
         self.proc = None
         try:
             try:
-                self.proc = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                self.proc = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, bufsize=1048576)
             except:
                 print(cmd)
                 raise
@@ -407,9 +435,9 @@ class AudioFile:
             # Attempt to monitor status of output file
             while fl < 4096:
                 with Delay(0.1):
-                    if not self.proc.is_running():
+                    if not is_strict_running(self.proc):
                         err = as_str(self.proc.stderr.read())
-                        if check_fmt:
+                        if check_fmt is not None:
                             if self.webpage_url and ("Server returned 5XX Server Error reply" in err or "Server returned 404 Not Found" in err or "Server returned 403 Forbidden" in err):
                                 print(err)
                                 with tracebacksuppressor:
@@ -418,12 +446,12 @@ class AudioFile:
                                     else:
                                         new_stream = request(f"VOICE.get_best_audio(VOICE.ytdl.extract_backup({repr(self.webpage_url)}))")
                                     if new_stream:
-                                        return self.load(eval_json(new_stream), check_fmt=False, force=True)
+                                        return self.load(eval_json(new_stream), check_fmt=None, force=True)
                             new = None
                             with suppress(ValueError):
                                 new = request(f"VOICE.select_and_convert({repr(stream)})")
                             if new not in (None, "null"):
-                                return self.load(eval_json(new), check_fmt=False, force=True)
+                                return self.load(eval_json(new), check_fmt=None, force=True)
                         print(self.proc.args)
                         if err:
                             ex = RuntimeError(err)
@@ -443,7 +471,7 @@ class AudioFile:
             ytdl.cache.pop(self.file, None)
             if self.proc is not None:
                 with suppress():
-                    self.proc.kill()
+                    force_kill(self.proc)
             with suppress():
                 os.remove("cache/" + self.file)
             self.readable.set_exception(ex)
@@ -458,7 +486,7 @@ class AudioFile:
     def update(self):
         if not self.live:
             # Check when file has been fully loaded
-            if self.buffered and not self.proc.is_running():
+            if self.buffered and not is_strict_running(self.proc):
                 if not self.loaded:
                     self.loaded = True
                     if not is_url(self.stream):
@@ -533,14 +561,15 @@ class AudioFile:
     # Destroys the file object, killing associated FFmpeg process and removing from cache.
     def destroy(self):
         self.expired = True
-        if self.proc and self.proc.is_running():
+        if is_strict_running(self.proc):
             with suppress():
-                self.proc.kill()
+                force_kill(self.proc)
         with suppress():
             with self.semaphore:
                 if not self.live:
                     retry(os.remove, "cache/" + self.file, attempts=8, delay=5, exc=(FileNotFoundError,))
                 # File is removed from cache data
+                request(f"VOICE.ytdl.cache.pop({repr(self.file)},None)")
                 ytdl.cache.pop(self.file, None)
                 # print(self.file, "deleted.")
 
@@ -566,7 +595,7 @@ class AudioFile:
         if options is None:
             options = auds.construct_options(full=self.live)
         speed = 1
-        if options or auds.reverse or pos or auds.stats.bitrate != 1966.08 or self.live:
+        if options or auds.reverse or pos or auds.stats.bitrate != 2293.76 or self.live:
             args = ["./ffmpeg", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets"]
             if (pos or auds.reverse) and self.seekable:
                 arg = "-to" if auds.reverse else "-ss"
@@ -577,14 +606,15 @@ class AudioFile:
             if auds.reverse:
                 speed = -speed
             args.append("-i")
-            if self.loaded:
+            if self.loaded or self.live:
                 buff = False
                 args.insert(1, "-nostdin")
                 args.append(source)
             else:
                 buff = True
-                args.append("pipe:0")
-            if options or auds.stats.bitrate != 1966.08:
+                args.append("-")
+            auds.stats.bitrate = min(auds.stats.bitrate, auds.stats.max_bitrate)
+            if options or auds.stats.bitrate != 2293.76:
                 br = 100 * auds.stats.bitrate
                 sr = SAMPLE_RATE
                 while br < 4096:
@@ -599,7 +629,7 @@ class AudioFile:
                 args.extend(("-f", "opus"))
                 if not self.live:
                     args.extend(("-c:a", "copy"))
-            args.append("pipe:1")
+            args.append("-")
             g_id = auds.guild_id
             self.readers[g_id] = True
             callback = lambda: self.readers.pop(g_id, None)
@@ -635,7 +665,7 @@ class LoadedAudioReader(discord.AudioSource):
         self.closed = False
         self.advanced = False
         self.args = args
-        self.proc = psutil.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
+        self.proc = psutil.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, bufsize=192000)
         self.packet_iter = discord.oggparse.OggStream(self.proc.stdout).iter_packets()
         self.file = file
         self.af = file
@@ -669,7 +699,7 @@ class LoadedAudioReader(discord.AudioSource):
                             self.args[i + 1] = str(float(self.args[i + 1]) - pos)
                     else:
                         self.args[i + 1] = str(float(self.args[i + 1]) + pos)
-                self.proc = psutil.Popen(self.args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
+                self.proc = psutil.Popen(self.args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, bufsize=192000)
                 self.packet_iter = discord.oggparse.OggStream(self.proc.stdout).iter_packets()
             else:
                 self.pos += self.speed
@@ -685,7 +715,7 @@ class LoadedAudioReader(discord.AudioSource):
     def close(self, *void1, **void2):
         self.closed = True
         with suppress():
-            self.proc.kill()
+            force_kill(self.proc)
         players.pop(self.key, None)
         if callable(self.callback):
             self.callback()
@@ -702,7 +732,7 @@ class BufferedAudioReader(discord.AudioSource):
     def __init__(self, file, args, callback=None, key=None):
         self.closed = False
         self.advanced = False
-        self.proc = psutil.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        self.proc = psutil.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=192000)
         self.packet_iter = discord.oggparse.OggStream(self.proc.stdout).iter_packets()
         self.file = file
         self.af = file
@@ -722,10 +752,10 @@ class BufferedAudioReader(discord.AudioSource):
         if self.full:
             fut = create_future_ex(next, self.packet_iter, b"")
             try:
-                out = fut.result(timeout=0.1)
+                out = fut.result(timeout=0.8)
             except concurent.futures.TimeoutError:
                 with suppress():
-                    self.proc.kill()
+                    force_kill(self.proc)
                 out = b""
         else:
             out = next(self.packet_iter, b"")
@@ -764,7 +794,7 @@ class BufferedAudioReader(discord.AudioSource):
         with suppress():
             self.stream.close()
         with suppress():
-            self.proc.kill()
+            force_kill(self.proc)
         players.pop(self.key, None)
         if callable(self.callback):
             self.callback()
@@ -853,11 +883,6 @@ async def kill():
         await fut
     return await client.close()
 
-
-@client.event
-async def before_identify_hook(shard_id, initial=False):
-    pass
-
 @client.event
 async def on_ready():
     create_task(communicate())
@@ -865,9 +890,9 @@ async def on_ready():
 
 def ensure_parent(proc, parent):
     while True:
-        if not parent.is_running():
+        if not is_strict_running(parent):
             await_fut(kill())
-            psutil.Process().kill()
+            force_kill(psutil.Process())
         time.sleep(6)
 
 

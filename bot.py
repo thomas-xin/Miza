@@ -59,6 +59,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     connect_ready = concurrent.futures.Future()
     guilds_ready = concurrent.futures.Future()
     socket_responses = deque(maxlen=256)
+    try:
+        shards = int(sys.argv[1])
+    except IndexError:
+        shards = 2
 
     def __init__(self, cache_size=1048576, timeout=24):
         # Initializes client (first in __mro__ of class inheritance)
@@ -97,6 +101,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         self.load_semaphore = Semaphore(200, inf, rate_limit=10)
         self.user_semaphore = Semaphore(64, inf, rate_limit=8)
         self.disk_semaphore = Semaphore(1, 1, rate_limit=1)
+        self.command_semaphore = Semaphore(262144, 16384)
         self.disk = 0
         self.storage_ratio = 0
         self.file_count = 0
@@ -227,7 +232,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     def create_command(self, data):
         with tracebacksuppressor:
             for i in range(16):
-                resp = reqs.next().post(
+                resp = reqx.next().post(
                     f"https://discord.com/api/{api}/applications/{self.id}/commands",
                     headers={"Content-Type": "application/json", "Authorization": "Bot " + self.token},
                     data=orjson.dumps(data),
@@ -246,7 +251,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             return
         print("Updating global slash commands...")
         with tracebacksuppressor:
-            resp = reqs.next().get(f"https://discord.com/api/{api}/applications/{self.id}/commands", headers=dict(Authorization="Bot " + self.token))
+            resp = reqx.next().get(f"https://discord.com/api/{api}/applications/{self.id}/commands", headers=dict(Authorization="Bot " + self.token))
             self.activity += 1
             if resp.status_code not in range(200, 400):
                 raise ConnectionError(f"Error {resp.status_code}", resp.text)
@@ -303,7 +308,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                                             print(curr)
                                             print(f"{curr['name']}'s slash command does not match, removing...")
                                             for i in range(16):
-                                                resp = reqs.next().delete(f"https://discord.com/api/{api}/applications/{self.id}/commands/{curr['id']}", headers=dict(Authorization="Bot " + self.token))
+                                                resp = reqx.next().delete(f"https://discord.com/api/{api}/applications/{self.id}/commands/{curr['id']}", headers=dict(Authorization="Bot " + self.token))
                                                 self.activity += 1
                                                 if resp.status_code == 429:
                                                     time.sleep(1)
@@ -325,7 +330,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             with tracebacksuppressor:
                 print(curr)
                 print(f"{curr['name']}'s application command does not exist, removing...")
-                resp = reqs.next().delete(f"https://discord.com/api/{api}/applications/{self.id}/commands/{curr['id']}", headers=dict(Authorization="Bot " + self.token))
+                resp = reqx.next().delete(f"https://discord.com/api/{api}/applications/{self.id}/commands/{curr['id']}", headers=dict(Authorization="Bot " + self.token))
                 self.activity += 1
                 if resp.status_code not in range(200, 400):
                     raise ConnectionError(f"Error {resp.status_code}", resp.text)
@@ -350,16 +355,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     for attr in ("flags", "server_only", "slash"):
                         with suppress(AttributeError):
                             c[attr] = command.attr
-            with open("misc/help.json", "w", encoding="utf-8") as f:
+            with open("misc/HELP.json", "w", encoding="utf-8") as f:
                 json.dump(j, f, indent="\t")
 
     def start_webserver(self):
         if self.server:
             with suppress():
-                self.server.kill()
+                force_kill(self.server)
         if os.path.exists("misc/x-server.py") and PORT:
             print("Starting webserver...")
-            self.server = psutil.Popen([python, "x-server.py"], cwd=os.getcwd() + "/misc", stderr=subprocess.PIPE)
+            self.server = psutil.Popen([python, "x-server.py"], cwd=os.getcwd() + "/misc", stderr=subprocess.PIPE, bufsize=65536)
         else:
             self.server = None
 
@@ -376,6 +381,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     # Starts up client.
     def run(self):
         print(f"Logging in...")
+        self.audio_client_start = create_future(self.start_audio_client, priority=True)
         with closing(get_event_loop()):
             with tracebacksuppressor():
                 get_event_loop().run_until_complete(self.start(self.token))
@@ -400,27 +406,33 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     data = obj.data
                     if getattr(obj, "garbage_collect", None):
                         return await obj.garbage_collect()
-                    for key in shuffle(list(data))[:1024]:
+                    if len(data) <= 1024:
+                        keys = data.keys()
+                    else:
+                        low = xrand(ceil(len(data) / 1024)) << 10
+                        keys = astype(data, alist).view[low:low + 1024]
+                    for key in keys:
                         if getattr(data, "unloaded", False):
                             return
-                        if key and type(key) is not str:
-                            try:
-                                # Database keys may be user, guild, or channel IDs
-                                if getattr(obj, "channel", None):
-                                    d = self.get_channel(key)
-                                else:
-                                    if not data[key]:
-                                        raise LookupError
-                                    with suppress(KeyError):
-                                        d = self.cache.guilds[key]
-                                        continue
-                                    d = await self.fetch_messageable(key)
-                                if d is not None:
+                        if not key or type(key) is str:
+                            continue
+                        try:
+                            # Database keys may be user, guild, or channel IDs
+                            if getattr(obj, "channel", None):
+                                d = self.get_channel(key)
+                            else:
+                                if not data[key]:
+                                    raise LookupError
+                                with suppress(KeyError):
+                                    d = self.cache.guilds[key]
                                     continue
-                            except:
-                                print_exc()
-                            print(f"Deleting {key} from {str(obj)}...")
-                            data.pop(key, None)
+                                d = await self.fetch_messageable(key)
+                            if d is not None:
+                                continue
+                        except:
+                            print_exc()
+                        print(f"Deleting {key} from {str(obj)}...")
+                        data.pop(key, None)
 
     # Calls a bot event, triggered by client events or others, across all bot databases. Calls may be sync or async.
     async def send_event(self, ev, *args, exc=False, **kwargs):
@@ -449,8 +461,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if member.guild_permissions.create_instant_invite:
                 invitedata = await Request(
                     f"https://discord.com/api/{api}/guilds/{guild.id}/invites",
-                    headers=dict(Authorization="Bot " + self.token),
-                    bypass=False,
+                    authorise=True,
                     aio=True,
                     json=True,
                 )
@@ -526,10 +537,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         except (LookupError, discord.NotFound):
             channel = await super().fetch_channel(s_id)
             self.cache.channels[s_id] = channel
-            self.limit_cache("channels")
             return channel
         self.cache.users[u_id] = user
-        self.limit_cache("users")
         return user
 
     # Fetches a user from ID, using the bot cache when possible.
@@ -537,7 +546,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         async with self.user_semaphore:
             user = await super().fetch_user(u_id)
             self.cache.users[u_id] = user
-            self.limit_cache("users")
             return user
     def fetch_user(self, u_id):
         with suppress(KeyError):
@@ -603,7 +611,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     return self.get_user(self.deleted_user)
                 raise KeyError("Target user ID not found.")
         self.cache.users[u_id] = user
-        self.limit_cache("users")
         return user
 
     async def find_users(self, argl, args, user, guild, roles=False):
@@ -780,8 +787,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 break
         if member is None:
             raise LookupError("Unable to find member data.")
-        self.cache.members[u_id] = member
-        self.limit_cache("members")
+        if find_others:
+            self.cache.members[u_id] = member
         return member
 
     # Fetches a guild from ID, using the bot cache when possible.
@@ -821,14 +828,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         except:
             guild = await super().fetch_guild(g_id)
         # self.cache.guilds[g_id] = guild
-        self.limit_cache("guilds")
         return guild
 
     # Fetches a channel from ID, using the bot cache when possible.
     async def _fetch_channel(self, c_id):
         channel = await super().fetch_channel(c_id)
         self.cache.channels[c_id] = channel
-        self.limit_cache("channels")
         return channel
     def fetch_channel(self, c_id):
         if type(c_id) is not int:
@@ -898,15 +903,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             add_user=lambda user: Request(
                 f"https://discord.com/api/{api}/channels/{channel.id}/thread-members/{verify_id(user)}",
                 method="PUT",
-                headers={"Authorization": "Bot " + bot.token},
-                bypass=False,
+                authorise=True,
                 aio=True,
             ),
             remove_user=lambda user: Request(
                 f"https://discord.com/api/{api}/channels/{channel.id}/thread-members/{verify_id(user)}",
                 method="DELETE",
-                headers={"Authorization": "Bot " + bot.token},
-                bypass=False,
+                authorise=True,
                 aio=True,
             ),
             delete=lambda reason=None: discord.abc.GuildChannel.delete(channel, reason=reason),
@@ -926,14 +929,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         Request(
             f"https://discord.com/api/{api}/channels/{channel.id}/thread-members/@me",
             method="POST",
-            headers={"Authorization": "Bot " + bot.token},
-            bypass=False,
+            authorise=True,
             aio=True,
         )
         data = await Request(
             f"https://discord.com/api/{api}/channels/{channel.id}",
-            headers={"Authorization": "Bot " + bot.token},
-            bypass=False,
+            authorise=True,
             aio=True,
             json=True,
         )
@@ -1001,7 +1002,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if role is None:
                 raise LookupError("Role not found.")
         self.cache.roles[r_id] = role
-        self.limit_cache("roles")
         return role
 
     # Fetches an emoji from ID and guild, using the bot cache when possible.
@@ -1023,7 +1023,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             else:
                 raise LookupError("Emoji not found.")
         self.cache.emojis[e_id] = emoji
-        self.limit_cache("emojis")
         return emoji
 
     # Searches the bot database for a webhook mimic from ID.
@@ -1216,48 +1215,64 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 first = url.split("?", 1)[0]
                 item = first[first.rindex("/") + 1:]
                 out.append(f"https://media2.giphy.com/media/{item}/giphy.gif")
-            elif images:
+            elif images and is_reddit_url(url):
+                first = url.split("?", 1)[0]
+                b = await Request(url, aio=True, timeout=16)
+                search = b'<script id="data">window.___r = '
+                with tracebacksuppressor:
+                    b = b[b.index(search) + len(search):]
+                    b = b[:b.index(b";</script><")]
+                    data = orjson.loads(b)
+                    for model in data["posts"]["models"].values():
+                        try:
+                            stream = model["media"]["scrubberThumbSource"]
+                        except KeyError:
+                            continue
+                        else:
+                            found = True
+                            out.append(stream)
+                            break
+            elif images and not any(maps((is_discord_url, is_youtube_url, is_youtube_stream), url)):
                 found = False
-                if not is_discord_url(url) and (images or is_tenor_url(url) or is_deviantart_url(url) or self.is_webserver_url(url)):
+                if images or is_tenor_url(url) or is_deviantart_url(url) or self.is_webserver_url(url):
                     skip = False
                     if url in self.mimes:
                         skip = "text/html" not in self.mimes[url]
                     if not skip:
-                        resp = await create_future(reqs.next().get, url, headers=Request.header(), stream=True)
+                        resp = await create_future(reqx.next().stream, "GET", url, headers=Request.header())
                         self.activity += 1
-                        with resp:
-                            url = resp.url
-                            head = fcdict(resp.headers)
-                            ctype = [t.strip() for t in head.get("Content-Type", "").split(";")]
-                            print(head, ctype, sep="\n")
-                            if "text/html" in ctype:
-                                it = resp.iter_content(65536)
-                                data = await create_future(next, it)
-                                s = as_str(data)
+                        resp = resp.__enter__()
+                        url = as_str(resp.url)
+                        head = fcdict(resp.headers)
+                        ctype = [t.strip() for t in head.get("Content-Type", "").split(";")]
+                        if "text/html" in ctype:
+                            it = resp.iter_bytes()
+                            data = await create_future(next, it)
+                            s = as_str(data)
+                            try:
+                                s = s[s.index("<meta") + 5:]
+                                search = 'http-equiv="refresh" content="'
                                 try:
-                                    s = s[s.index("<meta") + 5:]
-                                    search = 'http-equiv="refresh" content="'
-                                    try:
-                                        s = s[s.index(search) + len(search):]
-                                        s = s[:s.index('"')]
-                                        res = None
-                                        for k in s.split(";"):
-                                            temp = k.strip()
-                                            if temp.casefold().startswith("url="):
-                                                res = temp[4:]
-                                                break
-                                        if not res:
-                                            raise ValueError
-                                    except ValueError:
-                                        search ='property="og:image" content="'
-                                        s = s[s.index(search) + len(search):]
-                                        res = s[:s.index('"')]
+                                    s = s[s.index(search) + len(search):]
+                                    s = s[:s.index('"')]
+                                    res = None
+                                    for k in s.split(";"):
+                                        temp = k.strip()
+                                        if temp.casefold().startswith("url="):
+                                            res = temp[4:]
+                                            break
+                                    if not res:
+                                        raise ValueError
                                 except ValueError:
-                                    pass
-                                else:
-                                    found = True
-                                    print(res)
-                                    out.append(res)
+                                    search ='property="og:image" content="'
+                                    s = s[s.index(search) + len(search):]
+                                    res = s[:s.index('"')]
+                            except ValueError:
+                                pass
+                            else:
+                                found = True
+                                print(res)
+                                out.append(res)
                 if not found:
                     out.append(url)
         if lost:
@@ -1273,16 +1288,18 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             return self.mimes[url]
         except KeyError:
             pass
-        with reqs.next().get(url, stream=True) as resp:
-            self.activity += 1
-            head = fcdict(resp.headers)
-            try:
-                mime = [t.strip() for t in head.get("Content-Type", "").split(";")]
-            except KeyError:
-                it = resp.iter_content(65536)
-                mime = [t.strip() for t in self.mime.from_buffer(data).split(";")]
-            self.mimes[url] = mime
-            return mime
+        resp = reqx.next().stream("GET", url, follow_redirects=True)
+        self.activity += 1
+        resp = resp.__enter___()
+        head = fcdict(resp.headers)
+        try:
+            mime = [t.strip() for t in head.get("Content-Type", "").split(";")]
+        except KeyError:
+            it = resp.iter_bytes()
+            data = next(it)
+            mime = [t.strip() for t in self.mime.from_buffer(data).split(";")]
+        self.mimes[url] = mime
+        return mime
 
     emoji_stuff = {}
 
@@ -1393,7 +1410,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 f = file
             else:
                 data  = file
-                file = CompatFile(io.BytesIO(data), filename)
+                file = CompatFile(data, filename)
                 fsize = len(data)
         if fsize <= size:
             if not hasattr(file, "fp"):
@@ -1423,7 +1440,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 else:
                     ext = None
                 urls = await create_future(as_file, file if getattr(file, "_fp", None) else f, filename=filename, ext=ext, rename=rename)
-                message = await channel.send(msg + ("" if msg.endswith("```") else "\n") + urls[0], embed=embed, reference=reference) #, embed=discord.Embed(colour=discord.Colour(1)).set_image(url=urls[-1]))
+                if hasattr(channel, "simulated"):
+                    urls = (urls[1],)
+                message = await channel.send((msg + ("" if msg.endswith("```") else "\n") + urls[0]).strip(), embed=embed, reference=reference) #, embed=discord.Embed(colour=discord.Colour(1)).set_image(url=urls[-1]))
             else:
                 message = await channel.send(msg, embed=embed, file=file, reference=reference)
                 if filename is not None:
@@ -1441,7 +1460,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             raise
         if message.attachments:
             await self.add_attachment(message.attachments[0], data)
-            await message.edit(content=message.content + ("" if message.content.endswith("```") else "\n") + ("\n".join("<" + best_url(a) + ">" for a in message.attachments) if best else "\n".join("<" + a.url + ">" for a in message.attachments)))
+            content = message.content + ("" if message.content.endswith("```") else "\n") + ("\n".join("<" + best_url(a) + ">" for a in message.attachments) if best else "\n".join("<" + a.url + ">" for a in message.attachments))
+            await message.edit(content=content.strip())
         return message
 
     # Inserts a message into the bot cache, discarding existing ones if full.
@@ -1462,8 +1482,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             self.cache.messages[message.id] = message
             if (utc_dt() - created_at).total_seconds() < 86400 * 14 and "message_cache" in self.data and not getattr(message, "simulated", None):
                 self.data.message_cache.save_message(message)
-        if ts_us() % 16 == 0:
-            self.limit_cache("messages")
         return message
 
     # Deletes a message from the bot cache.
@@ -1484,44 +1502,48 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if not os.path.exists(fn):
                 with open(fn, "wb") as f:
                     await create_future(f.write, data)
-            self.limit_cache("attachments", 256)
         return attachment
 
     def attachment_from_file(self, file):
         a_id = int(file.split(".", 1)[0][11:])
         self.cache.attachments[a_id] = a_id
 
-    async def get_attachment(self, url, full=True):
-        if is_discord_url(url) and "attachments/" in url[:64]:
-            with suppress(ValueError):
-                a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
-                with suppress(LookupError):
-                    for i in range(30):
-                        data = self.cache.attachments[a_id]
-                        if data is not None:
-                            if type(data) is not bytes:
-                                self.cache.attachments[a_id] = None
-                                try:
-                                    with open(f"cache/attachment_{data}.bin", "rb") as f:
-                                        data = await create_future(f.read)
-                                except FileNotFoundError:
-                                    if full:
-                                        data = await Request(url, aio=True)
-                                        await self.add_attachment(cdict(id=a_id), data=data)
-                                        return data
-                                    return await create_future(reqs.next().get, url, stream=True)
-                                else:
-                                    self.cache.attachments[a_id] = data
-                            print(f"Successfully loaded attachment {a_id} from cache.")
-                            return data
-                        if i:
-                            await asyncio.sleep(0.25 * i)
+    async def get_attachment(self, url, full=True, allow_proxy=False):
+        if not is_discord_url(url) or "attachments/" not in url[:64]:
+            return
+        with suppress(ValueError):
+            a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
+            with suppress(LookupError):
+                for i in range(30):
+                    data = self.cache.attachments[a_id]
+                    if data is not None:
+                        if not isinstance(data, bytes):
+                            self.cache.attachments[a_id] = None
+                            try:
+                                with open(f"cache/attachment_{data}.bin", "rb") as f:
+                                    data = await create_future(f.read)
+                            except FileNotFoundError:
+                                if allow_proxy and is_image(url):
+                                    url = to_png(url)
+                                data = await Request(url, aio=True)
+                                await self.add_attachment(cdict(id=a_id), data=data)
+                                return data
+                            else:
+                                self.cache.attachments[a_id] = data
+                        print(f"Successfully loaded attachment {a_id} from cache.")
+                        return data
+                    if i:
+                        await asyncio.sleep(0.25 * i)
+            if allow_proxy and is_image(url):
+                url = to_png(url)
+            if full:
                 data = await Request(url, aio=True)
                 await self.add_attachment(cdict(id=a_id), data=data)
                 return data
-        return None
+            return await create_future(reqs.next().get, url, stream=True)
+        return
 
-    async def get_request(self, url, limit=None, full=True):
+    async def get_request(self, url, limit=None, full=True, timeout=12):
         fn = is_file(url)
         if fn:
             if limit:
@@ -1537,7 +1559,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             return data
         if not full:
             return await create_future(reqs.next().get, url, stream=True)
-        return await Request(url, aio=True)
+        return await Request(url, timeout=timeout, aio=True)
 
     def get_colour(self, user):
         if user is None:
@@ -1600,7 +1622,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if urls:
                 with tracebacksuppressor:
                     url = urls[0]
-                    resp = reqs.next().get(url, headers=Request.header(), timeout=12)
+                    resp = await create_future(reqx.next().get, url, headers=Request.header(), _timeout_=12)
                     self.activity += 1
                     headers = fcdict(resp.headers)
                     if headers.get("Content-Type", "").split("/", 1)[0] == "image":
@@ -1686,13 +1708,25 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         if limit is None:
             limit = self.cache_size
         if cache is not None:
-            caches = [self.cache[cache]]
+            caches = (self.cache[cache],)
         else:
             caches = self.cache.values()
         for c in caches:
             while len(c) > limit:
                 with suppress(RuntimeError):
                     c.pop(next(iter(c)))
+
+    def cache_reduce(self):
+        self.limit_cache("messages")
+        self.limit_cache("attachments", 256)
+        self.limit_cache("guilds")
+        self.limit_cache("channels")
+        self.limit_cache("users")
+        self.limit_cache("members")
+        self.limit_cache("roles")
+        self.limit_cache("emojis")
+        self.limit_cache("deleted", limit=4096)
+        self.limit_cache("banned", 4096)
 
     # Updates bot cache from the discord.py client cache, using automatic feeding to mitigate the need for slow dict.update() operations.
     def update_cache_feed(self):
@@ -1716,6 +1750,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     def update_subs(self):
         self.sub_guilds = dict(self._guilds) or self.sub_guilds
         self.sub_channels = dict(chain.from_iterable(guild._channels.items() for guild in self.sub_guilds.values())) or self.sub_channels
+        if not self.guilds_ready.done():
+            return
+        for guild in self.guilds:
+            if len(guild._members) != guild.member_count:
+                print("Incorrect member count:", guild, len(guild._members), guild.member_count)
+                create_task(self.load_guild(guild))
 
     # Gets the target bot prefix for the target guild, return the default one if none exists.
     def get_prefix(self, guild):
@@ -1878,7 +1918,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         except AttributeError:
             m_id = int(message)
         self.cache.deleted[m_id] = no_log + 2
-        self.limit_cache("deleted", limit=4096)
 
     # Silently deletes a message, bypassing logs.
     async def silent_delete(self, message, exc=False, no_log=False, delay=None):
@@ -1890,7 +1929,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             await asyncio.sleep(float(delay))
         try:
             self.log_delete(message, no_log)
-            await message.delete()
+            await discord.Message.delete(message)
         except:
             self.cache.deleted.pop(message.id, None)
             if exc:
@@ -1904,7 +1943,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             self.cache.banned.pop((guild.id, user.id), None)
             raise
         self.cache.banned[(guild.id, user.id)] = utc()
-        self.limit_cache("banned", 4096)
 
     def recently_banned(self, user, guild, duration=20):
         return utc() - self.cache.banned.get((verify_id(guild), verify_id(user)), 0) < duration
@@ -2059,7 +2097,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     try:
                         return round_min(f)
                     except:
-                        return ast.literal_eval(f)
+                        try:
+                            return orjson.loads(f)
+                        except:
+                            return ast.literal_eval(f)
         except (ValueError, TypeError, SyntaxError):
             r = await self.solve_math(f, 128, 0)
         x = r[0]
@@ -2246,7 +2287,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     def get_active(self):
         procs = 2 + sum(1 for c in self.proc.children(True))
         thrds = self.proc.num_threads()
-        coros = sum(1 for i in asyncio.all_tasks())
+        coros = sum(1 for i in asyncio.all_tasks(self.loop))
         return alist((procs, thrds, coros))
 
     # Gets the CPU and memory usage of a process over a period of 1 second.
@@ -2261,7 +2302,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         return 0, 0
 
     async def get_disk(self):
-        with tracebacksuppressor(SemaphoreOverflowError):
+        with tracebacksuppressor(SemaphoreOverflowError, FileNotFoundError):
             async with self.disk_semaphore:
                 self.disk = await create_future(get_folder_size, ".", priority=True)
         return self.disk
@@ -2291,6 +2332,57 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     self.size2[f] = line_count(path)
             self.curr_state = stats
             return stats
+
+    status_sem = Semaphore(1, inf, rate_limit=1)
+
+    def status(self):
+        if self.status_sem.busy:
+            return self.status_data
+        with self.status_sem:
+            active = self.get_active()
+            size = (
+                np.sum(deque(self.size.values()), dtype=np.uint32, axis=0)
+                + np.sum(deque(self.size2.values()), dtype=np.uint32, axis=0)
+            )
+            stats = self.curr_state
+            commands = set(itertools.chain(*self.commands.values()))
+            self.status_data = {
+                "System info": {
+                    "Process count": active[0],
+                    "Thread count": active[1],
+                    "Coroutine count": active[2],
+                    "CPU usage": f"{round(stats[0], 3)}%",
+                    "RAM usage": byte_scale(stats[1]) + "B",
+                    "Disk usage": byte_scale(stats[2]) + "B",
+                    "Network usage": byte_scale(bot.bitrate) + "bps",
+                    "Stored files": self.file_count,
+                },
+                "Discord info": {
+                    "Shard count": self.shards,
+                    "Server count": len(self._guilds),
+                    "User count": len(self.cache.users),
+                    "Channel count": len(self.cache.channels),
+                    "Role count": len(self.cache.roles),
+                    "Emoji count": len(self.cache.emojis),
+                    "Cached messages": len(self.cache.messages),
+                    "API latency": sec2time(self.api_latency),
+                },
+                "Misc info": {
+                    "Active commands": self.command_semaphore.active,
+                    "Connected voice channels": len(self.audio.players),
+                    "Active audio players": sum(bool(auds.queue and not auds.paused) for auds in self.audio.players.values()),
+                    "Activity count": self.activity,
+                    "Total data transmitted": byte_scale(bot.total_bytes) + "B",
+                    "System time": datetime.datetime.now(),
+                    "Current uptime": dyn_time_diff(utc(), bot.start_time),
+                },
+                "Code info": {
+                    "Code size": [x.item() for x in size],
+                    "Command count": len(commands),
+                    "Website URL": self.webserver,
+                },
+            }
+        return self.status_data
 
     # Loads a module containing commands and databases by name.
     def get_module(self, module):
@@ -2441,7 +2533,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 if utc() - os.path.getmtime(fn) < 60:
                     return fn
                 os.remove(fn)
-            lines = as_str(subprocess.run([sys.executable, "neutrino.py", "-c4", "../saves", "../" + fn], stderr=subprocess.PIPE, cwd="misc").stdout).splitlines()
+            lines = as_str(subprocess.run([sys.executable, "neutrino.py", "-c0", "../saves", "../" + fn], stderr=subprocess.PIPE, cwd="misc").stdout).splitlines()
             s = "\n".join(line for line in lines if not line.startswith("\r"))
             print(s)
         # zf = ZipFile(fn, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
@@ -2455,7 +2547,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
     # Autosaves modified bot databases. Called once every minute and whenever the bot is about to shut down.
     def update(self, force=False):
-        self.update_embeds()
+        if force:
+            self.update_embeds(True)
         saved = alist()
         with tracebacksuppressor:
             for i, u in self.data.items():
@@ -2613,8 +2706,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             guild_count = len(self.guilds)
             changed = guild_count != self.guild_count
             if changed or utc() > self.stat_timer:
-                # Status changes every 2 seconds
-                self.stat_timer = utc() + 1.5
+                # Status changes every 3 seconds (1 cps, threshold 2.5s)
+                self.stat_timer = utc() + 2.5
                 self.guild_count = guild_count
                 self.status_iter = (self.status_iter + 1) % (len(self.statuses) - (not self.audio))
                 with suppress(discord.NotFound):
@@ -2634,13 +2727,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         audio_status = f"await client.change_presence(status=discord.Status."
                         if status == discord.Status.invisible:
                             status = discord.Status.idle
-                            create_future_ex(self.audio.submit, audio_status + "online)")
+                            create_task(self.audio.asubmit(audio_status + "online)"))
                             await self.seen(self.user, event="misc", raw="Changing their status")
                         else:
                             if status == discord.Status.online:
-                                create_future_ex(self.audio.submit, audio_status + "dnd)")
+                                create_task(self.audio.asubmit(audio_status + "dnd)"))
                             create_task(self.seen(self.user, event="misc", raw="Changing their status"))
-                    await self.change_presence(activity=activity, status=status)
+                    with suppress(ConnectionResetError):
+                        await self.change_presence(activity=activity, status=status)
                     # Member update events are not sent through for the current user, so manually send a _seen_ event
                     await self.seen(self.user, event="misc", raw="Changing their status")
 
@@ -2941,8 +3035,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         )
                         # Add a callback to typing in the channel if the command takes too long
                         if fut is None and not hasattr(command, "typing"):
-                            create_task(delayed_callback(future, 2, typing, channel))
-                        response = await future
+                            create_task(delayed_callback(future, sqrt(3), typing, channel))
+                        with self.command_semaphore:
+                            response = await future
                         # Send bot event: user has executed command
                         await self.send_event("_command_", user=user, command=command, loop=loop, message=message)
                         # Process response to command if there is one
@@ -3001,8 +3096,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                                             filemsg = "Response too long for message."
                                         else:
                                             filemsg = "Response data:"
-                                        b = io.BytesIO(response)
-                                        f = CompatFile(b, filename="message.txt")
+                                        f = CompatFile(response, filename="message.txt")
                                         sent = await self.send_with_file(channel, filemsg, f, reference=message)
                                 # Add targeted react if there is one
                                 if react and sent:
@@ -3094,7 +3188,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     output = await glob["_"]()
                     glob["_"] = _
             if code is not None:
-                output = await create_future(eval, code, glob, priority=True)
+                try:
+                    output = await create_future(eval, code, glob, priority=True)
+                except:
+                    print(proc)
+                    raise
             if type(output) in (deque, alist):
                 output = list(output)
             if output is not None:
@@ -3115,8 +3213,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     async with self.load_semaphore:
                         memberdata = await Request(
                             f"https://discord.com/api/{api}/guilds/{guild.id}/members?limit=1000&after={x}",
-                            headers=dict(Authorization="Bot " + self.token),
-                            bypass=False,
+                            authorise=True,
                             json=True,
                             aio=True,
                         )
@@ -3127,8 +3224,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     break
             members = {int(m["user"]["id"]): discord.Member(guild=guild, data=m, state=self._connection) for m in memberdata}
             guild._members.update(members)
+            guild._member_count = len(guild._members)
             i = len(memberdata)
             x = max(members)
+
+    async def load_guild(self, guild):
+        await choice(self._connection.chunk_guild, self.load_guild_http)(guild)
+        guild._member_count = len(guild._members)
+        return guild
 
     async def load_guilds(self):
         funcs = [self._connection.chunk_guild, self.load_guild_http]
@@ -3207,22 +3310,18 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 async with getattr(w, "semaphore", emptyctx):
                     w = getattr(w, "webhook", w)
                     if hasattr(channel, "thread") or isinstance(channel, discord.Thread):
-                        data = orjson.dumps(dict(
+                        data = dict(
                             content=args[0] if args else kwargs.get("content"),
                             username=kwargs.get("username"),
                             avatar_url=kwargs.get("avatar_url"),
                             tts=kwargs.get("tts"),
                             embeds=[emb.to_dict() for emb in kwargs.get("embeds", ())] or [kwargs["embed"].to_dict()] if kwargs.get("embed") is not None else None,
-                        ))
+                        )
                         resp = await Request(
                             f"https://discord.com/api/{api}/webhooks/{w.id}/{w.token}?wait=True&thread_id={channel.id}",
                             method="POST",
-                            headers={
-                                "Content-Type": "application/json",
-                                "Authorization": f"Bot {self.token}",
-                            },
+                            authorise=True,
                             data=data,
-                            bypass=False,
                             aio=True,
                             json=True,
                         )
@@ -3237,12 +3336,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         resp = await Request(
                             f"https://discord.com/api/{api}/webhooks/{w.id}/{w.token}?wait=True&thread_id={channel.id}",
                             method="POST",
-                            headers={
-                                "Content-Type": "application/json",
-                                "Authorization": f"Bot {self.token}",
-                            },
+                            authorise=True,
                             data=data,
-                            bypass=False,
                             aio=True,
                             json=True,
                         )
@@ -3263,11 +3358,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 await message.add_reaction(react)
         return message
 
-    embed_calls = 0
-
     # Sends a list of embeds to the target sendable, using a webhook when possible.
-    async def _send_embeds(self, sendable, embeds, reacts=None, reference=None):
-        self.embed_calls += 1
+    async def _send_embeds(self, sendable, embeds, reacts=None, reference=None, force=True):
         s_id = verify_id(sendable)
         sendable = await self.fetch_messageable(s_id)
         with self.ExceptionSender(sendable, reference=reference):
@@ -3275,8 +3367,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 return
             guild = getattr(sendable, "guild", None)
             # Determine whether to send embeds individually or as blocks of up to 10, based on whether it is possible to use webhooks
+            if not guild:
+                return await send_with_react(sendable, embeds=embeds, reacts=reacts, reference=reference)
             single = False
-            if guild is None or (not hasattr(guild, "simulated") and hasattr(guild, "ghost")) or len(embeds) == 1:
+            if not hasattr(guild, "simulated") and hasattr(guild, "ghost"):
                 single = True
             else:
                 m = guild.me
@@ -3300,7 +3394,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         else:
                             create_task(sendable.send(embed=emb))
                 return
-            if self.embed_calls & 1:
+            if force:
                 return await send_with_react(sendable, embeds=embeds, reacts=reacts, reference=reference)
             embs = deque()
             for emb in embeds:
@@ -3329,12 +3423,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             await Request(
                 f"https://discord.com/api/{api}/interactions/{int_id}/{int_token}/callback",
                 method="POST",
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bot {self.token}",
-                },
-                data='{"type": 6}',
-                bypass=False,
+                authorise=True,
+                data='{"type":6}',
                 aio=True,
             )
 
@@ -3394,7 +3484,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         fin_col = col = None
         if colour is None:
             if author:
-                url = author.get("icon_url")
+                try:
+                    url = author.icon_url
+                except:
+                    url = author.get("icon_url")
                 if url:
                     with suppress():
                         fin_col = await self.data.colours.get(url)
@@ -3521,10 +3614,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         return self.send_embeds(channel, embeds=embs, reacts=reacts, reference=reference)
 
     # Updates all embed senders.
-    def update_embeds(self):
+    def update_embeds(self, force=False):
         sent = False
         for s_id in self.embed_senders:
             embeds = self.embed_senders[s_id]
+            if not force and len(embeds) <= 10 and sum(len(e) for e in embeds) <= 6000:
+                continue
             embs = deque()
             for emb in embeds:
                 if type(emb) is not discord.Embed:
@@ -3537,27 +3632,27 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             self.embed_senders[s_id] = embeds = embeds[len(embs):]
             if not embeds:
                 self.embed_senders.pop(s_id)
-            create_task(self._send_embeds(s_id, embs))
+            create_task(self._send_embeds(s_id, embs, force=force))
             sent = True
         return sent
 
-    # The fast update loop that runs 24 times per second. Used for events where timing is important.
+    # The fast update loop that runs almost 24 times per second. Used for events where timing is important.
     async def fast_loop(self):
 
         async def event_call(freq):
             for i in range(freq):
-                async with Delay(0.5 / freq):
+                async with Delay(0.51 / freq):
                     await self.send_event("_call_")
 
         freq = 12
         sent = 0
         while not self.closed:
             with tracebacksuppressor:
-                sent = self.update_embeds()
+                sent = self.update_embeds(utc() % 1 < 0.5)
                 if sent:
                     await event_call(freq)
                 else:
-                    async with Delay(0.5 / freq):
+                    async with Delay(0.51 / freq):
                         await self.send_event("_call_")
                 self.update_users()
 
@@ -3631,6 +3726,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         await create_future(self.update_subs, priority=True)
                     await asyncio.sleep(1)
                     await self.send_event("_minute_loop_")
+                    if SEMS:
+                        for sem in tuple(SEMS.values()):
+                            sem._update_bin()
+                    create_future_ex(self.cache_reduce, priority=True)
 
     # Heartbeat loop: Repeatedly deletes a file to inform the watchdog process that the bot's event loop is still running.
     async def heartbeat_loop(self):
@@ -3673,12 +3772,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
     # Handles a new sent message, calls process_message and sends an error if an exception occurs.
     async def handle_message(self, message, edit=True):
-        for i, a in enumerate(message.attachments):
-            if a.filename == "message.txt":
-                b = await self.get_request(message.attachments.pop(i).url)
-                if message.content:
-                    message.content += " "
-                message.content += as_str(b)
+        if message.author.id != self.user.id:
+            for i, a in enumerate(message.attachments):
+                if a.filename == "message.txt":
+                    b = await self.get_request(message.attachments.pop(i).url)
+                    if message.content:
+                        message.content += " "
+                    message.content += as_str(b)
         cpy = msg = message.content
         with self.ExceptionSender(message.channel, reference=message):
             if msg and msg[0] == "\\":
@@ -3872,13 +3972,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     data["embeds"] = [emb.to_dict() for emb in data["embeds"]]
                 resp = await Request(
                     f"https://discord.com/api/{api}/webhooks/{webhook.id}/{webhook.token}/messages/{self.id}",
-                    data=orjson.dumps(data),
-                    headers={
-                        "Authorization": f"Bot {bot.token}",
-                        "Content-Type": "application/json",
-                    },
+                    data=data,
+                    authorise=True,
                     method="PATCH",
-                    bypass=False,
                     aio=True,
                     json=True,
                 )
@@ -3934,8 +4030,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             def __copy__(self):
                 d = dict(self.__getattribute__("_data"))
                 channel = self.channel
+                if "channel_id" not in d:
+                    d["channel_id"] = channel.id
                 author = self.author
-                d.pop("author", None)
                 if "tts" not in d:
                     d["tts"] = False
                 try:
@@ -3950,7 +4047,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     pass
                 message = bot.LoadedMessage(state=bot._state, channel=channel, data=d)
                 apply_stickers(message, d)
-                message.author = author
+                if not getattr(message, "author", None):
+                    message.author = author
                 return message
 
             def __getattr__(self, k):
@@ -4001,7 +4099,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 if k == "system_content" and not d.get("type"):
                     return self.content
                 m = bot.cache.messages.get(d["id"])
-                if m is None or m is self or not issubclass(type(m), bot.LoadedMessage):
+                if m is None or m is self or not isinstance(m, bot.LoadedMessage):
                     message = self.__copy__()
                     if type(m) not in (discord.Message, bot.ExtendedMessage):
                         bot.add_message(message, files=False)
@@ -4011,7 +4109,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         if k == "mentions":
                             return ()
                         raise
-                return getattr(m, k)
+                try:
+                    return getattr(m, k)
+                except AttributeError:
+                    if k == "mentions":
+                        return ()
+                    raise
 
         class MessageCache(collections.abc.Mapping):
             data = bot.cache.messages
@@ -4213,6 +4316,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 for element in data:
                     element["channel_id"] = c_id
                     message = CM(element)
+                    message.channel = self.channel
                     await self.messages.put(message)
         
         discord.iterators.HistoryIterator.fill_messages = lambda self: fill_messages(self)
@@ -4272,34 +4376,129 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             return bot.ExtendedMessage.new(data)
         
         discord.state.ConnectionState.create_message = lambda self, *, channel, data: create_message(self, channel, data)
+
+        async def _request(self, bucket, files, form, method, url, kwargs, lock, maybe_lock=None):
+            for tries in range(5):
+                if files:
+                    for f in files:
+                        f.reset(seek=tries)
+                if form:
+                    form_data = aiohttp.FormData()
+                    for params in form:
+                        form_data.add_field(**params)
+                    kwargs['data'] = form_data
+
+                try:
+                    bot.activity += 1
+                    if form:
+                        r = await self._HTTPClient__session.request(method.upper(), url, **kwargs)
+                        data = await discord.http.json_or_text(r)
+                        status = r.status
+                    else:
+                        r = await Request.sessions.next().request(method.upper(), url, timeout=16, **kwargs)
+                        data = r.text
+                        try:
+                            if r.headers["Content-Type"] == "application/json":
+                                data = orjson.loads(data)
+                        except:
+                            pass
+                        status = r.status = r.status_code
+
+                    if maybe_lock and status != 429:
+                        # check if we have rate limit header information
+                        remaining = r.headers.get('X-Ratelimit-Remaining')
+                        if remaining == '0':
+                            # we've depleted our current bucket
+                            delta = parse_ratelimit_header(r.headers)
+                            # log.debug('A rate limit bucket has been exhausted (bucket: %s, retry: %s).', bucket, delta)
+                            maybe_lock.defer()
+                            self.loop.call_later(delta, lock.release)
+                        if remaining:
+                            limit = r.headers.get('X-Ratelimit-Limit')
+                            if limit and int(limit) == int(remaining) + 1:
+                                retry_after = r.headers.get("Retry-After") or r.headers.get("X-Ratelimit-Reset-After")
+                                if retry_after and float(retry_after):
+                                    limit = int(limit)
+                                    retry_after = round_min(retry_after) + limit * 0.03
+                                    sem = Semaphore(
+                                        limit,
+                                        256,
+                                        rate_limit=retry_after,
+                                        weak=True,
+                                    )
+                                    async with sem:
+                                        self._locks[bucket] = sem
+                                    maybe_lock = None
+                                    # print("Successfully registered hard rate limit", sem, "for", bucket)
+
+                    # the request was successful so just return the text/json
+                    if status in range(200, 400):
+                        return data
+
+                    # we are being rate limited
+                    if status == 429:
+                        if not r.headers.get('Via'):
+                            # Banned by Cloudflare more than likely.
+                            raise discord.HTTPException(r, data)
+                        # fmt = 'We are being rate limited. Retrying in %.2f seconds. Handled under the bucket "%s"'
+                        delta = parse_ratelimit_header(r.headers)
+                        is_global = data.get('global', False)
+                        if is_global:
+                            # log.warning('Global rate limit has been hit. Retrying in %.2f seconds.', retry_after)
+                            self._global_over.clear()
+                        await asyncio.sleep(delta)
+                        if not maybe_lock:
+                            fut = create_task(lock.__aenter__())
+                            lock.__exit__()
+                            await fut
+                        if is_global:
+                            self._global_over.set()
+                            # log.debug('Global rate limit is now over.')
+                        continue
+
+                    # we've received a 500 or 502, unconditional retry
+                    if status >= 500 and tries < 3:
+                        await asyncio.sleep(1 + tries * 2)
+                        continue
+
+                    if not hasattr(r, "reason"):
+                        r.reason = as_str(data)
+                    # the usual error cases
+                    if status == 403:
+                        raise discord.Forbidden(r, data)
+                    elif status == 404:
+                        raise discord.NotFound(r, data)
+                    elif status == 503:
+                        raise discord.DiscordServerError(r, data)
+                    else:
+                        raise discord.HTTPException(r, data)
+
+                # This is handling exceptions from the request
+                except (OSError, httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout, httpx.RemoteProtocolError):
+                    # Connection reset by peer
+                    if tries < 4:
+                        await asyncio.sleep(1 + tries * 2)
+                        continue
+                    raise
     
         async def request(self, route, *, files=None, form=None, **kwargs):
             bucket = route.bucket
             method = route.method
             url = route.url
 
-            rtype = 0
-            if "/reactions" in route.path:
-                rtype = 2
-            elif "/messages" in route.path:
-                rtype = 1
-
             lock = self._locks.get(bucket)
             if lock is None:
-                if rtype == 2:
-                    lock = Semaphore(1, 16, rate_limit=0.55)
-                if rtype == 1:
-                    lock = Semaphore(5, 256, rate_limit=5.1)
-                else:
+                if "/reactions" in route.path:
+                    lock = Semaphore(1, 16, rate_limit=0.28)
+                elif "/messages" in route.path:
+                    if method.casefold() != "delete":
+                        lock = Semaphore(5, 256, rate_limit=5.15)
+                if not lock:
                     lock = asyncio.Lock()
-                if bucket is not None:
-                    self._locks[bucket] = lock
+                self._locks[bucket] = lock
 
             # header creation
-            headers = {
-                'User-Agent': self.user_agent,
-            }
-
+            headers = {'User-Agent': self.user_agent}
             if self.token is not None:
                 headers['Authorization'] = 'Bot ' + self.token
             # some checking if it's a JSON request
@@ -4314,7 +4513,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             else:
                 if reason:
                     headers['X-Audit-Log-Reason'] = urllib.parse.quote(reason, safe='/ ')
-
             kwargs['headers'] = headers
 
             # Proxy support
@@ -4327,176 +4525,19 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 # wait until the global lock is complete
                 await self._global_over.wait()
 
-            if not rtype:
+            if not isinstance(lock, Semaphore):
                 await lock.acquire()
-                with discord.http.MaybeUnlock(lock) as maybe_lock:
-                    for tries in range(5):
-                        if files:
-                            for f in files:
-                                f.reset(seek=tries)
-
-                        if form:
-                            form_data = aiohttp.FormData()
-                            for params in form:
-                                form_data.add_field(**params)
-                            kwargs['data'] = form_data
-
-                        try:
-                            async with self.__dict__["_HTTPClient__session"].request(method, url, **kwargs) as r:
-                                bot.activity += 1
-                                # log.debug('%s %s with %s has returned %s', method, url, kwargs.get('data'), r.status)
-
-                                # even errors have text involved in them so this is safe to call
-                                data = await discord.http.json_or_text(r)
-
-                                # check if we have rate limit header information
-                                remaining = r.headers.get('X-Ratelimit-Remaining')
-                                if remaining == '0' and r.status != 429:
-                                    # we've depleted our current bucket
-                                    delta = utils._parse_ratelimit_header(r, use_clock=self.use_clock)
-                                    # log.debug('A rate limit bucket has been exhausted (bucket: %s, retry: %s).', bucket, delta)
-                                    maybe_lock.defer()
-                                    self.loop.call_later(delta, lock.release)
-
-                                # the request was successful so just return the text/json
-                                if 300 > r.status >= 200:
-                                    # log.debug('%s %s has received %s', method, url, data)
-                                    return data
-
-                                # we are being rate limited
-                                if r.status == 429:
-                                    if not r.headers.get('Via'):
-                                        # Banned by Cloudflare more than likely.
-                                        raise discord.HTTPException(r, data)
-
-                                    # fmt = 'We are being rate limited. Retrying in %.2f seconds. Handled under the bucket "%s"'
-
-                                    # sleep a bit
-                                    retry_after: float = data['retry_after']  # type: ignore
-                                    # log.warning(fmt, retry_after, bucket)
-
-                                    # check if it's a global rate limit
-                                    is_global = data.get('global', False)
-                                    if is_global:
-                                        # log.warning('Global rate limit has been hit. Retrying in %.2f seconds.', retry_after)
-                                        self._global_over.clear()
-
-                                    await asyncio.sleep(retry_after)
-                                    # log.debug('Done sleeping for the rate limit. Retrying...')
-
-                                    # release the global lock now that the
-                                    # global rate limit has passed
-                                    if is_global:
-                                        self._global_over.set()
-                                        # log.debug('Global rate limit is now over.')
-
-                                    continue
-
-                                # we've received a 500 or 502, unconditional retry
-                                if r.status >= 500 and tries < 3:
-                                    await asyncio.sleep(1 + tries * 2)
-                                    continue
-
-                                # the usual error cases
-                                if r.status == 403:
-                                    raise discord.Forbidden(r, data)
-                                elif r.status == 404:
-                                    raise discord.NotFound(r, data)
-                                elif r.status == 503:
-                                    raise discord.DiscordServerError(r, data)
-                                else:
-                                    raise discord.HTTPException(r, data)
-
-                        # This is handling exceptions from the request
-                        except OSError as e:
-                            # Connection reset by peer
-                            if tries < 4 and e.errno in (54, 10054):
-                                await asyncio.sleep(1 + tries * 2)
-                                continue
-                            raise
-
-            else:
+                lock = self._locks.get(bucket)
+                if not isinstance(lock, Semaphore):
+                    with discord.http.MaybeUnlock(lock) as maybe_lock:
+                        return await _request(self, bucket, files, form, method, url, kwargs, lock, maybe_lock=maybe_lock)
+            if isinstance(lock, Semaphore):
                 async with lock:
-                    for tries in range(5):
-                        if files:
-                            for f in files:
-                                f.reset(seek=tries)
-
-                        if form:
-                            form_data = aiohttp.FormData()
-                            for params in form:
-                                form_data.add_field(**params)
-                            kwargs['data'] = form_data
-
-                        try:
-                            async with self.__dict__["_HTTPClient__session"].request(method, url, **kwargs) as r:
-                                bot.activity += 1
-                                # log.debug('%s %s with %s has returned %s', method, url, kwargs.get('data'), r.status)
-
-                                # even errors have text involved in them so this is safe to call
-                                data = await discord.http.json_or_text(r)
-
-                                # the request was successful so just return the text/json
-                                if 300 > r.status >= 200:
-                                    # log.debug('%s %s has received %s', method, url, data)
-                                    return data
-
-                                # we are being rate limited
-                                if r.status == 429:
-                                    if not r.headers.get('Via'):
-                                        # Banned by Cloudflare more than likely.
-                                        raise discord.HTTPException(r, data)
-
-                                    # fmt = 'We are being rate limited. Retrying in %.2f seconds. Handled under the bucket "%s"'
-
-                                    # sleep a bit
-                                    retry_after: float = data['retry_after']  # type: ignore
-                                    # log.warning(fmt, retry_after, bucket)
-
-                                    # check if it's a global rate limit
-                                    is_global = data.get('global', False)
-                                    if is_global:
-                                        # log.warning('Global rate limit has been hit. Retrying in %.2f seconds.', retry_after)
-                                        self._global_over.clear()
-
-                                    await asyncio.sleep(retry_after)
-                                    # log.debug('Done sleeping for the rate limit. Retrying...')
-
-                                    # release the global lock now that the
-                                    # global rate limit has passed
-                                    if is_global:
-                                        self._global_over.set()
-                                        # log.debug('Global rate limit is now over.')
-
-                                    continue
-
-                                # we've received a 500 or 502, unconditional retry
-                                if r.status >= 500 and tries < 3:
-                                    await asyncio.sleep(1 + tries * 2)
-                                    continue
-
-                                # the usual error cases
-                                if r.status == 403:
-                                    raise discord.Forbidden(r, data)
-                                elif r.status == 404:
-                                    raise discord.NotFound(r, data)
-                                elif r.status == 503:
-                                    raise discord.DiscordServerError(r, data)
-                                else:
-                                    raise discord.HTTPException(r, data)
-
-                        # This is handling exceptions from the request
-                        except OSError as e:
-                            # Connection reset by peer
-                            if tries < 4 and e.errno in (54, 10054):
-                                await asyncio.sleep(1 + tries * 2)
-                                continue
-                            raise
+                    return await _request(self, bucket, files, form, method, url, kwargs, lock)
 
             # We've run out of retries, raise.
             if r.status >= 500:
                 raise discord.DiscordServerError(r, data)
-
             raise discord.HTTPException(r, data)
 
         discord.http.HTTPClient.request = lambda self, *args, **kwargs: request(self, *args, **kwargs)
@@ -4590,32 +4631,28 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             futs.add(self.audio_client_start)
             await self.wait_until_ready()
             self.bot_ready = True
-            print("Bot ready.")
             # Send bot_ready event to all databases.
             await self.send_event("_bot_ready_", bot=self)
             for fut in futs:
                 with tracebacksuppressor:
                     await fut
+            print("Bot ready.")
             await wrap_future(self.connect_ready)
+            print("Connect ready.")
             await wrap_future(self.guilds_ready)
+            print("Guilds ready.")
             await create_future(self.update_usernames)
             self.ready = True
             # Send ready event to all databases.
             print("Database ready.")
             await self.send_event("_ready_", bot=self)
             create_task(self.heartbeat_loop())
-            self.heartbeat_proc.kill()
-            print("Initialization complete.")
+            force_kill(self.heartbeat_proc)
+            print("Initialisation complete.")
 
     def set_client_events(self):
 
         print("Setting client events...")
-
-        @self.event
-        async def before_identify_hook(shard_id, initial=False):
-            if not getattr(self, "audio_client_start", None):
-                self.audio_client_start = create_future(self.start_audio_client, priority=True)
-            return
 
         # The event called when the client first connects, starts initialisation of the other modules
         @self.event
@@ -4644,7 +4681,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     if guild.unavailable:
                         print(f"Warning: Guild {guild.id} is not available.")
                 await self.handle_update()
-            self.connect_ready.set_result(True)
+            try:
+                self.connect_ready.set_result(True)
+            except concurrent.futures.InvalidStateError:
+                pass
 
         # Server join message
         @self.event
@@ -4960,6 +5000,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         message.guild = None
                     message.id = payload.message_id
                     message.author = await self.fetch_user(self.deleted_user)
+                    history = channel.history(limit=101, around=message)
+                    async def flatten_into_cache(history):
+                        messages = await history.flatten()
+                        data = {m.id: m for m in messages}
+                        create_future_ex(self.cache.messages.update, data)
+                    create_task(flatten_into_cache(history))
             try:
                 message.deleted = True
             except AttributeError:
@@ -5053,6 +5099,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         async def on_member_join(member):
             name = str(member)
             self.usernames[name] = self.cache.users[member.id]
+            if member.guild.id in self._guilds:
+                member.guild._member_count = len(member.guild._members)
             await self.send_event("_join_", user=member, guild=member.guild)
             await self.seen(member, member.guild, event="misc", raw=f"Joining a server")
 
@@ -5062,6 +5110,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if member.id not in self.cache.members:
                 name = str(member)
                 self.usernames.pop(name, None)
+            if member.guild.id in self._guilds:
+                member.guild._member_count = len(member.guild._members)
             await self.send_event("_leave_", user=member, guild=member.guild)
 
         # Channel create event: calls _channel_create_ bot database event.
@@ -5113,7 +5163,7 @@ class AudioClientInterface:
     written = False
 
     def __init__(self):
-        self.proc = psutil.Popen([python, "x-audio.py"], cwd=os.getcwd() + "/misc", stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        self.proc = psutil.Popen([python, "x-audio.py"], cwd=os.getcwd() + "/misc", stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=65536)
         create_thread(self.communicate)
         with suppress():
             if os.name == "nt":
@@ -5128,64 +5178,101 @@ class AudioClientInterface:
     def players(self):
         return bot.data.audio.players
 
+    async def asubmit(self, s, aio=False, ignore=False):
+        bot.activity += 1
+        key = ts_us()
+        while key in self.returns:
+            key += 1
+        self.returns[key] = None
+        if type(s) not in (bytes, memoryview):
+            s = as_str(s).encode("utf-8")
+        if aio:
+            s = b"await " + s
+        if ignore:
+            s = b"!" + s
+        out = (b"~", orjson.dumps(key), b"~", base64.b85encode(s), b"\n")
+        b = b"".join(out)
+        self.returns[key] = concurrent.futures.Future()
+        try:
+            await wrap_future(self.fut)
+            self.proc.stdin.write(b)
+            self.proc.stdin.flush()
+            resp = await asyncio.wait_for(wrap_future(self.returns[key]), timeout=48)
+        except:
+            raise
+        finally:
+            self.returns.pop(key, None)
+        return resp
+
     def submit(self, s, aio=False, ignore=False):
         bot.activity += 1
         key = ts_us()
         while key in self.returns:
             key += 1
         self.returns[key] = None
-        b = f"~{key}~".encode("utf-8") + (b"!" if ignore else b"") + (b"await " if aio else b"") + repr(as_str(s).encode("utf-8")).encode("utf-8") + b"\n"
-        # print(b)
+        if type(s) not in (bytes, memoryview):
+            s = as_str(s).encode("utf-8")
+        if aio:
+            s = b"await " + s
+        if ignore:
+            s = b"!" + s
+        out = (b"~", orjson.dumps(key), b"~", base64.b85encode(s), b"\n")
+        b = b"".join(out)
         self.returns[key] = concurrent.futures.Future()
-        self.fut.result()
-        self.proc.stdin.write(b)
-        self.proc.stdin.flush()
-        resp = self.returns[key].result(timeout=48)
-        self.returns.pop(key, None)
+        try:
+            self.fut.result()
+            self.proc.stdin.write(b)
+            self.proc.stdin.flush()
+            resp = self.returns[key].result(timeout=48)
+        except:
+            raise
+        finally:
+            self.returns.pop(key, None)
         return resp
 
     def communicate(self):
         proc = self.proc
-        proc.stdin.write(b"~0~0\n")
+        i = b"~0~Fa\n"
+        proc.stdin.write(i)
         proc.stdin.flush()
         while True:
-            s = as_str(proc.stdout.readline()).rstrip()
-            if s:
-                if s == "~b'bot.audio.returns[0].set_result(0)'":
+            s = proc.stdout.readline().rstrip()
+            if s.startswith(b"~"):
+                s = base64.b85decode(s[1:])
+                if s == b"bot.audio.returns[0].set_result(0)":
                     break
-                print(s)
+            print(as_str(s))
         self.written = True
         self.fut.set_result(self)
         with tracebacksuppressor:
-            while not bot.closed and proc.is_running():
-                s = as_str(proc.stdout.readline()).rstrip()
+            while not bot.closed and is_strict_running(proc):
+                s = proc.stdout.readline().rstrip()
                 if s:
-                    if s[0] == "~":
+                    if s[:1] == b"~":
                         bot.activity += 1
-                        c = as_str(literal_eval(s[1:]))
-                        if c.startswith("bot.audio.returns["):
+                        c = memoryview(base64.b85decode(s[1:]))
+                        if c[:18] == b"bot.audio.returns[":
                             out = Dummy
-                            if c.endswith("].set_result(None)"):
+                            if c[-18:] == b"].set_result(None)":
                                 out = None
-                            elif c.endswith("].set_result(True)"):
+                            elif c[-18:] == b"].set_result(True)":
                                 out = True
                             if out is not Dummy:
                                 k = int(c[18:-18])
-                                try:
+                                with tracebacksuppressor:
                                     self.returns[k].set_result(out)
-                                except:
-                                    pass
                                 continue
                         create_future_ex(exec_tb, c, bot._globals)
                     else:
-                        print(s)
+                        print(as_str(s))
 
     def kill(self):
-        if self.proc.is_running():
-            create_future_ex(self.submit, "await kill()")
-        time.sleep(1)
+        if not is_strict_running(self.proc):
+            return
+        with tracebacksuppressor:
+            create_future_ex(self.submit, "await kill()", priority=True).result(timeout=2)
         with tracebacksuppressor(psutil.NoSuchProcess):
-            return self.proc.kill()
+            return force_kill(self.proc)
 
 
 # Queries for searching members
@@ -5359,9 +5446,10 @@ def webserver_communicate(bot):
 
 class SimulatedMessage:
 
-    def __init__(self, bot, content, t, name, nick, recursive=True):
+    def __init__(self, bot, content, t, name, nick=None, recursive=True):
         self._state = bot._state
-        self.created_at = datetime.datetime.fromtimestamp(int(t) / 1e6)
+        self.created_at = datetime.datetime.utcfromtimestamp(int(t) / 1e6)
+        self.ip = name
         self.id = time_snowflake(self.created_at, high=True)
         self.content = content
         self.response = deque()
@@ -5379,7 +5467,7 @@ class SimulatedMessage:
         self.name = name
         disc = str(xrand(10000))
         self.discriminator = "0" * (4 - len(disc)) + disc
-        self.nick = self.display_name = nick
+        self.nick = self.display_name = nick or name
         self.owner_id = self.id
         self.mention = f"<@{self.id}>"
         self.recipient = author
@@ -5404,7 +5492,10 @@ class SimulatedMessage:
 
     async def send(self, *args, **kwargs):
         if args:
-            kwargs["content"] = args[0]
+            try:
+                kwargs["content"] = args[0]
+            except IndexError:
+                kwargs["content"] = ""
         try:
             embed = kwargs.pop("embed")
         except KeyError:
@@ -5434,7 +5525,7 @@ class SimulatedMessage:
 
     def edit(self, **kwargs):
         self.response[-1].update(kwargs)
-        return emptyfut
+        return as_fut(self)
 
     async def history(self, *args, **kwargs):
         yield self
@@ -5508,7 +5599,7 @@ if __name__ == "__main__":
             miza.miza = miza
             with miza:
                 miza.run()
-            miza.server.kill()
+            force_kill(miza.server)
             miza.audio.kill()
             sub_kill(start=False)
     print = _print

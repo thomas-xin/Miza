@@ -13,6 +13,12 @@ except ModuleNotFoundError:
     exec(code, globals())
 
 
+try:
+    RAPIDAPI_SECRET = AUTH["rapidapi_secret"]
+except KeyError:
+    RAPIDAPI_SECRET = None
+
+
 HOST = "http://i.mizabot.xyz"
 PORT = AUTH.get("webserver_port", 80)
 IND = "\x7f"
@@ -31,7 +37,7 @@ def send(*args, escape=True):
             sys.__stderr__.buffer.write(s)
             sys.__stderr__.flush()
     except OSError:
-        psutil.Process().kill()
+        force_kill(psutil.Process())
 
 
 def create_etag(data):
@@ -71,6 +77,10 @@ class EndpointRedirects(Dispatcher):
             path = "/raw/" + path[3:]
         elif path == "/upload":
             path = "/files"
+        elif path == "/api/mpinsights":
+            path = "/api_mpinsights"
+        elif path == "/api/status":
+            path = "/api_status"
         else:
             p = path.lstrip("/")
             if p in actually_static:
@@ -181,7 +191,7 @@ def get_geo(ip):
     if ip.startswith("192.168."):
         ip = IP
         if not ip:
-            ip = IP = reqs.next().get("https://api.ipify.org").text
+            ip = IP = reqx.next().get("https://api.ipify.org").text
     try:
         resp = TZCACHE[ip]
     except KeyError:
@@ -191,7 +201,7 @@ def get_geo(ip):
             url = f"https://demo.ip-api.com/json/{ip}?fields=256&key=test-demo-pro"
         geo_count += 1
         with geo_sem:
-            resp = reqs.next().get(url, headers={"DNT": "1", "User-Agent": f"Mozilla/5.{ip[-1]}", "Origin": "https://members.ip-api.com"})
+            resp = reqx.next().get(url, headers={"DNT": "1", "User-Agent": f"Mozilla/5.{ip[-1]}", "Origin": "https://members.ip-api.com"})
         send("@@@", escape=False)
         resp.raise_for_status()
         resp = cdict(resp.json())
@@ -397,7 +407,7 @@ class Server:
                 image_loaders = self.image_loaders
                 if (not os.path.exists(preview) or not os.path.getsize(preview)) and preview not in image_loaders:
                     args = (
-                        "ffmpeg",
+                        "./ffmpeg",
                         "-nostdin",
                         "-hide_banner",
                         "-v",
@@ -406,6 +416,8 @@ class Server:
                         "ignore_err",
                         "-fflags",
                         "+discardcorrupt+genpts+igndts+flush_packets",
+                        "-hwaccel",
+                        "auto",
                         "-an",
                         "-i",
                         p,
@@ -417,19 +429,20 @@ class Server:
                         "scale=240:-1",
                         preview,
                     )
-                    proc = psutil.Popen(args, stdout=subprocess.PIPE)
+                    print(args)
+                    proc = psutil.Popen(args)
                     image_loaders[preview] = proc
                 cp.response.headers["Content-Type"] = "image/gif"
                 cp.response.headers["ETag"] = create_etag(p)
-                while preview in image_loaders and (not os.path.exists(preview) or os.path.getsize(preview) < 524288) and image_loaders[preview].is_running():
+                while preview in image_loaders and (not os.path.exists(preview) or os.path.getsize(preview) < 524288) and is_strict_running(image_loaders[preview]):
                     time.sleep(0.05)
                 f = None
-                if preview in image_loaders and not image_loaders[preview].is_running() or preview not in image_loaders and os.path.exists(preview):
+                if preview in image_loaders and not is_strict_running(image_loaders[preview]) or preview not in image_loaders and os.path.exists(preview):
                     cp.response.headers["Content-Length"] = os.path.getsize(preview)
                 elif preview in image_loaders:
                     f = DownloadingFile(
                         preview,
-                        lambda: not image_loaders[preview].is_running(),
+                        lambda: not is_strict_running(image_loaders[preview]),
                     )
                 if not f:
                     if os.path.getsize(preview):
@@ -437,7 +450,7 @@ class Server:
                     else:
                         cp.response.headers["Content-Type"] = get_mime(p)
                         f = open(p, "rb")
-                return cp.lib.file_generator(f, 65536)
+                return cp.lib.file_generator(f, 262144)
             elif endpoint.startswith("a") and mime.split("/", 1)[0] in "video":
                 f_url = cp.url(qs=cp.request.query_string).replace(f"/{endpoint}/", "/f/")
                 i_url = f_url.replace("/f/", "/i/") + ".gif"
@@ -519,7 +532,7 @@ class Server:
                                 return b
                             f = resp.raw
                             # f = ForwardedRequest(resp, 98304)
-                            return cp.lib.file_generator(f, 65536)
+                            return cp.lib.file_generator(f, 262144)
             return cp.lib.static.serve_file(p, content_type=mime, disposition="attachment" if download else None)
     files._cp_config = {"response.stream": True}
 
@@ -685,7 +698,8 @@ class Server:
         v = d or kwargs.get("v") or kwargs.get("view")
         q = d or v or kwargs.get("q") or kwargs.get("query") or kwargs.get("s") or kwargs.get("search")
         if not q:
-            raise EOFError
+            cp.response.status = 204
+            return
         t = ts_us()
         while t in RESPONSES:
             t += 1
@@ -732,17 +746,17 @@ class Server:
                     return True
                 return j["result"] is not False
 
-            f = DownloadingFile(fni, af=af)
             cp.response.headers["Accept-Ranges"] = "bytes"
             cp.response.headers.update(CHEADERS)
             cp.response.headers["Content-Disposition"] = "attachment; " * bool(d) + "filename=" + json.dumps(name + fmt)
             if af():
+                f = open(fni, "rb")
                 count = 1048576
-                cp.response.headers["Content-Length"] = os.path.getsize(fni)
             else:
+                f = DownloadingFile(fni, af=af)
                 if d:
                     cp.response.status = 202
-                count = 65536
+                count = 262144
             cp.response.headers["Content-Type"] = f"audio/{fmt[1:]}"
             return cp.lib.file_generator(f, count)
         else:
@@ -756,7 +770,7 @@ class Server:
         return orjson.dumps(res)
     ytdl._cp_config = {"response.stream": True}
 
-    @cp.expose(("index", "p", "preview", "files", "file", "tester", "atlas", "mizatlas", "time"))
+    @cp.expose(("index", "p", "preview", "files", "file", "tester", "atlas", "mizatlas", "time", "mpinsights"))
     def index(self, path=None, filename=None, *args, **kwargs):
         url = cp.url(qs=cp.request.query_string)
         if "/p/" in url:
@@ -766,9 +780,12 @@ class Server:
         if "/upload" in url:
             raise cp.HTTPRedirect(url.replace("/upload", "/files"), status=307)
         data, mime = fetch_static("index.html")
-        meta = """<meta property="og:title" content="Miza"><meta property="og:description" content="A multipurpose Discord bot.">\
-<meta property="og:image" content="/logo256.png">\
-<meta property="og:site_name" content="Miza">"""
+        meta = '<meta property="og:title" content="Miza"><meta property="og:description" content="A multipurpose Discord bot.">'
+        if "/file" in url or "/files" in url:
+            meta += '<meta property="og:image" content="/mizaleaf.png">'
+        else:
+            meta += '<meta property="og:image" content="/logo256.png">'
+        meta += '<meta property="og:site_name" content="Miza">'
         if path:
             ind = IND
             p = None
@@ -1481,7 +1498,7 @@ body {
         if token != AUTH.get("discord_token"):
             raise InterruptedError
         url = cp.url(base="", qs=cp.request.query_string)
-        content = urllib.parse.unquote(url.split("?", 1)[0].lstrip("/").split("/", 2)[-1])
+        content = urllib.parse.unquote(url.lstrip("/").split("/", 2)[-1])
         t = ts_us()
         while t in RESPONSES:
             t += 1
@@ -1579,78 +1596,47 @@ body {
     mpimg = {}
 
     @cp.expose
-    def mpinsights(self):
+    def api_mpinsights(self):
         values = self.mpget()
         for i in range(3):
             values[i] = int(values[i])
-        if "text/html" not in cp.request.headers.get("Accept", ""):
-            self.ensure_mpins()
-            histories = [None] * len(values)
-            hours = histories.copy()
-            for k in range(len(histories)):
-                width = np.clip(len(self.ins_data[k]), 3, 96)
-                histories[k] = list(supersample(self.ins_data[k], width))
-                hours[k] = len(self.ins_data[k])
-            return orjson.dumps(dict(
-                current=dict(
-                    live_users=values[2],
-                    active_users=values[1],
-                    total_users=values[0],
-                    total_playtime=values[4],
-                    total_use_time=values[3],
-                    average_playtime=values[5],
-                ),
-                historical=dict(
-                    live_users=[histories[2], hours[2]],
-                    active_users=[histories[1], hours[2]],
-                    total_users=[histories[0], hours[2]],
-                    total_playtime=[histories[4], hours[2]],
-                    total_use_time=[histories[3], hours[2]],
-                    average_playtime=[histories[5], hours[2]],
-                ),
-            ))
-        create_future_ex(self.ensure_mpins)
-        return """<!DOCTYPE html><html>
-<head>
-    <meta charset="utf-8">
-    <title>Insights</title>
-    <meta content="Miza Player Insights" property="og:title">
-    <meta content="See the activity history for the Miza Player program!" property="og:description">
-    <meta content="{cp.url()}" property="og:url">
-    <meta property="og:image" content="https://raw.githubusercontent.com/thomas-xin/Image-Test/master/sky-rainbow.gif">
-    <meta content="#BF7FFF" data-react-helmet="true" name="theme-color">
-    <style>
-        body {
-            font-family:Rockwell;
-            background:black;
-            color:#bfbfbf;
-            text-align:center;
-        }
-        .center {
-            display: block;
-            margin-left: auto;
-            margin-right: auto;
-            max-width: 100%;
-        }
-    </style>
-</head>""" + f"""
-<body>
-    <h1 style="color:white;">Miza Player Insights</h1>
-    Live users: {values[2]}
-    <img class="center" src="http://i.mizabot.xyz/mpins/2">
-    Active users: {values[1]}
-    <img class="center" src="http://i.mizabot.xyz/mpins/1">
-    Total users: {values[0]}
-    <img class="center" src="http://i.mizabot.xyz/mpins/0">
-    <br>
-    Total playtime: {sec2time(values[4])}
-    <img class="center" src="http://i.mizabot.xyz/mpins/4">
-    Total use time: {sec2time(values[3])}
-    <img class="center" src="http://i.mizabot.xyz/mpins/3">
-    Average playtime per user: {sec2time(values[5])}
-    <img class="center" src="http://i.mizabot.xyz/mpins/5">
-</body>
-</html>"""
+        self.ensure_mpins()
+        histories = [None] * len(values)
+        hours = histories.copy()
+        for k in range(len(histories)):
+            width = np.clip(len(self.ins_data[k]), 3, 96)
+            histories[k] = list(supersample(self.ins_data[k], width))
+            hours[k] = len(self.ins_data[k])
+        return orjson.dumps(dict(
+            current=dict(
+                live_users=values[2],
+                active_users=values[1],
+                total_users=values[0],
+                total_playtime=values[4],
+                total_use_time=values[3],
+                average_playtime=values[5],
+            ),
+            historical=dict(
+                live_users=[histories[2], hours[2]],
+                active_users=[histories[1], hours[2]],
+                total_users=[histories[0], hours[2]],
+                total_playtime=[histories[4], hours[2]],
+                total_use_time=[histories[3], hours[2]],
+                average_playtime=[histories[5], hours[2]],
+            ),
+        ))
+
+    @cp.expose
+    def api_status(self):
+        t = ts_us()
+        while t in RESPONSES:
+            t += 1
+        RESPONSES[t] = fut = concurrent.futures.Future()
+        content = f'bot.status()'
+        send(f"!{t}\x7f{content}", escape=False)
+        j, after = fut.result()
+        RESPONSES.pop(t, None)
+        return orjson.dumps(j["result"])
 
     def ensure_mpins(self):
         try:
@@ -1767,8 +1753,9 @@ body {
                 send(traceback.format_exc())
             time.sleep(60)
 
+    rapidapi = 0
     @cp.expose(("commands",))
-    def command(self, content="", input=""):
+    def command(self, content="", input="", timeout=420):
         ip = cp.request.remote.ip
         if ip == "127.0.0.1":
             t, after = content.split("\x7f", 1)
@@ -1781,11 +1768,22 @@ body {
                 return b"\xf0\x9f\x92\x9c"
         content = input or urllib.parse.unquote(cp.url(base="", qs=cp.request.query_string).rstrip("?").split("/", 2)[-1])
         if "DNT" in (k.upper() for k in cp.request.headers):
-            ip = "255.255.255.255"
+            random.seed(ip)
+            ip = ".".join(str(xrand(1, 255)) for _ in loop(4))
+            random.seed(ts_us())
             tz = "Anonymous (DNT enabled)"
         else:
-            data = get_geo(ip)
-            tz = data["timezone"]
+            try:
+                secret = cp.request.headers["X-RapidAPI-Proxy-Secret"]
+                if secret != RAPIDAPI_SECRET:
+                    raise KeyError
+            except KeyError:
+                data = get_geo(ip)
+                tz = data["timezone"]
+            else:
+                ip = ".".join(str(xrand(1, 255)) for _ in loop(4))
+                tz = "Anonymous (DNT enabled)"
+                self.rapidapi += 1
         if " " not in content:
             content += " "
         t = ts_us()
@@ -1793,7 +1791,7 @@ body {
             t += 1
         RESPONSES[t] = fut = concurrent.futures.Future()
         send(f"~{t}\x7f{ip}\x7f{tz}\x7f{content}", escape=False)
-        j, after = fut.result(timeout=420)
+        j, after = fut.result(timeout=max(1, float(timeout)))
         RESPONSES.pop(t, None)
         a = after - utc()
         if a > 0:
@@ -1866,8 +1864,8 @@ def ensure_parent(proc, parent):
                 RESPONSES.pop(next(iter(RESPONSES)))
             except:
                 pass
-        if not parent.is_running():
-            psutil.Process().kill()
+        if not is_strict_running(parent):
+            force_kill(psutil.Process())
         time.sleep(6)
 
 if __name__ == "__main__":

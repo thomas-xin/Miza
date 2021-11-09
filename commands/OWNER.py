@@ -91,7 +91,7 @@ class Restart(Command):
                 # Kill the webserver
                 print("Killing webserver...")
                 with tracebacksuppressor:
-                    await create_future(bot.server.kill, priority=True)
+                    await create_future(force_kill, bot.server, priority=True)
                 # Disconnect as many voice clients as possible
                 print("Disconnecting remaining voice clients...")
                 futs = deque()
@@ -141,20 +141,21 @@ class Execute(Command):
         users = await bot.find_users(argl, args, user, guild)
         if not users:
             raise LookupError("No results found.")
-        if args:
-            try:
-                argv = message.content.split("run ", 1)[1]
-            except IndexError:
-                pass
-                # raise ArgumentError('"run" must be specified as a separator.')
-            futs = deque()
-            for u in users:
-                fake_message = copy.copy(message)
-                fake_message.content = argv
-                fake_message.author = u
-                futs.append(create_task(bot.process_message(fake_message, argv)))
-            for fut in futs:
-                await fut
+        if not args:
+            return
+        try:
+            argv = message.content.split("run ", 1)[1]
+        except IndexError:
+            pass
+            # raise ArgumentError('"run" must be specified as a separator.')
+        futs = deque()
+        for u in users:
+            fake_message = copy.copy(message)
+            fake_message.content = argv
+            fake_message.author = u
+            futs.append(create_task(bot.process_message(fake_message, argv)))
+        for fut in futs:
+            await fut
 
 
 class Exec(Command):
@@ -171,6 +172,7 @@ class Exec(Command):
         virtual=4,
         log=8,
         proxy=16,
+        shell=32,
     ))
 
     def __call__(self, bot, flags, argv, message, channel, guild, **void):
@@ -235,11 +237,8 @@ class UpdateExec(Database):
     _print = lambda self, *args, sep=" ", end="\n", prefix="", channel=None, **void: self.bot.send_as_embeds(channel, "```\n" + str(sep).join((i if type(i) is str else str(i)) for i in args) + str(end) + str(prefix) + "```")
     def _input(self, *args, channel=None, **kwargs):
         self._print(*args, channel=channel, **kwargs)
-        self.listeners.__setitem__(channel.id, None)
-        t = utc()
-        while self.listeners[channel.id] is None and utc() - t < 86400:
-            time.sleep(0.2)
-        return self.listeners.pop(channel.id, None)
+        self.listeners[channel.id] = fut = concurent.futures.Future()
+        return fut.result(timeout=86400)
 
     # Asynchronously evaluates Python code
     async def procFunc(self, message, proc, bot, term=0):
@@ -264,6 +263,13 @@ class UpdateExec(Database):
                 message=message,
                 auds=bot.data.audio.players.get(message.guild.id),
             ))
+            if term & 32:
+                proc = await asyncio.create_subprocess_shell(proc, stdout=subprocess.PIPE, limit=65536)
+                output = await proc.stdout.read()
+                output = as_str(output)
+                if output:
+                    glob["_"] = output
+                return output
         if "\n" not in proc:
             if proc.startswith("await "):
                 proc = proc[6:]
@@ -293,7 +299,7 @@ class UpdateExec(Database):
             output = await create_future(eval, code, glob, priority=True)
         # Output sent to "_" variable if used
         if output is not None:
-            glob["_"] = output 
+            glob["_"] = output
         return output
 
     async def sendDeleteID(self, c_id, delete_after=20, **kwargs):
@@ -334,47 +340,49 @@ class UpdateExec(Database):
         if bot.is_owner(message.author.id) and channel.id in self.data:
             flag = self.data[channel.id]
             # Both main and virtual terminals may be active simultaneously
-            for f in (flag & 1, flag & 4):
-                if f:
-                    proc = message.content.strip()
-                    if proc:
-                        # Ignore commented messages
-                        if proc[:2] in ("//", "||", "~~") or proc[0] in "\\#<>:;+.^*" or not proc[0].isascii():
-                            return
-                        if proc == "-" or proc.startswith("http://") or proc.startswith("https://"):
-                            return
-                        if proc.startswith("`") and proc.endswith("`"):
-                            if proc.startswith("```"):
-                                proc = proc[3:]
-                                spl = proc.splitlines()
-                                if spl[0].isalnum():
-                                    spl.pop(0)
-                                proc = "\n".join(spl)
-                            proc = proc.strip("`").strip()
-                        if not proc:
-                            return
-                        with suppress(KeyError):
-                            # Write to input() listener if required
-                            if self.listeners[channel.id] is None:
-                                create_task(message.add_reaction("👀"))
-                                self.listeners[channel.id] = proc
-                                return
-                        if not proc:
-                            return
-                        proc = proc.translate(self.qtrans)
-                        try:
-                            create_task(message.add_reaction("❗"))
-                            result = await self.procFunc(message, proc, bot, term=f)
-                            output = str(result)
-                            if len(output) > 24000:
-                                f = CompatFile(output.encode("utf-8"), filename="message.txt")
-                                await bot.send_with_file(channel, "Response over 24,000 characters.", file=f, reference=message)
-                            elif len(output) > 1993:
-                                bot.send_as_embeds(channel, output, md=code_md)
-                            else:
-                                await send_with_reply(channel, message, self.prepare_string(output, fmt=""))
-                        except:
-                            await send_with_react(channel, self.prepare_string(traceback.format_exc()), reacts="❎", reference=message)
+            for f in (flag & 1, flag & 4, flag & 32):
+                if not f:
+                    continue
+                proc = message.content.strip()
+                if not proc:
+                    return
+                # Ignore commented messages
+                if proc[:2] in ("//", "||", "~~") or proc[0] in "\\#<>:;+.^*" or not proc[0].isascii():
+                    return
+                if proc == "-" or proc.startswith("http://") or proc.startswith("https://"):
+                    return
+                if proc.startswith("`") and proc.endswith("`"):
+                    if proc.startswith("```"):
+                        proc = proc[3:]
+                        spl = proc.splitlines()
+                        if spl[0].isalnum():
+                            spl.pop(0)
+                        proc = "\n".join(spl)
+                    proc = proc.strip("`").strip()
+                if not proc:
+                    return
+                with suppress(KeyError):
+                    # Write to input() listener if required
+                    if self.listeners[channel.id]:
+                        create_task(message.add_reaction("👀"))
+                        self.listeners.pop(channel.id).set_result(proc)
+                        return
+                if not proc:
+                    return
+                proc = proc.translate(self.qtrans)
+                try:
+                    create_task(message.add_reaction("❗"))
+                    result = await self.procFunc(message, proc, bot, term=f)
+                    output = str(result)
+                    if len(output) > 24000:
+                        f = CompatFile(output.encode("utf-8"), filename="message.txt")
+                        await bot.send_with_file(channel, "Response over 24,000 characters.", file=f, reference=message)
+                    elif len(output) > 1993:
+                        bot.send_as_embeds(channel, output, md=code_md)
+                    else:
+                        await send_with_reply(channel, message, self.prepare_string(output, fmt=""))
+                except:
+                    await send_with_react(channel, self.prepare_string(traceback.format_exc()), reacts="❎", reference=message)
         # Relay DM messages
         elif message.guild is None:
             if bot.is_blacklisted(message.author.id):
@@ -385,7 +393,7 @@ class UpdateExec(Database):
             user = message.author
             if "dailies" in bot.data:
                 bot.data.dailies.progress_quests(user, "talk")
-            emb = as_embed(message)
+            emb = await bot.as_embed(message)
             col = await bot.get_colour(user)
             emb.colour = discord.Colour(col)
             url = await bot.get_proxy_url(user)
@@ -497,6 +505,8 @@ class UpdateExec(Database):
                     fn = url.rsplit("/", 1)[-1].split("?", 1)[0]
                     if "." not in fn:
                         fn += ".png"
+                    elif fn.endswith(".pnglarge") or fn.endswith(".jpglarge"):
+                        fn = fn[:-5]
                     files[i] = cdict(fut=create_future(reqs.next().get, url, stream=True), filename="SPOILER_" + fn, url=url)
                 else:
                     out[i] = url
@@ -953,15 +963,12 @@ class UpdateImagePools(Database):
                         break
                     try:
                         out = await func(*args)
-                        if type(out) is str:
+                        if isinstance(out, str):
                             out = (out,)
                         for url in out:
                             url = url.strip()
                             if url not in data:
-                                if i & 1:
-                                    data.appendleft(url)
-                                else:
-                                    data.append(url)
+                                data.add(url)
                                 failed = 0
                                 self.update(key)
                             else:

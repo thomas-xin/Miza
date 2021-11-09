@@ -50,7 +50,7 @@ def get_video(url, fps=None):
             url = url.replace("?dl=0", "?dl=1")
     return url, size, dur, fps
 
-VIDEOS = ("gif", "webp", "apng", "mp4", "webm", "mov", "wmv", "flv", "avi", "qt", "f4v", "zip")
+VIDEOS = ("gif", "webp", "apng", "mp4", "mkv", "webm", "mov", "wmv", "flv", "avi", "qt", "f4v", "zip")
 
 
 class IMG(Command):
@@ -84,6 +84,11 @@ class IMG(Command):
                     raise ArgumentError("Image tag too long.")
                 elif not key:
                     raise ArgumentError("Image tag must not be empty.")
+                if is_url(args[0]):
+                    if len(args) > 1:
+                        args = (args[-1], args[0])
+                    else:
+                        args = (args[0].split("?", 1)[0].rsplit("/", 1)[-1].rsplit(".", 1)[0], args[0])
                 urls = await bot.follow_url(args[-1], best=True, allow=True, limit=1)
                 url = urls[0]
                 if len(url) > 2000:
@@ -224,8 +229,8 @@ async def get_image(bot, user, message, args, argv, default=2, raw=False, ext="p
         value = default
     elif not raw:
         value = await bot.eval_math(value)
-        if not abs(value) <= 64:
-            raise OverflowError("Maximum multiplier input is 64.")
+        if not abs(value) <= 256:
+            raise OverflowError("Maximum multiplier input is 256.")
     # Try and find a good name for the output image
     try:
         name = url[url.rindex("/") + 1:]
@@ -264,7 +269,7 @@ class ImageAdjust(Command):
             default = 8
         else:
             default = 2
-        name, value, url, fmt = await get_image(bot, user, message, args, argv, default=default)
+        name2, value, url, fmt = await get_image(bot, user, message, args, argv, default=default)
         with discord.context_managers.Typing(channel):
             if name.startswith("sat"):
                 argi = ("Enhance", ["Color", value, "-f", fmt])
@@ -280,14 +285,16 @@ class ImageAdjust(Command):
                 argi = ("hue_shift", [value, "-f", fmt])
             elif name in ("blur", "gaussian"):
                 argi = ("blur", ["gaussian", value, "-f", fmt])
+            else:
+                raise RuntimeError(name)
             resp = await process_image(url, *argi, timeout=_timeout)
             fn = resp[0]
             if fn.endswith(".gif"):
-                if not name.endswith(".gif"):
-                    if "." in name:
-                        name = name[:name.rindex(".")]
-                    name += ".gif"
-        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
+                if not name2.endswith(".gif"):
+                    if "." in name2:
+                        name2 = name2[:name2.rindex(".")]
+                    name2 += ".gif"
+        await bot.send_with_file(channel, "", fn, filename=name2, reference=message)
 
 
 class ColourDeficiency(Command):
@@ -510,7 +517,7 @@ class ColourSpace(Command):
         if source == dest:
             raise TypeError("Colour spaces must be different.")
         for i in (source, dest):
-            if i not in ("rgb", "cmy", "hsv", "hsl", "hsi", "hcl", "lab", "luv", "xyz"):
+            if i not in ("rgb", "cmy", "xyz", "hsv", "hsl", "hsi", "hcl", "lab", "luv", "yiq", "yuv"):
                 raise TypeError(f"Invalid colour space {i}.")
         with discord.context_managers.Typing(channel):
             resp = await process_image(url, "colourspace", [source, dest, "-f", fmt], timeout=_timeout)

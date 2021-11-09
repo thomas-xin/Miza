@@ -424,21 +424,17 @@ class Text2048(Command):
                 try:
                     sem = EDIT_SEM[message.channel.id]
                 except KeyError:
-                    sem = EDIT_SEM[message.channel.id] = Semaphore(5.1, 256, rate_limit=5)
+                    sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
                 async with sem:
                     return await Request(
                         f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
-                        data=orjson.dumps(dict(
+                        data=dict(
                             content="**```\n2048: GAME OVER```**",
                             embed=emb.to_dict(),
                             components=None,
-                        )),
+                        ),
                         method="PATCH",
-                        headers={
-                            "Content-Type": "application/json",
-                            "Authorization": f"Bot {bot.token}",
-                        },
-                        bypass=False,
+                        authorise=True,
                         aio=True,
                     )
         if data is not None:
@@ -521,21 +517,17 @@ class Text2048(Command):
             try:
                 sem = EDIT_SEM[message.channel.id]
             except KeyError:
-                sem = EDIT_SEM[message.channel.id] = Semaphore(5.1, 256, rate_limit=5)
+                sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
             async with sem:
                 return await Request(
                     f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
-                    data=orjson.dumps(dict(
+                    data=dict(
                         content=content,
                         embed=emb.to_dict(),
                         components=restructure_buttons(buttons),
-                    )),
+                    ),
                     method="PATCH",
-                    headers={
-                        "Content-Type": "application/json",
-                        "Authorization": f"Bot {bot.token}",
-                    },
-                    bypass=False,
+                    authorise=True,
                     aio=True,
                 )
         return await bot.ignore_interaction(message)
@@ -998,12 +990,13 @@ class Barter(Command):
         data = bot.data.users[user.id]
         data["ingots"] -= amount
         if amount >= 18446744073709551616:
-            dtype = np.float64
+            dtype = np.float80
         elif amount >= 4294967296:
             dtype = np.uint64
         else:
             dtype = np.uint32
         itype = np.uint64 if dtype is not np.uint32 else np.uint32
+        ftype = np.float64 if dtype is not np.uint32 else np.float32
         totals = np.zeros(len(barter_weights), dtype=dtype)
         rand = np.random.default_rng(ts_us())
         if amount > 268435456:
@@ -1012,6 +1005,7 @@ class Barter(Command):
                 seeds = await create_future(rand.integers, 0, len(barter_seeding), size=count, dtype=itype)
                 ids = barter_seeding[seeds]
                 counts = await create_future(rand.integers, barter_lowers[ids], barter_uppers[ids], dtype=itype)
+                counts = counts.astype(ftype)
                 await create_future(np.add.at, totals, ids, counts)
             mult, amount = divmod(amount, 268435456)
             if not is_finite(amount):
@@ -1024,6 +1018,7 @@ class Barter(Command):
             seeds = await create_future(rand.integers, 0, len(barter_seeding), size=count, dtype=itype)
             ids = barter_seeding[seeds]
             counts = await create_future(rand.integers, barter_lowers[ids], barter_uppers[ids], dtype=itype)
+            counts = counts.astype(ftype)
             await create_future(np.add.at, totals, ids, counts)
         rewards = deque()
         data.setdefault("minecraft", {})
@@ -1222,24 +1217,20 @@ class Uno(Command):
                 try:
                     sem = EDIT_SEM[message.channel.id]
                 except KeyError:
-                    sem = EDIT_SEM[message.channel.id] = Semaphore(5.1, 256, rate_limit=5)
+                    sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
                 async with sem:
                     return await Request(
                         f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
-                        data=orjson.dumps(dict(
+                        data=dict(
                             content=content,
                             embed=embed.to_dict(),
                             components=restructure_buttons([[
                                 cdict(emoji="🔻", style=1),
                                 cdict(emoji="✖", style=4),
                             ]]),
-                        )),
+                        ),
                         method="PATCH",
-                        headers={
-                            "Content-Type": "application/json",
-                            "Authorization": f"Bot {bot.token}",
-                        },
-                        bypass=False,
+                        authorise=True,
                         aio=True,
                     )
             # Does not have permission to start game
@@ -1648,7 +1639,7 @@ class Matchmaking(Command):
             try:
                 user = await bot.fetch_member_ex(u_id, guild, allow_banned=False, fuzzy=None)
             except:
-                users.append(u_id.capitalize())
+                users.append(as_str(u_id).capitalize())
             else:
                 users.append(user.display_name)
         while len(users) < 2:
@@ -3133,10 +3124,41 @@ class XKCD(ImagePool, Command):
     database = "xkcd"
 
     async def fetch_one(self):
-        s = await Request("https://c.xkcd.com/random/comic", decode=True, aio=True)
-        search = "Image URL (for hotlinking/embedding): "
+        s = await create_future(Request, "https://c.xkcd.com/random/comic")
+        search = b"Image URL (for hotlinking/embedding): "
         s = s[s.index(search) + len(search):]
-        url = s[:s.index("<")].strip()
+        url = s[:s.index(b"<")].strip()
+        return as_str(url)
+
+
+class Turnoff(ImagePool, Command):
+    description = "Pulls a random image from turnoff.us and embeds it."
+    database = "turnoff"
+    threshold = 1
+
+    async def fetch_one(self):
+        if self.bot.data.imagepools.data.get(self.database) and xrand(64):
+            return choice(self.bot.data.imagepools[self.database])
+        s = await Request("https://turnoff.us", aio=True)
+        search = b"$(function() {"
+        s = s[s.rindex(search) + len(search):]
+        search = b"var pages = "
+        s = s[s.index(search) + len(search):]
+        s = s[:s.index(b'$("#random-link").attr("href", pages[parseInt(Math.random(1)*(pages.length - 1))]);')].rstrip(b" \r\n\t;")
+        hrefs = orjson.loads(s)
+        urls = alist("https://turnoff.us" + href.rstrip("/") + "/" for href in hrefs if href)
+        data = self.bot.data.imagepools.setdefault(self.database, alist())
+        for url in urls[:-1]:
+            s = await Request(url, aio=True)
+            search = b'<meta property="og:image" content="'
+            s = s[s.index(search) + len(search):]
+            url = as_str(s[:s.index(b'"')])
+            data.add(url)
+        url = url[-1]
+        s = await Request(url, aio=True)
+        search = b'<meta property="og:image" content="'
+        s = s[s.index(search) + len(search):]
+        url = as_str(s[:s.index(b'"')])
         return url
 
 
