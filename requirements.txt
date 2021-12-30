@@ -31,5 +31,5 @@ pytz>=2020.5
 requests>=2.26.0
 rule34>=1.8.1
 sympy>=1.8
-tsc-utils>=0.2.1
+tsc-utils>=0.2.2
 youtube-dl>=2021.6.6

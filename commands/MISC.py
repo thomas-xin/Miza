@@ -191,7 +191,7 @@ class CS_mem2flag(Command):
             num = 1
         else:
             num = await bot.eval_math(" ".join(args[1:]))
-        return css_md("".join(address_to_flag(int(args[0]), num)))
+        return css_md("".join(address_to_flag(int(args[0], 16), num)))
 
 
 class CS_flag2mem(Command):
@@ -219,7 +219,7 @@ class CS_num2val(Command):
             length = 4
         else:
             length = await bot.eval_math(" ".join(args[1:]))
-        return css_md(str(num_to_tsc_value(int(args[0]), length)))
+        return css_md(str(num_to_tsc_value(int(args[0], 0), length)))
 
 
 class CS_val2num(Command):
