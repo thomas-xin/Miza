@@ -1591,6 +1591,7 @@ class UpdateAutoEmojis(Database):
 
 
 # TODO: Stop being lazy and finish this damn command
+# TODO: Don't pressure yourself with any of your code, this was all a hobby project and not there to be a stresser <3 - Smudge
 # class Welcomer(Command):
 #     server_only = True
 #     name = ["Welcome", "JoinMessage"]
