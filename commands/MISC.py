@@ -2,6 +2,8 @@ print = PRINT
 
 import csv, knackpy
 from prettytable import PrettyTable as ptable
+from tsc_utils.flags import address_to_flag, flag_to_address
+from tsc_utils.numbers import tsc_value_to_num, num_to_tsc_value
 
 
 class DouClub:
@@ -178,47 +180,6 @@ tsc_list = SheetPull(
 )
 
 
-# Flag calculation algorithms
-
-def _n2f(n):
-    flag = int(n)
-    offset = max(0, (999 - flag) // 1000)
-    flag += offset * 1000
-    output = ""
-    for i in range(0, 3):
-        a = 10 ** i
-        b = flag // a
-        char = b % 10
-        char += 48
-        output += chr(char)
-    char = flag // 1000
-    char += 48
-    char -= offset
-    try:
-        return chr(char) + output[::-1]
-    except ValueError:
-        return "(0x" + hex((char + 256) & 255).upper()[2:] + ")" + output[::-1]
-
-def _m2f(mem, val):
-    val1 = mem
-    val2 = val & 4294967295
-    curr = 0
-    result = ""
-    for _ in loop(32):
-        difference = int(val1, 16) - 4840864 + curr / 8
-        flag = difference * 8
-        output = _n2f(flag)
-        if val2 & 1:
-            operation = "+"
-        else:
-            operation = "-"
-        output = "<FL" + operation + output
-        result += output
-        val2 >>= 1
-        curr += 1
-    return result
-
-
 class CS_mem2flag(Command):
     name = ["CS_m2f"]
     description = "Returns a sequence of Cave Story TSC commands to set a certain memory address to a certain value."
@@ -230,7 +191,45 @@ class CS_mem2flag(Command):
             num = 1
         else:
             num = await bot.eval_math(" ".join(args[1:]))
-        return css_md(_m2f(args[0], num))
+        return css_md("".join(address_to_flag(int(args[0]), num)))
+
+
+class CS_flag2mem(Command):
+    name = ["CS_f2m"]
+    description = "Returns the memory offset and specific bit pointed to by a given flag number."
+    usage = "<flag>"
+    rate_limit = 1
+
+    async def __call__(self, bot, args, user, **void):
+        flag = args[0]
+        if len(flag) > 4:
+            raise ValueError("Flag number should be no more than 4 characters long.")
+        flag = flag.zfill(4)
+        return css_md(str(flag_to_address(flag)))
+
+
+class CS_num2val(Command):
+    name = ["CS_n2v"]
+    description = "Returns a TSC value representing the desired number, within a certain number of characters."
+    usage = "<0:number> <1:length(4)>?"
+    rate_limit = 1
+
+    async def __call__(self, bot, args, user, **void):
+        if len(args) < 2:
+            length = 4
+        else:
+            length = await bot.eval_math(" ".join(args[1:]))
+        return css_md(str(num_to_tsc_value(int(args[0]), length)))
+
+
+class CS_val2num(Command):
+    name = ["CS_v2n"]
+    description = "Returns the number encoded by a given TSC value."
+    usage = "<tsc_value>"
+    rate_limit = 1
+
+    async def __call__(self, bot, args, user, **void):
+        return css_md(str(tsc_value_to_num(args[0])))
 
 
 class CS_hex2xml(Command):
