@@ -3310,22 +3310,27 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 async with getattr(w, "semaphore", emptyctx):
                     w = getattr(w, "webhook", w)
                     if hasattr(channel, "thread") or isinstance(channel, discord.Thread):
-                        data = dict(
-                            content=args[0] if args else kwargs.get("content"),
-                            username=kwargs.get("username"),
-                            avatar_url=kwargs.get("avatar_url"),
-                            tts=kwargs.get("tts"),
-                            embeds=[emb.to_dict() for emb in kwargs.get("embeds", ())] or [kwargs["embed"].to_dict()] if kwargs.get("embed") is not None else None,
-                        )
-                        resp = await Request(
-                            f"https://discord.com/api/{api}/webhooks/{w.id}/{w.token}?wait=True&thread_id={channel.id}",
-                            method="POST",
-                            authorise=True,
-                            data=data,
-                            aio=True,
-                            json=True,
-                        )
-                        message = self.ExtendedMessage.new(resp)
+                        if kwargs.get("files"):
+                            kwargs.pop("avatar_url", None)
+                            kwargs.pop("username", None)
+                            message = await channel.send(*args, **kwargs)
+                        else:
+                            data = dict(
+                                content=args[0] if args else kwargs.get("content"),
+                                username=kwargs.get("username"),
+                                avatar_url=kwargs.get("avatar_url"),
+                                tts=kwargs.get("tts"),
+                                embeds=[emb.to_dict() for emb in kwargs.get("embeds", ())] or [kwargs["embed"].to_dict()] if kwargs.get("embed") is not None else None,
+                            )
+                            resp = await Request(
+                                f"https://discord.com/api/{api}/webhooks/{w.id}/{w.token}?wait=True&thread_id={channel.id}",
+                                method="POST",
+                                authorise=True,
+                                data=data,
+                                aio=True,
+                                json=True,
+                            )
+                            message = self.ExtendedMessage.new(resp)
                     else:
                         message = await w.send(*args, wait=True, **kwargs)
             except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
