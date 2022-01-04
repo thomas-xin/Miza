@@ -57,6 +57,8 @@ class Math(Command):
     slash = True
 
     async def __call__(self, bot, argv, name, message, channel, guild, flags, user, **void):
+        if argv == "69":
+            return py_md("69 = nice")
         if "l" in flags:
             var = bot.data.variables.get(user.id, {})
             if not var:
