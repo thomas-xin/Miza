@@ -1134,6 +1134,34 @@ class Rate(Command):
         lego = lego.replace("?", "").replace("!", "")
         return f"{lego}? I rate {pronoun} a `{rate}/10`!"
 
+
+class Rps(Command):
+    name = ["Rockpaperscissors"]:
+    description = "A randomized game of Rock-Paper-Scissors!"
+    usage = "<rock/paper/scissors>"
+    slash = True
+
+    async def __call__(self, **void):
+        ctx = message.author
+        ctx_ = message.channel
+        return "Let's play Rock-Paper-Scissors! Post your choice!"
+        response = await self.bot.wait_for("message", check=lambda message: message.author == ctx and message.channel == ctx_)
+
+        matches = {"rock": "scissors", "scissors": "paper", "paper": "rock"}
+        decision = choice(list(matches.keys()))
+        await ctx.send(f"I'll go with {decision}!")
+
+        if response.content.lower() not in matches.keys():
+            return "Your answer doesn't count! 🙂"
+        if matches[decision] == response.content.lower():
+            return "I win! 😁"
+        if matches[response.content.lower()] == decision:
+            return "I lost... 😔 You won "
+            # database stuff
+        if response.content.lower() == decision:
+            await ctx.send("Wow, we tied! 🙃 You won ")
+            # more database stuff
+
     
 class WordCount(Command):
     name = ["Wc", "Cc", "Charactercount"]

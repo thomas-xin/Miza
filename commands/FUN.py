@@ -3284,6 +3284,40 @@ class Giphy(ImagePool, Command):
         self.bot.send_as_embeds(channel, image=url)
 
 
+class Rps(Command):
+    name = ["Rockpaperscissors"]:
+    description = "A randomized game of Rock-Paper-Scissors!"
+    usage = "<rock/paper/scissors>"
+    slash = True
+
+    async def __call__(self, argv, **void):
+        response = argv
+        if not response:
+            ctx = message.author
+            ctx_ = message.channel
+            return "Let's play Rock-Paper-Scissors! Post your choice!"
+            response = await self.bot.wait_for("message", check=lambda message: message.author == ctx and message.channel == ctx_)
+
+        matches = {"rock": "scissors", "scissors": "paper", "paper": "rock"}
+        decision = choice(list(matches.keys()))
+        await ctx.send(f"I'll go with {decision}!")
+
+        gud = bot.as_rewards(random.randint(50, 100))
+        meh = bot.as_rewards(random.randint(5, 50))
+
+
+        if response.content.lower() not in matches.keys():
+            return "Your answer doesn't count! 🙂"
+        if matches[decision] == response.content.lower():
+            return "**I win!** 😁"
+        if matches[response.content.lower()] == decision:
+            return f"**I lost...** 😔 You won {rew}"
+            await gud
+        if response.content.lower() == decision:
+            await ctx.send("Wow, **we tied!** 🙃 You won ")
+            await meh
+
+
 class Rickroll(Command):
     name = ["Thumbnail", "FakeThumbnail", "FakeVideo"]
     description = "Generates a link that embeds a thumbnail, but redirects to a separate YouTube video once played."
