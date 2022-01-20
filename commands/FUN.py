@@ -3300,7 +3300,7 @@ class Rps(Command):
 
         matches = {"rock": "scissors", "scissors": "paper", "paper": "rock"}
         decision = choice(list(matches.keys()))
-        await ctx.send(f"I'll go with {decision}!")
+        return f"I'll go with {decision}!"
 
         rew = random.randint(5, 50)
 
