@@ -3310,10 +3310,10 @@ class Rps(Command):
             return "**I win!** 😁"
         if matches[response.content.lower()] == decision:
             return f"**I lost...** 😔 You won {bot.as_rewards(rew)}"
-            await bot.data.users.add_gold(user, rew)
+            return bot.data.users.add_gold(user, rew)
         if response.content.lower() == decision:
             return f"Wow, **we tied!** 🙃 You won {bot.as_rewards(rew/2)}")
-            await bot.data.users.add_gold(user, int(rew/2))
+            return bot.data.users.add_gold(user, int(rew/2))
 
 
 class Rickroll(Command):
