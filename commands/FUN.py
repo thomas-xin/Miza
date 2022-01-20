@@ -3302,19 +3302,18 @@ class Rps(Command):
         decision = choice(list(matches.keys()))
         await ctx.send(f"I'll go with {decision}!")
 
-        gud = bot.as_rewards(random.randint(50, 100))
-        meh = bot.as_rewards(random.randint(5, 50))
+        rew = random.randint(5, 50)
 
         if response.content.lower() not in matches.keys():
             return "Your answer doesn't count! 🙂"
         if matches[decision] == response.content.lower():
             return "**I win!** 😁"
         if matches[response.content.lower()] == decision:
-            return f"**I lost...** 😔 You won {gud}"
-            await gud
+            return f"**I lost...** 😔 You won {rew}"
+            await bot.data.users.add_gold(user, rew)
         if response.content.lower() == decision:
-            return f"Wow, **we tied!** 🙃 You won {meh}")
-            await meh
+            return f"Wow, **we tied!** 🙃 You won {int(rew/2)}")
+            await bot.data.users.add_gold(user, int(rew/2))
 
 
 class Rickroll(Command):
