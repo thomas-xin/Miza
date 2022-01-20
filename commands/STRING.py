@@ -1112,7 +1112,7 @@ class Random(Command):
 
 
 class Rate(Command):
-    name = ["Rating"]
+    name = ["Rating", "Rank", "Ranking"]
     description = "Rates a given object with a random value out of 10!"
     usage = "<string>"
     slash = True
