@@ -3287,7 +3287,7 @@ class Giphy(ImagePool, Command):
 class Rps(Command):
     name = ["Rockpaperscissors"]:
     description = "A randomized game of Rock-Paper-Scissors!"
-    usage = "<rock/paper/scissors>"
+    usage = "<rock>? <paper>? <scissors>?"
     slash = True
 
     async def __call__(self, argv, **void):
