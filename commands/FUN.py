@@ -3285,7 +3285,7 @@ class Giphy(ImagePool, Command):
 
 
 class Rps(Command):
-    name = ["Rockpaperscissors"]:
+    name = ["Rockpaperscissors"]
     description = "A randomized game of Rock-Paper-Scissors!"
     usage = "<rock>? <paper>? <scissors>?"
     slash = True
