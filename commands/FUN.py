@@ -3309,10 +3309,10 @@ class Rps(Command):
         if matches[decision] == response.content.lower():
             return "**I win!** 😁"
         if matches[response.content.lower()] == decision:
-            return f"**I lost...** 😔 You won {rew}"
+            return f"**I lost...** 😔 You won {bot.as_rewards(rew)}"
             await bot.data.users.add_gold(user, rew)
         if response.content.lower() == decision:
-            return f"Wow, **we tied!** 🙃 You won {int(rew/2)}")
+            return f"Wow, **we tied!** 🙃 You won {bot.as_rewards(rew/2)}")
             await bot.data.users.add_gold(user, int(rew/2))
 
 
