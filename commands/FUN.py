@@ -3305,16 +3305,15 @@ class Rps(Command):
         gud = bot.as_rewards(random.randint(50, 100))
         meh = bot.as_rewards(random.randint(5, 50))
 
-
         if response.content.lower() not in matches.keys():
             return "Your answer doesn't count! 🙂"
         if matches[decision] == response.content.lower():
             return "**I win!** 😁"
         if matches[response.content.lower()] == decision:
-            return f"**I lost...** 😔 You won {rew}"
+            return f"**I lost...** 😔 You won {gud}"
             await gud
         if response.content.lower() == decision:
-            await ctx.send("Wow, **we tied!** 🙃 You won ")
+            return f"Wow, **we tied!** 🙃 You won {meh}")
             await meh
 
 
