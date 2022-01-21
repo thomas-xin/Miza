@@ -2531,7 +2531,7 @@ class UpdateMessageCache(Database):
                 mtype = getattr(message.type, "value", message.type)
                 if mtype:
                     m["type"] = mtype
-                Flags = message.flags.value if message.flags else 0
+                flags = message.flags.value if message.flags else 0
                 if flags:
                     m["flags"] = flags
                 for k in ("tts", "pinned", "mention_everyone", "webhook_id"):
