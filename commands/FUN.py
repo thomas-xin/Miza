@@ -3303,14 +3303,14 @@ class Rps(Command):
 
         rew = random.randint(5, 50)
 
-        if response.content.lower() not in matches.keys():
+        if argv.content.lower() not in matches.keys():
             return "Your answer doesn't count! 🙂"
-        if matches[decision] == response.content.lower():
+        if matches[decision] == argv.content.lower():
             return "**I win!** 😁"
-        if matches[response.content.lower()] == decision:
+        if matches[argv.content.lower()] == decision:
             create_task(channel.send(f"**I lost...** 😔 You won {bot.as_rewards(rew)}"))
             return bot.data.users.add_gold(user, rew)
-        if response.content.lower() == decision:
+        if argv.content.lower() == decision:
             create_task(channel.send(f"Wow, **we tied!** 🙃 You won {bot.as_rewards(rew/2)}"))
             return bot.data.users.add_gold(user, rew/2)
 
