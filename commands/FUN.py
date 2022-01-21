@@ -3330,7 +3330,7 @@ class RPS(Command):
     usage = "<rock>? <paper>? <scissors>?"
     slash = True
 
-    async def __call__(self, bot, user, channel, argv, **void):
+    async def __call__(self, bot, user, message, channel, argv, **void):
         try:
             message = message.content
             if not argv:
