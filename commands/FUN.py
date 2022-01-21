@@ -3331,26 +3331,30 @@ class RPS(Command):
     slash = True
 
     async def __call__(self, bot, user, channel, argv, **void):
-        if not argv:
-            create_task(channel.send("Let's play Rock-Paper-Scissors! Post your choice!"))
-            argv = await bot.wait_for("message", check=lambda message: message.author.id == user.id and message.channel.id == channel.id)
-        argv = full_prune(argv)
+        try:
+            message = message.content
+            if not argv:
+                create_task(channel.send("Let's play Rock-Paper-Scissors! Post your choice!"))
+                message = await bot.wait_for("message", check=lambda message: message.author.id == user.id and message.channel.id == channel.id)
+                argv = message
+            argv = full_prune(argv)
 
-        matches = dict(
-            rock="scissors",
-            scissors="paper",
-            paper="rock",
-        )
-        decision = choice(matches)
-        await channel.send(f"I'll go with {decision}!")
-        rew = random.randint(5, 50)
+            matches = dict(
+                rock="scissors",
+                scissors="paper",
+                paper="rock",
+            )
+            decision = choice(matches)
+            await channel.send(f"I'll go with {decision}!", reference=message)
+            rew = random.randint(5, 50)
 
-        if matches[decision] == argv:
-            return "**I win!** 😁"
-        if matches[argv] == decision:
-            bot.data.users.add_gold(user, rew)
-            return f"**I lost...** 😔 You won {bot.as_rewards(rew)}"
-        if argv == decision:
-            bot.data.users.add_gold(user, rew / 2)
-            return f"Wow, **we tied!** 🙃 You won {bot.as_rewards(rew / 2)}"
-        return "Your answer doesn't count! 🙂"
+            if matches[decision] == argv:
+                await channel.send("**I win**! 😁")
+            if matches[argv] == decision:
+                bot.data.users.add_gold(user, rew)
+                await channel.send(f"**I lost**... 😔 You won {bot.as_rewards(rew)}")
+            if argv == decision:
+                bot.data.users.add_gold(user, rew / 2)
+                await channel.send(f"Wow, **we tied**! 🙃 You won {bot.as_rewards(rew / 2)}")
+        except KeyError:
+            await channel.send("Your answer doesn't count! 🙂")
