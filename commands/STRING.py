@@ -1,6 +1,10 @@
 print = PRINT
 
-import googletrans
+try:
+    import googletrans
+except:
+    print_exc()
+    googletrans = None
 
 try:
     rapidapi_key = AUTH["rapidapi_key"]
@@ -20,11 +24,14 @@ class Translate(Command):
     no_parse = True
     rate_limit = (2, 7)
     slash = True
-    languages = demap(googletrans.LANGUAGES)
-    trans = googletrans.Translator()
-    trans.client.headers["DNT"] = "1"
+    if googletrans:
+        languages = demap(googletrans.LANGUAGES)
+        trans = googletrans.Translator()
+        trans.client.headers["DNT"] = "1"
 
     async def __call__(self, channel, argv, user, message, **void):
+        if not googletrans:
+            raise RuntimeError("Unable to load Google Translate.")
         if not argv:
             raise ArgumentError("Input string is empty.")
         self.trans.client.headers["X-Forwarded-For"] = ".".join(str(xrand(1, 255)) for _ in loop(4))
