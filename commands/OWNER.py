@@ -566,15 +566,17 @@ class UpdateExec(Database):
         with suppress(AttributeError):
             PRINT.funcs.append(self._log_)
         for c_id, flag in self.data.items():
-            if flag & 24:
-                channel = self.bot.cache.channels.get(c_id)
-                if channel:
-                    mchannel = None
-                    while not mchannel:
-                        mchannel = channel.parent if hasattr(channel, "thread") or isinstance(channel, discord.Thread) else channel
-                        if not mchannel:
-                            await asyncio.sleep(0.2)
-                    create_task(self.bot.ensure_webhook(mchannel, force=True))
+            if not flag & 24:
+                continue
+            channel = self.bot.cache.channels.get(c_id)
+            if not channel:
+                continue
+            mchannel = None
+            if not mchannel:
+                mchannel = channel.parent if hasattr(channel, "thread") or isinstance(channel, discord.Thread) else channel
+            if not mchannel:
+                continue
+            create_task(self.bot.ensure_webhook(mchannel, force=True))
         self.bot._globals["miza_player"] = Miza_Player(self.bot)
 
     def _destroy_(self, **void):
