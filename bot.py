@@ -2409,10 +2409,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 # mod = __import__(module)
             if not new:
                 mod = self._globals.pop(module, {})
-            else:
-                mod = self._globals
             # else:
-            #     mod = cdict(common.__dict__)
+            #     mod = self._globals
+            else:
+                mod = cdict(common.__dict__)
             fn = f"commands/{module}.py"
             with open(fn, "rb") as f:
                 b = f.read()
@@ -2422,7 +2422,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             commands = deque()
             dataitems = deque()
             items = mod
-            for var in items.values():
+            for var in tuple(items.values()):
                 if callable(var) and var is not Command and var is not Database:
                     load_type = 0
                     with suppress(TypeError):

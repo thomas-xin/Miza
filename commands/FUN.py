@@ -3352,5 +3352,5 @@ class RPS(Command):
             return f"**I lost...** 😔 You won {bot.as_rewards(rew)}"
         if argv == decision:
             bot.data.users.add_gold(user, rew / 2)
-            return f"Wow, **we tied!** 🙃 You won {bot.as_rewards(rew / 2)}")
+            return f"Wow, **we tied!** 🙃 You won {bot.as_rewards(rew / 2)}"
         return "Your answer doesn't count! 🙂"

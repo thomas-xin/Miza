@@ -1327,7 +1327,7 @@ class AudioDownloader:
             if video:
                 self.other_x += 1
                 if video is True:
-				    video = "merged"
+                    video = "merged"
                 v_url = f"https://www.yt-download.org/file/{video}/{url}"
                 resp = requests.get(v_url, headers=header(), timeout=24).content
                 search = b'<img class="h-20 w-20 md:h-48 md:w-48 mt-0 md:mt-12 lg:mt-0 rounded-full mx-auto md:mx-0 md:mr-6" src="'
@@ -4239,7 +4239,7 @@ class Player(Command):
         # b'\xe2\x8f\xa9': 11,
         # b'\xe2\x8f\xab': 12,
         # b'\xe2\x8f\xac': 13,
-	    b'\xe2\x8f\x8f': 14,
+        b'\xe2\x8f\x8f': 14,
         b'\xe2\x9c\x96': 15,
     })
     barsize = 24
