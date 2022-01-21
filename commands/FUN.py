@@ -3290,17 +3290,16 @@ class Rps(Command):
     usage = "<rock>? <paper>? <scissors>?"
     slash = True
 
-    async def __call__(self, argv, **void):
-        response = argv
-        if not response:
+    async def __call__(self, user, argv, **void):
+        if not argv:
             ctx = message.author
             ctx_ = message.channel
-            return "Let's play Rock-Paper-Scissors! Post your choice!"
-            response = await self.bot.wait_for("message", check=lambda message: message.author == ctx and message.channel == ctx_)
+            create_task(channel.send("Let's play Rock-Paper-Scissors! Post your choice!"))
+            argv = await self.bot.wait_for("message", check=lambda message: message.author == ctx and message.channel == ctx_)
 
         matches = {"rock": "scissors", "scissors": "paper", "paper": "rock"}
         decision = choice(list(matches.keys()))
-        return f"I'll go with {decision}!"
+        create_task(channel.send(f"I'll go with {decision}!"))
 
         rew = random.randint(5, 50)
 
@@ -3309,11 +3308,11 @@ class Rps(Command):
         if matches[decision] == response.content.lower():
             return "**I win!** 😁"
         if matches[response.content.lower()] == decision:
-            return f"**I lost...** 😔 You won {bot.as_rewards(rew)}"
+            create_task(channel.send(f"**I lost...** 😔 You won {bot.as_rewards(rew)}"))
             return bot.data.users.add_gold(user, rew)
         if response.content.lower() == decision:
-            return f"Wow, **we tied!** 🙃 You won {bot.as_rewards(rew/2)}")
-            return bot.data.users.add_gold(user, int(rew/2))
+            create_task(channel.send(f"Wow, **we tied!** 🙃 You won {bot.as_rewards(rew/2)}"))
+            return bot.data.users.add_gold(user, rew/2)
 
 
 class Rickroll(Command):
