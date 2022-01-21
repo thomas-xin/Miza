@@ -3284,35 +3284,36 @@ class Giphy(ImagePool, Command):
         self.bot.send_as_embeds(channel, image=url)
 
 
-class Rps(Command):
+class RPS(Command):
     name = ["Rockpaperscissors"]
     description = "A randomized game of Rock-Paper-Scissors!"
     usage = "<rock>? <paper>? <scissors>?"
     slash = True
 
-    async def __call__(self, user, argv, **void):
+    async def __call__(self, bot, user, channel, argv, **void):
         if not argv:
-            ctx = message.author
-            ctx_ = message.channel
             create_task(channel.send("Let's play Rock-Paper-Scissors! Post your choice!"))
-            argv = await self.bot.wait_for("message", check=lambda message: message.author == ctx and message.channel == ctx_)
+            argv = await bot.wait_for("message", check=lambda message: message.author.id == user.id and message.channel.id == channel.id)
+        argv = full_prune(argv)
 
-        matches = {"rock": "scissors", "scissors": "paper", "paper": "rock"}
-        decision = choice(list(matches.keys()))
-        create_task(channel.send(f"I'll go with {decision}!"))
-
+        matches = dict(
+            rock="scissors",
+            scissors="paper",
+            paper="rock",
+        )
+        decision = choice(matches)
+        await channel.send(f"I'll go with {decision}!")
         rew = random.randint(5, 50)
 
-        if argv.content.lower() not in matches.keys():
-            return "Your answer doesn't count! 🙂"
-        if matches[decision] == argv.content.lower():
+        if matches[decision] == argv:
             return "**I win!** 😁"
-        if matches[argv.content.lower()] == decision:
-            create_task(channel.send(f"**I lost...** 😔 You won {bot.as_rewards(rew)}"))
-            return bot.data.users.add_gold(user, rew)
-        if argv.content.lower() == decision:
-            create_task(channel.send(f"Wow, **we tied!** 🙃 You won {bot.as_rewards(rew/2)}"))
-            return bot.data.users.add_gold(user, rew/2)
+        if matches[argv] == decision:
+            bot.data.users.add_gold(user, rew)
+            return f"**I lost...** 😔 You won {bot.as_rewards(rew)}"
+        if argv == decision:
+            bot.data.users.add_gold(user, rew / 2)
+            return f"Wow, **we tied!** 🙃 You won {bot.as_rewards(rew / 2)}")
+        return "Your answer doesn't count! 🙂"
 
 
 class Rickroll(Command):
