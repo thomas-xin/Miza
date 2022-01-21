@@ -3167,7 +3167,7 @@ class Inspiro(ImagePool, Command):
     description = "Pulls a random image from inspirobot.me and embeds it."
     database = "inspirobot"
 
-    def fetch_one(self):
+    async def fetch_one(self):
         return Request("https://inspirobot.me/api?generate=true", decode=True, aio=True)
 
 

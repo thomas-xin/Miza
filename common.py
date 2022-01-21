@@ -2702,7 +2702,7 @@ def proxy_download(url, fn=None, refuse_html=True, timeout=24):
     j = xrand(len(reqx))
     with reqx[j].stream(
         "POST",
-        stream,
+        url,
         data=dict(d=url, allowCookies="on"),
         follow_redirects=True,
         timeout=timeout,

@@ -4603,6 +4603,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         channel = await self.fetch_channel(raw.channel_id)
         user = await self.fetch_user(raw.user_id)
         emoji = self._upgrade_partial_emoji(raw.emoji)
+        reaction = None
         try:
             message = await self.fetch_message(raw.message_id)
         except LookupError:
@@ -4613,6 +4614,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         else:
             with tracebacksuppressor:
                 reaction = message._remove_reaction(data, emoji, user.id)
+        if not reaction:
+            message = await channel.fetch_message(raw.message_id)
+            reaction = message._add_reaction(data, emoji, user.id)
+            if reaction.count > 1:
+                reaction.count -= 1
+            reaction = message._remove_reaction(data, emoji, user.id)
         self.dispatch("reaction_remove", reaction, user)
         self.add_message(message, files=False, force=True)
     
