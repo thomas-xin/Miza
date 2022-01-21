@@ -378,7 +378,7 @@ class CommandCancelledError(RuntimeError):
 python = sys.executable
 
 
-with open("auth.json") as f:
+with open("auth.json", "rb") as f:
     AUTH = eval(f.read())
 
 enc_key = None
@@ -1308,15 +1308,13 @@ def message_repr(message, limit=1024, username=False, link=False):
 def apply_stickers(message, data):
     if data.get("sticker_items"):
         for s in data["sticker_items"]:
-            a = cdict(s)
-            a.id = int(a.id)
             if s.get("format_type") == 3:
-                a.url = f"https://discord.com/stickers/{a.id}.json"
+                url = f"https://discord.com/stickers/{s['id']}.json"
             else:
-                a.url = f"https://media.discordapp.net/stickers/{a.id}.png"
-            a.filename = a.name
-            a.proxy_url = a.url
-            message.attachments.append(a)
+                url = f"https://media.discordapp.net/stickers/{s['id']}.png"
+            emb = discord.Embed()
+            emb.set_image(url=url)
+            message.embeds.append(emb)
     return message
 
 
@@ -1667,7 +1665,7 @@ is_tenor_url = lambda url: url and regexp("^https?:\\/\\/tenor.com(?:\\/view)?/[
 is_imgur_url = lambda url: url and regexp("^https?:\\/\\/(?:[A-Za-z]\\.)?imgur.com/[a-zA-Z0-9\\-_]+").findall(url)
 is_giphy_url = lambda url: url and regexp("^https?:\\/\\/giphy.com/gifs/[a-zA-Z0-9\\-_]+").findall(url)
 is_youtube_url = lambda url: url and regexp("^https?:\\/\\/(?:www\\.)?youtu(?:\\.be|be\\.com)\\/[^\\s<>`|\"']+").findall(url)
-is_youtube_stream = lambda url: url and regexp("^https?:\\/\\/r[0-9]+---.{2}-\\w+-\\w{4,}\\.googlevideo\\.com").findall(url)
+is_youtube_stream = lambda url: url and regexp("^https?:\\/\\/r+[0-9]+---.{2}-[A-Za-z0-9\\-_]{4,}\\.googlevideo\\.com").findall(url)
 is_deviantart_url = lambda url: url and regexp("^https?:\\/\\/(?:www\\.)?deviantart\\.com\\/[^\\s<>`|\"']+").findall(url)
 is_reddit_url = lambda url: url and regexp("^https?:\\/\\/(?:www\\.)?reddit.com\\/r\\/[^/]+\\/").findall(url)
 
@@ -1888,7 +1886,8 @@ def force_kill(proc):
         return
     with tracebacksuppressor(psutil.NoSuchProcess):
         killed = deque()
-        proc = psutil.Process(proc.pid)
+        if not callable(getattr(proc, "children", None)):
+            proc = psutil.Process(proc.pid)
         for child in proc.children(recursive=True):
             with suppress():
                 child.terminate()
@@ -2689,6 +2688,54 @@ def parse_ratelimit_header(headers):
     return max(0.001, delta)
 
 
+def proxy_download(url, fn=None, refuse_html=True, timeout=24):
+    downloading = globals().setdefault("proxy-download", {})
+    try:
+        fut = downloading[url]
+    except KeyError:
+        downloading[url] = fut = concurrent.futures.Future()
+    else:
+        return fut.result(timeout=timeout)
+    o_url = url
+    loc = random.choice(("eu", "us"))
+    i = random.randint(1, 17)
+    j = xrand(len(reqx))
+	with reqx[j].stream(
+		"POST",
+		stream,
+		data=dict(d=url, allowCookies="on"),
+		follow_redirects=True,
+		timeout=timeout,
+	) as resp:
+		if resp.status_code not in range(200, 400):
+			raise ConnectionError(resp.status_code, resp)
+		if not fn:
+			b = resp.read()
+            if refuse_html and b[:15] == b"<!DOCTYPE html>":
+                raise ValueError(b)
+		it = resp.iter_bytes()
+		if isinstance(fn, str):
+			f = open(fn, "wb")
+		else:
+			f = fn
+		try:
+			while True:
+				b = next(it)
+				if not b:
+					break
+				f.write(b)
+		except StopIteration:
+			pass
+        with open(fn, "rb") as f:
+            if refuse_html and f.read(15) == b"<!DOCTYPE html>":
+                raise ValueError(b)
+		return fn
+    if fn:
+        return o_url
+    fut.set_result(o_url)
+    return o_url
+
+
 # Manages both sync and async web requests.
 class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, collections.abc.Callable):
 
@@ -2719,7 +2766,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
     async def aio_call(self, url, headers, files, data, method, decode=False, json=False, session=None, ssl=True):
         async with self.semaphore:
             req = session or (self.sessions.next() if ssl else self.nossl)
-            resp = await req.request(method.upper(), url, headers=headers, files=files, data=data)
+            resp = await req.request(method.upper(), url, headers=headers, files=files, data=data, follow_redirects=True, timeout=24)
             if BOT[0]:
                 BOT[0].activity += 1
             status = getattr(resp, "status_code") or getattr(resp, "status", 400)
@@ -2744,7 +2791,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
                 return data
             return resp.content
 
-    def __call__(self, url, headers=None, files=None, data=None, raw=False, timeout=8, method="get", decode=False, json=False, bypass=True, aio=False, session=None, ssl=True, authorise=False):
+    def __call__(self, url, headers=None, files=None, data=None, raw=False, timeout=8, method="get", decode=False, json=False, bypass=True, proxy=False, aio=False, session=None, ssl=True, authorise=False):
         if headers is None:
             headers = {}
         if authorise:
@@ -2767,6 +2814,13 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
         if aio:
             return create_task(asyncio.wait_for(self.aio_call(url, headers, files, data, method, decode, json, session, ssl), timeout=timeout))
         with self.semaphore:
+            if proxy:
+                data = proxy_download(url)
+                if json:
+                    return orjson.loads(data)
+                if decode:
+                    return as_str(data)
+                return data
             if session:
                 req = session
                 resp = req.request(method.upper(), url, headers=headers, files=files, data=data, follow_redirects=True, timeout=timeout)

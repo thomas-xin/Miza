@@ -49,7 +49,6 @@ def _get_duration(filename, _timeout=12):
     return dur, bps
 
 DUR_CACHE = {}
-
 def get_duration(filename):
     if filename:
         with suppress(KeyError):
@@ -806,7 +805,7 @@ class AudioQueue(alist):
             if not auds.next and auds.source and len(self) > 1:
                 with self.sem:
                     e = self[1]
-                    source = ytdl.get_stream(e)
+                    source = ytdl.get_stream(e, asap=False)
                     if source:
                         auds.enqueue(source)
 
@@ -1037,7 +1036,7 @@ class AudioFileLink:
             raise AttributeError("Audio client not active.")
         return bot.audio.submit(f"cache['{self.fn}'].{k}")
 
-    def load(self, stream=None, check_fmt=False, force=False, webpage_url=None, live=False, seekable=True, duration=None):
+    def load(self, stream=None, check_fmt=False, force=False, webpage_url=None, live=False, seekable=True, duration=None, asap=True):
         if stream:
             self.stream = stream
         try:
@@ -1048,7 +1047,7 @@ class AudioFileLink:
         self.live = live
         self.seekable = seekable
         self.webpage_url = webpage_url
-        bot.audio.submit(f"!cache['{self.fn}'].load(" + ",".join(repr(i) for i in (stream, check_fmt, force, webpage_url, live, seekable, duration)) + ")")
+        bot.audio.submit(f"!cache['{self.fn}'].load(" + ",".join(repr(i) for i in (stream, check_fmt, force, webpage_url, live, seekable, duration, asap)) + ")")
         if duration:
             self.dur = duration
         try:
@@ -1251,7 +1250,7 @@ class AudioDownloader:
         self.cache = cdict()
         self.searched = cdict()
         self.semaphore = Semaphore(4, 128)
-        self.download_sem = Semaphore(8, 64, rate_limit=0.5)
+        self.download_sem = Semaphore(16, 64, rate_limit=0.5)
         create_future_ex(self.update_dl)
         create_future_ex(self.setup_pages)
         create_future_ex(self.set_cookie)
@@ -1326,17 +1325,31 @@ class AudioDownloader:
         resp = None
         try:
             if video:
-                v_url = f"https://www.yt-download.org/file/mp4/{url}"
                 self.other_x += 1
-                resp = requests.get(v_url, timeout=16).content
-                entry = cdict(formats=[])
+                if video is True:
+				    video = "merged"
+                v_url = f"https://www.yt-download.org/file/{video}/{url}"
+                resp = requests.get(v_url, headers=header(), timeout=24).content
+                search = b'<img class="h-20 w-20 md:h-48 md:w-48 mt-0 md:mt-12 lg:mt-0 rounded-full mx-auto md:mx-0 md:mr-6" src="'
+                resp = resp[resp.index(search) + len(search):]
+                thumbnail = as_str(resp[:resp.index(b'"')])
+                search = b'<h2 class="text-lg text-teal-600 font-bold m-2 text-center">'
+                resp = resp[resp.index(search) + len(search):]
+                title = html_decode(as_str(resp[:resp.index(b"</h2>")]))
+                entry = dict(
+                    formats=[],
+                    thumbnail=thumbnail,
+                    title=title,
+                    webpage_url=webpage_url,
+                )
                 while True:
                     try:
-                        resp = resp[resp.index(f'<a href="https://www.yt-download.org/download/{url}/mp4/'.encode("utf-8")) + 9:]
+                        resp = resp[resp.index(f'<a href="https://www.yt-download.org/download/{url}/{video}/'.encode("utf-8")) + 9:]
                         stream = as_str(resp[:resp.index(b'"')])
                         search = b'<div class="text-shadow-1">'
                         resp = resp[resp.index(search) + len(search):]
-                        height = int(resp[:resp.index(b"</div>")].strip().rstrip(b"p"))
+                        s = as_str(resp[:resp.index(b"</div>")].strip()).split("<", 1)[0]
+                        height = int(s.rstrip(" p"))
                     except ValueError:
                         break
                     else:
@@ -1346,9 +1359,9 @@ class AudioDownloader:
                             height=height,
                         ))
             else:
-                yt_url = f"https://www.yt-download.org/file/mp3/{url}"
                 self.other_x += 1
-                resp = requests.get(yt_url, timeout=16).content
+                yt_url = f"https://www.yt-download.org/file/mp3/{url}"
+                resp = requests.get(yt_url, timeout=24).content
                 search = b'<img class="h-20 w-20 md:h-48 md:w-48 mt-0 md:mt-12 lg:mt-0 rounded-full mx-auto md:mx-0 md:mr-6" src="'
                 resp = resp[resp.index(search) + len(search):]
                 thumbnail = as_str(resp[:resp.index(b'"')])
@@ -1917,12 +1930,12 @@ class AudioDownloader:
                             return res[:count]
                 # Otherwise call automatic extract_info function
                 resp = self.extract_info(item, count, search=search, mode=mode)
-                if resp.get("_type", None) == "url":
+                if resp.get("_type") == "url":
                     resp = self.extract_from(resp["url"])
                 if resp is None or not len(resp):
                     raise LookupError(f"No results for {item}")
                 # Check if result is a playlist
-                if resp.get("_type", None) == "playlist":
+                if resp.get("_type") == "playlist":
                     entries = list(resp["entries"])
                     if force or len(entries) <= 1:
                         for entry in entries:
@@ -2169,7 +2182,7 @@ class AudioDownloader:
                 return repr(ex)
 
     # Gets the stream URL of a queue entry, starting download when applicable.
-    def get_stream(self, entry, video=False, force=False, download=True, callback=None):
+    def get_stream(self, entry, video=False, force=False, download=True, callback=None, asap=True):
         if not entry.get("url"):
             raise FileNotFoundError
         try:
@@ -2290,7 +2303,7 @@ class AudioDownloader:
             seekable = not entry.get("duration") or entry["duration"] < inf
             cf = isnan(entry.get("duration") or nan) or not (stream.startswith("https://cf-hls-media.sndcdn.com/") or is_youtube_stream(stream))
             try:
-                f.load(stream, check_fmt=cf, webpage_url=entry["url"], live=live, seekable=seekable, duration=entry.get("duration"))
+                f.load(stream, check_fmt=cf, webpage_url=entry["url"], live=live, seekable=seekable, duration=entry.get("duration"), asap=asap)
             except:
                 self.cache.pop(fn, None)
                 raise
@@ -2420,7 +2433,7 @@ class AudioDownloader:
         # Add the audio to the rendered video, without re-encoding the entire frames
         args = ["./ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y"]
         args.extend(("-i", fnv, "-f", "s16le", "-ac", "2", "-ar", str(SAMPLE_RATE), "-i", afile))
-        args.extend(("-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-b:a", "224k", fn))
+        args.extend(("-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", "libopus", "-b:a", "224k", fn))
         print(args)
         subprocess.run(args, stderr=subprocess.PIPE)
         with suppress():
@@ -2555,7 +2568,12 @@ class AudioDownloader:
                 args.extend(("-f", "s16le", "-ar", "48k", "-ac", "2"))
                 asf = "-"
             else:
-                asf = asc = ast[0]["stream"]
+                stream = ast[0]["stream"]
+                if child:
+                    fii = f"cache/{ts}~proxy"
+                    with tracebacksuppressor:
+                        stream = proxy_download(stream, fii)
+                asf = asc = stream
             if not vst and not size:
                 args.append("-vn")
             elif fmt in ("gif", "apng", "webp"):
@@ -2598,10 +2616,12 @@ class AudioDownloader:
             sr = str(SAMPLE_RATE)
             ac = "2"
             if fmt in ("vox", "adpcm"):
-                args.extend(("-acodec", "adpcm_ms"))
+                args.extend(("-c:a", "adpcm_ms"))
                 fmt = "wav" if fmt == "adpcm" else "vox"
                 outf = f"{info['name']}.{fmt}"
                 fn = f"cache/\x7f{ts}~" + outf.translate(filetrans)
+            elif fmt == "ogg":
+                args.extend(("-c:a", "libopus"))
             elif fmt == "pcm":
                 fmt = "s16le"
             elif fmt == "mp2":
@@ -2637,16 +2657,18 @@ class AudioDownloader:
             try:
                 if len(ast) > 1:
                     proc = psutil.Popen(args, stdin=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1048576)
+                    futs = deque()
                     for t, info in enumerate(ast, ts + 1):
                         cfn = None
                         if type(info) is not str:
                             url = info.get("url")
                         else:
                             url = info
-                        try:
-                            cfn = self.download_file(url, "pcm", auds=None, ts=t, child=True, silenceremove=silenceremove)[0]
-                        except:
-                            print_exc()
+                        while len(futs) < 8:
+                            fut = submit(self.download_file, url, "pcm", auds=None, ts=t, child=True, silenceremove=silenceremove)
+                            futs.append(fut)
+                        with tracebacksuppressor:
+                            cfn = futs.popleft().result()[0]
                         if cfn and os.path.exists(cfn):
                             if os.path.getsize(cfn):
                                 with open(cfn, "rb") as f:
@@ -4741,7 +4763,7 @@ class Download(Command):
             desc += ", Audio settings: {ON}"
         desc += "```*"
         # Encode URL list into bytes and then custom base64 representation, hide in code box header
-        url_bytes = bytes(repr([e["url"] for e in res]), "utf-8")
+        url_bytes = orjson.dumps([e["url"] for e in res])
         url_enc = as_str(bytes2b64(url_bytes, True))
         vals = f"{user.id}_{len(res)}_{fmt}_{int(bool(a))}_{start}_{end}_{int(bool(b))}"
         msg = "*```" + "\n" * ("z" in flags) + "callback-voice-download-" + vals + "-" + url_enc + "\n" + desc
@@ -4789,7 +4811,7 @@ class Download(Command):
             if num >= int(spl[1]):
                 return
             # Reconstruct list of URLs from hidden encoded data
-            data = literal_eval(as_str(b642bytes(argv, True)))
+            data = orjson.loads(b642bytes(argv, True))
             url = data[num]
             # Perform all these tasks asynchronously to save time
             with discord.context_managers.Typing(channel):

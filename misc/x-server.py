@@ -725,7 +725,7 @@ class Server:
             h = shash(url)
             fn = "~" + h + fmt
             RESPONSES[t] = fut = concurrent.futures.Future()
-            send(f"!{t}\x7fbot.audio.returns[{t}]=VOICE.ytdl.get_stream(bot.audio.returns[{t}],download={repr(fmt)})", escape=False)
+            send(f"!{t}\x7fbot.audio.returns[{t}]=VOICE.ytdl.get_stream(bot.audio.returns[{t}],download={repr(fmt)},asap=False)", escape=False)
             fut.result()
             RESPONSES.pop(t, None)
             fni = "cache/" + fn

@@ -2450,24 +2450,25 @@ hex2bytes = lambda b: bytes.fromhex(as_str(b))
 def bytes2b64(b, alt_char_set=False):
     if type(b) is str:
         b = b.encode("utf-8")
-    b = base64.b64encode(b)
     if alt_char_set:
-        b = b.replace(b"=", b"-").replace(b"/", b".")
-    return b
+        b = base64.urlsafe_b64encode(b)
+        return b.rstrip(b"=")
+    return base64.b64encode(b)
 
 # Converts a base 64 string to a bytes object.
 def b642bytes(b, alt_char_set=False):
     if type(b) is str:
         b = b.encode("utf-8")
     if alt_char_set:
-        b = b.replace(b"-", b"=").replace(b".", b"/")
-    b = base64.b64decode(b)
-    return b
+        if not b.endswith(b"="):
+            b += b"=="
+        return base64.urlsafe_b64decode(b)
+    return base64.b64decode(b)
 
 if sys.version_info[0] >= 3 and sys.version_info[1] >= 9:
     randbytes = random.randbytes
 else:
-    randbytes = lambda size: np.random.randint(0, 256, size=size).data
+    randbytes = lambda size: np.random.randint(0, 256, size=size, dtype=np.uint8).data
 
 # SHA256 operations: base64 and base16.
 shash = lambda s: as_str(base64.urlsafe_b64encode(hashlib.sha256(s if type(s) is bytes else as_str(s).encode("utf-8")).digest()).rstrip(b"="))

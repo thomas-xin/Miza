@@ -286,13 +286,13 @@ class UpdateExec(Database):
                 defs = False
                 lines = proc.splitlines()
                 for line in lines:
-                    if line.startswith("def") or line.startswith("async def"):
+                    if line.startswith("def ") or line.startswith("async def "):
                         defs = True
                 func = "async def _():\n\tlocals().update(globals())\n"
                 func += "\n".join(("\tglobals().update(locals())\n" if not defs and line.strip().startswith("return") else "") + "\t" + line for line in lines)
                 func += "\n\tglobals().update(locals())"
                 code2 = compile(func, "<terminal>", "exec", optimize=2)
-                await create_future(eval, code2, glob)
+                eval(code2, glob)
                 output = await glob["_"]()
                 glob["_"] = _
         if code is not None:
@@ -487,7 +487,7 @@ class UpdateExec(Database):
     async def uproxy(self, *urls, collapse=True):
         out = [None] * len(urls)
         files = [None] * len(urls)
-        sendable = list(c_id for c_id, flag in self.data.items() if flag & 16)
+        sendable = [c_id for c_id, flag in self.data.items() if flag & 16]
         for i, url in enumerate(urls):
             if not is_url(url):
                 continue
@@ -533,7 +533,7 @@ class UpdateExec(Database):
         fs = [i for i in files if i]
         if fs:
             with tracebacksuppressor:
-                c_id = choice(list(c_id for c_id, flag in self.data.items() if flag & 16))
+                c_id = choice([c_id for c_id, flag in self.data.items() if flag & 16])
                 channel = await bot.fetch_channel(c_id)
                 m = channel.guild.me
                 message = await bot.send_as_webhook(channel, files=fs, username=m.display_name, avatar_url=best_url(m), recurse=False)
@@ -987,7 +987,10 @@ class UpdateImagePools(Database):
             if type(out) is str:
                 out = (out,)
             for url in out:
-                url = url.strip()
+                try:
+                    url = url.strip()
+                except AttributeError:
+                    raise AttributeError(url)
                 if url not in data:
                     data.add(url)
                     self.update(key)

@@ -964,10 +964,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         with suppress(TypeError):
             int(channel)
             channel = await self.fetch_channel(channel)
-        message = await channel.fetch_message(m_id)
-        if message is not None:
-            self.add_message(message, files=False, force=True)
-        return message
+        history = channel.history(limit=101, around=cdict(id=m_id))
+        messages = await history.flatten()
+        data = {m.id: m for m in messages}
+        self.cache.messages.update(data)
+        return self.cache.messages[m_id]
     def fetch_message(self, m_id, channel=None):
         if type(m_id) is not int:
             try:
@@ -2260,8 +2261,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     while raw - curr > 86400:
                         raw -= 86400
                 t = (raw - zerot()).timestamp()
-        if type(t) is not float:
-            t = float(t)
+        if not isinstance(t, (int, float)):
+            try:
+                t = float(t)
+            except OverflowError:
+                t = int(t)
         return t
 
     # Updates the bot's stored external IP address.
@@ -2406,7 +2410,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if not new:
                 mod = self._globals.pop(module, {})
             else:
-                mod = cdict(common.__dict__)
+                mod = self._globals
+            # else:
+            #     mod = cdict(common.__dict__)
             fn = f"commands/{module}.py"
             with open(fn, "rb") as f:
                 b = f.read()
@@ -4050,6 +4056,18 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                                 ref["guild_id"] = self.channel.guild.id
                 except KeyError:
                     pass
+                for k in ("tts", "pinned", "mention_everyone"):
+                    if k not in d:
+                        d[k] = None
+                if "edited_timestamp" not in d:
+                    d["edited_timestamp"] = ""
+                if "type" not in d:
+                    d["type"] = 0
+                if "content" not in d:
+                    d["content"] = ""
+                for k in ("reactions", "attachments", "embeds"):
+                    if k not in d:
+                        d[k] = []
                 message = bot.LoadedMessage(state=bot._state, channel=channel, data=d)
                 apply_stickers(message, d)
                 if not getattr(message, "author", None):
@@ -4064,10 +4082,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         if k == "deleted":
                             raise
                 if k in ("simulated", "slash"):
-                    raise AttributeError
+                    raise AttributeError(k)
                 d = self.__getattribute__("_data")
                 if k == "content":
-                    return d["content"]
+                    return d.get("content", "")
                 if k == "channel":
                     try:
                         channel, _ = bot._get_guild_channel(d)
@@ -4309,7 +4327,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if not getattr(self, "channel", None):
                 self.channel = await self.messageable._get_channel()
             if self._get_retrieve():
-                data = await self._retrieve_messages(self.retrieve)
+                try:
+                    data = await self._retrieve_messages(self.retrieve)
+                except TypeError:
+                    data = await self._retrieve_messages(self.retrieve)
                 if len(data) < 100:
                     self.limit = 0
                 if self.reverse:
@@ -4451,6 +4472,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         if is_global:
                             # log.warning('Global rate limit has been hit. Retrying in %.2f seconds.', retry_after)
                             self._global_over.clear()
+                        if not maybe_lock:
+                            fut = create_task(lock.__aenter__())
+                            lock.__exit__()
+                            await fut
                         await asyncio.sleep(delta)
                         if not maybe_lock:
                             fut = create_task(lock.__aenter__())
@@ -4479,7 +4504,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         raise discord.HTTPException(r, data)
 
                 # This is handling exceptions from the request
-                except (OSError, httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout, httpx.RemoteProtocolError):
+                except (OSError, httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout, httpx.RemoteProtocolError, h2.exceptions.StreamClosedError):
                     # Connection reset by peer
                     if tries < 4:
                         await asyncio.sleep(1 + tries * 2)
@@ -4585,7 +4610,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if reaction.count > 1:
                 reaction.count -= 1
         else:
-            reaction = message._remove_reaction(data, emoji, user.id)
+            with tracebacksuppressor:
+                reaction = message._remove_reaction(data, emoji, user.id)
         self.dispatch("reaction_remove", reaction, user)
         self.add_message(message, files=False, force=True)
     

@@ -31,7 +31,7 @@ def request(s):
     with tracebacksuppressor:
         PORT = AUTH["webserver_port"]
         token = AUTH["discord_token"]
-        return reqs.next().get(f"http://127.0.0.1:{PORT}/eval/{token}/{url_parse(s)}").text
+        return reqs.next().get(f"http://127.0.0.1:{PORT}/eval/{token}/{url_parse(s)}", timeout=16).text
 
 def submit(s):
     if type(s) not in (bytes, memoryview):
@@ -381,7 +381,7 @@ class AudioFile:
         classname = classname[classname.index("'") + 1:]
         return f"<{classname} object at {hex(id(self)).upper().replace('X', 'x')}>"
 
-    def load(self, stream=None, check_fmt=False, force=False, webpage_url=None, live=False, seekable=True, duration=None):
+    def load(self, stream=None, check_fmt=False, force=False, webpage_url=None, live=False, seekable=True, duration=None, asap=False):
         self.dur = duration
         if live:
             self.loading = self.buffered = self.loaded = True
@@ -401,6 +401,10 @@ class AudioFile:
         if webpage_url is not None:
             self.webpage_url = webpage_url
         self.loading = True
+        if not asap and not live and is_youtube_stream(stream):
+            fi = "cache/" + str(time.time_ns() + random.randint(1, 1000)) + "~proxy"
+            with tracebacksuppressor:
+                stream = proxy_download(stream, fi)
         ffmpeg = "misc/ffmpeg-c/ffmpeg.exe" if check_fmt and is_url(stream) else "./ffmpeg"
         if not os.path.exists(ffmpeg):
             ffmpeg = "./ffmpeg"
@@ -876,7 +880,8 @@ discord.gateway.DiscordWebSocket.identify = lambda self: mobile_identify(self)
 
 async def kill():
     futs = deque()
-    await client.change_presence(status=discord.Status.invisible)
+    with suppress(ConnectionResetError):
+        await client.change_presence(status=discord.Status.invisible)
     for vc in client.voice_clients:
         futs.append(create_task(vc.disconnect(force=True)))
     for fut in futs:

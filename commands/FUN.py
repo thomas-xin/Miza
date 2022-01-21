@@ -29,7 +29,7 @@ class ND2048(collections.abc.MutableSequence):
     spl = b"_"
     __slots__ = ("data", "history", "shape", "flags")
 
-    # Loads a new instance from serialized data
+    # Loads a new instance from serialised data
     @classmethod
     def load(cls, data):
         spl = data.split(cls.spl)
@@ -47,8 +47,8 @@ class ND2048(collections.abc.MutableSequence):
                 self.history.append(np.frombuffer(b642bytes(spl.pop(0), 1), dtype=np.int8).reshape(shape))
         return self
 
-    # Serializes gamestate data to base64
-    def serialize(self):
+    # serialises gamestate data to base64
+    def serialise(self):
         s = (self.spl.join(str(i).encode("utf-8") for i in self.data.shape)) + self.spl + str(self.flags).encode("utf-8") + self.spl * 2 + bytes2b64(self.data.tobytes(), 1)
         if self.flags & 1 and self.history:
             s += self.spl + self.spl.join(bytes2b64(b.tobytes(), 1) for b in self.history)
@@ -74,7 +74,7 @@ class ND2048(collections.abc.MutableSequence):
         self.flags = flags
         self.spawn(max(2, self.data.size // 6), flag_override=0)
 
-    __repr__ = lambda self: self.__class__.__name__ + ".load(" + repr(self.serialize()) + ")"
+    __repr__ = lambda self: self.__class__.__name__ + ".load(" + repr(self.serialise()) + ")"
 
     # Displays game board for dimensions N <= 4
     def __str__(self):
@@ -360,7 +360,7 @@ class Text2048(Command):
             #     if r == -2 or (r == -1 and mode & 1) or r >= 0 and r >> 1 < len(size):
             #         await message.add_reaction(as_str(react))
             g = ND2048(*size, flags=mode)
-            data = g.serialize()
+            data = g.serialise()
             r = -1
             score = 0
         else:
@@ -379,20 +379,20 @@ class Text2048(Command):
                     g = ND2048.load(data)
                     if not g.undo():
                         return
-                    data = g.serialize()
+                    data = g.serialise()
                 # Random moves
                 elif r == -2:
                     g = ND2048.load(data)
                     if not g.move(-1, count=16):
                         return
-                    data = g.serialize()
+                    data = g.serialise()
                 # Regular moves; each dimension has 2 possible moves
                 elif r >> 1 < len(size):
                     g = ND2048.load(data)
                     score = g.score()
                     if not g.move(r >> 1, r & 1):
                         return
-                    data = g.serialize()
+                    data = g.serialise()
             except GameOverError:
                 if u_id == 0:
                     u = None
@@ -582,7 +582,7 @@ class Text2048(Command):
         if mode & 1:
             reacts.append("↩️")
         g = ND2048(*size, flags=mode)
-        data = g.serialize()
+        data = g.serialise()
         u = user
         colour = await bot.get_colour(u)
         emb = discord.Embed(colour=colour)
@@ -1107,9 +1107,9 @@ class Uno(Command):
             return
         bot = self.bot
         vals = vals.split("_")
-        players = literal_eval(vals[0])
+        players = orjson.loads(vals[0])
         hands = [list(chain(x + y for x, y in zip(s[::2], s[1::2]))) for s in vals[1].split("x")]
-        winners = literal_eval(vals[2])
+        winners = orjson.loads(vals[2])
         turn = int(vals[3])
         last = vals[4]
         td = 1 if vals[5] == "0" else -1
@@ -3284,38 +3284,6 @@ class Giphy(ImagePool, Command):
         self.bot.send_as_embeds(channel, image=url)
 
 
-class RPS(Command):
-    name = ["Rockpaperscissors"]
-    description = "A randomized game of Rock-Paper-Scissors!"
-    usage = "<rock>? <paper>? <scissors>?"
-    slash = True
-
-    async def __call__(self, bot, user, channel, argv, **void):
-        if not argv:
-            create_task(channel.send("Let's play Rock-Paper-Scissors! Post your choice!"))
-            argv = await bot.wait_for("message", check=lambda message: message.author.id == user.id and message.channel.id == channel.id)
-        argv = full_prune(argv)
-
-        matches = dict(
-            rock="scissors",
-            scissors="paper",
-            paper="rock",
-        )
-        decision = choice(matches)
-        await channel.send(f"I'll go with {decision}!")
-        rew = random.randint(5, 50)
-
-        if matches[decision] == argv:
-            return "**I win!** 😁"
-        if matches[argv] == decision:
-            bot.data.users.add_gold(user, rew)
-            return f"**I lost...** 😔 You won {bot.as_rewards(rew)}"
-        if argv == decision:
-            bot.data.users.add_gold(user, rew / 2)
-            return f"Wow, **we tied!** 🙃 You won {bot.as_rewards(rew / 2)}")
-        return "Your answer doesn't count! 🙂"
-
-
 class Rickroll(Command):
     name = ["Thumbnail", "FakeThumbnail", "FakeVideo"]
     description = "Generates a link that embeds a thumbnail, but redirects to a separate YouTube video once played."
@@ -3354,3 +3322,35 @@ class Rickroll(Command):
 </head><body></body></html>"""
         urls = await create_future(bot._globals["as_file"], s.encode("utf-8"))
         return urls[0].replace("/p/", "/f/", 1)
+
+
+class RPS(Command):
+    name = ["Rockpaperscissors"]
+    description = "A randomized game of Rock-Paper-Scissors!"
+    usage = "<rock>? <paper>? <scissors>?"
+    slash = True
+
+    async def __call__(self, bot, user, channel, argv, **void):
+        if not argv:
+            create_task(channel.send("Let's play Rock-Paper-Scissors! Post your choice!"))
+            argv = await bot.wait_for("message", check=lambda message: message.author.id == user.id and message.channel.id == channel.id)
+        argv = full_prune(argv)
+
+        matches = dict(
+            rock="scissors",
+            scissors="paper",
+            paper="rock",
+        )
+        decision = choice(matches)
+        await channel.send(f"I'll go with {decision}!")
+        rew = random.randint(5, 50)
+
+        if matches[decision] == argv:
+            return "**I win!** 😁"
+        if matches[argv] == decision:
+            bot.data.users.add_gold(user, rew)
+            return f"**I lost...** 😔 You won {bot.as_rewards(rew)}"
+        if argv == decision:
+            bot.data.users.add_gold(user, rew / 2)
+            return f"Wow, **we tied!** 🙃 You won {bot.as_rewards(rew / 2)}")
+        return "Your answer doesn't count! 🙂"

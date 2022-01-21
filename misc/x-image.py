@@ -442,7 +442,7 @@ def yuv_split(image, convert=True):
     return out
 
 def rgb_merge(R, G, B, convert=True):
-    out = np.empty(R.shape + (3,), dtype=np.uint8)
+    out = np.empty(R.shape[::-1] + (3,), dtype=np.uint8)
     outT = np.swapaxes(out, 2, 0)
     if R.dtype in (np.float16, np.float32, np.float64):
         for a in (R, G, B):
@@ -691,7 +691,7 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
                     size = (960, 540)
         fn2 = fn + ".gif"
         f_in = fn if direct else url
-        command = ["./ffmpeg", "-threads", "2", "-hide_banner", "-nostdin", "-v", "error", "-y", "-hwaccel", "auto", "-i", f_in, "-an", "-vf"]
+        command = ["./ffmpeg", "-threads", "2", "-hide_banner", "-nostdin", "-v", "error", "-y", "-hwaccel", "auto", "-i", f_in, "-vf"]
         w, h = max_size(*size, maxsize)
         fps = fps or orig_fps or 20
         step = 1
@@ -1747,7 +1747,16 @@ def blend_op(image, url, operation, amount, recursive=True):
         filt = "blend"
     else:
         raise TypeError("Invalid image operation: \"" + op + '"')
-    image2 = get_image(url, url)
+    try:
+        image2 = get_image(url, url)
+    except TypeError as ex:
+        s = ex.args[0]
+        search = 'Filetype "audio/'
+        if not s.startswith(search):
+            raise
+        s = s[len(search):]
+        image.audio = dict(url=url, codec=s[:s.index('"')])
+        return image
     if recursive:
         if not globals()["ANIM"]:
             try:
@@ -1970,18 +1979,6 @@ def remove_matte(image, colour):
 colour_blind_map = dict(
     protan=(
         (
-            (0.625, 0.375, 0),
-            (0.7, 0.3, 0),
-            (0, 0.3, 0.7),
-        ),
-        (
-            (0.8, 0.2, 0),
-            (0.25833, 0.74167, 0),
-            (0, 0.14167, 0.85833),
-        ),
-    ),
-    deutan=(
-        (
             (0.56667, 0.43333, 0),
             (0.55833, 0.44167, 0),
             (0.24167, 0.75833, 0),
@@ -1990,6 +1987,18 @@ colour_blind_map = dict(
             (0.81667, 0.18333, 0),
             (0.33333, 0.66667, 0),
             (0, 0.125, 0.875),
+        ),
+    ),
+    deutan=(
+        (
+            (0.625, 0.375, 0),
+            (0.7, 0.3, 0),
+            (0, 0.3, 0.7),
+        ),
+        (
+            (0.8, 0.2, 0),
+            (0.25833, 0.74167, 0),
+            (0, 0.14167, 0.85833),
         ),
     ),
     tritan=(
@@ -2259,7 +2268,7 @@ def from_bytes(b, save=None):
         cmd = ("./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,avg_frame_rate", "-of", "csv=s=x:p=0", fn)
         print(cmd)
         p = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        cmd2 = ["./ffmpeg", "-hide_banner", "-v", "error", "-y", "-hwaccel", "auto", "-an", "-i", fn, "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0", "-"]
+        cmd2 = ["./ffmpeg", "-hide_banner", "-v", "error", "-y", "-hwaccel", "auto", "-i", fn, "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0", "-"]
         print(cmd2)
         proc = psutil.Popen(cmd2, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0)
         bcount = 4 if fmt == "rgba" else 3
@@ -2406,7 +2415,7 @@ def evalImg(url, operation, args):
     globals()["CURRENT_FRAME"] = 0
     ts = time.time_ns() // 1000
     out = "cache/" + str(ts) + ".png"
-    fmt = "gif"
+    fmt = "png"
     dur = None
     if len(args) > 1 and args[-2] == "-f":
         fmt = args.pop(-1)
@@ -2467,6 +2476,9 @@ def evalImg(url, operation, args):
                 new["frames"] = ImageOpIterator(image, step, operation=operation, ts=ts, args=args)
     else:
         new = eval(url)(*args)
+    if isinstance(new, Image.Image):
+        if getattr(new, "audio", None):
+            new = dict(count=1, duration=1, frames=[new])
     if type(new) is dict:
         duration = new["duration"]
         if dur and duration > dur:
@@ -2474,13 +2486,21 @@ def evalImg(url, operation, args):
         frames = new["frames"]
         if not frames:
             raise EOFError("No image output detected.")
-        elif new["count"] == 1:
-            new = next(iter(frames))
+        if new["count"] == 1:
+            temp = next(iter(frames))
+            video = getattr(temp, "audio", None)
+            if not video:
+                new = temp
+            else:
+                duration = 86400
+                new["count"] = 16
+                new["frames"] = [temp] * new["count"]
         else:
+            video = True
+        if video:
             if fmt in ("png", "jpg", "jpeg", "bmp"):
                 fmt = "gif"
             print(duration, new["count"])
-            out = "cache/" + str(ts) + "." + fmt
             # if new["count"] <= 1024:
             #     it = iter(frames)
             #     first = next(it)
@@ -2500,6 +2520,9 @@ def evalImg(url, operation, args):
                             yield next(it)
 
                 frames = frameit(first, it)
+            if getattr(first, "audio", None) and fmt == "gif":
+                fmt = "mp4"
+            out = "cache/" + str(ts) + "." + fmt
             mode = str(first.mode)
             if mode == "P":
                 mode = "RGBA"
@@ -2510,13 +2533,13 @@ def evalImg(url, operation, args):
                 command = [
                     "./ffmpeg", "-threads", "2", "-hide_banner", "-v", "error", "-y", "-hwaccel", "auto",
                     "-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", ("rgb24" if mode == "RGB" else "rgba"),
-                    "-video_size", "x".join(map(str, size)), "-i", "-", "-an"
+                    "-video_size", "x".join(map(str, size))
                 ]
                 if fmt in ("gif", "webp", "apng"):
-                    command.extend(("-gifflags", "-offsetting"))
+                    command.extend(("-i", "-", "-gifflags", "-offsetting"))
                     if new["count"] > 4096:
-                        vf = None
-                        # vf = "split[s0][s1];[s0]palettegen=reserve_transparent=1:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle:alpha_threshold=128"
+                        # vf = None
+                        vf = "split[s0][s1];[s0]palettegen=reserve_transparent=1:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle:alpha_threshold=128"
                     else:
                         vf = "split[s0][s1];[s0]palettegen="
                         if mode == "RGBA":
@@ -2526,17 +2549,33 @@ def evalImg(url, operation, args):
                         command.extend(("-vf", vf))
                     command.extend(("-loop", "0"))
                 else:
-                    meg = round(np.prod(size) * 3 / 1e6, 4)
-                    if meg < 1:
-                        meg = 1
-                    command.extend(("-b:v", f"{meg}M"))
+                    if getattr(first, "audio", None):
+                        command.extend(("-i", "-", "-i", first.audio["url"]))
+                        if first.audio["codec"] not in ("mp3", "mpeg", "ogg", "opus", "aac"):
+                            command.extend(("-c:a", "libopus", "-b:a", "224k"))
+                        else:
+                            command.extend(("-c:a", "copy"))
+                    else:
+                        command.extend(("-c:a", "copy"))
+                    if new.get("count", inf) <= 16:
+                        meg = 1048576
+                    else:
+                        meg = round(np.prod(size) * 3 / 1e6, 4)
+                        if meg < 1:
+                            meg = 1
+                    command.extend(("-b:v", f"{meg}M", "-pix_fmt"))
+                    if mode == "RGB":
+                        command.extend(("yuva420p", "-c:v", "vp9"))
+                    else:
+                        command.extend(("yuv420p", "-c:v", "h264"))
+                    # command.append("-shortest")
                 command.append(out)
                 print(command)
                 proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, bufsize=0)
             for i, frame in enumerate(frames):
                 if fmt == "zip":
                     b = io.BytesIO()
-                if issubclass(type(frame), Image.Image):
+                if isinstance(frame, Image.Image):
                     if frame.size != size:
                         frame = frame.resize(size)
                     if frame.mode != mode:
@@ -2564,14 +2603,13 @@ def evalImg(url, operation, args):
                     resp.writestr(f"{s}.png", data=b.read())
                 else:
                     proc.stdin.write(b)
-                    time.sleep(0.02)
             if fmt == "zip":
                 resp.close()
             else:
                 proc.stdin.close()
                 proc.wait()
             return [out]
-    if issubclass(type(new), Image.Image):
+    if isinstance(new, Image.Image):
         new.save(out, "png")
         return [out]
     elif type(new) is str and new.startswith("$"):

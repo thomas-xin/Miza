@@ -1194,6 +1194,7 @@ class Crosspost(Command):
         data = bot.data.crossposts
         if "d" in flags:
             if argv:
+                argv = verify_id(argv)
                 target = await bot.fetch_channel(argv)
                 if target.id in data:
                     data[target.id].discard(channel.id)
@@ -1591,7 +1592,6 @@ class UpdateAutoEmojis(Database):
 
 
 # TODO: Stop being lazy and finish this damn command
-# TODO: Don't pressure yourself with any of your code, this was all a hobby project and not there to be a stresser <3 - Smudge
 # class Welcomer(Command):
 #     server_only = True
 #     name = ["Welcome", "JoinMessage"]
@@ -2464,27 +2464,25 @@ class UpdateMessageCache(Database):
             if type(data) is not dict:
                 data = {as_str(m["id"]): m for m in data}
             self.raws[fn] = data
-            # if raw:
-                # print(f"{len(data)} message{'s' if len(data) != 1 else ''} temporarily read from {fn}")
-        if not raw:
-            found = self.loaded.setdefault(fn, {})
-            bot = self.bot
-            i = 0
-            for k, m in deque(data.items()):
-                if "channel" in m:
-                    m["channel_id"] = m.pop("channel")
-                try:
-                    message = bot.CachedMessage(m)
-                except:
-                    print(m)
-                    print_exc()
-                k = int(k)
-                bot.cache.messages[k] = found[k] = message
-                i += 1
-                if not i & 2047:
-                    time.sleep(0.1)
-            # print(f"{len(data)} message{'s' if len(data) != 1 else ''} successfully loaded from {fn}")
-            return found
+        if raw:
+            return
+        found = self.loaded.setdefault(fn, {})
+        bot = self.bot
+        i = 0
+        for k, m in deque(data.items()):
+            if "channel" in m:
+                m["channel_id"] = m.pop("channel")
+            try:
+                message = bot.CachedMessage(m)
+            except:
+                print(m)
+                print_exc()
+            k = int(k)
+            bot.cache.messages[k] = found[k] = message
+            i += 1
+            if not i & 2047:
+                time.sleep(0.1)
+        return found
 
     def load_message(self, m_id):
         fn = self.get_fn(m_id)
@@ -2509,7 +2507,7 @@ class UpdateMessageCache(Database):
         if fn in self.loaded:
             self.loaded[fn].update(messages)
         saved = self.raws.setdefault(fn, {})
-        for i, m_id, message in zip(range(1, len(messages) + 1), messages.keys(), messages.values()):
+        for m_id, message in messages.items():
             m = getattr(message, "_data", None)
             if m:
                 if "author" not in m:
@@ -2523,24 +2521,27 @@ class UpdateMessageCache(Database):
             else:
                 if message.channel is None:
                     continue
-                reactions = []
-                attachments = [dict(id=a.id, size=a.size, filename=a.filename, url=a.url, proxy_url=a.proxy_url) for a in message.attachments]
-                embeds = [e.to_dict() for e in message.embeds]
                 author = message.author
                 m = dict(
                     author=dict(id=author.id, s=str(author), avatar=author.avatar and author.avatar.key),
-                    webhook_id=message.webhook_id,
-                    reactions=reactions,
-                    attachments=attachments,
-                    embeds=embeds,
-                    edited_timestamp=str(message._edited_timestamp) if getattr(message, "_edited_timestamp", None) else "",
-                    type=getattr(message.type, "value", message.type),
-                    pinned=message.pinned,
-                    flags=message.flags.value if message.flags else 0,
-                    mention_everyone=message.mention_everyone,
-                    content=message.content,
                     channel_id=message.channel.id,
                 )
+                if message.content:
+                    m["content"] = message.content
+                mtype = getattr(message.type, "value", message.type)
+                if mtype:
+                    m["type"] = mtype
+                Flags = message.flags.value if message.flags else 0
+                if flags:
+                    m["flags"] = flags
+                for k in ("tts", "pinned", "mention_everyone", "webhook_id"):
+                    v = getattr(message, k, None)
+                    if v:
+                        m[k] = v
+                edited_timestamp = as_str(getattr(message, "_edited_timestamp", None) or "")
+                if edited_timestamp:
+                    m["edited_timestamp"] = edited_timestamp
+                reactions = []
                 for reaction in message.reactions:
                     if not reaction.is_custom_emoji():
                         r = dict(emoji=dict(id=None, name=str(reaction)))
@@ -2549,10 +2550,16 @@ class UpdateMessageCache(Database):
                         if reaction.me:
                             r["me"] = reaction.me
                         reactions.append(r)
+                if reactions:
+                    m["reactions"] = reactions
+                attachments = [dict(id=a.id, size=a.size, filename=a.filename, url=a.url, proxy_url=a.proxy_url) for a in message.attachments]
+                if attachments:
+                    m["attachments"] = attachments
+                embeds = [e.to_dict() for e in message.embeds]
+                if embeds:
+                    m["embeds"] = embeds
             m["id"] = str(m_id)
             saved[m["id"]] = m
-            if not i & 1023:
-                time.sleep(0.1)
         path = self.files + "/" + str(fn)
         if not saved:
             if os.path.exists(path):
@@ -2975,7 +2982,7 @@ class UpdateCrossposts(Database):
             files = deque()
             for a in message.attachments:
                 b = await self.bot.get_attachment(a.url, full=False)
-                files.append(CompatFile(seq(b)))
+                files.append(CompatFile(seq(b), filename=getattr(a, "filename", "untitled")))
             for c_id in tuple(self.data[message.channel.id]):
                 try:
                     channel = await self.bot.fetch_channel(c_id)
