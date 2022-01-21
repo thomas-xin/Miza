@@ -4,6 +4,7 @@
 
 import common
 from common import *
+import h2
 
 create_future_ex(get_colour_list)
 create_future_ex(load_emojis)
