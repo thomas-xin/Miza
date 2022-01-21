@@ -569,7 +569,12 @@ class UpdateExec(Database):
             if flag & 24:
                 channel = self.bot.cache.channels.get(c_id)
                 if channel:
-                    create_task(self.bot.ensure_webhook(channel, force=True))
+                    mchannel = None
+                    while not mchannel:
+                        mchannel = channel.parent if hasattr(channel, "thread") or isinstance(channel, discord.Thread) else channel
+                        if not mchannel:
+                            await asyncio.sleep(0.2)
+                    create_task(self.bot.ensure_webhook(mchannel, force=True))
         self.bot._globals["miza_player"] = Miza_Player(self.bot)
 
     def _destroy_(self, **void):
