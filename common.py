@@ -2700,36 +2700,36 @@ def proxy_download(url, fn=None, refuse_html=True, timeout=24):
     loc = random.choice(("eu", "us"))
     i = random.randint(1, 17)
     j = xrand(len(reqx))
-	with reqx[j].stream(
-		"POST",
-		stream,
-		data=dict(d=url, allowCookies="on"),
-		follow_redirects=True,
-		timeout=timeout,
-	) as resp:
-		if resp.status_code not in range(200, 400):
-			raise ConnectionError(resp.status_code, resp)
-		if not fn:
-			b = resp.read()
+    with reqx[j].stream(
+        "POST",
+        stream,
+        data=dict(d=url, allowCookies="on"),
+        follow_redirects=True,
+        timeout=timeout,
+    ) as resp:
+        if resp.status_code not in range(200, 400):
+            raise ConnectionError(resp.status_code, resp)
+        if not fn:
+            b = resp.read()
             if refuse_html and b[:15] == b"<!DOCTYPE html>":
                 raise ValueError(b)
-		it = resp.iter_bytes()
-		if isinstance(fn, str):
-			f = open(fn, "wb")
-		else:
-			f = fn
-		try:
-			while True:
-				b = next(it)
-				if not b:
-					break
-				f.write(b)
-		except StopIteration:
-			pass
+        it = resp.iter_bytes()
+        if isinstance(fn, str):
+            f = open(fn, "wb")
+        else:
+            f = fn
+        try:
+            while True:
+                b = next(it)
+                if not b:
+                    break
+                f.write(b)
+        except StopIteration:
+            pass
         with open(fn, "rb") as f:
             if refuse_html and f.read(15) == b"<!DOCTYPE html>":
                 raise ValueError(b)
-		return fn
+        return fn
     if fn:
         return o_url
     fut.set_result(o_url)
