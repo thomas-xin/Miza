@@ -3332,7 +3332,6 @@ class RPS(Command):
 
     async def __call__(self, bot, user, message, channel, argv, **void):
         try:
-            message = message.content
             if not argv:
                 create_task(channel.send("Let's play Rock-Paper-Scissors! Post your choice!"))
                 message = await bot.wait_for("message", check=lambda message: message.author.id == user.id and message.channel.id == channel.id)
@@ -3349,14 +3348,17 @@ class RPS(Command):
             earned = random.randint(5, 50)
 
             if matches[decision] == argv:
-                await channel.send("**I win**! 😁")
+                emoji = choice(("😄", "😁", "😀", "😏"))
+                await channel.send(f"**I win**! {emoji}")
             if matches[argv] == decision:
+                emoji = choice(("😔", "😦", "🥺", "😧"))
                 bot.data.users.add_gold(user, earned)
                 rew = await bot.as_rewards(earned)
-                await channel.send(f"**I lost**... 😔 You won {rew}")
+                await channel.send(f"**I lost**... {emoji} You won {rew}")
             if argv == decision:
+                emoji = choice(("🙃", "😉", "😮", "😳"))
                 bot.data.users.add_gold(user, earned / 2)
-                rew = bot.as_rewards(earned / 2)
+                rew = await bot.as_rewards(earned / 2)
                 await channel.send(f"Wow, **we tied**! 🙃 You won {rew}")
         except KeyError:
             await channel.send("Your answer doesn't count! 🙂")
