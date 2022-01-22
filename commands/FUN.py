@@ -3329,6 +3329,7 @@ class RPS(Command):
     description = "A randomized game of Rock-Paper-Scissors!"
     usage = "<rock>? <paper>? <scissors>?"
     slash = True
+    typing = False
 
     async def __call__(self, bot, user, message, channel, argv, **void):
         try:
