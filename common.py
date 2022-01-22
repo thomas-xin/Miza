@@ -2739,6 +2739,7 @@ def proxy_download(url, fn=None, refuse_html=True, timeout=24):
 # Manages both sync and async web requests.
 class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, collections.abc.Callable):
 
+    ts = 0
     semaphore = Semaphore(512, 256, delay=0.25)
 
     @classmethod
@@ -2758,6 +2759,8 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
         for session in self.sessions:
             await session.__aenter__()
         self.nossl = aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False))
+        self.ts = utc()
+        return self
 
     @property
     def session(self):

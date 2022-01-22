@@ -3671,6 +3671,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     # The slow update loop that runs once every 1 second.
     async def slow_loop(self):
         await asyncio.sleep(2)
+        errored = 0
         while not self.closed:
             async with Delay(1):
                 async with tracebacksuppressor:
@@ -3708,7 +3709,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                             self.api_latency *= 2
                         else:
                             self.api_latency = inf
-                        print_exc()
+                        if not errored:
+                            print_exc()
+                        errored = 2
+                    else:
+                        if errored > 0:
+                            errored -= 1
 
     # The lazy update loop that runs once every 2-4 seconds.
     async def lazy_loop(self):
@@ -4505,11 +4511,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         raise discord.HTTPException(r, data)
 
                 # This is handling exceptions from the request
-                except (OSError, httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout, httpx.RemoteProtocolError, h2.exceptions.StreamClosedError):
+                except (OSError, httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout, httpx.RemoteProtocolError, httpx.LocalProtocolError, h2.exceptions.StreamClosedError):
                     # Connection reset by peer
                     if tries < 4:
                         await asyncio.sleep(1 + tries * 2)
                         continue
+                    if utc() - Request.ts > 12:
+                        create_task(Request._init_())
                     raise
     
         async def request(self, route, *, files=None, form=None, **kwargs):
