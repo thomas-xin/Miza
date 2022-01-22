@@ -3340,26 +3340,30 @@ class RPS(Command):
                 argv = full_prune(argv)
 
             matches = dict(
+                r="scissors",
+                s="paper",
+                p="rock",
                 rock="scissors",
                 scissors="paper",
                 paper="rock",
             )
-            decision = choice(matches)
+            decision = choice(matches.values())
             await channel.send(f"I'll go with {decision}!", reference=message)
             earned = random.randint(5, 50)
 
             if matches[decision] == argv:
-                emoji = choice(("😄", "😁", "😀", "😏"))
+                emoji = choice("😄", "😁", "😀", "😏")
                 await channel.send(f"**I win**! {emoji}")
             if matches[argv] == decision:
-                emoji = choice(("😔", "😦", "🥺", "😧"))
+                emoji = choice("😔", "😦", "🥺", "😧")
                 bot.data.users.add_gold(user, earned)
                 rew = await bot.as_rewards(earned)
                 await channel.send(f"**I lost**... {emoji} You won {rew}")
             if argv == decision:
-                emoji = choice(("🙃", "😉", "😮", "😳"))
+                emoji = choice("🙃", "😉", "😮", "😳")
                 bot.data.users.add_gold(user, earned / 2)
                 rew = await bot.as_rewards(earned / 2)
-                await channel.send(f"Wow, **we tied**! 🙃 You won {rew}")
+                await channel.send(f"Wow, **we tied**! {emoji} You won {rew}")
         except KeyError:
-            await channel.send("Your answer doesn't count! 🙂")
+            emoji = choice("😛", "😶‍🌫️", "😇")
+            await channel.send(f"Your answer doesn't count! {emoji}")
