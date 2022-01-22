@@ -3346,15 +3346,17 @@ class RPS(Command):
             )
             decision = choice(matches)
             await channel.send(f"I'll go with {decision}!", reference=message)
-            rew = random.randint(5, 50)
+            earned = random.randint(5, 50)
 
             if matches[decision] == argv:
                 await channel.send("**I win**! 😁")
             if matches[argv] == decision:
-                bot.data.users.add_gold(user, rew)
-                await channel.send(f"**I lost**... 😔 You won {bot.as_rewards(rew)}")
+                bot.data.users.add_gold(user, earned)
+                rew = await bot.as_rewards(earned)
+                await channel.send(f"**I lost**... 😔 You won {rew}")
             if argv == decision:
-                bot.data.users.add_gold(user, rew / 2)
-                await channel.send(f"Wow, **we tied**! 🙃 You won {bot.as_rewards(rew / 2)}")
+                bot.data.users.add_gold(user, earned / 2)
+                rew = bot.as_rewards(earned / 2)
+                await channel.send(f"Wow, **we tied**! 🙃 You won {rew}")
         except KeyError:
             await channel.send("Your answer doesn't count! 🙂")
