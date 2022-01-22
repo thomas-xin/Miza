@@ -3336,8 +3336,8 @@ class RPS(Command):
             if not argv:
                 create_task(channel.send("Let's play Rock-Paper-Scissors! Post your choice!"))
                 message = await bot.wait_for("message", check=lambda message: message.author.id == user.id and message.channel.id == channel.id)
-                argv = message
-            argv = full_prune(argv)
+                argv = message.content
+                argv = full_prune(argv)
 
             matches = dict(
                 rock="scissors",
