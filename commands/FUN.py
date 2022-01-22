@@ -3349,15 +3349,22 @@ class RPS(Command):
             )
             decision = choice(matches.values())
             await channel.send(f"I'll go with {decision}!", reference=message)
-            earned = random.randint(5, 50)
+            earned = random.randint(32, 96) * 2 ** bot.data.rps.setdefault(user.id, 0)
 
             if matches[decision] == argv:
+                bot.data.rps.pop(user.id, 0)
                 emoji = choice("😄", "😁", "😀", "😏")
                 await channel.send(f"**I win**! {emoji}")
             if matches[argv] == decision:
+                bot.data.rps[user.id] += 1
                 emoji = choice("😔", "😦", "🥺", "😧")
-                bot.data.users.add_gold(user, earned)
-                rew = await bot.as_rewards(earned)
+                if earned < 1024:
+                    bot.data.users.add_gold(user, earned)
+                    rew = await bot.as_rewards(earned)
+                else:
+                    earned /= 1024
+                    bot.data.users.add_diamonds(user, earned)
+                    rew = await bot.as_rewards(earned, 0)
                 await channel.send(f"**I lost**... {emoji} You won {rew}")
             if decision[0] == argv[0]:
                 emoji = choice("🙃", "😉", "😮", "😳")
@@ -3365,5 +3372,9 @@ class RPS(Command):
                 rew = await bot.as_rewards(earned / 2)
                 await channel.send(f"Wow, **we tied**! {emoji} You won {rew}")
         except KeyError:
-            emoji = choice("😛", "😶‍🌫️", "😇")
+            emoji = choice("😛", "😶‍🌫️", "😇", "😶")
             await channel.send(f"Your answer doesn't count! {emoji}")
+
+
+class UpdateRPS(Database):
+    name = "rps"
