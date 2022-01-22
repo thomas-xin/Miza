@@ -825,22 +825,14 @@ class SlotMachine(Command):
             return "❤️"
         return choice("🍒🍎🍇🍋🍉🍌")
 
-    def generate(self, rate="low", count=3):
+    def generate(self, rate=0.5, count=3):
         x = random.random()
-        if rate == "high":
-            if x < 1 / 5:
-                count = 3
-            elif x < 8 / 15:
-                count = 2
-            else:
-                count = 1
+        if x < rate ** sqrt(5):
+            count = 3
+        elif x < rate:
+            count = 2
         else:
-            if x < 1 / 7:
-                count = 3
-            elif x < 3 / 7:
-                count = 2
-            else:
-                count = 1
+            count = 1
         out = alist((self.select(),) * count)
         while len(out) < 3:
             out.append(choice(self.emojis))
@@ -856,7 +848,7 @@ class SlotMachine(Command):
         return out
 
     async def __call__(self, argv, user, flags, **void):
-        b1 = 5
+        b1 = 50
         if argv:
             bet = await self.bot.eval_math(argv)
             if bet < b1:
@@ -882,7 +874,8 @@ class SlotMachine(Command):
                 if bet > bot.data.users.get(user.id, {}).get("gold", 0):
                     raise OverflowError("Bet cannot be greater than your balance.")
                 bot.data.users.add_gold(user, -bet)
-            wheel_true = self.generate("high" if bet <= 50 else "low")
+            rate = 0.5 - max(0, min(1, ((bet - 64) / 4032))) / 14
+            wheel_true = self.generate(rate)
             wheel_display = [None] * 3 if not skip else wheel_true
             wheel_order = deque(shuffle(range(3))) if not skip else deque((0, ))
             colour = await bot.get_colour(user)
@@ -3349,7 +3342,7 @@ class RPS(Command):
             )
             decision = choice(matches.values())
             await channel.send(f"I'll go with {decision}!", reference=message)
-            earned = random.randint(32, 96) * 2 ** bot.data.rps.setdefault(user.id, 0)
+            earned = random.randint(16, 48) * 2 ** bot.data.rps.setdefault(user.id, 0)
 
             if matches[decision] == argv:
                 bot.data.rps.pop(user.id, 0)
