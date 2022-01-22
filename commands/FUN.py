@@ -3359,7 +3359,7 @@ class RPS(Command):
                 bot.data.users.add_gold(user, earned)
                 rew = await bot.as_rewards(earned)
                 await channel.send(f"**I lost**... {emoji} You won {rew}")
-            if argv == decision:
+            if decision[0] == argv[0]:
                 emoji = choice("🙃", "😉", "😮", "😳")
                 bot.data.users.add_gold(user, earned / 2)
                 rew = await bot.as_rewards(earned / 2)
