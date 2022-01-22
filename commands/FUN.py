@@ -3358,12 +3358,12 @@ class RPS(Command):
                     earned /= 1024
                     bot.data.users.add_diamonds(user, earned)
                     rew = await bot.as_rewards(earned, 0)
-                await channel.send(f"**I lost**... {emoji} You won {rew}")
+                await channel.send(f"**I lost**... {emoji} You won {rew}.")
             if decision[0] == argv[0]:
                 emoji = choice("🙃", "😉", "😮", "😳")
                 bot.data.users.add_gold(user, earned / 2)
                 rew = await bot.as_rewards(earned / 2)
-                await channel.send(f"Wow, **we tied**! {emoji} You won {rew}")
+                await channel.send(f"Wow, **we tied**! {emoji} You won {rew}.")
         except KeyError:
             emoji = choice("😛", "😶‍🌫️", "😇", "😶")
             await channel.send(f"Your answer doesn't count! {emoji}")
