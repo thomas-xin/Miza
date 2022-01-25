@@ -3327,7 +3327,7 @@ class RPS(Command):
     async def __call__(self, bot, user, message, channel, argv, **void):
         try:
             if not argv:
-                create_task(channel.send("Let's play Rock-Paper-Scissors! Post your choice!"))
+                create_task(channel.send("Let's play Rock-Paper-Scissors! Post your choice!", reference=message))
                 message = await bot.wait_for("message", check=lambda message: message.author.id == user.id and message.channel.id == channel.id)
                 argv = message.content
                 argv = full_prune(argv)
@@ -3340,11 +3340,13 @@ class RPS(Command):
                 scissors="paper",
                 paper="rock",
             )
+            if argv not in matches:
+                raise KeyError
             decision = choice(matches.values())
             await channel.send(f"I'll go with {decision}!", reference=message)
             earned = random.randint(16, 48) * 2 ** bot.data.rps.setdefault(user.id, 0)
 
-            if matches[decision] == argv:
+            if matches[decision][0] == argv[0]:
                 bot.data.rps.pop(user.id, 0)
                 emoji = choice("😄", "😁", "😀", "😏")
                 await channel.send(f"**I win**! {emoji}")
