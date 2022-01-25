@@ -4480,9 +4480,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                             # log.warning('Global rate limit has been hit. Retrying in %.2f seconds.', retry_after)
                             self._global_over.clear()
                         if not maybe_lock:
-                            fut = create_task(lock.__aenter__())
-                            lock.__exit__()
-                            await fut
+                            lock.delay_for(delta)
                         await asyncio.sleep(delta)
                         if not maybe_lock:
                             fut = create_task(lock.__aenter__())

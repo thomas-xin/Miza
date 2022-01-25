@@ -156,6 +156,14 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
             SEMS.pop(id(self), None)
         return self.rate_bin
 
+    def delay_for(self, seconds=0):
+        t = utc() + seconds
+        for i in range(self.rate_limit):
+            self.rate_bin.append(t)
+        for i in range(len(self.rate_bin) - self.rate_limit):
+            self.rate_bin.popleft()
+        return self
+
     def enter(self):
         if self.trace:
             self.trace = inspect.stack()[2]
