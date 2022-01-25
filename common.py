@@ -2700,9 +2700,10 @@ def proxy_download(url, fn=None, refuse_html=True, timeout=24):
     loc = random.choice(("eu", "us"))
     i = random.randint(1, 17)
     j = xrand(len(reqx))
+    stream = f"https://{loc}{i}.proxysite.com/includes/process.php?action=update"
     with reqx[j].stream(
         "POST",
-        url,
+        stream,
         data=dict(d=url, allowCookies="on"),
         follow_redirects=True,
         timeout=timeout,
