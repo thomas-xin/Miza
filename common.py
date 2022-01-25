@@ -158,9 +158,9 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
 
     def delay_for(self, seconds=0):
         t = utc() + seconds
-        for i in range(self.rate_limit):
+        for i in range(self.limit):
             self.rate_bin.append(t)
-        for i in range(len(self.rate_bin) - self.rate_limit):
+        for i in range(len(self.rate_bin) - self.limit):
             self.rate_bin.popleft()
         return self
 
