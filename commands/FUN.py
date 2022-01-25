@@ -3368,7 +3368,7 @@ class RPS(Command):
                 await channel.send(f"Wow, **we tied**! {emoji} You won {rew}.")
         except KeyError:
             emoji = choice("😛", "😶‍🌫️", "😇", "😶")
-            await channel.send(f"{''.join(y for x in zip(argv[::2].upper(), argv[1::2].lower() + (' ' if len(argv) & 1 else '')) for y in x if y).strip()} doesn't count! {emoji}")
+            await channel.send(f"{''.join(y for x in zip(argv[::2].upper(), argv[1::2].lower() + (' ' if len(argv) & 1 else '')) for y in x if y).strip()} doesn't count! {emoji}", reference=message)
 
 
 class UpdateRPS(Database):
