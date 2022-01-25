@@ -1883,16 +1883,17 @@ class UpdateUsers(Database):
         return await self()
 
     def clear_events(self, data, minimum):
+        curr = round_min(int(utc() // self.interval) / self.scale)
         for hour in tuple(data):
-            if hour > minimum:
-                return
+            if minimum < hour < curr + 1:
+                continue
             data.pop(hour, None)
 
     def send_event(self, u_id, event, count=1):
         # print(self.bot.cache.users.get(u_id), event, count)
         data = set_dict(set_dict(self.data, u_id, {}), "recent", {})
         hour = round_min(int(utc() // self.interval) / self.scale)
-        if data:
+        if data and not xrand(12):
             self.clear_events(data, hour - self.hours)
         try:
             data[hour][event] += count

@@ -4517,8 +4517,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         await asyncio.sleep(1 + tries * 2)
                         continue
                     if utc() - Request.ts > 12:
-                        create_task(Request._init_())
+                        await Request._init_()
                     raise
+            raise RuntimeError("Somehow ran out of attempts then used one more")
     
         async def request(self, route, *, files=None, form=None, **kwargs):
             bucket = route.bucket

@@ -2179,6 +2179,8 @@ def plt_special(d, user=None, **void):
     width = hours / len(temp)
     domain = width * np.arange(-len(temp), 0)
     for k, v in d.items():
+        if len(v) > len(temp):
+            v = v[-len(temp):]
         plt.bar(domain, v, bottom=temp, color=special_colours.get(k, "k"), edgecolor="white", width=width, label=k)
         temp += np.array(v)
     plt.bar(list(range(-hours, 0)), np.ones(hours) * max(temp) / 512, edgecolor="white", color="k")
