@@ -939,12 +939,12 @@ class Ask(Command):
         else:
             q = single_space(full_prune(argv)).strip().translate(bot.mtrans).replace("?", "\u200b").strip("\u200b")
         if not q:
-            raise ArgumentError(choice(
+            return "\xad" + choice(
                 "Sorry, didn't see that, was that a question? 🤔",
                 "Ay, speak up, I don't bite! :3",
                 "Haha, nice try, I know that's not an actual question 🙃",
                 "You thinking of asking an actual question?",
-            ))
+            )
         out = None
         count = bot.data.users.get(user.id, {}).get("last_talk", 0)
         add_dict(bot.data.users, {user.id: {"last_talk": 1, "last_mention": 1}})
