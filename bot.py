@@ -4489,7 +4489,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         if is_global:
                             self._global_over.set()
                             # log.debug('Global rate limit is now over.')
-                        continue
+                        if tries < 3:
+                            continue
+                        raise ConnectionError(429, r)
 
                     # we've received a 500 or 502, unconditional retry
                     if status >= 500 and tries < 3:
@@ -4515,6 +4517,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         await asyncio.sleep(1 + tries * 2)
                         continue
                     if utc() - Request.ts > 12:
+                        print("Reinitialising request client...")
                         await Request._init_()
                     raise
             raise RuntimeError("Somehow ran out of attempts then used one more")
