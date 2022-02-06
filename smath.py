@@ -2385,7 +2385,7 @@ def fuzzy_substring(sub, s, match_start=False, match_length=True):
     if not match_length and s in sub:
         return 1
     if s.startswith(sub):
-        return min(1, len(sub) / len(s) * 2)
+        return len(sub) / len(s) * 2
     match = 0
     if not match_start or sub and s.startswith(sub[0]):
         found = [0] * len(s)
@@ -2415,7 +2415,7 @@ def fuzzy_substring(sub, s, match_start=False, match_length=True):
         if len(sub) > len(s) and match_length:
             match *= len(s) / len(sub)
     # ratio = match / len(s)
-    ratio = max(0, min(1, match / len(s)))
+    ratio = max(0, match / len(s))
     return ratio
 
 # Replaces words in a string from a mapping similar to str.replace, but performs operation both ways.
