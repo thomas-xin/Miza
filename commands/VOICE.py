@@ -523,7 +523,11 @@ class CustomAudio(collections.abc.Hashable):
     # Update event, ensures audio is playing correctly and moves, leaves, or rejoins voice when necessary.
     def update(self, *void1, **void2):
         with tracebacksuppressor:
-            self.fut.result(timeout=12)
+            try:
+                self.fut.result(timeout=12)
+            except:
+                print_exc()
+                return self.kill()
             guild = self.guild
             t = utc()
             if getattr(self, "player", None) is not None and self.stats.speed and not self.paused:
@@ -5003,13 +5007,14 @@ class UpdateAudio(Database):
                     auds = self.players[guild.id]
                     create_future_ex(auds.update)
             else:
-                a = 1
                 async with Delay(0.5):
+                    a = 1
+                    futs = deque()
                     for g in tuple(self.players):
                         with tracebacksuppressor(KeyError):
                             auds = self.players[g]
-                            create_future_ex(auds.update, priority=True)
-                            create_task(self.research(auds))
+                            futs.append(create_future(auds.update, priority=True))
+                            futs.append(create_task(self.research(auds)))
                             if auds.queue and not auds.paused and "dailies" in bot.data:
                                 if auds.ts is None:
                                     auds.ts = utc()
@@ -5024,6 +5029,9 @@ class UpdateAudio(Database):
                         if not a & 15:
                             await asyncio.sleep(0.2)
                         a += 1
+                    for fut in futs:
+                        with tracebacksuppressor:
+                            await fut
                 await bot.audio.asubmit("ytdl.update()")
             create_future_ex(ytdl.update_dl, priority=True)
 

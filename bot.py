@@ -3716,11 +3716,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         if errored > 0:
                             errored -= 1
 
-    # The lazy update loop that runs once every 2-4 seconds.
+    # The lazy update loop that runs once every 4-8 seconds.
     async def lazy_loop(self):
         await asyncio.sleep(5)
         while not self.closed:
-            async with Delay(frand(2) + 2):
+            async with Delay(frand(4) + 4):
                 async with tracebacksuppressor:
                     # self.var_count = await create_future(var_count)
                     with MemoryTimer("handle_update"):
