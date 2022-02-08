@@ -32,40 +32,40 @@ if os.name == "nt":
         os.system("color")
     except:
         traceback.print_exc()
-    with requests.get("https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip", stream=True) as resp:
-        try:
-            v = resp.url.rsplit("/", 1)[-1].split("-", 1)[-1].rsplit(".", 1)[0].split("-", 1)[0]
-            r = subprocess.run(ffmpeg, stderr=subprocess.PIPE)
-            s = r.stderr[:r.stderr.index(b"\n")].decode("utf-8", "replace").strip().lower()
-            if s.startswith("ffmpeg"):
-                s = s[6:].lstrip()
-            if s.startswith("version"):
-                s = s[7:].lstrip()
-            s = s.split("-", 1)[0]
-            if s != v:
-                print(f"FFmpeg version outdated ({v} > {s})")
-                raise FileNotFoundError
-            print(f"FFmpeg version {s} found; skipping installation...")
-        except FileNotFoundError:
-            print(f"Downloading FFmpeg version {v}...")
-            subprocess.run([sys.executable, "downloader.py", "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip", "ffmpeg.zip"], cwd="misc")
-            import zipfile, io
-            print("Download complete; extracting new FFmpeg installation...")
-            f = "misc/ffmpeg.zip"
-            with zipfile.ZipFile(f) as z:
-                names = [name for name in z.namelist() if "/bin/" in name and ".exe" in name]
-                for i, name in enumerate(names):
-                    print(f"{i}/{len(names)}")
-                    fn = name.rsplit("/", 1)[-1]
-                    with open(fn, "wb") as y:
-                        with z.open(name, "r") as x:
-                            while True:
-                                b = x.read(1048576)
-                                if not b:
-                                    break
-                                y.write(b)
-            print("FFmpeg extraction complete.")
-            os.remove(f)
+    # with requests.get("https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip", stream=True) as resp:
+    #     try:
+    #         v = resp.url.rsplit("/", 1)[-1].split("-", 1)[-1].rsplit(".", 1)[0].split("-", 1)[0]
+    #         r = subprocess.run(ffmpeg, stderr=subprocess.PIPE)
+    #         s = r.stderr[:r.stderr.index(b"\n")].decode("utf-8", "replace").strip().lower()
+    #         if s.startswith("ffmpeg"):
+    #             s = s[6:].lstrip()
+    #         if s.startswith("version"):
+    #             s = s[7:].lstrip()
+    #         s = s.split("-", 1)[0]
+    #         if s != v:
+    #             print(f"FFmpeg version outdated ({v} > {s})")
+    #             raise FileNotFoundError
+    #         print(f"FFmpeg version {s} found; skipping installation...")
+    #     except FileNotFoundError:
+    #         print(f"Downloading FFmpeg version {v}...")
+    #         subprocess.run([sys.executable, "downloader.py", "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip", "ffmpeg.zip"], cwd="misc")
+    #         import zipfile, io
+    #         print("Download complete; extracting new FFmpeg installation...")
+    #         f = "misc/ffmpeg.zip"
+    #         with zipfile.ZipFile(f) as z:
+    #             names = [name for name in z.namelist() if "/bin/" in name and ".exe" in name]
+    #             for i, name in enumerate(names):
+    #                 print(f"{i}/{len(names)}")
+    #                 fn = name.rsplit("/", 1)[-1]
+    #                 with open(fn, "wb") as y:
+    #                     with z.open(name, "r") as x:
+    #                         while True:
+    #                             b = x.read(1048576)
+    #                             if not b:
+    #                                 break
+    #                             y.write(b)
+    #         print("FFmpeg extraction complete.")
+    #         os.remove(f)
     if os.path.exists("misc"):
         if not os.path.exists("misc/ffmpeg-c"):
             print("Downloading ffmpeg version 4.2.2...")

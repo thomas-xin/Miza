@@ -4517,7 +4517,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     if tries < 4:
                         await asyncio.sleep(1 + tries * 2)
                         continue
-                    if utc() - Request.ts > 12:
+                    if utc() - Request.ts > 720:
                         print("Reinitialising request client...")
                         await Request._init_()
                     raise
