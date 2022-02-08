@@ -4533,7 +4533,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 if "/reactions" in route.path:
                     lock = Semaphore(1, 16, rate_limit=0.28)
                 elif "/messages" in route.path:
-                    if method.casefold() != "delete":
+                    if method.casefold() == "post":
                         lock = Semaphore(5, 256, rate_limit=5.15)
                 if not lock:
                     lock = asyncio.Lock()

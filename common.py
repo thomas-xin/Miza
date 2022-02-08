@@ -2750,6 +2750,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 
     ts = 0
     semaphore = Semaphore(512, 256, delay=0.25)
+    sessions = ()
 
     @classmethod
     def header(cls):
@@ -2761,6 +2762,10 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
     headers = header
 
     async def _init_(self):
+        if self.sessions:
+            for session in self.sessions:
+                await session.aclose()
+            await self.nossl.close()
         try:
             self.sessions = alist(httpx.AsyncClient(http2=True) for i in range(6))
         except:
