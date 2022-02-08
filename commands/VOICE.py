@@ -996,6 +996,7 @@ CONVERTERS = {
 }
 
 def select_and_convert(stream):
+    print("Selecting and converting", stream)
     resp = reqs.next().get(stream, headers=Request.header(), timeout=8, stream=True)
     b = seq(resp)
     try:

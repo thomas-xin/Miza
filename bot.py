@@ -4535,6 +4535,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 elif "/messages" in route.path:
                     if method.casefold() == "post":
                         lock = Semaphore(5, 256, rate_limit=5.15)
+                    elif method.casefold() == "patch":
+                        m_id = int(route.url.rsplit("/", 1)[-1])
+                        td = datetime.datetime.now() - snowflake_time_2(m_id)
+                        if td.total_seconds() > 3599:
+                            lock = Semaphore(5, 256, rate_limit=20.15)
                 if not lock:
                     lock = asyncio.Lock()
                 self._locks[bucket] = lock
