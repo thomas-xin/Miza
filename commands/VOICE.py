@@ -905,7 +905,7 @@ class AudioQueue(alist):
 def org2xm(org, dat=None):
     # if os.name != "nt":
     #     raise OSError("org2xm is only available on Windows.")
-    if not org or type(org) is not bytes:
+    if not org or not isinstance(org, (bytes, memoryview)):
         if not is_url(org):
             raise TypeError("Invalid input URL.")
         org = verify_url(org)

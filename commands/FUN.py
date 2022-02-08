@@ -3061,25 +3061,22 @@ class Cat(ImagePool, Command):
     database = "cats"
     name = ["🐱", "Meow", "Kitty", "Kitten"]
     slash = True
+    http_nums = {
+        100, 101, 102,
+        200, 201, 202, 203, 204, 206, 207,
+        300, 301, 302, 303, 304, 305, 307, 308,
+        400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417, 418, 420, 421, 422, 423, 424, 425, 426, 429, 431, 444,
+        450, 451, 497, 498, 499,
+        500, 501, 502, 503, 504, 506, 507, 508, 509, 510, 511, 521, 523, 525,
+        599,
+    }
 
-    async def fetch_one(self):
-        if random.random() > 2 / 3:
-            if random.random() > 2 / 3:
-                x = 0
-                url = await create_future(nekos.cat, timeout=8)
-            else:
-                x = 1
-        else:
-            x = 2
-        if x:
-            if x == 1 and alexflipnote_key:
-                d = await Request("https://api.alexflipnote.dev/cats", headers={"Authorization": alexflipnote_key}, json=True, aio=True)
-            else:
-                d = await Request("https://api.thecatapi.com/v1/images/search", json=True, aio=True)
-            if type(d) is list:
-                d = choice(d)
-            url = d["file" if x == 1 and alexflipnote_key else "url"]
-        return url
+    async def __call__(self, bot, channel, flags, argv, **void):
+        if argv.isnumeric() and int(argv) in self.http_nums:
+            url = f"https://http.cat/{int(argv)}"
+            self.bot.send_as_embeds(channel, image=url)
+            return
+        return await super().__call__(bot, channel, flags)
 
 
 class Dog(ImagePool, Command):
