@@ -3071,6 +3071,25 @@ class Cat(ImagePool, Command):
         599,
     }
 
+    async def fetch_one(self):
+        if random.random() > 2 / 3:
+            if random.random() > 2 / 3:
+                x = 0
+                url = await create_future(nekos.cat, timeout=8)
+            else:
+                x = 1
+        else:
+            x = 2
+        if x:
+            if x == 1 and alexflipnote_key:
+                d = await Request("https://api.alexflipnote.dev/cats", headers={"Authorization": alexflipnote_key}, json=True, aio=True)
+            else:
+                d = await Request("https://api.thecatapi.com/v1/images/search", json=True, aio=True)
+            if type(d) is list:
+                d = choice(d)
+            url = d["file" if x == 1 and alexflipnote_key else "url"]
+        return url
+
     async def __call__(self, bot, channel, flags, argv, **void):
         if argv.isnumeric() and int(argv) in self.http_nums:
             url = f"https://http.cat/{int(argv)}"
