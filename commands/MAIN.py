@@ -1762,7 +1762,7 @@ class UpdateMessages(Database):
                         self.data.pop(c_id)
                     else:
                         for m_id, v in data.items():
-                            if t - v.t >= 3:
+                            if t - v.t >= 8:
                                 v.t = t
                                 create_task(self.wrap_semaphore(eval(v.command, self.bot._globals)._callback2_, channel=channel, m_id=m_id, colour=col))
 

@@ -4446,7 +4446,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                             # log.debug('A rate limit bucket has been exhausted (bucket: %s, retry: %s).', bucket, delta)
                             maybe_lock.defer()
                             self.loop.call_later(delta, lock.release)
-                        if remaining:
+                        if remaining and method.lower() != "patch":
                             limit = r.headers.get('X-Ratelimit-Limit')
                             if limit and int(limit) == int(remaining) + 1:
                                 retry_after = r.headers.get("Retry-After") or r.headers.get("X-Ratelimit-Reset-After")
@@ -4533,13 +4533,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 if "/reactions" in route.path:
                     lock = Semaphore(1, 16, rate_limit=0.28)
                 elif "/messages" in route.path:
-                    if method.casefold() == "post":
+                    if method.lower() == "post":
                         lock = Semaphore(5, 256, rate_limit=5.15)
-                    elif method.casefold() == "patch":
-                        m_id = int(route.url.rsplit("/", 1)[-1])
-                        td = datetime.datetime.now() - snowflake_time_2(m_id)
-                        if td.total_seconds() > 3599:
-                            lock = Semaphore(5, 256, rate_limit=20.15)
+                    # elif method.lower() == "patch":
+                    #     m_id = int(route.url.rsplit("/", 1)[-1])
+                    #     td = datetime.datetime.now() - snowflake_time_2(m_id)
+                    #     if td.total_seconds() > 3599:
+                    #         lock = Semaphore(5, 256, rate_limit=5.15)
                 if not lock:
                     lock = asyncio.Lock()
                 self._locks[bucket] = lock
