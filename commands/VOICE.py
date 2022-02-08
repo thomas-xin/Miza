@@ -913,7 +913,7 @@ def org2xm(org, dat=None):
         if not data:
             raise FileNotFoundError("Error downloading file content.")
     else:
-        if not org.startswith(b"Org-"):
+        if org[:4] != b"Org-":
             raise ValueError("Invalid file header.")
         data = org
     # Set compatibility option if file is not of org2 format.
