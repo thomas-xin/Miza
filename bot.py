@@ -4491,7 +4491,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                             # log.debug('Global rate limit is now over.')
                         if tries < 3:
                             continue
-                        raise discord.HTTPException(r, data)
+                        print(url)
+                        raise ConnectionError(429, r, data)
 
                     # we've received a 500 or 502, unconditional retry
                     if status >= 500 and tries < 3:

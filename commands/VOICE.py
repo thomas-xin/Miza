@@ -917,7 +917,7 @@ def org2xm(org, dat=None):
             raise ValueError("Invalid file header.")
         data = org
     # Set compatibility option if file is not of org2 format.
-    compat = not data.startswith(b"Org-02")
+    compat = data[:6] != b"Org-02"
     ts = ts_us()
     # Write org data to file.
     r_org = "cache/" + str(ts) + ".org"
