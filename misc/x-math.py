@@ -135,6 +135,64 @@ def bf_parse(s):
 _bf = lambda s: bf_evaluate(s)
 
 
+# Returns the Roman Numeral representation of an integer.
+def roman_numerals(num, order=0):
+    num = num if type(num) is int else int(num)
+    carry = 0
+    over = ""
+    sym = ""
+    output = ""
+    if num >= 4000:
+        carry = num // 1000
+        num %= 1000
+        over = roman_numerals(carry, order + 1)
+    while num >= 1000:
+        num -= 1000
+        output += "M"
+    if num >= 900:
+        num -= 900
+        output += "CM"
+    elif num >= 500:
+        num -= 500
+        output += "D"
+    elif num >= 400:
+        num -= 400
+        output += "CD"
+    while num >= 100:
+        num -= 100
+        output += "C"
+    if num >= 90:
+        num -= 90
+        output += "XC"
+    elif num >= 50:
+        num -= 50
+        output += "L"
+    elif num >= 40:
+        num -= 40
+        output += "XL"
+    while num >= 10:
+        num -= 10
+        output += "X"
+    if num >= 9:
+        num -= 9
+        output += "IX"
+    elif num >= 5:
+        num -= 5
+        output += "V"
+    elif num >= 4:
+        num -= 4
+        output += "IV"
+    while num >= 1:
+        num -= 1
+        output += "I"
+    if output != "":
+        if order == 1:
+            sym = "ᴍ"
+        elif order == 2:
+            sym = "ᴍᴹ"
+    return over + output + sym
+
+
 def Random(a=None, b=None):
     random.seed(time.time_ns())
     if a is None:

@@ -3059,7 +3059,7 @@ class _8Ball(ImagePool, Command):
 class Cat(ImagePool, Command):
     description = "Pulls a random image from thecatapi.com, api.alexflipnote.dev/cats, or cdn.nekos.life/meow, and embeds it. Be sure to check out ⟨WEBSERVER⟩/cats!"
     database = "cats"
-    name = ["🐱", "Meow", "Kitty", "Kitten"]
+    name = ["🐱", "Gato", "Meow", "Kitty", "Kitten"]
     slash = True
     http_nums = {
         100, 101, 102,
