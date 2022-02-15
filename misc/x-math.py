@@ -567,6 +567,7 @@ plots = (
 for i in plots:
     _globals[i] = globals()[i]
 _globals.update({
+    "roman_numerals": roman_numerals,
     "bf": _bf,
     "brainfuck": _bf,
     "random": Random,
