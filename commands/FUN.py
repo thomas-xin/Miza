@@ -1918,7 +1918,7 @@ class EmojiList(Command):
             name = name.strip(":")
             if not regexp("[A-Za-z0-9\\-~_]{1,32}").fullmatch(name):
                 raise ArgumentError("Emoji aliases may only contain 1~32 alphanumeric characters, dashes, tildes and underscores.")
-            e_id = e_id.rsplit(":", 1)[-1].rstrip(">")
+            e_id = e_id.rsplit(":", 1)[-1].rstrip(">").strip(":")
             if not e_id.isnumeric():
                 raise ArgumentError("Only custom emojis are supported.")
             e_id = int(e_id)
@@ -3176,7 +3176,7 @@ class Inspiro(ImagePool, Command):
     description = "Pulls a random image from inspirobot.me and embeds it."
     database = "inspirobot"
 
-    async def fetch_one(self):
+    def fetch_one(self):
         return Request("https://inspirobot.me/api?generate=true", decode=True, aio=True)
 
 
@@ -3346,7 +3346,7 @@ class RPS(Command):
                 create_task(channel.send("Let's play Rock-Paper-Scissors! Post your choice!", reference=message))
                 message = await bot.wait_for("message", check=lambda message: message.author.id == user.id and message.channel.id == channel.id)
                 argv = message.content
-                argv = full_prune(argv)
+            argv = full_prune(argv)
 
             matches = dict(
                 r="scissors",
