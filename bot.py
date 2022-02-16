@@ -26,6 +26,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     twitch_url = "https://www.twitch.tv/-"
     # webserver = "https://mizabot.xyz"
     raw_webserver = "http://i.mizabot.xyz"
+    kofi_url = "https://ko-fi.com/mizabot"
     webserver = raw_webserver
     heartbeat = "heartbeat.tmp"
     heartbeat_ack = "heartbeat_ack.tmp"
