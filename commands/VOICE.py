@@ -1112,11 +1112,13 @@ class AudioClientSubInterface:
         cls.ensure_bot(cls)
         bot = cls.bot
         if bot.audio.players.get(guild.id):
-            self.auds = bot.audio.players[guild.id]
+            auds = bot.audio.players[guild.id]
+        else:
+            auds = None
         if guild.me.voice:
             c_id = bot.audio.submit(f"getattr(getattr(client.get_guild({guild.id}).voice_client, 'channel', None), 'id', None)")
             if c_id:
-                self = cls()
+                self = cls(auds)
                 self.guild = guild
                 self.channel = bot.get_channel(c_id)
                 bot.audio.clients[guild.id] = self
