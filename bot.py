@@ -5260,7 +5260,7 @@ class AudioClientInterface:
             self.returns.pop(key, None)
         return resp
 
-    def submit(self, s, aio=False, ignore=False):
+    def submit(self, s, aio=False, ignore=False, timeout=48):
         bot.activity += 1
         key = ts_us()
         while key in self.returns:
@@ -5279,7 +5279,7 @@ class AudioClientInterface:
             self.fut.result()
             self.proc.stdin.write(b)
             self.proc.stdin.flush()
-            resp = self.returns[key].result(timeout=48)
+            resp = self.returns[key].result(timeout=timeout)
         except:
             raise
         finally:

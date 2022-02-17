@@ -403,7 +403,7 @@ class AudioFile:
         self.loading = True
         if not asap and not live and is_youtube_stream(stream):
             fi = "cache/" + str(time.time_ns() + random.randint(1, 1000)) + "~proxy"
-            with tracebacksuppressor:
+            with suppress():
                 stream = proxy_download(stream, fi)
         ffmpeg = "misc/ffmpeg-c/ffmpeg.exe" if check_fmt and is_url(stream) else "./ffmpeg"
         if not os.path.exists(ffmpeg):

@@ -2721,7 +2721,7 @@ def proxy_download(url, fn=None, refuse_html=True, timeout=24):
         if not fn:
             b = resp.read()
             if refuse_html and b[:15] == b"<!DOCTYPE html>":
-                raise ValueError(b)
+                raise ValueError(b[:256])
         it = resp.iter_bytes()
         if isinstance(fn, str):
             f = open(fn, "wb")
@@ -2737,7 +2737,8 @@ def proxy_download(url, fn=None, refuse_html=True, timeout=24):
             pass
         with open(fn, "rb") as f:
             if refuse_html and f.read(15) == b"<!DOCTYPE html>":
-                raise ValueError(b)
+                f.seek(0)
+                raise ValueError(f.read(256))
         return fn
     if fn:
         return o_url

@@ -258,8 +258,9 @@ async def disconnect_members(bot, guild, members, channel=None):
 
 # Checks if the user is alone in voice chat (excluding bots).
 def is_alone(auds, user):
-    for m in auds.channel.members:
-        if m.id != user.id and not m.bot:
+    channel = auds.acsi.channel
+    for m in channel.members:
+        if m.id != user.id and not m.bot and m.voice and m.voice.channel.id == channel.id:
             return False
     return True
 
@@ -1052,7 +1053,8 @@ class AudioFileLink:
         self.live = live
         self.seekable = seekable
         self.webpage_url = webpage_url
-        bot.audio.submit(f"!cache['{self.fn}'].load(" + ",".join(repr(i) for i in (stream, check_fmt, force, webpage_url, live, seekable, duration, asap)) + ")")
+        timeout = 48 if asap else 300
+        bot.audio.submit(f"!cache['{self.fn}'].load(" + ",".join(repr(i) for i in (stream, check_fmt, force, webpage_url, live, seekable, duration, asap)) + ")", timeout=timeout)
         if duration:
             self.dur = duration
         try:
