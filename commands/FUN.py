@@ -2577,6 +2577,7 @@ class MimicConfig(Command):
                 else:
                     output += f"Current {setting} for {sqr_md(mimic.name)}: {sqr_md(mimic[setting])}.\n"
                 continue
+            m_id = mimic.id
             if setting == "birthday":
                 new = utc_ts(tzparse(new))
             # This limit is actually to comply with webhook usernames
