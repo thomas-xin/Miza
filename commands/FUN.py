@@ -2565,7 +2565,7 @@ class MimicConfig(Command):
         output = ""
         noret = False
         for mimic in mimlist:
-            await bot.data.mimics.updateMimic(mimic, message.guild)
+            await bot.data.mimics.update_mimic(mimic, message.guild)
             if mimic.u_id != user.id and not isnan(perm):
                 raise PermissionError(f"Target mimic {mimic.name} does not belong to you.")
             args.extend(best_url(a) for a in message.attachments)
@@ -2890,7 +2890,7 @@ class MimicSend(Command):
                 emb.timestamp = message.created_at
                 self.bot.send_embeds(c, emb)
             for mimic in m:
-                await bot.data.mimics.updateMimic(mimic, guild)
+                await bot.data.mimics.update_mimic(mimic, guild)
                 name = mimic.name
                 url = mimic.url
                 await wait_on_none(bot.send_as_webhook(channel, msg, username=name, avatar_url=url, tts=tts))
@@ -2945,8 +2945,8 @@ class UpdateMimics(Database):
                         if not found:
                             sending[-1].msg += "\n" + line
                     if sending:
-                        create_task(bot.silent_delete(message))
                         guild = message.guild
+                        create_task(bot.silent_delete(message))
                         if guild and "logM" in bot.data and guild.id in bot.data.logM:
                             c_id = bot.data.logM[guild.id]
                             try:
@@ -2962,7 +2962,7 @@ class UpdateMimics(Database):
                             self.bot.send_embeds(c, emb)
                         for k in sending:
                             mimic = self.data[k.m_id]
-                            await self.updateMimic(mimic, guild=message.guild)
+                            await self.update_mimic(mimic, guild=guild)
                             name = mimic.name
                             url = mimic.url
                             msg = escape_roles(k.msg)
@@ -2976,8 +2976,8 @@ class UpdateMimics(Database):
                             mimic.total += len(k.msg)
                             bot.data.users.add_xp(user, math.sqrt(len(msg)) * 2)
 
-    async def updateMimic(self, mimic, guild=None, it=None):
-        if set_dict(mimic, "auto", None):
+    async def update_mimic(self, mimic, guild=None, it=None):
+        if mimic.setdefault("auto", None):
             bot = self.bot
             mim = 0
             try:
@@ -3001,12 +3001,13 @@ class UpdateMimics(Database):
                     it[mim] = True
                     if not len(it) & 255:
                         await asyncio.sleep(0.2)
-                    await self.updateMimic(mimi, guild=guild, it=it)
+                    await self.update_mimic(mimi, guild=guild, it=it)
                     mimic.name = mimi.name
                     mimic.url = mimi.url
                 except LookupError:
                     mimic.name = str(mimic.auto)
                     mimic.url = "https://cdn.discordapp.com/embed/avatars/0.png"
+        return mimic
 
     async def __call__(self):
         with tracebacksuppressor(SemaphoreOverflowError):
