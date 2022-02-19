@@ -2622,7 +2622,7 @@ class MimicConfig(Command):
             name = mimic.name
             mimic[setting] = new
             update(m_id)
-            update(u_id)
+            update(user.id)
         if noret:
             return
         if output:
