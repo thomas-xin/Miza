@@ -445,7 +445,6 @@ int main(int argc, char** argv)
             int pan = note[i][j].pan;
 
             vol = (vol==0xff ? VOL : (vol/255.)*56.5+8.499); //org minimum volume adjustment
-            vol *= 2;
             pan = (pan==0xff ? 0 : (pan-6)*127/6);
 
             // "new note" or "change note parameters"?
@@ -588,10 +587,15 @@ int main(int argc, char** argv)
             if (wInst) buf[len++] = t[i].instrument;
 
             // volume column
-            if (wVol)
-                buf[len++] = 0x10 + n[i][j].vol;
+            if (wVol) {
+				int v1 = n[i][j].vol;
+				v1 += 0x10;
+				v1 << 1;
+				if (v1 > 255) v1 = 255;
+                buf[len++] = (uint8_t) v1;
+			}
             else if (wPanVol)
-                buf[len++] = 0xC0 + (n[i][j].pan>0x77 ? 0xF : n[i][j].pan+0x88>>4);
+                buf[len++] = 0xBF + (n[i][j].pan>0x77 ? 0x20 : n[i][j].pan+0x88>>3);
 
             // effect column
             if (wSkip) {
