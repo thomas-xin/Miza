@@ -385,7 +385,7 @@ class EnabledCommands(Command):
                 raise PermissionError(f"Elevated server priviliges required for specified command category.")
             if not catg in bot.categories:
                 raise LookupError(f"Unknown command category {catg}.")
-        curr = bot.get_enabled(target)
+        curr = set(bot.get_enabled(target))
         if target.id not in enabled:
             enabled[target.id] = curr if type(curr) is set else set(curr)
         for catg in args:
