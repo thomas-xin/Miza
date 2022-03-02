@@ -4662,7 +4662,7 @@ class Download(Command):
         # Prioritize attachments in message
         for a in message.attachments:
             argv = a.url + " " + argv
-        direct = getattr(message, "simulated", None)
+        direct = getattr(message, "simulated", None) or name == "org2xm"
         concat = "concat" in name or "c" in flags or name == "🌽🐱"
         start = end = None
         # Attempt to download items in queue if no search query provided
