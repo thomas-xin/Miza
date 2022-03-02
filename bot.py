@@ -540,7 +540,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             channel = await super().fetch_channel(s_id)
             self.cache.channels[s_id] = channel
             return channel
-        self.cache.users[u_id] = user
+        self.cache.users[s_id] = user
         return user
 
     # Fetches a user from ID, using the bot cache when possible.

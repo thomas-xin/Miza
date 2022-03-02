@@ -1961,10 +1961,14 @@ class AudioDownloader:
                                     "video": get_best_video(entry),
                                 })
                             else:
+                                try:
+                                    dur = round_min(data["duration"])
+                                except:
+                                    dur = None
                                 temp = cdict({
                                     "name": data["title"],
                                     "url": data["webpage_url"],
-                                    "duration": round_min(data["duration"]),
+                                    "duration": dur,
                                     "stream": get_best_audio(resp),
                                     "icon": get_best_icon(resp),
                                     "video": get_best_video(resp),
@@ -1991,9 +1995,9 @@ class AudioDownloader:
                                         if "." in title:
                                             title = title[:title.rindex(".")]
                                         found = False
-                                    if entry.get("duration") is not None:
-                                        dur = float(entry["duration"])
-                                    else:
+                                    try:
+                                        dur = round_min(entry["duration"])
+                                    except:
                                         dur = None
                                     url = entry.get("webpage_url", entry.get("url", entry.get("id")))
                                     if not url:
