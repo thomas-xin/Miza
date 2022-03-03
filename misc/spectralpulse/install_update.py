@@ -3,13 +3,18 @@ print("Loading and checking modules...")
 with open("requirements.txt", "rb") as f:
     modlist = f.read().decode("utf-8", "replace").replace("\r", "\n").split("\n")
 
-import os, subprocess, traceback, pkg_resources
+import os, sys, subprocess, traceback
 
-# Required to open python on different operating systems
-python = ("python3", "python")[os.name == "nt"]
+python = sys.executable
+
+try:
+    import pkg_resources
+except ModuleNotFoundError:
+    subprocess.run([python, "-m", "pip", "install", "--upgrade", "--user", "setuptools"])
+    import pkg_resources
 
 installing = []
-install = lambda m: installing.append(subprocess.Popen(["python", "-m", "pip", "install", "--upgrade", m, "--user"]))
+install = lambda m: installing.append(subprocess.Popen([python, "-m", "pip", "install", "--upgrade", m, "--user"]))
 
 # Parse requirements.txt
 for mod in modlist:

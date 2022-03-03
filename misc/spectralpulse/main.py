@@ -2,43 +2,9 @@
 
 import os, sys
 
-if os.name == "nt":
-    vi = sys.version_info
-    python = ["py", f"-{vi[0]}.{vi[1]}"]
-else:
-    python = ["python3"]
+python = [sys.executable]
 
-class Pillow_SIMD:
-    args = None
-    __bool__ = lambda self: bool(self.args)
-    get = lambda self: self.args or [python]
-
-    def check(self):
-        for v in range(8, 4, -1):
-            print(f"Attempting to find/install pillow-simd for Python 3.{v}...")
-            args = ["py", f"-3.{v}", "misc/install_pillow_simd.py"]
-            print(args)
-            resp = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            out = resp.stdout.decode("utf-8", "replace").strip()
-            if not out.startswith(f"Python 3.{v} not found!"):
-                print(out)
-                print(f"pillow-simd versioning successful for Python 3.{v}")
-                self.args = ["py", f"-3.{v}"]
-                return self.args
-        return [python]
-
-pillow_simd = Pillow_SIMD()
-
-if __name__ == "__main__":
-    if sys.version_info[1] in range(5, 9):
-        from install_pillow_simd import traceback, subprocess
-    else:
-        import subprocess
-        pillow_simd.check()
-        if pillow_simd:
-            subprocess.run(pillow_simd.get() + sys.argv)
-            sys.exit()
-        from install_update import traceback, subprocess
+from install_update import traceback, subprocess
 if os.name == "nt":
     os.system("color")
 import numpy, time, psutil, collections, random, contextlib, re, itertools, concurrent.futures
@@ -310,13 +276,19 @@ if __name__ == "__main__":
 
     # Maps colours to their respective terminal escape codes
     C = COLOURS = cdict(
+        red="\x1b[38;5;196m",
+        orange="\x1b[38;5;208m",
+        yellow="\x1b[38;5;226m",
+        chartreuse="\x1b[38;5;118m",
+        green="\x1b[38;5;46m",
+        spring_green="\x1b[38;5;48m",
+        cyan="\x1b[38;5;51m",
+        azure="\x1b[38;5;33m",
+        blue="\x1b[38;5;21m",
+        violet="\x1b[38;5;93m",
+        magenta="\x1b[38;5;201m",
+        rose="\x1b[38;5;198m",
         black="\u001b[30m",
-        red="\u001b[31m",
-        green="\u001b[32m",
-        yellow="\u001b[33m",
-        blue="\u001b[34m",
-        magenta="\u001b[35m",
-        cyan="\u001b[36m",
         white="\u001b[37m",
         reset="\u001b[0m",
     )
@@ -328,7 +300,7 @@ if __name__ == "__main__":
 
     # Generates a progress bar of terminal escape codes and various block characters
     bar = "∙░▒▓█"
-    col = [C.red, C.yellow, C.green, C.cyan, C.blue, C.magenta]
+    col = [C.red, C.orange, C.yellow, C.chartreuse, C.green, C.spring_green, C.cyan, C.azure, C.blue, C.violet, C.magenta, C.rose]
     def create_progress_bar(ratio, length=32, offset=None):
         # there are 4 possible characters for every position, meaning that the value of a single bar is 4
         high = length * 4
@@ -402,10 +374,10 @@ if __name__ == "__main__":
                     fl = 0
             if render:
                 # Start ffmpeg process to convert output bitmap images and wav audio into a mp4 video
-                args = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-r", str(fps), "-f", "rawvideo", "-pix_fmt", "rgb24", "-video_size", "x".join(str(i) for i in screensize), "-i", "-"]
+                args = ["ffmpeg", "-y", "-hwaccel", "auto", "-hide_banner", "-loglevel", "error", "-r", str(fps), "-f", "rawvideo", "-pix_fmt", "rgb24", "-video_size", "x".join(str(i) for i in screensize), "-i", "-"]
                 # if play:
-                args.extend(("-vn", "-f", "wav", "-i", f3, "-b:a", "256k"))
-                args.extend(("-c:v", "h264", "-b:v", "4M"))
+                args.extend(("-f", "wav", "-i", f3, "-b:a", "256k"))
+                args.extend(("-c:v", "h264", "-crf", "20"))
                 if not skip:
                     d = round((screensize[0] - self.cutoff) / speed / fps * 1000)
                     args.extend(("-af", f"adelay=delays={d}:all=1"))
@@ -706,7 +678,7 @@ if __name__ == "__main__":
                         with suppress(OverflowError, ZeroDivisionError):
                             rem = (fs / sample_rate / 4 - t / fps) / (len(timestamps) / fps / 60)
                         # Display output as a progress bar on the console
-                        out = f"\r{C.white}|{create_progress_bar(ratio, 64, ((-t * 16 / fps) % 6 / 6))}{C.white}| ({C.green}{time_disp(t / fps)}{C.white}/{C.red}{time_disp(fs / sample_rate / 4)}{C.white}) | Estimated time remaining: {C.magenta}[{time_disp(rem)}]"
+                        out = f"\r{C.white}|{create_progress_bar(ratio, 64, ((-t * 6 / fps) % 6 / 6))}{C.white}| ({C.green}{time_disp(t / fps)}{C.white}/{C.red}{time_disp(fs / sample_rate / 4)}{C.white}) | Estimated time remaining: {C.magenta}[{time_disp(rem)}]"
                         overflow = 120 - len(nocol(out))
                         out = out[:len(out) + overflow] + " " * (overflow) + C.white
                         sys.stdout.buffer.write(out.encode("utf-8"))

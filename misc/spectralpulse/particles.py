@@ -178,7 +178,7 @@ class Particles:
         Particle = self.Particle
         if Particle:
             # Initialize next frame to be an empty black image
-            sfx = Image.new("RGB", screensize, (0, 0, 0))
+            sfx = Image.new("RGB", screensize, (0,) * 3)
             if particles == "piano":
                 globals()["DRAW"] = ImageDraw.Draw(sfx)
             if Particle == Bar:
@@ -257,6 +257,8 @@ class Bar(Particle):
         super().__init__()
         dark = False
         self.colour = tuple(round(i * 255) for i in colorsys.hsv_to_rgb(x / barcount, 1, 1))
+        self.y = round(screensize[1] / barcount * x)
+        self.width = min(screensize[1], round(screensize[1] / barcount * (x + 1))) - self.y
         if particles == "bar":
             if x & 1:
                 dark = True
@@ -269,8 +271,6 @@ class Bar(Particle):
             octave = note // 12
             self.line = name + str(octave)
             # print(self.line)
-        self.y = round(screensize[1] / barcount * x)
-        self.width = min(screensize[1], round(screensize[1] / barcount * (x + 1))) - self.y
         if dark:
             self.colour = tuple(i + 1 >> 1 for i in self.colour)
             self.surf = Image.new("RGB", (3, 1), self.colour)

@@ -782,7 +782,7 @@ class SpectralPulse(Command):
         dest = f"cache/&{ts}"
         fn1 = dest + ".mp4"
         fn2 = dest + ".png"
-        args = pillow_simd.get() + ["main.py", "-dest", "../../" + dest, url]
+        args = [python, "main.py", "-dest", "../../" + dest, url]
         with discord.context_managers.Typing(channel):
             if self.spec_sem.is_busy():
                 await send_with_react(channel, italics(ini_md(f"SpectralPulse: {sqr_md(url)} enqueued in position {sqr_md(self.spec_sem.passive + 1)}.")), reacts="❎", reference=message)
