@@ -1242,14 +1242,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     if url in self.mimes:
                         skip = "text/html" not in self.mimes[url]
                     if not skip:
-                        resp = await create_future(reqx.next().stream, "GET", url, headers=Request.header())
+                        resp = await create_future(reqs.next().get, url, headers=Request.header(), stream=True)
                         self.activity += 1
-                        resp = resp.__enter__()
                         url = as_str(resp.url)
                         head = fcdict(resp.headers)
                         ctype = [t.strip() for t in head.get("Content-Type", "").split(";")]
                         if "text/html" in ctype:
-                            it = resp.iter_bytes()
+                            it = resp.iter_content(65536)
                             data = await create_future(next, it)
                             s = as_str(data)
                             try:
