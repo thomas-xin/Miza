@@ -2169,11 +2169,11 @@ class AudioDownloader:
         return out
 
     # Performs a search, storing and using cached search results for efficiency.
-    def search(self, item, force=False, mode=None, count=1):
+    def search(self, item, force=False, mode=None, images=False, count=1):
         item = verify_search(item)
         if not is_main_thread():
             with tracebacksuppressor:
-                items = await_fut(self.bot.follow_url(item, images=True))
+                items = await_fut(self.bot.follow_url(item, images=images))
                 if items:
                     item = items[0]
         if mode is None and count == 1 and item in self.searched:
