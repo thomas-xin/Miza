@@ -258,7 +258,10 @@ async def disconnect_members(bot, guild, members, channel=None):
 
 # Checks if the user is alone in voice chat (excluding bots).
 def is_alone(auds, user):
-    channel = auds.acsi.channel
+    try:
+        channel = auds.acsi.channel
+    except AttributeError:
+        return True
     for m in channel.members:
         if m.id != user.id and not m.bot and m.voice and m.voice.channel.id == channel.id:
             return False
