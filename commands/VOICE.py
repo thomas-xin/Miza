@@ -140,7 +140,7 @@ def get_best_audio(entry):
     replace = True
     for fmt in fmts:
         q = fmt.get("abr", 0)
-        if type(q) is not int:
+        if not isinstance(q, (int, float)):
             q = 0
         vcodec = fmt.get("vcodec", "none")
         if vcodec not in (None, "none"):
@@ -191,7 +191,7 @@ def get_best_video(entry):
     replace = True
     for fmt in fmts:
         q = fmt.get("height", 0)
-        if type(q) is not int:
+        if not isinstance(q, (int, float)):
             q = 0
         vcodec = fmt.get("vcodec", "none")
         if vcodec in (None, "none"):
