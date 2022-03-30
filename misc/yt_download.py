@@ -51,7 +51,7 @@ def get_driver():
 	return driver
 
 
-def yt_download(url, fmt="mp3", timeout=256):
+def yt_download(url, fmt="mp3", dir="", timeout=256):
 	driver = get_driver()
 	try:
 		folder = driver.folder
@@ -126,7 +126,7 @@ def yt_download(url, fmt="mp3", timeout=256):
 				raise TimeoutError("Request timed out.")
 
 		ts = time.time_ns()
-		fn = f"{ts}.{fmt}"
+		fn = os.path.join(dir, f"{ts}.{fmt}")
 		os.rename(os.path.join(folder, elems[0]), fn)
 	finally:
 		if os.path.exists(folder):
