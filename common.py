@@ -2789,14 +2789,12 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
                     return await data
                 return data
             try:
-                if awaitable(resp.content):
-                    raise
-            except:
                 data = await resp.read()
                 if decode:
                     return as_str(data)
                 return data
-            return resp.content
+            except (AttributeError, TypeError):
+                return resp.content
 
     def __call__(self, url, headers=None, files=None, data=None, raw=False, timeout=8, method="get", decode=False, json=False, bypass=True, proxy=False, aio=False, session=None, ssl=True, authorise=False):
         if headers is None:
