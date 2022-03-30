@@ -4,6 +4,7 @@ try:
     import yt_dlp as youtube_dl
 except ModuleNotFoundError:
     import youtube_dl
+from yt_download import *
 from bs4 import BeautifulSoup
 
 # Audio sample rate for both converting and playing
@@ -1332,87 +1333,33 @@ class AudioDownloader:
                     if dur:
                         d["duration"] = dur
                     return d
-            raise TypeError("Not a youtube link.")
         if ":" in url:
             url = url.rsplit("/", 1)[-1].split("v=", 1)[-1].split("&", 1)[0]
         webpage_url = f"https://www.youtube.com/watch?v={url}"
-        resp = None
-        try:
-            if video:
-                self.other_x += 1
-                if video is True:
-                    video = "merged"
-                v_url = f"https://www.yt-download.org/file/{video}/{url}"
-                resp = requests.get(v_url, headers=header(), timeout=24).content
-                search = b'<img class="h-20 w-20 md:h-48 md:w-48 mt-0 md:mt-12 lg:mt-0 rounded-full mx-auto md:mx-0 md:mr-6" src="'
-                resp = resp[resp.index(search) + len(search):]
-                thumbnail = as_str(resp[:resp.index(b'"')])
-                search = b'<h2 class="text-lg text-teal-600 font-bold m-2 text-center">'
-                resp = resp[resp.index(search) + len(search):]
-                title = html_decode(as_str(resp[:resp.index(b"</h2>")]))
-                entry = dict(
-                    formats=[],
-                    thumbnail=thumbnail,
-                    title=title,
-                    webpage_url=webpage_url,
-                )
-                while True:
-                    try:
-                        resp = resp[resp.index(f'<a href="https://www.yt-download.org/download/{url}/{video}/'.encode("utf-8")) + 9:]
-                        stream = as_str(resp[:resp.index(b'"')])
-                        search = b'<div class="text-shadow-1">'
-                        resp = resp[resp.index(search) + len(search):]
-                        s = as_str(resp[:resp.index(b"</div>")].strip()).split("<", 1)[0]
-                        height = int(s.rstrip(" p"))
-                    except ValueError:
-                        break
-                    else:
-                        entry["formats"].append(dict(
-                            abr=1,
-                            url=stream,
-                            height=height,
-                        ))
-            else:
-                self.other_x += 1
-                yt_url = f"https://www.yt-download.org/file/mp3/{url}"
-                resp = requests.get(yt_url, timeout=24).content
-                search = b'<img class="h-20 w-20 md:h-48 md:w-48 mt-0 md:mt-12 lg:mt-0 rounded-full mx-auto md:mx-0 md:mr-6" src="'
-                resp = resp[resp.index(search) + len(search):]
-                thumbnail = as_str(resp[:resp.index(b'"')])
-                search = b'<h2 class="text-lg text-teal-600 font-bold m-2 text-center">'
-                resp = resp[resp.index(search) + len(search):]
-                title = html_decode(as_str(resp[:resp.index(b"</h2>")]))
-                resp = resp[resp.index(f'<a href="https://www.yt-download.org/download/{url}/mp3/192'.encode("utf-8")) + 9:]
-                stream = as_str(resp[:resp.index(b'"')])
-                resp = resp[:resp.index(b"</a>")]
-                search = b'<div class="text-shadow-1">'
-                fs = parse_fs(resp[resp.rindex(search) + len(search):resp.rindex(b"</div>")])
-                dur = fs / 192000 * 8
-                entry = {
-                    "formats": [
-                        {
-                            "abr": 192,
-                            "url": stream,
-                        },
-                    ],
-                    "duration": dur,
-                    "thumbnail": thumbnail,
-                    "title": title,
-                    "webpage_url": webpage_url,
-                }
-            print("Successfully resolved with yt-download.")
-            return entry
-        except:
-            if resp:
-                try:
-                    search = b'<h3 class="text-center text-xl">'
-                    resp = resp[resp.index(search) + len(search):]
-                    resp = resp[:resp.index(b"<")]
-                except ValueError:
-                    pass
-                else:
-                    print(as_str(resp))
-            raise
+        if video:
+            title, stream = yt_download(webpage_url, fmt="mp4")
+            entry = dict(
+                formats=[dict(
+                    abr=1,
+                    url=stream,
+                    height=1080,
+                )],
+                title=title,
+                webpage_url=webpage_url,
+            )
+        else:
+            title, stream = yt_download(webpage_url, fmt="mp3")
+            entry = dict(
+                formats=[dict(
+                    abr=256,
+                    url=stream,
+                )],
+                duration=os.path.getsize(stream) / 256000 * 8
+                title=title,
+                webpage_url=webpage_url,
+            )
+        print("Successfully resolved with yt-download.")
+        return entry
 
     # Returns part of a spotify playlist.
     def get_spotify_part(self, url):
