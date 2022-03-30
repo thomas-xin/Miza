@@ -1354,7 +1354,7 @@ class AudioDownloader:
                     abr=256,
                     url=stream,
                 )],
-                duration=os.path.getsize(stream) / 256000 * 8
+                duration=os.path.getsize(stream) / 256000 * 8,
                 title=title,
                 webpage_url=webpage_url,
             )
