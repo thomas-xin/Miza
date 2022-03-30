@@ -9,7 +9,6 @@ discord.py>=1.7.3
 filetype>=1.0.10
 googletrans>=3.0.0
 gmpy2>=2.1.1
-httpx>=0.21.3
 inspiro>=0.0.2
 knackpy>=1.0.20
 matplotlib>=3.4.2

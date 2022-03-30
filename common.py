@@ -13,7 +13,6 @@ MultiAutoImporter(
     "json",
     "orjson",
     "aiohttp",
-    "httpx",
     "threading",
     "shutil",
     "filetype",
@@ -34,10 +33,6 @@ import nacl.secret
 
 utils = discord.utils
 reqs = alist(requests.Session() for i in range(6))
-try:
-    reqx = alist(httpx.Client(http2=True) for i in range(6))
-except:
-    reqx = alist(httpx.Client(http2=False) for i in range(6))
 url_parse = urllib.parse.quote_plus
 url_unparse = urllib.parse.unquote_plus
 escape_markdown = utils.escape_markdown
@@ -2764,16 +2759,11 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 
     async def _init_(self):
         if self.sessions:
-            with tracebacksuppressor(RuntimeError):
+            with tracebacksuppressor:
                 for session in self.sessions:
-                    await session.aclose()
+                    await session.close()
                 await self.nossl.close()
-        try:
-            self.sessions = alist(httpx.AsyncClient(http2=True) for i in range(6))
-        except:
-            self.sessions = alist(httpx.AsyncClient(http2=False) for i in range(6))
-        for session in self.sessions:
-            await session.__aenter__()
+        self.sessions = alist(aiohttp.ClientSession() for i in range(6))
         self.nossl = aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False))
         self.ts = utc()
         return self
@@ -2823,7 +2813,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
             if aio:
                 session = self.sessions.next()
             else:
-                session = httpx
+                session = requests
         elif bypass:
             if "user-agent" not in headers and "User-Agent" not in headers:
                 headers["User-Agent"] = f"Mozilla/5.{xrand(1, 10)}"
@@ -2844,7 +2834,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
                 req = session
                 resp = req.request(method.upper(), url, headers=headers, files=files, data=data, follow_redirects=True, timeout=timeout)
             elif bypass:
-                req = reqx.next()
+                req = reqs.next()
                 resp = req.request(method.upper(), url, headers=headers, files=files, data=data, follow_redirects=True, timeout=timeout)
             else:
                 req = requests

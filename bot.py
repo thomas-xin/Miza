@@ -234,7 +234,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     def create_command(self, data):
         with tracebacksuppressor:
             for i in range(16):
-                resp = reqx.next().post(
+                resp = reqs.next().post(
                     f"https://discord.com/api/{api}/applications/{self.id}/commands",
                     headers={"Content-Type": "application/json", "Authorization": "Bot " + self.token},
                     data=orjson.dumps(data),
@@ -253,7 +253,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             return
         print("Updating global slash commands...")
         with tracebacksuppressor:
-            resp = reqx.next().get(f"https://discord.com/api/{api}/applications/{self.id}/commands", headers=dict(Authorization="Bot " + self.token))
+            resp = reqs.next().get(
+                f"https://discord.com/api/{api}/applications/{self.id}/commands",
+                headers=dict(Authorization="Bot " + self.token),
+            )
             self.activity += 1
             if resp.status_code not in range(200, 400):
                 raise ConnectionError(f"Error {resp.status_code}", resp.text)
@@ -310,7 +313,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                                             print(curr)
                                             print(f"{curr['name']}'s slash command does not match, removing...")
                                             for i in range(16):
-                                                resp = reqx.next().delete(f"https://discord.com/api/{api}/applications/{self.id}/commands/{curr['id']}", headers=dict(Authorization="Bot " + self.token))
+                                                resp = reqs.next().delete(
+                                                    f"https://discord.com/api/{api}/applications/{self.id}/commands/{curr['id']}",
+                                                    headers=dict(Authorization="Bot " + self.token),
+                                                )
                                                 self.activity += 1
                                                 if resp.status_code == 429:
                                                     time.sleep(1)
@@ -332,7 +338,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             with tracebacksuppressor:
                 print(curr)
                 print(f"{curr['name']}'s application command does not exist, removing...")
-                resp = reqx.next().delete(f"https://discord.com/api/{api}/applications/{self.id}/commands/{curr['id']}", headers=dict(Authorization="Bot " + self.token))
+                resp = reqs.next().delete(
+                    f"https://discord.com/api/{api}/applications/{self.id}/commands/{curr['id']}",
+                    headers=dict(Authorization="Bot " + self.token),
+                )
                 self.activity += 1
                 if resp.status_code not in range(200, 400):
                     raise ConnectionError(f"Error {resp.status_code}", resp.text)
@@ -1290,14 +1299,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             return self.mimes[url]
         except KeyError:
             pass
-        resp = reqx.next().stream("GET", url, follow_redirects=True)
+        resp = reqs.next().get(url, stream=True)
         self.activity += 1
-        resp = resp.__enter___()
         head = fcdict(resp.headers)
         try:
             mime = [t.strip() for t in head.get("Content-Type", "").split(";")]
         except KeyError:
-            it = resp.iter_bytes()
+            it = resp.iter_content(65536)
             data = next(it)
             mime = [t.strip() for t in self.mime.from_buffer(data).split(";")]
         self.mimes[url] = mime
@@ -1624,7 +1632,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if urls:
                 with tracebacksuppressor:
                     url = urls[0]
-                    resp = await create_future(reqx.next().get, url, headers=Request.header(), _timeout_=12)
+                    resp = await create_future(reqs.next().get, url, headers=Request.header(), _timeout_=12)
                     self.activity += 1
                     headers = fcdict(resp.headers)
                     if headers.get("Content-Type", "").split("/", 1)[0] == "image":
@@ -4423,19 +4431,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
                 try:
                     bot.activity += 1
-                    if form:
-                        r = await self._HTTPClient__session.request(method.upper(), url, **kwargs)
-                        data = await discord.http.json_or_text(r)
-                        status = r.status
-                    else:
-                        r = await Request.sessions.next().request(method.upper(), url, timeout=16, **kwargs)
-                        data = r.text
-                        try:
-                            if r.headers["Content-Type"] == "application/json":
-                                data = orjson.loads(data)
-                        except:
-                            pass
-                        status = r.status = r.status_code
+                    r = await Request.sessions.next().request(method.upper(), url, **kwargs)
+                    data = await discord.http.json_or_text(r)
+                    status = r.status
 
                     if maybe_lock and status != 429:
                         # check if we have rate limit header information
@@ -4512,7 +4510,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         raise discord.HTTPException(r, data)
 
                 # This is handling exceptions from the request
-                except (OSError, RuntimeError, httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout, httpx.RemoteProtocolError, httpx.LocalProtocolError, h2.exceptions.StreamClosedError):
+                except (OSError, ):
                     # Connection reset by peer
                     if tries < 4:
                         await asyncio.sleep(1 + tries * 2)
