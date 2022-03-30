@@ -4512,7 +4512,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         raise discord.HTTPException(r, data)
 
                 # This is handling exceptions from the request
-                except (OSError, httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout, httpx.RemoteProtocolError, httpx.LocalProtocolError, h2.exceptions.StreamClosedError):
+                except (OSError, RuntimeError, httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout, httpx.RemoteProtocolError, httpx.LocalProtocolError, h2.exceptions.StreamClosedError):
                     # Connection reset by peer
                     if tries < 4:
                         await asyncio.sleep(1 + tries * 2)

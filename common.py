@@ -2764,9 +2764,10 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 
     async def _init_(self):
         if self.sessions:
-            for session in self.sessions:
-                await session.aclose()
-            await self.nossl.close()
+            with tracebacksuppressor(RuntimeError):
+                for session in self.sessions:
+                    await session.aclose()
+                await self.nossl.close()
         try:
             self.sessions = alist(httpx.AsyncClient(http2=True) for i in range(6))
         except:
