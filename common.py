@@ -2702,14 +2702,12 @@ def proxy_download(url, fn=None, refuse_html=True, timeout=24):
     o_url = url
     loc = random.choice(("eu", "us"))
     i = random.randint(1, 17)
-    j = xrand(len(reqx))
     stream = f"https://{loc}{i}.proxysite.com/includes/process.php?action=update"
-    with reqx[j].stream(
-        "POST",
+    with reqs.next().post(
         stream,
         data=dict(d=url, allowCookies="on"),
-        follow_redirects=True,
         timeout=timeout,
+        stream=True,
     ) as resp:
         if resp.status_code not in range(200, 400):
             raise ConnectionError(resp.status_code, resp)
@@ -2717,7 +2715,7 @@ def proxy_download(url, fn=None, refuse_html=True, timeout=24):
             b = resp.read()
             if refuse_html and b[:15] == b"<!DOCTYPE html>":
                 raise ValueError(b[:256])
-        it = resp.iter_bytes()
+        it = resp.iter_content(65536)
         if isinstance(fn, str):
             f = open(fn, "wb")
         else:
@@ -2775,7 +2773,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
     async def aio_call(self, url, headers, files, data, method, decode=False, json=False, session=None, ssl=True):
         async with self.semaphore:
             req = session or (self.sessions.next() if ssl else self.nossl)
-            resp = await req.request(method.upper(), url, headers=headers, files=files, data=data, follow_redirects=True, timeout=24)
+            resp = await req.request(method.upper(), url, headers=headers, files=files, data=data, timeout=24)
             if BOT[0]:
                 BOT[0].activity += 1
             status = getattr(resp, "status_code") or getattr(resp, "status", 400)
@@ -2832,10 +2830,10 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
                 return data
             if session:
                 req = session
-                resp = req.request(method.upper(), url, headers=headers, files=files, data=data, follow_redirects=True, timeout=timeout)
+                resp = req.request(method.upper(), url, headers=headers, files=files, data=data, timeout=timeout)
             elif bypass:
                 req = reqs.next()
-                resp = req.request(method.upper(), url, headers=headers, files=files, data=data, follow_redirects=True, timeout=timeout)
+                resp = req.request(method.upper(), url, headers=headers, files=files, data=data, timeout=timeout)
             else:
                 req = requests
                 resp = getattr(req, method)(url, headers=headers, files=files, data=data, timeout=timeout)
