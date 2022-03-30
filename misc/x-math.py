@@ -1053,8 +1053,10 @@ if __name__ == "__main__":
     import threading
     threading.Thread(target=ensure_parent, daemon=True).start()
     while True:
-        argv = sys.stdin.readline().rstrip()
-        if argv:
-            if argv[0] == "~":
-                ts, args = argv[1:].split("~", 1)
-                evaluate(ts, args)
+        argv = sys.stdin.readline()
+        if not argv:
+            raise SystemExit
+        argv = argv.rstrip()
+        if argv[0] == "~":
+            ts, args = argv[1:].split("~", 1)
+            evaluate(ts, args)
