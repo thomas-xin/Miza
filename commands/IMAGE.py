@@ -1,7 +1,9 @@
 print = PRINT
 
-import youtube_dl
-# youtube_dl = youtube_dlc
+try:
+    import yt_dlp as youtube_dl
+except ModuleNotFoundError:
+    import youtube_dl
 import aiohttp
 
 getattr(youtube_dl, "__builtins__", {})["print"] = print
