@@ -2773,7 +2773,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
     async def aio_call(self, url, headers, files, data, method, decode=False, json=False, session=None, ssl=True):
         async with self.semaphore:
             req = session or (self.sessions.next() if ssl else self.nossl)
-            resp = await req.request(method.upper(), url, headers=headers, files=files, data=data, timeout=24)
+            resp = await req.request(method.upper(), url, headers=headers, data=data, timeout=24)
             if BOT[0]:
                 BOT[0].activity += 1
             status = getattr(resp, "status_code") or getattr(resp, "status", 400)
