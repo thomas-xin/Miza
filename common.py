@@ -2776,7 +2776,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
             resp = await req.request(method.upper(), url, headers=headers, data=data, timeout=24)
             if BOT[0]:
                 BOT[0].activity += 1
-            status = getattr(resp, "status_code") or getattr(resp, "status", 400)
+            status = getattr(resp, "status_code", None) or getattr(resp, "status", 400)
             if status >= 400:
                 try:
                     data = await resp.read()

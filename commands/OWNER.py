@@ -77,7 +77,7 @@ class Restart(Command):
                 await bot.send_event("_destroy_", shutdown=True)
                 # Kill the audio player client
                 print("Shutting down audio client...")
-                kill = create_future(bot.audio.kill, priority=True)
+                kill = create_future(bot.audio.kill, timeout=16, priority=True)
                 # Save any database that has not already been autosaved
                 print("Saving all databases...")
                 await create_future(bot.update, force=True, priority=True)
@@ -87,7 +87,7 @@ class Restart(Command):
                 # Kill math and image subprocesses
                 print("Killing math and image subprocesses...")
                 with tracebacksuppressor:
-                    await create_future(sub_kill, start=False, priority=True)
+                    await create_future(sub_kill, start=False, timeout=8, priority=True)
                 # Kill the webserver
                 print("Killing webserver...")
                 with tracebacksuppressor:
