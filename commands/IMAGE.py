@@ -1001,6 +1001,7 @@ class Resize(Command):
             if not value:
                 x = y = 1
                 op = "auto"
+                fmt = "mp4"
             else:
                 # Parse width and height multipliers
                 if "x" in value[:-1] or "X" in value or "*" in value or "×" in value:
@@ -1022,11 +1023,15 @@ class Resize(Command):
                         if not value >= -32 or not value <= 32:
                             raise OverflowError("Maximum multiplier input is 32.")
                 if spl:
-                    op = " ".join(spl)
+                    op = spl.pop(0)
                     if op == "scale2":
                         op = "scale2x"
                 else:
                     op = "auto"
+                if spl:
+                    fmt = spl.pop(0)
+                else:
+                    fmt = "mp4"
             # Try and find a good name for the output image
             try:
                 name = url[url.rindex("/") + 1:]
@@ -1038,13 +1043,13 @@ class Resize(Command):
                 name = "unknown"
             if not name.endswith(".png"):
                 name += ".png"
-            resp = await process_image(url, func, [x, y, op], timeout=_timeout)
+            resp = await process_image(url, func, [x, y, op, "-f", fmt], timeout=_timeout)
             fn = resp[0]
-            if fn.endswith(".gif"):
-                if not name.endswith(".gif"):
+            if fn.endswith(".mp4"):
+                if not name.endswith(".mp4"):
                     if "." in name:
                         name = name[:name.rindex(".")]
-                    name += ".gif"
+                    name += ".mp4"
         await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
