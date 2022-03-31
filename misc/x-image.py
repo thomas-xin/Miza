@@ -2329,6 +2329,8 @@ def ImageOpIterator(image, step, operation, ts, args):
         else:
             temp = image
         func = getattr(temp, operation, None)
+        if callable(getattr(temp, "load", None)):
+            temp.load()
         if func is None:
             func = operation if callable(operation) else eval(operation)
             res = func(temp, *args)
