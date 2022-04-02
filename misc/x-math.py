@@ -199,7 +199,7 @@ def Random(a=None, b=None):
     elif b is None:
         return random.randint(0, round_random(a) - 1)
     else:
-        return random.randint(round_random(a), round_random(b) - 1)
+        return random.randint(round_random(a), round_random(b))
 
 
 def astype(obj, t, *args, **kwargs):
