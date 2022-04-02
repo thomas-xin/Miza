@@ -194,7 +194,6 @@ def roman_numerals(num, order=0):
 
 
 def Random(a=None, b=None):
-    random.seed(time.time_ns())
     if a is None:
         return random.random()
     elif b is None:
@@ -895,6 +894,7 @@ def evalSym(f, prec=64, r=False, variables=None):
                 line.clear()
         return ["\n".join(lines)]
     global BF_PREC
+    random.seed(time.time_ns())
     BF_PREC = sympy.ceiling(int(prec) * 1.25)
     r = int(r)
     prec = int(prec)
