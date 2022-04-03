@@ -4946,8 +4946,6 @@ class UpdateAudio(Database):
                             if m.voice.suppress or m.voice.requested_to_speak_at:
                                 return self.bot.audio.players[guild.id].speak()
                         elif m.voice.deaf or m.voice.mute or m.voice.afk:
-                            if perm.deafen_members:
-                                return m.edit(mute=False, deafen=False)
                             return m.edit(mute=False)
         return emptyfut
 
