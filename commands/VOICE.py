@@ -2630,7 +2630,7 @@ class AudioDownloader:
                         else:
                             url = info
                         while len(futs) < 8:
-                            fut = submit(self.download_file, url, "pcm", auds=None, ts=t, child=True, silenceremove=silenceremove)
+                            fut = create_future_ex(self.download_file, url, "pcm", auds=None, ts=t, child=True, silenceremove=silenceremove)
                             futs.append(fut)
                         with tracebacksuppressor:
                             cfn = futs.popleft().result()[0]
