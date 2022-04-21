@@ -726,7 +726,7 @@ class Rainbow(Command):
 class Scroll(Command):
     name = ["Parallax", "Offset", "ScrollGIF"]
     description = "Creates a .gif image from repeatedly shifting supplied image in a specified direction."
-    usage = "<0:url> <1:direction(left)>? <2:duration(2)>? <3:fps(20)>?"
+    usage = "<0:url> <1:direction(left)>? <2:duration(2)>? <3:fps(32)>?"
     no_parse = True
     rate_limit = (5, 11)
     _timeout_ = 8
@@ -773,7 +773,7 @@ class Scroll(Command):
             elif fps > 64:
                 raise OverflowError("Maximum FPS value is 64.")
         else:
-            fps = 25
+            fps = 32
         try:
             name = url[url.rindex("/") + 1:]
             if not name:
