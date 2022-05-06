@@ -451,9 +451,10 @@ class Loop(Command):
     name = ["For", "Rep", "While"]
     min_level = 1
     min_display = "1+"
-    description = "Loops a command."
+    description = "Loops a command. Delete the original message to terminate the loop if necessary."
     usage = "<0:iterations> <1:command>+"
     rate_limit = (3, 7)
+    active = set()
 
     async def __call__(self, args, argv, message, channel, bot, perm, user, guild, **void):
         if not args:
@@ -463,10 +464,12 @@ class Loop(Command):
         iters = round(num)
         # Bot owner bypasses restrictions
         if not isnan(perm):
-            if iters > 32 and not bot.is_trusted(guild.id):
-                raise PermissionError(f"Elevated server priviliges required to execute loop of greater than 32 iterations.")
+            if channel.id in self.active:
+                raise PermissionError("Only one loop may be active in a channel at any time.")
+            elif iters > 32 and not bot.is_trusted(guild.id):
+                raise PermissionError("Elevated server priviliges required to execute loop of greater than 32 iterations.")
             elif iters > 256:
-                raise PermissionError("Must be owner to execute loop of more than 256 iterations.")
+                raise PermissionError("Loops cannot be more than 256 iterations.")
         func = func2 = " ".join(args[1:])
         func = func.lstrip()
         if not isnan(perm):
@@ -477,7 +480,7 @@ class Loop(Command):
                 ) or (
                     (str(bot.id) + ">" + n).upper() in func.replace(" ", "").upper()
                 ):
-                    raise PermissionError("Must be owner to execute nested loop.")
+                    raise PermissionError("Loops must not be nested.")
         func2 = func2.split(None, 1)[-1]
         create_task(send_with_react(
             channel,
@@ -487,21 +490,25 @@ class Loop(Command):
         ))
         fake_message = copy.copy(message)
         fake_message.content = func2
-        for i in range(iters):
-            if hasattr(message, "simulated"):
-                curr_message = message
-            else:
-                curr_message = await bot.fetch_message(message.id, channel)
-            if getattr(message, "deleted", None) or getattr(curr_message, "deleted", None):
-                break
-            loop = i < iters - 1
-            t = utc()
-            # Calls process_message with the argument containing the looped command.
-            delay = await bot.process_message(fake_message, func, loop=loop)
-            # Must abide by command rate limit rules
-            delay = delay + t - utc()
-            if delay > 0:
-                await asyncio.sleep(delay)
+        self.active.add(channel.id)
+        try:
+            for i in range(iters):
+                if hasattr(message, "simulated"):
+                    curr_message = message
+                else:
+                    curr_message = await bot.fetch_message(message.id, channel)
+                if getattr(message, "deleted", None) or getattr(curr_message, "deleted", None):
+                    break
+                loop = i < iters - 1
+                t = utc()
+                # Calls process_message with the argument containing the looped command.
+                delay = await bot.process_message(fake_message, func, loop=loop)
+                # Must abide by command rate limit rules
+                delay = delay + t - utc()
+                if delay > 0:
+                    await asyncio.sleep(delay)
+        finally:
+            self.active.discard(channel.id)
 
 
 class Avatar(Command):
