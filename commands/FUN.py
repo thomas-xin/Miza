@@ -3346,7 +3346,7 @@ class RPS(Command):
     typing = False
     rate_limit = (0.05, 0.25)
 
-    async def __call__(self, bot, user, message, channel, argv, loop, **void):
+    async def __call__(self, bot, user, message, channel, argv, looped, **void):
         try:
             if not argv:
                 create_task(channel.send("Let's play Rock-Paper-Scissors! Post your choice!", reference=message))
@@ -3367,7 +3367,7 @@ class RPS(Command):
             decision = choice(matches.values())
             response = f"I'll go with {decision}!\n"
             earned = random.randint(16, 48) * 2 ** bot.data.rps.setdefault(user.id, 0)
-            if loop:
+            if looped:
                 earned = ceil(earned / 8)
 
             if matches[decision][0] == argv[0]:
