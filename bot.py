@@ -3045,6 +3045,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                             channel=channel,                # channel data
                             guild=guild,                    # guild data
                             name=command_check,             # alias the command was called as
+                            loop=loop,                      # whether this command was invoked as part of a loop
                             _timeout=timeout,               # timeout delay assigned to the command
                             timeout=timeout,                # timeout delay for the whole function
                         )

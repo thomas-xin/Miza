@@ -715,6 +715,8 @@ class Snake(Command):
                 if not game.grid[p]:
                     break
                 p = tuple(xrand(x) for x in game.size)
+            else:
+                return
             t = 2
             if "i" in flags and xrand(2):
                 t = 4
@@ -776,7 +778,7 @@ class Snake(Command):
                 await message.edit(embed=embed)
                 tailc = np.sum(game.grid < 0)
                 if tailc >= cells - 1:
-                    rew = cells << 4
+                    rew = cells ** 2 // 8
                     s = await bot.as_rewards(rew, 0)
                     bot.data.users.add_diamonds(user, rew)
                     await send_with_reply(None, message, f"{user.mention}, congratulations, **you won**! You earned {s}!")
@@ -790,7 +792,7 @@ class Snake(Command):
             await asyncio.sleep(1)
         
         if not game.alive:
-            rew = np.sum(game.grid < 0) + 1 << 4
+            rew = (np.sum(game.grid < 0) ** 2 + 1) * 128
             s = await bot.as_rewards(rew)
             bot.data.users.add_gold(user, rew)
             await send_with_reply(None, message, f"{user.mention}, **game over**! You earned {s}.")
@@ -989,20 +991,21 @@ class Barter(Command):
         else:
             dtype = np.uint32
         itype = np.uint64 if dtype is not np.uint32 else np.uint32
-        ftype = np.float64 if dtype is not np.uint32 else np.float32
+        # ftype = np.float64 if dtype is not np.uint32 else np.float32
         totals = np.zeros(len(barter_weights), dtype=dtype)
         rand = np.random.default_rng(ts_us())
-        if amount > 268435456:
-            for i in range(256):
+        if amount > 16777216:
+            for i in range(16):
                 count = 1048576
                 seeds = await create_future(rand.integers, 0, len(barter_seeding), size=count, dtype=itype)
                 ids = barter_seeding[seeds]
                 counts = await create_future(rand.integers, barter_lowers[ids], barter_uppers[ids], dtype=itype)
-                counts = counts.astype(ftype)
+                counts = counts.astype(dtype)
                 await create_future(np.add.at, totals, ids, counts)
-            mult, amount = divmod(amount, 268435456)
+            mult, amount = divmod(amount, 16777216)
             if not is_finite(amount):
                 amount = 0
+            mult = dtype(mult)
             totals = np.multiply(totals, mult, out=totals)
         else:
             mult = 1
@@ -1011,7 +1014,7 @@ class Barter(Command):
             seeds = await create_future(rand.integers, 0, len(barter_seeding), size=count, dtype=itype)
             ids = barter_seeding[seeds]
             counts = await create_future(rand.integers, barter_lowers[ids], barter_uppers[ids], dtype=itype)
-            counts = counts.astype(ftype)
+            counts = counts.astype(dtype)
             await create_future(np.add.at, totals, ids, counts)
         rewards = deque()
         data.setdefault("minecraft", {})
@@ -3341,8 +3344,9 @@ class RPS(Command):
     usage = "<rock>? <paper>? <scissors>?"
     slash = True
     typing = False
+    rate_limit = (0.05, 0.25)
 
-    async def __call__(self, bot, user, message, channel, argv, **void):
+    async def __call__(self, bot, user, message, channel, argv, loop, **void):
         try:
             if not argv:
                 create_task(channel.send("Let's play Rock-Paper-Scissors! Post your choice!", reference=message))
@@ -3361,14 +3365,16 @@ class RPS(Command):
             if argv not in matches:
                 raise KeyError
             decision = choice(matches.values())
-            await channel.send(f"I'll go with {decision}!", reference=message)
+            response = f"I'll go with {decision}!\n"
             earned = random.randint(16, 48) * 2 ** bot.data.rps.setdefault(user.id, 0)
+            if loop:
+                earned = ceil(earned / 8)
 
             if matches[decision][0] == argv[0]:
                 bot.data.rps.pop(user.id, 0)
                 emoji = choice("😄", "😁", "😀", "😏")
-                await channel.send(f"**I win**! {emoji}")
-            if matches[argv] == decision:
+                response += f"**I win**! {emoji}"
+            elif matches[argv] == decision:
                 bot.data.rps[user.id] += 1
                 emoji = choice("😔", "😦", "🥺", "😧")
                 if earned < 1024:
@@ -3378,12 +3384,13 @@ class RPS(Command):
                     earned /= 1024
                     bot.data.users.add_diamonds(user, earned)
                     rew = await bot.as_rewards(earned, 0)
-                await channel.send(f"**I lost**... {emoji} You won {rew}.")
-            if decision[0] == argv[0]:
+                response += f"**I lost**... {emoji} You won {rew}."
+            elif decision[0] == argv[0]:
                 emoji = choice("🙃", "😉", "😮", "😳")
                 bot.data.users.add_gold(user, earned / 2)
                 rew = await bot.as_rewards(earned / 2)
-                await channel.send(f"Wow, **we tied**! {emoji} You won {rew}.")
+                response += f"Wow, **we tied**! {emoji} You won {rew}."
+            await bot.send_as_embeds(channel, response)
         except KeyError:
             emoji = choice("😛", "😶‍🌫️", "😇", "😶")
             await channel.send(f"\u200b{''.join(y for x in zip(argv[::2].upper(), argv[1::2].lower() + (' ' if len(argv) & 1 else '')) for y in x if y).strip()} doesn't count! {emoji}", reference=message)
