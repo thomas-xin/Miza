@@ -2552,7 +2552,10 @@ def evalImg(url, operation, args):
                         vf += "stats_mode=diff[p];[s1][p]paletteuse=alpha_threshold=128:diff_mode=rectangle"
                     if vf:
                         command.extend(("-vf", vf))
-                    command.extend(("-loop", "0"))
+                    if fmt == "apng":
+                        command.extend(("-plays", "0"))
+                    else:
+                        command.extend(("-loop", "0"))
                 else:
                     if getattr(first, "audio", None):
                         command.extend(("-i", "-", "-i", first.audio["url"]))
