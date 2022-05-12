@@ -2424,7 +2424,7 @@ def evalImg(url, operation, args):
         fmt = args.pop(-1)
         args.pop(-1)
     if len(args) > 1 and args[-2] == "-d":
-        dur = args.pop(-1)
+        dur = args.pop(-1) * 1000
         args.pop(-1)
     if operation != "$":
         if args and args[-1] == "-raw":
@@ -2495,7 +2495,7 @@ def evalImg(url, operation, args):
             if not video:
                 new = temp
             else:
-                duration = 86400
+                duration = 3600000
                 new["count"] = 16
                 new["frames"] = [temp] * new["count"]
         else:
