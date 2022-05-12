@@ -778,7 +778,7 @@ class Snake(Command):
                 await message.edit(embed=embed)
                 tailc = np.sum(game.grid < 0)
                 if tailc >= cells - 1:
-                    rew = cells ** 2 / 64
+                    rew = cells ** 2 / 64 * 4
                     if rew >= 1:
                         s = await bot.as_rewards(rew, 0)
                         bot.data.users.add_diamonds(user, rew)
