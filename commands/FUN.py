@@ -3399,7 +3399,10 @@ class RPS(Command):
                 bot.data.users.add_gold(user, earned / 2)
                 rew = await bot.as_rewards(earned / 2)
                 response += f"Wow, **we tied**! {emoji} You won {rew}."
-            await bot.send_as_embeds(channel, response)
+            if looped:
+                await bot.send_as_embeds(channel, response)
+            else:
+                await channel.send(response, reference=message)
         except KeyError:
             emoji = choice("😛", "😶‍🌫️", "😇", "😶")
             await channel.send(f"\u200b{''.join(y for x in zip(argv[::2].upper(), argv[1::2].lower() + (' ' if len(argv) & 1 else '')) for y in x if y).strip()} doesn't count! {emoji}", reference=message)
