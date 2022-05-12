@@ -569,7 +569,6 @@ class Text2048(Command):
             mode |= 2
         if "e" in flags:
             mode |= 1
-        # s = "*```callback-fun-text2048-" + str(u_id) + "_" + str(mode) + "-" + "_".join(str(i) for i in size) + "\nStarting Game...```*"
         if len(size) <= 2:
             buttons = self.buttons[2]
         elif len(size) == 3:
@@ -3355,14 +3354,30 @@ class RPS(Command):
     typing = False
     rate_limit = (0.05, 0.25)
 
+    buttons = [
+        cdict(emoji="✊", style=1),
+        cdict(emoji="🖐️", style=1),
+        cdict(emoji="✌️", style=1),
+    ]
+    button_equiv = {
+        "✊": "rock",
+        "🖐️": "paper",
+        "✌️": "scissors",
+    }
+
     async def __call__(self, bot, user, message, channel, argv, looped, **void):
         try:
             if not argv:
-                create_task(channel.send("Let's play Rock-Paper-Scissors! Post your choice!", reference=message))
-                message = await bot.wait_for("message", check=lambda message: message.author.id == user.id and message.channel.id == channel.id)
-                argv = message.content
-            argv = full_prune(argv)
+                emb = discord.Embed()
+                emb.description = (
+                    "*```callback-fun-rps-" + str(user.id) + "-\n"
+                    + "Let's play Rock-Paper-Scissors! Select your choice!```*"
+                )
+                emb.set_author(**get_author(user))
+                await send_with_react(channel, "", embed=emb, buttons=self.buttons, reference=message)
+                return
 
+            argv = full_prune(argv)
             matches = dict(
                 r="scissors",
                 s="paper",
@@ -3373,7 +3388,7 @@ class RPS(Command):
             )
             if argv not in matches:
                 raise KeyError
-            decision = choice(matches.values())
+            decision = choice(self.button_equiv.values())
             response = f"I'll go with {decision}!\n"
             earned = random.randint(16, 48) * 2 ** bot.data.rps.setdefault(user.id, 0)
             if looped:
@@ -3399,6 +3414,7 @@ class RPS(Command):
                 bot.data.users.add_gold(user, earned / 2)
                 rew = await bot.as_rewards(earned / 2)
                 response += f"Wow, **we tied**! {emoji} You won {rew}."
+
             if looped:
                 await bot.send_as_embeds(channel, response)
             else:
@@ -3406,6 +3422,54 @@ class RPS(Command):
         except KeyError:
             emoji = choice("😛", "😶‍🌫️", "😇", "😶")
             await channel.send(f"\u200b{''.join(y for x in zip(argv[::2].upper(), argv[1::2].lower() + (' ' if len(argv) & 1 else '')) for y in x if y).strip()} doesn't count! {emoji}", reference=message)
+
+    async def _callback_(self, bot, message, reaction, argv, user, perm, vals, **void):
+        u_id = int(vals)
+        if u_id != user.id and u_id != 0 and perm < 3:
+            return
+        try:
+            argv = self.button_equiv[reaction]
+        except KeyError:
+            return
+        matches = dict(
+            rock="scissors",
+            scissors="paper",
+            paper="rock",
+        )
+        response = f"{user.display_name} chooses {argv}!"
+        decision = choice(self.button_equiv.values())
+        response += f"I'll go with {decision}!\n"
+        earned = random.randint(16, 48) * 2 ** bot.data.rps.setdefault(user.id, 0)
+
+        if matches[decision][0] == argv[0]:
+            bot.data.rps.pop(user.id, 0)
+            emoji = choice("😄", "😁", "😀", "😏")
+            response += f"**I win**! {emoji}"
+        elif matches[argv] == decision:
+            bot.data.rps[user.id] += 1
+            emoji = choice("😔", "😦", "🥺", "😧")
+            if earned < 1024:
+                bot.data.users.add_gold(user, earned)
+                rew = await bot.as_rewards(earned)
+            else:
+                earned /= 1024
+                bot.data.users.add_diamonds(user, earned)
+                rew = await bot.as_rewards(earned, 0)
+            response += f"**I lost**... {emoji} You won {rew}."
+        elif decision[0] == argv[0]:
+            emoji = choice("🙃", "😉", "😮", "😳")
+            bot.data.users.add_gold(user, earned / 2)
+            rew = await bot.as_rewards(earned / 2)
+            response += f"Wow, **we tied**! {emoji} You won {rew}."
+
+        emb = discord.Embed()
+        emb.description = (
+            "*```callback-fun-rps-" + str(user.id) + "-\n"
+            + "Let's play Rock-Paper-Scissors! Select your choice!```*"
+            + response
+        )
+        emb.set_author(**get_author(user))
+        await message.edit(embed=emb)
 
 
 class UpdateRPS(Database):
