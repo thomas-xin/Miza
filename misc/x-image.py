@@ -2483,9 +2483,6 @@ def evalImg(url, operation, args):
         if getattr(new, "audio", None):
             new = dict(count=1, duration=1, frames=[new])
     if type(new) is dict:
-        duration = new["duration"]
-        if dur and duration > dur:
-            duration = dur
         frames = new["frames"]
         if not frames:
             raise EOFError("No image output detected.")
@@ -2495,11 +2492,16 @@ def evalImg(url, operation, args):
             if not video:
                 new = temp
             else:
-                duration = 3600000
+                duration = dur = 3600000
                 new["count"] = 16
                 new["frames"] = [temp] * new["count"]
         else:
             video = True
+        duration = new["duration"]
+        if dur:
+            dur *= new["count"] / (new["count"] + 1)
+            if duration > dur:
+                duration = dur
         if video:
             if fmt in ("png", "jpg", "jpeg", "bmp"):
                 fmt = "gif"
