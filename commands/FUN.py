@@ -3438,7 +3438,7 @@ class RPS(Command):
             scissors="paper",
             paper="rock",
         )
-        response = f"{user.display_name} chooses {argv}!"
+        response = f"{user.display_name} chooses {argv}!\n"
         decision = choice(self.button_equiv.values())
         response += f"I'll go with {decision}!\n"
         earned = random.randint(16, 48) * 2 ** bot.data.rps.setdefault(user.id, 0)
