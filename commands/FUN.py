@@ -3468,11 +3468,12 @@ class RPS(Command):
         emb = discord.Embed(colour=colour)
         emb.description = (
             "*```callback-fun-rps-" + str(user.id) + "-\n"
-            + "Let's play Rock-Paper-Scissors! Select your choice!```*"
+            + "Let's play Rock-Paper-Scissors! Make your choice!```*"
             + response
         )
         emb.set_author(**get_author(user))
-        await message.edit(embed=emb)
+        create_task(message.edit(embed=emb))
+        await bot.ignore_interaction(message)
 
 
 class UpdateRPS(Database):
