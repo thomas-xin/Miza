@@ -3348,7 +3348,7 @@ class Rickroll(Command):
 
 class RPS(Command):
     name = ["Rockpaperscissors"]
-    description = "A randomized game of Rock-Paper-Scissors!"
+    description = "A randomised game of Rock-Paper-Scissors!"
     usage = "<rock>? <paper>? <scissors>?"
     slash = True
     typing = False
@@ -3368,10 +3368,11 @@ class RPS(Command):
     async def __call__(self, bot, user, message, channel, argv, looped, **void):
         try:
             if not argv:
-                emb = discord.Embed()
+                colour = await bot.get_colour(user)
+                emb = discord.Embed(colour=colour)
                 emb.description = (
                     "*```callback-fun-rps-" + str(user.id) + "-\n"
-                    + "Let's play Rock-Paper-Scissors! Select your choice!```*"
+                    + "Let's play Rock-Paper-Scissors! Make your choice!```*"
                 )
                 emb.set_author(**get_author(user))
                 await send_with_react(channel, "", embed=emb, buttons=self.buttons, reference=message)
@@ -3427,8 +3428,9 @@ class RPS(Command):
         u_id = int(vals)
         if u_id != user.id and u_id != 0 and perm < 3:
             return
+        r = as_str(reaction)
         try:
-            argv = self.button_equiv[reaction]
+            argv = self.button_equiv[r]
         except KeyError:
             return
         matches = dict(
@@ -3462,7 +3464,8 @@ class RPS(Command):
             rew = await bot.as_rewards(earned / 2)
             response += f"Wow, **we tied**! {emoji} You won {rew}."
 
-        emb = discord.Embed()
+        colour = await bot.get_colour(user)
+        emb = discord.Embed(colour=colour)
         emb.description = (
             "*```callback-fun-rps-" + str(user.id) + "-\n"
             + "Let's play Rock-Paper-Scissors! Select your choice!```*"
