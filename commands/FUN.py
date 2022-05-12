@@ -778,9 +778,14 @@ class Snake(Command):
                 await message.edit(embed=embed)
                 tailc = np.sum(game.grid < 0)
                 if tailc >= cells - 1:
-                    rew = cells ** 2 // 8
-                    s = await bot.as_rewards(rew, 0)
-                    bot.data.users.add_diamonds(user, rew)
+                    rew = cells ** 2 / 64
+                    if rew >= 1:
+                        s = await bot.as_rewards(rew, 0)
+                        bot.data.users.add_diamonds(user, rew)
+                    else:
+                        rew *= 1024
+                        s = await bot.as_rewards(rew)
+                        bot.data.users.add_gold(user, rew)
                     await send_with_reply(None, message, f"{user.mention}, congratulations, **you won**! You earned {s}!")
                     break
                 if tailc:
@@ -792,7 +797,7 @@ class Snake(Command):
             await asyncio.sleep(1)
         
         if not game.alive:
-            rew = (np.sum(game.grid < 0) ** 2 + 1) * 128
+            rew = (np.sum(game.grid < 0) ** 2 + 1) * 16
             s = await bot.as_rewards(rew)
             bot.data.users.add_gold(user, rew)
             await send_with_reply(None, message, f"{user.mention}, **game over**! You earned {s}.")
