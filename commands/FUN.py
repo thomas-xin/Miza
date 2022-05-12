@@ -711,7 +711,7 @@ class Snake(Command):
         
         def spawn_apple(game):
             p = tuple(xrand(x) for x in game.size)
-            for i in range(4096):
+            for i in range(cells * 16):
                 if not game.grid[p]:
                     break
                 p = tuple(xrand(x) for x in game.size)
@@ -778,7 +778,9 @@ class Snake(Command):
                 await message.edit(embed=embed)
                 tailc = np.sum(game.grid < 0)
                 if tailc >= cells - 1:
-                    rew = cells ** 2 / 64 * 4
+                    rew = cells ** 2 / 32 * 4
+                    if "i" in flags:
+                        rew /= 4
                     if rew >= 1:
                         s = await bot.as_rewards(rew, 0)
                         bot.data.users.add_diamonds(user, rew)
@@ -797,7 +799,9 @@ class Snake(Command):
             await asyncio.sleep(1)
         
         if not game.alive:
-            rew = (np.sum(game.grid < 0) ** 2 + 1) * 16
+            rew = (np.sum(game.grid < 0) ** 2 + 1) * 32
+            if "i" in flags:
+                rew /= 4
             s = await bot.as_rewards(rew)
             bot.data.users.add_gold(user, rew)
             await send_with_reply(None, message, f"{user.mention}, **game over**! You earned {s}.")
