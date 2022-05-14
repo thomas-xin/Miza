@@ -2607,6 +2607,8 @@ class AudioDownloader:
                 fmt = "matroska"
             if not copy and ast:
                 args.extend(("-ar", sr, "-ac", ac, "-b:a", str(br)))
+                if vst:
+                    args.extend(("-crf", "24"))
             if copy:
                 args.extend(("-c", "copy", fn))
             elif container:
