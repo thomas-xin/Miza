@@ -2446,7 +2446,11 @@ def bytes2hex(b, space=True):
     return b.hex().upper()
 
 # Converts a hex string to a bytes object.
-hex2bytes = lambda b: bytes.fromhex(as_str(b))
+def hex2bytes(b):
+    s = as_str(b)
+    if len(s) & 1:
+        s = s[:-1] + "0" + s[-1]
+    return bytes.fromhex(s)
 
 # Converts a bytes object to a base64 string.
 def bytes2b64(b, alt_char_set=False):
