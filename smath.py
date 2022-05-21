@@ -2447,7 +2447,7 @@ def bytes2hex(b, space=True):
 
 # Converts a hex string to a bytes object.
 def hex2bytes(b):
-    s = as_str(b)
+    s = as_str(b).replace(" ", "")
     if len(s) & 1:
         s = s[:-1] + "0" + s[-1]
     return bytes.fromhex(s)
