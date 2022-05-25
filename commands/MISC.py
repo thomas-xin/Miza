@@ -782,13 +782,13 @@ class SpectralPulse(Command):
         dest = f"cache/&{ts}"
         fn1 = dest + ".mp4"
         fn2 = dest + ".png"
-        args = [python, "main.py", "-dest", "../../" + dest, url]
+        args = [python, "main.py", "-dest", dest, url]
         with discord.context_managers.Typing(channel):
             if self.spec_sem.is_busy():
                 await send_with_react(channel, italics(ini_md(f"SpectralPulse: {sqr_md(url)} enqueued in position {sqr_md(self.spec_sem.passive + 1)}.")), reacts="❎", reference=message)
             async with self.spec_sem:
                 print(args)
-                proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc/spectralpulse", stdout=subprocess.DEVNULL)
+                proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd(), stdout=subprocess.DEVNULL)
                 try:
                     await asyncio.wait_for(proc.wait(), timeout=3200)
                 except (T0, T1, T2):
