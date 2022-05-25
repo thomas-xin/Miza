@@ -2638,7 +2638,7 @@ class AudioDownloader:
                             ress.append(cfn)
                         fut = create_future_ex(self.download_file, url, "pcm", auds=None, ts=t, child=True, silenceremove=silenceremove)
                         futs.append(fut)
-                    for cfn in itertools.chain(ress, (fut.result() for fut in futs)):
+                    for cfn in itertools.chain(ress, (fut.result()[0] for fut in futs)):
                         if cfn and os.path.exists(cfn):
                             if os.path.getsize(cfn):
                                 with open(cfn, "rb") as f:
