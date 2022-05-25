@@ -2537,7 +2537,7 @@ class AudioDownloader:
                 if child:
                     fii = f"cache/{ts}~proxy"
                     with tracebacksuppressor:
-                        stream = proxy_download(stream, fii)
+                        stream = proxy_download(stream, fii, timeout=86400)
                 asf = asc = stream
             if not vst and not size:
                 args.append("-vn")

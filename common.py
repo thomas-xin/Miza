@@ -2691,7 +2691,7 @@ def parse_ratelimit_header(headers):
     return max(0.001, delta)
 
 
-def proxy_download(url, fn=None, refuse_html=True, timeout=24):
+def proxy_download(url, fn=None, refuse_html=True, timeout=720):
     downloading = globals().setdefault("proxy-download", {})
     try:
         fut = downloading[url]
