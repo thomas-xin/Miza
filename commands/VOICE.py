@@ -2624,18 +2624,21 @@ class AudioDownloader:
             try:
                 if len(ast) > 1:
                     proc = psutil.Popen(args, stdin=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1048576)
+                    ress = []
                     futs = deque()
-                    for t, info in enumerate(ast, ts + 1):
+                    for i, info in enumerate(ast):
+                        t = i + ts + 1
                         cfn = None
                         if type(info) is not str:
                             url = info.get("url")
                         else:
                             url = info
-                        while len(futs) < 8:
-                            fut = create_future_ex(self.download_file, url, "pcm", auds=None, ts=t, child=True, silenceremove=silenceremove)
-                            futs.append(fut)
-                        with tracebacksuppressor:
+                        if len(futs) >= 8:
                             cfn = futs.popleft().result()[0]
+                            ress.append(cfn)
+                        fut = create_future_ex(self.download_file, url, "pcm", auds=None, ts=t, child=True, silenceremove=silenceremove)
+                        futs.append(fut)
+                    for cfn in itertools.chain(ress, (fut.result() for fut in futs)):
                         if cfn and os.path.exists(cfn):
                             if os.path.getsize(cfn):
                                 with open(cfn, "rb") as f:
