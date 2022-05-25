@@ -3,6 +3,11 @@
 import os, sys
 
 python = [sys.executable]
+arg = sys.argv[0].replace("\\", "/")
+if "/" in arg:
+	PATH = os.getcwd() + arg.rsplit("/", 1)[0]
+else:
+	PATH = "."
 
 from install_update import traceback, subprocess
 if os.name == "nt":
@@ -386,7 +391,7 @@ if __name__ == "__main__":
                 fut2 = exc.submit(psutil.Popen, args, stdin=subprocess.PIPE)
             if display:
                 # Start python process running display.py to display the preview
-                args = python + ["display.py", *[str(x) for x in screensize]]
+                args = python + [f"{PATH}/display.py", *[str(x) for x in screensize]]
                 print(" ".join(args))
                 fut3 = exc.submit(psutil.Popen, args, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL)
             if not higher_bound:
@@ -418,7 +423,7 @@ if __name__ == "__main__":
             print(maxfreq, minfreq, freqmul)
             if particles:
                 # Start python process running particles.py to render the particles using amplitude sample data
-                args = python + ["particles.py", str(particles), str(self.cutoff), str(screensize[1]), str(barcount), str(highest_note)]
+                args = python + [f"{PATH}/particles.py", str(particles), str(self.cutoff), str(screensize[1]), str(barcount), str(highest_note)]
                 print(" ".join(args))
                 fut4 = exc.submit(psutil.Popen, args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
             if play:
