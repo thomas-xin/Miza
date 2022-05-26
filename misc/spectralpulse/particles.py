@@ -1,6 +1,7 @@
 from main import *
 import PIL, colorsys, io
-from PIL import ImageDraw, ImageMath, ImageOps, ImageChops, ImageFont
+from PIL import Image, ImageDraw, ImageMath, ImageOps, ImageChops, ImageFont
+Resampling = getattr(Image, "Resampling", Image)
 
 print = lambda *args, sep=" ", end="\n": sys.__stderr__.write(str(sep).join(str(i) for i in args) + str(end))
 
@@ -110,7 +111,7 @@ class Circles:
 							draw.ellipse((3, 3, r * 2 - 3, r * 2 - 3), 254)
 						elif IMAGE:
 							# If the particle type is a source image, resize it to the required size
-							surf = IMAGE.resize((radius << 1,) * 2, resample=Image.Resampling.LANCZOS)
+							surf = IMAGE.resize((radius << 1,) * 2, resample=Resampling.LANCZOS)
 						else:
 							# Otherwise draw a series of concentric hexagons or circles to produce particle shape
 							r = radius + 2
@@ -126,7 +127,7 @@ class Circles:
 								draw.ellipse((3, 3, r * 2 - 3, r * 2 - 3), None, 192, 1)
 						CIRCLES[radius] = surf
 					if angle:
-						surf = surf.rotate(angle, resample=Image.Resampling.BICUBIC, expand=True)
+						surf = surf.rotate(angle, resample=Resampling.BICUBIC, expand=True)
 					# Convert greyscale to colour image by scaling RGB channels as required
 					curr = cdict(size=surf.size)
 					for c, v in zip("RGB", colour):
@@ -296,7 +297,7 @@ class Bar(Particle):
 		size = round(self.height)
 		if size:
 			# Resize gradient to form a bar, pasting onto the current frame
-			surf = self.surf.resize((size, self.width), resample=Image.Resampling.BILINEAR)
+			surf = self.surf.resize((size, self.width), resample=Resampling.BILINEAR)
 			sfx.paste(surf, (screensize[0] - size, self.y))
 			if type(self.line) is not str:
 				pos = max(0, screensize[0] - size)
