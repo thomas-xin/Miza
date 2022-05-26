@@ -1,11 +1,17 @@
 print("Loading and checking modules...")
 
-with open("requirements.txt", "rb") as f:
-    modlist = f.read().decode("utf-8", "replace").replace("\r", "\n").split("\n")
-
 import os, sys, subprocess, traceback
 
 python = sys.executable
+arg = sys.argv[0].replace("\\", "/")
+if "/" in arg:
+	PATH = os.path.join(os.getcwd(), arg.rsplit("/", 1)[0])
+else:
+	PATH = "."
+
+with open(f"{PATH}/requirements.txt", "rb") as f:
+    modlist = f.read().decode("utf-8", "replace").replace("\r", "\n").split("\n")
+
 
 try:
     import pkg_resources
