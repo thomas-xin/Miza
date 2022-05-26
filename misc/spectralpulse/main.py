@@ -29,7 +29,9 @@ url_match = re.compile("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s`|\"'\\])>]+$")
 is_url = lambda url: url_match.search(url)
 
 # Simple function to evaluate json inputs
-eval_json = lambda s: eval(s, dict(true=True, false=False, null=None, none=None), {})
+jdict = dict(true=True, false=False, null=None, none=None)
+globals().update(jdict)
+eval_json = lambda s: eval(s, jdict, {})
 
 
 # Simple dictionary-like hash table that additionally allows class-like indexing
@@ -749,8 +751,9 @@ if __name__ == "__main__":
 	else:
 		with open(f"{PATH}/config.json", "rb") as f:
 			data = f.read()
+	config = eval_json(data)
 	# Send settings to global variables (because I am lazy lol)
-	globals().update(eval_json(data))
+	globals().update(config)
 	# Take command-line flags such as "-size" to interpret as setting overrides
 	argv = sys.argv[1:]
 	while len(argv) >= 2:
@@ -758,16 +761,20 @@ if __name__ == "__main__":
 			arg = argv[1]
 			with suppress(SyntaxError, NameError):
 				arg = eval(arg)
-			globals()[argv[0][1:]] = arg
+			s = argv[0][1:]
+			config[s] = arg
+			globals()[s] = arg
 			argv = argv[2:]
 		else:
 			break
 	if len(argv):
 		inputs = argv
+		config["source"] = argv
 	else:
 		if not source:
 			source = input("No audio input found in config.json; please input audio file by path or URL: ")
 		inputs = [source]
+	print(config)
 	# Calculate remaining required variables from the input settings
 	screensize = size
 	res_scale = resolution * screensize[1]
