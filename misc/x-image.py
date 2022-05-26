@@ -2556,6 +2556,7 @@ def evalImg(url, operation, args):
                         command.extend(("-plays", "0"))
                     else:
                         command.extend(("-loop", "0"))
+                    command.extend(("-f", fmt))
                 else:
                     if getattr(first, "audio", None):
                         command.extend(("-i", "-", "-i", first.audio["url"]))

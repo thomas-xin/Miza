@@ -5,7 +5,7 @@ import os, sys
 python = [sys.executable]
 arg = sys.argv[0].replace("\\", "/")
 if "/" in arg:
-	PATH = os.getcwd() + arg.rsplit("/", 1)[0]
+	PATH = os.path.join(os.getcwd(), arg.rsplit("/", 1)[0])
 else:
 	PATH = "."
 
