@@ -77,7 +77,7 @@ class MultiAutoImporter:
 
 importer = MultiAutoImporter(
 	"numpy, contextlib, urllib, collections, math, traceback, requests, orjson",
-	"os, youtube_dl, random, time, base64, hashlib, re, psutil, subprocess, itertools, zipfile",
+	"os, yt_dlp, random, time, base64, hashlib, re, psutil, subprocess, itertools, zipfile",
 	pool=exc,
 	_globals=globals(),
 )
@@ -93,6 +93,7 @@ from math import *
 traceback.force()
 from traceback import print_exc
 reqs = requests.Session()
+youtube_dl = yt_dlp.force()
 
 
 class cdict(dict):
@@ -676,7 +677,7 @@ def get_best_icon(entry):
 def get_best_audio(entry):
 	with suppress(KeyError):
 		return entry["stream"]
-	best = -1
+	best = -inf
 	try:
 		fmts = entry["formats"]
 	except KeyError:
@@ -688,7 +689,7 @@ def get_best_audio(entry):
 	replace = True
 	for fmt in fmts:
 		q = fmt.get("abr", 0)
-		if type(q) is not int:
+		if not isinstance(q, (int, float)):
 			q = 0
 		vcodec = fmt.get("vcodec", "none")
 		if vcodec not in (None, "none"):
@@ -717,6 +718,8 @@ def get_best_audio(entry):
 				fmts.append(fmt)
 		entry["formats"] = fmts
 		return get_best_audio(entry)
+	if not url:
+		raise KeyError("URL not found.")
 	return url
 
 
