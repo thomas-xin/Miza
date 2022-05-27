@@ -195,7 +195,11 @@ def roman_numerals(num, order=0):
 
 def Random(a=None, b=None):
     if a is None:
-        return random.random()
+        return (
+            sympy.Float(random.random())
+            + sympy.Float(random.random()) / 2 ** 52
+            + sympy.Float(random.random()) / 2 ** 104
+        )
     elif b is None:
         return random.randint(0, round_random(a) - 1)
     else:

@@ -62,6 +62,7 @@ from cherrypy._cpdispatch import Dispatcher
 cp = cherrypy
 
 actually_static = set(os.listdir("misc/static"))
+mapped_static = {k[:-5]: k for k in actually_static if k.endswith(".html")}
 
 class EndpointRedirects(Dispatcher):
 
@@ -85,6 +86,8 @@ class EndpointRedirects(Dispatcher):
             p = path.lstrip("/")
             if p in actually_static:
                 path = "/static/" + p
+            elif p in mapped_static:
+                path = "/static/" + mapped_static[p]
         return Dispatcher.__call__(self, path)
 
 config = {
@@ -1638,6 +1641,83 @@ body {
         RESPONSES.pop(t, None)
         return orjson.dumps(j["result"])
 
+    mpimg = {}
+
+    @cp.expose
+    def mpinsights(self):
+        values = self.mpget()
+        for i in range(3):
+            values[i] = int(values[i])
+        if "text/html" not in cp.request.headers.get("Accept", ""):
+            self.ensure_mpins()
+            histories = [None] * len(values)
+            hours = histories.copy()
+            for k in range(len(histories)):
+                width = np.clip(len(self.ins_data[k]), 3, 960)
+                histories[k] = list(supersample(self.ins_data[k], width))
+                hours[k] = len(self.ins_data[k])
+            return json.dumps(dict(
+                current=dict(
+                    live_users=values[2],
+                    active_users=values[1],
+                    total_users=values[0],
+                    total_playtime=values[4],
+                    total_use_time=values[3],
+                    average_playtime=values[5],
+                ),
+                historical=dict(
+                    live_users=[histories[2], hours[2]],
+                    active_users=[histories[1], hours[2]],
+                    total_users=[histories[0], hours[2]],
+                    total_playtime=[histories[4], hours[2]],
+                    total_use_time=[histories[3], hours[2]],
+                    average_playtime=[histories[5], hours[2]],
+                ),
+            )).encode("utf-8")
+        create_future_ex(self.ensure_mpins)
+        return """<!DOCTYPE html><html>
+<head>
+    <meta charset="utf-8">
+    <title>Insights</title>
+    <meta content="Miza Player Insights" property="og:title">
+    <meta content="See the activity history for the Miza Player program!" property="og:description">
+    <meta content="{cp.url()}" property="og:url">
+    <meta property="og:image" content="https://github.com/thomas-xin/Miza/raw/e62dfccef0cce3b0fc3b8a09fb3ca3edfedd8ab0/misc/sky-rainbow.gif">
+    <meta content="#BF7FFF" data-react-helmet="true" name="theme-color">
+    <style>
+        body {
+            font-family:Rockwell;
+            background:black;
+            color:#bfbfbf;
+            text-align:center;
+        }
+        .center {
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            max-width: 100%;
+        }
+    </style>
+</head>""" + f"""
+<body>
+    <h1 style="color:white">Miza Player Insights</h1>
+    <h2 style="color:white">Get Miza Player <a href="https://github.com/thomas-xin/Miza-Player">here</a>!</h2>
+    Live users: {values[2]}
+    <img class="center" src="http://i.mizabot.xyz/mpins/2">
+    Active users: {values[1]}
+    <img class="center" src="http://i.mizabot.xyz/mpins/1">
+    Total users: {values[0]}
+    <img class="center" src="http://i.mizabot.xyz/mpins/0">
+    <br>
+    Total playtime: {sec2time(values[4])}
+    <img class="center" src="http://i.mizabot.xyz/mpins/4">
+    Total use time: {sec2time(values[3])}
+    <img class="center" src="http://i.mizabot.xyz/mpins/3">
+    Average playtime per user: {sec2time(values[5])}
+    <img class="center" src="http://i.mizabot.xyz/mpins/5">
+</body>
+</html>"""
+
     def ensure_mpins(self):
         try:
             ins_time = getattr(self, "ins_time", 0)
@@ -1685,7 +1765,8 @@ body {
         j, after = fut.result()
         RESPONSES.pop(t, None)
         self.mpimg[k] = fn = os.path.abspath(f"misc/{k}.png")
-        return cp.lib.static.serve_file(fn, content_type="image/png")
+        with open(fn, "rb") as f:
+            return f.read()
 
 
     # names = ("total_users", "active_users", "live_users", "active_seconds", "live_seconds", "seconds_per_user")
