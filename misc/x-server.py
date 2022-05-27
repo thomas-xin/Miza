@@ -659,6 +659,12 @@ class Server:
             transform: translate(-50%, -50%);
             color: white;
         }
+        .home {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 20px;
+        }
     </style>""" + f"""
 	<body style="background-color: black;">
         <div class="center">
@@ -677,6 +683,7 @@ class Server:
                 <option value="models/upconv_7/art/noise2_scale2.0x_model">Waifu2x Upconv7 Photo (noise2)</option>
                 <option value="models/upconv_7/art/noise3_scale2.0x_model">Waifu2x Upconv7 Photo (noise3)</option>
             </select>
+            <p>Code from <a href="https://gitlab.com/20kdc/waifu2x-upconv7-webgl">20kdc waifu2x</a></p>
             <p>Model data from <a href="https://github.com/nagadomi/waifu2x/">nagadomi waifu2x</a></p>
             <button id="runButton">Run</button>
             <button id="cancelButton">Cancel</button>
@@ -686,10 +693,11 @@ class Server:
             <canvas id="canvas"></canvas>
             <script src="{cp.url()}/main.js"></script>
         </div>
+        <a class="home" href="/miscellaneous">Back</a>
 	</body>
 </html>"""
         cp.response.headers.update(CHEADERS)
-        cp.response.headers["Content-Type"] = mime
+        cp.response.headers["Content-Type"] = "text/html"
         cp.response.headers["Content-Length"] = len(data)
         cp.response.headers["ETag"] = create_etag(data)
         return data
@@ -771,6 +779,43 @@ class Server:
         cp.response.headers["Content-Type"] = "application/json"
         return orjson.dumps(res)
     ytdl._cp_config = {"response.stream": True}
+
+    @cp.expose
+    def ytdlp(self, url, fmt="mp4", start="", end=""):
+        if not url:
+            cp.response.status = 204
+            return
+        t = ts_us()
+        while t in RESPONSES:
+            t += 1
+        fmt = fmt.strip() or "mp4"
+        if fmt not in ("mp3", "ogg", "opus", "m4a", "flac", "wav", "wma", "mp2", "weba", "vox", "adpcm", "pcm", "8bit", "mid", "midi", "webm", "mp4", "avi", "mov", "m4v", "mkv", "f4v", "flv", "wmv", "gif", "apng", "webp"):
+            raise TypeError
+        start = start.strip() or "-"
+        end = end.strip() or "-"
+        b = self.command(input=f"trim {url} {start} {end} as {fmt}")
+        data = orjson.loads(b)
+        url = data[0]["content"]
+        raise cp.HTTPRedirect(url, status="307")
+
+    @cp.expose
+    def ytdlc(self, *urls, fmt="mp4"):
+        urls = [url.strip() for url in urls]
+        urls = [url for url in urls if url]
+        if not any(urls):
+            cp.response.status = 204
+            return
+        t = ts_us()
+        while t in RESPONSES:
+            t += 1
+        fmt = fmt.strip() or "mp4"
+        if fmt not in ("mp3", "ogg", "opus", "m4a", "flac", "wav", "wma", "mp2", "weba", "vox", "adpcm", "pcm", "8bit", "mid", "midi", "webm", "mp4", "avi", "mov", "m4v", "mkv", "f4v", "flv", "wmv", "gif", "apng", "webp"):
+            raise TypeError
+        url = " ".join(urls)
+        b = self.command(input=f"concat {url} as {fmt}")
+        data = orjson.loads(b)
+        url = data[0]["content"]
+        raise cp.HTTPRedirect(url, status="307")
 
     @cp.expose(("index", "p", "preview", "files", "file", "tester", "atlas", "mizatlas", "time"))
     def index(self, path=None, filename=None, *args, **kwargs):
@@ -1697,6 +1742,12 @@ body {
             margin-right: auto;
             max-width: 100%;
         }
+        .home {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 20px;
+        }
     </style>
 </head>""" + f"""
 <body>
@@ -1715,6 +1766,7 @@ body {
     <img class="center" src="http://i.mizabot.xyz/mpins/3">
     Average playtime per user: {sec2time(values[5])}
     <img class="center" src="http://i.mizabot.xyz/mpins/5">
+    <a class="home" href="/miscellaneous">Back</a>
 </body>
 </html>"""
 
