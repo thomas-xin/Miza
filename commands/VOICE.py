@@ -2313,6 +2313,12 @@ class AudioDownloader:
             fps = 30
         # First produce a silent video file (I would have stored it as raw, except that overflows storage really bad)
         args = ["./ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-hwaccel", "auto", "-y"]
+        if str(start) != "None":
+            start = round_min(float(start))
+            args.extend(("-ss", str(start)))
+        if str(end) != "None":
+            end = round_min(min(float(end), 86400))
+            args.extend(("-to", str(end)))
         args.extend(("-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", "rgb24", "-video_size", "x".join(map(str, size)), "-i", "-", "-an", "-crf", "24"))
         afile = f"cache/-{ts}-.pcm"
         if len(urls) > 1:

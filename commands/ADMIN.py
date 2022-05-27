@@ -2974,6 +2974,7 @@ class UpdateCrossposts(Database):
                     embed.set_thumbnail(url=thumbnail)
                 if emb.footer:
                     footer = eval(repr(emb.footer), dict(EmbedProxy=dict))
+                    footer.pop("proxy_icon_url", None)
                     embed.set_footer(**footer)
                 if emb.timestamp:
                     embed.timestamp = emb.timestamp
