@@ -769,7 +769,7 @@ class Server:
         return orjson.dumps(res)
     ytdl._cp_config = {"response.stream": True}
 
-    @cp.expose(("index", "p", "preview", "files", "file", "tester", "atlas", "mizatlas", "time", "mpinsights"))
+    @cp.expose(("index", "p", "preview", "files", "file", "tester", "atlas", "mizatlas", "time"))
     def index(self, path=None, filename=None, *args, **kwargs):
         url = cp.url(qs=cp.request.query_string)
         if "/p/" in url:
@@ -972,6 +972,7 @@ class Server:
 </html>"""
         return s
 
+    @cp.expose
     def upload(self):
         global est_last
         ip = cp.request.remote.ip
@@ -1754,7 +1755,7 @@ body {
 
     rapidapi = 0
     @cp.expose(("commands",))
-    def command(self, content="", input="", timeout=420):
+    def command(self, content="", input="", timeout=420, redirect=""):
         ip = cp.request.remote.ip
         if ip == "127.0.0.1":
             t, after = content.split("\x7f", 1)

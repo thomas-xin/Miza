@@ -1965,8 +1965,9 @@ class CreateEmoji(Command):
                 path = "cache/" + str(ts)
                 with open(path, "wb") as f:
                     await create_future(f.write, image, timeout=18)
+                verified = False
                 width = 128
-                while len(image) > 262144:
+                while len(image) > 262144 or not verified:
                     try:
                         resp = await process_image(path, "resize_max", [width], timeout=_timeout)
                     except:
@@ -1981,6 +1982,7 @@ class CreateEmoji(Command):
                             continue
                         with open(fn, "rb") as f:
                             image = await create_future(f.read, timeout=18)
+                        verified = True
                     finally:
                         with suppress():
                             os.remove(fn)
@@ -2047,7 +2049,7 @@ class CreateSticker(Command):
                 await create_future(f.write, image, timeout=18)
             verified = False
             width = 320
-            while len(image) > 512000 and not verified:
+            while len(image) > 512000 or not verified:
                 try:
                     resp = await process_image(path, "resize_max", [width, "-d", 5, "-f", "apng"], timeout=_timeout)
                 except:

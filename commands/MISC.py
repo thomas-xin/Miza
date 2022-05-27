@@ -801,7 +801,7 @@ class SpectralPulse(Command):
             "-dest", dest, url,
         ]
         with discord.context_managers.Typing(channel):
-            if self.spec_sem.is_busy():
+            if self.spec_sem.is_busy() and not getattr(message, "simulated", False):
                 await send_with_react(channel, italics(ini_md(f"SpectralPulse: {sqr_md(url)} enqueued in position {sqr_md(self.spec_sem.passive + 1)}.")), reacts="❎", reference=message)
             async with self.spec_sem:
                 print(args)

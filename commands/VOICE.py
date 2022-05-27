@@ -1876,6 +1876,7 @@ class AudioDownloader:
                                 break
             # Only proceed if no items have already been found (from playlists in this case)
             if not len(output):
+                resp = None
                 # Allow loading of files output by ~dump
                 if is_url(item):
                     url = verify_url(item)
@@ -1886,11 +1887,11 @@ class AudioDownloader:
                         return [cdict(name=e["name"], url=e["url"], duration=e.get("duration")) for e in q]
                 elif mode in (None, "yt"):
                     with suppress(NotImplementedError):
-                        res = self.search_yt(item)
-                        if res:
-                            return res[:count]
+                        res = self.search_yt(item, count=count)
+                        resp = cdict(_type="playlist", entries=res)
                 # Otherwise call automatic extract_info function
-                resp = self.extract_info(item, count, search=search, mode=mode)
+                if not resp:
+                    resp = self.extract_info(item, count, search=search, mode=mode)
                 if resp.get("_type") == "url":
                     resp = self.extract_from(resp["url"])
                 if resp is None or not len(resp):
@@ -2042,18 +2043,17 @@ class AudioDownloader:
                         results.append(entry)
         return sorted(results, key=lambda entry: entry.views, reverse=True)
 
-    def search_yt(self, query, skip=False):
-        out = None
+    def search_yt(self, query, skip=False, count=1):
+        out = alist()
         if not skip:
             with tracebacksuppressor:
-                resp = self.extract_info(query)
+                resp = self.extract_info(query, search=True, count=count)
                 if resp.get("_type", None) == "url":
                     resp = self.extract_from(resp["url"])
                 if resp.get("_type", None) == "playlist":
                     entries = list(resp["entries"])
                 else:
                     entries = [resp]
-                out = alist()
                 for entry in entries:
                     found = True
                     if "title" in entry:
@@ -2118,7 +2118,7 @@ class AudioDownloader:
             if not out and len(query) < 16:
                 self.failed_yt = utc() + 180
                 print(query)
-        return out
+        return out[:count]
 
     # Performs a search, storing and using cached search results for efficiency.
     def search(self, item, force=False, mode=None, images=False, count=1):
