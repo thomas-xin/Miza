@@ -1888,6 +1888,7 @@ class AudioDownloader:
                 elif mode in (None, "yt"):
                     with suppress(NotImplementedError):
                         res = self.search_yt(item, count=count)
+                        res = [cdict(**e, webpage_url=e.get("url"), title=e.get("name")) for e in res]
                         resp = cdict(_type="playlist", entries=res)
                 # Otherwise call automatic extract_info function
                 if not resp:
