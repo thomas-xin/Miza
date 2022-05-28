@@ -799,7 +799,13 @@ class Server:
         raise cp.HTTPRedirect(url, status="307")
 
     @cp.expose
-    def ytdlc(self, *urls, fmt="mp4"):
+    def ytdlc(self, *urls, fmt="mp4", **kwargs):
+        kwurls = []
+        for k, v in kwargs.items():
+            if k.startswith("u") and k[1:].isnumeric():
+                kwurls.append((int(k[1:]), v))
+        urls = astype(urls, list)
+        urls.extend(v for k, v in sorted(kwurls))
         urls = [url.strip() for url in urls]
         urls = [url for url in urls if url]
         if not any(urls):

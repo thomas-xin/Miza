@@ -4,6 +4,8 @@ import os, sys, io, time, concurrent.futures, subprocess, psutil, collections, t
 import numpy as np
 import PIL
 from PIL import Image, ImageCms, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhance, ImageMath, ImageStat
+Resampling = getattr(Image, "Resampling", Image)
+Transpose = getattr(Image, "Transpose", Image)
 Image.MAX_IMAGE_PIXELS = 4294967296
 from zipfile import ZipFile
 import matplotlib.pyplot as plt
@@ -134,11 +136,11 @@ def to_qr(s, rainbow=False):
     imo = Image.open(fn)
     im = imo.convert("1")
     imo.close()
-    im = im.resize((512, 512), resample=Image.NEAREST)
+    im = im.resize((512, 512), resample=Resampling.NEAREST)
     if rainbow:
         if SWIRL is None:
             imo = Image.open("misc/swirl.png")
-            SWIRL = imo.resize((512, 512), resample=Image.BILINEAR)
+            SWIRL = imo.resize((512, 512), resample=Resampling.BILINEAR)
             imo.close()
         count = 128
 
@@ -157,7 +159,7 @@ def to_qr(s, rainbow=False):
                     filt1 = Image.merge("HSV", (hue1, spl[1], spl[2])).convert("RGB")
                     filt2 = Image.merge("HSV", (hue2, spl[1], spl[2])).convert("RGB")
                 filt1 = ImageEnhance.Brightness(ImageEnhance.Contrast(filt1).enhance(0.5)).enhance(2)
-                filt2 = ImageChops.invert(ImageEnhance.Brightness(ImageEnhance.Contrast(filt2).enhance(0.5)).enhance(2)).transpose(Image.FLIP_LEFT_RIGHT)
+                filt2 = ImageChops.invert(ImageEnhance.Brightness(ImageEnhance.Contrast(filt2).enhance(0.5)).enhance(2)).transpose(Transpose.FLIP_LEFT_RIGHT)
                 filt1.paste(filt2, mask=image)
                 yield filt1
 
@@ -255,7 +257,7 @@ def from_gradient(shape, count, colour):
     spl = [fromarray(i) for i in data]
     im = Image.merge(mode, spl)
     if im.width != s or im.height != s:
-        return im.resize((s,) * 2, resample=Image.NEAREST)
+        return im.resize((s,) * 2, resample=Resampling.NEAREST)
     return im
 
 def rgb_split(image, dtype=np.uint8):
@@ -818,7 +820,7 @@ def rainbow_gif2(image, duration):
             else:
                 A = None
             if temp.size[0] != size[0] or temp.size[1] != size[1]:
-                temp = temp.resize(size, Image.HAMMING)
+                temp = temp.resize(size, Resampling.HAMMING)
             channels = list(temp.convert("HSV").split())
             # channels = hsv_split(temp, convert=False)
             # hue = channels[0] + round(f / length / scale * loops * 256)
@@ -908,7 +910,7 @@ def spin_gif2(image, duration):
             image.seek(f % length)
             temp = image
             if temp.size[0] != size[0] or temp.size[1] != size[1]:
-                temp = temp.resize(size, Image.HAMMING)
+                temp = temp.resize(size, Resampling.HAMMING)
             temp = to_circle(rotate_to(temp, f * 360 / length / scale * loops, expand=False))
             yield temp
 
@@ -1146,7 +1148,7 @@ def scroll_gif2(image, direction, duration):
             y = 0
         for i in range(count):
             image.seek(i)
-            temp = resize_max(image, 960, resample=Image.HAMMING)
+            temp = resize_max(image, 960, resample=Resampling.HAMMING)
             if i:
                 xm = round(x * temp.width / count * i)
                 ym = round(y * temp.height / count * i)
@@ -1166,7 +1168,7 @@ def scroll_gif(image, direction, duration, fps):
         image.seek(0)
     else:
         return scroll_gif2(image, direction, duration)
-    image = resize_max(image, 960, resample=Image.HAMMING)
+    image = resize_max(image, 960, resample=Resampling.HAMMING)
     count = round(duration * fps)
 
     def scroll_gif_iterator(image):
@@ -1214,12 +1216,12 @@ def magik_gif2(image, cell_count, grid_distance, iterations):
             image.seek(f % length)
             temp = image
             if temp.size[0] != size[0] or temp.size[1] != size[1]:
-                temp = temp.resize(size, Image.HAMMING)
+                temp = temp.resize(size, Resampling.HAMMING)
             for _ in range(int(31 * iterations * f / length / scale)):
                 dst_grid = griddify(shape_to_rect(image.size), cell_count, cell_count)
                 src_grid = distort_grid(dst_grid, grid_distance)
                 mesh = grid_to_mesh(src_grid, dst_grid)
-                temp = temp.transform(temp.size, Image.MESH, mesh, resample=Image.NEAREST)
+                temp = temp.transform(temp.size, Transform.MESH, mesh, resample=Resampling.NEAREST)
             yield temp
 
     return dict(duration=total * scale, count=length * scale, frames=magik_gif_iterator(image))
@@ -1233,7 +1235,7 @@ def magik_gif(image, cell_count=7, iterations=1):
         image.seek(0)
     else:
         return magik_gif2(image, cell_count, grid_distance, iterations)
-    image = resize_max(image, 960, resample=Image.HAMMING)
+    image = resize_max(image, 960, resample=Resampling.HAMMING)
 
     def magik_gif_iterator(image):
         yield image
@@ -1242,7 +1244,7 @@ def magik_gif(image, cell_count=7, iterations=1):
                 dst_grid = griddify(shape_to_rect(image.size), cell_count, cell_count)
                 src_grid = distort_grid(dst_grid, grid_distance)
                 mesh = grid_to_mesh(src_grid, dst_grid)
-                image = image.transform(image.size, Image.MESH, mesh, resample=Image.NEAREST)
+                image = image.transform(image.size, Transform.MESH, mesh, resample=Resampling.NEAREST)
             yield image
 
     return dict(duration=2000, count=32, frames=magik_gif_iterator(image))
@@ -1319,7 +1321,7 @@ def magik(image, cell_count=7):
     dst_grid = griddify(shape_to_rect(image.size), cell_count, cell_count)
     src_grid = distort_grid(dst_grid, int(max(1, round(sqrt(np.prod(image.size)) / cell_count / 3))))
     mesh = grid_to_mesh(src_grid, dst_grid)
-    return image.transform(image.size, Image.MESH, mesh, resample=Image.NEAREST)
+    return image.transform(image.size, Transform.MESH, mesh, resample=Resampling.NEAREST)
 
 
 blurs = {
@@ -1437,7 +1439,7 @@ def max_size(w, h, maxsize, force=False):
         h = round(h * r)
     return w, h
 
-def resize_max(image, maxsize, resample=Image.LANCZOS, box=None, reducing_gap=None, force=False):
+def resize_max(image, maxsize, resample=Resampling.LANCZOS, box=None, reducing_gap=None, force=False):
     w, h = max_size(image.width, image.height, maxsize, force=force)
     if w != image.width or h != image.height:
         if type(resample) is str:
@@ -1447,16 +1449,16 @@ def resize_max(image, maxsize, resample=Image.LANCZOS, box=None, reducing_gap=No
     return image
 
 resizers = dict(
-    sinc=Image.LANCZOS,
-    lanczos=Image.LANCZOS,
-    cubic=Image.BICUBIC,
-    bicubic=Image.BICUBIC,
+    sinc=Resampling.LANCZOS,
+    lanczos=Resampling.LANCZOS,
+    cubic=Resampling.BICUBIC,
+    bicubic=Resampling.BICUBIC,
     scale2x="scale2x",
-    hamming=Image.HAMMING,
-    linear=Image.BILINEAR,
-    bilinear=Image.BILINEAR,
-    nearest=Image.NEAREST,
-    nearestneighbour=Image.NEAREST,
+    hamming=Resampling.HAMMING,
+    linear=Resampling.BILINEAR,
+    bilinear=Resampling.BILINEAR,
+    nearest=Resampling.NEAREST,
+    nearestneighbour=Resampling.NEAREST,
     crop="crop",
     padding="crop",
 )
@@ -1481,15 +1483,15 @@ def resize_to(image, w, h, operation="auto"):
         m = min(abs(w), abs(h))
         n = min(image.width, image.height)
         if n > m:
-            filt = Image.LANCZOS
+            filt = Resampling.LANCZOS
         elif m <= 512:
             filt = "scale2x"
         elif m <= 3072:
-            filt = Image.LANCZOS
+            filt = Resampling.LANCZOS
         elif m <= 4096:
-            filt = Image.BICUBIC
+            filt = Resampling.BICUBIC
         else:
-            filt = Image.BILINEAR
+            filt = Resampling.BILINEAR
     else:
         raise TypeError(f'Invalid image operation: "{op}"')
     if w < 0:
@@ -1498,7 +1500,7 @@ def resize_to(image, w, h, operation="auto"):
     if h < 0:
         h = -h
         image = ImageOps.flip(image)
-    if filt != Image.NEAREST:
+    if filt != Resampling.NEAREST:
         if str(image.mode) == "P":
             image = image.convert("RGBA")
     if filt == "scale2x":
@@ -1517,7 +1519,7 @@ def resize_to(image, w, h, operation="auto"):
             image = Image.frombuffer(image.mode, surf.get_size(), b)
         if image.size == (w, h):
             return image
-        filt = Image.NEAREST if w > image.width and h > image.height else Image.HAMMING
+        filt = Resampling.NEAREST if w > image.width and h > image.height else Resampling.HAMMING
     elif filt == "crop":
         if image.mode == "P":
             image = image.convert("RGBA")
@@ -1531,13 +1533,13 @@ def rotate_to(image, angle, expand=True):
     angle %= 360
     if not angle % 90:
         if angle == 90:
-            return image.transpose(Image.ROTATE_90)
+            return image.transpose(Transpose.ROTATE_90)
         elif angle == 180:
-            return image.transpose(Image.ROTATE_180)
+            return image.transpose(Transpose.ROTATE_180)
         elif angle == 270:
-            return image.transpose(Image.ROTATE_270)
+            return image.transpose(Transpose.ROTATE_270)
         return image
-    return image.rotate(angle, resample=Image.BICUBIC, expand=expand)
+    return image.rotate(angle, resample=Resampling.BICUBIC, expand=expand)
 
 
 def get_colour(image):

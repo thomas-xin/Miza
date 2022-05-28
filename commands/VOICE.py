@@ -2340,7 +2340,7 @@ class AudioDownloader:
                             start = round_min(float(start))
                         if str(end) != "None":
                             end = round_min(min(float(end), 86400))
-                        fut = create_future_ex(self.download_file, url, "pcm", start=start, end=end, auds=None, ts=t, child=True)
+                        fut = create_future_ex(self.download_file, url, "pcm", start=start, end=end, auds=None, ts=t, child=False)
                     else:
                         fut = create_future_ex(self.download_file, url, "pcm", auds=None, ts=t, child=True)
                     res = self.search(url)
