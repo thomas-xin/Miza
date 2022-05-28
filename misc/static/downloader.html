@@ -1,6 +1,14 @@
 <!DOCTYPE html>
 <html style="background-color:#000000;color:#ffffff;font-family:Rockwell">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+.home {
+	position: absolute;
+	top: 10px;
+	right: 10px;
+	font-size: 20px;
+}
+</style>
 <body>
 
 <h1 style="text-align:center">Media Downloader</h1>
@@ -21,6 +29,8 @@ Of course, direct file streams such as Discord attachments will also work, and i
 	<label for="fmt2">ogg</label>
 	<input type="radio" id="fmt3" name="fmt" value="opus">
 	<label for="fmt3">opus</label>
+	<input type="radio" id="fmt4" name="fmt" value="wav">
+	<label for="fmt4">wav</label>
 </form>
 
 <br>
@@ -32,32 +42,40 @@ Of course, direct file streams such as Discord attachments will also work, and i
 	<input type="submit" value="Download"><br>
 	Format
 	<select name="fmt" id="fmt">
-		<option value="mp4">mp4</option>
-		<option value="webm">webm</option>
-		<option value="avi">avi</option>
-		<option value="mov">mov</option>
-		<option value="m4v">m4v</option>
-		<option value="mkv">mkv</option>
-		<option value="f4v">f4v</option>
-		<option value="flv">flv</option>
-		<option value="wmv">wmv</option>
-		<option value="gif">gif</option>
-		<option value="apng">apng</option>
-		<option value="webp">webp</option>
-		<option value="mp3">mp3</option>
-		<option value="ogg">ogg</option>
-		<option value="opus">opus</option>
-		<option value="m4a">m4a</option>
-		<option value="flac">flac</option>
-		<option value="wav">wav</option>
-		<option value="wma">wma</option>
-		<option value="mp2">mp2</option>
-		<option value="weba">weba</option>
-		<option value="vox">vox</option>
-		<option value="adpcm">adpcm</option>
-		<option value="pcm">pcm</option>
-		<option value="8bit">8bit</option>
-		<option value="mid">mid</option>
+		<optgroup label="Video formats">
+			<option value="mp4">mp4</option>
+			<option value="webm">webm</option>
+			<option value="avi">avi</option>
+			<option value="mov">mov</option>
+			<option value="m4v">m4v</option>
+			<option value="mkv">mkv</option>
+			<option value="f4v">f4v</option>
+			<option value="flv">flv</option>
+			<option value="wmv">wmv</option>
+		</optgroup>
+		<optgroup label="Animation formats">
+			<option value="gif">gif</option>
+			<option value="apng">apng</option>
+			<option value="webp">webp</option>
+		</optgroup>
+		<optgroup label="Audio formats">
+			<option value="mp3">mp3</option>
+			<option value="ogg">ogg</option>
+			<option value="opus">opus</option>
+			<option value="m4a">m4a</option>
+			<option value="flac">flac</option>
+			<option value="wav">wav</option>
+			<option value="wma">wma</option>
+			<option value="mp2">mp2</option>
+			<option value="weba">weba</option>
+			<option value="vox">vox</option>
+			<option value="adpcm">adpcm</option>
+			<option value="pcm">pcm</option>
+			<option value="8bit">8bit</option>
+		</optgroup>
+		<optgroup label="Sequence formats">
+			<option value="mid">mid</option>
+		</optgroup>
 	</select><br>
 	<label for="trim">Trim (either 1:23 or 1m23s syntax works)</label>
 	<input style="width:96px" type="text" id="start" name="start" value="-"> - 
@@ -79,34 +97,44 @@ Of course, direct file streams such as Discord attachments will also work, and i
 	<input style="max-width:800px;width:50%" type="text" id="u5" name="u5"><br>
 	Format
 	<select name="fmt" id="fmt">
-		<option value="mp4">mp4</option>
-		<option value="webm">webm</option>
-		<option value="avi">avi</option>
-		<option value="mov">mov</option>
-		<option value="m4v">m4v</option>
-		<option value="mkv">mkv</option>
-		<option value="f4v">f4v</option>
-		<option value="flv">flv</option>
-		<option value="wmv">wmv</option>
-		<option value="gif">gif</option>
-		<option value="apng">apng</option>
-		<option value="webp">webp</option>
-		<option value="mp3">mp3</option>
-		<option value="ogg">ogg</option>
-		<option value="opus">opus</option>
-		<option value="m4a">m4a</option>
-		<option value="flac">flac</option>
-		<option value="wav">wav</option>
-		<option value="wma">wma</option>
-		<option value="mp2">mp2</option>
-		<option value="weba">weba</option>
-		<option value="vox">vox</option>
-		<option value="adpcm">adpcm</option>
-		<option value="pcm">pcm</option>
-		<option value="8bit">8bit</option>
-		<option value="mid">mid</option>
+		<optgroup label="Video formats">
+			<option value="mp4">mp4</option>
+			<option value="webm">webm</option>
+			<option value="avi">avi</option>
+			<option value="mov">mov</option>
+			<option value="m4v">m4v</option>
+			<option value="mkv">mkv</option>
+			<option value="f4v">f4v</option>
+			<option value="flv">flv</option>
+			<option value="wmv">wmv</option>
+		</optgroup>
+		<optgroup label="Animation formats">
+			<option value="gif">gif</option>
+			<option value="apng">apng</option>
+			<option value="webp">webp</option>
+		</optgroup>
+		<optgroup label="Audio formats">
+			<option value="mp3">mp3</option>
+			<option value="ogg">ogg</option>
+			<option value="opus">opus</option>
+			<option value="m4a">m4a</option>
+			<option value="flac">flac</option>
+			<option value="wav">wav</option>
+			<option value="wma">wma</option>
+			<option value="mp2">mp2</option>
+			<option value="weba">weba</option>
+			<option value="vox">vox</option>
+			<option value="adpcm">adpcm</option>
+			<option value="pcm">pcm</option>
+			<option value="8bit">8bit</option>
+		</optgroup>
+		<optgroup label="Sequence formats">
+			<option value="mid">mid</option>
+		</optgroup>
 	</select><br>
 </form>
+
+<a class="home" href="/miscellaneous">Back</a>
 
 </body>
 </html>

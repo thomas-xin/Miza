@@ -1889,7 +1889,7 @@ class AudioDownloader:
                     with suppress(NotImplementedError):
                         res = self.search_yt(item, count=count)
                         res = [cdict(**e, webpage_url=e.get("url"), title=e.get("name")) for e in res]
-                        resp = cdict(_type="playlist", entries=res)
+                        resp = cdict(_type="playlist", entries=res, url=res[0].webpage_url)
                 # Otherwise call automatic extract_info function
                 if not resp:
                     resp = self.extract_info(item, count, search=search, mode=mode)
@@ -1923,9 +1923,9 @@ class AudioDownloader:
                                     "name": data["title"],
                                     "url": data["webpage_url"],
                                     "duration": dur,
-                                    "stream": get_best_audio(resp),
-                                    "icon": get_best_icon(resp),
-                                    "video": get_best_video(resp),
+                                    "stream": get_best_audio(data),
+                                    "icon": get_best_icon(data),
+                                    "video": get_best_video(data),
                                 })
                             stream = temp.stream
                             if "googlevideo" in stream[:64]:
@@ -2313,12 +2313,13 @@ class AudioDownloader:
             fps = 30
         # First produce a silent video file (I would have stored it as raw, except that overflows storage really bad)
         args = ["./ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-hwaccel", "auto", "-y"]
-        if str(start) != "None":
-            start = round_min(float(start))
-            args.extend(("-ss", str(start)))
-        if str(end) != "None":
-            end = round_min(min(float(end), 86400))
-            args.extend(("-to", str(end)))
+        if len(urls) != 1:
+            if str(start) != "None":
+                start = round_min(float(start))
+                args.extend(("-ss", str(start)))
+            if str(end) != "None":
+                end = round_min(min(float(end), 86400))
+                args.extend(("-to", str(end)))
         args.extend(("-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", "rgb24", "-video_size", "x".join(map(str, size)), "-i", "-", "-an", "-crf", "24"))
         afile = f"cache/-{ts}-.pcm"
         if len(urls) > 1:
@@ -2334,7 +2335,14 @@ class AudioDownloader:
             for t, url in enumerate(urls, ts + 1):
                 with tracebacksuppressor:
                     # Download and convert the raw audio as pcm in background
-                    fut = create_future_ex(self.download_file, url, "pcm", auds=None, ts=t, child=True)
+                    if len(urls) == 1:
+                        if str(start) != "None":
+                            start = round_min(float(start))
+                        if str(end) != "None":
+                            end = round_min(min(float(end), 86400))
+                        fut = create_future_ex(self.download_file, url, "pcm", start=start, end=end, auds=None, ts=t, child=True)
+                    else:
+                        fut = create_future_ex(self.download_file, url, "pcm", auds=None, ts=t, child=True)
                     res = self.search(url)
                     if type(res) is str:
                         raise evalex(res)
@@ -2347,6 +2355,13 @@ class AudioDownloader:
                         video = info["video"] = get_best_video(data)
                     vidinfo = as_str(subprocess.check_output(["./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "default=nokey=1:noprint_wrappers=1", video])).strip()
                     args = alist(("./ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y", "-hwaccel", "auto"))
+                    if len(urls) == 1:
+                        if str(start) != "None":
+                            start = round_min(float(start))
+                            args.extend(("-ss", str(start)))
+                        if str(end) != "None":
+                            end = round_min(min(float(end), 86400))
+                            args.extend(("-to", str(end)))
                     args.extend(("-i", video))
                     # Tell FFmpeg to match fps/frame count as much as possible
                     vf = f"fps={fps}"
