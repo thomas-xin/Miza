@@ -4721,6 +4721,13 @@ class Download(Command):
             print(entry)
             futs = deque()
             with discord.context_managers.Typing(channel):
+                try:
+                    if a:
+                        auds = bot.data.audio.players[guild.id]
+                    else:
+                        auds = None
+                except LookupError:
+                    auds = None
                 for url in entry:
                     futs.append(create_future(
                         ytdl.download_file,
