@@ -828,7 +828,7 @@ class Server:
         argv = " ".join(itertools.chain(*kwargs.items()))
         b = self.command(input=f"spectralpulse {url} {argv}")
         data = orjson.loads(b)
-        url = data[0]["content"]
+        url = data[0]["content"].replace("/d/", "/f/")
         raise cp.HTTPRedirect(url, status="307")
 
     @cp.expose(("index", "p", "preview", "files", "file", "tester", "atlas", "mizatlas", "time"))
