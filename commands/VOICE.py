@@ -4658,10 +4658,7 @@ class Download(Command):
         else:
             # Parse search query, detecting file format selection if possible
             if " " in argv:
-                try:
-                    spl = smart_split(argv)
-                except ValueError:
-                    spl = argv.split(" ")
+                spl = smart_split(argv)
                 if len(spl) >= 1:
                     fmt = spl[-1].lstrip(".")
                     if fmt.casefold() not in ("mp3", "ogg", "opus", "m4a", "flac", "wav", "wma", "mp2", "weba", "vox", "adpcm", "pcm", "8bit", "mid", "midi", "webm", "mp4", "avi", "mov", "m4v", "mkv", "f4v", "flv", "wmv", "gif", "apng", "webp"):

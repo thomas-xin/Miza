@@ -2168,10 +2168,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             f = None
             if " " in expr:
                 # Parse timezones first
-                try:
-                    args = smart_split(expr)
-                except ValueError:
-                    args = expr.split()
+                args = smart_split(expr)
                 for a in (args[0], args[-1]):
                     tz = a.casefold()
                     if tz in TIMEZONES:
@@ -2977,23 +2974,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                                                 if hasattr(command, "multi"):
                                                     argv2 = single_space((argv[:xi] + " " + argv[yi + 1:]).replace("\n", " ").replace(",", " ").replace("\t", " ")).strip()
                                                     argv3 = single_space(middle.replace("\n", " ").replace(",", " ").replace("\t", " ")).strip()
-                                                    try:
-                                                        argl = smart_split(argv3)
-                                                    except ValueError:
-                                                        argl = argv3.split()
+                                                    argl = smart_split(argv3)
                                                 else:
                                                     argv2 = single_space(argv[:xi].replace("\n", " ").replace("\t", " ") + " " + (middle[xi + 1:yi]).replace("\n", " ").replace(",", " ").replace("\t", " ") + " " + argv[yi + 1:].replace("\n", " ").replace("\t", " "))
-                                                try:
-                                                    args = smart_split(argv2)
-                                                except ValueError:
-                                                    args = argv2.split()
+                                                args = smart_split(argv2)
                                                 raise StopIteration
                             if args is None:
                                 argv2 = single_space(argv.replace("\n", " ").replace("\t", " "))
-                                try:
-                                    args = smart_split(argv2)
-                                except ValueError:
-                                    args = argv2.split()
+                                args = smart_split(argv2)
                             if args and getattr(command, "flags", None):
                                 if not ("a" in flags or "e" in flags or "d" in flags):
                                     if "a" in command.flags and "e" in command.flags and "d" in command.flags:

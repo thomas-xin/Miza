@@ -3074,19 +3074,23 @@ def tzparse(expr):
 
 
 def smart_split(s):
-    t = shlex.shlex(s)
-    t.whitespace_split = True
-    out = deque()
-    while True:
-        try:
-            w = t.get_token()
-        except ValueError:
-            out.append(t.token.strip(t.quotes))
-            break
-        if not w:
-            break
-        out.extend(shlex.split(w))
-    return alist(out)
+    s = s.replace("#", "\uffff")
+    try:
+        t = shlex.shlex(s)
+        t.whitespace_split = True
+        out = deque()
+        while True:
+            try:
+                w = t.get_token()
+            except ValueError:
+                out.append(t.token.strip(t.quotes))
+                break
+            if not w:
+                break
+            out.extend(shlex.split(w))
+    except ValueError:
+        out = s.split()
+    return alist(w.replace("\uffff", "#") for w in out)
 
 
 __filetrans = {

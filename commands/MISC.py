@@ -802,7 +802,7 @@ class SpectralPulse(Command):
                     "-dest",
                     "-width", "-height",
                 }:
-                    kwargs[arg] = args[i + 1]
+                    kwargs[arg] = args[i + 1].replace("\xad", "#")
                     i += 1
             i += 1
         if "-width" in kwargs and "-height" in kwargs:
