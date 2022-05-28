@@ -3837,7 +3837,7 @@ class AudioSettings(Command):
 
 class Jump(Command):
     server_only = True
-    name = ["🔄", "Roll", "Next"]
+    name = ["🔄", "Roll", "Next", "RotateQueue"]
     min_display = "0~1"
     description = "Rotates the queue to the left by a certain amount of steps."
     usage = "<position>? <hide{?h}>?"
