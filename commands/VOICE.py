@@ -1600,9 +1600,10 @@ class AudioDownloader:
     # Repeatedly makes calls to youtube-dl until there is no more data to be collected.
     def extract_true(self, url):
         while not is_url(url):
-            with suppress(NotImplementedError):
-                return self.search_yt(regexp("ytsearch[0-9]*:").sub("", url, 1))[0]
-            resp = self.extract_from(url)
+            try:
+                resp = self.search_yt(regexp("ytsearch[0-9]*:").sub("", url, 1))[0]
+            except:
+                resp = self.extract_from(url)
             if "entries" in resp:
                 resp = next(iter(resp["entries"]))
             if "duration" in resp and "formats" in resp:
@@ -4626,7 +4627,7 @@ class Download(Command):
     _timeout_ = 75
     name = ["📥", "Search", "YTDL", "Youtube_DL", "AF", "AudioFilter", "Trim", "Concat", "Concatenate", "🌽🐱", "ConvertORG", "Org2xm", "Convert"]
     description = "Searches and/or downloads a song from a YouTube/SoundCloud query or audio file link. Will extend (loop) if trimmed past the end."
-    usage = "<0:search_links>* <trim{?t}>? <-3:trim_start|->? <-2:trim_end|->? <-1:out_format(mp4)>? <concatenate{?c}|remove_silence{?r}|apply_settings{?a}|verbose_search{?v}>*"
+    usage = "<0:search_links>* <multi{?m}> <trim{?t}>? <-3:trim_start|->? <-2:trim_end|->? <-1:out_format(mp4)>? <concatenate{?c}|remove_silence{?r}|apply_settings{?a}|verbose_search{?v}>*"
     flags = "avtzcr"
     rate_limit = (7, 16)
     typing = True
@@ -4643,6 +4644,7 @@ class Download(Command):
             argv = a.url + " " + argv
         direct = getattr(message, "simulated", None) or name == "org2xm"
         concat = "concat" in name or "c" in flags or name == "🌽🐱"
+        multi = "m" in flags
         start = end = None
         # Attempt to download items in queue if no search query provided
         if not argv:
@@ -4685,7 +4687,7 @@ class Download(Command):
             # Input may be a URL or set of URLs, in which case we attempt to find the first one
             urls = await bot.follow_url(argv, allow=True, images=False)
             if urls:
-                if not concat:
+                if not concat and not multi:
                     urls = (urls[0],)
                 futs = deque()
                 for e in urls:
@@ -4693,7 +4695,7 @@ class Download(Command):
                 for fut in futs:
                     temp = await fut
                     res.extend(temp)
-                direct = len(res) == 1 or concat
+                direct = len(res) == 1 or concat or multi
             if not res:
                 # 2 youtube results per soundcloud result, increased with verbose flag, followed by 1 spotify and 1 bandcamp
                 sc = min(4, flags.get("v", 0) + 1)
@@ -4709,13 +4711,43 @@ class Download(Command):
                         res.extend(temp)
             if not res:
                 raise LookupError(f"No results for {argv}.")
-            if not concat:
+            if not concat and not multi:
                 res = res[:10]
             desc = f"Search results for {argv}:"
         a = flags.get("a", 0)
         b = flags.get("r", 0)
+        if multi:
+            entry = [e["url"] for e in res]
+            print(entry)
+            futs = deque()
+            with discord.context_managers.Typing(channel):
+                for url in entry:
+                    futs.append(create_future(
+                        ytdl.download_file,
+                        url,
+                        fmt=fmt,
+                        start=start,
+                        end=end,
+                        auds=auds,
+                        silenceremove=b,
+                        child=len(entry) > 1,
+                    ))
+                fn = f"cache/{ts_us()}.zip"
+                with zipfile.ZipFile(fn, "w", zipfile.ZIP_STORED, allowZip64=True, strict_timestamps=False) as z:
+                    for fut in futs:
+                        f, out = await fut
+                        z.write(f)
+                create_task(bot.send_with_file(
+                    channel=channel,
+                    msg="",
+                    file=fn,
+                    filename="download.zip",
+                    rename=False,
+                    reference=message,
+                ))
+            return
         if concat:
-            entry = [e["url"] for e in res] if concat else res[0]["url"]
+            entry = [e["url"] for e in res]
             print(entry)
             with discord.context_managers.Typing(channel):
                 try:
@@ -4740,9 +4772,9 @@ class Download(Command):
                     file=f,
                     filename=out,
                     rename=False,
-                    reference=message
+                    reference=message,
                 ))
-                return
+            return
         desc += "\nDestination format: {." + fmt + "}"
         if start is not None or end is not None:
             desc += f"\nTrim: [{'-' if start is None else start} ~> {'-' if end is None else end}]"
@@ -4776,7 +4808,7 @@ class Download(Command):
                 perm=3,
                 vals=vals,
                 argv=url_enc,
-                user=user
+                user=user,
             )
             return
         # Add reaction numbers corresponding to search results for selection

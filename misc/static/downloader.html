@@ -87,7 +87,7 @@ Of course, direct file streams such as Discord attachments will also work, and i
 	<input style="width:96px" type="text" id="end" name="end" value="-">
 </form>
 
-<h2>Multiple video concatenation (slowest)</h2>
+<h2>Multiple video download</h2>
 <form action="/ytdlc">
 	<label for="u1">Playlist/URL</label>
 	<input style="max-width:800px;width:50%" type="text" id="u1" name="u1" value="https://www.youtube.com/playlist?list=PLIOjBWweFSbHDmRB1KIZgz_ecylRCOWTO">
@@ -137,6 +137,11 @@ Of course, direct file streams such as Discord attachments will also work, and i
 			<option value="mid">mid</option>
 		</optgroup>
 	</select><br>
+	Convert and concatenate to single file
+	<input type="radio" id="single1" name="multi" value="false">
+	<label for="single1">Yes</label>
+	<input type="radio" id="single2" name="multi" value="true" checked>
+	<label for="single2">No</label><br>
 </form>
 
 <a class="home" href="/miscellaneous">Back</a>

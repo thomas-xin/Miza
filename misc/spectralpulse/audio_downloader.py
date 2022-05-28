@@ -1064,9 +1064,10 @@ class AudioDownloader:
 	# Repeatedly makes calls to youtube-dl until there is no more data to be collected.
 	def extract_true(self, url):
 		while not is_url(url):
-			with suppress(NotImplementedError):
-				return self.search_yt(regexp("ytsearch[0-9]*:").sub("", url, 1))[0]
-			resp = self.extract_from(url)
+			try:
+				resp = self.search_yt(regexp("ytsearch[0-9]*:").sub("", url, 1))[0]
+			except:
+				resp = self.extract_from(url)
 			if "entries" in resp:
 				resp = next(iter(resp["entries"]))
 			if "duration" in resp and "formats" in resp:

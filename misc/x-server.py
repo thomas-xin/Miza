@@ -799,7 +799,8 @@ class Server:
         raise cp.HTTPRedirect(url, status="307")
 
     @cp.expose
-    def ytdlc(self, *urls, fmt="mp4", **kwargs):
+    def ytdlc(self, *urls, fmt="mp4", multi="true", **kwargs):
+        m = "" if multi in ("false", "False") else "-m"
         kwurls = []
         for k, v in kwargs.items():
             if k.startswith("u") and k[1:].isnumeric():
@@ -818,7 +819,7 @@ class Server:
         if fmt not in ("mp3", "ogg", "opus", "m4a", "flac", "wav", "wma", "mp2", "weba", "vox", "adpcm", "pcm", "8bit", "mid", "midi", "webm", "mp4", "avi", "mov", "m4v", "mkv", "f4v", "flv", "wmv", "gif", "apng", "webp"):
             raise TypeError
         url = " ".join(urls)
-        b = self.command(input=f"concat {url} as {fmt}")
+        b = self.command(input=f"concat {m} {url} as {fmt}")
         data = orjson.loads(b)
         url = data[0]["content"]
         raise cp.HTTPRedirect(url, status="307")
