@@ -823,6 +823,14 @@ class Server:
         url = data[0]["content"]
         raise cp.HTTPRedirect(url, status="307")
 
+    @cp.expose
+    def specexec(self, url, **kwargs):
+        argv = " ".join(itertools.chain(*kwargs.items()))
+        b = self.command(input=f"spectralpulse {url} {argv}")
+        data = orjson.loads(b)
+        url = data[0]["content"]
+        raise cp.HTTPRedirect(url, status="307")
+
     @cp.expose(("index", "p", "preview", "files", "file", "tester", "atlas", "mizatlas", "time"))
     def index(self, path=None, filename=None, *args, **kwargs):
         url = cp.url(qs=cp.request.query_string)

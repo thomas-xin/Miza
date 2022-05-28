@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html style="background-color:#000000;color:#ffffff;font-family:Rockwell">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta content="Spectralpulse" property="og:title">
+<meta content="Render an animated spectrogram for any song here!" property="og:description">
+<meta content="https://mizabot.xyz/spectralpulse" property="og:url">
+<meta property="og:image" content="http://i.mizabot.xyz/logo256.png">
+<meta content="#000000" data-react-helmet="true" name="theme-color">
+<style>
+.home {
+	position: absolute;
+	top: 10px;
+	right: 10px;
+	font-size: 20px;
+}
+</style>
+<body>
+
+<h1 style="text-align:center">Spectralpulse</h1>
+<p>Welcome to Spectralpulse, an audio analysis spectrogram generator! See the <a href="https://github.com/thomas-xin/SpectralPulse">homepage</a> for more info, or if you would like to run the program yourself!
+
+<br>
+
+<h2>Input (this service is very computationally expensive, so may take a long time, especially if multiple people are using the service simultaneously).</h2>
+<form action="/specexec">
+  <label for="url">Name/URL</label>
+  <input style="max-width:800px;width:50%" type="text" id="d" name="d" value="https://www.youtube.com/watch?v=dQw4w9WgXcQ">
+  <input type="submit" value="Render"><br>
+  Width
+  <input type="number" id="-width" name="-width" value="1280" min="1" max="3840">
+  Height
+  <input type="number" id="-height" name="-height" value="720" min="1" max="2160"><br>
+  FPS
+  <input type="number" id="-fps" name="-fps" value="30" min="1" max="144"><br>
+  Sample rate
+  <input type="number" id="-sample_rate" name="-sample_rate" value="48000" min="8000" max="384000"><br>
+  Amplitude
+  <input type="text" id="-amplitude" name="-amplitude" value="0.1"><br>
+  Smudge ratio
+  <input type="text" id="-smudge_ratio" name="-smudge_ratio" value="0.9"><br>
+  Speed
+  <input type="number" id="-speed" name="-speed" value="2" min="1" max="4"><br>
+  Lower bound
+  <input type="text" style="width:96px" id="-lower_bound" name="-lower_bound" value="A0">
+  Higher bound
+  <input type="text" style="width:96px" id="-higher_bound" name="-higher_bound" value="F#10"><br>
+  Animations (An image URL may optionally be specified instead.)
+  <input type="text" list="-particles" value="Piano">
+  <datalist id="-particles">
+    <option>Piano</option>
+    <option>Bar</option>
+    <option>Bubble</option>
+    <option>Hexagon</option>
+    <option>Trail</option>
+  </datalist><br>
+  Skip wait at beginning
+  <input type="radio" id="skip1" name="-skip" value="true" checked>
+  <label for="skip1">Yes</label>
+  <input type="radio" id="skip2" name="-skip" value="false">
+  <label for="skip2">No</label><br>
+</form>
+
+<a class="home" href="/miscellaneous">Back</a>
+
+</body>
+</html>

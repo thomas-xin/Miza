@@ -766,16 +766,48 @@ class SpectralPulse(Command):
     typing = True
     spec_sem = Semaphore(1, 256, rate_limit=1)
 
-    async def __call__(self, bot, channel, message, argv, **void):
+    async def __call__(self, bot, channel, message, args, **void):
         for a in message.attachments:
-            argv = a.url + " " + argv
-        if not argv:
+            args.insert(0, a.url)
+        if not args:
             raise ArgumentError("Input string is empty.")
-        urls = await bot.follow_url(argv, allow=True, images=False)
+        urls = await bot.follow_url(args.pop(0), allow=True, images=False)
         if not urls or not urls[0]:
             raise ArgumentError("Please input a valid URL.")
         url = urls[0]
-        name = url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
+        kwargs = {
+            "-size": "[1280,720]",
+            "-fps": "30",
+            "-sample_rate": "48000",
+            "-amplitude": "0.1",
+            "-smudge_ratio": "0.9",
+            "-speed": "2",
+            "-lower_bound": "A0",
+            "-higher_bound": "F#10",
+            "-particles": "piano",
+            "-skip": "true",
+            "-display": "false",
+            "-render": "true",
+            "-play": "false",
+            "-image": "true",
+        }
+        i = 0
+        while i < len(args):
+            arg = args[i]
+            if arg.startswith("-"):
+                if arg in {
+                    "-size", "-fps", "-sample_rate", "-amplitude",
+                    "-smudge_ratio", "-speed", "-lower_bound", "-higher_bound",
+                    "-particles", "-skip", "-display", "-render", "-play", "-image",
+                    "-dest",
+                    "-width", "-height",
+                }:
+                    kwargs[arg] = args[i + 1]
+                    i += 1
+            i += 1
+        if "-width" in kwargs and "-height" in kwargs:
+            kwargs["-size"] = f'({kwargs["-width"]},{kwargs["-height"]})'
+        name = kwargs.get("-dest") or url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
         n1 = name + ".mp4"
         n2 = name + ".png"
         ts = ts_us()
@@ -784,20 +816,7 @@ class SpectralPulse(Command):
         fn2 = dest + ".png"
         args = [
             python, "misc/spectralpulse/main.py",
-            "-size", "[1280,720]",
-            "-fps", "30",
-            "-sample_rate", "48000",
-            "-amplitude", "0.1",
-            "-smudge_ratio", "0.9",
-            "-speed", "2",
-            "-lower_bound", "A0",
-            "-higher_bound", "F#10",
-            "-particles", "piano",
-            "-skip", "true",
-            "-display", "false",
-            "-render", "true",
-            "-play", "false",
-            "-image", "true",
+            *itertools.chain(*kwargs.items()),
             "-dest", dest, url,
         ]
         with discord.context_managers.Typing(channel):
@@ -815,7 +834,8 @@ class SpectralPulse(Command):
                 for ext in ("pcm", "riff"):
                     await create_future(os.remove, f"{dest}.{ext}")
         await bot.send_with_file(channel, "", fn1, filename=n1, reference=message)
-        await bot.send_with_file(channel, "", fn2, filename=n2, reference=message)
+        if kwargs.get("-image") in ("true", "True"):
+            await bot.send_with_file(channel, "", fn2, filename=n2, reference=message)
 
 
 class DeviantArt(Command):
