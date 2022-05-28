@@ -4743,13 +4743,13 @@ class Download(Command):
                 with zipfile.ZipFile(fn, "w", zipfile.ZIP_STORED, allowZip64=True, strict_timestamps=False) as z:
                     for fut in futs:
                         f, out = await fut
-                        z.write(f)
+                        z.write(f, arcname=f.rsplit("/", 1)[-1])
                 create_task(bot.send_with_file(
                     channel=channel,
                     msg="",
                     file=fn,
                     filename="download.zip",
-                    rename=False,
+                    rename=True,
                     reference=message,
                 ))
             return
