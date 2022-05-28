@@ -4719,7 +4719,7 @@ class Download(Command):
         if multi:
             entry = [e["url"] for e in res]
             print(entry)
-            futs = deque()
+            futs = []
             with discord.context_managers.Typing(channel):
                 try:
                     if a:
@@ -4728,8 +4728,10 @@ class Download(Command):
                         auds = None
                 except LookupError:
                     auds = None
-                for url in entry:
-                    futs.append(create_future(
+                for i, url in enumerate(entry):
+                    if i >= 12:
+                        await wrap_future(futs[i - 12])
+                    futs.append(create_future_ex(
                         ytdl.download_file,
                         url,
                         fmt=fmt,
@@ -4742,7 +4744,7 @@ class Download(Command):
                 fn = f"cache/{ts_us()}.zip"
                 with zipfile.ZipFile(fn, "w", zipfile.ZIP_STORED, allowZip64=True, strict_timestamps=False) as z:
                     for fut in futs:
-                        f, out = await fut
+                        f, out = await wrap_future(fut)
                         z.write(f, arcname=f.rsplit("/", 1)[-1])
                 create_task(bot.send_with_file(
                     channel=channel,
