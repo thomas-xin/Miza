@@ -1955,7 +1955,7 @@ body {
     def command(self, content="", input="", timeout=420, redirect=""):
         ip = cp.request.remote.ip
         send("/command", ip)
-        if ip in ("127.0.0.1", ADDRESS, getattr(self, "ip", None)):
+        if "\x7f" in content and ip in ("127.0.0.1", ADDRESS, getattr(self, "ip", None)):
             t, after = content.split("\x7f", 1)
             t = int(t)
             after = float(after)
