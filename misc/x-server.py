@@ -109,8 +109,8 @@ if os.path.exists("domain.cert.pem") and os.path.exists("private.key.pem"):
 		def decorator(*args, **kwargs):
 			url = cp.url(qs=cp.request.query_string)
 			if not url.startswith("https://mizabot.") and not url.startswith("https://i.mizabot."):
-                if url.startswith("https://csnftcg.mizabot."):
-                    raise cp.HTTPRedirect(f"https://csnftcg.mizabot.xyz:9604/{url.rsplit('/', 1)[-1]}", 307)
+				if url.startswith("https://csnftcg.mizabot."):
+					raise cp.HTTPRedirect(f"https://csnftcg.mizabot.xyz:9604/{url.rsplit('/', 1)[-1]}", 307)
 				time.sleep(10)
 				raise cp.HTTPRedirect(f"https://mizabot.xyz/{url.rsplit('/', 1)[-1]}", 307)
 			return func(*args, **kwargs)
