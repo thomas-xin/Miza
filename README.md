@@ -1,7 +1,7 @@
 <h1 align="center">
   <img src="https://raw.githubusercontent.com/thomas-xin/Image-Test/master/title-rainbow.webp">
   <br>
-  <a href="http://mizabot.xyz">Miza</a>
+  <a href="https://mizabot.xyz">Miza</a>
 </h1>
 
 
