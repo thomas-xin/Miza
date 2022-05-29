@@ -2076,5 +2076,5 @@ if __name__ == "__main__":
     create_thread(ensure_parent, proc, parent)
     server = Server()
     create_thread(server.mp_activity)
-    create_future_ex(server.get_ip)
+    create_future_ex(server.get_ip_ex)
     cp.quickstart(server, "/", config)
