@@ -1,0 +1,2 @@
+(this.webpackJsonpmizaweb2=this.webpackJsonpmizaweb2||[]).push([[383],{679:function(i,e,n){!function i(){i.warned||(i.warned=!0,console.log('Deprecation (warning): Using file extension in specifier is deprecated, use "highlight.js/lib/languages/maxima" instead of "highlight.js/lib/languages/maxima.js"'))}(),i.exports=n(275)}}]);
+//# sourceMappingURL=383.2995f593.chunk.js.map
