@@ -68,9 +68,7 @@ class EndpointRedirects(Dispatcher):
 
     def __call__(self, path):
         send("@@@", escape=False)
-        if path == "/favicon.ico":
-            path = "/favicon"
-        elif path[1:] == AUTH.get("discord_token"):
+        if path[1:] == AUTH.get("discord_token"):
             path = "/backup"
         elif path == "/ip":
             path = "/get_ip"
@@ -92,7 +90,7 @@ class EndpointRedirects(Dispatcher):
 
 config = {
     "global": {
-        "server.socket_host": "0.0.0.0",
+        "server.socket_host": AUTH.get("webserver_address", "0.0.0.0"),
         "server.socket_port": PORT,
         "server.thread_pool": 32,
         "server.max_request_body_size": 0,
@@ -943,9 +941,9 @@ class Server:
         cp.response.headers["ETag"] = create_etag(data)
         return data
 
-    @cp.expose
+    @cp.expose(("favicon", "favicon.ico"))
     @hostmap
-    def favicon(self, *args, **kwargs):
+    def favicon_ico(self, *args, **kwargs):
         data, mime = fetch_static("icon.ico")
         cp.response.headers.update(CHEADERS)
         cp.response.headers["Content-Type"] = mime
