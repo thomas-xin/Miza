@@ -861,7 +861,7 @@ class Server:
         url = data[0]["content"].replace("/d/", "/f/")
         raise cp.HTTPRedirect(url, status="307")
 
-    @cp.expose(("index", "p", "preview", "files", "file", "tester", "atlas", "mizatlas", "time"))
+    @cp.expose(("index", "p", "preview", "files", "file", "tester", "atlas", "mizatlas", "time", "mpinsights"))
     @hostmap
     def index(self, path=None, filename=None, *args, **kwargs):
         url = cp.url(qs=cp.request.query_string)
@@ -1751,7 +1751,7 @@ body {
 
     @cp.expose
     @hostmap
-    def mpinsights(self):
+    def mpinsights_old(self):
         values = self.mpget()
         for i in range(3):
             values[i] = int(values[i])
