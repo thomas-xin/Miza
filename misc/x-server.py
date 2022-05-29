@@ -20,6 +20,7 @@ except KeyError:
 
 
 HOST = "https://mizabot.xyz"
+ADDRESS = AUTH.get("webserver_address") or "0.0.0.0"
 PORT = AUTH.get("webserver_port") or 80
 IND = "\x7f"
 
@@ -90,7 +91,7 @@ class EndpointRedirects(Dispatcher):
 
 config = {
     "global": {
-        "server.socket_host": AUTH.get("webserver_address") or "0.0.0.0",
+        "server.socket_host": ADDRESS,
         "server.socket_port": PORT,
         "server.thread_pool": 32,
         "server.max_request_body_size": 0,
@@ -1954,7 +1955,7 @@ body {
     @hostmap
     def command(self, content="", input="", timeout=420, redirect=""):
         ip = cp.request.remote.ip
-        if ip == "127.0.0.1":
+        if ip == "127.0.0.1" or ip == ADDRESS:
             t, after = content.split("\x7f", 1)
             t = int(t)
             after = float(after)

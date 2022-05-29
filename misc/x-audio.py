@@ -13,6 +13,10 @@ except ModuleNotFoundError:
     exec(code, globals())
 
 
+ADDRESS = AUTH.get("webserver_address") or "0.0.0.0"
+if ADDRESS == "0.0.0.0":
+    ADDRESS = "127.0.0.1"
+
 # Audio sample rate for both converting and playing
 SAMPLE_RATE = 48000
 
@@ -31,7 +35,7 @@ def request(s):
     with tracebacksuppressor:
         PORT = AUTH["webserver_port"]
         token = AUTH["discord_token"]
-        return reqs.next().get(f"https://127.0.0.1:{PORT}/eval/{token}/{url_parse(s)}", timeout=16).text
+        return reqs.next().get(f"https://{ADDRESS}:{PORT}/eval/{token}/{url_parse(s)}", timeout=16).text
 
 def submit(s):
     if type(s) not in (bytes, memoryview):
