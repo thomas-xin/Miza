@@ -959,7 +959,7 @@ class Server:
     def get_ip_ex(self):
         with suppress(SemaphoreOverflowError):
             with self.ip_sem:
-                resp = Request("https://api.ipify.org", decode=True)
+                resp = Request("https://api.ipify.org", bypass=False, decode=True)
                 if resp:
                     self.ip = resp
                 return resp
@@ -967,7 +967,6 @@ class Server:
     @cp.expose
     @hostmap
     def get_ip(self, *args, **kwargs):
-        self.get_ip_ex()
         data = orjson.dumps(dict(
             remote=cp.request.remote.ip,
             host=getattr(self, "ip", "127.0.0.1"),
@@ -1956,7 +1955,7 @@ body {
     def command(self, content="", input="", timeout=420, redirect=""):
         ip = cp.request.remote.ip
         send("/command", ip)
-        if ip == "127.0.0.1" or ip == ADDRESS:
+        if ip in ("127.0.0.1", ADDRESS, getattr(self, "ip", None)):
             t, after = content.split("\x7f", 1)
             t = int(t)
             after = float(after)
