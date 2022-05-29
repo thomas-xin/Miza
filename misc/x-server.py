@@ -20,7 +20,7 @@ except KeyError:
 
 
 HOST = "https://mizabot.xyz"
-PORT = AUTH.get("webserver_port", 80)
+PORT = AUTH.get("webserver_port") or 80
 IND = "\x7f"
 
 
@@ -90,7 +90,7 @@ class EndpointRedirects(Dispatcher):
 
 config = {
     "global": {
-        "server.socket_host": AUTH.get("webserver_address", "0.0.0.0"),
+        "server.socket_host": AUTH.get("webserver_address") or "0.0.0.0",
         "server.socket_port": PORT,
         "server.thread_pool": 32,
         "server.max_request_body_size": 0,
