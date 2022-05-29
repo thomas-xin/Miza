@@ -2599,7 +2599,7 @@
 							});
 					},
 				};
-			fetch("http://i.mizabot.xyz/static/HELP.json")
+			fetch("https://mizabot.xyz/static/HELP.json")
 				.then(function (e) {
 					return e.json();
 				})
@@ -2699,7 +2699,7 @@
 					K = function (e) {
 						var n = null !== e && void 0 !== e ? e : C;
 						W(!0),
-							fetch("http://i.mizabot.xyz/command/" + encodeURIComponent(n), { credentials: "omit", mode: window.location.hostname.includes("mizabot.xyz") ? "same-origin" : "cors" })
+							fetch("https://mizabot.xyz/command/" + encodeURIComponent(n), { credentials: "omit", mode: window.location.hostname.includes("mizabot.xyz") ? "same-origin" : "cors" })
 								.then(
 									(function () {
 										var e = Object(i.a)(
@@ -2928,7 +2928,7 @@
 					L = function (e) {
 						var n = null !== e && void 0 !== e ? e : _;
 						B(!0),
-							fetch("http://i.mizabot.xyz/command/" + encodeURIComponent(n), { credentials: "omit", mode: window.location.hostname.includes("mizabot.xyz") ? "same-origin" : "cors" })
+							fetch("https://mizabot.xyz/command/" + encodeURIComponent(n), { credentials: "omit", mode: window.location.hostname.includes("mizabot.xyz") ? "same-origin" : "cors" })
 								.then(
 									(function () {
 										var e = Object(i.a)(
@@ -3134,7 +3134,7 @@
 								}),
 								a.append("name", e.name),
 								a.append("index", "0"),
-								n.open("POST", "http://i.mizabot.xyz/merge", !0),
+								n.open("POST", "https://mizabot.xyz/merge", !0),
 								n.send(a);
 						}
 					};
@@ -3217,7 +3217,7 @@
 															  (n.onerror = function () {
 																  I(!0);
 															  }),
-															  n.open("POST", "http://i.mizabot.xyz/upload_chunk", !0),
+															  n.open("POST", "https://mizabot.xyz/upload_chunk", !0),
 															  n.setRequestHeader("X-File-Name", e.name),
 															  n.setRequestHeader("X-File-Size", e.size + ""),
 															  n.send(e);
@@ -3330,7 +3330,7 @@
 										for (;;)
 											switch ((n.prev = n.next)) {
 												case 0:
-													return (n.next = 2), fetch("http://i.mizabot.xyz/fileinfo/" + e.match.params.id);
+													return (n.next = 2), fetch("https://mizabot.xyz/fileinfo/" + e.match.params.id);
 												case 2:
 													return (a = n.sent), (n.next = 5), a.json();
 												case 5:
@@ -3486,7 +3486,7 @@
 												n.set("code", "308"),
 												n.set("ftype", "1"),
 												(e.next = 8),
-												fetch("http://i.mizabot.xyz/forward", { method: "POST", mode: window.location.hostname.includes("mizabot.xyz") ? "same-origin" : "cors", body: n })
+												fetch("https://mizabot.xyz/forward", { method: "POST", mode: window.location.hostname.includes("mizabot.xyz") ? "same-origin" : "cors", body: n })
 											);
 										case 8:
 											(a = e.sent), p(a.url.split("/").slice(-1)[0]);
@@ -4016,7 +4016,7 @@
 									for (;;)
 										switch ((e.prev = e.next)) {
 											case 0:
-												return (e.next = 2), fetch("http://i.mizabot.xyz/mpinsights", { headers: { accept: "application/json" }, method: "GET", mode: "cors", credentials: "omit" });
+												return (e.next = 2), fetch("https://mizabot.xyz/mpinsights", { headers: { accept: "application/json" }, method: "GET", mode: "cors", credentials: "omit" });
 											case 2:
 												return (n = e.sent), (e.next = 5), n.json();
 											case 5:

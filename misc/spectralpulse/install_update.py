@@ -43,6 +43,13 @@ for mod in modlist:
                 inst += "==" + version
             install(inst)
 
+try:
+    v = pkg_resources.get_distribution("yt_dlp").version
+    assert v >= "2022.5.18"
+except:
+    print_exc()
+    subprocess.run([python, "-m", "pip", "install", "git+https://github.com/yt-dlp/yt-dlp.git", "--upgrade", "--user"])
+
 # Run pip on any modules that need installing
 if installing:
     print("Installing missing or outdated modules, please wait...")

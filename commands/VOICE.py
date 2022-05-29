@@ -120,7 +120,7 @@ def get_best_icon(entry):
             entry["thumbnail"] = f"https://i.ytimg.com/vi/{vid}/maxresdefault.jpg"
             return entry["thumbnail"]
         if ytdl.bot.is_webserver_url(url):
-            return "http://i.mizabot.xyz/static/mizaleaf.png"
+            return "https://mizabot.xyz/static/mizaleaf.png"
         return url
     return sorted(thumbnails, key=lambda x: float(x.get("width", x.get("preference", 0) * 4096)), reverse=True)[0]["url"]
 

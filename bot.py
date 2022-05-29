@@ -25,7 +25,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     discord_icon = "https://cdn.discordapp.com/embed/avatars/0.png"
     twitch_url = "https://www.twitch.tv/-"
     # webserver = "https://mizabot.xyz"
-    raw_webserver = "http://i.mizabot.xyz"
+    raw_webserver = "https://mizabot.xyz"
     kofi_url = "https://ko-fi.com/mizabot"
     webserver = raw_webserver
     heartbeat = "heartbeat.tmp"
@@ -3146,7 +3146,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         return remaining
 
     async def process_http_command(self, t, name, nick, command):
-        url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f0"
+        url = f"https://127.0.0.1:{PORT}/commands/{t}\x7f0"
         out = "[]"
         with tracebacksuppressor:
             message = SimulatedMessage(self, command, t, name, nick)
@@ -3163,12 +3163,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     await asyncio.sleep(0.1)
                 await self.react_callback(message, None, message.author)
                 out = orjson.dumps(list(message.response))
-            url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f{after}"
+            url = f"https://127.0.0.1:{PORT}/commands/{t}\x7f{after}"
         await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, bypass=False, decode=True, aio=True)
 
     async def process_http_eval(self, t, proc):
         glob = self._globals
-        url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f0"
+        url = f"https://127.0.0.1:{PORT}/commands/{t}\x7f0"
         out = '{"result":null}'
         with tracebacksuppressor:
             code = None

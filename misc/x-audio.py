@@ -31,7 +31,7 @@ def request(s):
     with tracebacksuppressor:
         PORT = AUTH["webserver_port"]
         token = AUTH["discord_token"]
-        return reqs.next().get(f"http://127.0.0.1:{PORT}/eval/{token}/{url_parse(s)}", timeout=16).text
+        return reqs.next().get(f"https://127.0.0.1:{PORT}/eval/{token}/{url_parse(s)}", timeout=16).text
 
 def submit(s):
     if type(s) not in (bytes, memoryview):

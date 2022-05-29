@@ -19,7 +19,7 @@ except KeyError:
     RAPIDAPI_SECRET = None
 
 
-HOST = "http://i.mizabot.xyz"
+HOST = "https://mizabot.xyz"
 PORT = AUTH.get("webserver_port", 80)
 IND = "\x7f"
 
@@ -97,17 +97,35 @@ config = {
         "server.thread_pool": 32,
         "server.max_request_body_size": 0,
         "server.socket_timeout": 60,
+        "server.ssl_module": "builtin",
+        "engine.autoreload_on": False,
     },
     "/": {
         "request.dispatch": EndpointRedirects(),
     }
 }
-
-if os.path.exists("misc/cert.pem") and os.path.exists("misc/private.key.pem"):
-    config["global"]["server.ssl_module"] = "builtin"
-    config["global"]["server.ssl_certificate"] = "domain.cert.pem"
-    config["global"]["server.ssl_private_key"] = "private.key.pem"
-    config["global"]["server.ssl_certificate_chain"] = "intermediate.cert.pem"
+if os.path.exists("domain.cert.pem") and os.path.exists("private.key.pem"):
+	config["global"]["server.ssl_certificate"] = "domain.cert.pem"
+	config["global"]["server.ssl_private_key"] = "private.key.pem"
+	def hostmap(func):
+		def decorator(*args, **kwargs):
+			url = cp.url(qs=cp.request.query_string)
+			if not url.startswith("https://mizabot.") and not url.startswith("https://i.mizabot."):
+				time.sleep(10)
+				raise cp.HTTPRedirect(f"https://mizabot.xyz/{url.rsplit('/', 1)[-1]}", 307)
+			return func(*args, **kwargs)
+		return decorator
+	def e404(status, message, traceback, version):
+		url = cp.url(qs=cp.request.query_string)
+		if not url.startswith("https://mizabot.") and not url.startswith("https://i.mizabot."):
+			time.sleep(3600)
+		return message
+	cp.config["error_page.404"] = e404
+else:
+	def hostmap(func):
+		def decorator(*args, **kwargs):
+			return func(*args, **kwargs)
+		return decorator
 
 HEADERS = {
     "X-Content-Type-Options": "nosniff",
@@ -217,6 +235,7 @@ def get_geo(ip):
 class Server:
 
     @cp.expose
+    @hostmap
     def fileinfo(self, path, **void):
         orig_path = path
         ind = IND
@@ -269,6 +288,7 @@ class Server:
     image_loaders = {}
 
     @cp.expose(("animate", "animation", "a", "images", "image", "i", "view", "v", "raw", "f", "download", "d"))
+    @hostmap
     def files(self, path, filename=None, download=None, **void):
         if path in ("hacks", "mods", "files", "download", "static"):
             send(cp.request.remote.ip + " was rickrolled 🙃")
@@ -539,6 +559,7 @@ class Server:
     files._cp_config = {"response.stream": True}
 
     @cp.expose
+    @hostmap
     def static(self, *filepath):
         if not filepath:
             if cp.request.remote_ip == "127.0.0.1":
@@ -558,6 +579,7 @@ class Server:
         return data
 
     @cp.expose
+    @hostmap
     def apidoc(self):
         apidoc = getattr(self, "api", None)
         if not apidoc:
@@ -573,6 +595,7 @@ class Server:
         return data
 
     @cp.expose
+    @hostmap
     def models(self, *filepath):
         filename = "/".join(filepath)
         data, mime = fetch_static(f"waifu2x/models/{filename}")
@@ -583,6 +606,7 @@ class Server:
         return data
 
     @cp.expose
+    @hostmap
     def w2wbinit(self):
         data, mime = fetch_static("waifu2x/w2wbinit.png")
         cp.response.headers.update(CHEADERS)
@@ -592,6 +616,7 @@ class Server:
         return data
 
     @cp.expose
+    @hostmap
     def waifu2x(self, *filepath, source=None):
         if filepath:
             filename = "/".join(filepath)
@@ -703,6 +728,7 @@ class Server:
         return data
 
     @cp.expose
+    @hostmap
     def ytdl(self, **kwargs):
         d = kwargs.get("d") or kwargs.get("download")
         v = d or kwargs.get("v") or kwargs.get("view")
@@ -781,6 +807,7 @@ class Server:
     ytdl._cp_config = {"response.stream": True}
 
     @cp.expose
+    @hostmap
     def ytdlp(self, url, fmt="mp4", start="", end=""):
         if not url:
             cp.response.status = 204
@@ -799,6 +826,7 @@ class Server:
         raise cp.HTTPRedirect(url, status="307")
 
     @cp.expose
+    @hostmap
     def ytdlc(self, *urls, fmt="mp4", multi="true", **kwargs):
         m = "" if multi in ("false", "False") else "-m"
         kwurls = []
@@ -825,6 +853,7 @@ class Server:
         raise cp.HTTPRedirect(url, status="307")
 
     @cp.expose
+    @hostmap
     def specexec(self, url, **kwargs):
         argv = " ".join(itertools.chain(*kwargs.items()))
         b = self.command(input=f"spectralpulse {url} {argv}")
@@ -833,6 +862,7 @@ class Server:
         raise cp.HTTPRedirect(url, status="307")
 
     @cp.expose(("index", "p", "preview", "files", "file", "tester", "atlas", "mizatlas", "time"))
+    @hostmap
     def index(self, path=None, filename=None, *args, **kwargs):
         url = cp.url(qs=cp.request.query_string)
         if "/p/" in url:
@@ -914,6 +944,7 @@ class Server:
         return data
 
     @cp.expose
+    @hostmap
     def favicon(self, *args, **kwargs):
         data, mime = fetch_static("icon.ico")
         cp.response.headers.update(CHEADERS)
@@ -933,6 +964,7 @@ class Server:
                 return resp
 
     @cp.expose
+    @hostmap
     def get_ip(self, *args, **kwargs):
         self.get_ip_ex()
         data = orjson.dumps(dict(
@@ -945,8 +977,9 @@ class Server:
         cp.response.headers["ETag"] = create_etag(data)
         return data
 
-    @cp.config(**{"response.timeout": 7200})
     @cp.expose
+    @cp.config(**{"response.timeout": 7200})
+    @hostmap
     def upload_file(self, *args, **kwargs):
         ip = cp.request.remote.ip
         files = args + tuple(kwargs.values())
@@ -1036,6 +1069,7 @@ class Server:
         return s
 
     @cp.expose
+    @hostmap
     def upload(self):
         global est_last
         ip = cp.request.remote.ip
@@ -1297,6 +1331,7 @@ function mergeFile(blob) {
         return data
 
     @cp.expose
+    @hostmap
     def upload_chunk(self, **kwargs):
         s = cp.request.remote.ip + "%" + cp.request.headers.get("x-file-name", "untitled")
         h = hash(s) % 2 ** 48
@@ -1306,6 +1341,7 @@ function mergeFile(blob) {
 
     @cp.expose
     @cp.tools.accept(media="multipart/form-data")
+    @hostmap
     def merge(self, **kwargs):
         ts = time.time_ns() // 1000
         name = kwargs.get("name", "") or cp.request.headers.get("x-file-name", "untitled")
@@ -1326,6 +1362,7 @@ function mergeFile(blob) {
         return "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
 
     @cp.expose
+    @hostmap
     def upload_url(self, **kwargs):
         ts = time.time_ns() // 1000
         url = kwargs["url"]
@@ -1335,6 +1372,7 @@ function mergeFile(blob) {
         return HOST + "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
 
     @cp.expose(("proxy",))
+    @hostmap
     def redirect(self):
         data = """<!doctype HTML><html>
 <link href="https://unpkg.com/boxicons@2.0.7/css/boxicons.min.css" rel="stylesheet">
@@ -1446,6 +1484,7 @@ body {
 
     @cp.expose
     @cp.tools.accept(media="multipart/form-data")
+    @hostmap
     def forward(self, **kwargs):
         ts = time.time_ns() // 1000
         fn = f"cache/{IND}{ts}~.forward$"
@@ -1462,6 +1501,7 @@ body {
         raise cp.HTTPRedirect(url, status=307)
 
     @cp.expose(("timezones",))
+    @hostmap
     def timezone(self):
         ip = cp.request.remote.ip
         try:
@@ -1540,6 +1580,7 @@ body {
             raise
 
     @cp.expose
+    @hostmap
     def backup(self, token="~"):
         at = AUTH.get("discord_token")
         if token != at:
@@ -1557,6 +1598,7 @@ body {
     backup._cp_config = {"response.stream": True}
 
     @cp.expose(("eval", "exec"))
+    @hostmap
     def execute(self, token, *args, **kwargs):
         if token != AUTH.get("discord_token"):
             raise InterruptedError
@@ -1572,6 +1614,7 @@ body {
         return orjson.dumps(j["result"])
 
     @cp.expose
+    @hostmap
     def eval2(self, token, *args, **kwargs):
         if token != AUTH.get("discord_token"):
             raise InterruptedError
@@ -1609,6 +1652,7 @@ body {
     mpresponse = {}
 
     @cp.expose
+    @hostmap
     def mphb(self, playing=None):
         mpdata = self.mpdata
         ip = cp.request.remote.ip
@@ -1659,6 +1703,7 @@ body {
     mpimg = {}
 
     @cp.expose
+    @hostmap
     def api_mpinsights(self):
         values = self.mpget()
         for i in range(3):
@@ -1690,6 +1735,7 @@ body {
         ))
 
     @cp.expose
+    @hostmap
     def api_status(self):
         t = ts_us()
         while t in RESPONSES:
@@ -1704,6 +1750,7 @@ body {
     mpimg = {}
 
     @cp.expose
+    @hostmap
     def mpinsights(self):
         values = self.mpget()
         for i in range(3):
@@ -1769,18 +1816,18 @@ body {
     <h1 style="color:white">Miza Player Insights</h1>
     <h2 style="color:white">Get Miza Player <a href="https://github.com/thomas-xin/Miza-Player">here</a>!</h2>
     Live users: {values[2]}
-    <img class="center" src="http://i.mizabot.xyz/mpins/2">
+    <img class="center" src="https://mizabot.xyz/mpins/2">
     Active users: {values[1]}
-    <img class="center" src="http://i.mizabot.xyz/mpins/1">
+    <img class="center" src="https://mizabot.xyz/mpins/1">
     Total users: {values[0]}
-    <img class="center" src="http://i.mizabot.xyz/mpins/0">
+    <img class="center" src="https://mizabot.xyz/mpins/0">
     <br>
     Total playtime: {sec2time(values[4])}
-    <img class="center" src="http://i.mizabot.xyz/mpins/4">
+    <img class="center" src="https://mizabot.xyz/mpins/4">
     Total use time: {sec2time(values[3])}
-    <img class="center" src="http://i.mizabot.xyz/mpins/3">
+    <img class="center" src="https://mizabot.xyz/mpins/3">
     Average playtime per user: {sec2time(values[5])}
-    <img class="center" src="http://i.mizabot.xyz/mpins/5">
+    <img class="center" src="https://mizabot.xyz/mpins/5">
     <a class="home" href="/miscellaneous">Back</a>
 </body>
 </html>"""
@@ -1805,8 +1852,9 @@ body {
         except:
             send(traceback.format_exc())
 
-    @cp.config(**{"response.timeout": 7200})
     @cp.expose
+    @cp.config(**{"response.timeout": 7200})
+    @hostmap
     def mpins(self, k):
         k = int(k)
         try:
@@ -1903,6 +1951,7 @@ body {
 
     rapidapi = 0
     @cp.expose(("commands",))
+    @hostmap
     def command(self, content="", input="", timeout=420, redirect=""):
         ip = cp.request.remote.ip
         if ip == "127.0.0.1":
@@ -1948,6 +1997,7 @@ body {
         return orjson.dumps(j)
 
     @cp.expose(("cat", "cats", "dog", "dogs", "neko", "nekos", "giphy"))
+    @hostmap
     def imagepool(self, tag="", refresh=60):
         name = cp.url(base="").rsplit("/", 1)[-1]
         command = name.rstrip("s")

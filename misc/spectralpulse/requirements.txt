@@ -2,5 +2,4 @@ numpy>=1.22.2
 pillow>=9.0.1
 psutil>=5.9.0
 pygame>=2.1.2
-youtube-dl>=2021.12.17
 requests>=2.27.1
