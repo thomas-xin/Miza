@@ -1955,6 +1955,7 @@ body {
     @hostmap
     def command(self, content="", input="", timeout=420, redirect=""):
         ip = cp.request.remote.ip
+        send("/command", ip)
         if ip == "127.0.0.1" or ip == ADDRESS:
             t, after = content.split("\x7f", 1)
             t = int(t)
