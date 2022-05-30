@@ -1607,7 +1607,7 @@ class AudioDownloader:
         s = resp.text
         if s[0] == "{" and s[-1] == "}":
             t = resp.json()
-            return [dict(
+            return [cdict(
                 name=t["title"],
                 url=t["permalink_url"],
                 duration=t["duration"] / 1000,
@@ -1630,7 +1630,7 @@ class AudioDownloader:
                         emap[tid] = len(entries)
                         entries.append(tid)
                     else:
-                        entry = dict(
+                        entry = cdict(
                             name=t["title"],
                             url=t["permalink_url"],
                             duration=t["duration"] / 1000,
@@ -1645,7 +1645,7 @@ class AudioDownloader:
             if not resp.content:
                 resp.raise_for_status()
             for t, p in zip(resp.json(), emap.values()):
-                entry = dict(
+                entry = cdict(
                     name=t["title"],
                     url=t["permalink_url"],
                     duration=t["duration"] / 1000,
@@ -1688,7 +1688,7 @@ class AudioDownloader:
                     futs.append(fut)
                     entries.append(fut)
                 else:
-                    entry = dict(
+                    entry = cdict(
                         name=t["title"],
                         url=t["permalink_url"],
                         duration=t["duration"] / 1000,
@@ -3017,11 +3017,11 @@ class Queue(Command):
             if i > 262144:
                 break
             try:
-                name = e.name
+                name = e["name"]
             except:
                 print(e)
                 raise
-            url = e.url
+            url = e["url"]
             temp = {
                 # "hash": e.hash,
                 "name": name,
