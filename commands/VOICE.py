@@ -1639,10 +1639,11 @@ class AudioDownloader:
                         entries.append(entry)
 
         if emap:
-            ids = ",".join(map(str, emap))
+            ids = "%2C".join(map(str, emap))
             url = f"{api}tracks?ids={ids}&client_id={self.soundcloud_token}"
             resp = requests.get(url, headers=Request.header())
-            resp.raise_for_status()
+            if not resp.content:
+                resp.raise_for_status()
             for t, p in zip(resp.json(), emap.values()):
                 entry = dict(
                     name=t["title"],
@@ -1672,7 +1673,8 @@ class AudioDownloader:
         while True:
             url = f"{api}{uid}/likes?client_id={self.soundcloud_token}&limit={lim}"
             resp = requests.get(url, headers=Request.header())
-            resp.raise_for_status()
+            if not resp.content:
+                resp.raise_for_status()
             data = resp.json()
             for e in data["collection"]:
                 try:
