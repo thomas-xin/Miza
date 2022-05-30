@@ -1600,7 +1600,7 @@ class AudioDownloader:
             raise TypeError("Not a SoundCloud playlist.")
         if parts[-1] == "likes":
             return self.get_soundcloud_likes(url)
-        api = "https://api-v2.soundcloud.com/users/"
+        api = "https://api-v2.soundcloud.com/"
 
         resp = requests.get(url, headers=Request.header())
         resp.raise_for_status()
@@ -1628,7 +1628,7 @@ class AudioDownloader:
                     except KeyError:
                         tid = t["id"]
                         emap[tid] = len(entries)
-                        entries.append(tid)
+                        entries.append(None)
                     else:
                         entry = cdict(
                             name=t["title"],
@@ -1639,7 +1639,7 @@ class AudioDownloader:
                         entries.append(entry)
 
         if emap:
-            ids = "%2C".join(map(str, emap))
+            ids = ",".join(map(str, emap))
             url = f"{api}tracks?ids={ids}&client_id={self.soundcloud_token}"
             resp = requests.get(url, headers=Request.header())
             if not resp.content:
@@ -1652,14 +1652,15 @@ class AudioDownloader:
                     thumbnail=t["artwork_url"],
                 )
                 entries[p] = entry
-        return entries
+        return [e for e in entries if e]
 
     def get_soundcloud_likes(self, url):
-        api = "https://api-v2.soundcloud.com/users/"
+        api = "https://api-v2.soundcloud.com/"
         lim = 1000
 
-        if url.startswith(api):
-            uid = url[len(api):].split("?", 1)[0]
+        uapi = api + "users/"
+        if url.startswith(uapi):
+            uid = url[len(uapi):].split("?", 1)[0]
         else:
             resp = requests.get(url, headers=Request.header())
             resp.raise_for_status()
@@ -1671,7 +1672,7 @@ class AudioDownloader:
         futs = []
         entries = []
         while True:
-            url = f"{api}{uid}/likes?client_id={self.soundcloud_token}&limit={lim}"
+            url = f"{api}users/{uid}/likes?client_id={self.soundcloud_token}&limit={lim}"
             resp = requests.get(url, headers=Request.header())
             if not resp.content:
                 resp.raise_for_status()
