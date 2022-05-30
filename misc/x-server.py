@@ -798,7 +798,8 @@ class Server:
             return cp.lib.file_generator(f, count)
         else:
             RESPONSES[t] = fut = concurrent.futures.Future()
-            send(f"!{t}\x7f[VOICE.copy_entry(e) for e in VOICE.ytdl.search({repr(q)}, count=10)]", escape=False)
+            count = 1 if is_url(q) else 10
+            send(f"!{t}\x7f[VOICE.copy_entry(e) for e in VOICE.ytdl.search({repr(q)},count={count})]", escape=False)
             j, after = fut.result()
             RESPONSES.pop(t, None)
             res = j["result"]

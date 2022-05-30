@@ -1056,6 +1056,124 @@ class AudioDownloader:
 				out.append(entry)
 		return out
 
+	soundcloud_token = "7g7gIkrcAS05cJVf2FlIsnkOXtg4JdSe"
+
+	def get_soundcloud_playlist(self, url):
+		parts = url.split("?", 1)[0].split("/")
+		if parts[0] != "https:" or parts[2] not in ("soundcloud.com", "api-v2.soundcloud.com"):
+			raise TypeError("Not a SoundCloud playlist.")
+		if parts[-1] == "likes":
+			return self.get_soundcloud_likes(url)
+		api = "https://api-v2.soundcloud.com/"
+
+		resp = requests.get(url, headers=self.youtube_header())
+		resp.raise_for_status()
+		s = resp.text
+		if s[0] == "{" and s[-1] == "}":
+			t = resp.json()
+			return [cdict(
+				name=t["title"],
+				url=t["permalink_url"],
+				duration=t["duration"] / 1000,
+				thumbnail=t["artwork_url"],
+			)]
+		search = "<script>window.__sc_hydration = "
+		s = s[s.index(search) + len(search):]
+		s = s[:s.index(";</script>")]
+		data = orjson.loads(s)
+
+		emap = {}
+		entries = []
+		for hydratable in data:
+			if hydratable["hydratable"] == "playlist":
+				for t in hydratable["data"]["tracks"]:
+					try:
+						t["title"]
+					except KeyError:
+						tid = t["id"]
+						emap[tid] = len(entries)
+						entries.append(None)
+					else:
+						entry = cdict(
+							name=t["title"],
+							url=t["permalink_url"],
+							duration=t["duration"] / 1000,
+							thumbnail=t["artwork_url"],
+						)
+						entries.append(entry)
+
+		if emap:
+			ids = ",".join(map(str, emap))
+			url = f"{api}tracks?ids={ids}&client_id={self.soundcloud_token}"
+			resp = requests.get(url, headers=self.youtube_header())
+			if not resp.content:
+				resp.raise_for_status()
+			for t, p in zip(resp.json(), emap.values()):
+				entry = cdict(
+					name=t["title"],
+					url=t["permalink_url"],
+					duration=t["duration"] / 1000,
+					thumbnail=t["artwork_url"],
+				)
+				entries[p] = entry
+		return [e for e in entries if e]
+
+	def get_soundcloud_likes(self, url):
+		api = "https://api-v2.soundcloud.com/"
+		lim = 1000
+
+		uapi = api + "users/"
+		if url.startswith(uapi):
+			uid = url[len(uapi):].split("?", 1)[0]
+		else:
+			resp = requests.get(url, headers=self.youtube_header())
+			resp.raise_for_status()
+			s = resp.text
+			search = 'content="soundcloud://users:'
+			s = s[s.index(search) + len(search):]
+			uid = s[:s.index('"')]
+
+		futs = []
+		entries = []
+		while True:
+			url = f"{api}users/{uid}/likes?client_id={self.soundcloud_token}&limit={lim}"
+			resp = requests.get(url, headers=self.youtube_header())
+			if not resp.content:
+				resp.raise_for_status()
+			data = resp.json()
+			for e in data["collection"]:
+				try:
+					t = e["track"]
+				except KeyError:
+					p = e["playlist"]
+					url = p["permalink_url"]
+					if len(futs) >= 12:
+						futs.pop(0).result()
+					fut = create_future_ex(self.get_soundcloud_playlist, url)
+					futs.append(fut)
+					entries.append(fut)
+				else:
+					entry = cdict(
+						name=t["title"],
+						url=t["permalink_url"],
+						duration=t["duration"] / 1000,
+						thumbnail=t["artwork_url"],
+					)
+					entries.append(entry)
+			url = data.get("next_href")
+			if len(entries) < lim or not url:
+				break
+			url += f"client_id={self.soundcloud_token}&limit={lim}"
+
+		while True:
+			for i, e in enumerate(entries):
+				if isinstance(e, concurrent.futures.Future):
+					entries = entries[:i] + e.result() + entries[i + 1:]
+					break
+			else:
+				break
+		return entries
+
 	def ydl_errors(self, s):
 		return "this video has been removed" not in s and "private video" not in s and "has been terminated" not in s
 
@@ -1250,6 +1368,11 @@ class AudioDownloader:
 					print_exc()
 				else:
 					return entries
+		elif regexp("^https:\\/\\/soundcloud\\.com\\/[A-Za-z0-9]+\\/sets\\/").search(item) or regexp("^https:\\/\\/soundcloud\\.com\\/[A-Za-z0-9]+\\/likes").search(item) or regexp("^https:\\/\\/api-v2\\.soundcloud\\.com\\/users\\/[0-9]+\\/likes").search(item):
+				try:
+					return self.get_soundcloud_playlist(item)
+				except:
+					print_exc()
 		elif regexp("(play|open|api)\\.spotify\\.com").search(item):
 			# Spotify playlist searches contain up to 100 items each
 			if "playlist" in item:
