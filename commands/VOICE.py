@@ -822,10 +822,14 @@ class AudioQueue(alist):
                         if source:
                             auds.enqueue(source)
             if len(self) > 2 and not self.sem2.is_busy():
-                with self.sem2:
-                    e = self[2]
-                    sufficient = auds.epos[1] - auds.epos[0] + self[1].get("duration", 0) >= self[2].get("duration", inf) / 2
-                    source = ytdl.get_stream(e, asap=not sufficient)
+                e = self[2]
+                sufficient = auds.epos[1] - auds.epos[0] + self[1].get("duration", 0) >= self[2].get("duration", inf) / 2
+                if sufficient:
+                    create_future_ex(self.preemptive_download, e)
+
+    def preemptive_download(self, e):
+        with self.sem2:
+            ytdl.get_stream(e, asap=False)
 
     # Update queue, loading all file streams that would be played soon
     def update_load(self):
