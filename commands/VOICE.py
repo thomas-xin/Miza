@@ -821,7 +821,7 @@ class AudioQueue(alist):
                         source = ytdl.get_stream(e, asap=True)
                         if source:
                             auds.enqueue(source)
-            if len(self) > 2 and not self.sem2.is_busy():
+            if len(self) > 2 and not self.sem2.is_busy() and not auds.stats.get("shuffle"):
                 e = self[2]
                 sufficient = auds.epos[1] - auds.epos[0] + (self[1].get("duration") or 0) >= (self[2].get("duration") or inf) / 2
                 if sufficient:
