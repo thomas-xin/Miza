@@ -813,12 +813,18 @@ class AudioQueue(alist):
                 with self.sem:
                     self.announce_play(e)
                     self.auds.play(source, pos=auds.seek_pos)
-            if not auds.next and auds.source and len(self) > 1:
+            if not auds.next and auds.source and len(self) > 1 and not self.sem2.is_busy():
                 with self.sem:
-                    e = self[1]
-                    source = ytdl.get_stream(e, asap=False)
-                    if source:
-                        auds.enqueue(source)
+                    with self.sem2:
+                        e = self[1]
+                        source = ytdl.get_stream(e, asap=True)
+                        if source:
+                            auds.enqueue(source)
+            if len(self) > 2 and not self.sem2.is_busy():
+                with self.sem2:
+                    e = self[2]
+                    sufficient = auds.epos[1] - auds.epos[0] + self[1].get("duration", 0) >= self[2].get("duration", inf) / 2
+                    source = ytdl.get_stream(e, asap=not sufficient)
 
     # Update queue, loading all file streams that would be played soon
     def update_load(self):
@@ -2252,7 +2258,7 @@ class AudioDownloader:
                 if items:
                     item = items[0]
         if mode is None and count == 1 and item in self.searched:
-            if utc() - self.searched[item].t < 60:
+            if utc() - self.searched[item].t < 180:
                 return self.searched[item].data
             else:
                 self.searched.pop(item)
