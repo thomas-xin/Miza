@@ -6,6 +6,7 @@ import PIL
 from PIL import Image, ImageCms, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhance, ImageMath, ImageStat
 Resampling = getattr(Image, "Resampling", Image)
 Transpose = getattr(Image, "Transpose", Image)
+Transform = getattr(Image, "Transform", Image)
 Image.MAX_IMAGE_PIXELS = 4294967296
 from zipfile import ZipFile
 import matplotlib.pyplot as plt
