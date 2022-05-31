@@ -823,7 +823,7 @@ class AudioQueue(alist):
                             auds.enqueue(source)
             if len(self) > 2 and not self.sem2.is_busy():
                 e = self[2]
-                sufficient = auds.epos[1] - auds.epos[0] + self[1].get("duration", 0) >= self[2].get("duration", inf) / 2
+                sufficient = auds.epos[1] - auds.epos[0] + (self[1].get("duration") or 0) >= (self[2].get("duration") or inf) / 2
                 if sufficient:
                     create_future_ex(self.preemptive_download, e)
 
