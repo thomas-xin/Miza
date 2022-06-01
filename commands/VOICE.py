@@ -2016,7 +2016,7 @@ class AudioDownloader:
                     if url[-5:] == ".json" or url[-4:] in (".txt", ".bin", ".zip"):
                         s = await_fut(self.bot.get_request(url))
                         try:
-                            d = await create_future(select_and_loads, s, size=268435456)
+                            d = select_and_loads(s, size=268435456)
                         except orjson.JSONDecodeError:
                             d = [url for url in as_str(s).splitlines() if is_url(url)]
                             if not d:
