@@ -2022,7 +2022,8 @@ class AudioDownloader:
                             if not d:
                                 raise
                             q = [dict(name=url.split("?", 1)[0].rsplit("/", 1)[-1], url=url) for url in d]
-                        q = d["queue"][:262144]
+                        else:
+                            q = d["queue"][:262144]
                         return [cdict(name=e["name"], url=e["url"], duration=e.get("duration")) for e in q]
                 elif mode in (None, "yt"):
                     with suppress(NotImplementedError):
