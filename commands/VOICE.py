@@ -2015,7 +2015,13 @@ class AudioDownloader:
                     url = verify_url(item)
                     if url[-5:] == ".json" or url[-4:] in (".txt", ".bin", ".zip"):
                         s = await_fut(self.bot.get_request(url))
-                        d = select_and_loads(s, size=268435456)
+                        try:
+                            d = await create_future(select_and_loads, s, size=268435456)
+                        except orjson.JSONDecodeError:
+                            d = [url for url in as_str(s).splitlines() if is_url(url)]
+                            if not d:
+                                raise
+                            q = [dict(name=url.split("?", 1)[0].rsplit("/", 1)[-1], url=url) for url in d]
                         q = d["queue"][:262144]
                         return [cdict(name=e["name"], url=e["url"], duration=e.get("duration")) for e in q]
                 elif mode in (None, "yt"):
@@ -3711,7 +3717,13 @@ class Dump(Command):
             except IndexError:
                 raise ArgumentError("Input must be a valid URL or attachment.")
             s = await self.bot.get_request(url)
-            d = await create_future(select_and_loads, s, size=268435456)
+            try:
+                d = await create_future(select_and_loads, s, size=268435456)
+            except orjson.JSONDecodeError:
+                d = [url for url in as_str(s).splitlines() if is_url(url)]
+                if not d:
+                    raise
+                d = [dict(name=url.split("?", 1)[0].rsplit("/", 1)[-1], url=url) for url in d]
         else:
             # Queue may already be in dict form if loaded from database
             d = argv
@@ -3724,6 +3736,7 @@ class Dump(Command):
             for i, e in enumerate(q, 1):
                 if type(e) is not cdict:
                     e = q[i - 1] = cdict(e)
+                e.duration = e.get("duration")
                 e.u_id = user.id
                 e.skips = deque()
                 if not i & 8191:
