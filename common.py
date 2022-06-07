@@ -1871,16 +1871,22 @@ def is_strict_running(proc):
     try:
         if not proc.is_running():
             return False
-        if proc.status() == "zombie":
-            proc.wait()
+        try:
+            if proc.status() == "zombie":
+                proc.wait()
+                return
+        except psutil.NoSuchProcess:
             return
         return True
     except AttributeError:
         proc = psutil.Process(proc.pid)
     if not proc.is_running():
         return False
-    if proc.status() == "zombie":
-        proc.wait()
+    try:
+        if proc.status() == "zombie":
+            proc.wait()
+            return
+    except psutil.NoSuchProcess:
         return
     return True
 
