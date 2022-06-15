@@ -1129,6 +1129,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             before = cdict(id=before)
         if type(after) is int:
             after = cdict(id=after)
+        if not hasattr(channel, "history"):
+            return
         async for message in channel.history(limit=limit, before=before, after=after):
             if message.id not in found:
                 self.add_message(message, files=False, force=True)

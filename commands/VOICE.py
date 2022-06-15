@@ -3452,7 +3452,12 @@ class Connect(Command):
                 await auds.move_unmute(auds.acsi, vc_)
                 joining = True
         if guild.me.voice is None:
-            await bot.wait_for("voice_state_update", check=lambda member, before, after: member.id == bot.id and after, timeout=16)
+            try:
+                await bot.wait_for("voice_state_update", check=lambda member, before, after: member.id == bot.id and after, timeout=16)
+            except (T1):
+                if guild.me.voice is None:
+                    auds.kill(reason="")
+                    raise
         member = guild.me
         if getattr(member, "voice", None) is not None and vc_.permissions_for(member).mute_members:
             if vc_.type is discord.ChannelType.stage_voice:
