@@ -894,12 +894,15 @@ async def kill():
 
 @client.event
 async def on_ready():
-    create_task(communicate())
+    with tracebacksuppressor:
+        await communicate()
+    await client.close()
+    client.closed = True
 
 
 def ensure_parent(proc, parent):
     while True:
-        if not is_strict_running(parent):
+        if not is_strict_running(parent) or getattr(client, "closed", False):
             await_fut(kill())
             force_kill(psutil.Process())
         time.sleep(6)

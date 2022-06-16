@@ -350,8 +350,8 @@ class CustomAudio(collections.abc.Hashable):
                     self.queue.maxitems = 8192
                 bot.data.audio.players[guild.id] = self
                 self.stats.update(bot.data.audiosettings.get(guild.id, {}))
-            create_future_ex(self.connect_to, channel)
             self.timeout = utc()
+            return create_future_ex(self.connect_to, channel)
 
     def __str__(self):
         classname = str(self.__class__).replace("'>", "")
@@ -518,8 +518,9 @@ class CustomAudio(collections.abc.Hashable):
 
     # Kills this audio player, stopping audio playback. Will cause bot to leave voice upon next update event.
     def kill(self, reason=None):
-        with tracebacksuppressor:
-            self.acsi.kill()
+        if self.acsi:
+            with tracebacksuppressor:
+                self.acsi.kill()
         self.bot.data.audio.players.pop(self.guild.id, None)
         with suppress(LookupError):
             if reason is None:
