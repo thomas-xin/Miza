@@ -69,7 +69,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     except IndexError:
         shards = 2
 
-    def __init__(self, cache_size=1048576, timeout=24):
+    def __init__(self, cache_size=65536, timeout=24):
         # Initializes client (first in __mro__ of class inheritance)
         self.start_time = utc()
         self.monkey_patch()
@@ -1727,20 +1727,21 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         else:
             caches = self.cache.values()
         for c in caches:
-            while len(c) > limit:
-                with suppress(RuntimeError):
-                    c.pop(next(iter(c)))
+            if len(c) >= limit * 2:
+                items = tuple(c.items())
+                c.clear()
+                c.update(dict(items[-limit:]))
 
     def cache_reduce(self):
         self.limit_cache("messages")
         self.limit_cache("attachments", 256)
-        self.limit_cache("guilds")
+        # self.limit_cache("guilds")
         self.limit_cache("channels")
         self.limit_cache("users")
         self.limit_cache("members")
         self.limit_cache("roles")
         self.limit_cache("emojis")
-        self.limit_cache("deleted", limit=4096)
+        self.limit_cache("deleted", limit=16384)
         self.limit_cache("banned", 4096)
 
     # Updates bot cache from the discord.py client cache, using automatic feeding to mitigate the need for slow dict.update() operations.
