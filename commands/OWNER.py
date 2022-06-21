@@ -415,7 +415,10 @@ class UpdateExec(Database):
                     if channel is None:
                         invalid.add(c_id)
                     elif len(msg) > 6000:
-                        create_task(channel.send(file=CompatFile(msg.encode("utf-8"), filename="message.txt")))
+                        b = msg.encode("utf-8")
+                        if len(b) > 8388608:
+                            b = b[:4194304] + b[-4194304:]
+                        create_task(channel.send(file=CompatFile(b, filename="message.txt")))
                     else:
                         self.bot.send_as_embeds(channel, msg, md=code_md)
             if self.bot.ready:
