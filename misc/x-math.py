@@ -137,7 +137,9 @@ _bf = lambda s: bf_evaluate(s)
 
 # Returns the Roman Numeral representation of an integer.
 def roman_numerals(num, order=0):
-    num = num if type(num) is int else int(num)
+    num = int(num)
+    if num <= 0:
+        raise ValueError("Number is not legally representable in Roman Numerals.")
     carry = 0
     over = ""
     sym = ""
@@ -185,12 +187,9 @@ def roman_numerals(num, order=0):
     while num >= 1:
         num -= 1
         output += "I"
-    if output != "":
-        if order == 1:
-            sym = "ᴍ"
-        elif order == 2:
-            sym = "ᴍᴹ"
-    return over + output + sym
+    if output != "" and order:
+        output = "(" * order + output + ")" * order
+    return over + output
 
 
 def Random(a=None, b=None):

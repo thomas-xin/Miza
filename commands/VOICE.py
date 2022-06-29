@@ -2400,6 +2400,7 @@ class AudioDownloader:
             # print(entry.url, entry.duration)
             with suppress(KeyError):
                 self.searched[entry["url"]]["duration"] = entry["duration"]
+            self.searched[entry["url"]].data[0].update(entry)
             if not download:
                 return entry
             self.cache[fn] = f = AudioFileLink(fn)
