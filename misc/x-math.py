@@ -148,6 +148,8 @@ def roman_numerals(num, order=0):
         carry = num // 1000
         num %= 1000
         over = roman_numerals(carry, order + 1)
+    elif order:
+        over = "(" * order
     while num >= 1000:
         num -= 1000
         output += "M"
@@ -187,8 +189,8 @@ def roman_numerals(num, order=0):
     while num >= 1:
         num -= 1
         output += "I"
-    if output != "" and order:
-        output = "(" * order + output + ")" * order
+    if order:
+        output += ")"
     return over + output
 
 
