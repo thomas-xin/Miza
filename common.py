@@ -2046,7 +2046,10 @@ def evalEX(exc):
 
 
 # Main event loop for all asyncio operations.
-eloop = asyncio.new_event_loop()
+try:
+    eloop = asyncio.get_event_loop()
+except:
+    eloop = asyncio.new_event_loop()
 __setloop__ = lambda: asyncio.set_event_loop(eloop)
 __setloop__()
 

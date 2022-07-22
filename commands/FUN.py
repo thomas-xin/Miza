@@ -347,7 +347,7 @@ class Text2048(Command):
     }
 
     async def _callback_(self, bot, message, reaction, argv, user, perm, vals, **void):
-        u_id, mode = list(map(literal_eval, vals.split("_", 1)))
+        u_id, mode = list(map(int, vals.split("_", 1)))
         if reaction is not None and u_id != user.id and u_id != 0 and perm < 3:
             return
         spl = argv.split("-")
@@ -2906,7 +2906,7 @@ class Akinator(Command):
         await send_with_react(channel, "", embed=emb, buttons=self.buttons, reference=message)
 
     async def _callback_(self, bot, message, reaction, argv, user, perm, vals, **void):
-        u_id, sig, guessing = map(int, vals.split("_", 2))
+        u_id, sig, guessing = map(literal_eval, vals.split("_", 2))
         if u_id != user.id and u_id != 0 and perm < 3:
             return
         r = as_str(reaction)
