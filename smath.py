@@ -456,7 +456,7 @@ def round(x, y=None):
 			return x
 	except:
 		pass
-	if isinstance(x, complex)
+	if isinstance(x, complex):
 		return round(x.real, y) + round(x.imag, y) * 1j
 	try:
 		return math.round(x, y)
