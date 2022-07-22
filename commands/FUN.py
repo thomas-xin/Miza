@@ -2935,6 +2935,7 @@ class Akinator(Command):
             create_task(message.edit(embed=emb))
             raise TimeoutError("Akinator game has expired. Please create a new one to proceed!")
         aki.__dict__.setdefault("no", set())
+        create_task(bot.ignore_interaction(message))
 
         callback = "callback"
 
@@ -2948,7 +2949,10 @@ class Akinator(Command):
                 ans = "end"
             aki.no.add(aki.first_guess["id"])
         elif isinstance(ans, int):
-            await aki.answer(ans)
+            try:
+                await aki.answer(ans)
+            except json.JSONDecodeError:
+                await aki.answer(ans)
             if not guessing and aki.step >= 79:
                 guess = True
         elif ans == "undo":
@@ -2975,13 +2979,14 @@ class Akinator(Command):
             else:
                 if (guess or aki.progression >= 90) and aki.first_guess:
                     guess = aki.first_guess
-        print(aki.step, aki.guesses, aki.no, guess, sep="\n")
+        print(aki.step, aki.progression, aki.guesses, aki.no, guess, sep="\n")
 
         colour = await bot.get_colour(user)
         emb = discord.Embed(colour=colour)
 
         desc = ""
         if win:
+            aki.progression = 100
             question = "Guessed right one more time! I love playing with you!"
             emb.set_thumbnail(url="https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/triomphe.png")
         elif guess:
@@ -3015,7 +3020,6 @@ class Akinator(Command):
             + bar
         )
         emb.set_author(**get_author(user))
-        create_task(bot.ignore_interaction(message))
         try:
             sem = EDIT_SEM[message.channel.id]
         except KeyError:
