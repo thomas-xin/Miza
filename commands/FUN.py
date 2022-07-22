@@ -2888,7 +2888,6 @@ class Akinator(Command):
             language = "en"
         if language in ("", "en", "eng", "english") and "c" not in flags and akinators:
             aki = akinators.popleft()
-            create_task(self.ensure_akinators)
         else:
             aki = Akinator(client_session=Request.session)
             await aki.start_game(language=language, child_mode="c" in flags)
