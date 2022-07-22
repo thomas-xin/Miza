@@ -2975,7 +2975,7 @@ class Akinator(Command):
             else:
                 if (guess or aki.progression >= 90) and aki.first_guess:
                     guess = aki.first_guess
-        print(aki.step, aki.first_guess, aki.no, guess, sep="\n")
+        print(aki.step, aki.guesses, aki.no, guess, sep="\n")
 
         colour = await bot.get_colour(user)
         emb = discord.Embed(colour=colour)
