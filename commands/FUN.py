@@ -2913,6 +2913,7 @@ class Akinator(Command):
             + f"{aki.question}```*"
             + bar
         )
+        emb.set_thumbnail(url="https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/defi.png")
         emb.set_author(**get_author(user))
         await send_with_react(channel, "", embed=emb, buttons=self.buttons, reference=message)
 
@@ -2976,6 +2977,7 @@ class Akinator(Command):
                 if data["id"] in aki.no:
                     continue
                 guess = data
+                break
             else:
                 if (guess or aki.progression >= 90) and aki.first_guess:
                     guess = aki.first_guess
