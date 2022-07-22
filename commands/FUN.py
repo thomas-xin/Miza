@@ -2869,6 +2869,17 @@ class Akinator(Command):
         cdict(emoji="⏏️", name="End", style=1),
     ]
 
+    images = [
+        "https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/defi.png",
+        "https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/serein.png",
+        "https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/inspiration_legere.png",
+        "https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/etonnement.png",
+        "https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/concentration_intense.png",
+        "https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/vrai_decouragement.png",
+        "https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/mobile.png",
+        "https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/confiant.png",
+    ]
+
     button_equiv = {
         "Yes": 0,
         "No": 1,
@@ -2962,7 +2973,7 @@ class Akinator(Command):
                 if data["id"] in aki.no:
                     div -= float(data["proba"])
                     continue
-                if float(data["proba"]) > 0.9:
+                if float(data["proba"]) >= 0.9:
                     guess = data
                     confidence = float(data["proba"]) * 100
                     break
@@ -2971,8 +2982,9 @@ class Akinator(Command):
                     guess = aki.first_guess
                     if div <= 0:
                         div = 1
-                    confidence = float(data["proba"]) / div * 100
+                    confidence = float(guess["proba"]) / div * 100
         confidence = min(aki.progression, confidence)
+        print(aki.step, aki.progression, aki.first_guess, aki.no, guess, confidence, sep="\n")
 
         colour = await bot.get_colour(user)
         emb = discord.Embed(colour=colour)
@@ -2980,6 +2992,7 @@ class Akinator(Command):
         desc = ""
         if win:
             question = "Guessed right one more time! I love playing with you!"
+            emb.set_thumbnail(url="https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/triomphe.png")
         elif guess:
             if confidence > 90:
                 question = f"I'm {round(confidence, 2)}% sure it's..."
@@ -2997,6 +3010,7 @@ class Akinator(Command):
             else:
                 question = aki.question
             buttons = self.buttons
+            emb.set_thumbnail(url=choice(self.images))
         if callback == "none":
             emb.title = "Akinator: Game ended"
             buttons = ()
@@ -3010,6 +3024,7 @@ class Akinator(Command):
             + bar
         )
         emb.set_author(**get_author(user))
+        create_task(bot.ignore_interaction(message))
         try:
             sem = EDIT_SEM[message.channel.id]
         except KeyError:
@@ -3025,7 +3040,6 @@ class Akinator(Command):
                 authorise=True,
                 aio=True,
             )
-        await bot.ignore_interaction(message)
 
 
 class UpdateAkinator(Database):
@@ -3043,7 +3057,7 @@ class UpdateAkinator(Database):
         if self.sem.busy:
             return
         t = utc()
-        while self.akinators and t > self.akinators[0].timestamp + 480:
+        while self.akinators and t > self.akinators[0].timestamp + 240:
             self.akinators.popleft()
         async with self.sem:
             while len(self.akinators) < 2:
@@ -3051,7 +3065,7 @@ class UpdateAkinator(Database):
                 await aki.start_game(language="en", child_mode=False, client_session=Request.session)
                 self.akinators.append(aki)
             for k, aki in tuple(self.data.items()):
-                if t > aki.timestamp + 720:
+                if t > aki.timestamp + 960:
                     self.data.pop(k)
 
     def __call__(self, **void):
