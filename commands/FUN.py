@@ -347,7 +347,7 @@ class Text2048(Command):
     }
 
     async def _callback_(self, bot, message, reaction, argv, user, perm, vals, **void):
-        u_id, mode = list(map(int, vals.split("_", 1)))
+        u_id, mode = list(map(literal_eval, vals.split("_", 1)))
         if reaction is not None and u_id != user.id and u_id != 0 and perm < 3:
             return
         spl = argv.split("-")
@@ -2988,6 +2988,8 @@ class Akinator(Command):
             emb.title = f"Akinator"
             desc = bold(guess["name"]) + "\n" + italics(guess["description"]) + "\n"
             buttons = [self.buttons[0], self.buttons[4]]
+            if guess.get("absolute_picture_path"):
+                emb.set_thumbnail(url=guess["absolute_picture_path"])
         else:
             emb.title = f"Akinator: Question {aki.step + 1}"
             if aki.step >= 79:

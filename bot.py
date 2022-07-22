@@ -74,6 +74,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         self.start_time = utc()
         self.monkey_patch()
         super().__init__(
+            loop=eloop,
             max_messages=256,
             heartbeat_timeout=64,
             chunk_guilds_at_startup=False,
