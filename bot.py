@@ -1888,7 +1888,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 try:
                     enabled = self.data.enabled[guild.id]
                 except KeyError:
-                    enabled = ("main", "string", "admin", "voice", "image", "fun")
+                    enabled = ("main", "string", "admin", "voice", "image", "fun", "webhook")
         else:
             enabled = self.categories.keys()
         return enabled
