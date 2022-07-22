@@ -823,7 +823,7 @@ def round_min(x):
 			return round_min(x.real)
 		else:
 			return round_min(complex(x).real) + round_min(complex(x).imag) * (1j)
-	if isfinite(x):
+	if math.isfinite(x):
 		y = round(x)
 		if x == y:
 			return int(y)

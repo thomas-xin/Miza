@@ -3032,7 +3032,7 @@ class UpdateAkinator(Database):
         if self.sem.busy:
             return
         t = utc()
-        while t > self.akinators[0].timestamp + 480:
+        while self.akinators and t > self.akinators[0].timestamp + 480:
             self.akinators.popleft()
         async with self.sem:
             while len(self.akinators) < 2:
