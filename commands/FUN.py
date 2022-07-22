@@ -2995,7 +2995,7 @@ class Akinator(Command):
             else:
                 question = f"I'm ({round(aki.progression, 1)}%) thinking of..."
             emb.title = f"Akinator"
-            desc = bold(guess["name"]) + "\n" + italics(guess["description"]) + "\n"
+            desc = "\xad" + bold(guess["name"]) + "\n" + italics(guess["description"]) + "\n"
             buttons = [self.buttons[0], self.buttons[4]]
             if guess.get("absolute_picture_path"):
                 emb.set_thumbnail(url=guess["absolute_picture_path"])
