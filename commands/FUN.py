@@ -2915,7 +2915,7 @@ class Akinator(Command):
         except KeyError:
             return
 
-        aki = bot.data.akinators.get(aki.signature)
+        aki = bot.data.akinators.get(sig)
         if not aki:
             colour = await bot.get_colour(user)
             emb = discord.Embed(colour=colour)
