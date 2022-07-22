@@ -2950,7 +2950,12 @@ class Akinator(Command):
         if guessing and ans == 1:
             if aki.step >= 79:
                 ans = "end"
-            aki.no.add(aki.first_guess["id"])
+            if not aki.guesses:
+                aki.win()
+            for data in aki.guesses:
+                if data["id"] not in aki.no:
+                    aki.no.add(data["id"])
+                    break
         elif isinstance(ans, int):
             try:
                 await aki.answer(ans)
