@@ -2965,26 +2965,17 @@ class Akinator(Command):
             bot.data.akinators.pop(aki.signature, None)
 
         div = 1
-        confidence = 0
-        if (aki.progression >= 80 or guess) and not aki.step >= 79 and not win:
+        if (aki.progression >= 80 or guess) and not aki.step >= 79 and not win and not guessing:
             if not aki.guesses:
                 await aki.win()
             for data in aki.guesses:
                 if data["id"] in aki.no:
-                    div -= float(data["proba"])
                     continue
-                if float(data["proba"]) >= 0.9:
-                    guess = data
-                    confidence = float(data["proba"]) * 100
-                    break
+                guess = data
             else:
-                if guess and aki.first_guess:
+                if (guess or aki.progression >= 90) and aki.first_guess:
                     guess = aki.first_guess
-                    if div <= 0:
-                        div = 1
-                    confidence = float(guess["proba"]) / div * 100
-        confidence = min(aki.progression, confidence)
-        print(aki.step, aki.progression, aki.first_guess, aki.no, guess, confidence, sep="\n")
+        print(aki.step, aki.first_guess, aki.no, guess, sep="\n")
 
         colour = await bot.get_colour(user)
         emb = discord.Embed(colour=colour)
@@ -2994,10 +2985,10 @@ class Akinator(Command):
             question = "Guessed right one more time! I love playing with you!"
             emb.set_thumbnail(url="https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/triomphe.png")
         elif guess:
-            if confidence > 90:
-                question = f"I'm {round(confidence, 2)}% sure it's..."
+            if aki.progression > 90:
+                question = f"I'm {round(aki.progression, 2)}% sure it's..."
             else:
-                question = f"I'm ({round(confidence, 1)}%) thinking of..."
+                question = f"I'm ({round(aki.progression, 1)}%) thinking of..."
             emb.title = f"Akinator"
             desc = bold(guess["name"]) + "\n" + italics(guess["description"]) + "\n"
             buttons = [self.buttons[0], self.buttons[4]]

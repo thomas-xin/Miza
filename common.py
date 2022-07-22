@@ -76,7 +76,15 @@ ip2int = lambda ip: int.from_bytes(b"\x00" + bytes(int(i) for i in ip.split(".")
 
 api = "v9"
 
-emptyfut = fut_nop = asyncio.Future()
+# Main event loop for all asyncio operations.
+try:
+    eloop = asyncio.get_event_loop()
+except:
+    eloop = asyncio.new_event_loop()
+__setloop__ = lambda: asyncio.set_event_loop(eloop)
+__setloop__()
+
+emptyfut = fut_nop = asyncio.Future(loop=eloop)
 fut_nop.set_result(None)
 newfut = concurrent.futures.Future()
 newfut.set_result(None)
@@ -2043,15 +2051,6 @@ def evalEX(exc):
     if issubclass(type(ex), BaseException):
         raise ex
     return ex
-
-
-# Main event loop for all asyncio operations.
-try:
-    eloop = asyncio.get_event_loop()
-except:
-    eloop = asyncio.new_event_loop()
-__setloop__ = lambda: asyncio.set_event_loop(eloop)
-__setloop__()
 
 
 ThreadPoolExecutor = concurrent.futures.ThreadPoolExecutor
