@@ -531,7 +531,7 @@ class Text2048(Command):
                     authorise=True,
                     aio=True,
                 )
-        return await bot.ignore_interaction(message)
+        await bot.ignore_interaction(message)
 
     async def __call__(self, bot, argv, args, user, flags, message, guild, **void):
         # Input may be nothing, a single value representing board size, a size and dimension count input, or a sequence of numbers representing size along an arbitrary amount of dimensions
@@ -3008,12 +3008,22 @@ class Akinator(Command):
             + bar
         )
         emb.set_author(**get_author(user))
-        create_task(message.edit(embed=emb))
-        await interaction_patch(
-            bot=bot,
-            message=message,
-            buttons=buttons,
-        )
+        try:
+            sem = EDIT_SEM[message.channel.id]
+        except KeyError:
+            sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
+        async with sem:
+            return await Request(
+                f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
+                data=dict(
+                    embed=emb.to_dict(),
+                    components=restructure_buttons(buttons),
+                ),
+                method="PATCH",
+                authorise=True,
+                aio=True,
+            )
+        await bot.ignore_interaction(message)
 
 
 class UpdateAkinator(Database):

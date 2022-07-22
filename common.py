@@ -2046,8 +2046,9 @@ def evalEX(exc):
 
 
 # Main event loop for all asyncio operations.
-eloop = asyncio.get_event_loop()
+eloop = asyncio.new_event_loop()
 __setloop__ = lambda: asyncio.set_event_loop(eloop)
+__setloop__()
 
 
 ThreadPoolExecutor = concurrent.futures.ThreadPoolExecutor
@@ -2100,10 +2101,7 @@ pthreads = ThreadPoolExecutor(32, initializer=__setloop__)
 athreads = MultiThreadPool(pool_count=2, thread_count=64, initializer=__setloop__)
 
 def get_event_loop():
-    try:
-        return asyncio.get_event_loop()
-    except RuntimeError:
-        return eloop
+    return eloop
 
 # Creates an asyncio Future that waits on a multithreaded one.
 def wrap_future(fut, loop=None, shield=False, thread_safe=True):
