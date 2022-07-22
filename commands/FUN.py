@@ -2998,10 +2998,10 @@ class Akinator(Command):
                 question = aki.question
             buttons = self.buttons
         if callback == "none":
-            emb.title = "Akinator: Game over"
+            emb.title = "Akinator: Game ended"
             buttons = ()
 
-        guessing = not guess
+        guessing = bool(guess)
         bar = await bot.create_progress_bar(18, aki.progression / 100)
         emb.description = (
             f"*```{callback}-fun-akinator-{user.id}_{aki.signature}_{guessing}-\n"
