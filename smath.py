@@ -440,27 +440,29 @@ def divmod(x, y):
 
 # Rounds a number to a certain amount of decimal places.
 def round(x, y=None):
-    try:
-        if is_finite(x):
-            try:
-                if x == int(x):
-                    return int(x)
-                if y is None:
-                    return int(math.round(x))
-            except:
-                pass
-            return round_min(math.round(x, y))
-        else:
-            return x
-    except:
-        pass
-    if type(x) is complex:
-        return round(x.real, y) + round(x.imag, y) * 1j
-    try:
-        return math.round(x, y)
-    except:
-        pass
-    return x
+	if isinstance(x, int):
+		return x
+	try:
+		if is_finite(x):
+			try:
+				if x == int(x):
+					return int(x)
+				if y is None:
+					return int(math.round(x))
+			except:
+				pass
+			return round_min(math.round(x, y))
+		else:
+			return x
+	except:
+		pass
+	if isinstance(x, complex)
+		return round(x.real, y) + round(x.imag, y) * 1j
+	try:
+		return math.round(x, y)
+	except:
+		pass
+	return x
 
 # Rounds a number to the nearest integer, with a probability determined by the fractional part.
 def round_random(x):
@@ -806,40 +808,26 @@ def sub_dict(d, key):
 
 # Casts a number to integers if the conversion would not alter the value.
 def round_min(x):
-    if type(x) is str:
-        if "." in x:
-            x = x.strip("0")
-            if len(x) > 8:
-                x = mpf(x)
-            else:
-                x = float(x)
-        else:
-            try:
-                return int(x)
-            except ValueError:
-                return float(x)
-    if type(x) is int:
-        return x
-    if type(x) is not complex:
-        if is_finite(x):
-            if type(x) is globals().get("mpf", None):
-                y = int(x)
-                if x == y:
-                    return y
-                f = float(x)
-                if str(x) == str(f):
-                    return f
-            else:
-                y = math.round(x)
-                if x == y:
-                    return int(y)
-        return x
-    else:
-        if x.imag == 0:
-            return round_min(x.real)
-        else:
-            return round_min(complex(x).real) + round_min(complex(x).imag) * (1j)
-
+	if isinstance(x, int):
+		return x
+	if isinstance(x, str):
+		if "." in x:
+			x = float(x.strip("0"))
+		else:
+			try:
+				return int(x)
+			except ValueError:
+				return float(x)
+	if isinstance(x, complex):
+		if x.imag == 0:
+			return round_min(x.real)
+		else:
+			return round_min(complex(x).real) + round_min(complex(x).imag) * (1j)
+	if isfinite(x):
+		y = round(x)
+		if x == y:
+			return int(y)
+	return x
 
 # Rounds a number to various fractional positions if possible.
 def close_round(n):
@@ -851,7 +839,6 @@ def close_round(n):
         if abs(b - rounds[i]) < 0.02:
             c = rounds[i]
     return mpf(a + c)
-
 
 # Converts a float to a fraction represented by a numerator/denominator pair.
 def to_frac(num, limit=2147483647):
@@ -867,17 +854,21 @@ def to_frac(num, limit=2147483647):
     return frac
 
 
-def astype(obj, t, *args, **kwargs):
-    try:
-        if not isinstance(obj, t):
-            if callable(t):
-                return t(obj, *args, **kwargs)
-            return t
-    except TypeError:
-        if callable(t):
-            return t(obj, *args, **kwargs)
-        return t
-    return obj
+def astype(obj, types, *args, **kwargs):
+	if isinstance(types, tuple):
+		tl = tuple(t for t in types if isinstance(t, type))
+	else:
+		tl = None
+	tl = tl or types
+	try:
+		if not isinstance(obj, tl):
+			raise TypeError
+	except TypeError:
+		t = types[0] if isinstance(types, tuple) else types
+		if callable(t):
+			return t(obj, *args, **kwargs)
+		return t
+	return obj
 
 
 gcd = math.gcd

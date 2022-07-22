@@ -762,7 +762,7 @@ def restructure_buttons(buttons):
             if "type" not in button:
                 button["type"] = 2
             if "name" in button:
-                button["label"] = button["name"]
+                button["label"] = button.pop("name")
             if "label" in button:
                 button["label"] = lim_str(button["label"], 80)
             try:
@@ -798,7 +798,7 @@ def restructure_buttons(buttons):
             if "style" not in button:
                 button["style"] = 1
             if button.get("emoji"):
-                if button["emoji"].get("name") == "▪️":
+                if button["emoji"].get("label") == "▪️":
                     button["disabled"] = True
     return [dict(type=1, components=row) for row in buttons]
 

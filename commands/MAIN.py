@@ -3,7 +3,7 @@ print = PRINT
 
 # Default and standard command categories to enable.
 basic_commands = frozenset(("main", "string", "admin"))
-standard_commands = default_commands = basic_commands.union(("voice", "image", "fun"))
+standard_commands = default_commands = basic_commands.union(("voice", "image", "webhook", "fun"))
 
 help_colours = fcdict({
     None: 0xfffffe,

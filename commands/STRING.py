@@ -19,7 +19,7 @@ class Translate(Command):
     time_consuming = True
     name = ["TR"]
     description = "Translates a string into another language."
-    usage = "<0:language>? <1:string>"
+    usage = "<0:language(en)>? <1:string>"
     flags = "v"
     no_parse = True
     rate_limit = (2, 7)
