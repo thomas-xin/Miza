@@ -1,5 +1,5 @@
 import nekos, akinator
-from akinator.async_aki import Akinator
+from akinator.async_aki import Akinator as async_akinator
 print = PRINT
 
 
@@ -3036,7 +3036,7 @@ class UpdateAkinator(Database):
             self.akinators.popleft()
         async with self.sem:
             while len(self.akinators) < 2:
-                aki = Akinator()
+                aki = async_akinator()
                 await aki.start_game(language="en", child_mode=False, client_session=Request.session)
                 self.akinators.append(aki)
             for k, aki in tuple(self.data.items()):
