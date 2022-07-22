@@ -2878,6 +2878,8 @@ class Akinator(Command):
         "https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/vrai_decouragement.png",
         "https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/mobile.png",
         "https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/confiant.png",
+        "https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/leger_decouragement.png",
+        "https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/inspiration_forte.png",
     ]
 
     button_equiv = {
@@ -2989,7 +2991,10 @@ class Akinator(Command):
         desc = ""
         if win:
             aki.progression = 100
-            question = "Guessed right one more time! I love playing with you!"
+            question = "Great! Guessed right one more time! I love playing with you!"
+            gold = aki.step * 5
+            bot.data.users.add_gold(user, gold)
+            desc = await bot.as_rewards(gold)
             emb.set_thumbnail(url="https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/triomphe.png")
         elif guess:
             if aki.progression > 90:
@@ -3004,7 +3009,10 @@ class Akinator(Command):
         else:
             emb.title = f"Akinator: Question {aki.step + 1}"
             if aki.step >= 79:
-                question = "Bravo! You have defeated me! Play the game again on the Akinator website to add the character you were thinking of, and I'll try to remember next time!"
+                question = "Bravo! You have defeated me! Play the game again on the Akinator website to add the character you were thinking of, and I'll remember for next time!"
+                gold = aki.step * 4
+                bot.data.users.add_gold(user, gold)
+                desc = await bot.as_rewards(gold)
             else:
                 question = aki.question
             buttons = self.buttons

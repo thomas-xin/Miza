@@ -486,7 +486,9 @@ round_random_multiple = lambda x, y=1: round_min(round_random(x / y) * y) if y e
 def ceil(x):
     with suppress(Exception):
         return math.ceil(x)
-    if type(x) is complex:
+    if isinstance(x, str):
+        x = float(x)
+    elif isinstance(x, complex):
         return ceil(x.real) + ceil(x.imag) * 1j
     with suppress(Exception):
         return math.ceil(x)
@@ -496,7 +498,9 @@ def ceil(x):
 def floor(x):
     with suppress(Exception):
         return math.floor(x)
-    if type(x) is complex:
+    if isinstance(x, str):
+        x = float(x)
+    elif isinstance(x, complex):
         return floor(x.real) + floor(x.imag) * 1j
     with suppress(Exception):
         return math.floor(x)
@@ -506,7 +510,9 @@ def floor(x):
 def trunc(x):
     with suppress(Exception):
         return math.trunc(x)
-    if type(x) is complex:
+    if isinstance(x, str):
+        x = float(x)
+    elif isinstance(x, complex):
         return trunc(x.real) + trunc(x.imag) * 1j
     with suppress(Exception):
         return math.trunc(x)
