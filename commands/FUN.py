@@ -3036,8 +3036,8 @@ class UpdateAkinator(Database):
             self.akinators.popleft()
         async with self.sem:
             while len(self.akinators) < 2:
-                aki = Akinator(client_session=Request.session)
-                await aki.start_game(language="en", child_mode=False)
+                aki = Akinator()
+                await aki.start_game(language="en", child_mode=False, client_session=Request.session)
                 self.akinators.append(aki)
             for k, aki in tuple(self.data.items()):
                 if t > aki.timestamp + 720:
