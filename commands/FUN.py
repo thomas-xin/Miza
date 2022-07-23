@@ -3089,6 +3089,8 @@ class Akinator(Command):
             emb.set_image(url="https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/triomphe.png")
         elif guess and not guessing:
             if isinstance(guess, bool):
+                if not aki.guesses:
+                    aki.win()
                 for data in aki.guesses:
                     if data["id"] not in aki.no:
                         guess = data
