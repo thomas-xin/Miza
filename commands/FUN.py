@@ -2851,8 +2851,8 @@ class UpdateRPS(Database):
     name = "rps"
 
 
-EXCLUDE_URL = "https://{}/exclusion?callback=jQuery331023608747682107778_{}&urlApiWs={}&childMod={}&session={}&signature={}&step={}&frontaddr={}&question_filter={}&forward_answer=1"
-CHOICE_URL = "https://{}/choice?callback=jQuery331023608747682107778_{}&urlApiWs={}&childMod={}&session={}&signature={}&step={}&frontaddr={}&question_filter={}&element={}&duel_allowed=1"
+EXCLUDE_URL = "{}/exclusion?callback=jQuery331023608747682107778_{}&childMod={}&session={}&signature={}&step={}&frontaddr={}&question_filter={}&forward_answer=1"
+CHOICE_URL = "{}/choice?callback=jQuery331023608747682107778_{}&childMod={}&session={}&signature={}&step={}&frontaddr={}&question_filter={}&element={}&duel_allowed=1"
 
 HEADERS = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
@@ -2967,9 +2967,8 @@ class Akinator(Command):
                 await aki.win()
             resp = await Request(
                 CHOICE_URL.format(
-                    aki.uri,
-                    aki.timestamp,
                     aki.server,
+                    aki.timestamp,
                     str(aki.child_mode).lower(),
                     aki.session,
                     aki.signature,
@@ -2992,9 +2991,8 @@ class Akinator(Command):
                 aki.win()
             resp = await Request(
                 EXCLUDE_URL.format(
-                    aki.uri,
-                    aki.timestamp,
                     aki.server,
+                    aki.timestamp,
                     str(aki.child_mode).lower(),
                     aki.session,
                     aki.signature,
