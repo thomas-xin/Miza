@@ -2869,6 +2869,7 @@ def _parse_response(response):
 async_akinator.parse_response = lambda self, response: _parse_response(self, response)
 
 class Akinator(Command):
+    name = ["Aki"]
     description = "Think about a real or fictional character. I will try to guess who it is!"
     usage = "<language(en)>? <child_friendly{?c}>"
     flags = "c"
@@ -3057,7 +3058,7 @@ class Akinator(Command):
             bot.data.users.add_gold(user, gold)
             desc = await bot.as_rewards(gold)
             emb.set_image(url="https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/triomphe.png")
-        elif guess:
+        elif guess and not guessing:
             if aki.progression > 90:
                 question = f"I'm {round(aki.progression, 2)}% sure it's..."
             else:
