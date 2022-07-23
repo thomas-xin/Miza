@@ -2924,8 +2924,8 @@ class Akinator(Command):
         if language in ("", "en", "eng", "english") and "c" not in flags and akinators:
             aki = akinators.popleft()
         else:
-            aki = async_akinator(client_session=Request.session)
-            await aki.start_game(language=language, child_mode="c" in flags)
+            aki = async_akinator()
+            await aki.start_game(language=language, child_mode="c" in flags, client_session=Request.session)
         bot.data.akinators[aki.signature] = aki
 
         colour = await bot.get_colour(user)
@@ -3055,8 +3055,8 @@ class Akinator(Command):
             bot.data.akinators.pop(aki.signature, None)
         elif ans == "restart":
             bot.data.akinators.pop(aki.signature, None)
-            aki2 = async_akinator(client_session=Request.session)
-            await aki2.start_game(language=aki.uri.split(".", 1)[0], child_mode=aki.child_mode)
+            aki2 = async_akinator()
+            await aki2.start_game(language=aki.uri.split(".", 1)[0], child_mode=aki.child_mode, client_session=Request.session)
             aki = aki2
 
         div = 1
@@ -3121,6 +3121,7 @@ class Akinator(Command):
         if callback == "none":
             emb.title = "Akinator: Game ended"
             buttons = (self.buttons[-2],)
+            callback = "callback-"
         if desc:
             desc += "\n"
         else:
