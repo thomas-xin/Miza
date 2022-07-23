@@ -38,7 +38,7 @@ help_descriptions = fcdict((
     ("admin", "Moderation-based, used to help staffing servers"),
     ("voice", "Play, convert, or download songs through VC"),
     ("image", "Create or edit images, animations, and videos"),
-    ("webhook", "Webhook-related commands and management")
+    ("webhook", "Webhook-related commands and management"),
     ("fun", "Text-based games and other fun features"),
     ("owner", "Restricted owner-only commands; highly volatile"),
     ("nsfw", "Not Safe For Work; only usable in 18+ channels"),
