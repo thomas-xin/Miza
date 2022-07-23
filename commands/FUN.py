@@ -3058,6 +3058,7 @@ class Akinator(Command):
             aki2 = async_akinator()
             await aki2.start_game(language=aki.uri.split(".", 1)[0], child_mode=aki.child_mode, client_session=Request.session)
             aki = aki2
+            aki.__dict__.setdefault("no", set())
 
         div = 1
         if (aki.progression >= 80 or guess) and not aki.step >= 79 and not win and not guessing:
