@@ -2851,6 +2851,14 @@ class UpdateRPS(Database):
     name = "rps"
 
 
+EXCLUDE_URL = "https://{}/exclusion?callback=jQuery331023608747682107778_{}&urlApiWs={}&childMod={}&session={}&signature={}&step={}&frontaddr={}&question_filter={}&forward_answer=1"
+
+def _parse_response(response):
+    if response == '{["completion" => "KO - UNAUTHORIZED"]}':
+        return {"completion": "KO - UNAUTHORIZED"}
+    return json.loads(",".join(response.replace("=>", ":").split("(", 1)[-1:])[:-1])
+async_akinator.parse_response = lambda self, response: _parse_response(self, response)
+
 class Akinator(Command):
     description = "Think about a real or fictional character. I will try to guess who it is!"
     usage = "<language(en)>? <child_friendly{?c}>"
@@ -2902,7 +2910,7 @@ class Akinator(Command):
         if language in ("", "en", "eng", "english") and "c" not in flags and akinators:
             aki = akinators.popleft()
         else:
-            aki = Akinator(client_session=Request.session)
+            aki = async_akinator(client_session=Request.session)
             await aki.start_game(language=language, child_mode="c" in flags)
         bot.data.akinators[aki.signature] = aki
 
@@ -2937,7 +2945,7 @@ class Akinator(Command):
             emb.description = message.embeds[0].description.replace("callback-", "none-")
             create_task(message.edit(embed=emb))
             raise TimeoutError("Akinator game has expired. Please create a new one to proceed!")
-        aki.__dict__.setdefault("no", set())
+        # aki.__dict__.setdefault("no", set())
         create_task(bot.ignore_interaction(message))
 
         callback = "callback"
@@ -2952,10 +2960,30 @@ class Akinator(Command):
                 ans = "end"
             if not aki.guesses:
                 aki.win()
-            for data in aki.guesses:
-                if data["id"] not in aki.no:
-                    aki.no.add(data["id"])
-                    break
+            resp = await Request(
+                EXCLUDE_URL.format(
+                    aki.uri,
+                    aki.timestamp,
+                    aki.server,
+                    str(aki.child_mode).lower(),
+                    aki.session,
+                    aki.signature,
+                    aki.step,
+                    aki.frontaddr,
+                    aki.question_filter,
+                ),
+                headers=HEADERS,
+                decode=True
+            )
+            resp = aki.parse_response(resp)
+            if resp["completion"] == "OK":
+                aki._update(resp)
+            else:
+                akinator.utils.raise_connection_error(resp["completion"])
+            # for data in aki.guesses:
+            #     if data["id"] not in aki.no:
+            #         aki.no.add(data["id"])
+            #         break
         elif isinstance(ans, int):
             try:
                 await aki.answer(ans)
@@ -2965,7 +2993,7 @@ class Akinator(Command):
                 guess = True
         elif ans == "undo":
             await aki.back()
-            aki.no.clear()
+            # aki.no.clear()
         elif ans == "guess":
             guess = True
         elif ans == "end":
@@ -2981,14 +3009,14 @@ class Akinator(Command):
             if not aki.guesses:
                 await aki.win()
             for data in aki.guesses:
-                if data["id"] in aki.no:
-                    continue
+                # if data["id"] in aki.no:
+                #     continue
                 guess = data
                 break
             else:
                 if (guess or aki.progression >= 90) and aki.first_guess:
                     guess = aki.first_guess
-        print(aki.step, aki.progression, aki.guesses, aki.no, guess, sep="\n")
+        print(aki.step, aki.progression, aki.guesses, sep="\n")
 
         colour = await bot.get_colour(user)
         emb = discord.Embed(colour=colour)
@@ -3000,7 +3028,7 @@ class Akinator(Command):
             gold = aki.step * 5
             bot.data.users.add_gold(user, gold)
             desc = await bot.as_rewards(gold)
-            emb.set_thumbnail(url="https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/triomphe.png")
+            emb.set_image(url="https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/triomphe.png")
         elif guess:
             if aki.progression > 90:
                 question = f"I'm {round(aki.progression, 2)}% sure it's..."
@@ -3010,7 +3038,7 @@ class Akinator(Command):
             desc = "\xad" + bold(guess["name"]) + "\n" + italics(guess["description"])
             buttons = [self.buttons[0], self.buttons[4]]
             if guess.get("absolute_picture_path"):
-                emb.set_thumbnail(url=guess["absolute_picture_path"])
+                emb.set_image(url=guess["absolute_picture_path"])
         else:
             emb.title = f"Akinator: Question {aki.step + 1}"
             if aki.step >= 79:
@@ -3018,10 +3046,11 @@ class Akinator(Command):
                 gold = aki.step * 4
                 bot.data.users.add_gold(user, gold)
                 desc = await bot.as_rewards(gold)
+                emb.set_image(url="https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/deception.png")
             else:
                 question = aki.question
+                emb.set_image(url=choice(self.images))
             buttons = self.buttons
-            emb.set_thumbnail(url=choice(self.images))
         if callback == "none":
             emb.title = "Akinator: Game ended"
             buttons = ()

@@ -12,6 +12,7 @@ help_colours = fcdict({
     "admin": 0x0000ff,
     "voice": 0xff00ff,
     "image": 0xffff00,
+    "webhook": 0xff007f
     "fun": 0x00ffff,
     "owner": 0xbf7fff,
     "nsfw": 0xff9f9f,
@@ -24,6 +25,7 @@ help_emojis = fcdict((
     ("admin", "🕵️‍♀️"),
     ("voice", "🎼"),
     ("image", "🖼"),
+    ("webhook", "🕸️"),
     ("fun", "🙃"),
     ("owner", "💜"),
     ("nsfw", "🔞"),
@@ -36,7 +38,8 @@ help_descriptions = fcdict((
     ("admin", "Moderation-based, used to help staffing servers"),
     ("voice", "Play, convert, or download songs through VC"),
     ("image", "Create or edit images, animations, and videos"),
-    ("fun", "Text-based games and webhook management"),
+    ("webhook", "Webhook-related commands and management")
+    ("fun", "Text-based games and other fun features"),
     ("owner", "Restricted owner-only commands; highly volatile"),
     ("nsfw", "Not Safe For Work; only usable in 18+ channels"),
     ("misc", "Miscellaneous; restricted to trusted servers"),
