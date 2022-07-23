@@ -818,7 +818,7 @@ def interaction_response(bot, message, content=None, embed=None, components=None
         message.int_id = message.id
     if not getattr(message, "int_token", None):
         message.int_token = message.slash
-    return Request(
+    resp = Request(
         f"https://discord.com/api/{api}/interactions/{message.int_id}/{message.int_token}/callback",
         data=orjson.dumps(dict(
             type=4,
@@ -833,6 +833,14 @@ def interaction_response(bot, message, content=None, embed=None, components=None
         authorise=True,
         aio=True,
     )
+    bot = BOT[0]
+    if bot:
+        M = bot.ExtendedMessage.new
+    else:
+        M = discord.Message
+    message = M(state=bot._state, channel=channel, data=eval_json(resp))
+    bot.add_message(message, files=False, force=True)
+    return message
 
 def interaction_patch(bot, message, content=None, embed=None, components=None, buttons=None):
     if hasattr(embed, "to_dict"):
@@ -841,7 +849,7 @@ def interaction_patch(bot, message, content=None, embed=None, components=None, b
         message.int_id = message.id
     if not getattr(message, "int_token", None):
         message.int_token = message.slash
-    return Request(
+    resp = Request(
         f"https://discord.com/api/{api}/interactions/{message.int_id}/{message.int_token}/callback",
         data=orjson.dumps(dict(
             type=7,
@@ -856,6 +864,14 @@ def interaction_patch(bot, message, content=None, embed=None, components=None, b
         authorise=True,
         aio=True,
     )
+    bot = BOT[0]
+    if bot:
+        M = bot.ExtendedMessage.new
+    else:
+        M = discord.Message
+    message = M(state=bot._state, channel=channel, data=eval_json(resp))
+    bot.add_message(message, files=False, force=True)
+    return message
 
 
 # Escapes syntax in code highlighting markdown.
