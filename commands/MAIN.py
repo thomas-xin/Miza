@@ -12,7 +12,7 @@ help_colours = fcdict({
     "admin": 0x0000ff,
     "voice": 0xff00ff,
     "image": 0xffff00,
-    "webhook": 0xff007f
+    "webhook": 0xff007f,
     "fun": 0x00ffff,
     "owner": 0xbf7fff,
     "nsfw": 0xff9f9f,
