@@ -2957,6 +2957,8 @@ class Akinator(Command):
             emb = discord.Embed(colour=colour)
             emb.title = message.embeds[0].title
             emb.description = message.embeds[0].description.replace("callback-", "none-")
+            if message.embeds[0].image:
+                emb.set_image(message.embeds[0].image.url)
             create_task(message.edit(embed=emb))
             raise TimeoutError("Akinator game has expired. Please create a new one to proceed!")
         aki.__dict__.setdefault("no", set())
@@ -3058,6 +3060,7 @@ class Akinator(Command):
             aki2 = async_akinator()
             await aki2.start_game(language=aki.uri.split(".", 1)[0], child_mode=aki.child_mode, client_session=Request.session)
             aki = aki2
+            bot.data.akinators[aki.signature] = aki
             aki.__dict__.setdefault("no", set())
 
         div = 1
