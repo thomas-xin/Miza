@@ -2979,7 +2979,8 @@ class Akinator(Command):
                     aki.first_guess["id"],
                 ),
                 headers=HEADERS,
-                decode=True
+                decode=True,
+                aio=True,
             )
             resp = aki.parse_response(resp)
             if resp["completion"] != "OK":
@@ -3002,7 +3003,8 @@ class Akinator(Command):
                     aki.question_filter,
                 ),
                 headers=HEADERS,
-                decode=True
+                decode=True,
+                aio=True,
             )
             resp = aki.parse_response(resp)
             if resp["completion"] == "OK":
