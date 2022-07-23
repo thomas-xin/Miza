@@ -2890,18 +2890,21 @@ class Akinator(Command):
     ]
 
     images = [
-        "https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/defi.png",
-        "https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/serein.png",
-        "https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/inspiration_legere.png",
-        "https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/etonnement.png",
-        "https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/concentration_intense.png",
-        "https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/vrai_decouragement.png",
-        "https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/mobile.png",
-        "https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/confiant.png",
-        "https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/leger_decouragement.png",
-        "https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/inspiration_forte.png",
-        "https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/surprise.png",
+        "https://cdn.discordapp.com/attachments/731709481863479436/1000436949573705758/A0.png",
+        "https://cdn.discordapp.com/attachments/731709481863479436/1000436949917630575/A1.png",
+        "https://cdn.discordapp.com/attachments/731709481863479436/1000436950211252385/A2.png",
+        "https://cdn.discordapp.com/attachments/731709481863479436/1000436950550982716/A3.png",
+        "https://cdn.discordapp.com/attachments/731709481863479436/1000436950831988897/A4.png",
+        "https://cdn.discordapp.com/attachments/731709481863479436/1000436951180120145/A5.png",
+        "https://cdn.discordapp.com/attachments/731709481863479436/1000436951498895380/A6.png",
+        "https://cdn.discordapp.com/attachments/731709481863479436/1000436970218078239/A7.png",
+        "https://cdn.discordapp.com/attachments/731709481863479436/1000436970754945034/A8.png",
+        "https://cdn.discordapp.com/attachments/731709481863479436/1000436971048554496/A9.png",
+        "https://cdn.discordapp.com/attachments/731709481863479436/1000436971337945108/A10.png",
     ]
+    default_image = "https://cdn.discordapp.com/attachments/731709481863479436/1000436949573705758/A0.png"
+    defeat_image = "https://cdn.discordapp.com/attachments/731709481863479436/1000436971807715378/A11.png"
+    victory_image = "https://cdn.discordapp.com/attachments/731709481863479436/1000437894768500876/A12.png"
 
     button_equiv = {
         "Yes": 0,
@@ -2937,7 +2940,7 @@ class Akinator(Command):
             + f"{aki.question}```*"
             + bar
         )
-        emb.set_image(url="https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/defi.png")
+        emb.set_image(url=self.default_image)
         emb.set_author(**get_author(user))
         await send_with_react(channel, "", embed=emb, buttons=self.buttons, reference=message)
 
@@ -3092,7 +3095,7 @@ class Akinator(Command):
             gold = aki.step * 5
             bot.data.users.add_gold(user, gold)
             desc = await bot.as_rewards(gold)
-            emb.set_image(url="https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/triomphe.png")
+            emb.set_image(url=self.victory_image)
             callback = "none"
         elif guess and not guessing:
             if isinstance(guess, bool):
@@ -3120,7 +3123,7 @@ class Akinator(Command):
                 gold = aki.step * 4
                 bot.data.users.add_gold(user, gold)
                 desc = await bot.as_rewards(gold)
-                emb.set_image(url="https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/deception.png")
+                emb.set_image(url=self.defeat_image)
                 callback = "none"
             else:
                 question = aki.question
