@@ -2851,8 +2851,8 @@ class UpdateRPS(Database):
     name = "rps"
 
 
-EXCLUDE_URL = "{}/exclusion?callback=jQuery331023608747682107778_{}&childMod={}&session={}&signature={}&step={}&frontaddr={}&question_filter={}&forward_answer=1"
-CHOICE_URL = "{}/choice?callback=jQuery331023608747682107778_{}&childMod={}&session={}&signature={}&step={}&frontaddr={}&question_filter={}&element={}&duel_allowed=1"
+EXCLUDE_URL = "{}/exclusion?callback=jQuery331023608747682107778_{}&childMod={}&session={}&signature={}&step={}&frontaddr={}&question_filter={}&forward_answer=1&_={}"
+CHOICE_URL = "{}/choice?callback=jQuery331023608747682107778_{}&childMod={}&session={}&signature={}&step={}&frontaddr={}&question_filter={}&element={}&duel_allowed=1&_={}"
 
 HEADERS = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
@@ -2885,6 +2885,7 @@ class Akinator(Command):
         cdict(emoji="👎", name="No", style=1),
         cdict(emoji="↩️", name="Undo", style=1),
         cdict(emoji="🤔", name="Guess", style=1),
+        cdict(emoji="🔃", name="Restart", style=1),
         cdict(emoji="⏏️", name="End", style=1),
     ]
 
@@ -2899,6 +2900,7 @@ class Akinator(Command):
         "https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/confiant.png",
         "https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/leger_decouragement.png",
         "https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/inspiration_forte.png",
+        "https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/surprise.png",
     ]
 
     button_equiv = {
@@ -2909,6 +2911,7 @@ class Akinator(Command):
         "Probably not": 4,
         "Undo": "undo",
         "Guess": "guess",
+        "Restart": "restart",
         "End": "end",
     }
 
@@ -2928,7 +2931,7 @@ class Akinator(Command):
         colour = await bot.get_colour(user)
         emb = discord.Embed(colour=colour)
         emb.title = f"Akinator: Question {aki.step + 1}"
-        bar = await bot.create_progress_bar(18, aki.progression / 100)
+        bar = await bot.create_progress_bar(18, 0)
         emb.description = (
             f"*```callback-fun-akinator-{user.id}_{aki.signature}_0-\n"
             + f"{aki.question}```*"
@@ -2970,7 +2973,7 @@ class Akinator(Command):
             resp = await Request(
                 CHOICE_URL.format(
                     aki.server,
-                    aki.timestamp,
+                    int(aki.timestamp),
                     str(aki.child_mode).lower(),
                     aki.session,
                     aki.signature,
@@ -2978,6 +2981,7 @@ class Akinator(Command):
                     aki.frontaddr,
                     aki.question_filter,
                     aki.first_guess["id"],
+                    int(aki.timestamp) + aki.step + 1,
                 ),
                 headers=HEADERS,
                 decode=True,
@@ -2994,13 +2998,14 @@ class Akinator(Command):
             resp = await Request(
                 EXCLUDE_URL.format(
                     aki.server,
-                    aki.timestamp,
+                    int(aki.timestamp),
                     str(aki.child_mode).lower(),
                     aki.session,
                     aki.signature,
                     aki.step,
                     aki.frontaddr,
                     aki.question_filter,
+                    int(aki.timestamp) + aki.step + 1,
                 ),
                 headers=HEADERS,
                 decode=True,
@@ -3019,6 +3024,8 @@ class Akinator(Command):
                         if data["id"] not in aki.no:
                             aki.no.add(data["id"])
                             break
+                        else:
+                            aki.no.add("\x7f" + str(data["id"]))
         elif isinstance(ans, int):
             try:
                 await aki.answer(ans)
@@ -3038,6 +3045,11 @@ class Akinator(Command):
                 guess = True
             callback = "none"
             bot.data.akinators.pop(aki.signature, None)
+        elif ans == "restart":
+            bot.data.akinators.pop(aki.signature, None)
+            aki2 = async_akinator(client_session=Request.session)
+            await aki2.start_game(language=aki.uri.split(".", 1)[0], child_mode=aki.child_mode)
+            aki = aki2
 
         div = 1
         if (aki.progression >= 80 or guess) and not aki.step >= 79 and not win and not guessing:
@@ -3049,8 +3061,11 @@ class Akinator(Command):
                 guess = data
                 break
             else:
-                if (guess or aki.progression >= 90) and aki.first_guess:
+                if (guess or aki.progression >= 95) and aki.first_guess:
                     guess = aki.first_guess
+                    if "\x7f" + str(guess["id"]) in aki.no:
+                        aki.step = 79
+                        guess = None
         print(aki.step, aki.progression, aki.guesses, sep="\n")
 
         colour = await bot.get_colour(user)
@@ -3088,7 +3103,7 @@ class Akinator(Command):
             buttons = self.buttons
         if callback == "none":
             emb.title = "Akinator: Game ended"
-            buttons = ()
+            buttons = self.buttons[-2]
         if desc:
             desc += "\n"
         else:
