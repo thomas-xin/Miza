@@ -2866,7 +2866,8 @@ def _parse_response(response):
     if response == '{["completion" => "KO - UNAUTHORIZED"]}':
         return {"completion": "KO - UNAUTHORIZED"}
     return json.loads(",".join(response.replace("=>", ":").split("(", 1)[-1:])[:-1])
-async_akinator.parse_response = lambda self, response: _parse_response(self, response)
+async_akinator.parse_response = lambda self, response: _parse_response(response)
+akinator.Akinator.parse_response = lambda self, response: _parse_response(response)
 
 class Akinator(Command):
     name = ["Aki"]
