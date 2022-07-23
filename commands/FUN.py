@@ -3105,7 +3105,7 @@ class Akinator(Command):
             buttons = self.buttons
         if callback == "none":
             emb.title = "Akinator: Game ended"
-            buttons = self.buttons[-2]
+            buttons = (self.buttons[-2],)
         if desc:
             desc += "\n"
         else:
