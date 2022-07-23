@@ -2969,6 +2969,12 @@ class Akinator(Command):
         if guessing and ans == 0:
             ans = "end"
             await aki.win()
+            for data in aki.guesses:
+                if data["id"] not in aki.no:
+                    guess = data
+                    break
+            else:
+                guess = aki.first_guess
             resp = await Request(
                 CHOICE_URL.format(
                     aki.server,
@@ -2979,7 +2985,7 @@ class Akinator(Command):
                     aki.step,
                     aki.frontaddr,
                     aki.question_filter,
-                    aki.first_guess["id"],
+                    guess["id"],
                     int(aki.timestamp) + aki.step + 1,
                 ),
                 headers=HEADERS,
@@ -3082,6 +3088,13 @@ class Akinator(Command):
             desc = await bot.as_rewards(gold)
             emb.set_image(url="https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/triomphe.png")
         elif guess and not guessing:
+            if isinstance(guess, bool):
+                for data in aki.guesses:
+                    if data["id"] not in aki.no:
+                        guess = data
+                        break
+                else:
+                    guess = aki.first_guess
             if aki.progression > 90:
                 question = f"I'm {round(aki.progression, 2)}% sure it's..."
             else:

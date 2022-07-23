@@ -4228,7 +4228,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     return
                 msg = self._zlib.decompress(self._buffer)
                 self._buffer = bytearray()
-            msg = utils._from_json(msg)
+            msg = orjson.loads(msg)
             bot.socket_responses.append(msg)
             self._dispatch("socket_response", msg)
             event = msg.get("t")

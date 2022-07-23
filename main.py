@@ -98,7 +98,7 @@ else:
         subprocess.run(("wget", "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"))
         print("Download complete; extracting new FFmpeg installation...")
         os.mkdir(".temp")
-        subprocess.run(("tar", "-xf", "ffmpeg-git-amd64-static.tar.xz", "-C", ".temp"))
+        subprocess.run(("tar", "-xf", "ffmpeg-release-amd64-static.tar.xz", "-C", ".temp"))
         fi = os.listdir(".temp")[0]
         os.rename(f".temp/{fi}/ffmpeg", "ffmpeg")
         os.rename(f".temp/{fi}/ffprobe", "ffprobe")
