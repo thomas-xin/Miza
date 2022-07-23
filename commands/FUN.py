@@ -2968,8 +2968,7 @@ class Akinator(Command):
         guess = False
         if guessing and ans == 0:
             ans = "end"
-            if not aki.first_guess:
-                await aki.win()
+            await aki.win()
             resp = await Request(
                 CHOICE_URL.format(
                     aki.server,
@@ -2990,7 +2989,8 @@ class Akinator(Command):
             resp = aki.parse_response(resp)
             print(resp)
             if resp["completion"] != "OK":
-                akinator.utils.raise_connection_error(resp["completion"])
+                with tracebacksuppressor:
+                    akinator.utils.raise_connection_error(resp["completion"])
             win = max(1, int(resp["parameters"]["element_informations"]["times_selected"]))
         if guessing and ans == 1:
             if aki.step >= 79:
@@ -3026,10 +3026,8 @@ class Akinator(Command):
                 aki._update(resp)
                 aki.no.clear()
             else:
-                try:
+                with tracebacksuppressor:
                     akinator.utils.raise_connection_error(resp["completion"])
-                except akinator.AkiTechnicalError:
-                    print_exc()
         elif isinstance(ans, int):
             try:
                 await aki.answer(ans)
