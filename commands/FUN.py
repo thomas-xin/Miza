@@ -2991,8 +2991,6 @@ class Akinator(Command):
         if guessing and ans == 1:
             if aki.step >= 79:
                 ans = "end"
-            if not aki.guesses:
-                aki.win()
             resp = await Request(
                 EXCLUDE_URL.format(
                     aki.server,
@@ -3008,6 +3006,7 @@ class Akinator(Command):
                 decode=True,
                 aio=True,
             )
+            await aki.win()
             resp = aki.parse_response(resp)
             print(resp)
             if resp["completion"] == "OK":
