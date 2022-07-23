@@ -2995,6 +2995,14 @@ class Akinator(Command):
         if guessing and ans == 1:
             if aki.step >= 79:
                 ans = "end"
+            if not aki.guesses:
+                await aki.win()
+            for data in aki.guesses:
+                if data["id"] not in aki.no:
+                    aki.no.add(data["id"])
+                    break
+            else:
+                aki.no.add("\x7f" + str(data["id"]))
             resp = await Request(
                 EXCLUDE_URL.format(
                     aki.server,
@@ -3016,16 +3024,12 @@ class Akinator(Command):
             print(resp)
             if resp["completion"] == "OK":
                 aki._update(resp)
+                aki.no.clear()
             else:
                 try:
                     akinator.utils.raise_connection_error(resp["completion"])
                 except akinator.AkiTechnicalError:
-                    for data in aki.guesses:
-                        if data["id"] not in aki.no:
-                            aki.no.add(data["id"])
-                            break
-                        else:
-                            aki.no.add("\x7f" + str(data["id"]))
+                    print_exc()
         elif isinstance(ans, int):
             try:
                 await aki.answer(ans)
@@ -3066,7 +3070,7 @@ class Akinator(Command):
                     if "\x7f" + str(guess["id"]) in aki.no:
                         aki.step = 79
                         guess = None
-        print(aki.step, aki.progression, aki.guesses, sep="\n")
+        print(aki.step, aki.progression, aki.guesses, aki.no, sep="\n")
 
         colour = await bot.get_colour(user)
         emb = discord.Embed(colour=colour)
