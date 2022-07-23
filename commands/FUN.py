@@ -2956,7 +2956,7 @@ class Akinator(Command):
             emb.description = message.embeds[0].description.replace("callback-", "none-")
             create_task(message.edit(embed=emb))
             raise TimeoutError("Akinator game has expired. Please create a new one to proceed!")
-        # aki.__dict__.setdefault("no", set())
+        aki.__dict__.setdefault("no", set())
         create_task(bot.ignore_interaction(message))
 
         callback = "callback"
@@ -3013,11 +3013,13 @@ class Akinator(Command):
             if resp["completion"] == "OK":
                 aki._update(resp)
             else:
-                akinator.utils.raise_connection_error(resp["completion"])
-            # for data in aki.guesses:
-            #     if data["id"] not in aki.no:
-            #         aki.no.add(data["id"])
-            #         break
+                try:
+                    akinator.utils.raise_connection_error(resp["completion"])
+                except akinator.AkiTechnicalError:
+                    for data in aki.guesses:
+                        if data["id"] not in aki.no:
+                            aki.no.add(data["id"])
+                            break
         elif isinstance(ans, int):
             try:
                 await aki.answer(ans)
@@ -3027,7 +3029,7 @@ class Akinator(Command):
                 guess = True
         elif ans == "undo":
             await aki.back()
-            # aki.no.clear()
+            aki.no.clear()
         elif ans == "guess":
             guess = True
         elif ans == "end":
@@ -3043,8 +3045,8 @@ class Akinator(Command):
             if not aki.guesses:
                 await aki.win()
             for data in aki.guesses:
-                # if data["id"] in aki.no:
-                #     continue
+                if data["id"] in aki.no:
+                    continue
                 guess = data
                 break
             else:
