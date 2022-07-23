@@ -3090,7 +3090,7 @@ class Akinator(Command):
         elif guess and not guessing:
             if isinstance(guess, bool):
                 if not aki.guesses:
-                    aki.win()
+                    await aki.win()
                 for data in aki.guesses:
                     if data["id"] not in aki.no:
                         guess = data
