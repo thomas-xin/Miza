@@ -3093,6 +3093,7 @@ class Akinator(Command):
             bot.data.users.add_gold(user, gold)
             desc = await bot.as_rewards(gold)
             emb.set_image(url="https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/triomphe.png")
+            callback = "none"
         elif guess and not guessing:
             if isinstance(guess, bool):
                 if not aki.guesses:
@@ -3103,7 +3104,7 @@ class Akinator(Command):
                         break
                 else:
                     guess = aki.first_guess
-            if aki.progression > 90:
+            if aki.progression >= 90:
                 question = f"I'm {round(aki.progression, 2)}% sure it's..."
             else:
                 question = f"I'm ({round(aki.progression, 1)}%) thinking of..."
@@ -3120,6 +3121,7 @@ class Akinator(Command):
                 bot.data.users.add_gold(user, gold)
                 desc = await bot.as_rewards(gold)
                 emb.set_image(url="https://en.akinator.com/bundles/elokencesite/images/akitudes_670x1096/deception.png")
+                callback = "none"
             else:
                 question = aki.question
                 emb.set_image(url=choice(self.images))
