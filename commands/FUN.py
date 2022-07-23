@@ -2852,6 +2852,7 @@ class UpdateRPS(Database):
 
 
 EXCLUDE_URL = "https://{}/exclusion?callback=jQuery331023608747682107778_{}&urlApiWs={}&childMod={}&session={}&signature={}&step={}&frontaddr={}&question_filter={}&forward_answer=1"
+CHOICE_URL = "https://{}/choice?callback=jQuery331023608747682107778_{}&urlApiWs={}&childMod={}&session={}&signature={}&step={}&frontaddr={}&question_filter={}&element={}&duel_allowed=1"
 
 HEADERS = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
@@ -2962,7 +2963,28 @@ class Akinator(Command):
         guess = False
         if guessing and ans == 0:
             ans = "end"
-            win = True
+            if not aki.first_guess:
+                await aki.win()
+            resp = await Request(
+                CHOICE_URL.format(
+                    aki.uri,
+                    aki.timestamp,
+                    aki.server,
+                    str(aki.child_mode).lower(),
+                    aki.session,
+                    aki.signature,
+                    aki.step,
+                    aki.frontaddr,
+                    aki.question_filter,
+                    aki.first_guess["id"],
+                ),
+                headers=HEADERS,
+                decode=True
+            )
+            resp = aki.parse_response(resp)
+            if resp["completion"] != "OK":
+                akinator.utils.raise_connection_error(resp["completion"])
+            win = max(1, int(resp["parameters"]["element_informations"]["times_selected"]))
         if guessing and ans == 1:
             if aki.step >= 79:
                 ans = "end"
@@ -3032,7 +3054,7 @@ class Akinator(Command):
         desc = ""
         if win:
             aki.progression = 100
-            question = "Great! Guessed right one more time! I love playing with you!"
+            question = f"Great! Guessed right once more ({rank_format(win)} time with this character)! I love playing with you!"
             gold = aki.step * 5
             bot.data.users.add_gold(user, gold)
             desc = await bot.as_rewards(gold)
