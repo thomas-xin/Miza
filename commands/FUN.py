@@ -2984,6 +2984,7 @@ class Akinator(Command):
                 aio=True,
             )
             resp = aki.parse_response(resp)
+            print(resp)
             if resp["completion"] != "OK":
                 akinator.utils.raise_connection_error(resp["completion"])
             win = max(1, int(resp["parameters"]["element_informations"]["times_selected"]))
@@ -3008,6 +3009,7 @@ class Akinator(Command):
                 aio=True,
             )
             resp = aki.parse_response(resp)
+            print(resp)
             if resp["completion"] == "OK":
                 aki._update(resp)
             else:
@@ -3086,13 +3088,17 @@ class Akinator(Command):
         if callback == "none":
             emb.title = "Akinator: Game ended"
             buttons = ()
+        if desc:
+            desc += "\n"
+        else:
+            desc = ""
 
         guessing = bool(guess)
         bar = await bot.create_progress_bar(18, aki.progression / 100)
         emb.description = (
             f"*```{callback}-fun-akinator-{user.id}_{aki.signature}_{guessing}-\n"
             + f"{question}```*"
-            + desc.rstrip() + ("\n" if desc else "")
+            + desc
             + bar
         )
         emb.set_author(**get_author(user))
