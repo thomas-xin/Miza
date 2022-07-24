@@ -3132,7 +3132,7 @@ class Akinator(Command):
         if callback == "none":
             emb.title = "Akinator: Game ended"
             buttons = (self.buttons[-2],)
-            callback = "callback-"
+            callback = "callback"
         if desc:
             desc += "\n"
         else:
