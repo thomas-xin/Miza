@@ -1,5 +1,5 @@
 akinator.py>=5.0.0
-antlr4-python3-runtime>=4.9.2
+antlr4-python3-runtime>=4.10
 asyncio>=3.4.3
 blend-modes>=2.1.0
 bs4>=0.0.1
@@ -30,5 +30,5 @@ python-dateutil>=2.8.2
 pytz>=2021.3
 requests>=2.26.0
 rule34>=1.8.1
-sympy>=1.9
+sympy>=1.10.1
 tsc_utils>=0.2.2
