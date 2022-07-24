@@ -2945,7 +2945,7 @@ class Akinator(Command):
         await send_with_react(channel, "", embed=emb, buttons=self.buttons, reference=message)
 
     async def _callback_(self, bot, message, reaction, argv, user, perm, vals, **void):
-        u_id, sig, guessing = map(literal_eval, vals.split("_", 2))
+        u_id, sig, guessing = map(int, vals.split("_", 2))
         if u_id != user.id and u_id != 0 and perm < 3:
             return
         r = as_str(reaction)
@@ -3138,7 +3138,7 @@ class Akinator(Command):
         else:
             desc = ""
 
-        guessing = bool(guess)
+        guessing = int(bool(guess and not guessing))
         bar = await bot.create_progress_bar(18, aki.progression / 100)
         emb.description = (
             f"*```{callback}-fun-akinator-{user.id}_{aki.signature}_{guessing}-\n"
