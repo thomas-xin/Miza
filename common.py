@@ -834,13 +834,14 @@ async def interaction_response(bot, message, content=None, embed=None, component
         aio=True,
     )
     print("INTERACTION_RESPONSE", resp)
-    bot = BOT[0]
-    if bot:
-        M = bot.ExtendedMessage.new
-    else:
-        M = discord.Message
-    message = M(state=bot._state, channel=channel, data=eval_json(resp))
-    bot.add_message(message, files=False, force=True)
+    if resp:
+        bot = BOT[0]
+        if bot:
+            M = bot.ExtendedMessage.new
+        else:
+            M = discord.Message
+        message = M(state=bot._state, channel=channel, data=eval_json(resp))
+        bot.add_message(message, files=False, force=True)
     return message
 
 async def interaction_patch(bot, message, content=None, embed=None, components=None, buttons=None):
@@ -866,13 +867,17 @@ async def interaction_patch(bot, message, content=None, embed=None, components=N
         aio=True,
     )
     print("INTERACTION_PATCH", resp)
-    bot = BOT[0]
-    if bot:
-        M = bot.ExtendedMessage.new
+    if resp:
+        bot = BOT[0]
+        if bot:
+            M = bot.ExtendedMessage.new
+        else:
+            M = discord.Message
+        message = M(state=bot._state, channel=message.channel, data=eval_json(resp))
+        bot.add_message(message, files=False, force=True)
     else:
-        M = discord.Message
-    message = M(state=bot._state, channel=message.channel, data=eval_json(resp))
-    bot.add_message(message, files=False, force=True)
+        message.content = content or message.content
+        message.embeds = [embed] if embed else message.embeds
     return message
 
 
