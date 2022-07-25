@@ -840,7 +840,7 @@ async def interaction_response(bot, message, content=None, embed=None, component
             M = bot.ExtendedMessage.new
         else:
             M = discord.Message
-        message = M(state=bot._state, channel=channel, data=eval_json(resp))
+        message = M(state=bot._state, channel=message.channel, data=eval_json(resp))
         bot.add_message(message, files=False, force=True)
     return message
 
