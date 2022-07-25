@@ -811,14 +811,14 @@ def restructure_buttons(buttons):
     return [dict(type=1, components=row) for row in buttons]
 
 
-def interaction_response(bot, message, content=None, embed=None, components=None, buttons=None):
+async def interaction_response(bot, message, content=None, embed=None, components=None, buttons=None):
     if hasattr(embed, "to_dict"):
         embed = embed.to_dict()
     if not getattr(message, "int_id", None):
         message.int_id = message.id
     if not getattr(message, "int_token", None):
         message.int_token = message.slash
-    resp = Request(
+    resp = await Request(
         f"https://discord.com/api/{api}/interactions/{message.int_id}/{message.int_token}/callback",
         data=orjson.dumps(dict(
             type=4,
@@ -843,14 +843,14 @@ def interaction_response(bot, message, content=None, embed=None, components=None
     bot.add_message(message, files=False, force=True)
     return message
 
-def interaction_patch(bot, message, content=None, embed=None, components=None, buttons=None):
+async def interaction_patch(bot, message, content=None, embed=None, components=None, buttons=None):
     if hasattr(embed, "to_dict"):
         embed = embed.to_dict()
     if not getattr(message, "int_id", None):
         message.int_id = message.id
     if not getattr(message, "int_token", None):
         message.int_token = message.slash
-    resp = Request(
+    resp = await Request(
         f"https://discord.com/api/{api}/interactions/{message.int_id}/{message.int_token}/callback",
         data=orjson.dumps(dict(
             type=7,
