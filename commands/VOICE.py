@@ -2405,8 +2405,14 @@ class AudioDownloader:
             if not entry.get("duration"):
                 entry["duration"] = get_duration(stream)
             # print(entry.url, entry.duration)
-            with suppress(KeyError):
-                self.searched[entry["url"]]["duration"] = entry["duration"]
+            if entry["url"] not in self.searched:
+                self.searched[entry["url"]] = cdict(
+                    t=utc(),
+                    data=[cdict(entry)],
+                )
+            else:
+                with suppress(KeyError):
+                    self.searched[entry["url"]]["duration"] = entry["duration"]
             self.searched[entry["url"]].data[0].update(entry)
             if not download:
                 return entry
@@ -5253,7 +5259,8 @@ class UpdateAudio(Database):
             if file.startswith("~") and file not in ytdl.cache:
                 ytdl.cache[file] = f = await create_future(AudioFileLink, file, "cache/" + file, wasfile=True)
                 count += 1
-        print(f"Successfully reinstated {count} audio file{'s' if count != 1 else ''}")
+        if count:
+            print(f"Successfully reinstated {count} audio file{'s' if count != 1 else ''}")
         for k, v in self.data.items():
             with tracebacksuppressor:
                 vc = await bot.fetch_channel(k)
