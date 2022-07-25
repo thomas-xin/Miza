@@ -833,6 +833,7 @@ def interaction_response(bot, message, content=None, embed=None, components=None
         authorise=True,
         aio=True,
     )
+    print("INTERACTION_RESPONSE", resp)
     bot = BOT[0]
     if bot:
         M = bot.ExtendedMessage.new
@@ -864,6 +865,7 @@ def interaction_patch(bot, message, content=None, embed=None, components=None, b
         authorise=True,
         aio=True,
     )
+    print("INTERACTION_PATCH", resp)
     bot = BOT[0]
     if bot:
         M = bot.ExtendedMessage.new

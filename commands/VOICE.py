@@ -4,7 +4,13 @@ try:
     import yt_dlp as youtube_dl
 except ModuleNotFoundError:
     import youtube_dl
-from yt_download import *
+try:
+    from yt_download import *
+except:
+    print_exc()
+    has_ytd = False
+else:
+    has_ytd = True
 from bs4 import BeautifulSoup
 
 # Audio sample rate for both converting and playing
@@ -1778,10 +1784,11 @@ class AudioDownloader:
             if type(ex) is not youtube_dl.DownloadError or self.ydl_errors(s):
                 if "429" in s:
                     self.blocked_yt = utc() + 3600
-                try:
-                    entries = self.extract_backup(url)
-                except (TypeError, youtube_dl.DownloadError):
-                    raise FileNotFoundError("Unable to fetch audio data.")
+                if has_ytd:
+                    try:
+                        entries = self.extract_backup(url)
+                    except (TypeError, youtube_dl.DownloadError):
+                        raise FileNotFoundError("Unable to fetch audio data.")
             else:
                 raise
         if "entries" in entries:
@@ -1830,7 +1837,7 @@ class AudioDownloader:
             if type(ex) is not youtube_dl.DownloadError or self.ydl_errors(s):
                 if "429" in s:
                     self.blocked_yt = utc() + 3600
-                if is_url(url):
+                if is_url(url) and has_ytd:
                     try:
                         return self.extract_backup(url)
                     except (TypeError, youtube_dl.DownloadError):
@@ -2441,7 +2448,7 @@ class AudioDownloader:
         if not (info.get("video") and info["video"].startswith("https://www.yt-download.org/download/")):
             self.get_stream(info, video=True, force=True, download=False)
         video = info["video"]
-        if video == info["stream"] and is_youtube_url(info["url"]):
+        if video == info["stream"] and is_youtube_url(info["url"]) and has_ytd:
             data = self.extract_backup(info["url"], video=True)
             video = info["video"] = get_best_video(data)
         vidinfo = as_str(subprocess.check_output(["./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name,width,height,avg_frame_rate", "-of", "default=nokey=1:noprint_wrappers=1", video])).strip()
@@ -2492,7 +2499,7 @@ class AudioDownloader:
                     if not (info.get("video") and info["video"].startswith("https://www.yt-download.org/download/")):
                         self.get_stream(info, video=True, force=True, download=False)
                     video = info["video"]
-                    if video == info["stream"] and is_youtube_url(info["url"]):
+                    if video == info["stream"] and is_youtube_url(info["url"]) and has_ytd:
                         data = self.extract_backup(info["url"], video=True)
                         video = info["video"] = get_best_video(data)
                     vidinfo = as_str(subprocess.check_output(["./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "default=nokey=1:noprint_wrappers=1", video])).strip()
@@ -2622,7 +2629,7 @@ class AudioDownloader:
                         fn = f"cache/\x7f{ts}~{outft}"
                 if vst or vid:
                     video = info["video"]
-                    if video == info["stream"] and is_youtube_url(info["url"]):
+                    if video == info["stream"] and is_youtube_url(info["url"]) and has_ytd:
                         data = self.extract_backup(info["url"], video=True)
                         video = info["video"] = get_best_video(data)
                         try:
