@@ -5211,6 +5211,7 @@ class UpdateAudio(Database):
                                     if member.id != bot.id:
                                         vs = member.voice
                                         if vs is not None and not vs.deaf and not vs.self_deaf:
+                                            bot.data.users.add_gold(member, 0.25)
                                             bot.data.dailies.progress_quests(member, "music", utc() - auds.ts)
                                 auds.ts = utc()
                             else:

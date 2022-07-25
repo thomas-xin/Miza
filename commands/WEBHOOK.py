@@ -320,7 +320,7 @@ class EmojiList(Command):
         await send_with_reply(
             None,
             message,
-            "*```" + "\n" * ("z" in flags) + "callback-fun-emojilist-"
+            "*```" + "\n" * ("z" in flags) + "callback-webhook-emojilist-"
             + str(user.id) + "_0"
             + "-\nLoading EmojiList database...```*",
             buttons=buttons,
@@ -372,7 +372,7 @@ class EmojiList(Command):
             content = message.embeds[0].description
         i = content.index("callback")
         content = "*```" + "\n" * ("\n" in content[:i]) + (
-            "callback-fun-emojilist-"
+            "callback-webhook-emojilist-"
             + str(u_id) + "_" + str(pos)
             + "-\n"
         )
@@ -542,7 +542,7 @@ class Mimic(Command):
             await send_with_reply(
                 None,
                 message,
-                "*```" + "\n" * ("z" in flags) + "callback-fun-mimic-"
+                "*```" + "\n" * ("z" in flags) + "callback-webhook-mimic-"
                 + str(user.id) + "_0"
                 + "-\nLoading Mimic database...```*",
                 buttons=buttons,
@@ -693,7 +693,7 @@ class Mimic(Command):
             content = message.embeds[0].description
         i = content.index("callback")
         content = "*```" + "\n" * ("\n" in content[:i]) + (
-            "callback-fun-mimic-"
+            "callback-webhook-mimic-"
             + str(u_id) + "_" + str(pos)
             + "-\n"
         )

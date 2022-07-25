@@ -419,7 +419,7 @@ class Text2048(Command):
                     elif mode & 4:
                         xp /= 3
                     bot.data.users.add_gold(user, xp)
-                    emb.description += await bot.as_rewards(f"+{int(xp)}")
+                    emb.description += "+" + await bot.as_rewards(xp)
                 emb.set_footer(text=f"Score: {fscore}")
                 # Clear buttons and announce game over message
                 try:
@@ -466,7 +466,7 @@ class Text2048(Command):
                 elif mode & 4:
                     xp /= 3
                 bot.data.users.add_gold(user, xp)
-                emb.description += await bot.as_rewards(f"+{int(xp)}")
+                emb.description += "+" + await bot.as_rewards(xp)
             emb.set_footer(text=f"Score: {fscore}")
             create_task(bot.ignore_interaction(message))
             dims = max(2, len(g.data.shape))
@@ -3092,9 +3092,9 @@ class Akinator(Command):
         if win:
             aki.progression = 100
             question = f"Great! Guessed right once more ({rank_format(win)} time with this character)! I love playing with you!"
-            gold = aki.step * 5
+            gold = aki.step * 4
             bot.data.users.add_gold(user, gold)
-            desc = await bot.as_rewards(gold)
+            desc = "+" + await bot.as_rewards(gold)
             emb.set_image(url=self.victory_image)
             callback = "none"
         elif guess and not guessing:
@@ -3120,9 +3120,9 @@ class Akinator(Command):
             emb.title = f"Akinator: Question {aki.step + 1}"
             if aki.step >= 79:
                 question = "Bravo! You have defeated me! Play the game again on the Akinator website to add the character you were thinking of, and I'll remember for next time!"
-                gold = aki.step * 4
+                gold = aki.step * 5
                 bot.data.users.add_gold(user, gold)
-                desc = await bot.as_rewards(gold)
+                desc = "+" + await bot.as_rewards(gold)
                 emb.set_image(url=self.defeat_image)
                 callback = "none"
             else:
