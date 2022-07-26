@@ -751,7 +751,7 @@ class MimicSend(Command):
         except KeyError:
             enabled = bot.data.enabled.get(guild.id, ())
         # Because this command operates across channels and servers, we need to make sure these cannot be sent to channels without this command enabled
-        if not admin and ("fun" not in enabled or perm < 1):
+        if not admin and ("webhook" not in enabled or perm < 1):
             raise PermissionError("Not permitted to send into target channel.")
         if m:
             msg = escape_roles(msg)
@@ -804,7 +804,7 @@ class UpdateMimics(Database):
             else:
                 enabled = list(bot.categories)
             # User must have permission to use ~mimicsend in order to invoke by prefix
-            if admin or "fun" in enabled:
+            if admin or "webhook" in enabled:
                 database = self.data[user.id]
                 msg = message.content
                 with bot.ExceptionSender(message.channel, Exception, reference=message):
