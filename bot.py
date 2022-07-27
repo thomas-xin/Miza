@@ -2363,6 +2363,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             )
             stats = self.curr_state
             commands = set(itertools.chain(*self.commands.values()))
+            try:
+                audio_players = len(self.audio.players)
+            except:
+                audio_players = active_audio_players = "N/A"
+            else:
+                active_audio_players = sum(bool(auds.queue and not auds.paused) for auds in self.audio.players.values())
             self.status_data = {
                 "System info": {
                     "Process count": active[0],
@@ -2386,8 +2392,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 },
                 "Misc info": {
                     "Active commands": self.command_semaphore.active,
-                    "Connected voice channels": len(self.audio.players),
-                    "Active audio players": sum(bool(auds.queue and not auds.paused) for auds in self.audio.players.values()),
+                    "Connected voice channels": audio_players,
+                    "Active audio players": active_audio_players,
                     "Activity count": self.activity,
                     "Total data transmitted": byte_scale(bot.total_bytes) + "B",
                     "System time": datetime.datetime.now(),

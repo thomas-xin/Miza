@@ -261,8 +261,9 @@ class UpdateExec(Database):
             glob.update(dict(
                 user=message.author,
                 message=message,
-                auds=bot.data.audio.players.get(message.guild.id),
             ))
+            with suppress():
+                glob["auds"] = bot.data.audio.players[message.guild.id]
             if term & 32:
                 proc = await asyncio.create_subprocess_shell(proc, stdout=subprocess.PIPE, limit=65536)
                 output = await proc.stdout.read()

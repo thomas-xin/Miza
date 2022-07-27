@@ -1877,8 +1877,13 @@ class UpdateUsers(Database):
 
     async def _bot_ready_(self, **void):
         data = {"Command": Command}
+        name = "".join(regexp("[A-Za-z_]+").findall(self.bot.name.translate("".maketrans({
+            " ": "_",
+            "-", "_",
+            ".", "_",
+        }))))
         exec(
-            f"class {self.bot.name.replace(' ', '')}(Command):"
+            f"class {name}(Command):"
             + "\n\tdescription = 'Serves as an alias for mentioning the bot.'"
             + "\n\tno_parse = True"
             + "\n\tasync def __call__(self, message, argv, flags, **void):"

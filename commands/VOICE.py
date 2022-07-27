@@ -5279,7 +5279,7 @@ class UpdateAudio(Database):
                     else:
                         stats = dict(CustomAudio.defaults)
                         stats.update(argv.get("stats", {}))
-                        loading = stats != CustomAudio.defaults:
+                        loading = stats != CustomAudio.defaults
                     if loading:
                         print("auto-loading queue of", len(argv["queue"]), "items to", guild)
                         create_task(dump(guild, channel, user, bot, perm, name, argv, flags, message, vc=vc))
