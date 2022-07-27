@@ -1879,8 +1879,8 @@ class UpdateUsers(Database):
         data = {"Command": Command}
         name = "".join(regexp("[A-Za-z_]+").findall(self.bot.name.translate("".maketrans({
             " ": "_",
-            "-", "_",
-            ".", "_",
+            "-": "_",
+            ".": "_",
         }))))
         exec(
             f"class {name}(Command):"
