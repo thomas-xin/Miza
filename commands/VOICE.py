@@ -3727,7 +3727,7 @@ class Dump(Command):
             return
         if not is_alone(auds, user) and perm < 1:
             raise self.perm_error(perm, 1, "to load new queue while other users are in voice")
-        if type(argv) is str:
+        if isinstance(argv, str):
             if message.attachments:
                 url = message.attachments[0].url
             else:
@@ -5205,14 +5205,13 @@ class UpdateAudio(Database):
                             futs.append(create_future(auds.update, priority=True))
                             futs.append(create_task(self.research(auds)))
                             if auds.queue and not auds.paused and "dailies" in bot.data:
-                                if auds.ts is None:
-                                    auds.ts = utc()
-                                for member in auds.acsi.channel.members:
-                                    if member.id != bot.id:
-                                        vs = member.voice
-                                        if vs is not None and not vs.deaf and not vs.self_deaf:
-                                            bot.data.users.add_gold(member, 0.25)
-                                            bot.data.dailies.progress_quests(member, "music", utc() - auds.ts)
+                                if auds.ts is not None:
+                                    for member in auds.acsi.channel.members:
+                                        if member.id != bot.id:
+                                            vs = member.voice
+                                            if vs is not None and not vs.deaf and not vs.self_deaf:
+                                                bot.data.users.add_gold(member, 0.25)
+                                                bot.data.dailies.progress_quests(member, "music", utc() - auds.ts)
                                 auds.ts = utc()
                             else:
                                 auds.ts = None
@@ -5275,8 +5274,15 @@ class UpdateAudio(Database):
                 flags = "h"
                 message = cdict(attachments=None)
                 for dump in bot.commands.dump:
-                    print("auto-loading queue of", len(argv["queue"]), "items to", guild)
-                    create_task(dump(guild, channel, user, bot, perm, name, argv, flags, message, vc=vc))
+                    if argv.get("queue"):
+                        loading = True
+                    else:
+                        stats = dict(CustomAudio.defaults)
+                        stats.update(argv.get("stats", {}))
+                        loading = stats != CustomAudio.defaults:
+                    if loading:
+                        print("auto-loading queue of", len(argv["queue"]), "items to", guild)
+                        create_task(dump(guild, channel, user, bot, perm, name, argv, flags, message, vc=vc))
         self.data.clear()
 
 
