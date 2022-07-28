@@ -389,21 +389,18 @@ class EnabledCommands(Command):
             if not catg in bot.categories:
                 raise LookupError(f"Unknown command category {catg}.")
         curr = set(bot.get_enabled(target))
-        if target.id not in enabled:
-            enabled[target.id] = curr if type(curr) is set else set(curr)
         for catg in args:
             if "d" not in flags:
                 if catg not in curr:
-                    if type(curr) is set:
+                    if isinstance(curr, set):
                         curr.add(catg)
                     else:
                         curr.append(catg)
-                    update(target.id)
             else:
                 if catg in curr:
                     curr.remove(catg)
-                    update(target.id)
-        check = curr if type(curr) is set else frozenset(curr)
+        enabled[target.id] = astype(curr, set)
+        check = astype(curr, (frozenset, set))
         if check == default_commands:
             enabled.pop(target.id)
         if "h" in flags:

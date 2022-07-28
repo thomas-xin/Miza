@@ -3006,7 +3006,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                                             args.pop(0)
                                             argv = argv.split(None, 1)[-1]
                                             inc_dict(flags, d=1)
-                                    if "r" in command.flags:
+                                    if args and "r" in command.flags:
                                         if args[0].lower() in ("clear", "reset"):
                                             args.pop(0)
                                             argv = argv.split(None, 1)[-1]
