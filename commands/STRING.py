@@ -1111,11 +1111,15 @@ class Random(Command):
     usage = "<string>+"
     slash = True
 
-    def __call__(self, args, **void):
+    def __call__(self, argv, args, **void):
         if not args:
             raise ArgumentError("Input string is empty.")
         random.seed(time.time_ns())
-        return "\xadI choose `" + choice(args) + "`!"
+        if "\n" in argv:
+            x = choice(argv.splitlines())
+        else:
+            x = choice(args)
+        return f"\xadI choose `{x}`!"
 
 
 class Rate(Command):
@@ -1143,7 +1147,7 @@ class Rate(Command):
 
     
 class WordCount(Command):
-    name = ["Wc", "Cc", "Charactercount"]
+    name = ["Lc", "Wc", "Cc", "Character_Count", "Line_Count"]
     description = "Simple command that returns the word and character count of a supplied message. message.txt files work too!"
     usage = "<string>"
     slash = True
@@ -1151,9 +1155,12 @@ class WordCount(Command):
     async def __call__(self, argv, **void):
         if not argv:
             raise ArgumentError("Input string is empty.")
-        wc = argv.split()
-        cc = argv
-        return f"Word count: `{len(wc)}`\nCharacter count: `{len(cc)}`"
+        if is_url(argv):
+            argv = await self.bot.follow_url(argv, images=False)
+        lc = argv.count("\n") + 1
+        wc = len(argv.split())
+        cc = len(argv)
+        return f"Line count: `{lc}`\nWord count: `{wc}`\nCharacter count: `{cc}`"
 
 
 class Topic(Command):

@@ -833,7 +833,7 @@ async def interaction_response(bot, message, content=None, embed=None, component
         authorise=True,
         aio=True,
     )
-    print("INTERACTION_RESPONSE", resp)
+    # print("INTERACTION_RESPONSE", resp)
     if resp:
         bot = BOT[0]
         if bot:
@@ -866,7 +866,7 @@ async def interaction_patch(bot, message, content=None, embed=None, components=N
         authorise=True,
         aio=True,
     )
-    print("INTERACTION_PATCH", resp)
+    # print("INTERACTION_PATCH", resp)
     if resp:
         bot = BOT[0]
         if bot:

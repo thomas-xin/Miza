@@ -3061,9 +3061,15 @@ class Akinator(Command):
             callback = "none"
             bot.data.akinators.pop(aki.signature, None)
         elif ans == "restart":
-            bot.data.akinators.pop(aki.signature, None)
+            if aki:
+                bot.data.akinators.pop(aki.signature, None)
+                lang = language=aki.uri.split(".", 1)[0]
+                child = aki.child_mode
+            else:
+                lang = "en"
+                child = False
             aki2 = async_akinator()
-            await aki2.start_game(language=aki.uri.split(".", 1)[0], child_mode=aki.child_mode, client_session=Request.session)
+            await aki2.start_game(lang, child_mode=child, client_session=Request.session)
             aki = aki2
             bot.data.akinators[aki.signature] = aki
             aki.__dict__.setdefault("no", set())
