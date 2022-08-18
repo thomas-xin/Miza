@@ -75,7 +75,7 @@ def safecomp(gen):
 		except StopIteration:
 			return
 		except selenium.common.StaleElementReferenceException:
-			pass
+			continue
 		yield e
 
 
