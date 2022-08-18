@@ -1629,7 +1629,7 @@ class ServerProtector(Database):
 
 class CreateEmoji(Command):
     server_only = True
-    name = ["EmojiCreate", "EmojiCopy", "CopyEmoji", "Emoji"]
+    name = ["EmojiCreate", "EmojiCopy", "CopyEmoji", "Emote", "Emoticon", "Emoji"]
     min_level = 2
     description = "Creates a custom emoji from a URL or attached file."
     usage = "<1:name>+ <0:url>"

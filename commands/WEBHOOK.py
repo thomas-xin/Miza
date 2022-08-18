@@ -277,9 +277,27 @@ class UpdateAutoEmojis(Database):
             if pops:
                 print("Removed emojis:", pops)
                 msg = await self._nocommand_(message, recursive=False)
-                if msg and msg != m.content:
-                    create_task(self.bot.silent_delete(m))
-                    await self.bot.send_as_webhook(message.channel, msg, files=files, username=message.author.display_name, avatar_url=url)
+                if msg:
+                    m = await m.edit(content=msg)
+                    if m.content == ":_:":
+                        if emoji:
+                            fmt = "gif" if emoji.animated else "png"
+                            url = f"https://cdn.discordapp.com/emojis/{emoji.id}.{fmt}?quality=lossless&size=48"
+                            await m.edit(content=url)
+                            self.data.webhooks.pop(m.channel.id)
+                            return
+                    if regex.search(m.content):
+                        emb = discord.Embed(author=**get_author(self.bot.user))
+                        emb.description = (
+                            "Psst! It appears as though AutoEmoji has failed to convert an emoji. "
+                            + "To fix this, either add the emoji to this server, invite me to the server with the emoji, "
+                            + "or manually create a new webhook for this channel!"
+                        )
+                        await m.edit(embed=emb)
+                        self.data.webhooks.pop(m.channel.id)
+                        self.data.webhooks.temp.pop(m.channel.id)
+                    # create_task(self.bot.silent_delete(m))
+                    # m2 = await self.bot.send_as_webhook(message.channel, msg, files=files, username=message.author.display_name, avatar_url=url)
 
 
 class EmojiList(Command):
@@ -910,3 +928,109 @@ class UpdateMimics(Database):
                         if not i % 8191:
                             await asyncio.sleep(0.45)
                         i += 1
+
+
+class UpdateWebhooks(Database):
+    name = "webhooks"
+    channel = True
+    CID = collections.namedtuple("id", ["id"])
+    temp = {}
+
+    def from_dict(self, d, c_id):
+        d = copy.copy(d)
+        d.url = f"https://discord.com/api/webhooks/{d.id}/{d.token}"
+        w = discord.Webhook.from_url(d.url, session=self.bot._connection.http._HTTPClient__session, bot_token=self.bot.token)
+        d.send = w.send
+        d.display_avatar = d.avatar_url = d.avatar and f"https://cdn.discordapp.com/avatars/{d.id}/{d.avatar}.png?size=1024"
+        d.channel = self.CID(id=c_id)
+        d.created_at = snowflake_time_3(w.id)
+        return self.add(d)
+
+    def to_dict(self, user):
+        return cdict(
+            id=user.id,
+            name=user.name,
+            avatar=getattr(user, "avatar_url", as_str(user.avatar)),
+            token=user.token,
+            owner_id=user.owner_id,
+        )
+
+    def add(self, w):
+        user = self.bot.GhostUser()
+        with suppress(AttributeError):
+            user.channel = w.channel
+        user.id = w.id
+        user.name = w.name
+        user.display_name = w.name
+        user.joined_at = w.created_at
+        user.avatar = w.avatar and (w.avatar if isinstance(w.avatar, str) else w.avatar.key)
+        user.display_avatar = user.avatar_url = str(w.avatar)
+        user.bot = True
+        user.send = w.send
+        user.dm_channel = getattr(w, "channel", None)
+        user.webhook = w
+        user.owner_id = w.owner_id = w.user.id
+        try:
+            sem = self.bot.cache.users[w.id].semaphore
+        except (AttributeError, KeyError):
+            sem = None
+        self.bot.cache.users[w.id] = user
+        if w.token:
+            webhooks = self.data.setdefault(w.channel.id, cdict())
+            webhooks[w.id] = self.to_dict(w)
+            if sem is None:
+                sem = Semaphore(5, 256, rate_limit=5)
+            user.semaphore = sem
+        return user
+
+    async def get(self, channel, force=False, bypass=False):
+        guild = getattr(channel, "guild", None)
+        if not guild:
+            raise TypeError("DM channels cannot have webhooks.")
+        if not force:
+            with suppress(KeyError):
+                temp = self.temp[channel.id]
+                if temp:
+                    return temp
+            if channel.id in self.data:
+                self.temp[channel.id] = temp = alist(self.from_dict(w, channel.id) for w in self.data[channel.id].values())
+                if temp:
+                    bot = True
+                    for w in temp:
+                        user = getattr(w, "user", None) or await self.bot.fetch_user(w.owner_id)
+                        w.user = user
+                        if not user.bot:
+                            bot = False
+                    if not bot:
+                        for w in temp:
+                            if w.user.bot:
+                                await w.delete()
+                                self.bot.cache.users.pop(w.id, None)
+                        return [w for w in temp if not w.user.bot]
+                    return temp
+        async with self.bot.guild_semaphore if not bypass else emptyctx:
+            self.data.pop(channel.id, None)
+            if not channel.permissions_for(channel.guild.me).manage_webhooks:
+                raise PermissionError("Not permitted to create webhooks in channel.")
+            webhooks = None
+            if guild.me.guild_permissions.manage_webhooks:
+                with suppress(discord.Forbidden):
+                    webhooks = await guild.webhooks()
+            if webhooks is None:
+                webhooks = await aretry(channel.webhooks, attempts=5, delay=15, exc=(discord.Forbidden, discord.NotFound))
+        temp = [w for w in webhooks if w.token]
+        bot = True
+        for w in temp:
+            user = getattr(w, "user", None) or await self.bot.fetch_user(w.owner_id)
+            w.user = user
+            if not user.bot:
+                bot = False
+        if not bot:
+            for w in temp:
+                if w.user.bot:
+                    await w.delete()
+                    self.bot.cache.users.pop(w.id, None)
+            return [w for w in temp if not w.user.bot]
+        return temp
+        self.temp[channel.id] = temp = alist(w for w in [self.add(w) for w in temp] if w.channel.id == channel.id)
+        return temp

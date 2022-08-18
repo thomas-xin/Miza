@@ -1128,7 +1128,7 @@ class Reminder(Command):
     name = ["Announcement", "Announcements", "Announce", "RemindMe", "Reminders", "Remind"]
     description = "Sets a reminder for a certain date and time."
     usage = "<1:message>? <0:time>? <urgent{?u}>? <delete{?d}>?"
-    flags = "aedu"
+    flags = "aeduc"
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
     rate_limit = (1 / 3, 4)
@@ -1159,6 +1159,8 @@ class Reminder(Command):
             word = "reminders"
         rems = bot.data.reminders.get(sendable.id, [])
         update = bot.data.reminders.update
+        if "c" in flags:
+            
         if "d" in flags:
             if not len(rems):
                 return ini_md(f"No {word} currently set for {sqr_md(sendable)}.")
@@ -1339,8 +1341,9 @@ class Reminder(Command):
             match = re.search(self.timefind, argv)
             if match:
                 i = match.start()
-                spl = [argv[:i], argv[i:]]
-                msg = spl[0]
+                j = match.end()
+                spl = [argv[:i], argv[i:j], argv[j:]]
+                msg = spl[0] + spl[-1]
                 t += await bot.eval_time(spl[1])
                 break
             msg = " ".join(args[:-1])
@@ -1651,8 +1654,9 @@ class UpdateReminders(Database):
         self.bot.data.urgentreminders.update()
 
     async def __call__(self):
-        if utc() - self.t >= 3600:
-            create_future_ex(self.load)
+        if utc() - self.t >= 4800:
+            create_future_ex(self.__load__)
+            self.t = utc()
 
     # Fast call: runs many times per second
     async def _call_(self):
