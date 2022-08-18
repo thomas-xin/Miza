@@ -1312,8 +1312,8 @@ class Reminder(Command):
                             args.pop(i)
                             expr = " ".join(args)
                             break
-                        h = 0
-                    t += h * 3600
+                    #     h = 0
+                    # t += h * 3600
                 match = re.search(self.timefind, argv)
                 if match:
                     i = match.start()
@@ -1334,8 +1334,8 @@ class Reminder(Command):
                         args.pop(i)
                         expr = " ".join(args)
                         break
-                    h = 0
-                t += h * 3600
+                #     h = 0
+                # t += h * 3600
             match = re.search(self.timefind, argv)
             if match:
                 i = match.start()
@@ -1641,6 +1641,7 @@ class UpdateReminders(Database):
         d = self.data
         # This exists so that checking next scheduled item is O(1)
         self.listed = alist(sorted(((d[i][0]["t"], i) for i in d if type(i) is not str and d[i]), key=lambda x: x[0]))
+        self.t = utc()
 
     async def recurrent_message(self, channel, embed, wait=60):
         t = utc()
@@ -1648,6 +1649,10 @@ class UpdateReminders(Database):
         await message.add_reaction("✅")
         self.bot.data.urgentreminders.data["listed"].insort([t + wait, channel.id, message.id, embed, wait], key=lambda x: x)
         self.bot.data.urgentreminders.update()
+
+    async def __call__(self):
+        if utc() - self.t >= 3600:
+            create_future_ex(self.load)
 
     # Fast call: runs many times per second
     async def _call_(self):

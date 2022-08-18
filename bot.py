@@ -2273,7 +2273,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         raw += 86400
                     while raw - curr > 86400:
                         raw -= 86400
-                t = (raw - zerot()).timestamp()
+                t = (raw - utc_ddt()).total_seconds()
         if not isinstance(t, (int, float)):
             try:
                 t = float(t)
