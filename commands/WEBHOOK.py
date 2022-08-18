@@ -1019,7 +1019,7 @@ class UpdateWebhooks(Database):
                     webhooks = await guild.webhooks()
             if webhooks is None:
                 webhooks = await aretry(channel.webhooks, attempts=5, delay=15, exc=(discord.Forbidden, discord.NotFound))
-        temp = [w for w in webhooks if w.token]
+        temp = [w for w in webhooks if w.token and w.channel.id == channel.id]
         bot = True
         for w in temp:
             user = getattr(w, "user", None) or await self.bot.fetch_user(w.owner_id)
@@ -1033,5 +1033,5 @@ class UpdateWebhooks(Database):
                     self.bot.cache.users.pop(w.id, None)
             return [w for w in temp if not w.user.bot]
         return temp
-        self.temp[channel.id] = temp = alist(w for w in [self.add(w) for w in temp] if w.channel.id == channel.id)
+        self.temp[channel.id] = temp = alist(self.add(w) for w in temp)
         return temp
