@@ -1159,8 +1159,6 @@ class Reminder(Command):
             word = "reminders"
         rems = bot.data.reminders.get(sendable.id, [])
         update = bot.data.reminders.update
-        if "c" in flags:
-            
         if "d" in flags:
             if not len(rems):
                 return ini_md(f"No {word} currently set for {sqr_md(sendable)}.")
