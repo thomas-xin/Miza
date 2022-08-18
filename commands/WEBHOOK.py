@@ -970,6 +970,7 @@ class UpdateWebhooks(Database):
         user.send = w.send
         user.dm_channel = getattr(w, "channel", None)
         user.webhook = w
+        user.user = w.user
         user.owner_id = w.owner_id = w.user.id
         try:
             sem = self.bot.cache.users[w.id].semaphore
@@ -1019,7 +1020,7 @@ class UpdateWebhooks(Database):
                     webhooks = await guild.webhooks()
             if webhooks is None:
                 webhooks = await aretry(channel.webhooks, attempts=5, delay=15, exc=(discord.Forbidden, discord.NotFound))
-        temp = [w for w in webhooks if w.token and w.channel.id == channel.id]
+        temp = [w for w in webhooks if (getattr(w, "user", None) or getattr(w, "owner_id", None)) and w.token and w.channel.id == channel.id]
         bot = True
         for w in temp:
             user = getattr(w, "user", None) or await self.bot.fetch_user(w.owner_id)
