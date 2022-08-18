@@ -269,36 +269,46 @@ class UpdateAutoEmojis(Database):
         url = await self.bot.get_proxy_url(message.author)
         m = await self.bot.send_as_webhook(message.channel, msg, files=files, username=message.author.display_name, avatar_url=url)
         if recursive and regex.search(m.content):
-            for k in tuple(pops):
-                if str(k[1]) not in m.content:
-                    orig.pop(k[0], None)
-                else:
-                    pops.discard(k)
-            if pops:
-                print("Removed emojis:", pops)
-                msg = await self._nocommand_(message, recursive=False)
-                if msg:
-                    m = await m.edit(content=msg)
-                    if m.content == ":_:":
-                        if emoji:
-                            fmt = "gif" if emoji.animated else "png"
-                            url = f"https://cdn.discordapp.com/emojis/{emoji.id}.{fmt}?quality=lossless&size=48"
-                            await m.edit(content=url)
+            m = await m.edit(content=msg)
+            print(m, m.content)
+            if m.content == ":_:":
+                if emoji:
+                    fmt = "gif" if emoji.animated else "png"
+                    url = f"https://cdn.discordapp.com/emojis/{emoji.id}.{fmt}?quality=lossless&size=48"
+                    await m.edit(content=url)
+                    self.data.webhooks.pop(m.channel.id)
+                    return
+            if recursive and regex.search(m.content):
+                for k in tuple(pops):
+                    if str(k[1]) not in m.content:
+                        orig.pop(k[0], None)
+                    else:
+                        pops.discard(k)
+                if pops:
+                    print("Removed emojis:", pops)
+                    msg = await self._nocommand_(message, recursive=False)
+                    if msg:
+                        m = await m.edit(content=msg)
+                        if m.content == ":_:":
+                            if emoji:
+                                fmt = "gif" if emoji.animated else "png"
+                                url = f"https://cdn.discordapp.com/emojis/{emoji.id}.{fmt}?quality=lossless&size=48"
+                                await m.edit(content=url)
+                                self.data.webhooks.pop(m.channel.id)
+                                return
+                        if regex.search(m.content):
+                            emb = discord.Embed()
+                            emb.set_author(**get_author(self.bot.user))
+                            emb.description = (
+                                "Psst! It appears as though AutoEmoji has failed to convert an emoji. "
+                                + "To fix this, either add the emoji to this server, invite me to the server with the emoji, "
+                                + "or manually create a new webhook for this channel!"
+                            )
+                            await m.edit(embed=emb)
                             self.data.webhooks.pop(m.channel.id)
-                            return
-                    if regex.search(m.content):
-                        emb = discord.Embed()
-                        emb.set_author(**get_author(self.bot.user))
-                        emb.description = (
-                            "Psst! It appears as though AutoEmoji has failed to convert an emoji. "
-                            + "To fix this, either add the emoji to this server, invite me to the server with the emoji, "
-                            + "or manually create a new webhook for this channel!"
-                        )
-                        await m.edit(embed=emb)
-                        self.data.webhooks.pop(m.channel.id)
-                        self.data.webhooks.temp.pop(m.channel.id)
-                    # create_task(self.bot.silent_delete(m))
-                    # m2 = await self.bot.send_as_webhook(message.channel, msg, files=files, username=message.author.display_name, avatar_url=url)
+                            self.data.webhooks.temp.pop(m.channel.id)
+                        # create_task(self.bot.silent_delete(m))
+                        # m2 = await self.bot.send_as_webhook(message.channel, msg, files=files, username=message.author.display_name, avatar_url=url)
 
 
 class EmojiList(Command):
@@ -953,7 +963,7 @@ class UpdateWebhooks(Database):
             name=user.name,
             avatar=getattr(user, "avatar_url", as_str(user.avatar)),
             token=user.token,
-            owner_id=user.owner_id,
+            owner_id=getattr(user, "owner_id", None) or user.user.id,
         )
 
     def add(self, w):
@@ -971,7 +981,11 @@ class UpdateWebhooks(Database):
         user.dm_channel = getattr(w, "channel", None)
         user.webhook = w
         user.user = w.user
-        user.owner_id = w.owner_id = w.user.id
+        user.owner_id = w.user.id
+        try:
+            w.owner_id = w.user.id
+        except AttributeError:
+            pass
         try:
             sem = self.bot.cache.users[w.id].semaphore
         except (AttributeError, KeyError):
