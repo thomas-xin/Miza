@@ -68,6 +68,16 @@ def get_driver():
 	exc.submit(ensure_drivers)
 	return driver
 
+def safecomp(gen):
+	while True:
+		try:
+			e = next(gen)
+		except StopIteration:
+			return
+		except selenium.common.StaleElementReferenceException:
+			pass
+		yield e
+
 
 def yt_download(url, fmt="mp3", dir="", timeout=256):
 	driver = get_driver()
@@ -99,13 +109,13 @@ def yt_download(url, fmt="mp3", dir="", timeout=256):
 		t = time.time()
 		elems = None
 		while not elems:
-			elems = [e for e in driver.find_elements(by=css_selector, value="*") if e.text == "CONVERT"]
+			elems = [safecomp(e for e in driver.find_elements(by=css_selector, value="*") if e.text == "CONVERT")]
 			time.sleep(0.2)
 			if time.time() - t > 16:
 				raise TimeoutError("Convert button failed to load.")
 		elems[0].click()
 
-		titles = [e for e in driver.find_elements(by=css_selector, value="*") if "Download " in e.text]
+		titles = [safecomp(e for e in driver.find_elements(by=css_selector, value="*") if "Download " in e.text)]
 		if titles:
 			title = titles[0].text.split("Download ", 1)[-1].split("\n", 1)[0]
 		else:
