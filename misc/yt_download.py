@@ -29,10 +29,28 @@ def create_driver():
 	prefs = {"download.default_directory" : folder}
 	options.add_experimental_option("prefs", prefs)
 
-	driver = browser["driver"](
-		service=service,
-		options=options,
-	)
+	try:
+		driver = browser["driver"](
+			service=service,
+			options=options,
+		)
+	except selenium.common.SessionNotCreatedException as ex:
+		if "Current browser version is " in ex.args[0]:
+			v = ex.args[0].split("Current browser version is ", 1)[-1].split(None, 1)[0]
+			url = f"https://msedgedriver.azureedge.net/{v}/edgedriver_win64.zip"
+			import requests, io, zipfile
+			with requests.get(url, headers={"User-Agent": "Mozilla/6.0"}) as resp:
+				with zipfile.ZipFile(io.BytesIO(resp.content)) as z:
+					with z.open("msedgedriver.exe") as fi:
+						with open("misc/msedgedriver.exe", "wb") as fo:
+							b = fi.read()
+							fo.write(b)
+			driver = browser["driver"](
+				service=service,
+				options=options,
+			)
+		else:
+			raise
 	driver.folder = folder
 	return driver
 
