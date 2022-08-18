@@ -109,13 +109,13 @@ def yt_download(url, fmt="mp3", dir="", timeout=256):
 		t = time.time()
 		elems = None
 		while not elems:
-			elems = [safecomp(e for e in driver.find_elements(by=css_selector, value="*") if e.text == "CONVERT")]
+			elems = list(safecomp(e for e in driver.find_elements(by=css_selector, value="*") if e.text == "CONVERT"))
 			time.sleep(0.2)
 			if time.time() - t > 16:
 				raise TimeoutError("Convert button failed to load.")
 		elems[0].click()
 
-		titles = [safecomp(e for e in driver.find_elements(by=css_selector, value="*") if "Download " in e.text)]
+		titles = list(safecomp(e for e in driver.find_elements(by=css_selector, value="*") if "Download " in e.text))
 		if titles:
 			title = titles[0].text.split("Download ", 1)[-1].split("\n", 1)[0]
 		else:
