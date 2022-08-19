@@ -580,7 +580,7 @@ class RoleSelect(Command):
                 role = guild.get_role(r)
             if not role:
                 role = await str_lookup(
-                    guild.roles,
+                    guild.roles[1:],
                     r,
                     qkey=lambda x: [str(x), full_prune(str(x).replace(" ", ""))],
                     fuzzy=0.125,
@@ -691,7 +691,7 @@ class RoleGiver(Command):
             role = guild.get_role(i)
         else:
             role = await str_lookup(
-                guild.roles,
+                guild.roles[1:],
                 r,
                 qkey=lambda x: [str(x), full_prune(x.replace(" ", ""))],
                 fuzzy=0.125,
@@ -779,7 +779,7 @@ class AutoRole(Command):
         if len(guild.roles) <= 1:
             guild.roles = await guild.fetch_roles()
             guild.roles.sort()
-        rolelist = guild.roles
+        rolelist = guild.roles[1:]
         for r in rolenames:
             if type(r) is int:
                 for i in rolelist:
@@ -1467,7 +1467,7 @@ class UpdateMuteRoles(Database):
                 self.data.pop(g_id, None)
                 continue
             if guild:
-                if role not in guild.roles:
+                if role not in guild.roles[1:]:
                     self.data.pop(g_id)
                 role = await self.get(guild)
                 for channel in guild.channels:
