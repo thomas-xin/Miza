@@ -2390,10 +2390,16 @@ class UpdateMessageLogs(Database):
             for guild in self.bot.guilds:
                 futs = deque()
                 for channel in itertools.chain(guild.text_channels, guild.threads):
-                    if channel.permissions_for(guild.me).read_message_history:
+                    try:
+                        perm = channel.permissions_for(guild.me).read_message_history
+                    except:
+                        print_exc()
+                        perm = True
+                    if perm:
                         futs.append(create_task(self.save_channel(channel, t)))
                     if len(futs) >= 4:
-                        await futs.popleft()
+                        with tracebacksuppressor:
+                            await futs.popleft()
         for fut in futs:
             with tracebacksuppressor:
                 await fut
