@@ -2995,7 +2995,7 @@ class ThreadList(Command):
             title = "No threads found."
         def chm(c):
             s = channel_mention(c.id)
-            n = "9" * 32
+            n = 9223372036854775807
             return f"[{s}](https://discord.com/channels/{c.guild.id}/{c.id}/{n})"
         description = "\n".join(chm(c) for c in threads.values()) or "\xad"
         bot.send_as_embeds(channel, author=get_author(user), title=title, description=description, thumbnail=best_url(guild))

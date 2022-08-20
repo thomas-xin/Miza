@@ -24,7 +24,7 @@ class AutoEmoji(Command):
         await send_with_reply(
             None,
             message,
-            "*```" + "\n" * ("z" in flags) + "callback-admin-autoemoji-"
+            "*```" + "\n" * ("z" in flags) + "callback-webhook-autoemoji-"
             + str(user.id) + "_0"
             + "-\nLoading AutoEmoji database...```*",
             buttons=buttons,
@@ -60,7 +60,7 @@ class AutoEmoji(Command):
             content = message.embeds[0].description
         i = content.index("callback")
         content = "```" + "\n" * ("\n" in content[:i]) + (
-            "callback-admin-autoemoji-"
+            "callback-webhook-autoemoji-"
             + str(u_id) + "_" + str(pos)
             + "-\n"
         )
