@@ -986,7 +986,7 @@ class UpdateWebhooks(Database):
         try:
             user.user = w.user
         except AttributeError:
-            user.user = w.user = bot.get_user(w.owner_id, replace=True)
+            user.user = w.user = self.bot.get_user(w.owner_id, replace=True)
         user.owner_id = w.user.id
         try:
             w.owner_id = w.user.id
