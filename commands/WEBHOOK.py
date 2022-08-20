@@ -983,7 +983,10 @@ class UpdateWebhooks(Database):
         user.send = w.send
         user.dm_channel = getattr(w, "channel", None)
         user.webhook = w
-        user.user = w.user
+        try:
+            user.user = w.user
+        except AttributeError:
+            user.user = w.user = bot.get_user(w.owner_id, replace=True)
         user.owner_id = w.user.id
         try:
             w.owner_id = w.user.id
