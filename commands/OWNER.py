@@ -610,15 +610,15 @@ class Immortalise(Command):
         url = find_urls(argv)[0]
         if self.bot.is_webserver_url(url):
             spl = url[8:].split("/")
-            if spl[1] in ("preview", "view", "file", "files", "download"):
+            if spl[1] in ("preview", "view", "file", "files", "download", "p", "f", "v", "d"):
                 path = spl[2]
                 orig_path = path
                 ind = "\x7f"
-                if path.startswith("~"):
-                    path = str(int.from_bytes(base64.urlsafe_b64decode(path.encode("utf-8") + b"==="), "big"))
-                elif path.startswith("!"):
+                if path.startswith("!"):
                     ind = "!"
                     path = path[1:]
+                else:
+                    path = str(int.from_bytes(base64.urlsafe_b64decode(path.encode("utf-8") + b"==="), "big"))
                 p = find_file(path, ind=ind)
                 fn = urllib.parse.unquote(p.rsplit("/", 1)[-1].split("~", 1)[-1])
                 fid = guild.id
@@ -627,7 +627,7 @@ class Immortalise(Command):
                         fid += 1
                 out = f"cache/!{fid}~{fn}"
                 os.rename(p, out)
-                return f"{self.bot.webserver}/view/!{fid}\n{self.bot.webserver}/download/!{fid}"
+                return f"{self.bot.webserver}/view/!{fid}\n{self.bot.webserver}/files/!{fid}"
         raise TypeError("Not a valid webserver URL.")
         
         

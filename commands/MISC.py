@@ -905,7 +905,7 @@ class UpdateDeviantArt(Database):
         bot = self.bot
         try:
             channel = await bot.fetch_channel(c_id)
-        except LookupError:
+        except (LookupError, discord.NotFound):
             self.data.pop(c_id, None)
             return
         try:
