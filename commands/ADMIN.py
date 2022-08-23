@@ -1126,7 +1126,7 @@ class StarBoard(Command):
                         disabled = [set()]
                     disabled = disabled[0]
                     disabled.add(c_id)
-                    data[guild.id][k] = (count, c_id2, *disabled)
+                    data[guild.id][k] = (count, c_id2, disabled)
             data.update(guild.id)
             channels = sqr_md(", ".join(map(str, sorted(channels, key=lambda c: c.id))))
             return italics(css_md(f"Now excluding {channels} from starboard {triggers}."))
@@ -1154,7 +1154,7 @@ class StarBoard(Command):
         else:
             count = 1
         boards = data.setdefault(guild.id, {})
-        boards[emoji] = [count, channel.id, set()]
+        boards[emoji] = (count, channel.id, set())
         data.update(guild.id)
         return ini_md(f"Successfully added starboard to {sqr_md(channel)}, with trigger {sqr_md(emoji)}: {sqr_md(count)}.")
 
