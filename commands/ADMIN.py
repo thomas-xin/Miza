@@ -1095,8 +1095,12 @@ class StarBoard(Command):
                 for k in selected:
                     data.pop(k, None)
                 return italics(css_md(f"Disabled starboard {triggers} for {sqr_md(guild)}."))
+            args = set(int(a) for a in args)
+            if guild.id in args:
+                args.remove(guild.id)
+                args = set(c.id for c in guild.text_channels).difference(args)
             channels = []
-            for c_id in map(int, set(args)):
+            for c_id in args:
                 c = await bot.fetch_channel(c_id)
                 if c.guild.id != guild.id:
                     continue
