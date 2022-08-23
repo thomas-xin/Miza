@@ -1113,7 +1113,7 @@ class StarBoard(Command):
                     disabled.add(c_id)
                     data[k] = (e_id, count, disabled)
             channels = sqr_md(", ".join(map(str, channels)))
-            return italics(css_md(f"Now ignoring {channels} for starboard {triggers}."))
+            return italics(css_md(f"Now excluding {channels} from starboard {triggers}."))
         if not args:
             buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
             await send_with_reply(
