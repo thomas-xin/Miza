@@ -1072,7 +1072,7 @@ class StarBoard(Command):
         if "d" in flags:
             selected = []
             for k, t in data.items():
-                if k == channel.id:
+                if t[1] == channel.id:
                     selected.append(k)
             if not selected:
                 return ini_md(f"Starboard reposting is currently disabled in {sqr_md(channel)}.")
