@@ -1071,9 +1071,10 @@ class StarBoard(Command):
         data = bot.data.starboards
         if "d" in flags:
             selected = []
-            for k, t in data.items():
-                if t[1] == channel.id:
-                    selected.append(k)
+            if data.get(guild.id):
+                for k, t in data[guild.id].items():
+                    if t[1] == channel.id:
+                        selected.append(k)
             if not selected:
                 return ini_md(f"Starboard reposting is currently disabled in {sqr_md(channel)}.")
             emojis = []
