@@ -1078,8 +1078,7 @@ class StarBoard(Command):
             if not selected:
                 return ini_md(f"Starboard reposting is currently disabled in {sqr_md(channel)}.")
             emojis = []
-            print(selected)
-            for e_data, (count, c_id, *disabled) in zip(selected, map(data.get, selected)):
+            for e_data, (count, c_id, *disabled) in zip(selected, map(data[guild.id].get, selected)):
                 try:
                     e_id = int(e_data)
                 except:
@@ -1095,6 +1094,7 @@ class StarBoard(Command):
             if not args:
                 for k in selected:
                     data.pop(k, None)
+                data.update(guild.id)
                 return italics(css_md(f"Disabled starboard {triggers} for {sqr_md(guild)}."))
             args = set(int(a) for a in args)
             if guild.id in args:
