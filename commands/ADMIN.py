@@ -1070,28 +1070,46 @@ class StarBoard(Command):
     async def __call__(self, bot, args, user, message, channel, guild, flags, **void):
         data = bot.data.starboards
         if "d" in flags:
-            if args:
-                e_data = " ".join(args)
+            selected = []
+            for k, t in data.items():
+                if k == channel.id:
+                    selected.append(k)
+            if not selected:
+                return ini_md(f"Starboard reposting is currently disabled in {sqr_md(channel)}.")
+            emojis = []
+            for e_id, count, *disabled in map(data.get, selected):
+                e_data = args.pop(0)
                 try:
                     e_id = int(e_data)
                 except:
                     emoji = e_data
                 else:
                     emoji = await bot.fetch_emoji(e_id)
-                emoji = str(emoji)
-                try:
-                    data[guild.id].pop(emoji)
-                except KeyError:
-                    pass
-                else:
-                    if any(v for k, v in data[guild.id].items() if k != None):
-                        data.update(guild.id)
-                    else:
-                        data.pop(guild.id)
-                return italics(css_md(f"Disabled starboard trigger {sqr_md(emoji)} for {sqr_md(guild)}."))
-            for c_id, v in data.items():
-                data.pop(guild.id, None)
-            return italics(css_md(f"Disabled all starboard reposting for {sqr_md(guild)}."))
+                emojis.append(str(emoji))
+            if len(selected) > 1:
+                triggers = "triggers "
+            else:
+                triggers = "trigger "
+            triggers += sqr_md(", ".join(emojis))
+            if not args:
+                for k in selected:
+                    data.pop(k, None)
+                return italics(css_md(f"Disabled starboard {triggers} for {sqr_md(guild)}."))
+            channels = []
+            for c_id in map(int, set(args)):
+                c = await bot.fetch_channel(c_id)
+                if c.guild.id != guild.id:
+                    continue
+                channels.append(c)
+                for k in selected:
+                    e_id, count, *disabled = data[k]
+                    if not disabled:
+                        disabled = [set()]
+                    disabled = disabled[0]
+                    disabled.add(c_id)
+                    data[k] = (e_id, count, disabled)
+            channels = sqr_md(", ".join(map(str, channels)))
+            return italics(css_md(f"Now ignoring {channels} for starboard {triggers}."))
         if not args:
             buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
             await send_with_reply(
@@ -1103,11 +1121,6 @@ class StarBoard(Command):
                 buttons=buttons,
             )
             return
-        if not args:
-            try:
-                e_id, count = data[channel.id]
-            except KeyError:
-                return ini_md(f"Starboard reposting is currently disabled in {sqr_md(channel)}.")
         e_data = args.pop(0)
         try:
             e_id = int(e_data)
@@ -1121,7 +1134,7 @@ class StarBoard(Command):
         else:
             count = 1
         boards = data.setdefault(guild.id, {})
-        boards[emoji] = (count, channel.id)
+        boards[emoji] = [count, channel.id, set()]
         data.update(guild.id)
         return ini_md(f"Successfully added starboard to {sqr_md(channel)}, with trigger {sqr_md(emoji)}: {sqr_md(count)}.")
 
@@ -1134,7 +1147,8 @@ class StarBoard(Command):
         guild = message.guild
         user = await bot.fetch_user(u_id)
         data = bot.data.starboards
-        curr = data.setdefault(guild.id, {})
+        curr = data.setdefault(guild.id, {}).copy()
+        curr.pop(None, None)
         page = 16
         last = max(0, len(curr) - page)
         if reaction is not None:
@@ -1164,7 +1178,14 @@ class StarBoard(Command):
             msg = ""
         else:
             content += f"{len(curr)} starboard triggers currently assigned for {str(guild).replace('`', '')}:```*"
-            msg = ini_md(iter2str({k: curr[k] for k in tuple(curr)[pos:pos + page]}, key=lambda t: f"×{t[0]} {sqr_md(bot.get_channel(t[1]))}"))
+
+            def disp(t):
+                s = f"×{t[0]} -> {sqr_md(bot.get_channel(t[1]))}"
+                if len(t) > 2:
+                    s += ", excludes " + ", ".join(sqr_md(bot.get_channel(i)) for i in t[2:])
+                return s
+
+            msg = ini_md(iter2str({k: curr[k] for k in tuple(curr)[pos:pos + page]}, key=disp))
         colour = await self.bot.get_colour(guild)
         emb = discord.Embed(
             description=content + msg,
@@ -2726,7 +2747,11 @@ class UpdateStarboards(Database):
     async def _reaction_add_(self, message, react, **void):
         if not message.guild or message.guild.id not in self.data:
             return
-        if message.channel.id == self.data[message.guild.id].get(react, (message.channel.id,))[-1]:
+        temp = self.data[message.guild.id].get(react)
+        if not temp:
+            return
+        e_id, count, *disabled = temp
+        if disabled and message.channel.id in disabled[0]:
             return
         table = self.data[message.guild.id]
         req = table[react][0]
