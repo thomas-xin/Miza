@@ -1061,21 +1061,26 @@ class StarBoard(Command):
     server_only = True
     min_level = 2
     description = "Causes ⟨MIZA⟩ to repost popular messages with a certain number of a specified reaction anywhere from the server, into the current channel."
-    usage = "<0:reaction> <1:react_count(1)>? <disable{?d}>?"
-    flags = "d"
+    usage = "<0:reaction> <1:react_count(1)>? <enable_channel{?e}>? <disable_channel{?d}>? <channel_ids(-1)>*"
+    flags = "ed"
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
     rate_limit = 1
 
     async def __call__(self, bot, args, user, message, channel, guild, flags, **void):
         data = bot.data.starboards
-        if "d" in flags:
+        if "e" in flags or "d" in flags:
             selected = []
             if data.get(guild.id):
                 for k, t in data[guild.id].items():
                     if k and t[1] == channel.id:
                         selected.append(k)
             if not selected:
+                d = dict(data[guild.id])
+                d.pop(None, None)
+                if not d:
+                    data.pop(guild.id, None)
+                    data.update(guild.id)
                 return ini_md(f"Starboard reposting is currently disabled in {sqr_md(channel)}.")
             emojis = []
             for e_data, (count, c_id, *disabled) in zip(selected, map(data[guild.id].get, selected)):
@@ -1092,10 +1097,19 @@ class StarBoard(Command):
                 triggers = "trigger "
             triggers += sqr_md(", ".join(emojis))
             if not args:
+                if "d" in flags:
+                    for k in selected:
+                        data[guild.id].pop(k, None)
+                    d = dict(data[guild.id])
+                    d.pop(None, None)
+                    if not d:
+                        data.pop(guild.id, None)
+                    data.update(guild.id)
+                    return italics(css_md(f"Disabled starboard {triggers} for {sqr_md(guild)}."))
                 for k in selected:
-                    data.pop(k, None)
+                    data[guild.id][k] = data[guild.id][k][:2]
                 data.update(guild.id)
-                return italics(css_md(f"Disabled starboard {triggers} for {sqr_md(guild)}."))
+                return italics(css_md(f"No longer exluding channels for starboard {triggers}."))
             args = set(int(a) for a in args)
             if guild.id in args:
                 args.remove(guild.id)
@@ -1107,14 +1121,14 @@ class StarBoard(Command):
                     continue
                 channels.append(c)
                 for k in selected:
-                    e_id, count, *disabled = data[guild.id][k]
+                    count, c_id2, *disabled = data[guild.id][k]
                     if not disabled:
                         disabled = [set()]
                     disabled = disabled[0]
                     disabled.add(c_id)
-                    data[guild.id][k] = (e_id, count, disabled)
+                    data[guild.id][k] = (count, c_id2, *disabled)
             data.update(guild.id)
-            channels = sqr_md(", ".join(map(str, channels)))
+            channels = sqr_md(", ".join(map(str, sorted(channels, key=lambda c: c.id))))
             return italics(css_md(f"Now excluding {channels} from starboard {triggers}."))
         if not args:
             buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
