@@ -1125,7 +1125,10 @@ class StarBoard(Command):
                     if not disabled:
                         disabled = [set()]
                     disabled = disabled[0]
-                    disabled.add(c_id)
+                    if "d" in flags:
+                        disabled.add(c_id)
+                    else:
+                        disabled.discard(c_id)
                     data[guild.id][k] = (count, c_id2, disabled)
             data.update(guild.id)
             channels = sqr_md(", ".join(map(str, sorted(channels, key=lambda c: c.id))))
