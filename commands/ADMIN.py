@@ -1129,6 +1129,7 @@ class StarBoard(Command):
                     data[guild.id][k] = (count, c_id2, disabled)
             data.update(guild.id)
             channels = sqr_md(", ".join(map(str, sorted(channels, key=lambda c: c.id))))
+            now = "Now" if "d" in flags else "No longer"
             return italics(css_md(f"Now excluding {channels} from starboard {triggers}."))
         if not args:
             buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
