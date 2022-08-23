@@ -1107,12 +1107,13 @@ class StarBoard(Command):
                     continue
                 channels.append(c)
                 for k in selected:
-                    e_id, count, *disabled = data[k]
+                    e_id, count, *disabled = data[guild.id][k]
                     if not disabled:
                         disabled = [set()]
                     disabled = disabled[0]
                     disabled.add(c_id)
-                    data[k] = (e_id, count, disabled)
+                    data[guild.id][k] = (e_id, count, disabled)
+            data.update(guild.id)
             channels = sqr_md(", ".join(map(str, channels)))
             return italics(css_md(f"Now excluding {channels} from starboard {triggers}."))
         if not args:
