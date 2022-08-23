@@ -1110,7 +1110,7 @@ class StarBoard(Command):
                     data[guild.id][k] = data[guild.id][k][:2]
                 data.update(guild.id)
                 return italics(css_md(f"No longer exluding channels for starboard {triggers}."))
-            args = set(int(a) for a in args)
+            args = set(verify_id(a) for a in args)
             if guild.id in args:
                 args.remove(guild.id)
                 args = set(c.id for c in guild.text_channels).difference(args)
