@@ -5253,6 +5253,26 @@ class AudioClientInterface:
             self.proc.stdin.write(b)
             self.proc.stdin.flush()
             resp = await asyncio.wait_for(wrap_future(self.returns[key]), timeout=48)
+        except (T0, T1, T2):
+            if is_strict_running(self.proc):
+                force_kill(self.proc)
+            self.__init__()
+            if "audio" in bot.data:
+                await bot.data.audio._bot_ready_(bot)
+            for client in self.clients.values():
+                if client:
+                    client.kill()
+            self.clients.clear()
+            self.returns.clear()
+            futs = deque()
+            for guild in bot.client.guilds:
+                member = guild.get_member(bot.user.id)
+                if member:
+                    voice = member.voice
+                    if voice:
+                        futs.append(create_task(member.move_to(None)))
+            for fut in futs:
+                await fut
         except:
             raise
         finally:
@@ -5326,6 +5346,7 @@ class AudioClientInterface:
             return
         with tracebacksuppressor:
             create_future_ex(self.submit, "await kill()", priority=True).result(timeout=2)
+        time.sleep(0.5)
         with tracebacksuppressor(psutil.NoSuchProcess):
             return force_kill(self.proc)
 
