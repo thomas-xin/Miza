@@ -1162,6 +1162,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     mime = magic.Magic(mime=True, mime_encoding=True)
     mimes = {}
 
+    async def id_from_message(self, m_id):
+        if not m_id:
+            return m_id
+        m_id = await self.follow_url(m_id)
+        if is_url(m_id.strip("<>")) and "/emojis/" in m_id:
+            return m_id.strip("<>").split("/emojis/", 1)[-1].split(".", 1)[0]
+        if m_id in self.cache.messages:
+            return await self.id_from_message(self.cache.messages[m_id].content)
+        return m_id
+
     # Finds URLs in a string, following any discord message links found.
     async def follow_url(self, url, it=None, best=False, preserve=True, images=True, allow=False, limit=None):
         if limit is not None and limit <= 0:

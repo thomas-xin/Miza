@@ -178,7 +178,7 @@ class UpdateAutoEmojis(Database):
                                             emoji = emojis.get(name)
                     if emoji:
                         if type(emoji) is int:
-                            e_id = emoji
+                            e_id = await bot.id_from_message(emoji)
                             emoji = self.bot.cache.emojis.get(e_id)
                         futs.append(create_task(m2.add_reaction(emoji)))
                 if futs:
@@ -227,7 +227,7 @@ class UpdateAutoEmojis(Database):
                                 name = t[0] + "-" + str(i)
                                 emoji = emojis.get(name)
             if type(emoji) is int:
-                e_id = emoji
+                e_id = await bot.id_from_message(emoji)
                 emoji = self.bot.cache.emojis.get(e_id)
                 if not emoji:
                     animated = await create_future(self.bot.is_animated, e_id, verify=True)
@@ -335,10 +335,8 @@ class EmojiList(Command):
             name = name.strip(":")
             if not regexp("[A-Za-z0-9\\-~_]{1,32}").fullmatch(name):
                 raise ArgumentError("Emoji aliases may only contain 1~32 alphanumeric characters, dashes, tildes and underscores.")
-            e_id = e_id.strip("<>")
-            if is_url(e_id) and "/emojis/" in e_id:
-                e_id = e_id.split("/emojis/", 1)[-1].split(".", 1)[0]
-            e_id = e_id.rsplit(":", 1)[-1].strip(":")
+            e_id = await bot.id_from_message(e_id)
+            e_id = e_id.strip("<>").rsplit(":", 1)[-1].strip(":")
             if not e_id.isnumeric():
                 raise ArgumentError("Only custom emojis are supported.")
             e_id = int(e_id)

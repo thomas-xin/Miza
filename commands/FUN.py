@@ -1788,12 +1788,11 @@ class React(Command):
             raise OverflowError(f"React list for {guild} has reached the maximum of {lim} items. Please remove an item to add another.")
         # Limit substring length to 64
         a = unicode_prune(" ".join(args[:-1])).casefold()[:64]
-        if is_url(e_id.strip("<>")) and "/emojis/" in e_id:
-            e_id = e_id.strip("<>").split("/emojis/", 1)[-1].split(".", 1)[0]
+        e_id = await bot.id_from_message(args[-1])
         try:
-            e_id = int(args[-1])
+            e_id = int(e_id)
         except:
-            emoji = args[-1]
+            emoji = e_id
         else:
             emoji = await bot.fetch_emoji(e_id)
         emoji = str(emoji)
