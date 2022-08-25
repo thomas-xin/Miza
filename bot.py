@@ -1165,7 +1165,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     async def id_from_message(self, m_id):
         if not m_id:
             return m_id
-        m_id = await self.follow_url(m_id)
+        links = await self.follow_url(m_id)
+        m_id = links[0] if links else m_id
         if is_url(m_id.strip("<>")) and "/emojis/" in m_id:
             return m_id.strip("<>").split("/emojis/", 1)[-1].split(".", 1)[0]
         if m_id in self.cache.messages:
