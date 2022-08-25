@@ -178,7 +178,7 @@ class UpdateAutoEmojis(Database):
                                             emoji = emojis.get(name)
                     if emoji:
                         if type(emoji) is int:
-                            e_id = await bot.id_from_message(emoji)
+                            e_id = await self.bot.id_from_message(emoji)
                             emoji = self.bot.cache.emojis.get(e_id)
                         futs.append(create_task(m2.add_reaction(emoji)))
                 if futs:
@@ -227,7 +227,7 @@ class UpdateAutoEmojis(Database):
                                 name = t[0] + "-" + str(i)
                                 emoji = emojis.get(name)
             if type(emoji) is int:
-                e_id = await bot.id_from_message(emoji)
+                e_id = await self.bot.id_from_message(emoji)
                 emoji = self.bot.cache.emojis.get(e_id)
                 if not emoji:
                     animated = await create_future(self.bot.is_animated, e_id, verify=True)
