@@ -4077,16 +4077,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 author = self.author
                 if "tts" not in d:
                     d["tts"] = False
-                try:
-                    ref = d["message_reference"]
-                    if ref:
+                if "message_reference" in d:
+                    with tracebacksuppressor:
+                        ref = d["message_reference"]
                         if "channel_id" not in ref:
                             ref["channel_id"] = d["channel_id"]
                         if "guild_id" not in ref:
-                            if hasattr(self.channel, "guild"):
-                                ref["guild_id"] = self.channel.guild.id
-                except KeyError:
-                    pass
+                            if hasattr(channel, "guild"):
+                                ref["guild_id"] = channel.guild.id
                 for k in ("tts", "pinned", "mention_everyone"):
                     if k not in d:
                         d[k] = None
