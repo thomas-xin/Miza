@@ -998,10 +998,13 @@ class Resize(Command):
                     raise ArgumentError("Please input an image by URL or attachment.")
             value = " ".join(args).strip()
             func = "resize_mult"
+            fmt2 = url.split("?", 1)[0].rsplit(".", 1)[-1]
+            if fmt2 not in ("mp4", "gif"):
+                fmt2 = "mp4"
             if not value:
                 x = y = 1
                 op = "auto"
-                fmt = "mp4"
+                fmt = fmt2
             else:
                 # Parse width and height multipliers
                 if "x" in value[:-1] or "X" in value or "*" in value or "×" in value:
@@ -1031,7 +1034,7 @@ class Resize(Command):
                 if spl:
                     fmt = spl.pop(0)
                 else:
-                    fmt = "mp4"
+                    fmt = fmt2
             # Try and find a good name for the output image
             try:
                 name = url[url.rindex("/") + 1:]

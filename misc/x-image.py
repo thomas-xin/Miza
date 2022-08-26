@@ -696,7 +696,7 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
         f_in = fn if direct else url
         command = ["./ffmpeg", "-threads", "2", "-hide_banner", "-nostdin", "-v", "error", "-y", "-hwaccel", "auto", "-i", f_in, "-vf"]
         w, h = max_size(*size, maxsize)
-        fps = fps or orig_fps or 20
+        fps = fps or orig_fps or 30
         step = 1
         while fps / step >= 40:
             step += 1
@@ -2291,7 +2291,7 @@ def from_bytes(b, save=None):
         try:
             duration = 1000 / eval(info[-1], {}, {})
         except (ValueError, TypeError, SyntaxError, ZeroDivisionError):
-            duration = 50
+            duration = 33.333333333333333
         bcount *= int(np.prod(size))
         images = deque()
         while True:
@@ -2362,6 +2362,9 @@ class ImageSequence(Image.Image):
             self._images = [image.copy() for image in images]
         else:
             self._images = images
+        for i1, i2 in zip(self._images, images):
+            if "duration" in i2.info:
+                i1.info["duration"] = max(i2.info.get("duration", 0), 50)
         self._position = 0
 
     __len__ = lambda self: len(self._images)
@@ -2379,7 +2382,7 @@ class ImageSequence(Image.Image):
 
 
 def get_image(url, out):
-    if issubclass(type(url), Image.Image):
+    if isinstance(url, Image.Image):
         return url
     if type(url) not in (bytes, bytearray, io.BytesIO):
         save = None
