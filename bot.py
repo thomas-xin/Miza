@@ -4097,7 +4097,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 for k in ("reactions", "attachments", "embeds"):
                     if k not in d:
                         d[k] = []
-                message = bot.LoadedMessage(state=bot._state, channel=channel, data=d)
+                try:
+                    message = bot.LoadedMessage(state=bot._state, channel=channel, data=d)
+                except:
+                    print(d)
+                    raise
                 apply_stickers(message, d)
                 if not getattr(message, "author", None):
                     message.author = author
