@@ -73,7 +73,7 @@ except:
 
 try:
     v = pkg_resources.get_distribution("yt_dlp").version
-    assert v >= "2022.5.18"
+    assert v >= "2022.8.19"
 except:
     print_exc()
     subprocess.run([python, "-m", "pip", "install", "git+https://github.com/yt-dlp/yt-dlp.git", "--upgrade", "--user"])
