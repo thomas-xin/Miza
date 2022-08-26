@@ -2758,7 +2758,11 @@ class UpdateCrossposts(Database):
                     channel = await self.bot.fetch_channel(c_id)
                 except:
                     print_exc()
-                    self.data[message.channel.id].discard(c_id)
+                    s = self.data[message.channel.id]
+                    s.discard(c_id)
+                    if not s:
+                        self.pop(message.channel.id)
+                    self.update(message.channel.id)
                     continue
                 name = message.guild.name + "\u2009\u2009#" + str(message.channel)
                 url = best_url(message.guild)

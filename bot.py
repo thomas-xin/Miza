@@ -4085,6 +4085,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         if "guild_id" not in ref:
                             if hasattr(channel, "guild"):
                                 ref["guild_id"] = channel.guild.id
+                        if "referenced_message" in d:
+                            m = d["referenced_message"]
+                            m["channel_id"] = d["channel_id"]
+                            if "message_reference" in m:
+                                m["message_reference"]["channel_id"] = d["channel_id"]
                 for k in ("tts", "pinned", "mention_everyone"):
                     if k not in d:
                         d[k] = None
