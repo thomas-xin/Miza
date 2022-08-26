@@ -1000,7 +1000,13 @@ class Resize(Command):
             func = "resize_mult"
             fmt2 = url.split("?", 1)[0].rsplit(".", 1)[-1]
             if fmt2 not in ("mp4", "gif"):
-                fmt2 = "mp4"
+                if is_url(url):
+                    resp = await create_future(Request, url)
+                    fmt2 = resp["Content-Type"].rsplit("/", 1)[-1]
+                    if fmt2 not in ("mp4", "gif"):
+                        fmt2 = "mp4"
+                else:
+                    fmt2 = "mp4"
             if not value:
                 x = y = 1
                 op = "auto"
