@@ -1050,8 +1050,8 @@ class Resize(Command):
                     name = name[:name.rindex(".")]
             except ValueError:
                 name = "unknown"
-            if not name.endswith(".png"):
-                name += ".png"
+            if not name.endswith("." + fmt):
+                name += "." + fmt
             resp = await process_image(url, func, [x, y, op, "-f", fmt], timeout=_timeout)
             fn = resp[0]
             if fn.endswith(".mp4"):
