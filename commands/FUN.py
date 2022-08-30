@@ -419,7 +419,9 @@ class Text2048(Command):
                     elif mode & 4:
                         xp /= 3
                     bot.data.users.add_gold(user, xp)
-                    emb.description += "+" + await bot.as_rewards(xp)
+                    rew = await bot.as_rewards(xp)
+                    if rew:
+                        emb.description += "+" + rew
                 emb.set_footer(text=f"Score: {fscore}")
                 # Clear buttons and announce game over message
                 try:
@@ -466,7 +468,9 @@ class Text2048(Command):
                 elif mode & 4:
                     xp /= 3
                 bot.data.users.add_gold(user, xp)
-                emb.description += "+" + await bot.as_rewards(xp)
+                rew = await bot.as_rewards(xp)
+                if rew:
+                    emb.description += "+" + rew
             emb.set_footer(text=f"Score: {fscore}")
             create_task(bot.ignore_interaction(message))
             dims = max(2, len(g.data.shape))

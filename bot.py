@@ -2639,7 +2639,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             out.append(f"{coin} {gold}")
         if out:
             return " ".join(out)
-        return None
+        return
 
     zw_callback = zwencode("callback")
 
