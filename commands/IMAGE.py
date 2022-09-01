@@ -706,7 +706,7 @@ class QR(Command):
 
 
 class Rainbow(Command):
-    name = ["RainbowGIF"]
+    name = ["RainbowGIF", "Gay"]
     description = "Creates a .gif image from repeatedly hueshifting supplied image."
     usage = "<0:url> <1:duration(2)>?"
     no_parse = True
