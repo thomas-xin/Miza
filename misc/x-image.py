@@ -2496,7 +2496,7 @@ def evalImg(url, operation, args):
             temp = next(iter(frames))
             video = getattr(temp, "audio", None)
             if not video:
-                new = temp
+                new["frames"] = [temp]
             else:
                 duration = dur = 3600000
                 new["count"] = 16

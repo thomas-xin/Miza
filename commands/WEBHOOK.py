@@ -276,7 +276,7 @@ class UpdateAutoEmojis(Database):
                     fmt = "gif" if emoji.animated else "png"
                     url = f"https://cdn.discordapp.com/emojis/{emoji.id}.{fmt}?quality=lossless&size=48"
                     await m.edit(content=url)
-                    self.data.webhooks.pop(m.channel.id)
+                    self.pop(m.channel.id)
                     return
             if recursive and regex.search(m.content):
                 for k in tuple(pops):
@@ -294,7 +294,7 @@ class UpdateAutoEmojis(Database):
                                 fmt = "gif" if emoji.animated else "png"
                                 url = f"https://cdn.discordapp.com/emojis/{emoji.id}.{fmt}?quality=lossless&size=48"
                                 await m.edit(content=url)
-                                self.data.webhooks.pop(m.channel.id)
+                                self.pop(m.channel.id)
                                 return
                         if regex.search(m.content):
                             emb = discord.Embed()
@@ -305,8 +305,8 @@ class UpdateAutoEmojis(Database):
                                 + "or manually create a new webhook for this channel!"
                             )
                             await m.edit(embed=emb)
-                            self.data.webhooks.pop(m.channel.id)
-                            self.data.webhooks.temp.pop(m.channel.id)
+                            self.pop(m.channel.id)
+                            self.temp.pop(m.channel.id)
                         # create_task(self.bot.silent_delete(m))
                         # m2 = await self.bot.send_as_webhook(message.channel, msg, files=files, username=message.author.display_name, avatar_url=url)
 

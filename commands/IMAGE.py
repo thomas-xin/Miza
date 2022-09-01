@@ -1059,6 +1059,11 @@ class Resize(Command):
                     if "." in name:
                         name = name[:name.rindex(".")]
                     name += ".mp4"
+            elif fn.endswith(".png"):
+                if not name.endswith(".png"):
+                    if "." in name:
+                        name = name[:name.rindex(".")]
+                    name += ".png"
         await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
