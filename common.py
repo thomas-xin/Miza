@@ -1062,7 +1062,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
                     bucket = f"{channel.id}:None:" + "/channels/{channel_id}/messages"
                     sem = REPLY_SEM[channel.id] = bot.http._locks[bucket]
             except KeyError:
-                print_exc()
+                # print_exc()
                 sem = REPLY_SEM[channel.id] = bot.http._locks[bucket] = Semaphore(5, buffer=256, delay=0.1, rate_limit=5.15)
         inter = False
         url = f"https://discord.com/api/{api}/channels/{channel.id}/messages"

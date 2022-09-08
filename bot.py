@@ -4560,6 +4560,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         m_id = verify_id(url.rsplit("/", 1)[-1])
                         message = await bot.fetch_message(m_id)
                         lock = getattr(message, "sem", None)
+                        if not lock and message.edited_at and (utc_ddt() - message.created_at).total_seconds() >= 3590:
+                            lock = message.sem = Semaphore(3, 1, rate_limit=20.09)
                     # elif method.lower() == "patch":
                     #     m_id = int(route.url.rsplit("/", 1)[-1])
                     #     td = datetime.datetime.now() - snowflake_time_2(m_id)
@@ -5049,7 +5051,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if after.channel is None:
                 after.channel = self.force_channel(payload.channel_id)
             after.sem = getattr(before, "sem", None)
-            if not after.sem and after.edited_at and (utc_ddt() - after.edited_at).total_seconds() >= 3590:
+            if not after.sem and after.edited_at and (utc_ddt() - after.created_at).total_seconds() >= 3590:
                 after.sem = Semaphore(3, 1, rate_limit=20.09)
                 async with after.sem:
                     pass
