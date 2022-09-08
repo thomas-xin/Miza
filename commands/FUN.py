@@ -424,10 +424,12 @@ class Text2048(Command):
                         emb.description += "+" + rew
                 emb.set_footer(text=f"Score: {fscore}")
                 # Clear buttons and announce game over message
-                try:
-                    sem = EDIT_SEM[message.channel.id]
-                except KeyError:
-                    sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
+                sem = getattr(message, "sem", None)
+                if not sem:
+                    try:
+                        sem = EDIT_SEM[message.channel.id]
+                    except KeyError:
+                        sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
                 async with sem:
                     return await Request(
                         f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
@@ -519,10 +521,12 @@ class Text2048(Command):
                     dis.add((2, -1))
             for x, y in dis:
                 buttons[y][x].disabled = True
-            try:
-                sem = EDIT_SEM[message.channel.id]
-            except KeyError:
-                sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
+            sem = getattr(message, "sem", None)
+            if not sem:
+                try:
+                    sem = EDIT_SEM[message.channel.id]
+                except KeyError:
+                    sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
             async with sem:
                 return await Request(
                     f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
@@ -1223,10 +1227,12 @@ class Uno(Command):
                     message=message,
                     content=s,
                 ))
-                try:
-                    sem = EDIT_SEM[message.channel.id]
-                except KeyError:
-                    sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
+                sem = getattr(message, "sem", None)
+                if not sem:
+                    try:
+                        sem = EDIT_SEM[message.channel.id]
+                    except KeyError:
+                        sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
                 async with sem:
                     return await Request(
                         f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
@@ -3158,10 +3164,12 @@ class Akinator(Command):
             + bar
         )
         emb.set_author(**get_author(user))
-        try:
-            sem = EDIT_SEM[message.channel.id]
-        except KeyError:
-            sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
+        sem = getattr(message, "sem", None)
+        if not sem:
+            try:
+                sem = EDIT_SEM[message.channel.id]
+            except KeyError:
+                sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
         async with sem:
             return await Request(
                 f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",

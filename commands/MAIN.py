@@ -158,10 +158,12 @@ class Help(Command):
             if not getattr(message, "slash", None) and content:
                 create_task(bot.ignore_interaction(original))
                 embed.description = f"```callback-main-help-{user.id}-\n{user.display_name} has asked for help!```" + content
-                try:
-                    sem = EDIT_SEM[message.channel.id]
-                except KeyError:
-                    sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
+                sem = getattr(message, "sem", None)
+                if not sem:
+                    try:
+                        sem = EDIT_SEM[message.channel.id]
+                    except KeyError:
+                        sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
                 async with sem:
                     await Request(
                         f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
@@ -176,10 +178,12 @@ class Help(Command):
             elif content:
                 create_task(interaction_response(bot, original, content))
                 if not getattr(message, "slash", None):
-                    try:
-                        sem = EDIT_SEM[message.channel.id]
-                    except KeyError:
-                        sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
+                    sem = getattr(message, "sem", None)
+                    if not sem:
+                        try:
+                            sem = EDIT_SEM[message.channel.id]
+                        except KeyError:
+                            sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
                     async with sem:
                         await Request(
                             f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",

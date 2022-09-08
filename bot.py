@@ -4556,6 +4556,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 elif "/messages" in route.path:
                     if method.lower() == "post":
                         lock = Semaphore(5, 256, rate_limit=5.15)
+                    elif method.lower() == "patch":
+                        m_id = verify_id(url.rsplit("/", 1)[-1])
+                        message = await bot.fetch_message(m_id)
+                        lock = getattr(message, "sem", None)
                     # elif method.lower() == "patch":
                     #     m_id = int(route.url.rsplit("/", 1)[-1])
                     #     td = datetime.datetime.now() - snowflake_time_2(m_id)
@@ -5044,6 +5048,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 before.deleted = True
             if after.channel is None:
                 after.channel = self.force_channel(payload.channel_id)
+            after.sem = getattr(before, "sem", None)
+            if not after.sem and after.edited_at and (utc_ddt() - after.edited_at).total_seconds() >= 3590:
+                after.sem = Semaphore(3, 1, rate_limit=20.09)
+                async with after.sem:
+                    pass
             self.add_message(after, files=False, force=True)
             if raw or before.content != after.content:
                 if "users" in self.data:

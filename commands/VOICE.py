@@ -5047,10 +5047,12 @@ class Download(Command):
                             name = None
                         name = name or url.rsplit("/", 1)[-1].rsplit(".", 1)[0]
                         name = f"【{num}】{name}"
-                        try:
-                            sem = EDIT_SEM[message.channel.id]
-                        except KeyError:
-                            sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
+                        sem = getattr(message, "sem", None)
+                        if not sem:
+                            try:
+                                sem = EDIT_SEM[message.channel.id]
+                            except KeyError:
+                                sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
                         async with sem:
                             return await Request(
                                 f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
