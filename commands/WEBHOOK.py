@@ -336,7 +336,7 @@ class EmojiList(Command):
             if not regexp("[A-Za-z0-9\\-~_]{1,32}").fullmatch(name):
                 raise ArgumentError("Emoji aliases may only contain 1~32 alphanumeric characters, dashes, tildes and underscores.")
             e_id = await bot.id_from_message(e_id)
-            e_id = e_id.strip("<>").rsplit(":", 1)[-1].strip(":")
+            e_id = as_str(e_id).strip("<>").rsplit(":", 1)[-1].strip(":")
             if not e_id.isnumeric():
                 raise ArgumentError("Only custom emojis are supported.")
             e_id = int(e_id)

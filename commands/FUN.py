@@ -1799,11 +1799,7 @@ class React(Command):
         # Limit substring length to 64
         a = unicode_prune(" ".join(args[:-1])).casefold()[:64]
         e_id = await bot.id_from_message(args[-1])
-        try:
-            e_id = int(e_id)
-        except:
-            emoji = e_id
-        else:
+        if isinstance(e_id, int):
             emoji = await bot.fetch_emoji(e_id)
         emoji = str(emoji)
         # This reaction indicates that the emoji was valid

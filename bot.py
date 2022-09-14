@@ -4059,7 +4059,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
         class CachedMessage(discord.abc.Snowflake):
 
-            __slots__ = ("_data", "id", "created_at", "author", "channel", "channel_id", "deleted", "attachments")
+            __slots__ = ("_data", "id", "created_at", "author", "channel", "channel_id", "deleted", "attachments", "sem")
 
             def __init__(self, data):
                 self._data = data
@@ -5248,6 +5248,7 @@ class AudioClientInterface:
     clients = {}
     returns = {}
     written = False
+    killed = False
 
     def __init__(self):
         self.proc = psutil.Popen([python, "x-audio.py"], cwd=os.getcwd() + "/misc", stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=65536)
@@ -5286,11 +5287,11 @@ class AudioClientInterface:
             self.proc.stdin.flush()
             resp = await asyncio.wait_for(wrap_future(self.returns[key]), timeout=48)
         except (T0, T1, T2):
+            if self.killed:
+                raise
+            self.killed = True
             if is_strict_running(self.proc):
                 force_kill(self.proc)
-            self.__init__()
-            if "audio" in bot.data:
-                await bot.data.audio._bot_ready_(bot)
             for client in self.clients.values():
                 if client:
                     client.kill()
@@ -5305,6 +5306,10 @@ class AudioClientInterface:
                         futs.append(create_task(member.move_to(None)))
             for fut in futs:
                 await fut
+            self.__init__()
+            if "audio" in bot.data:
+                await bot.data.audio._bot_ready_(bot)
+            self.killed = False
         except:
             raise
         finally:
@@ -5344,11 +5349,13 @@ class AudioClientInterface:
         proc.stdin.flush()
         while True:
             s = proc.stdout.readline().rstrip()
-            if s.startswith(b"~"):
-                s = base64.b85decode(s[1:])
-                if s == b"bot.audio.returns[0].set_result(0)":
-                    break
-            print(as_str(s))
+            if s:
+                if s.startswith(b"~"):
+                    s = base64.b85decode(s[1:])
+                    if s == b"bot.audio.returns[0].set_result(0)":
+                        break
+                print(as_str(s))
+            time.sleep(0.1)
         self.written = True
         self.fut.set_result(self)
         with tracebacksuppressor:
@@ -5379,8 +5386,9 @@ class AudioClientInterface:
         with tracebacksuppressor:
             create_future_ex(self.submit, "await kill()", priority=True).result(timeout=2)
         time.sleep(0.5)
-        with tracebacksuppressor(psutil.NoSuchProcess):
-            return force_kill(self.proc)
+        if is_strict_running(self.proc):
+            with tracebacksuppressor(psutil.NoSuchProcess):
+                return force_kill(self.proc)
 
 
 # Queries for searching members
