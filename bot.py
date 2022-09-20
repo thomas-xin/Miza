@@ -3271,7 +3271,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if self.is_ws_ratelimited():
                 i = bool(i & 7)
             else:
-                i = i & 1
+                i = i + 1 & 1
             fut = create_task(asyncio.wait_for(funcs[i](guild), timeout=None if i else 60))
             fut.guild = guild
             if len(futs[i]) >= 16:
@@ -3282,12 +3282,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     try:
                         await fut
                     except (T0, T1, T2):
+                        print_exc()
                         await funcs[1](fut.guild)
             futs[i].append(fut)
         for f in itertools.chain(*futs):
             try:
                 await fut
             except (T0, T1, T2):
+                print_exc()
                 await funcs[1](fut.guild)
 
     # Adds a webhook to the bot's user and webhook cache.
