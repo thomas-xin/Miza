@@ -1054,7 +1054,8 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
         except KeyError:
             sem = None
         if not sem:
-            bucket = f"{channel.id}:{channel.guild.id}:" + "/channels/{channel_id}/messages"
+            g_id = channel.guild.id if getattr(channel, "guild", None) else None
+            bucket = f"{channel.id}:{g_id}:" + "/channels/{channel_id}/messages"
             try:
                 try:
                     sem = REPLY_SEM[channel.id] = bot.http._locks[bucket]
