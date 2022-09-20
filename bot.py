@@ -62,7 +62,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         replied_user=False,
     )
     connect_ready = concurrent.futures.Future()
-    guilds_ready = concurrent.futures.Future()
     socket_responses = deque(maxlen=256)
     try:
         shards = int(sys.argv[1])
@@ -3278,7 +3277,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             futs[i].append(fut)
         for f in itertools.chain(*futs):
             await fut
-        self.guilds_ready.set_result(None)
 
     # Adds a webhook to the bot's user and webhook cache.
     def add_webhook(self, w):
@@ -4721,7 +4719,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             print("Bot ready.")
             await wrap_future(self.connect_ready)
             print("Connect ready.")
-            await wrap_future(self.guilds_ready)
+            await self.guilds_ready
             print("Guilds ready.")
             await create_future(self.update_usernames)
             self.ready = True
@@ -4745,7 +4743,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if not self.started:
                 self.started = True
                 create_task(self.init_ready())
-                create_task(self.load_guilds())
+                self.guilds_ready = create_task(self.load_guilds())
                 self.update_cache_feed()
             else:
                 print("Reconnected.")
@@ -4959,6 +4957,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         else:
                             mdata = mdata.get("user")
                         user = self._state.store_user(mdata)
+                        if not user:
+                            user = self.GhostUser()
                         channel = None
                         try:
                             channel = self.force_channel(d["channel_id"])
