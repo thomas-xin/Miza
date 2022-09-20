@@ -3257,6 +3257,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             guild._member_count = len(guild._members)
             i = len(memberdata)
             x = max(members)
+        return guild.members
 
     async def load_guild(self, guild):
         await choice(self._connection.chunk_guild, self.load_guild_http)(guild)
@@ -3265,18 +3266,29 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
     async def load_guilds(self):
         funcs = [self._connection.chunk_guild, self.load_guild_http]
-        futs = [deque(), deque()]
+        futs = [alist(), alist()]
         for i, guild in enumerate(self.client.guilds):
             if self.is_ws_ratelimited():
                 i = bool(i & 7)
             else:
                 i = i & 1
-            fut = create_task(funcs[i](guild))
+            fut = create_task(asyncio.wait_for(funcs[i](guild), timeout=None if i else 60))
+            fut.guild = guild
             if len(futs[i]) >= 16:
-                await futs[i].popleft()
+                pops = [i for i, fut in enumerate(futs[i]) if fut.done()]
+                futs[i].pops(pops)
+                if len(futs[i]) >= 16:
+                    fut = futs[i].pop(0)
+                    try:
+                        await fut
+                    except (T0, T1, T2):
+                        await funcs[1](fut.guild)
             futs[i].append(fut)
         for f in itertools.chain(*futs):
-            await fut
+            try:
+                await fut
+            except (T0, T1, T2):
+                await funcs[1](fut.guild)
 
     # Adds a webhook to the bot's user and webhook cache.
     def add_webhook(self, w):
