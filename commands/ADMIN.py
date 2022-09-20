@@ -2764,7 +2764,7 @@ class UpdateCrossposts(Database):
                         self.pop(message.channel.id)
                     self.update(message.channel.id)
                     continue
-                name = message.guild.name + "\u2009\u2009#" + str(message.channel)
+                name = message.guild.name + "\u2009﹟" + str(message.channel)
                 url = best_url(message.guild)
                 create_task(self.bot.send_as_webhook(channel, content, embeds=list(embeds), files=list(files), username=name, avatar_url=url))
 
