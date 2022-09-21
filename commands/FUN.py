@@ -1649,6 +1649,7 @@ class Matchmaking(Command):
     slash = "Ship"
 
     async def __call__(self, bot, message, channel, guild, args, **void):
+        uids = deque()
         users = deque()
         for u_id in map(verify_id, args):
             try:
@@ -1657,6 +1658,7 @@ class Matchmaking(Command):
                 users.append(as_str(u_id).capitalize())
             else:
                 users.append(user.display_name)
+                uids.append(user.id)
         while len(users) < 2:
             users.append(choice(guild.members).display_name)
 
@@ -1680,7 +1682,7 @@ class Matchmaking(Command):
         suspicious_function = lambda x: x / ((x ** 2 * 6254793562032913) // (7632048114126314 * 10 ** 24) - (x * 5638138161912547) // 2939758 + 1000000155240420236976462021787648)
         suspicious_function_2 = lambda x: int.from_bytes(bytes.fromhex(x.encode("utf-8").hex()), "little")
         s = "".join(a.capitalize() for a in sorted(users))
-        if round(suspicious_function(suspicious_function_2(s))) in (13264547, 47787122):
+        if round(suspicious_function(suspicious_function_2(s))) in (13264547, 47787122) or fold(int.__and__, uids) == 38283079340654592:
             inwards_heart = [
                 "00111011100",
                 "01122122110",

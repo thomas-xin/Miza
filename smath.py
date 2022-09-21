@@ -919,6 +919,15 @@ def lcmRange(x):
         y *= p ** floor(log(x, p))
     return y
 
+def fold(f, it):
+    out = None
+    for i in it:
+        if out is None:
+            out = i
+        else:
+            out = f(out, i)
+    return out
+
 
 def _predict_next(seq):
     if len(seq) < 2:
