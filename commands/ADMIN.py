@@ -2456,7 +2456,7 @@ class UpdateMessageLogs(Database):
         if not getattr(message, "slash", None):
             return
         guild = message.guild
-        if guild.id not in self.data:
+        if not guild or guild.id not in self.data:
             return
         c_id = self.data[guild.id]
         try:
