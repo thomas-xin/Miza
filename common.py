@@ -2905,9 +2905,9 @@ def load_emojis():
     with tracebacksuppressor:
         data = Request("https://api.github.com/repos/twitter/twemoji/git/trees/master?recursive=1", json=True, timeout=None)
         ems = [e for e in data["tree"] if e["path"].startswith("assets/svg/")]
-        e_ids = [e["path"].rsplit("/", 1)[-1].split(".", 1)[0].split("-") for e in ems]
-        urls = [e["url"] for e in ems]
-        emojis = ["".join(chr(int(i, 16)) for i in e_id) for e_id in e_ids]
+        e_ids = [e["path"].rsplit("/", 1)[-1].split(".", 1)[0] for e in ems]
+        urls = [f"https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/{e_id}.svg" for e_id in e_ids]
+        emojis = ["".join(chr(int(i, 16)) for i in e_id.split("-")) for e_id in e_ids]
         etrans = dict(zip(emojis, urls))
 
         emoji_translate = {k: v for k, v in etrans.items() if len(k) == 1}
