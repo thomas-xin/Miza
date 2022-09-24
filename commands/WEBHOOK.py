@@ -980,6 +980,7 @@ class UpdateWebhooks(Database):
         user.display_avatar = user.avatar_url = str(w.avatar)
         user.bot = True
         user.send = w.send
+        user.edit = w.edit
         user.dm_channel = getattr(w, "channel", None)
         user.webhook = w
         try:
