@@ -2903,10 +2903,10 @@ Request = RequestManager()
 def load_emojis():
     global emoji_translate, emoji_replace, em_trans
     with tracebacksuppressor:
-        resp = Request("https://emojipedia.org/twitter", decode=True, timeout=None)
-        lines = resp.split('<ul class="emoji-grid">', 1)[-1].rsplit("</ul>", 1)[0].strip().split("</a>")
-        urls = [line.split('srcset="', 1)[-1].split('"', 1)[0].split(None, 1)[0].replace("/144/", "/160/", 1) for line in lines if 'srcset="' in line]
-        e_ids = [url.rsplit("_", 1)[-1].split(".", 1)[0].split("-") for url in urls]
+        data = Request("https://api.github.com/repos/twitter/twemoji/git/trees/master?recursive=1", json=True, timeout=None)
+        ems = [e for e in data["tree"] if e["path"].startswith("assets/svg/")]
+        e_ids = [e["path"].rsplit("/", 1)[-1].split(".", 1)[0].split("-") for e in ems]
+        urls = [e["url"] for e in ems]
         emojis = ["".join(chr(int(i, 16)) for i in e_id) for e_id in e_ids]
         etrans = dict(zip(emojis, urls))
 

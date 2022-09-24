@@ -128,6 +128,7 @@ class UpdateAutoEmojis(Database):
         guild = message.guild
         orig = self.bot.data.emojilists.get(message.author.id, {})
         emojis = None
+        # long = len(msg) > 32
         if msg.startswith("+"):
             emi = msg[1:].strip()
             spl = emi.rsplit(None, 1)
