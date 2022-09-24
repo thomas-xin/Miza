@@ -74,7 +74,7 @@ snowflake_time_3 = utils.snowflake_time
 
 ip2int = lambda ip: int.from_bytes(b"\x00" + bytes(int(i) for i in ip.split(".")), "big")
 
-api = "v10"
+api = "v9"
 
 # Main event loop for all asyncio operations.
 try:
