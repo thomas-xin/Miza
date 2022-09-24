@@ -3307,11 +3307,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         try:
             if fill:
                 while len(wlist) < fill:
-                    w = await channel.create_webhook(name=self.name, reason="Auto Webhook")
+                    data = await self.get_request(get_author(self.user).url)
+                    w = await channel.create_webhook(name=self.name, avatar=data, reason="Auto Webhook")
                     w = self.add_webhook(w)
                     wlist.append(w)
             if not wlist:
-                w = await channel.create_webhook(name=self.name, reason="Auto Webhook")
+                data = await self.get_request(get_author(self.user).url)
+                w = await channel.create_webhook(name=self.name, avatar=data, reason="Auto Webhook")
                 w = self.add_webhook(w)
             else:
                 w = wlist[0]
@@ -3322,7 +3324,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 w = wlist.next()
         if not w.avatar or str(w.avatar) == "https://cdn.discordapp.com/embed/avatars/0.png":
             data = await self.get_request(get_author(self.user).url)
-            return await w.edit(avatar=data)
+            return await w.edit(name=self.name, avatar=data)
         return w
 
     # Sends a message to the target channel, using a random webhook from that channel.
