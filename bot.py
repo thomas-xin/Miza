@@ -3320,6 +3320,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 print_exc()
                 wlist = await self.load_channel_webhooks(channel, force=True, bypass=bypass)
                 w = wlist.next()
+        if not w.avatar or str(w.avatar) == "https://cdn.discordapp.com/embed/avatars/0.png":
+            data = await self.get_request(get_author(self.user).url)
+            return await w.edit(avatar=data)
         return w
 
     # Sends a message to the target channel, using a random webhook from that channel.
