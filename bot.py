@@ -55,6 +55,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         reactions=True,
         typing=True,
     )
+    intents.value |= 32768 # message content intent because discord dumb
     allowed_mentions = discord.AllowedMentions(
         everyone=False,
         users=True,
