@@ -954,6 +954,7 @@ class UpdateWebhooks(Database):
         d.url = f"https://discord.com/api/webhooks/{d.id}/{d.token}"
         w = discord.Webhook.from_url(d.url, session=self.bot._connection.http._HTTPClient__session, bot_token=self.bot.token)
         d.send = w.send
+        d.edit = w.edit
         d.display_avatar = d.avatar_url = d.avatar and f"https://cdn.discordapp.com/avatars/{d.id}/{d.avatar}.png?size=1024"
         d.channel = self.CID(id=c_id)
         d.created_at = snowflake_time_3(w.id)
