@@ -19,7 +19,7 @@ except (AttributeError, ModuleNotFoundError):
             try:
                 return setattr(self.aki, k, v)
             except AttributeError:
-                return self.__dict__[k] = v
+                self.__dict__[k] = v
 
 print = PRINT
 
