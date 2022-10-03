@@ -1,5 +1,8 @@
 import nekos, akinator
-from akinator.async_aki import Akinator as async_akinator
+try:
+	from akinator.async_aki import Akinator as async_akinator
+except AttributeError:
+	import akinator.AsyncAkinator as async_akinator
 print = PRINT
 
 
