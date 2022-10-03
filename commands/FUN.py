@@ -1,7 +1,7 @@
 import nekos, akinator
 try:
 	from akinator.async_aki import Akinator as async_akinator
-except AttributeError:
+except (AttributeError, ModuleNotFoundError):
 	import akinator.AsyncAkinator as async_akinator
 print = PRINT
 
