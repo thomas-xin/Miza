@@ -3,8 +3,24 @@ try:
     from akinator.async_aki import Akinator as async_akinator
 except (AttributeError, ModuleNotFoundError):
     from akinator import AsyncAkinator
-    class async_akinator(AsyncAkinator):
-        pass
+
+    class async_akinator:
+
+        def __init__(self, *args, **kwargs):
+            self.aki = AsyncAkinator(*args, **kwargs)
+
+        def __getattr__(self, k):
+            try:
+                return self.__getattribute__(k)
+            except AttributeError:
+                return getattr(self.aki, k)
+
+        def __setattr__(self, k, v):
+            try:
+                return setattr(self.aki, k, v)
+            except AttributeError:
+                return self.__dict__[k] = v
+
 print = PRINT
 
 
