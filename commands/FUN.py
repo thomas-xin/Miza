@@ -7,7 +7,7 @@ except (AttributeError, ModuleNotFoundError):
     class async_akinator:
 
         def __init__(self, *args, **kwargs):
-            self.aki = AsyncAkinator(*args, **kwargs)
+            self.__dict__["aki"] = AsyncAkinator(*args, **kwargs)
 
         def __getattr__(self, k):
             try:
