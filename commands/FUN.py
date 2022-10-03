@@ -2891,7 +2891,7 @@ class Akinator(Command):
 
     async def compatible_akinator(self, language, child_mode=False, client_session=Request.session):
         try:
-            aki = async_akinator(language=language, child_mode=child_mode)
+            aki = async_akinator(language=akinator.Language.from_str(language), child_mode=child_mode)
             await aki.start_game()
         except:
             aki = async_akinator()
