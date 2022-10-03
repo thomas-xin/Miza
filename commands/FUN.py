@@ -3209,7 +3209,7 @@ class UpdateAkinator(Database):
             self.akinators.popleft()
         async with self.sem:
             while len(self.akinators) < 2:
-                aki = await self.compatible_akinator(language="en", child_mode=False)
+                aki = await self.bot.commands.akinator[0].compatible_akinator(language="en", child_mode=False)
                 self.akinators.append(aki)
             for k, aki in tuple(self.data.items()):
                 if t > aki.timestamp + 960:

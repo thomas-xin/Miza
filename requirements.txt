@@ -1,4 +1,4 @@
-akinator.py>=5.0.0
+akinator.py>=0.2.1
 antlr4-python3-runtime>=4.10
 asyncio>=3.4.3
 blend-modes>=2.1.0
