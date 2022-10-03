@@ -2383,7 +2383,7 @@ class UpdateMessageCache(Database):
         try:
             return os.path.getmtime(self.files + "/-1")
         except FileNotFoundError:
-            return 0
+            return utc() - 28 * 86400
     setmtime = lambda self: open(self.files + "/-1", "wb").close()
 
     async def _minute_loop_(self):
@@ -2410,7 +2410,7 @@ class UpdateMessageLogs(Database):
             t = None
             with tracebacksuppressor(FileNotFoundError):
                 t = utc_ft(self.bot.data.message_cache.getmtime())
-            if t is None:
+            if not t:
                 t = utc_dt() - datetime.timedelta(days=7)
             create_task(self.load_new_messages(t))
 
