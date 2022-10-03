@@ -2896,6 +2896,7 @@ class Akinator(Command):
         except:
             aki = async_akinator()
             await aki.start_game(language=language, child_mode=child_mode, client_session=client_session)
+        aki.timestamp = utc()
         return aki
 
     buttons = [
