@@ -23,11 +23,8 @@ x = sys.version_info[1]
 
 if sys.version_info.major == 3 and sys.version_info.minor >= 10:
 	import collections
-	try:
-		setattr(collections, "MutableMapping", collections.abc.MutableMapping)
-	except AttributeError:
-		collections.MutableMapping = collections.abc.Mapping
-	collections.Mapping = collections.abc.Mapping
+	for k in dir(collections.abc):
+		setattr(collections, k, getattr(collections.abc, k))
 
 installing = []
 install = lambda m: installing.append(subprocess.Popen([python, "-m", "pip", "install", m, "--upgrade", "--user"]))
