@@ -1,8 +1,8 @@
 import nekos, akinator
 try:
-	from akinator.async_aki import Akinator as async_akinator
+    from akinator.async_aki import Akinator as async_akinator
 except (AttributeError, ModuleNotFoundError):
-	from akinator import AsyncAkinator as async_akinator
+    from akinator import AsyncAkinator as async_akinator
 print = PRINT
 
 
@@ -2889,6 +2889,15 @@ class Akinator(Command):
     slash = True
     rate_limit = (1, 3)
 
+    async def compatible_akinator(self, language, child_mode=False, client_session=Request.session):
+        try:
+            aki = async_akinator(language=language, child_mode=child_mode)
+            await aki.start_game()
+        except:
+            aki = async_akinator()
+            await aki.start_game(language=language, child_mode=child_mode, client_session=client_session)
+        return aki
+
     buttons = [
         cdict(emoji="👍", name="Yes", style=1),
         cdict(emoji="🙂", name="Probably", style=1),
@@ -2939,8 +2948,7 @@ class Akinator(Command):
         if language in ("", "en", "eng", "english") and "c" not in flags and akinators:
             aki = akinators.popleft()
         else:
-            aki = async_akinator()
-            await aki.start_game(language=language, child_mode="c" in flags, client_session=Request.session)
+            aki = await self.compatible_akinator(language=language, child_mode="c" in flags)
         bot.data.akinators[aki.signature] = aki
 
         colour = await bot.get_colour(user)
@@ -3080,9 +3088,7 @@ class Akinator(Command):
             else:
                 lang = "en"
                 child = False
-            aki2 = async_akinator()
-            await aki2.start_game(lang, child_mode=child, client_session=Request.session)
-            aki = aki2
+            aki = await self.compatible_akinator(language=lang, child_mode=child)
             bot.data.akinators[aki.signature] = aki
             aki.__dict__.setdefault("no", set())
 
@@ -3203,8 +3209,7 @@ class UpdateAkinator(Database):
             self.akinators.popleft()
         async with self.sem:
             while len(self.akinators) < 2:
-                aki = async_akinator()
-                await aki.start_game(language="en", child_mode=False, client_session=Request.session)
+                aki = await self.compatible_akinator(language="en", child_mode=False)
                 self.akinators.append(aki)
             for k, aki in tuple(self.data.items()):
                 if t > aki.timestamp + 960:
