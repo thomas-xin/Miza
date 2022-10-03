@@ -772,8 +772,8 @@ class AutoRole(Command):
             if not assigned:
                 return ini_md(f"No currently active autoroles for {sqr_md(guild)}.")
             return f"Currently active autoroles for {bold(escape_markdown(guild.name))}:\n{ini_md(iter2str(rlist))}"
-        if sum(len(alist) for alist in assigned) >= 8:
-            raise OverflowError(f"Autorole list for #{channel} has reached the maximum of 8 items. Please remove an item to add another.")
+        if sum(len(alist) for alist in assigned) >= 12:
+            raise OverflowError(f"Autorole list for #{channel} has reached the maximum of 12 items. Please remove an item to add another.")
         roles = alist()
         rolenames = (verify_id(i) for i in args)
         if len(guild.roles) <= 1:
@@ -801,7 +801,7 @@ class AutoRole(Command):
                 if memb.top_role <= role:
                     raise PermissionError("Target role is higher than your highest role.")
             roles.append(role)
-        new = alist(role.id for role in roles)
+        new = alist(frozenset(role.id for role in roles))
         if new not in assigned:
             assigned.append(new)
             update(guild.id)
@@ -2904,13 +2904,14 @@ class UpdateAutoRoles(Database):
         # Do not apply autorole to users who have roles from role preservers
         with suppress(KeyError):
             return self.bot.data.rolepreservers[guild.id][user.id]
-        roles = deque()
+        roles = []
         assigned = self.data[guild.id]
         for rolelist in assigned:
             with tracebacksuppressor:
                 r = choice(rolelist)
                 role = await self.bot.fetch_role(r, guild)
-                roles.append(role)
+                if role not in roles:
+                    roles.append(role)
                 # if len(rolelist) > 1 and hasattr(rolelist, "next"):
                 #     self.update(guild.id)
         # Attempt to add all roles in one API call
