@@ -4835,7 +4835,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             self.users_updated = True
             self.cache.guilds.pop(guild.id, None)
             self.sub_guilds.pop(guild.id, None)
-            print(guild, "removed.")
+            print("Server lost:", guild, "removed.")
 
         # Reaction add event: uses raw payloads rather than discord.py message cache. calls _seen_ bot database event.
         @self.event
@@ -5306,30 +5306,36 @@ class AudioClientInterface:
             self.proc.stdin.write(b)
             self.proc.stdin.flush()
             resp = await asyncio.wait_for(wrap_future(self.returns[key]), timeout=48)
-        except (T0, T1, T2):
+        except (T0, T1, T2, OSError):
             if self.killed:
                 raise
-            self.killed = True
-            if is_strict_running(self.proc):
-                force_kill(self.proc)
-            for client in self.clients.values():
-                if client:
-                    client.kill()
-            self.clients.clear()
-            self.returns.clear()
-            futs = deque()
-            for guild in bot.client.guilds:
-                member = guild.get_member(bot.user.id)
-                if member:
-                    voice = member.voice
-                    if voice:
-                        futs.append(create_task(member.move_to(None)))
-            for fut in futs:
-                await fut
-            self.__init__()
-            if "audio" in bot.data:
-                await bot.data.audio._bot_ready_(bot)
-            self.killed = False
+            try:
+                self.killed = True
+                if is_strict_running(self.proc):
+                    force_kill(self.proc)
+                for client in self.clients.values():
+                    if client:
+                        client.kill()
+                self.clients.clear()
+                self.returns.clear()
+                futs = deque()
+                for guild in bot.client.guilds:
+                    member = guild.get_member(bot.user.id)
+                    if member:
+                        voice = member.voice
+                        if voice:
+                            futs.append(create_task(member.move_to(None)))
+                for fut in futs:
+                    await fut
+                print("Restarting audio client...")
+                self.__init__()
+                if "audio" in bot.data:
+                    await bot.data.audio._bot_ready_(bot)
+                self.killed = False
+            except:
+                print_exc()
+                time.sleep(1)
+                force_kill(PROC)
         except:
             raise
         finally:

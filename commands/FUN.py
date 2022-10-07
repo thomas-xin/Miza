@@ -2907,13 +2907,13 @@ class Akinator(Command):
     slash = True
     rate_limit = (1, 3)
 
-    async def compatible_akinator(self, language, child_mode=False, client_session=Request.session):
+    async def compatible_akinator(self, language, child_mode=False):
         try:
             aki = async_akinator(language=akinator.Language.from_str(language), child_mode=child_mode)
             await aki.start_game()
         except:
             aki = async_akinator()
-            await aki.start_game(language=language, child_mode=child_mode, client_session=client_session)
+            await aki.start_game(language=language, child_mode=child_mode)
         aki.timestamp = utc()
         return aki
 
