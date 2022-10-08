@@ -3253,6 +3253,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     await asyncio.sleep(r + 2)
                 else:
                     break
+            else:
+                raise RuntimeError("Max retries exceeded in loading guild members via http.")
             members = {int(m["user"]["id"]): discord.Member(guild=guild, data=m, state=self._connection) for m in memberdata}
             guild._members.update(members)
             guild._member_count = len(guild._members)

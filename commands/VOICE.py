@@ -816,7 +816,7 @@ class AudioQueue(alist):
         with tracebacksuppressor:
             auds = self.auds
             try:
-                self.pos
+                auds.epos
             except (TypeError, AttributeError):
                 auds.kill()
                 raise
