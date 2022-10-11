@@ -69,7 +69,7 @@ As of 26 September 2021, Miza now fully works on Windows and Linux. If you're pl
 * Navigate to your desired directory, by typing this command in Git Bash (or Linux terminal):
 ```bash
 cd [Desired Directory]
-Example: cd /C/Users/Miza/Documents/Projects/
+Example: cd C:/Users/Miza/Documents/Projects/
 ```
 
 * If on Linux, the following must be installed (use `yum install` on other distributions of Linux as required):
