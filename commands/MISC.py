@@ -862,6 +862,7 @@ class StableDiffusion(Command):
                 url = urls[0]
         if not rems and not url:
             raise ArgumentError("Please input a valid prompt.")
+        prompt = " ".join(rems)
         args = [
             "py",
             "-3.9",
@@ -870,7 +871,7 @@ class StableDiffusion(Command):
         if rems:
             args.extend((
                 "--prompt",
-                " ".join(rems),
+                prompt,
             ))
         if url:
             b = await bot.get_request(url)
@@ -883,9 +884,14 @@ class StableDiffusion(Command):
                 "--strength",
                 "0.333333333",
             ))
+        # args.extend((
+        #     "--num-inference-steps",
+        #     "24",
+        # ))
         with discord.context_managers.Typing(channel):
             if self.sdiff_sem.is_busy() and not getattr(message, "simulated", False):
-                await send_with_react(channel, italics(ini_md(f"StableDiffusion: {sqr_md(url)} enqueued in position {sqr_md(self.sdiff_sem.passive + 1)}.")), reacts="❎", reference=message)
+                temp = url or prompt
+                await send_with_react(channel, italics(ini_md(f"StableDiffusion: {sqr_md(temp)} enqueued in position {sqr_md(self.sdiff_sem.passive + 1)}.")), reacts="❎", reference=message)
             async with self.sdiff_sem:
                 print(args)
                 proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc/stable_diffusion.openvino", stdout=subprocess.DEVNULL)
