@@ -838,6 +838,67 @@ class SpectralPulse(Command):
             await bot.send_with_file(channel, "", fn2, filename=n2, reference=message)
 
 
+class StableDiffusion(Command):
+    _timeout_ = 150
+    name = ["Art", "AIArt"]
+    description = "Runs a Stable Diffusion AI art generator on the input prompt or image. Operates on a global queue system, and must be installed separately from https://github.com/bes-dev/stable_diffusion.openvino, extracted into the misc folder."
+    usage = "<0:prompt>"
+    rate_limit = (12, 60)
+    typing = True
+    sdiff_sem = Semaphore(1, 256, rate_limit=1)
+
+    async def __call__(self, bot, channel, message, args, **void):
+        for a in message.attachments:
+            args.insert(0, a.url)
+        if not args:
+            raise ArgumentError("Input string is empty.")
+        url = None
+        rems = deque()
+        for arg in args:
+            urls = await bot.follow_url(arg, allow=True, images=True)
+            if not urls:
+                rems.append(arg)
+            elif not url:
+                url = urls[0]
+        if not rems and not url:
+            raise ArgumentError("Please input a valid prompt.")
+        args = [
+            "py",
+            "-3.9",
+            "demo.py",
+        ]
+        if rems:
+            args.extend((
+                "--prompt",
+                " ".join(rems),
+            ))
+        if url:
+            b = await bot.get_request(url)
+            fn = "misc/stable_diffusion.openvino/input.png"
+            with open(fn, "wb") as f:
+                f.write(b)
+            args.extend((
+                "--init-image",
+                fn,
+                "--strength",
+                "0.333333333",
+            ))
+        with discord.context_managers.Typing(channel):
+            if self.sdiff_sem.is_busy() and not getattr(message, "simulated", False):
+                await send_with_react(channel, italics(ini_md(f"StableDiffusion: {sqr_md(url)} enqueued in position {sqr_md(self.sdiff_sem.passive + 1)}.")), reacts="❎", reference=message)
+            async with self.sdiff_sem:
+                print(args)
+                proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc/stable_diffusion.openvino", stdout=subprocess.DEVNULL)
+                try:
+                    await asyncio.wait_for(proc.wait(), timeout=3200)
+                except (T0, T1, T2):
+                    with tracebacksuppressor:
+                        force_kill(proc)
+                    raise
+        fn = "misc/stable_diffusion.openvino/output.png"
+        await bot.send_with_file(channel, "", fn, filename="output.png", reference=message)
+
+
 class DeviantArt(Command):
     server_only = True
     min_level = 2
