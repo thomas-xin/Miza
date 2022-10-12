@@ -880,7 +880,7 @@ class StableDiffusion(Command):
                 f.write(b)
             args.extend((
                 "--init-image",
-                fn,
+                "input.png",
                 "--strength",
                 "0.333333333",
             ))
