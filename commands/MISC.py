@@ -889,10 +889,12 @@ class StableDiffusion(Command):
             "24",
             "--guidance-scale",
             "8",
+            "--eta",
+            "0.8",
         ))
         with discord.context_managers.Typing(channel):
             if self.sdiff_sem.is_busy() and not getattr(message, "simulated", False):
-                temp = url or prompt
+                temp = " ".join(args)
                 await send_with_react(channel, italics(ini_md(f"StableDiffusion: {sqr_md(temp)} enqueued in position {sqr_md(self.sdiff_sem.passive + 1)}.")), reacts="❎", reference=message)
             async with self.sdiff_sem:
                 print(args)
