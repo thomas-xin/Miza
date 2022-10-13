@@ -882,12 +882,14 @@ class StableDiffusion(Command):
                 "--init-image",
                 "input.png",
                 "--strength",
-                "0.333333333",
+                "0.75",
             ))
-        # args.extend((
-        #     "--num-inference-steps",
-        #     "24",
-        # ))
+        args.extend((
+            "--num-inference-steps",
+            "24",
+            "--guidance-scale",
+            "8",
+        ))
         with discord.context_managers.Typing(channel):
             if self.sdiff_sem.is_busy() and not getattr(message, "simulated", False):
                 temp = url or prompt
