@@ -881,6 +881,7 @@ class StableDiffusion(Command):
                     kwargs[kwarg] = arg
                 # elif kwargs == "--mask":
                 #     kwargs[kwarg] = arg
+                kwarg = ""
                 continue
             if arg.startswith("--"):
                 kwarg = arg
