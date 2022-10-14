@@ -841,7 +841,7 @@ class SpectralPulse(Command):
 class StableDiffusion(Command):
     _timeout_ = 150
     name = ["Art", "AIArt"]
-    description = "Runs a Stable Diffusion AI art generator on the input prompt or image. Operates on a global queue system, and must be installed separately from https://github.com/bes-dev/stable_diffusion.openvino, extracted into the misc folder."
+    description = "Runs a Stable Diffusion AI art generator on the input prompt or image. Operates on a global queue system, and must be installed separately from https://github.com/bes-dev/stable_diffusion.openvino, extracted into the misc folder. Accepts appropriate keyword arguments."
     usage = "<0:prompt>"
     rate_limit = (12, 60)
     typing = True
@@ -852,9 +852,39 @@ class StableDiffusion(Command):
             args.insert(0, a.url)
         if not args:
             raise ArgumentError("Input string is empty.")
+        req = " ".join(args)
         url = None
         rems = deque()
+        kwargs = {
+            "--num-inference-steps": "24",
+            "--guidance-scale": "7.5",
+            "--eta": "0.8",
+        }
+        kwarg = ""
         for arg in args:
+            if kwarg:
+                # if kwarg == "--model":
+                #     kwargs[kwarg] = arg
+                if kwarg == "--seed":
+                    kwargs[kwarg] = arg
+                elif kwarg in ("--num-inference-steps", "--ddim_steps"):
+                    kwargs["--num-inference-steps"] = str(max(1, min(64, int(arg))))
+                elif kwarg in ("--guidance-scale", "--scale"):
+                    kwargs["--guidance-scale"] = str(max(0, min(100, float(arg))))
+                elif kwarg == "--eta":
+                    kwargs[kwarg] = arg
+                # elif kwarg in ("--tokenizer", "--tokeniser"):
+                #     kwargs["--tokenizer"] = arg
+                elif kwarg == "--prompt":
+                    kwargs[kwarg] = arg
+                elif kwarg == "--strength":
+                    kwargs[kwarg] = arg
+                # elif kwargs == "--mask":
+                #     kwargs[kwarg] = arg
+                continue
+            if arg.startswith("--"):
+                kwarg = arg
+                continue
             urls = await bot.follow_url(arg, allow=True, images=True)
             if not urls:
                 rems.append(arg)
@@ -863,12 +893,19 @@ class StableDiffusion(Command):
         if not rems and not url:
             raise ArgumentError("Please input a valid prompt.")
         prompt = " ".join(rems)
+        req = prompt
+        if url:
+            if req:
+                req += " "
+            req += url
+        if kwargs:
+            req += " ".join(f"{k} {v}" for k, v in kwargs.items())
         args = [
             "py",
             "-3.9",
             "demo.py",
         ]
-        if rems:
+        if rems and "--prompt" not in kwargs:
             args.extend((
                 "--prompt",
                 prompt,
@@ -881,21 +918,17 @@ class StableDiffusion(Command):
             args.extend((
                 "--init-image",
                 "input.png",
-                "--strength",
-                "0.75",
             ))
-        args.extend((
-            "--num-inference-steps",
-            "24",
-            "--guidance-scale",
-            "8",
-            "--eta",
-            "0.8",
-        ))
+            if "--strength" not in kwargs:
+                args.extend((
+                    "--strength",
+                    "0.75",
+                ))
+        for k, v in kwargs.items():
+            args.extend((k, v))
         with discord.context_managers.Typing(channel):
             if self.sdiff_sem.is_busy() and not getattr(message, "simulated", False):
-                temp = " ".join(args)
-                await send_with_react(channel, italics(ini_md(f"StableDiffusion: {sqr_md(temp)} enqueued in position {sqr_md(self.sdiff_sem.passive + 1)}.")), reacts="❎", reference=message)
+                await send_with_react(channel, italics(ini_md(f"StableDiffusion: {sqr_md(req)} enqueued in position {sqr_md(self.sdiff_sem.passive + 1)}.")), reacts="❎", reference=message)
             async with self.sdiff_sem:
                 print(args)
                 proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc/stable_diffusion.openvino", stdout=subprocess.DEVNULL)
