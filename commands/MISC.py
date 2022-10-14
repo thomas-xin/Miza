@@ -860,6 +860,7 @@ class StableDiffusion(Command):
             "--guidance-scale": "7.5",
             "--eta": "0.8",
         }
+        specified = set()
         kwarg = ""
         for arg in args:
             if kwarg:
@@ -868,19 +869,22 @@ class StableDiffusion(Command):
                 if kwarg == "--seed":
                     kwargs[kwarg] = arg
                 elif kwarg in ("--num-inference-steps", "--ddim_steps"):
-                    kwargs["--num-inference-steps"] = str(max(1, min(64, int(arg))))
+                    kwarg = "--num-inference-steps"
+                    kwargs[kwarg] = str(max(1, min(64, int(arg))))
                 elif kwarg in ("--guidance-scale", "--scale"):
-                    kwargs["--guidance-scale"] = str(max(0, min(100, float(arg))))
+                    kwarg = "--guidance-scale"
+                    kwargs[kwarg] = str(max(0, min(100, float(arg))))
                 elif kwarg == "--eta":
-                    kwargs[kwarg] = arg
+                    kwargs[kwarg] = str(max(0, min(1, float(arg))))
                 # elif kwarg in ("--tokenizer", "--tokeniser"):
                 #     kwargs["--tokenizer"] = arg
                 elif kwarg == "--prompt":
                     kwargs[kwarg] = arg
                 elif kwarg == "--strength":
-                    kwargs[kwarg] = arg
+                    kwargs[kwarg] = str(max(0, min(1, float(arg))))
                 # elif kwargs == "--mask":
                 #     kwargs[kwarg] = arg
+                specified = kwarg
                 kwarg = ""
                 continue
             if arg.startswith("--"):
@@ -899,8 +903,8 @@ class StableDiffusion(Command):
             if req:
                 req += " "
             req += url
-        if kwargs:
-            req += " ".join(f"{k} {v}" for k, v in kwargs.items())
+        if specified:
+            req += " ".join(f"{k} {v}" for k, v in kwargs.items() if k in specified)
         args = [
             "py",
             "-3.9",
