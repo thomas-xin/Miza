@@ -1274,15 +1274,18 @@ class Steganography(Command):
         b = await bot.get_request(url)
         if name == "nft":
             await bot.silent_delete(message)
-        msg = args.pop(0) if args else str(user.id)
-        n = verify_id(msg)
-        if isinstance(n, int):
-            try:
-                u = await bot.fetch_user(n)
-            except:
-                pass
-            else:
-                msg = str(u.id)
+        if args:
+            msg = args.pop(0)
+            n = verify_id(msg)
+            if isinstance(n, int):
+                try:
+                    u = await bot.fetch_user(n)
+                except:
+                    pass
+                else:
+                    msg = str(u.id)
+        else:
+            msg = str(user.id)
         remsg = " ".join(args)
         args = (
             sys.executable,
