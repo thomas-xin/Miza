@@ -47,7 +47,7 @@ ic = 0
 reader = []
 
 
-lim = 37 * 8 / 3
+lim = 48 * 8 / 3
 w = h = int(np.ceil(np.sqrt(lim)))
 while True:
 	if abs(w / h - ar) / ar < 1 / 32:
