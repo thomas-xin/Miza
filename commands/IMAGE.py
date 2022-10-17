@@ -1253,7 +1253,7 @@ class Blend(Command):
 
 
 class Steganography(Command):
-    name = ["C", "Copyright", "Ownership", "NFT"]
+    name = ["Watermark", "Copyright", "Ownership", "NFT", "C", "©"]
     description = "Tags an image with your discord user, or a message (input a user ID to tag another user). Raises an error if the image already has a tag."
     usage = "<0:url> <1:data>? <2:message>?"
     no_parse = True
@@ -1348,7 +1348,7 @@ class Steganography(Command):
                 return
             emb = await bot.as_embed(message, link=True)
             emb.colour = discord.Colour(0x00FF00)
-            action = f"**Mimic invoked in** {channel_mention(channel.id)}:\n"
+            action = f"{user_mention(u_id)} **deleted a copyrighted image deleted from** {channel_mention(channel.id)}:\n"
             emb.description = lim_str(action + emb.description, 4096)
             emb.timestamp = message.created_at
             self.bot.send_embeds(c, emb)
