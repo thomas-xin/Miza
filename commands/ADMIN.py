@@ -1710,7 +1710,7 @@ class ServerProtector(Database):
                         if str(u.id) in message.content:
                             return
                         create_task(send_with_react(
-                            user,
+                            u,
                             (
                                 f"```callback-image-steganography-{u.id}_{message.channel.id}_{message.id}-\n⚠️ Steganography alert ⚠️```"
                                 + f"Hey there, {user_mention(u.id)} has posted an image belonging to you without mentioning you. "
