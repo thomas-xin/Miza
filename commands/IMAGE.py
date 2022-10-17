@@ -1255,7 +1255,7 @@ class Blend(Command):
 class Steganography(Command):
     name = ["NFT"]
     description = "Tags an image with your discord user, or a message (input a user ID to tag another user). Raises an error if the image already has a tag."
-    usage = "<0:url> <1:message>?"
+    usage = "<0:url> <1:data>? <2:message>?"
     no_parse = True
     rate_limit = (1, 5)
     _timeout_ = 6
@@ -1283,6 +1283,7 @@ class Steganography(Command):
                 pass
             else:
                 msg = str(u.id)
+        remsg = " ".join(args)
         args = (
             sys.executable,
             "misc/steganography.py",
@@ -1323,7 +1324,7 @@ class Steganography(Command):
         if name == "nft":
             f = CompatFile(fn, filename=f"{fon}.png")
             url = await self.bot.get_proxy_url(message.author)
-            await self.bot.send_as_webhook(message.channel, " ".join(args), files=[f], username=message.author.display_name, avatar_url=url)
+            await self.bot.send_as_webhook(message.channel, remsg, files=[f], username=message.author.display_name, avatar_url=url)
         else:
             await bot.send_with_file(channel, f'Successfully created image with encoded message "{msg}".', fn, filename=f"{fon}.png", reference=message)
 
