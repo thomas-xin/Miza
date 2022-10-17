@@ -61,7 +61,7 @@ while True:
 		else:
 			w += 1
 			lim *= np.sqrt(2)
-print(bs, w, h)
+# print(bs, w, h)
 
 np.random.seed(time.time_ns() & 4294967295)
 spl = list(im.split())
@@ -146,7 +146,7 @@ try:
 	if s == msg:
 		raise ValueError
 except (ValueError, UnicodeDecodeError):
-	print(b)
+	# print(b)
 	if write:
 		im = Image.merge(im.mode, spl)
 		fn = fn.rsplit(".", 1)[0] + "~1.png"
