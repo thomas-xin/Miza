@@ -1508,6 +1508,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 if (utc_dt() - created_at).total_seconds() < 7200:
                     for attachment in message.attachments:
                         create_task(self.add_and_test(message, attachment))
+                    for url in find_urls(message.content):
+                        if is_discord_url(url) and "attachments/" in url:
+                            attachment = cdict(id=url.rsplit("/", 2)[-2], url=url, read=lambda: self.get_request(url))
+                            create_task(self.add_and_test(message, attachment))
             self.cache.messages[message.id] = message
             if (utc_dt() - created_at).total_seconds() < 86400 * 14 and "message_cache" in self.data and not getattr(message, "simulated", None):
                 self.data.message_cache.save_message(message)
@@ -1537,13 +1541,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         attachment = await self.add_attachment(attachment)
         if "prot" in self.data:
             fn = f"cache/attachment_{attachment.id}.bin"
+            if fn in self.cache.attachments:
+                await self.data.prot.call(message, fn, self.cache.attachments[fn])
+                return
             if not os.path.exists(fn):
                 data = await self.get_attachment(str(attachment.url))
                 if not data:
                     return
                 with open(fn, "wb") as f:
                     await create_future(f.write, data)
-            await self.data.prot.call(message, fn)
+            self.cache.attachments[fn] = await self.data.prot.call(message, fn)
 
     def attachment_from_file(self, file):
         a_id = int(file.split(".", 1)[0][11:])

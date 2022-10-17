@@ -1671,31 +1671,36 @@ class ServerProtector(Database):
             if cnt[u_id] > 5:
                 create_task(self.targetWarn(u_id, guild, f"banning `({cnt[u_id]})`"))
 
-    async def call(self, message, fn):
+    async def call(self, message, fn, known=None):
         args = (
             sys.executable,
             "misc/steganography.py",
             fn,
         )
         print(args)
-        proc = psutil.Popen(args, cwd=os.getcwd(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if not known:
+            proc = psutil.Popen(args, cwd=os.getcwd(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         try:
-            await create_future(proc.wait, timeout=3200)
+            if not known:
+                await create_future(proc.wait, timeout=3200)
         except (T0, T1, T2):
             with tracebacksuppressor:
                 force_kill(proc)
             raise
         else:
-            text = proc.stdout.read().decode("utf-8", "replace").strip()
+            if known:
+                text = known
+            else:
+                text = proc.stdout.read().decode("utf-8", "replace").strip()
             print(text)
             search = "Copyright detected: "
             if text.startswith(search):
-                text = text[len(search):]
-                print(text)
-                if text.isnumeric():
-                    i = int(text)
+                i = text[len(search):]
+                if i.isnumeric():
+                    i = int(i)
+                    print(i)
                     try:
-                        u = await bot.fetch_user(i)
+                        u = await self.bot.fetch_user(i)
                     except:
                         pass
                     else:
@@ -1718,6 +1723,7 @@ class ServerProtector(Database):
                                 + "Please make sure you have permission from the author before posting their art!"
                             ),
                         )
+        return text
 
 
 class CreateEmoji(Command):
