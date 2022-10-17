@@ -1253,7 +1253,7 @@ class Blend(Command):
 
 
 class Steganography(Command):
-    name = ["NFT"]
+    name = ["Copyright", "Ownership", "NFT"]
     description = "Tags an image with your discord user, or a message (input a user ID to tag another user). Raises an error if the image already has a tag."
     usage = "<0:url> <1:data>? <2:message>?"
     no_parse = True
