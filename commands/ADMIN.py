@@ -1713,7 +1713,7 @@ class ServerProtector(Database):
                             u,
                             (
                                 f"```callback-image-steganography-{u.id}_{message.channel.id}_{message.id}-\n⚠️ Steganography alert ⚠️```"
-                                + f"Hey there, {user_mention(u.id)} has posted an image belonging to you without mentioning you. "
+                                + f"Hey there, {user_mention(message.author.id)} has posted an image belonging to you without mentioning you. "
                                 + f"Check it by visiting <https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id}>, "
                                 + "or react with 🗑️ to take it down!"
                             ),
