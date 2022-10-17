@@ -35,8 +35,11 @@ if area < 1024:
 ar = im.size[0] / im.size[1]
 # print(im.size, area)
 
+entropy = max(0, min(1, im.entropy() ** 3 / 512 + 0.125))
+# print(entropy, im.entropy())
+
 write = bool(msg)
-b = b"\xff" + msg.encode("utf-8") + b"\xff"
+b = b"\xff" + (msg.encode("utf-8") + b"\xff") * 3 + b"\xff"
 bb = list(bool(i & 1 << j) for i in b for j in range(8))
 bs = len(bb)
 it = iter(bb)
@@ -44,7 +47,7 @@ ic = 0
 reader = []
 
 
-lim = 24 * 8 / 3
+lim = 37 * 8 / 3
 w = h = int(np.ceil(np.sqrt(lim)))
 while True:
 	if abs(w / h - ar) / ar < 1 / 32:
@@ -98,39 +101,49 @@ for i in (2, 0, 1):
 				r2[r2 == 0] = -3
 				r2[r2 > 0] = 1
 				rind = np.zeros(len(rv), dtype=np.bool_)
-				rind[:int(len(rv) * 0.8)] = True
+				if entropy:
+					rind[:int(len(rv) * entropy)] = True
 				np.random.shuffle(rind)
 
 				if bit:
 					v = np.clip(rv, 3, None, out=rv)
 					v[rind] |= 3
-					ind = v & 3
-					mask = ind == 0
-					t = v[mask]
-					v[mask] = np.subtract(t, r2[:len(t)], out=t, casting="unsafe")
-					mask = ind == 1
-					t = v[mask]
-					v[mask] = np.add(t, r1[:len(t)], out=t, casting="unsafe")
-					mask = ind == 2
-					t = v[mask]
-					v[mask] = np.add(t, r2[:len(t)], out=t, casting="unsafe")
-					target[:] = v.reshape(target.shape)
+					if entropy != 1:
+						ind = v & 3
+						mask = ind == 0
+						t = v[mask]
+						v[mask] = np.subtract(t, r2[:len(t)], out=t, casting="unsafe")
+						mask = ind == 1
+						t = v[mask]
+						v[mask] = np.add(t, r1[:len(t)], out=t, casting="unsafe")
+						mask = ind == 2
+						t = v[mask]
+						v[mask] = np.add(t, r2[:len(t)], out=t, casting="unsafe")
+						target[:] = v.reshape(target.shape)
 				else:
 					v = np.clip(rv, None, 252, out=rv)
 					v[rind] &= 252
-					ind = v & 3
-					mask = ind == 1
-					t = v[mask]
-					v[mask] = np.subtract(t, r2[:len(t)], out=t, casting="unsafe")
-					mask = ind == 2
-					t = v[mask]
-					v[mask] = np.add(t, r1[:len(t)], out=t, casting="unsafe")
-					mask = ind == 3
-					t = v[mask]
-					v[mask] = np.add(t, r2[:len(t)], out=t, casting="unsafe")
-					target[:] = v.reshape(target.shape)
+					if entropy != 1:
+						ind = v & 3
+						mask = ind == 1
+						t = v[mask]
+						v[mask] = np.subtract(t, r2[:len(t)], out=t, casting="unsafe")
+						mask = ind == 2
+						t = v[mask]
+						v[mask] = np.add(t, r1[:len(t)], out=t, casting="unsafe")
+						mask = ind == 3
+						t = v[mask]
+						v[mask] = np.add(t, r2[:len(t)], out=t, casting="unsafe")
+						target[:] = v.reshape(target.shape)
 
 	spl[i] = Image.fromarray(a, mode="L")
+
+try:
+	next(it)
+except StopIteration:
+	pass
+else:
+	raise EOFError
 
 while len(reader) & 7:
 	reader.pop(-1)
@@ -141,13 +154,36 @@ byted = np.zeros(len(reader) // 8, dtype=np.uint8)
 for i in range(8):
 	byted |= bitd[i::8] << np.uint8(i)
 b = byted.tobytes()
-while b[-1] == 0:
+while b and b[-1] != 255:
 	b = b[:-1]
 
 try:
-	if b[0] != 255 or b[-1] != 255:
+	if not b or b[0] != 255 or b[-1] != 255:
 		raise ValueError
-	s = b[1:-1].decode("utf-8")
+	b = b[1:-1]
+	if len(b) % 3:
+		raise ValueError
+	l = len(b) // 3
+	x = b[:l - 1]
+	y = b[l:l * 2 - 1]
+	z = b[l * 2:l * 3 - 1]
+	if x == y:
+		b = x
+	elif x == z:
+		b = x
+	elif y == z:
+		b = z
+	else:
+		d = []
+		for i in range(l - 1):
+			if x[i] == y[i]:
+				d.append(x[i])
+			elif x[i] == z[i]:
+				d.append(x[i])
+			else:
+				d.append(z[i])
+		b = bytes(d)
+	s = b.decode("utf-8")
 	if s == msg:
 		raise ValueError
 except (ValueError, UnicodeDecodeError):
