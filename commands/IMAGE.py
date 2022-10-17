@@ -1252,6 +1252,51 @@ class Blend(Command):
         await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
+class Steganography(Command):
+    name = ["NFT"]
+    description = "Tags an image with your discord user, or a message (input a user ID to tag another user). Raises an error if the image already has a tag."
+    usage = "<0:url> <1:message>?"
+    no_parse = True
+    rate_limit = (1, 5)
+    _timeout_ = 6
+    typing = True
+
+    async def __call__(self, bot, user, message, channel, args, **void):
+        for a in message.attachments:
+            args.insert(0, a.url)
+        ts = ts_us()
+        if not args:
+            raise ArgumentError("Please input an image by URL or attachment.")
+        urls = await bot.follow_url(args.pop(0))
+        if not urls:
+            raise ArgumentError("Please input an image by URL or attachment.")
+        url = urls[0]
+        args = (
+            sys.executable,
+            "misc/steganography.py",
+            f"cache/{ts}.png",
+            " ".join(args) or str(user.id),
+        )
+        with discord.context_managers.Typing(channel):
+            b = await bot.get_request(url)
+            with open(f"cache/{ts}.png", "wb") as f:
+                await create_future(f.write, b)
+            print(args)
+            proc = psutil.Popen(*args, cwd=os.getcwd(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            try:
+                await create_future(proc.wait, timeout=3200))
+            except (T0, T1, T2):
+                with tracebacksuppressor:
+                    force_kill(proc)
+                raise
+            else:
+                text = proc.stdout.read().strip()
+                if text.startswith("Copyright detected: "):
+                    raise PermissionError(text)
+        fn = f"cache/{ts}~1.png"
+        await bot.send_with_file(channel, "", fn, filename="output.png", reference=message)
+
+
 class Waifu2x(Command):
     description = "Resizes the target image using the popular Waifu2x AI algorithm."
     usage = "<url> <api{?a}>"
