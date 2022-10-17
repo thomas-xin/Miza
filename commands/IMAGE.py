@@ -1279,11 +1279,11 @@ class Steganography(Command):
             n = verify_id(msg)
             if isinstance(n, int):
                 try:
-                    u = await bot.fetch_user(n)
+                    user = await bot.fetch_user(n)
                 except:
                     pass
                 else:
-                    msg = str(u.id)
+                    msg = str(user.id)
         else:
             msg = str(user.id)
         remsg = " ".join(args)
@@ -1326,8 +1326,8 @@ class Steganography(Command):
         fn = f"cache/{ts}~1.png"
         if name == "nft":
             f = CompatFile(fn, filename=f"{fon}.png")
-            url = await self.bot.get_proxy_url(message.author)
-            await self.bot.send_as_webhook(message.channel, remsg, files=[f], username=message.author.display_name, avatar_url=url)
+            url = await self.bot.get_proxy_url(user)
+            await self.bot.send_as_webhook(message.channel, remsg, files=[f], username=user.display_name, avatar_url=url)
         else:
             await bot.send_with_file(channel, f'Successfully created image with encoded message "{msg}".', fn, filename=f"{fon}.png", reference=message)
 
