@@ -1824,6 +1824,8 @@ class React(Command):
         e_id = await bot.id_from_message(args[-1])
         if isinstance(e_id, int):
             emoji = await bot.fetch_emoji(e_id)
+        else:
+            emoji = e_id
         emoji = str(emoji)
         # This reaction indicates that the emoji was valid
         await message.add_reaction(emoji)
