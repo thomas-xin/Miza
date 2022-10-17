@@ -1271,11 +1271,12 @@ class Steganography(Command):
         if not urls:
             raise ArgumentError("Please input an image by URL or attachment.")
         url = urls[0]
+        msg = " ".join(args) or str(user.id)
         args = (
             sys.executable,
             "misc/steganography.py",
             f"cache/{ts}.png",
-            " ".join(args) or str(user.id),
+            msg,
         )
         with discord.context_managers.Typing(channel):
             b = await bot.get_request(url)
@@ -1304,7 +1305,7 @@ class Steganography(Command):
                             raise PermissionError(f"Copyright detected; image belongs to {user_mention(u.id)}")
                     raise PermissionError(text)
         fn = f"cache/{ts}~1.png"
-        await bot.send_with_file(channel, "", fn, filename="output.png", reference=message)
+        await bot.send_with_file(channel, f'Successfully created image with encoded message "{msg}".', fn, filename="output.png", reference=message)
 
 
 class Waifu2x(Command):
