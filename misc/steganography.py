@@ -20,10 +20,12 @@ if test:
 	sys.argv.remove("-t")
 
 fn = sys.argv[1]
+msg = " ".join(sys.argv[2:])
 im = Image.open(fn)
 if getattr(im, "text", None) and im.text.get("copyright"):
-	print("Copyright detected:", im.text["copyright"])
-	raise SystemExit
+	if im.text["copyright"] != msg:
+		print("Copyright detected:", im.text["copyright"])
+		# raise SystemExit
 
 if "RGB" not in im.mode:
 	im = im.convert("RGBA")
@@ -33,7 +35,6 @@ if area < 1024:
 ar = im.size[0] / im.size[1]
 # print(im.size, area)
 
-msg = " ".join(sys.argv[2:])
 write = bool(msg)
 b = b"\xff" + msg.encode("utf-8") + b"\xff"
 bb = list(bool(i & 1 << j) for i in b for j in range(8))
@@ -60,7 +61,7 @@ while True:
 		else:
 			w += 1
 			lim *= np.sqrt(2)
-# print(bs, w, h)
+print(bs, w, h)
 
 np.random.seed(time.time_ns() & 4294967295)
 spl = list(im.split())
@@ -82,32 +83,48 @@ for i in (2, 0, 1):
 			except StopIteration:
 				bit = 0
 			weight = 16
+			target = a[sy:ey].T[sx:ex]
+			rv = target.ravel()
 			if test:
 				if bit:
-					v = np.random.randint(0, weight, pa, dtype=np.uint8)
-					mask = v == 0
-					v[v != 0] = 255
-					v[mask] = np.random.randint(0, 256, np.sum(mask), dtype=np.uint8)
-					target = a[sy:ey].T[sx:ex]
-					target[:] = v.reshape(target.shape)
+					rv[:] = 255
 				else:
-					v = np.random.randint(0, weight, pa, dtype=np.uint8)
-					mask = v == 0
-					v[v != 0] = 0
-					v[mask] = np.random.randint(0, 256, np.sum(mask), dtype=np.uint8)
-					target = a[sy:ey].T[sx:ex]
-					target[:] = v.reshape(target.shape)
+					rv[:] = 0
 			elif write:
+				r1 = np.random.randint(-1, 1, pa, dtype=np.int8)
+				r1 |= 1
+				r1 <<= 1
+				r2 = np.random.randint(0, 4, pa, dtype=np.int8)
+				r2[r2 == 0] = -3
+				r2[r2 > 0] = 1
+
 				if bit:
-					v = np.random.randint(0, weight, pa, dtype=np.uint8)
-					v[v != 0] = 3
-					target = a[sy:ey].T[sx:ex]
-					target[:] |= v.reshape(target.shape)
+					v = np.clip(rv, 3, None, out=rv)
+					ind = v & 3
+					mask = ind == 0
+					t = v[mask]
+					v[mask] = np.subtract(t, r2[:len(t)], out=t, casting="unsafe")
+					mask = ind == 1
+					t = v[mask]
+					v[mask] = np.add(t, r1[:len(t)], out=t, casting="unsafe")
+					mask = ind == 2
+					t = v[mask]
+					v[mask] = np.add(t, r2[:len(t)], out=t, casting="unsafe")
+					target[:] = v.reshape(target.shape)
 				else:
-					v = np.random.randint(256 - weight, 256, pa, dtype=np.uint8)
-					v[v != 255] = 252
-					target = a[sy:ey].T[sx:ex]
-					target[:] &= v.reshape(target.shape)
+					v = np.clip(rv, None, 252, out=rv)
+					ind = v & 3
+					mask = ind == 1
+					t = v[mask]
+					v[mask] = np.subtract(t, r2[:len(t)], out=t, casting="unsafe")
+					mask = ind == 2
+					t = v[mask]
+					v[mask] = np.add(t, r1[:len(t)], out=t, casting="unsafe")
+					mask = ind == 3
+					t = v[mask]
+					v[mask] = np.add(t, r2[:len(t)], out=t, casting="unsafe")
+					target[:] = v.reshape(target.shape)
+
 	spl[i] = Image.fromarray(a, mode="L")
 
 while len(reader) & 7:
@@ -126,8 +143,10 @@ try:
 	if b[0] != 255 or b[-1] != 255:
 		raise ValueError
 	s = b[1:-1].decode("utf-8")
+	if s == msg:
+		raise ValueError
 except (ValueError, UnicodeDecodeError):
-	# print(b)
+	print(b)
 	if write:
 		im = Image.merge(im.mode, spl)
 		fn = fn.rsplit(".", 1)[0] + "~1.png"

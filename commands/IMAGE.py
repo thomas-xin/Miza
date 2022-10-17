@@ -1261,7 +1261,7 @@ class Steganography(Command):
     _timeout_ = 6
     typing = True
 
-    async def __call__(self, bot, user, message, channel, args, **void):
+    async def __call__(self, bot, user, message, channel, args, name, **void):
         for a in message.attachments:
             args.insert(0, a.url)
         ts = ts_us()
@@ -1278,6 +1278,7 @@ class Steganography(Command):
             f"cache/{ts}.png",
             msg,
         )
+        fon = url.rsplit("/", 1)[-1].rsplit(".", 1)[0]
         with discord.context_managers.Typing(channel):
             b = await bot.get_request(url)
             with open(f"cache/{ts}.png", "wb") as f:
@@ -1302,10 +1303,42 @@ class Steganography(Command):
                         except:
                             pass
                         else:
-                            raise PermissionError(f"Copyright detected; image belongs to {user_mention(u.id)}")
-                    raise PermissionError(text)
+                            pe = PermissionError(f"Copyright detected; image belongs to {user_mention(u.id)}")
+                            pe.no_react = True
+                            raise pe
+                    pe = PermissionError(text)
+                    pe.no_react = True
+                    raise pe
         fn = f"cache/{ts}~1.png"
-        await bot.send_with_file(channel, f'Successfully created image with encoded message "{msg}".', fn, filename="output.png", reference=message)
+        if name == "nft":
+            await bot.silent_delete(message)
+            f = CompatFile(fn, filename=f"{fon}.png")
+            url = await self.bot.get_proxy_url(message.author)
+            await self.bot.send_as_webhook(message.channel, message.content, files=[f], username=message.author.display_name, avatar_url=url)
+        else:
+            await bot.send_with_file(channel, f'Successfully created image with encoded message "{msg}".', fn, filename=f"{fon}.png", reference=message)
+
+    async def _callback_(self, bot, message, reaction, user, vals, **void):
+        u_id, c_id, m_id = map(int, vals.split("_", 2))
+        if user.id != u_id:
+            return
+        channel = await bot.fetch_channel(c_id)
+        message = await bot.fetch_message(m_id, channel)
+        await bot.silent_delete(message)
+        guild = m.guild
+        if guild and "logM" in bot.data and guild.id in bot.data.logM:
+            c_id = bot.data.logM[guild.id]
+            try:
+                c = await self.bot.fetch_channel(c_id)
+            except (EOFError, discord.NotFound):
+                bot.data.logM.pop(guild.id)
+                return
+            emb = await bot.as_embed(message, link=True)
+            emb.colour = discord.Colour(0x00FF00)
+            action = f"**Mimic invoked in** {channel_mention(channel.id)}:\n"
+            emb.description = lim_str(action + emb.description, 4096)
+            emb.timestamp = message.created_at
+            self.bot.send_embeds(c, emb)
 
 
 class Waifu2x(Command):

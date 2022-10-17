@@ -1507,8 +1507,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if files and not message.author.bot:
                 if (utc_dt() - created_at).total_seconds() < 7200:
                     for attachment in message.attachments:
-                        if getattr(attachment, "size", inf) <= 1048576:
-                            create_task(self.add_attachment(attachment))
+                        create_task(self.add_and_test(message, attachment))
             self.cache.messages[message.id] = message
             if (utc_dt() - created_at).total_seconds() < 86400 * 14 and "message_cache" in self.data and not getattr(message, "simulated", None):
                 self.data.message_cache.save_message(message)
@@ -1533,6 +1532,18 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 with open(fn, "wb") as f:
                     await create_future(f.write, data)
         return attachment
+
+    async def add_and_test(self, message, attachment):
+        attachment = await self.add_attachment(attachment)
+        if "prot" in self.data:
+            fn = f"cache/attachment_{attachment.id}.bin"
+            if not os.path.exists(fn):
+                data = await self.get_attachment(str(attachment.url))
+                if not data:
+                    return
+                with open(fn, "wb") as f:
+                    await create_future(f.write, data)
+            await self.data.prot.call(message, fn)
 
     def attachment_from_file(self, file):
         a_id = int(file.split(".", 1)[0][11:])
@@ -4641,12 +4652,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         discord.http.HTTPClient.request = lambda self, *args, **kwargs: request(self, *args, **kwargs)
 
     def send_exception(self, messageable, ex, reference=None):
+        if getattr(ex, "no_react", None):
+            reacts = ""
+        else:
+            reacts="❎"
         return self.send_as_embeds(
             messageable,
             description="\n".join(as_str(i) for i in ex.args),
             title=f"⚠ {type(ex).__name__} ⚠",
             fields=(("Unexpected or confusing error?", f"Consider joining the [support server]({self.rcc_invite}) for help and bug reports!"),),
-            reacts="❎",
+            reacts=reacts,
             reference=reference,
         )
 

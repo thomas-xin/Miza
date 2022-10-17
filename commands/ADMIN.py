@@ -1671,6 +1671,51 @@ class ServerProtector(Database):
             if cnt[u_id] > 5:
                 create_task(self.targetWarn(u_id, guild, f"banning `({cnt[u_id]})`"))
 
+    async def call(self, message, fn):
+        args = (
+            sys.executable,
+            "misc/steganography.py",
+            fn,
+        )
+        print(args)
+        proc = psutil.Popen(args, cwd=os.getcwd(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            await create_future(proc.wait, timeout=3200)
+        except (T0, T1, T2):
+            with tracebacksuppressor:
+                force_kill(proc)
+            raise
+        else:
+            text = proc.stdout.read().decode("utf-8", "replace").strip()
+            search = "Copyright detected: "
+            if text.startswith(search):
+                text = text[len(search):]
+                if text.isnumeric():
+                    i = int(text)
+                    try:
+                        u = await bot.fetch_user(i)
+                    except:
+                        pass
+                    else:
+                        if u.id == message.author.id:
+                            return
+                        if str(u.id) in message.content:
+                            return
+                        create_task(u.send(
+                            (
+                                f"```callback-image-steganography-{u.id}_{channel.id}_{message.id}-\n⚠️ Steganography alert ⚠️```"
+                                + f"Hey there, {user_mention(u.id)} has posted an image belonging to you without mentioning you. "
+                                + f"Check it by visiting https://discord.com/channels/{message.guild.id}/{message.channel.id}/{message.id}, "
+                                + "or react with 🗑️ to take it down!"
+                            ),
+                        ))
+                        await message.reply(
+                            (
+                                f"Woah, hey there, this image you posted belongs to {user_mention(u.id)}! "
+                                + "Please make sure you have permission from the author before posting their art!"
+                            ),
+                        )
+
 
 class CreateEmoji(Command):
     server_only = True
