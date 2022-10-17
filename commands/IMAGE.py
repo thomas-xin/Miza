@@ -1284,7 +1284,7 @@ class Steganography(Command):
             print(args)
             proc = psutil.Popen(*args, cwd=os.getcwd(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             try:
-                await create_future(proc.wait, timeout=3200))
+                await create_future(proc.wait, timeout=3200)
             except (T0, T1, T2):
                 with tracebacksuppressor:
                     force_kill(proc)
