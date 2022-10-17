@@ -25,7 +25,7 @@ im = Image.open(fn)
 if getattr(im, "text", None) and im.text.get("copyright"):
 	if im.text["copyright"] != msg:
 		print("Copyright detected:", im.text["copyright"])
-		# raise SystemExit
+		raise SystemExit
 
 if "RGB" not in im.mode:
 	im = im.convert("RGBA")
@@ -97,9 +97,13 @@ for i in (2, 0, 1):
 				r2 = np.random.randint(0, 4, pa, dtype=np.int8)
 				r2[r2 == 0] = -3
 				r2[r2 > 0] = 1
+				rind = np.zeros(len(rv), dtype=np.bool_)
+				rind[:int(len(rv) * 0.8)] = True
+				np.random.shuffle(rind)
 
 				if bit:
 					v = np.clip(rv, 3, None, out=rv)
+					v[rind] |= 3
 					ind = v & 3
 					mask = ind == 0
 					t = v[mask]
@@ -113,6 +117,7 @@ for i in (2, 0, 1):
 					target[:] = v.reshape(target.shape)
 				else:
 					v = np.clip(rv, None, 252, out=rv)
+					v[rind] &= 252
 					ind = v & 3
 					mask = ind == 1
 					t = v[mask]
@@ -146,7 +151,7 @@ try:
 	if s == msg:
 		raise ValueError
 except (ValueError, UnicodeDecodeError):
-	# print(b)
+	print(b)
 	if write:
 		im = Image.merge(im.mode, spl)
 		fn = fn.rsplit(".", 1)[0] + "~1.png"
