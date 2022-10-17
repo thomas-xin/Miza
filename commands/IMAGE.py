@@ -1271,7 +1271,15 @@ class Steganography(Command):
         if not urls:
             raise ArgumentError("Please input an image by URL or attachment.")
         url = urls[0]
-        msg = " ".join(args) or str(user.id)
+        msg = args.pop(0) if args else str(user.id)
+        n = verify_id(msg)
+        if isinstance(n, int):
+            try:
+                u = await bot.fetch_user(n)
+            except:
+                pass
+            else:
+                msg = str(u.id)
         args = (
             sys.executable,
             "misc/steganography.py",
@@ -1314,7 +1322,7 @@ class Steganography(Command):
             await bot.silent_delete(message)
             f = CompatFile(fn, filename=f"{fon}.png")
             url = await self.bot.get_proxy_url(message.author)
-            await self.bot.send_as_webhook(message.channel, message.content, files=[f], username=message.author.display_name, avatar_url=url)
+            await self.bot.send_as_webhook(message.channel, " ".join(args), files=[f], username=message.author.display_name, avatar_url=url)
         else:
             await bot.send_with_file(channel, f'Successfully created image with encoded message "{msg}".', fn, filename=f"{fon}.png", reference=message)
 
