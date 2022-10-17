@@ -1291,7 +1291,17 @@ class Steganography(Command):
                 raise
             else:
                 text = proc.stdout.read().decode("utf-8", "replace").strip()
-                if text.startswith("Copyright detected: "):
+                search = "Copyright detected: "
+                if text.startswith(search):
+                    text = text[len(search):]
+                    if text.isnumeric():
+                        i = int(text)
+                        try:
+                            u = await bot.fetch_user(i)
+                        except:
+                            pass
+                        else:
+                            raise PermissionError(f"Copyright detected; image belongs to {user_mention(u.id)}")
                     raise PermissionError(text)
         fn = f"cache/{ts}~1.png"
         await bot.send_with_file(channel, "", fn, filename="output.png", reference=message)
