@@ -1290,7 +1290,7 @@ class Steganography(Command):
                     force_kill(proc)
                 raise
             else:
-                text = proc.stdout.read().strip()
+                text = proc.stdout.read().decode("utf-8", "replace").strip()
                 if text.startswith("Copyright detected: "):
                     raise PermissionError(text)
         fn = f"cache/{ts}~1.png"
