@@ -1174,7 +1174,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             m_id = int(m_id)
             if m_id in self.cache.messages:
                 return await self.id_from_message(self.cache.messages[m_id].content)
-        return m_id
+        return verify_id(m_id)
 
     # Finds URLs in a string, following any discord message links found.
     async def follow_url(self, url, it=None, best=False, preserve=True, images=True, allow=False, limit=None):
