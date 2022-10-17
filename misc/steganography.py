@@ -151,7 +151,7 @@ try:
 	if s == msg:
 		raise ValueError
 except (ValueError, UnicodeDecodeError):
-	print(b)
+	# print(b)
 	if write:
 		im = Image.merge(im.mode, spl)
 		fn = fn.rsplit(".", 1)[0] + "~1.png"
