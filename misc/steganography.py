@@ -81,6 +81,9 @@ for i in (2, 0, 1):
 			ey = round_random(y * im.height / h)
 			pa = (ey - sy) * (ex - sx)
 			reader.append(np.sum(a[sy:ey].T[sx:ex] & 2 > 0) + np.sum(a[sy:ey].T[sx:ex] & 1) >= pa)
+			if not write and len(reader) == 8 and reader != [True] * 8:
+				print("No copyright detected.")
+				raise SystemExit
 			try:
 				bit = next(it)
 			except StopIteration:
