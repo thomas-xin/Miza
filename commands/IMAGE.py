@@ -1271,6 +1271,9 @@ class Steganography(Command):
         if not urls:
             raise ArgumentError("Please input an image by URL or attachment.")
         url = urls[0]
+        b = await bot.get_request(url)
+        if name == "nft":
+            await bot.silent_delete(message)
         msg = args.pop(0) if args else str(user.id)
         n = verify_id(msg)
         if isinstance(n, int):
@@ -1288,7 +1291,6 @@ class Steganography(Command):
         )
         fon = url.rsplit("/", 1)[-1].rsplit(".", 1)[0]
         with discord.context_managers.Typing(channel):
-            b = await bot.get_request(url)
             with open(f"cache/{ts}.png", "wb") as f:
                 await create_future(f.write, b)
             print(args)
@@ -1319,7 +1321,6 @@ class Steganography(Command):
                     raise pe
         fn = f"cache/{ts}~1.png"
         if name == "nft":
-            await bot.silent_delete(message)
             f = CompatFile(fn, filename=f"{fon}.png")
             url = await self.bot.get_proxy_url(message.author)
             await self.bot.send_as_webhook(message.channel, " ".join(args), files=[f], username=message.author.display_name, avatar_url=url)
