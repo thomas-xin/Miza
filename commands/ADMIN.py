@@ -1691,6 +1691,7 @@ class ServerProtector(Database):
             search = "Copyright detected: "
             if text.startswith(search):
                 text = text[len(search):]
+                print(text)
                 if text.isnumeric():
                     i = int(text)
                     try:
@@ -1698,6 +1699,7 @@ class ServerProtector(Database):
                     except:
                         pass
                     else:
+                        print(u)
                         if u.id == message.author.id:
                             return
                         if str(u.id) in message.content:
