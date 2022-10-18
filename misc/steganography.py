@@ -15,6 +15,8 @@ def round_random(x):
 		y += 1
 	return y
 
+invert = lambda b: bytes(i ^ 255 for i in b)
+
 test = "-t" in sys.argv
 if test:
 	sys.argv.remove("-t")
@@ -39,7 +41,8 @@ entropy = min(1, abs(im.entropy()) ** 3 / 384)
 # print(entropy, im.entropy())
 
 write = bool(msg)
-b = b"\xff" + (msg.encode("utf-8") + b"\xff") * 3 + b"\xff"
+mb = msg.encode("utf-8")
+b = b"\xff" + b"\xff".join((mb, invert(mb), mb)) + b"\xff"
 bb = list(bool(i & 1 << j) for i in b for j in range(8))
 bs = len(bb)
 it = iter(bb)
@@ -169,7 +172,7 @@ try:
 		raise ValueError
 	l = len(b) // 3
 	x = b[:l - 1]
-	y = b[l:l * 2 - 1]
+	y = invert(b[l:l * 2 - 1])
 	z = b[l * 2:l * 3 - 1]
 	if x == y:
 		b = x
