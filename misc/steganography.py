@@ -69,6 +69,8 @@ while True:
 			lim *= np.sqrt(2)
 # print(bs, w, h)
 
+copydetect = True
+
 np.random.seed(time.time_ns() & 4294967295)
 spl = list(im.split())
 for i in (2, 0, 1):
@@ -84,10 +86,11 @@ for i in (2, 0, 1):
 			ey = round_random(y * im.height / h)
 			pa = (ey - sy) * (ex - sx)
 			target = a[sy:ey].T[sx:ex]
-			reader.append(np.sum(target & 2 > 0) + np.sum(target & 1) >= pa)
-			if not write and len(reader) == 8 and reader != [True] * 8:
-				print("No copyright detected.")
-				raise SystemExit
+			if copydetect:
+				reader.append(np.sum(target & 2 > 0) + np.sum(target & 1) >= pa)
+			if len(reader) == 8 and copydetect and reader != [True] * 8:
+				copydetect = False
+
 			bit = next(it, False)
 			if test:
 				if bit:
@@ -125,7 +128,6 @@ for i in (2, 0, 1):
 						mask = ind == 2
 						t = v[mask]
 						v[mask] = np.add(t, r2[:len(t)], out=t, casting="unsafe")
-						target[:] = v.reshape(target.shape)
 				else:
 					v = np.clip(rv, None, 252, out=rv)
 					if entropy != 0:
@@ -141,7 +143,7 @@ for i in (2, 0, 1):
 						mask = ind == 3
 						t = v[mask]
 						v[mask] = np.add(t, r2[:len(t)], out=t, casting="unsafe")
-						target[:] = v.reshape(target.shape)
+				target[:] = v.reshape(target.shape)
 
 	spl[i] = Image.fromarray(a, mode="L")
 
