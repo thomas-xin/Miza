@@ -114,8 +114,12 @@ def split_to(im):
 	l *= r
 	return map(np.uint8, (h, s, l))
 
-def hash_to(im, msg):
-	h, s, l, rh = compare_to(im, msg)
+def hash_to(im, msg, skip=False):
+	if skip:
+		h, s, l = split_to(im)
+		rh = hash_reduce(l)
+	else:
+		h, s, l, rh = compare_to(im, msg)
 	sl = s + (l << 4)
 	hb = h.tobytes() + sl.tobytes()
 	s = base64.b64encode(hb).rstrip(b"=").decode("ascii") + ":" + msg + "\n"
@@ -365,4 +369,5 @@ except (ValueError, UnicodeDecodeError):
 		im.save(fn, pnginfo=meta)
 	print("No copyright detected.")
 else:
+	hash_to(im, s, skip=True)
 	print("Copyright detected in steganography:", s)
