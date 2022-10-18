@@ -90,12 +90,14 @@ def round_random(x):
 invert = lambda b: bytes(i ^ 255 for i in b)
 
 def hash_reduce(l):
-	amax = np.max(l)
+	# amax = np.max(l)
 	aavg = np.mean(l)
-	amin = np.min(l)
+	# amin = np.min(l)
+	# if amax <= amin:
+		# amax = amin + 1
 	im = Image.fromarray(l, mode="L")
 	im = im.resize((4, 4), resample=Resampling.LANCZOS)
-	im = im.point(lambda x: int((x - aavg) / (amax - amin) >= 0))
+	im = im.point(lambda x: int(x >= aavg))
 	bi = np.array(im, dtype=np.uint8).ravel()
 	bo = np.zeros(len(bi) // 8, dtype=np.uint8)
 	for i in range(8):
