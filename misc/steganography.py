@@ -35,7 +35,7 @@ if area < 1024:
 ar = im.size[0] / im.size[1]
 # print(im.size, area)
 
-entropy = max(0, min(1, im.entropy() ** 3 / 384))
+entropy = min(1, abs(im.entropy()) ** 3 / 384)
 # print(entropy, im.entropy())
 
 write = bool(msg)
@@ -93,14 +93,16 @@ for i in (2, 0, 1):
 					target[:] = 0
 			elif write:
 				rv = target.ravel()
-				r1 = np.random.randint(-1, 1, pa, dtype=np.int8)
-				r1 |= 1
-				r1 <<= 1
-				r2 = np.random.randint(0, 4, pa, dtype=np.int8)
-				r2[r2 == 0] = -3
-				r2[r2 > 0] = 1
 
-				if entropy:
+				if entropy != 1:
+					r1 = np.random.randint(-1, 1, pa, dtype=np.int8)
+					r1 |= 1
+					r1 <<= 1
+					r2 = np.random.randint(0, 4, pa, dtype=np.int8)
+					r2[r2 == 0] = -3
+					r2[r2 > 0] = 1
+
+				if entropy != 0:
 					rind = np.zeros(len(rv), dtype=np.bool_)
 					rind[:int(len(rv) * entropy)] = True
 					np.random.shuffle(rind)
