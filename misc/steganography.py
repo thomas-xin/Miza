@@ -35,7 +35,7 @@ if area < 1024:
 ar = im.size[0] / im.size[1]
 # print(im.size, area)
 
-entropy = max(0, min(1, im.entropy() ** 3 / 512 + 0.125))
+entropy = max(0, min(1, im.entropy() ** 3 / 384))
 # print(entropy, im.entropy())
 
 write = bool(msg)
@@ -80,37 +80,35 @@ for i in (2, 0, 1):
 			sy = ey
 			ey = round_random(y * im.height / h)
 			pa = (ey - sy) * (ex - sx)
-			reader.append(np.sum(a[sy:ey].T[sx:ex] & 2 > 0) + np.sum(a[sy:ey].T[sx:ex] & 1) >= pa)
+			target = a[sy:ey].T[sx:ex]
+			reader.append(np.sum(target & 2 > 0) + np.sum(target & 1) >= pa)
 			if not write and len(reader) == 8 and reader != [True] * 8:
 				print("No copyright detected.")
 				raise SystemExit
-			try:
-				bit = next(it)
-			except StopIteration:
-				bit = 0
-			weight = 16
-			target = a[sy:ey].T[sx:ex]
-			rv = target.ravel()
+			bit = next(it, False)
 			if test:
 				if bit:
-					rv[:] = 255
+					target[:] = 255
 				else:
-					rv[:] = 0
+					target[:] = 0
 			elif write:
+				rv = target.ravel()
 				r1 = np.random.randint(-1, 1, pa, dtype=np.int8)
 				r1 |= 1
 				r1 <<= 1
 				r2 = np.random.randint(0, 4, pa, dtype=np.int8)
 				r2[r2 == 0] = -3
 				r2[r2 > 0] = 1
-				rind = np.zeros(len(rv), dtype=np.bool_)
+
 				if entropy:
+					rind = np.zeros(len(rv), dtype=np.bool_)
 					rind[:int(len(rv) * entropy)] = True
-				np.random.shuffle(rind)
+					np.random.shuffle(rind)
 
 				if bit:
 					v = np.clip(rv, 3, None, out=rv)
-					v[rind] |= 3
+					if entropy != 0:
+						v[rind] |= 3
 					if entropy != 1:
 						ind = v & 3
 						mask = ind == 0
@@ -125,7 +123,8 @@ for i in (2, 0, 1):
 						target[:] = v.reshape(target.shape)
 				else:
 					v = np.clip(rv, None, 252, out=rv)
-					v[rind] &= 252
+					if entropy != 0:
+						v[rind] &= 252
 					if entropy != 1:
 						ind = v & 3
 						mask = ind == 1
