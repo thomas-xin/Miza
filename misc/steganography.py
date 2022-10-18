@@ -188,7 +188,9 @@ if area < 1024:
 ar = im.size[0] / im.size[1]
 # print(im.size, area)
 
-entropy = min(1, abs(im.entropy()) ** 3 / 384)
+i_entropy = im.entropy()
+ie_req = 4
+entropy = min(1, abs(i_entropy) ** 3 / 384)
 # print(entropy, im.entropy())
 
 write = bool(msg)
@@ -200,7 +202,7 @@ it = iter(bb)
 ic = 0
 reader = []
 
-if write:
+if write and i_entropy >= ie_req:
 	hash_to(im, msg)
 else:
 	compare_to(im, msg)
@@ -369,5 +371,6 @@ except (ValueError, UnicodeDecodeError):
 		im.save(fn, pnginfo=meta)
 	print("No copyright detected.")
 else:
-	hash_to(im, s, skip=True)
+	if i_entropy >= ie_req:
+		hash_to(im, s, skip=True)
 	print("Copyright detected in steganography:", s)
