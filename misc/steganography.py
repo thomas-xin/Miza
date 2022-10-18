@@ -1,7 +1,79 @@
-import sys, random, time
+import os, sys, random, time, base64
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
 import numpy as np
+
+Resampling = getattr(Image, "Resampling", Image)
+Transpose = getattr(Image, "Transpose", Image)
+Transform = getattr(Image, "Transform", Image)
+
+def rgb_split(image, dtype=np.uint8):
+	channels = None
+	if "RGB" not in str(image.mode):
+		if str(image.mode) == "L":
+			channels = [np.asanyarray(image, dtype=dtype)] * 3
+		else:
+			image = image.convert("RGB")
+	if channels is None:
+		a = np.asanyarray(image, dtype=dtype)
+		channels = np.swapaxes(a, 2, 0)[:3]
+	return channels
+
+def hsv_split(image, convert=True, partial=False, dtype=np.uint8):
+	channels = rgb_split(image, dtype=np.uint16)
+	R, G, B = channels
+	m = np.min(channels, 0)
+	M = np.max(channels, 0)
+	C = M - m #chroma
+	Cmsk = C != 0
+
+	# Hue
+	H = np.zeros(R.shape, dtype=np.float32)
+	for i, colour in enumerate(channels):
+		mask = (M == colour) & Cmsk
+		hm = np.asanyarray(channels[i - 2][mask], dtype=np.float32)
+		hm -= channels[i - 1][mask]
+		hm /= C[mask]
+		if i:
+			hm += i << 1
+		H[mask] = hm
+	H *= 256 / 6
+	H = np.asanyarray(H, dtype=dtype)
+
+	if partial:
+		return H, M, m, C, Cmsk, channels
+
+	# Saturation
+	S = np.zeros(R.shape, dtype=dtype)
+	Mmsk = M != 0
+	S[Mmsk] = np.clip(256 * C[Mmsk] // M[Mmsk], None, 255)
+
+	# Value
+	V = np.asanyarray(M, dtype=dtype)
+
+	out = [H, S, V]
+	if convert:
+		out = list(fromarray(a, "L") for a in out)
+	return out
+
+def hsl_split(image, convert=True, dtype=np.uint8):
+	H, M, m, C, Cmsk, channels = hsv_split(image, partial=True, dtype=dtype)
+
+	# Luminance
+	L = np.mean((M, m), 0, dtype=np.int16)
+
+	# Saturation
+	S = np.zeros(H.shape, dtype=dtype)
+	Lmsk = Cmsk
+	Lmsk &= (L != 1) & (L != 0)
+	S[Lmsk] = np.clip((C[Lmsk] << 8) // (255 - np.abs((L[Lmsk] << 1) - 255)), None, 255)
+
+	L = L.astype(dtype)
+
+	out = [H, S, L]
+	if convert:
+		out = list(fromarray(a, "L") for a in out)
+	return out
 
 def round_random(x):
 	try:
@@ -17,6 +89,81 @@ def round_random(x):
 
 invert = lambda b: bytes(i ^ 255 for i in b)
 
+def hash_reduce(l):
+	amax = np.max(l)
+	aavg = np.mean(l)
+	amin = np.min(l)
+	im = Image.fromarray(l, mode="L")
+	im = im.resize((4, 4), resample=Resampling.LANCZOS)
+	im = im.point(lambda x: int((x - aavg) / (amax - amin) >= 0))
+	bi = np.array(im, dtype=np.uint8).ravel()
+	bo = np.zeros(len(bi) // 8, dtype=np.uint8)
+	for i in range(8):
+		bo += bi[i::8] << (7 - i)
+	return bo
+
+def split_to(im):
+	hi = im.resize((32, 32), resample=Resampling.LANCZOS)
+	h, s, l = hsl_split(hi, convert=False, dtype=np.float32)
+	seff = np.sqrt(16384 - (l - 127) ** 2) / 128
+	s *= seff
+
+	r = 1 / 16
+	h *= r
+	s *= r
+	l *= r
+	return map(np.uint8, (h, s, l))
+
+def hash_to(im, msg):
+	h, s, l, rh = compare_to(im, msg)
+	sl = s + (l << 4)
+	hb = h.tobytes() + sl.tobytes()
+	s = base64.b64encode(hb).rstrip(b"=").decode("ascii") + ":" + msg + "\n"
+	for fd in (f"iman/{rh[0]}/{rh[1]}.txt", f"iman/{255 - rh[0]}/{255 - rh[1]}.txt"):
+		folder = fd.rsplit("/", 1)[0]
+		if not os.path.exists(folder):
+			os.mkdir(folder)
+		with open(fd, "a", encoding="utf-8") as f:
+			f.write(s)
+
+def compare_to(im, msg):
+	h, s, l = split_to(im)
+	rh = hash_reduce(l)
+	fd = f"iman/{rh[0]}/{rh[1]}.txt"
+
+	if os.path.exists(fd):
+		with open(fd, "r", encoding="utf-8") as f:
+			d = f.readlines()
+
+		for line in d:
+			k, v = line.split(":", 1)
+			v = v[:-1]
+			hb2 = np.frombuffer(base64.b64decode(k.encode("ascii") + b"=="), dtype=np.uint8)
+			half = len(hb2) >> 1
+			h2, sl2 = hb2[:half].reshape((32, 32)), hb2[half:].reshape((32, 32))
+			s2 = sl2 & 15
+			l2 = sl2 >> 4
+
+			heff = np.sqrt(65536 - (255 - s) * (255 - s2)) / 256
+			hd = np.sum((128 - np.abs((h - h2) - 128)) * heff) / 128 / 1024
+			sd = np.sum(np.abs(s - s2)) / 15 / 1024
+			ld = np.sum(np.abs(l - l2)) / 15 / 1024
+			ld2 = np.sum(np.abs(l + l2)) / 15 / 1024
+
+			R = hd + sd + min(ld, ld2)
+			# print(rh, R)
+			if R < 5:
+				if v == msg:
+					print("No copyright detected.")
+					raise SystemExit
+				print("Copyright detected in hashing:", v)
+				raise SystemExit
+
+	return h, s, l, rh
+
+if not os.path.exists("iman"):
+	os.mkdir("iman")
+
 test = "-t" in sys.argv
 if test:
 	sys.argv.remove("-t")
@@ -26,7 +173,7 @@ msg = " ".join(sys.argv[2:])
 im = Image.open(fn)
 if getattr(im, "text", None) and im.text.get("copyright"):
 	if im.text["copyright"] != msg:
-		print("Copyright detected:", im.text["copyright"])
+		print("Copyright detected in metadata:", im.text["copyright"])
 		raise SystemExit
 
 if "RGB" not in im.mode:
@@ -42,13 +189,17 @@ entropy = min(1, abs(im.entropy()) ** 3 / 384)
 
 write = bool(msg)
 mb = msg.encode("utf-8")
-b = b"\xff" + b"\xff".join((mb, invert(mb), mb)) + b"\xff"
+b = b"\xff" + b"\xff".join((mb, invert(mb), mb)) + b"\xff" * 2
 bb = list(bool(i & 1 << j) for i in b for j in range(8))
 bs = len(bb)
 it = iter(bb)
 ic = 0
 reader = []
 
+if write:
+	hash_to(im, msg)
+else:
+	compare_to(im, msg)
 
 lim = 60 * 8 / 3
 w = h = int(np.ceil(np.sqrt(lim)))
@@ -70,9 +221,10 @@ while True:
 # print(bs, w, h)
 
 copydetect = True
-
 np.random.seed(time.time_ns() & 4294967295)
 spl = list(im.split())
+if len(spl) > 3:
+	spl[-1] = spl[-1].point(lambda x: max(x, 8))
 for i in (2, 0, 1):
 	pl = spl[i]
 	a = np.array(pl, dtype=np.uint8)
@@ -89,6 +241,9 @@ for i in (2, 0, 1):
 			if copydetect:
 				reader.append(np.sum(target & 2 > 0) + np.sum(target & 1) >= pa)
 			if len(reader) == 8 and copydetect and reader != [True] * 8:
+				if not write:
+					print("No copyright detected.")
+					raise SystemExit
 				copydetect = False
 
 			bit = next(it, False)
@@ -158,13 +313,17 @@ while len(reader) & 7:
 	reader.pop(-1)
 # print(reader)
 
-bitd = np.array(reader, dtype=np.bool_)
-byted = np.zeros(len(reader) // 8, dtype=np.uint8)
-for i in range(8):
-	byted |= bitd[i::8] << np.uint8(i)
-b = byted.tobytes()
-while b and b[-1] != 255:
-	b = b[:-1]
+if copydetect:
+	bitd = np.array(reader, dtype=np.bool_)
+	byted = np.zeros(len(reader) // 8, dtype=np.uint8)
+	for i in range(8):
+		byted |= bitd[i::8] << np.uint8(i)
+	b = byted.tobytes()
+	# print(b)
+	while b and b[-1] != 255:
+		b = b[:-1]
+else:
+	b = b""
 
 try:
 	if not b or b[0] != 255 or b[-1] != 255:
@@ -176,6 +335,7 @@ try:
 	x = b[:l - 1]
 	y = invert(b[l:l * 2 - 1])
 	z = b[l * 2:l * 3 - 1]
+	# print(x, y, z)
 	if x == y:
 		b = x
 	elif x == z:
@@ -205,4 +365,4 @@ except (ValueError, UnicodeDecodeError):
 		im.save(fn, pnginfo=meta)
 	print("No copyright detected.")
 else:
-	print("Copyright detected:", s)
+	print("Copyright detected in steganography:", s)

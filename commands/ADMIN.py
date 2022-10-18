@@ -1693,9 +1693,8 @@ class ServerProtector(Database):
             else:
                 text = proc.stdout.read().decode("utf-8", "replace").strip()
             print(text)
-            search = "Copyright detected: "
-            if text.startswith(search):
-                i = text[len(search):]
+            if text.startswith("Copyright detected"):
+                i = text.split(":", 1)[-1]
                 if i.isnumeric():
                     i = int(i)
                     print(i)

@@ -1307,11 +1307,10 @@ class Steganography(Command):
                 raise
             else:
                 text = proc.stdout.read().decode("utf-8", "replace").strip()
-                search = "Copyright detected: "
-                if text.startswith(search):
-                    text = text[len(search):]
-                    if text.isnumeric():
-                        i = int(text)
+                if text.startswith("Copyright detected"):
+                    i = text.split(":", 1)[-1]
+                    if i.isnumeric():
+                        i = int(i)
                         try:
                             u = await bot.fetch_user(i)
                         except:
