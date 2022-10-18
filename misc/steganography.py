@@ -1,6 +1,8 @@
 import os, sys, random, time, base64
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
+import pillow_heif
+pillow_heif.register_heif_opener()
 import numpy as np
 
 Resampling = getattr(Image, "Resampling", Image)
@@ -156,8 +158,9 @@ def compare_to(im, msg):
 			ld = np.sum(np.abs(l - l2)) / 15 / 1024
 			ld2 = np.sum(np.abs(l + l2)) / 15 / 1024
 
+			print(hd, sd, ld, ld2)
 			R = hd + sd + min(ld, ld2)
-			# print(rh, R)
+			print(rh, R)
 			if R < 5:
 				if v == msg:
 					print("No copyright detected.")

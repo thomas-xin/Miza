@@ -4,6 +4,8 @@ import os, sys, io, time, concurrent.futures, subprocess, psutil, collections, t
 import numpy as np
 import PIL
 from PIL import Image, ImageCms, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhance, ImageMath, ImageStat
+import pillow_heif
+pillow_heif.register_heif_opener()
 Resampling = getattr(Image, "Resampling", Image)
 Transpose = getattr(Image, "Transpose", Image)
 Transform = getattr(Image, "Transform", Image)
