@@ -1335,10 +1335,13 @@ class Steganography(Command):
         u_id, c_id, m_id = map(int, vals.split("_", 2))
         if user.id != u_id:
             return
+        if reaction.decode("utf-8", "replace") != "🗑️":
+            return
+        m = message
         channel = await bot.fetch_channel(c_id)
         message = await bot.fetch_message(m_id, channel)
         await bot.silent_delete(message)
-        guild = m.guild
+        guild = message.guild
         if guild and "logM" in bot.data and guild.id in bot.data.logM:
             c_id = bot.data.logM[guild.id]
             try:
@@ -1352,6 +1355,7 @@ class Steganography(Command):
             emb.description = lim_str(action + emb.description, 4096)
             emb.timestamp = message.created_at
             self.bot.send_embeds(c, emb)
+        await m.reply("Message has been successfully taken down.")
 
 
 class Waifu2x(Command):
