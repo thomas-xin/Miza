@@ -94,9 +94,9 @@ def vague(t):
 
 def literal_question(t):
 	t = t.casefold().replace("'", "")
-	if t.startswith("what's your") or t.startswith("what is your"):
+	if t.startswith("whats your") or t.startswith("what is your") or t.startswith("what are your"):
 		return False
-	return any(t.startswith(i) for i in ("what's", "what ", "where's", "where ", "who's", "who ", "when's", "when ", "why's", "why ", "how's", "how "))
+	return any(t.startswith(i) for i in ("whats ", "what ", "wheres ", "where ", "whos ", "who ", "whens ", "when ", "whys ", "why ", "hows ", "how "))
 
 def valid_response(t):
 	t = t.strip()
