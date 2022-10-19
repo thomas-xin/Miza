@@ -148,17 +148,20 @@ class Bot:
 		else:
 			res = "\n".join(r.strip() for r in res.splitlines() if valid_response(r))
 			# print(res)
-			fut = exc.submit(
-				requests.post,
-				"https://api-inference.huggingface.co/models/salti/bert-base-multilingual-cased-finetuned-squad",
-				data=json.dumps(dict(
-					inputs=dict(
-						question=q,
-						context=res,
-					),
-				)),
-				headers=dict(cookie=f"token={self.token}"),
-			)
+			if not q.isascii():
+				fut = exc.submit(
+					requests.post,
+					"https://api-inference.huggingface.co/models/salti/bert-base-multilingual-cased-finetuned-squad",
+					data=json.dumps(dict(
+						inputs=dict(
+							question=q,
+							context=res,
+						),
+					)),
+					headers=dict(cookie=f"token={self.token}"),
+				)
+			else:
+				fut = None
 			resp = requests.post(
 				"https://api-inference.huggingface.co/models/deepset/roberta-base-squad2",
 				data=json.dumps(dict(
@@ -169,18 +172,26 @@ class Bot:
 				)),
 				headers=dict(cookie=f"token={self.token}"),
 			)
-			resp2 = fut.result()
-			# print(resp.json(), resp2.json())
-			if resp.status_code in range(200, 400):
-				a1 = resp.json()
-				if resp2.status_code in range(200, 400):
-					a2 = resp2.json()
-					if a2["score"] > a1["score"] and len(a2["answer"]) > len(a1["answer"]):
-						a1 = a2
+			if fut:
+				resp2 = fut.result()
+				# print(resp.json(), resp2.json())
+				if resp.status_code in range(200, 400):
+					a1 = resp.json()
+					if resp2.status_code in range(200, 400):
+						a2 = resp2.json()
+						if a2["score"] > a1["score"] and len(a2["answer"]) > len(a1["answer"]):
+							a1 = a2
+				elif resp2.status_code in range(200, 400):
+					a1 = resp2.json()
+				else:
+					print(resp2)
+					print(resp2.headers)
+					print(resp2.content)
 			else:
-				resp2.raise_for_status()
-				a1 = resp2.json()
+				a1 = resp.json()
 			response = a1["answer"]
+			if not response:
+				response = res.split("\n", 1)[0]
 
 		response = response.strip()
 		# self.history[q] = response
@@ -196,20 +207,13 @@ class Bot:
 			i = " ".join(swap.get(w, w) for w in words)
 			response = self.ask(i)
 			if response and response.casefold() != i.casefold():
+				self.history[i] = response
 				return response
 		self.history.pop(i, None)
 		inputs = dict(
 			generated_responses=list(self.history.values()),
 			past_user_inputs=list(self.history.keys()),
 			text=i,
-		)
-		fut = exc.submit(
-			requests.post,
-			"https://api-inference.huggingface.co/models/facebook/blenderbot-400M-distill",
-			data=json.dumps(dict(
-				inputs=inputs,
-			)),
-			headers=dict(cookie=f"token={self.token}"),
 		)
 		resp = requests.post(
 			"https://api-inference.huggingface.co/models/microsoft/DialoGPT-large",
@@ -218,24 +222,15 @@ class Bot:
 			)),
 			headers=dict(cookie=f"token={self.token}"),
 		)
-		resp2 = fut.result()
 		if resp.status_code in range(200, 400):
 			a1 = resp.json()["generated_text"].strip().replace("  ", " ")
 			# print(a1)
 			if a1.lower() == i.lower() or vague(a1) or a1.lower() in (a.lower() for a in self.history.values()):
 				a1 = ""
-			if resp2.status_code in range(200, 400):
-				a2 = resp2.json()["generated_text"].strip().replace("  ", " ")
-				# print(a2)
-				if a2.lower() == i.lower() or vague(a2) or a1.lower() in (a.lower() for a in self.history.values()):
-					a2 = ""
-				if len(a2) > len(a1) * 2 and (len(a1) < len(i) / 2 or (a1 and not a1.isupper() and a2 and a2.isupper())):
-					a1 = a2
 		else:
-			resp2.raise_for_status()
-			a1 = resp2.json()["generated_text"].strip()
-			if vague(a1):
-				a1 = ""
+			print(resp)
+			print(resp.headers)
+			print(resp.content)
 		response = a1
 		if recursive and not response:
 			return self.talk(i, recursive=False)
