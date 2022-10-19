@@ -951,6 +951,7 @@ class Ask(Command):
             q = unicode_prune(argv)
         else:
             q = argv
+        q = q.replace("？", "?")
         if q.casefold() in ("how", "how?"):
             await send_with_reply(channel, "h" not in flags and message, "https://imgur.com/gallery/8cfRt")
             return

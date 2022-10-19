@@ -90,7 +90,8 @@ def safecomp(gen):
 
 
 def valid_response(t):
-	if t in ("View all", "Feedback"):
+	t = t.strip()
+	if t in ("View all", "Feedback", "?", "？", "•", "·"):
 		return False
 	if t.startswith("Images for "):
 		return False
@@ -98,7 +99,7 @@ def valid_response(t):
 		return False
 	if not t:
 		return False
-	return True
+	return t
 
 swap = {
 	"I": "you",
@@ -133,8 +134,19 @@ class Bot:
 		if res.startswith("Calculator result\n"):
 			response = " ".join(res.split("\n", 3)[1:3])
 		else:
-			res = "\n".join(r for r in res.splitlines() if valid_response(r))
-			# print(res)
+			res = "\n".join(r.strip() for r in res.splitlines() if valid_response(r))
+			print(res)
+			fut = exc.submit(
+				requests.post,
+				"https://api-inference.huggingface.co/models/salti/bert-base-multilingual-cased-finetuned-squad",
+				data=json.dumps(dict(
+					inputs=dict(
+						question=q,
+						context=res,
+					),
+				)),
+				headers=dict(cookie=f"token={self.token}"),
+			)
 			resp = requests.post(
 				"https://api-inference.huggingface.co/models/deepset/roberta-base-squad2",
 				data=json.dumps(dict(
@@ -145,16 +157,27 @@ class Bot:
 				)),
 				headers=dict(cookie=f"token={self.token}"),
 			)
-			resp.raise_for_status()
-			response = resp.json()["answer"]
+			resp2 = fut.result()
+			if resp.status_code in range(200, 400):
+				a1 = resp.json()
+				if resp2.status_code in range(200, 400):
+					a2 = resp2.json()
+					if a2["score"] > a1["score"]:
+						a1 = a2
+			else:
+				resp2.raise_for_status()
+				a1 = resp2.json()
+			response = a1["answer"]
 
 		response = response.strip()
 		self.history[q] = response
 		return response
 
 	def talk(self, i):
-		if time.time() > self.timestamp + 720:
+		t = time.time()
+		if t > self.timestamp + 720:
 			self.__init__()
+		self.timestamp = t
 		if i.endswith("?"):
 			words = i.split()
 			i = " ".join(swap.get(w, w) for w in words)
