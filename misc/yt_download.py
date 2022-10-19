@@ -8,6 +8,7 @@ drivers = []
 
 class_name = webdriver.common.by.By.CLASS_NAME
 css_selector = webdriver.common.by.By.CSS_SELECTOR
+xpath = webdriver.common.by.By.XPATH
 driver_path = "misc/msedgedriver"
 browsers = dict(
 	edge=dict(
@@ -55,9 +56,9 @@ def create_driver():
 	return driver
 
 def ensure_drivers():
-	while len(drivers) < 3:
-		time.sleep(1)
+	while len(drivers) < 2:
 		drivers.append(exc.submit(create_driver))
+		time.sleep(1)
 def get_driver():
 	if not drivers:
 		drivers.append(exc.submit(create_driver))
@@ -65,6 +66,13 @@ def get_driver():
 		driver = drivers.pop(0).result()
 	except selenium.common.exceptions.WebDriverException:
 		driver = create_driver()
+	else:
+		try:
+			exc.submit(getattr, driver, "title").result(timeout=0.25)
+		except:
+			from traceback import print_exc
+			print_exc()
+			driver = create_driver()
 	exc.submit(ensure_drivers)
 	return driver
 
@@ -87,6 +95,8 @@ def yt_download(url, fmt="mp3", dir="", timeout=256):
 		fut = exc.submit(driver.get, search)
 		fut.result(timeout=16)
 
+		w = driver.current_window_handle
+
 		t = time.time()
 		elems = None
 		while not elems:
@@ -106,13 +116,56 @@ def yt_download(url, fmt="mp3", dir="", timeout=256):
 				raise TimeoutError("Widget failed to load.")
 		elems[0].click()
 
+		time.sleep(1)
+		driver.switch_to.window(w)
+
 		t = time.time()
 		elems = None
 		while not elems:
-			elems = list(safecomp(e for e in driver.find_elements(by=css_selector, value="*") if e.text == "CONVERT"))
-			time.sleep(0.2)
-			if time.time() - t > 16:
-				raise TimeoutError("Convert button failed to load.")
+			elems = list(safecomp(e for e in driver.find_elements(by=css_selector, value="*") if e.text == "CONVERT" or e.text == "DOWNLOAD"))
+			time.sleep(1)
+			driver.switch_to.window(w)
+			# if time.time() - t > 16:
+				# raise TimeoutError("Convert button failed to load.")
+		# time.sleep(10)
+		if not os.path.exists(folder):
+			os.mkdir(folder)
+		if elems[0].text == "CONVERT":
+			try:
+				e = driver.find_element(by=xpath, value="//iframe[2]")
+			except:
+				pass
+			else:
+				driver.execute_script("arguments[0].setAttribute('style', 'z-index:-2147483648')", e)
+			elems[0].click()
+
+			t = time.time()
+			while True:
+				if elems:
+					try:
+						if elems[0].text == "DOWNLOAD":
+							break
+					except selenium.common.exceptions.StaleElementReferenceException:
+						elems = ()
+				if not elems:
+					try:
+						for e in driver.find_elements(by=css_selector, value="*"):
+							if e.text == "DOWNLOAD":
+								elems = (e,)
+							elif "Convert Status: failed" in e.text:
+								raise RuntimeError("Conversion failed.")
+					except selenium.common.exceptions.StaleElementReferenceException:
+						elems = ()
+				time.sleep(1)
+				if time.time() - t > timeout:
+					raise TimeoutError("Download button failed to load.")
+				driver.switch_to.window(w)
+		try:
+			e = driver.find_element(by=xpath, value="//iframe[2]")
+		except:
+			pass
+		else:
+			driver.execute_script("arguments[0].setAttribute('style', 'z-index:-2147483648')", e)
 		elems[0].click()
 
 		titles = list(safecomp(e for e in driver.find_elements(by=css_selector, value="*") if "Download " in e.text))
@@ -120,30 +173,6 @@ def yt_download(url, fmt="mp3", dir="", timeout=256):
 			title = titles[0].text.split("Download ", 1)[-1].split("\n", 1)[0]
 		else:
 			title = url.split("?", 1)[0].rsplit("/", 1)[-1]
-
-		t = time.time()
-		while True:
-			if elems:
-				try:
-					if elems[0].text == "DOWNLOAD":
-						break
-				except selenium.common.exceptions.StaleElementReferenceException:
-					elems = ()
-			if not elems:
-				try:
-					for e in driver.find_elements(by=css_selector, value="*"):
-						if e.text == "DOWNLOAD":
-							elems = (e,)
-						elif "Convert Status: failed" in e.text:
-							raise RuntimeError("Conversion failed.")
-				except selenium.common.exceptions.StaleElementReferenceException:
-					elems = ()
-			time.sleep(0.5)
-			if time.time() - t > timeout:
-				raise TimeoutError("Download button failed to load.")
-		if not os.path.exists(folder):
-			os.mkdir(folder)
-		elems[0].click()
 
 		t = time.time()
 		elems = None
@@ -154,17 +183,14 @@ def yt_download(url, fmt="mp3", dir="", timeout=256):
 				raise TimeoutError("Request timed out.")
 
 		ts = time.time_ns()
-		fn = os.path.join(dir, f"{ts}.{fmt}")
+		fn = os.path.join(dir, f"cache/{ts}.{fmt}")
+		if not os.path.exists("cache"):
+			os.mkdir("cache")
 		os.rename(os.path.join(folder, elems[0]), fn)
 	finally:
 		if os.path.exists(folder):
 			for fn in os.listdir(folder):
 				os.remove(os.path.join(folder, fn))
 			os.rmdir(folder)
-		if not int(time.time_ns() // 1e4) % 3:
-			driver.close()
-		else:
-			fut = concurrent.futures.Future()
-			fut.set_result(driver)
-			drivers.insert(0, fut)
+		driver.close()
 	return title, fn
