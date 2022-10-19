@@ -959,9 +959,10 @@ class Ask(Command):
                 cb = self.convos[channel.id]
             except KeyError:
                 cb = self.convos[channel.id] = convobot.Bot(token=AUTH["huggingface_token"])
-            out = cb.talk(q)
+            with discord.context_managers.Typing(channel):
+                out = cb.talk(q)
             if out:
-                await send_with_reply(channel, "h" not in flags and message, escape_roles(out))
+                await send_with_reply(channel, "h" not in flags and message, "\xad" + escape_roles(out))
                 return
         q = single_space(q).strip().translate(bot.mtrans).replace("?", "\u200b").strip("\u200b")
         if not q:
