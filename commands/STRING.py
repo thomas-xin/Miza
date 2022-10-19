@@ -952,6 +952,7 @@ class Ask(Command):
         else:
             q = argv
         q = q.replace("？", "?")
+        print(q)
         if q.casefold() in ("how", "how?"):
             await send_with_reply(channel, "h" not in flags and message, "https://imgur.com/gallery/8cfRt")
             return
@@ -985,9 +986,6 @@ class Ask(Command):
             out = "Right now!"
         elif q == "where":
             out = "Here, dummy!"
-        elif q[:3] == "how" and not q[3:4].isalpha() or q[:4] == "hows" and not q[4:5].isalpha():
-            await send_with_reply(channel, "h" not in flags and message, "https://imgur.com/gallery/8cfRt")
-            out = None
         elif any(q.startswith(i) for i in ("what's ", "whats ", "what is ")) and regexp("[0-9]").search(q) and regexp("[+\\-*/\\\\^()").search(q):
             q = q[5:]
             q = q[q.index(" ") + 1:]

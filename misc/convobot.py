@@ -174,7 +174,7 @@ class Bot:
 		self.history[q] = response
 		return response
 
-	def talk(self, i):
+	def talk(self, i, recursive=True):
 		t = time.time()
 		if t > self.timestamp + 720:
 			self.__init__()
@@ -185,6 +185,7 @@ class Bot:
 			response = self.ask(i)
 			if response and response.casefold() != i.casefold():
 				return response
+			recursive = False
 		self.history.pop(i, None)
 		resp = requests.post(
 			"https://api-inference.huggingface.co/models/microsoft/DialoGPT-large",
@@ -200,6 +201,10 @@ class Bot:
 		resp.raise_for_status()
 		data = resp.json()
 		response = data["generated_text"].strip()
+		if recursive:
+			check = response.casefold().replace("'", "")
+			if check.startswith("i dont know") or check.startswith("im not sure"):
+				return talk(i + "?", recursive=False)
 		self.history[i] = response
 		return response
 
