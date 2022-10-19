@@ -135,7 +135,7 @@ class Bot:
 			response = " ".join(res.split("\n", 3)[1:3])
 		else:
 			res = "\n".join(r.strip() for r in res.splitlines() if valid_response(r))
-			print(res)
+			# print(res)
 			fut = exc.submit(
 				requests.post,
 				"https://api-inference.huggingface.co/models/salti/bert-base-multilingual-cased-finetuned-squad",
