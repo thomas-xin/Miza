@@ -88,6 +88,15 @@ def safecomp(gen):
 			continue
 		yield e
 
+def vague(t):
+	t = t.casefold().replace("'", "")
+	return any(t.startswith(i) for i in ("im unsure", "im not sure", "its ", "it is", "i think it", "i dont know", "i do not know", "i think you", "i am unsure", "i am not sure"))
+
+def literal_question(t):
+	t = t.casefold().replace("'", "")
+	if t.startswith("what's your") or t.startswith("what is your"):
+		return False
+	return any(t.startswith(i) for i in ("what's", "what ", "where's", "where ", "who's", "who ", "when's", "when ", "why's", "why ", "how's", "how "))
 
 def valid_response(t):
 	t = t.strip()
@@ -179,31 +188,54 @@ class Bot:
 		if t > self.timestamp + 720:
 			self.history.clear()
 		self.timestamp = t
-		if not recursive:
+		if not recursive or literal_question(i):
 			words = i.split()
 			i = " ".join(swap.get(w, w) for w in words)
 			response = self.ask(i)
 			if response and response.casefold() != i.casefold():
 				return response
 		self.history.pop(i, None)
-		resp = requests.post(
-			"https://api-inference.huggingface.co/models/microsoft/DialoGPT-large",
+		inputs = dict(
+			generated_responses=list(self.history.values()),
+			past_user_inputs=list(self.history.keys()),
+			text=i,
+		)
+		fut = exc.submit(
+			requests.post,
+			"https://api-inference.huggingface.co/models/facebook/blenderbot-400M-distill",
 			data=json.dumps(dict(
-				inputs=dict(
-					generated_responses=list(self.history.values()),
-					past_user_inputs=list(self.history.keys()),
-					text=i,
-				),
+				inputs=inputs,
 			)),
 			headers=dict(cookie=f"token={self.token}"),
 		)
-		resp.raise_for_status()
-		data = resp.json()
-		response = data["generated_text"].strip()
-		if recursive:
-			check = response.casefold().replace("'", "")
-			if check.startswith("im ") or check.startswith("its ") or check.startswith("i think its ") or check.startswith("i dont know") or check.startswith("i think you "):
-				return self.talk(i, recursive=False)
+		resp = requests.post(
+			"https://api-inference.huggingface.co/models/microsoft/DialoGPT-large",
+			data=json.dumps(dict(
+				inputs=inputs,
+			)),
+			headers=dict(cookie=f"token={self.token}"),
+		)
+		resp2 = fut.result()
+		if resp.status_code in range(200, 400):
+			a1 = resp.json()["generated_text"].strip().replace("  ", " ")
+			# print(a1)
+			if a1.lower() == i.lower() or vague(a1) or a1.lower() in (a.lower() for a in self.history.values()):
+				a1 = ""
+			if resp2.status_code in range(200, 400):
+				a2 = resp2.json()["generated_text"].strip().replace("  ", " ")
+				# print(a2)
+				if a2.lower() == i.lower() or vague(a2) or a1.lower() in (a.lower() for a in self.history.values()):
+					a2 = ""
+				if len(a2) > len(a1) * 2 and (len(a1) < len(i) / 2 or (a1 and not a1.isupper() and a2 and a2.isupper())):
+					a1 = a2
+		else:
+			resp2.raise_for_status()
+			a1 = resp2.json()["generated_text"].strip()
+			if vague(a1):
+				a1 = ""
+		response = a1
+		if recursive and not response:
+			return self.talk(i, recursive=False)
 		self.history[i] = response
 		return response
 
