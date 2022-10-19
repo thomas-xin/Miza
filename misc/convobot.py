@@ -147,7 +147,7 @@ class Bot:
 			response = " ".join(res.split("\n", 3)[1:3])
 		else:
 			res = "\n".join(r.strip() for r in res.splitlines() if valid_response(r))
-			# print(res)
+			print(res)
 			if not q.isascii():
 				fut = exc.submit(
 					requests.post,
@@ -198,6 +198,13 @@ class Bot:
 			response = a1["answer"]
 			if not response:
 				response = res.split("\n", 1)[0]
+				if response == "Dictionary":
+					r = []
+					for line in res.splitlines()[2:]:
+						if line.casefold() == "see more" or line.casefold().startswith("web result"):
+							break
+						r.append(line)
+					response = "\n".join(r)
 
 		response = response.strip()
 		# self.history[q] = response
