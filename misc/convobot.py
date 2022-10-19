@@ -162,7 +162,7 @@ class Bot:
 				a1 = resp.json()
 				if resp2.status_code in range(200, 400):
 					a2 = resp2.json()
-					if a2["score"] > a1["score"]:
+					if a2["score"] > a1["score"] * 2:
 						a1 = a2
 			else:
 				resp2.raise_for_status()
