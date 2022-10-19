@@ -133,7 +133,7 @@ class Bot:
 		if res.startswith("Calculator result\n"):
 			response = " ".join(res.split("\n", 3)[1:3])
 		else:
-			res = [r for r in res if valid_response(r)]
+			res = "\n".join(r for r in res.splitlines() if valid_response(r))
 			# print(res)
 			resp = requests.post(
 				"https://api-inference.huggingface.co/models/deepset/roberta-base-squad2",
