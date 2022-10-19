@@ -89,6 +89,17 @@ def safecomp(gen):
 		yield e
 
 
+def valid_response(t):
+	if t in ("View all", "Feedback"):
+		return False
+	if t.startswith("Images for "):
+		return False
+	if t.startswith("Missing: "):
+		return False
+	if not t:
+		return False
+	return True
+
 swap = {
 	"I": "you",
 	"Me": "You",
@@ -122,6 +133,7 @@ class Bot:
 		if res.startswith("Calculator result\n"):
 			response = " ".join(res.split("\n", 3)[1:3])
 		else:
+			res = [r for r in res if valid_response(r)]
 			# print(res)
 			resp = requests.post(
 				"https://api-inference.huggingface.co/models/deepset/roberta-base-squad2",
