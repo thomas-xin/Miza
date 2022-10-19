@@ -180,7 +180,7 @@ class Bot:
 			response = a1["answer"]
 
 		response = response.strip()
-		self.history[q] = response
+		# self.history[q] = response
 		return response
 
 	def talk(self, i, recursive=True):
