@@ -177,9 +177,9 @@ class Bot:
 	def talk(self, i, recursive=True):
 		t = time.time()
 		if t > self.timestamp + 720:
-			self.__init__()
+			self.history.clear()
 		self.timestamp = t
-		if i.endswith("?"):
+		if not self.history:
 			words = i.split()
 			i = " ".join(swap.get(w, w) for w in words)
 			response = self.ask(i)
@@ -203,7 +203,7 @@ class Bot:
 		response = data["generated_text"].strip()
 		if recursive:
 			check = response.casefold().replace("'", "")
-			if check.startswith("i dont know") or check.startswith("im not sure"):
+			if check.startswith("its ") or check.startswith("i dont know") or check.startswith("im not sure"):
 				return talk(i + "?", recursive=False)
 		self.history[i] = response
 		return response
