@@ -90,6 +90,8 @@ def safecomp(gen):
 
 def vague(t):
 	t = t.casefold().replace("'", "")
+	if t in ("i", "im"):
+		return True
 	return any(t.startswith(i) for i in ("im unsure", "im not sure", "its ", "it is", "i think it", "i dont know", "i do not know", "i think you", "i am unsure", "i am not sure"))
 
 def literal_question(t):
@@ -147,7 +149,7 @@ class Bot:
 			response = " ".join(res.split("\n", 3)[1:3])
 		else:
 			res = "\n".join(r.strip() for r in res.splitlines() if valid_response(r))
-			print(res)
+			# print(res)
 			if not q.isascii():
 				fut = exc.submit(
 					requests.post,
