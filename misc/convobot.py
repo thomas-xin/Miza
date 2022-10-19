@@ -184,6 +184,7 @@ class Bot:
 				elif resp2.status_code in range(200, 400):
 					a1 = resp2.json()
 				else:
+					a1 = ""
 					print(resp2)
 					print(resp2.headers)
 					print(resp2.content)
@@ -228,6 +229,7 @@ class Bot:
 			if a1.lower() == i.lower() or vague(a1) or a1.lower() in (a.lower() for a in self.history.values()):
 				a1 = ""
 		else:
+			a1 = ""
 			print(resp)
 			print(resp.headers)
 			print(resp.content)
