@@ -5364,6 +5364,7 @@ class AudioClientInterface:
                 print_exc()
                 time.sleep(1)
                 force_kill(PROC)
+                raise
         except:
             raise
         finally:
