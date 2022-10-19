@@ -960,7 +960,7 @@ class Ask(Command):
             except KeyError:
                 cb = self.convos[channel.id] = convobot.Bot(token=AUTH["huggingface_token"])
             with discord.context_managers.Typing(channel):
-                out = cb.talk(q)
+                out = await create_future(cb.talk, q)
             if out:
                 await send_with_reply(channel, "h" not in flags and message, "\xad" + escape_roles(out))
                 return
