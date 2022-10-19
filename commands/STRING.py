@@ -951,7 +951,7 @@ class Ask(Command):
             q = unicode_prune(argv)
         else:
             q = argv
-        if q[:3].casefold() == "how" and not q[3:4].isalpha() or q[:4].casefold() == "hows" and not q[4:5].isalpha():
+        if q.casefold() in ("how", "how?"):
             await send_with_reply(channel, "h" not in flags and message, "https://imgur.com/gallery/8cfRt")
             return
         if AUTH.get("huggingface_token"):
