@@ -56,7 +56,6 @@ def create_driver():
 	return driver
 
 def ensure_drivers():
-	return
 	while len(drivers) < 2:
 		drivers.append(exc.submit(create_driver))
 		time.sleep(1)
@@ -123,7 +122,7 @@ class Bot:
 		if res.startswith("Calculator result\n"):
 			response = " ".join(res.split("\n", 3)[1:3])
 		else:
-			print(res)
+			# print(res)
 			resp = requests.post(
 				"https://api-inference.huggingface.co/models/deepset/roberta-base-squad2",
 				data=json.dumps(dict(

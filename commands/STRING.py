@@ -961,8 +961,7 @@ class Ask(Command):
                 cb = self.convos[channel.id] = convobot.Bot(token=AUTH["huggingface_token"])
             out = cb.talk(q)
             if out:
-                q = q[0].upper() + q[1:]
-                await send_with_reply(channel, "h" not in flags and message, escape_roles(f"\xad{q}? {out}"))
+                await send_with_reply(channel, "h" not in flags and message, escape_roles(out))
                 return
         q = single_space(q).strip().translate(bot.mtrans).replace("?", "\u200b").strip("\u200b")
         if not q:
