@@ -946,7 +946,7 @@ class Ask(Command):
         if "dailies" in bot.data:
             bot.data.dailies.progress_quests(user, "talk")
         if name == "how":
-            q = name + (" " + argv).lstrip()
+            q = (name + " " + argv).lstrip()
         elif len(argv) > 1:
             q = unicode_prune(argv)
         else:
