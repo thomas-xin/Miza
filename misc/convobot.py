@@ -137,7 +137,10 @@ class Bot:
 		fut = exc.submit(driver.get, search)
 		fut.result(timeout=16)
 
-		elem = driver.find_element(by=webdriver.common.by.By.ID, value="rso")
+		try:
+			elem = driver.find_element(by=webdriver.common.by.By.ID, value="rso")
+		except:
+			return ""
 		res = elem.text
 		drivers.append(driver)
 		if res.startswith("Calculator result\n"):
@@ -236,6 +239,10 @@ class Bot:
 		response = a1
 		if recursive and not response:
 			return self.talk(i, recursive=False)
+		if not response:
+			response = resp.json()["generated_text"].strip().replace("  ", " ") or resp2.json()["generated_text"].strip().replace("  ", " ")
+		if not response:
+			response = "Sorry, I don't know."
 		self.history[i] = response
 		return response
 
