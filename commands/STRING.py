@@ -5,6 +5,7 @@ try:
 except:
     print_exc()
     googletrans = None
+import convobot
 
 try:
     rapidapi_key = AUTH["rapidapi_key"]
@@ -931,13 +932,39 @@ class Ask(Command):
     rate_limit = (0.5, 1)
     slash = True
 
+    convos = {}
+
     async def __call__(self, message, channel, user, argv, name, flags=(), **void):
         bot = self.bot
         guild = getattr(channel, "guild", None)
+        count = bot.data.users.get(user.id, {}).get("last_talk", 0)
+        add_dict(bot.data.users, {user.id: {"last_talk": 1, "last_mention": 1}})
+        bot.data.users[user.id]["last_used"] = utc()
+        bot.data.users.update(user.id)
+        await bot.seen(user, event="misc", raw="Talking to me")
+
+        if "dailies" in bot.data:
+            bot.data.dailies.progress_quests(user, "talk")
         if name == "how":
             q = name
+        elif len(argv) > 1:
+            q = unicode_prune(argv)
         else:
-            q = single_space(full_prune(argv)).strip().translate(bot.mtrans).replace("?", "\u200b").strip("\u200b")
+            q = argv
+        if q[:3].casefold() == "how" and not q[3:4].isalpha() or q[:4].casefold() == "hows" and not q[4:5].isalpha():
+            await send_with_reply(channel, "h" not in flags and message, "https://imgur.com/gallery/8cfRt")
+            return
+        if AUTH.get("huggingface_token"):
+            try:
+                cb = self.convos[channel.id]
+            except KeyError:
+                cb = self.convos[channel.id] = convobot.Bot(token=AUTH["huggingface_token"])
+            out = cb.talk(q)
+            if out:
+                q = q[0].upper() + q[1:]
+                await send_with_reply(channel, "h" not in flags and message, escape_roles(f"\xad{q}? {out}"))
+                return
+        q = single_space(q).strip().translate(bot.mtrans).replace("?", "\u200b").strip("\u200b")
         if not q:
             return "\xad" + choice(
                 "Sorry, didn't see that, was that a question? 🤔",
@@ -946,11 +973,6 @@ class Ask(Command):
                 "You thinking of asking an actual question?",
             )
         out = None
-        count = bot.data.users.get(user.id, {}).get("last_talk", 0)
-        add_dict(bot.data.users, {user.id: {"last_talk": 1, "last_mention": 1}})
-        bot.data.users[user.id]["last_used"] = utc()
-        bot.data.users.update(user.id)
-        await bot.seen(user, event="misc", raw="Talking to me")
         q = grammarly_2_point_0(q)
         if q == "why":
             out = "Because! :3"
@@ -1098,8 +1120,6 @@ class Ask(Command):
                 "Don't think so...",
             )
             out = out[ihash(q) % len(out)]
-        if "dailies" in bot.data:
-            bot.data.dailies.progress_quests(user, "talk")
         if out:
             q = q[0].upper() + q[1:]
             await send_with_reply(channel, "h" not in flags and message, escape_roles(f"\xad{q}? {out}"))
