@@ -184,12 +184,17 @@ class Bot:
 				elif resp2.status_code in range(200, 400):
 					a1 = resp2.json()
 				else:
-					a1 = ""
+					a1 = dict(answer="")
 					print(resp2)
 					print(resp2.headers)
 					print(resp2.content)
-			else:
+			elif resp.status_code in range(200, 400):
 				a1 = resp.json()
+			else:
+				a1 = dict(answer="")
+				print(resp)
+				print(resp.headers)
+				print(resp.content)
 			response = a1["answer"]
 			if not response:
 				response = res.split("\n", 1)[0]
