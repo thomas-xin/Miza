@@ -202,7 +202,7 @@ class Bot:
 		response = data["generated_text"].strip()
 		if recursive:
 			check = response.casefold().replace("'", "")
-			if check.startswith("im ") or check.startswith("its ") or check.startswith("i think its ") or check.startswith("i dont know"):
+			if check.startswith("im ") or check.startswith("its ") or check.startswith("i think its ") or check.startswith("i dont know") or check.startswith("i think you "):
 				return self.talk(i, recursive=False)
 		self.history[i] = response
 		return response
