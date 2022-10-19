@@ -158,11 +158,12 @@ class Bot:
 				headers=dict(cookie=f"token={self.token}"),
 			)
 			resp2 = fut.result()
+			# print(resp.json(), resp2.json())
 			if resp.status_code in range(200, 400):
 				a1 = resp.json()
 				if resp2.status_code in range(200, 400):
 					a2 = resp2.json()
-					if a2["score"] > a1["score"] * 2:
+					if a2["score"] > a1["score"] and len(a2["answer"]) > len(a1["answer"]):
 						a1 = a2
 			else:
 				resp2.raise_for_status()
