@@ -255,7 +255,7 @@ class Bot:
 		if recursive and not response:
 			return self.talk(i, recursive=False)
 		if not response:
-			response = resp.json()["generated_text"].strip().replace("  ", " ") or resp2.json()["generated_text"].strip().replace("  ", " ")
+			response = resp.json().get("generated_text", "").strip().replace("  ", " ")
 		if not response:
 			response = "Sorry, I don't know."
 		self.history[i] = response

@@ -952,6 +952,13 @@ class Ask(Command):
         else:
             q = argv
         q = q.replace("？", "?")
+        if not q.replace("?", ""):
+            return "\xad" + choice(
+                "Sorry, didn't see that, was that a question? 🤔",
+                "Ay, speak up, I don't bite! :3",
+                "Haha, nice try, I know that's not an actual question 🙃",
+                "You thinking of asking an actual question?",
+            )
         print(q)
         if q.casefold() in ("how", "how?"):
             await send_with_reply(channel, "h" not in flags and message, "https://imgur.com/gallery/8cfRt")
@@ -967,13 +974,6 @@ class Ask(Command):
                 await send_with_reply(channel, "h" not in flags and message, "\xad" + escape_roles(out))
                 return
         q = single_space(q).strip().translate(bot.mtrans).replace("?", "\u200b").strip("\u200b")
-        if not q:
-            return "\xad" + choice(
-                "Sorry, didn't see that, was that a question? 🤔",
-                "Ay, speak up, I don't bite! :3",
-                "Haha, nice try, I know that's not an actual question 🙃",
-                "You thinking of asking an actual question?",
-            )
         out = None
         q = grammarly_2_point_0(q)
         if q == "why":
