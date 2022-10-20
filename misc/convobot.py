@@ -90,7 +90,7 @@ def safecomp(gen):
 
 def vague(t):
 	t = t.casefold().replace("'", "")
-	if t in ("i", "im"):
+	if t in ("i", "im", "imo", "io"):
 		return True
 	return any(t.startswith(i) for i in ("im unsure", "im not sure", "its ", "it is", "i think it", "i dont know", "i do not know", "i think you", "i am unsure", "i am not sure"))
 
@@ -102,7 +102,7 @@ def literal_question(t):
 
 def valid_response(t):
 	t = t.strip()
-	if t in ("View all", "Feedback", "?", "？", "•", "·"):
+	if t in ("View all", "See more", "Videos", "PREVIEW", "Feedback", "?", "？", "•", "·"):
 		return False
 	if t.startswith("Images for "):
 		return False
@@ -203,10 +203,12 @@ class Bot:
 				if response == "Dictionary":
 					r = []
 					for line in res.splitlines()[2:]:
-						if line.casefold() == "see more" or line.casefold().startswith("web result"):
+						if line.casefold() == "translations and more definitions" or line.casefold().startswith("web result"):
 							break
 						r.append(line)
 					response = "\n".join(r)
+			elif response.casefold().replace("'", "") in ("i", "im", "imo", "io"):
+				response = ""
 
 		response = response.strip()
 		# self.history[q] = response
@@ -216,6 +218,8 @@ class Bot:
 		t = time.time()
 		if t > self.timestamp + 720:
 			self.history.clear()
+		elif len(self.history) > 8:
+			self.history.pop(next(iter(self.history)))
 		self.timestamp = t
 		if not recursive or literal_question(i):
 			words = i.split()
