@@ -90,7 +90,7 @@ def safecomp(gen):
 
 def vague(t):
 	t = t.casefold().replace("'", "")
-	if t in ("i", "im", "imo", "io"):
+	if t in ("i", "im", "imo", "io", "o"):
 		return True
 	return any(t.startswith(i) for i in ("im unsure", "im not sure", "its ", "it is", "i think it", "i dont know", "i do not know", "i think you", "i am unsure", "i am not sure"))
 
