@@ -2162,7 +2162,7 @@ class UpdateUsers(Database):
     async def _nocommand_(self, message, msg, force=False, flags=(), truemention=True, **void):
         bot = self.bot
         user = message.author
-        if force or truemention and bot.is_mentioned(message, bot, message.guild):
+        if force or msg and bot.is_mentioned(message, bot, message.guild):
             if user.bot:
                 with suppress(AttributeError):
                     async for m in self.bot.data.channel_cache.get(message.channel):
