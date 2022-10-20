@@ -1542,7 +1542,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         if "prot" in self.data:
             fn = f"cache/attachment_{attachment.id}.bin"
             if fn in self.cache.attachments:
-                await self.data.prot.call(message, fn, self.cache.attachments[fn])
+                if self.cache.attachments[fn]:
+                    await self.data.prot.call(message, fn, self.cache.attachments[fn])
                 return
             if not os.path.exists(fn):
                 data = await self.get_attachment(str(attachment.url))
@@ -1550,7 +1551,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     return
                 with open(fn, "wb") as f:
                     await create_future(f.write, data)
-            self.cache.attachments[fn] = await self.data.prot.call(message, fn)
+            if get_mime(fn).startswith("image/"):
+                res = await self.data.prot.call(message, fn)
+            else:
+                res = ""
+            self.cache.attachments[fn] = res
 
     def attachment_from_file(self, file):
         a_id = int(file.split(".", 1)[0][11:])

@@ -58,9 +58,20 @@ prev_date = utc_dt().date()
 zfailed = set()
 
 
-import cherrypy
+import cherrypy, cheroot
 from cherrypy._cpdispatch import Dispatcher
 cp = cherrypy
+
+def cp_error_log(self, msg='', level=20, traceback=False):
+    sys.stderr.write('{msg!s}\n'.format(msg=msg))
+    if traceback:
+        tblines = traceback_.format_exc()
+        if "SSLError:" in tblines or "SSLEOFError:" in tblines:
+            sys.stderr.write(tblines.rstrip().rsplit("\n", 1)[-1] + "\n")
+        else:
+            sys.stderr.write(tblines)
+    sys.stderr.flush()
+cheroot.server.HTTPServer.error_log = cp_error_log
 
 actually_static = set(os.listdir("misc/static"))
 mapped_static = {k[:-5]: k for k in actually_static if k.endswith(".html")}
