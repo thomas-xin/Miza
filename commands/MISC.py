@@ -895,9 +895,22 @@ class StableDiffusion(Command):
                 rems.append(arg)
             elif not url:
                 url = urls[0]
-        if not rems and not url:
-            raise ArgumentError("Please input a valid prompt.")
-        prompt = " ".join(rems)
+        prompt = " ".join(rems).strip()
+        if not prompt:
+            if not url:
+                raise ArgumentError("Please input a valid prompt.")
+            if AUTH.get("huggingface_token"):
+                b = await bot.get_request(url)
+                resp = await create_future(
+                    requests.post,
+                    "https://api-inference.huggingface.co/models/nlpconnect/vit-gpt2-image-captioning",
+                    data=b,
+                    headers=dict(cookie=f"token={AUTH['huggingface_token']}"),
+                )
+                if resp.status in range(200, 400):
+                    prompt = resp.json()[0]["generated_text"].strip()
+            if not prompt:
+                prompt = "art"
         req = prompt
         if url:
             if req:
@@ -910,7 +923,7 @@ class StableDiffusion(Command):
             "-3.9",
             "demo.py",
         ]
-        if rems and "--prompt" not in kwargs:
+        if prompt and "--prompt" not in kwargs:
             args.extend((
                 "--prompt",
                 prompt,
