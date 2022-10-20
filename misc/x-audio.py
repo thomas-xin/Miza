@@ -409,7 +409,7 @@ class AudioFile:
             fi = "cache/" + str(time.time_ns() + random.randint(1, 1000)) + "~proxy"
             with suppress():
                 stream = proxy_download(stream, fi, timeout=86400)
-        ffmpeg = "misc/ffmpeg-c/ffmpeg.exe" if check_fmt and is_url(stream) else "./ffmpeg"
+        ffmpeg = "./ffmpeg"
         if not os.path.exists(ffmpeg):
             ffmpeg = "./ffmpeg"
         fmt = cdc = self.file.rsplit(".", 1)[-1]

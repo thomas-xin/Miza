@@ -2676,10 +2676,10 @@ class AudioDownloader:
             ffmpeg = "./ffmpeg"
             if len(ast) <= 1 and not vst and fmt != "pcm":
                 if ast:
-                    if not is_youtube_stream(ast[0]["stream"]):
-                        ffmpeg = "misc/ffmpeg-c/ffmpeg.exe"
-                        if not os.path.exists(ffmpeg):
-                            ffmpeg = "./ffmpeg"
+                    # if not is_youtube_stream(ast[0]["stream"]):
+                    #     ffmpeg = "misc/ffmpeg-c/ffmpeg.exe"
+                    #     if not os.path.exists(ffmpeg):
+                    #         ffmpeg = "./ffmpeg"
                     cdc = codec = as_str(subprocess.check_output(["./ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "format=format_name", "-of", "default=nokey=1:noprint_wrappers=1", ast[0]["stream"]])).strip()
                     if fmt in cdc.split(","):
                         copy = True

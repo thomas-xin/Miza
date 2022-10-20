@@ -2754,7 +2754,7 @@ def proxy_download(url, fn=None, refuse_html=True, timeout=720):
         if resp.status_code not in range(200, 400):
             raise ConnectionError(resp.status_code, resp)
         if not fn:
-            b = resp.read()
+            b = resp.content
             if refuse_html and b[:15] == b"<!DOCTYPE html>":
                 raise ValueError(b[:256])
         it = resp.iter_content(65536)
