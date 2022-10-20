@@ -91,6 +91,7 @@ def round_random(x):
 
 invert = lambda b: bytes(i ^ 255 for i in b)
 
+# Reduces an image to a 4-bit black and white 4x4 square, then bitcrushes to 1-bit leaving 2 bytes total
 def hash_reduce(l):
 	# amax = np.max(l)
 	aavg = np.mean(l)
@@ -106,26 +107,22 @@ def hash_reduce(l):
 		bo += bi[i::8] << (7 - i)
 	return bo
 
+# Reduces an image to a 12-bit rgb 32x32 square, returning an additional greyscale luma component
 def split_to(im):
 	hi = im.resize((32, 32), resample=Resampling.LANCZOS)
+	g = hi.convert("L")
 	h, s, l = hsl_split(hi, convert=False, dtype=np.float32)
-	seff = np.sqrt(16384 - (l - 127) ** 2) / 128
-	s *= seff
-
-	r = 1 / 16
-	h *= r
-	s *= r
-	l *= r
-	return map(np.uint8, (h, s, l))
+	return (np.uint8(a) >> 4 for a in (h, s, l, g))
 
 def hash_to(im, msg, skip=False):
 	if skip:
-		h, s, l = split_to(im)
-		rh = hash_reduce(l)
+		h, s, l, g = split_to(im)
+		rh = hash_reduce(g)
 	else:
-		h, s, l, rh = compare_to(im, msg)
+		h, s, l, g, rh = compare_to(im, msg)
 	sl = s + (l << 4)
-	hb = h.tobytes() + sl.tobytes()
+	hg = h + (g << 4)
+	hb = hg.tobytes() + sl.tobytes()
 	s = base64.b64encode(hb).rstrip(b"=").decode("ascii") + ":" + msg + "\n"
 	for fd in (f"iman/{rh[0]}/{rh[1]}.txt", f"iman/{255 - rh[0]}/{255 - rh[1]}.txt"):
 		folder = fd.rsplit("/", 1)[0]
@@ -135,8 +132,8 @@ def hash_to(im, msg, skip=False):
 			f.write(s)
 
 def compare_to(im, msg):
-	h, s, l = split_to(im)
-	rh = hash_reduce(l)
+	h, s, l, g = split_to(im)
+	rh = hash_reduce(g)
 	fd = f"iman/{rh[0]}/{rh[1]}.txt"
 
 	if os.path.exists(fd):
@@ -148,27 +145,31 @@ def compare_to(im, msg):
 			v = v[:-1]
 			hb2 = np.frombuffer(base64.b64decode(k.encode("ascii") + b"=="), dtype=np.uint8)
 			half = len(hb2) >> 1
-			h2, sl2 = hb2[:half].reshape((32, 32)), hb2[half:].reshape((32, 32))
+			hg2, sl2 = hb2[:half].reshape((32, 32)), hb2[half:].reshape((32, 32))
+			h2 = hg2 & 15
+			g2 = hg2 >> 4
 			s2 = sl2 & 15
 			l2 = sl2 >> 4
 
 			heff = np.sqrt(65536 - (255 - s) * (255 - s2)) / 256
 			hd = np.sum((128 - np.abs((h - h2) - 128)) * heff) / 128 / 1024
-			sd = np.sum(np.abs(s - s2)) / 15 / 1024
+			seff = np.sqrt(65536 - (255 - l) * (255 - l2)) / 256
+			sd = np.sum(np.abs(s - s2) * seff) / 15 / 1024
 			ld = np.sum(np.abs(l - l2)) / 15 / 1024
-			ld2 = np.sum(np.abs(l + l2)) / 15 / 1024
+			gd = np.sum(np.abs(g - g2)) / 15 / 1024
+			gd2 = np.sum(np.abs(15 - g - g2)) / 15 / 1024
 
-			print(hd, sd, ld, ld2)
-			R = hd + sd + min(ld, ld2)
+			# print(hd, sd, ld, gd, gd2)
+			R = (hd + sd) / 2 + min(ld, gd, gd2)
 			print(rh, R)
-			if R < 5:
+			if R <= 3:
 				if v == msg:
 					print("No copyright detected.")
 					raise SystemExit
 				print("Copyright detected in hashing:", v)
 				raise SystemExit
 
-	return h, s, l, rh
+	return h, s, l, g, rh
 
 if not os.path.exists("iman"):
 	os.mkdir("iman")
