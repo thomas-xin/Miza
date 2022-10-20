@@ -907,7 +907,7 @@ class StableDiffusion(Command):
                     data=b,
                     headers=dict(cookie=f"token={AUTH['huggingface_token']}"),
                 )
-                if resp.status in range(200, 400):
+                if resp.status_code in range(200, 400):
                     prompt = resp.json()[0]["generated_text"].strip()
             if not prompt:
                 prompt = "art"
