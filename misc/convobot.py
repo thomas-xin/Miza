@@ -262,7 +262,8 @@ class Bot:
 		return response
 
 if __name__ == "__main__":
-	token = "WiqIYppNqlsIPISiLnzffiGdSTliJJDBPJyeFupzRkuwvKPQFjfUTPLyApKbTbUNyWLxIRieUAhekwwESNBCbgJLudYXohddHNMkawjlFLUKTHnyhcvwvFCTmlVIkYcU"
+	import sys
+	token = sys.argv[1]
 	bot = Bot(token)
 	while True:
 		print(bot.talk(input()))
