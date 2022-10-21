@@ -167,12 +167,14 @@ class Bot:
 			tokenizer = AutoTokenizer.from_pretrained(m, padding_side="left", padding=True)
 			model = AutoModelForCausalLM.from_pretrained(m)
 			self.models[m] = (tokenizer, model)
-		new_user_input_ids = tokenizer.encode(q + tokenizer.eos_token, return_tensors="pt")
-		if self.history:
-			chat_history_ids = tokenizer.encode((tokenizer.eos_token.join(qh), tokenizer.eos_token.join(ah)), return_tensors="pt")
-			bot_input_ids = torch.cat([chat_history_ids, new_user_input_ids], dim=-1).long()
-		else:
-			bot_input_ids = new_user_input_ids
+		end = tokenizer.eos_token
+		new_user_input_ids = tokenizer.encode(q + end, return_tensors="pt")
+		history = []
+		for k, v in self.history.items():
+			history.append(tokenizer.encode(k + end, return_tensors="pt"))
+			history.append(tokenizer.encode(v + end, return_tensors="pt"))
+		history.append(new_user_input_ids)
+		bot_input_ids = torch.cat(history, dim=-1)
 		chat_history_ids = model.generate(bot_input_ids, max_length=1024, pad_token_id=tokenizer.eos_token_id)
 		return tokenizer.decode(chat_history_ids[:, bot_input_ids.shape[-1]:][0], skip_special_tokens=True).strip()
 
@@ -204,7 +206,7 @@ class Bot:
 				a2 = fut.result()
 			if len(a2) > len(a1):
 				a1 = a2
-			response = a1
+			response = a1.strip()
 			if not response:
 				response = res.split("\n", 1)[0]
 				if response == "Dictionary":
@@ -214,7 +216,7 @@ class Bot:
 							break
 						r.append(line)
 					response = "\n".join(r)
-			elif response.casefold().replace("'", "") in ("i", "im", "imo", "io"):
+			elif response.casefold().replace("'", "") in ("i", "im", "imo", "io", "o"):
 				response = ""
 
 		response = response.strip().replace("  ", " ")
