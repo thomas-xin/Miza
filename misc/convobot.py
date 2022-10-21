@@ -194,7 +194,7 @@ class Bot:
 			response = " ".join(res.split("\n", 3)[1:3])
 		else:
 			res = "\n".join(r.strip() for r in res.splitlines() if valid_response(r))
-			print(res)
+			# print(res)
 			if not res.isascii():
 				fut = exc.submit(self.question_context_analysis, "salti/bert-base-multilingual-cased-finetuned-squad", q, res)
 			else:
