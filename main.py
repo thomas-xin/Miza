@@ -1,5 +1,14 @@
+import datetime
+import io
+import json
+import psutil
+import requests
+import subprocess
+import time
+import zipfile
+
 # Loads the install_update module, which makes sure all required libraries are installed to their required versions.
-from install_update import *
+from install_update import *        
 
 # Makes sure an authentication file exists.
 if not os.path.exists("auth.json") or not os.path.getsize("auth.json"):
@@ -16,19 +25,16 @@ if not os.path.exists("auth.json") or not os.path.getsize("auth.json"):
         "alexflipnote_key": "",
         "giphy_key": "",
     }
-    import json
     with open("auth.json", "w", encoding="utf-8") as f:
         json.dump(d, f, indent=4)
     input("auth.json generated. Please fill in discord_token and restart bot when done.")
     raise SystemExit
 
 
-import time, datetime, psutil, subprocess
 ffmpeg = "./ffmpeg"
 print("Verifying FFmpeg installation...")
 
 if os.name == "nt":
-    import requests
     try:
         os.system("color")
     except:
@@ -50,7 +56,6 @@ if os.name == "nt":
         except FileNotFoundError:
             print(f"Downloading FFmpeg version {v}...")
             subprocess.run([sys.executable, "downloader.py", "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip", "ffmpeg.zip"], cwd="misc")
-            import zipfile, io
             print("Download complete; extracting new FFmpeg installation...")
             f = "misc/ffmpeg.zip"
             with zipfile.ZipFile(f) as z:
@@ -72,7 +77,6 @@ if os.name == "nt":
     #         print("Downloading ffmpeg version 4.2.2...")
     #         os.mkdir("misc/ffmpeg-c")
     #         subprocess.run([sys.executable, "downloader.py", "https://dl.dropboxusercontent.com/s/6vjpswpkxubnig4/ffmpeg-c.zip?dl=1", "ffmpeg-c.zip"], cwd="misc")
-    #         import zipfile, io
     #         print("Download complete; extracting new FFmpeg installation...")
     #         f = "misc/ffmpeg-c.zip"
     #         with zipfile.ZipFile(f) as z:
@@ -83,7 +87,6 @@ if os.name == "nt":
         print("Downloading Poppler version 21.10.0...")
         os.mkdir("misc/poppler")
         subprocess.run([sys.executable, "downloader.py", "https://cdn.discordapp.com/attachments/731709481863479436/899556463016554496/Poppler.zip", "poppler.zip"], cwd="misc")
-        import zipfile, io
         print("Download complete; extracting new Poppler installation...")
         f = "misc/poppler.zip"
         with zipfile.ZipFile(f) as z:
