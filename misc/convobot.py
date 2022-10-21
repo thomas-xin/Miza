@@ -1,7 +1,8 @@
 import os, time, urllib, json
 import concurrent.futures
-import selenium, requests
+import selenium, requests, torch
 from selenium import webdriver
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering, AutoModelForCausalLM, pipeline
 
 exc = concurrent.futures.ThreadPoolExecutor(max_workers=6)
 drivers = []
@@ -56,7 +57,7 @@ def create_driver():
 	return driver
 
 def ensure_drivers():
-	while len(drivers) < 2:
+	while len(drivers) < 1:
 		drivers.append(exc.submit(create_driver))
 		time.sleep(1)
 def get_driver():
@@ -126,10 +127,54 @@ swap = {
 
 class Bot:
 
+	models = {}
+
 	def __init__(self, token=""):
 		self.token = token
 		self.history = {}
 		self.timestamp = time.time()
+
+	def question_context_analysis(self, m, q, c):
+		if m == "deepset/roberta-base-squad2":
+			try:
+				nlp = self.models[m]
+			except KeyError:
+				nlp = self.models[m] = pipeline("question-answering", model=m, tokenizer=m)
+			QA_input = dict(
+				question=q,
+				context=c,
+			)
+			return nlp(QA_input)["answer"]
+
+		try:
+			tokenizer, model = self.models[m]
+		except KeyError:
+			tokenizer = AutoTokenizer.from_pretrained(m)
+			model = AutoModelForQuestionAnswering.from_pretrained(m)
+			self.models[m] = (tokenizer, model)
+		inputs = tokenizer(q[:512], c[:512], return_tensors="pt")
+		with torch.no_grad():
+			outputs = model(**inputs)
+		answer_start_index = outputs.start_logits.argmax()
+		answer_end_index = outputs.end_logits.argmax()
+		predict_answer_tokens = inputs.input_ids[0, answer_start_index : answer_end_index + 1]
+		return tokenizer.decode(predict_answer_tokens).strip()
+
+	def question_answer_analysis(self, m, q, qh, ah):
+		try:
+			tokenizer, model = self.models[m]
+		except KeyError:
+			tokenizer = AutoTokenizer.from_pretrained(m, padding_side="left", padding=True)
+			model = AutoModelForCausalLM.from_pretrained(m)
+			self.models[m] = (tokenizer, model)
+		new_user_input_ids = tokenizer.encode(q + tokenizer.eos_token, return_tensors="pt")
+		if self.history:
+			chat_history_ids = tokenizer.encode((tokenizer.eos_token.join(qh), tokenizer.eos_token.join(ah)), return_tensors="pt")
+			bot_input_ids = torch.cat([chat_history_ids, new_user_input_ids], dim=-1).long()
+		else:
+			bot_input_ids = new_user_input_ids
+		chat_history_ids = model.generate(bot_input_ids, max_length=1024, pad_token_id=tokenizer.eos_token_id)
+		return tokenizer.decode(chat_history_ids[:, bot_input_ids.shape[-1]:][0], skip_special_tokens=True).strip()
 
 	def ask(self, q):
 		driver = get_driver()
@@ -149,55 +194,17 @@ class Bot:
 			response = " ".join(res.split("\n", 3)[1:3])
 		else:
 			res = "\n".join(r.strip() for r in res.splitlines() if valid_response(r))
-			# print(res)
-			if not q.isascii():
-				fut = exc.submit(
-					requests.post,
-					"https://api-inference.huggingface.co/models/salti/bert-base-multilingual-cased-finetuned-squad",
-					data=json.dumps(dict(
-						inputs=dict(
-							question=q,
-							context=res,
-						),
-					)),
-					headers=dict(cookie=f"token={self.token}"),
-				)
+			print(res)
+			if not res.isascii():
+				fut = exc.submit(self.question_context_analysis, "salti/bert-base-multilingual-cased-finetuned-squad", q, res)
 			else:
-				fut = None
-			resp = requests.post(
-				"https://api-inference.huggingface.co/models/deepset/roberta-base-squad2",
-				data=json.dumps(dict(
-					inputs=dict(
-						question=q,
-						context=res,
-					),
-				)),
-				headers=dict(cookie=f"token={self.token}"),
-			)
+				fut = a2 = ""
+			a1 = self.question_context_analysis("deepset/roberta-base-squad2", q, res)
 			if fut:
-				resp2 = fut.result()
-				# print(resp.json(), resp2.json())
-				if resp.status_code in range(200, 400):
-					a1 = resp.json()
-					if resp2.status_code in range(200, 400):
-						a2 = resp2.json()
-						if a2["score"] > a1["score"] and len(a2["answer"]) > len(a1["answer"]):
-							a1 = a2
-				elif resp2.status_code in range(200, 400):
-					a1 = resp2.json()
-				else:
-					a1 = dict(answer="")
-					print(resp2)
-					print(resp2.headers)
-					print(resp2.content)
-			elif resp.status_code in range(200, 400):
-				a1 = resp.json()
-			else:
-				a1 = dict(answer="")
-				print(resp)
-				print(resp.headers)
-				print(resp.content)
-			response = a1["answer"]
+				a2 = fut.result()
+			if len(a2) > len(a1):
+				a1 = a2
+			response = a1
 			if not response:
 				response = res.split("\n", 1)[0]
 				if response == "Dictionary":
@@ -210,7 +217,7 @@ class Bot:
 			elif response.casefold().replace("'", "") in ("i", "im", "imo", "io"):
 				response = ""
 
-		response = response.strip()
+		response = response.strip().replace("  ", " ")
 		# self.history[q] = response
 		return response
 
@@ -229,28 +236,9 @@ class Bot:
 				self.history[i] = response
 				return response
 		self.history.pop(i, None)
-		inputs = dict(
-			generated_responses=list(self.history.values()),
-			past_user_inputs=list(self.history.keys()),
-			text=i,
-		)
-		resp = requests.post(
-			"https://api-inference.huggingface.co/models/microsoft/DialoGPT-large",
-			data=json.dumps(dict(
-				inputs=inputs,
-			)),
-			headers=dict(cookie=f"token={self.token}"),
-		)
-		if resp.status_code in range(200, 400):
-			a1 = resp.json()["generated_text"].strip().replace("  ", " ")
-			# print(a1)
-			if a1.lower() == i.lower() or vague(a1) or a1.lower() in (a.lower() for a in self.history.values()):
-				a1 = ""
-		else:
+		a1 = self.question_answer_analysis("microsoft/DialoGPT-large", i, list(self.history.keys()), list(self.history.values()))
+		if a1.lower() == i.lower() or vague(a1) or a1.lower() in (a.lower() for a in self.history.values()):
 			a1 = ""
-			print(resp)
-			print(resp.headers)
-			print(resp.content)
 		response = a1
 		if recursive and not response:
 			return self.talk(i, recursive=False)
@@ -263,7 +251,7 @@ class Bot:
 
 if __name__ == "__main__":
 	import sys
-	token = sys.argv[1]
+	token = sys.argv[1] if len(sys.argv) > 1 else ""
 	bot = Bot(token)
 	while True:
 		print(bot.talk(input()))

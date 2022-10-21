@@ -5,6 +5,9 @@ from prettytable import PrettyTable as ptable
 from tsc_utils.flags import address_to_flag, flag_to_address
 from tsc_utils.numbers import tsc_value_to_num, num_to_tsc_value
 
+from transformers import AutoTokenizer, AutoModel
+from PIL import Image
+
 
 class DouClub:
 
@@ -899,16 +902,14 @@ class StableDiffusion(Command):
         if not prompt:
             if not url:
                 raise ArgumentError("Please input a valid prompt.")
-            if AUTH.get("huggingface_token"):
-                b = await bot.get_request(url)
-                resp = await create_future(
-                    requests.post,
-                    "https://api-inference.huggingface.co/models/nlpconnect/vit-gpt2-image-captioning",
-                    data=b,
-                    headers=dict(cookie=f"token={AUTH['huggingface_token']}"),
-                )
-                if resp.status_code in range(200, 400):
-                    prompt = resp.json()[0]["generated_text"].strip()
+            processor = await create_future(TrOCRProcessor.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
+            model = await create_future(VisionEncoderDecoderModel.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
+            b = await bot.get_request(url)
+            image = Image.open(io.BytesIO(b)).convert("RGB")
+            pixel_values = processor(image, return_tensors="pt").pixel_values
+            generated_ids = await create_future(model.generate, pixel_values)
+            generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+            prompt = generated_text.strip()
             if not prompt:
                 prompt = "art"
         req = prompt
