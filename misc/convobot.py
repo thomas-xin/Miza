@@ -238,14 +238,16 @@ class Bot:
 				self.history[i] = response
 				return response
 		self.history.pop(i, None)
-		a1 = self.question_answer_analysis("microsoft/DialoGPT-large", i, list(self.history.keys()), list(self.history.values()))
+		res = self.question_answer_analysis("microsoft/DialoGPT-large", i, list(self.history.keys()), list(self.history.values()))
+		a1 = res
 		if a1.lower() == i.lower() or vague(a1) or a1.lower() in (a.lower() for a in self.history.values()):
 			a1 = ""
 		response = a1
 		if recursive and not response:
 			return self.talk(i, recursive=False)
 		if not response:
-			response = resp.json().get("generated_text", "").strip().replace("  ", " ")
+			response = res
+		response = response.replace("  ", " ")
 		if not response:
 			response = "Sorry, I don't know."
 		self.history[i] = response
