@@ -852,15 +852,15 @@ class StableDiffusion(Command):
     cache = {}
 
     async def stable_diffusion_deepai(self, prompt):
+        headers = Request.header()
+        headers["api-key"] = "quickstart-QUdJIGlzIGNvbWluZy4uLi4K"
         resp = await create_future(
             requests.post,
             "https://api.deepai.org/api/text2img",
             files=dict(
                 text=prompt,
             ),
-            headers={
-                "api-key": "quickstart-QUdJIGlzIGNvbWluZy4uLi4K",
-            },
+            headers=headers,
         )
         if resp.status_code in range(200, 400):
             print(resp.text)
