@@ -178,6 +178,14 @@ class Bot:
 		chat_history_ids = model.generate(bot_input_ids, max_length=1024, pad_token_id=tokenizer.eos_token_id)
 		return tokenizer.decode(chat_history_ids[:, bot_input_ids.shape[-1]:][0], skip_special_tokens=True).strip()
 
+	def answer_fill_mask(self, m, q):
+		if m == "xlm-roberta-large":
+			try:
+				fmp = self.models[m]
+			except KeyError:
+				fmp = self.models[m] = pipeline("fill-mask", model=m, tokenizer=m)
+			return fmp(q)[0]["sequence"]
+
 	def ask(self, q):
 		driver = get_driver()
 
@@ -206,7 +214,32 @@ class Bot:
 				a2 = fut.result()
 			if len(a2) > len(a1):
 				a1 = a2
-			response = a1.strip()
+			response = "\n".join(line.strip() for line in a1.replace("[CLS]", "").replace("[SEP]", "\n").splitlines()).strip()
+			while "[UNK]" in response:
+				response = self.answer_fill_mask("xlm-roberta-large", response.replace("[UNK]", "<mask>", 1))
+			search = "https : / / "
+			while search in response:
+				i = response.index(search)
+				temp = response[i + len(search):].split(" ")
+				response = response[:i] + "https://"
+				while temp:
+					word = temp[0]
+					if word.endswith(".") or word.endswith("?") or word.endswith("&") or word.endswith("="):
+						response += temp.pop(0)
+					else:
+						break
+				response += " ".join(temp)
+			if "." in response:
+				words = response.split(".")
+				modified = False
+				for i in range(len(words) - 1):
+					a, b = words[i:i + 2]
+					if a and a[-1].isnumeric() and len(b) > 1 and b[0] == " " and b[1].isnumeric():
+						words[i + 1] = b.lstrip()
+						modified = True
+				if modified:
+					response = ".".join(words)
+			response = response.replace("( ", "(").replace(" )", ")")
 			if not response:
 				response = res.split("\n", 1)[0]
 				if response == "Dictionary":
@@ -237,7 +270,6 @@ class Bot:
 			if response and response.casefold() != i.casefold():
 				self.history[i] = response
 				return response
-		self.history.pop(i, None)
 		res = self.question_answer_analysis("microsoft/DialoGPT-large", i, list(self.history.keys()), list(self.history.values()))
 		a1 = res
 		if a1.lower() == i.lower() or vague(a1) or a1.lower() in (a.lower() for a in self.history.values()):

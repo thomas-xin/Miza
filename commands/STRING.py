@@ -963,16 +963,16 @@ class Ask(Command):
         if q.casefold() in ("how", "how?"):
             await send_with_reply(channel, "h" not in flags and message, "https://imgur.com/gallery/8cfRt")
             return
-        if AUTH.get("huggingface_token"):
-            try:
-                cb = self.convos[channel.id]
-            except KeyError:
-                cb = self.convos[channel.id] = convobot.Bot(token=AUTH["huggingface_token"])
-            with discord.context_managers.Typing(channel):
-                out = await create_future(cb.talk, q)
-            if out:
-                await send_with_reply(channel, "h" not in flags and message, "\xad" + escape_roles(out))
-                return
+        # if AUTH.get("huggingface_token"):
+        try:
+            cb = self.convos[channel.id]
+        except KeyError:
+            cb = self.convos[channel.id] = convobot.Bot(token=AUTH["huggingface_token"])
+        with discord.context_managers.Typing(channel):
+            out = await create_future(cb.talk, q)
+        if out:
+            await send_with_reply(channel, "h" not in flags and message, "\xad" + escape_roles(out))
+            return
         q = single_space(q).strip().translate(bot.mtrans).replace("?", "\u200b").strip("\u200b")
         out = None
         q = grammarly_2_point_0(q)
