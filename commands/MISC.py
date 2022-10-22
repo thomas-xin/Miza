@@ -5,7 +5,7 @@ from prettytable import PrettyTable as ptable
 from tsc_utils.flags import address_to_flag, flag_to_address
 from tsc_utils.numbers import tsc_value_to_num, num_to_tsc_value
 
-from transformers import AutoTokenizer, AutoModel, TrOCRProcessor
+from transformers import TrOCRProcessor, VisionEncoderDecoderModel
 from PIL import Image
 
 
