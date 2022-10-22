@@ -865,7 +865,7 @@ class StableDiffusion(Command):
         if resp.status_code in range(200, 400):
             print(resp.text)
             url = resp.json()["output_url"]
-            b = await bot.get_request(url)
+            b = await self.bot.get_request(url)
             image = Image.open(io.BytesIO(b))
             ims = [
                 image.crop((0, 0, 512, 512)),
