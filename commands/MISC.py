@@ -952,7 +952,7 @@ class StableDiffusion(Command):
             if self.cache.get(prompt):
                 b = io.BytesIO()
                 self.cache[prompt].pop(0).save(b, format="png")
-                if not self.cache[prompt]:
+                if len(self.cache[prompt]) < 2:
                     create_task(self.stable_diffusion_deepai(prompt))
                 b.seek(0)
                 fn = b.read()
