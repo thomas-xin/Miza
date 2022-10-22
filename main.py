@@ -67,18 +67,6 @@ if os.name == "nt":
                                 y.write(b)
             print("FFmpeg extraction complete.")
             os.remove(f)
-    # if os.path.exists("misc"):
-    #     if not os.path.exists("misc/ffmpeg-c"):
-    #         print("Downloading ffmpeg version 4.2.2...")
-    #         os.mkdir("misc/ffmpeg-c")
-    #         subprocess.run([sys.executable, "downloader.py", "https://dl.dropboxusercontent.com/s/6vjpswpkxubnig4/ffmpeg-c.zip?dl=1", "ffmpeg-c.zip"], cwd="misc")
-    #         import zipfile, io
-    #         print("Download complete; extracting new FFmpeg installation...")
-    #         f = "misc/ffmpeg-c.zip"
-    #         with zipfile.ZipFile(f) as z:
-    #             z.extractall("misc/ffmpeg-c")
-    #         print("FFmpeg extraction complete.")
-    #         os.remove(f)
     if not os.path.exists("misc/poppler"):
         print("Downloading Poppler version 21.10.0...")
         os.mkdir("misc/poppler")

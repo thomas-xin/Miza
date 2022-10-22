@@ -849,6 +849,34 @@ class StableDiffusion(Command):
     rate_limit = (12, 60)
     typing = True
     sdiff_sem = Semaphore(1, 256, rate_limit=1)
+    cache = {}
+
+    async def stable_diffusion_deepai(self, prompt):
+        resp = await create_future(
+            requests.post,
+            "https://api.deepai.org/api/text2img",
+            files=dict(
+                text=prompt,
+            ),
+            headers={
+                "api-key": "quickstart-QUdJIGlzIGNvbWluZy4uLi4K",
+            },
+        )
+        if resp.status_code in range(200, 400):
+            print(resp.text)
+            url = resp.json()["output_url"]
+            b = await bot.get_request(url)
+            image = Image.open(io.BytesIO(b))
+            ims = [
+                image.crop((0, 0, 512, 512)),
+                image.crop((512, 0, 1024, 512)),
+                image.crop((512, 512, 1024, 1024)),
+                image.crop((0, 512, 512, 1024)),
+            ]
+            self.cache.setdefault(prompt, []).extend(ims)
+            return shuffle(self.cache[prompt])
+        print(ConnectionError(resp.status_code, resp.text))
+        return ()
 
     async def __call__(self, bot, channel, message, args, **void):
         for a in message.attachments:
@@ -919,46 +947,58 @@ class StableDiffusion(Command):
             req += url
         if specified:
             req += " ".join(f"{k} {v}" for k, v in kwargs.items() if k in specified)
-        args = [
-            "py",
-            "-3.9",
-            "demo.py",
-        ]
-        if prompt and "--prompt" not in kwargs:
-            args.extend((
-                "--prompt",
-                prompt,
-            ))
-        if url:
-            b = await bot.get_request(url)
-            fn = "misc/stable_diffusion.openvino/input.png"
-            with open(fn, "wb") as f:
-                f.write(b)
-            args.extend((
-                "--init-image",
-                "input.png",
-            ))
-            if "--strength" not in kwargs:
+        fn = None
+        if not specified or not os.path.exists("misc/stable_diffusion.openvino"):
+            if self.cache.get(prompt):
+                fn = self.cache[prompt].pop(0).tobytes()
+                if not self.cache[prompt]:
+                    create_task(self.stable_diffusion_deepai(prompt))
+            else:
+                with discord.context_managers.Typing(channel):
+                    ims = await self.stable_diffusion_deepai(prompt)
+                    if ims:
+                        fn = ims.pop(0).tobytes()
+        if not fn:
+            args = [
+                "py",
+                "-3.9",
+                "demo.py",
+            ]
+            if prompt and "--prompt" not in kwargs:
                 args.extend((
-                    "--strength",
-                    "0.75",
+                    "--prompt",
+                    prompt,
                 ))
-        for k, v in kwargs.items():
-            args.extend((k, v))
-        with discord.context_managers.Typing(channel):
-            if self.sdiff_sem.is_busy() and not getattr(message, "simulated", False):
-                await send_with_react(channel, italics(ini_md(f"StableDiffusion: {sqr_md(req)} enqueued in position {sqr_md(self.sdiff_sem.passive + 1)}.")), reacts="❎", reference=message)
-            async with self.sdiff_sem:
-                print(args)
-                proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc/stable_diffusion.openvino", stdout=subprocess.DEVNULL)
-                try:
-                    await asyncio.wait_for(proc.wait(), timeout=3200)
-                except (T0, T1, T2):
-                    with tracebacksuppressor:
-                        force_kill(proc)
-                    raise
-        fn = "misc/stable_diffusion.openvino/output.png"
-        await bot.send_with_file(channel, "", fn, filename="output.png", reference=message)
+            if url:
+                b = await bot.get_request(url)
+                fn = "misc/stable_diffusion.openvino/input.png"
+                with open(fn, "wb") as f:
+                    f.write(b)
+                args.extend((
+                    "--init-image",
+                    "input.png",
+                ))
+                if "--strength" not in kwargs:
+                    args.extend((
+                        "--strength",
+                        "0.75",
+                    ))
+            for k, v in kwargs.items():
+                args.extend((k, v))
+            with discord.context_managers.Typing(channel):
+                if self.sdiff_sem.is_busy() and not getattr(message, "simulated", False):
+                    await send_with_react(channel, italics(ini_md(f"StableDiffusion: {sqr_md(req)} enqueued in position {sqr_md(self.sdiff_sem.passive + 1)}.")), reacts="❎", reference=message)
+                async with self.sdiff_sem:
+                    print(args)
+                    proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc/stable_diffusion.openvino", stdout=subprocess.DEVNULL)
+                    try:
+                        await asyncio.wait_for(proc.wait(), timeout=3200)
+                    except (T0, T1, T2):
+                        with tracebacksuppressor:
+                            force_kill(proc)
+                        raise
+            fn = "misc/stable_diffusion.openvino/output.png"
+        await bot.send_with_file(channel, "", fn, filename=prompt + ".png", reference=message)
 
 
 class DeviantArt(Command):
