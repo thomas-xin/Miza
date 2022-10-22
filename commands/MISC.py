@@ -954,14 +954,16 @@ class StableDiffusion(Command):
                 self.cache[prompt].pop(0).save(b, format="png")
                 if not self.cache[prompt]:
                     create_task(self.stable_diffusion_deepai(prompt))
-                fn = CompatFile(b)
+                b.seek(0)
+                fn = b.read()
             else:
                 with discord.context_managers.Typing(channel):
                     ims = await self.stable_diffusion_deepai(prompt)
                     if ims:
                         b = io.BytesIO()
                         ims.pop(0).save(b, format="png")
-                        fn = CompatFile(b)
+                        b.seek(0)
+                        fn = b.read()
         if not fn:
             args = [
                 "py",
