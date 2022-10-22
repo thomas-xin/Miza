@@ -1677,7 +1677,7 @@ class ServerProtector(Database):
             "misc/steganography.py",
             fn,
         )
-        print(args)
+        # print(args)
         if not known:
             proc = psutil.Popen(args, cwd=os.getcwd(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         try:
@@ -1692,8 +1692,8 @@ class ServerProtector(Database):
                 text = known
             else:
                 text = proc.stdout.read().decode("utf-8", "replace").strip()
-            print(text)
             if text.startswith("Copyright detected"):
+                print(text)
                 i = text.split(": ", 1)[-1]
                 if i.isnumeric():
                     i = int(i)
