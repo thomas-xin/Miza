@@ -948,7 +948,7 @@ class StableDiffusion(Command):
         if specified:
             req += " ".join(f"{k} {v}" for k, v in kwargs.items() if k in specified)
         fn = None
-        if not specified or not os.path.exists("misc/stable_diffusion.openvino"):
+        if not url and not specified or not os.path.exists("misc/stable_diffusion.openvino"):
             if self.cache.get(prompt):
                 b = io.BytesIO()
                 self.cache[prompt].pop(0).save(b, format="png")
