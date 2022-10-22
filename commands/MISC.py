@@ -950,14 +950,16 @@ class StableDiffusion(Command):
         fn = None
         if not specified or not os.path.exists("misc/stable_diffusion.openvino"):
             if self.cache.get(prompt):
-                fn = self.cache[prompt].pop(0).tobytes()
+                fn = io.BytesIO()
+                self.cache[prompt].pop(0).save(fn, format="png")
                 if not self.cache[prompt]:
                     create_task(self.stable_diffusion_deepai(prompt))
             else:
                 with discord.context_managers.Typing(channel):
                     ims = await self.stable_diffusion_deepai(prompt)
                     if ims:
-                        fn = ims.pop(0).tobytes()
+                        fn = io.BytesIO()
+                        ims.pop(0).save(fn, format="png")
         if not fn:
             args = [
                 "py",
