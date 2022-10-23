@@ -873,7 +873,10 @@ class StableDiffusion(Command):
                 image.crop((512, 512, 1024, 1024)),
                 image.crop((0, 512, 512, 1024)),
             ]
-            self.cache.setdefault(prompt, []).extend(ims)
+            ims2 = self.cache.setdefault(prompt, [])
+            for im in ims:
+                if np.sum(im.resize((32, 32))) > 0:
+                    ims2.append(im)
             return shuffle(self.cache[prompt])
         print(ConnectionError(resp.status_code, resp.text))
         return ()
