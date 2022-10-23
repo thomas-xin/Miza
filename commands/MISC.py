@@ -876,7 +876,6 @@ class StableDiffusion(Command):
             ims2 = self.cache.setdefault(prompt, [])
             for im in ims:
                 p = np.sum(im.resize((32, 32)).convert("L"))
-                print(p)
                 if p > 1024:
                     ims2.append(im)
             return shuffle(self.cache[prompt])
