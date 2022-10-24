@@ -1561,7 +1561,7 @@ class StableDiffusion(Command):
                     "https://securetoken.googleapis.com/v1/token?key=AIzaSyAzUV2NNUOlLTL04jwmUw9oLhjteuv6Qr4",
                     data=json.dumps(dict(
                         grant_type="refresh_token",
-                        refresh_token=self.token.refreshToken,
+                        refresh_token=self.token.get("refresh_token") or self.token.refreshToken,
                     )),
                     headers=header,
                 )
@@ -1581,7 +1581,7 @@ class StableDiffusion(Command):
                 )
                 self.token = cdict(resp.json())
                 self.token.ts = t
-            id_token = self.token.get("id_token") or self.token["idToken"]
+            id_token = self.token.get("id_token") or self.token.idToken
             header["Authorization"] = f"Bearer {id_token}"
             nis = int(kwargs.get("--num-inference-steps", 50))
             nis = min(50, max(25, nis))
