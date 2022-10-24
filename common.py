@@ -1025,7 +1025,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
             data["data"]["embeds"] = [embed.to_dict() for embed in embeds]
             data["data"].pop("flags", None)
         if components:
-            data["components"] = components
+            data["data"]["components"] = components
     else:
         ephemeral = False
         fields = {}
