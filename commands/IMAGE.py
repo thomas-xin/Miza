@@ -1582,7 +1582,7 @@ class StableDiffusion(Command):
                 self.token = cdict(resp.json())
                 self.token.ts = t
             id_token = self.token.get("id_token") or self.token["idToken"]
-            header["Authorization"] = f"Bearer {self.token.id_token}"
+            header["Authorization"] = f"Bearer {id_token}"
             resp = await create_future(
                 requests.post,
                 "https://api.mage.space/api/v2/images/generate",
