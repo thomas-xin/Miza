@@ -202,7 +202,7 @@ class Help(Command):
         else:
             if not embed.description:
                 embed.description = f"```callback-main-help-{user.id}-\n{user.display_name} has asked for help!```" + content
-            await send_with_reply(channel, message, embed=embed, buttons=buttons)
+            await send_with_reply(channel, message, embed=embed, buttons=buttons, ephemeral=True)
         return
 
     async def _callback_(self, message, reaction, user, vals, perm, **void):

@@ -811,19 +811,20 @@ def restructure_buttons(buttons):
     return [dict(type=1, components=row) for row in buttons]
 
 
-async def interaction_response(bot, message, content=None, embed=None, components=None, buttons=None):
+async def interaction_response(bot, message, content=None, embed=None, components=None, buttons=None, ephemeral=False):
     if hasattr(embed, "to_dict"):
         embed = embed.to_dict()
     if not getattr(message, "int_id", None):
         message.int_id = message.id
     if not getattr(message, "int_token", None):
         message.int_token = message.slash
+    ephemeral = ephemeral and 64
     resp = await Request(
         f"https://discord.com/api/{api}/interactions/{message.int_id}/{message.int_token}/callback",
         data=orjson.dumps(dict(
             type=4,
             data=dict(
-                flags=64,
+                flags=ephemeral,
                 content=content,
                 embed=embed,
                 components=components or restructure_buttons(buttons),
@@ -844,19 +845,20 @@ async def interaction_response(bot, message, content=None, embed=None, component
         bot.add_message(message, files=False, force=True)
     return message
 
-async def interaction_patch(bot, message, content=None, embed=None, components=None, buttons=None):
+async def interaction_patch(bot, message, content=None, embed=None, components=None, buttons=None, ephemeral=False):
     if hasattr(embed, "to_dict"):
         embed = embed.to_dict()
     if not getattr(message, "int_id", None):
         message.int_id = message.id
     if not getattr(message, "int_token", None):
         message.int_token = message.slash
+    ephemeral = ephemeral and 64
     resp = await Request(
         f"https://discord.com/api/{api}/interactions/{message.int_id}/{message.int_token}/callback",
         data=orjson.dumps(dict(
             type=7,
             data=dict(
-                flags=64,
+                flags=ephemeral,
                 content=content,
                 embed=embed,
                 components=components or restructure_buttons(buttons),
@@ -994,7 +996,7 @@ REPLY_SEM = cdict()
 EDIT_SEM = cdict()
 # noreply = discord.AllowedMentions(replied_user=False)
 
-async def send_with_reply(channel, reference=None, content="", embed=None, embeds=None, tts=None, file=None, files=None, buttons=None, mention=False):
+async def send_with_reply(channel, reference=None, content="", embed=None, embeds=None, tts=None, file=None, files=None, buttons=None, mention=False, ephemeral=False):
     if not channel:
         channel = reference.channel
     bot = BOT[0]
@@ -1004,13 +1006,14 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
         else:
             embeds = (embed,) + tuple(embeds)
     if getattr(reference, "slash", None):
+        ephemeral = ephemeral and 64
         sem = emptyctx
         inter = True
         url = f"https://discord.com/api/{api}/interactions/{reference.id}/{reference.slash}/callback"
         data = dict(
             type=4,
             data=dict(
-                flags=64,
+                flags=ephemeral,
                 content=content,
             ),
         )
@@ -1018,6 +1021,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
             data["data"]["embeds"] = [embed.to_dict() for embed in embeds]
             data["data"].pop("flags", None)
     else:
+        ephemeral = False
         fields = {}
         if embeds:
             fields["embeds"] = [embed.to_dict() for embed in embeds]
@@ -1122,7 +1126,10 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
                 M = bot.ExtendedMessage.new
             else:
                 M = discord.Message
-            return M(state=bot._state, channel=channel, data=eval_json(resp))
+            message = M(state=bot._state, channel=channel, data=eval_json(resp))
+            if ephemeral:
+                message.id = reference.id
+                message.slash = reference.slash
         await asyncio.sleep(i + 1)
     raise exc
 
