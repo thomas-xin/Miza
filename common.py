@@ -826,7 +826,7 @@ async def interaction_response(bot, message, content=None, embed=None, component
             data=dict(
                 flags=ephemeral,
                 content=content,
-                embed=embed,
+                embeds=[embed],
                 components=components or restructure_buttons(buttons),
             ),
         )),
@@ -860,7 +860,7 @@ async def interaction_patch(bot, message, content=None, embed=None, components=N
             data=dict(
                 flags=ephemeral,
                 content=content,
-                embed=embed,
+                embeds=[embed],
                 components=components or restructure_buttons(buttons),
             ),
         )),
