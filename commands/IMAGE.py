@@ -1584,9 +1584,9 @@ class StableDiffusion(Command):
             id_token = self.token.get("id_token") or self.token["idToken"]
             header["Authorization"] = f"Bearer {id_token}"
             nis = int(kwargs.get("--num-inference-steps", 50))
-            nis = min(50, max(25, round(nis / 25) * 25))
+            nis = min(50, max(25, nis))
             gs = float(kwargs.get("--guidance-scale", 7.5))
-            gs = min(17.5, max(2.5, round((gs - 2.5) / 5) * 5 + 2.5))
+            gs = min(17.5, max(2.5, gs))
             resp = await create_future(
                 requests.post,
                 "https://api.mage.space/api/v2/images/generate",
