@@ -166,25 +166,6 @@ class Help(Command):
                         authorise=True,
                         aio=True,
                     )
-            # elif content:
-            #     create_task(interaction_response(bot, original, content))
-            #     if not getattr(message, "slash", None):
-            #         sem = getattr(message, "sem", None)
-            #         if not sem:
-            #             try:
-            #                 sem = EDIT_SEM[message.channel.id]
-            #             except KeyError:
-            #                 sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
-            #         async with sem:
-            #             await Request(
-            #                 f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
-            #                 data=dict(
-            #                     components=restructure_buttons(buttons),
-            #                 ),
-            #                 method="PATCH",
-            #                 authorise=True,
-            #                 aio=True,
-            #             )
             else:
                 await interaction_patch(bot, original, embed=embed, buttons=buttons)
             return

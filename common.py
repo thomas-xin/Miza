@@ -1005,6 +1005,10 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
             embeds = (embed,)
         else:
             embeds = (embed,) + tuple(embeds)
+    if buttons:
+        components = restructure_buttons(buttons)
+    else:
+        components = ()
     if getattr(reference, "slash", None):
         ephemeral = ephemeral and 64
         sem = emptyctx
@@ -1020,6 +1024,8 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
         if embeds:
             data["data"]["embeds"] = [embed.to_dict() for embed in embeds]
             data["data"].pop("flags", None)
+        if components:
+            data["components"] = components
     else:
         ephemeral = False
         fields = {}
@@ -1049,10 +1055,6 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
                     fields.pop("reference")
                     return await channel.send(content, **fields)
                 raise
-        if buttons:
-            components = restructure_buttons(buttons)
-        else:
-            components = ()
         try:
             sem = REPLY_SEM[channel.id]
         except KeyError:
