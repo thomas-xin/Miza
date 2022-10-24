@@ -149,7 +149,6 @@ class Help(Command):
                 embed.description = f"```callback-main-help-{user.id}-\n{user.display_name} has asked for help!```" + content
             if not getattr(message, "slash", None):
                 create_task(bot.ignore_interaction(original))
-                embed.description = f"```callback-main-help-{user.id}-\n{user.display_name} has asked for help!```" + content
                 sem = getattr(message, "sem", None)
                 if not sem:
                     try:
