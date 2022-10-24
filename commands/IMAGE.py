@@ -1587,25 +1587,26 @@ class StableDiffusion(Command):
             nis = min(50, max(25, nis))
             gs = float(kwargs.get("--guidance-scale", 7.5))
             gs = min(17.5, max(2.5, gs))
-            resp = await create_future(
-                requests.post,
-                "https://api.mage.space/api/v2/images/generate",
-                data=json.dumps(dict(
-                    prompt=kwargs.get("--prompt", prompt),
-                    aspect_ratio=aspect,
-                    num_inference_steps=nis,
-                    guidance_scale=gs,
-                    strength=float(kwargs.get("--strength", 0.75)),
-                )),
-                headers=header,
-            )
-            if resp.status_code in range(200, 400):
-                print(resp.text)
-                data = resp.json()
-                url = data["results"][0]["image_url"]
-                fn = await bot.get_request(url)
-            else:
-                print(ConnectionError(resp.status_code, resp.text))
+            with discord.context_managers.Typing(channel):
+                resp = await create_future(
+                    requests.post,
+                    "https://api.mage.space/api/v2/images/generate",
+                    data=json.dumps(dict(
+                        prompt=kwargs.get("--prompt", prompt),
+                        aspect_ratio=aspect,
+                        num_inference_steps=nis,
+                        guidance_scale=gs,
+                        strength=float(kwargs.get("--strength", 0.75)),
+                    )),
+                    headers=header,
+                )
+                if resp.status_code in range(200, 400):
+                    print(resp.text)
+                    data = resp.json()
+                    url = data["results"][0]["image_url"]
+                    fn = await bot.get_request(url)
+                else:
+                    print(ConnectionError(resp.status_code, resp.text))
         if not fn:
             if self.fut:
                 with tracebacksuppressor:
