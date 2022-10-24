@@ -1003,7 +1003,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
             embeds = (embed,)
         else:
             embeds = (embed,) + tuple(embeds)
-    if getattr(reference, "slash", None) and not embed:
+    if getattr(reference, "slash", None):
         sem = emptyctx
         inter = True
         url = f"https://discord.com/api/{api}/interactions/{reference.id}/{reference.slash}/callback"
@@ -1014,6 +1014,9 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
                 content=content,
             ),
         )
+        if embed:
+            embeds = embeds or []
+            embeds.append(embed)
         if embeds:
             data["data"]["embeds"] = [embed.to_dict() for embed in embeds]
             data["data"].pop("flags", None)
