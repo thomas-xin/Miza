@@ -850,6 +850,7 @@ class StableDiffusion(Command):
     typing = True
     sdiff_sem = Semaphore(1, 256, rate_limit=1)
     cache = {}
+    token = None
 
     async def stable_diffusion_deepai(self, prompt):
         headers = Request.header()
@@ -896,6 +897,7 @@ class StableDiffusion(Command):
             "--eta": "0.8",
         }
         specified = set()
+        aspect = 1
         kwarg = ""
         for arg in args:
             if kwarg:
@@ -917,6 +919,8 @@ class StableDiffusion(Command):
                     kwargs[kwarg] = arg
                 elif kwarg == "--strength":
                     kwargs[kwarg] = str(max(0, min(1, float(arg))))
+                elif kwarg == "--aspect-ratio":
+                    aspect = float(arg)
                 # elif kwargs == "--mask":
                 #     kwargs[kwarg] = arg
                 specified = kwarg
@@ -930,6 +934,17 @@ class StableDiffusion(Command):
                 rems.append(arg)
             elif not url:
                 url = urls[0]
+        if not os.path.exists("misc/stable_diffusion.openvino"):
+            fut = create_future(subprocess.run(
+                [
+                    "git",
+                    "clone",
+                    "https://github.com/bes-dev/stable_diffusion.openvino.git",
+                ],
+                cwd="misc",
+            ))
+        else:
+            fut = None
         prompt = " ".join(rems).strip()
         if not prompt:
             if not url:
@@ -944,6 +959,9 @@ class StableDiffusion(Command):
             prompt = generated_text.strip()
             if not prompt:
                 prompt = "art"
+        if fut:
+            with tracebacksuppressor:
+                await fut
         req = prompt
         if url:
             if req:
@@ -952,7 +970,7 @@ class StableDiffusion(Command):
         if specified:
             req += " ".join(f"{k} {v}" for k, v in kwargs.items() if k in specified)
         fn = None
-        if not url and not specified or not os.path.exists("misc/stable_diffusion.openvino"):
+        if not specified and (xrand(2) and not url and or not os.path.exists("misc/stable_diffusion.openvino")):
             if self.cache.get(prompt):
                 b = io.BytesIO()
                 self.cache[prompt].pop(0).save(b, format="png")
@@ -968,6 +986,52 @@ class StableDiffusion(Command):
                         ims.pop(0).save(b, format="png")
                         b.seek(0)
                         fn = b.read()
+        if not fn and (not url or not os.path.exists("misc/stable_diffusion.openvino")):
+            t = utc()
+            header = Request.header()
+            if self.token and t - self.token.ts >= 3200:
+                resp = await create_future(
+                    requests.post,
+                    "https://securetoken.googleapis.com/v1/token?key=AIzaSyAzUV2NNUOlLTL04jwmUw9oLhjteuv6Qr4",
+                    data=json.dumps(dict(
+                        grant_type="refresh_token",
+                        refresh_token=self.token.refreshToken,
+                    )),
+                    headers=header,
+                )
+                if resp.status_code in range(200, 400):
+                    self.token = cdict(resp.json())
+                    self.token.ts = t
+                else:
+                    self.token = None
+            if not self.token:
+                resp = await create_future(
+                    requests.post,
+                    "https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=AIzaSyAzUV2NNUOlLTL04jwmUw9oLhjteuv6Qr4",
+                    data=json.dumps(dict(
+                        returnSecureToken=True,
+                    )),
+                    headers=header,
+                )
+                self.token = cdict(resp.json())
+                self.token.ts = t
+            header["Authorization"] = f"Bearer {self.token.id_token}"
+            resp = await create_future(
+                requests.post,
+                "https://api.mage.space/api/v2/images/generate",
+                data=json.dumps(dict(
+                    prompt=kwargs.get("--prompt", prompt),
+                    aspect_ratio=aspect,
+                    num_inference_steps=int(kwargs.get("--num-inference-steps", 50)),
+                    guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
+                    strength=float(kwargs.get("--strength", 0.75)),
+                ))
+                headers=header,
+            )
+            if resp.status_code in range(200, 400):
+                data = resp.json()
+                url = data["results"][0]["image_url"]
+                fn = await bot.get_request(url)
         if not fn:
             args = [
                 "py",
