@@ -6,6 +6,9 @@ except ModuleNotFoundError:
     import youtube_dl
 import aiohttp
 
+from transformers import TrOCRProcessor, VisionEncoderDecoderModel
+from PIL import Image
+
 getattr(youtube_dl, "__builtins__", {})["print"] = print
 
 
