@@ -1130,6 +1130,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
             if ephemeral:
                 message.id = reference.id
                 message.slash = reference.slash
+            return message
         await asyncio.sleep(i + 1)
     raise exc
 
