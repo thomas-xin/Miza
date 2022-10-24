@@ -1600,6 +1600,8 @@ class StableDiffusion(Command):
                 data = resp.json()
                 url = data["results"][0]["image_url"]
                 fn = await bot.get_request(url)
+            else:
+                print(ConnectionError(resp.status_code, resp.text))
         if not fn:
             if self.fut:
                 with tracebacksuppressor:
