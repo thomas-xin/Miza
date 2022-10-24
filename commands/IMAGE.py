@@ -1583,14 +1583,18 @@ class StableDiffusion(Command):
                 self.token.ts = t
             id_token = self.token.get("id_token") or self.token["idToken"]
             header["Authorization"] = f"Bearer {id_token}"
+            nis = int(kwargs.get("--num-inference-steps", 50))
+            nis = min(50, max(25, round(nis / 25) * 25))
+            gs = float(kwargs.get("--guidance-scale", 7.5))
+            gs = min(17.5, max(2.5, round((gs - 2.5) / 5) * 5 + 2.5))
             resp = await create_future(
                 requests.post,
                 "https://api.mage.space/api/v2/images/generate",
                 data=json.dumps(dict(
                     prompt=kwargs.get("--prompt", prompt),
                     aspect_ratio=aspect,
-                    num_inference_steps=int(kwargs.get("--num-inference-steps", 50)),
-                    guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
+                    num_inference_steps=nis,
+                    guidance_scale=gs,
                     strength=float(kwargs.get("--strength", 0.75)),
                 )),
                 headers=header,
