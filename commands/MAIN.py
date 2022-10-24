@@ -101,24 +101,14 @@ class Help(Command):
                 content += f"\n[Rate Limit] {sec2time(x)}"
             content = ini_md(content)
         else:
-            if getattr(message, "slash", None):
-                content = (
-                    f"```callback-main-help-{user.id}-\n{user.display_name} has asked for help!```"
-                    + f"Yo! Use the menu below to select from my command list!\n"
-                    + f"Alternatively, visit <{bot.webserver}/mizatlas> for a full command list and tester.\n\n"
-                    + f"If you're an admin and wish to disable me in a particular channel, check out `{prefix}ec`!\n"
-                    + f"Unsure about anything, or have a bug to report? check out the support server: <{bot.rcc_invite}>!\n"
-                    + f"Finally, find me on Ko-fi <{bot.kofi_url}>! Any support is greatly appreciated!"
-                )
-            else:
-                embed.description = (
-                    f"```callback-main-help-{user.id}-\n{user.display_name} has asked for help!```"
-                    + f"Yo! Use the menu below to select from my command list!\n"
-                    + f"Alternatively, visit [`mizatlas`]({bot.webserver}/mizatlas) for a full command list and tester.\n\n"
-                    + f"If you're an admin and wish to disable me in a particular channel, check out `{prefix}ec`!\n"
-                    + f"Unsure about anything, or have a bug to report? check out the [`support server`]({bot.rcc_invite})!\n"
-                    + f"Finally, find me on Ko-fi [`here`]({bot.kofi_url})! Any support is greatly appreciated!"
-                )
+            embed.description = (
+                f"```callback-main-help-{user.id}-\n{user.display_name} has asked for help!```"
+                + f"Yo! Use the menu below to select from my command list!\n"
+                + f"Alternatively, visit [`mizatlas`]({bot.webserver}/mizatlas) for a full command list and tester.\n\n"
+                + f"If you're an admin and wish to disable me in a particular channel, check out `{prefix}ec`!\n"
+                + f"Unsure about anything, or have a bug to report? check out the [`support server`]({bot.rcc_invite})!\n"
+                + f"Finally, find me on Ko-fi [`here`]({bot.kofi_url})! Any support is greatly appreciated!"
+            )
         embed.colour = discord.Colour(help_colours[catg])
         if not catg:
             coms = chain.from_iterable(v for k, v in bot.categories.items() if k in standard_commands)
@@ -195,10 +185,10 @@ class Help(Command):
                             aio=True,
                         )
             else:
-                await interaction_patch(bot, original, buttons=buttons)
+                await interaction_patch(bot, original, embed=embed, buttons=buttons)
             return
         elif getattr(message, "slash", None):
-            await interaction_response(bot, message, content, buttons=buttons)
+            await interaction_response(bot, message, content, embed=embed, buttons=buttons)
         else:
             if not embed.description:
                 embed.description = f"```callback-main-help-{user.id}-\n{user.display_name} has asked for help!```" + content
