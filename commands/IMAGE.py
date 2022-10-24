@@ -856,7 +856,7 @@ class Orbit(Command):
 
 
 class GMagik(Command):
-    name = ["MagikGIF"]
+    name = ["Liquefy", "MagikGIF"]
     description = "Repeatedly applies the Magik image filter to supplied image."
     usage = "<0:url> <cell_size(7)>?"
     no_parse = True
@@ -864,27 +864,18 @@ class GMagik(Command):
     _timeout_ = 8
     typing = True
 
-    async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url, fmt = await get_image(bot, user, message, args, argv, ext="gif")
+    async def __call__(self, bot, user, channel, message, name, args, argv, _timeout, **void):
+        if name == "liquefy":
+            default = 32
+        else:
+            default = 7
+        name, value, url, fmt = await get_image(bot, user, message, args, argv, default=default, ext="gif")
+        if name == "liquefy":
+            arr = [abs(value), 2, "-gif", "-f", fmt]
+        else:
+            arr = [abs(value), "-gif", "-f", fmt]
         with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "magik_gif", [abs(value), "-gif", "-f", fmt], timeout=_timeout)
-            fn = resp[0]
-        await bot.send_with_file(channel, "", fn, filename=name, reference=message)
-
-
-class Liquefy(Command):
-    name = ["LiquidGIF"]
-    description = "Repeatedly applies slight distortion to supplied image."
-    usage = "<0:url> <cell_count(32)>?"
-    no_parse = True
-    rate_limit = (7, 14)
-    _timeout_ = 8
-    typing = True
-
-    async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url, fmt = await get_image(bot, user, message, args, argv, default=32, ext="gif")
-        with discord.context_managers.Typing(channel):
-            resp = await process_image(url, "magik_gif", [abs(value), 2, "-gif", "-f", fmt], timeout=_timeout)
+            resp = await process_image(url, "magik_gif", arr, timeout=_timeout)
             fn = resp[0]
         await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
@@ -1415,6 +1406,272 @@ class Waifu2x(Command):
                 raise FileNotFoundError("image file not found")
             image = await create_future(base64.b64decode, img["image"])
         await bot.send_with_file(channel, "", file=image, filename=name, reference=message)
+
+
+class StableDiffusion(Command):
+    _timeout_ = 150
+    name = ["Art", "AIArt"]
+    description = "Runs a Stable Diffusion AI art generator on the input prompt or image. Operates on a global queue system, and must be installed separately from https://github.com/bes-dev/stable_diffusion.openvino, extracted into the misc folder. Accepts appropriate keyword arguments."
+    usage = "<0:prompt>"
+    rate_limit = (12, 60)
+    typing = True
+    sdiff_sem = Semaphore(1, 256, rate_limit=1)
+    cache = {}
+    fut = None
+    token = None
+
+    async def stable_diffusion_deepai(self, prompt):
+        headers = Request.header()
+        headers["api-key"] = "quickstart-QUdJIGlzIGNvbWluZy4uLi4K"
+        resp = await create_future(
+            requests.post,
+            "https://api.deepai.org/api/text2img",
+            files=dict(
+                text=prompt,
+            ),
+            headers=headers,
+        )
+        if resp.status_code in range(200, 400):
+            print(resp.text)
+            url = resp.json()["output_url"]
+            b = await self.bot.get_request(url)
+            image = Image.open(io.BytesIO(b))
+            ims = [
+                image.crop((0, 0, 512, 512)),
+                image.crop((512, 0, 1024, 512)),
+                image.crop((512, 512, 1024, 1024)),
+                image.crop((0, 512, 512, 1024)),
+            ]
+            ims2 = self.cache.setdefault(prompt, [])
+            for im in ims:
+                p = np.sum(im.resize((32, 32)).convert("L"))
+                if p > 1024:
+                    ims2.append(im)
+            return shuffle(self.cache[prompt])
+        print(ConnectionError(resp.status_code, resp.text))
+        return ()
+
+    async def __call__(self, bot, channel, message, args, **void):
+        for a in message.attachments:
+            args.insert(0, a.url)
+        if not args:
+            raise ArgumentError("Input string is empty.")
+        req = " ".join(args)
+        url = None
+        rems = deque()
+        kwargs = {
+            "--num-inference-steps": "24",
+            "--guidance-scale": "7.5",
+            "--eta": "0.8",
+        }
+        specified = set()
+        aspect = 1
+        kwarg = ""
+        for arg in args:
+            if kwarg:
+                # if kwarg == "--model":
+                #     kwargs[kwarg] = arg
+                if kwarg == "--seed":
+                    kwargs[kwarg] = arg
+                elif kwarg in ("--num-inference-steps", "--ddim_steps"):
+                    kwarg = "--num-inference-steps"
+                    kwargs[kwarg] = str(max(1, min(64, int(arg))))
+                elif kwarg in ("--guidance-scale", "--scale"):
+                    kwarg = "--guidance-scale"
+                    kwargs[kwarg] = str(max(0, min(100, float(arg))))
+                elif kwarg == "--eta":
+                    kwargs[kwarg] = str(max(0, min(1, float(arg))))
+                # elif kwarg in ("--tokenizer", "--tokeniser"):
+                #     kwargs["--tokenizer"] = arg
+                elif kwarg == "--prompt":
+                    kwargs[kwarg] = arg
+                elif kwarg == "--strength":
+                    kwargs[kwarg] = str(max(0, min(1, float(arg))))
+                elif kwarg == "--aspect-ratio":
+                    aspect = float(arg)
+                # elif kwargs == "--mask":
+                #     kwargs[kwarg] = arg
+                specified = kwarg
+                kwarg = ""
+                continue
+            if arg.startswith("--"):
+                kwarg = arg
+                continue
+            urls = await bot.follow_url(arg, allow=True, images=True)
+            if not urls:
+                rems.append(arg)
+            elif not url:
+                url = urls[0]
+        if not self.fut and not os.path.exists("misc/stable_diffusion.openvino"):
+            self.fut = create_future(subprocess.run(
+                [
+                    "git",
+                    "clone",
+                    "https://github.com/bes-dev/stable_diffusion.openvino.git",
+                ],
+                cwd="misc",
+            ))
+        prompt = " ".join(rems).strip()
+        if not prompt:
+            if not url:
+                raise ArgumentError("Please input a valid prompt.")
+            processor = await create_future(TrOCRProcessor.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
+            model = await create_future(VisionEncoderDecoderModel.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
+            b = await bot.get_request(url)
+            image = Image.open(io.BytesIO(b)).convert("RGB")
+            pixel_values = processor(image, return_tensors="pt").pixel_values
+            generated_ids = await create_future(model.generate, pixel_values)
+            generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+            prompt = generated_text.strip()
+            if not prompt:
+                prompt = "art"
+        req = prompt
+        if url:
+            if req:
+                req += " "
+            req += url
+        if specified:
+            req += " ".join(f"{k} {v}" for k, v in kwargs.items() if k in specified)
+        fn = None
+        if not specified and (xrand(2) and not url or not os.path.exists("misc/stable_diffusion.openvino")):
+            if self.cache.get(prompt):
+                b = io.BytesIO()
+                self.cache[prompt].pop(0).save(b, format="png")
+                if len(self.cache[prompt]) < 2:
+                    create_task(self.stable_diffusion_deepai(prompt))
+                b.seek(0)
+                fn = b.read()
+            else:
+                with discord.context_managers.Typing(channel):
+                    ims = await self.stable_diffusion_deepai(prompt)
+                    if ims:
+                        b = io.BytesIO()
+                        ims.pop(0).save(b, format="png")
+                        b.seek(0)
+                        fn = b.read()
+        if not fn and (not url or not os.path.exists("misc/stable_diffusion.openvino")):
+            t = utc()
+            header = Request.header()
+            if self.token and t - self.token.ts >= 3200:
+                resp = await create_future(
+                    requests.post,
+                    "https://securetoken.googleapis.com/v1/token?key=AIzaSyAzUV2NNUOlLTL04jwmUw9oLhjteuv6Qr4",
+                    data=json.dumps(dict(
+                        grant_type="refresh_token",
+                        refresh_token=self.token.refreshToken,
+                    )),
+                    headers=header,
+                )
+                if resp.status_code in range(200, 400):
+                    self.token = cdict(resp.json())
+                    self.token.ts = t
+                else:
+                    self.token = None
+            if not self.token:
+                resp = await create_future(
+                    requests.post,
+                    "https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=AIzaSyAzUV2NNUOlLTL04jwmUw9oLhjteuv6Qr4",
+                    data=json.dumps(dict(
+                        returnSecureToken=True,
+                    )),
+                    headers=header,
+                )
+                self.token = cdict(resp.json())
+                self.token.ts = t
+            header["Authorization"] = f"Bearer {self.token.id_token}"
+            resp = await create_future(
+                requests.post,
+                "https://api.mage.space/api/v2/images/generate",
+                data=json.dumps(dict(
+                    prompt=kwargs.get("--prompt", prompt),
+                    aspect_ratio=aspect,
+                    num_inference_steps=int(kwargs.get("--num-inference-steps", 50)),
+                    guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
+                    strength=float(kwargs.get("--strength", 0.75)),
+                )),
+                headers=header,
+            )
+            if resp.status_code in range(200, 400):
+                data = resp.json()
+                url = data["results"][0]["image_url"]
+                fn = await bot.get_request(url)
+        if not fn:
+            if self.fut:
+                with tracebacksuppressor:
+                    await self.fut
+                    if os.name == "nt":
+                        self.fut = create_future(subprocess.run(
+                            [
+                                "py",
+                                "-3.9",
+                                "-m",
+                                "pip",
+                                "install",
+                                "-r",
+                                "requirements.txt",
+                            ],
+                            cwd="misc",
+                        ))
+                    else:
+                        self.fut = create_future(subprocess.run(
+                            [
+                                sys.executable,
+                                "-m",
+                                "pip",
+                                "install",
+                                "-r",
+                                "requirements.txt",
+                            ],
+                            cwd="misc",
+                        ))
+                    await self.fut
+                    self.fut = None
+            if os.name == "nt":
+                args = [
+                    "py",
+                    "-3.9",
+                    "demo.py",
+                ]
+            else:
+                args = [
+                    sys.executable,
+                    "demo.py",
+                ]
+            if prompt and "--prompt" not in kwargs:
+                args.extend((
+                    "--prompt",
+                    prompt,
+                ))
+            if url:
+                b = await bot.get_request(url)
+                fn = "misc/stable_diffusion.openvino/input.png"
+                with open(fn, "wb") as f:
+                    f.write(b)
+                args.extend((
+                    "--init-image",
+                    "input.png",
+                ))
+                if "--strength" not in kwargs:
+                    args.extend((
+                        "--strength",
+                        "0.75",
+                    ))
+            for k, v in kwargs.items():
+                args.extend((k, v))
+            with discord.context_managers.Typing(channel):
+                if self.sdiff_sem.is_busy() and not getattr(message, "simulated", False):
+                    await send_with_react(channel, italics(ini_md(f"StableDiffusion: {sqr_md(req)} enqueued in position {sqr_md(self.sdiff_sem.passive + 1)}.")), reacts="❎", reference=message)
+                async with self.sdiff_sem:
+                    print(args)
+                    proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc/stable_diffusion.openvino", stdout=subprocess.DEVNULL)
+                    try:
+                        await asyncio.wait_for(proc.wait(), timeout=3200)
+                    except (T0, T1, T2):
+                        with tracebacksuppressor:
+                            force_kill(proc)
+                        raise
+            fn = "misc/stable_diffusion.openvino/output.png"
+        await bot.send_with_file(channel, "", fn, filename=prompt + ".png", reference=message)
 
 
 class UpdateImages(Database):
