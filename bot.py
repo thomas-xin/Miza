@@ -3089,7 +3089,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         )
                         # Add a callback to typing in the channel if the command takes too long
                         if fut is None and not hasattr(command, "typing"):
-                            create_task(delayed_callback(future, sqrt(3), typing, channel))
+                            create_task(delayed_callback(future, sqrt(3), channel.trigger_typing()))
+                            if getattr(message, "slash", None):
+                                create_task(delayed_callback(future, 1, self.defer_interaction(message)))
                         with self.command_semaphore:
                             response = await future
                         # Send bot event: user has executed command
@@ -3490,6 +3492,22 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if embs:
                 url = await self.get_proxy_url(m)
                 await self.send_as_webhook(sendable, embeds=embs, username=m.display_name, avatar_url=url, reacts=reacts)
+
+    async def defer_interaction(self, message):
+        with tracebacksuppressor:
+            if hasattr(message, "int_id"):
+                int_id, int_token = message.int_id, message.int_token
+            elif hasattr(message, "slash"):
+                int_id, int_token = message.id, message.slash
+            else:
+                return
+            await Request(
+                f"https://discord.com/api/{api}/interactions/{int_id}/{int_token}/callback",
+                method="POST",
+                authorise=True,
+                data='{"type":5}',
+                aio=True,
+            )
 
     async def ignore_interaction(self, message):
         with tracebacksuppressor:
