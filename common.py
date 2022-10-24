@@ -1014,9 +1014,6 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
                 content=content,
             ),
         )
-        if embed:
-            embeds = embeds or []
-            embeds.append(embed)
         if embeds:
             data["data"]["embeds"] = [embed.to_dict() for embed in embeds]
             data["data"].pop("flags", None)
