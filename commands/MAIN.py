@@ -962,7 +962,7 @@ class Activity(Command):
     rate_limit = (2, 9)
     typing = True
     slash = True
-    usercmd = True
+    # usercmd = True
 
     async def __call__(self, guild, user, argv, flags, channel, bot, _timeout, **void):
         u_id = None

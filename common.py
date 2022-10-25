@@ -811,9 +811,12 @@ def restructure_buttons(buttons):
     return [dict(type=1, components=row) for row in buttons]
 
 
-async def interaction_response(bot, message, content=None, embed=None, components=None, buttons=None, ephemeral=False):
+async def interaction_response(bot, message, content=None, embed=None, embeds=(), components=None, buttons=None, ephemeral=False):
     if hasattr(embed, "to_dict"):
         embed = embed.to_dict()
+    if embed:
+        embeds = astype(embeds, list)
+        embeds.append(embed)
     if not getattr(message, "int_id", None):
         message.int_id = message.id
     if not getattr(message, "int_token", None):
@@ -826,7 +829,7 @@ async def interaction_response(bot, message, content=None, embed=None, component
             data=dict(
                 flags=ephemeral,
                 content=content,
-                embeds=[embed],
+                embeds=embeds,
                 components=components or restructure_buttons(buttons),
             ),
         )),
@@ -845,9 +848,12 @@ async def interaction_response(bot, message, content=None, embed=None, component
         bot.add_message(message, files=False, force=True)
     return message
 
-async def interaction_patch(bot, message, content=None, embed=None, components=None, buttons=None, ephemeral=False):
+async def interaction_patch(bot, message, content=None, embed=None, embeds=(), components=None, buttons=None, ephemeral=False):
     if hasattr(embed, "to_dict"):
         embed = embed.to_dict()
+    if embed:
+        embeds = astype(embeds, list)
+        embeds.append(embed)
     if not getattr(message, "int_id", None):
         message.int_id = message.id
     if not getattr(message, "int_token", None):
@@ -860,7 +866,7 @@ async def interaction_patch(bot, message, content=None, embed=None, components=N
             data=dict(
                 flags=ephemeral,
                 content=content,
-                embeds=[embed],
+                embeds=embeds,
                 components=components or restructure_buttons(buttons),
             ),
         )),
@@ -1023,7 +1029,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
         )
         if embeds:
             data["data"]["embeds"] = [embed.to_dict() for embed in embeds]
-            data["data"].pop("flags", None)
+            # data["data"].pop("flags", None)
         if components:
             data["data"]["components"] = components
     else:
@@ -2292,7 +2298,10 @@ async def delayed_callback(fut, delay, func, *args, exc=False, **kwargs):
     try:
         return fut.result()
     except ISE:
-        res = func(*args, **kwargs)
+        if hasattr(func, "__call__"):
+            res = func(*args, **kwargs)
+        else:
+            res = func
         if awaitable(res):
             await res
         try:
