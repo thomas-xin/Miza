@@ -39,7 +39,7 @@ class Restart(Command):
         await message.add_reaction("❗")
         save = None
         if name == "update":
-            resp = await create_future(subprocess.run, ["git", "pull"])
+            resp = await create_future(subprocess.run, ["git", "pull"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             print(resp.stdout)
             print(resp.stderr)
         if argv == "when free":
