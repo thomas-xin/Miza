@@ -1028,7 +1028,6 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
         )
         if embeds:
             data["data"]["embeds"] = [embed.to_dict() for embed in embeds]
-            # data["data"].pop("flags", None)
         if components:
             data["data"]["components"] = components
     else:
@@ -1132,7 +1131,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
                     print_exc()
                 elif ex.errno == 404:
                     continue
-                # print_exc()
+                print_exc()
                 fields = {}
                 if files:
                     fields["files"] = files
