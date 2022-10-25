@@ -1023,9 +1023,10 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
             type=4,
             data=dict(
                 flags=ephemeral,
-                content=content,
             ),
         )
+        if content:
+            data["data"]["content"] = content
         if embeds:
             data["data"]["embeds"] = [embed.to_dict() for embed in embeds]
         if components:
