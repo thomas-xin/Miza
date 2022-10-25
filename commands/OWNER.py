@@ -40,8 +40,8 @@ class Restart(Command):
         save = None
         if name == "update":
             resp = await create_future(subprocess.run, ["git", "pull"])
-            print(resp.stdin)
             print(resp.stdout)
+            print(resp.stderr)
         if argv == "when free":
             busy = True
             while busy:
