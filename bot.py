@@ -1457,8 +1457,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             fp.seek(0)
             with suppress(AttributeError):
                 fp.clear()
-        if reference and getattr(reference, "slash", None) or getattr(reference, "simulated", None):
-            reference = None
+        # if reference and getattr(reference, "slash", None) or getattr(reference, "simulated", None):
+        #     reference = None
         try:
             if fsize > size:
                 if not f:
@@ -1472,9 +1472,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 urls = await create_future(as_file, file if getattr(file, "_fp", None) else f, filename=filename, ext=ext, rename=rename)
                 if hasattr(channel, "simulated"):
                     urls = (urls[1],)
-                message = await channel.send((msg + ("" if msg.endswith("```") else "\n") + urls[0]).strip(), embed=embed, reference=reference) #, embed=discord.Embed(colour=discord.Colour(1)).set_image(url=urls[-1]))
+                message = await send_with_reply(channel, (msg + ("" if msg.endswith("```") else "\n") + urls[0]).strip(), embed=embed, reference=reference) #, embed=discord.Embed(colour=discord.Colour(1)).set_image(url=urls[-1]))
             else:
-                message = await channel.send(msg, embed=embed, file=file, reference=reference)
+                message = await send_with_reply(channel, msg, embed=embed, file=file, reference=reference)
                 if filename is not None:
                     if hasattr(filename, "filename"):
                         filename = filename.filename
@@ -1488,7 +1488,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 with suppress():
                     os.remove(filename)
             raise
-        if message.attachments:
+        if not getattr(reference, "slash", None) and message.attachments:
             await self.add_attachment(message.attachments[0], data)
             content = message.content + ("" if message.content.endswith("```") else "\n") + ("\n".join("<" + best_url(a) + ">" for a in message.attachments) if best else "\n".join("<" + a.url + ">" for a in message.attachments))
             await message.edit(content=content.strip())
@@ -3091,7 +3091,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         if fut is None and not hasattr(command, "typing"):
                             create_task(delayed_callback(future, sqrt(3), channel.trigger_typing))
                             if getattr(message, "slash", None):
-                                create_task(delayed_callback(future, 1, self.defer_interaction, message))
+                                create_task(delayed_callback(future, 1, self.defer_interaction, message, repeat=True))
                         with self.command_semaphore:
                             response = await future
                         # Send bot event: user has executed command

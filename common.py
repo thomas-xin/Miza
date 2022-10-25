@@ -2305,25 +2305,26 @@ def trace(fut, *args):
     return create_task(traceback_coro(fut, *args))
 
 # A function that takes a coroutine, and calls a second function if it takes longer than the specified delay.
-async def delayed_callback(fut, delay, func, *args, exc=False, **kwargs):
-    await asyncio.sleep(delay)
-    try:
-        return fut.result()
-    except ISE:
-        if hasattr(func, "__call__"):
-            res = func(*args, **kwargs)
-        else:
-            res = func
-        if awaitable(res):
-            await res
+async def delayed_callback(fut, delay, func, *args, repeat=False, exc=False, **kwargs):
+    while True:
+        await asyncio.sleep(delay)
         try:
+            return fut.result()
+        except ISE:
+            if hasattr(func, "__call__"):
+                res = func(*args, **kwargs)
+            else:
+                res = func
+            if awaitable(res):
+                await res
+            if repeat:
+                delay += 1
+                continue
             return await fut
         except:
             if exc:
                 raise
-    except:
-        if exc:
-            raise
+            break
 
 
 def exec_tb(s, *args, **kwargs):
