@@ -1007,10 +1007,9 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
         channel = reference.channel
     bot = BOT[0]
     if embed:
-        if not embeds:
-            embeds = (embed,)
-        else:
-            embeds = (embed,) + tuple(embeds)
+        embeds = (embed,) + tuple(embeds or ())
+    if file:
+        files = (file,) + tuple(files or ())
     if buttons:
         components = restructure_buttons(buttons)
     else:
