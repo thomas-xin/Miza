@@ -1104,6 +1104,18 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
     exc = RuntimeError
     for i in range(xrand(12, 17)):
         try:
+            if files:
+                form = aiohttp.FormData()
+                form.append(dict(
+                    name="payload_json",
+                    value=body,
+                ))
+                for i, f in enumerate(files):
+                    f.reset()
+                    b = f.fp.read()
+                    mime = magic.from_buffer(b)
+                    form.add_field(name="files[0]", filename=f.filename, value=b, content_type=mime)
+                body = form
             async with sem:
                 resp = await Request(
                     url,
@@ -2865,7 +2877,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
             headers["Authorization"] = f"Bot {token}"
             if data:
                 headers["Content-Type"] = "application/json"
-                if not isinstance(data, (str, bytes, memoryview)):
+                if not isinstance(data, (str, bytes, memoryview, aiohttp.FormData)):
                     data = orjson.dumps(data)
             if aio:
                 session = self.sessions.next()

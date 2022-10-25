@@ -1414,7 +1414,7 @@ class Waifu2x(Command):
 class StableDiffusion(Command):
     _timeout_ = 150
     name = ["Art", "AIArt"]
-    description = "Runs a Stable Diffusion AI art generator on the input prompt or image. Operates on a global queue system, and must be installed separately from https://github.com/bes-dev/stable_diffusion.openvino, extracted into the misc folder. Accepts appropriate keyword arguments."
+    description = "Runs a Stable Diffusion AI art generator on the input prompt or image. Operates on a global queue system. Accepts appropriate keyword arguments."
     usage = "<0:prompt>"
     rate_limit = (12, 60)
     typing = True

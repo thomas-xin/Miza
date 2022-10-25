@@ -4594,7 +4594,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         raise discord.HTTPException(r, data)
 
                 # This is handling exceptions from the request
-                except (OSError, ):
+                except (OSError, discord.DiscordServerError):
                     # Connection reset by peer
                     if tries < 4:
                         await asyncio.sleep(1 + tries * 2)

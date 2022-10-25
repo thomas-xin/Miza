@@ -2507,23 +2507,23 @@ class UpdateMessageLogs(Database):
         self.bot.data.message_cache.setmtime()
         print("Loading new messages completed.")
 
-    async def _command_(self, message, **void):
-        if not getattr(message, "slash", None):
-            return
-        guild = message.guild
-        if not guild or guild.id not in self.data:
-            return
-        c_id = self.data[guild.id]
-        try:
-            channel = await self.bot.fetch_channel(c_id)
-        except (EOFError, discord.NotFound):
-            self.data.pop(guild.id)
-            return
-        emb = await self.bot.as_embed(message, link=True)
-        emb.colour = discord.Colour(0x00FFFF)
-        action = f"**Slash command executed in** {channel_mention(message.channel.id)}:\n"
-        emb.description = lim_str(action + (emb.description or ""), 4096)
-        self.bot.send_embeds(channel, emb)
+    # async def _command_(self, message, **void):
+    #     if not getattr(message, "slash", None):
+    #         return
+    #     guild = message.guild
+    #     if not guild or guild.id not in self.data:
+    #         return
+    #     c_id = self.data[guild.id]
+    #     try:
+    #         channel = await self.bot.fetch_channel(c_id)
+    #     except (EOFError, discord.NotFound):
+    #         self.data.pop(guild.id)
+    #         return
+    #     emb = await self.bot.as_embed(message, link=True)
+    #     emb.colour = discord.Colour(0x00FFFF)
+    #     action = f"**Slash command executed in** {channel_mention(message.channel.id)}:\n"
+    #     emb.description = lim_str(action + (emb.description or ""), 4096)
+    #     self.bot.send_embeds(channel, emb)
 
     # Edit events are rather straightforward to log
     async def _edit_(self, before, after, **void):
