@@ -1105,7 +1105,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
                 form = aiohttp.FormData()
                 form.add_field(
                     name="payload_json",
-                    value=body,
+                    value=body.decode("utf-8", "replace"),
                     content_type="application/json",
                 )
                 for i, f in enumerate(files):
@@ -1134,6 +1134,8 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
                     continue
                 # print_exc()
                 fields = {}
+                if files:
+                    fields["files"] = files
                 if embeds:
                     fields["embeds"] = embeds
                 if tts:
