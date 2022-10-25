@@ -1104,10 +1104,12 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
             if files:
                 form = aiohttp.FormData()
                 for i, f in enumerate(files):
+                    f.reset()
+                    b = f.fp.read()
                     form.add_field(
                         name=f"files[{i}]",
                         filename=f.filename,
-                        value=f.fp.read(),
+                        value=io.BytesIO(b),
                         content_type="application/octet-stream",
                     )
                     f.reset()
