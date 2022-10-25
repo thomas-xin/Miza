@@ -1105,17 +1105,17 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
                 form = aiohttp.FormData()
                 form.add_field(
                     name="payload_json",
-                    value=body.decode("utf-8", "replace"),
+                    value=orjson.dumps(data["data"]),
                     content_type="application/json",
                 )
                 for i, f in enumerate(files):
-                    f.reset()
                     form.add_field(
                         name=f"files[{i}]",
                         filename=f.filename,
-                        value=f.fp,
+                        value=f.fp.read(),
                         content_type="application/octet-stream",
                     )
+                    f.reset()
                 body = form
             async with sem:
                 resp = await Request(
