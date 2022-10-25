@@ -2882,9 +2882,9 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
             token = AUTH["discord_token"]
             headers["Authorization"] = f"Bot {token}"
             if data:
-                headers["Content-Type"] = "application/json"
                 if not isinstance(data, (str, bytes, memoryview, aiohttp.FormData)):
                     data = orjson.dumps(data)
+                    headers["Content-Type"] = "application/json"
             if aio:
                 session = self.sessions.next()
             else:

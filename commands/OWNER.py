@@ -27,7 +27,7 @@ class Reload(Command):
 
 
 class Restart(Command):
-    name = ["Shutdown", "Reboot"]
+    name = ["Shutdown", "Reboot", "Update"]
     min_level = nan
     description = "Restarts, reloads, or shuts down ⟨MIZA⟩, with an optional delay."
     usage = "<delay>?"
@@ -38,6 +38,10 @@ class Restart(Command):
         client = bot.client
         await message.add_reaction("❗")
         save = None
+        if name == "update":
+            resp = await create_future(subprocess.run, ["git", "pull"])
+            print(resp.stdin)
+            print(resp.stdout)
         if argv == "when free":
             busy = True
             while busy:
