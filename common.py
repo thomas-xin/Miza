@@ -1105,10 +1105,10 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
         try:
             if files:
                 form = aiohttp.FormData()
-                form.append(dict(
+                form.add_field(
                     name="payload_json",
                     value=body,
-                ))
+                )
                 for i, f in enumerate(files):
                     f.reset()
                     b = f.fp.read()
