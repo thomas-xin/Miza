@@ -3386,7 +3386,7 @@ class Connect(Command):
     name = ["📲", "🎤", "🎵", "🎶", "📴", "📛", "Summon", "J", "Join", "DC", "Disconnect", "Leave", "Yeet", "Move", "Reconnect"]
     # Because Rythm also has this alias :P
     alias = name + ["FuckOff"]
-    description = "Summons the bot into a voice channel."
+    description = "Summons the bot into a voice channel, or advises it to leave."
     usage = "<channel>?"
     rate_limit = (3, 4)
     slash = ("Join", "Leave")

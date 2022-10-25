@@ -74,7 +74,7 @@ snowflake_time_3 = utils.snowflake_time
 
 ip2int = lambda ip: int.from_bytes(b"\x00" + bytes(int(i) for i in ip.split(".")), "big")
 
-api = "v9"
+api = "v10"
 
 # Main event loop for all asyncio operations.
 try:
@@ -1045,8 +1045,6 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
                 else:
                     reference.to_message_reference_dict = lambda message: dict(message_id=message.id)
             fields["reference"] = reference
-        if file:
-            fields["file"] = file
         if files:
             fields["files"] = files
         if not buttons and (not embeds or len(embeds) <= 1):
@@ -1108,12 +1106,16 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
                 form.add_field(
                     name="payload_json",
                     value=body,
+                    content_type="application/json",
                 )
                 for i, f in enumerate(files):
                     f.reset()
-                    b = f.fp.read()
-                    mime = magic.from_buffer(b)
-                    form.add_field(name="files[0]", filename=f.filename, value=b, content_type=mime)
+                    form.add_field(
+                        name=f"files[{i}]",
+                        filename=f.filename,
+                        value=f.fp,
+                        content_type="application/octet-stream",
+                    )
                 body = form
             async with sem:
                 resp = await Request(
