@@ -927,7 +927,7 @@ class Ask(Command):
     alias = ["How"]
     description = "Ask me any question, and I'll answer it!"
     usage = "<string>"
-    flags = "h"
+    # flags = "h"
     no_parse = True
     rate_limit = (0.5, 1)
     slash = True
@@ -961,7 +961,7 @@ class Ask(Command):
             )
         print(q)
         if q.casefold() in ("how", "how?"):
-            await send_with_reply(channel, "h" not in flags and message, "https://imgur.com/gallery/8cfRt")
+            await send_with_reply(channel, message, "https://imgur.com/gallery/8cfRt")
             return
         # if AUTH.get("huggingface_token"):
         try:
@@ -971,7 +971,7 @@ class Ask(Command):
         with discord.context_managers.Typing(channel):
             out = await create_future(cb.talk, q)
         if out:
-            await send_with_reply(channel, "h" not in flags and message, "\xad" + escape_roles(out))
+            await send_with_reply(channel, message, "\xad" + escape_roles(out))
             return
         q = single_space(q).strip().translate(bot.mtrans).replace("?", "\u200b").strip("\u200b")
         out = None
@@ -1056,7 +1056,7 @@ class Ask(Command):
                     "How about a question for you?",
                 )
                 resp = choice(response) + " " + choice(bot.data.users.questions)
-            await send_with_reply(channel, "h" not in flags and message, resp)
+            await send_with_reply(channel, message, resp)
             out = None
         elif any(q.startswith(i) for i in ("why ", "are ", "was ", "you ", "you're ")):
             out = alist(
@@ -1091,7 +1091,7 @@ class Ask(Command):
             for _hello in bot.commands.hello:
                 out = await _hello(bot, user, q.split(None, 1)[0], "".join(q.split(None, 1)[1:]), guild)
                 if out:
-                    await send_with_reply(channel, "h" not in flags and message, escape_roles(out))
+                    await send_with_reply(channel, message, escape_roles(out))
                     return
         else:
             out = alist(
@@ -1121,7 +1121,7 @@ class Ask(Command):
             out = out[ihash(q) % len(out)]
         if out:
             q = q[0].upper() + q[1:]
-            await send_with_reply(channel, "h" not in flags and message, escape_roles(f"\xad{q}? {out}"))
+            await send_with_reply(channel, message, escape_roles(f"\xad{q}? {out}"))
 
 
 class Random(Command):

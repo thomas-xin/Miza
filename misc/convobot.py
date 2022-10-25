@@ -272,7 +272,7 @@ class Bot:
 				return response
 		res = self.question_answer_analysis("microsoft/DialoGPT-large", i, list(self.history.keys()), list(self.history.values()))
 		a1 = res
-		if a1.lower() == i.lower() or vague(a1) or a1.lower() in (a.lower() for a in self.history.values()):
+		if a1.lower() == i.lower() or vague(a1) or (len(i) > 5 and a1.lower() in (a.lower() for a in self.history.values())):
 			a1 = ""
 		response = a1
 		if recursive and not response:
