@@ -3224,7 +3224,7 @@ class UpdateAkinator(Database):
     no_file = True
     no_delete = True
 
-    sem = Semaphore(1, 1)
+    sem = Semaphore(1, 1, rate_limit=60)
 
     def __load__(self):
         self.akinators = deque()
@@ -3238,7 +3238,10 @@ class UpdateAkinator(Database):
             self.akinators.popleft()
         async with self.sem:
             while len(self.akinators) < 2:
-                aki = await self.bot.commands.akinator[0].compatible_akinator(language="en", child_mode=False)
+                try:
+                    aki = await self.bot.commands.akinator[0].compatible_akinator(language="en", child_mode=False)
+                except:
+                    return
                 self.akinators.append(aki)
             for k, aki in tuple(self.data.items()):
                 if t > aki.timestamp + 960:

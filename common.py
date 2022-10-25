@@ -1111,7 +1111,8 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
                         content_type="application/octet-stream",
                     )
                     f.reset()
-                    data["data"].setdefault("attachments", []).append(dict(id=i, description=".", filename=f.filename))
+                    if "data" in data:
+                        data["data"].setdefault("attachments", []).append(dict(id=i, description=".", filename=f.filename))
                 form.add_field(
                     name="payload_json",
                     value=orjson.dumps(data),
