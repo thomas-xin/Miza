@@ -1110,11 +1110,11 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
                         name=f"files[{i}]",
                         filename=f.filename,
                         value=io.BytesIO(b),
-                        content_type="application/octet-stream",
+                        content_type=magic.from_buffer(b),
                     )
                     f.reset()
-                    if "data" in data:
-                        data["data"].setdefault("attachments", []).append(dict(id=i, description=".", filename=f.filename))
+                    # if "data" in data:
+                    #     data["data"].setdefault("attachments", []).append(dict(id=i, description=".", filename=f.filename))
                 form.add_field(
                     name="payload_json",
                     value=orjson.dumps(data).decode("utf-8", "replace"),
@@ -2884,8 +2884,9 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
             token = AUTH["discord_token"]
             headers["Authorization"] = f"Bot {token}"
             if data:
-                if not isinstance(data, (str, bytes, memoryview, aiohttp.FormData)):
-                    data = orjson.dumps(data)
+                if not isinstance(data, aiohttp.FormData):
+                    if not isinstance(data, (str, bytes, memoryview)):
+                        data = orjson.dumps(data)
                     headers["Content-Type"] = "application/json"
             if aio:
                 session = self.sessions.next()
