@@ -1667,7 +1667,7 @@ class Matchmaking(Command):
     name = ["Ship"] + HEARTS
     description = "Ships two provided objects with a randomised percent."
     usage = "<objects>*"
-    slash = "Ship"
+    slash = ("Ship",)
 
     async def __call__(self, bot, message, channel, guild, args, **void):
         uids = deque()

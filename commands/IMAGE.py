@@ -1418,7 +1418,7 @@ class StableDiffusion(Command):
     usage = "<0:prompt>"
     rate_limit = (12, 60)
     typing = True
-    slash = "Art"
+    slash = ("Art",)
     sdiff_sem = Semaphore(1, 256, rate_limit=1)
     cache = {}
     fut = None
