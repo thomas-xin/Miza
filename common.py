@@ -3395,6 +3395,12 @@ class ImagePool:
 # Redirects all print operations to target files, limiting the amount of operations that can occur in any given amount of time for efficiency.
 class __logPrinter:
 
+    ignored_messages = {
+        "A decoder-only architecture is being used, but right-padding was detected! For correct generation results, please set `padding_side='left'` when initializing the tokenizer.",
+        "ssl.SSLError: [SSL: BAD_KEY_SHARE] bad key share (_ssl.c:997)",
+        "ssl.SSLEOFError: EOF occurred in violation of protocol (_ssl.c:2396)",
+    }
+
     def __init__(self, file=None):
         self.buffer = self
         self.data = {}
@@ -3441,7 +3447,7 @@ class __logPrinter:
                 out = lim_str(self.data[f], 65536)
                 data = enc(self.data[f])
                 self.data[f] = ""
-                if self.funcs:
+                if self.funcs and out.strip():
                     [func(out) for func in self.funcs]
                 if f == self.file:
                     outfunc(data)
@@ -3463,13 +3469,13 @@ class __logPrinter:
         out = str(sep).join(i if type(i) is str else str(i) for i in args) + str(end) + str(prefix)
         if not out:
             return
-        if self.closed or args and type(args[0]) is str and args[0].startswith("WARNING:"):
+        temp = out.strip()
+        if self.closed or temp.rsplit("\n", 1)[-1] in self.ignored_messages:
             return sys.__stdout__.write(out)
         if file is None:
             file = self.file
         if file not in self.data:
             self.data[file] = ""
-        temp = out.strip()
         if temp:
             if file in self.history and self.history.get(file).strip() == temp:
                 add_dict(self.counts, {file:1})
