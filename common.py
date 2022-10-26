@@ -1049,8 +1049,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
             fields["files"] = files
         if not buttons and (not embeds or len(embeds) <= 1):
             if embeds:
-                fields["embed"] = embeds[0]
-            fields.pop("embeds", None)
+                fields["embed"] = (fields.pop("embeds", None) or (None,))[0]
             try:
                 return await channel.send(content, **fields)
             except discord.HTTPException as ex:
