@@ -638,10 +638,10 @@ class RoleSelect(Command):
             raise NameError(f"Incorrect hash: {h1} != {h2}")
         if role in user.roles:
             await user.remove_roles(role, reason="Role Select")
-            await interaction_response(bot, message, user.mention + ": Successfully removed " + role.mention)
+            await interaction_response(bot, message, user.mention + ": Successfully removed " + role.mention, ephemeral=True)
         else:
             await user.add_roles(role, reason="Role Select")
-            await interaction_response(bot, message, user.mention + ": Successfully added " + role.mention)
+            await interaction_response(bot, message, user.mention + ": Successfully added " + role.mention, ephemeral=True)
 
 
 class RoleGiver(Command):
