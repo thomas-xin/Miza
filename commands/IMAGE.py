@@ -1537,11 +1537,11 @@ class StableDiffusion(Command):
         if specified:
             req += " ".join(f"{k} {v}" for k, v in kwargs.items() if k in specified)
         fn = None
-        if not specified and (xrand(2) and not url or not os.path.exists("misc/stable_diffusion.openvino")):
+        if not specified and ((xrand(2) or self.cache.get(prompt)) and not url or not os.path.exists("misc/stable_diffusion.openvino")):
             if self.cache.get(prompt):
                 b = io.BytesIO()
                 self.cache[prompt].pop(0).save(b, format="png")
-                if len(self.cache[prompt]) < 2:
+                if len(self.cache[prompt]) < 2 and xrand(2):
                     create_task(self.stable_diffusion_deepai(prompt))
                 b.seek(0)
                 fn = b.read()
@@ -1556,39 +1556,39 @@ class StableDiffusion(Command):
         if not fn and (not url or not os.path.exists("misc/stable_diffusion.openvino")):
             t = utc()
             header = Request.header()
-            if self.token and t - self.token.ts >= 3200:
-                resp = await create_future(
-                    requests.post,
-                    "https://securetoken.googleapis.com/v1/token?key=AIzaSyAzUV2NNUOlLTL04jwmUw9oLhjteuv6Qr4",
-                    data=json.dumps(dict(
-                        grant_type="refresh_token",
-                        refresh_token=self.token.get("refresh_token") or self.token.refreshToken,
-                    )),
-                    headers=header,
-                )
-                if resp.status_code in range(200, 400):
+            with discord.context_managers.Typing(channel):
+                if self.token and t - self.token.ts >= 3200:
+                    resp = await create_future(
+                        requests.post,
+                        "https://securetoken.googleapis.com/v1/token?key=AIzaSyAzUV2NNUOlLTL04jwmUw9oLhjteuv6Qr4",
+                        data=json.dumps(dict(
+                            grant_type="refresh_token",
+                            refresh_token=self.token.get("refresh_token") or self.token.refreshToken,
+                        )),
+                        headers=header,
+                    )
+                    if resp.status_code in range(200, 400):
+                        self.token = cdict(resp.json())
+                        self.token.ts = t
+                    else:
+                        self.token = None
+                if not self.token:
+                    resp = await create_future(
+                        requests.post,
+                        "https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=AIzaSyAzUV2NNUOlLTL04jwmUw9oLhjteuv6Qr4",
+                        data=json.dumps(dict(
+                            returnSecureToken=True,
+                        )),
+                        headers=header,
+                    )
                     self.token = cdict(resp.json())
                     self.token.ts = t
-                else:
-                    self.token = None
-            if not self.token:
-                resp = await create_future(
-                    requests.post,
-                    "https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=AIzaSyAzUV2NNUOlLTL04jwmUw9oLhjteuv6Qr4",
-                    data=json.dumps(dict(
-                        returnSecureToken=True,
-                    )),
-                    headers=header,
-                )
-                self.token = cdict(resp.json())
-                self.token.ts = t
-            id_token = self.token.get("id_token") or self.token.idToken
-            header["Authorization"] = f"Bearer {id_token}"
-            nis = int(kwargs.get("--num-inference-steps", 50))
-            nis = min(50, max(25, nis))
-            gs = float(kwargs.get("--guidance-scale", 7.5))
-            gs = min(17.5, max(2.5, gs))
-            with discord.context_managers.Typing(channel):
+                id_token = self.token.get("id_token") or self.token.idToken
+                header["Authorization"] = f"Bearer {id_token}"
+                nis = int(kwargs.get("--num-inference-steps", 50))
+                nis = min(50, max(25, nis))
+                gs = float(kwargs.get("--guidance-scale", 7.5))
+                gs = min(17.5, max(2.5, gs))
                 resp = await create_future(
                     requests.post,
                     "https://api.mage.space/api/v2/images/generate",
