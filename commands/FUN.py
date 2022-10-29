@@ -456,7 +456,7 @@ class Text2048(Command):
                         f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
                         data=dict(
                             content="**```\n2048: GAME OVER```**",
-                            embed=emb.to_dict(),
+                            embeds=[emb.to_dict()],
                             components=None,
                         ),
                         method="PATCH",
@@ -553,7 +553,7 @@ class Text2048(Command):
                     f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
                     data=dict(
                         content=content,
-                        embed=emb.to_dict(),
+                        embeds=[emb.to_dict()],
                         components=restructure_buttons(buttons),
                     ),
                     method="PATCH",
@@ -1259,7 +1259,7 @@ class Uno(Command):
                         f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
                         data=dict(
                             content=content,
-                            embed=embed.to_dict(),
+                            embeds=[embed.to_dict()],
                             components=restructure_buttons([[
                                 cdict(emoji="🔻", style=1),
                                 cdict(emoji="✖", style=4),
@@ -3210,7 +3210,7 @@ class Akinator(Command):
             return await Request(
                 f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
                 data=dict(
-                    embed=emb.to_dict(),
+                    embeds=[emb.to_dict()],
                     components=restructure_buttons(buttons),
                 ),
                 method="PATCH",

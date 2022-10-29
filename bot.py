@@ -1498,6 +1498,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     def add_message(self, message, files=True, cache=True, force=False):
         if self.closed:
             return message
+        try:
+            m = self.cache.messages[message.id]
+        except KeyError:
+            pass
+        else:
+            if getattr(m, "slash", False):
+                message.slash = m.slash
         if cache and message.id not in self.cache.messages or force:
             created_at = message.created_at
             if created_at.tzinfo:

@@ -101,7 +101,7 @@ class Help(Command):
                 content += f"\n[Rate Limit] {sec2time(x)}"
             content = ini_md(content)
         else:
-            embed.description = (
+            content = (
                 f"```callback-main-help-{user.id}-\n{user.display_name} has asked for help!```"
                 + f"Yo! Use the menu below to select from my command list!\n"
                 + f"Alternatively, visit [`mizatlas`]({bot.webserver}/mizatlas) for a full command list and tester.\n\n"
@@ -144,9 +144,9 @@ class Help(Command):
             placeholder=com.parse_name() if comm else "Choose a command...",
         )
         buttons = [[catmenu], [commenu]]
+        if content:
+            embed.description = f"```callback-main-help-{user.id}-\n{user.display_name} has asked for help!```" + content
         if original:
-            if content:
-                embed.description = f"```callback-main-help-{user.id}-\n{user.display_name} has asked for help!```" + content
             if not getattr(message, "slash", None):
                 create_task(bot.ignore_interaction(original))
                 sem = getattr(message, "sem", None)
@@ -159,7 +159,7 @@ class Help(Command):
                     await Request(
                         f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
                         data=dict(
-                            embed=embed.to_dict(),
+                            embeds=[embed.to_dict()],
                             components=restructure_buttons(buttons),
                         ),
                         method="PATCH",
@@ -169,11 +169,9 @@ class Help(Command):
             else:
                 await interaction_patch(bot, original, embed=embed, buttons=buttons)
             return
-        elif getattr(message, "slash", None):
-            await interaction_response(bot, message, content, embed=embed, buttons=buttons)
+        # elif getattr(message, "slash", None):
+        #     await interaction_response(bot, message, embed=embed, buttons=buttons, ephemeral=True)
         else:
-            if not embed.description:
-                embed.description = f"```callback-main-help-{user.id}-\n{user.display_name} has asked for help!```" + content
             await send_with_reply(channel, message, embed=embed, buttons=buttons, ephemeral=True)
         return
 
