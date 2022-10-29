@@ -894,7 +894,7 @@ async def interaction_patch(bot, message, content=None, embed=None, embeds=(), c
         bot.add_message(message, files=False, force=True)
     else:
         message.content = content or message.content
-        message.embeds = [embed] if embed else message.embeds
+        message.embeds = [discord.Embed.from_dict(embed)] if embed else message.embeds
     return message
 
 
