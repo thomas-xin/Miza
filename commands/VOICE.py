@@ -532,7 +532,7 @@ class CustomAudio(collections.abc.Hashable):
         if self.acsi:
             with tracebacksuppressor(AttributeError):
                 self.acsi.kill()
-        if self.guild.me.voice:
+        if self.guild.me and self.guild.me.voice:
             create_task(self.guild.change_voice_state(channel=None))
         self.bot.data.audio.players.pop(self.guild.id, None)
         with suppress(LookupError):
@@ -1153,7 +1153,7 @@ class AudioClientSubInterface:
             auds = bot.audio.players[guild.id]
         else:
             auds = None
-        if guild.me.voice:
+        if guild.me and guild.me.voice:
             c_id = bot.audio.submit(f"getattr(getattr(client.get_guild({guild.id}).voice_client, 'channel', None), 'id', None)")
             if c_id:
                 self = cls(auds)
@@ -3478,6 +3478,8 @@ class Connect(Command):
             if auds.acsi.channel != vc_:
                 await auds.move_unmute(auds.acsi, vc_)
                 joining = True
+        if not guild.me:
+            raise RuntimeError("Server not detected!")
         if guild.me.voice is None:
             try:
                 await bot.wait_for("voice_state_update", check=lambda member, before, after: member.id == bot.id and after, timeout=16)
