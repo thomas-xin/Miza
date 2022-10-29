@@ -3765,7 +3765,10 @@ class Dump(Command):
         if type(d) is list:
             d = dict(queue=d, stats={})
         q = d["queue"][:262144]
-        ctx = discord.context_managers.Typing(channel) if q else emptyctx
+        try:
+            ctx = discord.context_managers.Typing(channel) if q else emptyctx
+        except AttributeError:
+            ctx = emptyctx
         async with ctx:
             # Copy items and cast to cdict queue entries
             for i, e in enumerate(q, 1):
