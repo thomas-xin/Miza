@@ -838,14 +838,23 @@ async def interaction_response(bot, message, content=None, embed=None, embeds=()
         aio=True,
     )
     # print("INTERACTION_RESPONSE", resp)
+    bot = BOT[0]
     if resp:
-        bot = BOT[0]
         if bot:
             M = bot.ExtendedMessage.new
         else:
             M = discord.Message
         message = M(state=bot._state, channel=message.channel, data=eval_json(resp))
         bot.add_message(message, files=False, force=True)
+    # else:
+    #     m = bot.GhostMessage()
+    #     m.id = message.id
+    #     m.content = content
+    #     m.embeds = embeds
+    #     m.ephemeral = ephemeral
+    #     if getattr(message, "slash", False):
+    #         m.slash = message.slash
+    #     bot.add_message(message, files=False, force=True)
     return message
 
 async def interaction_patch(bot, message, content=None, embed=None, embeds=(), components=None, buttons=None, ephemeral=False):
@@ -875,8 +884,8 @@ async def interaction_patch(bot, message, content=None, embed=None, embeds=(), c
         aio=True,
     )
     # print("INTERACTION_PATCH", resp)
+    bot = BOT[0]
     if resp:
-        bot = BOT[0]
         if bot:
             M = bot.ExtendedMessage.new
         else:

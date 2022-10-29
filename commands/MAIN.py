@@ -102,8 +102,7 @@ class Help(Command):
             content = ini_md(content)
         else:
             content = (
-                f"```callback-main-help-{user.id}-\n{user.display_name} has asked for help!```"
-                + f"Yo! Use the menu below to select from my command list!\n"
+                f"Yo! Use the menu below to select from my command list!\n"
                 + f"Alternatively, visit [`mizatlas`]({bot.webserver}/mizatlas) for a full command list and tester.\n\n"
                 + f"If you're an admin and wish to disable me in a particular channel, check out `{prefix}ec`!\n"
                 + f"Unsure about anything, or have a bug to report? check out the [`support server`]({bot.rcc_invite})!\n"
@@ -147,27 +146,7 @@ class Help(Command):
         if content:
             embed.description = f"```callback-main-help-{user.id}-\n{user.display_name} has asked for help!```" + content
         if original:
-            if not getattr(message, "slash", None):
-                create_task(bot.ignore_interaction(original))
-                sem = getattr(message, "sem", None)
-                if not sem:
-                    try:
-                        sem = EDIT_SEM[message.channel.id]
-                    except KeyError:
-                        sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
-                async with sem:
-                    await Request(
-                        f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
-                        data=dict(
-                            embeds=[embed.to_dict()],
-                            components=restructure_buttons(buttons),
-                        ),
-                        method="PATCH",
-                        authorise=True,
-                        aio=True,
-                    )
-            else:
-                await interaction_patch(bot, original, embed=embed, buttons=buttons)
+            await interaction_patch(bot, original, embed=embed, buttons=buttons)
             return
         # elif getattr(message, "slash", None):
         #     await interaction_response(bot, message, embed=embed, buttons=buttons, ephemeral=True)
