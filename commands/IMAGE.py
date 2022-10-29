@@ -1655,26 +1655,26 @@ class StableDiffusion(Command):
                     "--prompt",
                     prompt,
                 ))
-            if url:
-                b = await bot.get_request(url)
-                fn = "misc/stable_diffusion.openvino/input.png"
-                with open(fn, "wb") as f:
-                    f.write(b)
-                args.extend((
-                    "--init-image",
-                    "input.png",
-                ))
-                if "--strength" not in kwargs:
-                    args.extend((
-                        "--strength",
-                        "0.75",
-                    ))
-            for k, v in kwargs.items():
-                args.extend((k, v))
             with discord.context_managers.Typing(channel):
                 if self.sdiff_sem.is_busy() and not getattr(message, "simulated", False):
                     await send_with_react(channel, italics(ini_md(f"StableDiffusion: {sqr_md(req)} enqueued in position {sqr_md(self.sdiff_sem.passive + 1)}.")), reacts="❎", reference=message)
                 async with self.sdiff_sem:
+                    if url:
+                        b = await bot.get_request(url)
+                        fn = "misc/stable_diffusion.openvino/input.png"
+                        with open(fn, "wb") as f:
+                            f.write(b)
+                        args.extend((
+                            "--init-image",
+                            "input.png",
+                        ))
+                        if "--strength" not in kwargs:
+                            args.extend((
+                                "--strength",
+                                "0.75",
+                            ))
+                    for k, v in kwargs.items():
+                        args.extend((k, v))
                     print(args)
                     proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc/stable_diffusion.openvino", stdout=subprocess.DEVNULL)
                     try:
