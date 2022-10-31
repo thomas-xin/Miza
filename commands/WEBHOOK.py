@@ -155,7 +155,7 @@ class UpdateAutoEmojis(Database):
                 s = ems
                 for word in possible:
                     s = s.replace(word, "")
-                if not s.strip():
+                if s.strip():
                     return
                 possible = (n.strip(":") for n in possible)
                 for name in (n for n in possible if n):
