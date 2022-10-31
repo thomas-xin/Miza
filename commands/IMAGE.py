@@ -1183,6 +1183,8 @@ class Blend(Command):
                 url1 = urls[0]
             else:
                 url1 = None
+            if not args:
+                raise ArgumentError("This command requires two image inputs as URL or attachment.")
             urls = await bot.follow_url(args.pop(0), best=True, allow=True, limit=1)
             if urls:
                 url2 = urls[0]

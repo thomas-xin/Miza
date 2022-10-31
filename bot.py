@@ -3097,9 +3097,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         )
                         # Add a callback to typing in the channel if the command takes too long
                         if fut is None and not hasattr(command, "typing"):
-                            create_task(delayed_callback(future, sqrt(3), channel.trigger_typing))
+                            create_task(delayed_callback(future, sqrt(3), channel.trigger_typing, repeat=True))
                         if getattr(message, "slash", None):
-                            create_task(delayed_callback(future, 1, self.defer_interaction, message, repeat=True))
+                            create_task(delayed_callback(future, 1, self.defer_interaction, message))
                         with self.command_semaphore:
                             response = await future
                         # Send bot event: user has executed command

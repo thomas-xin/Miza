@@ -3870,6 +3870,7 @@ class AudioSettings(Command):
         "♻": "reset",
     }
     rate_limit = (0.5, 5)
+    slash = True
 
     def __init__(self, *args):
         self.alias = list(self.aliasMap) + list(self.aliasExt)[1:]
