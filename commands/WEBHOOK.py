@@ -151,12 +151,13 @@ class UpdateAutoEmojis(Database):
             if m2:
                 futs = deque()
                 ems = regexp("<a?:[A-Za-z0-9\\-~_]{1,32}").sub("", ems.replace(" ", "").replace("\\", "")).replace(">", ":")
-                possible = n.strip(":") for n in regexp(":[A-Za-z0-9\\-~_]{1,32}:|[^\\x00-\\x7F]").findall(ems)
+                possible = regexp(":[A-Za-z0-9\\-~_]{1,32}:|[^\\x00-\\x7F]").findall(ems)
                 s = ems
                 for word in possible:
                     s = s.replace(word, "")
                 if not s.strip():
                     return
+                possible = (n.strip(":") for n in possible)
                 for name in (n for n in possible if n):
                     emoji = None
                     if emojis is None:
