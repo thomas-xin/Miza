@@ -2027,6 +2027,34 @@ class AudioDownloader:
                             if v_id == e.get("id"):
                                 output.rotate(-i)
                                 break
+            elif is_url(item) and tuple(reversed(item.split("/", 3)[2].encode("utf-8"))) == (109, 111, 99, 46, 117, 109, 105, 110, 97, 120):
+                b = Request(item, headers=self.youtube_header(), timeout=12)
+                search = b'itemprop="name" content="'
+                try:
+                    i = b.index(search)
+                except ValueError:
+                    pass
+                else:
+                    s, b = b[i + len(search):].split(b'"', 1)
+                    name = s.decode("utf-8", "replace")
+                    search = b'itemprop="duration" content="'
+                    s, b = b.split(search, 1)[-1].split(b'"', 1)
+                    duration = time_parse(s.decode("utf-8", "replace").lstrip("P").rstrip("S").replace("DT", ":").replace("H", ":").replace("M", ":"))
+                    search = b'itemprop="thumbnailUrl" content="'
+                    s, b = b.split(search, 1)[-1].split(b'"', 1)
+                    thumbnail = s.decode("utf-8", "replace")
+                    search = b'itemprop="embedURL" content="'
+                    with requests.head(b.split(search, 1)[-1].split(b'"', 1)[0].decode("utf-8", "replace"), headers=self.youtube_header(), allow_redirects=True) as resp:
+                        stream = resp.url
+                    temp = cdict(
+                        name=name,
+                        url=item,
+                        duration=duration,
+                        thumbnail=thumbnail,
+                        stream=stream,
+                        video=stream,
+                    )
+                    output.append(temp)
             # Only proceed if no items have already been found (from playlists in this case)
             if not len(output):
                 resp = None
