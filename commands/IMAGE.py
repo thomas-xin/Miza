@@ -1557,7 +1557,6 @@ class StableDiffusion(Command):
                         fn = b.read()
         if not fn and (not url or not os.path.exists("misc/stable_diffusion.openvino")):
             t = utc()
-            header = Request.header()
             with discord.context_managers.Typing(channel):
                 if self.token and t - self.token.ts >= 3200:
                     if t - self.token.ts >= 21600:
@@ -1570,7 +1569,7 @@ class StableDiffusion(Command):
                                 grant_type="refresh_token",
                                 refresh_token=self.token.get("refresh_token") or self.token.refreshToken,
                             )),
-                            headers=header,
+                            headers=self.header,
                         )
                         if resp.status_code in range(200, 400):
                             self.token = cdict(resp.json())
@@ -1578,13 +1577,14 @@ class StableDiffusion(Command):
                         else:
                             self.token = None
                 if not self.token:
+                    self.header = Request.header()
                     resp = await create_future(
                         requests.post,
                         "https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=AIzaSyAzUV2NNUOlLTL04jwmUw9oLhjteuv6Qr4",
                         data=json.dumps(dict(
                             returnSecureToken=True,
                         )),
-                        headers=header,
+                        headers=self.header,
                     )
                     self.token = cdict(resp.json())
                     self.token.ts = t
@@ -1604,7 +1604,7 @@ class StableDiffusion(Command):
                         guidance_scale=gs,
                         strength=float(kwargs.get("--strength", 0.75)),
                     )),
-                    headers=header,
+                    headers=self.header,
                 )
                 if resp.status_code in range(200, 400):
                     print(resp.text)
