@@ -1560,20 +1560,23 @@ class StableDiffusion(Command):
             header = Request.header()
             with discord.context_managers.Typing(channel):
                 if self.token and t - self.token.ts >= 3200:
-                    resp = await create_future(
-                        requests.post,
-                        "https://securetoken.googleapis.com/v1/token?key=AIzaSyAzUV2NNUOlLTL04jwmUw9oLhjteuv6Qr4",
-                        data=json.dumps(dict(
-                            grant_type="refresh_token",
-                            refresh_token=self.token.get("refresh_token") or self.token.refreshToken,
-                        )),
-                        headers=header,
-                    )
-                    if resp.status_code in range(200, 400):
-                        self.token = cdict(resp.json())
-                        self.token.ts = t
-                    else:
+                    if t - self.token.ts >= 21600:
                         self.token = None
+                    else:
+                        resp = await create_future(
+                            requests.post,
+                            "https://securetoken.googleapis.com/v1/token?key=AIzaSyAzUV2NNUOlLTL04jwmUw9oLhjteuv6Qr4",
+                            data=json.dumps(dict(
+                                grant_type="refresh_token",
+                                refresh_token=self.token.get("refresh_token") or self.token.refreshToken,
+                            )),
+                            headers=header,
+                        )
+                        if resp.status_code in range(200, 400):
+                            self.token = cdict(resp.json())
+                            self.token.ts = t
+                        else:
+                            self.token = None
                 if not self.token:
                     resp = await create_future(
                         requests.post,
