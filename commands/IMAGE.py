@@ -1589,7 +1589,7 @@ class StableDiffusion(Command):
                     self.token = cdict(resp.json())
                     self.token.ts = t
                 id_token = self.token.get("id_token") or self.token.idToken
-                header["Authorization"] = f"Bearer {id_token}"
+                self.header["Authorization"] = f"Bearer {id_token}"
                 nis = int(kwargs.get("--num-inference-steps", 50))
                 nis = min(50, max(25, nis))
                 gs = float(kwargs.get("--guidance-scale", 7.5))
