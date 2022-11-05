@@ -1423,6 +1423,7 @@ class StableDiffusion(Command):
     typing = True
     slash = ("Art",)
     sdiff_sem = Semaphore(1, 256, rate_limit=1)
+    fut = None
     imagebot = imagebot.Bot()
 
     async def __call__(self, bot, channel, message, args, **void):
