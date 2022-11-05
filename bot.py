@@ -1577,6 +1577,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 for i in range(30):
                     data = self.cache.attachments[a_id]
                     if data is not None:
+                        if isinstance(data, memoryview):
+                            self.cache.attachments[a_id] = data = bytes(data)
                         if not isinstance(data, bytes):
                             self.cache.attachments[a_id] = None
                             try:
