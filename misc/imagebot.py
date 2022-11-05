@@ -196,7 +196,7 @@ class Bot:
 		funcs = []
 		if not url or not os.path.exists("misc/stable_diffusion.openvino"):
 			if not specified:
-				if random.randint(0, 1) and self.cache.get(prompt):
+				if random.randint(0, 2) and self.cache.get(prompt):
 					return self.cache[prompt].pop(0)
 				funcs.append(self.art_mage)
 				funcs.append(self.art_deepai)
