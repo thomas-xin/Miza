@@ -30,7 +30,7 @@ def create_driver():
 	service = browser["service"](browser["path"])
 	options = browser["options"]()
 	options.headless = True
-	options.add_argument("--disable-gpu")
+	# options.add_argument("--disable-gpu")
 	prefs = {"download.default_directory" : folder}
 	options.add_experimental_option("prefs", prefs)
 

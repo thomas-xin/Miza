@@ -32,8 +32,8 @@ def create_driver():
 	folder = os.path.join(os.getcwd(), f"d~{ts}")
 	service = browser["service"](browser["path"])
 	options = browser["options"]()
-	options.headless = True
-	options.add_argument("--disable-gpu")
+	# options.headless = True
+	# options.add_argument("--disable-gpu")
 	prefs = {"download.default_directory" : folder}
 	options.add_experimental_option("prefs", prefs)
 
@@ -196,7 +196,7 @@ class Bot:
 		funcs = []
 		if not url or not os.path.exists("misc/stable_diffusion.openvino"):
 			if not specified:
-				if self.cache.get(prompt):
+				if random.randint(0, 1) and self.cache.get(prompt):
 					return self.cache[prompt].pop(0)
 				funcs.append(self.art_mage)
 				funcs.append(self.art_deepai)
