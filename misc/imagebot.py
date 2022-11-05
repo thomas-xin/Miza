@@ -32,8 +32,8 @@ def create_driver():
 	folder = os.path.join(os.getcwd(), f"d~{ts}")
 	service = browser["service"](browser["path"])
 	options = browser["options"]()
-	# options.headless = True
-	# options.add_argument("--disable-gpu")
+	options.headless = True
+	options.add_argument("--disable-gpu")
 	prefs = {"download.default_directory" : folder}
 	options.add_experimental_option("prefs", prefs)
 
@@ -146,6 +146,7 @@ class Bot:
 			while not elems:
 				elems = [e for e in os.listdir(folder) if e.endswith(".png")]
 				time.sleep(0.5)
+			print(elems[0])
 
 			ts = time.time_ns()
 			fn = f"cache/{ts}.png"
