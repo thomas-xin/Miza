@@ -1367,7 +1367,7 @@ class AudioDownloader:
             url = url.rsplit("/", 1)[-1].split("v=", 1)[-1].split("&", 1)[0]
         webpage_url = f"https://www.youtube.com/watch?v={url}"
         if video:
-            title, stream = yt_download(webpage_url, fmt="mp4", dir="cache", timeout=720)
+            title, stream = yt_download(webpage_url, fmt="mp4", timeout=720)
             entry = dict(
                 formats=[dict(
                     abr=1,
@@ -1378,7 +1378,7 @@ class AudioDownloader:
                 webpage_url=webpage_url,
             )
         else:
-            title, stream = yt_download(webpage_url, fmt="mp3", dir="cache", timeout=720)
+            title, stream = yt_download(webpage_url, fmt="mp3", timeout=720)
             entry = dict(
                 formats=[dict(
                     abr=256,

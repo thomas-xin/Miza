@@ -4,12 +4,16 @@ import selenium, requests, torch
 from selenium import webdriver
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering, AutoModelForCausalLM, pipeline
 
-exc = concurrent.futures.ThreadPoolExecutor(max_workers=6)
+try:
+	exc = concurrent.futures.exc_worker
+except AttributeError:
+	exc = concurrent.futures.exc_worker = concurrent.futures.ThreadPoolExecutor(max_workers=16)
 drivers = []
 
 class_name = webdriver.common.by.By.CLASS_NAME
 css_selector = webdriver.common.by.By.CSS_SELECTOR
 xpath = webdriver.common.by.By.XPATH
+tag_name = webdriver.common.by.By.TAG_NAME
 driver_path = "misc/msedgedriver"
 browsers = dict(
 	edge=dict(

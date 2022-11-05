@@ -8,6 +8,7 @@ import aiohttp
 
 from transformers import TrOCRProcessor, VisionEncoderDecoderModel
 from PIL import Image
+import imagebot
 
 getattr(youtube_dl, "__builtins__", {})["print"] = print
 
@@ -1422,40 +1423,7 @@ class StableDiffusion(Command):
     typing = True
     slash = ("Art",)
     sdiff_sem = Semaphore(1, 256, rate_limit=1)
-    cache = {}
-    fut = None
-    token = None
-
-    async def stable_diffusion_deepai(self, prompt):
-        headers = Request.header()
-        headers["api-key"] = "quickstart-QUdJIGlzIGNvbWluZy4uLi4K"
-        resp = await create_future(
-            requests.post,
-            "https://api.deepai.org/api/text2img",
-            files=dict(
-                text=prompt,
-            ),
-            headers=headers,
-        )
-        if resp.status_code in range(200, 400):
-            print(resp.text)
-            url = resp.json()["output_url"]
-            b = await self.bot.get_request(url)
-            image = Image.open(io.BytesIO(b))
-            ims = [
-                image.crop((0, 0, 512, 512)),
-                image.crop((512, 0, 1024, 512)),
-                image.crop((512, 512, 1024, 1024)),
-                image.crop((0, 512, 512, 1024)),
-            ]
-            ims2 = self.cache.setdefault(prompt, [])
-            for im in ims:
-                p = np.sum(im.resize((32, 32)).convert("L"))
-                if p > 1024:
-                    ims2.append(im)
-            return shuffle(self.cache[prompt])
-        print(ConnectionError(resp.status_code, resp.text))
-        return ()
+    imagebot = imagebot.Bot()
 
     async def __call__(self, bot, channel, message, args, **void):
         for a in message.attachments:
@@ -1538,81 +1506,8 @@ class StableDiffusion(Command):
             req += url
         if specified:
             req += " ".join(f"{k} {v}" for k, v in kwargs.items() if k in specified)
-        fn = None
-        if not specified and ((xrand(2) or self.cache.get(prompt)) and not url or not os.path.exists("misc/stable_diffusion.openvino")):
-            if self.cache.get(prompt):
-                b = io.BytesIO()
-                self.cache[prompt].pop(0).save(b, format="png")
-                if len(self.cache[prompt]) < 2 and xrand(2):
-                    create_task(self.stable_diffusion_deepai(prompt))
-                b.seek(0)
-                fn = b.read()
-            else:
-                with discord.context_managers.Typing(channel):
-                    ims = await self.stable_diffusion_deepai(prompt)
-                    if ims:
-                        b = io.BytesIO()
-                        ims.pop(0).save(b, format="png")
-                        b.seek(0)
-                        fn = b.read()
-        if not fn and (not url or not os.path.exists("misc/stable_diffusion.openvino")):
-            t = utc()
-            with discord.context_managers.Typing(channel):
-                if self.token and t - self.token.ts >= 3200:
-                    if t - self.token.ts >= 21600:
-                        self.token = None
-                    else:
-                        resp = await create_future(
-                            requests.post,
-                            "https://securetoken.googleapis.com/v1/token?key=AIzaSyAzUV2NNUOlLTL04jwmUw9oLhjteuv6Qr4",
-                            data=json.dumps(dict(
-                                grant_type="refresh_token",
-                                refresh_token=self.token.get("refresh_token") or self.token.refreshToken,
-                            )),
-                            headers=self.header,
-                        )
-                        if resp.status_code in range(200, 400):
-                            self.token = cdict(resp.json())
-                            self.token.ts = t
-                        else:
-                            self.token = None
-                if not self.token:
-                    self.header = Request.header()
-                    resp = await create_future(
-                        requests.post,
-                        "https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=AIzaSyAzUV2NNUOlLTL04jwmUw9oLhjteuv6Qr4",
-                        data=json.dumps(dict(
-                            returnSecureToken=True,
-                        )),
-                        headers=self.header,
-                    )
-                    self.token = cdict(resp.json())
-                    self.token.ts = t
-                id_token = self.token.get("id_token") or self.token.idToken
-                header["Authorization"] = f"Bearer {id_token}"
-                nis = int(kwargs.get("--num-inference-steps", 50))
-                nis = min(50, max(25, nis))
-                gs = float(kwargs.get("--guidance-scale", 7.5))
-                gs = min(17.5, max(2.5, gs))
-                resp = await create_future(
-                    requests.post,
-                    "https://api.mage.space/api/v2/images/generate",
-                    data=json.dumps(dict(
-                        prompt=kwargs.get("--prompt", prompt),
-                        aspect_ratio=aspect,
-                        num_inference_steps=nis,
-                        guidance_scale=gs,
-                        strength=float(kwargs.get("--strength", 0.75)),
-                    )),
-                    headers=self.header,
-                )
-                if resp.status_code in range(200, 400):
-                    print(resp.text)
-                    data = resp.json()
-                    url = data["results"][0]["image_url"]
-                    fn = await bot.get_request(url)
-                else:
-                    print(ConnectionError(resp.status_code, resp.text))
+        with discord.context_managers.Typing(channel):
+            fn = await create_future(self.imagebot.art, prompt, url, kwargs, specified)
         if not fn:
             if self.fut:
                 with tracebacksuppressor:

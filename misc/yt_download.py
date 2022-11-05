@@ -3,12 +3,16 @@ import concurrent.futures
 import selenium
 from selenium import webdriver
 
-exc = concurrent.futures.ThreadPoolExecutor(max_workers=6)
+try:
+	exc = concurrent.futures.exc_worker
+except AttributeError:
+	exc = concurrent.futures.exc_worker = concurrent.futures.ThreadPoolExecutor(max_workers=16)
 drivers = []
 
 class_name = webdriver.common.by.By.CLASS_NAME
 css_selector = webdriver.common.by.By.CSS_SELECTOR
 xpath = webdriver.common.by.By.XPATH
+tag_name = webdriver.common.by.By.TAG_NAME
 driver_path = "misc/msedgedriver"
 browsers = dict(
 	edge=dict(
@@ -87,7 +91,7 @@ def safecomp(gen):
 		yield e
 
 
-def yt_download(url, fmt="mp3", dir="", timeout=256):
+def yt_download(url, fmt="mp3", timeout=256):
 	driver = get_driver()
 	try:
 		folder = driver.folder
@@ -183,7 +187,7 @@ def yt_download(url, fmt="mp3", dir="", timeout=256):
 				raise TimeoutError("Request timed out.")
 
 		ts = time.time_ns()
-		fn = os.path.join(dir, f"cache/{ts}.{fmt}")
+		fn = f"cache/{ts}.{fmt}"
 		if not os.path.exists("cache"):
 			os.mkdir("cache")
 		os.rename(os.path.join(folder, elems[0]), fn)
