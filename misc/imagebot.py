@@ -183,12 +183,12 @@ class Bot:
 			for im in ims:
 				p = np.sum(im.resize((32, 32)).convert("L"))
 				if p > 1024:
-					ims2.append(im)
+					b = io.BytesIO()
+					im.save(b, format="png")
+					b.seek(0)
+					ims2.append(b.read())
 			random.shuffle(ims2)
-			b = io.BytesIO()
-			ims2.pop(0).save(b, format="png")
-			b.seek(0)
-			return b.read()
+			return ims2.pop(0)
 		return []
 
 	def art(self, prompt, url="", kwargs={}, specified=False):
