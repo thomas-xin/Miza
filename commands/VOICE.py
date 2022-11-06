@@ -1273,7 +1273,8 @@ class AudioDownloader:
     ydl_opts = {
         # "verbose": 1,
         "quiet": 1,
-        "format": "bestaudio/best",
+        "format": "bestvideo+bestaudio/best",
+        "overwrites": 1,
         "nocheckcertificate": 1,
         "no_call_home": 1,
         "nooverwrites": 1,
@@ -2673,6 +2674,16 @@ class AudioDownloader:
                         fn = f"cache/C{ts}~{outft}"
                     else:
                         fn = f"cache/\x7f{ts}~{outft}"
+                if "yt_live_broadcast" in info["stream"] and "force_finished" in info["stream"]:
+                    self.downloader.params["outtmpl"]["default"] = fn
+                    self.downloader.download(info["url"])
+                    if os.path.exists(fn):
+                        info["stream"] = fn
+                        info["video"] = fn
+                        if vst or vid:
+                            vst.append(fn)
+                        ast.append(fn)
+                        continue
                 if vst or vid:
                     video = info["video"]
                     if video == info["stream"] and is_youtube_url(info["url"]) and has_ytd:
