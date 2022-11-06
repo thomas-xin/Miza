@@ -2495,7 +2495,14 @@ class AudioDownloader:
         if not (info.get("video") and info["video"].startswith("https://www.yt-download.org/download/")):
             self.get_stream(info, video=True, force=True, download=False)
         video = info["video"]
-        if video == info["stream"] and is_youtube_url(info["url"]) and has_ytd:
+        if "yt_live_broadcast" in info["stream"] and "force_finished" in info["stream"]:
+            self.downloader.params["outtmpl"]["default"] = fn
+            self.downloader.download(info["url"])
+            if os.path.exists(fn):
+                info["stream"] = fn
+                info["video"] = fn
+                video = fn
+        elif video == info["stream"] and is_youtube_url(info["url"]) and has_ytd:
             data = self.extract_backup(info["url"], video=True)
             video = info["video"] = get_best_video(data)
         vidinfo = as_str(subprocess.check_output(["./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name,width,height,avg_frame_rate", "-of", "default=nokey=1:noprint_wrappers=1", video])).strip()
@@ -2508,7 +2515,7 @@ class AudioDownloader:
         except:
             fps = 30
         # First produce a silent video file (I would have stored it as raw, except that overflows storage really bad)
-        args = ["./ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-hwaccel", "auto", "-y"]
+        args = ["./ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y"]
         if len(urls) != 1:
             if str(start) != "None":
                 start = round_min(float(start))
@@ -2550,7 +2557,7 @@ class AudioDownloader:
                         data = self.extract_backup(info["url"], video=True)
                         video = info["video"] = get_best_video(data)
                     vidinfo = as_str(subprocess.check_output(["./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "default=nokey=1:noprint_wrappers=1", video])).strip()
-                    args = alist(("./ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y", "-hwaccel", "auto"))
+                    args = alist(("./ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y"))
                     if len(urls) == 1:
                         if str(start) != "None":
                             start = round_min(float(start))
