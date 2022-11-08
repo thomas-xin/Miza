@@ -1211,6 +1211,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 else:
                     found.extend(a.url for a in m.attachments)
                 found.extend(find_urls(m.content))
+                temp = await self.follow_to_image(m.content)
+                found.extend(filter(is_url, temp))
                 # Attempt to find URLs in embed contents
                 for e in m.embeds:
                     for a in medias:
@@ -1225,6 +1227,26 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                                 break
                 # Attempt to find URLs in embed descriptions
                 [found.extend(find_urls(e.description)) for e in m.embeds if e.description]
+                if images:
+                    for r in m.reactions:
+                        e = r.emoji
+                        if hasattr(e, "url")
+                            found.append(as_str(e.url))
+                        else:
+                            u = translate_emojis(e)
+                            if is_url(u):
+                                found.append(u)
+                    if not found:
+                        m = await c.fetch_message(int(spl[2]))
+                        self.bot.add_message(m, files=False, force=True)
+                        for r in m.reactions:
+                            e = r.emoji
+                            if hasattr(e, "url")
+                                found.append(as_str(e.url))
+                            else:
+                                u = translate_emojis(e)
+                                if is_url(u):
+                                    found.append(u)
                 for u in found:
                     # Do not attempt to find the same URL twice
                     if u not in it:

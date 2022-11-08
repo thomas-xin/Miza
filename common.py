@@ -2966,7 +2966,10 @@ def load_emojis():
         print(f"Successfully loaded {len(etrans)} unicode emojis.")
 
 def translate_emojis(s):
-    return s.translate(em_trans)
+    res = s.translate(em_trans)
+    if res in emoji_replace:
+        return emoji_replace[res]
+    return res
 
 def replace_emojis(s):
     for emoji, url in emoji_replace.items():
