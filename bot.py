@@ -1230,7 +1230,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 if images:
                     for r in m.reactions:
                         e = r.emoji
-                        if hasattr(e, "url")
+                        if hasattr(e, "url"):
                             found.append(as_str(e.url))
                         else:
                             u = translate_emojis(e)
@@ -1241,7 +1241,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         self.bot.add_message(m, files=False, force=True)
                         for r in m.reactions:
                             e = r.emoji
-                            if hasattr(e, "url")
+                            if hasattr(e, "url"):
                                 found.append(as_str(e.url))
                             else:
                                 u = translate_emojis(e)
