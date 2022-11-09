@@ -812,6 +812,8 @@ def restructure_buttons(buttons):
 
 
 async def interaction_response(bot, message, content=None, embed=None, embeds=(), components=None, buttons=None, ephemeral=False):
+    if getattr(message, "deferred", False):
+        return interaction_patch(bot, message, content, embed, embeds, components, buttons, ephemeral)
     if hasattr(embed, "to_dict"):
         embed = embed.to_dict()
     if embed:
@@ -1027,7 +1029,10 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
         ephemeral = ephemeral and 64
         sem = emptyctx
         inter = True
-        url = f"https://discord.com/api/{api}/interactions/{reference.id}/{reference.slash}/callback"
+        if getattr(reference, "deferred", False):
+            url = f"https://discord.com/api/{api}/webhooks/{bot.id}/{reference.slash}/messages/@original"
+        else:
+            url = f"https://discord.com/api/{api}/interactions/{reference.id}/{reference.slash}/callback"
         data = dict(
             type=4,
             data=dict(
@@ -1056,7 +1061,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
             fields["reference"] = reference
         if files:
             fields["files"] = files
-        if not buttons and (not embeds or len(embeds) <= 1):
+        if not buttons and (not embeds or len(embeds) <= 1) and getattr(channel, "send", None):
             if embeds:
                 fields["embed"] = next(iter(embeds))
             fields.pop("embeds", None)
@@ -1087,7 +1092,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
         url = f"https://discord.com/api/{api}/channels/{channel.id}/messages"
         if getattr(channel, "dm_channel", None):
             channel = channel.dm_channel
-        elif getattr(channel, "guild", None) and not channel.permissions_for(channel.guild.me).read_message_history:
+        elif getattr(channel, "send", None) and getattr(channel, "guild", None) and not channel.permissions_for(channel.guild.me).read_message_history:
             fields = {}
             if embeds:
                 fields["embeds"] = [embed.to_dict() for embed in embeds]

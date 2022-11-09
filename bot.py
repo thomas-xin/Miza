@@ -3540,6 +3540,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 data='{"type":5}',
                 aio=True,
             )
+            message.deferred = True
 
     async def ignore_interaction(self, message):
         with tracebacksuppressor:

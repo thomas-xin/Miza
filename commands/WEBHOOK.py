@@ -361,6 +361,7 @@ class EmojiList(Command):
             + str(user.id) + "_0"
             + "-\nLoading EmojiList database...```*",
             buttons=buttons,
+            ephemeral=True,
         )
     
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
