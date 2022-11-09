@@ -2277,7 +2277,7 @@ def from_bytes(b, save=None):
         p = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         cmd2 = ["./ffmpeg", "-hide_banner", "-v", "error", "-y", "-hwaccel", "auto", "-i", fn, "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0", "-"]
         print(cmd2)
-        proc = psutil.Popen(cmd2, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0)
+        proc = psutil.Popen(cmd2, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1048576)
         bcount = 4 if fmt == "rgba" else 3
         mode = "RGBA" if fmt == "rgba" else "RGB"
         try:
@@ -2307,6 +2307,8 @@ def from_bytes(b, save=None):
             img = Image.frombuffer(mode, size, b)
             img.info["duration"] = duration
             images.append(img)
+        if not images:
+            print(proc.stderr.read())
         proc.wait(timeout=2)
         return ImageSequence(*images)
     try:
@@ -2586,7 +2588,7 @@ def evalImg(url, operation, args):
                     # command.append("-shortest")
                 command.append(out)
                 print(command)
-                proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, bufsize=0)
+                proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, bufsize=1048576)
             for i, frame in enumerate(frames):
                 if fmt == "zip":
                     b = io.BytesIO()

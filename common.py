@@ -1135,10 +1135,11 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
                     content_type="application/json",
                 )
                 body = form
+            method = "patch" if getattr(reference, "deferred", False) else "post"
             async with sem:
                 resp = await Request(
                     url,
-                    method="post",
+                    method=method,
                     data=body,
                     authorise=True,
                     aio=True,
