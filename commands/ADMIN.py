@@ -1807,7 +1807,7 @@ class CreateEmoji(Command):
             with suppress(discord.Forbidden):
                 await message.add_reaction(emoji)
         s = css_md(f"Successfully created emoji {sqr_md(emoji)} for {sqr_md(guild)}.")
-        await send_with_reply(channel, message, s, buttons=buttons, ephemeral=True)
+        await send_with_reply(channel, message, s, ephemeral=True)
 
 
 class CreateSticker(Command):
