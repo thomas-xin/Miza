@@ -2275,7 +2275,7 @@ def from_bytes(b, save=None):
         cmd = ("./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,avg_frame_rate", "-of", "csv=s=x:p=0", fn)
         print(cmd)
         p = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        cmd2 = ["./ffmpeg", "-hide_banner", "-v", "error", "-y", "-hwaccel", "auto", "-i", fn, "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0", "-"]
+        cmd2 = ["./ffmpeg", "-hide_banner", "-v", "error", "-y", "-i", fn, "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0", "-"]
         print(cmd2)
         proc = psutil.Popen(cmd2, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1048576)
         bcount = 4 if fmt == "rgba" else 3
