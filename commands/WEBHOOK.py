@@ -319,7 +319,7 @@ class UpdateAutoEmojis(Database):
 
 
 class EmojiList(Command):
-    description = "Sets a custom alias for an emoji, usable by ~autoemoji."
+    description = "Sets a custom alias for an emoji, usable by ~autoemoji. Accepts emojis, emoji IDs, emoji URLs, and message links containing emojis or reactions."
     usage = "(add|delete)? <name>? <id>?"
     flags = "aed"
     no_parse = True

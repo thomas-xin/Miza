@@ -3885,25 +3885,28 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
     # Deletes own messages if any of the "X" emojis are reacted by a user with delete message permission level, or if the message originally contained the corresponding reaction from the bot.
     async def check_to_delete(self, message, reaction, user):
+        if user.id == self.id:
+            return
+        if not message.reactions:
+            message = await message.channel.fetch_message(message.id)
+            self.bot.add_message(message, files=False, force=True)
+        if str(reaction) not in "❌✖️🇽❎":
+            return
         if message.author.id == self.id or getattr(message, "webhook_id", None):
             with suppress(discord.NotFound):
                 u_perm = self.get_perms(user.id, message.guild)
                 check = False
                 if not u_perm < 3:
-                    check = True
+                    await self.silent_delete(message, exc=True)
+                elif message.reference and message.reference.resolved and message.reference.resolved.author.id == user.id:
+                    await self.silent_delete(message, exc=True)
+                    await self.send_event("_delete_", message=message)
                 else:
-                    if not message.reactions:
-                        message = await message.channel.fetch_message(message.id)
-                        self.bot.add_message(message, files=False, force=True)
                     for react in message.reactions:
                         if str(reaction) == str(react):
                             if react.me:
-                                check = True
-                                break
-                if check and user.id != self.id:
-                    s = str(reaction)
-                    if s in "❌✖️🇽❎":
-                        await self.silent_delete(message, exc=True)
+                                await self.silent_delete(message, exc=True)
+                                return
 
     # Handles a new sent message, calls process_message and sends an error if an exception occurs.
     async def handle_message(self, message, edit=True):
