@@ -326,7 +326,9 @@ class Server:
                 else:
                     url = cp.request.base + "/i/" + c.rstrip(b"=").decode("utf-8", "replace") + ".gif"
                     return f"""<!DOCTYPE html>
-<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<html><head>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta property="og:type" content="video.other">
 <meta property="twitter:player" content="https://www.youtube.com/embed/dQw4w9WgXcQ">
 <meta property="og:video:type" content="text/html">
@@ -365,6 +367,7 @@ class Server:
                 s = """<!DOCTYPE html>
 <html>
     <head>
+        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
         <style>
         body {
             text-align: center;
@@ -490,6 +493,7 @@ class Server:
                 i_url = f_url.replace("/f/", "/i/") + ".gif"
                 b = ("""<!DOCTYPE html>
 <html>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
 <style>
 .center {
   margin: 0;
@@ -657,6 +661,7 @@ class Server:
         if source:
             data = f"""<!DOCTYPE html>
 <html>
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
     <meta property="og:image" content="{source}">""" + """
     <style>
         .center {
@@ -686,6 +691,7 @@ class Server:
         else:
             data = """<!DOCTYPE html>
 <html>
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
     <style>
         .center {
             margin: 0;
@@ -911,7 +917,9 @@ class Server:
                     else:
                         url = cp.request.base + "/i/" + c.rstrip(b"=").decode("utf-8", "replace") + ".gif"
                         return f"""<!DOCTYPE html>
-    <html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <html><head>
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta property="og:url" content="/">
     <meta property="og:type" content="video.other">
     <meta property="twitter:player" content="https://www.youtube.com/embed/dQw4w9WgXcQ">
@@ -947,7 +955,9 @@ class Server:
 <meta name="twitter:title" content="{a2}"><meta property="twitter:url" content="{f_url}"><meta property="og:image" content="{i_url}">
 <meta property="og:url" content="{f_url}"><meta name="og:description" content="{description}">"""
         i = data.index(b'<meta name="twitter:image:alt" content="somebody once told me the world was gonna roll me">')
-        s = """<!doctype html><html lang="en"><head><meta charset="utf-8"/><link rel="icon" href="/logo256.png"/>\
+        s = """<!doctype html><html lang="en"><head>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
+<meta charset="utf-8"/><link rel="icon" href="/logo256.png"/>\
 <meta charset="utf-8"><meta name="author" content="Miza">""" + meta
         data = s.encode("utf-8") + data[i:]
         cp.response.headers.update(CHEADERS)
@@ -1020,6 +1030,7 @@ class Server:
         s = """<!DOCTYPE html>
 <html>
     <head>
+        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
         <style>
         body {
             text-align: center;
@@ -1093,6 +1104,8 @@ class Server:
         data = f"""<!DOCTYPE html>
 <html>
 <head>
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000"
+     crossorigin="anonymous"></script>
     <meta charset="utf-8">
     <title>Files</title>
     <meta content="Files" property="og:title">
@@ -1423,6 +1436,8 @@ body {
 }
 </style>
 <body>
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000"
+     crossorigin="anonymous"></script>
 	<video playsinline autoplay muted loop poster="https://cdn.discordapp.com/attachments/691915140198826005/846945647873490944/GpAy.webp" style="position:fixed;right:0;bottom:0;min-width:100%;min-height:100%;z-index:-1;">
         <source src="https://cdn.discordapp.com/attachments/691915140198826005/846587863797203004/GpAy.mp4" type="video/mp4">
     </video>
@@ -1524,6 +1539,7 @@ body {
             html = """<!DOCTYPE html>
 <html>
     <head>
+        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
         <meta charset="utf-8">
         <title>Timezones</title>
         <meta content="Timezones" property="og:title">
@@ -1796,6 +1812,7 @@ body {
         create_future_ex(self.ensure_mpins)
         return """<!DOCTYPE html><html>
 <head>
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
     <meta charset="utf-8">
     <title>Insights</title>
     <meta content="Miza Player Insights" property="og:title">
@@ -2034,6 +2051,7 @@ body {
         return f"""<!DOCTYPE html>
 <html>
 <head>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
 <meta property="og:image" content="{url}">
 <meta http-equiv="refresh" content="{refresh}; URL={cp.url(qs=cp.request.query_string)}">
 <meta name="viewport" content="width=device-width, initial-scale=1">
