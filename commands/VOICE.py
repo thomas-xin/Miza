@@ -3531,7 +3531,7 @@ class Connect(Command):
                 try:
                     await bot.wait_for("voice_state_update", check=lambda member, before, after: member.id == bot.id and after, timeout=1)
                 except (T0, T1, T2):
-                    if guild.me.voice is None and and auds.asci is None:
+                    if guild.me.voice is None and auds.asci is None:
                         if i >= 16:
                             auds.kill(reason="")
                             raise
