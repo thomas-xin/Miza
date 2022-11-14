@@ -3527,12 +3527,16 @@ class Connect(Command):
         if not guild.me:
             raise RuntimeError("Server not detected!")
         if guild.me.voice is None:
-            try:
-                await bot.wait_for("voice_state_update", check=lambda member, before, after: member.id == bot.id and after, timeout=16)
-            except (T1):
-                if guild.me.voice is None:
-                    auds.kill(reason="")
-                    raise
+            for i in range(1, 17):
+                try:
+                    await bot.wait_for("voice_state_update", check=lambda member, before, after: member.id == bot.id and after, timeout=1)
+                except (T0, T1, T2):
+                    if guild.me.voice is None and and auds.asci is None:
+                        if i >= 16:
+                            auds.kill(reason="")
+                            raise
+                        continue
+                break
         member = guild.me
         if getattr(member, "voice", None) is not None and vc_.permissions_for(member).mute_members:
             if vc_.type is discord.ChannelType.stage_voice:
@@ -4054,7 +4058,7 @@ class AudioSettings(Command):
                     # Attempt to adjust audio setting by re-initializing FFmpeg player
                     try:
                         await create_future(auds.play, auds.source, auds.pos, timeout=12)
-                    except (TimeoutError, asyncio.exceptions.TimeoutError, concurrent.futures.TimeoutError):
+                    except (T0, T1, T2):
                         if auds.source:
                             print(auds.args)
                         await create_future(auds.stop, timeout=18)
