@@ -2805,9 +2805,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 status_changes.extend(range(self.status_iter + 1, len(self.statuses) - (not self.audio)))
                 self.status_iter = choice(status_changes)
                 with suppress(discord.NotFound):
-                    u = await self.fetch_user(next(iter(self.owners)))
-                    n = u.name
-                    text = f"{self.webserver}, to {uni_str(guild_count)} server{'s' if guild_count != 1 else ''}, from {belongs(uni_str(n))} place!"
+                    text = f"{self.webserver}, to {uni_str(guild_count)} server{'s' if guild_count != 1 else ''}"
+                    if self.owners:
+                        u = await self.fetch_user(next(iter(self.owners)))
+                        n = u.name
+                        text += f", from {belongs(uni_str(n))} place!"
+                    else:
+                        text += "!"
                     # Status iterates through 5 possible choices
                     status = self.statuses[self.status_iter]
                     if status is discord.Streaming:

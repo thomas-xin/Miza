@@ -5,7 +5,11 @@ try:
 except:
     print_exc()
     googletrans = None
-import convobot
+try:
+    import convobot
+except:
+    print_exc()
+    convobot = None
 
 try:
     rapidapi_key = AUTH["rapidapi_key"]
@@ -970,7 +974,10 @@ class Ask(Command):
         try:
             cb = self.convos[channel.id]
         except KeyError:
-            cb = self.convos[channel.id] = convobot.Bot(token=AUTH["huggingface_token"])
+            if not convobot:
+                cb = cdict(talk=lambda *args: "")
+            else:
+                cb = self.convos[channel.id] = convobot.Bot(token=AUTH["huggingface_token"])
         with discord.context_managers.Typing(channel):
             out = await create_future(cb.talk, q)
         if out:
