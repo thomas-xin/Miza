@@ -356,7 +356,9 @@ def predict_next(seq, limit=8):
             return temp
 
 # Multiple variable limit
-def lim(f, **kwargs):
+def lim(f, _d=None, **kwargs):
+    if _d:
+        kwargs.update(_d)
     if hasattr(f, "subs"):
         g = f.subs(kwargs)
         try:
