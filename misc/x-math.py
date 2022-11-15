@@ -356,19 +356,19 @@ def predict_next(seq, limit=8):
             return temp
 
 # Multiple variable limit
-def lim(f, _d=None, **kwargs):
-    if _d:
-        kwargs.update(_d)
+def lim(f, kwargs=None, **_vars):
+    if kwargs:
+        _vars.update({str(k): v for k, v in kwargs.items())
     if hasattr(f, "subs"):
-        g = f.subs(kwargs)
+        g = f.subs(_vars)
         try:
             if not math.isnan(g):
                 return g
         except TypeError:
             return g
-    for i in kwargs:
-        g = sympy.limit(f, i, kwargs[i], "+")
-        h = sympy.limit(f, i, kwargs[i], "-")
+    for i in _vars:
+        g = sympy.limit(f, i, _vars[i], "+")
+        h = sympy.limit(f, i, _vars[i], "-")
         if g != h:
             try:
                 if not math.isfinite(g) and not math.isfinite(h) and g == -h:
