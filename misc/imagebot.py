@@ -200,7 +200,8 @@ class Bot:
 			if not specified:
 				if random.randint(0, 2) and self.cache.get(prompt):
 					return self.cache[prompt].pop(0)
-				funcs.append(self.art_mage)
+				if prompt.isascii():
+					funcs.append(self.art_mage)
 				funcs.append(self.art_deepai)
 		random.shuffle(funcs)
 		for func in funcs:
