@@ -1002,8 +1002,11 @@ class Ask(Command):
                         generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
                         prompt = generated_text.strip()
                         if prompt:
-                            cb.append(f"image = {prompt}")
+                            prompt = f"this is {prompt}"
+                            print(prompt)
+                            cb.append(prompt)
                 if reference.content and not is_url(reference.content):
+                    print(reference.content)
                     cb.append(reference.content)
             out = await create_future(cb.talk, q)
         if out:
