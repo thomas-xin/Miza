@@ -1008,7 +1008,7 @@ class Ask(Command):
                                 print(prompt)
                                 cb.append(prompt)
                                 spl = q.casefold().replace("'", " ").strip("?").split()
-                                if ("what" in spl or "who" in spl or "is" in spl or "name" in spl or "does") and ("this" in spl or "is" in spl):
+                                if ("what" in spl or "who" in spl or "is" in spl or "name" in spl or "does") and ("this" in spl or "is" in spl or "that" in spl):
                                     cb.append(q)
                                     await send_with_reply(channel, message, "\xad" + escape_roles(prompt))
                                     return
@@ -1036,7 +1036,7 @@ class Ask(Command):
                                 prompt = f"This is {prompt}"
                                 print(prompt)
                                 cb.append(prompt)
-                                if ("what" in spl or "who" in spl or "is" in spl or "name" in spl or "does") and ("this" in spl or "is" in spl):
+                                if ("what" in spl or "who" in spl or "is" in spl or "name" in spl or "does") and ("this" in spl or "is" in spl or "that" in spl):
                                     cb.append(q)
                                     await send_with_reply(channel, message, "\xad" + escape_roles(prompt))
                                     return
