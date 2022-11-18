@@ -1004,10 +1004,10 @@ class Ask(Command):
                             prompt = generated_text.strip()
                             if prompt:
                                 prompt = prompt.replace(" is ", ", ").replace(" are ", ", ")
-                                prompt = f"this is {prompt}"
+                                prompt = f"This is {prompt}"
                                 print(prompt)
                                 cb.append(prompt)
-                                spl = q.casefold().replace("'", " ").split()
+                                spl = q.casefold().replace("'", " ").strip("?").split()
                                 if ("what" in spl or "who" in spl or "is" in spl or "name" in spl or "does") and ("this" in spl or "is" in spl):
                                     cb.append(q)
                                     await send_with_reply(channel, message, "\xad" + escape_roles(prompt))
@@ -1016,7 +1016,7 @@ class Ask(Command):
                     print(reference.content)
                     cb.append(reference.content)
             if TrOCRProcessor:
-                spl = q.casefold().replace("'", " ").split()
+                spl = q.casefold().replace("'", " ").strip("?").split()
                 if ("what" in spl or "who" in spl or "is" in spl or "name" in spl or "does") and ("this" in spl or "is" in spl):
                     url = f"https://discord.com/channels/0/{channel.id}/{message.id}"
                     found = await bot.follow_url(url)
@@ -1033,7 +1033,7 @@ class Ask(Command):
                             prompt = generated_text.strip()
                             if prompt:
                                 prompt = prompt.replace(" is ", ", ").replace(" are ", ", ")
-                                prompt = f"this is {prompt}"
+                                prompt = f"This is {prompt}"
                                 print(prompt)
                                 cb.append(q)
                                 cb.append(prompt)
