@@ -1002,12 +1002,41 @@ class Ask(Command):
                         generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
                         prompt = generated_text.strip()
                         if prompt:
+                            prompt = prompt.replace(" is ", ", ")
                             prompt = f"this is {prompt}"
                             print(prompt)
                             cb.append(prompt)
+                            spl = q.replace("'", " ").split()
+                            if (("what" in spl or "who" in spl) and "is" in spl or "name" in spl) and ("this" in spl or "is" in spl):
+                                cb.append(q)
+                                await send_with_reply(channel, message, "\xad" + escape_roles(prompt))
+                                return
                 if reference.content and not find_urls(reference.content):
                     print(reference.content)
                     cb.append(reference.content)
+            if TrOCRProcessor:
+                spl = q.replace("'", " ").split()
+                if (("what" in spl or "who" in spl) and "is" in spl or "name" in spl) and ("this" in spl or "is" in spl):
+                    url = f"https://discord.com/channels/0/{channel.id}/{message.id}"
+                    found = await bot.follow_url(url)
+                    if found and found[0] != url:
+                        url = found[0]
+                        processor = await create_future(TrOCRProcessor.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
+                        model = await create_future(VisionEncoderDecoderModel.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
+                        b = await bot.get_request(url)
+                        image = Image.open(io.BytesIO(b)).convert("RGB")
+                        pixel_values = processor(image, return_tensors="pt").pixel_values
+                        generated_ids = await create_future(model.generate, pixel_values)
+                        generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+                        prompt = generated_text.strip()
+                        if prompt:
+                            prompt = prompt.replace(" is ", ", ")
+                            prompt = f"this is {prompt}"
+                            print(prompt)
+                            cb.append(q)
+                            cb.append(prompt)
+                            await send_with_reply(channel, message, "\xad" + escape_roles(prompt))
+                            return
             out = await create_future(cb.talk, q)
         if out:
             await send_with_reply(channel, message, "\xad" + escape_roles(out))
