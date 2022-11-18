@@ -1017,7 +1017,7 @@ class Ask(Command):
                     cb.append(reference.content)
             if TrOCRProcessor:
                 spl = q.casefold().replace("'", " ").strip("?").split()
-                if ("what" in spl or "who" in spl or "is" in spl or "name" in spl or "does") and ("this" in spl or "is" in spl):
+                if find_urls(message.content) or message.attachments or message.embeds:
                     url = f"https://discord.com/channels/0/{channel.id}/{message.id}"
                     found = await bot.follow_url(url)
                     if found and found[0] != url and is_image(found[0]) is not None:
@@ -1035,10 +1035,11 @@ class Ask(Command):
                                 prompt = prompt.replace(" is ", ", ").replace(" are ", ", ")
                                 prompt = f"This is {prompt}"
                                 print(prompt)
-                                cb.append(q)
                                 cb.append(prompt)
-                                await send_with_reply(channel, message, "\xad" + escape_roles(prompt))
-                                return
+                                if ("what" in spl or "who" in spl or "is" in spl or "name" in spl or "does") and ("this" in spl or "is" in spl):
+                                    cb.append(q)
+                                    await send_with_reply(channel, message, "\xad" + escape_roles(prompt))
+                                    return
             out = await create_future(cb.talk, q)
         if out:
             await send_with_reply(channel, message, "\xad" + escape_roles(out))
