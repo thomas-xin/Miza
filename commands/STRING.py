@@ -985,7 +985,7 @@ class Ask(Command):
                 cb = self.convos[channel.id] = convobot.Bot(token=AUTH["huggingface_token"])
         with discord.context_managers.Typing(channel):
             if getattr(message, "reference", None):
-                reference = message.reference
+                reference = message.reference.resolved
                 if TrOCRProcessor:
                     url = f"https://discord.com/channels/0/{channel.id}/{reference.id}"
                     found = await bot.follow_url(url)
