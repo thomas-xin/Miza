@@ -15,6 +15,8 @@ try:
     from transformers import TrOCRProcessor, VisionEncoderDecoderModel
 except ImportError:
     TrOCRProcessor = None
+else:
+    from PIL import Image
 
 try:
     rapidapi_key = AUTH["rapidapi_key"]
