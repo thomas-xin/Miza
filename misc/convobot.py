@@ -291,7 +291,7 @@ class Bot:
 		return response
 
 	def append(self, msg):
-		self.history[msg] = self.history.pop(msg, None)
+		self.history[msg] = self.history.pop(msg, "")
 		return msg
 
 if __name__ == "__main__":
