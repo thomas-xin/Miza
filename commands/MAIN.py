@@ -2126,7 +2126,7 @@ class UpdateUsers(Database):
             # Simulates a randomized conversation
             if count < 5:
                 create_task(message.add_reaction("👀"))
-            if msg and "ask" in bot.commands and random.random() > math.atan(count / 16) / 4:
+            if msg and "ask" in bot.commands:# and random.random() > math.atan(count / 16) / 4:
                 argv = self.mentionspam.sub("", msg).strip(" ,")
                 for ask in bot.commands.ask:
                     await ask(message, message.channel, user, argv, name="ask", flags=flags)

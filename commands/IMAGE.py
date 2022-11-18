@@ -6,7 +6,10 @@ except ModuleNotFoundError:
     import youtube_dl
 import aiohttp
 
-from transformers import TrOCRProcessor, VisionEncoderDecoderModel
+try:
+    from transformers import TrOCRProcessor, VisionEncoderDecoderModel
+except ImportError:
+    TrOCRProcessor = None
 from PIL import Image
 import imagebot
 
@@ -1490,14 +1493,15 @@ class StableDiffusion(Command):
         if not prompt:
             if not url:
                 raise ArgumentError("Please input a valid prompt.")
-            processor = await create_future(TrOCRProcessor.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
-            model = await create_future(VisionEncoderDecoderModel.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
-            b = await bot.get_request(url)
-            image = Image.open(io.BytesIO(b)).convert("RGB")
-            pixel_values = processor(image, return_tensors="pt").pixel_values
-            generated_ids = await create_future(model.generate, pixel_values)
-            generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
-            prompt = generated_text.strip()
+            if TrOCRProcessor:
+                processor = await create_future(TrOCRProcessor.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
+                model = await create_future(VisionEncoderDecoderModel.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
+                b = await bot.get_request(url)
+                image = Image.open(io.BytesIO(b)).convert("RGB")
+                pixel_values = processor(image, return_tensors="pt").pixel_values
+                generated_ids = await create_future(model.generate, pixel_values)
+                generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+                prompt = generated_text.strip()
             if not prompt:
                 prompt = "art"
         req = prompt

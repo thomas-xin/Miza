@@ -12,6 +12,11 @@ except:
     convobot = None
 
 try:
+    from transformers import TrOCRProcessor, VisionEncoderDecoderModel
+except ImportError:
+    TrOCRProcessor = None
+
+try:
     rapidapi_key = AUTH["rapidapi_key"]
     if not rapidapi_key:
         raise
@@ -979,6 +984,25 @@ class Ask(Command):
             else:
                 cb = self.convos[channel.id] = convobot.Bot(token=AUTH["huggingface_token"])
         with discord.context_managers.Typing(channel):
+            if getattr(message, "reference", None):
+                reference = message.reference
+                if TrOCRProcessor:
+                    url = f"https://discord.com/channels/0/{channel.id}/{reference.id}"
+                    found = await bot.follow_url(url)
+                    if found and found[0] != url:
+                        url = found[0]
+                        processor = await create_future(TrOCRProcessor.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
+                        model = await create_future(VisionEncoderDecoderModel.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
+                        b = await bot.get_request(url)
+                        image = Image.open(io.BytesIO(b)).convert("RGB")
+                        pixel_values = processor(image, return_tensors="pt").pixel_values
+                        generated_ids = await create_future(model.generate, pixel_values)
+                        generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+                        prompt = generated_text.strip()
+                        if prompt:
+                            cb.append(f"image = {prompt}")
+                if reference.content and not is_url(reference.content):
+                    cb.append(reference.content)
             out = await create_future(cb.talk, q)
         if out:
             await send_with_reply(channel, message, "\xad" + escape_roles(out))
