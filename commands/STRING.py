@@ -1005,7 +1005,7 @@ class Ask(Command):
                             prompt = f"this is {prompt}"
                             print(prompt)
                             cb.append(prompt)
-                if reference.content and not is_url(reference.content):
+                if reference.content and not find_urls(reference.content):
                     print(reference.content)
                     cb.append(reference.content)
             out = await create_future(cb.talk, q)
