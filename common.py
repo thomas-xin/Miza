@@ -2878,7 +2878,10 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
                     data = await resp.read()
                 except (TypeError, AttributeError):
                     data = resp.text
-                raise ConnectionError(status, url, as_str(data))
+                if not isinstance(data, bytes):
+                    data = bytes(data, "utf-8")
+                if not data or magic.from_buffer(resp.content).startswith("text/"):
+                    raise ConnectionError(status, url, as_str(data))
             if json:
                 data = resp.json()
                 if awaitable(data):
@@ -2935,7 +2938,8 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
             if BOT[0]:
                 BOT[0].activity += 1
             if resp.status_code >= 400:
-                raise ConnectionError(resp.status_code, url, resp.text)
+                if not resp.content or magic.from_buffer(resp.content).startswith("text/"):
+                    raise ConnectionError(resp.status_code, url, resp.text)
             if json:
                 return resp.json()
             if raw and getattr(resp, "raw", None):
