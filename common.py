@@ -2880,7 +2880,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
                     data = resp.text
                 if not isinstance(data, bytes):
                     data = bytes(data, "utf-8")
-                if not data or magic.from_buffer(resp.content).startswith("text/"):
+                if not data or magic.from_buffer(data).startswith("text/"):
                     raise ConnectionError(status, url, as_str(data))
             if json:
                 data = resp.json()
