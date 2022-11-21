@@ -1017,6 +1017,8 @@ class Ask(Command):
                                         await send_with_reply(channel, message, "\xad" + escape_roles(prompt))
                                         self.analysed[url] = prompt
                                         return
+                        else:
+                            cb.append(prompt)
                 if reference.content and not find_urls(reference.content):
                     print(reference.content)
                     cb.append(reference.content)
@@ -1049,6 +1051,8 @@ class Ask(Command):
                                         await send_with_reply(channel, message, "\xad" + escape_roles(prompt))
                                         self.analysed[url] = prompt
                                         return
+                        else:
+                            cb.append(prompt)
             out = await create_future(cb.talk, q)
         if out:
             await send_with_reply(channel, message, "\xad" + escape_roles(out))
