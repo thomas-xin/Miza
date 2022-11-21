@@ -944,6 +944,7 @@ class Ask(Command):
     slash = True
 
     convos = {}
+    analysed = {}
 
     async def __call__(self, message, channel, user, argv, name, flags=(), **void):
         bot = self.bot
@@ -993,25 +994,29 @@ class Ask(Command):
                     found = await bot.follow_url(url)
                     if found and found[0] != url and is_image(found[0]) is not None:
                         url = found[0]
-                        processor = await create_future(TrOCRProcessor.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
-                        model = await create_future(VisionEncoderDecoderModel.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
-                        b = await bot.get_request(url)
-                        with tracebacksuppressor:
-                            image = Image.open(io.BytesIO(b)).convert("RGB")
-                            pixel_values = processor(image, return_tensors="pt").pixel_values
-                            generated_ids = await create_future(model.generate, pixel_values)
-                            generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
-                            prompt = generated_text.strip()
-                            if prompt:
-                                prompt = prompt.replace(" is ", ", ").replace(" are ", ", ")
-                                prompt = f"This is {prompt}"
-                                print(prompt)
-                                cb.append(prompt)
-                                spl = q.casefold().replace("'", " ").strip("?").split()
-                                if ("what" in spl or "who" in spl or "is" in spl or "name" in spl or "does") and ("this" in spl or "is" in spl or "that" in spl):
-                                    cb.append(q)
-                                    await send_with_reply(channel, message, "\xad" + escape_roles(prompt))
-                                    return
+                        try:
+                            prompt = self.analysed[url]
+                        except KeyError:
+                            processor = await create_future(TrOCRProcessor.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
+                            model = await create_future(VisionEncoderDecoderModel.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
+                            b = await bot.get_request(url)
+                            with tracebacksuppressor:
+                                image = Image.open(io.BytesIO(b)).convert("RGB")
+                                pixel_values = processor(image, return_tensors="pt").pixel_values
+                                generated_ids = await create_future(model.generate, pixel_values)
+                                generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+                                prompt = generated_text.strip()
+                                if prompt:
+                                    prompt = prompt.replace(" is ", ", ").replace(" are ", ", ")
+                                    prompt = f"This is {prompt}"
+                                    print(prompt)
+                                    cb.append(prompt)
+                                    spl = q.casefold().replace("'", " ").strip("?").split()
+                                    if ("what" in spl or "who" in spl or "is" in spl or "name" in spl or "does") and ("this" in spl or "is" in spl or "that" in spl):
+                                        cb.append(q)
+                                        await send_with_reply(channel, message, "\xad" + escape_roles(prompt))
+                                        self.analysed[url] = prompt
+                                        return
                 if reference.content and not find_urls(reference.content):
                     print(reference.content)
                     cb.append(reference.content)
@@ -1022,24 +1027,28 @@ class Ask(Command):
                     found = await bot.follow_url(url)
                     if found and found[0] != url and is_image(found[0]) is not None:
                         url = found[0]
-                        processor = await create_future(TrOCRProcessor.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
-                        model = await create_future(VisionEncoderDecoderModel.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
-                        b = await bot.get_request(url)
-                        with tracebacksuppressor:
-                            image = Image.open(io.BytesIO(b)).convert("RGB")
-                            pixel_values = processor(image, return_tensors="pt").pixel_values
-                            generated_ids = await create_future(model.generate, pixel_values)
-                            generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
-                            prompt = generated_text.strip()
-                            if prompt:
-                                prompt = prompt.replace(" is ", ", ").replace(" are ", ", ")
-                                prompt = f"This is {prompt}"
-                                print(prompt)
-                                cb.append(prompt)
-                                if ("what" in spl or "who" in spl or "is" in spl or "name" in spl or "does") and ("this" in spl or "is" in spl or "that" in spl):
-                                    cb.append(q)
-                                    await send_with_reply(channel, message, "\xad" + escape_roles(prompt))
-                                    return
+                        try:
+                            prompt = self.analysed[url]
+                        except KeyError:
+                            processor = await create_future(TrOCRProcessor.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
+                            model = await create_future(VisionEncoderDecoderModel.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
+                            b = await bot.get_request(url)
+                            with tracebacksuppressor:
+                                image = Image.open(io.BytesIO(b)).convert("RGB")
+                                pixel_values = processor(image, return_tensors="pt").pixel_values
+                                generated_ids = await create_future(model.generate, pixel_values)
+                                generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+                                prompt = generated_text.strip()
+                                if prompt:
+                                    prompt = prompt.replace(" is ", ", ").replace(" are ", ", ")
+                                    prompt = f"This is {prompt}"
+                                    print(prompt)
+                                    cb.append(prompt)
+                                    if ("what" in spl or "who" in spl or "is" in spl or "name" in spl or "does") and ("this" in spl or "is" in spl or "that" in spl):
+                                        cb.append(q)
+                                        await send_with_reply(channel, message, "\xad" + escape_roles(prompt))
+                                        self.analysed[url] = prompt
+                                        return
             out = await create_future(cb.talk, q)
         if out:
             await send_with_reply(channel, message, "\xad" + escape_roles(out))
