@@ -1045,6 +1045,8 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
             data["data"]["embeds"] = [embed.to_dict() for embed in embeds]
         if components:
             data["data"]["components"] = components
+        if getattr(reference, "deferred", False):
+            data = data["data"]
     else:
         ephemeral = False
         fields = {}
