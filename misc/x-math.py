@@ -381,9 +381,90 @@ def lim(f, kwargs=None, **_vars):
             f = g
     return f
 
+has_maxima = os.name == "nt"
+
+def get_maxima():
+    try:
+        proc = globals()["MAXIMA"]
+    except KeyError:
+        import psutil
+        proc = globals()["MAXIMA"] = psutil.Popen("maxima", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        o = None
+        while o != b"%":
+            o = proc.stdout.read(1)
+    except FileNotFoundError:
+        globals()["has_maxima"] = False
+        raise
+    return proc
+
+def _integrate(*args, **kwargs):
+    proc = get_maxima()
+    s = "grind(integrate(" + ",".join(map(str, args)) + "))$"
+    try:
+        proc.stdin.write(s.encode("utf-8"))
+        proc.stdin.flush()
+        proc.stdout.readline()
+        b = proc.stdout.readline().decode("utf-8", "replace")
+        if b.startswith("incorrect syntax:"):
+            raise SyntaxError(b)
+        s = b.strip("$; \r\n")
+    except:
+        if proc.is_running():
+            proc.kill()
+        globals().pop("MAXIMA", None)
+        raise
+    return sympy.sympify(s)
+
 # May integrate a spline
 def integrate(*args, **kwargs):
     try:
+        if has_maxima:
+            try:
+                ans = _integrate(*args, **kwargs)
+                if not ans:
+                    raise EOFError
+            except:
+                pass
+            else:
+                return ans
+        return sympy.integrate(*args, **kwargs)
+    except ValueError:
+        return sympy.integrate(*plotArgs(args), sympy.Symbol("x"))
+
+
+def _dsolve(*args, **kwargs):
+    proc = get_maxima()
+    args = list(args)
+    for i, arg in enumerate(args):
+        for j in range(8):
+            args[i] = arg.replace("_y", "'diff(y,x)")
+    s = "grind(integrate(" + ",".join(map(str, args)) + "=0))$"
+    try:
+        proc.stdin.write(s.encode("utf-8"))
+        proc.stdin.flush()
+        proc.stdout.readline()
+        b = proc.stdout.readline().decode("utf-8", "replace")
+        if b.startswith("incorrect syntax:"):
+            raise SyntaxError(b)
+        s = b.strip("$; \r\n").replace("%c", "0").replace("%e", "e")
+    except:
+        if proc.is_running():
+            proc.kill()
+        globals().pop("MAXIMA", None)
+        raise
+    return sympy.sympify(s)
+
+def dsolve(*args, **kwargs):
+    try:
+        if has_maxima:
+            try:
+                ans = _dsolve(*args, **kwargs)
+                if not ans:
+                    raise EOFError
+            except:
+                pass
+            else:
+                return ans
         return sympy.integrate(*args, **kwargs)
     except ValueError:
         return sympy.integrate(*plotArgs(args), sympy.Symbol("x"))
