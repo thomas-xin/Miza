@@ -399,7 +399,7 @@ def get_maxima():
 
 def _integrate(*args, **kwargs):
     proc = get_maxima()
-    s = "grind(integrate(" + ",".join(map(str, args)) + "))$"
+    s = "grind(integrate(" + ",".join(map(str, args)) + ",x))$"
     try:
         proc.stdin.write(s.encode("utf-8"))
         proc.stdin.flush()
@@ -438,7 +438,7 @@ def _dsolve(*args, **kwargs):
     for i, arg in enumerate(args):
         for j in range(8):
             args[i] = arg.replace("_y", "'diff(y,x)")
-    s = "grind(integrate(" + ",".join(map(str, args)) + "=0))$"
+    s = "grind(contrib_ode(" + ",".join(map(str, args)) + "=0),y,x)$"
     try:
         proc.stdin.write(s.encode("utf-8"))
         proc.stdin.flush()
