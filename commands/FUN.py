@@ -2724,6 +2724,7 @@ class Rickroll(Command):
         if len(args) < 2:
             args.append("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
         url, video = args[:2]
+        video = video.strip("<>")
         urls = await bot.follow_url(url, best=True, allow=True, limit=1)
         if not urls:
             url = await bot.get_last_image(message.channel)
@@ -2760,8 +2761,12 @@ class Rickroll(Command):
         elif video.startswith("http://youtube.com/v/"):
             vid = video.split("v/", 1)[-1].split("?", 1)[0]
         else:
-            vid = video
-            mime = await create_future(bot.detect_mime, video)
+            urls = await bot.follow_url(video, best=True, allow=True, limit=1)
+            if urls:
+                vid = urls[0]
+            else:
+                vid = video
+            mime = await create_future(bot.detect_mime, vid)
         if not vid:
             raise TypeError(f"Unsupported url: {video}.")
         s = f"""<!DOCTYPE html>
