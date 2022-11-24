@@ -1161,7 +1161,10 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
                     fields["embeds"] = embeds
                 if tts:
                     fields["tts"] = tts
-                return await channel.send(content, **fields)
+                message = await channel.send(content, **fields)
+                for a in message.attachments:
+                    print("<attachment>", a.url)
+                return message
             print_exc()
         else:
             if not resp:
@@ -1174,6 +1177,8 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
             if ephemeral:
                 message.id = reference.id
                 message.slash = reference.slash
+            for a in message.attachments:
+                print("<attachment>", a.url)
             return message
         await asyncio.sleep(i + 1)
     raise exc
