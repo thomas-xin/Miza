@@ -2763,21 +2763,22 @@ class Rickroll(Command):
         else:
             urls = await bot.follow_url(video, best=True, allow=True, limit=1)
             if urls:
-                vid = urls[0]
-            else:
-                vid = video
-            mime = await create_future(bot.detect_mime, vid)
-        if not vid:
-            raise TypeError(f"Unsupported url: {video}.")
+                video = urls[0]
+            mime = await create_future(bot.detect_mime, video)
+        if vid:
+            embed = f"https://www.youtube.com/embed/{vid}"
+            video = f"https://www.youtube.com/watch?v={vid}"
+        else:
+            embed = video
         s = f"""<!DOCTYPE html>
 <html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta property="og:type" content="video.other">
-<meta property="twitter:player" content="https://www.youtube.com/embed/{vid}">
+<meta property="twitter:player" content="{embed}">
 <meta property="og:video:type" content="{mime}">
 <meta property="og:video:width" content="{w}">
 <meta property="og:video:height" content="{h}">
 <meta name="twitter:image" content="{url}">
-<meta http-equiv="refresh" content="0;url=https://www.youtube.com/watch?v={vid}">
+<meta http-equiv="refresh" content="0;url={video}">
 </head><body></body></html>"""
         urls = await create_future(bot._globals["as_file"], s.encode("utf-8"))
         return urls[0].replace("/p/", "/f/", 1)
