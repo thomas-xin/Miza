@@ -2747,22 +2747,29 @@ class Rickroll(Command):
                         ext = "jpg"
                 else:
                     ext = "png"
+        b = await bot.get_request(url)
+        from PIL import Image
+        with Image.open(io.BytesIO(b)) as im:
+            w, h = im.size
         vid = None
+        mime = "text/html"
         if video.startswith("https://www.youtube.com/watch?v") and "=" in video:
             vid = video.split("=", 1)[-1].split("&", 1)[0].split("#", 1)[0]
         elif video.startswith("http://youtu.be/"):
             vid = video.split("e/", 1)[-1].split("?", 1)[0]
         elif video.startswith("http://youtube.com/v/"):
             vid = video.split("v/", 1)[-1].split("?", 1)[0]
+        else:
+            mime = "video/webm"
         if not vid:
             raise TypeError(f"Unsupported url: {video}.")
         s = f"""<!DOCTYPE html>
 <html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta property="og:type" content="video.other">
 <meta property="twitter:player" content="https://www.youtube.com/embed/{vid}">
-<meta property="og:video:type" content="text/html">
-<meta property="og:video:width" content="960">
-<meta property="og:video:height" content="720">
+<meta property="og:video:type" content="{mime}">
+<meta property="og:video:width" content="{w}">
+<meta property="og:video:height" content="{h}">
 <meta name="twitter:image" content="{url}">
 <meta http-equiv="refresh" content="0;url=https://www.youtube.com/watch?v={vid}">
 </head><body></body></html>"""
