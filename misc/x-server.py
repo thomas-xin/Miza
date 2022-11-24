@@ -453,15 +453,15 @@ class Server:
                         "ignore_err",
                         "-fflags",
                         "+discardcorrupt+genpts+igndts+flush_packets",
-                        "-hwaccel",
-                        "auto",
+                        # "-hwaccel",
+                        # "auto",
                         "-an",
                         "-i",
                         p,
                         "-loop",
                         "0",
                         "-fs",
-                        "1048576",
+                        "524288",
                         "-vf",
                         "scale=240:-1",
                         preview,
@@ -963,12 +963,17 @@ class Server:
 <meta name="twitter:card" content="summary_large_image">\
 <meta name="twitter:title" content="{a2}"><meta property="twitter:url" content="{f_url}"><meta property="og:image" content="{i_url}">\
 <meta property="og:image:type" content="{mim}"><meta property="og:url" content="{f_url}"><meta name="og:description" content="{description}">"""
-        i = data.index(b'<meta name="twitter:image:alt" content="somebody once told me the world was gonna roll me">')
-        s = f"""<!doctype html><html lang="en"><head>
+        i = data.index(b'</title>' + 8)
+        s = """<!doctype html><html lang="en"><head>
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
 <meta charset="utf-8"/><link rel="icon" href="/logo256.png"/>\
-<meta charset="utf-8"><meta name="author" content="{fn}">""" + meta
-        data = s.encode("utf-8") + data[i:]
+<meta charset="utf-8"><meta name="author" content="Miza">\
+<meta name="viewport" content="width=device-width,initial-scale=1"/>\
+<meta name="theme-color" content="#694777"/>\
+<link rel="apple-touch-icon" href="/logo256.png"/>\
+<link rel="manifest" href="/manifest.json"/>""" + meta
+        t = f'<title>{fn}</title><meta name="description" content="{description}"/>'
+        data = s.encode("utf-8") + data[i:] + t.encode("utf-8")
         cp.response.headers.update(CHEADERS)
         cp.response.headers["Content-Type"] = mime
         cp.response.headers["Content-Length"] = len(data)
