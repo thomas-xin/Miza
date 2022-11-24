@@ -439,7 +439,7 @@ class Server:
                 cp.response.headers["Content-Length"] = len(b)
                 cp.response.headers["ETag"] = create_etag(b)
                 return b
-            elif endpoint.startswith("i") and (mime in ("image/webp", "image/apng") or mime.split("/", 1)[0] == "video"):
+            elif endpoint.startswith("r") and (mime in ("image/webp", "image/apng") or mime.split("/", 1)[0] == "video"):
                 preview = "cache/%" + p.rsplit("/", 1)[-1].split(".", 1)[0] + ".gif"
                 image_loaders = self.image_loaders
                 if (not os.path.exists(preview) or not os.path.getsize(preview)) and preview not in image_loaders:
@@ -461,7 +461,7 @@ class Server:
                         "-loop",
                         "0",
                         "-fs",
-                        "524288",
+                        "1048576",
                         "-vf",
                         "scale=240:-1",
                         preview,
@@ -488,9 +488,54 @@ class Server:
                         cp.response.headers["Content-Type"] = get_mime(p)
                         f = open(p, "rb")
                 return cp.lib.file_generator(f, 262144)
+            elif endpoint.startswith("i") and (mime in ("image/webp", "image/apng") or mime.split("/", 1)[0] == "video"):
+                preview = "cache/%" + p.rsplit("/", 1)[-1].split(".", 1)[0] + ".png"
+                image_loaders = self.image_loaders
+                if (not os.path.exists(preview) or not os.path.getsize(preview)) and preview not in image_loaders:
+                    args = (
+                        "./ffmpeg",
+                        "-nostdin",
+                        "-hide_banner",
+                        "-v",
+                        "error",
+                        "-err_detect",
+                        "ignore_err",
+                        "-fflags",
+                        "+discardcorrupt+genpts+igndts+flush_packets",
+                        # "-hwaccel",
+                        # "auto",
+                        "-an",
+                        "-i",
+                        p,
+                        "-vframes",
+                        "1",
+                        preview,
+                    )
+                    print(args)
+                    proc = psutil.Popen(args)
+                    image_loaders[preview] = proc
+                cp.response.headers["Content-Type"] = "image/png"
+                cp.response.headers["ETag"] = create_etag(p)
+                while preview in image_loaders and (not os.path.exists(preview) or os.path.getsize(preview) < 524288) and is_strict_running(image_loaders[preview]):
+                    time.sleep(0.05)
+                f = None
+                if preview in image_loaders and not is_strict_running(image_loaders[preview]) or preview not in image_loaders and os.path.exists(preview):
+                    cp.response.headers["Content-Length"] = os.path.getsize(preview)
+                elif preview in image_loaders:
+                    f = DownloadingFile(
+                        preview,
+                        lambda: not is_strict_running(image_loaders[preview]),
+                    )
+                if not f:
+                    if os.path.getsize(preview):
+                        f = open(preview, "rb")
+                    else:
+                        cp.response.headers["Content-Type"] = get_mime(p)
+                        f = open(p, "rb")
+                return cp.lib.file_generator(f, 262144)
             elif endpoint.startswith("a") and mime.split("/", 1)[0] in "video":
                 f_url = cp.url(qs=cp.request.query_string).replace(f"/{endpoint}/", "/f/")
-                i_url = f_url.replace("/f/", "/i/") + ".gif"
+                i_url = f_url.replace("/f/", "/r/") + ".gif"
                 b = ("""<!DOCTYPE html>
 <html>
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
@@ -947,18 +992,19 @@ class Server:
                 fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
                 attachment = filename or fn
                 a2 = url_unparse(attachment)
-                i_url = url.replace("/file/", "/i/") + ".gif"
                 f_url = url.replace("/file/", "/f/")
                 mim = get_mime(p)
                 description = mim + f", {byte_scale(os.path.getsize(p))}B"
                 meta = '<meta http-equiv="Content-Type" content="text/html;charset=UTF-8">'
                 if mim.startswith("video/"):
+                    i_url = url.replace("/file/", "/i/") + ".gif"
                     meta += f"""<meta property="og:type" content="video.other">\
 <meta property="twitter:player" content="{f_url}">\
 <meta property="og:video:type" content="{mim}">\
 <meta property="og:video:width" content="960">\
 <meta name="twitter:image" content="{i_url}">"""
                 else:
+                    i_url = url.replace("/file/", "/r/") + ".gif"
                     meta += f"""<meta name="twitter:image:src" content="{i_url}">\
 <meta name="twitter:card" content="summary_large_image">\
 <meta name="twitter:title" content="{a2}"><meta property="twitter:url" content="{f_url}"><meta property="og:image" content="{i_url}">\
