@@ -949,20 +949,20 @@ class Server:
                 a2 = url_unparse(attachment)
                 i_url = url.replace("/file/", "/i/") + ".gif"
                 f_url = url.replace("/file/", "/f/")
-                mime = get_mime(p)
-                description = mime + f", {byte_scale(os.path.getsize(p))}B"
-                meta = '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">'
-                if mime.startswith("video/"):
+                mim = get_mime(p)
+                description = mim + f", {byte_scale(os.path.getsize(p))}B"
+                meta = '<meta http-equiv="Content-Type" content="text/html;charset=UTF-8">'
+                if mim.startswith("video/"):
                     meta += f"""<meta property="og:type" content="video.other">\
 <meta property="twitter:player" content="{f_url}">\
-<meta property="og:video:type" content="{mime}">\
+<meta property="og:video:type" content="{mim}">\
 <meta property="og:video:width" content="960">\
 <meta name="twitter:image" content="{i_url}">"""
                 else:
                     meta += f"""<meta name="twitter:image:src" content="{i_url}">\
 <meta name="twitter:card" content="summary_large_image">\
 <meta name="twitter:title" content="{a2}"><meta property="twitter:url" content="{f_url}"><meta property="og:image" content="{i_url}">\
-<meta property="og:url" content="{f_url}"><meta name="og:description" content="{description}">"""
+<meta property="og:image:type" content="{mim}"><meta property="og:url" content="{f_url}"><meta name="og:description" content="{description}">"""
         i = data.index(b'<meta name="twitter:image:alt" content="somebody once told me the world was gonna roll me">')
         s = """<!doctype html><html lang="en"><head>
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
