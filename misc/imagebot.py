@@ -136,13 +136,17 @@ class Bot:
 			os.mkdir(folder)
 
 		try:
-			elems = driver.find_elements(by=css_selector, value="*")
-			for e in reversed(elems):
-				if e.text == "Download":
-					e.click()
-					break
+			elems = driver.find_elements(by=css_selector, value="a[download='']")
+			if elems:
+				elems[0].click()
 			else:
-				raise
+				elems = driver.find_elements(by=css_selector, value="*")
+				for e in reversed(elems):
+					if e.text == "Download":
+						e.click()
+						break
+				else:
+					raise FileNotFoundError("Download")
 
 			elems = None
 			while not elems:
@@ -190,9 +194,11 @@ class Bot:
 					im.save(b, format="png")
 					b.seek(0)
 					ims2.append(b.read())
-			random.shuffle(ims2)
-			return ims2.pop(0)
-		return []
+			if ims2:
+				random.shuffle(ims2)
+				return ims2.pop(0)
+			else:
+				self.cache.pop(prompt, None)
 
 	def art(self, prompt, url="", kwargs={}, specified=False):
 		funcs = []
@@ -205,7 +211,12 @@ class Bot:
 				funcs.append(self.art_deepai)
 		random.shuffle(funcs)
 		for func in funcs:
-			im = func(prompt, kwargs)
+			try:
+				im = func(prompt, kwargs)
+			except:
+				import traceback
+				traceback.print_exc()
+				im = None
 			if im:
 				return im
 
