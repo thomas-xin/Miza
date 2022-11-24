@@ -2716,7 +2716,7 @@ class Rickroll(Command):
     no_parse = True
     rate_limit = 1
 
-    async def __call__(self, bot, args, message, **void):
+    async def __call__(self, bot, args, message, channel, **void):
         if message.attachments:
             args = [best_url(a) for a in message.attachments] + args
         if not args:
