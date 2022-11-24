@@ -2760,7 +2760,8 @@ class Rickroll(Command):
         elif video.startswith("http://youtube.com/v/"):
             vid = video.split("v/", 1)[-1].split("?", 1)[0]
         else:
-            mime = "video/webm"
+            vid = video
+            mime = await create_future(bot.detect_mime, video)
         if not vid:
             raise TypeError(f"Unsupported url: {video}.")
         s = f"""<!DOCTYPE html>
