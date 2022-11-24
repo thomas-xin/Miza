@@ -974,7 +974,7 @@ class Ask(Command):
                 "Haha, nice try, I know that's not an actual question 🙃",
                 "You thinking of asking an actual question?",
             )
-        print(q)
+        print(f"{message.author}:", q)
         if q.casefold() in ("how", "how?"):
             await send_with_reply(channel, message, "https://imgur.com/gallery/8cfRt")
             return

@@ -403,6 +403,7 @@ class UpdateExec(Database):
             emb.colour = discord.Colour(col)
             url = await bot.get_proxy_url(user)
             emb.set_author(name=f"{user} ({user.id})", icon_url=url)
+            emb.set_footer(text=str(message.id))
             for c_id, flag in self.data.items():
                 if flag & 2:
                     channel = self.bot.cache.channels.get(c_id)
