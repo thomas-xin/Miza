@@ -2727,7 +2727,8 @@ class Rickroll(Command):
         urls = await bot.follow_url(url, best=True, allow=True, limit=1)
         if not urls:
             url = await bot.get_last_image(message.channel)
-        url = urls[0]
+        else:
+            url = urls[0]
         with discord.context_managers.Typing(channel):
             mime = await create_future(bot.detect_mime, url)
             image = None
