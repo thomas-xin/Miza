@@ -917,18 +917,18 @@ class Server:
                     else:
                         url = cp.request.base + "/i/" + c.rstrip(b"=").decode("utf-8", "replace") + ".gif"
                         return f"""<!DOCTYPE html>
-    <html><head>
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    <meta property="og:url" content="/">
-    <meta property="og:type" content="video.other">
-    <meta property="twitter:player" content="https://www.youtube.com/embed/dQw4w9WgXcQ">
-    <meta property="og:video:type" content="text/html">
-    <meta property="og:video:width" content="960">
-    <meta property="og:video:height" content="720">
-    <meta name="twitter:image" content="{url}">
-    <meta http-equiv="refresh" content="0;url=https://www.youtube.com/watch?v=dQw4w9WgXcQ">
-    </head><body></body></html>""".encode("utf-8")
+<html><head>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta property="og:url" content="/">
+<meta property="og:type" content="video.other">
+<meta property="twitter:player" content="https://www.youtube.com/embed/dQw4w9WgXcQ">
+<meta property="og:video:type" content="text/html">
+<meta property="og:video:width" content="960">
+<meta property="og:video:height" content="720">
+<meta name="twitter:image" content="{url}">
+<meta http-equiv="refresh" content="0;url=https://www.youtube.com/watch?v=dQw4w9WgXcQ">
+</head><body></body></html>""".encode("utf-8")
                 if (len(b) - 1) & 3 == 0:
                     b += b"="
                 path = str(int.from_bytes(base64.urlsafe_b64decode(b), "big"))
@@ -964,10 +964,10 @@ class Server:
 <meta name="twitter:title" content="{a2}"><meta property="twitter:url" content="{f_url}"><meta property="og:image" content="{i_url}">\
 <meta property="og:image:type" content="{mim}"><meta property="og:url" content="{f_url}"><meta name="og:description" content="{description}">"""
         i = data.index(b'<meta name="twitter:image:alt" content="somebody once told me the world was gonna roll me">')
-        s = """<!doctype html><html lang="en"><head>
+        s = f"""<!doctype html><html lang="en"><head>
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
 <meta charset="utf-8"/><link rel="icon" href="/logo256.png"/>\
-<meta charset="utf-8"><meta name="author" content="Miza">""" + meta
+<meta charset="utf-8"><meta name="author" content="{p}">""" + meta
         data = s.encode("utf-8") + data[i:]
         cp.response.headers.update(CHEADERS)
         cp.response.headers["Content-Type"] = mime
