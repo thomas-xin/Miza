@@ -2765,6 +2765,7 @@ class Rickroll(Command):
             if urls:
                 video = urls[0]
             mime = await create_future(bot.detect_mime, video)
+            mime = mime[0]
         if vid:
             embed = f"https://www.youtube.com/embed/{vid}"
             video = f"https://www.youtube.com/watch?v={vid}"
