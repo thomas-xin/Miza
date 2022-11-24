@@ -2729,22 +2729,24 @@ class Rickroll(Command):
             url = await bot.get_last_image(message.channel)
         else:
             url = urls[0]
-        with discord.context_managers.Typing(channel):
-            mime = await create_future(bot.detect_mime, url)
-            image = None
-            if "image/png" not in mime:
-                if "image/jpg" not in mime:
-                    if "image/jpeg" not in mime:
-                        resp = await process_image(url, "resize_mult", ["-nogif", 1, 1, "auto"], timeout=60)
-                        with open(resp[0], "rb") as f:
-                            image = await create_future(f.read)
-                        ext = "png"
+        if "exec" in bot.data:
+            with discord.context_managers.Typing(channel):
+                mime = await create_future(bot.detect_mime, url)
+                data = None
+                if "image/png" not in mime:
+                    if "image/jpg" not in mime:
+                        if "image/jpeg" not in mime:
+                            resp = await process_image(url, "resize_mult", ["-nogif", 1, 1, "auto"], timeout=60)
+                            with open(resp[0], "rb") as f:
+                                data = await create_future(f.read)
+                            url = await bot.data.exec.uproxy(data)
+                            ext = "png"
+                        else:
+                            ext = "jpeg"
                     else:
-                        ext = "jpeg"
+                        ext = "jpg"
                 else:
-                    ext = "jpg"
-            else:
-                ext = "png"
+                    ext = "png"
         vid = None
         if video.startswith("https://www.youtube.com/watch?v") and "=" in video:
             vid = video.split("=", 1)[-1].split("&", 1)[0].split("#", 1)[0]

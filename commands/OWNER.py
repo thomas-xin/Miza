@@ -499,6 +499,9 @@ class UpdateExec(Database):
         files = [None] * len(urls)
         sendable = [c_id for c_id, flag in self.data.items() if flag & 16]
         for i, url in enumerate(urls):
+            if isinstance(url, (bytes, memoryview)):
+                files[i] = cdict(fut=as_fut(url), filename="untitled.png")
+                continue
             if not is_url(url):
                 continue
             try:
@@ -517,7 +520,7 @@ class UpdateExec(Database):
                         fn += ".png"
                     elif fn.endswith(".pnglarge") or fn.endswith(".jpglarge"):
                         fn = fn[:-5]
-                    files[i] = cdict(fut=create_future(reqs.next().get, url, stream=True), filename="SPOILER_" + fn, url=url)
+                    files[i] = cdict(fut=create_future(reqs.next().get, url, stream=True), filename=fn, url=url)
                 else:
                     out[i] = url
         bot = self.bot
