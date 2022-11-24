@@ -967,7 +967,7 @@ class Server:
         s = f"""<!doctype html><html lang="en"><head>
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
 <meta charset="utf-8"/><link rel="icon" href="/logo256.png"/>\
-<meta charset="utf-8"><meta name="author" content="{p}">""" + meta
+<meta charset="utf-8"><meta name="author" content="{fn}">""" + meta
         data = s.encode("utf-8") + data[i:]
         cp.response.headers.update(CHEADERS)
         cp.response.headers["Content-Type"] = mime
