@@ -973,7 +973,7 @@ class Server:
 <link rel="apple-touch-icon" href="/logo256.png"/>\
 <link rel="manifest" href="/manifest.json"/>""" + meta
         t = f'<title>{fn}</title><meta name="description" content="{description}"/>'
-        data = s.encode("utf-8") + data[i:] + t.encode("utf-8")
+        data = s.encode("utf-8") + t.encode("utf-8") + data[i:]
         cp.response.headers.update(CHEADERS)
         cp.response.headers["Content-Type"] = mime
         cp.response.headers["Content-Length"] = len(data)
