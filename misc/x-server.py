@@ -1011,6 +1011,7 @@ class Server:
 <meta property="og:image:type" content="{mim}"><meta property="og:url" content="{f_url}"><meta name="og:description" content="{description}">"""
         else:
             fn = "Miza"
+            description = "A multipurpose Discord bot."
         i = data.index(b'</title>') + 8
         s = """<!doctype html><html lang="en"><head>
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
