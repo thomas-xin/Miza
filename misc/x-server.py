@@ -1009,6 +1009,8 @@ class Server:
 <meta name="twitter:card" content="summary_large_image">\
 <meta name="twitter:title" content="{a2}"><meta property="twitter:url" content="{f_url}"><meta property="og:image" content="{i_url}">\
 <meta property="og:image:type" content="{mim}"><meta property="og:url" content="{f_url}"><meta name="og:description" content="{description}">"""
+        else:
+            fn = "Miza"
         i = data.index(b'</title>') + 8
         s = """<!doctype html><html lang="en"><head>
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
