@@ -1578,8 +1578,11 @@ class StableDiffusion(Command):
                             "input.png",
                         ))
                         if inpaint:
+                            fm = "misc/stable_diffusion.openvino/mask.png"
+                            if os.path.exists(fm):
+                                os.remove(fm)
                             resp = await process_image(url, "get_mask", ["-nogif"], timeout=60)
-                            os.rename(resp[0], "misc/stable_diffusion.openvino/mask.png")
+                            os.rename(resp[0], fm)
                             args.extend((
                                 "--mask",
                                 "mask.png",
