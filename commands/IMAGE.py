@@ -1577,17 +1577,22 @@ class StableDiffusion(Command):
                             "--init-image",
                             "input.png",
                         ))
-                        if "--strength" not in kwargs:
-                            args.extend((
-                                "--strength",
-                                "0.75",
-                            ))
                         if inpaint:
-                            resp = await process_image(fn, "get_mask", ["-nogif"], timeout=60)
+                            resp = await process_image(url, "get_mask", ["-nogif"], timeout=60)
                             os.rename(resp[0], "misc/stable_diffusion.openvino/mask.png")
                             args.extend((
                                 "--mask",
                                 "mask.png",
+                            ))
+                            if "--strength" not in kwargs:
+                                args.extend((
+                                    "--strength",
+                                    "1",
+                                ))
+                        elif "--strength" not in kwargs:
+                            args.extend((
+                                "--strength",
+                                "0.75",
                             ))
                     for k, v in kwargs.items():
                         args.extend((k, v))

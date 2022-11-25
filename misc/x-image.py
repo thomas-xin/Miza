@@ -2168,6 +2168,8 @@ def hue_shift(image, value):
 def get_mask(image):
     if image.mode != "LA":
         image = image.convert("LA")
+    if image.size != (512, 512):
+        image = image.resize((512, 512), resample=Resampling.LANCZOS)
     a = np.array(image, dtype=np.uint8).T
     L, A = a[0].T, a[1].T
     anytrans = A != 255
