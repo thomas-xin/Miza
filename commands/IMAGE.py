@@ -1419,17 +1419,18 @@ class Waifu2x(Command):
 
 class StableDiffusion(Command):
     _timeout_ = 150
-    name = ["Art", "AIArt"]
+    name = ["Art", "AIArt", "Inpaint"]
     description = "Runs a Stable Diffusion AI art generator on the input prompt or image. Operates on a global queue system. Accepts appropriate keyword arguments."
-    usage = "<0:prompt>"
+    usage = "<0:prompt> <inpaint{?i}>"
     rate_limit = (12, 60)
+    flags = "i"
     typing = True
     slash = ("Art",)
     sdiff_sem = Semaphore(1, 256, rate_limit=1)
     fut = None
     imagebot = imagebot.Bot()
 
-    async def __call__(self, bot, channel, message, args, **void):
+    async def __call__(self, bot, channel, message, name, args, flags, **void):
         for a in message.attachments:
             args.insert(0, a.url)
         if not args:
@@ -1442,6 +1443,7 @@ class StableDiffusion(Command):
             "--guidance-scale": "7.5",
             "--eta": "0.8",
         }
+        inpaint = "i" in flags or name == "inpaint"
         specified = set()
         aspect = 1
         kwarg = ""
@@ -1579,6 +1581,13 @@ class StableDiffusion(Command):
                             args.extend((
                                 "--strength",
                                 "0.75",
+                            ))
+                        if inpaint:
+                            resp = await process_image(fn, "get_mask", ["-nogif"], timeout=60)
+                            os.rename(resp[0], "misc/stable_diffusion.openvino/mask.png")
+                            args.extend((
+                                "--mask",
+                                "mask.png",
                             ))
                     for k, v in kwargs.items():
                         args.extend((k, v))

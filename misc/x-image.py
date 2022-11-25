@@ -2165,6 +2165,43 @@ def hue_shift(image, value):
     return image
 
 
+def get_mask(image):
+    if image.mode != "LA":
+        image = image.convert("LA")
+    a = np.array(image, dtype=np.uint8).T
+    L, A = a[0].T, a[1].T
+    anytrans = A != 255
+    anyalpha = anytrans & (A != 0)
+    at = np.any(anytrans)
+    aa = np.any(anyalpha)
+    anywhite = L == 255
+    anyblack = L == 0
+    aw = np.sum(anywhite)
+    ab = np.sum(anyblack)
+    if at and not aa:
+        L[anytrans] = 255
+        L[anytrans == False] = 0
+    else:
+        if aw and ab:
+            avg = np.mean(L)
+            if 255 - avg < 32:
+                aw = 0
+            elif avg < 32:
+                ab = 0
+            elif aw > ab:
+                ab = 0
+            else:
+                aw = 0
+        if aw and not ab:
+            L[anywhite == False] = 0
+        elif ab and not aw:
+            L[anyblack] = 255
+            L[anyblack == False] = 0
+        else:
+            raise RuntimeError("Unable to detect mask. Please use full black, white, or transparent.")
+    return Image.fromarray(L, mode="L")
+
+
 # For the ~activity command.
 special_colours = {
     "message": (0, 0, 1),
