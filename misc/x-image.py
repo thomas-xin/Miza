@@ -2205,53 +2205,53 @@ def get_mask(image):
 
 def inpaint(image, url):
     image2 = get_image(url, url)
-	if image2.mode == "LA":
-		image2 = image2.getchannel("L")
-	elif "RGB" in image2.mode or "P" in image2.mode:
-		image2 = image2.convert("L")
-	mask = np.asanyarray(image2, dtype=np.uint8) >= 128
-	outl = np.roll(mask, -1, axis=0)
-	outu = np.roll(mask, -1, axis=1)
-	outr = np.roll(mask, 1, axis=0)
-	outd = np.roll(mask, 1, axis=1)
-	outline = (outl | outu | outr | outd) & (mask == False)
-	if image.mode != "RGB":
-		image = image.convert("RGB")
-	if image.size != image2.size:
-		image = image.resize(image2.size, resample=Resampling.LANCZOS)
-	a = np.array(image, dtype=np.uint8)
-	orients = [None] * 2
-	for i in range(2):
-		if i:
-			b = a.swapaxes(0, 1)
-			m2 = mask.T
-			o2 = outline.T
-		else:
-			b = a
-			m2 = mask
-			o2 = outline
-		pm = np.argwhere(m2)
-		om = np.argwhere(o2)
-		paint_mask = np.empty(len(pm), dtype=object)
-		paint_mask[:] = tuple(map(tuple, pm))
-		outliner = np.empty(len(om), dtype=object)
-		outliner[:] = tuple(map(tuple, om))
-		nearr = np.searchsorted(outliner, paint_mask) % len(om)
-		nearl = nearr - 1
-		ipl = tuple(om[nearl].T)
-		ipr = tuple(om[nearr].T)
-		dist = np.sqrt(np.sum((pm.astype(np.float32) - om[nearl]) ** 2, axis=1))
-		dist /= np.max(dist)
-		grads = np.tile(dist, (3, 1)).T
-		interpolated = (b[ipl] * (1 - grads) + b[ipr] * grads).astype(np.uint8) >> 1
-		orients[i] = (m2, interpolated)
-	a[mask] = 0
-	for i, (m, o) in enumerate(orients):
-		if i:
-			a.swapaxes(0, 1)[m] += o
-		else:
-			a[mask] += o
-	return Image.fromarray(a, mode="RGB")
+    if image2.mode == "LA":
+        image2 = image2.getchannel("L")
+    elif "RGB" in image2.mode or "P" in image2.mode:
+        image2 = image2.convert("L")
+    mask = np.asanyarray(image2, dtype=np.uint8) >= 128
+    outl = np.roll(mask, -1, axis=0)
+    outu = np.roll(mask, -1, axis=1)
+    outr = np.roll(mask, 1, axis=0)
+    outd = np.roll(mask, 1, axis=1)
+    outline = (outl | outu | outr | outd) & (mask == False)
+    if image.mode != "RGB":
+        image = image.convert("RGB")
+    if image.size != image2.size:
+        image = image.resize(image2.size, resample=Resampling.LANCZOS)
+    a = np.array(image, dtype=np.uint8)
+    orients = [None] * 2
+    for i in range(2):
+        if i:
+            b = a.swapaxes(0, 1)
+            m2 = mask.T
+            o2 = outline.T
+        else:
+            b = a
+            m2 = mask
+            o2 = outline
+        pm = np.argwhere(m2)
+        om = np.argwhere(o2)
+        paint_mask = np.empty(len(pm), dtype=object)
+        paint_mask[:] = tuple(map(tuple, pm))
+        outliner = np.empty(len(om), dtype=object)
+        outliner[:] = tuple(map(tuple, om))
+        nearr = np.searchsorted(outliner, paint_mask) % len(om)
+        nearl = nearr - 1
+        ipl = tuple(om[nearl].T)
+        ipr = tuple(om[nearr].T)
+        dist = np.sqrt(np.sum((pm.astype(np.float32) - om[nearl]) ** 2, axis=1))
+        dist /= np.max(dist)
+        grads = np.tile(dist, (3, 1)).T
+        interpolated = (b[ipl] * (1 - grads) + b[ipr] * grads).astype(np.uint8) >> 1
+        orients[i] = (m2, interpolated)
+    a[mask] = 0
+    for i, (m, o) in enumerate(orients):
+        if i:
+            a.swapaxes(0, 1)[m] += o
+        else:
+            a[mask] += o
+    return Image.fromarray(a, mode="RGB")
 
 
 # For the ~activity command.
