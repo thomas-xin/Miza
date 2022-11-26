@@ -2173,7 +2173,8 @@ def get_mask(image):
     a = np.array(image, dtype=np.uint8).T
     L, A = a[0].T, a[1].T
     anytrans = A != 255
-    anyalpha = anytrans & (A != 0)
+    notblank = A != 0
+    anyalpha = anytrans & notblank
     at = np.any(anytrans)
     aa = np.any(anyalpha)
     anywhite = L == 255
@@ -2185,7 +2186,7 @@ def get_mask(image):
         L[anytrans == False] = 0
     else:
         if aw and ab:
-            avg = np.mean(L)
+            avg = np.mean(L[notblank])
             if 255 - avg < 32:
                 aw = 0
             elif avg < 32:
@@ -2195,10 +2196,10 @@ def get_mask(image):
             else:
                 aw = 0
         if aw and not ab:
-            L[(anywhite == False) & (A != 0)] = 0
+            L[(anywhite == False) & notblank] = 0
         elif ab and not aw:
-            L[anyblack & (A != 0)] = 255
-            L[(anyblack == False) & (A != 0)] = 0
+            L[anyblack & notblank] = 255
+            L[(anyblack == False) & notblank] = 0
         else:
             raise RuntimeError("Unable to detect mask. Please use full black, white, or transparent.")
     mask = Image.fromarray(L, mode="L")
