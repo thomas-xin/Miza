@@ -1437,6 +1437,7 @@ class StableDiffusion(Command):
             raise ArgumentError("Input string is empty.")
         req = " ".join(args)
         url = None
+        url2 = None
         rems = deque()
         kwargs = {
             "--num-inference-steps": "24",
@@ -1480,8 +1481,10 @@ class StableDiffusion(Command):
             urls = await bot.follow_url(arg, allow=True, images=True)
             if not urls:
                 rems.append(arg)
-            elif not url:
-                url = urls[0]
+            if urls and not url:
+                url = urls.pop(0)
+            if urls and not url2:
+                url2 = urls.pop(0)
         if not self.fut and not os.path.exists("misc/stable_diffusion.openvino"):
             self.fut = create_future(subprocess.run(
                 [
@@ -1513,10 +1516,13 @@ class StableDiffusion(Command):
             if req:
                 req += " "
             req += url
+            if url2:
+                req += " " + url2
         if specified:
             req += " ".join(f"{k} {v}" for k, v in kwargs.items() if k in specified)
+        fn = None
         with discord.context_managers.Typing(channel):
-            fn = await create_future(self.imagebot.art, prompt, url, kwargs, specified)
+            fn = await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified)
         if not fn:
             if self.fut:
                 with tracebacksuppressor:
@@ -1569,30 +1575,44 @@ class StableDiffusion(Command):
                     await send_with_react(channel, italics(ini_md(f"StableDiffusion: {sqr_md(req)} enqueued in position {sqr_md(self.sdiff_sem.passive + 1)}.")), reacts="❎", reference=message)
                 async with self.sdiff_sem:
                     if url:
-                        b = await bot.get_request(url)
                         fn = "misc/stable_diffusion.openvino/input.png"
-                        with open(fn, "wb") as f:
-                            f.write(b)
+                        resp = await process_image(url, "resize_mult", ["-nogif", 1, 1, "auto"], timeout=60)
+                        if os.path.exists(fn):
+                            os.remove(fn)
+                        os.rename(resp[0], fn)
                         args.extend((
                             "--init-image",
                             "input.png",
                         ))
-                        if inpaint:
+                        if inpaint and url2:
+                            b = await bot.get_request(url2)
                             fm = "misc/stable_diffusion.openvino/mask.png"
+                            with open(fm, "wb") as f:
+                                f.write(b)
+                            args.extend((
+                                "--mask",
+                                "mask.png",
+                            ))
+                        if inpaint and not url2:
+                            fm = "misc/stable_diffusion.openvino/mask.png"
+                            resp = await process_image(fn, "get_mask", ["-nogif", "-nodel"], timeout=60)
                             if os.path.exists(fm):
                                 os.remove(fm)
-                            resp = await process_image(url, "get_mask", ["-nogif"], timeout=60)
                             os.rename(resp[0], fm)
                             args.extend((
                                 "--mask",
                                 "mask.png",
                             ))
-                            if "--strength" not in kwargs:
-                                args.extend((
-                                    "--strength",
-                                    "1",
-                                ))
-                        elif "--strength" not in kwargs:
+                            # if "--strength" not in kwargs:
+                            #     args.extend((
+                            #         "--strength",
+                            #         "1",
+                            #     ))
+                            resp = await process_image(fn, "inpaint", [url2, "-nodel"], timeout=60)
+                            if os.path.exists(fn):
+                                os.remove(fn)
+                            os.rename(resp[0], fn)
+                        if "--strength" not in kwargs:
                             args.extend((
                                 "--strength",
                                 "0.75",

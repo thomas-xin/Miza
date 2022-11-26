@@ -156,7 +156,7 @@ class Bot:
 			tokenizer = AutoTokenizer.from_pretrained(m)
 			model = AutoModelForQuestionAnswering.from_pretrained(m)
 			self.models[m] = (tokenizer, model)
-		inputs = tokenizer(q[:512], c[:512], return_tensors="pt", max_length=4096, truncate=True)
+		inputs = tokenizer(q[:512], c[:512], return_tensors="pt", max_length=4096, truncation=True)
 		with torch.no_grad():
 			outputs = model(**inputs)
 		answer_start_index = outputs.start_logits.argmax()
@@ -172,12 +172,12 @@ class Bot:
 			model = AutoModelForCausalLM.from_pretrained(m)
 			self.models[m] = (tokenizer, model)
 		end = tokenizer.eos_token
-		new_user_input_ids = tokenizer.encode(q + end, return_tensors="pt", max_length=4096, truncate=True)
+		new_user_input_ids = tokenizer.encode(q + end, return_tensors="pt", max_length=4096, truncation=True)
 		history = []
 		for k, v in self.history.items():
-			history.append(tokenizer.encode(k + end, return_tensors="pt", max_length=4096, truncate=True))
+			history.append(tokenizer.encode(k + end, return_tensors="pt", max_length=4096, truncation=True))
 			if v:
-				history.append(tokenizer.encode(v + end, return_tensors="pt", max_length=4096, truncate=True))
+				history.append(tokenizer.encode(v + end, return_tensors="pt", max_length=4096, truncation=True))
 		history.append(new_user_input_ids)
 		bot_input_ids = torch.cat(history, dim=-1)
 		chat_history_ids = model.generate(bot_input_ids, max_length=1024, pad_token_id=tokenizer.eos_token_id)
