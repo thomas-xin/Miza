@@ -1601,6 +1601,14 @@ class StableDiffusion(Command):
                             if os.path.exists(fm):
                                 os.remove(fm)
                             os.rename(resp[0], fm)
+                            resp = await process_image(fn, "inpaint", [fm, "-nodel"], timeout=60)
+                            if os.path.exists(fn):
+                                os.remove(fn)
+                            os.rename(resp[0], fn)
+                            resp = await process_image(fm, "expand_mask", ["-nogif", 8], timeout=60)
+                            if os.path.exists(fm):
+                                os.remove(fm)
+                            os.rename(resp[0], fm)
                             args.extend((
                                 "--mask",
                                 "mask.png",
@@ -1610,10 +1618,6 @@ class StableDiffusion(Command):
                             #         "--strength",
                             #         "1",
                             #     ))
-                            resp = await process_image(fn, "inpaint", [fm, "-nodel"], timeout=60)
-                            if os.path.exists(fn):
-                                os.remove(fn)
-                            os.rename(resp[0], fn)
                         if "--strength" not in kwargs:
                             args.extend((
                                 "--strength",

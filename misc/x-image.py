@@ -2201,7 +2201,8 @@ def get_mask(image):
             L[anyblack == False] = 0
         else:
             raise RuntimeError("Unable to detect mask. Please use full black, white, or transparent.")
-    return Image.fromarray(L, mode="L")
+    mask = Image.fromarray(L, mode="L")
+    return expand_mask(mask, radius=4)
 
 def inpaint(image, url):
     image2 = get_image(url, url, nodel=True)
@@ -2259,6 +2260,44 @@ def inpaint(image, url):
     a2 = np.asanyarray(im2, dtype=np.uint8)
     a[mask] = a2[mask]
     return Image.fromarray(a, mode="RGB")
+
+def expand_mask(image2, radius=4):
+    if not radius:
+        return image2
+    if radius > image2.width:
+        radius = image2.width
+    if radius > image2.height:
+        radius = image2.height
+    if image2.mode == "LA":
+        image2 = image2.getchannel("L")
+    elif "RGB" in image2.mode or "P" in image2.mode:
+        image2 = image2.convert("L")
+    mask = np.asanyarray(image2, dtype=np.uint8)
+    outmask = mask.copy()
+    for x in range(-radius, radius + 1):
+        for y in range(-radius, radius + 1):
+            if x ** 2 + y ** 2 > (radius + 0.5) ** 2:
+                continue
+            temp = mask.copy()
+            if x > 0:
+                t2 = temp[:-x]
+                temp[:x] = temp[-x:]
+                temp[x:] = t2
+            elif x < 0:
+                t2 = temp[-x:]
+                temp[x:] = temp[:-x]
+                temp[:x] = t2
+            if y > 0:
+                t2 = temp.T[:-y]
+                temp.T[:y] = temp.T[-y:]
+                temp.T[y:] = t2
+            elif y < 0:
+                t2 = temp.T[-y:]
+                temp.T[y:] = temp.T[:-y]
+                temp.T[:y] = t2
+            outmask |= temp
+    outim = Image.fromarray(outmask, mode="L")
+    return outim
 
 
 # For the ~activity command.
