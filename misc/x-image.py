@@ -2204,7 +2204,7 @@ def get_mask(image):
     return Image.fromarray(L, mode="L")
 
 def inpaint(image, url):
-    image2 = get_image(url, url)
+    image2 = get_image(url, url, nodel=True)
     if image2.mode == "LA":
         image2 = image2.getchannel("L")
     elif "RGB" in image2.mode or "P" in image2.mode:

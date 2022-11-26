@@ -1610,7 +1610,7 @@ class StableDiffusion(Command):
                             #         "--strength",
                             #         "1",
                             #     ))
-                            resp = await process_image(fn, "inpaint", [url2, "-nodel"], timeout=60)
+                            resp = await process_image(fn, "inpaint", [fm, "-nodel"], timeout=60)
                             if os.path.exists(fn):
                                 os.remove(fn)
                             os.rename(resp[0], fn)
