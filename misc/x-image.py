@@ -2209,6 +2209,8 @@ def inpaint(image, url):
         image2 = image2.getchannel("L")
     elif "RGB" in image2.mode or "P" in image2.mode:
         image2 = image2.convert("L")
+    elif image2.mode != "L":
+        image2 = image2.convert("L")
     mask = np.asanyarray(image2, dtype=np.uint8) >= 128
     outl = np.roll(mask, -1, axis=0)
     outu = np.roll(mask, -1, axis=1)
@@ -2251,6 +2253,11 @@ def inpaint(image, url):
             a.swapaxes(0, 1)[m] += o
         else:
             a[mask] += o
+    im = Image.fromarray(a, mode="RGB")
+    filt = ImageFilter.GaussianBlur(radius=2.5)
+    im2 = im.filter(filt)
+    a2 = np.asanyarray(im2, dtype=np.uint8)
+    a[mask] = a2[mask]
     return Image.fromarray(a, mode="RGB")
 
 
