@@ -180,7 +180,7 @@ class Bot:
 				history.append(tokenizer.encode(v + end, return_tensors="pt", max_length=4096, truncation=True))
 		history.append(new_user_input_ids)
 		bot_input_ids = torch.cat(history, dim=-1)
-		chat_history_ids = model.generate(bot_input_ids, max_length=1024, pad_token_id=tokenizer.eos_token_id)
+		chat_history_ids = model.generate(bot_input_ids, max_length=16384, pad_token_id=tokenizer.eos_token_id)
 		return tokenizer.decode(chat_history_ids[:, bot_input_ids.shape[-1]:][0], skip_special_tokens=True).strip()
 
 	def answer_fill_mask(self, m, q):

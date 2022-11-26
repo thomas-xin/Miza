@@ -2254,7 +2254,7 @@ def inpaint(image, url):
         else:
             a[mask] += o
     im = Image.fromarray(a, mode="RGB")
-    filt = ImageFilter.GaussianBlur(radius=2.5)
+    filt = ImageFilter.GaussianBlur(radius=1.5)
     im2 = im.filter(filt)
     a2 = np.asanyarray(im2, dtype=np.uint8)
     a[mask] = a2[mask]

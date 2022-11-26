@@ -1055,7 +1055,7 @@ class Ask(Command):
                             cb.append(prompt)
             out = await create_future(cb.talk, q)
         if out:
-            await send_with_reply(channel, message, "\xad" + escape_roles(out))
+            await send_with_reply(channel, message, lim_str("\xad" + escape_roles(out), 2000))
             return
         q = single_space(q).strip().translate(bot.mtrans).replace("?", "\u200b").strip("\u200b")
         out = None

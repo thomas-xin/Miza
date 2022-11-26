@@ -1431,7 +1431,7 @@ class StableDiffusion(Command):
     imagebot = imagebot.Bot()
 
     async def __call__(self, bot, channel, message, name, args, flags, **void):
-        for a in message.attachments:
+        for a in reversed(message.attachments):
             args.insert(0, a.url)
         if not args:
             raise ArgumentError("Input string is empty.")
