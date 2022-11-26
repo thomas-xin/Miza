@@ -2402,8 +2402,15 @@ def from_bytes(b, save=None):
     if mime == "application/zip":
         z = zipfile.ZipFile(io.BytesIO(data), compression=zipfile.ZIP_DEFLATED, strict_timestamps=False)
         return ImageSequence(*(Image.open(z.open(f.filename)) for f in z.filelist if not f.is_dir()))
+    if mime.split("/", 1)[0] == "image" and mime.split("/", 1)[-1] in "blp bmp cur dcx dds dib emf eps fits flc fli fpx ftex gbr gd icns ico im imt iptc jpeg jpg mcidas mic mpo msp naa pcd pcx pixar png ppm psd sgi sun spider tga tiff wal webp wmf xbm".split():
+        try:
+            return Image.open(out)
+        except PIL.UnidentifiedImageError:
+            if not b:
+                raise FileNotFoundError("image file not found")
+            out.seek(0)   
     if mime.split("/", 1)[0] in ("image", "video"):
-        fmt = "rgba" if mime == "image/gif" else "rgb24"
+        fmt = "rgba" if mime.split("/", 1)[0] == "image" else "rgb24"
         ts = time.time_ns() // 1000
         fn = "cache/" + str(ts)
         with open(fn, "wb") as f:
@@ -2447,14 +2454,7 @@ def from_bytes(b, save=None):
             print(proc.stderr.read())
         proc.wait(timeout=2)
         return ImageSequence(*images)
-    try:
-        return Image.open(out)
-    except PIL.UnidentifiedImageError:
-        if not b:
-            raise FileNotFoundError("image file not found")
-        out.seek(0)
-        raise TypeError(f'Filetype "{mime}" is not supported.')
-
+    raise TypeError(f'Filetype "{mime}" is not supported.')
 
 def ImageOpIterator(image, step, operation, ts, args):
     # Attempt to perform operation on all individual frames of .gif images
