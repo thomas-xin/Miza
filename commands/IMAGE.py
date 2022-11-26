@@ -1578,7 +1578,7 @@ class StableDiffusion(Command):
                 async with self.sdiff_sem:
                     if url:
                         fn = "misc/stable_diffusion.openvino/input.png"
-                        resp = await process_image(url, "resize_mult", ["-nogif", 1, 1, "auto"], timeout=60)
+                        resp = await process_image(url, "resize_to", ["-nogif", 512, 512, "auto"], timeout=60)
                         if os.path.exists(fn):
                             os.remove(fn)
                         os.rename(resp[0], fn)
