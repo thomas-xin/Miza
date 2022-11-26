@@ -2195,10 +2195,10 @@ def get_mask(image):
             else:
                 aw = 0
         if aw and not ab:
-            L[anywhite == False] = 0
+            L[(anywhite == False) & (A != 0)] = 0
         elif ab and not aw:
-            L[anyblack] = 255
-            L[anyblack == False] = 0
+            L[anyblack & (A != 0)] = 255
+            L[(anyblack == False) & (A != 0)] = 0
         else:
             raise RuntimeError("Unable to detect mask. Please use full black, white, or transparent.")
     mask = Image.fromarray(L, mode="L")
