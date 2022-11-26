@@ -1481,6 +1481,8 @@ class StableDiffusion(Command):
             urls = await bot.follow_url(arg, allow=True, images=True)
             if not urls:
                 rems.append(arg)
+            else:
+                urls = list(urls)
             if urls and not url:
                 url = urls.pop(0)
             if urls and not url2:
