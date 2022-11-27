@@ -3910,11 +3910,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     check = True
                 elif message.reference and message.reference.resolved and message.reference.resolved.author.id == user.id:
                     check = True
-                # else:
-                #     for react in message.reactions:
-                #         if str(reaction) == str(react) and react.me:
-                #             check = True
-                #             break
+                elif not message.reference:
+                    for react in message.reactions:
+                        if str(reaction) == str(react) and react.me:
+                            check = True
+                            break
                 if check:
                     if str(reaction) in "🔳🔲":
                         if message.content.startswith("||"):
