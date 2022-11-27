@@ -3936,7 +3936,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                                 content += "\n" + "\n".join(f"||{url} ||" for url in urls)
                         before = copy.copy(message)
                         message = await message.edit(content=content, attachments=(), embeds=())
-                        await self.send_event("_edit_", before=before, after=message, force=True)
+                        # await self.send_event("_edit_", before=before, after=message, force=True)
                     else:
                         await self.silent_delete(message, exc=True)
                         await self.send_event("_delete_", message=message)
