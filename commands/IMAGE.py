@@ -1478,11 +1478,19 @@ class StableDiffusion(Command):
             if arg.startswith("--"):
                 kwarg = arg
                 continue
-            urls = await bot.follow_url(arg, allow=True, images=True)
+            urls = None
+            i = verify_id(arg)
+            if isinstance(i, int):
+                with suppress():
+                    u = await bot.fetch_user(i)
+                    rems.append(u.display_name)
+                    urls = [best_url(u)]
             if not urls:
-                rems.append(arg)
-            else:
-                urls = list(urls)
+                urls = await bot.follow_url(arg, allow=True, images=True)
+                if not urls:
+                    rems.append(arg)
+                else:
+                    urls = list(urls)
             if urls and not url:
                 url = urls.pop(0)
             if urls and not url2:

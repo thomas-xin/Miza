@@ -2578,7 +2578,7 @@ def evalImg(url, operation, args):
             args.pop(-1)
             image = get_request(url)
         else:
-            if args[-1] == "-nodel":
+            if args and args[-1] == "-nodel":
                 nodel = args.pop(-1)
             else:
                 nodel = False

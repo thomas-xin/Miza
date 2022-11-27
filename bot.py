@@ -3927,7 +3927,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                             if e.thumbnail:
                                 urls.append(best_url(e.thumbnail))
                         spl = message.content.split()
-                        content = " ".join(word for word in spl if not is_url(spl.strip("<>|*")))
+                        content = " ".join(word for word in spl if not is_url(word.strip("<>|*")))
                         if urls:
                             content += "\n" + "\n".join(f"||{url} ||" for url in urls)
                         before = copy.copy(message)
