@@ -1443,7 +1443,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         return out
 
         # Sends a message to a channel, then edits to add links to all attached files.
-    async def send_with_file(self, channel, msg=None, file=None, filename=None, embed=None, best=False, rename=True, reference=None):
+    async def send_with_file(self, channel, msg=None, file=None, filename=None, embed=None, best=False, rename=True, reference=None, reacts=""):
         if not msg:
             msg = ""
         f = None
@@ -1514,6 +1514,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             await self.add_attachment(message.attachments[0], data)
             content = message.content + ("" if message.content.endswith("```") else "\n") + ("\n".join("<" + best_url(a) + ">" for a in message.attachments) if best else "\n".join("<" + a.url + ">" for a in message.attachments))
             await message.edit(content=content.strip())
+        if reacts:
+            for react in reacts:
+                await message.add_reaction(react)
         return message
 
     # Inserts a message into the bot cache, discarding existing ones if full.
@@ -3895,23 +3898,43 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         if not message.reactions:
             message = await message.channel.fetch_message(message.id)
             self.bot.add_message(message, files=False, force=True)
-        if str(reaction) not in "❌✖️🇽❎":
+        if str(reaction) not in "❌✖️🇽❎🔳🔲":
+            return
+        if str(reaction) in "🔳🔲" and (not message.attachments and not message.embeds or "exec" in self.data):
             return
         if message.author.id == self.id or getattr(message, "webhook_id", None):
             with suppress(discord.NotFound):
                 u_perm = self.get_perms(user.id, message.guild)
                 check = False
                 if not u_perm < 3:
-                    await self.silent_delete(message, exc=True)
+                    check = True
                 elif message.reference and message.reference.resolved and message.reference.resolved.author.id == user.id:
-                    await self.silent_delete(message, exc=True)
-                    await self.send_event("_delete_", message=message)
+                    check = True
                 else:
                     for react in message.reactions:
-                        if str(reaction) == str(react):
-                            if react.me:
-                                await self.silent_delete(message, exc=True)
-                                return
+                        if str(reaction) == str(react) and react.me:
+                            check = True
+                            break
+                if check:
+                    if str(reaction) in "🔳🔲":
+                        urls = []
+                        for a in message.attachments:
+                            url = await self.data.exec.uproxy(str(a.url))
+                            urls.append(url)
+                        for e in message.embeds:
+                            if e.image:
+                                urls.append(best_url(e.image.url))
+                            if e.thumbnail:
+                                urls.append(best_url(e.thumbnail))
+                        spl = message.content.split()
+                        content = " ".join(word for word in spl if not is_url(spl.strip("<>|*")))
+                        if urls:
+                            content += "\n" + "\n".join(f"||{url} ||" for url in urls)
+                        await message.edit(content=content)
+                        await self.send_event("_edit_", message=message)
+                    else:
+                        await self.silent_delete(message, exc=True)
+                        await self.send_event("_delete_", message=message)
 
     # Handles a new sent message, calls process_message and sends an error if an exception occurs.
     async def handle_message(self, message, edit=True):

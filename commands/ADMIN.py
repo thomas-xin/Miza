@@ -2527,8 +2527,8 @@ class UpdateMessageLogs(Database):
     #     self.bot.send_embeds(channel, emb)
 
     # Edit events are rather straightforward to log
-    async def _edit_(self, before, after, **void):
-        if after.author.bot:
+    async def _edit_(self, before, after, force=False, **void):
+        if after.author.bot and not force:
             return
         guild = before.guild
         if guild.id not in self.data:

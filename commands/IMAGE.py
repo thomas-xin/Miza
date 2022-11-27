@@ -1634,7 +1634,7 @@ class StableDiffusion(Command):
                             force_kill(proc)
                         raise
             fn = "misc/stable_diffusion.openvino/output.png"
-        await bot.send_with_file(channel, "", fn, filename=lim_str(prompt, 96) + ".png", reference=message)
+        await bot.send_with_file(channel, "", fn, filename=lim_str(prompt, 96) + ".png", reference=message, reacts="🔳")
 
 
 class UpdateImages(Database):
