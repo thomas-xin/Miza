@@ -3917,19 +3917,23 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 #             break
                 if check:
                     if str(reaction) in "🔳🔲":
-                        urls = []
-                        for a in message.attachments:
-                            url = await self.data.exec.uproxy(str(a.url))
-                            urls.append(url)
-                        for e in message.embeds:
-                            if e.image:
-                                urls.append(best_url(e.image.url))
-                            if e.thumbnail:
-                                urls.append(best_url(e.thumbnail))
-                        spl = message.content.split()
-                        content = " ".join(word for word in spl if not is_url(word.strip("<>|*")))
-                        if urls:
-                            content += "\n" + "\n".join(f"||{url} ||" for url in urls)
+                        if message.content.startswith("||"):
+                            content = message.content.replace("||", "")
+                        else:
+                            urls = set()
+                            for a in message.attachments:
+                                url = await self.data.exec.uproxy(str(a.url))
+                                urls.add(url)
+                            for e in message.embeds:
+                                if e.image:
+                                    urls.add(best_url(e.image.url))
+                                if e.thumbnail:
+                                    urls.add(best_url(e.thumbnail))
+                            symrem = "".maketrans({c: "" for c in "<>|*"})
+                            spl = [word.translate(symrem) for word in message.content.split()]
+                            content = " ".join(word for word in spl if not is_url(word))
+                            if urls:
+                                content += "\n" + "\n".join(f"||{url} ||" for url in urls)
                         before = copy.copy(message)
                         message = await message.edit(content=content, attachments=(), embeds=())
                         await self.send_event("_edit_", before=before, after=message, force=True)
