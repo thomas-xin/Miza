@@ -3489,7 +3489,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             # Determine whether to send embeds individually or as blocks of up to 10, based on whether it is possible to use webhooks
             if not guild:
                 return await send_with_react(sendable, embeds=embeds, reacts=reacts, reference=reference)
-            single = False
+            single = len(embeds) == 1
             if not hasattr(guild, "simulated") and hasattr(guild, "ghost"):
                 single = True
             else:
@@ -3900,7 +3900,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             self.bot.add_message(message, files=False, force=True)
         if str(reaction) not in "❌✖️🇽❎🔳🔲":
             return
-        if str(reaction) in "🔳🔲" and (not message.attachments and not message.embeds or "exec" in self.data):
+        if str(reaction) in "🔳🔲" and (not message.attachments and not message.embeds or "exec" not in self.data):
             return
         if message.author.id == self.id or getattr(message, "webhook_id", None):
             with suppress(discord.NotFound):
@@ -3910,11 +3910,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     check = True
                 elif message.reference and message.reference.resolved and message.reference.resolved.author.id == user.id:
                     check = True
-                else:
-                    for react in message.reactions:
-                        if str(reaction) == str(react) and react.me:
-                            check = True
-                            break
+                # else:
+                #     for react in message.reactions:
+                #         if str(reaction) == str(react) and react.me:
+                #             check = True
+                #             break
                 if check:
                     if str(reaction) in "🔳🔲":
                         urls = []
@@ -3931,7 +3931,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         if urls:
                             content += "\n" + "\n".join(f"||{url} ||" for url in urls)
                         await message.edit(content=content)
-                        await self.send_event("_edit_", message=message)
+                        await self.send_event("_edit_", message=message, force=True)
                     else:
                         await self.silent_delete(message, exc=True)
                         await self.send_event("_delete_", message=message)

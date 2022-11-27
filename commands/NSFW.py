@@ -386,7 +386,9 @@ class Neko(Command):
                 url = await self.img(get)
         if "v" in flags:
             return escape_roles(url)
-        bot.send_as_embeds(channel, image=url, reacts="🔳")
+        embed = discord.Embed(colour=await bot.get_colour(url))
+        embed.set_image(url=url)
+        await send_with_react(channel, embed=embed, reacts="🔳")
 
 
 class Lewd(Command):
@@ -413,4 +415,6 @@ class Lewd(Command):
                 + "__**"
             )
             return escape_roles(text)
-        self.bot.send_as_embeds(channel, image=url, reacts="🔳")
+        embed = discord.Embed(colour=await bot.get_colour(url))
+        embed.set_image(url=url)
+        await send_with_react(channel, embed=embed, reacts="🔳")

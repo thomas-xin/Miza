@@ -2599,7 +2599,9 @@ class Inspiro(ImagePool, Command):
         url = await bot.data.imagepools.get(self.database, self.fetch_one, self.threshold)
         if "v" in flags:
             return escape_roles(url)
-        self.bot.send_as_embeds(channel, image=url, reacts="🔳")
+        embed = discord.Embed(colour=await bot.get_colour(url))
+        embed.set_image(url=url)
+        await send_with_react(channel, embed=embed, reacts="🔳")
 
 
 class ImageSearch(ImagePool, Command):
