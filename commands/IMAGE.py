@@ -1532,7 +1532,8 @@ class StableDiffusion(Command):
             req += " ".join(f"{k} {v}" for k, v in kwargs.items() if k in specified)
         fn = None
         with discord.context_managers.Typing(channel):
-            fn = await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified)
+            with tracebacksuppressor:
+                fn = await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, timeout=60)
         if not fn:
             if self.fut:
                 with tracebacksuppressor:
