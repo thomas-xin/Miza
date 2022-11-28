@@ -6,7 +6,7 @@ bs4>=0.0.1
 CherryPy>=18.8.0
 colormath>=3.0.0
 cython>=0.29.32
-discord.py>=1.7.3
+discord.py==2.0.0a3575+g45d498c1
 filetype>=1.1.0
 googletrans>=3.0.0
 gmpy2>=2.1.2
