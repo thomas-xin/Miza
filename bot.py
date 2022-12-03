@@ -3080,7 +3080,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                                             args.pop(0)
                                             argv = argv.split(None, 1)[-1]
                                             inc_dict(flags, a=1)
-                                        elif args[0].lower() in ("rem", "clear", "disable", "remove", "unset", "delete"):
+                                        elif args[0].lower() in ("rem", "disable", "remove", "unset", "delete"):
                                             args.pop(0)
                                             argv = argv.split(None, 1)[-1]
                                             inc_dict(flags, d=1)
