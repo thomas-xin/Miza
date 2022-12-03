@@ -1651,6 +1651,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     def get_colour(self, user):
         if user is None:
             return as_fut(16777214)
+        if hasattr(user, "icon_url"):
+            user = astype(user.icon_url, str)
         url = worst_url(user)
         return self.data.colours.get(url)
 

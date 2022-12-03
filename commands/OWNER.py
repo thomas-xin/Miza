@@ -314,20 +314,20 @@ class UpdateExec(Database):
         if is_finite(delete_after):
             create_task(self.bot.silent_delete(message, no_log=True, delay=delete_after))
 
-    async def _typing_(self, user, channel, **void):
-        # Typing indicator for DM channels
-        bot = self.bot
-        if user.id == bot.client.user.id or bot.is_blacklisted(user.id):
-            return
-        if not hasattr(channel, "guild") or channel.guild is None:
-            colour = await bot.get_colour(user)
-            emb = discord.Embed(colour=colour)
-            url = await bot.get_proxy_url(user)
-            emb.set_author(name=f"{user} ({user.id})", icon_url=url)
-            emb.description = italics(ini_md("typing..."))
-            for c_id, flag in self.data.items():
-                if flag & 2:
-                    create_task(self.sendDeleteID(c_id, embed=emb))
+    # async def _typing_(self, user, channel, **void):
+    #     # Typing indicator for DM channels
+    #     bot = self.bot
+    #     if user.id == bot.client.user.id or bot.is_blacklisted(user.id):
+    #         return
+    #     if not hasattr(channel, "guild") or channel.guild is None:
+    #         colour = await bot.get_colour(user)
+    #         emb = discord.Embed(colour=colour)
+    #         url = await bot.get_proxy_url(user)
+    #         emb.set_author(name=f"{user} ({user.id})", icon_url=url)
+    #         emb.description = italics(ini_md("typing..."))
+    #         for c_id, flag in self.data.items():
+    #             if flag & 2:
+    #                 create_task(self.sendDeleteID(c_id, embed=emb))
 
     def prepare_string(self, s, lim=2000, fmt="py"):
         if type(s) is not str:

@@ -1081,7 +1081,7 @@ class Reminder(Command):
     name = ["Announcement", "Announcements", "Announce", "RemindMe", "Reminders", "Remind"]
     description = "Sets a reminder for a certain date and time."
     usage = "<1:message>? <0:time>? <urgent{?u}>? <delete{?d}>?"
-    flags = "aeduc"
+    flags = "aedurf"
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
     rate_limit = (1 / 3, 4)
@@ -1128,6 +1128,17 @@ class Reminder(Command):
                     bot.data.reminders.listed.insort((rems[0]["t"], sendable.id), key=lambda x: x[0])
             update(sendable.id)
             return ini_md(f"Successfully removed {sqr_md(lim_str(x['msg'], 128))} from {word} list for {sqr_md(sendable)}.")
+        elif "r" in flags:
+            if not len(rems):
+                return ini_md(f"No {word} currently set for {sqr_md(sendable)}.")
+            if "f" not in flags:
+                return css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(users))} ITEMS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0), force=True)
+            rems.clear()
+            bot.data.reminders.pop(sendable.id, None)
+            with suppress(IndexError):
+                bot.data.reminders.listed.remove(sendable.id, key=lambda x: x[-1])
+            update(sendable.id)
+            return italics(css_md(f"Successfully cleared all {word} for {sqr_md(sendable)}."))
         if not argv:
             # Set callback message for scrollable list
             buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
