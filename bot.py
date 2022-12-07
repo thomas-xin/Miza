@@ -1169,7 +1169,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         links = await self.follow_url(m_id)
         m_id = links[0] if links else m_id
         if is_url(m_id.strip("<>")) and "/emojis/" in m_id:
-            return m_id.strip("<>").split("/emojis/", 1)[-1].split(".", 1)[0]
+            return int(m_id.strip("<>").split("/emojis/", 1)[-1].split(".", 1)[0])
         if m_id[0] == "<" and m_id[-1] == ">" and ":" in m_id:
             n = m_id.rsplit(":", 1)[-1][:-1]
             if n.isnumeric():
