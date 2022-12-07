@@ -1170,6 +1170,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         m_id = links[0] if links else m_id
         if is_url(m_id.strip("<>")) and "/emojis/" in m_id:
             return m_id.strip("<>").split("/emojis/", 1)[-1].split(".", 1)[0]
+        if m_id[0] == "<" and m_id[-1] == ">" and ":" in m_id:
+            n = m_id.rsplit(":", 1)[-1][:-1]
+            if n.isnumeric():
+                return int(n)
         if m_id.isnumeric():
             m_id = int(m_id)
             if m_id in self.cache.messages:
@@ -1513,8 +1517,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         if not getattr(reference, "slash", None) and message.attachments:
             await self.add_attachment(message.attachments[0], data)
             content = message.content + ("" if message.content.endswith("```") else "\n") + ("\n".join("<" + best_url(a) + ">" for a in message.attachments) if best else "\n".join("<" + a.url + ">" for a in message.attachments))
-            await message.edit(content=content.strip())
-        if reacts:
+            message = await message.edit(content=content.strip())
+        if not message:
+            print("No message detected.")
+        elif reacts:
             for react in reacts:
                 await message.add_reaction(react)
         return message

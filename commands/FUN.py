@@ -1930,6 +1930,10 @@ class UpdateReacts(Database):
             # Reactions sorted by their order of appearance in the message
             for r in sorted(reacting):
                 for react in reacting[r]:
+                    if isinstance(react, str) and not react.isnumeric():
+                        react = await self.bot.id_from_message(react)
+                    if isinstance(react, int):
+                        react = await self.bot.fetch_emoji(react)
                     try:
                         await message.add_reaction(react)
                     except discord.HTTPException as ex:

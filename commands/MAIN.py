@@ -146,7 +146,19 @@ class Help(Command):
         if content:
             embed.description = f"```callback-main-help-{user.id}-\n{user.display_name} has asked for help!```" + content
         if original:
-            await interaction_patch(bot, original, embed=embed, buttons=buttons)
+            if getattr(message, "slash", None):
+                await interaction_patch(bot, original, embed=embed, buttons=buttons)
+            else:
+                await Request(
+                    f"https://discord.com/api/{api}/channels/{original.channel.id}/messages/{original.id}",
+                    data=dict(
+                        embeds=[embed.to_dict()],
+                        components=restructure_buttons(buttons),
+                    ),
+                    method="PATCH",
+                    authorise=True,
+                    aio=True,
+                )
             return
         # elif getattr(message, "slash", None):
         #     await interaction_response(bot, message, embed=embed, buttons=buttons, ephemeral=True)

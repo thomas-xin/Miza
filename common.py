@@ -1168,7 +1168,16 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
             print_exc()
         else:
             if not resp:
-                return
+                if url.endswith("/callback"):
+                    url = f"https://discord.com/api/{api}/webhooks/{bot.id}/{reference.slash}/messages/@original"
+                    resp = await Request(
+                        url,
+                        method="GET",
+                        authorise=True,
+                        aio=True,
+                    )
+                if not resp:
+                    return
             if bot:
                 M = bot.ExtendedMessage.new
             else:
