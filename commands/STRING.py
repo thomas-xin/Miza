@@ -1004,12 +1004,12 @@ class Ask(Command):
                     url = f"https://discord.com/channels/0/{channel.id}/{reference.id}"
                     found = await bot.follow_url(url)
                     if found and found[0] != url and is_image(found[0]) is not None:
-                        urls.append(found)
+                        urls.append(found[0])
                 if find_urls(message.content) or message.attachments or message.embeds:
                     url = f"https://discord.com/channels/0/{channel.id}/{message.id}"
                     found = await bot.follow_url(url)
                     if found and found[0] != url and is_image(found[0]) is not None:
-                        urls.append(found)
+                        urls.append(found[0])
                 for url in urls:
                     try:
                         prompt = self.analysed[url]
