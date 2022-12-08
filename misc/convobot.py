@@ -130,6 +130,13 @@ swap = {
 	"my": "your",
 }
 
+js_code = """
+  var elm = arguments[0], txt = arguments[1];
+  elm.value += txt;
+  elm.dispatchEvent(new Event('change'));
+"""
+
+
 class Bot:
 
 	models = {}
@@ -297,19 +304,26 @@ class Bot:
 
 		elems = [e for e in d.find_elements(by=class_name, value="resize-none") if e in d.find_elements(by=class_name, value="bg-transparent")]
 		e = elems[0]
-		e.send_keys(question)
+		if question.isascii():
+			e.send_keys(question)
+		else:
+			driver.execute_script(js_code, e, question)
 		elems = [e for e in d.find_elements(by=class_name, value="text-gray-500") if e in d.find_elements(by=class_name, value="absolute")]
 		e = elems[0]
 		e.click()
 		time.sleep(0.5)
+		t2 = q.rstrip("?").casefold().split()
 		for attempt in range(3):
-			while True:
+			for i in range(120):
 				elems = [e for e in d.find_elements(by=class_name, value="btn-neutral") if e.text == "Try again"]
 				if elems:
 					break
 				time.sleep(0.5)
+			else:
+				drivers.insert(0, driver)
+				return
 			elems = d.find_elements(by=class_name, value="text-base")
-			response = elems[-1].text
+			response = elems[-1].text.removesuffix("\n2 / 2")
 			print(response)
 			test = response.casefold()
 			if test.startswith("!\nan error occurred."):
@@ -322,13 +336,14 @@ class Bot:
 				if test.startswith("i'm sorry,"):
 					elems = [e for e in d.find_elements(by=class_name, value="btn-neutral") if e.text == "Try again"]
 					if not elems:
+						drivers.insert(0, driver)
 						return
 					elems[0].click()
 					continue
 				if test.startswith("it is not possible for me"):
 					drivers.insert(0, driver)
 					return
-				if "i do not have the ability to" in test or "i am not able to" in test or "illegal" in test:
+				if "i do not have the ability to" in test or "i am not able to" in test or ("illegal" in test.split() and "legal" not in t2 and "ok" not in t2):
 					drivers.insert(0, driver)
 					return
 			break

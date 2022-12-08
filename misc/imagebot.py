@@ -97,6 +97,12 @@ def safecomp(gen):
 			continue
 		yield e
 
+js_code = """
+  var elm = arguments[0], txt = arguments[1];
+  elm.value += txt;
+  elm.dispatchEvent(new Event('change'));
+"""
+
 
 class Bot:
 
@@ -117,7 +123,10 @@ class Bot:
 		fut.result(timeout=16)
 
 		bar = driver.find_element(by=webdriver.common.by.By.ID, value="search-bar")
-		bar.send_keys(prompt)
+		if prompt.isascii():
+			bar.send_keys(prompt)
+		else:
+			driver.execute_script(js_code, bar, prompt)
 
 		generate = driver.find_element(by=webdriver.common.by.By.ID, value="ZQvTCDloXyqgqlOiDvup")
 		generate.click()
