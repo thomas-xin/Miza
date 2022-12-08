@@ -215,7 +215,7 @@ class Bot:
 			a1 = a2
 		a1 = a1.strip()
 		if not a1:
-			return res
+			return res.strip()
 		if "\n" not in a1 and ". " not in a1 and a1 in res:
 			for sentence in res.replace("\n", ". ").split(". "):
 				if a1 in sentence:
@@ -337,7 +337,7 @@ class Bot:
 			if not additional and "\n" not in test and len(test) < 1024:
 				if test.startswith("i'm sorry,") or test.startswith("i am sorry,") or test.startswith("sorry,"):
 					elems = [e for e in d.find_elements(by=class_name, value="btn-neutral") if e.text == "Try again"]
-					if not elems or attempt >= 2:
+					if not elems or attempt >= 1:
 						drivers.insert(0, driver)
 						return
 					elems[0].click()
