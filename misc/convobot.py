@@ -313,7 +313,7 @@ class Bot:
 		test = response.casefold()
 		if test.startswith("!\nan error occurred."):
 			return
-		if "\n" not in test and len(test) < 1024:
+		if not additional and "\n" not in test and len(test) < 1024:
 			if test.startswith("i'm sorry,"):
 				return
 			if test.startswith("it is not possible for me"):
@@ -370,6 +370,11 @@ class Bot:
 			googled = True
 		else:
 			googled = False
+		if additional:
+			response = self.clean_response(q, response, additional=additional)
+			if response and response.casefold() != i.casefold():
+				self.history[i] = response
+				return response
 		res = self.question_answer_analysis("microsoft/DialoGPT-large", i, list(self.history.keys()), list(self.history.values()))
 		a1 = res
 		if a1.lower() == i.lower() or vague(a1) or (len(i) > 5 and a1.lower() in (a.lower() for a in self.history.values())):
