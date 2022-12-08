@@ -324,7 +324,8 @@ class Bot:
 				drivers.insert(0, driver)
 				return
 			elems = d.find_elements(by=class_name, value="text-base")
-			response = elems[-1].text.removesuffix("\n2 / 2")
+			response = elems[-1].text
+			text = text.removesuffix("\n2 / 2").removesuffix("\n3 / 3")
 			print(response)
 			test = response.casefold()
 			if test.startswith("!\nan error occurred."):
