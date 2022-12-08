@@ -300,26 +300,37 @@ class Bot:
 		elems = [e for e in d.find_elements(by=class_name, value="text-gray-500") if e in d.find_elements(by=class_name, value="absolute")]
 		e = elems[0]
 		e.click()
-		elems = []
-		while True:
-			elems = [e for e in d.find_elements(by=class_name, value="btn-neutral") if e.text == "Try again"]
-			if elems:
-				break
-			time.sleep(0.5)
-		elems = elems = d.find_elements(by=class_name, value="text-base")
-		drivers.insert(0, driver)
-		response = elems[-1].text
-		print(response)
-		test = response.casefold()
-		if test.startswith("!\nan error occurred."):
+		for attempt in range(3):
+			while True:
+				elems = [e for e in d.find_elements(by=class_name, value="btn-neutral") if e.text == "Try again"]
+				if elems:
+					break
+				time.sleep(0.5)
+			elems = d.find_elements(by=class_name, value="text-base")
+			response = elems[-1].text
+			print(response)
+			test = response.casefold()
+			if test.startswith("!\nan error occurred."):
+				elems = [e for e in d.find_elements(by=class_name, value="btn-neutral") if e.text == "Try again"]
+				if not elems:
+					return
+				elems[0].click()
+				continue
+			if not additional and "\n" not in test and len(test) < 1024:
+				if test.startswith("i'm sorry,"):
+					elems = [e for e in d.find_elements(by=class_name, value="btn-neutral") if e.text == "Try again"]
+					if not elems:
+						return
+					elems[0].click()
+					continue
+				if test.startswith("it is not possible for me"):
+					return
+				if "i do not have the ability to" in test or "i am not able to" in test or "illegal" in test:
+					return
+			break
+		else:
 			return
-		if not additional and "\n" not in test and len(test) < 1024:
-			if test.startswith("i'm sorry,"):
-				return
-			if test.startswith("it is not possible for me"):
-				return
-			if "i do not have the ability to" in test or "i am not able to" in test or "illegal" in test:
-				return
+		drivers.insert(0, driver)
 		if "essay" in q or "full" in q or "write" in q or "writing" in q:
 			return response
 		res = response.replace("I am Assistant", "I am Miza").replace("trained by OpenAI", "trained by OpenAI, Google, Deepset and Microsoft")
