@@ -337,7 +337,7 @@ class Bot:
 			if not additional and "\n" not in test and len(test) < 1024:
 				if test.startswith("i'm sorry,") or test.startswith("i am sorry,") or test.startswith("sorry,"):
 					elems = [e for e in d.find_elements(by=class_name, value="btn-neutral") if e.text == "Try again"]
-					if not elems:
+					if not elems or attempt >= 2:
 						drivers.insert(0, driver)
 						return
 					elems[0].click()
