@@ -305,7 +305,10 @@ class Bot:
 		elems = elems = d.find_elements(by=class_name, value="text-base")
 		drivers.insert(0, driver)
 		response = elems[-1].text
+		print(response)
 		test = response.casefold()
+		if test.startswith("!\nan error occurred."):
+			return
 		if test.startswith("i'm sorry,"):
 			return
 		if test.startswith("it is not possible for me"):
@@ -315,10 +318,11 @@ class Bot:
 		if "essay" in q or "full" in q or "write" in q or "writing" in q:
 			return response
 		res = response.replace("I am Assistant", "I am Miza").replace("trained by OpenAI", "trained by OpenAI, Google, Deepset and Microsoft")
-		if additional or len(q) >= 32:
+		if additional or len(q) < 32:
 			response = self.clean_response(q, res, additional=additional)
 		else:
 			response = res.strip()
+		# print(response)
 		return response
 
 	def google(self, q, additional=()):
