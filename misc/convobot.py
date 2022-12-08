@@ -344,7 +344,7 @@ class Bot:
 				if test.startswith("it is not possible for me"):
 					drivers.insert(0, driver)
 					return
-				if "i do not have the ability to" in test or "i am not able to" in test or ("illegal" in test.split() and "legal" not in t2 and "ok" not in t2):
+				if "i do not have the ability to" in test or "i am not able to" in test or ("illegal" in test.split() and "legal" not in q and "ok" not in t2 and "okay" not in t2):
 					drivers.insert(0, driver)
 					return
 			break
@@ -352,7 +352,7 @@ class Bot:
 			drivers.insert(0, driver)
 			return
 		drivers.insert(0, driver)
-		if "essay" in q or "full" in q or "write" in q or "writing" in q:
+		if "essay" in t2 or "full" in t2 or "write" in t2 or "writing" in t2 or "about" in t2:
 			return response
 		res = response.replace("I am Assistant", "I am Miza").replace("trained by OpenAI", "linked to OpenAI, Google, Deepset and Microsoft")
 		if additional or len(q) < 32:
