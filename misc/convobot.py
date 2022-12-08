@@ -405,7 +405,7 @@ class Bot:
 		else:
 			googled = False
 		if additional:
-			response = self.clean_response(q, response, additional=additional)
+			response = self.clean_response(i, response, additional=additional)
 			if response and response.casefold() != i.casefold():
 				self.history[i] = response
 				return response
