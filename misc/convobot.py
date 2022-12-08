@@ -345,7 +345,7 @@ class Bot:
 		if a1.lower() == i.lower() or vague(a1) or (len(i) > 5 and a1.lower() in (a.lower() for a in self.history.values())):
 			a1 = ""
 		response = a1
-		if not response:
+		if not response and literal_question(i):
 			response = self.google(i, additional=additional)
 			if response and response.casefold() != i.casefold():
 				self.history[i] = response
