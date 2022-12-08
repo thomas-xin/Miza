@@ -257,6 +257,10 @@ class Bot:
 	def chatgpt(self, q, additional=()):
 		if not self.email or not self.password:
 			return ""
+		if additional:
+			question = "\n".join(additional) + "\n" + q
+		else:
+			question = q
 		driver = d = get_driver()
 		search = "https://chat.openai.com/chat"
 		fut = exc.submit(driver.get, search)
@@ -292,7 +296,7 @@ class Bot:
 
 		elems = [e for e in d.find_elements(by=class_name, value="resize-none") if e in d.find_elements(by=class_name, value="bg-transparent")]
 		e = elems[0]
-		e.send_keys(q)
+		e.send_keys(question)
 		elems = [e for e in d.find_elements(by=class_name, value="text-gray-500") if e in d.find_elements(by=class_name, value="absolute")]
 		e = elems[0]
 		e.click()
