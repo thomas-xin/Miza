@@ -303,6 +303,7 @@ class Bot:
 				break
 			time.sleep(0.5)
 		elems = elems = d.find_elements(by=class_name, value="text-base")
+		drivers.insert(0, driver)
 		response = elems[-1].text
 		test = response.casefold()
 		if test.startswith("i'm sorry,"):
@@ -311,14 +312,13 @@ class Bot:
 			return
 		if "i do not have the ability to" in test:
 			return
-		if "essay" in q or "full" in q:
+		if "essay" in q or "full" in q or "write" in q or "writing" in q:
 			return response
 		res = response.replace("I am Assistant", "I am Miza").replace("trained by OpenAI", "trained by OpenAI, Google, Deepset and Microsoft")
 		if additional or len(q) >= 32:
 			response = self.clean_response(q, res, additional=additional)
 		else:
 			response = res.strip()
-		drivers.insert(0, driver)
 		return response
 
 	def google(self, q, additional=()):
