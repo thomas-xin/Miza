@@ -30,7 +30,8 @@ def create_driver():
 	folder = os.path.join(os.getcwd(), f"d~{ts}")
 	service = browser["service"](browser["path"])
 	options = browser["options"]()
-	# options.headless = True
+	options.add_argument("--headless")
+	options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36")
 	# options.add_argument("--disable-gpu")
 	prefs = {"download.default_directory" : folder}
 	options.add_experimental_option("prefs", prefs)
@@ -208,13 +209,13 @@ class Bot:
 		if not a1:
 			return res
 		if a1[0].islower() and a1 in res:
-			for sentence in res.replace("\n", ".").split("."):
+			for sentence in res.replace("\n", ". ").split(". "):
 				if a1 in sentence:
 					a1 = sentence.strip()
 					if not a1.endswith("."):
 						a1 += "."
 					break
-		elif (" " not in a1 or len(a1) < 12) and not ai[0].isnumeric():
+		elif (" " not in a1 or len(a1) < 12) and not a1[0].isnumeric():
 			a1 = res.strip()
 		response = "\n".join(line.strip() for line in a1.replace("[CLS]", "").replace("[SEP]", "\n").splitlines()).strip()
 		while "[UNK]" in response:
@@ -265,35 +266,43 @@ class Bot:
 		elems = [e for e in elems if "log in" in e.text.casefold()]
 		if elems:
 			elems[0].click()
-			e = d.find_element(by=xpath, value='//*[@id="username"]')
+			time.sleep(1)
+			e = d.find_element(by=webdriver.common.by.By.ID, value="username")
 			e.send_keys(self.email)
-			e = d.find_element(by=xpath, value='/html/body/main/section/div/div/div/form/div[2]/button')
+			e = [e for e in d.find_elements(by=class_name, value="_button-login-id") if e.text == "Continue"][0]
 			e.click()
-			e = d.find_element(by=xpath, value='//*[@id="password"]')
+			time.sleep(1)
+			e = d.find_element(by=webdriver.common.by.By.ID, value="password")
 			e.send_keys(self.password)
-			e = d.find_element(by=xpath, value='/html/body/main/section/div/div/div/form/div[2]/button')
+			e = [e for e in d.find_elements(by=class_name, value="_button-login-password") if e.text == "Continue"][0]
 			e.click()
+		time.sleep(1)
 
-		elems = d.find_elements(by=xpath, value='//*[@id="headlessui-dialog-panel-:r1:"]/div[2]/div[4]/button')
+		elems = [e for e in d.find_elements(by=class_name, value="btn-neutral") if e.text in ("Next", "Done")]
 		if elems:
 			elems[0].click()
 			while True:
-				elems = d.find_elements(by=xpath, value='//*[@id="headlessui-dialog-panel-:r1:"]/div[2]/div[4]/button[2]')
+				elems = [e for e in d.find_elements(by=class_name, value="btn-neutral") if e.text in ("Next", "Done")]
 				if not elems:
 					break
 				elems[0].click()
+			elems = [e for e in d.find_elements(by=class_name, value="btn-primary") if e.text in ("Next", "Done")]
+			if elems:
+				elems[0].click()
 
-		e = d.find_element(by=xpath, value='//*[@id="__next"]/div/div[1]/main/div[2]/form/div/div[2]/textarea')
+		elems = [e for e in d.find_elements(by=class_name, value="resize-none") if e in d.find_elements(by=class_name, value="bg-transparent")]
+		e = elems[0]
 		e.send_keys(q)
-		e = d.find_element(by=xpath, value='//*[@id="__next"]/div/div[1]/main/div[2]/form/div/div[2]/button')
+		elems = [e for e in d.find_elements(by=class_name, value="text-gray-500") if e in d.find_elements(by=class_name, value="absolute")]
+		e = elems[0]
 		e.click()
 		elems = []
-		while not elems:
-			elems = d.find_elements(by=xpath, value='//*[@id="__next"]/div/div[1]/main/div[2]/form/div/div[1]/button')
+		while True:
+			elems = [e for e in d.find_elements(by=class_name, value="btn-neutral") if e.text == "Try again"]
 			if elems:
 				break
 			time.sleep(0.5)
-		elems = d.find_elements(by=xpath, value='//*[@id="__next"]/div/div[1]/main/div[1]/div/div/div/div/div/div[2]/div[1]/div/p')
+		elems = elems = d.find_elements(by=class_name, value="text-base")
 		response = elems[-1].text
 		test = response.casefold()
 		if test.startswith("i'm sorry,"):
@@ -306,6 +315,7 @@ class Bot:
 			return response
 		res = response.replace("I am Assistant", "I am Miza").replace("trained by OpenAI", "trained by OpenAI, Google, Deepset and Microsoft")
 		response = self.clean_response(q, res, additional=additional)
+		drivers.insert(0, driver)
 		return response
 
 	def google(self, q, additional=()):
@@ -321,12 +331,12 @@ class Bot:
 		except:
 			return ""
 		res = elem.text
-		drivers.append(driver)
 		if res.startswith("Calculator result\n"):
 			response = " ".join(res.split("\n", 3)[1:3])
 		else:
 			res = "\n".join(r.strip() for r in res.splitlines() if valid_response(r))
 			response = self.clean_response(q, res, additional=additional)
+		drivers.insert(0, driver)
 		return response
 
 	def talk(self, i, additional=()):
