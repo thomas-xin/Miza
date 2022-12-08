@@ -353,7 +353,7 @@ class Bot:
 			drivers.insert(0, driver)
 			return
 		drivers.insert(0, driver)
-		if "essay" in t2 or "full" in t2 or "write" in t2 or "writing" in t2 or "about" in t2:
+		if "essay" in t2 or "full" in t2 or "write" in t2 or "writing" in t2 or "about" in t2 or "worth noting that" in test:
 			return response
 		res = response.replace("I am Assistant", "I am Miza").replace("trained by OpenAI", "linked to OpenAI, Google, Deepset and Microsoft")
 		if additional or len(q) < 32:
