@@ -203,7 +203,7 @@ class Bot:
 
 	def clean_response(self, q, res, additional=()):
 		if additional:
-			res = "\n".join(additional) + "\n" + res
+			res = "\n".join(additional) + "\n" + (res or "")
 		if not res.isascii():
 			fut = exc.submit(self.question_context_analysis, "salti/bert-base-multilingual-cased-finetuned-squad", q, res)
 		else:
@@ -328,7 +328,7 @@ class Bot:
 			response = response.removesuffix("\n2 / 2").removesuffix("\n3 / 3")
 			print(response)
 			test = response.casefold()
-			if test.startswith("!\nan error occurred."):
+			if test.startswith("!\nan error occurred.") or test.startswith("!\ninternal server error"):
 				elems = [e for e in d.find_elements(by=class_name, value="btn-neutral") if e.text == "Try again"]
 				if not elems:
 					return
