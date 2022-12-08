@@ -309,12 +309,13 @@ class Bot:
 		test = response.casefold()
 		if test.startswith("!\nan error occurred."):
 			return
-		if test.startswith("i'm sorry,"):
-			return
-		if test.startswith("it is not possible for me"):
-			return
-		if "i do not have the ability to" in test:
-			return
+		if "\n" not in test and len(test) < 1024:
+			if test.startswith("i'm sorry,"):
+				return
+			if test.startswith("it is not possible for me"):
+				return
+			if "i do not have the ability to" in test or "i am not able to" in test or "illegal" in test:
+				return
 		if "essay" in q or "full" in q or "write" in q or "writing" in q:
 			return response
 		res = response.replace("I am Assistant", "I am Miza").replace("trained by OpenAI", "trained by OpenAI, Google, Deepset and Microsoft")
@@ -357,12 +358,20 @@ class Bot:
 		if response and response.casefold() != i.casefold():
 			self.history[i] = response
 			return response
+		if literal_question(i):
+			response = self.google(i, additional=additional)
+			if response and response.casefold() != i.casefold():
+				self.history[i] = response
+				return response
+			googled = True
+		else:
+			googled = False
 		res = self.question_answer_analysis("microsoft/DialoGPT-large", i, list(self.history.keys()), list(self.history.values()))
 		a1 = res
 		if a1.lower() == i.lower() or vague(a1) or (len(i) > 5 and a1.lower() in (a.lower() for a in self.history.values())):
 			a1 = ""
 		response = a1
-		if not response and literal_question(i):
+		if not googled and not response:
 			response = self.google(i, additional=additional)
 			if response and response.casefold() != i.casefold():
 				self.history[i] = response
