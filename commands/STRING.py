@@ -1028,6 +1028,9 @@ class Ask(Command):
                                 prompt = f"This is {prompt}"
                                 print(prompt)
                                 additional.append(prompt)
+                                if len(self.analysed) > 4096:
+                                    self.analysed.pop(next(iter(self.analysed)), None)
+                                self.analysed[url] = prompt
                     else:
                         additional.append(prompt)
             out = await create_future(cb.talk, q, additional=additional)
