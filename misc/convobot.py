@@ -206,9 +206,10 @@ class Bot:
 			a2 = fut.result()
 		if len(a2) >= len(a1) * 2:
 			a1 = a2
+		a1 = a1.strip()
 		if not a1:
 			return res
-		if a1[0].islower() and a1 in res:
+		if a1 in res:
 			for sentence in res.replace("\n", ". ").split(". "):
 				if a1 in sentence:
 					a1 = sentence.strip()
@@ -300,6 +301,7 @@ class Bot:
 		elems = [e for e in d.find_elements(by=class_name, value="text-gray-500") if e in d.find_elements(by=class_name, value="absolute")]
 		e = elems[0]
 		e.click()
+		time.sleep(0.5)
 		for attempt in range(3):
 			while True:
 				elems = [e for e in d.find_elements(by=class_name, value="btn-neutral") if e.text == "Try again"]
@@ -336,7 +338,7 @@ class Bot:
 		drivers.insert(0, driver)
 		if "essay" in q or "full" in q or "write" in q or "writing" in q:
 			return response
-		res = response.replace("I am Assistant", "I am Miza").replace("trained by OpenAI", "trained by OpenAI, Google, Deepset and Microsoft")
+		res = response.replace("I am Assistant", "I am Miza").replace("trained by OpenAI", "linked to OpenAI, Google, Deepset and Microsoft")
 		if additional or len(q) < 32:
 			response = self.clean_response(q, res, additional=additional)
 		else:
@@ -355,6 +357,7 @@ class Bot:
 		try:
 			elem = driver.find_element(by=webdriver.common.by.By.ID, value="rso")
 		except:
+			drivers.insert(0, driver)
 			return ""
 		res = elem.text
 		if res.startswith("Calculator result\n"):
