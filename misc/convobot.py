@@ -344,7 +344,7 @@ class Bot:
 				if test.startswith("it is not possible for me"):
 					drivers.insert(0, driver)
 					return
-				if "i do not have the ability to" in test or "i am not able to" in test or ("illegal" in test.split() and "legal" not in q and "ok" not in t2 and "okay" not in t2):
+				if "impossible for me" in test or "i do not have the ability to" in test or "i am not able to" in test or ("illegal" in test.split() and "legal" not in q and "ok" not in t2 and "okay" not in t2):
 					drivers.insert(0, driver)
 					return
 			break
