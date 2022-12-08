@@ -324,11 +324,14 @@ class Bot:
 					elems[0].click()
 					continue
 				if test.startswith("it is not possible for me"):
+					drivers.insert(0, driver)
 					return
 				if "i do not have the ability to" in test or "i am not able to" in test or "illegal" in test:
+					drivers.insert(0, driver)
 					return
 			break
 		else:
+			drivers.insert(0, driver)
 			return
 		drivers.insert(0, driver)
 		if "essay" in q or "full" in q or "write" in q or "writing" in q:
