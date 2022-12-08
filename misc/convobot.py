@@ -209,7 +209,7 @@ class Bot:
 		a1 = a1.strip()
 		if not a1:
 			return res
-		if a1 in res:
+		if "\n" not in a1 and ". " not in a1 and a1 in res:
 			for sentence in res.replace("\n", ". ").split(". "):
 				if a1 in sentence:
 					a1 = sentence.strip()
