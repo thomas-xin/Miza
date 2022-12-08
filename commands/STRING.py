@@ -978,82 +978,59 @@ class Ask(Command):
         if q.casefold() in ("how", "how?"):
             await send_with_reply(channel, message, "https://imgur.com/gallery/8cfRt")
             return
-        # if AUTH.get("huggingface_token"):
         try:
             cb = self.convos[channel.id]
         except KeyError:
             if not convobot:
                 cb = cdict(talk=lambda *args: "")
             else:
-                cb = self.convos[channel.id] = convobot.Bot(token=AUTH["huggingface_token"])
+                cb = self.convos[channel.id] = convobot.Bot(
+                    token=AUTH.get("huggingface_token"),
+                    email=AUTH.get("openai_email"),
+                    password=AUTH.get("openai_password"),
+                )
         with discord.context_managers.Typing(channel):
+            urls = []
+            additional = []
             if getattr(message, "reference", None):
                 reference = message.reference.resolved
-                if TrOCRProcessor:
+            else:
+                reference = None
+            if reference and reference.content and not find_urls(reference.content):
+                print(reference.content)
+                additional.append(reference.content)
+            if TrOCRProcessor:
+                if reference:
                     url = f"https://discord.com/channels/0/{channel.id}/{reference.id}"
                     found = await bot.follow_url(url)
                     if found and found[0] != url and is_image(found[0]) is not None:
-                        url = found[0]
-                        try:
-                            prompt = self.analysed[url]
-                        except KeyError:
-                            processor = await create_future(TrOCRProcessor.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
-                            model = await create_future(VisionEncoderDecoderModel.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
-                            b = await bot.get_request(url)
-                            with tracebacksuppressor:
-                                image = Image.open(io.BytesIO(b)).convert("RGB")
-                                pixel_values = processor(image, return_tensors="pt").pixel_values
-                                generated_ids = await create_future(model.generate, pixel_values)
-                                generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
-                                prompt = generated_text.strip()
-                                if prompt:
-                                    prompt = prompt.replace(" is ", ", ").replace(" are ", ", ")
-                                    prompt = f"This is {prompt}"
-                                    print(prompt)
-                                    cb.append(prompt)
-                                    spl = q.casefold().replace("'", " ").strip("?").split()
-                                    if ("what" in spl or "who" in spl or "is" in spl or "name" in spl or "does") and ("this" in spl or "is" in spl or "that" in spl):
-                                        cb.append(q)
-                                        await send_with_reply(channel, message, "\xad" + escape_roles(prompt))
-                                        self.analysed[url] = prompt
-                                        return
-                        else:
-                            cb.append(prompt)
-                if reference.content and not find_urls(reference.content):
-                    print(reference.content)
-                    cb.append(reference.content)
-            if TrOCRProcessor:
-                spl = q.casefold().replace("'", " ").strip("?").split()
+                        urls.append(found)
                 if find_urls(message.content) or message.attachments or message.embeds:
                     url = f"https://discord.com/channels/0/{channel.id}/{message.id}"
                     found = await bot.follow_url(url)
                     if found and found[0] != url and is_image(found[0]) is not None:
-                        url = found[0]
-                        try:
-                            prompt = self.analysed[url]
-                        except KeyError:
-                            processor = await create_future(TrOCRProcessor.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
-                            model = await create_future(VisionEncoderDecoderModel.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
-                            b = await bot.get_request(url)
-                            with tracebacksuppressor:
-                                image = Image.open(io.BytesIO(b)).convert("RGB")
-                                pixel_values = processor(image, return_tensors="pt").pixel_values
-                                generated_ids = await create_future(model.generate, pixel_values)
-                                generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
-                                prompt = generated_text.strip()
-                                if prompt:
-                                    prompt = prompt.replace(" is ", ", ").replace(" are ", ", ")
-                                    prompt = f"This is {prompt}"
-                                    print(prompt)
-                                    cb.append(prompt)
-                                    if ("what" in spl or "who" in spl or "is" in spl or "name" in spl or "does") and ("this" in spl or "is" in spl or "that" in spl):
-                                        cb.append(q)
-                                        await send_with_reply(channel, message, "\xad" + escape_roles(prompt))
-                                        self.analysed[url] = prompt
-                                        return
-                        else:
-                            cb.append(prompt)
-            out = await create_future(cb.talk, q)
+                        urls.append(found)
+                for url in urls:
+                    try:
+                        prompt = self.analysed[url]
+                    except KeyError:
+                        processor = await create_future(TrOCRProcessor.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
+                        model = await create_future(VisionEncoderDecoderModel.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
+                        b = await bot.get_request(url)
+                        with tracebacksuppressor:
+                            image = Image.open(io.BytesIO(b)).convert("RGB")
+                            pixel_values = processor(image, return_tensors="pt").pixel_values
+                            generated_ids = await create_future(model.generate, pixel_values)
+                            generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+                            prompt = generated_text.strip()
+                            if prompt:
+                                prompt = prompt.replace(" is ", ", ").replace(" are ", ", ")
+                                prompt = f"This is {prompt}"
+                                print(prompt)
+                                additional.append(prompt)
+                    else:
+                        additional.append(prompt)
+            out = await create_future(cb.talk, q, additional=additional)
         if out:
             await send_with_reply(channel, message, lim_str("\xad" + escape_roles(out), 2000))
             return

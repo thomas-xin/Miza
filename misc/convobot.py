@@ -30,7 +30,7 @@ def create_driver():
 	folder = os.path.join(os.getcwd(), f"d~{ts}")
 	service = browser["service"](browser["path"])
 	options = browser["options"]()
-	options.headless = True
+	# options.headless = True
 	# options.add_argument("--disable-gpu")
 	prefs = {"download.default_directory" : folder}
 	options.add_experimental_option("prefs", prefs)
@@ -133,8 +133,10 @@ class Bot:
 
 	models = {}
 
-	def __init__(self, token=""):
+	def __init__(self, token="", email="", password=""):
 		self.token = token
+		self.email = email
+		self.password = password
 		self.history = {}
 		self.timestamp = time.time()
 
@@ -191,10 +193,125 @@ class Bot:
 				fmp = self.models[m] = pipeline("fill-mask", model=m, tokenizer=m)
 			return fmp(q)[0]["sequence"]
 
-	def ask(self, q):
-		driver = get_driver()
+	def clean_response(self, q, res, additional=()):
+		if additional:
+			res = "\n".join(additional) + "\n" + res
+		if not res.isascii():
+			fut = exc.submit(self.question_context_analysis, "salti/bert-base-multilingual-cased-finetuned-squad", q, res)
+		else:
+			fut = a2 = ""
+		a1 = self.question_context_analysis("deepset/roberta-base-squad2", q, res)
+		if fut:
+			a2 = fut.result()
+		if len(a2) >= len(a1) * 2:
+			a1 = a2
+		if not a1:
+			return res
+		if a1[0].islower() and a1 in res:
+			for sentence in res.replace("\n", ".").split("."):
+				if a1 in sentence:
+					a1 = sentence.strip()
+					if not a1.endswith("."):
+						a1 += "."
+					break
+		elif (" " not in a1 or len(a1) < 12) and not ai[0].isnumeric():
+			a1 = res.strip()
+		response = "\n".join(line.strip() for line in a1.replace("[CLS]", "").replace("[SEP]", "\n").splitlines()).strip()
+		while "[UNK]" in response:
+			response = self.answer_fill_mask("xlm-roberta-large", response.replace("[UNK]", "<mask>", 1))
+		search = "https : / / "
+		while search in response:
+			i = response.index(search)
+			temp = response[i + len(search):].split(" ")
+			response = response[:i] + "https://"
+			while temp:
+				word = temp[0]
+				if word.endswith(".") or word.endswith("?") or word.endswith("&") or word.endswith("="):
+					response += temp.pop(0)
+				else:
+					break
+			response += " ".join(temp)
+		if ". " in response:
+			words = response.split(".")
+			modified = False
+			for i in range(len(words) - 1):
+				a, b = words[i:i + 2]
+				if a and a[-1].isnumeric() and len(b) > 1 and b[0] == " " and b[1].isnumeric():
+					words[i + 1] = b.lstrip()
+					modified = True
+			if modified:
+				response = ".".join(words)
+		response = response.replace("( ", "(").replace(" )", ")")
+		if not response:
+			response = res.split("\n", 1)[0]
+			if response == "Dictionary":
+				r = []
+				for line in res.splitlines()[2:]:
+					if line.casefold() == "translations and more definitions" or line.casefold().startswith("web result"):
+						break
+					r.append(line)
+				response = "\n".join(r)
+		return response.strip().replace("  ", " ")
 
-		folder = driver.folder
+	def chatgpt(self, q, additional=()):
+		if not self.email or not self.password:
+			return ""
+		driver = d = get_driver()
+		search = "https://chat.openai.com/chat"
+		fut = exc.submit(driver.get, search)
+		fut.result(timeout=16)
+
+		elems = d.find_elements(by=class_name, value="btn-primary")
+		elems = [e for e in elems if "log in" in e.text.casefold()]
+		if elems:
+			elems[0].click()
+			e = d.find_element(by=xpath, value='//*[@id="username"]')
+			e.send_keys(self.email)
+			e = d.find_element(by=xpath, value='/html/body/main/section/div/div/div/form/div[2]/button')
+			e.click()
+			e = d.find_element(by=xpath, value='//*[@id="password"]')
+			e.send_keys(self.password)
+			e = d.find_element(by=xpath, value='/html/body/main/section/div/div/div/form/div[2]/button')
+			e.click()
+
+		elems = d.find_elements(by=xpath, value='//*[@id="headlessui-dialog-panel-:r1:"]/div[2]/div[4]/button')
+		if elems:
+			elems[0].click()
+			while True:
+				elems = d.find_elements(by=xpath, value='//*[@id="headlessui-dialog-panel-:r1:"]/div[2]/div[4]/button[2]')
+				if not elems:
+					break
+				elems[0].click()
+
+		e = d.find_element(by=xpath, value='//*[@id="__next"]/div/div[1]/main/div[2]/form/div/div[2]/textarea')
+		e.send_keys(q)
+		e = d.find_element(by=xpath, value='//*[@id="__next"]/div/div[1]/main/div[2]/form/div/div[2]/button')
+		e.click()
+		elems = []
+		while not elems:
+			elems = d.find_elements(by=xpath, value='//*[@id="__next"]/div/div[1]/main/div[2]/form/div/div[1]/button')
+			if elems:
+				break
+			time.sleep(0.5)
+		elems = d.find_elements(by=xpath, value='//*[@id="__next"]/div/div[1]/main/div[1]/div/div/div/div/div/div[2]/div[1]/div/p')
+		response = elems[-1].text
+		test = response.casefold()
+		if test.startswith("i'm sorry,"):
+			return
+		if test.startswith("it is not possible for me"):
+			return
+		if "i do not have the ability to" in test:
+			return
+		if "essay" in q or "full" in q:
+			return response
+		res = response.replace("I am Assistant", "I am Miza").replace("trained by OpenAI", "trained by OpenAI, Google, Deepset and Microsoft")
+		response = self.clean_response(q, res, additional=additional)
+		return response
+
+	def google(self, q, additional=()):
+		words = q.split()
+		q = " ".join(swap.get(w, w) for w in words)
+		driver = get_driver()
 		search = f"https://www.google.com/search?q={urllib.parse.quote_plus(q)}"
 		fut = exc.submit(driver.get, search)
 		fut.result(timeout=16)
@@ -209,81 +326,32 @@ class Bot:
 			response = " ".join(res.split("\n", 3)[1:3])
 		else:
 			res = "\n".join(r.strip() for r in res.splitlines() if valid_response(r))
-			# print(res)
-			if not res.isascii():
-				fut = exc.submit(self.question_context_analysis, "salti/bert-base-multilingual-cased-finetuned-squad", q, res)
-			else:
-				fut = a2 = ""
-			a1 = self.question_context_analysis("deepset/roberta-base-squad2", q, res)
-			if fut:
-				a2 = fut.result()
-			if len(a2) > len(a1):
-				a1 = a2
-			response = "\n".join(line.strip() for line in a1.replace("[CLS]", "").replace("[SEP]", "\n").splitlines()).strip()
-			while "[UNK]" in response:
-				response = self.answer_fill_mask("xlm-roberta-large", response.replace("[UNK]", "<mask>", 1))
-			search = "https : / / "
-			while search in response:
-				i = response.index(search)
-				temp = response[i + len(search):].split(" ")
-				response = response[:i] + "https://"
-				while temp:
-					word = temp[0]
-					if word.endswith(".") or word.endswith("?") or word.endswith("&") or word.endswith("="):
-						response += temp.pop(0)
-					else:
-						break
-				response += " ".join(temp)
-			if "." in response:
-				words = response.split(".")
-				modified = False
-				for i in range(len(words) - 1):
-					a, b = words[i:i + 2]
-					if a and a[-1].isnumeric() and len(b) > 1 and b[0] == " " and b[1].isnumeric():
-						words[i + 1] = b.lstrip()
-						modified = True
-				if modified:
-					response = ".".join(words)
-			response = response.replace("( ", "(").replace(" )", ")")
-			if not response:
-				response = res.split("\n", 1)[0]
-				if response == "Dictionary":
-					r = []
-					for line in res.splitlines()[2:]:
-						if line.casefold() == "translations and more definitions" or line.casefold().startswith("web result"):
-							break
-						r.append(line)
-					response = "\n".join(r)
-			elif response.casefold().replace("'", "") in ("i", "im", "imo", "io", "o"):
-				response = ""
-
-		response = response.strip().replace("  ", " ")
-		# self.history[q] = response
+			response = self.clean_response(q, res, additional=additional)
 		return response
 
-	def talk(self, i, recursive=True):
+	def talk(self, i, additional=()):
 		t = time.time()
 		if t > self.timestamp + 720:
 			self.history.clear()
 		elif len(self.history) > 8:
 			self.history.pop(next(iter(self.history)))
 		self.timestamp = t
-		if not recursive or literal_question(i):
-			words = i.split()
-			i = " ".join(swap.get(w, w) for w in words)
-			response = self.ask(i)
-			if response and response.casefold() != i.casefold():
-				self.history[i] = response
-				return response
+		response = reso = self.chatgpt(i, additional=additional)
+		if response and response.casefold() != i.casefold():
+			self.history[i] = response
+			return response
 		res = self.question_answer_analysis("microsoft/DialoGPT-large", i, list(self.history.keys()), list(self.history.values()))
 		a1 = res
 		if a1.lower() == i.lower() or vague(a1) or (len(i) > 5 and a1.lower() in (a.lower() for a in self.history.values())):
 			a1 = ""
 		response = a1
-		if recursive and not response:
-			return self.talk(i, recursive=False)
 		if not response:
-			response = res
+			response = self.google(i, additional=additional)
+			if response and response.casefold() != i.casefold():
+				self.history[i] = response
+				return response
+		if not response:
+			response = reso if reso else res
 		response = response.replace("  ", " ")
 		if not response:
 			response = "Sorry, I don't know."
