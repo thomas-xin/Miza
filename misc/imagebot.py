@@ -126,6 +126,7 @@ class Bot:
 		if prompt.isascii():
 			bar.send_keys(prompt)
 		else:
+			time.sleep(0.5)
 			driver.execute_script(js_code, bar, prompt)
 
 		generate = driver.find_element(by=webdriver.common.by.By.ID, value="ZQvTCDloXyqgqlOiDvup")

@@ -307,6 +307,7 @@ class Bot:
 		if question.isascii():
 			e.send_keys(question)
 		else:
+			time.sleep(0.5)
 			driver.execute_script(js_code, e, question)
 		elems = [e for e in d.find_elements(by=class_name, value="text-gray-500") if e in d.find_elements(by=class_name, value="absolute")]
 		e = elems[0]
