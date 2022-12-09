@@ -31,7 +31,7 @@ def create_driver():
 	folder = os.path.join(os.getcwd(), f"d~{ts}")
 	service = browser["service"](browser["path"])
 	options = browser["options"]()
-	# options.add_argument("--headless")
+	options.add_argument("--headless")
 	options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36")
 	# options.add_argument("--disable-gpu")
 	prefs = {"download.default_directory" : folder}
@@ -450,7 +450,7 @@ class Bot:
 		tup = (i.casefold(), a1.casefold())
 		if a1.lower() == i.lower() or vague(a1) or (len(i) > 5 and tup == self.previous):
 			a1 = ""
-		if (" " not in a1 or len(a1) < 12) and not a1[0].isnumeric() and not a1.endswith("."):
+		if a1 and (" " not in a1 or len(a1) < 12) and not a1[0].isnumeric() and not a1.endswith("."):
 			response = ""
 		else:
 			response = a1
