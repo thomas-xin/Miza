@@ -415,6 +415,8 @@ class Bot:
 		if "essay" in t2 or "full" in t2 or "write" in t2 or "writing" in t2 or "about" in t2 or "worth noting that" in test or "worth mentioning that" in test:
 			return response
 		if additional or len(q) < 32:
+			if response and additional and self.previous and q.casefold() == self.previous[0]:
+				additional = [a for a in additional if a.casefold() != self.previous[1]]
 			response = self.clean_response(q, response, additional=additional)
 		else:
 			response = response.strip()
