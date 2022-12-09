@@ -935,6 +935,7 @@ class Match(Command):
 
 
 class Ask(Command):
+    _timeout_ = 4
     alias = ["How"]
     description = "Ask me any question, and I'll answer it!"
     usage = "<string>"
