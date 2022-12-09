@@ -142,8 +142,7 @@ class Bot:
 				size="512x512",
 			)
 		else:
-			resp = openai.Image.create_edit(
-				prompt=prompt,
+			resp = openai.Image.create_variation(
 				image=image_1b,
 				n=1,
 				size="512x512",
