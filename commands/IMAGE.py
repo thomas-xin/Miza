@@ -1600,6 +1600,7 @@ class StableDiffusion(Command):
                         image_1 = resp[0]
                         resp = await process_image(image_2, "expand_mask", ["-nogif", 12], timeout=60)
                         image_2 = resp[0]
+                        print(image_1, image_2)
                     if "--strength" not in kwargs:
                         args.extend((
                             "--strength",

@@ -2175,13 +2175,14 @@ def get_mask(image):
     anytrans = A != 255
     notblank = A != 0
     anyalpha = anytrans & notblank
-    at = np.any(anytrans)
-    aa = np.any(anyalpha)
+    at = np.sum(anytrans)
+    aa = np.sum(anyalpha)
     anywhite = L == 255
     anyblack = L == 0
     aw = np.sum(anywhite)
     ab = np.sum(anyblack)
-    if at and not aa:
+    # print(np.sum(anytrans), np.sum(notblank), np.sum(anyalpha), aw, ab)
+    if at and aa < at / 2 and at > max(aw, ab):
         L[anytrans] = 255
         L[anytrans == False] = 0
     else:
