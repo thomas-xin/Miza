@@ -249,6 +249,7 @@ class Bot:
 				self.cache.pop(prompt, None)
 
 	def art(self, prompt, url="", url2="", kwargs={}, specified=False):
+		funcs = []
 		if not specified and not url and not url2 or not os.path.exists("misc/stable_diffusion.openvino"):
 			if random.randint(0, 2) and self.cache.get(prompt):
 				return self.cache[prompt].pop(0)

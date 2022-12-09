@@ -1615,31 +1615,32 @@ class StableDiffusion(Command):
                     if self.sdiff_sem.is_busy() and not getattr(message, "simulated", False):
                         await send_with_react(channel, italics(ini_md(f"StableDiffusion: {sqr_md(req)} enqueued in position {sqr_md(self.sdiff_sem.passive + 1)}.")), reacts="❎", reference=message)
                     async with self.sdiff_sem:
-                        fn = "misc/stable_diffusion.openvino/input.png"
-                        if os.path.exists(fn):
-                            os.remove(fn)
-                        os.rename(image_1, fn)
-                        args.extend((
-                            "--init-image",
-                            "input.png",
-                        ))
-                        if image_2:
-                            fm = "misc/stable_diffusion.openvino/mask.png"
-                            if os.path.exists(fm):
-                                os.remove(fm)
-                            os.rename(image_2, fm)
+                        if url:
+                            fn = "misc/stable_diffusion.openvino/input.png"
+                            if os.path.exists(fn):
+                                os.remove(fn)
+                            os.rename(image_1, fn)
                             args.extend((
-                                "--mask",
-                                "mask.png",
+                                "--init-image",
+                                "input.png",
                             ))
-                        elif image_2b:
-                            fm = "misc/stable_diffusion.openvino/mask.png"
-                            with open(fm, "wb") as f:
-                                f.write(image_2b)
-                            args.extend((
-                                "--mask",
-                                "mask.png",
-                            ))
+                            if image_2:
+                                fm = "misc/stable_diffusion.openvino/mask.png"
+                                if os.path.exists(fm):
+                                    os.remove(fm)
+                                os.rename(image_2, fm)
+                                args.extend((
+                                    "--mask",
+                                    "mask.png",
+                                ))
+                            elif image_2b:
+                                fm = "misc/stable_diffusion.openvino/mask.png"
+                                with open(fm, "wb") as f:
+                                    f.write(image_2b)
+                                args.extend((
+                                    "--mask",
+                                    "mask.png",
+                                ))
                         for k, v in kwargs.items():
                             args.extend((k, v))
                         print(args)
