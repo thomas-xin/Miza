@@ -1,6 +1,6 @@
 import os, time, urllib, json, io, random, subprocess
 import concurrent.futures
-import selenium, requests, torch, pyperclip, openai
+import selenium, requests, torch, openai
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering, AutoModelForCausalLM, pipeline
@@ -170,11 +170,11 @@ class Bot:
 		fut.result(timeout=16)
 
 		bar = driver.find_element(by=webdriver.common.by.By.ID, value="search-bar")
-		if prompt.isascii():
+		try:
 			bar.send_keys(prompt)
-		else:
-			pyperclip.copy(prompt)
-			bar.send_keys(Keys.CONTROL, "v")
+		except selenium.common.exceptions.WebDriverException:
+			d.execute_script("document.getElementById('search-bar').focus()")
+			d.execute_script(f"document.execCommand('insertText', false, {repr(prompt)});")
 
 		generate = driver.find_element(by=webdriver.common.by.By.ID, value="ZQvTCDloXyqgqlOiDvup")
 		generate.click()

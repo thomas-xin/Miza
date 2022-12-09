@@ -1,6 +1,6 @@
 import os, time, urllib, json
 import concurrent.futures
-import selenium, requests, torch, pyperclip
+import selenium, requests, torch
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering, AutoModelForCausalLM, pipeline
@@ -181,7 +181,7 @@ class Bot:
 		end = tokenizer.eos_token
 		new_user_input_ids = tokenizer.encode(q + end, return_tensors="pt", max_length=2048, truncation=True)
 		history = []
-		if self.chat_history_ids:
+		if self.chat_history_ids is not None:
 			history.append(self.chat_history_ids)
 		for k, v in self.history.items():
 			history.append(tokenizer.encode(k + end, return_tensors="pt", max_length=2048, truncation=True))
@@ -269,6 +269,7 @@ class Bot:
 			question = "\n".join(additional) + "\n" + q
 		else:
 			question = q
+		question = question.strip()
 		driver = d = get_driver()
 		search = "https://chat.openai.com/chat"
 		fut = exc.submit(driver.get, search)
@@ -304,28 +305,47 @@ class Bot:
 
 		elems = [e for e in d.find_elements(by=class_name, value="resize-none") if e in d.find_elements(by=class_name, value="bg-transparent")]
 		e = elems[0]
-		if question.isascii():
+		try:
 			e.send_keys(question)
-		else:
-			pyperclip.copy(question)
-			e.send_keys(Keys.CONTROL, "v")
+		except selenium.common.exceptions.WebDriverException:
+			d.execute_script("document.getElementsByClassName('resize-none')[0].focus()")
+			d.execute_script(f"document.execCommand('insertText', false, {repr(question)});")
+		if not e.text:
+			print("ChatGPT: No input.")
+			drivers.insert(0, driver)
+			return
 		elems = [e for e in d.find_elements(by=class_name, value="text-gray-500") if e in d.find_elements(by=class_name, value="absolute")]
 		e = elems[0]
 		e.click()
 		time.sleep(0.5)
 		t2 = q.rstrip("?").casefold().split()
 		for attempt in range(3):
-			for i in range(240):
+			for i in range(180):
 				elems = [e for e in d.find_elements(by=class_name, value="btn-neutral") if e.text == "Try again"]
 				if elems:
+					elems = d.find_elements(by=class_name, value="text-base")
+					response = elems[-1].text
 					break
 				time.sleep(0.5)
+				if i == 20:
+					elems = d.find_elements(by=class_name, value="text-base")
+					if not elems:
+						print("ChatGPT: No input.")
+						drivers.insert(0, driver)
+						return
 			else:
-				print("ChatGPT: Timed out.")
-				drivers.insert(0, driver)
-				return
-			elems = d.find_elements(by=class_name, value="text-base")
-			response = elems[-1].text
+				response = None
+				elems = d.find_elements(by=class_name, value="text-base")
+				if elems:
+					response = elems[-1].text
+					if len(response) < 4 or response == question:
+						response = None
+					else:
+						print("ChatGPT: Recovered.")
+				if not response:
+					print("ChatGPT: Timed out.")
+					drivers.insert(0, driver)
+					return
 			response = response.removesuffix("\n2 / 2").removesuffix("\n3 / 3")
 			print(response)
 			test = response.casefold()
