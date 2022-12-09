@@ -104,7 +104,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         self.semaphore = Semaphore(2, 1)
         self.ready_semaphore = Semaphore(1, inf)
         self.guild_semaphore = Semaphore(5, inf, rate_limit=5)
-        self.load_semaphore = Semaphore(200, inf, rate_limit=10)
+        self.load_semaphore = Semaphore(50, inf, rate_limit=10)
         self.user_semaphore = Semaphore(64, inf, rate_limit=8)
         self.disk_semaphore = Semaphore(1, 1, rate_limit=1)
         self.command_semaphore = Semaphore(262144, 16384)
