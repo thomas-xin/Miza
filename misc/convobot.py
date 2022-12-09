@@ -190,8 +190,8 @@ class Bot:
 		self.history.clear()
 		history.append(new_user_input_ids)
 		bot_input_ids = torch.cat(history, dim=-1)
-		self.chat_history_ids = model.generate(bot_input_ids, max_length=4096, pad_token_id=tokenizer.eos_token_id)
-		return tokenizer.decode(self.chat_history_ids[:, bot_input_ids.shape[-1]:][0], skip_special_tokens=True).strip()
+		self.chat_history_ids = model.generate(bot_input_ids, max_length=16384, pad_token_id=tokenizer.eos_token_id)
+		return tokenizer.decode(self.chat_history_ids[-4096:, bot_input_ids.shape[-1]:][0], skip_special_tokens=True).strip()
 
 	def answer_fill_mask(self, m, q):
 		if m == "xlm-roberta-large":
