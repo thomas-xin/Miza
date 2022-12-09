@@ -126,6 +126,7 @@ class Bot:
 			return resp.content
 
 	def dalle_i2i(self, prompt, image_1b, image_2b=None):
+		openai.api_key = self.token
 		if image_2b:
 			im = Image.open(io.BytesIO(image_2b))
 			if "A" not in im.mode:
