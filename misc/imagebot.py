@@ -120,7 +120,7 @@ class Bot:
 		with requests.get(resp.data[0].url) as resp:
 			return resp.content
 
-	def dalle_i2i(self, prompt, image_1b, image_2b=None):
+	def dalle_i2i(self, prompt, image_1b, image_2b=None, force=False):
 		openai.api_key = self.token
 		if image_2b:
 			im = Image.open(io.BytesIO(image_2b))
@@ -138,7 +138,7 @@ class Bot:
 				size="512x512",
 			)
 		else:
-			if not prompt:
+			if not prompt or not force:
 				resp = openai.Image.create_variation(
 					image=image_1b,
 					n=1,

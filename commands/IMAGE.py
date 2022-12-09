@@ -1613,7 +1613,7 @@ class StableDiffusion(Command):
                             with open(image_2, "rb") as f:
                                 image_2b = f.read()
                         with tracebacksuppressor:
-                            fn = await create_future(self.imagebot.dalle_i2i, prompt, image_1b, image_2b, timeout=60)
+                            fn = await create_future(self.imagebot.dalle_i2i, prompt, image_1b, image_2b, force=force, timeout=60)
                             done = True
                 if not done:
                     if self.sdiff_sem.is_busy() and not getattr(message, "simulated", False):
