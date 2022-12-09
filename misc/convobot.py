@@ -315,7 +315,7 @@ class Bot:
 		time.sleep(0.5)
 		t2 = q.rstrip("?").casefold().split()
 		for attempt in range(3):
-			for i in range(120):
+			for i in range(240):
 				elems = [e for e in d.find_elements(by=class_name, value="btn-neutral") if e.text == "Try again"]
 				if elems:
 					break

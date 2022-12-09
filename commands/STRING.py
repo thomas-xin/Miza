@@ -935,7 +935,7 @@ class Match(Command):
 
 
 class Ask(Command):
-    _timeout_ = 4
+    _timeout_ = 8
     alias = ["How"]
     description = "Ask me any question, and I'll answer it! I am connected to OpenAI ChatGPT, Google Search, Microsoft DialoGPT, Deepset Roberta, and more!"
     usage = "<string>"
