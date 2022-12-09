@@ -321,6 +321,7 @@ class Bot:
 					break
 				time.sleep(0.5)
 			else:
+				print("ChatGPT: Timed out.")
 				drivers.insert(0, driver)
 				return
 			elems = d.find_elements(by=class_name, value="text-base")
@@ -342,7 +343,7 @@ class Bot:
 					"death",
 					"hate",
 				)
-				if any(stm in spl for stm in filtered):
+				if any(stm in spl for stm in unfiltered):
 					break
 				filtered = (
 					"i'm sorry,",
@@ -407,6 +408,7 @@ class Bot:
 		try:
 			elem = driver.find_element(by=webdriver.common.by.By.ID, value="rso")
 		except:
+			print("Google: Timed out.")
 			drivers.insert(0, driver)
 			return ""
 		res = elem.text
