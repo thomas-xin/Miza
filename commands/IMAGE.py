@@ -1606,7 +1606,7 @@ class StableDiffusion(Command):
                             "--strength",
                             "0.75",
                         ))
-                    if (inpaint or not force) and "--strength" not in kwargs and str(kwargs["--guidance-scale"]) == "7.5" and str(kwargs["--eta"]) == "0.8":
+                    if "--strength" not in kwargs and str(kwargs["--guidance-scale"]) == "7.5" and str(kwargs["--eta"]) == "0.8":
                         with open(image_1, "rb") as f:
                             image_1b = f.read()
                         if image_2:

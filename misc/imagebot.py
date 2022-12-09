@@ -138,11 +138,25 @@ class Bot:
 				size="512x512",
 			)
 		else:
-			resp = openai.Image.create_variation(
-				image=image_1b,
-				n=1,
-				size="512x512",
-			)
+			if not prompt:
+				resp = openai.Image.create_variation(
+					image=image_1b,
+					n=1,
+					size="512x512",
+				)
+			else:
+				im = Image.new("LA", (512, 512), 0)
+				b = io.BytesIO()
+				im.save(b, format="png")
+				b.seek(0)
+				image_2b = b.read()
+				resp = openai.Image.create_variation(
+					prompt=prompt,
+					image=image_1b,
+					mask=image_2b,
+					n=1,
+					size="512x512",
+				)
 		print(resp)
 		with requests.get(resp.data[0].url) as resp:
 			return resp.content
