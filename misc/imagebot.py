@@ -125,7 +125,7 @@ class Bot:
 		if image_2b:
 			im = Image.open(io.BytesIO(image_2b))
 			if "A" not in im.mode:
-				im.putalpha(im.convert("L"))
+				im.putalpha(im.convert("L").point(lambda x: x ^ 255))
 				b = io.BytesIO()
 				im.save(b, format="png")
 				b.seek(0)
