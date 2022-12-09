@@ -1,7 +1,8 @@
 import os, time, urllib, json
 import concurrent.futures
-import selenium, requests, torch
+import selenium, requests, torch, pyperclip
 from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering, AutoModelForCausalLM, pipeline
 
 try:
@@ -30,7 +31,7 @@ def create_driver():
 	folder = os.path.join(os.getcwd(), f"d~{ts}")
 	service = browser["service"](browser["path"])
 	options = browser["options"]()
-	options.add_argument("--headless")
+	# options.add_argument("--headless")
 	options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36")
 	# options.add_argument("--disable-gpu")
 	prefs = {"download.default_directory" : folder}
@@ -130,12 +131,6 @@ swap = {
 	"my": "your",
 }
 
-js_code = """
-  var elm = arguments[0], txt = arguments[1];
-  elm.value += txt;
-  elm.dispatchEvent(new Event('change'));
-"""
-
 
 class Bot:
 
@@ -146,6 +141,8 @@ class Bot:
 		self.email = email
 		self.password = password
 		self.history = {}
+		self.chat_history_ids = None
+		self.previous = None
 		self.timestamp = time.time()
 
 	def question_context_analysis(self, m, q, c):
@@ -182,16 +179,19 @@ class Bot:
 			model = AutoModelForCausalLM.from_pretrained(m)
 			self.models[m] = (tokenizer, model)
 		end = tokenizer.eos_token
-		new_user_input_ids = tokenizer.encode(q + end, return_tensors="pt", max_length=4096, truncation=True)
+		new_user_input_ids = tokenizer.encode(q + end, return_tensors="pt", max_length=2048, truncation=True)
 		history = []
+		if self.chat_history_ids:
+			history.append(self.chat_history_ids)
 		for k, v in self.history.items():
-			history.append(tokenizer.encode(k + end, return_tensors="pt", max_length=4096, truncation=True))
+			history.append(tokenizer.encode(k + end, return_tensors="pt", max_length=2048, truncation=True))
 			if v:
-				history.append(tokenizer.encode(v + end, return_tensors="pt", max_length=4096, truncation=True))
+				history.append(tokenizer.encode(v + end, return_tensors="pt", max_length=2048, truncation=True))
+		self.history.clear()
 		history.append(new_user_input_ids)
 		bot_input_ids = torch.cat(history, dim=-1)
-		chat_history_ids = model.generate(bot_input_ids, max_length=16384, pad_token_id=tokenizer.eos_token_id)
-		return tokenizer.decode(chat_history_ids[:, bot_input_ids.shape[-1]:][0], skip_special_tokens=True).strip()
+		self.chat_history_ids = model.generate(bot_input_ids, max_length=4096, pad_token_id=tokenizer.eos_token_id)
+		return tokenizer.decode(self.chat_history_ids[:, bot_input_ids.shape[-1]:][0], skip_special_tokens=True).strip()
 
 	def answer_fill_mask(self, m, q):
 		if m == "xlm-roberta-large":
@@ -262,7 +262,7 @@ class Bot:
 				response = "\n".join(r)
 		return response.strip().replace("  ", " ")
 
-	def chatgpt(self, q, additional=()):
+	def chatgpt(self, q, additional=(), force=False):
 		if not self.email or not self.password:
 			return ""
 		if additional:
@@ -307,8 +307,8 @@ class Bot:
 		if question.isascii():
 			e.send_keys(question)
 		else:
-			time.sleep(0.5)
-			driver.execute_script(js_code, e, question)
+			pyperclip.copy(question)
+			e.send_keys(Keys.CONTROL, "v")
 		elems = [e for e in d.find_elements(by=class_name, value="text-gray-500") if e in d.find_elements(by=class_name, value="absolute")]
 		e = elems[0]
 		e.click()
@@ -336,7 +336,7 @@ class Bot:
 				elems[0].click()
 				continue
 			spl = test.split()
-			if not additional and "\n" not in test and len(test) < 1024:
+			if not force and not additional and "\n" not in test and len(test) < 1024:
 				unfiltered = (
 					"kill",
 					"suicide",
@@ -362,6 +362,7 @@ class Bot:
 					continue
 				filtered = (
 					"t have access",
+					"s not appropriate for",
 					"s not possible for me",
 					"s impossible for me",
 					"t have the ability to",
@@ -377,6 +378,7 @@ class Bot:
 					return
 			break
 		else:
+			print("ChatGPT: Exceeded attempt limit.")
 			drivers.insert(0, driver)
 			return
 		drivers.insert(0, driver)
@@ -387,13 +389,15 @@ class Bot:
 		for search in searches:
 			if response.startswith(search):
 				response = "I " + response[search:]
-		if "essay" in t2 or "full" in t2 or "write" in t2 or "writing" in t2 or "about" in t2 or "worth noting that" in test:
+		response = response.replace("I am Assistant", "I am Miza").replace("trained by OpenAI", "linked to OpenAI, Google, Deepset and Microsoft")
+		if ". Is there" in response:
+			response = response.rsplit(". Is there", 1)[0] + "."
+		if "essay" in t2 or "full" in t2 or "write" in t2 or "writing" in t2 or "about" in t2 or "worth noting that" in test or "worth mentioning that" in test:
 			return response
-		res = response.replace("I am Assistant", "I am Miza").replace("trained by OpenAI", "linked to OpenAI, Google, Deepset and Microsoft")
 		if additional or len(q) < 32:
-			response = self.clean_response(q, res, additional=additional)
+			response = self.clean_response(q, response, additional=additional)
 		else:
-			response = res.strip()
+			response = response.strip()
 		# print(response)
 		return response
 
@@ -429,42 +433,50 @@ class Bot:
 		self.timestamp = t
 		response = reso = self.chatgpt(i, additional=additional)
 		if response and response.casefold() != i.casefold():
-			self.history[i] = response
-			return response
+			return self.register(i, response)
 		if literal_question(i):
 			response = self.google(i, additional=additional)
 			if response and response.casefold() != i.casefold():
-				self.history[i] = response
-				return response
+				return self.register(i, response)
 			googled = True
 		else:
 			googled = False
 		if additional:
 			response = self.clean_response(i, response, additional=additional)
 			if response and response.casefold() != i.casefold():
-				self.history[i] = response
-				return response
+				return self.register(i, response)
 		res = self.question_answer_analysis("microsoft/DialoGPT-large", i, list(self.history.keys()), list(self.history.values()))
 		a1 = res
-		if a1.lower() == i.lower() or vague(a1) or (len(i) > 5 and a1.lower() in (a.lower() for a in self.history.values())):
+		tup = (i.casefold(), a1.casefold())
+		if a1.lower() == i.lower() or vague(a1) or (len(i) > 5 and tup == self.previous):
 			a1 = ""
-		response = a1
+		if (" " not in a1 or len(a1) < 12) and not a1[0].isnumeric() and not a1.endswith("."):
+			response = ""
+		else:
+			response = a1
 		if not googled and not response:
 			response = self.google(i, additional=additional)
 			if response and response.casefold() != i.casefold():
-				self.history[i] = response
-				return response
+				return self.register(i, response)
 		if not response:
 			response = reso if reso else res
+		if not response:
+			print(i + ": forcing ChatGPT response...")
+			response = reso = self.chatgpt(i, additional=additional, force=True)
 		response = response.replace("  ", " ")
 		if not response:
 			response = "Sorry, I don't know."
-		self.history[i] = response
-		return response
+		return self.register(i, response)
 
 	def append(self, msg):
 		self.history[msg] = self.history.pop(msg, "")
 		return msg
+
+	def register(self, q, a):
+		tup = (q.casefold(), a.casefold())
+		self.previous = tup
+		self.history[q] = a
+		return a
 
 if __name__ == "__main__":
 	import sys

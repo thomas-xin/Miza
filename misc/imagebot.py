@@ -1,7 +1,8 @@
 import os, time, urllib, json, io, random, subprocess
 import concurrent.futures
-import selenium, requests, torch, openai
+import selenium, requests, torch, pyperclip, openai
 from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering, AutoModelForCausalLM, pipeline
 import numpy as np
 from PIL import Image
@@ -97,12 +98,6 @@ def safecomp(gen):
 			continue
 		yield e
 
-js_code = """
-  var elm = arguments[0], txt = arguments[1];
-  elm.value += txt;
-  elm.dispatchEvent(new Event('change'));
-"""
-
 
 class Bot:
 
@@ -164,8 +159,8 @@ class Bot:
 		if prompt.isascii():
 			bar.send_keys(prompt)
 		else:
-			time.sleep(0.5)
-			driver.execute_script(js_code, bar, prompt)
+			pyperclip.copy(prompt)
+			bar.send_keys(Keys.CONTROL, "v")
 
 		generate = driver.find_element(by=webdriver.common.by.By.ID, value="ZQvTCDloXyqgqlOiDvup")
 		generate.click()
