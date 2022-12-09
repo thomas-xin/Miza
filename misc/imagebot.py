@@ -150,7 +150,7 @@ class Bot:
 				im.save(b, format="png")
 				b.seek(0)
 				image_2b = b.read()
-				resp = openai.Image.create_variation(
+				resp = openai.Image.create_edit(
 					prompt=prompt,
 					image=image_1b,
 					mask=image_2b,
