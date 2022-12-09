@@ -15,6 +15,8 @@ if not os.path.exists("auth.json") or not os.path.getsize("auth.json"):
         "rapidapi_secret": "",
         "alexflipnote_key": "",
         "giphy_key": "",
+        "huggingface_key": "",
+        "openai_key": "",
     }
     import json
     with open("auth.json", "w", encoding="utf-8") as f:

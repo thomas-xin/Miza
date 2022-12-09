@@ -1,6 +1,6 @@
 import os, time, urllib, json, io, random, subprocess
 import concurrent.futures
-import selenium, requests, torch
+import selenium, requests, torch, openai
 from selenium import webdriver
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering, AutoModelForCausalLM, pipeline
 import numpy as np
@@ -114,6 +114,44 @@ class Bot:
 		self.session = requests.Session()
 		self.timestamp = time.time()
 
+	def art_dalle(self, prompt, kwargs=None):
+		openai.api_key = self.token
+		resp = openai.Image.create(
+			prompt=prompt,
+			n=1,
+			size="512x512"
+		)
+		print(resp)
+		with requests.get(resp.data[0].url) as resp:
+			return resp.content
+
+	def dalle_i2i(self, prompt, image_1b, image_2b=None):
+		if image_2b:
+			im = Image.open(io.BytesIO(image_2b))
+			if "A" not in im.mode:
+				im.putalpha(im.convert("L"))
+				b = io.BytesIO()
+				im.save(b, format="png")
+				b.seek(0)
+				image_2b = b.read()
+			resp = openai.Image.create_edit(
+				prompt=prompt,
+				image=image_1b,
+				mask=image_2b,
+				n=1,
+				size="512x512",
+			)
+		else:
+			resp = openai.Image.create_edit(
+				prompt=prompt,
+				image=image_1b,
+				n=1,
+				size="512x512",
+			)
+		print(resp)
+		with requests.get(resp.data[0].url) as resp:
+			return resp.content
+
 	def art_mage(self, prompt, kwargs=None):
 		driver = get_driver()
 
@@ -211,15 +249,14 @@ class Bot:
 				self.cache.pop(prompt, None)
 
 	def art(self, prompt, url="", url2="", kwargs={}, specified=False):
-		funcs = []
-		if not url and not url2 or not os.path.exists("misc/stable_diffusion.openvino"):
-			if not specified:
-				if random.randint(0, 2) and self.cache.get(prompt):
-					return self.cache[prompt].pop(0)
-				if prompt.isascii():
-					funcs.append(self.art_mage)
-				funcs.append(self.art_deepai)
+		if not specified and not url and not url2 or not os.path.exists("misc/stable_diffusion.openvino"):
+			if random.randint(0, 2) and self.cache.get(prompt):
+				return self.cache[prompt].pop(0)
+			funcs.append(self.art_mage)
+			funcs.append(self.art_deepai)
 		random.shuffle(funcs)
+		if not specified and not url and not url2 or not os.path.exists("misc/stable_diffusion.openvino"):
+			funcs.insert(0, self.art_dalle)
 		for func in funcs:
 			try:
 				im = func(prompt, kwargs)

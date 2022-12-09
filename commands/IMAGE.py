@@ -1428,7 +1428,7 @@ class StableDiffusion(Command):
     slash = ("Art",)
     sdiff_sem = Semaphore(1, 256, rate_limit=1)
     fut = None
-    imagebot = imagebot.Bot()
+    imagebot = imagebot.Bot(token=AUTH.get("openai_key"))
 
     async def __call__(self, bot, channel, message, name, args, flags, **void):
         for a in reversed(message.attachments):
@@ -1582,67 +1582,75 @@ class StableDiffusion(Command):
                     prompt,
                 ))
             with discord.context_managers.Typing(channel):
-                if self.sdiff_sem.is_busy() and not getattr(message, "simulated", False):
-                    await send_with_react(channel, italics(ini_md(f"StableDiffusion: {sqr_md(req)} enqueued in position {sqr_md(self.sdiff_sem.passive + 1)}.")), reacts="❎", reference=message)
-                async with self.sdiff_sem:
-                    if url:
+                image_1 = image_2 = None
+                image_1b = image_2b = None
+                done = False
+                if url:
+                    resp = await process_image(url, "resize_to", ["-nogif", 512, 512, "auto"], timeout=60)
+                    image_1 = resp[0]
+                    if inpaint and url2:
+                        image_2b = await bot.get_request(url2)
+                    if inpaint and not url2:
+                        resp = await process_image(image_1, "get_mask", ["-nogif", "-nodel"], timeout=60)
+                        image_2 = resp[0]
+                        resp = await process_image(image_1, "inpaint", [image_2, "-nodel"], timeout=60)
+                        image_1 = resp[0]
+                        resp = await process_image(image_2, "expand_mask", ["-nogif", 12], timeout=60)
+                        image_2 = resp[0]
+                    if "--strength" not in kwargs:
+                        args.extend((
+                            "--strength",
+                            "0.75",
+                        ))
+                    if "--strength" not in kwargs and str(kwargs["--guidance-scale"]) == "7.5" and str(kwargs["--eta"]) == "0.8":
+                        with open(image_1, "rb") as f:
+                            image_1b = f.read()
+                        if image_2:
+                            with open(image_2, "rb") as f:
+                                image_2b = f.read()
+                        with tracebacksuppressor:
+                            fn = await create_future(self.imagebot.dalle_i2i, prompt, image_1b, image_2b, timeout=60)
+                            done = True
+                if not done:
+                    if self.sdiff_sem.is_busy() and not getattr(message, "simulated", False):
+                        await send_with_react(channel, italics(ini_md(f"StableDiffusion: {sqr_md(req)} enqueued in position {sqr_md(self.sdiff_sem.passive + 1)}.")), reacts="❎", reference=message)
+                    async with self.sdiff_sem:
                         fn = "misc/stable_diffusion.openvino/input.png"
-                        resp = await process_image(url, "resize_to", ["-nogif", 512, 512, "auto"], timeout=60)
                         if os.path.exists(fn):
                             os.remove(fn)
-                        os.rename(resp[0], fn)
+                        os.rename(image_1, fn)
                         args.extend((
                             "--init-image",
                             "input.png",
                         ))
-                        if inpaint and url2:
-                            b = await bot.get_request(url2)
+                        if image_2:
+                            fm = "misc/stable_diffusion.openvino/mask.png"
+                            if os.path.exists(fm):
+                                os.remove(fm)
+                            os.rename(image_2, fm)
+                            args.extend((
+                                "--mask",
+                                "mask.png",
+                            ))
+                        elif image_2b:
                             fm = "misc/stable_diffusion.openvino/mask.png"
                             with open(fm, "wb") as f:
-                                f.write(b)
+                                f.write(image_2b)
                             args.extend((
                                 "--mask",
                                 "mask.png",
                             ))
-                        if inpaint and not url2:
-                            fm = "misc/stable_diffusion.openvino/mask.png"
-                            resp = await process_image(fn, "get_mask", ["-nogif", "-nodel"], timeout=60)
-                            if os.path.exists(fm):
-                                os.remove(fm)
-                            os.rename(resp[0], fm)
-                            resp = await process_image(fn, "inpaint", [fm, "-nodel"], timeout=60)
-                            if os.path.exists(fn):
-                                os.remove(fn)
-                            os.rename(resp[0], fn)
-                            resp = await process_image(fm, "expand_mask", ["-nogif", 12], timeout=60)
-                            if os.path.exists(fm):
-                                os.remove(fm)
-                            os.rename(resp[0], fm)
-                            args.extend((
-                                "--mask",
-                                "mask.png",
-                            ))
-                            # if "--strength" not in kwargs:
-                            #     args.extend((
-                            #         "--strength",
-                            #         "1",
-                            #     ))
-                        if "--strength" not in kwargs:
-                            args.extend((
-                                "--strength",
-                                "0.75",
-                            ))
-                    for k, v in kwargs.items():
-                        args.extend((k, v))
-                    print(args)
-                    proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc/stable_diffusion.openvino", stdout=subprocess.DEVNULL)
-                    try:
-                        await asyncio.wait_for(proc.wait(), timeout=3200)
-                    except (T0, T1, T2):
-                        with tracebacksuppressor:
-                            force_kill(proc)
-                        raise
-            fn = "misc/stable_diffusion.openvino/output.png"
+                        for k, v in kwargs.items():
+                            args.extend((k, v))
+                        print(args)
+                        proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc/stable_diffusion.openvino", stdout=subprocess.DEVNULL)
+                        try:
+                            await asyncio.wait_for(proc.wait(), timeout=3200)
+                        except (T0, T1, T2):
+                            with tracebacksuppressor:
+                                force_kill(proc)
+                            raise
+                        fn = "misc/stable_diffusion.openvino/output.png"
         await bot.send_with_file(channel, "", fn, filename=lim_str(prompt, 96) + ".png", reference=message, reacts="🔳")
 
 
