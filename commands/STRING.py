@@ -937,7 +937,7 @@ class Match(Command):
 class Ask(Command):
     _timeout_ = 4
     alias = ["How"]
-    description = "Ask me any question, and I'll answer it!"
+    description = "Ask me any question, and I'll answer it! I am connected to OpenAI ChatGPT, Google Search, Microsoft DialoGPT, Deepset Roberta, and more!"
     usage = "<string>"
     # flags = "h"
     no_parse = True
@@ -1036,6 +1036,7 @@ class Ask(Command):
                         additional.append(prompt)
             out = await create_future(cb.talk, q, additional=additional)
         if out:
+            print(out)
             await send_with_reply(channel, message, lim_str("\xad" + escape_roles(out), 2000))
             return
         q = single_space(q).strip().translate(bot.mtrans).replace("?", "\u200b").strip("\u200b")

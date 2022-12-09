@@ -334,18 +334,44 @@ class Bot:
 					return
 				elems[0].click()
 				continue
+			spl = test.split()
 			if not additional and "\n" not in test and len(test) < 1024:
-				if test.startswith("i'm sorry,") or test.startswith("i am sorry,") or test.startswith("sorry,"):
+				unfiltered = (
+					"kill",
+					"suicide",
+					"death",
+					"hate",
+				)
+				if any(stm in spl for stm in filtered):
+					break
+				filtered = (
+					"i'm sorry,",
+					"i am sorry,",
+					"sorry,",
+					"i am not sure",
+					"i'm not sure",
+					"it is not specified",
+				)
+				if any(test.startswith(stm) for stm in filtered):
 					elems = [e for e in d.find_elements(by=class_name, value="btn-neutral") if e.text == "Try again"]
 					if not elems or attempt >= 1:
 						drivers.insert(0, driver)
 						return
 					elems[0].click()
 					continue
-				if test.startswith("it is not possible for me"):
-					drivers.insert(0, driver)
-					return
-				if "do not have access" in test or "impossible for me" in test or "i do not have the ability to" in test or "i am not able to" in test or ("illegal" in test.split() and "legal" not in q and "ok" not in t2 and "okay" not in t2):
+				filtered = (
+					"t have access",
+					"s not possible for me",
+					"s impossible for me",
+					"t have the ability to",
+					"m not able to",
+					"m not capable of",
+					"m unable to",
+				)
+				if (
+					any(stm in test for stm in filtered)
+					or ("illegal" in spl and "legal" not in q and "ok" not in t2 and "okay" not in t2)
+				):
 					drivers.insert(0, driver)
 					return
 			break
@@ -353,6 +379,13 @@ class Bot:
 			drivers.insert(0, driver)
 			return
 		drivers.insert(0, driver)
+		searches = (
+			"I am a large language model trained by OpenAI and ",
+			"As a large language model trained by OpenAI, I ",
+		)
+		for search in searches:
+			if response.startswith(search):
+				response = "I " + response[search:]
 		if "essay" in t2 or "full" in t2 or "write" in t2 or "writing" in t2 or "about" in t2 or "worth noting that" in test:
 			return response
 		res = response.replace("I am Assistant", "I am Miza").replace("trained by OpenAI", "linked to OpenAI, Google, Deepset and Microsoft")

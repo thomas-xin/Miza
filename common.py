@@ -1168,7 +1168,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
             print_exc()
         else:
             if not resp:
-                if url.endswith("/callback"):
+                if url.endswith("/callback") and hasattr(reference, "slash"):
                     url = f"https://discord.com/api/{api}/webhooks/{bot.id}/{reference.slash}/messages/@original"
                     resp = await Request(
                         url,
