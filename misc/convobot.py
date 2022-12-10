@@ -300,7 +300,7 @@ class Bot:
 			lines.append(a + "\n")
 		lines.append(f"Human: {question}\n")
 		if literal_question(q):
-			res = lim_str(self.google(q, raw=True).replace("\n", ". "), 256)
+			res = lim_str(self.google(q, raw=True).replace("\n", ". "), 256, mode="right")
 			lines.append(f"Google: {res}\n")
 			googled = True
 		else:
@@ -309,7 +309,7 @@ class Bot:
 		prompt = ""
 		while lines and len(prompt) < 1536:
 			prompt = lines.pop(-1) + prompt
-		print("GPTV2 prompt:", prompt)
+		print("GPTV3 prompt:", prompt)
 		model = "text-babbage-001" if len(prompt) >= 1024 else "text-curie-001" if len(prompt) >= 512 or not random.randint(0, 2) else "text-davinci-003"
 		response = openai.Completion.create(
 			model=model,
@@ -321,6 +321,7 @@ class Bot:
 			presence_penalty=0,
 		)
 		text = response.choices[0].text.removesuffix("Is there anything else I can help you with?").removesuffix("Can you provide more information to support your claim?").strip()
+		print("GPTV3 response:", text)
 		# set_seed(int(time.time() // 0.1) & 4294967295)
 		# text = ""
 		# while not text.endswith("."):
@@ -346,14 +347,14 @@ class Bot:
 			for a in additional:
 				lines.append(a + "\n")
 			lines.append(f"Human: {question}\n")
-			res = lim_str(self.google(q, raw=True).replace("\n", ". "), 256)
+			res = lim_str(self.google(q, raw=True).replace("\n", ". "), 256, mode="right")
 			lines.pop(-1)
 			lines.append(f"Google: {res}\n")
 			lines.append("Miza AI:")
 			prompt = ""
 			while lines and len(prompt) < 1536:
 				prompt = lines.pop(-1) + prompt
-			print("GPTV3 prompt:", prompt)
+			print("GPTV3 prompt2:", prompt)
 			model = "text-curie-001" if len(prompt) >= 512 or not random.randint(0, 2) else "text-davinci-003"
 			response = openai.Completion.create(
 				model=model,
@@ -365,7 +366,7 @@ class Bot:
 				presence_penalty=0,
 			)
 			text = response.choices[0].text.removesuffix("Is there anything else I can help you with?").removesuffix("Can you provide more information to support your claim?").strip()
-			print("GPTV3 response:", text)
+			print("GPTV3 response2:", text)
 		return text
 
 	def chatgpt(self, q, additional=(), force=False):
