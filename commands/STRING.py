@@ -989,7 +989,7 @@ class Ask(Command):
                     token=AUTH.get("openai_key"),
                     email=AUTH.get("openai_email"),
                     password=AUTH.get("openai_password"),
-                ))
+                )
         with discord.context_managers.Typing(channel):
             urls = []
             additional = []
