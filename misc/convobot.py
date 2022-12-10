@@ -311,6 +311,7 @@ class Bot:
 			top_p=1,
 			frequency_penalty=0,
 			presence_penalty=0,
+			user=str(id(self)),
 		)
 		text = response.choices[0].text.removesuffix("Is there anything else I can help you with?").removesuffix("Can you provide more information to support your claim?").strip()
 		print("GPTV3 response:", text)
@@ -363,6 +364,7 @@ class Bot:
 				top_p=1,
 				frequency_penalty=0,
 				presence_penalty=0,
+				user=str(id(self)),
 			)
 			text = response.choices[0].text.removesuffix("Is there anything else I can help you with?").removesuffix("Can you provide more information to support your claim?").strip()
 			print("GPTV3 response2:", text)

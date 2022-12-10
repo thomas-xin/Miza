@@ -115,6 +115,7 @@ class Bot:
 			prompt=prompt,
 			n=1,
 			size="512x512",
+			user=str(id(self)),
 		)
 		print(resp)
 		with requests.get(resp.data[0].url) as resp:
@@ -136,6 +137,7 @@ class Bot:
 				mask=image_2b,
 				n=1,
 				size="512x512",
+				user=str(id(self)),
 			)
 		else:
 			if not prompt or not force:
@@ -143,6 +145,7 @@ class Bot:
 					image=image_1b,
 					n=1,
 					size="512x512",
+					user=str(id(self)),
 				)
 			else:
 				im = Image.new("LA", (512, 512), 0)
@@ -156,6 +159,7 @@ class Bot:
 					mask=image_2b,
 					n=1,
 					size="512x512",
+					user=str(id(self)),
 				)
 		print(resp)
 		with requests.get(resp.data[0].url) as resp:
