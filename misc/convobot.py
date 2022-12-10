@@ -3,7 +3,7 @@ import concurrent.futures
 import selenium, requests, torch, openai
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
-from transformers import AutoTokenizer, AutoModelForQuestionAnswering, AutoModelForCausalLM, pipeline
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering, AutoModelForCausalLM, pipeline, set_seed
 
 try:
 	exc = concurrent.futures.exc_worker
@@ -168,6 +168,7 @@ class Bot:
 		self.chat_history_ids = None
 		self.previous = None
 		self.timestamp = time.time()
+		self.gpt2_generator = pipeline('text-generation', model='gpt2-large')
 
 	def question_context_analysis(self, m, q, c):
 		if m == "deepset/roberta-base-squad2":
@@ -286,7 +287,7 @@ class Bot:
 				response = "\n".join(r)
 		return response.strip().replace("  ", " ")
 
-	def gptv3(self, q, additional=()):
+	def gptcomplete(self, q, additional=()):
 		openai.api_key = self.token
 		question = q.strip()
 		lines = []
@@ -298,25 +299,29 @@ class Bot:
 		for a in additional:
 			lines.append(a + "\n")
 		lines.append(f"Human: {question}\n")
+		if literal_question(q):
+			res = lim_str(self.google(q, raw=True).replace("\n", ". "), 256)
+			lines.append(f"Google: {res}\n")
+			googled = True
+		else:
+			googled = False
 		lines.append("Miza AI:")
 		prompt = ""
 		while lines and len(prompt) < 1536:
 			prompt = lines.pop(-1) + prompt
-		print("GPTV3 prompt:", prompt)
-		model = "text-curie-001" if len(prompt) >= 512 or not random.randint(0, 2) else "text-davinci-003"
-		response = openai.Completion.create(
-			model=model,
-			prompt=prompt,
-			temperature=0.7,
-			max_tokens=256,
-			top_p=1,
-			frequency_penalty=0,
-			presence_penalty=0,
+		print("GPTV2 prompt:", prompt)
+		set_seed(int(time.time() // 0.1))
+		response = self.gpt2_generator(
+			prompt,
+			max_length=4096,
+			num_return_sequences=1,
 		)
-		text = response.choices[0].text.removesuffix("Is there anything else I can help you with?").strip()
-		print("GPTV3 response:", text)
+		text = response[0]["generated_text"]
+		print("GPTV2 prompt:", text)
 		test = text.casefold()
 		if test.startswith("sorry,") or test.startswith("i'm sorry,"):
+			if googled:
+				return
 			lines = []
 			if self.chat_history:
 				for q, a in self.chat_history:
@@ -333,8 +338,8 @@ class Bot:
 			prompt = ""
 			while lines and len(prompt) < 1536:
 				prompt = lines.pop(-1) + prompt
-			print("GPTV3 prompt2:", prompt)
-			model = "text-davinci-003"
+			print("GPTV3 prompt:", prompt)
+			model = "text-curie-001" if len(prompt) >= 512 or not random.randint(0, 2) else "text-davinci-003"
 			response = openai.Completion.create(
 				model=model,
 				prompt=prompt,
@@ -345,7 +350,7 @@ class Bot:
 				presence_penalty=0,
 			)
 			text = response.choices[0].text.removesuffix("Is there anything else I can help you with?").strip()
-			print("GPTV3 response2:", text)
+			print("GPTV3 response:", text)
 		return text
 
 	def chatgpt(self, q, additional=(), force=False):
