@@ -150,14 +150,6 @@ swap = {
 class Bot:
 
 	models = {}
-	unfiltered = (
-		"kill",
-		"suicide",
-		"death",
-		"hate",
-		"kys",
-		"kms",
-	)
 
 	def __init__(self, token="", email="", password=""):
 		self.token = token
@@ -299,8 +291,8 @@ class Bot:
 		for a in additional:
 			lines.append(a + "\n")
 		lines.append(f"Human: {question}\n")
-		if literal_question(q):
-			res = lim_str(self.google(q, raw=True).replace("\n", ". "), 256, mode="right")
+		if literal_question(question):
+			res = lim_str(self.google(question, raw=True).replace("\n", ". "), 256, mode="right")
 			lines.append(f"Google: {res}\n")
 			googled = True
 		else:
@@ -336,6 +328,13 @@ class Bot:
 		# print("GPTV2 response:", text)
 		test = text.casefold()
 		if not test or test.startswith("sorry,") or test.startswith("i'm sorry,"):
+			response = openai.Moderation.create(
+				input=question,
+			)
+			results = response.results[0].categories
+			if results.hate or results["self-harm"] or results["sexual/minors"] or results.violence:
+				print(results)
+				return text
 			if googled:
 				return
 			lines = []
@@ -347,7 +346,7 @@ class Bot:
 			for a in additional:
 				lines.append(a + "\n")
 			lines.append(f"Human: {question}\n")
-			res = lim_str(self.google(q, raw=True).replace("\n", ". "), 256, mode="right")
+			res = lim_str(self.google(question, raw=True).replace("\n", ". "), 256, mode="right")
 			lines.pop(-1)
 			lines.append(f"Google: {res}\n")
 			lines.append("Miza AI:")
@@ -464,7 +463,12 @@ class Bot:
 				continue
 			spl = test.split()
 			if not force and not additional and "\n" not in test and len(test) < 1024:
-				if any(stm in spl for stm in self.unfiltered):
+				response = openai.Moderation.create(
+					input=question,
+				)
+				results = response.results[0].categories
+				if results.hate or results["self-harm"] or results["sexual/minors"] or results.violence:
+					print(results)
 					break
 				filtered = (
 					"i'm sorry,",
@@ -562,7 +566,7 @@ class Bot:
 		tried_chatgpt = False
 		response = reso = None
 		words = i.casefold().split()
-		if not additional and (len(i) >= 32 and (random.randint(0, 1) or not self.chat_history) or "essay" in words or any(w in self.unfiltered for w in words)):
+		if not additional and (len(i) >= 32 and (random.randint(0, 1) or not self.chat_history) or "essay" in words):
 			response = reso = self.chatgpt(i, additional=additional)
 			tried_chatgpt = True
 		if response and response.casefold() != i.casefold():
