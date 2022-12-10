@@ -310,7 +310,7 @@ class Bot:
 		while lines and len(prompt) < 1536:
 			prompt = lines.pop(-1) + prompt
 		print("GPTV2 prompt:", prompt)
-		model = "text-babbage-001" if len(prompt) >= 512 else "text-curie-001" if len(prompt) >= 1024 or not random.randint(0, 2) else "text-davinci-003"
+		model = "text-babbage-001" if len(prompt) >= 512 or random.randint(0, 1) else "text-curie-001" if len(prompt) >= 1024 or random.randint(0, 1) else "text-davinci-003"
 		response = openai.Completion.create(
 			model=model,
 			prompt=prompt,
