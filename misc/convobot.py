@@ -465,6 +465,7 @@ class Bot:
 				continue
 			spl = test.split()
 			if not force and not additional and "\n" not in test and len(test) < 1024:
+				openai.api_key = self.token
 				resp = openai.Moderation.create(
 					input=question,
 				)
