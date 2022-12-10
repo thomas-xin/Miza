@@ -484,7 +484,7 @@ class Bot:
 		self.timestamp = t
 		tried_chatgpt = False
 		response = reso = None
-		if not additional and (len(i) >= 32 or "essay" in i.casefold().split()):
+		if not additional and (len(i) >= 32 and random.randint(0, 1) or "essay" in i.casefold().split() or not self.chat_history):
 			response = reso = self.chatgpt(i, additional=additional)
 			tried_chatgpt = True
 		if response and response.casefold() != i.casefold():
