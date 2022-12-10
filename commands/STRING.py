@@ -986,7 +986,7 @@ class Ask(Command):
                 cb = cdict(talk=lambda *args: "")
             else:
                 cb = self.convos[channel.id] = convobot.Bot(
-                    token=AUTH.get("huggingface_key"),
+                    token=AUTH.get("openai_key"),
                     email=AUTH.get("openai_email"),
                     password=AUTH.get("openai_password"),
                 )
@@ -1026,7 +1026,7 @@ class Ask(Command):
                             prompt = generated_text.strip()
                             if prompt:
                                 prompt = prompt.replace(" is ", ", ").replace(" are ", ", ")
-                                prompt = f"This is {prompt}"
+                                prompt = f"This is an image of {prompt}"
                                 print(prompt)
                                 additional.append(prompt)
                                 if len(self.analysed) > 4096:

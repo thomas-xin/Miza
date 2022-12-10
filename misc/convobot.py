@@ -1,6 +1,6 @@
-import os, time, urllib, json
+import os, time, urllib, json, random
 import concurrent.futures
-import selenium, requests, torch
+import selenium, requests, torch, openai
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering, AutoModelForCausalLM, pipeline
@@ -141,6 +141,7 @@ class Bot:
 		self.email = email
 		self.password = password
 		self.history = {}
+		self.chat_history = []
 		self.chat_history_ids = None
 		self.previous = None
 		self.timestamp = time.time()
@@ -261,6 +262,34 @@ class Bot:
 					r.append(line)
 				response = "\n".join(r)
 		return response.strip().replace("  ", " ")
+
+	def gptv3(self, q, additional=()):
+		openai.api_key = self.token
+		question = q.strip()
+		lines = []
+		if self.chat_history:
+			for q, a in self.chat_history:
+				lines.append(f"Human: {q}\nMiza AI: {a}\n")
+		for a in additional:
+			lines.append(a + "\n")
+		lines.append(f"Human: {question}\n")
+		lines.append("Miza AI:")
+		prompt = ""
+		while lines and len(prompt) < 1536:
+			prompt = lines.pop(-1) + prompt
+		print(prompt)
+		response = openai.Completion.create(
+			model="text-davinci-003",
+			prompt=prompt,
+			temperature=0.7,
+			max_tokens=256,
+			top_p=1,
+			frequency_penalty=0,
+			presence_penalty=0
+		)
+		text = response.choices[0].text.strip()
+		print(text)
+		return text
 
 	def chatgpt(self, q, additional=(), force=False):
 		if not self.email or not self.password:
@@ -451,9 +480,19 @@ class Bot:
 		elif len(self.history) > 8:
 			self.history.pop(next(iter(self.history)))
 		self.timestamp = t
-		response = reso = self.chatgpt(i, additional=additional)
+		tried_chatgpt = False
+		response = reso = None
+		if not additional and (len(i) >= 32 or "essay" in i.casefold().split()):
+			response = reso = self.chatgpt(i, additional=additional)
+			tried_chatgpt = True
 		if response and response.casefold() != i.casefold():
 			return self.register(i, response)
+		response = reso = self.gptv3(i, additional=additional)
+		if response and response.casefold() != i.casefold():
+			return self.register(i, response)
+		if not tried_chatgpt:
+			response = reso = self.chatgpt(i, additional=additional)
+			tried_chatgpt = True
 		if literal_question(i):
 			response = self.google(i, additional=additional)
 			if response and response.casefold() != i.casefold():
@@ -481,7 +520,7 @@ class Bot:
 		if not response:
 			response = reso if reso else res
 		if not response:
-			print(i + ": forcing ChatGPT response...")
+			print(i + ": forcing GPTV3 response...")
 			response = reso = self.chatgpt(i, additional=additional, force=True)
 		response = response.replace("  ", " ")
 		if not response:
@@ -495,6 +534,9 @@ class Bot:
 	def register(self, q, a):
 		tup = (q.casefold(), a.casefold())
 		self.previous = tup
+		if len(self.chat_history) >= 3:
+			self.chat_history.pop(0)
+		self.chat_history.append((q, a))
 		self.history[q] = a
 		return a
 
