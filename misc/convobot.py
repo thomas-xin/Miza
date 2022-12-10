@@ -150,6 +150,14 @@ swap = {
 class Bot:
 
 	models = {}
+	unfiltered = (
+		"kill",
+		"suicide",
+		"death",
+		"hate",
+		"kys",
+		"kms",
+	)
 
 	def __init__(self, token="", email="", password=""):
 		self.token = token
@@ -309,6 +317,15 @@ class Bot:
 		print("GPTV3 response:", text)
 		test = text.casefold()
 		if test.startswith("sorry,") or test.startswith("i'm sorry,"):
+			lines = []
+			if self.chat_history:
+				for q, a in self.chat_history:
+					q = lim_str(q, 256)
+					a = lim_str(a, 256)
+					lines.append(f"Human: {q}\nMiza AI: {a}\n")
+			for a in additional:
+				lines.append(a + "\n")
+			lines.append(f"Human: {question}\n")
 			res = lim_str(self.google(q, raw=True).replace("\n", ". "), 256)
 			lines.pop(-1)
 			lines.append(f"Google: {res}\n")
@@ -416,9 +433,9 @@ class Bot:
 					drivers.insert(0, driver)
 					return
 			response = response.removesuffix("\n2 / 2").removesuffix("\n3 / 3")
-			print(response)
+			print("ChatGPT response:", response)
 			test = response.casefold()
-			if test.startswith("!\nan error occurred.") or test.startswith("!\ninternal server error"):
+			if test.startswith("!\nan error occurred.") or test.startswith("!\ninternal server error") or test.startswith("!\nToo many requests"):
 				elems = [e for e in d.find_elements(by=class_name, value="btn-neutral") if e.text == "Try again"]
 				if not elems:
 					return
@@ -426,13 +443,7 @@ class Bot:
 				continue
 			spl = test.split()
 			if not force and not additional and "\n" not in test and len(test) < 1024:
-				unfiltered = (
-					"kill",
-					"suicide",
-					"death",
-					"hate",
-				)
-				if any(stm in spl for stm in unfiltered):
+				if any(stm in spl for stm in self.unfiltered):
 					break
 				filtered = (
 					"i'm sorry,",
@@ -516,6 +527,7 @@ class Bot:
 			if raw:
 				return res
 			response = self.clean_response(q, res, additional=additional)
+		print("Google response:", response)
 		drivers.insert(0, driver)
 		return response
 
@@ -528,7 +540,8 @@ class Bot:
 		self.timestamp = t
 		tried_chatgpt = False
 		response = reso = None
-		if not additional and (len(i) >= 32 and (random.randint(0, 1) or not self.chat_history) or "essay" in i.casefold().split()):
+		words = i.casefold().split()
+		if not additional and (len(i) >= 32 and (random.randint(0, 1) or not self.chat_history) or "essay" in words or any(w in self.unfiltered for w in words)):
 			response = reso = self.chatgpt(i, additional=additional)
 			tried_chatgpt = True
 		if response and response.casefold() != i.casefold():
