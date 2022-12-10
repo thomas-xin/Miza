@@ -2051,8 +2051,8 @@ class AudioDownloader:
                         name=name,
                         url=item,
                         duration=duration,
-                        thumbnail=thumbnail,
                         stream=stream,
+                        icon=thumbnail,
                         video=stream,
                     )
                     output.append(temp)
@@ -2211,6 +2211,7 @@ class AudioDownloader:
             name=video["title"]["runs"][0]["text"],
             url=f"https://www.youtube.com/watch?v={video['videoId']}",
             duration=dur,
+            icon=thumbnail,
             views=views,
         )
 
