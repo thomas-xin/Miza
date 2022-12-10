@@ -435,7 +435,7 @@ class Bot:
 			response = response.removesuffix("\n2 / 2").removesuffix("\n3 / 3")
 			print("ChatGPT response:", response)
 			test = response.casefold()
-			if test.startswith("!\nan error occurred.") or test.startswith("!\ninternal server error") or test.startswith("!\nToo many requests"):
+			if test.startswith("!\nan error occurred.") or test.startswith("!\ninternal server error") or test.startswith("!\ntoo many requests"):
 				elems = [e for e in d.find_elements(by=class_name, value="btn-neutral") if e.text == "Try again"]
 				if not elems:
 					return
