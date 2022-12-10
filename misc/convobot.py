@@ -566,7 +566,7 @@ class Bot:
 			tried_chatgpt = True
 		if response and response.casefold() != i.casefold():
 			return self.register(i, response)
-		response = reso = self.gptv3(i, additional=additional)
+		response = reso = self.gptcomplete(i, additional=additional)
 		if response and response.casefold() != i.casefold():
 			return self.register(i, response)
 		if not tried_chatgpt:
