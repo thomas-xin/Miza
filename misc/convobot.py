@@ -329,10 +329,10 @@ class Bot:
 		# print("GPTV2 response:", text)
 		test = text.casefold()
 		if not test or test.startswith("sorry,") or test.startswith("i'm sorry,"):
-			response = openai.Moderation.create(
+			resp = openai.Moderation.create(
 				input=question,
 			)
-			results = response.results[0].categories
+			results = resp.results[0].categories
 			if results.hate or results["self-harm"] or results["sexual/minors"] or results.violence:
 				print(results)
 				return text
@@ -465,10 +465,10 @@ class Bot:
 				continue
 			spl = test.split()
 			if not force and not additional and "\n" not in test and len(test) < 1024:
-				response = openai.Moderation.create(
+				resp = openai.Moderation.create(
 					input=question,
 				)
-				results = response.results[0].categories
+				results = resp.results[0].categories
 				if results.hate or results["self-harm"] or results["sexual/minors"] or results.violence:
 					print(results)
 					break
@@ -509,6 +509,8 @@ class Bot:
 			drivers.insert(0, driver)
 			return
 		drivers.insert(0, driver)
+		if not response:
+			return
 		searches = (
 			"I am a large language model trained by OpenAI and ",
 			"As a large language model trained by OpenAI, I ",
