@@ -114,7 +114,7 @@ class Bot:
 		resp = openai.Image.create(
 			prompt=prompt,
 			n=1,
-			size="512x512"
+			size="512x512",
 		)
 		print(resp)
 		with requests.get(resp.data[0].url) as resp:

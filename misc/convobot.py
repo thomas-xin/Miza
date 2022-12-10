@@ -11,6 +11,21 @@ except AttributeError:
 	exc = concurrent.futures.exc_worker = concurrent.futures.ThreadPoolExecutor(max_workers=16)
 drivers = []
 
+from math import *
+def lim_str(s, maxlen=10, mode="centre"):
+    if maxlen is None:
+        return s
+    if type(s) is not str:
+        s = str(s)
+    over = (len(s) - maxlen) / 2
+    if over > 0:
+        if mode == "centre":
+            half = len(s) / 2
+            s = s[:ceil(half - over - 1)] + ".." + s[ceil(half + over + 1):]
+        else:
+            s = s[:maxlen - 3] + "..."
+    return s
+
 class_name = webdriver.common.by.By.CLASS_NAME
 css_selector = webdriver.common.by.By.CSS_SELECTOR
 xpath = webdriver.common.by.By.XPATH
@@ -269,6 +284,8 @@ class Bot:
 		lines = []
 		if self.chat_history:
 			for q, a in self.chat_history:
+				q = lim_str(q, 256)
+				a = lim_str(a, 256)
 				lines.append(f"Human: {q}\nMiza AI: {a}\n")
 		for a in additional:
 			lines.append(a + "\n")
@@ -277,18 +294,41 @@ class Bot:
 		prompt = ""
 		while lines and len(prompt) < 1536:
 			prompt = lines.pop(-1) + prompt
-		print(prompt)
+		print("GPTV3 prompt:", prompt)
+		model = "text-curie-001" if len(prompt) >= 512 or not random.randint(0, 2) else "text-davinci-003"
 		response = openai.Completion.create(
-			model="text-davinci-003",
+			model=model,
 			prompt=prompt,
 			temperature=0.7,
 			max_tokens=256,
 			top_p=1,
 			frequency_penalty=0,
-			presence_penalty=0
+			presence_penalty=0,
 		)
-		text = response.choices[0].text.strip()
-		print(text)
+		text = response.choices[0].text.removesuffix("Is there anything else I can help you with?").strip()
+		print("GPTV3 response:", text)
+		test = text.casefold()
+		if test.startswith("sorry,") or test.startswith("i'm sorry,"):
+			res = lim_str(self.google(q, raw=True).replace("\n", ". "), 256)
+			lines.pop(-1)
+			lines.append(f"Google: {res}\n")
+			lines.append("Miza AI:")
+			prompt = ""
+			while lines and len(prompt) < 1536:
+				prompt = lines.pop(-1) + prompt
+			print("GPTV3 prompt2:", prompt)
+			model = "text-davinci-003"
+			response = openai.Completion.create(
+				model=model,
+				prompt=prompt,
+				temperature=0.8,
+				max_tokens=256,
+				top_p=1,
+				frequency_penalty=0,
+				presence_penalty=0,
+			)
+			text = response.choices[0].text.removesuffix("Is there anything else I can help you with?").strip()
+			print("GPTV3 response2:", text)
 		return text
 
 	def chatgpt(self, q, additional=(), force=False):
@@ -452,7 +492,7 @@ class Bot:
 		# print(response)
 		return response
 
-	def google(self, q, additional=()):
+	def google(self, q, additional=(), raw=False):
 		words = q.split()
 		q = " ".join(swap.get(w, w) for w in words)
 		driver = get_driver()
@@ -469,8 +509,12 @@ class Bot:
 		res = elem.text
 		if res.startswith("Calculator result\n"):
 			response = " ".join(res.split("\n", 3)[1:3])
+			if raw:
+				return response
 		else:
 			res = "\n".join(r.strip() for r in res.splitlines() if valid_response(r))
+			if raw:
+				return res
 			response = self.clean_response(q, res, additional=additional)
 		drivers.insert(0, driver)
 		return response
