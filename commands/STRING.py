@@ -985,11 +985,11 @@ class Ask(Command):
             if not convobot:
                 cb = cdict(talk=lambda *args: "")
             else:
-                cb = self.convos[channel.id] = convobot.Bot(
+                cb = self.convos[channel.id] = await create_future(convobot.Bot,
                     token=AUTH.get("openai_key"),
                     email=AUTH.get("openai_email"),
                     password=AUTH.get("openai_password"),
-                )
+                ))
         with discord.context_managers.Typing(channel):
             urls = []
             additional = []

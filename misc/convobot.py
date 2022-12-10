@@ -168,7 +168,7 @@ class Bot:
 		self.chat_history_ids = None
 		self.previous = None
 		self.timestamp = time.time()
-		self.gpt2_generator = pipeline('text-generation', model='gpt2-large')
+		# self.gpt2_generator = pipeline('text-generation', model='gpt2-large')
 
 	def question_context_analysis(self, m, q, c):
 		if m == "deepset/roberta-base-squad2":
@@ -310,16 +310,31 @@ class Bot:
 		while lines and len(prompt) < 1536:
 			prompt = lines.pop(-1) + prompt
 		print("GPTV2 prompt:", prompt)
-		set_seed(int(time.time() // 0.1))
-		response = self.gpt2_generator(
-			prompt,
-			max_length=4096,
-			num_return_sequences=1,
+		model = "text-babbage-001" if len(prompt) >= 512 else "text-curie-001" if len(prompt) >= 1024 or not random.randint(0, 2) else "text-davinci-003"
+		response = openai.Completion.create(
+			model=model,
+			prompt=prompt,
+			temperature=0.8,
+			max_tokens=256,
+			top_p=1,
+			frequency_penalty=0,
+			presence_penalty=0,
 		)
-		text = response[0]["generated_text"]
-		print("GPTV2 prompt:", text)
+		text = response.choices[0].text.removesuffix("Is there anything else I can help you with?").removesuffix("Can you provide more information to support your claim?").strip()
+		# set_seed(int(time.time() // 0.1) & 4294967295)
+		# text = ""
+		# while not text.endswith("."):
+		# 	response = self.gpt2_generator(
+		# 		prompt,
+		# 		max_length=4096,
+		# 		num_return_sequences=1,
+		# 	)
+		# 	gt = response[0]["generated_text"]
+		# 	seed 
+		# text = text.removesuffix("Is there anything else I can help you with?").removesuffix("Can you provide more information to support your claim?").strip()
+		# print("GPTV2 response:", text)
 		test = text.casefold()
-		if test.startswith("sorry,") or test.startswith("i'm sorry,"):
+		if not test or test.startswith("sorry,") or test.startswith("i'm sorry,"):
 			if googled:
 				return
 			lines = []
@@ -349,7 +364,7 @@ class Bot:
 				frequency_penalty=0,
 				presence_penalty=0,
 			)
-			text = response.choices[0].text.removesuffix("Is there anything else I can help you with?").strip()
+			text = response.choices[0].text.removesuffix("Is there anything else I can help you with?").removesuffix("Can you provide more information to support your claim?").strip()
 			print("GPTV3 response:", text)
 		return text
 
