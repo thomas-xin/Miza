@@ -415,6 +415,6 @@ class Lewd(Command):
                 + "__**"
             )
             return escape_roles(text)
-        embed = discord.Embed(colour=await bot.get_colour(url))
+        embed = discord.Embed(colour=await self.bot.get_colour(url))
         embed.set_image(url=url)
         await send_with_react(channel, embed=embed, reacts="🔳")
