@@ -310,14 +310,14 @@ class Bot:
 		lines = []
 		if self.chat_history:
 			for q, a in self.chat_history:
-				q = lim_str(q, 256)
-				a = lim_str(a, 256)
+				q = lim_str(q, 128)
+				a = lim_str(a, 192)
 				lines.append(f"Human: {q}\nMiza AI: {a}\n")
 		for a in additional:
 			lines.append(a + "\n")
 		lines.append(f"Human: {question}\n")
 		if literal_question(question) and not additional:
-			res = lim_str(self.google(question, raw=True).replace("\n", ". "), 256, mode="right")
+			res = lim_str(self.google(question, raw=True).replace("\n", ". "), 512, mode="right")
 			lines.append(f"Google: {res}\n")
 			googled = True
 		else:
@@ -338,7 +338,17 @@ class Bot:
 			presence_penalty=0,
 			user=str(id(self)),
 		)
-		text = response.choices[0].text.removesuffix("Is there anything else I can help you with?").removesuffix("Can you provide more information to support your claim?").strip()
+		text = response.choices[0].text.removesuffix(
+			"Is there anything else I can help you with?"
+		).removesuffix(
+			"Can you provide more information to support your claim?"
+		).replace(
+			"https://www.miza.ai",
+			"https://mizabot.xyz"
+		).replace(
+			"https://miza.ai",
+			"https://mizabot.xyz"
+		).strip()
 		print("GPTV3 response:", text)
 		# set_seed(int(time.time() // 0.1) & 4294967295)
 		# text = ""
@@ -366,13 +376,13 @@ class Bot:
 			lines = []
 			if self.chat_history:
 				for q, a in self.chat_history:
-					q = lim_str(q, 256)
-					a = lim_str(a, 256)
+					q = lim_str(q, 128)
+					a = lim_str(a, 192)
 					lines.append(f"Human: {q}\nMiza AI: {a}\n")
 			for a in additional:
 				lines.append(a + "\n")
 			lines.append(f"Human: {question}\n")
-			res = lim_str(self.google(question, raw=True).replace("\n", ". "), 256, mode="right")
+			res = lim_str(self.google(question, raw=True).replace("\n", ". "), 512, mode="right")
 			lines.pop(-1)
 			lines.append(f"Google: {res}\n")
 			lines.append("Miza AI:")
@@ -391,7 +401,17 @@ class Bot:
 				presence_penalty=0,
 				user=str(id(self)),
 			)
-			text = response.choices[0].text.removesuffix("Is there anything else I can help you with?").removesuffix("Can you provide more information to support your claim?").strip()
+			text = response.choices[0].text.removesuffix(
+				"Is there anything else I can help you with?"
+			).removesuffix(
+				"Can you provide more information to support your claim?"
+			).replace(
+				"https://www.miza.ai",
+				"https://mizabot.xyz"
+			).replace(
+				"https://miza.ai",
+				"https://mizabot.xyz"
+			).strip()
 			print("GPTV3 response2:", text)
 		return text
 
@@ -650,7 +670,7 @@ class Bot:
 	def register(self, q, a):
 		tup = (q.casefold(), a.casefold())
 		self.previous = tup
-		if len(self.chat_history) >= 3:
+		if len(self.chat_history) >= 2:
 			self.chat_history.pop(0)
 		self.chat_history.append((q, a))
 		self.history[q] = a
