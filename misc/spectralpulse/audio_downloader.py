@@ -1318,7 +1318,7 @@ class AudioDownloader:
 				duration=entry.get("duration"),
 				stream=get_best_audio(entry),
 				icon=get_best_icon(entry),
-				video=get_best_video(resp),
+				video=get_best_video(entry),
 			)
 			out.append(temp)
 		return out
