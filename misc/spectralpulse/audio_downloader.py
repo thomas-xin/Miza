@@ -500,7 +500,7 @@ def html_decode(s):
 	return s.replace("&quot;", '"').replace("&apos;", "'")
 
 def time_parse(ts):
-	data = as_str(ts).split(":")
+	data = str(ts).split(":")
 	t = 0
 	mult = 1
 	while len(data):
@@ -550,13 +550,33 @@ shash = lambda s: base64.b64encode(hashlib.sha256(s.encode("utf-8")).digest()).r
 
 
 def round_min(x):
+	if type(x) is str:
+		if "." in x:
+			x = x.strip("0")
+			if len(x) > 8 and "mpf" in globals():
+				x = mpf(x)
+			else:
+				x = float(x)
+		else:
+			try:
+				return int(x)
+			except ValueError:
+				return float(x)
 	if type(x) is int:
 		return x
 	if type(x) is not complex:
 		if isfinite(x):
-			y = round(x)
-			if x == y:
-				return int(y)
+			if type(x) is globals().get("mpf", None):
+				y = int(x)
+				if x == y:
+					return y
+				f = float(x)
+				if str(x) == str(f):
+					return f
+			else:
+				y = math.round(x)
+				if x == y:
+					return int(y)
 		return x
 	else:
 		if x.imag == 0:
@@ -672,7 +692,6 @@ def get_best_icon(entry):
 		return url
 	return sorted(thumbnails, key=lambda x: float(x.get("width", x.get("preference", 0) * 4096)), reverse=True)[0]["url"]
 
-
 # Gets the best audio file download link for a queue entry.
 def get_best_audio(entry):
 	with suppress(KeyError):
@@ -691,11 +710,17 @@ def get_best_audio(entry):
 		q = fmt.get("abr", 0)
 		if not isinstance(q, (int, float)):
 			q = 0
+		if q <= 0:
+			if fmt.get("asr"):
+				q = fmt["asr"] / 1000
+			elif fmt.get("audio_channels"):
+				q = fmt["audio_channels"]
 		vcodec = fmt.get("vcodec", "none")
 		if vcodec not in (None, "none"):
 			q -= 1
 		if not fmt["url"].startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
 			replace = False
+		# print(fmt["url"], q)
 		if q > best or replace:
 			best = q
 			url = fmt["url"]
@@ -722,10 +747,60 @@ def get_best_audio(entry):
 		raise KeyError("URL not found.")
 	return url
 
+# Gets the best video file download link for a queue entry.
+def get_best_video(entry):
+	with suppress(KeyError):
+		return entry["stream"]
+	best = -inf
+	try:
+		fmts = entry["formats"]
+	except KeyError:
+		fmts = ()
+	try:
+		url = entry["webpage_url"]
+	except KeyError:
+		url = entry.get("url")
+	replace = True
+	for fmt in fmts:
+		q = 720 - abs(720 - (fmt.get("height") or 0))
+		if not isinstance(q, (int, float)):
+			q = 0
+		vcodec = fmt.get("vcodec", "none")
+		if vcodec in (None, "none"):
+			q -= inf
+		u = fmt["url"]
+		if not u.startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
+			replace = False
+		if q > best or replace:
+			best = q
+			url = fmt["url"]
+	if "dropbox.com" in url:
+		if "?dl=0" in url:
+			url = url.replace("?dl=0", "?dl=1")
+	if url.startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
+		resp = reqs.get(url).content
+		fmts = deque()
+		with suppress(ValueError, KeyError):
+			while True:
+				search = b'<Representation id="'
+				resp = resp[resp.index(search) + len(search):]
+				f_id = resp[:resp.index(b'"')].decode("utf-8")
+				search = b"><BaseURL>"
+				resp = resp[resp.index(search) + len(search):]
+				stream = resp[:resp.index(b'</BaseURL>')].decode("utf-8")
+				fmt = cdict(youtube_dl.extractor.youtube.YoutubeIE._formats[f_id])
+				fmt.url = stream
+				fmts.append(fmt)
+		entry["formats"] = fmts
+		return get_best_video(entry)
+	if not url:
+		raise KeyError("URL not found.")
+	return url
+
 
 # Manages all audio searching and downloading.
 class AudioDownloader:
-	
+
 	_globals = globals()
 	ydl_opts = {
 		# "verbose": 1,
@@ -1189,7 +1264,20 @@ class AudioDownloader:
 			if "entries" in resp:
 				resp = next(iter(resp["entries"]))
 			if "duration" in resp and "formats" in resp:
-				return resp
+				out = cdict(
+					name=resp["title"],
+					url=resp["webpage_url"],
+					duration=resp["duration"],
+					stream=get_best_audio(resp),
+					icon=get_best_icon(resp),
+					video=get_best_video(resp),
+				)
+				stream = out.stream
+				if "googlevideo" in stream[:64]:
+					durstr = regexp("[&?]dur=([0-9\\.]+)").findall(stream)
+					if durstr:
+						out.duration = round_min(durstr[0])
+				return out
 			try:
 				url = resp["webpage_url"]
 			except KeyError:
@@ -1230,6 +1318,7 @@ class AudioDownloader:
 				duration=entry.get("duration"),
 				stream=get_best_audio(entry),
 				icon=get_best_icon(entry),
+				video=get_best_video(resp),
 			)
 			out.append(temp)
 		return out
@@ -1443,6 +1532,34 @@ class AudioDownloader:
 						if v_id == e.get("id"):
 							output.rotate(-i)
 							break
+		if is_url(item) and tuple(reversed(item.split("/", 3)[2].encode("utf-8"))) == (109, 111, 99, 46, 117, 109, 105, 110, 97, 120):
+			b = reqs.get(item, headers=self.youtube_header()).content
+			search = b'itemprop="name" content="'
+			try:
+				i = b.index(search)
+			except ValueError:
+				pass
+			else:
+				s, b = b[i + len(search):].split(b'"', 1)
+				name = s.decode("utf-8", "replace")
+				search = b'itemprop="duration" content="'
+				s, b = b.split(search, 1)[-1].split(b'"', 1)
+				duration = time_parse(s.decode("utf-8", "replace").lstrip("P").rstrip("S").replace("DT", ":").replace("H", ":").replace("M", ":"))
+				search = b'itemprop="thumbnailUrl" content="'
+				s, b = b.split(search, 1)[-1].split(b'"', 1)
+				thumbnail = s.decode("utf-8", "replace")
+				search = b'itemprop="embedURL" content="'
+				with requests.head(b.split(search, 1)[-1].split(b'"', 1)[0].decode("utf-8", "replace"), headers=self.youtube_header(), allow_redirects=True) as resp:
+					stream = resp.url
+				temp = cdict(
+					name=name,
+					url=item,
+					duration=duration,
+					stream=stream,
+					icon=thumbnail,
+					video=stream,
+				)
+				output.append(temp)
 		# Only proceed if no items have already been found (from playlists in this case)
 		if not len(output):
 			# Allow loading of files output by ~dump
@@ -1479,6 +1596,7 @@ class AudioDownloader:
 							"duration": float(data["duration"]),
 							"stream": get_best_audio(resp),
 							"icon": get_best_icon(resp),
+							"video": get_best_video(resp),
 						}
 						output.append(cdict(temp))
 				else:
@@ -1529,6 +1647,7 @@ class AudioDownloader:
 					"duration": dur,
 					"stream": get_best_audio(resp),
 					"icon": get_best_icon(resp),
+					"video": get_best_video(resp),
 				}
 				output.append(cdict(temp))
 		return output
@@ -1706,17 +1825,36 @@ class AudioDownloader:
 			else:
 				stream = entry.get("stream", None)
 				icon = entry.get("icon", None)
+				video = entry.get("video", None)
 		# If stream is still not found or is a soundcloud audio fragment playlist file, perform secondary youtube-dl search
 		if stream in (None, "none"):
 			data = self.search(entry["url"])
-			stream = data[0].setdefault("stream", data[0].url)
-			icon = data[0].setdefault("icon", data[0].url)
-		elif not searched and (stream.startswith("ytsearch:") or stream.startswith("https://cf-hls-media.sndcdn.com/") or expired(stream)):
+			stream = data[0].get("stream") or data[0]["url"]
+			icon = data[0].setdefault("icon", data[0]["url"])
+			video = data[0].setdefault("video", data[0]["url"])
+			entry["duration"] = data[0].get("duration")
+		if not searched and (not is_url(stream) or not isfinite(float(entry.get("duration") or inf)) or stream.startswith("ytsearch:") or stream.startswith("https://cf-hls-media.sndcdn.com/") or expired(stream)):
 			data = self.extract(entry["url"])
-			stream = data[0].setdefault("stream", data[0].url)
-			icon = data[0].setdefault("icon", data[0].url)
+			stream = data[0].get("stream") or data[0]["url"]
+			icon = data[0].setdefault("icon", data[0]["url"])
+			video = data[0].setdefault("video", data[0]["url"])
+			entry.update(data[0])
 		entry["stream"] = stream
 		entry["icon"] = icon
+		entry["video"] = video
+		if "googlevideo" in stream[:64]:
+			durstr = regexp("[&?]dur=([0-9\\.]+)").findall(stream)
+			if durstr:
+				entry["duration"] = round_min(durstr[0])
+		if entry["url"] not in self.searched:
+			self.searched[entry["url"]] = cdict(
+				t=utc(),
+				data=[cdict(entry)],
+			)
+		else:
+			with suppress(KeyError):
+				self.searched[entry["url"]]["duration"] = entry["duration"]
+		self.searched[entry["url"]].data[0].update(entry)
 		return stream
 
 	# Extracts full data for a single entry. Uses cached results for optimization.
@@ -1748,6 +1886,7 @@ class AudioDownloader:
 			url=data.get("webpage_url") or data.get("url"),
 			stream=data.get("stream") or get_best_audio(data),
 			icon=data.get("icon") or get_best_icon(data),
+			video=data.get("video") or get_best_video(data),
 		)]
 		try:
 			out[0].duration = data["duration"]
