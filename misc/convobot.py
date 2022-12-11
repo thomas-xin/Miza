@@ -4,6 +4,7 @@ import selenium, requests, torch, openai
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering, AutoModelForCausalLM, pipeline, set_seed
+from traceback import print_exc
 
 try:
 	exc = concurrent.futures.exc_worker
@@ -90,7 +91,6 @@ def create_driver():
 		confirm = driver.find_element(by=class_name, value="jfk-button-action")
 		confirm.click()
 	except:
-		from traceback import print_exc
 		print_exc()
 	return driver
 
@@ -106,14 +106,12 @@ def get_driver():
 		if hasattr(driver, "result"):
 			driver = driver.result()
 	except selenium.common.exceptions.WebDriverException:
-		from traceback import print_exc
 		print_exc()
 		driver = create_driver()
 	else:
 		try:
 			exc.submit(getattr, driver, "title").result(timeout=0.25)
 		except:
-			from traceback import print_exc
 			print_exc()
 			driver = create_driver()
 	exc.submit(ensure_drivers)
@@ -636,7 +634,10 @@ class Bot:
 		response = reso = None
 		words = i.casefold().split()
 		if not additional and len(i) >= 32 and (random.randint(0, 1) or not self.chat_history) or "essay" in words:
-			response = reso = self.chatgpt(i, additional=additional)
+			try:
+				response = reso = self.chatgpt(i, additional=additional)
+			except:
+				print_exc()
 			tried_chatgpt = True
 		if response and response.casefold() != i.casefold():
 			return self.register(i, response)
@@ -644,7 +645,10 @@ class Bot:
 		if response and response.casefold() != i.casefold():
 			return self.register(i, response)
 		if not tried_chatgpt:
-			response = reso = self.chatgpt(i, additional=additional)
+			try:
+				response = reso = self.chatgpt(i, additional=additional)
+			except:
+				print_exc()
 			tried_chatgpt = True
 		if literal_question(i):
 			response = self.google(i, additional=additional)
