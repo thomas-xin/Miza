@@ -47,9 +47,14 @@ def create_driver():
 	service = browser["service"](browser["path"])
 	options = browser["options"]()
 	options.add_argument("--headless")
+	options.add_argument("--disable-gpu")
+	options.add_argument("--no-sandbox")
+	options.add_argument("--deny-permission-prompts")
 	options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36")
-	# options.add_argument("--disable-gpu")
-	prefs = {"download.default_directory" : folder}
+	prefs = {
+		"download.default_directory" : folder,
+		"profile.managed_default_content_settings.geolocation": 2,
+	}
 	options.add_experimental_option("prefs", prefs)
 
 	try:
@@ -75,6 +80,18 @@ def create_driver():
 		else:
 			raise
 	driver.folder = folder
+	try:
+		driver.get("https://google.com/preferences")
+		spans = driver.find_elements(by=tag_name, value="span")
+		more = [span for span in spans if span.text == "Show more"][-1]
+		more.click()
+		opts = driver.find_elements(by=class_name, value="DB6WRb")[1:]
+		random.choice(opts).click()
+		confirm = driver.find_element(by=class_name, value="jfk-button-action")
+		confirm.click()
+	except:
+		from traceback import print_exc
+		print_exc()
 	return driver
 
 def ensure_drivers():
@@ -89,6 +106,8 @@ def get_driver():
 		if hasattr(driver, "result"):
 			driver = driver.result()
 	except selenium.common.exceptions.WebDriverException:
+		from traceback import print_exc
+		print_exc()
 		driver = create_driver()
 	else:
 		try:
@@ -120,6 +139,12 @@ def literal_question(t):
 	t = t.casefold().replace("'", "")
 	if t.startswith("whats your") or t.startswith("what is your") or t.startswith("what are your") or t.startswith("what do you"):
 		return False
+	t = t.removeprefix("so ")
+	t = t.removeprefix("then ")
+	t = t.removeprefix("but ")
+	t2 = t.split()
+	if "google" in t2:
+		return True
 	return any(t.startswith(i) for i in ("whats ", "what ", "wheres ", "where ", "whos ", "who ", "whens ", "when ", "whys ", "why ", "hows ", "how "))
 
 def valid_response(t):
@@ -545,20 +570,22 @@ class Bot:
 			elem = driver.find_element(by=webdriver.common.by.By.ID, value="rso")
 		except:
 			print("Google: Timed out.")
-			drivers.insert(0, driver)
+			drivers.append(driver)
 			return ""
 		res = elem.text
 		if res.startswith("Calculator result\n"):
 			response = " ".join(res.split("\n", 3)[1:3])
 			if raw:
+				drivers.append(driver)
 				return response
 		else:
 			res = "\n".join(r.strip() for r in res.splitlines() if valid_response(r))
 			if raw:
+				drivers.append(driver)
 				return res
 			response = self.clean_response(q, res, additional=additional)
 		print("Google response:", response)
-		drivers.insert(0, driver)
+		drivers.append(driver)
 		return response
 
 	def talk(self, i, additional=()):
@@ -571,7 +598,7 @@ class Bot:
 		tried_chatgpt = False
 		response = reso = None
 		words = i.casefold().split()
-		if not additional and (len(i) >= 32 and (random.randint(0, 1) or not self.chat_history) or "essay" in words):
+		if not additional and len(i) >= 32 and (random.randint(0, 1) or not self.chat_history) or "essay" in words:
 			response = reso = self.chatgpt(i, additional=additional)
 			tried_chatgpt = True
 		if response and response.casefold() != i.casefold():
