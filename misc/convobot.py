@@ -349,8 +349,11 @@ class Bot:
 			"https://miza.ai",
 			"https://mizabot.xyz"
 		).replace(
-			"www.miza.ai",
+			" www.miza.ai",
 			"https://mizabot.xyz"
+		).replace(
+			" miza.ai",
+			" https://mizabot.xyz"
 		).strip()
 		print("GPTV3 response:", text)
 		# set_seed(int(time.time() // 0.1) & 4294967295)
@@ -415,8 +418,11 @@ class Bot:
 				"https://miza.ai",
 				"https://mizabot.xyz"
 			).replace(
-				"www.miza.ai",
+				" www.miza.ai",
 				"https://mizabot.xyz"
+			).replace(
+				" miza.ai",
+				" https://mizabot.xyz"
 			).strip()
 			print("GPTV3 response2:", text)
 		return text
