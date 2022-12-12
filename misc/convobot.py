@@ -326,34 +326,42 @@ class Bot:
 			prompt = lines.pop(-1) + prompt
 		prompt = "Miza is a friendly, playful, cute chatbot:\n\n" + prompt
 		print("GPTV3 prompt:", prompt)
-		model = "text-babbage-001" if len(prompt) >= 1024 and random.randint(0, 1) else "text-curie-001" if len(prompt) >= 512 or not random.randint(0, 2) else "text-davinci-003"
-		response = openai.Completion.create(
-			model=model,
-			prompt=prompt,
-			temperature=0.8,
-			max_tokens=1024,
-			top_p=1,
-			frequency_penalty=0,
-			presence_penalty=0,
-			user=str(id(self)),
-		)
-		text = response.choices[0].text.removesuffix(
-			"Is there anything else I can help you with?"
-		).removesuffix(
-			"Can you provide more information to support your claim?"
-		).replace(
-			"https://www.miza.ai",
-			"https://mizabot.xyz"
-		).replace(
-			"https://miza.ai",
-			"https://mizabot.xyz"
-		).replace(
-			" www.miza.ai",
-			"https://mizabot.xyz"
-		).replace(
-			" miza.ai",
-			" https://mizabot.xyz"
-		).strip()
+		words = question.casefold().split()
+		if "essay" in words or "full" in words or "write" in words or "writing" in words or "about" in words:
+			model = "text-davinci-003"
+		else:
+			model = "text-babbage-001" if len(prompt) >= 1024 and random.randint(0, 1) else "text-curie-001" if len(prompt) >= 512 or not random.randint(0, 2) else "text-davinci-003"
+		try:
+			response = openai.Completion.create(
+				model=model,
+				prompt=prompt,
+				temperature=0.7,
+				max_tokens=1024,
+				top_p=0.7,
+				frequency_penalty=0,
+				presence_penalty=0,
+				user=str(id(self)),
+			)
+		except openai.error.ServiceUnavailableError:
+			text = ""
+		else:
+			text = response.choices[0].text.removesuffix(
+				"Is there anything else I can help you with?"
+			).removesuffix(
+				"Can you provide more information to support your claim?"
+			).replace(
+				"https://www.miza.ai",
+				"https://mizabot.xyz"
+			).replace(
+				"https://miza.ai",
+				"https://mizabot.xyz"
+			).replace(
+				" www.miza.ai",
+				"https://mizabot.xyz"
+			).replace(
+				" miza.ai",
+				" https://mizabot.xyz"
+			).strip()
 		print("GPTV3 response:", text)
 		# set_seed(int(time.time() // 0.1) & 4294967295)
 		# text = ""
@@ -397,34 +405,42 @@ class Bot:
 				prompt = lines.pop(-1) + prompt
 			prompt = "Miza is a friendly, playful, cute chatbot:\n\n" + prompt
 			print("GPTV3 prompt2:", prompt)
-			model = "text-curie-001" if len(prompt) >= 512 or not random.randint(0, 2) else "text-davinci-003"
-			response = openai.Completion.create(
-				model=model,
-				prompt=prompt,
-				temperature=0.8,
-				max_tokens=1024,
-				top_p=1,
-				frequency_penalty=0,
-				presence_penalty=0,
-				user=str(id(self)),
-			)
-			text = response.choices[0].text.removesuffix(
-				"Is there anything else I can help you with?"
-			).removesuffix(
-				"Can you provide more information to support your claim?"
-			).replace(
-				"https://www.miza.ai",
-				"https://mizabot.xyz"
-			).replace(
-				"https://miza.ai",
-				"https://mizabot.xyz"
-			).replace(
-				" www.miza.ai",
-				"https://mizabot.xyz"
-			).replace(
-				" miza.ai",
-				" https://mizabot.xyz"
-			).strip()
+			words = question.casefold().split()
+			if "essay" in words or "full" in words or "write" in words or "writing" in words or "about" in words:
+				model = "text-davinci-003"
+			else:
+				model = "text-babbage-001" if len(prompt) >= 1024 and random.randint(0, 1) else "text-curie-001" if len(prompt) >= 512 or not random.randint(0, 2) else "text-davinci-003"
+			try:
+				response = openai.Completion.create(
+					model=model,
+					prompt=prompt,
+					temperature=0.7,
+					max_tokens=1536 if model == "text-davinci-003" else 1024,
+					top_p=0.7,
+					frequency_penalty=0,
+					presence_penalty=0,
+					user=str(id(self)),
+				)
+			except openai.error.ServiceUnavailableError:
+				text = ""
+			else:
+				text = response.choices[0].text.removesuffix(
+					"Is there anything else I can help you with?"
+				).removesuffix(
+					"Can you provide more information to support your claim?"
+				).replace(
+					"https://www.miza.ai",
+					"https://mizabot.xyz"
+				).replace(
+					"https://miza.ai",
+					"https://mizabot.xyz"
+				).replace(
+					" www.miza.ai",
+					"https://mizabot.xyz"
+				).replace(
+					" miza.ai",
+					" https://mizabot.xyz"
+				).strip()
 			print("GPTV3 response2:", text)
 		return text
 
