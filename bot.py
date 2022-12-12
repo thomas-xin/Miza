@@ -2048,7 +2048,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         if u_id in (member.id for member in message.mentions):
             return True
         if guild is None:
-            return False
+            return True
         member = guild.get_member(u_id)
         if member is None:
             return False
