@@ -324,7 +324,7 @@ class Bot:
 		prompt = ""
 		while lines and len(prompt) < 1536:
 			prompt = lines.pop(-1) + prompt
-		prompt = "Miza is a friendly, playful, cute chatbot:\n\n" + prompt
+		prompt = "Miza is a friendly, playful, cute AI:\n\n" + prompt
 		print("GPTV3 prompt:", prompt)
 		words = question.casefold().split()
 		if "essay" in words or "full" in words or "write" in words or "writing" in words or "about" in words:
@@ -403,7 +403,7 @@ class Bot:
 			prompt = ""
 			while lines and len(prompt) < 1536:
 				prompt = lines.pop(-1) + prompt
-			prompt = "Miza is a friendly, playful, cute chatbot:\n\n" + prompt
+			prompt = "Miza is a friendly, playful, cute AI:\n\n" + prompt
 			print("GPTV3 prompt2:", prompt)
 			words = question.casefold().split()
 			if "essay" in words or "full" in words or "write" in words or "writing" in words or "about" in words:
