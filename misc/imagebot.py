@@ -6,6 +6,7 @@ from selenium.webdriver.common.keys import Keys
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering, AutoModelForCausalLM, pipeline
 import numpy as np
 from PIL import Image
+from traceback import print_exc
 
 try:
 	exc = concurrent.futures.exc_worker
@@ -86,7 +87,6 @@ def get_driver():
 		try:
 			exc.submit(getattr, driver, "title").result(timeout=0.25)
 		except:
-			from traceback import print_exc
 			print_exc()
 			driver = create_driver()
 	exc.submit(ensure_drivers)
@@ -181,6 +181,7 @@ class Bot:
 		try:
 			bar.send_keys(prompt)
 		except selenium.common.exceptions.WebDriverException:
+			d = driver
 			d.execute_script("document.getElementById('search-bar').focus()")
 			d.execute_script(f"document.execCommand('insertText', false, {repr(prompt)});")
 
@@ -279,8 +280,7 @@ class Bot:
 			try:
 				im = func(prompt, kwargs)
 			except:
-				import traceback
-				traceback.print_exc()
+				print_exc()
 				im = None
 			if im:
 				return im
