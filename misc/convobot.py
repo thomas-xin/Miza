@@ -313,13 +313,13 @@ class Bot:
 				lines.append(f"Human: {q}\nMiza: {a}\n")
 		for a in additional:
 			lines.append(a + "\n")
-		lines.append(f"Human: {question}\n")
 		if literal_question(question) and not additional:
 			res = lim_str(self.google(question, raw=True).replace("\n", ". "), 512, mode="right")
 			lines.append(f"Google: {res}\n")
 			googled = True
 		else:
 			googled = False
+		lines.append(f"Human: {question}\n")
 		lines.append("Miza:")
 		prompt = ""
 		while lines and len(prompt) < 1536:
@@ -387,10 +387,10 @@ class Bot:
 					lines.append(f"Human: {q}\nMiza: {a}\n")
 			for a in additional:
 				lines.append(a + "\n")
-			lines.append(f"Human: {question}\n")
 			res = lim_str(self.google(question, raw=True).replace("\n", ". "), 512, mode="right")
-			lines.pop(-1)
+			# lines.pop(-1)
 			lines.append(f"Google: {res}\n")
+			lines.append(f"Human: {question}\n")
 			lines.append("Miza:")
 			prompt = ""
 			while lines and len(prompt) < 1536:
