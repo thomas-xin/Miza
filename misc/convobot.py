@@ -679,11 +679,12 @@ class Bot:
 
 	def register(self, q, a):
 		tup = (q.casefold(), a.casefold())
-		self.previous = tup
-		if len(self.chat_history) >= 2:
-			self.chat_history.pop(0)
-		self.chat_history.append((q, a))
-		self.history[q] = a
+		if self.previous != tup:
+			self.previous = tup
+			if len(self.chat_history) >= 2:
+				self.chat_history.pop(0)
+			self.chat_history.append((q, a))
+			self.history[q] = a
 		return a
 
 if __name__ == "__main__":

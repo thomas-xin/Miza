@@ -969,16 +969,29 @@ class Ask(Command):
             q = argv
         q = q.replace("？", "?")
         if not q.replace("?", ""):
-            return "\xad" + choice(
-                "Sorry, didn't see that, was that a question? 🤔",
-                "Ay, speak up, I don't bite! :3",
-                "Haha, nice try, I know that's not an actual question 🙃",
-                "You thinking of asking an actual question?",
-            )
+            q = "Hi!"
+            # return "\xad" + choice(
+            #     "Sorry, didn't see that, was that a question? 🤔",
+            #     "Ay, speak up, I don't bite! :3",
+            #     "Haha, nice try, I know that's not an actual question 🙃",
+            #     "You thinking of asking an actual question?",
+            # )
         print(f"{message.author}:", q)
         if q.casefold() in ("how", "how?"):
-            await send_with_reply(channel, message, "https://imgur.com/gallery/8cfRt")
+            a = "https://imgur.com/gallery/8cfRt"
+            if channel.id in self.convos:
+                self.convos[channel.id].register(q, a)
+            await send_with_reply(channel, message, a)
             return
+        elif q.casefold() == "https://youtube.com/watch?v=":
+            a = "dQw4w9WgXcQ"
+            if channel.id in self.convos:
+                self.convos[channel.id].register(q, a)
+            await send_with_reply(channel, message, a)
+            return
+            # choice(
+            #     "0GeQVtZ6Rd4",
+            # )
         try:
             cb = self.convos[channel.id]
         except KeyError:
