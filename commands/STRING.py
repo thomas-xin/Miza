@@ -997,7 +997,7 @@ class Ask(Command):
                 reference = message.reference.resolved
             else:
                 reference = None
-            if reference and reference.content and not find_urls(reference.content):
+            if reference and reference.content:# and not find_urls(reference.content):
                 print(reference.content)
                 additional.append(reference.content)
             if TrOCRProcessor:
