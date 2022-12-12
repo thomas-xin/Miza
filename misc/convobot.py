@@ -320,7 +320,7 @@ class Bot:
 			googled = True
 		else:
 			googled = False
-		lines.append("Miza AI:")
+		lines.append("Miza:")
 		prompt = ""
 		while lines and len(prompt) < 1536:
 			prompt = lines.pop(-1) + prompt
@@ -384,14 +384,14 @@ class Bot:
 				for q, a in self.chat_history:
 					q = lim_str(q, 128)
 					a = lim_str(a, 192)
-					lines.append(f"Human: {q}\nMiza AI: {a}\n")
+					lines.append(f"Human: {q}\nMiza: {a}\n")
 			for a in additional:
 				lines.append(a + "\n")
 			lines.append(f"Human: {question}\n")
 			res = lim_str(self.google(question, raw=True).replace("\n", ". "), 512, mode="right")
 			lines.pop(-1)
 			lines.append(f"Google: {res}\n")
-			lines.append("Miza AI:")
+			lines.append("Miza:")
 			prompt = ""
 			while lines and len(prompt) < 1536:
 				prompt = lines.pop(-1) + prompt
