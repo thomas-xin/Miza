@@ -330,7 +330,7 @@ class Bot:
 		if "essay" in words or "full" in words or "write" in words or "writing" in words or "about" in words:
 			model = "text-davinci-003"
 		else:
-			model = "text-babbage-001" if len(prompt) >= 1024 and random.randint(0, 1) else "text-curie-001" if len(prompt) >= 512 or not random.randint(0, 2) else "text-davinci-003"
+			model = "text-curie-001" if len(prompt) >= 512 or not random.randint(0, 2) else "text-davinci-003"
 		try:
 			response = openai.Completion.create(
 				model=model,
@@ -338,7 +338,7 @@ class Bot:
 				temperature=0.7,
 				max_tokens=1024,
 				top_p=0.9,
-				frequency_penalty=0.25,
+				frequency_penalty=0.5,
 				presence_penalty=0,
 				user=str(id(self)),
 			)
@@ -405,7 +405,7 @@ class Bot:
 					temperature=0.8,
 					max_tokens=1536 if model == "text-davinci-003" else 1024,
 					top_p=1,
-					frequency_penalty=0.125,
+					frequency_penalty=0.25,
 					presence_penalty=0,
 					user=str(id(self)),
 				)
