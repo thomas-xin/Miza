@@ -376,7 +376,7 @@ class Bot:
 		# text = text.removesuffix("Is there anything else I can help you with?").removesuffix("Can you provide more information to support your claim?").strip()
 		# print("GPTV2 response:", text)
 		test = text.casefold()
-		if not test or test.startswith("sorry,") or test.startswith("i'm sorry,") or test.startswith("i don't know,"):
+		if not test or test.startswith("sorry,") or test.startswith("i'm sorry,") or test.startswith("i don't know,") or test.startswith("i don't know "):
 			resp = openai.Moderation.create(
 				input=question,
 			)
