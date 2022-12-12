@@ -321,9 +321,10 @@ class Bot:
 		else:
 			googled = False
 		lines.append("Miza AI:")
-		prompt = "Miza is a friendly, playful, cute chatbot:\n\n"
+		prompt = ""
 		while lines and len(prompt) < 1536:
 			prompt = lines.pop(-1) + prompt
+		prompt = "Miza is a friendly, playful, cute chatbot:\n\n" + prompt
 		print("GPTV3 prompt:", prompt)
 		model = "text-babbage-001" if len(prompt) >= 1024 and random.randint(0, 1) else "text-curie-001" if len(prompt) >= 512 or not random.randint(0, 2) else "text-davinci-003"
 		response = openai.Completion.create(
@@ -391,9 +392,10 @@ class Bot:
 			lines.pop(-1)
 			lines.append(f"Google: {res}\n")
 			lines.append("Miza AI:")
-			prompt = "Miza is a friendly, playful, cute chatbot:\n\n"
+			prompt = ""
 			while lines and len(prompt) < 1536:
 				prompt = lines.pop(-1) + prompt
+			prompt = "Miza is a friendly, playful, cute chatbot:\n\n" + prompt
 			print("GPTV3 prompt2:", prompt)
 			model = "text-curie-001" if len(prompt) >= 512 or not random.randint(0, 2) else "text-davinci-003"
 			response = openai.Completion.create(
