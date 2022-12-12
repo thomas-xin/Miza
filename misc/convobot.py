@@ -309,7 +309,7 @@ class Bot:
 		if self.chat_history:
 			for q, a in self.chat_history:
 				q = lim_str(q, 64)
-				a = lim_str(a, 128)
+				a = lim_str(a, 192)
 				lines.append(f"Human: {q}\nMiza: {a}\n")
 		for a in additional:
 			lines.append(a + "\n")
@@ -339,7 +339,7 @@ class Bot:
 				max_tokens=1024,
 				top_p=0.9,
 				frequency_penalty=0,
-				presence_penalty=0,
+				presence_penalty=0.25,
 				user=str(id(self)),
 			)
 		except openai.error.ServiceUnavailableError:
@@ -391,7 +391,7 @@ class Bot:
 			if self.chat_history:
 				for q, a in self.chat_history:
 					q = lim_str(q, 128)
-					a = lim_str(a, 192)
+					a = lim_str(a, 256)
 					lines.append(f"Human: {q}\nMiza: {a}\n")
 			for a in additional:
 				lines.append(a + "\n")
@@ -418,7 +418,7 @@ class Bot:
 					max_tokens=1536 if model == "text-davinci-003" else 1024,
 					top_p=1,
 					frequency_penalty=0,
-					presence_penalty=0,
+					presence_penalty=0.125,
 					user=str(id(self)),
 				)
 			except openai.error.ServiceUnavailableError:
