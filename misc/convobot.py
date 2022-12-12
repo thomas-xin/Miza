@@ -313,7 +313,7 @@ class Bot:
 				lines.append(f"Human: {q}\nMiza: {a}\n")
 		for a in additional:
 			lines.append(a + "\n")
-		if literal_question(question) and not additional:
+		if literal_question(question):
 			res = lim_str(self.google(question, raw=True).replace("\n", ". "), 512, mode="right").replace(": ", " -")
 			lines.append(f"Google: {res}\n")
 			googled = True
