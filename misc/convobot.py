@@ -314,7 +314,7 @@ class Bot:
 		for a in additional:
 			lines.append(a + "\n")
 		if literal_question(question) and not additional:
-			res = lim_str(self.google(question, raw=True).replace("\n", ". "), 512, mode="right")
+			res = lim_str(self.google(question, raw=True).replace("\n", ". "), 512, mode="right").replace(": ", " -")
 			lines.append(f"Google: {res}\n")
 			googled = True
 		else:
@@ -338,8 +338,8 @@ class Bot:
 				temperature=0.7,
 				max_tokens=1024,
 				top_p=0.9,
-				frequency_penalty=0,
-				presence_penalty=0.25,
+				frequency_penalty=0.25,
+				presence_penalty=0,
 				user=str(id(self)),
 			)
 		except openai.error.ServiceUnavailableError:
@@ -349,18 +349,6 @@ class Bot:
 				"Is there anything else I can help you with?"
 			).removesuffix(
 				"Can you provide more information to support your claim?"
-			).replace(
-				"https://www.miza.ai",
-				"https://mizabot.xyz"
-			).replace(
-				"https://miza.ai",
-				"https://mizabot.xyz"
-			).replace(
-				" www.miza.ai",
-				"https://mizabot.xyz"
-			).replace(
-				" miza.ai",
-				" https://mizabot.xyz"
 			).strip()
 		print("GPTV3 response:", text)
 		# set_seed(int(time.time() // 0.1) & 4294967295)
@@ -417,8 +405,8 @@ class Bot:
 					temperature=0.8,
 					max_tokens=1536 if model == "text-davinci-003" else 1024,
 					top_p=1,
-					frequency_penalty=0,
-					presence_penalty=0.125,
+					frequency_penalty=0.125,
+					presence_penalty=0,
 					user=str(id(self)),
 				)
 			except openai.error.ServiceUnavailableError:
@@ -428,18 +416,6 @@ class Bot:
 					"Is there anything else I can help you with?"
 				).removesuffix(
 					"Can you provide more information to support your claim?"
-				).replace(
-					"https://www.miza.ai",
-					"https://mizabot.xyz"
-				).replace(
-					"https://miza.ai",
-					"https://mizabot.xyz"
-				).replace(
-					" www.miza.ai",
-					"https://mizabot.xyz"
-				).replace(
-					" miza.ai",
-					" https://mizabot.xyz"
 				).strip()
 			print("GPTV3 response2:", text)
 		return text
