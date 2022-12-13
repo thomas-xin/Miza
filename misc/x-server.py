@@ -2058,6 +2058,8 @@ body {
         oid = cp.request.headers["X-RapidAPI-User"]
         subscription = cp.request.headers["X-RapidAPI-Subscription"]
         i = ("BASIC", "PRO", "ULTRA", "MEGA", "CUSTOM").index(subscription)
+        if not user_id:
+            return f"Your subscription level has been verified as {subscription}!"
         t = ts_us()
         while t in RESPONSES:
             t += 1
