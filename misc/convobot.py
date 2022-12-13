@@ -145,12 +145,8 @@ def literal_question(t):
 		return True
 	for i in ("whats", "what", "wheres", "where", "whos", "who", "whens", "when", "whys", "why", "hows", "how"):
 		if t2[0] == i:
-			t2.pop(0)
-			while t2 and t2[0] in ("is", "a", "an", "the"):
-				t2.pop(0)
-			if not t2:
-				return False
-			return " ".join(t2).rstrip("?") or False
+			return t
+	return False
 
 def valid_response(t):
 	t = t.strip()
@@ -337,17 +333,19 @@ class Bot:
 		words = question.casefold().split()
 		if googled or "essay" in words or "full" in words or "write" in words or "writing" in words or "about" in words:
 			model = "text-davinci-003"
+			temp = 0.5
 		else:
 			model = "text-curie-001" if len(prompt) >= 512 or not random.randint(0, 2) else "text-davinci-003"
+			temp = 0.7
 		try:
 			response = openai.Completion.create(
 				model=model,
 				prompt=prompt,
-				temperature=0.7,
+				temperature=temp,
 				max_tokens=1024,
 				top_p=0.9,
-				frequency_penalty=0.5,
-				presence_penalty=0,
+				frequency_penalty=0.8,
+				presence_penalty=0.2,
 				user=str(id(self)),
 			)
 		except openai.error.ServiceUnavailableError:
@@ -403,15 +401,16 @@ class Bot:
 			print("GPTV3 prompt2:", prompt)
 			words = question.casefold().split()
 			model = "text-davinci-003"
+			temp = 0.8
 			try:
 				response = openai.Completion.create(
 					model=model,
 					prompt=prompt,
-					temperature=0.8,
+					temperature=temp,
 					max_tokens=1536 if model == "text-davinci-003" else 1024,
 					top_p=1,
-					frequency_penalty=0.25,
-					presence_penalty=0,
+					frequency_penalty=0.4,
+					presence_penalty=0.1,
 					user=str(id(self)),
 				)
 			except openai.error.ServiceUnavailableError:
