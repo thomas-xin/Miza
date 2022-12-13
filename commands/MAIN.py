@@ -2153,7 +2153,7 @@ class UpdateUsers(Database):
         if user.id != self.bot.id and amount and not self.bot.is_blacklisted(user.id):
             pl = self.bot.premium_level(user)
             if pl:
-                amount <<= pl
+                amount *= 2 ** pl
             add_dict(set_dict(self.data, user.id, {}), {"xp": amount})
             if "dailies" in self.bot.data:
                 self.bot.data.dailies.progress_quests(user, "xp", amount)
@@ -2163,7 +2163,7 @@ class UpdateUsers(Database):
         if user.id != self.bot.id and amount and not self.bot.is_blacklisted(user.id):
             pl = self.bot.premium_level(user)
             if pl:
-                amount <<= pl
+                amount *= 2 ** pl
             add_dict(set_dict(self.data, user.id, {}), {"gold": amount})
             self.update(user.id)
 
@@ -2171,7 +2171,7 @@ class UpdateUsers(Database):
         if user.id != self.bot.id and amount and not self.bot.is_blacklisted(user.id):
             pl = self.bot.premium_level(user)
             if pl:
-                amount <<= pl
+                amount *= 2 ** pl
             add_dict(set_dict(self.data, user.id, {}), {"diamonds": amount})
             if "dailies" in self.bot.data:
                 self.bot.data.dailies.progress_quests(user, "diamond", amount)
