@@ -925,7 +925,7 @@ class Server:
         url = data[0]["content"].replace("/d/", "/f/")
         raise cp.HTTPRedirect(url, status="307")
 
-    @cp.expose(("index", "p", "preview", "files", "file", "tester", "atlas", "mizatlas", "time", "mpinsights"))
+    @cp.expose(("index", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "time", "mpinsights"))
     @hostmap
     def index(self, path=None, filename=None, *args, **kwargs):
         url = cp.url(qs=cp.request.query_string)
