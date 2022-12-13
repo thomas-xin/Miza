@@ -2071,6 +2071,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             return False
         return guild and bool(trusted.get(verify_id(guild)))
 
+    # Checks a user's premium subscription level.
+    def premium_level(self, user):
+        try:
+            trusted = self.data.trusted
+        except (AttributeError, KeyError):
+            return 0
+        if trusted.get(str(user)):
+            trusted[user.id] = trusted.pop(str(user))
+        return trusted.get(user.id, 0)
+
     # Checks if a user is blacklisted from the bot.
     def is_blacklisted(self, user):
         u_id = verify_id(user)
@@ -2976,28 +2986,30 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                             if getattr(command, "server_only", False):
                                 raise ReferenceError("This command is only available in servers.")
                         # Make sure target has permission to use the target command, rate limit the command if necessary.
-                        if u_perm is not nan:
-                            if not u_perm >= req:
-                                raise command.perm_error(u_perm, req, "for command " + command_check)
-                            x = command.rate_limit
-                            if x:
-                                if issubclass(type(x), collections.abc.Sequence):
-                                    x = x[not self.is_trusted(getattr(guild, "id", 0))]
-                                remaining += x
-                                d = command.used
-                                t = d.get(u_id, -inf)
-                                wait = utc() - t - x
-                                if wait > -1:
-                                    if wait < 0:
-                                        w = max(0.2, -wait)
-                                        d[u_id] = max(t, utc()) + w
-                                        await asyncio.sleep(w)
-                                    if len(d) >= 4096:
-                                        with suppress(RuntimeError):
-                                            d.pop(next(iter(d)))
-                                    d[u_id] = max(t, utc())
-                                else:
-                                    raise TooManyRequests(f"Command has a rate limit of {sec2time(x)}; please wait {sec2time(-wait)}.")
+                        if not u_perm >= req:
+                            raise command.perm_error(u_perm, req, "for command " + command_check)
+                        x = command.rate_limit
+                        if x:
+                            if user.id in bot.owners:
+                                x = 0
+                            elif isinstance(x, collections.abc.Sequence):
+                                x = x[not bot.is_trusted(getattr(guild, "id", 0))]
+                                x /= 2 ** bot.premium_level(user)
+                            remaining += x
+                            d = command.used
+                            t = d.get(u_id, -inf)
+                            wait = utc() - t - x
+                            if wait > -1:
+                                if wait < 0:
+                                    w = max(0.2, -wait)
+                                    d[u_id] = max(t, utc()) + w
+                                    await asyncio.sleep(w)
+                                if len(d) >= 4096:
+                                    with suppress(RuntimeError):
+                                        d.pop(next(iter(d)))
+                                d[u_id] = max(t, utc())
+                            else:
+                                raise TooManyRequests(f"Command has a rate limit of {sec2time(x)}; please wait {sec2time(-wait)}.")
                         flags = {}
                         if loop:
                             inc_dict(flags, h=1)
@@ -4763,6 +4775,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             reacts = ""
         else:
             reacts="❎"
+        if not isinstance(ex, TooManyRequests) or random.randint(0, 5):
+            footer = None
+        else:
+            footer = dict(text="Running into the rate limit often? Consider donating using one of the subscriptions here, which will grant shorter rate limits amongst other features! https://rapidapi.com/thomas-xin/api/miza")
         return self.send_as_embeds(
             messageable,
             description="\n".join(as_str(i) for i in ex.args),
@@ -4770,6 +4786,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             fields=(("Unexpected or confusing error?", f"Consider joining the [support server]({self.rcc_invite}) for help and bug reports!"),),
             reacts=reacts,
             reference=reference,
+            footer=footer
         )
 
     async def reaction_add(self, raw, data):

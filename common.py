@@ -3233,7 +3233,7 @@ class Command(collections.abc.Hashable, collections.abc.Callable):
     description = ""
     usage = ""
     min_level = 0
-    rate_limit = 0
+    rate_limit = (2, 3)
 
     def perm_error(self, perm, req=None, reason=None):
         if req is None:

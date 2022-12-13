@@ -1770,8 +1770,8 @@ class Pay(Command):
             raise ValueError("Please input a valid amount of coins.")
         if not amount <= bot.data.users.get(user.id, {}).get("gold", 0):
             raise OverflowError("Payment cannot be greater than your balance.")
-        bot.data.users.add_gold(user, -amount)
-        bot.data.users.add_gold(target, amount)
+        bot.data.users.add_gold(user, -amount, multiplier=False)
+        bot.data.users.add_gold(target, amount, multiplier=False)
         if user.id != target.id:
             bot.data.dailies.progress_quests(user, "pay", amount)
         return css_md(f"{sqr_md(user)} has paid {sqr_md(amount)} coins to {sqr_md(target)}.")
@@ -2373,7 +2373,7 @@ class Shop(Command):
     products = cdict(
         upgradeserver=cdict(
             name="Upgrade Server",
-            cost=[240, 30720],
+            cost=[480, 61440],
             description="Upgrades the server's privilege level, granting access to all command categories and reducing command cooldown.",
         ),
         goldingots=cdict(

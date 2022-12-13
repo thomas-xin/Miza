@@ -98,8 +98,11 @@ class Help(Command):
             )
             x = com.rate_limit
             if x:
-                if isinstance(x, collections.abc.Sequence):
+                if user.id in bot.owners:
+                    x = 0
+                elif isinstance(x, collections.abc.Sequence):
                     x = x[not bot.is_trusted(getattr(guild, "id", 0))]
+                    x /= 2 ** bot.premium_level(user)
                 content += f"\n[Rate Limit] {sec2time(x)}"
             if getattr(com, "example", None):
                 example = com.example
@@ -2146,20 +2149,29 @@ class UpdateUsers(Database):
         data = self.data.get(user.id, EMPTY)
         return await self.bot.as_rewards(data.get("diamonds"), data.get("gold"))
 
-    def add_xp(self, user, amount):
+    def add_xp(self, user, amount, multiplier=True):
         if user.id != self.bot.id and amount and not self.bot.is_blacklisted(user.id):
+            pl = self.bot.premium_level(user)
+            if pl:
+                amount <<= pl
             add_dict(set_dict(self.data, user.id, {}), {"xp": amount})
             if "dailies" in self.bot.data:
                 self.bot.data.dailies.progress_quests(user, "xp", amount)
             self.update(user.id)
 
-    def add_gold(self, user, amount):
+    def add_gold(self, user, amount, multiplier=True):
         if user.id != self.bot.id and amount and not self.bot.is_blacklisted(user.id):
+            pl = self.bot.premium_level(user)
+            if pl:
+                amount <<= pl
             add_dict(set_dict(self.data, user.id, {}), {"gold": amount})
             self.update(user.id)
 
-    def add_diamonds(self, user, amount):
+    def add_diamonds(self, user, amount, multiplier=True):
         if user.id != self.bot.id and amount and not self.bot.is_blacklisted(user.id):
+            pl = self.bot.premium_level(user)
+            if pl:
+                amount <<= pl
             add_dict(set_dict(self.data, user.id, {}), {"diamonds": amount})
             if "dailies" in self.bot.data:
                 self.bot.data.dailies.progress_quests(user, "diamond", amount)

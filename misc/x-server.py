@@ -2042,6 +2042,34 @@ body {
             time.sleep(60)
 
     rapidapi = 0
+    @cp.expose(("subscriptions",))
+    @hostmap
+    def subscription(self, user_id=""):
+        ip = cp.request.remote.ip
+        try:
+            secret = cp.request.headers["X-RapidAPI-Proxy-Secret"]
+            if secret != RAPIDAPI_SECRET:
+                raise KeyError
+        except KeyError:
+            raise PermissionError("RapidAPI Proxy Secret not detected.")
+        if "\x7f" in user_id:
+            raise ValueError
+        self.rapidapi += 1
+        oid = cp.request.headers["X-RapidAPI-User"]
+        subscription = cp.request.headers["X-RapidAPI-Subscription"]
+        i = ("BASIC", "PRO", "ULTRA", "MEGA", "CUSTOM").index(subscription)
+        t = ts_us()
+        while t in RESPONSES:
+            t += 1
+        RESPONSES[t] = fut = concurrent.futures.Future()
+        send(f"!{t}\x7fbot.data.trusted.subscribe({repr(user_id)},{i},{repr(oid)})", escape=False)
+        j, after = fut.result()
+        RESPONSES.pop(t, None)
+        res = j["result"]
+        if not res:
+            return f"An error occured fetching {user_id}. Please try again."
+        return f"{res} ~ Successfully renewed {subscription} subscription for {1 << i}x benefits!"
+
     @cp.expose(("commands",))
     @hostmap
     def command(self, content="", input="", timeout=420, redirect=""):
@@ -2057,23 +2085,23 @@ body {
                 RESPONSES[t].set_result((j, after))
                 return b"\xf0\x9f\x92\x9c"
         content = input or urllib.parse.unquote(cp.url(base="", qs=cp.request.query_string).rstrip("?").split("/", 2)[-1])
-        if "DNT" in (k.upper() for k in cp.request.headers):
-            random.seed(ip)
-            ip = ".".join(str(xrand(1, 255)) for _ in loop(4))
-            random.seed(ts_us())
-            tz = "Anonymous (DNT enabled)"
+        # if "DNT" in (k.upper() for k in cp.request.headers):
+        #     random.seed(ip)
+        #     ip = ".".join(str(xrand(1, 255)) for _ in loop(4))
+        #     random.seed(ts_us())
+        #     tz = "Anonymous (DNT enabled)"
+        # else:
+        try:
+            secret = cp.request.headers["X-RapidAPI-Proxy-Secret"]
+            if secret != RAPIDAPI_SECRET:
+                raise KeyError
+        except KeyError:
+            data = get_geo(ip)
+            tz = data["timezone"]
         else:
-            try:
-                secret = cp.request.headers["X-RapidAPI-Proxy-Secret"]
-                if secret != RAPIDAPI_SECRET:
-                    raise KeyError
-            except KeyError:
-                data = get_geo(ip)
-                tz = data["timezone"]
-            else:
-                ip = ".".join(str(xrand(1, 255)) for _ in loop(4))
-                tz = "Anonymous (DNT enabled)"
-                self.rapidapi += 1
+            ip = ".".join(str(xrand(1, 255)) for _ in loop(4))
+            tz = "Anonymous (DNT enabled)"
+            self.rapidapi += 1
         if " " not in content:
             content += " "
         t = ts_us()

@@ -748,6 +748,29 @@ class Miza_Player:
 class UpdateTrusted(Database):
     name = "trusted"
 
+    async def subscribe(self, user_id, i=0, oid=None):
+        if user_id.isnumeric():
+            try:
+                u = await self.bot.fetch_user(user_id)
+            except:
+                print_exc()
+                return
+            user_id = str(u)
+        elif len(user_id) < 5 or len(user_id) > 37 or user_id[-5] != "#" or not user_id[-4:].isnumeric():
+            return
+        if oid:
+            try:
+                uid = self[oid][0]
+            except KeyError:
+                pass
+            else:
+                self.pop(oid)
+                self.pop(uid, None)
+        temp = self.data.get(user_id, 0)
+        self[user_id] = i
+        self[oid] = (user_id, time.time(), i)
+        return user_id
+
 
 class UpdateColours(Database):
     name = "colours"
