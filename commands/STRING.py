@@ -993,7 +993,7 @@ class Ask(Command):
             # )
         try:
             cb = self.convos[channel.id]
-            if cb.get("personality") != bot.commands.personality[0].retrieve(guild.id):
+            if getattr(cb, "personality", None) != bot.commands.personality[0].retrieve(guild.id):
                 raise KeyError
         except KeyError:
             if not convobot:
