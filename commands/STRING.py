@@ -1232,7 +1232,7 @@ class Personality(Command):
         return p
 
     def retrieve(self, i):
-        return self.decode(self.bot.data.personalities.get(i) or "friendly, playful, cute")
+        return self.bot.data.personalities.get(i) or "friendly, playful, cute"
 
     async def __call__(self, bot, flags, guild, message, user, args, **void):
         if not AUTH.get("openai_key"):
@@ -1241,7 +1241,7 @@ class Personality(Command):
             self.data.personalities.pop(guild.id, None)
             return css_md(f"My personality for {sqr_md(guild)} has been reset.")
         if not args:
-            p = self.retrieve(guild.id)
+            p = self.decode(self.retrieve(guild.id))
             return ini_md(f"My current personality for {sqr_md(guild)} is {sqr_md(p)}.")
         p = self.encode(" ".join(args).replace(",", " ").replace("  ", " ").replace(" ", ", "))
         import openai
