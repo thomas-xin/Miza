@@ -135,7 +135,7 @@ def vague(t):
 
 def literal_question(t):
 	t = t.casefold().replace("'", "")
-	if t.startswith("whats your") or t.startswith("what is your") or t.startswith("what are your") or t.startswith("what do you"):
+	if not t or t.startswith("whats your") or t.startswith("what is your") or t.startswith("what are your") or t.startswith("what do you"):
 		return False
 	t = t.removeprefix("so ")
 	t = t.removeprefix("then ")
@@ -143,7 +143,14 @@ def literal_question(t):
 	t2 = t.split()
 	if "google" in t2:
 		return True
-	return any(t.startswith(i) for i in ("whats ", "what ", "wheres ", "where ", "whos ", "who ", "whens ", "when ", "whys ", "why ", "hows ", "how "))
+	for i in ("whats", "what", "wheres", "where", "whos", "who", "whens", "when", "whys", "why", "hows", "how"):
+		if t2[0] == i:
+			t2.pop(0)
+			while t2 and t2[0] in ("is", "a", "an", "the"):
+				t2.pop(0)
+			if not t2:
+				return False
+			return " ".join(t2)
 
 def valid_response(t):
 	t = t.strip()
@@ -313,8 +320,9 @@ class Bot:
 				lines.append(f"Human: {q}\nMiza: {a}\n")
 		for a in additional:
 			lines.append(a + "\n")
-		if literal_question(question):
-			res = lim_str(self.google(question, raw=True).replace("\n", ". "), 512, mode="right").replace(": ", " -")
+		lq = literal_question(question)
+		if lq:
+			res = lim_str(self.google(lq, raw=True).replace("\n", ". "), 512, mode="right").replace(": ", " -")
 			lines.append(f"Google: {res}\n")
 			googled = True
 		else:
@@ -383,7 +391,7 @@ class Bot:
 					lines.append(f"Human: {q}\nMiza: {a}\n")
 			for a in additional:
 				lines.append(a + "\n")
-			res = lim_str(self.google(question, raw=True).replace("\n", ". "), 512, mode="right")
+			res = lim_str(self.google(lq or question, raw=True).replace("\n", ". "), 512, mode="right")
 			# lines.pop(-1)
 			lines.append(f"Google: {res}\n")
 			lines.append(f"Human: {question}\n")
