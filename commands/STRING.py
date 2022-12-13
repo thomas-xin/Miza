@@ -1207,6 +1207,7 @@ class Ask(Command):
 
 
 class Personality(Command):
+    server_only = True
     name = ["ChangePersonality"]
     min_level = 2
     description = "Customises ⟨MIZA⟩'s personality for ~ask in the current server. Note that initial responses are often given in a polite manner regardless of personality traits set."
