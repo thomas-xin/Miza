@@ -993,6 +993,8 @@ class Ask(Command):
             # )
         try:
             cb = self.convos[channel.id]
+            if cb.get("personality") != bot.commands.personality[0].retrieve(guild.id):
+                raise KeyError
         except KeyError:
             if not convobot:
                 cb = cdict(talk=lambda *args: "")
@@ -1275,7 +1277,6 @@ class Personality(Command):
                 + "Please reword or consider contacting the support server if you believe this is a mistake!"
             )
         bot.data.personalities[guild.id] = p
-        bot.commands.ask[0].convos.pop(guild.id, None)
         return css_md(f"My personality for {sqr_md(guild)} has been changed to {sqr_md(p)}.")
 
 

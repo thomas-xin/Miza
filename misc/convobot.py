@@ -333,7 +333,7 @@ class Bot:
 		prompt = f"{self.name} is a {self.personality} AI:\n\n" + prompt
 		print("GPTV3 prompt:", prompt)
 		words = question.casefold().replace(",", " ").split()
-		if googled or "essay" in words or "full" in words or "write" in words or "writing" in words or "about" in words:
+		if googled or not additional or "essay" in words or "full" in words or "write" in words or "writing" in words or "about" in words:
 			model = "text-davinci-003"
 			temp = 0.5
 		else:
