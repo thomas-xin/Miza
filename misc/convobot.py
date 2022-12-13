@@ -142,7 +142,7 @@ def literal_question(t):
 	t = t.removeprefix("but ")
 	t2 = t.replace(",", " ").split()
 	if "google" in t2:
-		return True
+		return t
 	for i in ("whats", "what", "wheres", "where", "whos", "who", "whens", "when", "whys", "why", "hows", "how"):
 		if t2[0] == i:
 			return t
