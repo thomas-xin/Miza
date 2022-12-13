@@ -270,11 +270,14 @@ neko_tags = {
     "yaoi": True,
 }
 nekobot_shared = {
-    "hentai", "holo", "neko", "anal", "boobs"
+    "hentai", "holo", "neko", "anal", "boobs",
 }
 nekobot_exclusive = {
     "ass", "hass", "hmidriff", "pgif", "4k", "hneko", "hkitsune", "kemonomimi", "hanal", "gonewild", "kanna",
-    "thigh", "hthigh", "gah", "coffee", "food", "paizuri", "tentacle", "hboobs", "yaoi"
+    "thigh", "hthigh", "gah", "coffee", "food", "paizuri", "tentacle", "hboobs", "yaoi",
+}
+nekoslife_deprecated = {
+    "meow", "lewd",
 }
 
 
@@ -327,8 +330,8 @@ class Neko(Command):
                         data = await Request(url, aio=True, json=True)
                     return data["message"]
                 return
-            if tag == "meow":
-                data = await Request("https://nekos.life/api/v2/img/meow", aio=True, json=True)
+            if tag in nekoslife_deprecated:
+                data = await Request(f"https://nekos.life/api/v2/img/{tag}", aio=True, json=True)
                 return data["url"]
             return await create_future(nekos.img, tag)
 

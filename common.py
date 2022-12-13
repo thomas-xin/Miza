@@ -390,7 +390,7 @@ python = sys.executable
 
 
 with open("auth.json", "rb") as f:
-    AUTH = eval(f.read())
+    AUTH = cdict(eval(f.read()))
 
 enc_key = None
 with tracebacksuppressor:

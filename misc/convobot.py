@@ -140,7 +140,7 @@ def literal_question(t):
 	t = t.removeprefix("so ")
 	t = t.removeprefix("then ")
 	t = t.removeprefix("but ")
-	t2 = t.split()
+	t2 = t.replace(",", " ").split()
 	if "google" in t2:
 		return True
 	return any(t.startswith(i) for i in ("whats ", "what ", "wheres ", "where ", "whos ", "who ", "whens ", "when ", "whys ", "why ", "hows ", "how "))
@@ -174,10 +174,11 @@ class Bot:
 
 	models = {}
 
-	def __init__(self, token="", email="", password=""):
+	def __init__(self, token="", email="", password="", personality="friendly, playful, cute"):
 		self.token = token
 		self.email = email
 		self.password = password
+		self.personality = personality
 		self.history = {}
 		self.chat_history = []
 		self.chat_history_ids = None
@@ -324,9 +325,9 @@ class Bot:
 		prompt = ""
 		while lines and len(prompt) < 1536:
 			prompt = lines.pop(-1) + prompt
-		prompt = "Miza is a friendly, playful, cute AI:\n\n" + prompt
+		prompt = f"Miza is a {self.personality} AI:\n\n" + prompt
 		print("GPTV3 prompt:", prompt)
-		words = question.casefold().split()
+		words = question.casefold().replace(",", " ").split()
 		if "essay" in words or "full" in words or "write" in words or "writing" in words or "about" in words:
 			model = "text-davinci-003"
 		else:
@@ -374,7 +375,7 @@ class Bot:
 			if results.hate or results["self-harm"] or results["sexual/minors"] or results.violence:
 				return text
 			if googled:
-				return
+				return text
 			lines = []
 			if self.chat_history:
 				for q, a in self.chat_history:
@@ -391,9 +392,9 @@ class Bot:
 			prompt = ""
 			while lines and len(prompt) < 1536:
 				prompt = lines.pop(-1) + prompt
-			prompt = "Miza is a friendly, playful, cute AI:\n\n" + prompt
+			prompt = f"Miza is a {self.personality} AI:\n\n" + prompt
 			print("GPTV3 prompt2:", prompt)
-			words = question.casefold().split()
+			words = question.casefold().replace(",", " ").split()
 			if "essay" in words or "full" in words or "write" in words or "writing" in words or "about" in words:
 				model = "text-davinci-003"
 			else:

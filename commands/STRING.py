@@ -371,19 +371,19 @@ class AltCaps(Command):
         return fix_md("".join(i[0] + i[1] for i in zip(a, b)) + c)
 
 
-class Say(Command):
-    description = "Repeats a message that the user provides."
-    usage = "<string>"
-    no_parse = True
-    slash = True
+# class Say(Command):
+#     description = "Repeats a message that the user provides."
+#     usage = "<string>"
+#     no_parse = True
+#     slash = True
     
-    def __call__(self, bot, user, message, argv, **void):
-        create_task(bot.silent_delete(message, no_log=-1))
-        if not argv:
-            raise ArgumentError("Input string is empty.")
-        if not bot.is_owner(user):
-            argv = lim_str("\u200b" + escape_roles(argv).lstrip("\u200b"), 2000)
-        create_task(message.channel.send(argv))
+#     def __call__(self, bot, user, message, argv, **void):
+#         create_task(bot.silent_delete(message, no_log=-1))
+#         if not argv:
+#             raise ArgumentError("Input string is empty.")
+#         if not bot.is_owner(user):
+#             argv = lim_str("\u200b" + escape_roles(argv).lstrip("\u200b"), 2000)
+#         create_task(message.channel.send(argv))
 
 
 # Char2Emoj, a simple script to convert a string into a block of text
@@ -684,30 +684,30 @@ class Timezone(Command):
         return ini_md(f"Current time at UTC/GMT{h}: {sqr_md(t)}.")
 
 
-class TimeCalc(Command):
-    name = ["TimeDifference", "TimeDiff", "TimeSum", "TimeAdd"]
-    description = "Computes the sum or difference between two times, or the Unix timestamp of a datetime string."
-    usage = "<0:time1> [|,] <1:time2>?"
-    no_parse = True
+# class TimeCalc(Command):
+#     name = ["TimeDifference", "TimeDiff", "TimeSum", "TimeAdd"]
+#     description = "Computes the sum or difference between two times, or the Unix timestamp of a datetime string."
+#     usage = "<0:time1> [|,] <1:time2>?"
+#     no_parse = True
 
-    def __call__(self, argv, user, name, **void):
-        if not argv:
-            timestamps = [utc()]
-        else:
-            if "|" in argv:
-                spl = argv.split("|")
-            elif "," in argv:
-                spl = argv.split(",")
-            else:
-                spl = [argv]
-            timestamps = [utc_ts(tzparse(t)) for t in spl]
-        if len(timestamps) == 1:
-            out = f"{round_min(timestamps[0])} ({DynamicDT.utcfromtimestamp(timestamps[0])} UTC)"
-        elif "sum" not in name and "add" not in name:
-            out = dyn_time_diff(max(timestamps), min(timestamps))
-        else:
-            out = time_sum(*timestamps)
-        return code_md(out)
+#     def __call__(self, argv, user, name, **void):
+#         if not argv:
+#             timestamps = [utc()]
+#         else:
+#             if "|" in argv:
+#                 spl = argv.split("|")
+#             elif "," in argv:
+#                 spl = argv.split(",")
+#             else:
+#                 spl = [argv]
+#             timestamps = [utc_ts(tzparse(t)) for t in spl]
+#         if len(timestamps) == 1:
+#             out = f"{round_min(timestamps[0])} ({DynamicDT.utcfromtimestamp(timestamps[0])} UTC)"
+#         elif "sum" not in name and "add" not in name:
+#             out = dyn_time_diff(max(timestamps), min(timestamps))
+#         else:
+#             out = time_sum(*timestamps)
+#         return code_md(out)
 
 
 class Identify(Command):
@@ -947,9 +947,8 @@ class Ask(Command):
     convos = {}
     analysed = {}
 
-    async def __call__(self, message, channel, user, argv, name, flags=(), **void):
+    async def __call__(self, message, guild, channel, user, argv, name, flags=(), **void):
         bot = self.bot
-        guild = getattr(channel, "guild", None)
         count = bot.data.users.get(user.id, {}).get("last_talk", 0)
         add_dict(bot.data.users, {user.id: {"last_talk": 1, "last_mention": 1}})
         bot.data.users[user.id]["last_used"] = utc()
@@ -1002,6 +1001,7 @@ class Ask(Command):
                     token=AUTH.get("openai_key"),
                     email=AUTH.get("openai_email"),
                     password=AUTH.get("openai_password"),
+                    personality=self.commands.personality[0].retrieve(guild.id),
                 )
         with discord.context_managers.Typing(channel):
             urls = []
@@ -1201,6 +1201,84 @@ class Ask(Command):
         if out:
             q = q[0].upper() + q[1:]
             await send_with_reply(channel, message, escape_roles(f"\xad{q}? {out}"))
+
+
+class Personality(Command):
+    name = ["ChangePersonality"]
+    min_level = 2
+    description = "Customises ⟨MIZA⟩'s personality for ~ask in the current server."
+    usage = "<traits>* <default{?d}>?"
+    flags = "aed"
+    rate_limit = (2, 5)
+
+    def encode(self, p):
+        return p.replace(
+            " and ", ", "
+        ).replace(
+            ", and ", ", "
+        ).replace(
+            ",and ", ", "
+        ).replace(
+            ":", ";"
+        ).removeprefix("an ").removeprefix("a ").removeprefix("more ").removesuffix(" ai")
+
+    def decode(self, p):
+        if p.count(", ") > 1:
+            a, b, c = p.rpartition(", ")
+            p = a + " and " + c
+        return p
+
+    def retrieve(self, i):
+        return self.decode(self.bot.data.personalities.get(i) or "friendly, playful, cute")
+
+    async def __call__(self, bot, flags, guild, message, user, args, **void):
+        if not AUTH.get("openai_key"):
+            raise ModuleNotFoundError("No OpenAI key found for customisable personality.")
+        if "d" in flags:
+            self.data.personalities.pop(guild.id, None)
+            return css_md(f"My personality for {sqr_md(guild)} has been reset.")
+        if not args:
+            p = self.retrieve(guild.id)
+            return ini_md(f"My current personality for {sqr_md(guild)} is {sqr_md(p)}.")
+        p = self.encode(" ".join(args).replace(",", " ").replace("  ", " ").replace(" ", ", "))
+        import openai
+        inappropriate = False
+        openai.api_key = AUTH["openai_key"]
+        resp = openai.Moderation.create(
+            input=p,
+        )
+        results = resp.results[0].categories
+        if results.hate or results["self-harm"] or results["sexual/minors"] or results.violence:
+            inappropriate = True
+            print(results)
+        if not inappropriate:
+            prompt = f"Is it illegal to be {p}?\n"
+            response = openai.Completion.create(
+				model="text-davinci-003",
+				prompt=prompt,
+				temperature=0,
+				max_tokens=32,
+				top_p=0,
+				frequency_penalty=0,
+				presence_penalty=0,
+				user=str(user.id),
+			)
+            text = response.choices[0].text
+            words = text.casefold().replace(",", " ").split()
+            if "no" not in words and "not" not in words:
+                inappropriate = True
+                print(text)
+        if inappropriate:
+            raise PermissionError(
+                "Apologies, my AI has detected that your input may be inappropriate.\n"
+                + "Please reword or consider contacting the support server if you believe this is a mistake!"
+            )
+        bot.data.personalities[guild.id] = p
+        return css_md(f"My personality for {sqr_md(guild)} has been changed to {sqr_md(p)}.")
+
+
+class UpdatePersonalities(Database):
+    name = "personalities"
 
 
 class Random(Command):
