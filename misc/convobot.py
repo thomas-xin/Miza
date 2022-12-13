@@ -177,10 +177,11 @@ class Bot:
 
 	models = {}
 
-	def __init__(self, token="", email="", password="", personality="friendly, playful, cute"):
+	def __init__(self, token="", email="", password="", name="Miza", personality="friendly, playful, cute"):
 		self.token = token
 		self.email = email
 		self.password = password
+		self.name = name
 		self.personality = personality
 		self.history = {}
 		self.chat_history = []
@@ -314,7 +315,7 @@ class Bot:
 			for q, a in self.chat_history:
 				q = lim_str(q, 64)
 				a = lim_str(a, 192)
-				lines.append(f"Human: {q}\nMiza: {a}\n")
+				lines.append(f"Human: {q}\n{self.name}: {a}\n")
 		for a in additional:
 			lines.append(a + "\n")
 		lq = literal_question(question)
@@ -325,11 +326,11 @@ class Bot:
 		else:
 			googled = False
 		lines.append(f"Human: {question}\n")
-		lines.append("Miza:")
+		lines.append(f"{self.name}:")
 		prompt = ""
 		while lines and len(prompt) < 1536:
 			prompt = lines.pop(-1) + prompt
-		prompt = f"Miza is a {self.personality} AI:\n\n" + prompt
+		prompt = f"{self.name} is a {self.personality} AI:\n\n" + prompt
 		print("GPTV3 prompt:", prompt)
 		words = question.casefold().replace(",", " ").split()
 		if googled or "essay" in words or "full" in words or "write" in words or "writing" in words or "about" in words:
@@ -387,18 +388,18 @@ class Bot:
 				for q, a in self.chat_history:
 					q = lim_str(q, 128)
 					a = lim_str(a, 256)
-					lines.append(f"Human: {q}\nMiza: {a}\n")
+					lines.append(f"Human: {q}\n{self.name}: {a}\n")
 			for a in additional:
 				lines.append(a + "\n")
 			res = lim_str(self.google(lq or question, raw=True).replace("\n", ". "), 512, mode="right")
 			# lines.pop(-1)
 			lines.append(f"Google: {res}\n")
 			lines.append(f"Human: {question}\n")
-			lines.append("Miza:")
+			lines.append(f"{self.name}:")
 			prompt = ""
 			while lines and len(prompt) < 1536:
 				prompt = lines.pop(-1) + prompt
-			prompt = f"Miza is a {self.personality} AI:\n\n" + prompt
+			prompt = f"{self.name} is a {self.personality} AI:\n\n" + prompt
 			print("GPTV3 prompt2:", prompt)
 			words = question.casefold().replace(",", " ").split()
 			model = "text-davinci-003"
