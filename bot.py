@@ -365,7 +365,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         usage=command.usage,
                         level=str(command.min_level),
                         rate_limit=str(command.rate_limit),
-                        example=getatrr(command, "example", []),
+                        example=getattr(command, "example", []),
                         timeout=str(getattr(command, "_timeout_", 1) * self.timeout),
                     )
                     for attr in ("flags", "server_only", "slash"):
