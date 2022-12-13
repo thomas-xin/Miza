@@ -135,7 +135,7 @@ def vague(t):
 
 def literal_question(t):
 	t = t.casefold().replace("'", "")
-	if t.startswith("whats your") or t.startswith("what is your") or t.startswith("what are your") or t.startswith("what do you"):
+	if not t or t.startswith("whats your") or t.startswith("what is your") or t.startswith("what are your") or t.startswith("what do you"):
 		return False
 	t = t.removeprefix("so ")
 	t = t.removeprefix("then ")
@@ -143,7 +143,10 @@ def literal_question(t):
 	t2 = t.replace(",", " ").split()
 	if "google" in t2:
 		return True
-	return any(t.startswith(i) for i in ("whats ", "what ", "wheres ", "where ", "whos ", "who ", "whens ", "when ", "whys ", "why ", "hows ", "how "))
+	for i in ("whats", "what", "wheres", "where", "whos", "who", "whens", "when", "whys", "why", "hows", "how"):
+		if t2[0] == i:
+			return t
+	return False
 
 def valid_response(t):
 	t = t.strip()
@@ -314,8 +317,9 @@ class Bot:
 				lines.append(f"Human: {q}\nMiza: {a}\n")
 		for a in additional:
 			lines.append(a + "\n")
-		if literal_question(question) and not additional:
-			res = lim_str(self.google(question, raw=True).replace("\n", ". "), 512, mode="right").replace(": ", " -")
+		lq = literal_question(question)
+		if lq:
+			res = lim_str(self.google(lq, raw=True).replace("\n", ". "), 512, mode="right").replace(": ", " -")
 			lines.append(f"Google: {res}\n")
 			googled = True
 		else:
@@ -328,19 +332,21 @@ class Bot:
 		prompt = f"Miza is a {self.personality} AI:\n\n" + prompt
 		print("GPTV3 prompt:", prompt)
 		words = question.casefold().replace(",", " ").split()
-		if "essay" in words or "full" in words or "write" in words or "writing" in words or "about" in words:
+		if googled or "essay" in words or "full" in words or "write" in words or "writing" in words or "about" in words:
 			model = "text-davinci-003"
+			temp = 0.5
 		else:
-			model = "text-babbage-001" if len(prompt) >= 1024 and random.randint(0, 1) else "text-curie-001" if len(prompt) >= 512 or not random.randint(0, 2) else "text-davinci-003"
+			model = "text-curie-001" if len(prompt) >= 512 or not random.randint(0, 2) else "text-davinci-003"
+			temp = 0.7
 		try:
 			response = openai.Completion.create(
 				model=model,
 				prompt=prompt,
-				temperature=0.7,
+				temperature=temp,
 				max_tokens=1024,
 				top_p=0.9,
-				frequency_penalty=0.25,
-				presence_penalty=0,
+				frequency_penalty=0.8,
+				presence_penalty=0.2,
 				user=str(id(self)),
 			)
 		except openai.error.ServiceUnavailableError:
@@ -351,7 +357,7 @@ class Bot:
 			).removesuffix(
 				"Can you provide more information to support your claim?"
 			).strip()
-		print("GPTV3 response:", text)
+		print(f"GPTV3 {model} response:", text)
 		# set_seed(int(time.time() // 0.1) & 4294967295)
 		# text = ""
 		# while not text.endswith("."):
@@ -365,7 +371,7 @@ class Bot:
 		# text = text.removesuffix("Is there anything else I can help you with?").removesuffix("Can you provide more information to support your claim?").strip()
 		# print("GPTV2 response:", text)
 		test = text.casefold()
-		if not test or test.startswith("sorry,") or test.startswith("i'm sorry,") or test.startswith("i don't know,") or test.startswith("i don't know "):
+		if not test or test.startswith("sorry,") or test.startswith("i'm sorry,") or test.startswith("i don't know,") or test.startswith("i don't know ") or test.startswith("i'm not sure,") or test.startswith("i'm not sure "):
 			resp = openai.Moderation.create(
 				input=question,
 			)
@@ -384,7 +390,7 @@ class Bot:
 					lines.append(f"Human: {q}\nMiza: {a}\n")
 			for a in additional:
 				lines.append(a + "\n")
-			res = lim_str(self.google(question, raw=True).replace("\n", ". "), 512, mode="right")
+			res = lim_str(self.google(lq or question, raw=True).replace("\n", ". "), 512, mode="right")
 			# lines.pop(-1)
 			lines.append(f"Google: {res}\n")
 			lines.append(f"Human: {question}\n")
@@ -395,19 +401,17 @@ class Bot:
 			prompt = f"Miza is a {self.personality} AI:\n\n" + prompt
 			print("GPTV3 prompt2:", prompt)
 			words = question.casefold().replace(",", " ").split()
-			if "essay" in words or "full" in words or "write" in words or "writing" in words or "about" in words:
-				model = "text-davinci-003"
-			else:
-				model = "text-babbage-001" if len(prompt) >= 1024 and random.randint(0, 1) else "text-curie-001" if len(prompt) >= 512 or not random.randint(0, 2) else "text-davinci-003"
+			model = "text-davinci-003"
+			temp = 0.8
 			try:
 				response = openai.Completion.create(
 					model=model,
 					prompt=prompt,
-					temperature=0.8,
+					temperature=temp,
 					max_tokens=1536 if model == "text-davinci-003" else 1024,
 					top_p=1,
-					frequency_penalty=0.125,
-					presence_penalty=0,
+					frequency_penalty=0.4,
+					presence_penalty=0.1,
 					user=str(id(self)),
 				)
 			except openai.error.ServiceUnavailableError:
@@ -418,7 +422,7 @@ class Bot:
 				).removesuffix(
 					"Can you provide more information to support your claim?"
 				).strip()
-			print("GPTV3 response2:", text)
+			print(f"GPTV3 {model} response2:", text)
 		return text
 
 	# def chatgpt(self, q, additional=(), force=False):
