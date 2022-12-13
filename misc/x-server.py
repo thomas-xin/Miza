@@ -2044,7 +2044,7 @@ body {
     rapidapi = 0
     @cp.expose(("subscriptions",))
     @hostmap
-    def subscription(self, user_id=""):
+    def subscription(self, **kwargs):
         ip = cp.request.remote.ip
         try:
             secret = cp.request.headers["X-RapidAPI-Proxy-Secret"]
@@ -2052,6 +2052,7 @@ body {
                 raise KeyError
         except KeyError:
             raise PermissionError("RapidAPI Proxy Secret not detected.")
+        user_id = kwargs.pop("user_id", "")
         if "\x7f" in user_id:
             raise ValueError
         self.rapidapi += 1
