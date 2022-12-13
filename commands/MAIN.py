@@ -101,8 +101,8 @@ class Help(Command):
                 if isinstance(x, collections.abc.Sequence):
                     x = x[not bot.is_trusted(getattr(guild, "id", 0))]
                 content += f"\n[Rate Limit] {sec2time(x)}"
-            if getattr(comm, "example", None):
-                example = comm.example
+            if getattr(com, "example", None):
+                example = com.example
                 if isinstance(example, str):
                     example = [example]
                 exs = []
