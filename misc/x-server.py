@@ -2052,7 +2052,7 @@ body {
                 raise KeyError
         except KeyError:
             raise PermissionError("RapidAPI Proxy Secret not detected.")
-        user_id = kwargs.pop("user_id", "")
+        user_id = kwargs.pop("user-id", "")
         if "\x7f" in user_id:
             raise ValueError
         self.rapidapi += 1
