@@ -2079,7 +2079,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             return 0
         if trusted.get(str(user)):
             trusted[user.id] = trusted.pop(str(user))
-        return trusted.get(user.id, 0)
+        return trusted.get(user.id) or 0
 
     # Checks if a user is blacklisted from the bot.
     def is_blacklisted(self, user):
@@ -2986,30 +2986,31 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                             if getattr(command, "server_only", False):
                                 raise ReferenceError("This command is only available in servers.")
                         # Make sure target has permission to use the target command, rate limit the command if necessary.
-                        if not u_perm >= req:
-                            raise command.perm_error(u_perm, req, "for command " + command_check)
-                        x = command.rate_limit
-                        if x:
-                            if user.id in bot.owners:
-                                x = 0
-                            elif isinstance(x, collections.abc.Sequence):
-                                x = x[not bot.is_trusted(getattr(guild, "id", 0))]
-                                x /= 2 ** bot.premium_level(user)
-                            remaining += x
-                            d = command.used
-                            t = d.get(u_id, -inf)
-                            wait = utc() - t - x
-                            if wait > -1:
-                                if wait < 0:
-                                    w = max(0.2, -wait)
-                                    d[u_id] = max(t, utc()) + w
-                                    await asyncio.sleep(w)
-                                if len(d) >= 4096:
-                                    with suppress(RuntimeError):
-                                        d.pop(next(iter(d)))
-                                d[u_id] = max(t, utc())
-                            else:
-                                raise TooManyRequests(f"Command has a rate limit of {sec2time(x)}; please wait {sec2time(-wait)}.")
+                        if not isnan(u_perm):
+                            if not u_perm >= req:
+                                raise command.perm_error(u_perm, req, "for command " + command_check)
+                            x = command.rate_limit
+                            if x:
+                                if user.id in bot.owners:
+                                    x = 0
+                                elif isinstance(x, collections.abc.Sequence):
+                                    x = x[not bot.is_trusted(getattr(guild, "id", 0))]
+                                    x /= 2 ** bot.premium_level(user)
+                                remaining += x
+                                d = command.used
+                                t = d.get(u_id, -inf)
+                                wait = utc() - t - x
+                                if wait > -1:
+                                    if wait < 0:
+                                        w = max(0.2, -wait)
+                                        d[u_id] = max(t, utc()) + w
+                                        await asyncio.sleep(w)
+                                    if len(d) >= 4096:
+                                        with suppress(RuntimeError):
+                                            d.pop(next(iter(d)))
+                                    d[u_id] = max(t, utc())
+                                else:
+                                    raise TooManyRequests(f"Command has a rate limit of {sec2time(x)}; please wait {sec2time(-wait)}.")
                         flags = {}
                         if loop:
                             inc_dict(flags, h=1)
@@ -3121,14 +3122,15 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         if not loop and tc:
                             fut = create_task(channel.trigger_typing())
                         # Get maximum time allowed for command to process
-                        if bot.is_owner(user):
+                        if isnan(u_perm):
                             timeout = None
                         else:
                             timeout = getattr(command, "_timeout_", 1) * bot.timeout
                             if timeout >= inf:
                                 timeout = None
                             elif self.is_trusted(message.guild):
-                                timeout *= 3
+                                timeout *= 2
+                            timeout *= 2 ** self.premium_level(user)
                         # Create a future to run the command
                         future = create_future(
                             command,                        # command is a callable object, may be async or not
