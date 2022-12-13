@@ -150,7 +150,7 @@ def literal_question(t):
 				t2.pop(0)
 			if not t2:
 				return False
-			return " ".join(t2)
+			return " ".join(t2).rstrip("?") or False
 
 def valid_response(t):
 	t = t.strip()
