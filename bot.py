@@ -2923,6 +2923,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 channel,
                 "Sorry, you are currently not permitted to request my services.",
                 reacts="❎",
+                reference=message,
             ))
             return 0
         truemention = True

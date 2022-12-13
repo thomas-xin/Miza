@@ -335,16 +335,18 @@ class Bot:
 		words = question.casefold().replace(",", " ").split()
 		if googled or not additional or "essay" in words or "full" in words or "write" in words or "writing" in words or "about" in words:
 			model = "text-davinci-003"
-			temp = 0.5
-		else:
-			model = "text-curie-001" if len(prompt) >= 512 or not random.randint(0, 2) else "text-davinci-003"
 			temp = 0.7
+			tokens = 1536
+		else:
+			model = "text-curie-001" if len(prompt) >= 256 or not random.randint(0, 2) else "text-davinci-003"
+			temp = 0.75
+			tokens = 1024
 		try:
 			response = openai.Completion.create(
 				model=model,
 				prompt=prompt,
 				temperature=temp,
-				max_tokens=1024,
+				max_tokens=tokens,
 				top_p=0.9,
 				frequency_penalty=0.8,
 				presence_penalty=0.2,
@@ -353,31 +355,36 @@ class Bot:
 		except openai.error.ServiceUnavailableError:
 			text = ""
 		else:
-			text = response.choices[0].text.removesuffix(
-				"Is there anything else I can help you with?"
-			).removesuffix(
-				"Can you provide more information to support your claim?"
-			).strip()
+			text = response.choices[0].text.strip()
 		print(f"GPTV3 {model} response:", text)
-		# set_seed(int(time.time() // 0.1) & 4294967295)
-		# text = ""
-		# while not text.endswith("."):
-		# 	response = self.gpt2_generator(
-		# 		prompt,
-		# 		max_length=4096,
-		# 		num_return_sequences=1,
-		# 	)
-		# 	gt = response[0]["generated_text"]
-		# 	seed 
-		# text = text.removesuffix("Is there anything else I can help you with?").removesuffix("Can you provide more information to support your claim?").strip()
-		# print("GPTV2 response:", text)
 		test = text.casefold()
-		if not test or test.startswith("sorry,") or test.startswith("i'm sorry,") or test.startswith("i don't know,") or test.startswith("i don't know ") or test.startswith("i'm not sure,") or test.startswith("i'm not sure "):
+
+		def unsure(t):
+			t = t.removeprefix("hmm").lstrip(", ")
+			if t.startswith("sorry,"):
+				return True
+			if t.startswith("i'm sorry,"):
+				return True
+			if t.startswith("i don't know"):
+				t = t.removeprefix("i don't know")
+				if t and t[0] in ", ":
+					return True
+			if t.startswith("i'm not sure"):
+				t = t.removeprefix("i'm not sure")
+				if t and t[0] in ", ":
+					return True
+			if t.startswith("i don't understand"):
+				t = t.removeprefix("i don't understand")
+				if t and t[0] in ", ":
+					return True
+
+		if not test or unsure(test):
 			resp = openai.Moderation.create(
 				input=question,
 			)
 			results = resp.results[0].categories
-			if any(results.values()):
+			av = any(results.values())
+			if av:
 				print(results)
 			if results.hate or results["self-harm"] or results["sexual/minors"] or results.violence:
 				return text
@@ -402,7 +409,7 @@ class Bot:
 			prompt = f"{self.name} is a {self.personality} AI:\n\n" + prompt
 			print("GPTV3 prompt2:", prompt)
 			words = question.casefold().replace(",", " ").split()
-			model = "text-davinci-003"
+			model = "text-curie-001" if av else "text-davinci-003"
 			temp = 0.8
 			try:
 				response = openai.Completion.create(
@@ -418,11 +425,7 @@ class Bot:
 			except openai.error.ServiceUnavailableError:
 				text = ""
 			else:
-				text = response.choices[0].text.removesuffix(
-					"Is there anything else I can help you with?"
-				).removesuffix(
-					"Can you provide more information to support your claim?"
-				).strip()
+				text = response.choices[0].text.strip()
 			print(f"GPTV3 {model} response2:", text)
 		return text
 
