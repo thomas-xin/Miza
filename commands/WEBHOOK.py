@@ -4,10 +4,11 @@ class AutoEmoji(Command):
     min_level = 0
     description = "Causes all failed emojis starting and ending with : to be deleted and reposted with a webhook, when possible."
     usage = "(enable|disable)?"
+    example = ("emojis", "autoemoji enable", "nqn disable")
     flags = "aed"
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
-    rate_limit = 1
+    rate_limit = (4, 6)
 
     async def __call__(self, bot, flags, guild, message, user, name, perm, **void):
         data = bot.data.autoemojis
@@ -321,10 +322,12 @@ class UpdateAutoEmojis(Database):
 class EmojiList(Command):
     description = "Sets a custom alias for an emoji, usable by ~autoemoji. Accepts emojis, emoji IDs, emoji URLs, and message links containing emojis or reactions."
     usage = "(add|delete)? <name>? <id>?"
+    example = ("emojilist add how https://cdn.discordapp.com/emojis/645188934267043840.gif", "emojilist remove why")
     flags = "aed"
     no_parse = True
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
+    rate_limit = (4, 6)
 
     async def __call__(self, bot, flags, message, user, name, argv, args, **void):
         data = bot.data.emojilists
@@ -440,11 +443,12 @@ class UpdateEmojiLists(Database):
 
 
 class MimicConfig(Command):
-    name = ["PluralConfig", "RPConfig"]
+    name = ["PluralConfig", "PConfig", "RPConfig", "MConfig"]
     description = "Modifies an existing webhook mimic's attributes."
     usage = "<0:mimic_id> (prefix|name|avatar|description|gender|birthday)? <1:new>?"
+    example = ("mconfig 692369756941978254 name test2",)
     no_parse = True
-    rate_limit = 1
+    rate_limit = (4, 5)
 
     async def __call__(self, bot, user, message, perm, flags, args, **void):
         update = bot.data.mimics.update
@@ -555,11 +559,12 @@ class Mimic(Command):
     name = ["RolePlay", "Plural", "RP", "RPCreate"]
     description = "Spawns a webhook mimic with an optional username and icon URL, or lists all mimics with their respective prefixes. Mimics require permission level of 1 to invoke."
     usage = "<0:prefix>? <1:user|name>? <2:url[]>? <delete{?d}>?"
+    example = ("mimic %miza @Miza", "rp %%test Test https://cdn.discordapp.com/embed/avatars/0.png", "plural -d %lol%")
     flags = "aedzf"
     no_parse = True
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
-    rate_limit = (1, 2)
+    rate_limit = (6, 7)
 
     async def __call__(self, bot, message, user, perm, flags, args, argv, **void):
         update = self.data.mimics.update
@@ -760,8 +765,8 @@ class MimicSend(Command):
     name = ["RPSend", "PluralSend"]
     description = "Sends a message using a webhook mimic, to the target channel."
     usage = "<0:mimic> <1:channel> <2:string>"
+    example = ("rpsend %test #bots this is a test", "mimicsend !mimic #roleplay hi guys")
     no_parse = True
-    rate_limit = 0.5
 
     async def __call__(self, bot, channel, message, user, perm, argv, args, **void):
         update = bot.data.mimics.update

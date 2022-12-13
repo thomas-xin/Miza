@@ -32,9 +32,10 @@ class Translate(Command):
     name = ["TR"]
     description = "Translates a string into another language."
     usage = "<0:language(en)>? <1:string>"
+    example = ("translate english 你好", "tr zh-cn bonjour")
     flags = "v"
     no_parse = True
-    rate_limit = (2, 7)
+    rate_limit = (6, 9)
     slash = True
     if googletrans:
         languages = demap(googletrans.LANGUAGES)
@@ -71,8 +72,9 @@ class Math(Command):
     alias = name + ["Plot3D", "Factor", "Factorise", "Factorize"]
     description = "Evaluates a math formula."
     usage = "<string> <verbose{?v}>? <rationalize{?r}>? <show_variables{?l}>? <clear_variables{?c}>?"
+    example = ("m factorial 32", "plot 3x^2-2x+1", "math integral tan(x)", "calc std([6.26,6.23,6.34,6.28])", "🔢 predict_next([2, 10, 30, 68, 130])")
     flags = "rvlcd"
-    rate_limit = (0.5, 5)
+    rate_limit = (4.5, 6)
     slash = True
 
     async def __call__(self, bot, argv, name, message, channel, guild, flags, user, **void):
@@ -150,6 +152,8 @@ class Unicode(Command):
     ]
     description = "Converts unicode text to hexadecimal or binary numbers."
     usage = "<string>"
+    example = ("u2h test", "uni2bin this is a secret message", "32u NRXWY")
+    rate_limit = (3.5, 5)
     no_parse = True
 
     def __call__(self, argv, name, **void):
@@ -208,6 +212,8 @@ class ID2Time(Command):
     name = ["I2T", "CreateTime", "Timestamp", "Time2ID", "T2I"]
     description = "Converts a discord ID to its corresponding UTC time."
     usage = "<string>"
+    example = ("i2t 1052187107600375124", "time2id 13 sep 2018")
+    rate_limit = (3, 4)
 
     def __call__(self, argv, name, **void):
         if not argv:
@@ -225,6 +231,8 @@ class Fancy(Command):
     name = ["FancyText"]
     description = "Creates translations of a string using unicode fonts."
     usage = "<string>"
+    example = ("fancy This is a cool message",)
+    rate_limit = (4, 5)
     no_parse = True
     slash = True
 
@@ -244,6 +252,8 @@ class Zalgo(Command):
     name = ["Chaos", "ZalgoText"]
     description = "Generates random combining accent symbols between characters in a string."
     usage = "<string>"
+    example = ("zalgo This is a cool message",)
+    rate_limit = (4, 5)
     no_parse = True
     slash = True
     chrs = [chr(n) for n in zalgo_map]
@@ -267,6 +277,8 @@ class Format(Command):
     name = ["FormatText"]
     description = "Creates neatly fomatted text using combining unicode characters."
     usage = "<string>"
+    example = ("format This is a cool message",)
+    rate_limit = (4, 5)
     no_parse = True
     slash = True
     formats = "".join(chr(i) for i in (0x30a, 0x325, 0x303, 0x330, 0x30c, 0x32d, 0x33d, 0x353, 0x35b, 0x20f0))
@@ -287,6 +299,8 @@ class UnFancy(Command):
     name = ["UnFormat", "UnZalgo"]
     description = "Removes unicode formatting and diacritic characters from inputted text."
     usage = "<string>"
+    example = ("unfancy T̕​̄​h ֠​̑​̡​ⓘ ͪ​ⷧ​࣮​ⓢ ̱​ࣶ​᷇​  ꙺ​ۭ​ⷼ​ｉ ͑​ⷻ​̍​ｓ ͉​ࣟ​꙯​  ͚​ؖ​ⷠ​𝕒 ׅ​ࣱ​ٕ​  ͯ​ⷡ​͖​𝓬 ࣭​ͤ​̀​𝓸 ࣝ​͂​͡​𝘰 ̘​̪​᷅​𝘭 ֣​̉​֕​  ֞​ⷮ​ࣧ​ᘻ ̩​ⷥ​̴​ᘿ ͟​̎​ꙴ​𝚜 ࣶ​֬​͏​𝚜 ᷃​֘​͉​𝙖 ؒ​֑​ⷲ​𝙜 ⷣ​ͧ​̸​𝐞 ̾​",)
+    rate_limit = (4, 5)
     slash = True
 
     def __call__(self, argv, **void):
@@ -306,6 +320,8 @@ class OwOify(Command):
     name = ["UwU", "OwO", "UwUify"]
     description = "Applies the owo/uwu text filter to a string."
     usage = "<string> <aggressive{?a}>? <basic{?b}>?"
+    example = ("owoify hello, what's your name?", "owoify -a Greetings, this is your cat god speaking")
+    rate_limit = (4, 5)
     flags = "ab"
     no_parse = True
 
@@ -353,6 +369,8 @@ class OwOify(Command):
 class AltCaps(Command):
     description = "Alternates the capitalization on characters in a string."
     usage = "<string>"
+    example = ("altcaps that's what she said")
+    rate_limit = (4, 5)
     no_parse = True
 
     def __call__(self, argv, **void):
@@ -480,6 +498,8 @@ class Char2Emoji(Command):
     name = ["C2E", "Char2Emoj"]
     description = "Makes emoji blocks using a string."
     usage = "<0:string> <1:emoji_1> <2:emoji_2>"
+    example = ("c2e POOP 💩 🪰")
+    rate_limit = (10, 14)
     no_parse = True
     slash = True
 
@@ -530,6 +550,7 @@ class EmojiCrypt(Command):
     name = ["EncryptEmoji", "DecryptEmoji", "EmojiEncrypt", "EmojiDecrypt"]
     description = "Encrypts the input text or file into smileys."
     usage = "<string> <encrypt{?e}|decrypt{?d}> <encrypted{?p}>? <-1:password>"
+    rate_limit = (9, 12)
     no_parse = True
     slash = True
     flags = "ed"
@@ -585,6 +606,8 @@ class Time(Command):
     name = ["🕰️", "⏰", "⏲️", "UTC", "GMT", "T", "EstimateTime", "EstimateTimezone"]
     description = "Shows the current time at a certain GMT/UTC offset, or the current time for a user. Be sure to check out ⟨WEBSERVER⟩/time!"
     usage = "<offset_hours|user>?"
+    example = ("time mst", "utc-10", "time Miza")
+    rate_limit = (3, 5)
     slash = True
 
     async def __call__(self, name, channel, guild, argv, args, user, **void):
@@ -666,6 +689,8 @@ class Time(Command):
 class Timezone(Command):
     description = "Shows the current time in a certain timezone. Be sure to check out ⟨WEBSERVER⟩/time!"
     usage = "<timezone> <list{?l}>?"
+    example = ("timezone ?l", "timezone pacific")
+    rate_limit = (3, 5)
 
     async def __call__(self, channel, argv, message, **void):
         if not argv:
@@ -714,7 +739,8 @@ class Identify(Command):
     name = ["📂", "Magic", "Mime", "FileType"]
     description = "Detects the type, mime, and optionally details of an input file."
     usage = "<url>*"
-    rate_limit = (2, 7)
+    example = ("identify https://raw.githubusercontent.com/thomas-xin/Image-Test/master/title-rainbow.webp",)
+    rate_limit = (12, 16)
     mime = magic.Magic(mime=True, mime_encoding=True)
     msgcmd = True
     slash = True
@@ -871,7 +897,8 @@ class Follow(Command):
     name = ["🚶", "Follow_URL", "Redirect"]
     description = "Follows a discord message link and/or finds URLs in a string."
     usage = "<url>*"
-    rate_limit = (1, 5)
+    example = ("follow https://canary.discord.com/channels/247184721262411776/669066569170550797/1052190693390565406",)
+    rate_limit = (7, 10)
     slash = True
 
     async def __call__(self, bot, channel, argv, message, **void):
@@ -903,7 +930,8 @@ class Match(Command):
     name = ["RE", "RegEx", "RexExp", "GREP"]
     description = "matches two strings using Linux-style RegExp, or computes the match ratio of two strings."
     usage = "<0:string1> <1:string2>?"
-    rate_limit = (0.5, 2)
+    example = ("match test test2", "regex t*e+s?t test")
+    rate_limit = (4, 6)
     no_parse = True
 
     async def __call__(self, args, name, **void):
@@ -913,7 +941,7 @@ class Match(Command):
             regex = None
             for i in (1, -1):
                 s = args[i]
-                if len(s) >= 2 and s[0] == s[1] == "/":
+                if len(s) >= 2 and s[0] == s[-1] == "/":
                     if regex:
                         raise ArgumentError("Cannot match two Regular Expressions.")
                     regex = s[1:-1]
@@ -939,9 +967,10 @@ class Ask(Command):
     alias = ["How"]
     description = "Ask me any question, and I'll answer it! I am connected to OpenAI ChatGPT and GPT3, Google Search, Microsoft DialoGPT, Deepset Roberta, and more!"
     usage = "<string>"
+    example = ("ask what's the date?", "ask what is the square root of 3721?", "ask can I have a hug?")
     # flags = "h"
     no_parse = True
-    rate_limit = (0.5, 1)
+    rate_limit = (8, 12)
     slash = True
 
     convos = {}
@@ -1212,8 +1241,9 @@ class Personality(Command):
     min_level = 2
     description = "Customises ⟨MIZA⟩'s personality for ~ask in the current server. Note that initial responses are often given in a polite manner regardless of personality traits set."
     usage = "<traits>* <default{?d}>?"
+    example = ("personality mischievous, cunning", "personality dry, sarcastic, snarky", "personality sweet, loving")
     flags = "aed"
-    rate_limit = (2, 5)
+    rate_limit = (18, 24)
 
     def encode(self, p):
         return p.replace(
@@ -1289,6 +1319,7 @@ class Random(Command):
     name = ["choice", "choose"]
     description = "Randomizes a set of arguments."
     usage = "<string>+"
+    example = ("random 1 2 3", 'choose "this one" "that one"')
     slash = True
 
     def __call__(self, argv, args, **void):
@@ -1306,6 +1337,7 @@ class Rate(Command):
     name = ["Rating", "Rank", "Ranking"]
     description = "Rates a given object with a random value out of 10!"
     usage = "<string>"
+    example = ("rate cats' cuteness",)
     slash = True
 
     async def __call__(self, bot, guild, argv, **void):
@@ -1330,6 +1362,7 @@ class WordCount(Command):
     name = ["Lc", "Wc", "Cc", "Character_Count", "Line_Count"]
     description = "Simple command that returns the word and character count of a supplied message. message.txt files work too!"
     usage = "<string>"
+    example = ("wordcount two words", "wc Lorem ipsum dolor sit amet.")
     slash = True
 
     async def __call__(self, argv, **void):
@@ -1347,6 +1380,7 @@ class Topic(Command):
     name = ["Question"]
     description = "Asks a random question."
     usage = "<relationship{?r}>? <pickup-line{?p}>? <nsfw-pickup-line{?n}>?"
+    example = ("topic", "question -r")
     flags = "npr"
     
     def __call__(self, bot, user, flags, channel, **void):
@@ -1377,8 +1411,9 @@ class Urban(Command):
     name = ["📖", "UrbanDictionary"]
     description = "Searches Urban Dictionary for an item."
     usage = "<string>"
+    example = ("urban ur mom",)
     flags = "v"
-    rate_limit = (2, 8)
+    rate_limit = (5, 8)
     typing = True
     slash = True
     header = {

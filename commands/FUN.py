@@ -279,8 +279,9 @@ class Text2048(Command):
     name = ["2048", "🎮"]
     description = "Plays a game of 2048 using buttons. Gained points are rewarded as gold."
     usage = "<0:dimension_sizes(4x4)>* <1:dimension_count(2)>? <public{?p}|special_tiles{?s}|insanity_mode{?i}|easy_mode{?e}>*"
+    example = ("2048", "text2048 3x4 -p", "2048 3x3x3 -e -s", "2048 4x4x4x4 -i")
     flags = "pies"
-    rate_limit = (3, 9)
+    rate_limit = (8, 14)
     reacts = ("⬅️", "➡️", "⬆️", "⬇️", "⏪", "⏩", "⏫", "⏬", "◀️", "▶️", "🔼", "🔽", "👈", "👉", "👆", "👇")
     directions = demap((r.encode("utf-8"), i) for i, r in enumerate(reacts))
     directions[b'\xf0\x9f\x92\xa0'] = -2
@@ -628,10 +629,11 @@ class Text2048(Command):
 class Snake(Command):
     time_consuming = True
     name = ["Snaek", "🐍"]
-    rate_limit = (3, 9)
     description = "Plays a game of Snake using buttons!"
     usage = "<dimensions(8x8)>* <public{?p}|insanity_mode{?i}>*"
+    example = ("snake", "snake 4x12", "snake 6x6 -i")
     flags = "pi"
+    rate_limit = (8, 14)
     slash = True
 
     buttons = [
@@ -843,8 +845,9 @@ class SlotMachine(Command):
     name = ["Slots"]
     description = "Plays a slot machine game. Costs gold to play, can yield gold and diamonds."
     usage = "<bet{50}>? <skip_animation{?s}>?"
+    example = ("slots 60", "slots -s 1000")
     flags = "s"
-    rate_limit = (5, 10)
+    rate_limit = (7, 12)
     emojis = {
         "❤️": 20,
         "🍒": 6,
@@ -1008,7 +1011,8 @@ barter_uppers = np.array([d[2] for d in barter_weights.values()], dtype=np.uint3
 class Barter(Command):
     description = "Simulates a Minecraft Piglin barter. Uses gold ingots; see ~shop and ~bal for more!"
     usage = "<amount>"
-    rate_limit = 1
+    example = ("barter 10",)
+    rate_limit = (1, 2)
 
     async def __call__(self, bot, channel, message, user, argv, **void):
         if not argv:
@@ -1089,7 +1093,7 @@ class Barter(Command):
 
 class Uno(Command):
     description = "Play a game of UNO with me, or with friends!"
-    rate_limit = 2
+    rate_limit = (8, 14)
 
     async def __call__(self, bot, message, user, flags, **void):
         # players ~ hands ~ current-card
@@ -1667,6 +1671,8 @@ class Matchmaking(Command):
     name = ["Ship"] + HEARTS
     description = "Ships two provided objects with a randomised percent."
     usage = "<objects>*"
+    example = ("ship user_a user_b", "ship")
+    rate_limit = (3, 4)
     slash = ("Ship",)
 
     async def __call__(self, bot, message, channel, guild, args, **void):
@@ -1747,7 +1753,8 @@ class Pay(Command):
     name = ["GiveCoins", "GiveGold"]
     description = "Pays a specified amount of coins to the target user."
     usage = "<0:user> <1:amount(1)>?"
-    rate_limit = 0.5
+    example = ("pay @Miza 100",)
+    rate_limit = (6, 8)
 
     async def __call__(self, bot, user, args, guild, **void):
         if not args:
@@ -1776,11 +1783,12 @@ class React(Command):
     min_level = 2
     description = "Causes ⟨MIZA⟩ to automatically assign a reaction to messages containing the substring."
     usage = "<0:react_to>? <1:react_data>? <disable{?d}>?"
+    example = ("react cat 🐱", "react ?d dog")
     flags = "aedzf"
     no_parse = True
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
-    rate_limit = (1, 2)
+    rate_limit = (4, 6)
     slash = True
 
     async def __call__(self, bot, flags, guild, message, user, argv, args, **void):
@@ -1946,6 +1954,7 @@ class Dogpile(Command):
     min_level = 2
     description = "Causes ⟨MIZA⟩ to automatically imitate users when 3+ of the same messages are posted in a row. Grants XP and gold when triggered."
     usage = "(enable|disable)?"
+    example = ("dogpile enable",)
     flags = "aed"
     rate_limit = 0.5
 
@@ -2081,7 +2090,7 @@ class UpdateDogpiles(Database):
 class Daily(Command):
     name = ["Quests", "Quest", "Tasks", "Challenges", "Dailies"]
     description = "Shows your list of daily quests."
-    rate_limit = 1
+    rate_limit = (6, 8)
 
     async def __call__(self, bot, user, channel, **void):
         data = bot.data.dailies.get(user)
@@ -2300,7 +2309,8 @@ class Wallet(Command):
     name = ["Level", "Bal", "Balance"]
     description = "Shows the target users' wallet."
     usage = "<users>*"
-    rate_limit = 1
+    example = ("bal", "wallet @Miza")
+    rate_limit = (3, 4)
     multi = True
     slash = ("Wallet", "Bal")
 
@@ -2357,7 +2367,8 @@ class Wallet(Command):
 class Shop(Command):
     description = "Displays the shop system, or purchases an item."
     usage = "<item[]>"
-    rate_limit = 1
+    example = ("shop", "shop upgrade_server")
+    rate_limit = (6, 10)
 
     products = cdict(
         upgradeserver=cdict(
@@ -2447,9 +2458,9 @@ class Shop(Command):
 
 
 class Cat(ImagePool, Command):
+    name = ["🐱", "Gato", "Meow", "Kitty", "Kitten"]
     description = "Pulls a random image from thecatapi.com, api.alexflipnote.dev/cats, or cdn.nekos.life/meow, and embeds it. Be sure to check out ⟨WEBSERVER⟩/cats!"
     database = "cats"
-    name = ["🐱", "Gato", "Meow", "Kitty", "Kitten"]
     slash = True
     http_nums = {
         100, 101, 102,
@@ -2460,6 +2471,7 @@ class Cat(ImagePool, Command):
         500, 501, 502, 503, 504, 506, 507, 508, 509, 510, 511, 521, 523, 525,
         599,
     }
+    rate_limit = (0.5, 3)
 
     async def fetch_one(self):
         if random.random() > 2 / 3:
@@ -2489,10 +2501,11 @@ class Cat(ImagePool, Command):
 
 
 class Dog(ImagePool, Command):
+    name = ["🐶", "Woof", "Doggy", "Doggo", "Puppy", "Puppo"]
     description = "Pulls a random image from images.dog.ceo, api.alexflipnote.dev/dogs, or cdn.nekos.life/woof, and embeds it. Be sure to check out ⟨WEBSERVER⟩/dogs!"
     database = "dogs"
-    name = ["🐶", "Woof", "Doggy", "Doggo", "Puppy", "Puppo"]
     slash = True
+    rate_limit = (0.5, 3)
 
     async def fetch_one(self):
         if random.random() > 2 / 3:
@@ -2519,9 +2532,10 @@ class Dog(ImagePool, Command):
 
 
 class _8Ball(ImagePool, Command):
+    name = ["🎱"]
     description = "Pulls a random image from cdn.nekos.life/8ball, and embeds it."
     database = "8ball"
-    name = ["🎱"]
+    rate_limit = (0.5, 3)
 
     def __call__(self, channel, flags, **void):
         e_id = choice(
@@ -2550,6 +2564,7 @@ class _8Ball(ImagePool, Command):
 class XKCD(ImagePool, Command):
     description = "Pulls a random image from xkcd.com and embeds it."
     database = "xkcd"
+    rate_limit = (0.5, 3)
 
     async def fetch_one(self):
         s = await create_future(Request, "https://c.xkcd.com/random/comic")
@@ -2563,6 +2578,7 @@ class Turnoff(ImagePool, Command):
     description = "Pulls a random image from turnoff.us and embeds it."
     database = "turnoff"
     threshold = 1
+    rate_limit = (0.5, 3)
 
     async def fetch_one(self):
         if self.bot.data.imagepools.data.get(self.database) and xrand(64):
@@ -2594,6 +2610,7 @@ class Inspiro(ImagePool, Command):
     name = ["InspiroBot"]
     description = "Pulls a random image from inspirobot.me and embeds it."
     database = "inspirobot"
+    rate_limit = (0.5, 3)
 
     async def fetch_one(self):
         return await Request("https://inspirobot.me/api?generate=true", decode=True, aio=True)
@@ -2610,8 +2627,10 @@ class Inspiro(ImagePool, Command):
 class ImageSearch(ImagePool, Command):
     name = ["🖼", "🧁", "ImgSearch", "Muffin", "Muffins"]
     description = "Pulls a random image from a search on gettyimages.co.uk and unsplash.com, using tags."
+    example = ("imgsearch cat", "muffin")
     threshold = 9
     sem = Semaphore(5, 256, rate_limit=1)
+    rate_limit = (2, 4)
 
     def img(self, tag=None, search_tag=None):
         file = f"imgsearch~{tag}"
@@ -2672,8 +2691,10 @@ class ImageSearch(ImagePool, Command):
 class Giphy(ImagePool, Command):
     name = ["GIFSearch"]
     description = "Pulls a random image from a search on giphy.com using tags."
+    example = ("giphy cat",)
     threshold = 4
     sem = Semaphore(5, 256, rate_limit=1)
+    rate_limit = (2, 4)
 
     def img(self, tag=None, search_tag=None):
         file = f"giphy~{tag}"
@@ -2724,8 +2745,9 @@ class Rickroll(Command):
     name = ["Thumbnail", "FakeThumbnail", "FakeVideo"]
     description = "Generates a link that embeds a thumbnail, but redirects to a separate YouTube video once played."
     usage = "<thumbnail>? <video>?"
+    example = ("rickroll https://i.ytimg.com/kJQP7kiw5Fk/maxresdefault.jpg", "rickroll https://i.ytimg.com/kJQP7kiw5Fk/maxresdefault.jpg https://www.youtube.com/watch?v=wDgQdr8ZkTw")
     no_parse = True
-    rate_limit = 1
+    rate_limit = (6, 9)
 
     async def __call__(self, bot, args, message, channel, **void):
         if message.attachments:
@@ -2800,9 +2822,10 @@ class RPS(Command):
     name = ["Rockpaperscissors"]
     description = "A randomised game of Rock-Paper-Scissors!"
     usage = "<rock>? <paper>? <scissors>?"
+    example = ("rockpaperscissors", "rps rock")
     slash = True
     typing = False
-    rate_limit = (0.05, 0.25)
+    rate_limit = (0.5, 3)
 
     buttons = [
         cdict(emoji="✊", style=1),
@@ -2952,9 +2975,10 @@ class Akinator(Command):
     name = ["Aki"]
     description = "Think about a real or fictional character. I will try to guess who it is!"
     usage = "<language(en)>? <child_friendly{?c}>"
+    example = ("akinator", "akinator -c en")
     flags = "c"
     slash = True
-    rate_limit = (1, 3)
+    rate_limit = (12, 16)
     session = None
 
     async def compatible_akinator(self, language, child_mode=False):

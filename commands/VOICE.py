@@ -3021,12 +3021,13 @@ class Queue(Command):
     alias = name + ["LS"]
     description = "Shows the music queue, or plays a song in voice."
     usage = "<search_links>* <force{?f}|budge{?b}|random{?r}|verbose{?v}|hide{?h}>*"
+    example = ("play despacito", "queue", "enqueue https://www.youtube.com/watch?v=dQw4w9WgXcQ")
     flags = "hvfbrz"
     no_parse = True
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
     _timeout_ = 2
-    rate_limit = (0.5, 3)
+    rate_limit = (3.5, 5)
     typing = True
     slash = ("Play", "Queue")
     msgcmd = ("Search & Play",)
@@ -3304,10 +3305,11 @@ class Playlist(Command):
     min_display = "0~2"
     description = "Shows, appends, or removes from the default playlist."
     usage = "(add|remove)? <search_links>*"
+    example = ("playlist add https://www.youtube.com/watch?v=wDgQdr8ZkTw", "playlist remove 6")
     flags = "aedzf"
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
-    rate_limit = 0.5
+    rate_limit = (7, 11)
     typing = True
     slash = True
 
@@ -3434,6 +3436,7 @@ class Connect(Command):
     # Because Rythm also has this alias :P
     alias = name + ["FuckOff"]
     description = "Summons the bot into a voice channel, or advises it to leave."
+    example = ("join", "connect 247184721262411777", "leave")
     usage = "<channel>?"
     rate_limit = (3, 4)
     slash = ("Join", "Leave")
@@ -3557,8 +3560,9 @@ class Skip(Command):
     min_display = "0~1"
     description = "Removes an entry or range of entries from the voice channel queue."
     usage = "<queue_positions(0)>* <force{?f}|vote{?v}|hide{?h}>*"
+    example = ("skip", "fs", "skip 1 2 3", "skip 3..9", "skip 90:50:-1", "remove 9", "clear")
     flags = "fhv"
-    rate_limit = (0.5, 3)
+    rate_limit = (3.5, 5)
     slash = True
 
     async def __call__(self, bot, channel, user, perm, name, args, argv, guild, flags, message, **void):
@@ -3706,8 +3710,9 @@ class Pause(Command):
     min_display = "0~1"
     description = "Pauses, stops, or resumes audio playing."
     usage = "<hide{?h}>?"
+    example = ("pause", "resume", "stop")
     flags = "h"
-    rate_limit = (0.5, 3)
+    rate_limit = (3, 4)
     slash = True
 
     async def __call__(self, bot, name, guild, user, perm, channel, flags, **void):
@@ -3740,6 +3745,7 @@ class Seek(Command):
     min_display = "0~1"
     description = "Seeks to a position in the current audio file."
     usage = "<position(0)>? <hide{?h}>?"
+    example = ("replay", "seek 5m30", "seek 3:41", "seek 123")
     flags = "h"
     rate_limit = (0.5, 3)
     slash = True
@@ -3774,6 +3780,7 @@ class Dump(Command):
     min_display = "0~1"
     description = "Saves or loads the currently playing audio queue state."
     usage = "<data>? <append{?a}|song_positions{?x}|hide{?h}>*"
+    example = ("save", "dump https://cdn.discordapp.com/attachments/731709481863479436/1052210287303999528/dump.json")
     flags = "ahx"
     rate_limit = (1, 2)
     slash = True
@@ -3920,7 +3927,7 @@ class AudioSettings(Command):
         "24/7": "stay",
         "♻": "reset",
     }
-    rate_limit = (0.5, 5)
+    rate_limit = (3.5, 5)
     slash = True
 
     def __init__(self, *args):
@@ -3929,6 +3936,7 @@ class AudioSettings(Command):
         self.min_display = "0~2"
         self.description = "Changes the current audio settings for this server. Some settings are very flexible; volume and bassboost are unlimited, speed and nightcore can be negative, etc."
         self.usage = "<value>? <volume(?v)|speed(?s)|pitch(?p)|pan(?e)|bassboost(?b)|reverb(?r)|compressor(?c)|chorus(?u)|nightcore(?n)|bitrate(?i)|loop(?l)|repeat(?1)|shuffle(?x)|quiet(?q)|stay(?t)|force_permanent(?f)|disable(?d)|hide(?h)>*"
+        self.example = ("volume 150", "speed 200", "pitch -400", "reverb -f 320", "chorus -d", "bitrate 19600", "repeat 1", "stay 1")
         self.flags = "vspebrcunil1xqtfdh"
         self.map = {k.casefold(): self.aliasMap[k] for k in self.aliasMap}
         add_dict(self.map, {k.casefold(): self.aliasExt[k] for k in self.aliasExt})
@@ -4076,6 +4084,7 @@ class Jump(Command):
     min_display = "0~1"
     description = "Rotates the queue to the left by a certain amount of steps."
     usage = "<position>? <hide{?h}>?"
+    example = ("jump 6", "roll -3")
     flags = "h"
     rate_limit = (4, 9)
 
@@ -4198,7 +4207,8 @@ class Radio(Command):
     name = ["FM"]
     description = "Searches for a radio station livestream on https://worldradiomap.com that can be played on ⟨MIZA⟩."
     usage = "<0:country>? <2:state>? <1:city>?"
-    rate_limit = (2, 6)
+    example = ("radio", "radio australia", "radio Canada Ottawa,_on")
+    rate_limit = (6, 8)
     slash = True
     countries = fcdict()
 
@@ -4306,7 +4316,8 @@ class Radio(Command):
             for country in self.countries:
                 if len(country) > 2:
                     fields.add(country[0].upper(), self.country_repr(country))
-            return bot.send_as_embeds(channel, title="Available countries", fields={k: "\n".join(v) for k, v in fields.items()}, author=get_author(bot.user), reference=message)
+            bot.send_as_embeds(channel, title="Available countries", fields={k: "\n".join(v) for k, v in fields.items()}, author=get_author(bot.user), reference=message)
+            return
         c = args.pop(0)
         if c not in self.countries:
             await create_future(self.get_countries)
@@ -4322,7 +4333,8 @@ class Radio(Command):
             for city in country.cities:
                 desc.append(self.country_repr(city))
             t = "states" if country.states else "cities"
-            return bot.send_as_embeds(channel, title=f"Available {t} in {self.country_repr(c)}", thumbnail=country.icon, description="\n".join(desc), author=get_author(bot.user), reference=message)
+            bot.send_as_embeds(channel, title=f"Available {t} in {self.country_repr(c)}", thumbnail=country.icon, description="\n".join(desc), author=get_author(bot.user), reference=message)
+            return
         c = args.pop(0)
         if c not in country.cities:
             await create_future(country.get_cities, country)
@@ -4339,7 +4351,8 @@ class Radio(Command):
                 desc = deque()
                 for city in state.cities:
                     desc.append(self.country_repr(city))
-                return bot.send_as_embeds(channel, title=f"Available cities in {self.country_repr(c)}", thumbnail=country.icon, description="\n".join(desc), author=get_author(bot.user), reference=message)
+                bot.send_as_embeds(channel, title=f"Available cities in {self.country_repr(c)}", thumbnail=country.icon, description="\n".join(desc), author=get_author(bot.user), reference=message)
+                return
             c = args.pop(0)
             if c not in state.cities:
                 await create_future(state.get_cities, state)
@@ -4389,7 +4402,7 @@ class Radio(Command):
                         name = station[:station.index("<")]
                         field[1] += f"[{name.strip()}]({href.strip()})"
                     fields.append(field)
-        return bot.send_as_embeds(channel, title=title, thumbnail=country.icon, fields=sorted(fields), author=get_author(bot.user), reference=message)
+        bot.send_as_embeds(channel, title=title, thumbnail=country.icon, fields=sorted(fields), author=get_author(bot.user), reference=message)
 
 
 class Party(Command):
@@ -4398,7 +4411,8 @@ class Party(Command):
     name = ["YTT"]
     description = "Generates an activity party link in the nearest voice channel!"
     usage = "(poker|betrayal|youtube|fishington|chess)?"
-    rate_limit = 5
+    example = ("ytt", "party poker")
+    rate_limit = (10, 14)
     sem = Semaphore(2, 8, rate_limit=8)
     names = fcdict((
         ("Poker", 755827207812677713),
@@ -4475,8 +4489,9 @@ class Player(Command):
     min_display = "0~3"
     description = "Creates an auto-updating virtual audio player for the current server."
     usage = "<enable{?e}|disable{?d}>?"
+    example = ("player", "np -d")
     flags = "adez"
-    rate_limit = (2, 7)
+    rate_limit = (6, 9)
 
     async def show(self, auds):
         q = auds.queue
@@ -4798,8 +4813,9 @@ class Lyrics(Command):
     name = ["SongLyrics"]
     description = "Searches genius.com for lyrics of a song."
     usage = "<search_link>* <verbose{?v}>?"
+    example = ("lyrics", "lyrics despacito", "lyrics -v viva la vida")
     flags = "v"
-    rate_limit = (2, 6)
+    rate_limit = (7, 12)
     typing = True
     slash = True
 
@@ -4863,8 +4879,9 @@ class Download(Command):
     name = ["📥", "Search", "YTDL", "Youtube_DL", "AF", "AudioFilter", "Trim", "Concat", "Concatenate", "🌽🐱", "ConvertORG", "Org2xm", "Convert"]
     description = "Searches and/or downloads a song from a YouTube/SoundCloud query or audio file link. Will extend (loop) if trimmed past the end."
     usage = "<0:search_links>* <multi{?m}> <trim{?t}>? <-3:trim_start|->? <-2:trim_end|->? <-1:out_format(mp4)>? <concatenate{?c}|remove_silence{?r}|apply_settings{?a}|verbose_search{?v}>*"
+    example = ("download https://www.youtube.com/watch?v=kJQP7kiw5Fk mp3", "trim https://www.youtube.com/watch?v=dQw4w9WgXcQ 1m 3m as mp4", "concatenate https://www.youtube.com/watch?v=kJQP7kiw5Fk https://www.youtube.com/watch?v=dQw4w9WgXcQ webm")
     flags = "avtzcrm"
-    rate_limit = (7, 16)
+    rate_limit = (12, 18)
     typing = True
     slash = True
     msgcmd = ("Download as mp3",)

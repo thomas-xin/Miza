@@ -285,8 +285,9 @@ class Neko(Command):
     name = ["Nya"]
     description = "Pulls a random image from nekos.life and embeds it."
     usage = "<tags(neko)>? <verbose{?v}|random{?r}|list{?l}>?"
+    example = ("neko poke", "neko lizard")
     flags = "lrv"
-    rate_limit = (0, 4)
+    rate_limit = (0.5, 3)
     threshold = 256
     moe_sem = Semaphore(1, 0, rate_limit=10)
     nekobot_sem = cdict()
@@ -401,6 +402,7 @@ class Lewd(Command):
     min_level = 1
     description = "Pulls a random image from a search on Rule34 and e621, and embeds it."
     usage = "<query> <verbose{?v}>?"
+    example = ("lewd pokemon",)
     flags = "v"
     no_parse = True
     rate_limit = (1, 6)

@@ -5,6 +5,7 @@ class Reload(Command):
     name = ["Unload"]
     min_level = nan
     description = "Reloads a specified module."
+    example = ("reload admin", "unload string")
     _timeout_ = inf
 
     async def __call__(self, bot, message, channel, guild, argv, name, **void):
@@ -30,6 +31,7 @@ class Restart(Command):
     name = ["Shutdown", "Reboot", "Update"]
     min_level = nan
     description = "Restarts, reloads, or shuts down ⟨MIZA⟩, with an optional delay."
+    example = ("shutdown", "update", "restart")
     usage = "<delay>?"
     _timeout_ = inf
 
@@ -137,6 +139,7 @@ class Execute(Command):
     min_level = nan
     description = "Executes a command as other user(s), similar to the command's function in Minecraft."
     usage = "as <0:users>* run <1:command>+"
+    example = ("execute as @Miza run ~info",)
     multi = True
 
     async def __call__(self, bot, user, message, guild, argl, args, argv, **void):
@@ -167,6 +170,7 @@ class Exec(Command):
     min_level = nan
     description = "Causes all messages by the bot owner(s) in the current channel to be executed as python code on ⟨MIZA⟩."
     usage = "(enable|disable)? <type(virtual)>?"
+    example = ("exec enable", "exec ?d")
     flags = "aed"
     # Different types of terminals for different purposes
     terminal_types = demap(dict(
@@ -613,6 +617,7 @@ class Immortalise(Command):
     min_level = nan
     description = "Immortalises a targeted webserver URL."
     usage = "<url>"
+    example = ("immortalise https://mizabot.xyz/f/Be-084pLnw",)
 
     async def __call__(self, argv, guild, **void):
         url = find_urls(argv)[0]
@@ -644,6 +649,7 @@ class SetAvatar(Command):
     min_level = nan
     description = "Changes ⟨MIZA⟩'s current avatar."
     usage = "<avatar_url>?"
+    example = ("setavatar https://mizabot.xyz/favicon",)
 
     async def __call__(self, bot, user, message, channel, args, **void):
         # Checking if message has an attachment
@@ -827,6 +833,7 @@ class Suspend(Command):
     min_level = nan
     description = "Prevents a user from accessing ⟨MIZA⟩'s commands. Overrides <perms>."
     usage = "<0:user> <disable(?d)>"
+    example = ("block 201548633244565504",)
     flags = "aed"
 
     async def __call__(self, bot, user, guild, args, flags, **void):

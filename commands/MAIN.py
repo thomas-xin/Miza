@@ -50,7 +50,9 @@ class Help(Command):
     name = ["❓", "❔", "?", "Halp"]
     description = "Shows a list of usable commands, or gives a detailed description of a command."
     usage = "<(command|category)>?"
+    example = ("help string", "help waifu2x")
     flags = "v"
+    rate_limit = (3, 5)
     no_parse = True
     slash = True
 
@@ -99,6 +101,14 @@ class Help(Command):
                 if isinstance(x, collections.abc.Sequence):
                     x = x[not bot.is_trusted(getattr(guild, "id", 0))]
                 content += f"\n[Rate Limit] {sec2time(x)}"
+            if getattr(comm, "example", None):
+                example = comm.example
+                if isinstance(example, str):
+                    example = [example]
+                exs = []
+                for ex in example:
+                    exs.append(prefix + ex.replace("~", prefix))
+                content += "\n[Examples]\n" + "\n".join(exs)
             content = ini_md(content)
         else:
             content = (
@@ -149,6 +159,8 @@ class Help(Command):
             if getattr(message, "slash", None):
                 await interaction_patch(bot, original, embed=embed, buttons=buttons)
             else:
+                if getattr(message, "simulated", None):
+                    create_task(bot.ignore_interaction, message)
                 await Request(
                     f"https://discord.com/api/{api}/channels/{original.channel.id}/messages/{original.id}",
                     data=dict(
@@ -177,6 +189,8 @@ class Hello(Command):
     name = ["👋", "Hi", "Hi!", "Hewwo", "Herro", "'sup", "Hey", "Greetings", "Welcome", "Bye", "Cya", "Goodbye"]
     description = "Sends a greeting message. Useful for checking whether the bot is online."
     usage = "<user>?"
+    example = ("hello",)
+    rate_limit = (1, 2)
     slash = True
 
     async def __call__(self, bot, user, name, argv, guild, **void):
@@ -235,7 +249,9 @@ class Perms(Command):
     name = ["DefaultPerms", "ChangePerms", "Perm", "ChangePerm", "Permissions"]
     description = "Shows or changes a user's permission level."
     usage = "<0:users>* <1:new_level>? <default{?d}>? <hide{?h}>?"
+    example = ("perms steven 2", "perms 201548633244565504 ?d")
     flags = "fhd"
+    rate_limit = (5, 8)
     multi = True
     slash = True
 
@@ -287,17 +303,23 @@ class Perms(Command):
 
 class EnabledCommands(Command):
     server_only = True
-    name = ["EC", "Enable"]
+    name = ["EC", "Enable", "Disable"]
     min_display = "0~3"
     description = "Shows, enables, or disables a command category in the current channel."
     usage = "(enable|disable|clear)? <category>? <server-wide(?s)> <list{?l}>? <hide{?h}>?"
+    example = ("enable fun ", "ec disable main", "ec -l")
     flags = "aedlhrs"
+    rate_limit = (5, 8)
     slash = True
 
     def __call__(self, argv, args, flags, user, channel, guild, perm, name, **void):
         bot = self.bot
         update = bot.data.enabled.update
         enabled = bot.data.enabled
+        if name == "enable":
+            flags["e"] = 1
+        elif name == "disable":
+            flags["d"] = 1
         if "s" in flags:
             target = guild
             mention = lambda *args: str(guild)
@@ -380,7 +402,9 @@ class Prefix(Command):
     min_display = "0~3"
     description = "Shows or changes the prefix for ⟨MIZA⟩'s commands for this server."
     usage = "<new_prefix>? <default{?d}>?"
+    example = ("prefix !", "change_prefix >", "prefix -d")
     flags = "hd"
+    rate_limit = (5, 8)
     umap = {c: "" for c in ZeroEnc}
     umap["\u200a"] = ""
     utrans = "".maketrans(umap)
@@ -418,7 +442,8 @@ class Loop(Command):
     min_display = "1+"
     description = "Loops a command. Delete the original message to terminate the loop if necessary."
     usage = "<0:iterations> <1:command>+"
-    rate_limit = (3, 7)
+    example = ("loop 3 ~cat", "loop 8 ~sharpen")
+    rate_limit = (10, 15)
     active = set()
 
     async def __call__(self, args, argv, message, channel, bot, perm, user, guild, **void):
@@ -480,6 +505,8 @@ class Avatar(Command):
     name = ["PFP", "Icon"]
     description = "Sends a link to the avatar of a user or server."
     usage = "<objects>*"
+    example = ("icon 247184721262411776", "avatar bob", "pfp")
+    rate_limit = (5, 7)
     multi = True
     slash = True
 
@@ -582,8 +609,9 @@ class Info(Command):
     name = ["🔍", "🔎", "UserInfo", "ServerInfo", "WhoIs"]
     description = "Shows information about the target user or server."
     usage = "<objects>* <verbose{?v}>?"
+    example = ("info 201548633244565504", "info")
     flags = "v"
-    rate_limit = 1
+    rate_limit = (6, 9)
     multi = True
     slash = True
     usercmd = True
@@ -868,8 +896,9 @@ class Profile(Command):
     name = ["User", "UserProfile"]
     description = "Shows or edits a user profile on ⟨MIZA⟩."
     usage = "(user|description|timezone|birthday)? <value>? <delete{?d}>?"
+    example = ("profile 201548633244565504", "user")
     flags = "d"
-    rate_limit = 1
+    rate_limit = (4, 6)
     no_parse = True
     slash = True
     usercmd = True
@@ -947,8 +976,9 @@ class Activity(Command):
     name = ["Recent", "Log"]
     description = "Shows recent Discord activity for the targeted user, server, or channel."
     usage = "<user>? <verbose{?v}>?"
-    flags="v"
-    rate_limit = (2, 9)
+    example = ("recent 201548633244565504", "log")
+    flags = "v"
+    rate_limit = (8, 11)
     typing = True
     slash = True
     # usercmd = True
@@ -981,9 +1011,10 @@ class Status(Command):
     name = ["State", "Ping"]
     description = "Shows the bot's current internal program state."
     usage = "(enable|disable)?"
+    example = ("status", "status enable")
     flags = "aed"
     slash = True
-    rate_limit = (0.15, 0.25)
+    rate_limit = (9, 13)
 
     async def __call__(self, perm, flags, channel, bot, **void):
         if "d" in flags:
@@ -1045,6 +1076,8 @@ class Status(Command):
 class Invite(Command):
     name = ["Website", "BotInfo", "InviteLink"]
     description = "Sends a link to ⟨MIZA⟩'s homepage, github and invite code, as well as an invite link to the current server if applicable."
+    example = ("invite",)
+    rate_limit = (9, 13)
     slash = True
 
     async def __call__(self, channel, message, **void):
@@ -1069,6 +1102,8 @@ class Invite(Command):
 class Upload(Command):
     name = ["Filehost", "Files"]
     description = "Sends a link to ⟨MIZA⟩'s webserver's upload page: ⟨WEBSERVER⟩/files"
+    example = ("upload https://cdn.discordapp.com/attachments/911168940246442006/1026474858705588224/6e74595fa98e9c52e2fab6ece4639604.png", "files")
+    rate_limit = (12, 17)
     msgcmd = True
     _timeout_ = 50
 
@@ -1094,9 +1129,10 @@ class Reminder(Command):
     description = "Sets a reminder for a certain date and time."
     usage = "<1:message>? <0:time>? <urgent{?u}>? <delete{?d}>?"
     flags = "aedurf"
+    example = ("remindme test in 3 hours 27 mins", "remind urgently submit ticket on 3 june 2023", "announce look at me! in 10 minutes", "remind every 8h take meds in 2d")
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
-    rate_limit = (1 / 3, 4)
+    rate_limit = (8, 13)
     keywords = ["on", "at", "in", "when", "event"]
     keydict = {re.compile(f"(^|[^a-z0-9]){i[::-1]}([^a-z0-9]|$)", re.I): None for i in keywords}
     no_parse = True
@@ -1456,6 +1492,8 @@ class Note(Command):
     name = ["Trash", "Notes"]
     description = "Takes note of a given string and allows you to view and edit a to-do list!"
     usage = "(edit|delete)? <id|note>?"
+    example = ("note test", "trash 1", "note edit 0 do the laundry")
+    rate_limit = (6, 10)
     flags = "aed"
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     dirnames = ["First", "Prev", "Next", "Last", "Refresh"]

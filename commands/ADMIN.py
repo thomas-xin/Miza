@@ -8,8 +8,9 @@ class Purge(Command):
     min_level = 3
     description = "Deletes a number of messages from a certain user in current channel."
     usage = "<1:users>? <0:count(1)>? <ignore{?i}|range{?r}|hide{?h}>*"
+    example = ("purge @Miza 3", "purge 50")
     flags = "fiaehr"
-    rate_limit = (2, 4)
+    rate_limit = (7, 12)
     multi = True
     slash = True
 
@@ -109,10 +110,11 @@ class Mute(Command):
     min_display = "3+"
     description = "Mutes a user for a certain amount of time, with an optional reason."
     usage = "<0:users>* <1:time>? (reason)? <2:reason>? <hide{?h}>?"
+    example = ("mute @Miza 1h for being naughty",)
     flags = "fhz"
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
-    rate_limit = (2, 5)
+    rate_limit = (9, 16)
     multi = True
     slash = True
 
@@ -149,7 +151,7 @@ class Mute(Command):
                     create_task(channel.send(ini_md(f"{sqr_md(user)} is currently not muted in {sqr_md(guild)}.")))
                     continue
                 if name == "unmute":
-                    await self.unmute(guild, user)
+                    # await self.unmute(guild, user)
                     try:
                         ind = mutelist.search(user.id, key=lambda b: b["u"])
                     except LookupError:
@@ -338,10 +340,11 @@ class Ban(Command):
     min_display = "3+"
     description = "Bans a user for a certain amount of time, with an optional reason."
     usage = "<0:users>* <1:time>? (reason)? <2:reason>? <hide{?h}>?"
+    example = ("ban @Miza 30m for being naughty",)
     flags = "fhz"
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
-    rate_limit = (2, 5)
+    rate_limit = (9, 16)
     multi = True
     slash = True
 
@@ -561,9 +564,10 @@ class RoleSelect(Command):
     min_display = "3+"
     description = "Creates a message that allows users to self-assign roles from a specified list."
     usage = "<roles>+"
+    example = ("roleselect A B C", 'reactionroles "role 1", "role 2", "role 3"')
     flags = "ae"
     no_parse = True
-    rate_limit = (1, 2)
+    rate_limit = (9, 12)
 
     async def __call__(self, args, message, guild, user, perm, **void):
         if not args:
@@ -651,9 +655,10 @@ class RoleGiver(Command):
     min_display = "3+"
     description = "Adds an automated role giver to the current channel. Triggered by a keyword in messages, only applicable to users with permission level >= 0."
     usage = "<0:react_to>? <1:role>? <delete_messages{?x}>? <disable{?d}>?"
+    example = ("rolegiver lol lol_role", "rolegiver n*gger muted")
     flags = "aedx"
     no_parse = True
-    rate_limit = (2, 4)
+    rate_limit = (9, 12)
     slash = True
 
     async def __call__(self, argv, args, user, channel, guild, perm, flags, **void):
@@ -718,8 +723,9 @@ class AutoRole(Command):
     _timeout_ = 12
     description = "Causes any new user joining the server to automatically gain the targeted role. Input multiple roles to create a randomized role giver."
     usage = "<role>? <update_all{?x}>? <disable{?d}>?"
+    example = ("autorole welcome", 'autorole -x "lovely people"')
     flags = "aedx"
-    rate_limit = 1
+    rate_limit = (9, 12)
     slash = True
 
     async def __call__(self, argv, args, name, user, channel, guild, perm, flags, **void):
@@ -828,7 +834,9 @@ class RolePreserver(Command):
     min_display = "3+"
     description = "Causes ⟨MIZA⟩ to save roles for all users, and re-add them when they leave and rejoin."
     usage = "(enable|disable)?"
+    example = ("rolepreserver enable", "stickyroles disable")
     flags = "aed"
+    rate_limit = (9, 12)
     slash = True
 
     def __call__(self, flags, guild, name, **void):
@@ -857,6 +865,8 @@ class NickPreserver(Command):
     min_display = "3+"
     description = "Causes ⟨MIZA⟩ to save nicknames for all users, and re-add them when they leave and rejoin."
     usage = "(enable|disable)?"
+    example = ("nickpreserver enable", "stickynicks disable")
+    rate_limit = (9, 12)
     flags = "aed"
 
     def __call__(self, flags, guild, name, **void):
@@ -885,6 +895,8 @@ class ThreadPreserver(Command):
     min_display = "3+"
     description = 'Causes ⟨MIZA⟩ to "bump" (revive) the current thread when auto-archived.'
     usage = "(enable|disable)?"
+    example = ("keepalive enable", "threadpreserver disable")
+    rate_limit = (9, 12)
     flags = "aed"
 
     async def __call__(self, bot, guild, channel, name, args, flags, **void):
@@ -913,7 +925,7 @@ class Lockdown(Command):
     min_level = inf
     description = "Completely locks down the server by removing send message permissions for all users, revoking all invites, and archiving all threads."
     flags = "f"
-    rate_limit = 30
+    rate_limit = (30, 40)
 
     async def roleLock(self, role, channel):
         perm = role.permissions
@@ -952,6 +964,8 @@ class SaveChannel(Command):
     min_level = 3
     description = "Saves a number of messages in a channel, as well as their contents, to a .txt file."
     usage = "<0:channel>? <1:message_limit(4096)>?"
+    example = ("savechannel 1000",)
+    rate_limit = (120, 180)
 
     async def __call__(self, guild, channel, args, **void):
         num = 4096
@@ -987,6 +1001,7 @@ class UserLog(Command):
     min_level = 3
     description = "Causes ⟨MIZA⟩ to log user and member events from the server, in the current channel."
     usage = "(enable|disable)?"
+    example = ("userlog enable",)
     flags = "aed"
     rate_limit = 1
 
@@ -1012,6 +1027,7 @@ class MessageLog(Command):
     min_level = 3
     description = "Causes ⟨MIZA⟩ to log message events from the server, in the current channel."
     usage = "(enable|disable)?"
+    example = ("messagelog enable",)
     flags = "aed"
     rate_limit = 1
 
@@ -1037,6 +1053,7 @@ class FileLog(Command):
     min_level = 3
     description = "Causes ⟨MIZA⟩ to log deleted files from the server, in the current channel."
     usage = "(enable|disable)?"
+    example = ("filelog enable",)
     flags = "aed"
     rate_limit = 1
 
@@ -1062,6 +1079,7 @@ class StarBoard(Command):
     min_level = 2
     description = "Causes ⟨MIZA⟩ to repost popular messages with a certain number of a specified reaction anywhere from the server, into the current channel."
     usage = "<0:reaction> <1:react_count(1)>? <enable_channel{?e}>? <disable_channel{?d}>? <channel_ids(-1)>*"
+    example = ("starboard 🐱 6", "starboard disable")
     flags = "ed"
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
@@ -1230,10 +1248,11 @@ class Crosspost(Command):
     min_level = 3
     description = "Causes ⟨MIZA⟩ to automatically crosspost all messages from the target channel, into the current channel."
     usage = "<channel> <disable{?d}>?"
+    example = ("crosspost 683634093464092672", "crosspost -d #general")
     flags = "aed"
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
     dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
-    rate_limit = 1
+    rate_limit = (7, 11)
 
     async def __call__(self, bot, argv, flags, user, message, channel, guild, **void):
         data = bot.data.crossposts
@@ -1332,8 +1351,9 @@ class Publish(Command):
     min_level = 3
     description = "Causes ⟨MIZA⟩ to automatically publish all posted messages in the current channel."
     usage = "(enable|disable)? <force{?x}>?"
+    example = ("publish enable", "news disable")
     flags = "aedx"
-    rate_limit = 1
+    rate_limit = (16, 24)
 
     async def __call__(self, bot, flags, message, channel, guild, name, **void):
         data = bot.data.publishers
@@ -1733,9 +1753,10 @@ class CreateEmoji(Command):
     min_level = 2
     description = "Creates a custom emoji from a URL or attached file."
     usage = "<1:name>+ <0:url>"
+    example = ("emoji how https://cdn.discordapp.com/emojis/645188934267043840.gif?size=128",)
     flags = "aed"
     no_parse = True
-    rate_limit = (3, 6)
+    rate_limit = (8, 12)
     _timeout_ = 6
     typing = True
     slash = ("Emoji",)
@@ -1816,9 +1837,10 @@ class CreateSticker(Command):
     min_level = 2
     description = "Creates a custom sticker from a URL or attached file."
     usage = "<1:name>+ <0:url>"
+    example = ("sticker HOW https://cdn.discordapp.com/stickers/974228511357284372.png",)
     flags = "aed"
     no_parse = True
-    rate_limit = (3, 6)
+    rate_limit = (8, 12)
     _timeout_ = 8
     typing = True
     slash = ("Sticker",)
@@ -1922,8 +1944,9 @@ class ScanEmoji(Command):
     min_level = 1
     description = "Scans all the emojis in the current server for potential issues."
     usage = "<count(inf)>"
+    example = ("scanemoji",)
     no_parse = True
-    rate_limit = (4, 7)
+    rate_limit = (24, 32)
     _timeout_ = 4
     typing = True
 
