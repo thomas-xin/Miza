@@ -327,7 +327,7 @@ class Bot:
 		prompt = "Miza is a friendly, playful, cute AI:\n\n" + prompt
 		print("GPTV3 prompt:", prompt)
 		words = question.casefold().split()
-		if "essay" in words or "full" in words or "write" in words or "writing" in words or "about" in words:
+		if googled or "essay" in words or "full" in words or "write" in words or "writing" in words or "about" in words:
 			model = "text-davinci-003"
 		else:
 			model = "text-curie-001" if len(prompt) >= 512 or not random.randint(0, 2) else "text-davinci-003"
@@ -350,7 +350,7 @@ class Bot:
 			).removesuffix(
 				"Can you provide more information to support your claim?"
 			).strip()
-		print("GPTV3 response:", text)
+		print(f"GPTV3 {model} response:", text)
 		# set_seed(int(time.time() // 0.1) & 4294967295)
 		# text = ""
 		# while not text.endswith("."):
@@ -394,10 +394,7 @@ class Bot:
 			prompt = "Miza is a friendly, playful, cute AI:\n\n" + prompt
 			print("GPTV3 prompt2:", prompt)
 			words = question.casefold().split()
-			if "essay" in words or "full" in words or "write" in words or "writing" in words or "about" in words:
-				model = "text-davinci-003"
-			else:
-				model = "text-babbage-001" if len(prompt) >= 1024 and random.randint(0, 1) else "text-curie-001" if len(prompt) >= 512 or not random.randint(0, 2) else "text-davinci-003"
+			model = "text-davinci-003"
 			try:
 				response = openai.Completion.create(
 					model=model,
@@ -417,7 +414,7 @@ class Bot:
 				).removesuffix(
 					"Can you provide more information to support your claim?"
 				).strip()
-			print("GPTV3 response2:", text)
+			print(f"GPTV3 {model} response2:", text)
 		return text
 
 	# def chatgpt(self, q, additional=(), force=False):
