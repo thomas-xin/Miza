@@ -1274,6 +1274,7 @@ class Personality(Command):
                 + "Please reword or consider contacting the support server if you believe this is a mistake!"
             )
         bot.data.personalities[guild.id] = p
+        bot.commands.ask[0].convos.pop(guild.id, None)
         return css_md(f"My personality for {sqr_md(guild)} has been changed to {sqr_md(p)}.")
 
 
