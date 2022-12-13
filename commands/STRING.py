@@ -369,7 +369,7 @@ class OwOify(Command):
 class AltCaps(Command):
     description = "Alternates the capitalization on characters in a string."
     usage = "<string>"
-    example = ("altcaps that's what she said")
+    example = ("altcaps that's what she said",)
     rate_limit = (4, 5)
     no_parse = True
 
@@ -498,7 +498,7 @@ class Char2Emoji(Command):
     name = ["C2E", "Char2Emoj"]
     description = "Makes emoji blocks using a string."
     usage = "<0:string> <1:emoji_1> <2:emoji_2>"
-    example = ("c2e POOP 💩 🪰")
+    example = ("c2e POOP 💩 🪰",)
     rate_limit = (10, 14)
     no_parse = True
     slash = True

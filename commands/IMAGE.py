@@ -1183,7 +1183,7 @@ class Blend(Command):
     name = ["ImageBlend", "ImageOP"]
     description = "Combines the two supplied images, using an optional blend operation."
     usage = "<0:url1> <1:url2> (normal|replace|add|sub|mul|div|mod|and|or|xor|nand|nor|xnor|difference|overlay|screen|soft|hard|lighten|darken|plusdarken|overflow|lighting|burn|linearburn|dodge|hue|sat|lum|colour|extract|merge)? <3:opacity(0.5|1)>?"
-    example = ("blend https://mizabot.xyz/favicon https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png overflow")
+    example = ("blend https://mizabot.xyz/favicon https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png overflow",)
     no_parse = True
     rate_limit = (13, 17)
     flags = "l"

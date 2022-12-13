@@ -4789,7 +4789,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             fields=(("Unexpected or confusing error?", f"Consider joining the [support server]({self.rcc_invite}) for help and bug reports!"),),
             reacts=reacts,
             reference=reference,
-            footer=footer
+            footer=footer,
         )
 
     async def reaction_add(self, raw, data):
