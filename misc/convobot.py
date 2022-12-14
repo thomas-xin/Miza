@@ -317,7 +317,7 @@ class Bot:
 		q = self.chat_history[-1][1]
 		openai.api_key = self.token
 		lines = []
-		if self.premium > 0:
+		if self.premium > 0 and (self.premium > 1 or literal_question(q)):
 			res = lim_str(self.google(raw=True), 512, mode="right").replace("\n", ". ").replace(": ", " -")
 			lines.append(f"Google: {res}\n")
 		if self.chat_history:

@@ -752,18 +752,18 @@ class UpdateTrusted(Database):
 class UpdatePremium(Database):
     name = "premiums"
 
-    async def subscribe(self, user, lv=None):
+    def subscribe(self, user, lv=None):
         uid = verify_id(user)
-        if uid not in self:
+        if uid not in self or not isinstance(self[uid], dict):
             if not lv:
                 return
-            d = dict(ts=time.time(), lv=lv, gl=set())
+            d = cdict(ts=time.time(), lv=lv, gl=set())
             self[uid] = d
         d = self[uid]
-        if d.lv != lv:
-            d.lv = lv
-            while len(d.gl) > lv:
-                self.bot.data.trusted.pop(d.gl.pop(), None)
+        if d["lv"] != lv:
+            d["lv"] = lv
+            while len(d["gl"]) > lv:
+                self.bot.data.trusted.pop(d["gl"].pop(), None)
             self.update(uid)
         if not lv:
             self.pop(uid)
