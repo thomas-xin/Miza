@@ -641,7 +641,7 @@ class Info(Command):
         if lv > 0:
             d += f"\n{bot.name} Premium Upgraded Lv{lv} " + "💎" * lv
         else:
-            d += f"\nNo {bot.name} Premium Upgrades! Visit {bot.rapidapi_url} to purchase one!"
+            d += f"\nNo {bot.name} Premium Upgrades! Visit {bot.kofi_url} to purchase one!"
         emb.description = d
         emb.add_field(name="Server ID", value=str(g.id), inline=0)
         emb.add_field(name="Creation time", value=time_repr(g.created_at), inline=1)
