@@ -1024,6 +1024,7 @@ class Ask(Command):
             # choice(
             #     "0GeQVtZ6Rd4",
             # )
+        premium = max(bot.is_trusted(guild), bot.premium_level(user))
         try:
             cb = self.convos[channel.id]
             if getattr(cb, "personality", None) != bot.commands.personality[0].retrieve(guild.id):
@@ -1034,7 +1035,6 @@ class Ask(Command):
             if not convobot:
                 cb = cdict(talk=lambda *args: "")
             else:
-                premium = max(bot.is_trusted(guild), bot.premium_level(user))
                 cb = self.convos[channel.id] = await create_future(convobot.Bot,
                     token=AUTH.get("openai_key"),
                     email=AUTH.get("openai_email"),
@@ -1051,6 +1051,8 @@ class Ask(Command):
                     if m.content:
                         cb.appendleft((m.author, m.content))
                         i += 1
+        else:
+            cb.premium = premium
         with discord.context_managers.Typing(channel):
             urls = []
             if getattr(message, "reference", None):

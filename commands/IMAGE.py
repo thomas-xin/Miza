@@ -1456,7 +1456,7 @@ class StableDiffusion(Command):
     fut = None
     imagebot = imagebot.Bot(token=AUTH.get("openai_key"))
 
-    async def __call__(self, bot, channel, message, name, args, flags, **void):
+    async def __call__(self, bot, guild, channel, message, name, args, flags, **void):
         for a in reversed(message.attachments):
             args.insert(0, a.url)
         if not args:

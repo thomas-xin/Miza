@@ -400,11 +400,12 @@ class Bot:
 		return response
 
 	def ai(self):
-		while len(self.chat_history) > 8:
+		while len(self.chat_history) > self.history_length:
 			self.chat_history.pop(0)
-		response = self.gptcomplete()
-		if response:
-			return self.append((self.name, response))
+		if self.premium > 0:
+			response = self.gptcomplete()
+			if response:
+				return self.append((self.name, response))
 		q = self.chat_history[-1][-1]
 		if self.premium > 0 and literal_question(q):
 			response = self.google()
@@ -429,6 +430,9 @@ class Bot:
 			response = reso
 		response = response.replace("  ", " ")
 		if not response:
+			response = self.gptcomplete()
+			if response:
+				return self.append((self.name, response))
 			response = "Sorry, I don't know."
 		return self.append((self.name, response))
 
