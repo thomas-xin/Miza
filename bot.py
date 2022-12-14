@@ -69,6 +69,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         shards = int(sys.argv[1])
     except IndexError:
         shards = 2
+    premium_server = 247184721262411776
+    premium_roles = {
+        1052645637033824346: 1,
+        1052645761638215761: 2,
+        1052647823188967444: 3,
+    }
 
     def __init__(self, cache_size=65536, timeout=24):
         # Initializes client (first in __mro__ of class inheritance)
@@ -2071,7 +2077,20 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             trusted = self.data.trusted
         except (AttributeError, KeyError):
             return 0
-        return int((guild and trusted.get(verify_id(guild))) or 0)
+        if not guild:
+            return 0
+        i = verify_id(guild)
+        if not trusted.get(i):
+            return 0
+        if not isinstance(trusted[i], set):
+            trusted[i] = {None}
+        for u in tuple(trusted[i]):
+            if u in self.data.premiums and self.data.premiums[u]["lv"] >= 2:
+                pass
+            else:
+                trusted[i].remove(u)
+                trusted.update(i)
+        return min(2, len(trusted[i]))
 
     # Checks a user's premium subscription level.
     def premium_level(self, user):
@@ -2080,30 +2099,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         except (AttributeError, KeyError):
             return 0
         lv = 0
-        if premiums.get(str(user)):
-            premiums[user.id] = premiums.pop(str(user))
-        if premiums.get(user.id):
-            oid = premiums[user.id]
-            p = premiums.get(oid)
-            if p:
-                lv = p["lv"]
-        if 247184721262411776 in self.cache.guilds:
-            u = self.cache.guilds[247184721262411776].get_member(user.id)
-            if not u:
-                return lv
-            s = f"Discord {user}"
-            if any(role.id == 1052647823188967444 for role in u.roles):
-                if lv < 3:
-                    create_task(premiums.subscribe(user.id, 3, s))
-                    lv = 3
-            if any(role.id == 1052645761638215761 for role in u.roles):
-                if lv < 2:
-                    create_task(premiums.subscribe(user.id, 2, s))
-                    lv = 2
-            if any(role.id == 1052645637033824346 for role in u.roles):
-                if lv < 1:
-                    create_task(premiums.subscribe(user.id, 1, s))
-                    lv = 1
+        if self.premium_server in self.cache.guilds:
+            u = self.cache.guilds[self.premium_server].get_member(user.id)
+            if u:
+                for role in u.roles:
+                    if role.id in self.premium_roles:
+                        lv = max(lv, self.premium_roles[role.id])
+        premiums.subscribe(user, lv)
         return lv
 
     # Checks if a user is blacklisted from the bot.

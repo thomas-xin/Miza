@@ -2463,7 +2463,7 @@ class Shop(Command):
                         bot.data.trusted[guild.id] = count
                         ext = ""
                     else:
-                        rm = bot.data.premiums.register(user.id, guild.id)
+                        rm = bot.data.premiums.register(user, guild)
                         ext = f"\n{len(rm)} server{'s' if len(rm) != 1 else ''} ha{'ve' if len(rm) != 1 else 's'} been removed from your promoted list to make room."
                     await message.channel.send(f"```{sqr_md(guild)} has been successfully elevated from {t} to {count} privilege level.{ext}```", reference=message)
                     return

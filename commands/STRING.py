@@ -1100,7 +1100,18 @@ class Ask(Command):
             out = await create_future(cb.ai)
         if out:
             print(out)
-            await send_with_reply(channel, message, lim_str("\xad" + escape_roles(out), 2000))
+            if not random.randint(0, 16) and premium < 2:
+                emb = discord.Embed(colour=rand_colour())
+                emb.set_author(**get_author(bot.user))
+                emb.description = (
+                    "Looking for my more advanced and intelligent chatbot to talk to?\n"
+                    + "Unfortunately the service for it had to be cut short, as the cutting-edge technology was too expensive for my creator to keep up given the size of my audience.\n"
+                    + f"However, if you would still wish to use the service for your user or server, it is available for subscription [here]({bot.kofi_url}), to help fund API usage!\n"
+                    + "Any support is greatly appreciated!"
+                )
+            else:
+                emb = None
+            await send_with_reply(channel, message, lim_str("\xad" + escape_roles(out), 2000), embed=emb)
             return
         q = single_space(q).strip().translate(bot.mtrans).replace("?", "\u200b").strip("\u200b")
         out = None

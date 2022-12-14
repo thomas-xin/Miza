@@ -187,7 +187,7 @@ class Bot:
 		self.chat_history_ids = None
 		self.timestamp = time.time()
 		self.premium = premium
-		self.history_length = 2 << premium
+		self.history_length = 1 if premium < 1 else 2 if premium < 2 else 8
 
 	def question_context_analysis(self, m, q, c):
 		if m == "deepset/roberta-base-squad2":
@@ -324,7 +324,7 @@ class Bot:
 			for k, v in self.chat_history:
 				lines.append(f"{k}: {v}\n")
 		lines.append(f"{self.name}:")
-		if self.premium < 1:
+		if self.premium < 1 or self.premium < 2 and len(q) >= 256:
 			model = "text-babbage-001"
 			temp = 0.9
 			limit = 1000
@@ -348,6 +348,8 @@ class Bot:
 		start = f"{self.name} is a {self.personality} AI:\n\n"
 		prompt = lim_str(start + prompt, limit * 3)
 		print("GPTV3 prompt:", prompt)
+		response = None
+		text = ""
 		try:
 			response = openai.Completion.create(
 				model=model,
@@ -360,8 +362,19 @@ class Bot:
 				user=self.chat_history[-1][0],
 			)
 		except openai.error.ServiceUnavailableError:
-			text = ""
-		else:
+			pass
+		except openai.error.InvalidRequestError:
+			response = openai.Completion.create(
+				model=model,
+				prompt=prompt,
+				temperature=temp,
+				max_tokens=limit - len(prompt),
+				top_p=1,
+				frequency_penalty=0.8,
+				presence_penalty=0.4,
+				user=self.chat_history[-1][0],
+			)
+		if response:
 			text = response.choices[0].text.strip()
 		print(f"GPTV3 {model} response:", text)
 		return text

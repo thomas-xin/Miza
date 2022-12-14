@@ -751,32 +751,22 @@ class UpdateTrusted(Database):
 
 class UpdatePremium(Database):
     name = "premiums"
-    sem = Semaphore(1, 0, rate_limit=86400)
 
-    async def subscribe(self, user_id, i=0, oid=None):
-        if isinstance(user_id, int) or user_id.isnumeric():
-            try:
-                u = await self.bot.fetch_user(user_id)
-            except:
-                print_exc()
+    async def subscribe(self, user, lv=None):
+        uid = verify_id(user)
+        if uid not in self:
+            if not lv:
                 return
-            user_id = str(u)
-        elif len(user_id) < 5 or len(user_id) > 37 or user_id[-5] != "#" or not user_id[-4:].isnumeric():
-            return
-        d = None
-        if oid:
-            try:
-                uid = self[oid]["id"]
-            except KeyError:
-                pass
-            else:
-                d = self.pop(oid)
-                self.pop(uid, None)
-        self[user_id] = oid
-        if not d:
-            d = dict(id=user_id, ts=time.time(), lv=i, gl=[])
-        self[oid] = d
-        return user_id
+            d = dict(ts=time.time(), lv=lv, gl=set())
+            self[uid] = d
+        d = self[uid]
+        if d.lv != lv:
+            d.lv = lv
+            while len(d.gl) > lv:
+                self.bot.data.trusted.pop(d.gl.pop(), None)
+            self.update(uid)
+        if not lv:
+            self.pop(uid)
 
     def prem_limit(self, lv):
         if lv < 2:
@@ -787,56 +777,20 @@ class UpdatePremium(Database):
             return 5
         return inf
 
-    def tick(self, users):
-        data = {}
-        for oid, lv in users.items():
-            try:
-                d = self[oid]
-            except KeyError:
-                pass
-            else:
-                d["lv"] = lv
-                d.setdefault("gl", [])
-                pl = self.prem_limit(lv)
-                if len(d["gl"]) > pl:
-                    rm, gl = d["gl"][:-pl], d["gl"][-pl:]
-                    for i in rm:
-                        if self.bot.data.trusted.get(i):
-                            self.bot.data.trusted[i] = 1
-                    d["gl"] = gl
-                data[oid] = d
-                data[d["id"]] = oid
-        self.clear()
-        self.data.update(data)
-        for oid, d in self.items():
-            if isinstance(d, dict):
-                gl = d.setdefault("gl", [])
-                for i in gl:
-                    self.bot.data.trusted[i] = 2
-
-    def register(self, uid, gid):
-        oid = self[uid]
-        d = self[oid]
-        pl = self.prem_limit(d["lv"])
+    def register(self, user, guild):
+        lv = self.bot.premium_level(user)
+        pl = self.prem_limit(lv)
         assert pl > 0
-        gl = d.setdefault("gl", [])
-        self.bot.data.trusted[gid] = 2
-        gl.append(gid)
+        d = self[user.id]
+        gl = d.setdefault("gl", set())
+        self.bot.data.trusted.setdefault(guild.id, {None}).add(user.id)
+        gl.add(guild.id)
         rm = []
         while len(gl) > pl:
-            i = gl.pop(0)
+            i = gl.pop()
             rm.append(i)
-            self.bot.data.trusted[i] = 1
-        self[oid] = d
-        create_task(self(force=True))
+            self.bot.data.trusted[i].discard(user.id)
         return rm
-
-    async def __call__(self, force=False, **void):
-        if not force and self.sem.busy:
-            return
-        async with self.sem:
-            datas = {k: v["lv"] for k, v in self.data.items() if isinstance(k, str)}
-            self.tick(datas)
 
 
 class UpdateColours(Database):
