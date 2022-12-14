@@ -2457,14 +2457,15 @@ class Shop(Command):
                     pl = bot.premium_level(user)
                     if t == 1 and pl < 2:
                         await message.channel.send(f"```\nA premium subscription level of 2 or higher is required to promote this server further. Visit {bot.rapidapi_url} to purchase a subscription.```", reference=message)
+                    ext = ""
                     if pl < 2:
                         bot.data.users.add_diamonds(user, -product.cost[0])
                         bot.data.users.add_gold(user, -product.cost[-1])
                         bot.data.trusted[guild.id] = count
-                        ext = ""
                     else:
                         rm = bot.data.premiums.register(user, guild)
-                        ext = f"\n{len(rm)} server{'s' if len(rm) != 1 else ''} ha{'ve' if len(rm) != 1 else 's'} been removed from your promoted list to make room."
+                        if rm:
+                            ext = f"\n{len(rm)} server{'s' if len(rm) != 1 else ''} ha{'ve' if len(rm) != 1 else 's'} been removed from your promoted list to make room."
                     await message.channel.send(f"```{sqr_md(guild)} has been successfully elevated from {t} to {count} privilege level.{ext}```", reference=message)
                     return
                 if product.name == "Gold Ingots":
