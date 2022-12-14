@@ -2079,14 +2079,32 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             premiums = self.data.premiums
         except (AttributeError, KeyError):
             return 0
+        lv = 0
         if premiums.get(str(user)):
             premiums[user.id] = premiums.pop(str(user))
         if premiums.get(user.id):
             oid = premiums[user.id]
             p = premiums.get(oid)
             if p:
-                return p["lv"]
-        return 0
+                lv = p["lv"]
+        if 247184721262411776 in self.cache.guilds:
+            u = self.cache.guilds[247184721262411776].get_member(user.id)
+            if not u:
+                return lv
+            s = f"Discord {user}"
+            if any(role.id == 1052647823188967444 for role in u.roles):
+                if lv < 3:
+                    premiums.subscribe(user.id, 3, s)
+                    lv = 3
+            if any(role.id == 1052645761638215761 for role in u.roles):
+                if lv < 2:
+                    premiums.subscribe(user.id, 2, s)
+                    lv = 2
+            if any(role.id == 1052645637033824346 for role in u.roles):
+                if lv < 1:
+                    premiums.subscribe(user.id, 1, s)
+                    lv = 1
+        return lv
 
     # Checks if a user is blacklisted from the bot.
     def is_blacklisted(self, user):
