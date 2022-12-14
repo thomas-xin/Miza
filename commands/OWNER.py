@@ -763,16 +763,19 @@ class UpdatePremium(Database):
             user_id = str(u)
         elif len(user_id) < 5 or len(user_id) > 37 or user_id[-5] != "#" or not user_id[-4:].isnumeric():
             return
+        d = None
         if oid:
             try:
-                uid = self[oid][0]
+                uid = self[oid]["id"]
             except KeyError:
                 pass
             else:
-                self.pop(oid)
+                d = self.pop(oid)
                 self.pop(uid, None)
         self[user_id] = oid
-        self[oid] = dict(id=user_id, ts=time.time(), lv=i, gl=[])
+        if not d:
+            d = dict(id=user_id, ts=time.time(), lv=i, gl=[])
+        self[oid] = d
         return user_id
 
     def prem_limit(self, lv):
