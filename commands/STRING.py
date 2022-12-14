@@ -1024,7 +1024,7 @@ class Ask(Command):
             # choice(
             #     "0GeQVtZ6Rd4",
             # )
-        premium = max(bot.is_trusted(guild), bot.premium_level(user))
+        premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
         try:
             cb = self.convos[channel.id]
             if getattr(cb, "personality", None) != bot.commands.personality[0].retrieve(guild.id):
