@@ -2093,6 +2093,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if u in self.data.premiums and self.data.premiums[u]["lv"] >= 2:
                 pass
             else:
+                print(i, "trusted lost from", u)
                 trusted[i].remove(u)
                 trusted.update(i)
         trusted[i].add(None)

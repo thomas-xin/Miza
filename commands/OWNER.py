@@ -749,7 +749,7 @@ class UpdateTrusted(Database):
     name = "trusted"
 
 
-class UpdatePremium(Database):
+class UpdatePremiums(Database):
     name = "premiums"
 
     def subscribe(self, user, lv=None):
@@ -763,7 +763,11 @@ class UpdatePremium(Database):
         if d["lv"] != lv:
             d["lv"] = lv
             while len(d["gl"]) > lv:
-                self.bot.data.trusted.pop(d["gl"].pop(), None)
+                i = d["gl"].pop()
+                self.bot.data.trusted.pop(i, None)
+                print(i, "subscription lost from", uid)
+            for i in d["gl"]:
+                self.bot.data.trusted.setdefault(i, {None}).add(uid)
             self.update(uid)
         if not lv:
             self.pop(uid)
