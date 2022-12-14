@@ -824,14 +824,14 @@ class UpdatePremium(Database):
             rm.append(i)
             self.bot.data.trusted[i] = 1
         self[oid] = d
-        self(force=True)
+        create_task(self(force=True))
         return rm
 
     async def __call__(self, force=False, **void):
         if not force and self.sem.busy:
             return
         async with self.sem:
-            datas = {k: v["lv"] for k, v in self.data.items()}
+            datas = {k: v["lv"] for k, v in self.data.items() if isinstance(k, str)}
             self.tick(datas)
 
 
