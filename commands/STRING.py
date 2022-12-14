@@ -1061,7 +1061,7 @@ class Ask(Command):
                 print(reference.content)
                 cb.append((reference.author.display_name, prompt))
             if TrOCRProcessor:
-                if reference and find_urls(reference.content) or reference.attachments or reference.embeds:
+                if reference and (find_urls(reference.content) or reference.attachments or reference.embeds):
                     url = f"https://discord.com/channels/0/{channel.id}/{reference.id}"
                     found = await bot.follow_url(url)
                     if found and found[0] != url and is_image(found[0]) is not None:
