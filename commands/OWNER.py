@@ -811,7 +811,8 @@ class UpdatePremium(Database):
                 self.bot.data.trusted[i] = 2
 
     def register(self, uid, gid):
-        d = self[uid]
+        oid = self[uid]
+        d = self[oid]
         pl = self.prem_limit(d["lv"])
         assert pl > 0
         gl = d.setdefault("gl", [])
@@ -822,7 +823,7 @@ class UpdatePremium(Database):
             i = gl.pop(0)
             rm.append(i)
             self.bot.data.trusted[i] = 1
-        self[uid] = d
+        self[oid] = d
         self(force=True)
         return rm
 
