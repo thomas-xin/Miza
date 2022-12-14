@@ -806,9 +806,10 @@ class UpdatePremium(Database):
         self.clear()
         self.data.update(data)
         for oid, d in self.items():
-            gl = d.setdefault("gl", [])
-            for i in gl:
-                self.bot.data.trusted[i] = 2
+            if isinstance(oid, str):
+                gl = d.setdefault("gl", [])
+                for i in gl:
+                    self.bot.data.trusted[i] = 2
 
     def register(self, uid, gid):
         oid = self[uid]
