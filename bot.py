@@ -3572,6 +3572,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 aio=True,
             )
             message.deferred = True
+            if self.cache.messages.get(message.id):
+                self.cache.messages[message.id].deferred = True
+            else:
+                self.cache.messages[message.id] = message
+            return message
 
     async def ignore_interaction(self, message):
         with tracebacksuppressor:

@@ -1448,7 +1448,7 @@ class StableDiffusion(Command):
     description = "Runs a Stable Diffusion AI art generator on the input prompt or image. Operates on a global queue system. Accepts appropriate keyword arguments."
     usage = "<0:prompt> <inpaint{?i}>"
     example = ("art cute kitten", "art https://mizabot.xyz/favicon")
-    rate_limit = (35, 45)
+    rate_limit = (45, 60)
     flags = "i"
     typing = True
     slash = ("Art",)

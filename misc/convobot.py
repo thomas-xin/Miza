@@ -348,8 +348,8 @@ class Bot:
 				temperature=temp,
 				max_tokens=tokens,
 				top_p=0.9,
-				frequency_penalty=0.8,
-				presence_penalty=0.2,
+				frequency_penalty=1.2,
+				presence_penalty=0.4,
 				user=str(id(self)),
 			)
 		except openai.error.ServiceUnavailableError:
@@ -418,8 +418,8 @@ class Bot:
 					temperature=temp,
 					max_tokens=1536 if model == "text-davinci-003" else 1024,
 					top_p=1,
-					frequency_penalty=0.4,
-					presence_penalty=0.1,
+					frequency_penalty=0.8,
+					presence_penalty=0.2,
 					user=str(id(self)),
 				)
 			except openai.error.ServiceUnavailableError:
