@@ -2080,7 +2080,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         if not guild:
             return 0
         i = verify_id(guild)
-        if not trusted.get(i):
+        if i not in trusted:
             return 0
         if not isinstance(trusted[i], set):
             try:
