@@ -2094,15 +2094,15 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             s = f"Discord {user}"
             if any(role.id == 1052647823188967444 for role in u.roles):
                 if lv < 3:
-                    premiums.subscribe(user.id, 3, s)
+                    create_task(premiums.subscribe(user.id, 3, s))
                     lv = 3
             if any(role.id == 1052645761638215761 for role in u.roles):
                 if lv < 2:
-                    premiums.subscribe(user.id, 2, s)
+                    create_task(premiums.subscribe(user.id, 2, s))
                     lv = 2
             if any(role.id == 1052645637033824346 for role in u.roles):
                 if lv < 1:
-                    premiums.subscribe(user.id, 1, s)
+                    create_task(premiums.subscribe(user.id, 1, s))
                     lv = 1
         return lv
 
