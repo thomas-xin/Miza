@@ -4810,7 +4810,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         if not isinstance(ex, TooManyRequests) or random.randint(0, 5):
             footer = None
         else:
-            footer = dict(text="Running into the rate limit often? Consider donating using one of the subscriptions here, which will grant shorter rate limits amongst other features! https://rapidapi.com/thomas-xin/api/miza")
+            footer = dict(text=f"Running into the rate limit often? Consider donating using one of the subscriptions here, which will grant shorter rate limits amongst other feature improvements! {self.kofi_url}")
         return self.send_as_embeds(
             messageable,
             description="\n".join(as_str(i) for i in ex.args),
