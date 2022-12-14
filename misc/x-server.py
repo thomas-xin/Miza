@@ -2060,18 +2060,18 @@ body {
         subscription = cp.request.headers["X-RapidAPI-Subscription"]
         i = ("BASIC", "PRO", "ULTRA", "MEGA", "CUSTOM").index(subscription)
         if not user_id:
-            return f"Your subscription level has been verified as {subscription}!"
+            return f"Your premium subscription level has been verified as {subscription}!"
         t = ts_us()
         while t in RESPONSES:
             t += 1
         RESPONSES[t] = fut = concurrent.futures.Future()
-        send(f"!{t}\x7fbot.data.trusted.subscribe({repr(user_id)},{i},{repr(oid)})", escape=False)
+        send(f"!{t}\x7fbot.data.premiums.subscribe({repr(user_id)},{i},{repr(oid)})", escape=False)
         j, after = fut.result()
         RESPONSES.pop(t, None)
         res = j["result"]
         if not res:
             return f"An error occured fetching {user_id}. Please try again."
-        return f"{res} ~ Successfully renewed {subscription} subscription for {1 << i}x benefits!"
+        return f"{res} ~ Successfully renewed {subscription} subscription for Lv{i} benefits!"
 
     @cp.expose(("commands",))
     @hostmap

@@ -2335,6 +2335,9 @@ class Wallet(Command):
             if ingots:
                 ingot = await create_future(bot.data.emojis.emoji_as, "gold_ingot.gif")
                 description += f" {ingot} {ingots}"
+            lv = bot.premium_level(user)
+            if lv > 0:
+                description += f"\n{bot.name} Premium Supporter Lv{lv} " + "💎" * lv
             minecraft = data.get("minecraft", 0)
             if minecraft:
                 items = deque()
@@ -2365,6 +2368,7 @@ class Wallet(Command):
 
 
 class Shop(Command):
+    name = ["Upgrade", "Premium", "Premiums"]
     description = "Displays the shop system, or purchases an item."
     usage = "<item[]>"
     example = ("shop", "shop upgrade_server")
@@ -2404,9 +2408,14 @@ class Shop(Command):
                 if product.name == "Upgrade Server":
                     if hasattr(guild, "ghost"):
                         return "```\nThis item can only be purchased in a server.```"
-                    if bot.is_trusted(guild):
+                    t = bot.is_trusted(guild)
+                    if t >= 2:
                         return "```\nThe current server's privilege level is already at the highest available level. However, you may still purchase this item for other servers.```"
-                    await send_with_react(channel, f"```callback-fun-shop-{user.id}_{item}-\nYou are about to upgrade the server's privilege level from 0 to 1.\nThis is irreversible. Please choose wisely.```", reacts="✅", reference=message)
+                    pl = bot.premium_level(user)
+                    if t == 1 and pl < 2:
+                        return f"```\nA premium subscription level of 2 or higher is required to promote this server further. Visit {bot.rapidapi_url} to purchase a subscription.```"
+                    target = 1 if pl < 2 else 2
+                    await send_with_react(channel, f"```callback-fun-shop-{user.id}_{item}_{target}-\nYou are about to upgrade the server's privilege level from {t} to {target}.```", reacts="✅", reference=message)
                     return
                 if product.name == "Gold Ingots":
                     reacts = deque()
@@ -2421,6 +2430,11 @@ class Shop(Command):
         if reaction is None or as_str(reaction) != "✅" and b"\xef\xb8\x8f\xe2\x83\xa3" not in reaction:
             return
         u_id, item = vals.split("_", 1)
+        if "_" in item:
+            item, count = item.split("_", 1)
+            count = int(count)
+        else:
+            count = 1
         u_id = int(u_id)
         if u_id != user.id:
             return
@@ -2432,16 +2446,24 @@ class Shop(Command):
         data = bot.data.users.get(user.id, {})
         gold = data.get("gold", 0)
         diamonds = data.get("diamonds", 0)
-        if len(product.cost) < 2 or diamonds >= product.cost[0]:
-            if gold >= product.cost[-1]:
+        if count > 1 or len(product.cost) < 2 or diamonds >= product.cost[0]:
+            if count > 1 or gold >= product.cost[-1]:
                 if product.name == "Upgrade Server":
-                    if bot.is_trusted(guild):
-                        await message.channel.send("```\nThe current server's privilege level is already at the highest available level. However, you may still purchase this item for other servers.", reference=message)
-                        return
-                    bot.data.users.add_diamonds(user, -product.cost[0])
-                    bot.data.users.add_gold(user, -product.cost[-1])
-                    bot.data.trusted[guild.id] = True
-                    await message.channel.send(f"```{sqr_md(guild)} has been successfully elevated from 0 to 1 privilege level.```", reference=message)
+                    t = bot.is_trusted(guild)
+                    if t >= 2:
+                        await message.channel.send("```\nThe current server's privilege level is already at the highest available level. However, you may still purchase this item for other servers.```", reference=message)
+                    pl = bot.premium_level(user)
+                    if t == 1 and pl < 2:
+                        await message.channel.send(f"```\nA premium subscription level of 2 or higher is required to promote this server further. Visit {bot.rapidapi_url} to purchase a subscription.```", reference=message)
+                    if pl < 2:
+                        bot.data.users.add_diamonds(user, -product.cost[0])
+                        bot.data.users.add_gold(user, -product.cost[-1])
+                        bot.data.trusted[guild.id] = count
+                        ext = ""
+                    else:
+                        rm = bot.data.premiums.register(user.id, guild.id)
+                        ext = f"\n{len(rm)} server{'s' if len(rm) != 1 else ''} have been removed from your promoted list to make room."
+                    await message.channel.send(f"```{sqr_md(guild)} has been successfully elevated from {t} to {count} privilege level.{ext}```", reference=message)
                     return
                 if product.name == "Gold Ingots":
                     magnitude = int(as_str(reaction)[0])

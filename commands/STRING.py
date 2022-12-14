@@ -965,7 +965,7 @@ class Match(Command):
 class Ask(Command):
     _timeout_ = 8
     alias = ["How"]
-    description = "Ask me any question, and I'll answer it! I am connected to OpenAI ChatGPT and GPT3, Google Search, Microsoft DialoGPT, Deepset Roberta, and more!"
+    description = "Ask me any question, and I'll answer it. Make sure the server's at a premium level of at least 2 to be able to get the best results; check that using ~serverinfo!"
     usage = "<string>"
     example = ("ask what's the date?", "ask what is the square root of 3721?", "ask can I have a hug?")
     # flags = "h"
@@ -1008,13 +1008,17 @@ class Ask(Command):
         if q.casefold() in ("how", "how?"):
             a = "https://imgur.com/gallery/8cfRt"
             if channel.id in self.convos:
-                self.convos[channel.id].register(q, a)
+                cb = self.convos[channel.id]
+                cb.append((message.author.display_name, q))
+                cb.append((bot.name, a))
             await send_with_reply(channel, message, a)
             return
         elif q.casefold() == "https://youtube.com/watch?v=":
             a = "dQw4w9WgXcQ"
             if channel.id in self.convos:
-                self.convos[channel.id].register(q, a)
+                cb = self.convos[channel.id]
+                cb.append((message.author.display_name, q))
+                cb.append((bot.name, a))
             await send_with_reply(channel, message, a)
             return
             # choice(
@@ -1024,29 +1028,40 @@ class Ask(Command):
             cb = self.convos[channel.id]
             if getattr(cb, "personality", None) != bot.commands.personality[0].retrieve(guild.id):
                 raise KeyError
+            if utc() - cb.timestamp > 720:
+                raise KeyError
         except KeyError:
             if not convobot:
                 cb = cdict(talk=lambda *args: "")
             else:
+                premium = max(bot.is_trusted(guild), bot.premium_level(user))
                 cb = self.convos[channel.id] = await create_future(convobot.Bot,
                     token=AUTH.get("openai_key"),
                     email=AUTH.get("openai_email"),
                     password=AUTH.get("openai_password"),
                     name=bot.name,
                     personality=bot.commands.personality[0].retrieve((guild or channel).id),
+                    premium=premium,
                 )
+                cb.timestamp = utc()
+                i = 0
+                async for m in bot.history(channel, limit=50):
+                    if i >= cb.history_length:
+                        break
+                    if m.content:
+                        cb.appendleft((m.author, m.content))
+                        i += 1
         with discord.context_managers.Typing(channel):
             urls = []
-            additional = []
             if getattr(message, "reference", None):
                 reference = message.reference.resolved
             else:
                 reference = None
             if reference and reference.content:# and not find_urls(reference.content):
                 print(reference.content)
-                additional.append(reference.content)
+                cb.append((reference.author.display_name, prompt))
             if TrOCRProcessor:
-                if reference:
+                if reference and find_urls(reference.content) or reference.attachments or reference.embeds:
                     url = f"https://discord.com/channels/0/{channel.id}/{reference.id}"
                     found = await bot.follow_url(url)
                     if found and found[0] != url and is_image(found[0]) is not None:
@@ -1073,13 +1088,14 @@ class Ask(Command):
                                 prompt = prompt.replace(" is ", ", ").replace(" are ", ", ")
                                 prompt = f"This is an image of {prompt}"
                                 print(prompt)
-                                additional.append(prompt)
                                 if len(self.analysed) > 4096:
                                     self.analysed.pop(next(iter(self.analysed)), None)
                                 self.analysed[url] = prompt
+                                cb.append(("GPT2", prompt))
                     else:
-                        additional.append(prompt)
-            out = await create_future(cb.talk, q, additional=additional)
+                        cb.append(("GPT2", prompt))
+            cb.append((message.author.display_name, q))
+            out = await create_future(cb.ai)
         if out:
             print(out)
             await send_with_reply(channel, message, lim_str("\xad" + escape_roles(out), 2000))

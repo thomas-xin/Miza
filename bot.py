@@ -30,6 +30,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     twitch_url = "https://www.twitch.tv/-"
     webserver = "https://mizabot.xyz"
     kofi_url = "https://ko-fi.com/mizabot"
+    rapidapi_url = "https://rapidapi.com/thomas-xin/api/miza"
     raw_webserver = webserver
     heartbeat = "heartbeat.tmp"
     heartbeat_ack = "heartbeat_ack.tmp"
@@ -2070,17 +2071,24 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             trusted = self.data.trusted
         except (AttributeError, KeyError):
             return False
-        return guild and bool(trusted.get(verify_id(guild)))
+        return guild and trusted.get(verify_id(guild))
 
     # Checks a user's premium subscription level.
     def premium_level(self, user):
+        if self.is_owner(user.id):
+            return 5
         try:
-            trusted = self.data.trusted
+            premiums = self.data.premiums
         except (AttributeError, KeyError):
             return 0
-        if trusted.get(str(user)):
-            trusted[user.id] = trusted.pop(str(user))
-        return trusted.get(user.id) or 0
+        if premiums.get(str(user)):
+            premiums[user.id] = premiums.pop(str(user))
+        if premiums.get(user.id):
+            oid = premiums[user.id]
+            p = premiums.get(oid)
+            if p:
+                return p["lv"]
+        return 0
 
     # Checks if a user is blacklisted from the bot.
     def is_blacklisted(self, user):

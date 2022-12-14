@@ -118,8 +118,8 @@ class Help(Command):
                 f"Yo! Use the menu below to select from my command list!\n"
                 + f"Alternatively, visit [`mizatlas`]({bot.webserver}/mizatlas) for a full command list and tester.\n\n"
                 + f"If you're an admin and wish to disable me in a particular channel, check out `{prefix}ec`!\n"
-                + f"Unsure about anything, or have a bug to report? check out the [`support server`]({bot.rcc_invite})!\n"
-                + f"Finally, find me on Ko-fi [`here`]({bot.kofi_url})! Any support is greatly appreciated!"
+                + f"Want to try the premium features, unsure about anything, or have a bug to report? check out the [`support server`]({bot.rcc_invite})!\n"
+                + f"Finally, donate to me [`here`]({bot.kofi_url}), or purchase a premium subscription [`here`]({bot.rapidapi_url})! Any support is greatly appreciated!"
             )
         embed.colour = discord.Colour(help_colours[catg])
         if not catg:
@@ -637,6 +637,9 @@ class Info(Command):
             d = ""
         if g.description:
             d += code_md(g.description)
+        lv = bot.is_trusted(u)
+        if lv > 0:
+            d += f"\n{bot.name} Premium Upgraded Lv{lv} " + "💎" * lv
         emb.description = d
         emb.add_field(name="Server ID", value=str(g.id), inline=0)
         emb.add_field(name="Creation time", value=time_repr(g.created_at), inline=1)
@@ -795,6 +798,9 @@ class Info(Command):
                     if getattr(u, "system", None):
                         st.append("Discord System ⚙️")
                         is_sys = True
+                    lv = bot.premium_level(u)
+                    if lv > 0:
+                        st.append(f"{bot.name} Premium Supporter Lv{lv} " + "💎" * lv)
                     uf = getattr(u, "public_flags", None)
                     is_bot = False
                     if uf:

@@ -177,18 +177,17 @@ class Bot:
 
 	models = {}
 
-	def __init__(self, token="", email="", password="", name="Miza", personality="friendly, playful, cute"):
+	def __init__(self, token="", email="", password="", name="Miza", personality="friendly, playful, cute", premium=0):
 		self.token = token
 		self.email = email
 		self.password = password
 		self.name = name
 		self.personality = personality
-		self.history = {}
 		self.chat_history = []
 		self.chat_history_ids = None
-		self.previous = None
 		self.timestamp = time.time()
-		# self.gpt2_generator = pipeline('text-generation', model='gpt2-large')
+		self.premium = premium
+		self.history_length = 2 << premium
 
 	def question_context_analysis(self, m, q, c):
 		if m == "deepset/roberta-base-squad2":
@@ -216,7 +215,7 @@ class Bot:
 		predict_answer_tokens = inputs.input_ids[0, answer_start_index : answer_end_index + 1]
 		return tokenizer.decode(predict_answer_tokens).strip()
 
-	def question_answer_analysis(self, m, q, qh, ah):
+	def question_answer_analysis(self, m):
 		try:
 			tokenizer, model = self.models[m]
 		except KeyError:
@@ -224,16 +223,11 @@ class Bot:
 			model = AutoModelForCausalLM.from_pretrained(m)
 			self.models[m] = (tokenizer, model)
 		end = tokenizer.eos_token
-		new_user_input_ids = tokenizer.encode(q + end, return_tensors="pt", max_length=2048, truncation=True)
 		history = []
 		if self.chat_history_ids is not None:
 			history.append(self.chat_history_ids)
-		for k, v in self.history.items():
-			history.append(tokenizer.encode(k + end, return_tensors="pt", max_length=2048, truncation=True))
-			if v:
-				history.append(tokenizer.encode(v + end, return_tensors="pt", max_length=2048, truncation=True))
-		self.history.clear()
-		history.append(new_user_input_ids)
+		for k, v in self.chat_history:
+			history.append(tokenizer.encode(v + end, return_tensors="pt", max_length=2048, truncation=True))
 		bot_input_ids = torch.cat(history, dim=-1)
 		self.chat_history_ids = model.generate(bot_input_ids, max_length=16384, pad_token_id=tokenizer.eos_token_id)
 		return tokenizer.decode(self.chat_history_ids[-4096:, bot_input_ids.shape[-1]:][0], skip_special_tokens=True).strip()
@@ -246,9 +240,7 @@ class Bot:
 				fmp = self.models[m] = pipeline("fill-mask", model=m, tokenizer=m)
 			return fmp(q)[0]["sequence"]
 
-	def clean_response(self, q, res, additional=()):
-		if additional:
-			res = "\n".join(additional) + "\n" + (res or "")
+	def clean_response(self, q, res):
 		if not res.isascii():
 			fut = exc.submit(self.question_context_analysis, "salti/bert-base-multilingual-cased-finetuned-squad", q, res)
 		else:
@@ -307,297 +299,77 @@ class Bot:
 				response = "\n".join(r)
 		return response.strip().replace("  ", " ")
 
-	def gptcomplete(self, q, additional=()):
+	unpunctuation = "".maketrans({
+		",": " ",
+		".": " ",
+		":": " ",
+		";": " ",
+		"[": " ",
+		"]": " ",
+		"(": " ",
+		")": " ",
+		"*": " ",
+		"~": " ",
+	})
+	def gptcomplete(self):
+		if not self.chat_history:
+			return ""
+		q = self.chat_history[-1][1]
 		openai.api_key = self.token
-		question = q.strip()
 		lines = []
-		if self.chat_history:
-			for q, a in self.chat_history:
-				q = lim_str(q, 64)
-				a = lim_str(a, 192)
-				lines.append(f"Human: {q}\n{self.name}: {a}\n")
-		for a in additional:
-			lines.append(a + "\n")
-		lq = literal_question(question)
-		if lq:
-			res = lim_str(self.google(lq, raw=True).replace("\n", ". "), 512, mode="right").replace(": ", " -")
+		if self.premium > 0:
+			res = lim_str(self.google(raw=True), 512, mode="right").replace("\n", ". ").replace(": ", " -")
 			lines.append(f"Google: {res}\n")
-			googled = True
-		else:
-			googled = False
-		lines.append(f"Human: {question}\n")
+		if self.chat_history:
+			for k, v in self.chat_history:
+				lines.append(f"{k}: {v}\n")
 		lines.append(f"{self.name}:")
-		prompt = ""
-		while lines and len(prompt) < 1536:
-			prompt = lines.pop(-1) + prompt
-		prompt = f"{self.name} is a {self.personality} AI:\n\n" + prompt
-		print("GPTV3 prompt:", prompt)
-		words = question.casefold().replace(",", " ").split()
-		if googled or not additional or "essay" in words or "full" in words or "write" in words or "writing" in words or "about" in words:
+		if self.premium < 1:
+			model = "text-babbage-001"
+			temp = 0.9
+			limit = 1000
+		elif self.premium < 2:
+			model = "text-curie-001"
+			temp = 0.8
+			limit = 2000
+		else:
 			model = "text-davinci-003"
 			temp = 0.7
-			tokens = 1536
+			limit = 4000
+		q = self.chat_history[-1][1]
+		words = q.casefold().translate(self.unpunctuation).split()
+		if "essay" in words or "full" in words or "write" in words or "writing" in words or "about" in words:
+			soft = limit
 		else:
-			model = "text-curie-001" if len(prompt) >= 256 or not random.randint(0, 2) else "text-davinci-003"
-			temp = 0.75
-			tokens = 1024
+			soft = limit * 2
+		prompt = ""
+		while lines and len(prompt) < soft:
+			prompt = lines.pop(-1) + prompt
+		start = f"{self.name} is a {self.personality} AI:\n\n"
+		prompt = lim_str(start + prompt, limit * 3)
+		print("GPTV3 prompt:", prompt)
 		try:
 			response = openai.Completion.create(
 				model=model,
 				prompt=prompt,
 				temperature=temp,
-				max_tokens=tokens,
-				top_p=0.9,
-				frequency_penalty=1.2,
+				max_tokens=limit - len(prompt) // 3,
+				top_p=1,
+				frequency_penalty=0.8,
 				presence_penalty=0.4,
-				user=str(id(self)),
+				user=self.chat_history[-1][0],
 			)
 		except openai.error.ServiceUnavailableError:
 			text = ""
 		else:
 			text = response.choices[0].text.strip()
 		print(f"GPTV3 {model} response:", text)
-		test = text.casefold()
-
-		def unsure(t):
-			t = t.removeprefix("hmm").lstrip(", ")
-			if t.startswith("sorry,"):
-				return True
-			if t.startswith("i'm sorry,"):
-				return True
-			if t.startswith("i don't know"):
-				t = t.removeprefix("i don't know")
-				if t and t[0] in ", ":
-					return True
-			if t.startswith("i'm not sure"):
-				t = t.removeprefix("i'm not sure")
-				if t and t[0] in ", ":
-					return True
-			if t.startswith("i don't understand"):
-				t = t.removeprefix("i don't understand")
-				if t and t[0] in ", ":
-					return True
-
-		if not test or unsure(test):
-			resp = openai.Moderation.create(
-				input=question,
-			)
-			results = resp.results[0].categories
-			av = any(results.values())
-			if av:
-				print(results)
-			if results.hate or results["self-harm"] or results["sexual/minors"] or results.violence:
-				return text
-			if googled:
-				return text
-			lines = []
-			if self.chat_history:
-				for q, a in self.chat_history:
-					q = lim_str(q, 128)
-					a = lim_str(a, 256)
-					lines.append(f"Human: {q}\n{self.name}: {a}\n")
-			for a in additional:
-				lines.append(a + "\n")
-			res = lim_str(self.google(lq or question, raw=True).replace("\n", ". "), 512, mode="right")
-			# lines.pop(-1)
-			lines.append(f"Google: {res}\n")
-			lines.append(f"Human: {question}\n")
-			lines.append(f"{self.name}:")
-			prompt = ""
-			while lines and len(prompt) < 1536:
-				prompt = lines.pop(-1) + prompt
-			prompt = f"{self.name} is a {self.personality} AI:\n\n" + prompt
-			print("GPTV3 prompt2:", prompt)
-			words = question.casefold().replace(",", " ").split()
-			model = "text-curie-001" if av else "text-davinci-003"
-			temp = 0.8
-			try:
-				response = openai.Completion.create(
-					model=model,
-					prompt=prompt,
-					temperature=temp,
-					max_tokens=1536 if model == "text-davinci-003" else 1024,
-					top_p=1,
-					frequency_penalty=0.8,
-					presence_penalty=0.2,
-					user=str(id(self)),
-				)
-			except openai.error.ServiceUnavailableError:
-				text = ""
-			else:
-				text = response.choices[0].text.strip()
-			print(f"GPTV3 {model} response2:", text)
 		return text
 
-	# def chatgpt(self, q, additional=(), force=False):
-	# 	if not self.email or not self.password:
-	# 		return ""
-	# 	if additional:
-	# 		question = "\n".join(additional) + "\n" + q
-	# 	else:
-	# 		question = q
-	# 	question = question.strip()
-	# 	driver = d = get_driver()
-	# 	search = "https://chat.openai.com/chat"
-	# 	fut = exc.submit(driver.get, search)
-	# 	fut.result(timeout=16)
-
-	# 	elems = d.find_elements(by=class_name, value="btn-primary")
-	# 	elems = [e for e in elems if "log in" in e.text.casefold()]
-	# 	if elems:
-	# 		elems[0].click()
-	# 		time.sleep(1)
-	# 		e = d.find_element(by=webdriver.common.by.By.ID, value="username")
-	# 		e.send_keys(self.email)
-	# 		e = [e for e in d.find_elements(by=class_name, value="_button-login-id") if e.text == "Continue"][0]
-	# 		e.click()
-	# 		time.sleep(1)
-	# 		e = d.find_element(by=webdriver.common.by.By.ID, value="password")
-	# 		e.send_keys(self.password)
-	# 		e = [e for e in d.find_elements(by=class_name, value="_button-login-password") if e.text == "Continue"][0]
-	# 		e.click()
-	# 	time.sleep(1)
-
-	# 	elems = [e for e in d.find_elements(by=class_name, value="btn-neutral") if e.text in ("Next", "Done")]
-	# 	if elems:
-	# 		elems[0].click()
-	# 		while True:
-	# 			elems = [e for e in d.find_elements(by=class_name, value="btn-neutral") if e.text in ("Next", "Done")]
-	# 			if not elems:
-	# 				break
-	# 			elems[0].click()
-	# 		elems = [e for e in d.find_elements(by=class_name, value="btn-primary") if e.text in ("Next", "Done")]
-	# 		if elems:
-	# 			elems[0].click()
-
-	# 	elems = [e for e in d.find_elements(by=class_name, value="resize-none") if e in d.find_elements(by=class_name, value="bg-transparent")]
-	# 	e = elems[0]
-	# 	try:
-	# 		e.send_keys(question)
-	# 	except selenium.common.exceptions.WebDriverException:
-	# 		d.execute_script("document.getElementsByClassName('resize-none')[0].focus()")
-	# 		d.execute_script(f"document.execCommand('insertText', false, {repr(question)});")
-	# 	if not e.text:
-	# 		print("ChatGPT: No input.")
-	# 		drivers.insert(0, driver)
-	# 		return
-	# 	elems = [e for e in d.find_elements(by=class_name, value="text-gray-500") if e in d.find_elements(by=class_name, value="absolute")]
-	# 	e = elems[0]
-	# 	e.click()
-	# 	time.sleep(0.5)
-	# 	t2 = q.rstrip("?").casefold().split()
-	# 	for attempt in range(3):
-	# 		for i in range(180):
-	# 			elems = [e for e in d.find_elements(by=class_name, value="btn-neutral") if e.text == "Try again"]
-	# 			if elems:
-	# 				elems = d.find_elements(by=class_name, value="text-base")
-	# 				response = elems[-1].text
-	# 				break
-	# 			time.sleep(0.5)
-	# 			if i == 20:
-	# 				elems = d.find_elements(by=class_name, value="text-base")
-	# 				if not elems:
-	# 					print("ChatGPT: No input.")
-	# 					drivers.insert(0, driver)
-	# 					return
-	# 		else:
-	# 			response = None
-	# 			elems = d.find_elements(by=class_name, value="text-base")
-	# 			if elems:
-	# 				response = elems[-1].text
-	# 				if len(response) < 4 or response == question:
-	# 					response = None
-	# 				else:
-	# 					print("ChatGPT: Recovered.")
-	# 			if not response:
-	# 				print("ChatGPT: Timed out.")
-	# 				drivers.insert(0, driver)
-	# 				return
-	# 		response = response.removesuffix("\n2 / 2").removesuffix("\n3 / 3")
-	# 		print("ChatGPT response:", response)
-	# 		test = response.casefold()
-	# 		if (
-	# 			test.startswith("!\nan error occurred.")
-	# 			or test.startswith("!\ninternal server error")
-	# 			or test.startswith("!\ntoo many requests")
-	# 			or test.startswith("!\nhmm...something seems to have gone wrong")
-	# 		):
-	# 			elems = [e for e in d.find_elements(by=class_name, value="btn-neutral") if e.text == "Try again"]
-	# 			if not elems:
-	# 				return
-	# 			elems[0].click()
-	# 			continue
-	# 		spl = test.split()
-	# 		if not force and not additional and "\n" not in test and len(test) < 1024:
-	# 			openai.api_key = self.token
-	# 			resp = openai.Moderation.create(
-	# 				input=question,
-	# 			)
-	# 			results = resp.results[0].categories
-	# 			if results.hate or results["self-harm"] or results["sexual/minors"] or results.violence:
-	# 				print(results)
-	# 				break
-	# 			filtered = (
-	# 				"i'm sorry,",
-	# 				"i am sorry,",
-	# 				"sorry,",
-	# 				"i am not sure",
-	# 				"i'm not sure",
-	# 				"it is not specified",
-	# 			)
-	# 			if any(test.startswith(stm) for stm in filtered):
-	# 				elems = [e for e in d.find_elements(by=class_name, value="btn-neutral") if e.text == "Try again"]
-	# 				if not elems or attempt >= 1:
-	# 					drivers.insert(0, driver)
-	# 					return
-	# 				elems[0].click()
-	# 				continue
-	# 			filtered = (
-	# 				"t have access",
-	# 				"s not appropriate for",
-	# 				"s not possible for me",
-	# 				"s impossible for me",
-	# 				"t have the ability to",
-	# 				"m not able to",
-	# 				"m not capable of",
-	# 				"m unable to",
-	# 			)
-	# 			if (
-	# 				any(stm in test for stm in filtered)
-	# 				or ("illegal" in spl and "legal" not in q and "ok" not in t2 and "okay" not in t2)
-	# 			):
-	# 				drivers.insert(0, driver)
-	# 				return
-	# 		break
-	# 	else:
-	# 		print("ChatGPT: Exceeded attempt limit.")
-	# 		drivers.insert(0, driver)
-	# 		return
-	# 	drivers.insert(0, driver)
-	# 	if not response:
-	# 		return
-	# 	searches = (
-	# 		"I am a large language model trained by OpenAI and ",
-	# 		"As a large language model trained by OpenAI, I ",
-	# 	)
-	# 	for search in searches:
-	# 		if response.startswith(search):
-	# 			response = "I " + response[search:]
-	# 	response = response.replace("I am Assistant", "I am Miza").replace("trained by OpenAI", "linked to OpenAI, Google, Deepset and Microsoft")
-	# 	if ". Is there" in response:
-	# 		response = response.rsplit(". Is there", 1)[0] + "."
-	# 	if "essay" in t2 or "full" in t2 or "write" in t2 or "writing" in t2 or "about" in t2 or "worth noting that" in test or "worth mentioning that" in test:
-	# 		return response
-	# 	if additional or len(q) < 32:
-	# 		if response and additional and self.previous and q.casefold() == self.previous[0]:
-	# 			additional = [a for a in additional if a.casefold() != self.previous[1]]
-	# 		response = self.clean_response(q, response, additional=additional)
-	# 	else:
-	# 		response = response.strip()
-	# 	# print(response)
-	# 	return response
-
-	def google(self, q, additional=(), raw=False):
+	def google(self, raw=False):
+		if not self.chat_history:
+			return ""
+		q = self.chat_history[-1][1]
 		words = q.split()
 		q = " ".join(swap.get(w, w) for w in words)
 		driver = get_driver()
@@ -622,79 +394,52 @@ class Bot:
 			if raw:
 				drivers.append(driver)
 				return res
-			response = self.clean_response(q, res, additional=additional)
+			response = self.clean_response(q, f"Answer as a {self.personality} AI:\n\n" + res)
 		print("Google response:", response)
 		drivers.append(driver)
 		return response
 
-	def talk(self, i, additional=()):
-		t = time.time()
-		if t > self.timestamp + 720:
-			self.history.clear()
-		elif len(self.history) > 8:
-			self.history.pop(next(iter(self.history)))
-		self.timestamp = t
-		# tried_chatgpt = False
-		response = reso = None
-		# words = i.casefold().split()
-		# if not additional and len(i) >= 32 and (random.randint(0, 1) or not self.chat_history) or "essay" in words:
-		# 	response = reso = self.chatgpt(i, additional=additional)
-		# 	tried_chatgpt = True
-		# if response and response.casefold() != i.casefold():
-		# 	return self.register(i, response)
-		response = reso = self.gptcomplete(i, additional=additional)
-		if response and response.casefold() != i.casefold():
-			return self.register(i, response)
-		# if not tried_chatgpt:
-		# 	response = reso = self.chatgpt(i, additional=additional)
-		# 	tried_chatgpt = True
-		if literal_question(i):
-			response = self.google(i, additional=additional)
-			if response and response.casefold() != i.casefold():
-				return self.register(i, response)
+	def ai(self):
+		while len(self.chat_history) > 8:
+			self.chat_history.pop(0)
+		response = self.gptcomplete()
+		if response:
+			return self.append((self.name, response))
+		q = self.chat_history[-1][-1]
+		if self.premium > 0 and literal_question(q):
+			response = self.google()
+			if response:
+				return self.append((self.name, response))
 			googled = True
 		else:
 			googled = False
-		if additional:
-			response = self.clean_response(i, response, additional=additional)
-			if response and response.casefold() != i.casefold():
-				return self.register(i, response)
-		res = self.question_answer_analysis("microsoft/DialoGPT-large", i, list(self.history.keys()), list(self.history.values()))
-		a1 = res
-		tup = (i.casefold(), a1.casefold())
-		if a1.lower() == i.lower() or vague(a1) or (len(i) > 5 and tup == self.previous):
-			a1 = ""
-		if a1 and (" " not in a1 or len(a1) < 12) and not a1[0].isnumeric() and not a1.endswith("."):
+		response = reso = self.question_answer_analysis("microsoft/DialoGPT-large")
+		a1 = response
+		if not a1 or a1.lower() == q.lower() or vague(a1):
+			response = ""
+		elif (" " not in a1 or len(a1) < 12) and not a1[0].isnumeric() and not a1.endswith("."):
 			response = ""
 		else:
 			response = a1
 		if not googled and not response:
-			response = self.google(i, additional=additional)
-			if response and response.casefold() != i.casefold():
-				return self.register(i, response)
+			response = self.google()
+			if response:
+				return self.append((self.name, response))
 		if not response:
-			response = reso if reso else res
-		# if not response:
-		# 	print(i + ": forcing GPTV3 response...")
-		# 	response = reso = self.chatgpt(i, additional=additional, force=True)
+			response = reso
 		response = response.replace("  ", " ")
 		if not response:
 			response = "Sorry, I don't know."
-		return self.register(i, response)
+		return self.append((self.name, response))
 
-	def append(self, msg):
-		self.history[msg] = self.history.pop(msg, "")
-		return msg
+	def append(self, tup):
+		self.chat_history.append(tup)
+		return tup[-1]
 
-	def register(self, q, a):
-		tup = (q.casefold(), a.casefold())
-		if self.previous != tup:
-			self.previous = tup
-			if len(self.chat_history) >= 2:
-				self.chat_history.pop(0)
-			self.chat_history.append((q, a))
-			self.history[q] = a
-		return a
+	def appendleft(self, tup):
+		self.chat_history.insert(0, tup)
+		return tup[-1]
+
 
 if __name__ == "__main__":
 	import sys

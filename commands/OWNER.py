@@ -748,6 +748,11 @@ class Miza_Player:
 class UpdateTrusted(Database):
     name = "trusted"
 
+
+class UpdatePremium(Database):
+    name = "premiums"
+    sem = Semaphore(1, 0, rate_limit=86400)
+
     async def subscribe(self, user_id, i=0, oid=None):
         if user_id.isnumeric():
             try:
@@ -766,10 +771,67 @@ class UpdateTrusted(Database):
             else:
                 self.pop(oid)
                 self.pop(uid, None)
-        temp = self.data.get(user_id, 0)
-        self[user_id] = i
-        self[oid] = (user_id, time.time(), i)
+        self[user_id] = oid
+        self[oid] = dict(id=user_id, ts=time.time(), lv=i, gl=[])
         return user_id
+
+    def prem_limit(self, lv):
+        if lv < 2:
+            return 0
+        if lv < 3:
+            return 1
+        if lv < 4:
+            return 5
+        return inf
+
+    def tick(self, users):
+        data = {}
+        for oid, lv in users.items():
+            try:
+                d = self[oid]
+            except KeyError:
+                pass
+            else:
+                d["lv"] = lv
+                d.setdefault("gl", [])
+                pl = self.prem_limit(lv)
+                if len(d["gl"]) > pl:
+                    rm, gl = d["gl"][:-pl], d["gl"][-pl:]
+                    for i in rm:
+                        if self.bot.data.trusted.get(i):
+                            self.bot.data.trusted[i] = 1
+                    d["gl"] = gl
+                data[oid] = d
+                data[d["id"]] = oid
+        self.clear()
+        self.data.update(data)
+        for oid, d in self.items():
+            gl = d.setdefault("gl", [])
+            for i in gl:
+                self.bot.data.trusted[i] = 2
+
+    def register(self, uid, gid):
+        d = self[uid]
+        pl = self.prem_limit(d["lv"])
+        assert pl > 0
+        gl = d.setdefault("gl", [])
+        self.bot.data.trusted[gid] = 2
+        gl.append(gid)
+        rm = []
+        while len(gl) > pl:
+            i = gl.pop(0)
+            rm.append(i)
+            self.bot.data.trusted[i] = 1
+        self[uid] = d
+        self(force=True)
+        return rm
+
+    async def __call__(self, force=False, **void):
+        if not force and self.sem.busy:
+            return
+        async with self.sem:
+            datas = [k, v["lv"] for k, v in self.data.items()]
+            self.tick(datas)
 
 
 class UpdateColours(Database):

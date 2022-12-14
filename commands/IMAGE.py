@@ -1632,15 +1632,16 @@ class StableDiffusion(Command):
                             "--strength",
                             "0.75",
                         ))
-                    if not force and "--strength" not in kwargs and str(kwargs["--guidance-scale"]) == "7.5" and str(kwargs["--eta"]) == "0.8":
-                        with open(image_1, "rb") as f:
-                            image_1b = f.read()
-                        if image_2:
-                            with open(image_2, "rb") as f:
-                                image_2b = f.read()
-                        with tracebacksuppressor:
-                            fn = await create_future(self.imagebot.dalle_i2i, prompt, image_1b, image_2b, timeout=60)
-                            done = True
+                    if max(bot.is_trusted(guild), bot.premium_level(user)) >= 2:
+                        if not force and "--strength" not in kwargs and str(kwargs["--guidance-scale"]) == "7.5" and str(kwargs["--eta"]) == "0.8":
+                            with open(image_1, "rb") as f:
+                                image_1b = f.read()
+                            if image_2:
+                                with open(image_2, "rb") as f:
+                                    image_2b = f.read()
+                            with tracebacksuppressor:
+                                fn = await create_future(self.imagebot.dalle_i2i, prompt, image_1b, image_2b, timeout=60)
+                                done = True
                 if not done:
                     if self.sdiff_sem.is_busy() and not getattr(message, "simulated", False):
                         await send_with_react(channel, italics(ini_md(f"StableDiffusion: {sqr_md(req)} enqueued in position {sqr_md(self.sdiff_sem.passive + 1)}.")), reacts="❎", reference=message)
