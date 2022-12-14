@@ -754,7 +754,7 @@ class UpdatePremium(Database):
     sem = Semaphore(1, 0, rate_limit=86400)
 
     async def subscribe(self, user_id, i=0, oid=None):
-        if user_id.isnumeric():
+        if isinstance(user_id, int) or user_id.isnumeric():
             try:
                 u = await self.bot.fetch_user(user_id)
             except:
@@ -809,7 +809,7 @@ class UpdatePremium(Database):
         self.clear()
         self.data.update(data)
         for oid, d in self.items():
-            if isinstance(oid, str) and not oid.isnumeric():
+            if isinstance(d, dict):
                 gl = d.setdefault("gl", [])
                 for i in gl:
                     self.bot.data.trusted[i] = 2
