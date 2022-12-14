@@ -2368,10 +2368,10 @@ class Wallet(Command):
 
 
 class Shop(Command):
-    name = ["Upgrade", "Premium", "Premiums"]
+    name = ["Upgrade", "Premium", "Premiums", "UpgradeServer"]
     description = "Displays the shop system, or purchases an item."
     usage = "<item[]>"
-    example = ("shop", "shop upgrade_server")
+    example = ("shop", "shop upgrade_server", "upgrade_server")
     rate_limit = (6, 10)
 
     products = cdict(
@@ -2387,7 +2387,9 @@ class Shop(Command):
         ),
     )
 
-    async def __call__(self, bot, guild, channel, user, message, argv, **void):
+    async def __call__(self, bot, guild, channel, user, message, argv, name, **void):
+        if name != "shop":
+            argv = "upgradeserver"
         if not argv:
             desc = deque()
             for product in self.products.values():
