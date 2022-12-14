@@ -1562,7 +1562,7 @@ class StableDiffusion(Command):
         fn = None
         with discord.context_managers.Typing(channel):
             with tracebacksuppressor:
-                dalle2 = max(bot.is_trusted(guild), bot.premium_level(user)) >= 2
+                dalle2 = max(bot.is_trusted(guild), bot.premium_level(user) * 2) >= 2
                 fn = await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2=dalle2, timeout=60)
         if not fn:
             if self.fut:
@@ -1633,7 +1633,7 @@ class StableDiffusion(Command):
                             "--strength",
                             "0.75",
                         ))
-                    if max(bot.is_trusted(guild), bot.premium_level(user)) >= 2:
+                    if max(bot.is_trusted(guild), bot.premium_level(user) * 2) >= 2:
                         if not force and "--strength" not in kwargs and str(kwargs["--guidance-scale"]) == "7.5" and str(kwargs["--eta"]) == "0.8":
                             with open(image_1, "rb") as f:
                                 image_1b = f.read()
