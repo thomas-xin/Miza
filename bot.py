@@ -2085,11 +2085,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         if not isinstance(trusted[i], set):
             trusted[i] = {None}
         for u in tuple(trusted[i]):
+            if u is None:
+                continue
             if u in self.data.premiums and self.data.premiums[u]["lv"] >= 2:
                 pass
             else:
                 trusted[i].remove(u)
                 trusted.update(i)
+        trusted[i].add(None)
         return min(2, len(trusted[i]))
 
     # Checks a user's premium subscription level.

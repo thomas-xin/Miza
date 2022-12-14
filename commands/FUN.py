@@ -2461,7 +2461,7 @@ class Shop(Command):
                     if pl < 2:
                         bot.data.users.add_diamonds(user, -product.cost[0])
                         bot.data.users.add_gold(user, -product.cost[-1])
-                        bot.data.trusted[guild.id] = count
+                        bot.data.trusted[guild.id] = {None}
                     else:
                         rm = bot.data.premiums.register(user, guild)
                         if rm:
