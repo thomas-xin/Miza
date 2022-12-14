@@ -762,13 +762,14 @@ class UpdatePremiums(Database):
         d = self[uid]
         if d["lv"] != lv:
             d["lv"] = lv
-            while len(d["gl"]) > lv:
+            pl = self.prem_limit(lv)
+            while len(d["gl"]) > pl:
                 i = d["gl"].pop()
                 self.bot.data.trusted.pop(i, None)
                 print(i, "subscription lost from", uid)
-            for i in d["gl"]:
-                self.bot.data.trusted.setdefault(i, {None}).add(uid)
             self.update(uid)
+        for i in d["gl"]:
+            self.bot.data.trusted.setdefault(i, {None}).add(uid)
         if not lv:
             self.pop(uid)
 
