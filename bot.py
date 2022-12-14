@@ -2071,7 +2071,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             trusted = self.data.trusted
         except (AttributeError, KeyError):
             return 0
-        return (guild and trusted.get(verify_id(guild))) or 0
+        return int((guild and trusted.get(verify_id(guild))) or 0)
 
     # Checks a user's premium subscription level.
     def premium_level(self, user):
