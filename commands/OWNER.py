@@ -830,7 +830,7 @@ class UpdatePremium(Database):
         if not force and self.sem.busy:
             return
         async with self.sem:
-            datas = [k, v["lv"] for k, v in self.data.items()]
+            datas = {k: v["lv"] for k, v in self.data.items()}
             self.tick(datas)
 
 
