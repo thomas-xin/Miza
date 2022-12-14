@@ -806,7 +806,7 @@ class UpdatePremium(Database):
         self.clear()
         self.data.update(data)
         for oid, d in self.items():
-            if isinstance(oid, str):
+            if isinstance(oid, str) and not oid.isnumeric():
                 gl = d.setdefault("gl", [])
                 for i in gl:
                     self.bot.data.trusted[i] = 2
