@@ -2083,7 +2083,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         if not trusted.get(i):
             return 0
         if not isinstance(trusted[i], set):
-            trusted[i] = {None}
+            try:
+                trusted[i] = set(trusted[i])
+            except TypeError:
+                trusted[i] = set()
         for u in tuple(trusted[i]):
             if u is None:
                 continue
