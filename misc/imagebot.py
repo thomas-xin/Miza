@@ -266,16 +266,16 @@ class Bot:
 			else:
 				self.cache.pop(prompt, None)
 
-	def art(self, prompt, url="", url2="", kwargs={}, specified=False):
+	def art(self, prompt, url="", url2="", kwargs={}, specified=False, dalle2=False):
 		funcs = []
 		if not specified and not url and not url2 or not os.path.exists("misc/stable_diffusion.openvino"):
 			if random.randint(0, 2) and self.cache.get(prompt):
 				return self.cache[prompt].pop(0)
 			funcs.append(self.art_mage)
 			funcs.append(self.art_deepai)
-			if random.randint(0, 1):
-				funcs.append(self.art_dalle)
 		random.shuffle(funcs)
+		if dalle2:
+			funcs.insert(0, self.art_dalle)
 		for func in funcs:
 			try:
 				im = func(prompt, kwargs)

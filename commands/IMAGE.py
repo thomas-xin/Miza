@@ -1562,7 +1562,8 @@ class StableDiffusion(Command):
         fn = None
         with discord.context_managers.Typing(channel):
             with tracebacksuppressor:
-                fn = await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, timeout=60)
+                dalle2 = max(bot.is_trusted(guild), bot.premium_level(user)) >= 2
+                fn = await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2=dalle2, timeout=60)
         if not fn:
             if self.fut:
                 with tracebacksuppressor:

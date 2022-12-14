@@ -664,7 +664,7 @@ class FileHashDict(collections.abc.MutableMapping):
 
     def update(self, other):
         self.modified.update(other)
-        self.update(other)
+        self.data.update(other)
         return self
 
     def clear(self):
