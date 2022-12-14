@@ -1033,7 +1033,7 @@ class Ask(Command):
                     email=AUTH.get("openai_email"),
                     password=AUTH.get("openai_password"),
                     name=bot.name,
-                    personality=bot.commands.personality[0].retrieve(guild.id),
+                    personality=bot.commands.personality[0].retrieve((guild or channel).id),
                 )
         with discord.context_managers.Typing(channel):
             urls = []
