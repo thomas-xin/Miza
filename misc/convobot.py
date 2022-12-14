@@ -317,6 +317,7 @@ class Bot:
 		q = self.chat_history[-1][1]
 		openai.api_key = self.token
 		lines = []
+		res = None
 		if self.premium > 0 and (self.premium > 1 or literal_question(q)):
 			res = lim_str(self.google(raw=True), 512, mode="right").replace("\n", ". ").replace(": ", " -")
 			lines.append(f"Google: {res}\n")
@@ -324,7 +325,7 @@ class Bot:
 			for k, v in self.chat_history:
 				lines.append(f"{k}: {v}\n")
 		lines.append(f"{self.name}:")
-		if self.premium < 1 or self.premium < 2 and len(q) >= 256:
+		if self.premium < 1 or self.premium < 2 and (len(q) >= 256 or res):
 			model = "text-babbage-001"
 			temp = 0.9
 			limit = 1000
