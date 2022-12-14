@@ -1061,7 +1061,7 @@ class Ask(Command):
                 reference = None
             if reference and reference.content:# and not find_urls(reference.content):
                 print(reference.content)
-                cb.append((reference.author.display_name, prompt))
+                cb.append((reference.author.display_name, reference.content))
             if TrOCRProcessor:
                 if reference and (find_urls(reference.content) or reference.attachments or reference.embeds):
                     url = f"https://discord.com/channels/0/{channel.id}/{reference.id}"
