@@ -345,7 +345,8 @@ class Bot:
 		prompt = ""
 		while lines and len(prompt) + len(res) < soft:
 			prompt = lines.pop(-1) + prompt
-		start = f"{self.name} is a {self.personality} AI:\n\n"
+		p = "" if self.premium < 2 else self.personality
+		start = f"{self.name} is a {p} AI:\n\n"
 		if res:
 			start += f"Google: {res}\n"
 		prompt = lim_str(start + prompt, limit * 3)
@@ -409,7 +410,7 @@ class Bot:
 			if raw:
 				drivers.append(driver)
 				return res
-			response = self.clean_response(q, f"Answer as a {self.personality} AI:\n\n" + res)
+			response = self.clean_response(q, res)
 		print("Google response:", response)
 		drivers.append(driver)
 		return response
