@@ -346,7 +346,13 @@ class Bot:
 		while lines and len(prompt) + len(res) < soft:
 			prompt = lines.pop(-1) + prompt
 		p = "" if self.premium < 2 else self.personality
-		start = f"{self.name} is a {p} AI:\n\n"
+		if not p:
+			p = "an"
+		elif p[0] in "aeio":
+			p = "an " + p
+		else:
+			p = "a " + p
+		start = f"{self.name} is {p} AI:\n\n"
 		if res:
 			start += f"Google: {res}\n"
 		prompt = lim_str(start + prompt, limit * 3)

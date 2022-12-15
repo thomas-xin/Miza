@@ -1046,7 +1046,7 @@ class Ask(Command):
                     if i >= cb.history_length:
                         break
                     if m.content:
-                        cb.appendleft((m.author, m.content))
+                        cb.appendleft((bot.name if m.author.id == bot.id else m.author.display_name, unicode_prune(m.content)))
                         i += 1
         else:
             cb.name = bot.name
@@ -1110,7 +1110,7 @@ class Ask(Command):
                 )
             else:
                 emb = None
-            await send_with_reply(channel, message, lim_str("\xad" + escape_roles(out.strip()), 2000), embed=emb)
+            await send_with_reply(channel, message, lim_str("\xad" + escape_roles(out), 2000), embed=emb)
             return
         q = single_space(q).strip().translate(bot.mtrans).replace("?", "\u200b").strip("\u200b")
         out = None
