@@ -1000,7 +1000,12 @@ class Archive(Command):
                 line = line.decode("utf-8").strip()
                 if utc() - t >= 2:
                     t = utc()
-                    info = ini_md(f"Archive {sqr_md(line)}")
+                    if ": " in line:
+                        p, q = line.split(": ", 1)
+                    else:
+                        p = "Progress"
+                        q = line
+                    info = ini_md(f"Archive {p}: {sqr_md(q)}")
                     await m.edit(content=info)
         if not fn:
             raise FileNotFoundError("The requested file was not found. If this issue persists, please report it in the support server.")
