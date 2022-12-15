@@ -991,19 +991,15 @@ class Ask(Command):
                 q = name
             else:
                 q = (name + " " + argv).lstrip()
-        elif len(argv) > 1:
-            q = unicode_prune(argv)
         else:
-            q = argv
-        q = q.replace("？", "?")
-        if not q.replace("?", ""):
-            q = "Hi!"
-            # return "\xad" + choice(
-            #     "Sorry, didn't see that, was that a question? 🤔",
-            #     "Ay, speak up, I don't bite! :3",
-            #     "Haha, nice try, I know that's not an actual question 🙃",
-            #     "You thinking of asking an actual question?",
-            # )
+            if "openai_key" not in AUTH:
+                if len(argv) > 1:
+                    q = unicode_prune(argv)
+                else:
+                    q = argv
+                q = q.replace("？", "?")
+                if not q.replace("?", ""):
+                    q = "Hi!"
         print(f"{message.author}:", q)
         if q.casefold() in ("how", "how?"):
             a = "https://imgur.com/gallery/8cfRt"

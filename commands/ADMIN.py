@@ -990,8 +990,13 @@ class Archive(Command):
             proc = psutil.Popen(args, stdout=subprocess.PIPE)
             t = utc()
             while proc.is_running():
-                line = await create_future(proc.stdout.readline)
-                line = line.strip()
+                line = bytearray()
+                while not line or line[-1] != b"\n":
+                    b = await create_future(proc.stdout.read, 1)
+                    if not b:
+                        break
+                    line.append(b[0])
+                line = line.decode("utf-8").strip()
                 if line.endswith("(Complete)"):
                     break
                 if utc() - t >= 2:
