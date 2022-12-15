@@ -2420,12 +2420,12 @@ class Shop(Command):
                         st = f"Your current subscription is {pl}! Please visit {bot.kofi_url} if you'd like to upgrade or cancel!\n"
                     else:
                         st = ""
-                    if t >= 2:
+                    if t >= 2 and user.id not in bot.data.trusted[guild.id]:
                         return f"```\n{st}The current server's privilege level is already at the highest available level. However, you may still purchase this item for other servers.```"
                     if t == 1 and pl < 2:
                         return f"```\n{st}A premium subscription level of 2 or higher is required to promote this server further. Visit {bot.rapidapi_url} to purchase a subscription.```"
-                    target = 1 if pl < 2 else 2
-                    await send_with_react(channel, f"```callback-fun-shop-{user.id}_{item}_{target}-\n{st}You are about to upgrade the server's privilege level from {t} to {target}.```", reacts="✅", reference=message)
+                    target = 1 if pl < 2 or t == 2 else 2
+                    await send_with_react(channel, f"```callback-fun-shop-{user.id}_{item}_{target}-\n{st}You are about to {'up' if target >= item else 'down'}grade the server's privilege level from {t} to {target}.```", reacts="✅", reference=message)
                     return
                 if product.name == "Gold Ingots":
                     reacts = deque()
@@ -2444,7 +2444,7 @@ class Shop(Command):
             item, count = item.split("_", 1)
             count = int(count)
         else:
-            count = 1
+            count = 0
         u_id = int(u_id)
         if u_id != user.id:
             return
@@ -2456,11 +2456,11 @@ class Shop(Command):
         data = bot.data.users.get(user.id, {})
         gold = data.get("gold", 0)
         diamonds = data.get("diamonds", 0)
-        if count > 1 or len(product.cost) < 2 or diamonds >= product.cost[0]:
-            if count > 1 or gold >= product.cost[-1]:
+        if count != 0 or len(product.cost) < 2 or diamonds >= product.cost[0]:
+            if count != 0 or gold >= product.cost[-1]:
                 if product.name == "Upgrade Server":
                     t = bot.is_trusted(guild)
-                    if t >= 2:
+                    if t >= 2 and user.id not in bot.data.trusted.get(guild.id, ()):
                         await message.channel.send("```\nThe current server's privilege level is already at the highest available level. However, you may still purchase this item for other servers.```", reference=message)
                     pl = bot.premium_level(user)
                     if t == 1 and pl < 2:
@@ -2470,6 +2470,13 @@ class Shop(Command):
                         bot.data.users.add_diamonds(user, -product.cost[0])
                         bot.data.users.add_gold(user, -product.cost[-1])
                         bot.data.trusted[guild.id] = {None}
+                    elif count < 2:
+                        bot.data.premiums[user.id]["gl"].discard(guild.id)
+                        bot.data.premiums.update(user.id)
+                        bot.data.trusted[guild.id].discard(user.id)
+                        bot.data.trusted.update(guild.id)
+                        await message.channel.send(f"```{sqr_md(guild)} has been removed from your promoted server list.```", reference=message)
+                        return
                     else:
                         rm = bot.data.premiums.register(user, guild)
                         if rm:

@@ -767,8 +767,9 @@ class UpdatePremiums(Database):
                 i = d["gl"].pop()
                 if i in self.bot.data.trusted:
                     self.bot.data.trusted[i].discard(uid)
-                else:
-                    self.bot.data.trusted.pop(i, None)
+                    if not self.bot.data.trusted[i]:
+                        self.bot.data.trusted.pop(i, None)
+                    self.bot.data.trusted.update(i)
                 print(i, "subscription lost from", uid)
             self.update(uid)
         for i in d["gl"]:
