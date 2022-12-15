@@ -432,7 +432,7 @@ class Bot:
 		a1 = response
 		if not a1 or a1.lower() == q.lower() or vague(a1):
 			response = ""
-		elif (" " not in a1 or len(a1) < 12) and not a1[0].isnumeric() and not a1.endswith("."):
+		elif (" " not in a1 or len(a1) < 12) and not a1[0].isnumeric() and a1[-1] not in ".!?)]":
 			response = ""
 		else:
 			response = a1

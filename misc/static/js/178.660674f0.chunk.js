@@ -1,2 +1,0 @@
-(this.webpackJsonpmizaweb2=this.webpackJsonpmizaweb2||[]).push([[178],{259:function(n,e){n.exports=function(n){return{name:"VBScript in HTML",subLanguage:"xml",contains:[{begin:"<%",end:"%>",subLanguage:"vbscript"}]}}}}]);
-//# sourceMappingURL=178.660674f0.chunk.js.map
