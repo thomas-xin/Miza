@@ -987,6 +987,7 @@ class Archive(Command):
         info = ini_md("Archive Started!")
         m = await send_with_reply(channel, message, info)
         with discord.context_managers.Typing(channel):
+            print(args)
             proc = psutil.Popen(args, stdout=subprocess.PIPE)
             t = utc()
             while proc.is_running():
@@ -997,8 +998,6 @@ class Archive(Command):
                         break
                     line.append(b[0])
                 line = line.decode("utf-8").strip()
-                if line.endswith("(Complete)"):
-                    break
                 if utc() - t >= 2:
                     t = utc()
                     info = ini_md(f"Archive {sqr_md(line)}")

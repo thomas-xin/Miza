@@ -1000,6 +1000,8 @@ class Ask(Command):
                 q = q.replace("？", "?")
                 if not q.replace("?", ""):
                     q = "Hi!"
+            else:
+                q = argv
         print(f"{message.author}:", q)
         if q.casefold() in ("how", "how?"):
             a = "https://imgur.com/gallery/8cfRt"
