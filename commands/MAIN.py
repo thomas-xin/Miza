@@ -1191,7 +1191,7 @@ class Reminder(Command):
             if not len(rems):
                 return ini_md(f"No {word} currently set for {sqr_md(sendable)}.")
             if "f" not in flags:
-                return css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(rems))} ITEMS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0), force=True)
+                raise InterruptedError(css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(rems))} ITEMS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0), force=True))
             rems.clear()
             bot.data.reminders.pop(sendable.id, None)
             with suppress(IndexError):

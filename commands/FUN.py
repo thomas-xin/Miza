@@ -1801,7 +1801,7 @@ class React(Command):
             if "d" in flags:
                 # This deletes all auto reacts for the current guild
                 if "f" not in flags and len(curr) > 1:
-                    return css_md(sqr_md(f"WARNING: {len(curr)} ITEMS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), force=True)
+                    raise InterruptedError(css_md(sqr_md(f"WARNING: {len(curr)} ITEMS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), force=True))
                 if guild.id in following:
                     following.pop(guild.id)
                 return italics(css_md(f"Successfully removed all {sqr_md(len(curr))} auto reacts for {sqr_md(guild)}."))

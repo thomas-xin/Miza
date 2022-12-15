@@ -60,7 +60,7 @@ class Purge(Command):
                     if uset is None and m.author.bot or uset and m.author.id in uset:
                         delD.append(m)
         if len(delD) >= 64 and "f" not in flags:
-            return css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(delD))} MESSAGES TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0), force=True)
+            raise InterruptedError(css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(delD))} MESSAGES TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0), force=True))
         # attempt to bulk delete up to 100 at a time, otherwise delete 1 at a time
         deleted = 0
         delM = alist(delD)
@@ -142,7 +142,7 @@ class Mute(Command):
         if not users:
             raise LookupError("No results found.")
         if len(users) > 1 and "f" not in flags:
-            return css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(users))} USERS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0), force=True)
+            raise InterruptedError(css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(users))} USERS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0), force=True))
         if not args or name == "unmute":
             for user in users:
                 try:
@@ -372,7 +372,7 @@ class Ban(Command):
         if not users:
             raise LookupError("No results found.")
         if len(users) > 1 and "f" not in flags:
-            return css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(users))} USERS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0), force=True)
+            raise InterruptedError(css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(users))} USERS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0), force=True))
         if not args or name == "unban":
             for user in users:
                 try:
@@ -944,7 +944,7 @@ class Lockdown(Command):
 
     async def __call__(self, guild, channel, flags, **void):
         if "f" not in flags:
-            return self.bot.dangerous_command
+            raise InterruptedError(self.bot.dangerous_command)
         u_id = self.bot.id
         for role in guild.roles:
             if len(role.members) != 1 or role.members[-1].id not in (u_id, guild.owner_id):
@@ -964,15 +964,18 @@ class Archive(Command):
     min_level = 3
     description = "Archives all messages, attachments and users into a .zip folder. Requires server permission level 3 as well as a Lv2 or above ⟨MIZA⟩ subscription to perform, and may take a significant amount of time."
     usage = "<server>?"
+    flags = "f"
     rate_limit = (120, 180)
 
-    async def __call__(self, bot, message, guild, user, channel, argv, **void):
+    async def __call__(self, bot, message, guild, user, channel, argv, flags, **void):
         if argv:
             guild = await bot.fetch_guild(argv)
-        if bot.get_perm(user, guild) < 3:
+        if bot.get_perms(user, guild) < 3:
             raise PermissionError("You must be in the target server and have a permission level of minimum 3.")
         if max(bot.is_trusted(guild), bot.premium_level(user) * 2) < 2:
             raise PermissionError(f"You or the server must have a subscription level of minimum 2. Please make sure you have a subscription from {bot.kofi_url}.")
+        if "f" not in flags:
+            raise InterruptedError(css_md(uni_str(sqr_md(f"WARNING: SERVER DOWNLOAD REQUESTED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0), force=True))
         fn = f"cache/{ts_us()}.zip"
         args = [
             sys.executable,
