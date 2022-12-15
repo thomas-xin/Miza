@@ -376,10 +376,6 @@ class Bot:
 				presence_penalty=0.4,
 				user=str(hash(self.curr_history[-1][0])),
 			)
-		except openai.error.APIError:
-			pass
-		except openai.error.ServiceUnavailableError:
-			pass
 		except openai.error.InvalidRequestError:
 			response = openai.Completion.create(
 				model=model,
@@ -391,6 +387,8 @@ class Bot:
 				presence_penalty=0.4,
 				user=str(hash(self.curr_history[-1][0])),
 			)
+		except:
+			print_exc()
 		if response:
 			text = response.choices[0].text.strip()
 		print(f"GPTV3 {model} response:", text)
