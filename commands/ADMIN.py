@@ -981,7 +981,7 @@ class Archive(Command):
             sys.executable,
             "misc/server-dump.py",
             bot.token,
-            guild.id,
+            str(guild.id),
             fn,
         ]
         info = ini_md("Archive Started!")
@@ -989,7 +989,7 @@ class Archive(Command):
         with discord.context_managers.Typing(channel):
             proc = psutil.Popen(args, stdout=subprocess.PIPE)
             t = utc()
-            while True:
+            while proc.is_running():
                 line = proc.stdout.readline().strip()
                 if line.endswith("(Complete)"):
                     break
@@ -997,6 +997,8 @@ class Archive(Command):
                     t = utc()
                     info = ini_md(f"Archive {sqr_md(line)}")
                     await m.edit(content=info)
+        if not fn:
+            raise FileNotFoundError("The requested file was not found. If this issue persists, please report it in the support server.")
         await bot.send_with_file(channel, file=CompatFile(fn), reference=message)
 
 
