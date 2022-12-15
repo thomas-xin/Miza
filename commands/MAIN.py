@@ -640,6 +640,8 @@ class Info(Command):
         lv = bot.is_trusted(g)
         if lv > 0:
             d += f"\n{bot.name} Premium Upgraded Lv{lv} " + "💎" * lv
+            if lv < 2:
+                d += f"; Visit {bot.kofi_url} to upgrade!"
         else:
             d += f"\nNo {bot.name} Premium Upgrades! Visit {bot.kofi_url} to purchase one!"
         emb.description = d

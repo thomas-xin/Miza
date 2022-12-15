@@ -965,7 +965,7 @@ class Match(Command):
 class Ask(Command):
     _timeout_ = 8
     alias = ["How"]
-    description = "Ask me any question, and I'll answer it. Make sure the server's at a premium level of at least 2 to be able to get the best results; check that using ~serverinfo!"
+    description = "Ask me any question, and I'll answer it. Premium Lv1 enables Google and GPT-Curie, Premium Lv2 enables GPT-Davinci; check that using ~serverinfo, or apply it with ~premium!"
     usage = "<string>"
     example = ("ask what's the date?", "ask what is the square root of 3721?", "ask can I have a hug?")
     # flags = "h"
@@ -1041,7 +1041,6 @@ class Ask(Command):
                     personality=bot.commands.personality[0].retrieve((guild or channel).id),
                     premium=premium,
                 )
-                cb.timestamp = utc()
                 i = 0
                 async for m in bot.history(channel, limit=50):
                     if i >= cb.history_length:
@@ -1050,7 +1049,9 @@ class Ask(Command):
                         cb.appendleft((m.author, m.content))
                         i += 1
         else:
+            cb.name = bot.name
             cb.premium = premium
+            cb.timestamp = utc()
         with discord.context_managers.Typing(channel):
             urls = []
             if getattr(message, "reference", None):
@@ -1059,7 +1060,7 @@ class Ask(Command):
                 reference = None
             if reference and reference.content:# and not find_urls(reference.content):
                 print(reference.content)
-                cb.append((reference.author.display_name, reference.content))
+                cb.append((bot.name if reference.author.id == bot.id else reference.author.display_name, reference.content))
             if TrOCRProcessor:
                 if reference and (find_urls(reference.content) or reference.attachments or reference.embeds):
                     url = f"https://discord.com/channels/0/{channel.id}/{reference.id}"
@@ -1266,7 +1267,7 @@ class Personality(Command):
     server_only = True
     name = ["ChangePersonality"]
     min_level = 2
-    description = "Customises ⟨MIZA⟩'s personality for ~ask in the current server. Note that initial responses are often given in a polite manner regardless of personality traits set."
+    description = "Customises ⟨MIZA⟩'s personality for ~ask in the current server. Requires a Lv2 or above ⟨MIZA⟩ subscription to perform. Note that initial responses are often given in a polite manner regardless of personality traits set."
     usage = "<traits>* <default{?d}>?"
     example = ("personality mischievous, cunning", "personality dry, sarcastic, snarky", "personality sweet, loving")
     flags = "aed"

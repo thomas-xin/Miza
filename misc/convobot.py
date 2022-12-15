@@ -317,10 +317,9 @@ class Bot:
 		q = self.chat_history[-1][1]
 		openai.api_key = self.token
 		lines = []
-		res = None
+		res = ""
 		if self.premium > 0 and (self.premium > 1 or literal_question(q)):
-			res = lim_str(self.google(raw=True), 512, mode="right").replace("\n", ". ").replace(": ", " -")
-			lines.append(f"Google: {res}\n")
+			res = lim_str(self.google(raw=True), 512, mode="right").replace("\n", ". ").replace(": ", " -").strip()
 		if self.chat_history:
 			for k, v in self.chat_history:
 				lines.append(f"{k}: {v}\n")
@@ -344,9 +343,11 @@ class Bot:
 		else:
 			soft = limit * 2
 		prompt = ""
-		while lines and len(prompt) < soft:
+		while lines and len(prompt) + len(res) < soft:
 			prompt = lines.pop(-1) + prompt
 		start = f"{self.name} is a {self.personality} AI:\n\n"
+		if res:
+			start += f"Google: {res}\n"
 		prompt = lim_str(start + prompt, limit * 3)
 		print("GPTV3 prompt:", prompt)
 		response = None

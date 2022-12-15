@@ -2388,6 +2388,10 @@ class Shop(Command):
     )
 
     async def __call__(self, bot, guild, channel, user, message, argv, name, **void):
+        if name.startswith("premium"):
+            premium = bot.premium_level(user)
+            if premium < 1:
+                return f"You have no assigned subscription! Please visit {bot.kofi_url} to purchase one, or join the support server at {bot.rcc_invite} if you've already purchased one!"
         if name != "shop":
             argv = "upgradeserver"
         if not argv:
@@ -2411,13 +2415,17 @@ class Shop(Command):
                     if hasattr(guild, "ghost"):
                         return "```\nThis item can only be purchased in a server.```"
                     t = bot.is_trusted(guild)
-                    if t >= 2:
-                        return "```\nThe current server's privilege level is already at the highest available level. However, you may still purchase this item for other servers.```"
                     pl = bot.premium_level(user)
+                    if name.startswith("premium"):
+                        st = f"Your current subscription is {pl}! Please visit {bot.kofi_url} if you'd like to upgrade or cancel!\n"
+                    else:
+                        st = ""
+                    if t >= 2:
+                        return f"```\n{st}The current server's privilege level is already at the highest available level. However, you may still purchase this item for other servers.```"
                     if t == 1 and pl < 2:
-                        return f"```\nA premium subscription level of 2 or higher is required to promote this server further. Visit {bot.rapidapi_url} to purchase a subscription.```"
+                        return f"```\n{st}A premium subscription level of 2 or higher is required to promote this server further. Visit {bot.rapidapi_url} to purchase a subscription.```"
                     target = 1 if pl < 2 else 2
-                    await send_with_react(channel, f"```callback-fun-shop-{user.id}_{item}_{target}-\nYou are about to upgrade the server's privilege level from {t} to {target}.```", reacts="✅", reference=message)
+                    await send_with_react(channel, f"```callback-fun-shop-{user.id}_{item}_{target}-\n{st}You are about to upgrade the server's privilege level from {t} to {target}.```", reacts="✅", reference=message)
                     return
                 if product.name == "Gold Ingots":
                     reacts = deque()
