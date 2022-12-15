@@ -957,42 +957,44 @@ class Lockdown(Command):
         return bold(css_md(sqr_md(uni_str("LOCKDOWN REQUESTED.")), force=True))
 
 
-class SaveChannel(Command):
+class Archive(Command):
     time_consuming = 1
-    _timeout_ = 16
-    name = ["BackupChannel", "DownloadChannel"]
+    _timeout_ = 3600
+    name = ["ArchiveServer", "DownloadServer"]
     min_level = 3
-    description = "Saves a number of messages in a channel, as well as their contents, to a .txt file."
-    usage = "<0:channel>? <1:message_limit(4096)>?"
-    example = ("savechannel 1000",)
+    description = "Archives all messages, attachments and users into a .zip folder. Requires server permission level 3 as well as a Lv2 or above ⟨MIZA⟩ subscription to perform, and may take a significant amount of time."
+    usage = "<server>?"
     rate_limit = (120, 180)
 
-    async def __call__(self, guild, channel, args, **void):
-        num = 4096
-        ch = channel
-        if args:
-            if len(args) >= 2:
-                num = await self.bot.eval_math(" ".join(args[1:]))
-                if not num <= 65536:
-                    raise OverflowError("Maximum number of messages allowed is 65536.")
-                if num <= 0:
-                    raise ValueError("Please input a valid message limit.")
-            ch = await self.bot.fetch_channel(verify_id(args[0]))
-            if guild is None or hasattr(guild, "ghost"):
-                if guild.id != ch.id:
-                    raise PermissionError("Target channel is not in this server.")
-            elif ch.id not in (c.id for c in guild.channels):
-                raise PermissionError("Target channel is not in this server.")
-        h = await ch.history(limit=num).flatten()
-        h = h[::-1]
-        s = ""
-        while h:
-            async with Delay(0.32):
-                if s:
-                    s += "\n\n"
-                s += "\n\n".join(message_repr(m, limit=4096, username=True) for m in h[:4096])
-                h = h[4096:]
-        return bytes(s, "utf-8")
+    async def __call__(self, bot, message, guild, user, channel, argv, **void):
+        if argv:
+            guild = await bot.fetch_guild(argv)
+        if bot.get_perm(user, guild) < 3:
+            raise PermissionError("You must be in the target server and have a permission level of minimum 3.")
+        if max(bot.is_trusted(guild), bot.premium_level(user) * 2) < 2:
+            raise PermissionError(f"You or the server must have a subscription level of minimum 2. Please make sure you have a subscription from {bot.kofi_url}.")
+        fn = f"cache/{ts_us()}.zip"
+        args = [
+            sys.executable,
+            "misc/server-dump.py",
+            bot.token,
+            guild.id,
+            fn,
+        ]
+        info = ini_md("Archive Started!")
+        m = await send_with_reply(channel, message, info)
+        with discord.context_managers.Typing(channel):
+            proc = psutil.Popen(args, stdout=subprocess.PIPE)
+            t = utc()
+            while True:
+                line = proc.stdout.readline().strip()
+                if line.endswith("(Complete)"):
+                    break
+                if utc() - t >= 2:
+                    t = utc()
+                    info = ini_md(f"Archive {sqr_md(line)}")
+                    await m.edit(content=info)
+        await bot.send_with_file(channel, file=CompatFile(fn), reference=message)
 
 
 class UserLog(Command):

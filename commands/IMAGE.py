@@ -1442,9 +1442,9 @@ class Waifu2x(Command):
         await bot.send_with_file(channel, "", file=image, filename=name, reference=message)
 
 
-class StableDiffusion(Command):
+class Art(Command):
     _timeout_ = 150
-    name = ["Art", "AIArt", "Inpaint", "Dalle", "Dalle2"]
+    name = ["AIArt", "Inpaint", "StableDiffusion", "Dalle", "Dalle2"]
     description = "Runs a Stable Diffusion AI art generator on the input prompt or image. Operates on a global queue system. Accepts appropriate keyword arguments."
     usage = "<0:prompt> <inpaint{?i}>"
     example = ("art cute kitten", "art https://mizabot.xyz/favicon")
@@ -1461,6 +1461,7 @@ class StableDiffusion(Command):
             args.insert(0, a.url)
         if not args:
             raise ArgumentError("Input string is empty.")
+        premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
         req = " ".join(args)
         url = None
         url2 = None
@@ -1562,7 +1563,7 @@ class StableDiffusion(Command):
         fn = None
         with discord.context_managers.Typing(channel):
             with tracebacksuppressor:
-                dalle2 = max(bot.is_trusted(guild), bot.premium_level(user) * 2) >= 2
+                dalle2 = premium >= 2
                 fn = await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2=dalle2, timeout=60)
         if not fn:
             if self.fut:
@@ -1633,7 +1634,7 @@ class StableDiffusion(Command):
                             "--strength",
                             "0.75",
                         ))
-                    if max(bot.is_trusted(guild), bot.premium_level(user) * 2) >= 2:
+                    if premium >= 2:
                         if not force and "--strength" not in kwargs and str(kwargs["--guidance-scale"]) == "7.5" and str(kwargs["--eta"]) == "0.8":
                             with open(image_1, "rb") as f:
                                 image_1b = f.read()
@@ -1684,7 +1685,18 @@ class StableDiffusion(Command):
                                 force_kill(proc)
                             raise
                         fn = "misc/stable_diffusion.openvino/output.png"
-        await bot.send_with_file(channel, "", fn, filename=lim_str(prompt, 96) + ".png", reference=message, reacts="🔳")
+        if not random.randint(0, 16) and premium < 2:
+            emb = discord.Embed(colour=rand_colour())
+            emb.set_author(**get_author(bot.user))
+            emb.description = (
+                "Looking for Dall·E 2 image synthesis?\n"
+                + "Unfortunately the service for it had to be cut short, as the API services were too expensive for my creator to keep up given the size of my audience.\n"
+                + f"However, if you would still wish to use the service for your user or server, it is available for subscription [here]({bot.kofi_url}), to help fund API usage!\n"
+                + "Any support is greatly appreciated!"
+            )
+        else:
+            emb = None
+        await bot.send_with_file(channel, "", fn, filename=lim_str(prompt, 96) + ".png", embed=emb, reference=message, reacts="🔳")
 
 
 class UpdateImages(Database):

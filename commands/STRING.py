@@ -1104,8 +1104,8 @@ class Ask(Command):
                 emb = discord.Embed(colour=rand_colour())
                 emb.set_author(**get_author(bot.user))
                 emb.description = (
-                    "Looking for my more advanced and intelligent chatbot to talk to?\n"
-                    + "Unfortunately the service for it had to be cut short, as the cutting-edge technology was too expensive for my creator to keep up given the size of my audience.\n"
+                    "Looking for my more advanced and intelligent GPT-based chatbot to talk to?\n"
+                    + "Unfortunately the service for it had to be cut short, as the API services were too expensive for my creator to keep up given the size of my audience.\n"
                     + f"However, if you would still wish to use the service for your user or server, it is available for subscription [here]({bot.kofi_url}), to help fund API usage!\n"
                     + "Any support is greatly appreciated!"
                 )
