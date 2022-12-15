@@ -2425,7 +2425,7 @@ class Shop(Command):
                     if t == 1 and pl < 2:
                         return f"```\n{st}A premium subscription level of 2 or higher is required to promote this server further. Visit {bot.rapidapi_url} to purchase a subscription.```"
                     target = 1 if pl < 2 or t == 2 else 2
-                    await send_with_react(channel, f"```callback-fun-shop-{user.id}_{item}_{target}-\n{st}You are about to {'up' if target >= item else 'down'}grade the server's privilege level from {t} to {target}.```", reacts="✅", reference=message)
+                    await send_with_react(channel, f"```callback-fun-shop-{user.id}_{item}_{target}-\n{st}You are about to {'up' if target >= t else 'down'}grade the server's privilege level from {t} to {target}.```", reacts="✅", reference=message)
                     return
                 if product.name == "Gold Ingots":
                     reacts = deque()
