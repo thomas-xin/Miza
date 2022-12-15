@@ -1701,3 +1701,7 @@ class Art(Command):
 
 class UpdateImages(Database):
     name = "images"
+
+    def __call__(self, **void):
+        if imagebot:
+            imagebot.update()

@@ -1042,7 +1042,7 @@ class Ask(Command):
                     premium=premium,
                 )
                 i = 0
-                async for m in bot.history(channel, limit=50):
+                async for m in bot.history(channel, limit=5):
                     if i >= cb.history_length:
                         break
                     if m.content:
@@ -1337,6 +1337,10 @@ class Personality(Command):
 
 class UpdatePersonalities(Database):
     name = "personalities"
+
+    def __call__(self, **void):
+        if convobot:
+            convobot.update()
 
 
 class Random(Command):

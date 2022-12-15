@@ -35,7 +35,7 @@ def create_driver():
 	service = browser["service"](browser["path"])
 	options = browser["options"]()
 	options.add_argument("--headless")
-	options.add_argument("--disable-gpu")
+	# options.add_argument("--disable-gpu")
 	options.add_argument("--no-sandbox")
 	options.add_argument("--deny-permission-prompts")
 	options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36")
@@ -70,11 +70,14 @@ def create_driver():
 	driver.folder = folder
 	return driver
 
+LAST_DRIVER = 0
 def ensure_drivers():
+	globals()["LAST_DRIVER"] = time.time()
 	while len(drivers) < 1:
 		drivers.append(exc.submit(create_driver))
 		time.sleep(1)
 def get_driver():
+	globals()["LAST_DRIVER"] = time.time()
 	if not drivers:
 		drivers.append(exc.submit(create_driver))
 	try:
@@ -82,6 +85,7 @@ def get_driver():
 		if hasattr(driver, "result"):
 			driver = driver.result()
 	except selenium.common.exceptions.WebDriverException:
+		print_exc()
 		driver = create_driver()
 	else:
 		try:
@@ -91,6 +95,9 @@ def get_driver():
 			driver = create_driver()
 	exc.submit(ensure_drivers)
 	return driver
+def update():
+	if time.time() - LAST_DRIVER >= 3600:
+		drivers.clear()
 
 def safecomp(gen):
 	while True:
