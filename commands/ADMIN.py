@@ -991,7 +991,7 @@ class Archive(Command):
             t = utc()
             while proc.is_running():
                 line = bytearray()
-                while not line or line[-1] != b"\n":
+                while not line or line[-1] != 10:
                     b = await create_future(proc.stdout.read, 1)
                     if not b:
                         break
