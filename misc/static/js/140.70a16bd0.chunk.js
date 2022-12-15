@@ -1,0 +1,2 @@
+(this.webpackJsonpmizaweb2=this.webpackJsonpmizaweb2||[]).push([[140],{220:function(n,s){n.exports=function(n){return{aliases:["pycon"],contains:[{className:"meta",starts:{end:/ |$/,starts:{end:"$",subLanguage:"python"}},variants:[{begin:/^>>>(?=[ ]|$)/},{begin:/^\.\.\.(?=[ ]|$)/}]}]}}}}]);
+//# sourceMappingURL=140.70a16bd0.chunk.js.map

@@ -1,0 +1,2 @@
+(this.webpackJsonpmizaweb2=this.webpackJsonpmizaweb2||[]).push([[95],{175:function(e,a){e.exports=function(e){return{name:"Leaf",contains:[{className:"function",begin:"#+[A-Za-z_0-9]*\\(",end:/ \{/,returnBegin:!0,excludeEnd:!0,contains:[{className:"keyword",begin:"#+"},{className:"title",begin:"[A-Za-z_][A-Za-z_0-9]*"},{className:"params",begin:"\\(",end:"\\)",endsParent:!0,contains:[{className:"string",begin:'"',end:'"'},{className:"variable",begin:"[A-Za-z_][A-Za-z_0-9]*"}]}]}]}}}}]);
+//# sourceMappingURL=95.5bcd6768.chunk.js.map
