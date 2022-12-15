@@ -200,7 +200,7 @@ class Bot:
 		self.email = email
 		self.password = password
 		self.name = name
-		self.personality = personality
+		self.personality = " ".join(personality.replace(",", " ").split())
 		self.chat_history = []
 		self.chat_history_ids = None
 		self.timestamp = time.time()
