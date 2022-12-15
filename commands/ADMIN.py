@@ -965,7 +965,7 @@ class Archive(Command):
     description = "Archives all messages, attachments and users into a .zip folder. Requires server permission level 3 as well as a Lv2 or above ⟨MIZA⟩ subscription to perform, and may take a significant amount of time."
     usage = "<server>?"
     flags = "f"
-    rate_limit = (120, 180)
+    rate_limit = 172800
 
     async def __call__(self, bot, message, guild, user, channel, argv, flags, **void):
         if argv:
