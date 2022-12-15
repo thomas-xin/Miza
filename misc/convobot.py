@@ -362,7 +362,7 @@ class Bot:
 			soft = limit * 2
 		prompt = ""
 		while lines and len(prompt) + len(res) < soft:
-			prompt = lines.pop(-1) + prompt
+			prompt = lim_str(lines.pop(-1), 128) + prompt
 		p = "" if self.premium < 2 else self.personality
 		if not p:
 			p = "an"
