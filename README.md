@@ -35,7 +35,11 @@ Miza's dedicated creator loves to find ways to make Miza bigger and better all t
 and fun to be had! with Features Including: <b>Moderation, Music, Fun, Image Manipulation, and more!</b>
 </p>
 
-<br>
+<p align="center">
+Please support the development of Miza here if you enjoy her services, or would like access to her premium features!<br>
+https://ko-fi.com/mizabot<br>
+Miza has been free to use for 3 years now since the start of her development, but is quickly becoming more expensive to sustain. Any donations are greatly appreciated, and 100% will go towards supporting Miza's future!
+</p>
 
 <h2 align="center">
 Table of Contents
@@ -199,3 +203,9 @@ Thanks to all the [contributers](https://github.com/thomas-xin/Miza/graphs/contr
 *Writing this README is [smudgedpasta](https://github.com/smudgedpasta), Miza's secondary bot owner! :3*
 
 <br>
+
+<p align="center">
+Please support the development of Miza here if you enjoy her services, or would like access to her premium features!<br>
+https://ko-fi.com/mizabot<br>
+Miza has been free to use for 3 years now since the start of her development, but is quickly becoming more expensive to sustain. Any donations are greatly appreciated, and 100% will go towards supporting Miza's future!
+</p>
