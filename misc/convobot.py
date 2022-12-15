@@ -226,7 +226,7 @@ class Bot:
 		history = []
 		if self.chat_history_ids is not None:
 			history.append(self.chat_history_ids)
-		for k, v in self.chat_history:
+		for k, v in self.curr_history:
 			history.append(tokenizer.encode(v + end, return_tensors="pt", max_length=2048, truncation=True))
 		bot_input_ids = torch.cat(history, dim=-1)
 		self.chat_history_ids = model.generate(bot_input_ids, max_length=16384, pad_token_id=tokenizer.eos_token_id)
@@ -312,16 +312,16 @@ class Bot:
 		"~": " ",
 	})
 	def gptcomplete(self):
-		if not self.chat_history:
+		if not self.curr_history:
 			return ""
-		q = self.chat_history[-1][1]
+		q = self.curr_history[-1][1]
 		openai.api_key = self.token
 		lines = []
 		res = ""
 		if self.premium > 0 and (self.premium > 1 or literal_question(q)):
 			res = lim_str(self.google(raw=True), 512, mode="right").replace("\n", ". ").replace(": ", " -").strip()
-		if self.chat_history:
-			for k, v in self.chat_history:
+		if self.curr_history:
+			for k, v in self.curr_history:
 				lines.append(f"{k}: {v}\n")
 		lines.append(f"{self.name}:")
 		if self.premium < 1 or self.premium < 2 and (len(q) >= 256 or res):
@@ -336,7 +336,7 @@ class Bot:
 			model = "text-davinci-003"
 			temp = 0.7
 			limit = 4000
-		q = self.chat_history[-1][1]
+		q = self.curr_history[-1][1]
 		words = q.casefold().translate(self.unpunctuation).split()
 		if "essay" in words or "full" in words or "write" in words or "writing" in words or "about" in words:
 			soft = limit
@@ -362,7 +362,7 @@ class Bot:
 				top_p=1,
 				frequency_penalty=0.8,
 				presence_penalty=0.4,
-				user=self.chat_history[-1][0],
+				user=str(hash(self.curr_history[-1][0])),
 			)
 		except openai.error.ServiceUnavailableError:
 			pass
@@ -375,7 +375,7 @@ class Bot:
 				top_p=1,
 				frequency_penalty=0.8,
 				presence_penalty=0.4,
-				user=self.chat_history[-1][0],
+				user=str(hash(self.curr_history[-1][0])),
 			)
 		if response:
 			text = response.choices[0].text.strip()
@@ -383,9 +383,9 @@ class Bot:
 		return text
 
 	def google(self, raw=False):
-		if not self.chat_history:
+		if not self.curr_history:
 			return ""
-		q = self.chat_history[-1][1]
+		q = self.curr_history[-1][1]
 		words = q.split()
 		q = " ".join(swap.get(w, w) for w in words)
 		driver = get_driver()
@@ -418,11 +418,12 @@ class Bot:
 	def ai(self):
 		while len(self.chat_history) > self.history_length:
 			self.chat_history.pop(0)
+		self.curr_history = self.chat_history.copy()
 		if self.premium > 0:
 			response = self.gptcomplete()
 			if response:
 				return self.append((self.name, response))
-		q = self.chat_history[-1][-1]
+		q = self.curr_history[-1][-1]
 		if self.premium > 0 and literal_question(q):
 			response = self.google()
 			if response:
