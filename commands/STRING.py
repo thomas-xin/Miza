@@ -1025,7 +1025,7 @@ class Ask(Command):
         premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
         try:
             cb = self.convos[channel.id]
-            if getattr(cb, "personality", None) != bot.commands.personality[0].retrieve(guild.id):
+            if guild and getattr(cb, "personality", None) != bot.commands.personality[0].retrieve(guild.id):
                 raise KeyError
             if utc() - cb.timestamp > 720:
                 raise KeyError
