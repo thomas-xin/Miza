@@ -197,7 +197,8 @@ def download(url, fn):
 	t = time.time()
 	if t - PTIME >= 1:
 		globals()["PTIME"] = t
-		print(f"\rProgress: {PROGRESS}", end=END)
+		sys.stdout.write(f"\rProgress: {PROGRESS}{END}")
+		sys.stdout.flush()
 
 users = {}
 while channels:
@@ -320,10 +321,10 @@ if fn:
 	from pathlib import Path
 	if os.path.exists(fn):
 		os.remove(fn)
-	fold = Path(sfold + os.listdir(sfold)[0])
+	fold = Path(sfold)
 	with zipfile.ZipFile(fn, "w", zipfile.ZIP_STORED) as z:
 		for entry in fold.rglob("*"):
 			z.write(entry, entry.relative_to(fold))
 	shutil.rmtree(sfold)
 
-print(f"\rProgress: {PROGRESS} (Complete)", end=END)
+sys.stdout.write(f"\rProgress: {PROGRESS} (Complete){END}")
