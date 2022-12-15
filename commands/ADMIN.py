@@ -1010,6 +1010,8 @@ class Archive(Command):
         if not fn:
             raise FileNotFoundError("The requested file was not found. If this issue persists, please report it in the support server.")
         await bot.send_with_file(channel, file=CompatFile(fn), reference=message)
+        info = ini_md("Archive Complete!")
+        await m.edit(content=info)
 
 
 class UserLog(Command):
