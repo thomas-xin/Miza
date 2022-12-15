@@ -1274,19 +1274,13 @@ class Personality(Command):
 
     def encode(self, p):
         return p.replace(
-            " and ", ", "
-        ).replace(
-            ", and ", ", "
-        ).replace(
-            ",and ", ", "
-        ).replace(
             ":", ";"
         ).removeprefix("an ").removeprefix("a ").removeprefix("more ").removesuffix(" ai")
 
     def decode(self, p):
-        if p.count(", ") > 1:
-            a, b, c = p.rpartition(", ")
-            p = a + " and " + c
+        # if p.count(", ") > 1:
+        #     a, b, c = p.rpartition(", ")
+        #     p = a + " and " + c
         return p
 
     def retrieve(self, i):
@@ -1301,6 +1295,8 @@ class Personality(Command):
         if not args:
             p = self.decode(self.retrieve(guild.id))
             return ini_md(f"My current personality for {sqr_md(guild)} is {sqr_md(p)}.")
+        if max(bot.is_trusted(guild), bot.premium_level(user) * 2) < 2:
+            raise PermissionError(f"Sorry, unfortunately this feature is for premium users only. Please make sure you have a subscription level of minimum 2 from {bot.kofi_url}!")
         p = self.encode(" ".join(args).replace(",", " ").replace("  ", " ").replace(" ", ", "))
         import openai
         inappropriate = False
