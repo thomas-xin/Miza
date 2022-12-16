@@ -350,7 +350,7 @@ class Bot:
 	})
 	def gptcomplete(self):
 		if not self.curr_history:
-			return ""
+			return "", 0
 		q = self.curr_history[-1][1]
 		openai.api_key = self.token
 		lines = []
@@ -546,7 +546,7 @@ class Bot:
 		else:
 			response = a1
 		if not googled and not response:
-			response = (self.google, self.bing)[random.randint(0, 1)]
+			response = (self.google, self.bing)[random.randint(0, 1)]()
 			if response:
 				return self.append((self.name, response)), 0
 		if not response:
