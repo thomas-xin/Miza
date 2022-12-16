@@ -341,6 +341,7 @@ class Bot:
 		if self.curr_history:
 			for k, v in self.curr_history[:-1]:
 				lines.append(lim_str(f"{k}: {v}\n", 128))
+			k, v = self.curr_history[-1]
 			lines.append(f"{k}: {v}\n")
 		lines.append(lim_str(f"{self.name}:", 2048))
 		if self.premium < 1 or self.premium < 2 and (len(q) >= 256 or res):
