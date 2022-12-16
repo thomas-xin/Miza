@@ -799,6 +799,8 @@ class UpdatePremiums(Database):
             i = gl.pop()
             rm.append(i)
             self.bot.data.trusted[i].discard(user.id)
+        self.update(user.id)
+        self.bot.data.trusted.update(guild.id)
         return rm
 
 
