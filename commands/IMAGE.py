@@ -1563,7 +1563,7 @@ class Art(Command):
         fn = None
         with discord.context_managers.Typing(channel):
             with tracebacksuppressor:
-                dalle2 = premium >= 2
+                dalle2 = premium >= 2 and name != "stablediffusion"
                 if dalle2 and guild.id == 312733374831788034:
                     self.imagebot.token = AUTH.get("openai_key_2")
                 else:
