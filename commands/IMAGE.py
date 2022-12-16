@@ -1564,6 +1564,10 @@ class Art(Command):
         with discord.context_managers.Typing(channel):
             with tracebacksuppressor:
                 dalle2 = premium >= 2
+                if dalle2 and guild.id == 312733374831788034:
+                    self.imagebot.token = AUTH.get("openai_key_2")
+                else:
+                    self.imagebot.token = AUTH.get("openai_key")
                 fn = await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2=dalle2, timeout=60)
                 if fn and dalle2 and "costs" in bot.data:
                     bot.data.costs.put(user.id, 180000)
@@ -1644,6 +1648,10 @@ class Art(Command):
                             with open(image_2, "rb") as f:
                                 image_2b = f.read()
                         with tracebacksuppressor:
+                            if guild.id == 312733374831788034:
+                                self.imagebot.token = AUTH.get("openai_key_2")
+                            else:
+                                self.imagebot.token = AUTH.get("openai_key")
                             fn = await create_future(self.imagebot.dalle_i2i, prompt, image_1b, image_2b, timeout=60)
                             done = True
                             if fn and "costs" in bot.data:
