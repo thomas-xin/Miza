@@ -362,22 +362,17 @@ class Bot:
 			else:
 				res = self.bing(raw=True)
 				start = "Bing: "
-			res = self.answer_summarise("facebook/bart-large-cnn", res, max_length=384, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
-			res = lim_str(start + res, 384, mode="right")
+			if len(self.gpttokens(res)) > 96:
+				res = self.answer_summarise("facebook/bart-large-cnn", res, max_length=96, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
+			res = start + res
 		if self.curr_history:
 			for k, v in self.curr_history[:-1]:
 				s = f"{k}: {v}\n"
-				if len(s) > 128:
-					s = self.answer_summarise("facebook/bart-large-cnn", s).replace("\n", ". ").strip()
-					s = lim_str(s, 128)
 				lines.append(s)
 			k, v = self.curr_history[-1]
 			s = f"{k}: {v}\n"
-			if len(s) > 2048:
-				s = self.answer_summarise("facebook/bart-large-cnn", s, max_length=2048, min_length=32).replace("\n", ". ").strip()
-				if len(s) < 256:
-					s = f"{k}: {v}\n"
-				s = lim_str(s, 1024)
+			if len(self.gpttokens(s)) > 384:
+				s = self.answer_summarise("facebook/bart-large-cnn", s, max_length=384, min_length=32).replace("\n", ". ").strip()
 			lines.append(s)
 		lines.append(f"{self.name}:")
 		if self.premium < 1 or self.premium < 2 and (len(q) >= 256 or res):
@@ -561,11 +556,22 @@ class Bot:
 
 	def append(self, tup):
 		if not self.chat_history or tup != self.chat_history[-1]:
+			if self.chat_history:
+				k, v = self.chat_history[-1]
+				if len(self.gpptokens(v)) > 32:
+					v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
+					# v = lim_str(v, 192)
+					self.chat_history[-1] = (k, v)
 			self.chat_history.append(tup)
 		return tup[-1]
 
 	def appendleft(self, tup):
 		if not self.chat_history or tup != self.chat_history[0]:
+			k, v = tup
+			if len(self.gpptokens(v)) > 32:
+				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
+				# v = lim_str(v, 192)
+				tup = (k, v)
 			self.chat_history.insert(0, tup)
 		return tup[0]
 
