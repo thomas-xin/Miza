@@ -1007,7 +1007,7 @@ class Ask(Command):
             a = "https://imgur.com/gallery/8cfRt"
             if channel.id in self.convos:
                 cb = self.convos[channel.id]
-                cb.append((message.author.display_name, q))
+                await create_future(cb.append, (message.author.display_name, q))
                 cb.append((bot.name, a))
             await send_with_reply(channel, message, a)
             return
@@ -1015,7 +1015,7 @@ class Ask(Command):
             a = "dQw4w9WgXcQ"
             if channel.id in self.convos:
                 cb = self.convos[channel.id]
-                cb.append((message.author.display_name, q))
+                await create_future(cb.append, (message.author.display_name, q))
                 cb.append((bot.name, a))
             await send_with_reply(channel, message, a)
             return
@@ -1052,7 +1052,7 @@ class Ask(Command):
                     if i >= cb.history_length:
                         break
                     if m.content:
-                        cb.appendleft((bot.name if m.author.id == bot.id else m.author.display_name, unicode_prune(m.content)))
+                        await create_future(cb.appendleft, (bot.name if m.author.id == bot.id else m.author.display_name, unicode_prune(m.content)))
                         i += 1
         else:
             cb.name = bot.name
@@ -1066,7 +1066,7 @@ class Ask(Command):
                 reference = None
             if reference and reference.content:# and not find_urls(reference.content):
                 print(reference.content)
-                cb.append((bot.name if reference.author.id == bot.id else reference.author.display_name, reference.content))
+                await create_future(cb.append, (bot.name if reference.author.id == bot.id else reference.author.display_name, reference.content))
             if TrOCRProcessor:
                 if reference and (find_urls(reference.content) or reference.attachments or reference.embeds):
                     url = f"https://discord.com/channels/0/{channel.id}/{reference.id}"
@@ -1098,10 +1098,10 @@ class Ask(Command):
                                 if len(self.analysed) > 4096:
                                     self.analysed.pop(next(iter(self.analysed)), None)
                                 self.analysed[url] = prompt
-                                cb.append(("GPT2", prompt))
+                                await create_future(cb.append, ("GPT2", prompt))
                     else:
-                        cb.append(("GPT2", prompt))
-            cb.append((message.author.display_name, q))
+                        await create_future(cb.append, ("GPT2", prompt))
+            await create_future(cb.append, (message.author.display_name, q))
             out, cost = await create_future(cb.ai)
             if cost and "costs" in bot.data:
                 bot.data.costs.put(user.id, cost)
