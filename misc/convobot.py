@@ -356,12 +356,8 @@ class Bot:
 		lines = []
 		res = ""
 		if self.premium > 0 and (self.premium > 1 or literal_question(q)):
-			if random.randint(0, 1):
-				res = self.google(raw=True)
-				start = "Google: "
-			else:
-				res = self.bing(raw=True)
-				start = "Bing: "
+			res = self.google(raw=True)
+			start = "Google: "
 			if len(self.gpttokens(res)) > 96:
 				res = self.answer_summarise("facebook/bart-large-cnn", res, max_length=96, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
 			res = start + res
