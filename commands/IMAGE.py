@@ -1568,10 +1568,10 @@ class Art(Command):
                     self.imagebot.token = AUTH.get("openai_key_2")
                 else:
                     self.imagebot.token = AUTH.get("openai_key")
-                fn = await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2=dalle2, timeout=60)
-                if fn and dalle2 and "costs" in bot.data:
-                    bot.data.costs.put(user.id, 180000)
-                    bot.data.costs.put(guild.id, 180000)
+                fn, cost = await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2=dalle2, timeout=60)
+                if fn and cost and "costs" in bot.data:
+                    bot.data.costs.put(user.id, cost)
+                    bot.data.costs.put(guild.id, cost)
         if not fn:
             if self.fut:
                 with tracebacksuppressor:
@@ -1652,11 +1652,11 @@ class Art(Command):
                                 self.imagebot.token = AUTH.get("openai_key_2")
                             else:
                                 self.imagebot.token = AUTH.get("openai_key")
-                            fn = await create_future(self.imagebot.dalle_i2i, prompt, image_1b, image_2b, timeout=60)
+                            fn, cost = await create_future(self.imagebot.dalle_i2i, prompt, image_1b, image_2b, timeout=60)
                             done = True
-                            if fn and "costs" in bot.data:
-                                bot.data.costs.put(user.id, 180000)
-                                bot.data.costs.put(guild.id, 180000)
+                            if fn and cost and "costs" in bot.data:
+                                bot.data.costs.put(user.id, cost)
+                                bot.data.costs.put(guild.id, cost)
                 if not done:
                     if self.sdiff_sem.is_busy() and not getattr(message, "simulated", False):
                         await send_with_react(channel, italics(ini_md(f"StableDiffusion: {sqr_md(req)} enqueued in position {sqr_md(self.sdiff_sem.passive + 1)}.")), reacts="❎", reference=message)
