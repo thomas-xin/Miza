@@ -361,7 +361,7 @@ class Bot:
 			else:
 				res = self.bing(raw=True)
 				start = "Bing: "
-			res = self.answer_summarise("facebook/bart-large-cnn", res, max_length=384, min_length=128).replace("\n", ". ").replace(": ", " -").strip()
+			res = self.answer_summarise("facebook/bart-large-cnn", res, max_length=384, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
 			res = lim_str(start + res, 384, mode="right")
 		if self.curr_history:
 			for k, v in self.curr_history[:-1]:
@@ -410,7 +410,7 @@ class Bot:
 		start = f"{self.name} is {p} AI:\n\n"
 		if res:
 			start += res + "\n"
-		prompt = lim_str(start + prompt, limit * 3)
+		prompt = start + prompt
 		print("GPTV3 prompt:", prompt)
 		response = None
 		text = ""
@@ -419,7 +419,7 @@ class Bot:
 				model=model,
 				prompt=prompt,
 				temperature=temp,
-				max_tokens=limit - len(self.gpttokens(prompt)),
+				max_tokens=limit - len(self.gpttokens(prompt)) - 64,
 				top_p=1,
 				frequency_penalty=0.8,
 				presence_penalty=0.4,
@@ -515,7 +515,7 @@ class Bot:
 		while len(self.chat_history) > self.history_length:
 			self.chat_history.pop(0)
 		self.curr_history = self.chat_history.copy()
-		if self.premium > 0:
+		if self.premium > 0 or random.randint(0, 1):
 			response = self.gptcomplete()
 			if response:
 				return self.append((self.name, response))
