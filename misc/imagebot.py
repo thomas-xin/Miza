@@ -186,7 +186,7 @@ class Bot:
 				)
 		print(resp)
 		with requests.get(resp.data[0].url) as resp:
-			return resp.content
+			return resp.content, 180000
 
 	def art_mage(self, prompt, kwargs=None):
 		driver = get_driver()
@@ -289,7 +289,7 @@ class Bot:
 		funcs = []
 		if not specified and not url and not url2 or not os.path.exists("misc/stable_diffusion.openvino"):
 			if random.randint(0, 2) and self.cache.get(prompt):
-				return self.cache[prompt].pop(0)
+				return self.cache[prompt].pop(0), 0
 			funcs.append(self.art_mage)
 			funcs.append(self.art_deepai)
 		random.shuffle(funcs)
@@ -302,7 +302,10 @@ class Bot:
 				print_exc()
 				im = None
 			if im:
-				return im
+				if func is self.art_dalle:
+					return im, 180000
+				else:
+					return im, 0
 
 if __name__ == "__main__":
 	import sys
