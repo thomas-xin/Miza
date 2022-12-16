@@ -293,7 +293,7 @@ class Bot:
 			funcs.append(self.art_mage)
 			funcs.append(self.art_deepai)
 		random.shuffle(funcs)
-		if dalle2:
+		if dalle2 and not specified and not url and not url2:
 			funcs.insert(0, self.art_dalle)
 		for func in funcs:
 			try:

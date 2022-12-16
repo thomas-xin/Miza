@@ -3,7 +3,7 @@ import concurrent.futures
 import selenium, requests, torch, openai
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
-from transformers import AutoTokenizer, AutoModelForQuestionAnswering, AutoModelForCausalLM, pipeline, set_seed
+from transformers import GPT2TokenizerFast, AutoTokenizer, AutoModelForQuestionAnswering, AutoModelForCausalLM, pipeline, set_seed
 from traceback import print_exc
 
 try:
@@ -201,6 +201,7 @@ class Bot:
 		self.password = password
 		self.name = name
 		self.personality = " ".join(personality.replace(",", " ").split())
+		self.curr_history = []
 		self.chat_history = []
 		self.chat_history_ids = None
 		self.timestamp = time.time()
@@ -251,14 +252,21 @@ class Bot:
 		return tokenizer.decode(self.chat_history_ids[-4096:, bot_input_ids.shape[-1]:][0], skip_special_tokens=True).strip()
 
 	def answer_fill_mask(self, m, q):
-		if m == "xlm-roberta-large":
-			try:
-				fmp = self.models[m]
-			except KeyError:
-				fmp = self.models[m] = pipeline("fill-mask", model=m, tokenizer=m)
-			return fmp(q)[0]["sequence"]
+		try:
+			fmp = self.models[m]
+		except KeyError:
+			fmp = self.models[m] = pipeline("fill-mask", model=m, tokenizer=m)
+		return fmp(q)[0]["sequence"]
+
+	def answer_summarise(self, m, q, max_length=128, min_length=32, do_sample=False):
+		try:
+			smp = self.models[m]
+		except KeyError:
+			smp = self.models[m] = pipeline("summarization", model=m)
+		return smp(q, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
 
 	def clean_response(self, q, res):
+		res = res.strip()
 		if not res.isascii():
 			fut = exc.submit(self.question_context_analysis, "salti/bert-base-multilingual-cased-finetuned-squad", q, res)
 		else:
@@ -269,7 +277,9 @@ class Bot:
 		if len(a2) >= len(a1) * 2:
 			a1 = a2
 		a1 = a1.strip()
-		if not a1:
+		if len(a1) < 16:
+			res = self.answer_summarise("facebook/bart-large-cnn", res)
+			print("Bart response:", res)
 			return res.strip()
 		if "\n" not in a1 and ". " not in a1 and a1 in res:
 			for sentence in res.replace("\n", ". ").split(". "):
@@ -315,7 +325,15 @@ class Bot:
 						break
 					r.append(line)
 				response = "\n".join(r)
-		return response.strip().replace("  ", " ")
+		res = response.strip().replace("  ", " ")
+		print("Roberta response:", res)
+		return res
+
+	tokeniser = None
+	def gpttokens(self, s):
+		if not self.tokeniser:
+			self.tokeniser = GPT2TokenizerFast.from_pretrained("gpt2")
+		return self.tokeniser(s)["input_ids"]
 
 	unpunctuation = "".maketrans({
 		",": " ",
@@ -337,13 +355,30 @@ class Bot:
 		lines = []
 		res = ""
 		if self.premium > 0 and (self.premium > 1 or literal_question(q)):
-			res = lim_str(self.google(raw=True), 512, mode="right").replace("\n", ". ").replace(": ", " -").strip()
+			if random.randint(0, 1):
+				res = self.google(raw=True)
+				start = "Google: "
+			else:
+				res = self.bing(raw=True)
+				start = "Bing: "
+			res = self.answer_summarise("facebook/bart-large-cnn", res, max_length=384, min_length=128).replace("\n", ". ").replace(": ", " -").strip()
+			res = lim_str(start + res, 384, mode="right")
 		if self.curr_history:
 			for k, v in self.curr_history[:-1]:
-				lines.append(lim_str(f"{k}: {v}\n", 128))
+				s = f"{k}: {v}\n"
+				if len(s) > 128:
+					s = self.answer_summarise("facebook/bart-large-cnn", s).replace("\n", ". ").strip()
+					s = lim_str(s, 128)
+				lines.append(s)
 			k, v = self.curr_history[-1]
-			lines.append(f"{k}: {v}\n")
-		lines.append(lim_str(f"{self.name}:", 2048))
+			s = f"{k}: {v}\n"
+			if len(s) > 2048:
+				s = self.answer_summarise("facebook/bart-large-cnn", s, max_length=2048, min_length=32).replace("\n", ". ").strip()
+				if len(s) < 256:
+					s = f"{k}: {v}\n"
+				s = lim_str(s, 1024)
+			lines.append(s)
+		lines.append(f"{self.name}:")
 		if self.premium < 1 or self.premium < 2 and (len(q) >= 256 or res):
 			model = "text-babbage-001"
 			temp = 0.9
@@ -359,11 +394,11 @@ class Bot:
 		q = self.curr_history[-1][1]
 		words = q.casefold().translate(self.unpunctuation).split()
 		if "essay" in words or "full" in words or "write" in words or "writing" in words or "about" in words:
-			soft = limit
+			soft = limit / 4
 		else:
-			soft = limit * 2
+			soft = limit / 2
 		prompt = ""
-		while lines and len(prompt) + len(res) < soft:
+		while lines and len(self.gpttokens(prompt + res)) < soft:
 			prompt = lines.pop(-1) + prompt
 		p = "" if self.premium < 2 else self.personality
 		if not p:
@@ -374,7 +409,7 @@ class Bot:
 			p = "a " + p
 		start = f"{self.name} is {p} AI:\n\n"
 		if res:
-			start += f"Google: {res}\n"
+			start += res + "\n"
 		prompt = lim_str(start + prompt, limit * 3)
 		print("GPTV3 prompt:", prompt)
 		response = None
@@ -384,7 +419,7 @@ class Bot:
 				model=model,
 				prompt=prompt,
 				temperature=temp,
-				max_tokens=limit - len(prompt) // 3,
+				max_tokens=limit - len(self.gpttokens(prompt)),
 				top_p=1,
 				frequency_penalty=0.8,
 				presence_penalty=0.4,
@@ -395,7 +430,7 @@ class Bot:
 				model=model,
 				prompt=prompt,
 				temperature=temp,
-				max_tokens=limit - len(prompt),
+				max_tokens=int((limit - len(self.gpttokens(prompt))) * 0.75),
 				top_p=1,
 				frequency_penalty=0.8,
 				presence_penalty=0.4,
@@ -418,6 +453,7 @@ class Bot:
 		search = f"https://www.google.com/search?q={urllib.parse.quote_plus(q)}"
 		fut = exc.submit(driver.get, search)
 		fut.result(timeout=16)
+		time.sleep(1)
 
 		try:
 			elem = driver.find_element(by=webdriver.common.by.By.ID, value="rso")
@@ -426,20 +462,54 @@ class Bot:
 			drivers.append(driver)
 			return ""
 		res = elem.text
+		print("Google response:", res)
 		if res.startswith("Calculator result\n"):
-			response = " ".join(res.split("\n", 3)[1:3])
+			res = " ".join(res.split("\n", 3)[1:3])
 			if raw:
 				drivers.append(driver)
-				return response
+				return res
 		else:
 			res = "\n".join(r.strip() for r in res.splitlines() if valid_response(r))
 			if raw:
 				drivers.append(driver)
 				return res
-			response = self.clean_response(q, res)
-		print("Google response:", response)
+			res = self.clean_response(q, res)
 		drivers.append(driver)
-		return response
+		return res
+
+	def bing(self, raw=False):
+		if not self.curr_history:
+			return ""
+		q = self.curr_history[-1][1]
+		words = q.split()
+		q = " ".join(swap.get(w, w) for w in words)
+		driver = get_driver()
+		search = f"https://www.bing.com/search?q={urllib.parse.quote_plus(q)}"
+		fut = exc.submit(driver.get, search)
+		fut.result(timeout=16)
+		time.sleep(1)
+
+		try:
+			elem = driver.find_element(by=webdriver.common.by.By.ID, value="b_results")
+		except:
+			print("Bing: Timed out.")
+			drivers.append(driver)
+			return ""
+		res = elem.text
+		print("Bing response:", res)
+		if driver.find_elements(by=webdriver.common.by.By.ID, value="rcCalB"):
+			res = " ".join(res.split("\n", 3)[:2])
+			if raw:
+				drivers.append(driver)
+				return res
+		else:
+			res = "\n".join(r.strip() for r in res.splitlines() if valid_response(r))
+			if raw:
+				drivers.append(driver)
+				return res
+			res = self.clean_response(q, res)
+		drivers.append(driver)
+		return res
 
 	def ai(self):
 		while len(self.chat_history) > self.history_length:
@@ -451,7 +521,7 @@ class Bot:
 				return self.append((self.name, response))
 		q = self.curr_history[-1][-1]
 		if self.premium > 0 and literal_question(q):
-			response = self.google()
+			response = (self.google, self.bing)[random.randint(0, 1)]
 			if response:
 				return self.append((self.name, response))
 			googled = True
@@ -466,7 +536,7 @@ class Bot:
 		else:
 			response = a1
 		if not googled and not response:
-			response = self.google()
+			response = (self.google, self.bing)[random.randint(0, 1)]
 			if response:
 				return self.append((self.name, response))
 		if not response:
