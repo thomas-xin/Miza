@@ -1043,6 +1043,8 @@ class Ask(Command):
                 )
                 i = 0
                 async for m in bot.history(channel, limit=5):
+                    if m.id == message.id:
+                        continue
                     if i >= cb.history_length:
                         break
                     if m.content:
