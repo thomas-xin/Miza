@@ -480,7 +480,7 @@ class Bot:
 		return self.append((self.name, response))
 
 	def append(self, tup):
-                if not self.chat_history or tup != self.chat_history[-1]:
+		if not self.chat_history or tup != self.chat_history[-1]:
 			self.chat_history.append(tup)
 		return tup[-1]
 
