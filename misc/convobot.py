@@ -339,9 +339,10 @@ class Bot:
 		if self.premium > 0 and (self.premium > 1 or literal_question(q)):
 			res = lim_str(self.google(raw=True), 512, mode="right").replace("\n", ". ").replace(": ", " -").strip()
 		if self.curr_history:
-			for k, v in self.curr_history:
-				lines.append(f"{k}: {v}\n")
-		lines.append(f"{self.name}:")
+			for k, v in self.curr_history[:-1]:
+				lines.append(lim_str(f"{k}: {v}\n", 128))
+			lines.append(f"{k}: {v}\n")
+		lines.append(lim_str(f"{self.name}:", 2000))
 		if self.premium < 1 or self.premium < 2 and (len(q) >= 256 or res):
 			model = "text-babbage-001"
 			temp = 0.9
@@ -362,7 +363,7 @@ class Bot:
 			soft = limit * 2
 		prompt = ""
 		while lines and len(prompt) + len(res) < soft:
-			prompt = lim_str(lines.pop(-1), 128) + prompt
+			prompt = lines.pop(-1) + prompt
 		p = "" if self.premium < 2 else self.personality
 		if not p:
 			p = "an"
