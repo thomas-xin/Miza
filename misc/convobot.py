@@ -480,12 +480,14 @@ class Bot:
 		return self.append((self.name, response))
 
 	def append(self, tup):
-		self.chat_history.append(tup)
+                if not self.chat_history or tup != self.chat_history[-1]:
+			self.chat_history.append(tup)
 		return tup[-1]
 
 	def appendleft(self, tup):
-		self.chat_history.insert(0, tup)
-		return tup[-1]
+		if not self.chat_history or tup != self.chat_history[0]:
+			self.chat_history.insert(0, tup)
+		return tup[0]
 
 
 if __name__ == "__main__":
