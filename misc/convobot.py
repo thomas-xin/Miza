@@ -342,7 +342,7 @@ class Bot:
 			for k, v in self.curr_history[:-1]:
 				lines.append(lim_str(f"{k}: {v}\n", 128))
 			lines.append(f"{k}: {v}\n")
-		lines.append(lim_str(f"{self.name}:", 2000))
+		lines.append(lim_str(f"{self.name}:", 2048))
 		if self.premium < 1 or self.premium < 2 and (len(q) >= 256 or res):
 			model = "text-babbage-001"
 			temp = 0.9
