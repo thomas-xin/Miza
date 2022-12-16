@@ -206,6 +206,7 @@ class Bot:
 		self.chat_history_ids = None
 		self.timestamp = time.time()
 		self.premium = premium
+		self.last_cost = 0
 		self.history_length = 1 if premium < 1 else 2 if premium < 2 else 8
 
 	def question_context_analysis(self, m, q, c):
@@ -383,14 +384,17 @@ class Bot:
 			model = "text-babbage-001"
 			temp = 0.9
 			limit = 1000
+			cm = 5
 		elif self.premium < 2:
 			model = "text-curie-001"
 			temp = 0.8
 			limit = 2000
+			cm = 20
 		else:
 			model = "text-davinci-003"
 			temp = 0.7
 			limit = 4000
+			cm = 200
 		q = self.curr_history[-1][1]
 		words = q.casefold().translate(self.unpunctuation).split()
 		if "essay" in words or "full" in words or "write" in words or "writing" in words or "about" in words:
@@ -414,12 +418,13 @@ class Bot:
 		print("GPTV3 prompt:", prompt)
 		response = None
 		text = ""
+		pc = len(self.gpttokens(prompt))
 		try:
 			response = openai.Completion.create(
 				model=model,
 				prompt=prompt,
 				temperature=temp,
-				max_tokens=limit - len(self.gpttokens(prompt)) - 64,
+				max_tokens=limit - pc - 64,
 				top_p=1,
 				frequency_penalty=0.8,
 				presence_penalty=0.4,
@@ -430,7 +435,7 @@ class Bot:
 				model=model,
 				prompt=prompt,
 				temperature=temp,
-				max_tokens=int((limit - len(self.gpttokens(prompt))) * 0.75),
+				max_tokens=int((limit - pc) * 0.75),
 				top_p=1,
 				frequency_penalty=0.8,
 				presence_penalty=0.4,
@@ -439,9 +444,14 @@ class Bot:
 		except:
 			print_exc()
 		if response:
-			text = response.choices[0].text.strip()
+			text = response.choices[0].text
+			rc = len(self.gpttokens(text))
+			text = text.strip()
+			cost = (pc + rc) * cm
+		else:
+			cost = 0
 		print(f"GPTV3 {model} response:", text)
-		return text
+		return text, cost
 
 	def google(self, raw=False):
 		if not self.curr_history:
@@ -516,14 +526,14 @@ class Bot:
 			self.chat_history.pop(0)
 		self.curr_history = self.chat_history.copy()
 		if self.premium > 0 or random.randint(0, 1):
-			response = self.gptcomplete()
+			response, cost = self.gptcomplete()
 			if response:
-				return self.append((self.name, response))
+				return self.append((self.name, response)), cost
 		q = self.curr_history[-1][-1]
 		if self.premium > 0 and literal_question(q):
 			response = (self.google, self.bing)[random.randint(0, 1)]
 			if response:
-				return self.append((self.name, response))
+				return self.append((self.name, response)), 0
 			googled = True
 		else:
 			googled = False
@@ -538,16 +548,16 @@ class Bot:
 		if not googled and not response:
 			response = (self.google, self.bing)[random.randint(0, 1)]
 			if response:
-				return self.append((self.name, response))
+				return self.append((self.name, response)), 0
 		if not response:
 			response = reso
 		response = response.replace("  ", " ")
 		if not response:
-			response = self.gptcomplete()
+			response, cost = self.gptcomplete()
 			if response:
-				return self.append((self.name, response))
+				return self.append((self.name, response)), cost
 			response = "Sorry, I don't know."
-		return self.append((self.name, response))
+		return self.append((self.name, response)), 0
 
 	def append(self, tup):
 		if not self.chat_history or tup != self.chat_history[-1]:

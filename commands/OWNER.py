@@ -802,6 +802,17 @@ class UpdatePremiums(Database):
         return rm
 
 
+class UpdateCosts(Database):
+    name = "costs"
+
+    def put(self, i, cost):
+        try:
+            self[i] += cost
+        except KeyError:
+            self[i] = cost
+        self.update(i)
+
+
 class UpdateColours(Database):
     name = "colours"
     limit = 65536

@@ -1098,7 +1098,10 @@ class Ask(Command):
                     else:
                         cb.append(("GPT2", prompt))
             cb.append((message.author.display_name, q))
-            out = await create_future(cb.ai)
+            out, cost = await create_future(cb.ai)
+            if cost and "costs" in bot.data:
+                bot.data.costs.put(user.id, cost)
+                bot.data.costs.put(guild.id, cost)
         if out:
             print(out)
             if not random.randint(0, 16) and premium < 2:
