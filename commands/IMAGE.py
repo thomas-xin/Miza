@@ -1565,6 +1565,9 @@ class Art(Command):
             with tracebacksuppressor:
                 dalle2 = premium >= 2
                 fn = await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2=dalle2, timeout=60)
+                if fn and dalle2 and "costs" in bot.data:
+                    bot.data.costs.put(user.id, 180000)
+                    bot.data.costs.put(guild.id, 180000)
         if not fn:
             if self.fut:
                 with tracebacksuppressor:
@@ -1643,6 +1646,9 @@ class Art(Command):
                         with tracebacksuppressor:
                             fn = await create_future(self.imagebot.dalle_i2i, prompt, image_1b, image_2b, timeout=60)
                             done = True
+                            if fn and "costs" in bot.data:
+                                bot.data.costs.put(user.id, 180000)
+                                bot.data.costs.put(guild.id, 180000)
                 if not done:
                     if self.sdiff_sem.is_busy() and not getattr(message, "simulated", False):
                         await send_with_react(channel, italics(ini_md(f"StableDiffusion: {sqr_md(req)} enqueued in position {sqr_md(self.sdiff_sem.passive + 1)}.")), reacts="❎", reference=message)
