@@ -558,7 +558,7 @@ class Bot:
 		if not self.chat_history or tup != self.chat_history[-1]:
 			if self.chat_history:
 				k, v = self.chat_history[-1]
-				if len(self.gpptokens(v)) > 32:
+				if len(self.gpttokens(v)) > 32:
 					v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
 					# v = lim_str(v, 192)
 					self.chat_history[-1] = (k, v)
@@ -568,7 +568,7 @@ class Bot:
 	def appendleft(self, tup):
 		if not self.chat_history or tup != self.chat_history[0]:
 			k, v = tup
-			if len(self.gpptokens(v)) > 32:
+			if len(self.gpttokens(v)) > 32:
 				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
 				# v = lim_str(v, 192)
 				tup = (k, v)
