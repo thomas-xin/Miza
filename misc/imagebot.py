@@ -300,9 +300,9 @@ class Bot:
 				im = func(prompt, kwargs)
 			except:
 				print_exc()
-				im = None
+				im = dalle2 = None
 			if im:
-				if func is self.art_dalle:
+				if dalle2:
 					return im, 180000
 				else:
 					return im, 0
