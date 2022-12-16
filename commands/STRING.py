@@ -1033,8 +1033,12 @@ class Ask(Command):
             if not convobot:
                 cb = cdict(talk=lambda *args: "")
             else:
+                if guild.id == 312733374831788034:
+                    cb_token = AUTH.get("openai_key_2")
+                else:
+                    cb_token = AUTH.get("openai_key")
                 cb = self.convos[channel.id] = await create_future(convobot.Bot,
-                    token=AUTH.get("openai_key"),
+                    token=cb_token,
                     email=AUTH.get("openai_email"),
                     password=AUTH.get("openai_password"),
                     name=bot.name,
