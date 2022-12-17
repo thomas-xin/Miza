@@ -1019,15 +1019,12 @@ class Ask(Command):
                 cb.append((bot.name, a))
             await send_with_reply(channel, message, a)
             return
-            # choice(
-            #     "0GeQVtZ6Rd4",
-            # )
         premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
         try:
             cb = self.convos[channel.id]
             if guild and getattr(cb, "personality", None) != bot.commands.personality[0].retrieve(guild.id):
                 raise KeyError
-            if utc() - cb.timestamp > 720:
+            if utc() - cb.timestamp > 86400:
                 raise KeyError
         except KeyError:
             if not convobot:
@@ -1052,7 +1049,15 @@ class Ask(Command):
                     if i >= cb.history_length:
                         break
                     if m.content:
-                        await create_future(cb.appendleft, (bot.name if m.author.id == bot.id else m.author.display_name, unicode_prune(m.content)))
+                        if m.author.id == bot.id:
+                            name = bot.name
+                        else:
+                            name = m.author.display_name
+                            if name == bot.name:
+                                name = m.author.name
+                                if name == bot.name:
+                                    name = bot.name + "2"
+                        await create_future(cb.appendleft, (name, unicode_prune(m.content)))
                         i += 1
         else:
             cb.name = bot.name
@@ -1060,13 +1065,22 @@ class Ask(Command):
             cb.timestamp = utc()
         with discord.context_managers.Typing(channel):
             urls = []
+            refs = []
             if getattr(message, "reference", None):
                 reference = message.reference.resolved
             else:
                 reference = None
             if reference and reference.content:# and not find_urls(reference.content):
-                print(reference.content)
-                await create_future(cb.append, (bot.name if reference.author.id == bot.id else reference.author.display_name, reference.content, True))
+                m = reference
+                if m.author.id == bot.id:
+                    name = bot.name
+                else:
+                    name = m.author.display_name
+                    if name == bot.name:
+                        name = m.author.name
+                        if name == bot.name:
+                            name = bot.name + "2"
+                refs.append((name, reference.content))
             if TrOCRProcessor:
                 if reference and (find_urls(reference.content) or reference.attachments or reference.embeds):
                     url = f"https://discord.com/channels/0/{channel.id}/{reference.id}"
@@ -1098,11 +1112,19 @@ class Ask(Command):
                                 if len(self.analysed) > 4096:
                                     self.analysed.pop(next(iter(self.analysed)), None)
                                 self.analysed[url] = prompt
-                                await create_future(cb.append, ("GPT2", prompt))
+                                refs.append(("GPT2", prompt))
                     else:
-                        await create_future(cb.append, ("GPT2", prompt))
-            await create_future(cb.append, (message.author.display_name, q))
-            out, cost = await create_future(cb.ai)
+                        refs.append(("GPT2", prompt))
+            m = message
+            if m.author.id == bot.id:
+                name = bot.name
+            else:
+                name = m.author.display_name
+                if name == bot.name:
+                    name = m.author.name
+                    if name == bot.name:
+                        name = bot.name + "2"
+            out, cost = await create_future(cb.ai, name, q, refs=refs)
             if cost and "costs" in bot.data:
                 bot.data.costs.put(user.id, cost)
                 bot.data.costs.put(guild.id, cost)

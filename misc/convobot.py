@@ -195,19 +195,19 @@ class Bot:
 
 	models = {}
 
-	def __init__(self, token="", email="", password="", name="Miza", personality="friendly, playful, cute", premium=0):
+	def __init__(self, token="", email="", password="", name="Miza", personality="loyal friendly playful cute", premium=0):
 		self.token = token
 		self.email = email
 		self.password = password
 		self.name = name
 		self.personality = " ".join(personality.replace(",", " ").split())
-		self.curr_history = []
+		self.promises = []
 		self.chat_history = []
 		self.chat_history_ids = None
 		self.timestamp = time.time()
 		self.premium = premium
 		self.last_cost = 0
-		self.history_length = 1 if premium < 1 else 2 if premium < 2 else 8
+		self.history_length = 1 if premium < 1 else 2 if premium < 2 else 3
 
 	def question_context_analysis(self, m, q, c):
 		if m == "deepset/roberta-base-squad2":
@@ -227,7 +227,7 @@ class Bot:
 			tokenizer = AutoTokenizer.from_pretrained(m)
 			model = AutoModelForQuestionAnswering.from_pretrained(m)
 			self.models[m] = (tokenizer, model)
-		inputs = tokenizer(q[:512], c[:512], return_tensors="pt", max_length=4096, truncation=True)
+		inputs = tokenizer(q[:512], c[:1536], return_tensors="pt", max_length=4096, truncation=True)
 		with torch.no_grad():
 			outputs = model(**inputs)
 		answer_start_index = outputs.start_logits.argmax()
@@ -244,9 +244,13 @@ class Bot:
 			self.models[m] = (tokenizer, model)
 		end = tokenizer.eos_token
 		history = []
+		self.chat_history_ids = None
 		if self.chat_history_ids is not None:
 			history.append(self.chat_history_ids)
-		for k, v in self.curr_history:
+		else:
+			for k, v in self.promises:
+				history.append(tokenizer.encode(v + end, return_tensors="pt", max_length=2048, truncation=True))
+		for k, v in self.chat_history:
 			history.append(tokenizer.encode(v + end, return_tensors="pt", max_length=2048, truncation=True))
 		bot_input_ids = torch.cat(history, dim=-1)
 		self.chat_history_ids = model.generate(bot_input_ids, max_length=16384, pad_token_id=tokenizer.eos_token_id)
@@ -265,6 +269,13 @@ class Bot:
 		except KeyError:
 			smp = self.models[m] = pipeline("summarization", model=m)
 		return smp(q, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
+
+	def answer_classify(self, m, q, labels):
+		try:
+			zscp = self.models[m]
+		except KeyError:
+			zscp = self.models[m] = pipeline("zero-shot-classification", model=m)
+		return zscp(q, labels, truncation=True)
 
 	def clean_response(self, q, res):
 		res = res.strip()
@@ -348,31 +359,33 @@ class Bot:
 		"*": " ",
 		"~": " ",
 	})
-	def gptcomplete(self):
-		if not self.curr_history:
-			return "", 0
-		curr_history = self.curr_history
-		q = curr_history[-1][1]
+	def gptcomplete(self, u, q, refs):
 		openai.api_key = self.token
+		chat_history = self.chat_history.copy()
 		lines = []
+		for k, v in self.promises:
+			k = k.replace(":", "")
+			s = f"{k}: {v}\n"
+			lines.append(s)
+		for k, v in chat_history:
+			k = k.replace(":", "")
+			s = f"{k}: {v}\n"
+			lines.append(s)
 		res = ""
 		if self.premium > 0 and (self.premium > 1 or literal_question(q)):
-			res = self.google(raw=True)
+			res = self.google(q, raw=True)
 			start = "Google: "
 			if len(self.gpttokens(res)) > 96:
 				res = self.answer_summarise("facebook/bart-large-cnn", res, max_length=96, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
 			res = start + res + "\n"
-		for k, v, *args in curr_history[:-1]:
+			lines.append(res)
+		for k, v in refs:
 			k = k.replace(":", "")
+			if len(self.gpttokens(v)) > 32:
+				v = self.answer_summarise("facebook/bart-large-cnn", s, max_length=32, min_length=6).replace("\n", ". ").strip()
 			s = f"{k}: {v}\n"
 			lines.append(s)
-		if res:
-			if len(curr_history) > 1 and (curr_history[-2][0] != self.name or len(curr_history[-2]) > 2):
-				lines.insert(-1, res)
-			else:
-				lines.append(res)
-		k, v, *args = curr_history[-1]
-		s = f"{k}: {v}\n"
+		s = f"{u}: {q}\n"
 		if len(self.gpttokens(s)) > 384:
 			s = self.answer_summarise("facebook/bart-large-cnn", s, max_length=384, min_length=32).replace("\n", ". ").strip()
 		lines.append(s)
@@ -392,14 +405,13 @@ class Bot:
 			temp = 0.7
 			limit = 4000
 			cm = 200
-		q = curr_history[-1][1]
 		words = q.casefold().translate(self.unpunctuation).split()
 		if "essay" in words or "full" in words or "write" in words or "writing" in words or "about" in words:
 			soft = limit / 4
 		else:
 			soft = limit / 2
 		prompt = ""
-		while lines and len(self.gpttokens(prompt)) < soft:
+		while lines and len(prompt) < soft * 4:
 			prompt = lines.pop(-1) + prompt
 		p = "" if self.premium < 2 else self.personality
 		if not p:
@@ -423,7 +435,7 @@ class Bot:
 				top_p=1,
 				frequency_penalty=0.8,
 				presence_penalty=0.4,
-				user=str(hash(curr_history[-1][0])),
+				user=str(hash(u)),
 			)
 		except openai.error.InvalidRequestError:
 			response = openai.Completion.create(
@@ -434,7 +446,7 @@ class Bot:
 				top_p=1,
 				frequency_penalty=0.8,
 				presence_penalty=0.4,
-				user=str(hash(curr_history[-1][0])),
+				user=str(hash(u)),
 			)
 		except:
 			print_exc()
@@ -448,10 +460,7 @@ class Bot:
 		print(f"GPTV3 {model} response:", text)
 		return text, cost
 
-	def google(self, raw=False):
-		if not self.curr_history:
-			return ""
-		q = self.curr_history[-1][1]
+	def google(self, q, raw=False):
 		words = q.split()
 		q = " ".join(swap.get(w, w) for w in words)
 		driver = get_driver()
@@ -482,10 +491,7 @@ class Bot:
 		drivers.append(driver)
 		return res
 
-	def bing(self, raw=False):
-		if not self.curr_history:
-			return ""
-		q = self.curr_history[-1][1]
+	def bing(self, q, raw=False):
 		words = q.split()
 		q = " ".join(swap.get(w, w) for w in words)
 		driver = get_driver()
@@ -516,19 +522,18 @@ class Bot:
 		drivers.append(driver)
 		return res
 
-	def ai(self):
+	def ai(self, u, q, refs=()):
+		tup = (u, q)
 		while len(self.chat_history) > self.history_length:
 			self.chat_history.pop(0)
-		self.curr_history = self.chat_history.copy()
 		if self.premium > 0 or random.randint(0, 1):
-			response, cost = self.gptcomplete()
+			response, cost = self.gptcomplete(u, q, refs=refs)
 			if response:
-				return self.append((self.name, response)), cost
-		q = self.curr_history[-1][-1]
+				return self.after(tup, (self.name, response)), cost
 		if self.premium > 0 and literal_question(q):
-			response = (self.google, self.bing)[random.randint(0, 1)]
+			response = (self.google, self.bing)[random.randint(0, 1)](q)
 			if response:
-				return self.append((self.name, response)), 0
+				return self.after(tup, (self.name, response)), 0
 			googled = True
 		else:
 			googled = False
@@ -541,39 +546,60 @@ class Bot:
 		else:
 			response = a1
 		if not googled and not response:
-			response = (self.google, self.bing)[random.randint(0, 1)]()
+			response = (self.google, self.bing)[random.randint(0, 1)](q)
 			if response:
-				return self.append((self.name, response)), 0
+				return self.after(tup, (self.name, response)), 0
 		if not response:
 			response = reso
 		response = response.replace("  ", " ")
 		if not response:
-			response, cost = self.gptcomplete()
+			response, cost = self.gptcomplete(u, q, refs=refs)
 			if response:
-				return self.append((self.name, response)), cost
+				return self.after(tup, (self.name, response)), cost
 			response = "Sorry, I don't know."
-		return self.append((self.name, response)), 0
+		return self.after(tup, (self.name, response)), 0
 
 	def append(self, tup):
 		if not self.chat_history or tup != self.chat_history[-1]:
-			if self.chat_history:
-				k, v, *args = self.chat_history[-1]
-				if len(self.gpttokens(v)) > 32:
-					v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
-					# v = lim_str(v, 192)
-					self.chat_history[-1] = (k, v, *args)
+			k, v = tup
+			if len(self.gpttokens(v)) > 32:
+				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
+				tup = (k, v)
 			self.chat_history.append(tup)
 		return tup[-1]
 
 	def appendleft(self, tup):
 		if not self.chat_history or tup != self.chat_history[0]:
-			k, v, *args = tup
+			k, v = tup
 			if len(self.gpttokens(v)) > 32:
 				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
-				# v = lim_str(v, 192)
-				tup = (k, v, *args)
+				tup = (k, v)
 			self.chat_history.insert(0, tup)
 		return tup[0]
+
+	def after(self, t1, t2):
+		k, v = t2
+		if self.premium > 1:
+			labels = ("promise", "information", "example")
+			response = self.answer_classify("joeddav/xlm-roberta-large-xnli", v, labels)
+			data = dict(zip(response["labels"], response["scores"]))
+		if len(self.gpttokens(v)) > 32:
+			v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
+			t2 = (k, v)
+		k, v = t1
+		if len(self.gpttokens(v)) > 32:
+			v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
+			t1 = (k, v)
+		if self.premium > 1 and data["promise"] >= 0.5:
+			if len(self.promises) >= 8:
+				self.promises = self.promises[2:]
+			self.promises.append(t1)
+			self.promises.append(t2)
+			print("Promises:", self.promises)
+		else:
+			self.append(t1)
+			self.append(t2)
+		return t2
 
 
 if __name__ == "__main__":
