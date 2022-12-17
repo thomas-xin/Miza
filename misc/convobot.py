@@ -362,10 +362,14 @@ class Bot:
 				res = self.answer_summarise("facebook/bart-large-cnn", res, max_length=96, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
 			res = start + res + "\n"
 		for k, v in self.curr_history[:-1]:
+			k = k.replace(":", "")
 			s = f"{k}: {v}\n"
 			lines.append(s)
 		if res:
-			lines.append(res)
+			if len(self.curr_history) > 1 and self.curr_history[-2][0] != self.name:
+				lines.insert(-1, res)
+			else:
+				lines.append(res)
 		k, v = self.curr_history[-1]
 		s = f"{k}: {v}\n"
 		if len(self.gpttokens(s)) > 384:
