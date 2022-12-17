@@ -1066,7 +1066,7 @@ class Ask(Command):
                 reference = None
             if reference and reference.content:# and not find_urls(reference.content):
                 print(reference.content)
-                await create_future(cb.append, (bot.name + ":" if reference.author.id == bot.id else reference.author.display_name, reference.content))
+                await create_future(cb.append, (bot.name if reference.author.id == bot.id else reference.author.display_name, reference.content, True))
             if TrOCRProcessor:
                 if reference and (find_urls(reference.content) or reference.attachments or reference.embeds):
                     url = f"https://discord.com/channels/0/{channel.id}/{reference.id}"
