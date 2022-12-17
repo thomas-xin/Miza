@@ -362,16 +362,16 @@ class Bot:
 			if len(self.gpttokens(res)) > 96:
 				res = self.answer_summarise("facebook/bart-large-cnn", res, max_length=96, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
 			res = start + res + "\n"
-		for k, v in curr_history[:-1]:
+		for k, v, *args in curr_history[:-1]:
 			k = k.replace(":", "")
 			s = f"{k}: {v}\n"
 			lines.append(s)
 		if res:
-			if len(curr_history) > 1 and curr_history[-2][0] != self.name:
+			if len(curr_history) > 1 and (curr_history[-2][0] != self.name or len(curr_history[-2]) > 2):
 				lines.insert(-1, res)
 			else:
 				lines.append(res)
-		k, v = curr_history[-1]
+		k, v, *args = curr_history[-1]
 		s = f"{k}: {v}\n"
 		if len(self.gpttokens(s)) > 384:
 			s = self.answer_summarise("facebook/bart-large-cnn", s, max_length=384, min_length=32).replace("\n", ". ").strip()
@@ -557,21 +557,21 @@ class Bot:
 	def append(self, tup):
 		if not self.chat_history or tup != self.chat_history[-1]:
 			if self.chat_history:
-				k, v = self.chat_history[-1]
+				k, v, *args = self.chat_history[-1]
 				if len(self.gpttokens(v)) > 32:
 					v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
 					# v = lim_str(v, 192)
-					self.chat_history[-1] = (k, v)
+					self.chat_history[-1] = (k, v *args)
 			self.chat_history.append(tup)
 		return tup[-1]
 
 	def appendleft(self, tup):
 		if not self.chat_history or tup != self.chat_history[0]:
-			k, v = tup
+			k, v, *args = tup
 			if len(self.gpttokens(v)) > 32:
 				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
 				# v = lim_str(v, 192)
-				tup = (k, v)
+				tup = (k, v, *args)
 			self.chat_history.insert(0, tup)
 		return tup[0]
 
