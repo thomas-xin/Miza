@@ -561,7 +561,7 @@ class Bot:
 				if len(self.gpttokens(v)) > 32:
 					v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
 					# v = lim_str(v, 192)
-					self.chat_history[-1] = (k, v *args)
+					self.chat_history[-1] = (k, v, *args)
 			self.chat_history.append(tup)
 		return tup[-1]
 
