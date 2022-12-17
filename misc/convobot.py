@@ -360,16 +360,17 @@ class Bot:
 			start = "Google: "
 			if len(self.gpttokens(res)) > 96:
 				res = self.answer_summarise("facebook/bart-large-cnn", res, max_length=96, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
-			res = start + res
-		if self.curr_history:
-			for k, v in self.curr_history[:-1]:
-				s = f"{k}: {v}\n"
-				lines.append(s)
-			k, v = self.curr_history[-1]
+			res = start + res + "\n"
+		for k, v in self.curr_history[:-1]:
 			s = f"{k}: {v}\n"
-			if len(self.gpttokens(s)) > 384:
-				s = self.answer_summarise("facebook/bart-large-cnn", s, max_length=384, min_length=32).replace("\n", ". ").strip()
 			lines.append(s)
+		if res:
+			lines.append(res)
+		k, v = self.curr_history[-1]
+		s = f"{k}: {v}\n"
+		if len(self.gpttokens(s)) > 384:
+			s = self.answer_summarise("facebook/bart-large-cnn", s, max_length=384, min_length=32).replace("\n", ". ").strip()
+		lines.append(s)
 		lines.append(f"{self.name}:")
 		if self.premium < 1 or self.premium < 2 and (len(q) >= 256 or res):
 			model = "text-babbage-001"
@@ -393,7 +394,7 @@ class Bot:
 		else:
 			soft = limit / 2
 		prompt = ""
-		while lines and len(self.gpttokens(prompt + res)) < soft:
+		while lines and len(self.gpttokens(prompt)) < soft:
 			prompt = lines.pop(-1) + prompt
 		p = "" if self.premium < 2 else self.personality
 		if not p:
@@ -403,8 +404,6 @@ class Bot:
 		else:
 			p = "a " + p
 		start = f"{self.name} is {p} AI:\n\n"
-		if res:
-			start += res + "\n"
 		prompt = start + prompt
 		print("GPTV3 prompt:", prompt)
 		response = None
