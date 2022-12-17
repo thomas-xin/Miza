@@ -579,6 +579,7 @@ class Bot:
 
 	def after(self, t1, t2):
 		k, v = t2
+		a = v
 		if self.premium > 1:
 			labels = ("promise", "information", "example")
 			response = self.answer_classify("joeddav/xlm-roberta-large-xnli", v, labels)
@@ -599,7 +600,7 @@ class Bot:
 		else:
 			self.append(t1)
 			self.append(t2)
-		return t2[1]
+		return a
 
 
 if __name__ == "__main__":
