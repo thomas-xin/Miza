@@ -351,7 +351,8 @@ class Bot:
 	def gptcomplete(self):
 		if not self.curr_history:
 			return "", 0
-		q = self.curr_history[-1][1]
+		curr_history = self.curr_history
+		q = curr_history[-1][1]
 		openai.api_key = self.token
 		lines = []
 		res = ""
@@ -361,16 +362,16 @@ class Bot:
 			if len(self.gpttokens(res)) > 96:
 				res = self.answer_summarise("facebook/bart-large-cnn", res, max_length=96, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
 			res = start + res + "\n"
-		for k, v in self.curr_history[:-1]:
+		for k, v in curr_history[:-1]:
 			k = k.replace(":", "")
 			s = f"{k}: {v}\n"
 			lines.append(s)
 		if res:
-			if len(self.curr_history) > 1 and self.curr_history[-2][0] != self.name:
+			if len(curr_history) > 1 and curr_history[-2][0] != self.name:
 				lines.insert(-1, res)
 			else:
 				lines.append(res)
-		k, v = self.curr_history[-1]
+		k, v = curr_history[-1]
 		s = f"{k}: {v}\n"
 		if len(self.gpttokens(s)) > 384:
 			s = self.answer_summarise("facebook/bart-large-cnn", s, max_length=384, min_length=32).replace("\n", ". ").strip()
@@ -391,7 +392,7 @@ class Bot:
 			temp = 0.7
 			limit = 4000
 			cm = 200
-		q = self.curr_history[-1][1]
+		q = curr_history[-1][1]
 		words = q.casefold().translate(self.unpunctuation).split()
 		if "essay" in words or "full" in words or "write" in words or "writing" in words or "about" in words:
 			soft = limit / 4
@@ -422,7 +423,7 @@ class Bot:
 				top_p=1,
 				frequency_penalty=0.8,
 				presence_penalty=0.4,
-				user=str(hash(self.curr_history[-1][0])),
+				user=str(hash(curr_history[-1][0])),
 			)
 		except openai.error.InvalidRequestError:
 			response = openai.Completion.create(
@@ -433,7 +434,7 @@ class Bot:
 				top_p=1,
 				frequency_penalty=0.8,
 				presence_penalty=0.4,
-				user=str(hash(self.curr_history[-1][0])),
+				user=str(hash(curr_history[-1][0])),
 			)
 		except:
 			print_exc()
