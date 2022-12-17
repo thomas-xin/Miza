@@ -599,7 +599,7 @@ class Bot:
 		else:
 			self.append(t1)
 			self.append(t2)
-		return t2
+		return t2[1]
 
 
 if __name__ == "__main__":
