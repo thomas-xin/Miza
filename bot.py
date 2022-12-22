@@ -659,10 +659,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
     def user_from_identifier(self, u_id):
         if "#" in u_id:
-            try:
-                return self.usernames[u_id]
-            except:
-                pass
+            spl = u_id.split()
+            for i in range(len(spl) - 1):
+                uid = " ".join(spl[i:])
+                try:
+                    return self.usernames[uid]
+                except:
+                    pass
 
     async def fetch_user_member(self, u_id, guild=None):
         u_id = verify_id(u_id)
