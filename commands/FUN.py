@@ -2332,7 +2332,7 @@ class Wallet(Command):
     multi = True
     slash = ("Wallet", "Trial")
 
-    async def __call__(self, bot, name, args, argv, argl, user, guild, channel, **void):
+    async def __call__(self, bot, name, flags, args, argv, argl, user, guild, channel, **void):
         if name == "trial" or "t" in flags:
             premium = bot.premium_level(user, absolute=True)
             if premium >= 2:

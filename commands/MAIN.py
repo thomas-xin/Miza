@@ -803,8 +803,11 @@ class Info(Command):
                         st.append("Discord System ⚙️")
                         is_sys = True
                     lv = bot.premium_level(u)
-                    if lv > 0:
-                        st.append(f"{bot.name} Premium Supporter Lv{lv} " + "💎" * lv)
+                    lv2 = bot.premium_level(u, absolute=True)
+                    if lv2 > 0:
+                        st.append(f"{bot.name} Premium Supporter Lv{lv2} " + "💎" * lv2)
+                    elif lv > 0:
+                        st.append(f"{bot.name} Trial Supporter Lv{lv} " + "💎" * lv)
                     uf = getattr(u, "public_flags", None)
                     is_bot = False
                     if uf:
