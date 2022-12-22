@@ -1182,6 +1182,7 @@ class Uno(Command):
                     message=message,
                     content=s,
                     embed=emb,
+                    ephemeral=True,
                 ))
                 return await message.edit(content=content, embed=embed)
             # Already joined
@@ -1204,6 +1205,7 @@ class Uno(Command):
                 message=message,
                 content=s,
                 embed=emb,
+                ephemeral=True,
             )
         if r == "✅":
             # Start game
@@ -1251,6 +1253,7 @@ class Uno(Command):
                     bot=bot,
                     message=message,
                     content=s,
+                    ephemeral=True,
                 ))
                 sem = getattr(message, "sem", None)
                 if not sem:
@@ -1295,6 +1298,7 @@ class Uno(Command):
                 message=message,
                 content=s,
                 embed=emb,
+                ephemeral=True,
             )
         if r == "🔻":
             # Begins turn
@@ -1332,6 +1336,7 @@ class Uno(Command):
                     message=message,
                     content=s,
                     buttons=buttons,
+                    ephemeral=True,
                 )
             # Not your turn
             hand = hands[players.index(user.id)]
@@ -1350,6 +1355,7 @@ class Uno(Command):
                 message=message,
                 content=s,
                 embed=emb,
+                ephemeral=True,
             )
         if r == "~!":
             if user.id != players[turn]:
@@ -1410,6 +1416,7 @@ class Uno(Command):
                     message=message,
                     content=s,
                     buttons=buttons,
+                    ephemeral=True,
                 )
         if r in ("~!", "~@"):
             if user.id != players[turn]:
@@ -2325,7 +2332,7 @@ class Wallet(Command):
     multi = True
     slash = ("Wallet", "Trial")
 
-    async def __call__(self, bot, name, args, argv, argl, user, name, guild, channel, **void):
+    async def __call__(self, bot, name, args, argv, argl, user, guild, channel, **void):
         if name == "trial" or "t" in flags:
             premium = bot.premium_level(user, absolute=True)
             if premium >= 2:
