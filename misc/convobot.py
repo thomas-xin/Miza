@@ -195,8 +195,9 @@ class Bot:
 
 	models = {}
 
-	def __init__(self, token="", email="", password="", name="Miza", personality="loyal friendly playful cute", premium=0):
+	def __init__(self, token="", key="", email="", password="", name="Miza", personality="loyal friendly playful cute", premium=0):
 		self.token = token
+		self.key = key
 		self.email = email
 		self.password = password
 		self.name = name
@@ -227,7 +228,7 @@ class Bot:
 			tokenizer = AutoTokenizer.from_pretrained(m)
 			model = AutoModelForQuestionAnswering.from_pretrained(m)
 			self.models[m] = (tokenizer, model)
-		inputs = tokenizer(q[:512], c[:1536], return_tensors="pt", max_length=4096, truncation=True)
+		inputs = tokenizer(q[:512], c[:3584], return_tensors="pt", max_length=4096, truncation=True)
 		with torch.no_grad():
 			outputs = model(**inputs)
 		answer_start_index = outputs.start_logits.argmax()
@@ -283,14 +284,14 @@ class Bot:
 			fut = exc.submit(self.question_context_analysis, "salti/bert-base-multilingual-cased-finetuned-squad", q, res)
 		else:
 			fut = a2 = ""
-		a1 = self.question_context_analysis("deepset/roberta-base-squad2", q, res)
+		a1 = self.question_context_analysis("deepset/tinyroberta-squad2", q, res)
 		if fut:
 			a2 = fut.result()
-		if len(a2) >= len(a1) * 2:
+		if len(a2) >= len(a1) * 2 and len(a1) < 32:
 			a1 = a2
 		a1 = a1.strip()
 		if len(a1) < 16:
-			res = self.answer_summarise("facebook/bart-large-cnn", res)
+			res = self.answer_summarise("facebook/bart-large-cnn", q + "\n\n" + res)
 			print("Bart response:", res)
 			return res.strip()
 		if "\n" not in a1 and ". " not in a1 and a1 in res:
@@ -360,7 +361,7 @@ class Bot:
 		"~": " ",
 	})
 	def gptcomplete(self, u, q, refs):
-		openai.api_key = self.token
+		openai.api_key = self.key
 		chat_history = self.chat_history.copy()
 		lines = []
 		for k, v in self.promises:
@@ -423,9 +424,9 @@ class Bot:
 		start = f"{self.name} is {p} AI:\n\n"
 		prompt = start + prompt
 		print("GPTV3 prompt:", prompt)
+		pc = len(self.gpttokens(prompt))
 		response = None
 		text = ""
-		pc = len(self.gpttokens(prompt))
 		try:
 			response = openai.Completion.create(
 				model=model,
@@ -459,6 +460,12 @@ class Bot:
 			cost = 0
 		print(f"GPTV3 {model} response:", text)
 		return text, cost
+
+	def bloom(self, prompt):
+		API_URL = "https://api-inference.huggingface.co/models/bigscience/bloom"
+		headers = {"Authorization": f"Bearer {self.token}"}
+		resp = requests.post(API_URL, headers=headers, json=dict(inputs=prompt))
+		return resp.json()
 
 	def google(self, q, raw=False):
 		words = q.split()

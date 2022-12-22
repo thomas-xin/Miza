@@ -2171,20 +2171,24 @@ class UpdateUsers(Database):
 
     def add_gold(self, user, amount, multiplier=True):
         if user.id != self.bot.id and amount and not self.bot.is_blacklisted(user.id):
-            pl = self.bot.premium_level(user)
+            pl = self.bot.premium_level(user, absolute=True)
             if pl:
                 amount *= 2 ** pl
             add_dict(set_dict(self.data, user.id, {}), {"gold": amount})
+            if amount < 0 and self[user.id]["gold"] < 0:
+                self[user.id]["gold"] = 0
             self.update(user.id)
 
     def add_diamonds(self, user, amount, multiplier=True):
         if user.id != self.bot.id and amount and not self.bot.is_blacklisted(user.id):
-            pl = self.bot.premium_level(user)
+            pl = self.bot.premium_level(user, absolute=True)
             if pl:
                 amount *= 2 ** pl
             add_dict(set_dict(self.data, user.id, {}), {"diamonds": amount})
-            if "dailies" in self.bot.data:
+            if amount > 0 and "dailies" in self.bot.data:
                 self.bot.data.dailies.progress_quests(user, "diamond", amount)
+            if amount < 0 and self[user.id]["diamonds"] < 0:
+                self[user.id]["diamonds"] = 0
             self.update(user.id)
 
     async def _typing_(self, user, **void):

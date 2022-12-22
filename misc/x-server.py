@@ -17,6 +17,10 @@ try:
     RAPIDAPI_SECRET = AUTH["rapidapi_secret"]
 except KeyError:
     RAPIDAPI_SECRET = None
+try:
+    KOFI_SECRET = AUTH["kofi_secret"]
+except KeyError:
+    KOFI_SECRET = None
 
 
 HOST = "https://mizabot.xyz"
@@ -2041,38 +2045,48 @@ body {
                 send(traceback.format_exc())
             time.sleep(60)
 
-    rapidapi = 0
-    @cp.expose(("subscriptions",))
+    @cp.expose
     @hostmap
-    def subscription(self, **kwargs):
+    def donation(self, data={}):
         ip = cp.request.remote.ip
         try:
-            secret = cp.request.headers["X-RapidAPI-Proxy-Secret"]
-            if secret != RAPIDAPI_SECRET:
+            secret = data["verification_token"]
+            if secret != KOFI_SECRET:
                 raise KeyError
         except KeyError:
-            raise PermissionError("RapidAPI Proxy Secret not detected.")
-        user_id = kwargs.pop("user-id", "")
-        if "\x7f" in user_id:
-            raise ValueError
-        self.rapidapi += 1
-        oid = cp.request.headers["X-RapidAPI-User"]
-        subscription = cp.request.headers["X-RapidAPI-Subscription"]
-        i = ("BASIC", "PRO", "ULTRA", "MEGA", "CUSTOM").index(subscription)
-        if not user_id:
-            return f"Your premium subscription level has been verified as {subscription}!"
+            raise PermissionError("Ko-fi Proxy Secret not detected.")
+        print(data)
+        if data["type"] != "Donation":
+            return
+        amount = round_min(float(data["amount"]))
+        if amount <= 0:
+            return
+        msg = data["message"]
+        name = data["from_name"]
+        r = regexp("[^\\s@#:`][^@#:`]{0,30}[^\\s@#:`]#[0-9]{4}")
+        found = r.findall(msg)
+        if not found:
+            r = regexp("<@[!&]?[0-9]+>")
+            found = r.findall(msg)
+            if not found:
+                r = regexp("[0-9]{8,20}")
+                found = r.findall(msg)
+        if found:
+            uid = found[0]
+        else:
+            uid = None
         t = ts_us()
         while t in RESPONSES:
             t += 1
         RESPONSES[t] = fut = concurrent.futures.Future()
-        send(f"!{t}\x7fbot.data.premiums.subscribe({repr(user_id)},{i},{repr(oid)})", escape=False)
+        send(f"!{t}\x7fbot.donate({repr(name)},{repr(uid)},{amount},{repr(msg)})", escape=False)
         j, after = fut.result()
         RESPONSES.pop(t, None)
         res = j["result"]
-        if not res:
-            return f"An error occured fetching {user_id}. Please try again."
-        return f"{res} ~ Successfully renewed {subscription} subscription for Lv{i} benefits!"
+        print(res)
+        return as_str(res)
 
+    rapidapi = 0
     @cp.expose(("commands",))
     @hostmap
     def command(self, content="", input="", timeout=420, redirect=""):

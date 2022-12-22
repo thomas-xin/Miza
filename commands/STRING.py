@@ -1028,14 +1028,14 @@ class Ask(Command):
                 raise KeyError
         except KeyError:
             if not convobot:
-                cb = cdict(talk=lambda *args: "")
+                cb = None
             else:
                 if guild.id == 312733374831788034:
-                    cb_token = AUTH.get("openai_key_2")
+                    cb_key = AUTH.get("openai_key_2")
                 else:
-                    cb_token = AUTH.get("openai_key")
+                    cb_key = AUTH.get("openai_key")
                 cb = self.convos[channel.id] = await create_future(convobot.Bot,
-                    token=cb_token,
+                    key=cb_key,
                     email=AUTH.get("openai_email"),
                     password=AUTH.get("openai_password"),
                     name=bot.name,
@@ -1063,15 +1063,61 @@ class Ask(Command):
             cb.name = bot.name
             cb.premium = premium
             cb.timestamp = utc()
-        with discord.context_managers.Typing(channel):
-            urls = []
-            refs = []
-            if getattr(message, "reference", None):
-                reference = message.reference.resolved
-            else:
-                reference = None
-            if reference and reference.content:# and not find_urls(reference.content):
-                m = reference
+        emb = None
+        if cb:
+            with discord.context_managers.Typing(channel):
+                urls = []
+                refs = []
+                if getattr(message, "reference", None):
+                    reference = message.reference.resolved
+                else:
+                    reference = None
+                if reference and reference.content:# and not find_urls(reference.content):
+                    m = reference
+                    if m.author.id == bot.id:
+                        name = bot.name
+                    else:
+                        name = m.author.display_name
+                        if name == bot.name:
+                            name = m.author.name
+                            if name == bot.name:
+                                name = bot.name + "2"
+                    refs.append((name, reference.content))
+                if TrOCRProcessor:
+                    if reference and (find_urls(reference.content) or reference.attachments or reference.embeds):
+                        url = f"https://discord.com/channels/0/{channel.id}/{reference.id}"
+                        found = await bot.follow_url(url)
+                        if found and found[0] != url and is_image(found[0]) is not None:
+                            urls.append(found[0])
+                    if find_urls(message.content) or message.attachments or message.embeds:
+                        url = f"https://discord.com/channels/0/{channel.id}/{message.id}"
+                        found = await bot.follow_url(url)
+                        if found and found[0] != url and is_image(found[0]) is not None:
+                            urls.append(found[0])
+                    for url in urls:
+                        try:
+                            prompt = self.analysed[url]
+                        except KeyError:
+                            processor = await create_future(TrOCRProcessor.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
+                            model = await create_future(VisionEncoderDecoderModel.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
+                            b = await bot.get_request(url)
+                            with tracebacksuppressor:
+                                image = Image.open(io.BytesIO(b)).convert("RGB")
+                                pixel_values = processor(image, return_tensors="pt").pixel_values
+                                generated_ids = await create_future(model.generate, pixel_values)
+                                generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+                                prompt = generated_text.strip()
+                                if prompt:
+                                    prompt = prompt.replace(" is ", ", ").replace(" are ", ", ")
+                                    prompt = f"This is an image of {prompt}"
+                                    print(prompt)
+                                    if len(self.analysed) > 4096:
+                                        self.analysed.pop(next(iter(self.analysed)), None)
+                                    self.analysed[url] = prompt
+                                    refs.append(("GPT2", prompt))
+                        else:
+                            refs.append(("GPT2", prompt))
+                m = message
                 if m.author.id == bot.id:
                     name = bot.name
                 else:
@@ -1080,67 +1126,32 @@ class Ask(Command):
                         name = m.author.name
                         if name == bot.name:
                             name = bot.name + "2"
-                refs.append((name, reference.content))
-            if TrOCRProcessor:
-                if reference and (find_urls(reference.content) or reference.attachments or reference.embeds):
-                    url = f"https://discord.com/channels/0/{channel.id}/{reference.id}"
-                    found = await bot.follow_url(url)
-                    if found and found[0] != url and is_image(found[0]) is not None:
-                        urls.append(found[0])
-                if find_urls(message.content) or message.attachments or message.embeds:
-                    url = f"https://discord.com/channels/0/{channel.id}/{message.id}"
-                    found = await bot.follow_url(url)
-                    if found and found[0] != url and is_image(found[0]) is not None:
-                        urls.append(found[0])
-                for url in urls:
-                    try:
-                        prompt = self.analysed[url]
-                    except KeyError:
-                        processor = await create_future(TrOCRProcessor.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
-                        model = await create_future(VisionEncoderDecoderModel.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
-                        b = await bot.get_request(url)
-                        with tracebacksuppressor:
-                            image = Image.open(io.BytesIO(b)).convert("RGB")
-                            pixel_values = processor(image, return_tensors="pt").pixel_values
-                            generated_ids = await create_future(model.generate, pixel_values)
-                            generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
-                            prompt = generated_text.strip()
-                            if prompt:
-                                prompt = prompt.replace(" is ", ", ").replace(" are ", ", ")
-                                prompt = f"This is an image of {prompt}"
-                                print(prompt)
-                                if len(self.analysed) > 4096:
-                                    self.analysed.pop(next(iter(self.analysed)), None)
-                                self.analysed[url] = prompt
-                                refs.append(("GPT2", prompt))
-                    else:
-                        refs.append(("GPT2", prompt))
-            m = message
-            if m.author.id == bot.id:
-                name = bot.name
-            else:
-                name = m.author.display_name
-                if name == bot.name:
-                    name = m.author.name
-                    if name == bot.name:
-                        name = bot.name + "2"
-            out, cost = await create_future(cb.ai, name, q, refs=refs)
-            if cost and "costs" in bot.data:
-                bot.data.costs.put(user.id, cost)
-                bot.data.costs.put(guild.id, cost)
+                out, cost = await create_future(cb.ai, name, q, refs=refs)
+                if cost:
+                    if "costs" in bot.data:
+                        bot.data.costs.put(user.id, cost)
+                        bot.data.costs.put(guild.id, cost)
+                    data = bot.data.users.get(user.id)
+                    if data and data.get("trial"):
+                        bot.data.users.add_diamonds(user, cost / -25000)
+                        if data.get("diamonds", 0) < 1:
+                            emb = discord.Embed(colour=rand_colour())
+                            emb.set_author(**get_author(bot.user))
+                            emb.description = (
+                                "Uh-oh, it appears your tokens have run out! Top up using a donation [here]({bot.kofi_url}), "
+                                + "or purchase a subscription to gain temporary unlimited usage!"
+                            )
         if out:
             print(out)
-            if not random.randint(0, 16) and premium < 2:
+            if not emb and not random.randint(0, 16) and premium < 2:
                 emb = discord.Embed(colour=rand_colour())
                 emb.set_author(**get_author(bot.user))
                 emb.description = (
-                    "Looking for my more advanced and intelligent GPT-based chatbot to talk to?\n"
+                    "Looking for my more advanced and intelligent GPT-DaVinci chatbot to talk to?\n"
                     + "Unfortunately the service for it had to be cut short, as the API services were too expensive for my creator to keep up given the size of my audience.\n"
-                    + f"However, if you would still wish to use the service for your user or server, it is available for subscription [here]({bot.kofi_url}), to help fund API usage!\n"
-                    + "Any support is greatly appreciated!"
+                    + f"However, if you would still wish to use the service for your user or server, it is available for subscription [here]({bot.kofi_url}), to help fund API usage; any support is greatly appreciated!\n"
+                    + "Additionally if you would like to try out the premium features without paying, you may enable a temporary trial by using the ~trial command!"
                 )
-            else:
-                emb = None
             await send_with_reply(channel, message, lim_str("\xad" + escape_roles(out), 2000), embed=emb)
             return
         q = single_space(q).strip().translate(bot.mtrans).replace("?", "\u200b").strip("\u200b")
@@ -1328,7 +1339,7 @@ class Personality(Command):
             p = self.decode(self.retrieve(guild.id))
             return ini_md(f"My current personality for {sqr_md(guild)} is {sqr_md(p)}.")
         if max(bot.is_trusted(guild), bot.premium_level(user) * 2) < 2:
-            raise PermissionError(f"Sorry, unfortunately this feature is for premium users only. Please make sure you have a subscription level of minimum 2 from {bot.kofi_url}!")
+            raise PermissionError(f"Sorry, unfortunately this feature is for premium users only. Please make sure you have a subscription level of minimum 2 from {bot.kofi_url}, or try out ~trial if you haven't already!")
         p = self.encode(" ".join(args).replace(",", " ").replace("  ", " ").replace(" ", ", "))
         import openai
         inappropriate = False

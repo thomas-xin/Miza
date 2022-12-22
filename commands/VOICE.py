@@ -560,9 +560,12 @@ class CustomAudio(collections.abc.Hashable):
             else:
                 cnt = sum(1 for m in self.acsi.channel.members if not m.bot)
             if not cnt:
-                # Timeout for leaving is 120 seconds
-                if self.timeout < utc() - 120:
-                    return self.kill(css_md(f"🎵 Automatically disconnected from {sqr_md(guild)}: All channels empty. 🎵"))
+                # Timeout for leaving is 240 seconds
+                if self.timeout < utc() - 240:
+                    if self.queue:
+                        return self.kill(css_md(f"🎵 Automatically disconnected from {sqr_md(guild)}: All channels empty. 🎵"))
+                    else:
+                        return self.kill(css_md(f"🎵 Automatically disconnected from {sqr_md(guild)}: Queue empty. 🎵"))
                 perms = self.acsi.channel.permissions_for(guild.me)
                 if not perms.connect or not perms.speak:
                     return self.kill(css_md(f"🎵 Automatically disconnected from {sqr_md(guild)}: No permission to connect/speak in {sqr_md(self.acsi.channel)}. 🎵"))
@@ -583,7 +586,7 @@ class CustomAudio(collections.abc.Hashable):
                             with tracebacksuppressor(SemaphoreOverflowError):
                                 await_fut(self.move_unmute(self.acsi, ch))
                                 self.announce(ini_md(f"🎵 Detected {sqr_md(cnt)} user{'s' if cnt != 1 else ''} in {sqr_md(ch)}, automatically joined! 🎵"), aio=False)
-            else:
+            elif self.queue or cnt >= 2:
                 self.timeout = utc()
             self.queue.update_load()
 
@@ -3535,7 +3538,7 @@ class Connect(Command):
                 try:
                     await bot.wait_for("voice_state_update", check=lambda member, before, after: member.id == bot.id and after, timeout=1)
                 except (T0, T1, T2):
-                    if guild.me.voice is None and auds.asci is None:
+                    if guild.me.voice is None and auds.acsi is None:
                         if i >= 16:
                             auds.kill(reason="")
                             raise
@@ -4363,7 +4366,7 @@ class Radio(Command):
         resp = await Request(city, aio=True)
         title = "Radio stations in " + ", ".join(self.country_repr(c) for c in reversed(path)) + ", by frequency (MHz)"
         fields = deque()
-        search = b"<div class=exp>Click on the radio station name to listen online"
+        search = b'<table class=fix cellpadding="0" cellspacing="0">'
         resp = as_str(resp[resp.index(search) + len(search):resp.index(b"</p></div><!--end rightcontent-->")])
         for section in resp.split("<td class=tr31><b>")[1:]:
             scale = section[section.index("</b>,") + 5:section.index("Hz</td>")].upper()

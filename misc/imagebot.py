@@ -196,6 +196,16 @@ class Bot:
 		fut = exc.submit(driver.get, search)
 		fut.result(timeout=16)
 
+		# elems = driver.find_elements(by=class_name, value="mantine-1qsvvs3")
+		# if elems:
+		# 	elems[0].click()
+		# 	elems = driver.find_elements(by=class_name, value="mantine-q5ciiw")
+		# 	if elems:
+		# 		elems[0].click()
+		# 	elems = driver.find_elements(by=class_name, value="mantine-8jlqcf")
+		# 	if elems:
+		# 		elems[0].click()
+
 		bar = driver.find_element(by=webdriver.common.by.By.ID, value="search-bar")
 		try:
 			bar.send_keys(prompt)

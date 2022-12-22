@@ -1563,15 +1563,19 @@ class Art(Command):
         fn = None
         with discord.context_managers.Typing(channel):
             with tracebacksuppressor:
-                dalle2 = premium >= 2 and name != "stablediffusion"
+                dalle2 = name.startswith("dalle")
+                if dalle2 and premium < 2:
+                    raise PermissionError("Premium subscription required to perform DALL·E 2 operations.")
                 if dalle2 and guild.id == 312733374831788034:
                     self.imagebot.token = AUTH.get("openai_key_2")
                 else:
                     self.imagebot.token = AUTH.get("openai_key")
-                fn, cost = await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2=dalle2, timeout=60)
-                if fn and cost and "costs" in bot.data:
-                    bot.data.costs.put(user.id, cost)
-                    bot.data.costs.put(guild.id, cost)
+                tup = await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2=dalle2, timeout=60)
+                if tup:
+                    fn, cost = tup
+                    if fn and cost and "costs" in bot.data:
+                        bot.data.costs.put(user.id, cost)
+                        bot.data.costs.put(guild.id, cost)
         if not fn:
             if self.fut:
                 with tracebacksuppressor:
@@ -1698,18 +1702,18 @@ class Art(Command):
                                 force_kill(proc)
                             raise
                         fn = "misc/stable_diffusion.openvino/output.png"
-        if not random.randint(0, 16) and premium < 2:
-            emb = discord.Embed(colour=rand_colour())
-            emb.set_author(**get_author(bot.user))
-            emb.description = (
-                "Looking for Dall·E 2 image synthesis?\n"
-                + "Unfortunately the service for it had to be cut short, as the API services were too expensive for my creator to keep up given the size of my audience.\n"
-                + f"However, if you would still wish to use the service for your user or server, it is available for subscription [here]({bot.kofi_url}), to help fund API usage!\n"
-                + "Any support is greatly appreciated!"
-            )
-        else:
-            emb = None
-        await bot.send_with_file(channel, "", fn, filename=lim_str(prompt, 96) + ".png", embed=emb, reference=message, reacts="🔳")
+        # if not random.randint(0, 16) and premium < 2:
+        #     emb = discord.Embed(colour=rand_colour())
+        #     emb.set_author(**get_author(bot.user))
+        #     emb.description = (
+        #         "Looking for Dall·E 2 image synthesis?\n"
+        #         + "Unfortunately the service for it had to be cut short, as the API services were too expensive for my creator to keep up given the size of my audience.\n"
+        #         + f"However, if you would still wish to use the service for your user or server, it is available for subscription [here]({bot.kofi_url}), to help fund API usage!\n"
+        #         + "Any support is greatly appreciated!"
+        #     )
+        # else:
+        #     emb = None
+        await bot.send_with_file(channel, "", fn, filename=lim_str(prompt, 96) + ".png", reference=message, reacts="🔳")
 
 
 class UpdateImages(Database):

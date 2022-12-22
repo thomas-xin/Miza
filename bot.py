@@ -2100,7 +2100,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         return min(2, len(trusted[i]))
 
     # Checks a user's premium subscription level.
-    def premium_level(self, user):
+    def premium_level(self, user, absolute=False):
         try:
             premiums = self.data.premiums
         except (AttributeError, KeyError):
@@ -2112,8 +2112,43 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 for role in u.roles:
                     if role.id in self.premium_roles:
                         lv = max(lv, self.premium_roles[role.id])
-        premiums.subscribe(user, lv)
+        if not absolute:
+            data = bot.data.users.get(user.id)
+            if data and data.get("trial"):
+                if lv >= 2:
+                    data.pop("trial")
+                    bot.data.users.update(user.id)
+                elif data.get("diamonds", 0) >= 1:
+                    lv = max(lv, data["trial"])
+                else:
+                    data.pop("trial")
+                    bot.data.users.update(user.id)
+            premiums.subscribe(user, lv)
         return lv
+
+    async def donate(self, name, uid, amount, msg):
+        channel = self.get_channel(320915703102177293)
+        if not channel:
+            return
+        if msg:
+            emb = discord.Embed(colour=rand_colour())
+            emb.set_author(**get_author(self.user))
+            emb.description = msg
+        else:
+            emb = None
+        if not uid:
+            await channel.send(f"Failed to locate donation of ${amount} from user {name}!", embed=emb)
+        try:
+            user = await self.fetch_user(uid)
+        except:
+            print_exc()
+            await channel.send(f"Failed to locate donation of ${amount} from user {name}/{uid}!", embed=emb)
+        else:
+            dias = round_min(amount * 300)
+            self.data.users.add_diamonds(user, dias, multiplier=False)
+            create_task(channel.send(f"Thank you {user_mention(user.id)} for donating ${amount}! Your account has been credited 💎 {dias}!", embed=emb))
+            await user.send(f"Thank you for donating ${amount}! Your account has been credited 💎 {dias}!")
+            return True
 
     # Checks if a user is blacklisted from the bot.
     def is_blacklisted(self, user):
@@ -2858,6 +2893,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 self.guild_count = guild_count
                 status_changes = list(range(self.status_iter))
                 status_changes.extend(range(self.status_iter + 1, len(self.statuses) - (not self.audio)))
+                if not status_changes:
+                    status_changes = range(len(self.statuses))
                 self.status_iter = choice(status_changes)
                 with suppress(discord.NotFound):
                     text = f"{self.webserver}, to {uni_str(guild_count)} server{'s' if guild_count != 1 else ''}"
@@ -3034,9 +3071,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                                 d = command.used
                                 t = d.get(u_id, -inf)
                                 wait = utc() - t - x
-                                if wait > -1:
+                                if wait > min(1 - x, -1):
                                     if wait < 0:
-                                        w = max(0.2, -wait)
+                                        w = -wait
                                         d[u_id] = max(t, utc()) + w
                                         await asyncio.sleep(w)
                                     if len(d) >= 4096:
@@ -3569,7 +3606,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         if reacts or reference:
                             create_task(send_with_react(sendable, embed=emb, reacts=reacts, reference=reference))
                         else:
-                            create_task(sendable.send(embed=emb))
+                            create_task(send_with_reply(sendable, embed=emb))
                 return
             if force:
                 return await send_with_react(sendable, embeds=embeds, reacts=reacts, reference=reference)
@@ -4816,15 +4853,20 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             reacts = ""
         else:
             reacts="❎"
-        if not isinstance(ex, TooManyRequests) or random.randint(0, 5):
+        if not isinstance(ex, TooManyRequests):
             footer = None
+            fields = (("Unexpected or confusing error?", f"Consider joining the [support server]({self.rcc_invite}) for help and bug reports!"),)
         else:
-            footer = dict(text=f"Running into the rate limit often? Consider donating using one of the subscriptions here, which will grant shorter rate limits amongst other feature improvements! {self.kofi_url}")
+            if not random.randint(0, 5):
+                footer = dict(text=f"Running into the rate limit often? Consider donating using one of the subscriptions here, which will grant shorter rate limits amongst other feature improvements! {self.kofi_url}")
+            else:
+                footer = None
+            fields = None
         return self.send_as_embeds(
             messageable,
             description="\n".join(as_str(i) for i in ex.args),
             title=f"⚠ {type(ex).__name__} ⚠",
-            fields=(("Unexpected or confusing error?", f"Consider joining the [support server]({self.rcc_invite}) for help and bug reports!"),),
+            fields=fields,
             reacts=reacts,
             reference=reference,
             footer=footer,

@@ -1750,31 +1750,41 @@ class Matchmaking(Command):
 
 
 class Pay(Command):
-    name = ["GiveCoins", "GiveGold"]
-    description = "Pays a specified amount of coins to the target user."
-    usage = "<0:user> <1:amount(1)>?"
+    name = ["GiveCoins", "GiveGold", "GiveDiamond", "GiveDiamonds", "💎"]
+    description = "Pays a specified amount of coins or diamonds to the target user."
+    usage = "<0:user> <1:amount(1)>? <-1:diamonds{💎}>?"
     example = ("pay @Miza 100",)
     rate_limit = (6, 8)
 
-    async def __call__(self, bot, user, args, guild, **void):
+    async def __call__(self, bot, user, args, name, guild, **void):
         if not args:
             raise ArgumentError("Please input target user.")
         target = await bot.fetch_user_member(args.pop(0), guild)
         if target.id == bot.id:
             return "\u200bI appreciate the generosity, but I have enough already :3"
+        if len(args) > 1 and args[-1].casefold() in ("diamonds", "diamond", "💎"):
+            currency = "diamonds"
+            args.pop(-1)
+        elif len(args) > 1 and args[0].casefold() in ("diamonds", "diamond", "💎"):
+            currency = "diamonds"
+            args.pop(0)
+        elif "diamond" in name or name == "💎":
+            currency = "diamonds"
+        else:
+            currency = "gold"
         if args:
             amount = await bot.eval_math(" ".join(args))
         else:
             amount = 1
         if amount <= 0:
-            raise ValueError("Please input a valid amount of coins.")
-        if not amount <= bot.data.users.get(user.id, {}).get("gold", 0):
+            raise ValueError(f"Please input a valid amount of {currency}.")
+        if not amount <= bot.data.users.get(user.id, {}).get(currency, 0):
             raise OverflowError("Payment cannot be greater than your balance.")
-        bot.data.users.add_gold(user, -amount, multiplier=False)
-        bot.data.users.add_gold(target, amount, multiplier=False)
+        getattr(bot.data.users, f"add_{currency}")(user, -amount, multiplier=False)
+        getattr(bot.data.users, f"add_{currency}")(target, amount, multiplier=False)
         if user.id != target.id:
             bot.data.dailies.progress_quests(user, "pay", amount)
-        return css_md(f"{sqr_md(user)} has paid {sqr_md(amount)} coins to {sqr_md(target)}.")
+        return css_md(f"{sqr_md(user)} has paid {sqr_md(amount)} {currency} to {sqr_md(target)}.")
 
 
 class React(Command):
@@ -2306,15 +2316,33 @@ class UpdateDailies(Database):
 
 
 class Wallet(Command):
-    name = ["Level", "Bal", "Balance"]
-    description = "Shows the target users' wallet."
-    usage = "<users>*"
+    name = ["Level", "Bal", "Balance", "Trial"]
+    description = "Shows the target users' wallet, or enables a token-based trial of ⟨MIZA⟩'s premium features, where 1 💎 = 25000 quota."
+    usage = "<users>* <trial{?t}>?"
+    flags = "t"
     example = ("bal", "wallet @Miza")
     rate_limit = (3, 4)
     multi = True
-    slash = ("Wallet", "Bal")
+    slash = ("Wallet", "Trial")
 
-    async def __call__(self, bot, args, argv, argl, user, guild, channel, **void):
+    async def __call__(self, bot, name, args, argv, argl, user, name, guild, channel, **void):
+        if name == "trial" or "t" in flags:
+            premium = bot.premium_level(user, absolute=True)
+            if premium >= 2:
+                raise OverflowError("You already have a registered premium subscription and are permitted to use all features without additional costs.")
+            data = bot.data.users.get(user.id, {})
+            if data.get("trial"):
+                data.pop("trial", 0)
+                bot.premium_level(user)
+                bot.data.users.update(user.id)
+                return css_md(f"Successfully disabled trial mode for {sqr_md(user)}.")
+            elif data.get("diamonds", 0) < 1:
+                raise PermissionError("Insufficient funds. Requires at least 1 diamond 💎 to activate.")
+            else:
+                data["trial"] = 2
+                bot.premium_level(user)
+                bot.data.users.update(user.id)
+                return css_md(f"Successfully enabled trial mode for {sqr_md(user)}.")
         users = await bot.find_users(argl, args, user, guild)
         if not users:
             raise LookupError("No results found.")
