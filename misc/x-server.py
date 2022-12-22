@@ -2050,6 +2050,7 @@ body {
     def donation(self, data=None):
         ip = cp.request.remote.ip
         data = data or cp.request.json
+        self.data = data
         try:
             secret = data["verification_token"]
             if secret != KOFI_SECRET:
