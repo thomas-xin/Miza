@@ -2105,24 +2105,25 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             premiums = self.data.premiums
         except (AttributeError, KeyError):
             return 0
+        uid = verify_id(user)
         lv = 0
         if self.premium_server in self.cache.guilds:
-            u = self.cache.guilds[self.premium_server].get_member(user.id)
+            u = self.cache.guilds[self.premium_server].get_member(uid)
             if u:
                 for role in u.roles:
                     if role.id in self.premium_roles:
                         lv = max(lv, self.premium_roles[role.id])
         if not absolute:
-            data = bot.data.users.get(user.id)
+            data = bot.data.users.get(uid)
             if data and data.get("trial"):
                 if lv >= 2:
                     data.pop("trial")
-                    bot.data.users.update(user.id)
+                    bot.data.users.update(uid)
                 elif data.get("diamonds", 0) >= 1:
                     lv = max(lv, data["trial"])
                 else:
                     data.pop("trial")
-                    bot.data.users.update(user.id)
+                    bot.data.users.update(uid)
             premiums.subscribe(user, lv)
         return lv
 

@@ -2371,8 +2371,11 @@ class Wallet(Command):
                 ingot = await create_future(bot.data.emojis.emoji_as, "gold_ingot.gif")
                 description += f" {ingot} {ingots}"
             lv = bot.premium_level(user)
-            if lv > 0:
-                description += f"\n{bot.name} Premium Supporter Lv{lv} " + "💎" * lv
+            lv2 = bot.premium_level(user, absolute=True)
+            if lv2 > 0:
+                description += f"\n{bot.name} Premium Supporter Lv{lv2} " + "💎" * lv2)
+            elif lv > 0:
+                description += f"\n{bot.name} Trial Supporter Lv{lv} " + "💎" * lv)
             minecraft = data.get("minecraft", 0)
             if minecraft:
                 items = deque()

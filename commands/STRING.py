@@ -1131,10 +1131,18 @@ class Ask(Command):
                     if "costs" in bot.data:
                         bot.data.costs.put(user.id, cost)
                         bot.data.costs.put(guild.id, cost)
-                    data = bot.data.users.get(user.id)
+                    if bot.is_trusted(guild) >= 2:
+                        for uid in reversed(bot.data.trusted[guild.id]):
+                            if bot.premium_level(uid, absolute=True) >= 2:
+                                break
+                        u = await bot.fetch_user(uid)
+                    else:
+                        u = user
+                    data = bot.data.users.get(u.id)
                     if data and data.get("trial"):
                         bot.data.users.add_diamonds(user, cost / -25000)
                         if data.get("diamonds", 0) < 1:
+                            bot.premium_level(u)
                             emb = discord.Embed(colour=rand_colour())
                             emb.set_author(**get_author(bot.user))
                             emb.description = (
