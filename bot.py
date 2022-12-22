@@ -2139,17 +2139,18 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             emb = None
         if not uid:
             await channel.send(f"Failed to locate donation of ${amount} from user {name}!", embed=emb)
+            return
         try:
             user = await self.fetch_user(uid)
         except:
             print_exc()
             await channel.send(f"Failed to locate donation of ${amount} from user {name}/{uid}!", embed=emb)
-        else:
-            dias = round_min(amount * 300)
-            self.data.users.add_diamonds(user, dias, multiplier=False)
-            create_task(channel.send(f"Thank you {user_mention(user.id)} for donating ${amount}! Your account has been credited 💎 {dias}!", embed=emb))
-            await user.send(f"Thank you for donating ${amount}! Your account has been credited 💎 {dias}!")
-            return True
+            return
+        dias = round_min(amount * 300)
+        self.data.users.add_diamonds(user, dias, multiplier=False)
+        create_task(channel.send(f"Thank you {user_mention(user.id)} for donating ${amount}! Your account has been credited 💎 {dias}!", embed=emb))
+        await user.send(f"Thank you for donating ${amount}! Your account has been credited 💎 {dias}!")
+        return True
 
     # Checks if a user is blacklisted from the bot.
     def is_blacklisted(self, user):
