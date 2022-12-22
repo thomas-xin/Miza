@@ -2047,15 +2047,16 @@ body {
 
     @cp.expose
     @hostmap
-    def donation(self, data={}):
+    def donation(self, data=None):
         ip = cp.request.remote.ip
+        data = data or cp.request.json
         try:
             secret = data["verification_token"]
             if secret != KOFI_SECRET:
                 raise KeyError
         except KeyError:
             raise PermissionError("Ko-fi Proxy Secret not detected.")
-        print(data)
+        send(data)
         if data["type"] != "Donation":
             return
         amount = round_min(float(data["amount"]))

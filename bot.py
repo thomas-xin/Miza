@@ -3001,12 +3001,20 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         # Respond to blacklisted users attempting to use a command, or when mentioned without a command.
         if (u_perm <= -inf and (op or self.id in (member.id for member in message.mentions))) and not cpy.startswith("~~"):
             # print(f"Ignoring command from blacklisted user {user} ({u_id}): {lim_str(message.content, 256)}")
-            create_task(send_with_react(
-                channel,
-                "Sorry, you are currently not permitted to request my services.",
-                reacts="❎",
-                reference=message,
-            ))
+            if not self.ready:
+                create_task(send_with_react(
+                    channel,
+                    "I am currently in the process of restarting, please hold tight!",
+                    reacts="❎",
+                    reference=message,
+                ))
+            else:
+                create_task(send_with_react(
+                    channel,
+                    "Sorry, you are currently not permitted to request my services.",
+                    reacts="❎",
+                    reference=message,
+                ))
             return 0
         truemention = True
         if self.id in (member.id for member in message.mentions):
