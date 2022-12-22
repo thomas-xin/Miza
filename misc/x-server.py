@@ -2050,7 +2050,9 @@ body {
     def donation(self, data=None):
         ip = cp.request.remote.ip
         data = data or cp.request.json
-        self.data = data
+        if isinstance(data, str):
+            data = orjson.loads(data)
+        self.last_donation = data
         try:
             secret = data["verification_token"]
             if secret != KOFI_SECRET:
@@ -2214,7 +2216,7 @@ if __name__ == "__main__":
     proc = psutil.Process(pid)
     parent = psutil.Process(ppid)
     create_thread(ensure_parent, proc, parent)
-    server = Server()
+    self = server = Server()
     create_thread(server.mp_activity)
     create_future_ex(server.get_ip_ex)
     cp.quickstart(server, "/", config)
