@@ -2373,9 +2373,9 @@ class Wallet(Command):
             lv = bot.premium_level(user)
             lv2 = bot.premium_level(user, absolute=True)
             if lv2 > 0:
-                description += f"\n{bot.name} Premium Supporter Lv{lv2} " + "💎" * lv2)
+                description += f"\n{bot.name} Premium Supporter Lv{lv2} " + "💎" * lv2
             elif lv > 0:
-                description += f"\n{bot.name} Trial Supporter Lv{lv} " + "💎" * lv)
+                description += f"\n{bot.name} Trial Supporter Lv{lv} " + "💎" * lv
             minecraft = data.get("minecraft", 0)
             if minecraft:
                 items = deque()
