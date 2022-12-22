@@ -208,7 +208,7 @@ class Bot:
 		self.timestamp = time.time()
 		self.premium = premium
 		self.last_cost = 0
-		self.history_length = 1 if premium < 1 else 2 if premium < 2 else 3
+		self.history_length = 1 if premium < 1 else 2
 
 	def question_context_analysis(self, m, q, c):
 		if m == "deepset/roberta-base-squad2":
@@ -586,19 +586,20 @@ class Bot:
 
 	def after(self, t1, t2):
 		k, v = t2
+		a = v
 		if self.premium > 1:
 			labels = ("promise", "information", "example")
 			response = self.answer_classify("joeddav/xlm-roberta-large-xnli", v, labels)
 			data = dict(zip(response["labels"], response["scores"]))
 		if len(self.gpttokens(v)) > 32:
-			v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
+			v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=8).replace("\n", ". ").strip()
 			t2 = (k, v)
 		k, v = t1
-		if len(self.gpttokens(v)) > 32:
-			v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
+		if len(self.gpttokens(v)) > 24:
+			v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=24, min_length=6).replace("\n", ". ").strip()
 			t1 = (k, v)
 		if self.premium > 1 and data["promise"] >= 0.5:
-			if len(self.promises) >= 8:
+			if len(self.promises) >= 6:
 				self.promises = self.promises[2:]
 			self.promises.append(t1)
 			self.promises.append(t2)
@@ -606,7 +607,7 @@ class Bot:
 		else:
 			self.append(t1)
 			self.append(t2)
-		return t2[1]
+		return a
 
 
 if __name__ == "__main__":
