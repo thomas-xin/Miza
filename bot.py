@@ -660,7 +660,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     def user_from_identifier(self, u_id):
         if "#" in u_id:
             spl = u_id.split()
-            for i in range(len(spl) - 1):
+            for i in range(len(spl)):
                 uid = " ".join(spl[i:])
                 try:
                     return self.usernames[uid]
