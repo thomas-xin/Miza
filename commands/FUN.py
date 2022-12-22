@@ -2349,7 +2349,7 @@ class Wallet(Command):
                 data["trial"] = 2
                 bot.premium_level(user)
                 bot.data.users.update(user.id)
-                return css_md(f"Successfully enabled trial mode for {sqr_md(user)}.")
+                return css_md(f"Successfully enabled trial mode for {sqr_md(user)}. You now have access to all premium Lv2 features, with a quota at the cost of your diamond currency (💎). It will automatically be disabled when you run out; check your balance using ~wallet!")
         users = await bot.find_users(argl, args, user, guild)
         if not users:
             raise LookupError("No results found.")

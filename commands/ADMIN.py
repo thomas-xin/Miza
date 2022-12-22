@@ -2535,6 +2535,8 @@ class UpdateMessageLogs(Database):
                 for channel in itertools.chain(guild.text_channels, guild.threads):
                     try:
                         perm = channel.permissions_for(guild.me).read_message_history
+                    except discord.errors.ClientException:
+                        pass
                     except:
                         print_exc()
                         perm = True

@@ -1560,22 +1560,42 @@ class Art(Command):
                 req += " " + url2
         if specified:
             req += " ".join(f"{k} {v}" for k, v in kwargs.items() if k in specified)
+        emb = None
         fn = None
         with discord.context_managers.Typing(channel):
             with tracebacksuppressor:
                 dalle2 = name.startswith("dalle")
                 if dalle2 and premium < 2:
                     raise PermissionError("Premium subscription required to perform DALL·E 2 operations.")
-                if dalle2 and guild.id == 312733374831788034:
-                    self.imagebot.token = AUTH.get("openai_key_2")
-                else:
-                    self.imagebot.token = AUTH.get("openai_key")
+                # if dalle2 and guild.id == 312733374831788034:
+                #     self.imagebot.token = AUTH.get("openai_key_2")
+                # else:
+                self.imagebot.token = AUTH.get("openai_key")
                 tup = await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2=dalle2, timeout=60)
                 if tup:
                     fn, cost = tup
-                    if fn and cost and "costs" in bot.data:
-                        bot.data.costs.put(user.id, cost)
-                        bot.data.costs.put(guild.id, cost)
+                    if fn and cost:
+                        if "costs" in bot.data:
+                            bot.data.costs.put(user.id, cost)
+                            bot.data.costs.put(guild.id, cost)
+                        if bot.is_trusted(guild) >= 2:
+                            for uid in reversed(bot.data.trusted[guild.id]):
+                                if bot.premium_level(uid, absolute=True) >= 2:
+                                    break
+                            u = await bot.fetch_user(uid)
+                        else:
+                            u = user
+                        data = bot.data.users.get(u.id)
+                        if data and data.get("trial"):
+                            bot.data.users.add_diamonds(user, cost / -25000)
+                            if data.get("diamonds", 0) < 1:
+                                bot.premium_level(u)
+                                emb = discord.Embed(colour=rand_colour())
+                                emb.set_author(**get_author(bot.user))
+                                emb.description = (
+                                    "Uh-oh, it appears your tokens have run out! Check ~wallet to view your balance, top up using a donation [here]({bot.kofi_url}), "
+                                    + "or purchase a subscription to gain temporary unlimited usage!"
+                                )
         if not fn:
             if self.fut:
                 with tracebacksuppressor:
@@ -1652,15 +1672,34 @@ class Art(Command):
                             with open(image_2, "rb") as f:
                                 image_2b = f.read()
                         with tracebacksuppressor:
-                            if guild.id == 312733374831788034:
-                                self.imagebot.token = AUTH.get("openai_key_2")
-                            else:
-                                self.imagebot.token = AUTH.get("openai_key")
+                            # if guild.id == 312733374831788034:
+                            #     self.imagebot.token = AUTH.get("openai_key_2")
+                            # else:
+                            self.imagebot.token = AUTH.get("openai_key")
                             fn, cost = await create_future(self.imagebot.dalle_i2i, prompt, image_1b, image_2b, timeout=60)
                             done = True
-                            if fn and cost and "costs" in bot.data:
-                                bot.data.costs.put(user.id, cost)
-                                bot.data.costs.put(guild.id, cost)
+                            if fn and cost:
+                                if "costs" in bot.data:
+                                    bot.data.costs.put(user.id, cost)
+                                    bot.data.costs.put(guild.id, cost)
+                                if bot.is_trusted(guild) >= 2:
+                                    for uid in reversed(bot.data.trusted[guild.id]):
+                                        if bot.premium_level(uid, absolute=True) >= 2:
+                                            break
+                                    u = await bot.fetch_user(uid)
+                                else:
+                                    u = user
+                                data = bot.data.users.get(u.id)
+                                if data and data.get("trial"):
+                                    bot.data.users.add_diamonds(user, cost / -25000)
+                                    if data.get("diamonds", 0) < 1:
+                                        bot.premium_level(u)
+                                        emb = discord.Embed(colour=rand_colour())
+                                        emb.set_author(**get_author(bot.user))
+                                        emb.description = (
+                                            "Uh-oh, it appears your tokens have run out! Check ~wallet to view your balance, top up using a donation [here]({bot.kofi_url}), "
+                                            + "or purchase a subscription to gain temporary unlimited usage!"
+                                        )
                 if not done:
                     if self.sdiff_sem.is_busy() and not getattr(message, "simulated", False):
                         await send_with_react(channel, italics(ini_md(f"StableDiffusion: {sqr_md(req)} enqueued in position {sqr_md(self.sdiff_sem.passive + 1)}.")), reacts="❎", reference=message)
@@ -1713,7 +1752,7 @@ class Art(Command):
         #     )
         # else:
         #     emb = None
-        await bot.send_with_file(channel, "", fn, filename=lim_str(prompt, 96) + ".png", reference=message, reacts="🔳")
+        await bot.send_with_file(channel, "", fn, filename=lim_str(prompt, 96) + ".png", reference=message, reacts="🔳", embed=emb)
 
 
 class UpdateImages(Database):

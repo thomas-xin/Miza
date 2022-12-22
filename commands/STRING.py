@@ -1030,10 +1030,10 @@ class Ask(Command):
             if not convobot:
                 cb = None
             else:
-                if guild.id == 312733374831788034:
-                    cb_key = AUTH.get("openai_key_2")
-                else:
-                    cb_key = AUTH.get("openai_key")
+                # if guild.id == 312733374831788034:
+                #     cb_key = AUTH.get("openai_key_2")
+                # else:
+                cb_key = AUTH.get("openai_key")
                 cb = self.convos[channel.id] = await create_future(convobot.Bot,
                     key=cb_key,
                     email=AUTH.get("openai_email"),
@@ -1146,7 +1146,7 @@ class Ask(Command):
                             emb = discord.Embed(colour=rand_colour())
                             emb.set_author(**get_author(bot.user))
                             emb.description = (
-                                "Uh-oh, it appears your tokens have run out! Top up using a donation [here]({bot.kofi_url}), "
+                                "Uh-oh, it appears your tokens have run out! Check ~wallet to view your balance, top up using a donation [here]({bot.kofi_url}), "
                                 + "or purchase a subscription to gain temporary unlimited usage!"
                             )
         if out:

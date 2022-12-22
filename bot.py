@@ -615,7 +615,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     return user
                 if "#" in u_id:
                     raise LookupError(f"User identifier not found: {u_id}")
-                raise TypeError(f"Invalid user identifier: {u_id}")
+                u_id = verify_id(u_id)
+                if not isinstance(u_id, int):
+                    raise TypeError(f"Invalid user identifier: {u_id}")
         with suppress(KeyError):
             return self.cache.users[u_id]
         if u_id == self.deleted_user:
@@ -2143,6 +2145,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         if not uid:
             await channel.send(f"Failed to locate donation of ${amount} from user {name}!", embed=emb)
             return
+        await create_future(self.update_usernames)
         try:
             user = await self.fetch_user(uid)
         except:
@@ -3075,16 +3078,20 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                                 raise command.perm_error(u_perm, req, "for command " + command_check)
                             x = command.rate_limit
                             if x:
+                                x2 = x
                                 if user.id in bot.owners:
-                                    x = 0
+                                    x = x2 = 0
                                 elif isinstance(x, collections.abc.Sequence):
-                                    x = x[not bot.is_trusted(getattr(guild, "id", 0))]
+                                    x = x2 = x[not bot.is_trusted(getattr(guild, "id", 0))]
                                     x /= 2 ** bot.premium_level(user)
+                                    x2 /= 2 ** bot.premium_level(user, absolute=True)
                                 remaining += x
                                 d = command.used
                                 t = d.get(u_id, -inf)
                                 wait = utc() - t - x
                                 if wait > min(1 - x, -1):
+                                    if x != x2 and (utc() - t - x2) < min(1 - x2, -1):
+                                        bot.data.users.add_diamonds(user, -0.05)
                                     if wait < 0:
                                         w = -wait
                                         d[u_id] = max(t, utc()) + w
