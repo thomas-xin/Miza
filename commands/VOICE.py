@@ -804,7 +804,7 @@ class AudioQueue(alist):
     def announce_play(self, e):
         auds = self.auds
         if not auds.stats.quiet:
-            if utc() - self.lastsent > 1:
+            if utc() - self.lastsent > 1 and e.get("u_id") != self.bot.id:
                 try:
                     u = self.bot.cache.users[e.u_id]
                     name = u.display_name
