@@ -1144,6 +1144,11 @@ class Ask(Command):
                                 refs.append(("IMAGE", p1))
                             if p2:
                                 refs.append(("ANSWER", p2))
+                urls = find_urls(q)
+                for url in urls:
+                    if is_image(url) is not None:
+                        capt = url.rsplit("/", 1)[-1]
+                        q = q.replace(url, f"[{capt}]")
                 m = message
                 if m.author.id == bot.id:
                     name = bot.name
