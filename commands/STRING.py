@@ -1101,7 +1101,7 @@ class Ask(Command):
                     for url in urls:
                         prompts = None
                         try:
-                            prompts = self.analysed[url]
+                            p1 = self.analysed[url]
                         except KeyError:
                             b = await bot.get_request(url)
                             image = Image.open(io.BytesIO(b)).convert("RGB")
@@ -1118,28 +1118,26 @@ class Ask(Command):
                                 generated_ids = await create_future(m.generate, pixel_values)
                                 generated_text = p.batch_decode(generated_ids, skip_special_tokens=True)[0]
                                 p1 = generated_text.strip()
-                            try:
-                                p, m = self.vvqa
-                            except AttributeError:
-                                p = await create_future(ViltProcessor.from_pretrained, "dandelin/vilt-b32-finetuned-vqa")
-                                m = await create_future(ViltForQuestionAnswering.from_pretrained, "dandelin/vilt-b32-finetuned-vqa")
-                                self.vvqa = (p, m)
-                            spl = q.split()
-                            t = " ".join(w for w in spl if not is_url(w))[:128]
-                            with tracebacksuppressor:
-                                encoding = await create_future(p, image, t, return_tensors="pt")
-                                outputs = m(**encoding)
-                                logits = outputs.logits
-                                idx = logits.argmax(-1).item()
-                                p2 = m.config.id2label[idx].strip()
-                            if p1 or p2:
-                                prompts = (p1, p2)
-                                if len(self.analysed) > 4096:
-                                    self.analysed.pop(next(iter(self.analysed)), None)
-                                self.analysed[url] = prompts
-                        if prompts:
-                            p1, p2 = prompts
-                            print(prompts)
+                                if p1:
+                                    if len(self.analysed) > 4096:
+                                        self.analysed.pop(next(iter(self.analysed)), None)
+                                    self.analysed[url] = p1
+                        try:
+                            p, m = self.vvqa
+                        except AttributeError:
+                            p = await create_future(ViltProcessor.from_pretrained, "dandelin/vilt-b32-finetuned-vqa")
+                            m = await create_future(ViltForQuestionAnswering.from_pretrained, "dandelin/vilt-b32-finetuned-vqa")
+                            self.vvqa = (p, m)
+                        spl = q.split()
+                        t = " ".join(w for w in spl if not is_url(w))[:128]
+                        with tracebacksuppressor:
+                            encoding = await create_future(p, image, t, return_tensors="pt")
+                            outputs = m(**encoding)
+                            logits = outputs.logits
+                            idx = logits.argmax(-1).item()
+                            p2 = m.config.id2label[idx].strip()
+                        if p1 or p2:
+                            print(p1, p2)
                             if p1:
                                 refs.append(("IMAGE", p1))
                             if p2:
