@@ -1094,6 +1094,10 @@ class Ask(Command):
                         found = await bot.follow_url(url)
                         if found and found[0] != url and is_image(found[0]) is not None:
                             urls.append(found[0])
+                            if not find_urls(q):
+                                if q:
+                                    q += " "
+                                q += found[0]
                     for url in urls:
                         prompts = None
                         try:
@@ -1120,8 +1124,10 @@ class Ask(Command):
                                 p = await create_future(ViltProcessor.from_pretrained, "dandelin/vilt-b32-finetuned-vqa")
                                 m = await create_future(ViltForQuestionAnswering.from_pretrained, "dandelin/vilt-b32-finetuned-vqa")
                                 self.vvqa = (p, m)
+                            spl = q.split()
+                            t = " ".join(w for w in spl if not is_url(w))[:128]
                             with tracebacksuppressor:
-                                encoding = await create_future(p, image, q[:128], return_tensors="pt")
+                                encoding = await create_future(p, image, t, return_tensors="pt")
                                 outputs = m(**encoding)
                                 logits = outputs.logits
                                 idx = logits.argmax(-1).item()
