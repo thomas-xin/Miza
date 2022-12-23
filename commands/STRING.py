@@ -1082,7 +1082,7 @@ class Ask(Command):
                             name = m.author.name
                             if name == bot.name:
                                 name = bot.name + "2"
-                    refs.append((name, reference.content))
+                    refs.append(("REPLY: " + name, reference.content))
                 p1 = p2 = None
                 if TrOCRProcessor:
                     if reference and (find_urls(reference.content) or reference.attachments or reference.embeds):
