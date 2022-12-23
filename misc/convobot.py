@@ -189,13 +189,14 @@ swap = {
 	"My": "Your",
 	"my": "your",
 }
+DEFPER = "loyal friendly playful cute"
 
 
 class Bot:
 
 	models = {}
 
-	def __init__(self, token="", key="", email="", password="", name="Miza", personality="loyal friendly playful cute", premium=0):
+	def __init__(self, token="", key="", email="", password="", name="Miza", personality=DEFPER, premium=0):
 		self.token = token
 		self.key = key
 		self.email = email
@@ -362,6 +363,7 @@ class Bot:
 	})
 	def gptcomplete(self, u, q, refs):
 		openai.api_key = self.key
+		per = self.personality
 		chat_history = self.chat_history.copy()
 		lines = []
 		for k, v in self.promises:
@@ -372,6 +374,9 @@ class Bot:
 			k = k.replace(":", "")
 			s = f"{k}: {v}\n"
 			lines.append(s)
+		if not lines and per == DEFPER:
+			lines.append(f"{u}: Hi!\n")
+			lines.append(f"{self.name}: Hiya! Can I help with anything? :3\n")
 		res = ""
 		if not refs and self.premium > 0 and (self.premium > 1 or literal_question(q)):
 			res = self.google(q, raw=True)
@@ -414,7 +419,7 @@ class Bot:
 		prompt = ""
 		while lines and len(prompt) < soft * 4:
 			prompt = lines.pop(-1) + prompt
-		p = "" if self.premium < 2 else self.personality
+		p = "" if self.premium < 2 else per
 		if not p:
 			p = "an"
 		elif p[0] in "aeio":
