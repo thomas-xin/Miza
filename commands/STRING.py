@@ -1100,11 +1100,11 @@ class Ask(Command):
                                     q += " "
                                 q += found[0]
                     for url in urls:
+                        b = await bot.get_request(url)
+                        image = Image.open(io.BytesIO(b)).convert("RGB")
                         try:
                             p1 = self.analysed[url]
                         except KeyError:
-                            b = await bot.get_request(url)
-                            image = Image.open(io.BytesIO(b)).convert("RGB")
                             p1 = p2 = None
                             try:
                                 p, m = self.vgpt
