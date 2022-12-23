@@ -1114,10 +1114,6 @@ class Ask(Command):
                                 generated_ids = await create_future(m.generate, pixel_values)
                                 generated_text = p.batch_decode(generated_ids, skip_special_tokens=True)[0]
                                 p1 = generated_text.strip()
-                                if p1:
-                                    # p1 = p1.replace(" is ", ", ").replace(" are ", ", ")
-                                    # p1 = f"This is an image of {p1}"
-                                    print(p1)
                             try:
                                 p, m = self.vvqa
                             except AttributeError:
@@ -1130,8 +1126,6 @@ class Ask(Command):
                                 logits = outputs.logits
                                 idx = logits.argmax(-1).item()
                                 p2 = m.config.id2label[idx].strip()
-                                if p2:
-                                    print(p2)
                             if p1 or p2:
                                 prompts = (p1, p2)
                                 if len(self.analysed) > 4096:
@@ -1139,10 +1133,11 @@ class Ask(Command):
                                 self.analysed[url] = prompts
                         if prompts:
                             p1, p2 = prompts
+                            print(prompts)
                             if p1:
                                 refs.append(("IMAGE", p1))
                             if p2:
-                                refs.append(("CONTEXT", p2))
+                                refs.append(("ANSWER", p2))
                 m = message
                 if m.author.id == bot.id:
                     name = bot.name
@@ -1158,9 +1153,11 @@ class Ask(Command):
                         bot.data.costs.put(user.id, cost)
                         bot.data.costs.put(guild.id, cost)
                     if bot.is_trusted(guild) >= 2:
-                        for uid in reversed(bot.data.trusted[guild.id]):
+                        for uid in bot.data.trusted[guild.id]:
                             if bot.premium_level(uid, absolute=True) >= 2:
                                 break
+                        else:
+                            uid = next(iter(bot.data.trusted[guild.id]))
                         u = await bot.fetch_user(uid)
                     else:
                         u = user

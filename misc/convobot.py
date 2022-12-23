@@ -537,7 +537,7 @@ class Bot:
 			response, cost = self.gptcomplete(u, q, refs=refs)
 			if response:
 				return self.after(tup, (self.name, response)), cost
-		if refs and refs[-1][0] in ("IMAGE", "CONTEXT"):
+		if refs and refs[-1][0] in ("IMAGE", "ANSWER"):
 			if len(refs) > 1:
 				response = refs[-2][1] + ", " + refs[-1][1]
 			else:
