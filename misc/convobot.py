@@ -373,7 +373,7 @@ class Bot:
 			s = f"{k}: {v}\n"
 			lines.append(s)
 		res = ""
-		if self.premium > 0 and (self.premium > 1 or literal_question(q)):
+		if not refs and self.premium > 0 and (self.premium > 1 or literal_question(q)):
 			res = self.google(q, raw=True)
 			start = "GOOGLE: "
 			if len(self.gpttokens(res)) > 96:
