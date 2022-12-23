@@ -1757,7 +1757,7 @@ class Matchmaking(Command):
 
 
 class Pay(Command):
-    name = ["GiveCoins", "GiveGold", "GiveDiamond", "GiveDiamonds", "💎"]
+    name = ["GiveCoins", "GiveGold", "GiveDiamond", "GiveDiamonds", "🪙", "💎"]
     description = "Pays a specified amount of coins or diamonds to the target user."
     usage = "<0:user> <1:amount(1)>? <-1:diamonds{💎}>?"
     example = ("pay @Miza 100",)

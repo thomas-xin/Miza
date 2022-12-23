@@ -3090,8 +3090,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                                 t = d.get(u_id, -inf)
                                 wait = utc() - t - x
                                 if wait > min(1 - x, -1):
-                                    if x != x2 and (utc() - t - x2) < min(1 - x2, -1):
-                                        bot.data.users.add_diamonds(user, -0.05)
+                                    if x < x2 and (utc() - t - x2) < min(1 - x2, -1):
+                                        bot.data.users.add_diamonds(user, (x - x2) / 100)
                                     if wait < 0:
                                         w = -wait
                                         d[u_id] = max(t, utc()) + w

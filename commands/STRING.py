@@ -12,7 +12,7 @@ except:
     convobot = None
 
 try:
-    from transformers import TrOCRProcessor, VisionEncoderDecoderModel
+    from transformers import TrOCRProcessor, VisionEncoderDecoderModel, ViltProcessor, ViltForQuestionAnswering
 except ImportError:
     TrOCRProcessor = None
 else:
@@ -1095,28 +1095,54 @@ class Ask(Command):
                         if found and found[0] != url and is_image(found[0]) is not None:
                             urls.append(found[0])
                     for url in urls:
+                        prompts = None
                         try:
-                            prompt = self.analysed[url]
+                            prompts = self.analysed[url]
                         except KeyError:
-                            processor = await create_future(TrOCRProcessor.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
-                            model = await create_future(VisionEncoderDecoderModel.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
                             b = await bot.get_request(url)
+                            image = Image.open(io.BytesIO(b)).convert("RGB")
+                            p1 = p2 = None
+                            try:
+                                p, m = self.vgpt
+                            except AttributeError:
+                                p = await create_future(TrOCRProcessor.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
+                                m = await create_future(VisionEncoderDecoderModel.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
+                                self.vgpt = (p, m)
                             with tracebacksuppressor:
-                                image = Image.open(io.BytesIO(b)).convert("RGB")
-                                pixel_values = processor(image, return_tensors="pt").pixel_values
-                                generated_ids = await create_future(model.generate, pixel_values)
-                                generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
-                                prompt = generated_text.strip()
-                                if prompt:
-                                    prompt = prompt.replace(" is ", ", ").replace(" are ", ", ")
-                                    prompt = f"This is an image of {prompt}"
-                                    print(prompt)
-                                    if len(self.analysed) > 4096:
-                                        self.analysed.pop(next(iter(self.analysed)), None)
-                                    self.analysed[url] = prompt
-                                    refs.append(("GPT2", prompt))
-                        else:
-                            refs.append(("GPT2", prompt))
+                                impv = await create_future(p, image, return_tensors="pt")
+                                pixel_values = impv.pixel_values
+                                generated_ids = await create_future(m.generate, pixel_values)
+                                generated_text = p.batch_decode(generated_ids, skip_special_tokens=True)[0]
+                                p1 = generated_text.strip()
+                                if p1:
+                                    # p1 = p1.replace(" is ", ", ").replace(" are ", ", ")
+                                    # p1 = f"This is an image of {p1}"
+                                    print(p1)
+                            try:
+                                p, m = self.vvqa
+                            except AttributeError:
+                                p = await create_future(ViltProcessor.from_pretrained, "dandelin/vilt-b32-finetuned-vqa")
+                                m = await create_future(ViltForQuestionAnswering.from_pretrained, "dandelin/vilt-b32-finetuned-vqa")
+                                self.vvqa = (p, m)
+                            with tracebacksuppressor:
+                                encoding = await create_future(p, image, q, return_tensors="pt")
+                                outputs = m(**encoding)
+                                logits = outputs.logits
+                                idx = logits.argmax(-1).item()
+                                p2 = m.config.id2label[idx].strip()
+                                if p2:
+                                    print(p2)
+                            if p1 or p2:
+                                prompts = (p1, p2)
+                                if len(self.analysed) > 4096:
+                                    self.analysed.pop(next(iter(self.analysed)), None)
+                                self.analysed[url] = prompts
+                        if prompts:
+                            p1, p2 = prompts
+                            if p1:
+                                refs.append(("IMAGE", p1))
+                            if p2:
+                                refs.append(("CONTEXT", p2))
                 m = message
                 if m.author.id == bot.id:
                     name = bot.name

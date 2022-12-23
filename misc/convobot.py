@@ -375,7 +375,7 @@ class Bot:
 		res = ""
 		if self.premium > 0 and (self.premium > 1 or literal_question(q)):
 			res = self.google(q, raw=True)
-			start = "Google: "
+			start = "GOOGLE: "
 			if len(self.gpttokens(res)) > 96:
 				res = self.answer_summarise("facebook/bart-large-cnn", res, max_length=96, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
 			res = start + res + "\n"
@@ -537,6 +537,13 @@ class Bot:
 			response, cost = self.gptcomplete(u, q, refs=refs)
 			if response:
 				return self.after(tup, (self.name, response)), cost
+		if refs and refs[-1][0] in ("IMAGE", "CONTEXT"):
+			if len(refs) > 1:
+				response = refs[-2][1] + ", " + refs[-1][1]
+			else:
+				response = refs[-1][1]
+			if response:
+				return self.after(tup, (self.name, response)), 0
 		if self.premium > 0 and literal_question(q):
 			response = (self.google, self.bing)[random.randint(0, 1)](q)
 			if response:
