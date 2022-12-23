@@ -1121,7 +1121,7 @@ class Ask(Command):
                                 m = await create_future(ViltForQuestionAnswering.from_pretrained, "dandelin/vilt-b32-finetuned-vqa")
                                 self.vvqa = (p, m)
                             with tracebacksuppressor:
-                                encoding = await create_future(p, image, q, return_tensors="pt")
+                                encoding = await create_future(p, image, q[:128], return_tensors="pt")
                                 outputs = m(**encoding)
                                 logits = outputs.logits
                                 idx = logits.argmax(-1).item()
