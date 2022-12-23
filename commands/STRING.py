@@ -1129,7 +1129,7 @@ class Ask(Command):
                             m = await create_future(ViltForQuestionAnswering.from_pretrained, "dandelin/vilt-b32-finetuned-vqa")
                             self.vvqa = (p, m)
                         spl = q.split()
-                        t = " ".join(w for w in spl if not is_url(w))[:128]
+                        t = " ".join(w for w in spl if not find_urls(w))[:96]
                         with tracebacksuppressor:
                             encoding = await create_future(p, image, t, return_tensors="pt")
                             outputs = m(**encoding)
