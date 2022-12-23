@@ -1083,6 +1083,7 @@ class Ask(Command):
                             if name == bot.name:
                                 name = bot.name + "2"
                     refs.append((name, reference.content))
+                p1 = p2 = None
                 if TrOCRProcessor:
                     if reference and (find_urls(reference.content) or reference.attachments or reference.embeds):
                         url = f"https://discord.com/channels/0/{channel.id}/{reference.id}"
@@ -1099,7 +1100,6 @@ class Ask(Command):
                                     q += " "
                                 q += found[0]
                     for url in urls:
-                        prompts = None
                         try:
                             p1 = self.analysed[url]
                         except KeyError:
@@ -1146,7 +1146,10 @@ class Ask(Command):
                 for url in urls:
                     if is_image(url) is not None:
                         capt = url.rsplit("/", 1)[-1]
-                        q = q.replace(url, f"[{capt}]")
+                        q = q.replace(url, f"[Image {capt}]")
+                    elif p2:
+                        capt = url.rsplit("/", 1)[-1]
+                        q = q.replace(url, f"[Image {capt}]")
                 m = message
                 if m.author.id == bot.id:
                     name = bot.name
