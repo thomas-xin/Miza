@@ -380,16 +380,16 @@ class Bot:
 				res = self.answer_summarise("facebook/bart-large-cnn", res, max_length=96, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
 			res = start + res + "\n"
 			lines.append(res)
+		s = f"{u}: {q}\n"
+		if len(self.gpttokens(s)) > 384:
+			s = self.answer_summarise("facebook/bart-large-cnn", s, max_length=384, min_length=32).replace("\n", ". ").strip()
+		lines.append(s)
 		for k, v in refs:
 			k = k.replace(":", "")
 			if len(self.gpttokens(v)) > 32:
 				v = self.answer_summarise("facebook/bart-large-cnn", s, max_length=32, min_length=6).replace("\n", ". ").strip()
 			s = f"{k}: {v}\n"
 			lines.append(s)
-		s = f"{u}: {q}\n"
-		if len(self.gpttokens(s)) > 384:
-			s = self.answer_summarise("facebook/bart-large-cnn", s, max_length=384, min_length=32).replace("\n", ". ").strip()
-		lines.append(s)
 		lines.append(f"{self.name}:")
 		if self.premium < 1 or self.premium < 2 and (len(q) >= 256 or res):
 			model = "text-babbage-001"
