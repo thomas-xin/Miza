@@ -1577,7 +1577,8 @@ class Art(Command):
                     if fn and cost:
                         if "costs" in bot.data:
                             bot.data.costs.put(user.id, cost)
-                            bot.data.costs.put(guild.id, cost)
+                            if guild:
+                                bot.data.costs.put(guild.id, cost)
                         if bot.is_trusted(guild) >= 2:
                             for uid in bot.data.trusted[guild.id]:
                                 if bot.premium_level(uid, absolute=True) >= 2:
@@ -1683,7 +1684,8 @@ class Art(Command):
                             if fn and cost:
                                 if "costs" in bot.data:
                                     bot.data.costs.put(user.id, cost)
-                                    bot.data.costs.put(guild.id, cost)
+                                    if guild:
+                                        bot.data.costs.put(guild.id, cost)
                                 if bot.is_trusted(guild) >= 2:
                                     for uid in reversed(bot.data.trusted[guild.id]):
                                         if bot.premium_level(uid, absolute=True) >= 2:
