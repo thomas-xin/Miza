@@ -1072,26 +1072,6 @@ class Ask(Command):
                     reference = message.reference.resolved
                 else:
                     reference = None
-                if reference and reference.content:# and not find_urls(reference.content):
-                    m = reference
-                    if m.author.id == bot.id:
-                        name = bot.name
-                    else:
-                        name = m.author.display_name
-                        if name == bot.name:
-                            name = m.author.name
-                            if name == bot.name:
-                                name = bot.name + "2"
-                    c = reference.content
-                    urls = find_urls(c)
-                    for url in urls:
-                        if is_image(url) is not None:
-                            capt = url.rsplit("/", 1)[-1]
-                            c = c.replace(url, f"[Image {capt}]")
-                        elif p2:
-                            capt = url.rsplit("/", 1)[-1]
-                            c = c.replace(url, f"[Image {capt}]")
-                    refs.append(("REPLY: " + name, c))
                 p1 = p2 = None
                 if TrOCRProcessor:
                     if reference and (find_urls(reference.content) or reference.attachments or reference.embeds):
@@ -1152,6 +1132,26 @@ class Ask(Command):
                                 refs.append(("IMAGE", p1))
                             if p2:
                                 refs.append(("ANSWER", p2))
+                if reference and reference.content:# and not find_urls(reference.content):
+                    m = reference
+                    if m.author.id == bot.id:
+                        name = bot.name
+                    else:
+                        name = m.author.display_name
+                        if name == bot.name:
+                            name = m.author.name
+                            if name == bot.name:
+                                name = bot.name + "2"
+                    c = reference.content
+                    urls = find_urls(c)
+                    for url in urls:
+                        if is_image(url) is not None:
+                            capt = url.rsplit("/", 1)[-1]
+                            c = c.replace(url, f"[Image {capt}]")
+                        elif p2:
+                            capt = url.rsplit("/", 1)[-1]
+                            c = c.replace(url, f"[Image {capt}]")
+                    refs.insert(0, ("REPLY: " + name, c))
                 urls = find_urls(q)
                 for url in urls:
                     if is_image(url) is not None:
