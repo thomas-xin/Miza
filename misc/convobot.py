@@ -366,6 +366,9 @@ class Bot:
 		per = self.personality
 		chat_history = self.chat_history.copy()
 		lines = []
+		if per == DEFPER:
+			lines.append(f"{u}: Hi!\n")
+			lines.append(f"{self.name}: Hiya! Can I help with anything? :3\n")
 		for k, v in self.promises:
 			k = k.replace(":", "")
 			s = f"{k}: {v}\n"
@@ -374,9 +377,6 @@ class Bot:
 			k = k.replace(":", "")
 			s = f"{k}: {v}\n"
 			lines.append(s)
-		if not lines and per == DEFPER:
-			lines.append(f"{u}: Hi!\n")
-			lines.append(f"{self.name}: Hiya! Can I help with anything? :3\n")
 		res = ""
 		if not refs and self.premium > 0 and (self.premium > 1 or literal_question(q)):
 			res = self.google(q, raw=True)
