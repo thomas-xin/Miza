@@ -220,47 +220,29 @@ class Bot:
 		elems = None
 		while not elems:
 			elems = driver.find_elements(by=tag_name, value="img")
-			for i in elems:
-				if any(x > 0 for x in i.size.values()):
+			for e in reversed(elems):
+				a = e.get_attribute("src")
+				if a.startswith("https://cdn.mage.space/generate/"):
 					break
 			else:
 				elems.clear()
 			time.sleep(1)
+		drivers.append(driver)
 
-		if not os.path.exists(folder):
-			os.mkdir(folder)
-
-		try:
-			elems = driver.find_elements(by=css_selector, value="a[download='']")
-			if elems:
-				elems[0].click()
-			else:
-				elems = driver.find_elements(by=css_selector, value="*")
-				for e in reversed(elems):
-					if e.text == "Download":
-						e.click()
-						break
-				else:
-					raise FileNotFoundError("Download")
-
-			elems = None
-			while not elems:
-				elems = [e for e in os.listdir(folder) if e.endswith(".png")]
-				time.sleep(0.5)
-			print(elems[0])
-
-			ts = time.time_ns()
-			fn = f"cache/{ts}.png"
-			if not os.path.exists("cache"):
-				os.mkdir("cache")
-			os.rename(os.path.join(folder, elems[0]), fn)
-		finally:
-			os.rmdir(folder)
-		return fn
+		headers = {
+			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36",
+			"DNT": "1",
+			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
+			"api-key": "quickstart-QUdJIGlzIGNvbWluZy4uLi4K",
+		}
+		resp = self.session.get(a, headers=headers)
+		if resp.status_code in range(200, 400):
+			return resp.content
+		print(resp.status_code, resp.text)
 
 	def art_deepai(self, prompt, kwargs=None):
 		headers = {
-			"User-Agent": "Mozilla/5.0",
+			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36",
 			"DNT": "1",
 			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
 			"api-key": "quickstart-QUdJIGlzIGNvbWluZy4uLi4K",
@@ -294,6 +276,7 @@ class Bot:
 				return ims2.pop(0)
 			else:
 				self.cache.pop(prompt, None)
+		print(resp.status_code, resp.text)
 
 	def art(self, prompt, url="", url2="", kwargs={}, specified=False, dalle2=False):
 		funcs = []
