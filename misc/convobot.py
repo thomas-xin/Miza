@@ -231,7 +231,7 @@ class Bot:
 		self.history_length = 1 if premium < 1 else 2
 
 	def question_context_analysis(self, m, q, c):
-		if m == "deepset/roberta-base-squad2":
+		if m in ("deepset/roberta-base-squad2", "deepset/tinyroberta-squad2"):
 			try:
 				nlp = self.models[m]
 			except KeyError:
