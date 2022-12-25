@@ -2403,7 +2403,7 @@ def from_bytes(b, save=None):
     if mime == "application/zip":
         z = zipfile.ZipFile(io.BytesIO(data), compression=zipfile.ZIP_DEFLATED, strict_timestamps=False)
         return ImageSequence(*(Image.open(z.open(f.filename)) for f in z.filelist if not f.is_dir()))
-    if mime.split("/", 1)[0] == "image" and mime.split("/", 1)[-1] in "blp bmp cur dcx dds dib emf eps fits flc fli fpx ftex gbr gd icns ico im imt iptc jpeg jpg mcidas mic mpo msp naa pcd pcx pixar png ppm psd sgi sun spider tga tiff wal webp wmf xbm".split():
+    if mime.split("/", 1)[0] == "image" and mime.split("/", 1)[-1] in "blp bmp cur dcx dds dib emf eps fits flc fli fpx ftex gbr gd heif heic icns ico im imt iptc jpeg jpg mcidas mic mpo msp naa pcd pcx pixar png ppm psd sgi sun spider tga tiff wal webp wmf xbm".split():
         try:
             return Image.open(out)
         except PIL.UnidentifiedImageError:
