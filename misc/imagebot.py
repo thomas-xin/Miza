@@ -67,6 +67,25 @@ def create_driver():
 			)
 		else:
 			raise
+	except selenium.common.WebDriverException as ex:
+		argv = " ".join(args)
+		search = "unrecognized Microsoft Edge version"
+		if search in argv and "Chrome" in argv:
+			v = argv.split("Stacktrace", 1)[0].rsplit("/", 1)[-1].strip()
+			url = f"https://chromedriver.storage.googleapis.com/{v}/chromedriver_win32.zip"
+			import requests, io, zipfile
+			with requests.get(url, headers={"User-Agent": "Mozilla/6.0"}) as resp:
+				with zipfile.ZipFile(io.BytesIO(resp.content)) as z:
+					with z.open("chromedriver.exe") as fi:
+						with open("misc/msedgedriver.exe", "wb") as fo:
+							b = fi.read()
+							fo.write(b)
+			driver = browser["driver"](
+				service=service,
+				options=options,
+			)
+		else:
+			raise
 	driver.folder = folder
 	return driver
 
@@ -233,7 +252,6 @@ class Bot:
 			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36",
 			"DNT": "1",
 			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
-			"api-key": "quickstart-QUdJIGlzIGNvbWluZy4uLi4K",
 		}
 		resp = self.session.get(a, headers=headers)
 		if resp.status_code in range(200, 400):

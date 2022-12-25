@@ -29,9 +29,15 @@ def create_driver():
 	folder = os.path.join(os.getcwd(), f"d~{ts}")
 	service = browser["service"](browser["path"])
 	options = browser["options"]()
-	options.headless = True
+	options.add_argument("--headless")
 	# options.add_argument("--disable-gpu")
-	prefs = {"download.default_directory" : folder}
+	options.add_argument("--no-sandbox")
+	options.add_argument("--deny-permission-prompts")
+	options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36")
+	prefs = {
+		"download.default_directory" : folder,
+		"profile.managed_default_content_settings.geolocation": 2,
+	}
 	options.add_experimental_option("prefs", prefs)
 
 	try:
@@ -56,29 +62,68 @@ def create_driver():
 			)
 		else:
 			raise
+	except selenium.common.WebDriverException as ex:
+		argv = " ".join(args)
+		search = "unrecognized Microsoft Edge version"
+		if search in argv and "Chrome" in argv:
+			v = argv.split("Stacktrace", 1)[0].rsplit("/", 1)[-1].strip()
+			url = f"https://chromedriver.storage.googleapis.com/{v}/chromedriver_win32.zip"
+			import requests, io, zipfile
+			with requests.get(url, headers={"User-Agent": "Mozilla/6.0"}) as resp:
+				with zipfile.ZipFile(io.BytesIO(resp.content)) as z:
+					with z.open("chromedriver.exe") as fi:
+						with open("misc/msedgedriver.exe", "wb") as fo:
+							b = fi.read()
+							fo.write(b)
+			driver = browser["driver"](
+				service=service,
+				options=options,
+			)
+		else:
+			raise
 	driver.folder = folder
 	return driver
 
+LAST_DRIVER = 0
 def ensure_drivers():
-	while len(drivers) < 2:
+	globals()["LAST_DRIVER"] = time.time()
+	while len(drivers) < 1:
 		drivers.append(exc.submit(create_driver))
 		time.sleep(1)
 def get_driver():
+	globals()["LAST_DRIVER"] = time.time()
 	if not drivers:
 		drivers.append(exc.submit(create_driver))
 	try:
-		driver = drivers.pop(0).result()
+		driver = drivers.pop(0)
+		if hasattr(driver, "result"):
+			driver = driver.result()
 	except selenium.common.exceptions.WebDriverException:
+		print_exc()
 		driver = create_driver()
 	else:
 		try:
 			exc.submit(getattr, driver, "title").result(timeout=0.25)
 		except:
-			from traceback import print_exc
 			print_exc()
 			driver = create_driver()
 	exc.submit(ensure_drivers)
 	return driver
+def update():
+	if time.time() - LAST_DRIVER >= 3600:
+		globals()["LAST_DRIVER"] = time.time()
+		if not drivers:
+			return
+		try:
+			d = drivers.pop(0)
+			if hasattr(d, "result"):
+				d = d.result()
+		except:
+			pass
+		else:
+			d.get("file://")
+			drivers.clear()
+			drivers.append(d)
 
 def safecomp(gen):
 	while True:

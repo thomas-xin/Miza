@@ -80,6 +80,25 @@ def create_driver():
 			)
 		else:
 			raise
+	except selenium.common.WebDriverException as ex:
+		argv = " ".join(args)
+		search = "unrecognized Microsoft Edge version"
+		if search in argv and "Chrome" in argv:
+			v = argv.split("Stacktrace", 1)[0].rsplit("/", 1)[-1].strip()
+			url = f"https://chromedriver.storage.googleapis.com/{v}/chromedriver_win32.zip"
+			import requests, io, zipfile
+			with requests.get(url, headers={"User-Agent": "Mozilla/6.0"}) as resp:
+				with zipfile.ZipFile(io.BytesIO(resp.content)) as z:
+					with z.open("chromedriver.exe") as fi:
+						with open("misc/msedgedriver.exe", "wb") as fo:
+							b = fi.read()
+							fo.write(b)
+			driver = browser["driver"](
+				service=service,
+				options=options,
+			)
+		else:
+			raise
 	driver.folder = folder
 	try:
 		driver.get("https://google.com/preferences")

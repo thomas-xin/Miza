@@ -1426,7 +1426,7 @@ class UpdatePersonalities(Database):
 
     def __call__(self, **void):
         if convobot:
-            convobot.update()
+            create_future_ex(convobot.update)
 
 
 class Random(Command):

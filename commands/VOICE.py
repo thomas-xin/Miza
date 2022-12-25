@@ -5,6 +5,7 @@ try:
 except ModuleNotFoundError:
     import youtube_dl
 try:
+    import yt_download
     from yt_download import *
 except:
     print_exc()
@@ -5313,6 +5314,7 @@ class UpdateAudio(Database):
                         with tracebacksuppressor:
                             await fut
                 await bot.audio.asubmit("ytdl.update()")
+            create_future_ex(yt_download.update)
             create_future_ex(ytdl.update_dl, priority=True)
 
     def _announce_(self, *args, **kwargs):
