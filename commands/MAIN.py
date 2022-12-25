@@ -159,10 +159,10 @@ class Help(Command):
         if content:
             embed.description = f"```callback-main-help-{user.id}-\n{user.display_name} has asked for help!```" + content
         if original:
-            if getattr(message, "slash", None):
+            if getattr(message, "int_id", None):
                 await interaction_patch(bot, original, embed=embed, buttons=buttons)
             else:
-                if not getattr(message, "simulated", None):
+                if getattr(message, "slash", None):
                     create_task(bot.ignore_interaction, message)
                 await Request(
                     f"https://discord.com/api/{api}/channels/{original.channel.id}/messages/{original.id}",
