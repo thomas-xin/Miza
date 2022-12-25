@@ -1143,6 +1143,7 @@ class Uno(Command):
     async def _callback_(self, message, reaction, user, vals, perm, **void):
         if not reaction:
             return
+        # [uids], <hands>, [winners], turn, last, reverse, draws
         bot = self.bot
         vals = vals.split("_")
         players = orjson.loads(vals[0])
