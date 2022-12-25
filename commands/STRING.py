@@ -1082,7 +1082,16 @@ class Ask(Command):
                             name = m.author.name
                             if name == bot.name:
                                 name = bot.name + "2"
-                    refs.append(("REPLY: " + name, reference.content))
+                    c = reference.content
+                    urls = find_urls(c)
+                    for url in urls:
+                        if is_image(url) is not None:
+                            capt = url.rsplit("/", 1)[-1]
+                            c = c.replace(url, f"[Image {capt}]")
+                        elif p2:
+                            capt = url.rsplit("/", 1)[-1]
+                            c = c.replace(url, f"[Image {capt}]")
+                    refs.append(("REPLY: " + name, c))
                 p1 = p2 = None
                 if TrOCRProcessor:
                     if reference and (find_urls(reference.content) or reference.attachments or reference.embeds):
@@ -1137,7 +1146,8 @@ class Ask(Command):
                             idx = logits.argmax(-1).item()
                             p2 = m.config.id2label[idx].strip()
                         if p1 or p2:
-                            print(p1, p2)
+                            print(p1)
+                            print(p2)
                             if p1:
                                 refs.append(("IMAGE", p1))
                             if p2:

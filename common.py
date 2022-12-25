@@ -2861,7 +2861,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
     @classmethod
     def header(cls):
         return {
-            "User-Agent": f"Mozilla/5.{xrand(1, 10)}",
+            "User-Agent": f"Mozilla/5.{random.randint(1, 9)} (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36",
             "DNT": "1",
             "X-Forwarded-For": ".".join(str(xrand(1, 255)) for _ in loop(4)),
         }
@@ -2928,7 +2928,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
                 session = requests
         elif bypass:
             if "user-agent" not in headers and "User-Agent" not in headers:
-                headers["User-Agent"] = f"Mozilla/5.{xrand(1, 10)}"
+                headers["User-Agent"] = f"Mozilla/5.{random.randint(1, 9)} (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36"
                 headers["X-Forwarded-For"] = ".".join(str(xrand(1, 255)) for _ in loop(4))
             headers["DNT"] = "1"
         method = method.casefold()
