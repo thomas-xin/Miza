@@ -162,7 +162,7 @@ class Help(Command):
             if getattr(message, "slash", None):
                 await interaction_patch(bot, original, embed=embed, buttons=buttons)
             else:
-                if getattr(message, "simulated", None):
+                if getattr(message, "slash", None):
                     create_task(bot.ignore_interaction, message)
                 await Request(
                     f"https://discord.com/api/{api}/channels/{original.channel.id}/messages/{original.id}",
