@@ -1067,7 +1067,7 @@ class UpdateGuilds(Database):
         for cm in mdata:
             if cm.id in guild._members:
                 continue
-            m = GhostUser()
+            m = self.bot.GhostUser()
             m.id = cm.id
             m.name = cm.name
             m.nick = cm.nick
