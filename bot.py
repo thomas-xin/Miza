@@ -3483,6 +3483,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 await funcs[1](fut.guild)
             if "guilds" in self.data:
                 self.data.guilds.register(fut.guild)
+        print("Guilds loaded.")
 
     # Adds a webhook to the bot's user and webhook cache.
     def add_webhook(self, w):
@@ -5008,12 +5009,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             print("Connect ready.")
             self.ready = True
             await create_future(self.update_usernames)
+            # Send ready event to all databases.
             await self.send_event("_ready_", bot=self)
             print("Database ready.")
             await self.guilds_ready
             await create_future(self.update_usernames)
             print("Guilds ready.")
-            # Send ready event to all databases.
             create_task(self.heartbeat_loop())
             force_kill(self.heartbeat_proc)
             print("Initialisation complete.")
