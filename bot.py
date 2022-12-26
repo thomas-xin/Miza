@@ -3461,7 +3461,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     i = bool(i & 7)
                 else:
                     i = i + 1 & 1
-                if not i and guild.member_count > 250:
+                if not i and getattr(guild, "_member_count", len(guild._members)) > 250:
                     i = 1
                 fut = create_task(asyncio.wait_for(funcs[i](guild), timeout=None if i else 60))
                 fut.guild = guild
@@ -5478,6 +5478,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             self.usernames[name] = self.cache.users[member.id]
             if member.guild.id in self._guilds:
                 member.guild._member_count = len(member.guild._members)
+                if "guilds" in self.data:
+                    self.data.guilds.register(guild, force=False)
             await self.send_event("_join_", user=member, guild=member.guild)
             await self.seen(member, member.guild, event="misc", raw=f"Joining a server")
 
@@ -5489,6 +5491,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 self.usernames.pop(name, None)
             if member.guild.id in self._guilds:
                 member.guild._member_count = len(member.guild._members)
+                if "guilds" in self.data:
+                    self.data.guilds.register(guild, force=False)
             await self.send_event("_leave_", user=member, guild=member.guild)
 
         # Channel create event: calls _channel_create_ bot database event.
