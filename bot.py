@@ -111,7 +111,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         self.semaphore = Semaphore(2, 1)
         self.ready_semaphore = Semaphore(1, inf)
         self.guild_semaphore = Semaphore(5, inf, rate_limit=5)
-        self.load_semaphore = Semaphore(50, inf, rate_limit=10)
+        self.load_semaphore = Semaphore(5, inf, rate_limit=1)
         self.user_semaphore = Semaphore(64, inf, rate_limit=8)
         self.disk_semaphore = Semaphore(1, 1, rate_limit=1)
         self.command_semaphore = Semaphore(262144, 16384)
@@ -3484,6 +3484,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     await self.load_guild_http(fut.guild)
                 if "guilds" in self.data:
                     self.data.guilds.register(fut.guild)
+            self.users_updated = True
             print("Guilds loaded.")
 
     # Adds a webhook to the bot's user and webhook cache.
@@ -5034,8 +5035,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if not self.started:
                 self.started = True
                 create_task(self.init_ready())
-                self.guilds_ready = create_task(self.load_guilds())
-                self.update_cache_feed()
             else:
                 print("Reconnected.")
             await self.handle_update()
@@ -5043,6 +5042,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         # The event called when the discord.py state is fully ready.
         @self.event
         async def on_ready():
+            self.guilds_ready = create_task(self.load_guilds())
             create_task(aretry(self.get_ip, delay=20))
             await create_future(self.update_subs, priority=True)
             self.update_cache_feed()
