@@ -3473,7 +3473,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                             print_exc()
                             await funcs[1](fut.guild)
                 futs[i].append(fut)
-            for f in itertools.chain(*futs):
+            for fut in itertools.chain(*futs):
                 try:
                     await fut
                 except (T0, T1, T2):
