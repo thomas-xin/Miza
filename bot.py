@@ -2530,6 +2530,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
     def status(self):
         if self.status_sem.busy:
+            self.status_sem.wait()
             return self.status_data
         with self.status_sem:
             active = self.get_active()
@@ -4179,6 +4180,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             status = None
             voice = None
             display_avatar = avatar_url = icon_url = url = bot.discord_icon
+            joined_at = None
 
             @property
             def display_name(self):
