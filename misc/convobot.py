@@ -408,7 +408,7 @@ class Bot:
 			if not k.startswith("REPLYING: "):
 				continue
 			if len(self.gpttokens(v)) > 32:
-				v = self.answer_summarise("facebook/bart-large-cnn", s, max_length=32, min_length=6).replace("\n", ". ").strip()
+				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
 			s = f"{k}: {v}\n"
 			lines.append(s)
 		s = f"{u}: {q}\n"
@@ -420,7 +420,7 @@ class Bot:
 				continue
 			k = k.replace(":", "")
 			if len(self.gpttokens(v)) > 32:
-				v = self.answer_summarise("facebook/bart-large-cnn", s, max_length=32, min_length=6).replace("\n", ". ").strip()
+				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
 			s = f"{k}: {v}\n"
 			lines.append(s)
 		lines.append(f"{self.name}:")
