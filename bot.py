@@ -3457,10 +3457,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             funcs = [self._connection.chunk_guild, self.load_guild_http]
             futs = [alist(), alist()]
             for i, guild in enumerate(self.client.guilds):
-                if self.is_ws_ratelimited():
-                    i = bool(i & 7)
-                else:
-                    i = i + 1 & 1
+                i = bool(i & 7)
                 if not i and getattr(guild, "_member_count", len(guild._members)) > 250:
                     i = 1
                 fut = create_task(asyncio.wait_for(funcs[i](guild), timeout=None if i else 60))
@@ -3481,7 +3478,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     await fut
                 except (T0, T1, T2):
                     print_exc()
-                    await funcs[1](fut.guild)
+                    await self.load_guild_http(fut.guild)
                 if "guilds" in self.data:
                     self.data.guilds.register(fut.guild)
             print("Guilds loaded.")
@@ -5479,7 +5476,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if member.guild.id in self._guilds:
                 member.guild._member_count = len(member.guild._members)
                 if "guilds" in self.data:
-                    self.data.guilds.register(guild, force=False)
+                    self.data.guilds.register(member.guild, force=False)
             await self.send_event("_join_", user=member, guild=member.guild)
             await self.seen(member, member.guild, event="misc", raw=f"Joining a server")
 
@@ -5492,7 +5489,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if member.guild.id in self._guilds:
                 member.guild._member_count = len(member.guild._members)
                 if "guilds" in self.data:
-                    self.data.guilds.register(guild, force=False)
+                    self.data.guilds.register(member.guild, force=False)
             await self.send_event("_leave_", user=member, guild=member.guild)
 
         # Channel create event: calls _channel_create_ bot database event.
