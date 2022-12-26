@@ -3455,25 +3455,27 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     async def load_guilds(self):
         with tracebacksuppressor:
             funcs = [self._connection.chunk_guild, self.load_guild_http]
-            futs = [alist(), alist()]
-            for i, guild in enumerate(self.client.guilds):
-                i = bool(i & 7)
+            futs = alist()
+            for n, guild in enumerate(self.client.guilds):
+                i = bool(n & 7)
                 if not i and getattr(guild, "_member_count", len(guild._members)) > 250:
                     i = 1
                 fut = create_task(asyncio.wait_for(funcs[i](guild), timeout=None if i else 60))
                 fut.guild = guild
-                if len(futs[i]) >= 16:
-                    pops = [i for i, fut in enumerate(futs[i]) if fut.done()]
-                    futs[i].pops(pops)
-                    if len(futs[i]) >= 16:
-                        fut = futs[i].pop(0)
+                if len(futs) >= 16:
+                    pops = [a for a, fut in enumerate(futs) if fut.done()]
+                    futs.pops(pops)
+                    if len(futs) >= 16:
+                        fut = futs.pop(0)
                         try:
                             await fut
                         except (T0, T1, T2):
                             print_exc()
-                            await funcs[1](fut.guild)
-                futs[i].append(fut)
-            for fut in itertools.chain(*futs):
+                            await self.load_guild_http(fut.guild)
+                        if "guilds" in self.data:
+                            self.data.guilds.register(fut.guild)
+                futs.append(fut)
+            for fut in futs:
                 try:
                     await fut
                 except (T0, T1, T2):
