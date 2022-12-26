@@ -3453,37 +3453,38 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         return guild.members
 
     async def load_guilds(self):
-        funcs = [self._connection.chunk_guild, self.load_guild_http]
-        futs = [alist(), alist()]
-        for i, guild in enumerate(self.client.guilds):
-            if self.is_ws_ratelimited():
-                i = bool(i & 7)
-            else:
-                i = i + 1 & 1
-            if not i and guild.member_count > 250:
-                i = 1
-            fut = create_task(asyncio.wait_for(funcs[i](guild), timeout=None if i else 60))
-            fut.guild = guild
-            if len(futs[i]) >= 16:
-                pops = [i for i, fut in enumerate(futs[i]) if fut.done()]
-                futs[i].pops(pops)
+        with tracebacksuppressor:
+            funcs = [self._connection.chunk_guild, self.load_guild_http]
+            futs = [alist(), alist()]
+            for i, guild in enumerate(self.client.guilds):
+                if self.is_ws_ratelimited():
+                    i = bool(i & 7)
+                else:
+                    i = i + 1 & 1
+                if not i and guild.member_count > 250:
+                    i = 1
+                fut = create_task(asyncio.wait_for(funcs[i](guild), timeout=None if i else 60))
+                fut.guild = guild
                 if len(futs[i]) >= 16:
-                    fut = futs[i].pop(0)
-                    try:
-                        await fut
-                    except (T0, T1, T2):
-                        print_exc()
-                        await funcs[1](fut.guild)
-            futs[i].append(fut)
-        for f in itertools.chain(*futs):
-            try:
-                await fut
-            except (T0, T1, T2):
-                print_exc()
-                await funcs[1](fut.guild)
-            if "guilds" in self.data:
-                self.data.guilds.register(fut.guild)
-        print("Guilds loaded.")
+                    pops = [i for i, fut in enumerate(futs[i]) if fut.done()]
+                    futs[i].pops(pops)
+                    if len(futs[i]) >= 16:
+                        fut = futs[i].pop(0)
+                        try:
+                            await fut
+                        except (T0, T1, T2):
+                            print_exc()
+                            await funcs[1](fut.guild)
+                futs[i].append(fut)
+            for f in itertools.chain(*futs):
+                try:
+                    await fut
+                except (T0, T1, T2):
+                    print_exc()
+                    await funcs[1](fut.guild)
+                if "guilds" in self.data:
+                    self.data.guilds.register(fut.guild)
+            print("Guilds loaded.")
 
     # Adds a webhook to the bot's user and webhook cache.
     def add_webhook(self, w):

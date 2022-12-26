@@ -1056,6 +1056,12 @@ class UpdateGuilds(Database):
         self[guild.id] = mdata
         return mdata
 
+    def _bot_ready_(self, **void):
+        bot = self.bot
+        for guild in bot.cache.guilds.values():
+            if guild.member_count > len(guild._members) and guild.id in self:
+                self.load_guild(guild)
+
     def load_guild(self, guild):
         mdata = self.get(guild.id, [])
         for cm in mdata:
@@ -1069,12 +1075,6 @@ class UpdateGuilds(Database):
             m.bot = cm.bot
             guild._members[m.id] = m
         return guild._members
-
-    def _bot_ready_(self, **void):
-        bot = self.bot
-        for guild in bot.cache.guilds.values():
-            if guild.member_count > len(guild._members) and guild.id in self:
-                self.load_guild(guild)
 
     def register(self, guild, force=True):
         if force:
