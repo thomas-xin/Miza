@@ -2442,6 +2442,7 @@ class CompatFile(discord.File):
                 self.filename = "SPOILER_" + "UNKNOWN"
         elif self.filename and self.filename.startswith("SPOILER_"):
             self.filename = self.filename[8:]
+        self.name = self.filename
         self.clear = getattr(self.fp, "clear", lambda self: None)
 
     def reset(self, seek=True):

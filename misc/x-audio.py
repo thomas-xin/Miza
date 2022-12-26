@@ -849,11 +849,11 @@ async def mobile_identify(self):
         'd': {
             'token': self.token,
             'properties': {
-                '$os': 'Miza-OS',
-                '$browser': 'Discord Android',
-                '$device': 'Miza',
-                '$referrer': '',
-                '$referring_domain': ''
+                'os': 'Miza-OS',
+                'browser': 'Discord Android',
+                'device': 'Miza',
+                'referrer': '',
+                'referring_domain': ''
             },
             'compress': True,
             'large_threshold': 250,

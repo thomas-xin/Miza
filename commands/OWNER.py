@@ -268,6 +268,7 @@ class UpdateExec(Database):
                 ))
             glob.update(dict(
                 user=message.author,
+                member=message.author,
                 message=message,
             ))
             with suppress():
@@ -1035,3 +1036,49 @@ class UpdateImagePools(Database):
         if not self.sem.is_busy():
             create_task(self.proc(key, func, args=args))
         return choice(data)
+
+
+class UpdateGuilds(Database):
+    name = "guilds"
+    forced = set()
+
+    def cache_guild(self, guild):
+        mdata = []
+        for m in guild._members.values():
+            cm = cdict(
+                name=m.name,
+                nick=m.nick,
+                id=m.id,
+                gp=m.guild_permissions.value,
+                bot=m.bot,
+            )
+            mdata.append(cm)
+        self[guild.id] = mdata
+        return mdata
+
+    def load_guild(self, guild):
+        mdata = self.get(guild.id, [])
+        for cm in mdata:
+            if cm.id in guild._members:
+                continue
+            m = GhostUser()
+            m.id = cm.id
+            m.name = cm.name
+            m.nick = cm.nick
+            m.guild_permissions = discord.Permissions(cm.gp)
+            m.bot = cm.bot
+            guild._members[m.id] = m
+        return guild._members
+
+    def _bot_ready_(self, **void):
+        bot = self.bot
+        for guild in bot.cache.guilds.values():
+            if guild.member_count > len(guild._members) and guild.id in self:
+                self.load_guild(guild)
+
+    def register(self, guild, force=True):
+        if force:
+            self.forced.add(guild.id)
+        elif guild.id not in self.forced:
+            return
+        return self.cache_guild(guild)

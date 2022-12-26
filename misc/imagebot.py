@@ -253,6 +253,7 @@ class Bot:
 			"DNT": "1",
 			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
 		}
+		print(a)
 		resp = self.session.get(a, headers=headers)
 		if resp.status_code in range(200, 400):
 			return resp.content

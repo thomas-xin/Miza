@@ -1522,7 +1522,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         except:
             if filename is not None:
                 if type(filename) is not str:
-                    filename = filename.name
+                    filename = getattr(filename, "filename", None) or filename.name
                 print(filename, os.path.getsize(filename))
                 with suppress():
                     os.remove(filename)
@@ -1555,6 +1555,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 created_at = created_at.replace(tzinfo=None)
             if not getattr(message, "simulated", None) and "channel_cache" in self.data:
                 self.data.channel_cache.add(message.channel.id, message.id)
+                if message.guild and hasattr(message.author, "guild"):
+                    guild = message.guild
+                    author = message.author
+                    try:
+                        if guild._members[author.id] != author:
+                            raise KeyError
+                    except KeyError:
+                        guild._members[author.id] = author
+                        if "guilds" in self.data:
+                            self.data.guilds.register(fut.guild, force=False)
             if files and not message.author.bot:
                 if (utc_dt() - created_at).total_seconds() < 7200:
                     for attachment in message.attachments:
@@ -1864,7 +1874,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         for guild in self.guilds:
             if len(guild._members) != guild.member_count:
                 print("Incorrect member count:", guild, len(guild._members), guild.member_count)
-                create_task(self.load_guild(guild))
+                create_task(self.load_guild_http(guild))
 
     # Gets the target bot prefix for the target guild, return the default one if none exists.
     def get_prefix(self, guild):
@@ -3414,6 +3424,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, bypass=False, decode=True, aio=True)
 
     async def load_guild_http(self, guild):
+        _members = {}
         x = 0
         i = 1000
         while i >= 1000:
@@ -3434,16 +3445,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             else:
                 raise RuntimeError("Max retries exceeded in loading guild members via http.")
             members = {int(m["user"]["id"]): discord.Member(guild=guild, data=m, state=self._connection) for m in memberdata}
-            guild._members.update(members)
-            guild._member_count = len(guild._members)
+            _members.update(members)
             i = len(memberdata)
             x = max(members)
+        guild._members = _members
+        guild._member_count = len(_members)
         return guild.members
-
-    async def load_guild(self, guild):
-        await choice(self._connection.chunk_guild, self.load_guild_http)(guild)
-        guild._member_count = len(guild._members)
-        return guild
 
     async def load_guilds(self):
         funcs = [self._connection.chunk_guild, self.load_guild_http]
@@ -3453,6 +3460,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 i = bool(i & 7)
             else:
                 i = i + 1 & 1
+            if not i and guild.member_count > 250:
+                i = 1
             fut = create_task(asyncio.wait_for(funcs[i](guild), timeout=None if i else 60))
             fut.guild = guild
             if len(futs[i]) >= 16:
@@ -3472,6 +3481,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             except (T0, T1, T2):
                 print_exc()
                 await funcs[1](fut.guild)
+            if "guilds" in self.data:
+                self.data.guilds.register(fut.guild)
 
     # Adds a webhook to the bot's user and webhook cache.
     def add_webhook(self, w):
@@ -4159,10 +4170,18 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             is_blocked = lambda self: None
             colour = color = discord.Colour(16777215)
             avatar = ""
-            display_name = name = "[USER DATA NOT FOUND]"
+            name = "[USER DATA NOT FOUND]"
+            nick = None
             discriminator = "0000"
             id = 0
+            guild = None
+            status = None
+            voice = None
             display_avatar = avatar_url = icon_url = url = bot.discord_icon
+
+            @property
+            def display_name(self):
+                return self.nick or self.name
 
             @property
             def mention(self):
@@ -4987,13 +5006,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             print("Bot ready.")
             await wrap_future(self.connect_ready)
             print("Connect ready.")
-            await self.guilds_ready
-            print("Guilds ready.")
-            await create_future(self.update_usernames)
             self.ready = True
-            # Send ready event to all databases.
-            print("Database ready.")
+            await create_future(self.update_usernames)
             await self.send_event("_ready_", bot=self)
+            print("Database ready.")
+            await self.guilds_ready
+            await create_future(self.update_usernames)
+            print("Guilds ready.")
+            # Send ready event to all databases.
             create_task(self.heartbeat_loop())
             force_kill(self.heartbeat_proc)
             print("Initialisation complete.")
@@ -5939,11 +5959,11 @@ async def desktop_identify(self):
         'd': {
             'token': self.token,
             'properties': {
-                '$os': 'Miza-OS',
-                '$browser': 'Discord Client',
-                '$device': 'Miza',
-                '$referrer': '',
-                '$referring_domain': ''
+                'os': 'Miza-OS',
+                'browser': 'Discord Client',
+                'device': 'Miza',
+                'referrer': '',
+                'referring_domain': ''
             },
             'compress': True,
             'large_threshold': 250,
