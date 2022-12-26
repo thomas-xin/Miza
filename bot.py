@@ -624,7 +624,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             user = self.GhostUser()
             user.system = True
             user.name = "Deleted User"
-            user.display_name = "Deleted User"
+            user.nick = "Deleted User"
             user.id = u_id
         else:
             try:
@@ -1564,7 +1564,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     except KeyError:
                         guild._members[author.id] = author
                         if "guilds" in self.data:
-                            self.data.guilds.register(fut.guild, force=False)
+                            self.data.guilds.register(guild, force=False)
             if files and not message.author.bot:
                 if (utc_dt() - created_at).total_seconds() < 7200:
                     for attachment in message.attachments:
