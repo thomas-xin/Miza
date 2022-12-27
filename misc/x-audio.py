@@ -205,6 +205,8 @@ players = cdict()
 class AudioPlayer(discord.AudioSource):
 
     vc = None
+    listener = None
+    listening = False
     # Empty opus packet data
     emptyopus = b"\xfc\xff\xfe"
 
@@ -238,6 +240,18 @@ class AudioPlayer(discord.AudioSource):
         self.queue = deque(maxlen=2)
         if guild:
             self.vc = client.get_guild(verify_id(guild)).voice_client
+
+    def _listen(self):
+        while self.listening:
+            break
+
+    def listen(self):
+        if self.listener and not self.listener.done():
+            self.listening = False
+            self.listener.result()
+        self.listening = True
+        self.listener = create_future_ex(self._listen)
+        return self.listener
 
     def __getattr__(self, k):
         try:
@@ -338,6 +352,8 @@ class AudioPlayer(discord.AudioSource):
         create_task(self.vc.disconnect(force=True))
         self.clear()
         players.pop(self.guild.id, None)
+        self.vc.dead = True
+        self.vc = None
 
     is_opus = lambda self: True
     cleanup = lambda self: None
@@ -880,6 +896,65 @@ async def mobile_identify(self):
     await self.send_as_json(payload)
 
 discord.gateway.DiscordWebSocket.identify = lambda self: mobile_identify(self)
+
+SPEAKING = {}
+SSRC = {}
+USRC = {}
+
+async def received_message(self, msg):
+    print("Voice websocket frame received:", msg)
+    op = msg['op']
+    data = msg['d']  # According to Discord this key is always given
+
+    if op == self.READY:
+        await self.initial_connection(data)
+        self.ssrc = data["ssrc"]
+    elif op == self.HEARTBEAT:
+        payload = {
+            'op': self.HEARTBEAT_ACK,
+            'd': time.time_ns() // 1000000,
+        }
+        await self.send_as_json(payload)
+    elif op == self.HEARTBEAT_ACK:
+        if self._keep_alive:
+            self._keep_alive.ack()
+    elif op == self.RESUMED:
+        pass
+        # _log.debug('Voice RESUME succeeded.')
+    elif op == self.SESSION_DESCRIPTION:
+        self._connection.mode = data['mode']
+        self.secret_key = self._connection.secret_key = data['secret_key']
+        payload = {
+            'op': self.SPEAKING,
+            'd': {
+                'delay': 0,
+                'speaking': 0,
+                'ssrc': self._connection.ssrc,
+            },
+        }
+        await self.send_as_json(payload)
+    elif op == self.SPEAKING:
+        uid = int(data["user_id"])
+        ssrc = int(data["ssrc"])
+        SPEAKING[uid] = data["speaking"]
+        SSRC[ssrc] = uid
+        USRC[uid] = ssrc
+    elif op == self.HELLO:
+        interval = data['heartbeat_interval'] / 1000.0
+        if getattr(self, "_keep_alive", None):
+            self._keep_alive.stop()
+        self._keep_alive = discord.gateway.VoiceKeepAliveHandler(ws=self, interval=min(interval, 5.0))
+        self._keep_alive.start()
+    elif op == 13:
+        uid = int(data["user_id"])
+        ssrc = USRC.pop(uid, None)
+        SSRC.pop(ssrc, None)
+        SPEAKING.pop(uid)
+    else:
+        print("Unknown audio event:\n" + str(msg))
+    await self._hook(self, msg)
+
+discord.gateway.DiscordVoiceWebSocket.received_message = received_message
 
 
 async def kill():

@@ -4,6 +4,7 @@ import selenium, requests, torch, openai
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering, AutoModelForCausalLM, pipeline
+from fp.fp import FreeProxy
 import numpy as np
 from PIL import Image
 from traceback import print_exc
@@ -160,7 +161,7 @@ class Bot:
 			user=str(id(self)),
 		)
 		print(resp)
-		with requests.get(resp.data[0].url) as resp:
+		with self.session.get(resp.data[0].url) as resp:
 			return resp.content
 
 	def dalle_i2i(self, prompt, image_1b, image_2b=None, force=False):
@@ -204,7 +205,7 @@ class Bot:
 					user=str(id(self)),
 				)
 		print(resp)
-		with requests.get(resp.data[0].url) as resp:
+		with self.session.get(resp.data[0].url) as resp:
 			return resp.content, 180000
 
 	def art_mage(self, prompt, kwargs=None):
@@ -297,6 +298,39 @@ class Bot:
 				self.cache.pop(prompt, None)
 		print(resp.status_code, resp.text)
 
+	def art_openjourney(self, prompt, kwargs=None):
+		if not any(w in prompt for w in ("style", "stylised", "stylized")):
+			prompt += ", mdjrny-v4 style"
+		p = FreeProxy(rand=True).get()
+		b = self.session.post(
+			"https://api-inference.huggingface.co/models/prompthero/openjourney",
+			data=dict(inputs=prompt),
+			proxies=dict(http=p, https=p),
+			verify=False,
+		).content
+		im = Image.open(io.BytesIO(b))
+		p = np.sum(im.resize((32, 32)).convert("L"))
+		if p > 1024:
+			return b, 0
+
+	def art_openjourney_local(self, prompt, kwargs=None):
+		if not any(w in prompt for w in ("style", "stylised", "stylized")):
+			prompt += ", mdjrny-v4 style"
+		pipe = getattr(self.__class__, "ojp", None)
+		if not pipe:
+			pipe = StableDiffusionPipeline.from_pretrained("prompthero/openjourney", torch_dtype=torch.float32)
+			try:
+				pipe = pipe.to("cuda")
+			except:
+				pass
+			pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
+			self.__class__.ojp = pipe
+		im = pipe(prompt).images[0]
+		b = io.BytesIO()
+		im.save(b, format="png")
+		b.seek(0)
+		return b.read(), 0
+
 	def art(self, prompt, url="", url2="", kwargs={}, specified=False, dalle2=False):
 		funcs = []
 		if not specified and not url and not url2 or not os.path.exists("misc/stable_diffusion.openvino"):
@@ -304,9 +338,11 @@ class Bot:
 				return self.cache[prompt].pop(0), 0
 			funcs.append(self.art_mage)
 			funcs.append(self.art_deepai)
-		random.shuffle(funcs)
+			# random.shuffle(funcs)
+			funcs.insert(0, self.art_openjourney)
 		if dalle2 and not specified and not url and not url2:
 			funcs.insert(0, self.art_dalle)
+			funcs.insert(2, self.art_openjourney_local)
 		for func in funcs:
 			try:
 				im = func(prompt, kwargs)
