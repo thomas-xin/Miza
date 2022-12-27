@@ -1,4 +1,5 @@
 # Loads the install_update module, which makes sure all required libraries are installed to their required versions.
+import install_update
 from install_update import *
 
 # Makes sure an authentication file exists.
