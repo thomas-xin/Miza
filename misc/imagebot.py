@@ -308,11 +308,14 @@ class Bot:
 			"cache-control": "no-cache",
 			"x-use-cache": "false",
 		}
+		resp = None
 		p = None
 		for i in range(5):
-			if not p and i < 3:
+			if not p and i <= 3:
 				p = FreeProxy(rand=True).get()
 				proxies = dict(http=p, https=p)
+			else:
+				proxies = None
 			try:
 				resp = self.session.post(
 					"https://api-inference.huggingface.co/models/prompthero/openjourney",
@@ -361,7 +364,7 @@ class Bot:
 		b.seek(0)
 		return b.read()
 
-	def art(self, prompt, url="", url2="", kwargs={}, specified=False, dalle2=False):
+	def art(self, prompt, url="", url2="", kwargs={}, specified=False, dalle2=False, openjourney=False):
 		funcs = []
 		if not specified and not url and not url2 or not os.path.exists("misc/stable_diffusion.openvino"):
 			if random.randint(0, 2) and self.cache.get(prompt):
@@ -372,6 +375,8 @@ class Bot:
 		if dalle2 and not specified and not url and not url2:
 			funcs.insert(0, self.art_dalle)
 			funcs.insert(2, self.art_openjourney_local)
+		if openjourney:
+			funcs.insert(1, self.art_openjourney_local)
 		for func in funcs:
 			try:
 				im = func(prompt, kwargs)
