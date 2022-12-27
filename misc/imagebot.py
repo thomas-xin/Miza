@@ -307,7 +307,7 @@ class Bot:
 			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
 			"cache-control": "no-cache",
 			"x-use-cache": "false",
-		},
+		}
 		p = FreeProxy(rand=True).get()
 		resp = self.session.post(
 			"https://api-inference.huggingface.co/models/prompthero/openjourney",
