@@ -4184,7 +4184,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             joined_at = premium_since = None
             _client_status = None
             pending = False
-            _state = self._state
             ghost = True
             roles = ()
             _roles = ()
@@ -4200,6 +4199,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             @property
             def created_at(self):
                 return snowflake_time_3(self.id)
+
+            @property
+            def _state(self):
+                return bot._state
 
             def _to_minimal_user_json(self):
                 return cdict(
