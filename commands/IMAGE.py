@@ -1444,8 +1444,8 @@ class Waifu2x(Command):
 
 class Art(Command):
     _timeout_ = 150
-    name = ["AIArt", "Inpaint", "StableDiffusion", "Dalle", "Dalle2"]
-    description = "Runs a Stable Diffusion AI art generator on the input prompt or image. Operates on a global queue system. Accepts appropriate keyword arguments."
+    name = ["AIArt", "Inpaint", "StableDiffusion", "Dalle", "Dalle2", "Openjourney", "Midjourney"]
+    description = "Runs a Stable Diffusion AI art generator on the input prompt or image, defaulting to Openjourney (Midjourney style). Operates on a global queue system for image prompts. Accepts appropriate keyword arguments."
     usage = "<0:prompt> <inpaint{?i}>"
     example = ("art cute kitten", "art https://mizabot.xyz/favicon")
     rate_limit = (45, 60)
@@ -1460,7 +1460,18 @@ class Art(Command):
         for a in reversed(message.attachments):
             args.insert(0, a.url)
         if not args:
-            raise ArgumentError("Input string is empty.")
+            # raise ArgumentError("Input string is empty.")
+            s = await Request(
+                "https://magatsu.net/generators/art/index.php",
+                data=dict(selGenCount="1", selStyle="2", subGenerate="Generate Prompts"),
+                method="POST",
+                decode=True,
+                aio=True,
+            )
+            s = s.split("<strong>Prompt:</strong>", 1)[-1].removeprefix("<BR>")
+            s = s.split("<BR>", 1)[0].replace("<br />", " ").replace("<br>", " ").replace("<i>", "*").replace("<b>", "**").replace("<u>", "__")
+            args = [s]
+            print(s)
         premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
         req = " ".join(args)
         url = None
