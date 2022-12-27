@@ -184,6 +184,9 @@ while not os.path.exists(sd):
     except:
         traceback.print_exc()
     time.sleep(0.5)
+    import importlib
+    importlib.reload(install_update)
+    time.sleep(0.5)
 
 if proc.is_running():
     try:

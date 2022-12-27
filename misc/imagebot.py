@@ -304,7 +304,7 @@ class Bot:
 		p = FreeProxy(rand=True).get()
 		b = requests.post(
 			"https://api-inference.huggingface.co/models/prompthero/openjourney",
-			headers={"cache-control": "no-cache"}
+			headers={"cache-control": "no-cache"},
 			data=dict(inputs=prompt),
 			proxies=dict(http=p, https=p),
 			# verify=False,
