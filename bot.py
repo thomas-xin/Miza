@@ -4183,6 +4183,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             display_avatar = avatar_url = icon_url = url = bot.discord_icon
             joined_at = None
             ghost = True
+            roles = ()
+            _roles = ()
 
             @property
             def display_name(self):
