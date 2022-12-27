@@ -301,22 +301,28 @@ class Bot:
 	def art_openjourney(self, prompt, kwargs=None):
 		if not any(w in prompt for w in ("style", "stylised", "stylized")):
 			prompt += ", mdjrny-v4 style"
+		headers={
+			"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36",
+			"DNT": "1",
+			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
+			"cache-control": "no-cache",
+			"x-use-cache": "false",
+		},
 		p = FreeProxy(rand=True).get()
-		b = self.session.post(
+		resp = self.session.post(
 			"https://api-inference.huggingface.co/models/prompthero/openjourney",
-			headers={
-				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36",
-				"cache-control": "no-cache",
-				"x-use-cache": "false",
-			},
+			headers=headers,
 			data=dict(inputs=prompt),
 			proxies=dict(http=p, https=p),
 			# verify=False,
-		).content
-		im = Image.open(io.BytesIO(b))
-		p = np.sum(im.resize((32, 32)).convert("L"))
-		if p > 1024:
-			return b
+		)
+		if resp.status_code in range(200, 400):
+			b = resp.content
+			im = Image.open(io.BytesIO(b))
+			p = np.sum(im.resize((32, 32)).convert("L"))
+			if p > 1024:
+				return b
+		print(resp.status_code, resp.text)
 
 	def art_openjourney_local(self, prompt, kwargs=None):
 		if not any(w in prompt for w in ("style", "stylised", "stylized")):
