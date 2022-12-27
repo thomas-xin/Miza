@@ -302,11 +302,12 @@ class Bot:
 		if not any(w in prompt for w in ("style", "stylised", "stylized")):
 			prompt += ", mdjrny-v4 style"
 		p = FreeProxy(rand=True).get()
-		b = self.session.post(
+		b = requests.post(
 			"https://api-inference.huggingface.co/models/prompthero/openjourney",
+			headers={"cache-control": "no-cache"}
 			data=dict(inputs=prompt),
 			proxies=dict(http=p, https=p),
-			verify=False,
+			# verify=False,
 		).content
 		im = Image.open(io.BytesIO(b))
 		p = np.sum(im.resize((32, 32)).convert("L"))
