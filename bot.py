@@ -4172,7 +4172,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             is_friend = lambda self: None
             is_blocked = lambda self: None
             colour = color = discord.Colour(16777215)
-            avatar = ""
+            avatar = _avatar = ""
             name = "[USER DATA NOT FOUND]"
             nick = None
             discriminator = "0000"
@@ -4181,7 +4181,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             status = None
             voice = None
             display_avatar = avatar_url = icon_url = url = bot.discord_icon
-            joined_at = None
+            joined_at = premium_since = None
+            _client_status = None
+            pending = False
+            _state = miza._state
             ghost = True
             roles = ()
             _roles = ()
