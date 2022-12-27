@@ -4182,6 +4182,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             voice = None
             display_avatar = avatar_url = icon_url = url = bot.discord_icon
             joined_at = None
+            ghost = True
 
             @property
             def display_name(self):
@@ -4195,7 +4196,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             def created_at(self):
                 return snowflake_time_3(self.id)
 
-            ghost = True
+            def _to_minimal_user_json(self):
+                return cdict(
+                    username=self.name,
+                    id=self.id,
+                    avatar=self.avatar,
+                    discriminator=self.discriminator,
+                    bot=self.bot,
+                )
 
         GhostUser.bot = False
 
