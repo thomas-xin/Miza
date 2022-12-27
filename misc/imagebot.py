@@ -313,13 +313,17 @@ class Bot:
 			if not p and i < 3:
 				p = FreeProxy(rand=True).get()
 				proxies = dict(http=p, https=p)
-			resp = self.session.post(
-				"https://api-inference.huggingface.co/models/prompthero/openjourney",
-				headers=headers,
-				data=dict(inputs=prompt),
-				proxies=proxies,
-				# verify=False,
-			)
+			try:
+				resp = self.session.post(
+					"https://api-inference.huggingface.co/models/prompthero/openjourney",
+					headers=headers,
+					data=dict(inputs=prompt),
+					proxies=proxies,
+					# verify=False,
+				)
+			except requests.exceptions.ProxyError:
+				p = None
+				continue
 			if resp.status_code == 503:
 				try:
 					d = resp.json()
@@ -329,6 +333,7 @@ class Bot:
 				continue
 			elif resp.status_code not in range(200, 400):
 				p = None
+				continue
 			break
 		if resp.status_code in range(200, 400):
 			b = resp.content
