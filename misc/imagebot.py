@@ -308,13 +308,16 @@ class Bot:
 			"cache-control": "no-cache",
 			"x-use-cache": "false",
 		}
-		p = FreeProxy(rand=True).get()
+		p = None
 		for i in range(5):
+			if not p and i < 3:
+				p = FreeProxy(rand=True).get()
+				proxies = dict(http=p, https=p)
 			resp = self.session.post(
 				"https://api-inference.huggingface.co/models/prompthero/openjourney",
 				headers=headers,
 				data=dict(inputs=prompt),
-				proxies=dict(http=p, https=p),
+				proxies=proxies,
 				# verify=False,
 			)
 			if resp.status_code == 503:
@@ -322,8 +325,10 @@ class Bot:
 					d = resp.json()
 					time.sleep(d["estimated_time"])
 				except:
-					break
+					p = None
 				continue
+			elif resp.status_code not in range(200, 400):
+				p = None
 			break
 		if resp.status_code in range(200, 400):
 			b = resp.content
