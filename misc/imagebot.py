@@ -302,9 +302,13 @@ class Bot:
 		if not any(w in prompt for w in ("style", "stylised", "stylized")):
 			prompt += ", mdjrny-v4 style"
 		p = FreeProxy(rand=True).get()
-		b = requests.post(
+		b = self.session.post(
 			"https://api-inference.huggingface.co/models/prompthero/openjourney",
-			headers={"cache-control": "no-cache"},
+			headers={
+				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36",
+				"cache-control": "no-cache",
+				"x-use-cache": "false",
+			},
 			data=dict(inputs=prompt),
 			proxies=dict(http=p, https=p),
 			# verify=False,
