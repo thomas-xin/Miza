@@ -4184,7 +4184,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             joined_at = premium_since = None
             _client_status = None
             pending = False
-            _state = miza._state
+            _state = self._state
             ghost = True
             roles = ()
             _roles = ()
