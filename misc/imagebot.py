@@ -311,7 +311,7 @@ class Bot:
 		im = Image.open(io.BytesIO(b))
 		p = np.sum(im.resize((32, 32)).convert("L"))
 		if p > 1024:
-			return b, 0
+			return b
 
 	def art_openjourney_local(self, prompt, kwargs=None):
 		if not any(w in prompt for w in ("style", "stylised", "stylized")):
@@ -329,17 +329,16 @@ class Bot:
 		b = io.BytesIO()
 		im.save(b, format="png")
 		b.seek(0)
-		return b.read(), 0
+		return b.read()
 
 	def art(self, prompt, url="", url2="", kwargs={}, specified=False, dalle2=False):
 		funcs = []
 		if not specified and not url and not url2 or not os.path.exists("misc/stable_diffusion.openvino"):
 			if random.randint(0, 2) and self.cache.get(prompt):
 				return self.cache[prompt].pop(0), 0
+			funcs.append(self.art_openjourney)
 			funcs.append(self.art_mage)
 			funcs.append(self.art_deepai)
-			# random.shuffle(funcs)
-			funcs.insert(0, self.art_openjourney)
 		if dalle2 and not specified and not url and not url2:
 			funcs.insert(0, self.art_dalle)
 			funcs.insert(2, self.art_openjourney_local)
