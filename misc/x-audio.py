@@ -902,7 +902,7 @@ SSRC = {}
 USRC = {}
 
 async def received_message(self, msg):
-    print("Voice websocket frame received:", msg)
+    # print("Voice websocket frame received:", msg)
     op = msg['op']
     data = msg['d']  # According to Discord this key is always given
 
