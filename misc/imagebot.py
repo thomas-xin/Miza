@@ -309,13 +309,22 @@ class Bot:
 			"x-use-cache": "false",
 		}
 		p = FreeProxy(rand=True).get()
-		resp = self.session.post(
-			"https://api-inference.huggingface.co/models/prompthero/openjourney",
-			headers=headers,
-			data=dict(inputs=prompt),
-			proxies=dict(http=p, https=p),
-			# verify=False,
-		)
+		while True:
+			resp = self.session.post(
+				"https://api-inference.huggingface.co/models/prompthero/openjourney",
+				headers=headers,
+				data=dict(inputs=prompt),
+				proxies=dict(http=p, https=p),
+				# verify=False,
+			)
+			if resp.status_code == 503:
+				try:
+					d = resp.json()
+					time.sleep(d["estimated_time"])
+				except:
+					break
+				continue
+			break
 		if resp.status_code in range(200, 400):
 			b = resp.content
 			im = Image.open(io.BytesIO(b))
