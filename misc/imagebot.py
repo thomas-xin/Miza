@@ -4,6 +4,7 @@ import selenium, requests, torch, openai
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering, AutoModelForCausalLM, pipeline
+from diffusers import StableDiffusionPipeline
 from fp.fp import FreeProxy
 import numpy as np
 from PIL import Image
@@ -254,7 +255,7 @@ class Bot:
 			"DNT": "1",
 			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
 		}
-		print(a)
+		print("Mage:", a)
 		resp = self.session.get(a, headers=headers)
 		if resp.status_code in range(200, 400):
 			return resp.content
@@ -273,7 +274,7 @@ class Bot:
 			headers=headers,
 		)
 		if resp.status_code in range(200, 400):
-			print(resp.text)
+			print("DeepAI:", resp.text)
 			url = resp.json()["output_url"]
 			b = self.session.get(url, headers=headers).content
 			image = Image.open(io.BytesIO(b))
@@ -339,6 +340,7 @@ class Bot:
 				continue
 			break
 		if resp.status_code in range(200, 400):
+			print("Openjourney:", resp)
 			b = resp.content
 			im = Image.open(io.BytesIO(b))
 			p = np.sum(im.resize((32, 32)).convert("L"))
@@ -361,6 +363,7 @@ class Bot:
 		im = pipe(prompt).images[0]
 		b = io.BytesIO()
 		im.save(b, format="png")
+		print("OpenjourneyL:", b)
 		b.seek(0)
 		return b.read()
 
