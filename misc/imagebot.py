@@ -309,7 +309,7 @@ class Bot:
 			"x-use-cache": "false",
 		}
 		p = FreeProxy(rand=True).get()
-		for i in range(3):
+		for i in range(5):
 			resp = self.session.post(
 				"https://api-inference.huggingface.co/models/prompthero/openjourney",
 				headers=headers,
