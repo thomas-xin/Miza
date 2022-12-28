@@ -4182,7 +4182,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             voice = None
             display_avatar = avatar_url = icon_url = url = bot.discord_icon
             joined_at = premium_since = None
-            _client_status = None
+            _client_status = {None: "offline"}
             pending = False
             ghost = True
             roles = ()
