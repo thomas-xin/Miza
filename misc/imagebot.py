@@ -325,7 +325,7 @@ class Bot:
 					proxies=proxies,
 					# verify=False,
 				)
-			except requests.exceptions.ProxyError:
+			except (requests.exceptions.ProxyError, requests.exceptions.SSLError):
 				p = None
 				continue
 			if resp.status_code == 503:
@@ -346,6 +346,8 @@ class Bot:
 			p = np.sum(im.resize((32, 32)).convert("L"))
 			if p > 1024:
 				return b
+			print("Openjourney response censored")
+			return
 		print(resp.status_code, resp.text)
 
 	def art_openjourney_local(self, prompt, kwargs=None):

@@ -1611,6 +1611,9 @@ class Art(Command):
                                     "Uh-oh, it appears your tokens have run out! Check ~wallet to view your balance, top up using a donation [here]({bot.kofi_url}), "
                                     + "or purchase a subscription to gain temporary unlimited usage!"
                                 )
+        if not fn and not specified and not url:
+            if openjourney:
+                fn = await create_future(self.imagebot.art_openjourney_local, prompt, kwargs)
         if not fn:
             if self.fut:
                 with tracebacksuppressor:

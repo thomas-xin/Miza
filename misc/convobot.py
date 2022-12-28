@@ -249,7 +249,7 @@ class Bot:
 			tokenizer = AutoTokenizer.from_pretrained(m)
 			model = AutoModelForQuestionAnswering.from_pretrained(m)
 			self.models[m] = (tokenizer, model)
-		inputs = tokenizer(q[:512], c[:3584], return_tensors="pt", max_length=4096, truncation=True)
+		inputs = tokenizer(q[:512], c[:3072], return_tensors="pt", max_length=4096, truncation=True)
 		with torch.no_grad():
 			outputs = model(**inputs)
 		answer_start_index = outputs.start_logits.argmax()
