@@ -379,9 +379,9 @@ class Bot:
 			funcs.append(self.art_deepai)
 		if dalle2 and not specified and not url and not url2:
 			funcs.insert(0, self.art_dalle)
-			funcs.insert(2, self.art_openjourney_local)
-		if openjourney:
-			funcs.insert(1, self.art_openjourney_local)
+			# funcs.insert(2, self.art_openjourney_local)
+		# if openjourney:
+		# 	funcs.insert(1, self.art_openjourney_local)
 		for func in funcs:
 			try:
 				im = func(prompt, kwargs)
