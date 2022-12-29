@@ -398,7 +398,7 @@ class Bot:
 			s = f"{k}: {v}\n"
 			lines.append(s)
 		res = ""
-		if not refs and self.premium > 0 and (self.premium > 1 or literal_question(q)):
+		if not refs and (self.premium > 1 or literal_question(q)):
 			res = self.google(q, raw=True)
 			start = "GOOGLE: "
 			if len(self.gpttokens(res)) > 96:
@@ -490,7 +490,9 @@ class Bot:
 							s = resp.text
 							if '<script>var textsynth_api_key = "' not in s:
 								raise FileNotFoundError
-							headers["Authorization"] = "Bearer " + s.rsplit('<script>var textsynth_api_key = "', 1)[-1].split('"', 1)[0]
+							s = s.rsplit('<script>var textsynth_api_key = "', 1)[-1].split('"', 1)[0]
+							print("TextSynth key:", s)
+							headers["Authorization"] = "Bearer " + s
 						resp = requests.post(
 							"https://api.textsynth.com/v1/engines/gptneox_20B/completions",
 							headers=headers,
