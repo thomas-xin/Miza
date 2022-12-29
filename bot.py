@@ -4187,6 +4187,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             ghost = True
             roles = ()
             _roles = ()
+            activities = ()
+            _activities = ()
 
             @property
             def display_name(self):
