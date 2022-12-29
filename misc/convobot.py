@@ -439,7 +439,7 @@ class Bot:
 			else:
 				model = "text-neox-001"
 				temp = 0.8
-				limit = 200
+				limit = 2000
 				cm = 0
 		else:
 			model = "text-davinci-003"
