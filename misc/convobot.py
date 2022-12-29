@@ -173,8 +173,10 @@ def vague(t):
 
 def literal_question(t):
 	t = t.casefold().replace("'", "")
-	if not t or t.startswith("whats your") or t.startswith("what is your") or t.startswith("what are your") or t.startswith("what do you"):
-		return False
+	if not t:
+		return false
+	# if t.startswith("whats your") or t.startswith("what is your") or t.startswith("what are your") or t.startswith("what do you"):
+	# 	return False
 	t = t.removeprefix("so ")
 	t = t.removeprefix("then ")
 	t = t.removeprefix("but ")
@@ -398,11 +400,12 @@ class Bot:
 			s = f"{k}: {v}\n"
 			lines.append(s)
 		res = ""
-		if not refs and (self.premium > 1 or literal_question(q)):
+		if (not refs and self.premium > 1 or literal_question(q)):
 			res = (self.google, self.bing)[random.randint(0, 1)](q, raw=True)
 			start = "GOOGLE: "
-			if len(self.gpttokens(res)) > 96:
-				res = self.answer_summarise("facebook/bart-large-cnn", q + "\n" + res, max_length=96, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
+			if len(self.gpttokens(res)) > 128:
+				summ = self.answer_summarise("facebook/bart-large-cnn", q + "\n" + res, max_length=96, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
+				res = lim_str(res.replace("\n", " "), 256, mode="right") + "\n" + summ
 			res = start + res + "\n"
 			lines.append(res)
 		for k, v in refs:
