@@ -503,7 +503,7 @@ class Bot:
 								stream=False,
 								stop="###"
 							)),
-							proxies=proxies,
+							# proxies=proxies,
 						)
 					else:
 						raise NotImplementedError
