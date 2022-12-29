@@ -514,7 +514,7 @@ class Bot:
 						)
 					else:
 						raise NotImplementedError
-				except (requests.exceptions.ProxyError, requests.exceptions.SSLError, FileNotFoundError):
+				except (requests.exceptions.ProxyError, requests.exceptions.SSLError, requests.exceptions.ChunkedEncodingError, FileNotFoundError):
 					p = None
 					continue
 				if resp.status_code == 503:

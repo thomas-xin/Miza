@@ -326,7 +326,7 @@ class Bot:
 					data=dict(inputs=prompt, wait_for_model=True),
 					proxies=proxies,
 				)
-			except (requests.exceptions.ProxyError, requests.exceptions.SSLError):
+			except (requests.exceptions.ProxyError, requests.exceptions.SSLError, requests.exceptions.ChunkedEncodingError):
 				p = None
 				continue
 			if resp.status_code == 503:
