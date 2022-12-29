@@ -142,7 +142,7 @@ class Execute(Command):
     example = ("execute as @Miza run ~info",)
     multi = True
 
-    async def __call__(self, bot, user, message, guild, argl, args, argv, **void):
+    async def __call__(self, bot, user, message, channel, guild, argl, args, argv, **void):
         envs = []
         env = (user, channel)
         while args:

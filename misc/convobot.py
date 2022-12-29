@@ -249,7 +249,7 @@ class Bot:
 			tokenizer = AutoTokenizer.from_pretrained(m)
 			model = AutoModelForQuestionAnswering.from_pretrained(m)
 			self.models[m] = (tokenizer, model)
-		inputs = tokenizer(q[:512], c[:3072], return_tensors="pt", max_length=4096, truncation=True)
+		inputs = tokenizer(q[:512], c[:2048], return_tensors="pt", max_length=4096, truncation=True)
 		with torch.no_grad():
 			outputs = model(**inputs)
 		answer_start_index = outputs.start_logits.argmax()
@@ -646,10 +646,10 @@ class Bot:
 		tup = (u, q)
 		while len(self.chat_history) > self.history_length:
 			self.chat_history.pop(0)
-		if self.premium > 0 or random.randint(0, 1):
-			response, cost = self.gptcomplete(u, q, refs=refs)
-			if response:
-				return self.after(tup, (self.name, response)), cost
+		# if self.premium > 0 or random.randint(0, 1):
+		response, cost = self.gptcomplete(u, q, refs=refs)
+		if response:
+			return self.after(tup, (self.name, response)), cost
 		if refs and refs[-1][0] in ("IMAGE", "ANSWER"):
 			if len(refs) > 1:
 				response = refs[-2][1] + ", " + refs[-1][1]
