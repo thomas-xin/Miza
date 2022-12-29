@@ -612,6 +612,7 @@ class Bot:
 				return res
 		else:
 			res = "\n".join(r.strip() for r in res.splitlines() if valid_response(r))
+			res = lim_str(res, 4096, mode="right")
 			if raw:
 				drivers.append(driver)
 				return res
@@ -643,6 +644,7 @@ class Bot:
 				return res
 		else:
 			res = "\n".join(r.strip() for r in res.splitlines() if valid_response(r))
+			res = lim_str(res, 4096, mode="right")
 			if raw:
 				drivers.append(driver)
 				return res
