@@ -494,7 +494,7 @@ class Bot:
 						resp = requests.post(
 							"https://api.textsynth.com/v1/engines/gptneox_20B/completions",
 							headers=headers,
-							data=dict(
+							data=json.dumps(dict(
 								prompt=prompt,
 								temperature=temp,
 								top_k=128,
@@ -502,7 +502,7 @@ class Bot:
 								max_tokens=200,
 								stream=False,
 								stop="###"
-							),
+							)),
 							proxies=proxies,
 						)
 					else:
@@ -539,6 +539,7 @@ class Bot:
 					text += s + ": "
 			else:
 				print(resp.status_code, resp.text)
+				model = "text-curie-001"
 		if not text:
 			try:
 				response = openai.Completion.create(
