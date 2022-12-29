@@ -315,6 +315,7 @@ class Bot:
 		for i in range(8):
 			if not p and i <= 3:
 				p = FreeProxy(rand=True).get()
+				print("Proxy", p)
 				proxies = dict(http=p, https=p)
 			else:
 				proxies = None

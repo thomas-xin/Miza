@@ -4206,6 +4206,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             def _state(self):
                 return bot._state
 
+            @property
+            def _user(self):
+                return bot.cache.users.get(self.id) or self
+
             def _to_minimal_user_json(self):
                 return cdict(
                     username=self.name,

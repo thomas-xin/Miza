@@ -476,13 +476,14 @@ class Bot:
 			for i in range(8):
 				if not p and i <= 3:
 					p = FreeProxy(rand=True).get()
+					print("Proxy", p)
 					proxies = dict(http=p, https=p)
 				else:
 					proxies = None
 				try:
 					if model == "text-neox-001":
 						if "Authorization" not in headers:
-							headers["Authorization"] = "842a11464f81fc8be43ac76fb36426d2"
+							headers["Authorization"] = "Bearer 842a11464f81fc8be43ac76fb36426d2"
 							# resp = requests.get(
 							# 	"https://textsynth.com/playground.html",
 							# 	headers=headers,
@@ -504,7 +505,7 @@ class Bot:
 								top_p=1,
 								max_tokens=200,
 								stream=False,
-								stop="###"
+								stop="####"
 							)),
 							proxies=proxies,
 						)
