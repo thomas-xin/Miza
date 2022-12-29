@@ -11,7 +11,7 @@ try:
 	exc = concurrent.futures.exc_worker
 except AttributeError:
 	exc = concurrent.futures.exc_worker = concurrent.futures.ThreadPoolExecutor(max_workers=16)
-drivers = []
+drivers = selenium.__dict__.setdefault("-drivers", [])
 
 from math import *
 def lim_str(s, maxlen=10, mode="centre"):
@@ -217,6 +217,8 @@ DEFPER = "loyal friendly playful cute"
 class Bot:
 
 	models = {}
+	proxies = []
+	ptime = 0
 
 	def __init__(self, token="", key="", email="", password="", name="Miza", personality=DEFPER, premium=0):
 		self.token = token
@@ -232,6 +234,26 @@ class Bot:
 		self.premium = premium
 		self.last_cost = 0
 		self.history_length = 1 if premium < 1 else 2
+
+	def get_proxy(self):
+		if not self.proxies or time.time() - self.ptime > 180:
+			self.proxies.clear()
+			d = get_driver()
+			d.get("https://www.proxynova.com/proxy-server-list/")
+			time.sleep(1)
+			e = d.find_element(by=tag_name, value="tbody")
+			elems = e.find_elements(by=xpath, value="./child::*")
+			texts = [e.text.strip() for e in elems]
+			datas = [e.split() for e in texts if e]
+			infos = [(a[0] + ":" + a[1], int(a[5])) for a in datas]
+			infos.sort(key=lambda t: int(t[1]))
+			proxies = infos[:8]
+			infos = infos[8:]
+			while infos[0][1] < 2000:
+				proxies.append(infos.pop(0))
+			self.proxies.extend(proxies)
+			self.ptime = time.time()
+		return self.proxies.pop(0)[0]
 
 	def question_context_analysis(self, m, q, c):
 		if m in ("deepset/roberta-base-squad2", "deepset/tinyroberta-squad2"):
@@ -477,9 +499,9 @@ class Bot:
 			}
 			p = None
 			for i in range(8):
-				if not p and i <= 3:
+				if not p and i < 5:
 					p = FreeProxy(rand=True).get()
-					print("Proxy", p)
+					print("Proxy2", p)
 					proxies = dict(http=p, https=p)
 				else:
 					proxies = None
@@ -514,7 +536,8 @@ class Bot:
 						)
 					else:
 						raise NotImplementedError
-				except (requests.exceptions.ProxyError, requests.exceptions.SSLError, requests.exceptions.ChunkedEncodingError, FileNotFoundError):
+				except:
+					print_exc()
 					p = None
 					continue
 				if resp.status_code == 503:

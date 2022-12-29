@@ -1,4 +1,4 @@
-import os, time, urllib, json, io, random, subprocess
+import os, time, urllib, json, io, random, subprocess, base64
 import concurrent.futures
 import selenium, requests, torch, openai
 from selenium import webdriver
@@ -14,7 +14,7 @@ try:
 	exc = concurrent.futures.exc_worker
 except AttributeError:
 	exc = concurrent.futures.exc_worker = concurrent.futures.ThreadPoolExecutor(max_workers=16)
-drivers = []
+drivers = selenium.__dict__.setdefault("-drivers", [])
 
 class_name = webdriver.common.by.By.CLASS_NAME
 css_selector = webdriver.common.by.By.CSS_SELECTOR
@@ -146,12 +146,34 @@ def safecomp(gen):
 class Bot:
 
 	models = {}
+	proxies = []
+	ptime = 0
 
 	def __init__(self, token=""):
 		self.token = token
 		self.cache = {}
 		self.session = requests.Session()
 		self.timestamp = time.time()
+
+	def get_proxy(self):
+		if not self.proxies or time.time() - self.ptime > 180:
+			self.proxies.clear()
+			d = get_driver()
+			d.get("https://www.proxynova.com/proxy-server-list/")
+			time.sleep(1)
+			e = d.find_element(by=tag_name, value="tbody")
+			elems = e.find_elements(by=xpath, value="./child::*")
+			texts = [e.text.strip() for e in elems]
+			datas = [e.split() for e in texts if e]
+			infos = [(a[0] + ":" + a[1], int(a[5])) for a in datas]
+			infos.sort(key=lambda t: int(t[1]))
+			proxies = infos[:8]
+			infos = infos[8:]
+			while infos[0][1] < 2000:
+				proxies.append(infos.pop(0))
+			self.proxies.extend(proxies)
+			self.ptime = time.time()
+		return self.proxies.pop(0)[0]
 
 	def art_dalle(self, prompt, kwargs=None):
 		openai.api_key = self.token
@@ -313,9 +335,9 @@ class Bot:
 		resp = None
 		p = None
 		for i in range(8):
-			if not p and i <= 3:
+			if not p and i < 5:
 				p = FreeProxy(rand=True).get()
-				print("Proxy", p)
+				print("Proxy2", p)
 				proxies = dict(http=p, https=p)
 			else:
 				proxies = None
@@ -326,7 +348,8 @@ class Bot:
 					data=dict(inputs=prompt, wait_for_model=True),
 					proxies=proxies,
 				)
-			except (requests.exceptions.ProxyError, requests.exceptions.SSLError, requests.exceptions.ChunkedEncodingError):
+			except:
+				print_exc()
 				p = None
 				continue
 			if resp.status_code == 503:
@@ -370,22 +393,80 @@ class Bot:
 		b.seek(0)
 		return b.read()
 
+	def art_textsynth(self, prompt, kwargs=None):
+		headers = {
+			"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36",
+			"DNT": "1",
+			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
+			"cache-control": "no-cache",
+		}
+		kwargs = kwargs or {}
+		resp = None
+		p = None
+		for i in range(8):
+			if not p and i < 5:
+				p = FreeProxy(rand=True).get()
+				print("Proxy2", p)
+				proxies = dict(http=p, https=p)
+			else:
+				proxies = None
+			try:
+				if "Authorization" not in headers:
+					headers["Authorization"] = "Bearer 842a11464f81fc8be43ac76fb36426d2"
+				resp = self.session.post(
+					"https://api.textsynth.com/v1/engines/stable_diffusion/text_to_image",
+					headers=headers,
+					data=json.dumps(dict(
+						prompt=prompt,
+						timesteps=kwargs.get("--num-inference-steps", 50),
+						guidance_scale=kwargs.get("--guidance-scale", 7.5),
+						image_count=4,
+						width=512,
+						height=512,
+					)),
+					proxies=proxies,
+				)
+			except:
+				print_exc()
+				p = None
+				continue
+			if resp.status_code == 503:
+				try:
+					d = resp.json()
+					time.sleep(d["estimated_time"])
+				except:
+					p = None
+				continue
+			elif resp.status_code not in range(200, 400):
+				p = None
+				continue
+			break
+		if resp.status_code in range(200, 400):
+			print("TextSynth:", resp)
+			d = resp.json()
+			ds = d["images"]
+			ims = [base64.b64decode(b["data"].encode("ascii")) for b in ds]
+			b = ims.pop(0)
+			self.cache.setdefault(prompt, []).extend(ims)
+			return b
+		print(resp.status_code, resp.text)
+
 	def art(self, prompt, url="", url2="", kwargs={}, specified=False, dalle2=False, openjourney=False):
 		funcs = []
-		if not specified and not url and not url2 or not os.path.exists("misc/stable_diffusion.openvino"):
+		if not specified and not url:
 			if random.randint(0, 2) and self.cache.get(prompt):
 				return self.cache[prompt].pop(0), 0
 			funcs.append(self.art_openjourney)
 			funcs.append(self.art_mage)
+		if not url:
+			funcs.append(self.art_textsynth)
+		if not specified and not url:
 			funcs.append(self.art_deepai)
-		if dalle2 and not specified and not url and not url2:
-			funcs.insert(0, self.art_dalle)
-			# funcs.insert(2, self.art_openjourney_local)
-		# if openjourney:
-		# 	funcs.insert(1, self.art_openjourney_local)
+			if dalle2:
+				funcs.insert(0, self.art_dalle)
 		for func in funcs:
 			try:
-				im = func(prompt, kwargs)
+				im = exc.submit(func, prompt, kwargs).result(timeout=240)
 			except:
 				print_exc()
 				im = dalle2 = None
