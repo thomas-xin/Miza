@@ -539,6 +539,9 @@ class Bot:
 						text += s.rsplit("\n", 1)[0]
 						break
 					text += s + ": "
+				text = text.strip()
+				if text.endswith(":"):
+					text = text.rsplit("\n", 1)[0]
 			else:
 				print(resp.status_code, resp.text)
 				model = "text-curie-001"
