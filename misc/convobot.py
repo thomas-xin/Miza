@@ -482,17 +482,18 @@ class Bot:
 				try:
 					if model == "text-neox-001":
 						if "Authorization" not in headers:
-							resp = requests.get(
-								"https://textsynth.com/playground.html",
-								headers=headers,
-								proxies=proxies,
-							)
-							s = resp.text
-							if '<script>var textsynth_api_key = "' not in s:
-								raise FileNotFoundError
-							s = s.rsplit('<script>var textsynth_api_key = "', 1)[-1].split('"', 1)[0]
-							print("TextSynth key:", s)
-							headers["Authorization"] = "Bearer " + s
+							headers["Authorization"] = "842a11464f81fc8be43ac76fb36426d2"
+							# resp = requests.get(
+							# 	"https://textsynth.com/playground.html",
+							# 	headers=headers,
+							# 	proxies=proxies,
+							# )
+							# s = resp.text
+							# if '<script>var textsynth_api_key = "' not in s:
+							# 	raise FileNotFoundError
+							# s = s.rsplit('<script>var textsynth_api_key = "', 1)[-1].split('"', 1)[0]
+							# print("TextSynth key:", s)
+							# headers["Authorization"] = "Bearer " + s
 						resp = requests.post(
 							"https://api.textsynth.com/v1/engines/gptneox_20B/completions",
 							headers=headers,
@@ -505,7 +506,7 @@ class Bot:
 								stream=False,
 								stop="###"
 							)),
-							# proxies=proxies,
+							proxies=proxies,
 						)
 					else:
 						raise NotImplementedError
