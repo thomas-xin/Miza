@@ -399,7 +399,7 @@ class Bot:
 			lines.append(s)
 		res = ""
 		if not refs and (self.premium > 1 or literal_question(q)):
-			res = self.google(q, raw=True)
+			res = (self.google, self.bing)[random.randint(0, 1)](q, raw=True)
 			start = "GOOGLE: "
 			if len(self.gpttokens(res)) > 96:
 				res = self.answer_summarise("facebook/bart-large-cnn", q + "\n" + res, max_length=96, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
@@ -612,7 +612,7 @@ class Bot:
 				return res
 		else:
 			res = "\n".join(r.strip() for r in res.splitlines() if valid_response(r))
-			res = lim_str(res, 4096, mode="right")
+			res = lim_str(res, 3072, mode="right")
 			if raw:
 				drivers.append(driver)
 				return res
@@ -644,7 +644,7 @@ class Bot:
 				return res
 		else:
 			res = "\n".join(r.strip() for r in res.splitlines() if valid_response(r))
-			res = lim_str(res, 4096, mode="right")
+			res = lim_str(res, 3072, mode="right")
 			if raw:
 				drivers.append(driver)
 				return res
