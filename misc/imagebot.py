@@ -302,16 +302,17 @@ class Bot:
 	def art_openjourney(self, prompt, kwargs=None):
 		if not any(w in prompt for w in ("style", "stylised", "stylized")):
 			prompt += ", mdjrny-v4 style"
-		headers={
+		headers = {
 			"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36",
 			"DNT": "1",
 			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
 			"cache-control": "no-cache",
 			"x-use-cache": "false",
+			"x-wait-for-model": "true",
 		}
 		resp = None
 		p = None
-		for i in range(5):
+		for i in range(8):
 			if not p and i <= 3:
 				p = FreeProxy(rand=True).get()
 				proxies = dict(http=p, https=p)
@@ -321,9 +322,8 @@ class Bot:
 				resp = self.session.post(
 					"https://api-inference.huggingface.co/models/prompthero/openjourney",
 					headers=headers,
-					data=dict(inputs=prompt),
+					data=dict(inputs=prompt, wait_for_model=True),
 					proxies=proxies,
-					# verify=False,
 				)
 			except (requests.exceptions.ProxyError, requests.exceptions.SSLError):
 				p = None

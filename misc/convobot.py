@@ -425,30 +425,32 @@ class Bot:
 			s = f"{k}: {v}\n"
 			lines.append(s)
 		lines.append(f"{self.name}:")
-		if self.premium < 1 or self.premium < 2 and (len(q) >= 256 or res):
-			model = "text-babbage-001"
-			temp = 0.9
-			limit = 1000
-			cm = 5
-		elif self.premium < 2:
-			model = "text-curie-001"
-			temp = 0.8
-			limit = 2000
-			cm = 20
+		words = q.casefold().translate(self.unpunctuation).split()
+		longer = "essay" in words or "full" in words or "write" in words or "writing" in words or "about" in words
+		if self.premium < 2:
+			if longer:
+				model = "text-curie-001"
+				temp = 0.8
+				limit = 2000
+				cm = 20
+			else:
+				model = "text-neox-001"
+				temp = 0.8
+				limit = 200
+				cm = 0
 		else:
 			model = "text-davinci-003"
 			temp = 0.7
 			limit = 4000
 			cm = 200
-		words = q.casefold().translate(self.unpunctuation).split()
-		if "essay" in words or "full" in words or "write" in words or "writing" in words or "about" in words:
+		if longer:
 			soft = limit / 4
 		else:
 			soft = limit / 2
 		prompt = ""
 		while lines and len(prompt) < soft * 4:
 			prompt = lines.pop(-1) + prompt
-		p = "" if self.premium < 2 else per
+		p = per
 		if not p:
 			p = "an"
 		elif p[0] in "aeio":
@@ -461,37 +463,114 @@ class Bot:
 		pc = len(self.gpttokens(prompt))
 		response = None
 		text = ""
-		try:
-			response = openai.Completion.create(
-				model=model,
-				prompt=prompt,
-				temperature=temp,
-				max_tokens=limit - pc - 64,
-				top_p=1,
-				frequency_penalty=0.8,
-				presence_penalty=0.4,
-				user=str(hash(u)),
-			)
-		except openai.error.InvalidRequestError:
-			response = openai.Completion.create(
-				model=model,
-				prompt=prompt,
-				temperature=temp,
-				max_tokens=int((limit - pc) * 0.75),
-				top_p=1,
-				frequency_penalty=0.8,
-				presence_penalty=0.4,
-				user=str(hash(u)),
-			)
-		except:
-			print_exc()
-		if response:
+		if model in ("text-neox-001", "text-bloom-001"):
+			headers = {
+				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36",
+				"DNT": "1",
+				"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
+				"cache-control": "no-cache",
+				"x-use-cache": "false",
+				"x-wait-for-model": "true",
+			}
+			p = None
+			for i in range(8):
+				if not p and i <= 3:
+					p = FreeProxy(rand=True).get()
+					proxies = dict(http=p, https=p)
+				else:
+					proxies = None
+				try:
+					if model == "text-neox-001":
+						if "Authorization" not in headers:
+							resp = requests.get(
+								"https://textsynth.com/playground.html",
+								headers=headers,
+								proxies=proxies,
+							)
+							s = resp.text
+							if '<script>var textsynth_api_key = "' not in s:
+								raise FileNotFoundError
+							headers["Authorization"] = "Bearer " + s.rsplit('<script>var textsynth_api_key = "', 1)[-1].split('"', 1)[0]
+						resp = requests.post(
+							"https://api.textsynth.com/v1/engines/gptneox_20B/completions",
+							headers=headers,
+							data=dict(
+								prompt=prompt,
+								temperature=temp,
+								top_k=128,
+								top_p=1,
+								max_tokens=200,
+								stream=False,
+								stop="###"
+							),
+							proxies=proxies,
+						)
+					else:
+						raise NotImplementedError
+				except (requests.exceptions.ProxyError, requests.exceptions.SSLError, FileNotFoundError):
+					p = None
+					continue
+				if resp.status_code == 503:
+					try:
+						d = resp.json()
+						time.sleep(d["estimated_time"])
+					except:
+						p = None
+					continue
+				elif resp.status_code not in range(200, 400):
+					p = None
+					continue
+				break
+			if resp.status_code in range(200, 400):
+				lines = resp.text.splitlines()
+				text = ""
+				for line in lines:
+					if line:
+						d = json.loads(line)
+						text += d["text"] + "\n"
+				text = text.strip()
+				spl = text.split(": ")
+				text = ""
+				while spl:
+					s = spl.pop(0)
+					if "\n" in s:
+						text += s.rsplit("\n", 1)[0]
+						break
+					text += s + ": "
+			else:
+				print(resp.status_code, resp.text)
+		if not text:
+			try:
+				response = openai.Completion.create(
+					model=model,
+					prompt=prompt,
+					temperature=temp,
+					max_tokens=limit - pc - 64,
+					top_p=1,
+					frequency_penalty=0.8,
+					presence_penalty=0.4,
+					user=str(hash(u)),
+				)
+			except openai.error.InvalidRequestError:
+				response = openai.Completion.create(
+					model=model,
+					prompt=prompt,
+					temperature=temp,
+					max_tokens=int((limit - pc) * 0.75),
+					top_p=1,
+					frequency_penalty=0.8,
+					presence_penalty=0.4,
+					user=str(hash(u)),
+				)
+			except:
+				print_exc()
+		if response and not text:
 			text = response.choices[0].text
 			rc = len(self.gpttokens(text))
-			text = text.strip()
 			cost = (pc + rc) * cm
 		else:
 			cost = 0
+		text = text.strip()
 		print(f"GPTV3 {model} response:", text)
 		return text, cost
 

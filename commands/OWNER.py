@@ -143,11 +143,56 @@ class Execute(Command):
     multi = True
 
     async def __call__(self, bot, user, message, guild, argl, args, argv, **void):
-        if args and args[0] == "as":
-            args.pop(0)
-        users = await bot.find_users(argl, args, user, guild)
-        if not users:
-            raise LookupError("No results found.")
+        envs = []
+        env = (user, channel)
+        while args:
+            if args[0] == "as":
+                args.pop(0)
+                al = args.pop(0).split()
+                users = await bot.find_users(al, al, user, guild)
+                if not users:
+                    raise LookupError("No results found.")
+                temp = []
+                for env in envs:
+                    temp.extend((u, env[1]) for u in users)
+                envs = temp
+            elif args[0] == "at":
+                args.pop(0)
+                al = args.pop(0).split()
+                users = await bot.find_users(al, al, user, guild)
+                if not users:
+                    raise LookupError("No results found.")
+                channels = []
+                for u in users:
+                    cid = bot.data.users.get(u.id, {}).get("last_channel")
+                    try:
+                        if not cid:
+                            raise
+                        c = await bot.fetch_channel(cid)
+                    except:
+                        m = bot.get_member(u.id, guild, find_others=True)
+                        if hasattr(m, "guild"):
+                            c = bot.get_first_sendable(m.guild, m)
+                            channels.append(c)
+                    else:
+                        channels.append(c)
+                temp = []
+                for env in envs:
+                    temp.extend((env[0], c) for c in channels)
+                envs = temp
+            elif args[0] == "in":
+                args.pop(0)
+                al = args.pop(0).split()
+                channels = []
+                for i in al:
+                    c = await bot.fetch_channel(verify_id(i))
+                    channels.append(c)
+                temp = []
+                for env in envs:
+                    temp.extend((env[0], c) for c in channels)
+                envs = temp
+            else:
+                break
         if not args:
             return
         try:
@@ -156,10 +201,16 @@ class Execute(Command):
             pass
             # raise ArgumentError('"run" must be specified as a separator.')
         futs = deque()
-        for u in users:
+        for u, c in envs:
             fake_message = copy.copy(message)
             fake_message.content = argv
-            fake_message.author = u
+            fake_message.channel = c
+            g = getattr(c, "guild", None)
+            fake_message.guild = g
+            if g:
+                fake_message.author = g.get_member(u.id) or u
+            else:
+                fake_message.author = u
             futs.append(create_task(bot.process_message(fake_message, argv)))
         for fut in futs:
             await fut

@@ -2303,4 +2303,6 @@ class UpdateUsers(Database):
             if not self.data.get(user.id, EMPTY).get("last_mention") and random.random() > 0.6:
                 self.data.get(user.id, EMPTY).pop("last_talk", None)
             self.data.get(user.id, EMPTY).pop("last_mention", None)
+        if not getattr(message, "simulated", None):
+            self.data.setdefault(user.id, {})["last_channel"] = message.channel.id
         self.update(user.id)

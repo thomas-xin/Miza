@@ -1381,7 +1381,10 @@ class Personality(Command):
         return p
 
     def retrieve(self, i):
-        return self.bot.data.personalities.get(i) or "loyal friendly playful cute"
+        defper = "loyal friendly playful cute"
+        if self.bot.premium_level(i) < 2:
+            return self.bot.data.personalities.pop(i, None) or defper
+        return self.bot.data.personalities.get(i) or defper
 
     async def __call__(self, bot, flags, guild, message, user, args, **void):
         if not AUTH.get("openai_key"):
