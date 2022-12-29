@@ -402,7 +402,7 @@ class Bot:
 			res = self.google(q, raw=True)
 			start = "GOOGLE: "
 			if len(self.gpttokens(res)) > 96:
-				res = self.answer_summarise("facebook/bart-large-cnn", res, max_length=96, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
+				res = self.answer_summarise("facebook/bart-large-cnn", q + "\n" + res, max_length=96, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
 			res = start + res + "\n"
 			lines.append(res)
 		for k, v in refs:
