@@ -499,7 +499,7 @@ class Bot:
 							# s = s.rsplit('<script>var textsynth_api_key = "', 1)[-1].split('"', 1)[0]
 							# print("TextSynth key:", s)
 							# headers["Authorization"] = "Bearer " + s
-						with httpx.Client(http2=True, proxies=p) as reqx:
+						with httpx.Client(timeout=120, http2=True, proxies=p) as reqx:
 							resp = reqx.post(
 								"https://api.textsynth.com/v1/engines/gptneox_20B/completions",
 								headers=headers,

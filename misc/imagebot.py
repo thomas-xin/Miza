@@ -321,7 +321,7 @@ class Bot:
 			else:
 				p = None
 			try:
-				with httpx.Client(http2=True, proxies=p) as reqx:
+				with httpx.Client(timeout=120, http2=True, proxies=p) as reqx:
 					resp = reqx.post(
 						"https://api-inference.huggingface.co/models/prompthero/openjourney",
 						headers=headers,
@@ -391,7 +391,7 @@ class Bot:
 			try:
 				if "Authorization" not in headers:
 					headers["Authorization"] = "Bearer 842a11464f81fc8be43ac76fb36426d2"
-				with httpx.Client(http2=True, proxies=p) as reqx:
+				with httpx.Client(timeout=120, http2=True, proxies=p) as reqx:
 					resp = reqx.post(
 						"https://api.textsynth.com/v1/engines/stable_diffusion/text_to_image",
 						headers=headers,
