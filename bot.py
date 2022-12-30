@@ -4190,6 +4190,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             activities = ()
             _activities = ()
 
+            def __getattr__(self, k):
+                if k == "member":
+                    return self.__getattribute__(k)
+                elif hasattr(self, "member"):
+                    return getattr(self.member, k)
+                return self.__getattribute__(k)
+
             @property
             def display_name(self):
                 return self.nick or self.name
@@ -4218,6 +4225,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     discriminator=self.discriminator,
                     bot=self.bot,
                 )
+
+            def _update(self, data):
+                m = discord.Member._copy(self)
+                m._update(data)
+                self.member = m
+                return m
 
         GhostUser.bot = False
 
