@@ -1151,7 +1151,7 @@ class Ask(Command):
                         elif p2:
                             capt = url.rsplit("/", 1)[-1]
                             c = c.replace(url, f"[Image {capt}]")
-                    refs.insert(0, ("REPLYING: " + name, c))
+                    refs.insert(0, ("REPLIED TO: " + name, c))
                 urls = find_urls(q)
                 for url in urls:
                     if is_image(url) is not None:

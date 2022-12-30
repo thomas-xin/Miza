@@ -66,16 +66,28 @@ import cherrypy, cheroot
 from cherrypy._cpdispatch import Dispatcher
 cp = cherrypy
 
-def cp_error_log(self, msg="", level=20, traceback=False):
-    sys.stderr.write("{msg!s}\n".format(msg=msg))
-    if traceback:
-        tblines = traceback_.format_exc()
-        if "SSLError:" in tblines or "SSLEOFError:" in tblines:
-            sys.stderr.write(tblines.rstrip().rsplit("\n", 1)[-1] + "\n")
-        else:
-            sys.stderr.write(tblines)
-    sys.stderr.flush()
-cheroot.server.HTTPServer.error_log = lambda self, *args, **kwargs: cp_error_log(self, *args, **kwargs)
+def serve(self):
+    while self.ready and not self.interrupt:
+        try:
+            self._connections.run(self.expiration_interval)
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception:
+            self.error_log(
+                'Error in HTTPServer.serve', level=logging.ERROR,
+                traceback=False,
+            )
+cheroot.server.HTTPServer.serve = serve
+# def cp_error_log(self, msg="", level=20, traceback=False):
+#     sys.stderr.write("{msg!s}\n".format(msg=msg))
+#     if traceback:
+#         tblines = traceback_.format_exc()
+#         if "SSLError:" in tblines or "SSLEOFError:" in tblines:
+#             sys.stderr.write(tblines.rstrip().rsplit("\n", 1)[-1] + "\n")
+#         else:
+#             sys.stderr.write(tblines)
+#     sys.stderr.flush()
+# cheroot.server.HTTPServer.error_log = lambda self, *args, **kwargs: cp_error_log(self, *args, **kwargs)
 
 actually_static = set(os.listdir("misc/static"))
 mapped_static = {k[:-5]: k for k in actually_static if k.endswith(".html")}

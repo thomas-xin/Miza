@@ -12,6 +12,7 @@ filetype>=1.1.0
 free-proxy>=1.1.0
 googletrans>=3.0.0
 gmpy2>=2.1.2
+httpx[http2]>=0.23.1
 inspiro>=0.0.2
 knackpy>=1.1.1
 matplotlib>=3.5.3

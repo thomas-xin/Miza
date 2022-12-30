@@ -3436,8 +3436,6 @@ class __logPrinter:
 
     ignored_messages = {
         "A decoder-only architecture is being used, but right-padding was detected! For correct generation results, please set `padding_side='left'` when initializing the tokenizer.",
-        "ssl.SSLError: [SSL: BAD_KEY_SHARE] bad key share (_ssl.c:997)",
-        "ssl.SSLEOFError: EOF occurred in violation of protocol (_ssl.c:2396)",
     }
 
     def __init__(self, file=None):

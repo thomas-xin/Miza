@@ -1,6 +1,6 @@
 import os, time, urllib, json, io, random, subprocess, base64
 import concurrent.futures
-import selenium, requests, torch, openai
+import selenium, requests, torch, openai, httpx
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering, AutoModelForCausalLM, pipeline
@@ -154,26 +154,6 @@ class Bot:
 		self.cache = {}
 		self.session = requests.Session()
 		self.timestamp = time.time()
-
-	def get_proxy(self):
-		if not self.proxies or time.time() - self.ptime > 180:
-			self.proxies.clear()
-			d = get_driver()
-			d.get("https://www.proxynova.com/proxy-server-list/")
-			time.sleep(1)
-			e = d.find_element(by=tag_name, value="tbody")
-			elems = e.find_elements(by=xpath, value="./child::*")
-			texts = [e.text.strip() for e in elems]
-			datas = [e.split() for e in texts if e]
-			infos = [(a[0] + ":" + a[1], int(a[5])) for a in datas]
-			infos.sort(key=lambda t: int(t[1]))
-			proxies = infos[:8]
-			infos = infos[8:]
-			while infos[0][1] < 2000:
-				proxies.append(infos.pop(0))
-			self.proxies.extend(proxies)
-			self.ptime = time.time()
-		return self.proxies.pop(0)[0]
 
 	def art_dalle(self, prompt, kwargs=None):
 		openai.api_key = self.token
@@ -338,18 +318,17 @@ class Bot:
 			if not p and i < 5:
 				p = FreeProxy(rand=True).get()
 				print("Proxy2", p)
-				proxies = dict(http=p, https=p)
 			else:
-				proxies = None
+				p = None
 			try:
-				resp = self.session.post(
-					"https://api-inference.huggingface.co/models/prompthero/openjourney",
-					headers=headers,
-					data=dict(inputs=prompt, wait_for_model=True),
-					proxies=proxies,
-				)
-			except:
-				print_exc()
+				with httpx.Client(http2=True, proxies=p) as reqx:
+					resp = reqx.post(
+						"https://api-inference.huggingface.co/models/prompthero/openjourney",
+						headers=headers,
+						data=dict(inputs=prompt, wait_for_model=True),
+					)
+			except Exception as ex:
+				print(repr(ex))
 				p = None
 				continue
 			if resp.status_code == 503:
@@ -407,27 +386,26 @@ class Bot:
 			if not p and i < 5:
 				p = FreeProxy(rand=True).get()
 				print("Proxy2", p)
-				proxies = dict(http=p, https=p)
 			else:
-				proxies = None
+				p = None
 			try:
 				if "Authorization" not in headers:
 					headers["Authorization"] = "Bearer 842a11464f81fc8be43ac76fb36426d2"
-				resp = self.session.post(
-					"https://api.textsynth.com/v1/engines/stable_diffusion/text_to_image",
-					headers=headers,
-					data=json.dumps(dict(
-						prompt=prompt,
-						timesteps=kwargs.get("--num-inference-steps", 50),
-						guidance_scale=kwargs.get("--guidance-scale", 7.5),
-						image_count=4,
-						width=512,
-						height=512,
-					)),
-					proxies=proxies,
-				)
-			except:
-				print_exc()
+				with httpx.Client(http2=True, proxies=p) as reqx:
+					resp = reqx.post(
+						"https://api.textsynth.com/v1/engines/stable_diffusion/text_to_image",
+						headers=headers,
+						data=json.dumps(dict(
+							prompt=prompt,
+							timesteps=kwargs.get("--num-inference-steps", 50),
+							guidance_scale=kwargs.get("--guidance-scale", 7.5),
+							image_count=4,
+							width=512,
+							height=512,
+						)),
+					)
+			except Exception as ex:
+				print(repr(ex))
 				p = None
 				continue
 			if resp.status_code == 503:

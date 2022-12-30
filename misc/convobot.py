@@ -1,6 +1,6 @@
 import os, time, urllib, json, random
 import concurrent.futures
-import selenium, requests, torch, openai
+import selenium, requests, torch, openai, httpx
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from transformers import GPT2TokenizerFast, AutoTokenizer, AutoModelForQuestionAnswering, AutoModelForCausalLM, pipeline, set_seed
@@ -235,26 +235,6 @@ class Bot:
 		self.last_cost = 0
 		self.history_length = 1 if premium < 1 else 2
 
-	def get_proxy(self):
-		if not self.proxies or time.time() - self.ptime > 180:
-			self.proxies.clear()
-			d = get_driver()
-			d.get("https://www.proxynova.com/proxy-server-list/")
-			time.sleep(1)
-			e = d.find_element(by=tag_name, value="tbody")
-			elems = e.find_elements(by=xpath, value="./child::*")
-			texts = [e.text.strip() for e in elems]
-			datas = [e.split() for e in texts if e]
-			infos = [(a[0] + ":" + a[1], int(a[5])) for a in datas]
-			infos.sort(key=lambda t: int(t[1]))
-			proxies = infos[:8]
-			infos = infos[8:]
-			while infos[0][1] < 2000:
-				proxies.append(infos.pop(0))
-			self.proxies.extend(proxies)
-			self.ptime = time.time()
-		return self.proxies.pop(0)[0]
-
 	def question_context_analysis(self, m, q, c):
 		if m in ("deepset/roberta-base-squad2", "deepset/tinyroberta-squad2"):
 			try:
@@ -405,7 +385,7 @@ class Bot:
 		"*": " ",
 		"~": " ",
 	})
-	def gptcomplete(self, u, q, refs):
+	def gptcomplete(self, u, q, refs=()):
 		openai.api_key = self.key
 		per = self.personality
 		chat_history = self.chat_history.copy()
@@ -431,7 +411,7 @@ class Bot:
 			res = start + res + "\n"
 			lines.append(res)
 		for k, v in refs:
-			if not k.startswith("REPLYING: "):
+			if not k.startswith("REPLIED TO: "):
 				continue
 			if len(self.gpttokens(v)) > 32:
 				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
@@ -442,7 +422,7 @@ class Bot:
 			s = self.answer_summarise("facebook/bart-large-cnn", s, max_length=384, min_length=32).replace("\n", ". ").strip()
 		lines.append(s)
 		for k, v in refs:
-			if k.startswith("REPLYING"):
+			if k.startswith("REPLIED TO: "):
 				continue
 			k = k.replace(":", "")
 			if len(self.gpttokens(v)) > 32:
@@ -502,9 +482,8 @@ class Bot:
 				if not p and i < 5:
 					p = FreeProxy(rand=True).get()
 					print("Proxy2", p)
-					proxies = dict(http=p, https=p)
 				else:
-					proxies = None
+					p = None
 				try:
 					if model == "text-neox-001":
 						if "Authorization" not in headers:
@@ -520,24 +499,24 @@ class Bot:
 							# s = s.rsplit('<script>var textsynth_api_key = "', 1)[-1].split('"', 1)[0]
 							# print("TextSynth key:", s)
 							# headers["Authorization"] = "Bearer " + s
-						resp = requests.post(
-							"https://api.textsynth.com/v1/engines/gptneox_20B/completions",
-							headers=headers,
-							data=json.dumps(dict(
-								prompt=prompt,
-								temperature=temp,
-								top_k=128,
-								top_p=1,
-								max_tokens=200,
-								stream=False,
-								stop="####"
-							)),
-							proxies=proxies,
-						)
+						with httpx.Client(http2=True, proxies=p) as reqx:
+							resp = reqx.post(
+								"https://api.textsynth.com/v1/engines/gptneox_20B/completions",
+								headers=headers,
+								data=json.dumps(dict(
+									prompt=prompt,
+									temperature=temp,
+									top_k=128,
+									top_p=1,
+									max_tokens=200,
+									stream=False,
+									stop="####"
+								)),
+							)
 					else:
 						raise NotImplementedError
-				except:
-					print_exc()
+				except Exception as ex:
+					print(repr(ex))
 					p = None
 					continue
 				if resp.status_code == 503:
@@ -558,7 +537,7 @@ class Bot:
 					if line:
 						d = json.loads(line)
 						text += d["text"] + "\n"
-				text = text.strip()
+				text = text.strip().replace(":\n", ": ")
 				spl = text.split(": ")
 				text = ""
 				while spl:

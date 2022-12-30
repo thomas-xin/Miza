@@ -5584,6 +5584,8 @@ class AudioClientInterface:
         return bot.data.audio.players
 
     async def asubmit(self, s, aio=False, ignore=False):
+        if self.killed:
+            return
         bot.activity += 1
         key = ts_us()
         while key in self.returns:
@@ -5608,20 +5610,21 @@ class AudioClientInterface:
                 raise
             try:
                 self.killed = True
-                if is_strict_running(self.proc):
-                    force_kill(self.proc)
                 for client in self.clients.values():
                     if client:
                         client.kill()
+                if is_strict_running(self.proc):
+                    force_kill(self.proc)
                 self.clients.clear()
                 self.returns.clear()
                 futs = deque()
                 for guild in bot.client.guilds:
-                    member = guild.get_member(bot.user.id)
-                    if member:
-                        voice = member.voice
-                        if voice:
-                            futs.append(create_task(member.move_to(None)))
+                    futs.append(create_task(self.guild.change_voice_state(channel=None)))
+                    # member = guild.get_member(bot.user.id)
+                    # if member:
+                    #     voice = member.voice
+                    #     if voice:
+                    #         futs.append(create_task(member.move_to(None)))
                 for fut in futs:
                     await fut
                 print("Restarting audio client...")

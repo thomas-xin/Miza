@@ -7,7 +7,7 @@ try:
 	exc = concurrent.futures.exc_worker
 except AttributeError:
 	exc = concurrent.futures.exc_worker = concurrent.futures.ThreadPoolExecutor(max_workers=16)
-drivers = []
+drivers = selenium.__dict__.setdefault("-drivers", [])
 
 class_name = webdriver.common.by.By.CLASS_NAME
 css_selector = webdriver.common.by.By.CSS_SELECTOR
