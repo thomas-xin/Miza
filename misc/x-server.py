@@ -62,7 +62,7 @@ prev_date = utc_dt().date()
 zfailed = set()
 
 
-import cherrypy, cheroot
+import cherrypy, cheroot, logging
 from cherrypy._cpdispatch import Dispatcher
 cp = cherrypy
 
