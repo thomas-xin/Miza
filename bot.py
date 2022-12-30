@@ -4191,6 +4191,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             _activities = ()
             public_flags = discord.flags.PublicUserFlags()
             _public_flags = discord.flags.PublicUserFlags()
+            banner = None
+            _banner = None
 
             def __getattr__(self, k):
                 if k == "member":
