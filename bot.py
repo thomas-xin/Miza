@@ -4189,12 +4189,17 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             _roles = ()
             activities = ()
             _activities = ()
+            public_flags = discord.flags.PublicUserFlags()
+            _public_flags = discord.flags.PublicUserFlags()
 
             def __getattr__(self, k):
                 if k == "member":
                     return self.__getattribute__(k)
                 elif hasattr(self, "member"):
-                    return getattr(self.member, k)
+                    try:
+                        return getattr(self.member, k)
+                    except AttributeError:
+                        pass
                 return self.__getattribute__(k)
 
             @property
