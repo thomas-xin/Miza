@@ -577,7 +577,7 @@ class Bot:
 					except:
 						p = None
 					continue
-				elif resp.status_code not in range(200, 400):
+				elif resp.status_code not in range(200, 400) or not resp.content:
 					p = None
 					continue
 				break
