@@ -157,6 +157,7 @@ class Bot:
 		self.cache = {}
 		self.session = requests.Session()
 		self.timestamp = time.time()
+		self.fp = FreeProxy()
 
 	def get_proxy(self, retry=True):
 		if self.proxies and time.time() - self.ctime <= 20:
