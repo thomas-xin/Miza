@@ -270,7 +270,7 @@ class Bot:
 				assert fut.result(timeout=6)[0] == b"{"
 			except:
 				# print_exc()
-				self.proxies.remove(p)
+				self.proxies.discard(p)
 				self.bad_proxies.add(p)
 		if not self.proxies:
 			if not retry:
