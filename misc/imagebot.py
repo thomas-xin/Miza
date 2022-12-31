@@ -146,6 +146,7 @@ def safecomp(gen):
 class Bot:
 
 	models = {}
+	ctime = 0
 	proxies = set()
 	ptime = 0
 	bad_proxies = set()
@@ -158,9 +159,9 @@ class Bot:
 		self.timestamp = time.time()
 
 	def get_proxy(self, retry=True):
-		if self.proxies and time.time() - self.ptime <= 20:
+		if self.proxies and time.time() - self.ctime <= 20:
 			return random.choice(tuple(self.proxies))
-		while not self.proxies:
+		while not self.proxies or time.time() - self.ptime > 240:
 			i = random.randint(1, 3)
 			if i == 1:
 				repeat = False
@@ -173,15 +174,19 @@ class Bot:
 				self.fp.country_id = None
 			proxies = self.fp.get_proxy_list(repeat)
 			self.proxies.update("http://" + p for p in proxies)
+			if self.proxies:
+				self.ptime = time.time()
 		proxies = list(self.proxies)
 		# print(proxies)
 		if time.time() - self.btime > 480:
 			self.bad_proxies.clear()
 			self.btime = time.time()
-		futs = [exc.submit(self.check_proxy, p) for p in proxies if p not in self.bad_proxies]
+		else:
+			self.proxies.difference_update(self.bad_proxies)
+		futs = [exc.submit(self.check_proxy, p) for p in proxies]
 		for i, (p, fut) in enumerate(zip(proxies, futs)):
 			try:
-				assert fut.result()
+				assert fut.result(timeout=6)
 			except:
 				# print_exc()
 				self.proxies.remove(p)
@@ -191,12 +196,12 @@ class Bot:
 				return
 				raise FileNotFoundError("Proxy unavailable.")
 			return self.get_proxy(retry=False)
-		self.ptime = time.time()
+		self.ctime = time.time()
 		return random.choice(tuple(self.proxies))
 
 	def check_proxy(self, p):
 		url = "https://mizabot.xyz/ip"
-		with httpx.Client(timeout=5, http2=True, proxies=p, verify=False) as reqx:
+		with httpx.Client(timeout=3, http2=True, proxies=p, verify=False) as reqx:
 			resp = reqx.get(url)
 			return resp.content
 
