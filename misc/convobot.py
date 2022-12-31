@@ -444,6 +444,8 @@ class Bot:
 		if per == DEFPER:
 			lines.append(f"{u}: Hi!\n")
 			lines.append(f"{self.name}: Hiya! Can I help with anything? :3\n")
+			lines.append(f"{u}: Can I have a hug?\n")
+			lines.append(f"{self.name}: *glomps you before you can finish* ;w;\n")
 		for k, v in self.promises:
 			k = k.replace(":", "")
 			s = f"{k}: {v}\n"
