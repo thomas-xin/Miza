@@ -586,7 +586,11 @@ class Bot:
 				text = ""
 				for line in lines:
 					if line:
-						d = json.loads(line)
+						try:
+							d = json.loads(line)
+						except:
+							print(lines)
+							raise
 						text += d["text"] + "\n"
 				text = text.strip().replace("â€™", "'").replace(":\n", ": ")
 				spl = text.split(": ")
