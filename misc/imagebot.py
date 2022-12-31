@@ -183,7 +183,7 @@ class Bot:
 			try:
 				assert fut.result()
 			except:
-				print_exc()
+				# print_exc()
 				self.proxies.remove(p)
 				self.bad_proxies.add(p)
 		if not self.proxies:
