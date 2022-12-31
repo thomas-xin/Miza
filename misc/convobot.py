@@ -267,7 +267,7 @@ class Bot:
 		futs = [exc.submit(self.check_proxy, p) for p in proxies]
 		for i, (p, fut) in enumerate(zip(proxies, futs)):
 			try:
-				assert fut.result(timeout=6)
+				assert fut.result(timeout=6)[0] == b"{"
 			except:
 				# print_exc()
 				self.proxies.remove(p)
@@ -524,6 +524,7 @@ class Bot:
 				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36",
 				"DNT": "1",
 				"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
+				"Content-Type": "application/json",
 				"cache-control": "no-cache",
 				"x-use-cache": "false",
 				"x-wait-for-model": "true",
