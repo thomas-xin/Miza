@@ -187,7 +187,7 @@ class Bot:
 		futs = [exc.submit(self.check_proxy, p) for p in proxies]
 		for i, (p, fut) in enumerate(zip(proxies, futs)):
 			try:
-				assert fut.result(timeout=6)[0] == b"{"
+				assert fut.result(timeout=6)[0] == 105
 			except:
 				# print_exc()
 				self.proxies.discard(p)
@@ -201,7 +201,7 @@ class Bot:
 		return random.choice(tuple(self.proxies))
 
 	def check_proxy(self, p):
-		url = "https://mizabot.xyz/ip"
+		url = "https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/deleter.py"
 		with httpx.Client(timeout=3, http2=True, proxies=p, verify=False) as reqx:
 			resp = reqx.get(url)
 			return resp.content

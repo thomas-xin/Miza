@@ -120,7 +120,7 @@ config = {
     "global": {
         "server.socket_host": ADDRESS,
         "server.socket_port": PORT,
-        "server.thread_pool": 32,
+        "server.thread_pool": 96,
         "server.max_request_body_size": 0,
         "server.socket_timeout": 60,
         "server.ssl_module": "builtin",
