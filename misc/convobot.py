@@ -10,7 +10,7 @@ from traceback import print_exc
 try:
 	exc = concurrent.futures.exc_worker
 except AttributeError:
-	exc = concurrent.futures.exc_worker = concurrent.futures.ThreadPoolExecutor(max_workers=16)
+	exc = concurrent.futures.exc_worker = concurrent.futures.ThreadPoolExecutor(max_workers=64)
 drivers = selenium.__dict__.setdefault("-drivers", [])
 
 from math import *
@@ -217,8 +217,10 @@ DEFPER = "loyal friendly playful cute"
 class Bot:
 
 	models = {}
-	proxies = []
+	proxies = set()
 	ptime = 0
+	bad_proxies = set()
+	btime = 0
 
 	def __init__(self, token="", key="", email="", password="", name="Miza", personality=DEFPER, premium=0):
 		self.token = token
@@ -234,6 +236,50 @@ class Bot:
 		self.premium = premium
 		self.last_cost = 0
 		self.history_length = 1 if premium < 1 else 2
+		self.fp = FreeProxy()
+
+	def get_proxy(self, retry=True):
+		if self.proxies and time.time() - self.ptime <= 20:
+			return random.choice(tuple(self.proxies))
+		while not self.proxies:
+			i = random.randint(1, 3)
+			if i == 1:
+				repeat = False
+				self.fp.country_id = ["US"]
+			elif i == 2:
+				repeat = True
+				self.fp.country_id = None
+			else:
+				repeat = False
+				self.fp.country_id = None
+			proxies = self.fp.get_proxy_list(repeat)
+			self.proxies.update("http://" + p for p in proxies)
+		proxies = list(self.proxies)
+		# print(proxies)
+		if time.time() - self.btime > 480:
+			self.bad_proxies.clear()
+			self.btime = time.time()
+		futs = [exc.submit(self.check_proxy, p) for p in proxies if p not in self.bad_proxies]
+		for i, (p, fut) in enumerate(zip(proxies, futs)):
+			try:
+				assert fut.result()
+			except:
+				print_exc()
+				self.proxies.remove(p)
+				self.bad_proxies.add(p)
+		if not self.proxies:
+			if not retry:
+				return
+				raise FileNotFoundError("Proxy unavailable.")
+			return self.get_proxy(retry=False)
+		self.ptime = time.time()
+		return random.choice(tuple(self.proxies))
+
+	def check_proxy(self, p):
+		url = "https://mizabot.xyz/ip"
+		with httpx.Client(timeout=5, http2=True, proxies=p, verify=False) as reqx:
+			resp = reqx.get(url)
+			return resp.content
 
 	def question_context_analysis(self, m, q, c):
 		if m in ("deepset/roberta-base-squad2", "deepset/tinyroberta-squad2"):
@@ -480,7 +526,7 @@ class Bot:
 			p = None
 			for i in range(8):
 				if not p and i < 5:
-					p = FreeProxy(rand=True).get()
+					p = self.get_proxy()
 					print("Proxy2", p)
 				else:
 					p = None
@@ -499,7 +545,7 @@ class Bot:
 							# s = s.rsplit('<script>var textsynth_api_key = "', 1)[-1].split('"', 1)[0]
 							# print("TextSynth key:", s)
 							# headers["Authorization"] = "Bearer " + s
-						with httpx.Client(timeout=120, http2=True, proxies=p) as reqx:
+						with httpx.Client(timeout=360, http2=True, proxies=p) as reqx:
 							resp = reqx.post(
 								"https://api.textsynth.com/v1/engines/gptneox_20B/completions",
 								headers=headers,
@@ -537,7 +583,7 @@ class Bot:
 					if line:
 						d = json.loads(line)
 						text += d["text"] + "\n"
-				text = text.strip().replace(":\n", ": ")
+				text = text.strip().replace("â€™", "'").replace(":\n", ": ")
 				spl = text.split(": ")
 				text = ""
 				while spl:

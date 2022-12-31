@@ -1197,16 +1197,21 @@ class Ask(Command):
                             )
         if out:
             print(out)
-            if not emb and not random.randint(0, 16) and premium < 2:
-                emb = discord.Embed(colour=rand_colour())
-                emb.set_author(**get_author(bot.user))
-                emb.description = (
-                    "Looking for my more advanced and intelligent GPT-DaVinci chatbot to talk to?\n"
-                    + "Unfortunately the service for it had to be cut short, as the API services were too expensive for my creator to keep up given the size of my audience.\n"
-                    + f"However, if you would still wish to use the service for your user or server, it is available for subscription [here]({bot.kofi_url}), to help fund API usage; any support is greatly appreciated!\n"
-                    + "Additionally if you would like to try out the premium features without paying, you may enable a temporary trial by using the ~trial command!"
-                )
-            await send_with_reply(channel, message, lim_str("\xad" + escape_roles(out), 2000), embed=emb)
+            code = "\xad"
+            if not emb and premium < 2 and not random.randint(0, 16):
+                oo = bot.data.users.get(user.id, {}).get("opt_out")
+                if not oo:
+                    code = f"*```callback-string-ask-{user.id}-\nReact with 🚫 to never show the below message again.```*\n"
+                    emb = discord.Embed(colour=rand_colour())
+                    emb.set_author(**get_author(bot.user))
+                    emb.description = (
+                        "Looking for my more advanced and intelligent GPT-DaVinci chatbot to talk to?\n"
+                        + "Unfortunately the service for it had to be cut short, as the API services were too expensive for my creator to keep up given the size of my audience.\n"
+                        + f"However, if you would still wish to use the service for your user or server, it is available for subscription [here]({bot.kofi_url}), to help fund API usage; any support is greatly appreciated!\n"
+                        + "Additionally if you would like to try out the premium features without paying, you may enable a temporary trial by using the ~trial command!"
+                    )
+            s = lim_str(code + escape_roles(out), 2000)
+            await send_with_reply(channel, message, s, embed=emb)
             return
         q = single_space(q).strip().translate(bot.mtrans).replace("?", "\u200b").strip("\u200b")
         out = None
@@ -1357,6 +1362,16 @@ class Ask(Command):
         if out:
             q = q[0].upper() + q[1:]
             await send_with_reply(channel, message, escape_roles(f"\xad{q}? {out}"))
+
+    async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
+        u_id = int(vals)
+        if not reaction or u_id != user.id:
+            return
+        if reaction.decode("utf-8", "replace") not in ("🚫", "⛔"):
+            return
+        bot.data.users.setdefault(user.id, {})["opt_out"] = True
+        bot.data.users.update(user.id)
+        await message.edit(embeds=())
 
 
 class Personality(Command):

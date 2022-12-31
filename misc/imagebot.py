@@ -13,7 +13,7 @@ from traceback import print_exc
 try:
 	exc = concurrent.futures.exc_worker
 except AttributeError:
-	exc = concurrent.futures.exc_worker = concurrent.futures.ThreadPoolExecutor(max_workers=16)
+	exc = concurrent.futures.exc_worker = concurrent.futures.ThreadPoolExecutor(max_workers=64)
 drivers = selenium.__dict__.setdefault("-drivers", [])
 
 class_name = webdriver.common.by.By.CLASS_NAME
@@ -146,14 +146,59 @@ def safecomp(gen):
 class Bot:
 
 	models = {}
-	proxies = []
+	proxies = set()
 	ptime = 0
+	bad_proxies = set()
+	btime = 0
 
 	def __init__(self, token=""):
 		self.token = token
 		self.cache = {}
 		self.session = requests.Session()
 		self.timestamp = time.time()
+
+	def get_proxy(self, retry=True):
+		if self.proxies and time.time() - self.ptime <= 20:
+			return random.choice(tuple(self.proxies))
+		while not self.proxies:
+			i = random.randint(1, 3)
+			if i == 1:
+				repeat = False
+				self.fp.country_id = ["US"]
+			elif i == 2:
+				repeat = True
+				self.fp.country_id = None
+			else:
+				repeat = False
+				self.fp.country_id = None
+			proxies = self.fp.get_proxy_list(repeat)
+			self.proxies.update("http://" + p for p in proxies)
+		proxies = list(self.proxies)
+		# print(proxies)
+		if time.time() - self.btime > 480:
+			self.bad_proxies.clear()
+			self.btime = time.time()
+		futs = [exc.submit(self.check_proxy, p) for p in proxies if p not in self.bad_proxies]
+		for i, (p, fut) in enumerate(zip(proxies, futs)):
+			try:
+				assert fut.result()
+			except:
+				print_exc()
+				self.proxies.remove(p)
+				self.bad_proxies.add(p)
+		if not self.proxies:
+			if not retry:
+				return
+				raise FileNotFoundError("Proxy unavailable.")
+			return self.get_proxy(retry=False)
+		self.ptime = time.time()
+		return random.choice(tuple(self.proxies))
+
+	def check_proxy(self, p):
+		url = "https://mizabot.xyz/ip"
+		with httpx.Client(timeout=5, http2=True, proxies=p, verify=False) as reqx:
+			resp = reqx.get(url)
+			return resp.content
 
 	def art_dalle(self, prompt, kwargs=None):
 		openai.api_key = self.token
@@ -316,12 +361,12 @@ class Bot:
 		p = None
 		for i in range(8):
 			if not p and i < 5:
-				p = FreeProxy(rand=True).get()
+				p = self.get_proxy()
 				print("Proxy2", p)
 			else:
 				p = None
 			try:
-				with httpx.Client(timeout=120, http2=True, proxies=p) as reqx:
+				with httpx.Client(timeout=360, http2=True, proxies=p) as reqx:
 					resp = reqx.post(
 						"https://api-inference.huggingface.co/models/prompthero/openjourney",
 						headers=headers,
@@ -384,14 +429,14 @@ class Bot:
 		p = None
 		for i in range(8):
 			if not p and i < 5:
-				p = FreeProxy(rand=True).get()
+				p = self.get_proxy()
 				print("Proxy2", p)
 			else:
 				p = None
 			try:
 				if "Authorization" not in headers:
 					headers["Authorization"] = "Bearer 842a11464f81fc8be43ac76fb36426d2"
-				with httpx.Client(timeout=120, http2=True, proxies=p) as reqx:
+				with httpx.Client(timeout=360, http2=True, proxies=p) as reqx:
 					resp = reqx.post(
 						"https://api.textsynth.com/v1/engines/stable_diffusion/text_to_image",
 						headers=headers,
