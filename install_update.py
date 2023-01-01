@@ -32,6 +32,7 @@ install = lambda m: installing.append(subprocess.Popen([python, "-m", "pip", "in
 # Parse requirements.txt
 for mod in modlist:
     if mod:
+        s = None
         try:
             name = mod
             version = None
@@ -45,6 +46,8 @@ for mod in modlist:
                 assert eval(s, {}, {})
         except:
             # Modules may require an older version, replace current version if necessary
+            if s:
+                print(s)
             print_exc()
             inst = name
             if op in ("==", "<="):

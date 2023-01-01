@@ -4193,8 +4193,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             _public_flags = discord.flags.PublicUserFlags()
             banner = None
             _banner = None
-            accent_color = None
-            _accent_color = None
+            accent_colour = None
+            _accent_colour = None
 
             def __getattr__(self, k):
                 if k == "member":
