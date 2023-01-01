@@ -44,6 +44,7 @@ def send(*args, escape=True):
     except OSError:
         force_kill(psutil.Process())
 
+print = send
 
 def create_etag(data):
     n = len(data)
@@ -62,9 +63,11 @@ prev_date = utc_dt().date()
 zfailed = set()
 
 
-import cherrypy, cheroot, logging
+import cherrypy, cheroot, logging, ssl
 from cherrypy._cpdispatch import Dispatcher
 cp = cherrypy
+from cheroot import errors
+errors.SSLEOFError = ssl.SSLEOFError
 
 def serve(self):
     while self.ready and not self.interrupt:
@@ -72,22 +75,53 @@ def serve(self):
             self._connections.run(self.expiration_interval)
         except (KeyboardInterrupt, SystemExit):
             raise
-        except Exception:
+        except Exception as ex:
             self.error_log(
                 'Error in HTTPServer.serve', level=logging.ERROR,
                 traceback=False,
             )
+            print(repr(ex))
 cheroot.server.HTTPServer.serve = serve
-# def cp_error_log(self, msg="", level=20, traceback=False):
-#     sys.stderr.write("{msg!s}\n".format(msg=msg))
-#     if traceback:
-#         tblines = traceback_.format_exc()
-#         if "SSLError:" in tblines or "SSLEOFError:" in tblines:
-#             sys.stderr.write(tblines.rstrip().rsplit("\n", 1)[-1] + "\n")
-#         else:
-#             sys.stderr.write(tblines)
-#     sys.stderr.flush()
-# cheroot.server.HTTPServer.error_log = lambda self, *args, **kwargs: cp_error_log(self, *args, **kwargs)
+
+def communicate(self):
+    request_seen = False
+    try:
+        req = self.RequestHandlerClass(self.server, self)
+        req.parse_request()
+        if self.server.stats['Enabled']:
+            self.requests_seen += 1
+        if not req.ready:
+            return False
+        request_seen = True
+        req.respond()
+        if not req.close_connection:
+            return True
+    except socket.error as ex:
+        errnum = ex.args[0]
+        # sadly SSL sockets return a different (longer) time out string
+        timeout_errs = 'timed out', 'The read operation timed out'
+        if errnum in timeout_errs:
+            if (not request_seen) or (req and req.started_request):
+                self._conditional_error(req, '408 Request Timeout')
+        elif errnum not in errors.socket_errors_to_ignore:
+            self.server.error_log(
+                'socket.error %s' % repr(errnum),
+                level=logging.WARNING, traceback=True,
+            )
+            self._conditional_error(req, '500 Internal Server Error')
+    except (KeyboardInterrupt, SystemExit):
+        raise
+    except (errors.FatalSSLAlert, errors.SSLEOFError) as ex:
+        print(repr(ex))
+    except errors.NoSSLError:
+        self._handle_no_ssl(req)
+    except Exception as ex:
+        self.server.error_log(
+            repr(ex), level=logging.ERROR, traceback=True,
+        )
+        self._conditional_error(req, '500 Internal Server Error')
+    return False
+cheroot.server.HTTPServer.communicate = communicate
 
 actually_static = set(os.listdir("misc/static"))
 mapped_static = {k[:-5]: k for k in actually_static if k.endswith(".html")}

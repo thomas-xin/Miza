@@ -1198,6 +1198,7 @@ class Ask(Command):
         if out:
             print(out)
             code = "\xad"
+            reacts = None
             if not emb and premium < 2 and not random.randint(0, 16):
                 oo = bot.data.users.get(user.id, {}).get("opt_out")
                 if not oo:
@@ -1210,8 +1211,9 @@ class Ask(Command):
                         + f"However, if you would still wish to use the service for your user or server, it is available for subscription [here]({bot.kofi_url}), to help fund API usage; any support is greatly appreciated!\n"
                         + "Additionally if you would like to try out the premium features without paying, you may enable a temporary trial by using the ~trial command!"
                     )
+                    reacts = "🚫"
             s = lim_str(code + escape_roles(out), 2000)
-            await send_with_reply(channel, message, s, embed=emb)
+            await send_with_react(channel, s, embed=emb, reacts=reacts, reference=message)
             return
         q = single_space(q).strip().translate(bot.mtrans).replace("?", "\u200b").strip("\u200b")
         out = None
