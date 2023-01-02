@@ -442,10 +442,12 @@ class Bot:
 		chat_history = self.chat_history.copy()
 		lines = []
 		if per == DEFPER:
+			e1 = random.choice((":3", ":D", ";3", ":>", ":0", ";w;", ":P", "^ω^"))
+			e2 = random.choice(("😊", "🥰", "😉", "😛", "😌"))
 			lines.append(f"{u}: Hi!\n")
-			lines.append(f"{self.name}: Hiya! Can I help with anything? :3\n")
-			lines.append(f"{u}: Can I have a hug?\n")
-			lines.append(f"{self.name}: *glomps you before you can finish* ;w;\n")
+			lines.append(f"{self.name}: Hiya! Can I help with anything? {e1}\n")
+			lines.append(f"{u}: What's the integral of 4x+1?\n")
+			lines.append(f"{self.name}: It's 2x^2+x+C! {e2}\n")
 		for k, v in self.promises:
 			k = k.replace(":", "")
 			s = f"{k}: {v}\n"
@@ -466,19 +468,19 @@ class Bot:
 		for k, v in refs:
 			if not k.startswith("REPLIED TO: "):
 				continue
-			if len(self.gpttokens(v)) > 32:
+			if len(self.gpttokens(v)) > 36:
 				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
 			s = f"{k}: {v}\n"
 			lines.append(s)
 		s = f"{u}: {q}\n"
-		if len(self.gpttokens(s)) > 384:
+		if len(self.gpttokens(s)) > 388:
 			s = self.answer_summarise("facebook/bart-large-cnn", s, max_length=384, min_length=32).replace("\n", ". ").strip()
 		lines.append(s)
 		for k, v in refs:
 			if k.startswith("REPLIED TO: "):
 				continue
 			k = k.replace(":", "")
-			if len(self.gpttokens(v)) > 32:
+			if len(self.gpttokens(v)) > 36:
 				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
 			s = f"{k}: {v}\n"
 			lines.append(s)
@@ -570,6 +572,7 @@ class Bot:
 					else:
 						raise NotImplementedError
 				except Exception as ex:
+					self.proxies.discard(p)
 					print(repr(ex))
 					p = None
 					continue
@@ -581,6 +584,7 @@ class Bot:
 						p = None
 					continue
 				elif resp.status_code not in range(200, 400) or not resp.content:
+					self.proxies.discard(p)
 					p = None
 					continue
 				break
@@ -762,7 +766,7 @@ class Bot:
 	def append(self, tup):
 		if not self.chat_history or tup != self.chat_history[-1]:
 			k, v = tup
-			if len(self.gpttokens(v)) > 32:
+			if len(self.gpttokens(v)) > 36:
 				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
 				tup = (k, v)
 			self.chat_history.append(tup)
@@ -771,7 +775,7 @@ class Bot:
 	def appendleft(self, tup):
 		if not self.chat_history or tup != self.chat_history[0]:
 			k, v = tup
-			if len(self.gpttokens(v)) > 32:
+			if len(self.gpttokens(v)) > 36:
 				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
 				tup = (k, v)
 			self.chat_history.insert(0, tup)
@@ -784,11 +788,11 @@ class Bot:
 				labels = ("promise", "information", "example")
 				response = self.answer_classify("joeddav/xlm-roberta-large-xnli", v, labels)
 				data = dict(zip(response["labels"], response["scores"]))
-			if len(self.gpttokens(v)) > 32:
+			if len(self.gpttokens(v)) > 36:
 				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=8).replace("\n", ". ").strip()
 				t2 = (k, v)
 			k, v = t1
-			if len(self.gpttokens(v)) > 24:
+			if len(self.gpttokens(v)) > 28:
 				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=24, min_length=6).replace("\n", ". ").strip()
 				t1 = (k, v)
 			if self.premium > 1 and data["promise"] >= 0.5:

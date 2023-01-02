@@ -379,6 +379,7 @@ class Bot:
 						data=dict(inputs=prompt, wait_for_model=True),
 					)
 			except Exception as ex:
+				self.proxies.discard(p)
 				print(repr(ex))
 				p = None
 				continue
@@ -390,6 +391,7 @@ class Bot:
 					p = None
 				continue
 			elif resp.status_code not in range(200, 400) or not resp.content:
+				self.proxies.discard(p)
 				p = None
 				continue
 			break
@@ -457,6 +459,7 @@ class Bot:
 						)),
 					)
 			except Exception as ex:
+				self.proxies.discard(p)
 				print(repr(ex))
 				p = None
 				continue
@@ -468,6 +471,7 @@ class Bot:
 					p = None
 				continue
 			elif resp.status_code not in range(200, 400) or not resp.content:
+				self.proxies.discard(p)
 				p = None
 				continue
 			break
