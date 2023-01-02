@@ -589,7 +589,8 @@ class Bot:
 					continue
 				break
 			if resp.status_code in range(200, 400):
-				lines = resp.text.splitlines()
+				text = resp.content.decode("utf-8")
+				lines = text.splitlines()
 				text = ""
 				for line in lines:
 					if line:
