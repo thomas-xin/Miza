@@ -99,7 +99,7 @@ def communicate(self):
     except socket.error as ex:
         errnum = ex.args[0]
         # sadly SSL sockets return a different (longer) time out string
-        timeout_errs = 'timed out', 'The read operation timed out'
+        timeout_errs = 'timed out', 'The read operation timed out', 'EOF occurred in violation of protocol'
         if errnum in timeout_errs:
             if (not request_seen) or (req and req.started_request):
                 self._conditional_error(req, '408 Request Timeout')
