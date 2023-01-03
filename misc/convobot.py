@@ -174,7 +174,7 @@ def vague(t):
 def literal_question(t):
 	t = t.casefold().replace("'", "")
 	if not t:
-		return false
+		return False
 	# if t.startswith("whats your") or t.startswith("what is your") or t.startswith("what are your") or t.startswith("what do you"):
 	# 	return False
 	t = t.removeprefix("so ")
@@ -600,7 +600,7 @@ class Bot:
 							print(lines)
 							raise
 						text += d["text"] + "\n"
-				text = text.strip().replace("â€™", "'").replace(":\n", ": ")
+				text = text.strip().replace(":\n", ": ")
 				spl = text.split(": ")
 				text = ""
 				while spl:
