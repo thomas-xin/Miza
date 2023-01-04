@@ -1854,7 +1854,7 @@ class React(Command):
             emoji = e_id
         # This reaction indicates that the emoji was valid
         await message.add_reaction(emoji)
-        curr.append(a, emoji)
+        curr.append(a, e_id)
         following[guild.id] = mdict({i: curr[i] for i in sorted(curr)})
         return css_md(f"Added {sqr_md(a)} ➡️ {sqr_md(emoji)} to the auto react list for {sqr_md(guild)}.")
 

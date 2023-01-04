@@ -451,7 +451,7 @@ class Bot:
 						headers=headers,
 						data=json.dumps(dict(
 							prompt=prompt,
-							timesteps=kwargs.get("--num-inference-steps", 50),
+							timesteps=int(kwargs.get("--num-inference-steps", 50)),
 							guidance_scale=kwargs.get("--guidance-scale", 7.5),
 							image_count=4,
 							width=512,
