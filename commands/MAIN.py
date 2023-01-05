@@ -976,7 +976,7 @@ class Profile(Command):
                 raise OverflowError("Description must be 1024 or fewer in length.")
         elif setting == "thumbnail":
             urls = await bot.follow_url(value)
-            if not is_url(urls):
+            if not urls:
                 raise ValueError("Thumbnail must be an attachment or URL.")
             value = urls[0]
         elif setting.startswith("time"):
