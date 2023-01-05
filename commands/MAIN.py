@@ -911,19 +911,22 @@ class Info(Command):
 class Profile(Command):
     name = ["User", "UserProfile"]
     description = "Shows or edits a user profile on ⟨MIZA⟩."
-    usage = "(user|description|timezone|birthday)? <value>? <delete{?d}>?"
-    example = ("profile 201548633244565504", "user")
+    usage = "user|(description|thumbnail|timezone|birthday)? <value>? <delete{?d}>?"
+    example = ("profile 201548633244565504", "profile timezone ", "user")
     flags = "d"
     rate_limit = (4, 6)
     no_parse = True
     slash = True
     usercmd = True
 
-    async def __call__(self, user, args, argv, flags, channel, guild, bot, **void):
+    async def __call__(self, user, args, argv, flags, channel, guild, bot, message, **void):
+        if message.attachments:
+            args = [best_url(a) for a in message.attachments] + args
+            argv = " ".join(best_url(a) for a in message.attachments) + " " * bool(argv) + argv
         setting = None
         if not args:
             target = user
-        elif args[0] in ("description", "timezone", "time", "birthday"):
+        elif args[0] in ("description", "thumbnail", "timezone", "time", "birthday"):
             target = user
             setting = args.pop(0)
             if not args:
@@ -935,6 +938,7 @@ class Profile(Command):
         profile = bot.data.users.get(target.id, EMPTY)
         if setting is None:
             description = profile.get("description", "")
+            thumbnail = profile.get("thumbnail")
             birthday = profile.get("birthday")
             timezone = profile.get("timezone")
             t = utc()
@@ -959,7 +963,7 @@ class Profile(Command):
                 elif field == "timezone" and value is not None:
                     value = timezone_repr(value)
                 fields.add((field, value, False))
-            return bot.send_as_embeds(channel, description, fields=fields, author=get_author(target))
+            return bot.send_as_embeds(channel, description, thumbnail=thumbnail, fields=fields, author=get_author(target), reference=message)
         if setting != "description" and value.casefold() in ("undefined", "remove", "rem", "reset", "unset", "delete", "clear", "null", "none") or "d" in flags:
             profile.pop(setting, None)
             bot.data.users.update(user.id)
@@ -969,6 +973,9 @@ class Profile(Command):
         if setting == "description":
             if len(value) > 1024:
                 raise OverflowError("Description must be 1024 or fewer in length.")
+        elif setting == "thumbnail":
+            if not is_url(value):
+                raise ValueError("Thumbnail must be an attachment or URL.")
         elif setting.startswith("time"):
             value = value.casefold()
             try:
