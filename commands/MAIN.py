@@ -921,8 +921,8 @@ class Profile(Command):
 
     async def __call__(self, user, args, argv, flags, channel, guild, bot, message, **void):
         if message.attachments:
-            args = [best_url(a) for a in message.attachments] + args
-            argv = " ".join(best_url(a) for a in message.attachments) + " " * bool(argv) + argv
+            args += [best_url(a) for a in message.attachments]
+            argv += " " * bool(argv) + " ".join(best_url(a) for a in message.attachments)
         setting = None
         if not args:
             target = user
@@ -963,7 +963,8 @@ class Profile(Command):
                 elif field == "timezone" and value is not None:
                     value = timezone_repr(value)
                 fields.add((field, value, False))
-            return bot.send_as_embeds(channel, description, thumbnail=thumbnail, fields=fields, author=get_author(target), reference=message)
+            bot.send_as_embeds(channel, description, thumbnail=thumbnail, fields=fields, author=get_author(target), reference=message)
+            return
         if setting != "description" and value.casefold() in ("undefined", "remove", "rem", "reset", "unset", "delete", "clear", "null", "none") or "d" in flags:
             profile.pop(setting, None)
             bot.data.users.update(user.id)
@@ -974,8 +975,10 @@ class Profile(Command):
             if len(value) > 1024:
                 raise OverflowError("Description must be 1024 or fewer in length.")
         elif setting == "thumbnail":
-            if not is_url(value):
+            urls = await bot.follow_url(value)
+            if not is_url(urls):
                 raise ValueError("Thumbnail must be an attachment or URL.")
+            value = urls[0]
         elif setting.startswith("time"):
             value = value.casefold()
             try:
