@@ -497,7 +497,7 @@ class Bot:
 		irp = ""
 		if im:
 			b = io.BytesIO()
-			im.save(b, "WEBP")
+			im.save(b, "PNG")
 			b.seek(0)
 			b = b.read()
 			resp = requests.post(
@@ -505,7 +505,10 @@ class Bot:
 				files=(("image", b),),
 				headers=headers,
 			)
-			if resp.status_code in range(200, 400):
+			if resp.status_code not in range(200, 400):
+				print("CAI create:", resp)
+				print(resp.text)
+			else:
 				print("CAI upload:", resp)
 				idt = "AUTO_IMAGE_CAPTIONING"
 				iot = "UPLOADED"
