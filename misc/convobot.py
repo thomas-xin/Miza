@@ -530,6 +530,8 @@ class Bot:
 		if resp.status_code not in range(200, 400):
 			print("CAI:", resp)
 			print(resp.text)
+			self.cai_ready = False
+			self.cai_channel = None
 			return
 		lines = [line.strip() for line in resp.text.splitlines()]
 		e1 = json.loads(lines[-2]) if len(lines) > 1 else {}
@@ -539,7 +541,7 @@ class Bot:
 			aborted = True
 		else:
 			aborted = False
-		text = random.choice(e2.get("replies") or [{}]).get("text", "").strip().replace("UTSEESRT", u).replace("utseesrt", u)
+		text = random.choice(e2.get("replies") or [{}]).get("text", "").strip().replace("UTSEESRT", u).replace("utseesrt", u).replace("Utseesrt", u)
 		print("CAI response:", text)
 		if aborted:
 			self.cai_ready = False

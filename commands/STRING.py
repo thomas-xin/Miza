@@ -1043,6 +1043,9 @@ class Ask(Command):
                     personality=bot.commands.personality[0].retrieve((guild or channel).id),
                     premium=premium,
                 )
+                caic = bot.data.cai_channels.get(channel.id)
+                if caic:
+                    cb.cai_channel = caic
                 i = 0
                 async for m in bot.history(channel, limit=5):
                     if m.id == message.id:
@@ -1198,6 +1201,11 @@ class Ask(Command):
                                 + "or purchase a subscription to gain temporary unlimited usage!"
                             )
         if out:
+            caic = cb.cai_channel
+            if caic:
+                bot.data.cai_channels[channel.id] = caic
+            else:
+                bot.data.cai_channels.pop(channel.id)
             print(out)
             code = "\xad"
             reacts = None
@@ -1376,6 +1384,10 @@ class Ask(Command):
         bot.data.users.setdefault(user.id, {})["opt_out"] = True
         bot.data.users.update(user.id)
         await message.edit(embeds=())
+
+
+class UpdateCAIChannels(Database):
+    name = "cai_channels"
 
 
 class Personality(Command):
