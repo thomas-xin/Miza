@@ -469,8 +469,6 @@ class Bot:
 			lines.append(res)
 		if refs or lines:
 			for k, v in refs:
-				if not k.startswith("REPLIED TO: "):
-					continue
 				if len(self.gpttokens(v)) > 36:
 					v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
 				s = f"{k}: {v}\n"
@@ -479,14 +477,6 @@ class Bot:
 			if len(self.gpttokens(s)) > 388:
 				s = self.answer_summarise("facebook/bart-large-cnn", s, max_length=384, min_length=32).replace("\n", ". ").strip()
 			lines.append(s)
-			for k, v in refs:
-				if k.startswith("REPLIED TO: "):
-					continue
-				k = k.replace(":", "")
-				if len(self.gpttokens(v)) > 36:
-					v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
-				s = f"{k}: {v}\n"
-				lines.append(s)
 		if lines:
 			prompt = "".join(lines)
 		else:
