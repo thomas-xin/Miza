@@ -1094,7 +1094,7 @@ class Ask(Command):
                                     q += " "
                                 q += found[0]
                     for url in urls:
-                        resp = await process_image(url, "resize_max", ["-nogif", 512, 512, "auto"], timeout=60)
+                        resp = await process_image(url, "resize_max", ["-nogif", 512, "auto"], timeout=60)
                         im = await create_future(Image.open, resp[0])
                         if im.mode != "RGB":
                             image = await create_future(im.convert, "RGB")
