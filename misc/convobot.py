@@ -514,7 +514,7 @@ class Bot:
 				print("CAI upload:", resp)
 				idt = "AUTO_IMAGE_CAPTIONING"
 				iot = "UPLOADED"
-				irp = resp.json()["value"]
+				irp = "https://characterai.io/i/400/static/user/" + resp.json()["value"]
 		resp = requests.post(
 			"https://beta.character.ai/chat/streaming/",
 			data=json.dumps(dict(
