@@ -539,7 +539,7 @@ class Bot:
 			aborted = True
 		else:
 			aborted = False
-		text = random.choice(e2.get("replies") or [{}]).get("text", "").strip().replace("_user_", u)
+		text = random.choice(e2.get("replies") or [{}]).get("text", "").strip().replace("UTSEESRT", u).replace("utseesrt", u)
 		print("CAI response:", text)
 		if aborted:
 			self.cai_ready = False
