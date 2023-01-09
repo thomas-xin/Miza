@@ -501,7 +501,7 @@ class Bot:
 			b.seek(0)
 			b = b.read()
 			h2 = headers.copy()
-			h2["Content-Type"] = "image/webp"
+			h2.pop("Content-Type")
 			resp = requests.post(
 				"https://beta.character.ai/chat/upload-image/",
 				files=(("image", b),),
