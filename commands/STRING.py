@@ -1094,8 +1094,12 @@ class Ask(Command):
                                     q += " "
                                 q += found[0]
                     for url in urls:
-                        b = await bot.get_request(url)
-                        image = Image.open(io.BytesIO(b)).convert("RGB")
+                        resp = await process_image(url, "resize_max", ["-nogif", 512, 512, "auto"], timeout=60)
+                        im = await create_future(Image.open, resp[0])
+                        if im.mode != "RGB":
+                            image = await create_future(im.convert, "RGB")
+                        else:
+                            image = im
                         try:
                             p1 = self.analysed[url]
                         except KeyError:
@@ -1174,7 +1178,7 @@ class Ask(Command):
                         name = m.author.name
                         if name == bot.name:
                             name = bot.name + "2"
-                out, cost = await create_future(cb.ai, name, q, refs=refs)
+                out, cost = await create_future(cb.ai, name, q, refs=refs, im=im)
                 if cost:
                     if "costs" in bot.data:
                         bot.data.costs.put(user.id, cost)

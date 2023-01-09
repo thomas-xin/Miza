@@ -421,7 +421,7 @@ class Bot:
 		print("Roberta response:", res)
 		return res
 
-	def caichat(self, u, q, refs=()):
+	def caichat(self, u, q, refs=(), im=None):
 		headers = {
 			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
 			# "DNT": "1",
@@ -475,7 +475,7 @@ class Bot:
 					v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
 				s = f"{k}: {v}\n"
 				lines.append(s)
-			s = f"{u}: {q}\n"
+			s = f"###\nQuestion: {q}\n"
 			if len(self.gpttokens(s)) > 388:
 				s = self.answer_summarise("facebook/bart-large-cnn", s, max_length=384, min_length=32).replace("\n", ". ").strip()
 			lines.append(s)
@@ -492,6 +492,24 @@ class Bot:
 		else:
 			prompt = q
 		print("CAI prompt:", prompt)
+		idt = ""
+		iot = ""
+		irp = ""
+		if im:
+			b = io.BytesIO()
+			im.save(b, "WEBP")
+			b.seek(0)
+			b = b.read()
+			resp = requests.post(
+				"https://beta.character.ai/chat/upload-image/",
+				files=(("image", b),),
+				headers=headers,
+			)
+			if resp.status_code in range(200, 400):
+				print("CAI upload:", resp)
+				idt = "AUTO_IMAGE_CAPTIONING"
+				iot = "UPLOADED"
+				irp = resp.json()["value"]
 		resp = requests.post(
 			"https://beta.character.ai/chat/streaming/",
 			data=json.dumps(dict(
@@ -501,9 +519,9 @@ class Bot:
 				filter_candidates=None,
 				history_external_id=self.cai_channel,
 				image_description="",
-				image_description_type="",
-				image_origin_type="",
-				image_rel_path="",
+				image_description_type=idt,
+				image_origin_type=iot,
+				image_rel_path=irp,
 				initial_timeout=None,
 				insert_beginning=None,
 				is_proactive=False,
@@ -856,12 +874,12 @@ class Bot:
 		drivers.append(driver)
 		return res
 
-	def ai(self, u, q, refs=()):
+	def ai(self, u, q, refs=(), im=None):
 		tup = (u, q)
 		while len(self.chat_history) > self.history_length:
 			self.chat_history.pop(0)
 		if self.personality == DEFPER:
-			response = self.caichat(u, q, refs=refs)
+			response = self.caichat(u, q, refs=refs, im=im)
 			if response:
 				return self.after(tup, (self.name, response)), 0
 		# if self.premium > 0 or random.randint(0, 1):
