@@ -588,10 +588,10 @@ class Bot:
 		lines = []
 		if per == DEFPER:
 			e1 = random.choice((":3", ":D", ";3", ":>", ":0", ";w;", ":P", "^ω^"))
-			e2 = random.choice(("😊", "🥰", "😉", "😛", "😌"))
 			lines.append(f"{u}: Hi!\n")
 			lines.append(f"{self.name}: Hiya! Can I help with anything? {e1}\n")
 			if len(chat_history) < 2:
+				e2 = random.choice(("😊", "🥰", "😉", "😛", "😌"))
 				lines.append(f"{u}: What's the integral of 4x+1?\n")
 				lines.append(f"{self.name}: It's 2x^2+x+C! {e2}\n")
 		for k, v in self.promises:

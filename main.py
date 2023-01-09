@@ -141,7 +141,7 @@ while not os.path.exists(sd):
                     + str(datetime.datetime.now())
                     + "\033[1;37;40m."
                 )
-                for i in range(32):
+                for i in range(64):
                     time.sleep(0.25)
                     ld = os.listdir()
                     if rs in ld or sd in ld:

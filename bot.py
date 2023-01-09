@@ -992,7 +992,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         with suppress(TypeError):
             int(channel)
             channel = await self.fetch_channel(channel)
-        history = channel.history(limit=101, around=cdict(id=m_id))
+        history = discord.abc.Messageable.history(channel, limit=101, around=cdict(id=m_id))
         messages = await history.flatten()
         data = {m.id: m for m in messages}
         self.cache.messages.update(data)
@@ -1143,9 +1143,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             before = cdict(id=before)
         if type(after) is int:
             after = cdict(id=after)
-        if not hasattr(channel, "history"):
+        if not getattr(channel, "simulated", None):
             return
-        async for message in channel.history(limit=limit, before=before, after=after):
+        async for message in discord.abc.Messageable.history(channel, limit=limit, before=before, after=after):
             if message.id not in found:
                 self.add_message(message, files=False, force=True)
                 yield message
@@ -4029,7 +4029,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         if user.id == self.id:
             return
         if not message.reactions:
-            message = await message.channel.fetch_message(message.id)
+            message = await discord.abc.Messageable.fetch_message(message.channel, message.id)
             self.bot.add_message(message, files=False, force=True)
         if str(reaction) not in "❌✖️🇽❎🔳🔲":
             return
@@ -4966,7 +4966,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         try:
             message = await self.fetch_message(raw.message_id)
         except LookupError:
-            message = await channel.fetch_message(raw.message_id)
+            message = await discord.abc.Messageable.fetch_message(channel, raw.message_id)
             reaction = message._add_reaction(data, emoji, user.id)
             if reaction.count > 1:
                 reaction.count -= 1
@@ -4983,7 +4983,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         try:
             message = await self.fetch_message(raw.message_id)
         except LookupError:
-            message = await channel.fetch_message(raw.message_id)
+            message = await discord.abc.Messageable.fetch_message(channel, raw.message_id)
             reaction = message._add_reaction(data, emoji, user.id)
             if reaction.count > 1:
                 reaction.count -= 1
@@ -4991,7 +4991,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             with tracebacksuppressor:
                 reaction = message._remove_reaction(data, emoji, user.id)
         if not reaction:
-            message = await channel.fetch_message(raw.message_id)
+            message = await discord.abc.Messageable.fetch_message(channel, raw.message_id)
             reaction = message._add_reaction(data, emoji, user.id)
             if reaction.count > 1:
                 reaction.count -= 1
@@ -5369,7 +5369,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                             # user = await self.fetch_user(u_id)
                         before.author = user
                     try:
-                        after = await channel.fetch_message(before.id)
+                        after = await discord.abc.Messageable.fetch_message(channel, before.id)
                     except LookupError:
                         after = copy.copy(before)
                         after._update(data)
@@ -5422,7 +5422,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         message.guild = None
                     message.id = payload.message_id
                     message.author = await self.fetch_user(self.deleted_user)
-                    history = channel.history(limit=101, around=message)
+                    history = discord.abc.Messageable.history(channel, limit=101, around=message)
                     async def flatten_into_cache(history):
                         messages = await history.flatten()
                         data = {m.id: m for m in messages}

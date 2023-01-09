@@ -1047,22 +1047,23 @@ class Ask(Command):
                 if caic:
                     cb.cai_channel = caic
                 i = 0
-                async for m in bot.history(channel, limit=5):
-                    if m.id == message.id:
-                        continue
-                    if i >= cb.history_length:
-                        break
-                    if m.content:
-                        if m.author.id == bot.id:
-                            name = bot.name
-                        else:
-                            name = m.author.display_name
-                            if name == bot.name:
-                                name = m.author.name
+                if not getattr(message, "simulated", False):
+                    async for m in bot.history(channel, limit=5):
+                        if m.id == message.id:
+                            continue
+                        if i >= cb.history_length:
+                            break
+                        if m.content:
+                            if m.author.id == bot.id:
+                                name = bot.name
+                            else:
+                                name = m.author.display_name
                                 if name == bot.name:
-                                    name = bot.name + "2"
-                        await create_future(cb.appendleft, (name, unicode_prune(m.content)))
-                        i += 1
+                                    name = m.author.name
+                                    if name == bot.name:
+                                        name = bot.name + "2"
+                            await create_future(cb.appendleft, (name, unicode_prune(m.content)))
+                            i += 1
         else:
             cb.name = bot.name
             cb.premium = premium
