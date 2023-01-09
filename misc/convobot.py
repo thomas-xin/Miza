@@ -497,13 +497,15 @@ class Bot:
 		irp = ""
 		if im:
 			b = io.BytesIO()
-			im.save(b, "PNG")
+			im.save(b, "WEBP")
 			b.seek(0)
 			b = b.read()
+			h2 = headers.copy()
+			h2["Content-Type"] = "image/webp"
 			resp = requests.post(
 				"https://beta.character.ai/chat/upload-image/",
 				files=(("image", b),),
-				headers=headers,
+				headers=h2,
 			)
 			if resp.status_code not in range(200, 400):
 				print("CAI create:", resp)
