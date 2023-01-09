@@ -4778,7 +4778,7 @@ def extract_lyrics(s):
 async def get_lyrics(item):
     url = f"https://genius.com/api/search/multi?q={item}"
     for i in range(2):
-        header = {"User-Agent": f"Mozilla/5.{random.randint(1, 9)} (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36"}
+        header = {"User-Agent": f"Mozilla/5.{random.randint(1, 9)} (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"}
         data = {"q": item}
         rdata = await Request(url, data=data, headers=header, aio=True, json=True, timeout=18)
         hits = chain(*(sect["hits"] for sect in rdata["response"]["sections"]))

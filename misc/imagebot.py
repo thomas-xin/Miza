@@ -40,7 +40,7 @@ def create_driver():
 	# options.add_argument("--disable-gpu")
 	options.add_argument("--no-sandbox")
 	options.add_argument("--deny-permission-prompts")
-	options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36")
+	options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36")
 	prefs = {
 		"download.default_directory" : folder,
 		"profile.managed_default_content_settings.geolocation": 2,
@@ -304,7 +304,7 @@ class Bot:
 		drivers.append(driver)
 
 		headers = {
-			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36",
+			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
 			"DNT": "1",
 			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
 		}
@@ -316,7 +316,7 @@ class Bot:
 
 	def art_deepai(self, prompt, kwargs=None):
 		headers = {
-			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36",
+			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
 			"DNT": "1",
 			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
 			"api-key": "quickstart-QUdJIGlzIGNvbWluZy4uLi4K",
@@ -356,7 +356,7 @@ class Bot:
 		if not any(w in prompt for w in ("style", "stylised", "stylized")):
 			prompt += ", mdjrny-v4 style"
 		headers = {
-			"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36",
+			"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
 			"DNT": "1",
 			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
 			"cache-control": "no-cache",
@@ -427,7 +427,7 @@ class Bot:
 
 	def art_textsynth(self, prompt, kwargs=None):
 		headers = {
-			"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36",
+			"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
 			"DNT": "1",
 			"Content-Type": "application/json",
 			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),

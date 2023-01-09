@@ -1036,6 +1036,7 @@ class Ask(Command):
                 cb_key = AUTH.get("openai_key")
                 cb = self.convos[channel.id] = await create_future(convobot.Bot,
                     key=cb_key,
+                    cai_token=AUTH.get("cai_token"),
                     email=AUTH.get("openai_email"),
                     password=AUTH.get("openai_password"),
                     name=bot.name,
@@ -1063,6 +1064,7 @@ class Ask(Command):
             cb.name = bot.name
             cb.premium = premium
             cb.timestamp = utc()
+        im = None
         emb = None
         if cb:
             with discord.context_managers.Typing(channel):

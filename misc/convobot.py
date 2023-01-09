@@ -52,7 +52,7 @@ def create_driver():
 	# options.add_argument("--disable-gpu")
 	options.add_argument("--no-sandbox")
 	options.add_argument("--deny-permission-prompts")
-	options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36")
+	options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36")
 	prefs = {
 		"download.default_directory" : folder,
 		"profile.managed_default_content_settings.geolocation": 2,
@@ -223,9 +223,10 @@ class Bot:
 	bad_proxies = set()
 	btime = 0
 
-	def __init__(self, token="", key="", email="", password="", name="Miza", personality=DEFPER, premium=0):
+	def __init__(self, token="", key="", cai_token="", email="", password="", name="Miza", personality=DEFPER, premium=0):
 		self.token = token
 		self.key = key
+		self.cai_token = cai_token
 		self.email = email
 		self.password = password
 		self.name = name
@@ -233,10 +234,12 @@ class Bot:
 		self.promises = []
 		self.chat_history = []
 		self.chat_history_ids = None
+		self.cai_ready = False
+		self.cai_channel = None
 		self.timestamp = time.time()
 		self.premium = premium
 		self.last_cost = 0
-		self.history_length = 1 if premium < 1 else 2
+		self.history_length = 2 if premium < 1 else 4
 		self.fp = FreeProxy()
 
 	def get_proxy(self, retry=True):
@@ -418,6 +421,133 @@ class Bot:
 		print("Roberta response:", res)
 		return res
 
+	def caichat(self, u, q, refs=()):
+		headers = {
+			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
+			# "DNT": "1",
+			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
+			"Content-Type": "application/json",
+			"cache-control": "no-cache",
+			"Authorization": f"Token {self.cai_token}",
+		}
+		miza_id = "uBA8BVN2JgEC06sUU2KMtX-xv-X10rJEqvjgenJXfP4"
+		miza_iid = "internal_id:cc102978-48f5-40b7-9867-bd39732dd6fb"
+		lines = []
+		if not self.cai_ready:
+			if not self.cai_channel:
+				resp = requests.post(
+					"https://beta.character.ai/chat/history/create/",
+					data=json.dumps(dict(character_external_id=miza_id)),
+					headers=headers,
+				)
+				if resp.status_code not in range(200, 400):
+					print("CAI create:", resp)
+					print(resp.text)
+					return
+				try:
+					self.cai_channel = resp.json()["external_id"]
+				except KeyError:
+					print("CAI create:", resp)
+					print(resp.text)
+					return
+			chat_history = self.chat_history.copy()
+			for k, v in self.promises:
+				k = k.replace(":", "")
+				s = f"{k}: {v}\n"
+				lines.append(s)
+			for k, v in chat_history:
+				k = k.replace(":", "")
+				s = f"{k}: {v}\n"
+				lines.append(s)
+		if literal_question(q):
+			res = (self.google, self.bing)[random.randint(0, 1)](q, raw=True)
+			start = "GOOGLE: "
+			if len(self.gpttokens(res)) > 128:
+				summ = self.answer_summarise("facebook/bart-large-cnn", q + "\n" + res, max_length=96, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
+				res = lim_str(res.replace("\n", " "), 256, mode="right") + "\n" + summ
+			res = start + res + "\n"
+			lines.append(res)
+		if refs or lines:
+			for k, v in refs:
+				if not k.startswith("REPLIED TO: "):
+					continue
+				if len(self.gpttokens(v)) > 36:
+					v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
+				s = f"{k}: {v}\n"
+				lines.append(s)
+			s = f"{u}: {q}\n"
+			if len(self.gpttokens(s)) > 388:
+				s = self.answer_summarise("facebook/bart-large-cnn", s, max_length=384, min_length=32).replace("\n", ". ").strip()
+			lines.append(s)
+			for k, v in refs:
+				if k.startswith("REPLIED TO: "):
+					continue
+				k = k.replace(":", "")
+				if len(self.gpttokens(v)) > 36:
+					v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
+				s = f"{k}: {v}\n"
+				lines.append(s)
+		if lines:
+			prompt = "".join(lines)
+		else:
+			prompt = q
+		print("CAI prompt:", prompt)
+		resp = requests.post(
+			"https://beta.character.ai/chat/streaming/",
+			data=json.dumps(dict(
+				character_external_id=miza_id,
+				chunks_to_pad=8,
+				enable_tti=False,
+				filter_candidates=None,
+				history_external_id=self.cai_channel,
+				image_description="",
+				image_description_type="",
+				image_origin_type="",
+				image_rel_path="",
+				initial_timeout=None,
+				insert_beginning=None,
+				is_proactive=False,
+				livetune_coeff=None,
+				model_server_address=None,
+				override_prefix=None,
+				override_rank=None,
+				parent_msg_id=None,
+				prefix_limit=None,
+				prefix_token_limit=None,
+				rank_candidates=None,
+				ranking_method="random",
+				seen_msg_ids=[],
+				staging=False,
+				stream_every_n_steps=16,
+				stream_params=None,
+				text=prompt,
+				tgt=miza_iid,
+				translate_candidates=None,
+				voice_enabled=False,
+			)),
+			headers=headers,
+		)
+		if resp.status_code not in range(200, 400):
+			print("CAI:", resp)
+			print(resp.text)
+			return
+		lines = [line.strip() for line in resp.text.splitlines()]
+		e1 = json.loads(lines[-2]) if len(lines) > 1 else {}
+		e2 = json.loads(lines[-1])
+		if e2.get("abort", False):
+			e2 = e1
+			aborted = True
+		else:
+			aborted = False
+		text = random.choice(e2.get("replies") or [{}]).get("text", "").strip().replace("_user_", u)
+		print("CAI response:", text)
+		if aborted:
+			self.cai_ready = False
+			return self.gptcomplete(u, q, refs=refs, start=text)
+		else:
+			self.cai_ready = True
+		return text
+
 	tokeniser = None
 	def gpttokens(self, s):
 		if not self.tokeniser:
@@ -436,7 +566,7 @@ class Bot:
 		"*": " ",
 		"~": " ",
 	})
-	def gptcomplete(self, u, q, refs=()):
+	def gptcomplete(self, u, q, refs=(), start=""):
 		openai.api_key = self.key
 		per = self.personality
 		chat_history = self.chat_history.copy()
@@ -446,8 +576,9 @@ class Bot:
 			e2 = random.choice(("😊", "🥰", "😉", "😛", "😌"))
 			lines.append(f"{u}: Hi!\n")
 			lines.append(f"{self.name}: Hiya! Can I help with anything? {e1}\n")
-			lines.append(f"{u}: What's the integral of 4x+1?\n")
-			lines.append(f"{self.name}: It's 2x^2+x+C! {e2}\n")
+			if len(chat_history) < 2:
+				lines.append(f"{u}: What's the integral of 4x+1?\n")
+				lines.append(f"{self.name}: It's 2x^2+x+C! {e2}\n")
 		for k, v in self.promises:
 			k = k.replace(":", "")
 			s = f"{k}: {v}\n"
@@ -484,7 +615,10 @@ class Bot:
 				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
 			s = f"{k}: {v}\n"
 			lines.append(s)
-		lines.append(f"{self.name}:")
+		ns = f"{self.name}:"
+		if start:
+			ns += " " + start
+		lines.append(ns)
 		words = q.casefold().translate(self.unpunctuation).split()
 		longer = "essay" in words or "full" in words or "write" in words or "writing" in words or "about" in words
 		if self.premium < 2:
@@ -525,7 +659,7 @@ class Bot:
 		text = ""
 		if model in ("text-neox-001", "text-bloom-001"):
 			headers = {
-				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36",
+				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
 				"DNT": "1",
 				"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
 				"Content-Type": "application/json",
@@ -672,7 +806,7 @@ class Bot:
 			drivers.append(driver)
 			return ""
 		res = elem.text
-		print("Google response:", res)
+		# print("Google response:", res)
 		if res.startswith("Calculator result\n"):
 			res = " ".join(res.split("\n", 3)[1:3])
 			if raw:
@@ -704,7 +838,7 @@ class Bot:
 			drivers.append(driver)
 			return ""
 		res = elem.text
-		print("Bing response:", res)
+		# print("Bing response:", res)
 		if driver.find_elements(by=webdriver.common.by.By.ID, value="rcCalB"):
 			res = " ".join(res.split("\n", 3)[:2])
 			if raw:
@@ -724,6 +858,10 @@ class Bot:
 		tup = (u, q)
 		while len(self.chat_history) > self.history_length:
 			self.chat_history.pop(0)
+		if self.personality == DEFPER:
+			response = self.caichat(u, q, refs=refs)
+			if response:
+				return self.after(tup, (self.name, response)), 0
 		# if self.premium > 0 or random.randint(0, 1):
 		response, cost = self.gptcomplete(u, q, refs=refs)
 		if response:

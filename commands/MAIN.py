@@ -912,7 +912,7 @@ class Profile(Command):
     name = ["User", "UserProfile"]
     description = "Shows or edits a user profile on ⟨MIZA⟩."
     usage = "<user>? (description|thumbnail|timezone|birthday)? <value>? <delete{?d}>?"
-    example = ("profile 201548633244565504", "profile timezone ", "user")
+    example = ("profile 201548633244565504", "profile timezone singapore", "user")
     flags = "d"
     rate_limit = (4, 6)
     no_parse = True
