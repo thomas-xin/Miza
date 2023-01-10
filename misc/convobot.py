@@ -554,7 +554,7 @@ class Bot:
 			aborted = True
 		else:
 			aborted = False
-		names = "[Uu][Tt][Ss][Ee]{2}[Ss][Rr][TtFf]"
+		names = "[Uu][Tt][Ss][Ee]{2}[Ss][Rr]?[TtFf]?"
 		text = random.choice(e2.get("replies") or [{}]).get("text", "").strip()
 		text = u.join(re.split(names, text))
 		print("CAI response:", text)
@@ -636,6 +636,7 @@ class Bot:
 		ns = f"{self.name}:"
 		if start:
 			ns += " " + start
+
 		lines.append(ns)
 		words = q.casefold().translate(self.unpunctuation).split()
 		longer = "essay" in words or "full" in words or "write" in words or "writing" in words or "about" in words
