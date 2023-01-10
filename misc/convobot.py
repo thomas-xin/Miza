@@ -875,9 +875,9 @@ class Bot:
 		while len(self.chat_history) > self.history_length:
 			self.chat_history.pop(0)
 		if self.personality == DEFPER:
-			response = self.caichat(u, q, refs=refs, im=im)
+			response, cost = self.caichat(u, q, refs=refs, im=im)
 			if response:
-				return self.after(tup, (self.name, response)), 0
+				return self.after(tup, (self.name, response)), cost
 		# if self.premium > 0 or random.randint(0, 1):
 		response, cost = self.gptcomplete(u, q, refs=refs)
 		if response:
