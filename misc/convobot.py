@@ -1,4 +1,4 @@
-import os, time, urllib, json, io, random
+import os, time, urllib, json, io, random, re
 import concurrent.futures
 import selenium, requests, torch, openai, httpx
 from selenium import webdriver
@@ -554,7 +554,9 @@ class Bot:
 			aborted = True
 		else:
 			aborted = False
-		text = random.choice(e2.get("replies") or [{}]).get("text", "").strip().replace("UTSEESRT", u).replace("utseesrt", u).replace("Utseesrt", u)
+		names = "[Uu][Tt][Ss][Ee]{2}[Ss][Rr][TtFf]"
+		text = random.choice(e2.get("replies") or [{}]).get("text", "").strip()
+		text = u.join(re.split(names, text))
 		print("CAI response:", text)
 		if aborted:
 			self.cai_ready = False
