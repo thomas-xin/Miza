@@ -558,10 +558,11 @@ class Bot:
 		print("CAI response:", text)
 		if aborted:
 			self.cai_ready = False
-			return self.gptcomplete(u, q, refs=refs, start=text)
+			text2, cost = self.gptcomplete(u, q, refs=refs, start=text)
+			return text + text2, cost
 		else:
 			self.cai_ready = True
-		return text
+		return text, 0
 
 	tokeniser = None
 	def gpttokens(self, s):
