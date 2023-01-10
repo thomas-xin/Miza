@@ -1143,25 +1143,31 @@ class Ask(Command):
                             if p2:
                                 refs.append(("ANSWER", p2))
                 if reference and reference.content:# and not find_urls(reference.content):
-                    m = reference
-                    if m.author.id == bot.id:
-                        name = bot.name
-                    else:
-                        name = m.author.display_name
-                        if name == bot.name:
-                            name = m.author.name
+                    ref = False
+                    async for m in bot.history(channel, limit=2, before=message.id, after=reference.id):
+                        if m and m.content:
+                            ref = True
+                            break
+                    if ref:
+                        m = reference
+                        if m.author.id == bot.id:
+                            name = bot.name
+                        else:
+                            name = m.author.display_name
                             if name == bot.name:
-                                name = bot.name + "2"
-                    c = reference.content
-                    urls = find_urls(c)
-                    for url in urls:
-                        if is_image(url) is not None:
-                            capt = url.rsplit("/", 1)[-1]
-                            c = c.replace(url, f"[Image {capt}]")
-                        elif p2:
-                            capt = url.rsplit("/", 1)[-1]
-                            c = c.replace(url, f"[Image {capt}]")
-                    refs.insert(0, ("REPLIED TO: " + name, c))
+                                name = m.author.name
+                                if name == bot.name:
+                                    name = bot.name + "2"
+                        c = reference.content
+                        urls = find_urls(c)
+                        for url in urls:
+                            if is_image(url) is not None:
+                                capt = url.rsplit("/", 1)[-1]
+                                c = c.replace(url, f"[Image {capt}]")
+                            elif p2:
+                                capt = url.rsplit("/", 1)[-1]
+                                c = c.replace(url, f"[Image {capt}]")
+                        refs.insert(0, ("REPLIED TO: " + name, c))
                 urls = find_urls(q)
                 for url in urls:
                     if is_image(url) is not None:

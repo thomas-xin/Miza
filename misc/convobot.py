@@ -101,17 +101,17 @@ def create_driver():
 		else:
 			raise
 	driver.folder = folder
-	try:
-		driver.get("https://google.com/preferences")
-		spans = driver.find_elements(by=tag_name, value="span")
-		more = [span for span in spans if span.text == "Show more"][-1]
-		more.click()
-		opts = driver.find_elements(by=class_name, value="DB6WRb")[1:]
-		random.choice(opts).click()
-		confirm = driver.find_element(by=class_name, value="jfk-button-action")
-		confirm.click()
-	except:
-		print_exc()
+	# try:
+	# 	driver.get("https://google.com/preferences")
+	# 	spans = driver.find_elements(by=tag_name, value="span")
+	# 	more = [span for span in spans if span.text == "Show more"][-1]
+	# 	more.click()
+	# 	opts = driver.find_elements(by=class_name, value="DB6WRb")[1:]
+	# 	random.choice(opts).click()
+	# 	confirm = driver.find_element(by=class_name, value="jfk-button-action")
+	# 	confirm.click()
+	# except:
+	# 	print_exc()
 	return driver
 
 LAST_DRIVER = 0
@@ -561,7 +561,7 @@ class Bot:
 		if aborted:
 			self.cai_ready = False
 			text2, cost = self.gptcomplete(u, q, refs=refs, start=text)
-			return text + text2, cost
+			return text + " " + text2, cost
 		else:
 			self.cai_ready = True
 		return text, 0

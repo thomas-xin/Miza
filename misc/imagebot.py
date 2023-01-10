@@ -490,8 +490,8 @@ class Bot:
 		if not specified and not url:
 			if random.randint(0, 2) and self.cache.get(prompt):
 				return self.cache[prompt].pop(0), 0
-			funcs.append(self.art_openjourney)
 			funcs.append(self.art_mage)
+			funcs.append(self.art_openjourney)
 		if not url:
 			funcs.append(self.art_textsynth)
 		if not specified and not url:
