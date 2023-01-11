@@ -598,14 +598,14 @@ class Bot:
 		chat_history = self.chat_history.copy()
 		lines = []
 		if per == DEFPER:
-			if len(chat_history) < 4:
-				e1 = random.choice((":3", ":D", ";3", ":>", ":0", ";w;", ":P", "^ω^"))
-				lines.append(f"{u}: Hi!\n")
-				lines.append(f"{self.name}: Hiya! Can I help with anything? {e1}\n")
-				if len(chat_history) < 2:
-					e2 = random.choice(("😊", "🥰", "😉", "😛", "😌"))
-					lines.append(f"{u}: What's the integral of 4x+1?\n")
-					lines.append(f"{self.name}: It's 2x^2+x+C! {e2}\n")
+			# if len(chat_history) < 4:
+			e1 = random.choice((":3", ":D", ";3", ":>", ":0", ";w;", ":P", "^ω^"))
+			lines.append(f"{u}: Hi!\n")
+			lines.append(f"{self.name}: Hiya! Can I help with anything? {e1}\n")
+			if len(chat_history) < 2:
+				e2 = random.choice(("😊", "🥰", "😉", "😛", "😌"))
+				lines.append(f"{u}: What's the integral of 4x+1?\n")
+				lines.append(f"{self.name}: It's 2x^2+x+C! {e2}\n")
 		for k, v in self.promises:
 			k = k.replace(":", "")
 			s = f"{k}: {v}\n"
