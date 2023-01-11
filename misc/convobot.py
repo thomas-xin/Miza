@@ -248,7 +248,7 @@ class Bot:
 		self.email = email
 		self.password = password
 		self.name = name
-		self.personality = " ".join(personality.replace(",", " ").split())
+		self.personality = personality
 		self.promises = []
 		self.chat_history = []
 		self.chat_history_ids = None
