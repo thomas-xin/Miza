@@ -683,7 +683,8 @@ class Bot:
 		pc = len(self.gpttokens(prompt))
 		response = None
 		text = ""
-		if model in ("text-neox-001", "text-bloom-001"):
+		exclusive = {"text-neox-001", "text-bloom-001"}
+		if model in exclusive:
 			headers = {
 				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
 				"DNT": "1",
@@ -765,40 +766,45 @@ class Bot:
 					p = None
 					continue
 				break
-			if resp.status_code in range(200, 400):
-				if model == "text-neox-001":
-					text = resp.content.decode("utf-8")
-					lines = text.splitlines()
+				if resp.status_code in range(200, 400):
+					if model == "text-neox-001":
+						text = resp.content.decode("utf-8")
+						lines = text.splitlines()
+						text = ""
+						for line in lines:
+							if line:
+								try:
+									d = json.loads(line)
+								except:
+									print(lines)
+									raise
+								text += d["text"] + "\n"
+					elif model == "text-bloom-001":
+						d = resp.json()
+						text = d[0]["generated_text"]
+						if text.startswith(prompt):
+							text = text[len(prompt):]
+					text = text.strip().replace(":\n", ": ")
+					spl = text.split(": ")
 					text = ""
-					for line in lines:
-						if line:
-							try:
-								d = json.loads(line)
-							except:
-								print(lines)
-								raise
-							text += d["text"] + "\n"
-				elif model == "text-bloom-001":
-					d = resp.json()
-					text = d[0]["generated_text"]
-					if text.startswith(prompt):
-						text = text[len(prompt):]
-				text = text.strip().replace(":\n", ": ")
-				spl = text.split(": ")
-				text = ""
-				while spl:
-					s = spl.pop(0)
-					if "\n" in s:
-						text += s.rsplit("\n", 1)[0]
-						break
-					text += s + ": "
-				text = text.strip()
-				if text.endswith(":"):
-					text = text.rsplit("\n", 1)[0]
-				if text.startswith(start):
-					text = text[len(start):].strip()
-			else:
-				text = None
+					while spl:
+						s = spl.pop(0)
+						if "\n" in s:
+							text += s.rsplit("\n", 1)[0]
+							break
+						text += s + ": "
+					text = text.strip()
+					if text.endswith(":"):
+						text = text.rsplit("\n", 1)[0]
+					if text.startswith(start):
+						text = text[len(start):].strip()
+				else:
+					text = None
+				if not text:
+					print(resp.status_code, resp.text)
+					model = random.choice(tuple(exclusive.difference([model])))
+				else:
+					break
 			if not text:
 				print(resp.status_code, resp.text)
 				model = "text-curie-001"
