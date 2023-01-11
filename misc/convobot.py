@@ -646,7 +646,7 @@ class Bot:
 		if start:
 			ns += " " + start
 		lines.append(ns)
-		longer = req_longer(q)
+		longer = req_long(q)
 		if self.premium < 2:
 			if not res:
 				model = "text-bloom-001"
