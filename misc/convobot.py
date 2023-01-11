@@ -617,11 +617,11 @@ class Bot:
 		res = ""
 		if (not refs and self.premium > 1 or literal_question(q)):
 			res = (self.google, self.bing)[random.randint(0, 1)](q, raw=True)
-			start = "GOOGLE: "
+			s = "GOOGLE: "
 			if len(self.gpttokens(res)) > 128:
 				summ = self.answer_summarise("facebook/bart-large-cnn", q + "\n" + res, max_length=96, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
 				res = lim_str(res.replace("\n", " "), 256, mode="right") + "\n" + summ
-			res = start + res + "\n"
+			res = s + res + "\n"
 			lines.append(res)
 		for k, v in refs:
 			if not k.startswith("REPLIED TO: "):
