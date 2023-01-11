@@ -1405,9 +1405,9 @@ class Personality(Command):
     server_only = True
     name = ["ChangePersonality"]
     min_level = 2
-    description = "Customises ⟨MIZA⟩'s personality for ~ask in the current server. Requires a Lv2 or above ⟨MIZA⟩ subscription to perform. Note that initial responses are often given in a polite manner regardless of personality traits set."
+    description = "Customises ⟨MIZA⟩'s personality for ~ask in the current server. Note that initial responses are often given in a polite manner regardless of personality traits set. Will attempt to use the highest available GPT-family tier unless the personality is set to \"character.ai\", in which case the assigned character on said site will be used instead."
     usage = "<traits>* <default{?d}>?"
-    example = ("personality mischievous, cunning", "personality dry, sarcastic, snarky", "personality sweet, loving")
+    example = ("personality character.ai", "personality mischievous, cunning", "personality dry, sarcastic, snarky", "personality sweet, loving")
     flags = "aed"
     rate_limit = (18, 24)
 
@@ -1436,42 +1436,43 @@ class Personality(Command):
             return css_md(f"My personality for {sqr_md(guild)} has been reset.")
         if not args:
             p = self.decode(self.retrieve(guild.id))
-            return ini_md(f"My current personality for {sqr_md(guild)} is {sqr_md(p)}.")
-        if max(bot.is_trusted(guild), bot.premium_level(user) * 2) < 2:
-            raise PermissionError(f"Sorry, unfortunately this feature is for premium users only. Please make sure you have a subscription level of minimum 2 from {bot.kofi_url}, or try out ~trial if you haven't already!")
-        p = self.encode(" ".join(args).replace(",", " ").replace("  ", " ").replace(" ", ", "))
-        import openai
-        inappropriate = False
-        openai.api_key = AUTH["openai_key"]
-        resp = openai.Moderation.create(
-            input=p,
-        )
-        results = resp.results[0].categories
-        if results.hate or results["self-harm"] or results["sexual/minors"] or results.violence:
-            inappropriate = True
-            print(results)
-        if not inappropriate:
-            prompt = f"Is it illegal to be {p}?\n"
-            response = openai.Completion.create(
-				model="text-davinci-003",
-				prompt=prompt,
-				temperature=0,
-				max_tokens=32,
-				top_p=0,
-				frequency_penalty=0,
-				presence_penalty=0,
-				user=str(user.id),
-			)
-            text = response.choices[0].text
-            words = text.casefold().replace(",", " ").split()
-            if "no" not in words and "not" not in words:
-                inappropriate = True
-                print(text)
-        if inappropriate:
-            raise PermissionError(
-                "Apologies, my AI has detected that your input may be inappropriate.\n"
-                + "Please reword or consider contacting the support server if you believe this is a mistake!"
+            return ini_md(f"My current personality for {sqr_md(guild)} is {sqr_md(p)}. Enter keywords to modify the AI for default GPT-based chat, or enter \"character.ai\" for the assigned character.ai bot instead.")
+        # if max(bot.is_trusted(guild), bot.premium_level(user) * 2) < 2:
+        #     raise PermissionError(f"Sorry, unfortunately this feature is for premium users only. Please make sure you have a subscription level of minimum 2 from {bot.kofi_url}, or try out ~trial if you haven't already!")
+        p = self.encode(" ".join(args))#.replace(",", " ").replace("  ", " ").replace(" ", ", "))
+        if p != "character.ai":
+            import openai
+            inappropriate = False
+            openai.api_key = AUTH["openai_key"]
+            resp = openai.Moderation.create(
+                input=p,
             )
+            results = resp.results[0].categories
+            if results.hate or results["self-harm"] or results["sexual/minors"] or results.violence:
+                inappropriate = True
+                print(results)
+            if not inappropriate:
+                prompt = f"Is it illegal to be {p}?\n"
+                response = openai.Completion.create(
+                    model="text-curie-001",
+                    prompt=prompt,
+                    temperature=0,
+                    max_tokens=32,
+                    top_p=0,
+                    frequency_penalty=0,
+                    presence_penalty=0,
+                    user=str(user.id),
+                )
+                text = response.choices[0].text
+                words = text.casefold().replace(",", " ").split()
+                if "no" not in words and "not" not in words:
+                    inappropriate = True
+                    print(text)
+            if inappropriate:
+                raise PermissionError(
+                    "Apologies, my AI has detected that your input may be inappropriate.\n"
+                    + "Please reword or consider contacting the support server if you believe this is a mistake!"
+                )
         bot.data.personalities[guild.id] = p
         return css_md(f"My personality for {sqr_md(guild)} has been changed to {sqr_md(p)}.")
 

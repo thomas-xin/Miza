@@ -200,6 +200,23 @@ def valid_response(t):
 		return False
 	return t
 
+unpunctuation = "".maketrans({
+		",": " ",
+		".": " ",
+		":": " ",
+		";": " ",
+		"[": " ",
+		"]": " ",
+		"(": " ",
+		")": " ",
+		"*": " ",
+		"~": " ",
+	})
+
+def req_long(q):
+	words = q.casefold().translate(unpunctuation).split()
+	return "essay" in words or "full" in words or "write" in words or "writing" in words or "about" in words
+
 swap = {
 	"I": "you",
 	"Me": "You",
@@ -212,6 +229,7 @@ swap = {
 	"my": "your",
 }
 DEFPER = "loyal friendly playful cute"
+CAIPER = "character.ai"
 
 
 class Bot:
@@ -572,31 +590,22 @@ class Bot:
 			self.tokeniser = GPT2TokenizerFast.from_pretrained("gpt2")
 		return self.tokeniser(s)["input_ids"]
 
-	unpunctuation = "".maketrans({
-		",": " ",
-		".": " ",
-		":": " ",
-		";": " ",
-		"[": " ",
-		"]": " ",
-		"(": " ",
-		")": " ",
-		"*": " ",
-		"~": " ",
-	})
 	def gptcomplete(self, u, q, refs=(), start=""):
 		openai.api_key = self.key
 		per = self.personality
+		if per == CAIPER:
+			per = DEFPER
 		chat_history = self.chat_history.copy()
 		lines = []
 		if per == DEFPER:
-			e1 = random.choice((":3", ":D", ";3", ":>", ":0", ";w;", ":P", "^ω^"))
-			lines.append(f"{u}: Hi!\n")
-			lines.append(f"{self.name}: Hiya! Can I help with anything? {e1}\n")
-			if len(chat_history) < 2:
-				e2 = random.choice(("😊", "🥰", "😉", "😛", "😌"))
-				lines.append(f"{u}: What's the integral of 4x+1?\n")
-				lines.append(f"{self.name}: It's 2x^2+x+C! {e2}\n")
+			if len(chat_history) < 4:
+				e1 = random.choice((":3", ":D", ";3", ":>", ":0", ";w;", ":P", "^ω^"))
+				lines.append(f"{u}: Hi!\n")
+				lines.append(f"{self.name}: Hiya! Can I help with anything? {e1}\n")
+				if len(chat_history) < 2:
+					e2 = random.choice(("😊", "🥰", "😉", "😛", "😌"))
+					lines.append(f"{u}: What's the integral of 4x+1?\n")
+					lines.append(f"{self.name}: It's 2x^2+x+C! {e2}\n")
 		for k, v in self.promises:
 			k = k.replace(":", "")
 			s = f"{k}: {v}\n"
@@ -638,14 +647,13 @@ class Bot:
 			ns += " " + start
 
 		lines.append(ns)
-		words = q.casefold().translate(self.unpunctuation).split()
-		longer = "essay" in words or "full" in words or "write" in words or "writing" in words or "about" in words
+		longer = req_long(q)
 		if self.premium < 2:
-			if longer:
-				model = "text-curie-001"
+			if longer or premium > 0:
+				model = "text-bloom-001"
 				temp = 0.8
 				limit = 2000
-				cm = 20
+				cm = 0
 			else:
 				model = "text-neox-001"
 				temp = 0.8
@@ -722,6 +730,23 @@ class Bot:
 									stop="####"
 								)),
 							)
+					elif model == "text-bloom-001":
+						with httpx.Client(timeout=360, http2=True, proxies=p, verify=False) as reqx:
+							resp = reqx.post(
+								"https://api-inference.huggingface.co/models/bigscience/bloom",
+								headers=headers,
+								data=json.dumps(dict(
+									inputs=prompt,
+									parameters=dict(
+										do_sample=True,
+										early_stopping=False,
+										length_penalty=5,
+										max_new_tokens=250,
+										seed=random.randint(0, 65535),
+										top_p=0.9,
+									)
+								))
+							)
 					else:
 						raise NotImplementedError
 				except Exception as ex:
@@ -742,17 +767,23 @@ class Bot:
 					continue
 				break
 			if resp.status_code in range(200, 400):
-				text = resp.content.decode("utf-8")
-				lines = text.splitlines()
-				text = ""
-				for line in lines:
-					if line:
-						try:
-							d = json.loads(line)
-						except:
-							print(lines)
-							raise
-						text += d["text"] + "\n"
+				if model == "text-neox-001":
+					text = resp.content.decode("utf-8")
+					lines = text.splitlines()
+					text = ""
+					for line in lines:
+						if line:
+							try:
+								d = json.loads(line)
+							except:
+								print(lines)
+								raise
+							text += d["text"] + "\n"
+				elif model == "text-bloom-001":
+					d = resp.json()
+					text = d[0]["generated_text"]
+					if text.startswith(prompt):
+						text = text[len(prompt):]
 				text = text.strip().replace(":\n", ": ")
 				spl = text.split(": ")
 				text = ""
@@ -768,6 +799,7 @@ class Bot:
 			else:
 				print(resp.status_code, resp.text)
 				model = "text-curie-001"
+				cm = 20
 		if not text:
 			try:
 				response = openai.Completion.create(
@@ -802,12 +834,6 @@ class Bot:
 		text = text.strip()
 		print(f"GPTV3 {model} response:", text)
 		return text, cost
-
-	def bloom(self, prompt):
-		API_URL = "https://api-inference.huggingface.co/models/bigscience/bloom"
-		headers = {"Authorization": f"Bearer {self.token}"}
-		resp = requests.post(API_URL, headers=headers, json=dict(inputs=prompt))
-		return resp.json()
 
 	def google(self, q, raw=False):
 		words = q.split()
@@ -877,7 +903,7 @@ class Bot:
 		tup = (u, q)
 		while len(self.chat_history) > self.history_length:
 			self.chat_history.pop(0)
-		if self.personality == DEFPER:
+		if self.personality == CAIPER or self.personality == DEFPER and req_long(q):
 			response, cost = self.caichat(u, q, refs=refs, im=im)
 			if response:
 				return self.after(tup, (self.name, response)), cost
