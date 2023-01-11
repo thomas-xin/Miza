@@ -2048,7 +2048,7 @@ class UpdateUserLogs(Database):
             memb = guild.get_member(after.id)
             if memb is None:
                 raise LookupError
-        except LookupError:
+        except (LookupError, AttributeError):
             return
         except:
             print_exc()

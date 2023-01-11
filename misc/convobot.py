@@ -215,7 +215,7 @@ unpunctuation = "".maketrans({
 
 def req_long(q):
 	words = q.casefold().translate(unpunctuation).split()
-	return "essay" in words or "full" in words or "write" in words or "writing" in words or "about" in words
+	return "essay" in words or "full" in words or "write" in words or "writing" in words
 
 swap = {
 	"I": "you",
