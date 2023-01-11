@@ -677,8 +677,8 @@ class Bot:
 			p = "an " + p
 		else:
 			p = "a " + p
-		start = f"{self.name} is {p} AI:\n\n"
-		prompt = start + prompt
+		start = f"{self.name} is {p} AI;"
+		prompt = start + "\n\n" + prompt
 		print("GPTV3 prompt:", prompt)
 		pc = len(self.gpttokens(prompt))
 		response = None
@@ -795,7 +795,11 @@ class Bot:
 				text = text.strip()
 				if text.endswith(":"):
 					text = text.rsplit("\n", 1)[0]
+				if text.startswith(start):
+					text = text[len(start):].strip()
 			else:
+				text = None
+			if not text:
 				print(resp.status_code, resp.text)
 				model = "text-curie-001"
 				cm = 20
