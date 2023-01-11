@@ -765,7 +765,6 @@ class Bot:
 					self.proxies.discard(p)
 					p = None
 					continue
-				break
 				if resp.status_code in range(200, 400):
 					if model == "text-neox-001":
 						text = resp.content.decode("utf-8")
