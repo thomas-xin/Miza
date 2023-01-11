@@ -1440,6 +1440,8 @@ class Personality(Command):
         # if max(bot.is_trusted(guild), bot.premium_level(user) * 2) < 2:
         #     raise PermissionError(f"Sorry, unfortunately this feature is for premium users only. Please make sure you have a subscription level of minimum 2 from {bot.kofi_url}, or try out ~trial if you haven't already!")
         p = self.encode(" ".join(args))#.replace(",", " ").replace("  ", " ").replace(" ", ", "))
+        if p.casefold() in ("characterai", "c.ai", "character.ai"):
+            p = "character.ai"
         if p != "character.ai":
             import openai
             inappropriate = False
