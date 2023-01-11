@@ -257,7 +257,7 @@ class Bot:
 		self.timestamp = time.time()
 		self.premium = premium
 		self.last_cost = 0
-		self.history_length = 2 if premium < 1 else 4
+		self.history_length = 4 if premium < 1 else 6
 		self.fp = FreeProxy()
 
 	def get_proxy(self, retry=True):
