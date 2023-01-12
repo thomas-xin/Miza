@@ -3222,7 +3222,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         # Automatically start typing if the command is time consuming
                         tc = getattr(command, "time_consuming", False)
                         if not loop and tc:
-                            fut = create_task(channel.trigger_typing())
+                            fut = create_task(discord.abc.Messageable.trigger_typing(channel))
                         # Get maximum time allowed for command to process
                         if isnan(u_perm):
                             timeout = None

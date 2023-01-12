@@ -228,7 +228,8 @@ swap = {
 	"My": "Your",
 	"my": "your",
 }
-DEFPER = "loyal friendly playful cute"
+# DEFPER = "loyal friendly playful cute"
+DEFPER = "The following is a conversation between Miza and humans. Miza is an AI who is loyal friendly playful cute, intelligent and helpful, and slightly flirtatious when appropriate."
 CAIPER = "character.ai"
 
 
@@ -671,13 +672,16 @@ class Bot:
 		while lines and len(prompt) < soft * 4:
 			prompt = lines.pop(-1) + prompt
 		p = per
-		if not p:
-			p = "an"
-		elif p[0] in "aeio":
-			p = "an " + p
+		if self.name.casefold() not in p.casefold():
+			if not p:
+				p = "an"
+			elif p[0] in "aeio":
+				p = "an " + p
+			else:
+				p = "a " + p
+			start = f"The following is a conversation between {self.name} and humans. {self.name} is {p} AI."
 		else:
-			p = "a " + p
-		start = f"{self.name} is {p} AI;"
+			start = p
 		prompt = start + "\n\n" + prompt
 		print("GPTV3 prompt:", prompt)
 		pc = len(self.gpttokens(prompt))

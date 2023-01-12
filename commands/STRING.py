@@ -1405,16 +1405,16 @@ class Personality(Command):
     server_only = True
     name = ["ChangePersonality"]
     min_level = 2
-    description = "Customises ⟨MIZA⟩'s personality for ~ask in the current server. Note that initial responses are often given in a polite manner regardless of personality traits set. Will attempt to use the highest available GPT-family tier unless the personality is set to \"character.ai\", in which case the assigned character on said site will be used instead."
+    description = "Customises ⟨MIZA⟩'s personality for ~ask in the current server. Will attempt to use the highest available GPT-family tier unless the personality is set to \"character.ai\", in which case the assigned character on said site will be used instead. Experimental long descriptions are now supported."
     usage = "<traits>* <default{?d}>?"
-    example = ("personality character.ai", "personality mischievous, cunning", "personality dry, sarcastic, snarky", "personality sweet, loving")
+    example = ("personality character.ai", "personality mischievous, cunning", "personality dry, sarcastic, snarky", "personality sweet, loving", "personality The following is a conversation between Miza and humans. Miza is an AI who is loyal friendly playful cute, intelligent and helpful, and slightly flirtatious when appropriate.")
     flags = "aed"
     rate_limit = (18, 24)
 
     def encode(self, p):
         return p.replace(
             ":", ";"
-        ).removeprefix("an ").removeprefix("a ").removeprefix("more ").removesuffix(" ai")
+        )#.removeprefix("an ").removeprefix("a ").removeprefix("more ").removesuffix(" ai")
 
     def decode(self, p):
         # if p.count(", ") > 1:
@@ -1423,23 +1423,24 @@ class Personality(Command):
         return p
 
     def retrieve(self, i):
-        defper = "loyal friendly playful cute"
+        defper = "The following is a conversation between Miza and humans. Miza is an AI who is loyal friendly playful cute, intelligent and helpful, and slightly flirtatious when appropriate."
+        # defper = "loyal friendly playful cute"
         # if self.bot.premium_level(i) < 2:
             # return self.bot.data.personalities.pop(i, None) or defper
         return self.bot.data.personalities.get(i) or defper
 
-    async def __call__(self, bot, flags, guild, message, user, args, **void):
+    async def __call__(self, bot, flags, guild, message, user, argv, **void):
         if not AUTH.get("openai_key"):
             raise ModuleNotFoundError("No OpenAI key found for customisable personality.")
         if "d" in flags:
             self.data.personalities.pop(guild.id, None)
             return css_md(f"My personality for {sqr_md(guild)} has been reset.")
-        if not args:
+        if not argv:
             p = self.decode(self.retrieve(guild.id))
             return ini_md(f"My current personality for {sqr_md(guild)} is {sqr_md(p)}. Enter keywords to modify the AI for default GPT-based chat, or enter \"character.ai\" for the assigned character.ai bot instead.")
         # if max(bot.is_trusted(guild), bot.premium_level(user) * 2) < 2:
         #     raise PermissionError(f"Sorry, unfortunately this feature is for premium users only. Please make sure you have a subscription level of minimum 2 from {bot.kofi_url}, or try out ~trial if you haven't already!")
-        p = self.encode(" ".join(args))#.replace(",", " ").replace("  ", " ").replace(" ", ", "))
+        p = self.encode(argv)#.replace(",", " ").replace("  ", " ").replace(" ", ", "))
         if p.casefold() in ("characterai", "c.ai", "character.ai"):
             p = "character.ai"
         if p != "character.ai":
@@ -1453,33 +1454,33 @@ class Personality(Command):
             if results.hate or results["self-harm"] or results["sexual/minors"] or results.violence:
                 inappropriate = True
                 print(results)
-            if not inappropriate:
-                prompt = f"Is it illegal to be {p}?\n"
-                response = openai.Completion.create(
-                    model="text-curie-001",
-                    prompt=prompt,
-                    temperature=0,
-                    max_tokens=32,
-                    top_p=0,
-                    frequency_penalty=0,
-                    presence_penalty=0,
-                    user=str(user.id),
-                )
-                text = response.choices[0].text
-                words = text.casefold().replace(",", " ").split()
-                if "no" not in words and "not" not in words:
-                    inappropriate = True
-                    print(text)
+            # if not inappropriate:
+            #     prompt = f"Is it illegal to be {p}?\n"
+            #     response = openai.Completion.create(
+            #         model="text-curie-001",
+            #         prompt=prompt,
+            #         temperature=0,
+            #         max_tokens=32,
+            #         top_p=0,
+            #         frequency_penalty=0,
+            #         presence_penalty=0,
+            #         user=str(user.id),
+            #     )
+            #     text = response.choices[0].text
+            #     words = text.casefold().replace(",", " ").split()
+            #     if "no" not in words and "not" not in words:
+            #         inappropriate = True
+            #         print(text)
             if inappropriate:
                 raise PermissionError(
                     "Apologies, my AI has detected that your input may be inappropriate.\n"
                     + "Please reword or consider contacting the support server if you believe this is a mistake!"
                 )
         bot.data.personalities[guild.id] = p
-        for channel in guild.voice_channels:
+        for channel in guild.channels:
             bot.data.cai_channels.pop(channel.id, None)
             bot.commands.ask[0].convos.pop(channel.id, None)
-        return css_md(f"My personality for {sqr_md(guild)} has been changed to {sqr_md(p)}.")
+        return css_md(f"My personality description for {sqr_md(guild)} has been changed to {sqr_md(p)}.")
 
 
 class UpdatePersonalities(Database):

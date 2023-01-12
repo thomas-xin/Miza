@@ -1161,7 +1161,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
                     fields["embeds"] = embeds
                 if tts:
                     fields["tts"] = tts
-                message = await channel.send(content, **fields)
+                message = await discord.abc.Messageable.send(channel, content, **fields)
                 for a in message.attachments:
                     print("<attachment>", a.url)
                 return message
