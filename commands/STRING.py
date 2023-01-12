@@ -1476,6 +1476,9 @@ class Personality(Command):
                     + "Please reword or consider contacting the support server if you believe this is a mistake!"
                 )
         bot.data.personalities[guild.id] = p
+        for channel in guild.voice_channels:
+            bot.data.cai_channels.pop(channel.id, None)
+            bot.commands.ask[0].convos.pop(channel.id, None)
         return css_md(f"My personality for {sqr_md(guild)} has been changed to {sqr_md(p)}.")
 
 
