@@ -3324,32 +3324,28 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     # Represents any timeout error that occurs
                     except (T0, T1, T2):
                         if fut is not None:
-                            await fut
+                            try:
+                                await fut
+                            except:
+                                pass
                         print(msg)
                         raise TimeoutError("Request timed out.")
                     except (ArgumentError, TooManyRequests) as ex:
                         if fut is not None:
-                            await fut
+                            try:
+                                await fut
+                            except:
+                                pass
                         command.used.pop(u_id, None)
                         out_fut = self.send_exception(channel, ex, message)
                         return remaining
-                    # except discord.Forbidden as ex:
-                    #     if fut is not None:
-                    #         await fut
-                    #     if not channel.permissions_for(guild.me).send_messages:
-                    #         s = f"Oops, it appears I do not have permission to reply to your command [here](https://discord.com/channels/{guild.id}/{channel.id}/{message.id}).\nPlease contact an admin of the server if you believe this is a mistake!"
-                    #         colour = await self.get_colour(self.user)
-                    #         emb = discord.Embed(colour=colour)
-                    #         emb.set_author(**get_author(self.user))
-                    #         emb.description = s
-                    #         await user.send(embed=emb)
-                    #         return remaining
-                    #     out_fut = self.send_exception(channel, ex, message)
-                    #     return remaining
                     # Represents all other errors
                     except Exception as ex:
                         if fut is not None:
-                            await fut
+                            try:
+                                await fut
+                            except:
+                                pass
                         command.used.pop(u_id, None)
                         print_exc()
                         out_fut = self.send_exception(channel, ex, message)
@@ -4962,8 +4958,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             else:
                 footer = None
             fields = None
-        if reference and not messageable.permissions_for(guild.me).send_messages:
+        if reference and isinstance(ex, discord.Forbidden) and not messageable.permissions_for(guild.me).send_messages:
             return create_task(self.missing_perms(messageable, reference))
+        print(reference)
         return self.send_as_embeds(
             messageable,
             description="\n".join(as_str(i) for i in ex.args),
