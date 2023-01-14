@@ -283,16 +283,15 @@ class Bot:
 		time.sleep(2)
 		elems = driver.find_elements(by=webdriver.common.by.By.ID, value="mantine-R3bm")
 		if elems:
-			d.execute_script("document.getElementById('mantine-R3bm').style['z-index'] = -3")
+			driver.execute_script("document.getElementById('mantine-R3bm').style['z-index'] = -3")
 		time.sleep(1)
 
 		bar = driver.find_element(by=webdriver.common.by.By.ID, value="search-bar")
 		try:
 			bar.send_keys(prompt)
 		except selenium.common.exceptions.WebDriverException:
-			d = driver
-			d.execute_script("document.getElementById('search-bar').focus()")
-			d.execute_script(f"document.execCommand('insertText', false, {repr(prompt)});")
+			driver.execute_script("document.getElementById('search-bar').focus()")
+			driver.execute_script(f"document.execCommand('insertText', false, {repr(prompt)});")
 
 		generate = driver.find_element(by=webdriver.common.by.By.ID, value="ZQvTCDloXyqgqlOiDvup")
 		generate.click()
