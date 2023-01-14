@@ -1194,7 +1194,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
 
 # Sends a message to a channel, then adds reactions accordingly.
 async def send_with_react(channel, *args, reacts=None, reference=None, mention=False, **kwargs):
-    with tracebacksuppressor:
+    try:
         if reference or "buttons" in kwargs or "embeds" in kwargs:
             sent = await send_with_reply(channel, reference, *args, mention=mention, **kwargs)
         else:
@@ -1203,6 +1203,9 @@ async def send_with_react(channel, *args, reacts=None, reference=None, mention=F
             for react in reacts:
                 await sent.add_reaction(react)
         return sent
+    except:
+        print_exc()
+        raise
 
 
 voice_channels = lambda guild: [channel for channel in guild.channels if getattr(channel, "type", None) in (discord.ChannelType.voice, discord.ChannelType.stage_voice)]
