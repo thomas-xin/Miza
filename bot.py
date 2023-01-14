@@ -4958,7 +4958,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             else:
                 footer = None
             fields = None
-        if reference and isinstance(ex, discord.Forbidden) and not messageable.permissions_for(guild.me).send_messages:
+        if reference and isinstance(ex, discord.Forbidden) and reference.guild and not messageable.permissions_for(reference.guild.me).send_messages:
             return create_task(self.missing_perms(messageable, reference))
         print(reference)
         return self.send_as_embeds(
