@@ -464,7 +464,7 @@ class Bot:
 						data=json.dumps(dict(
 							prompt=prompt,
 							timesteps=int(kwargs.get("--num-inference-steps", 50)),
-							guidance_scale=kwargs.get("--guidance-scale", 7.5),
+							guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
 							image_count=4,
 							width=512,
 							height=512,
@@ -503,11 +503,14 @@ class Bot:
 			if random.randint(0, 2) and self.cache.get(prompt):
 				return self.cache[prompt].pop(0), 0
 			funcs.append(self.art_mage)
-		if not url:
+		if not url and not dalle2:
 			funcs.append(self.art_textsynth)
 		if not specified and not url:
-			funcs.append(self.art_openjourney)
+			if not openjourney:
+				funcs.append(self.art_openjourney)
 			funcs.append(self.art_deepai)
+			if openjourney:
+				funcs.insert(0, self.art_openjourney)
 			if dalle2:
 				funcs.insert(0, self.art_dalle)
 		for func in funcs:

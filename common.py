@@ -1198,7 +1198,7 @@ async def send_with_react(channel, *args, reacts=None, reference=None, mention=F
         if reference or "buttons" in kwargs or "embeds" in kwargs:
             sent = await send_with_reply(channel, reference, *args, mention=mention, **kwargs)
         else:
-            sent = await channel.send(*args, **kwargs)
+            sent = await discord.abc.Messageable.send(channel, *args, **kwargs)
         if reacts:
             for react in reacts:
                 await sent.add_reaction(react)

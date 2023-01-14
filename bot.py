@@ -3333,19 +3333,19 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         command.used.pop(u_id, None)
                         out_fut = self.send_exception(channel, ex, message)
                         return remaining
-                    except discord.Forbidden as ex:
-                        if fut is not None:
-                            await fut
-                        if not channel.permissions_for(guild.me).send_messages:
-                            s = "Oops, it appears I do not have permission to reply to your command [here](https://discord.com/channels/683328402232573954/731709481863479436/1063846529728778321).\nPlease contact an admin of the server if you believe this is a mistake!"
-                            colour = await self.get_colour(self.user)
-                            emb = discord.Embed(colour=colour)
-                            emb.set_author(**get_author(self.user))
-                            emb.description = s
-                            await user.send(embed=emb)
-                            return remaining
-                        out_fut = self.send_exception(channel, ex, message)
-                        return remaining
+                    # except discord.Forbidden as ex:
+                    #     if fut is not None:
+                    #         await fut
+                    #     if not channel.permissions_for(guild.me).send_messages:
+                    #         s = f"Oops, it appears I do not have permission to reply to your command [here](https://discord.com/channels/{guild.id}/{channel.id}/{message.id}).\nPlease contact an admin of the server if you believe this is a mistake!"
+                    #         colour = await self.get_colour(self.user)
+                    #         emb = discord.Embed(colour=colour)
+                    #         emb.set_author(**get_author(self.user))
+                    #         emb.description = s
+                    #         await user.send(embed=emb)
+                    #         return remaining
+                    #     out_fut = self.send_exception(channel, ex, message)
+                    #     return remaining
                     # Represents all other errors
                     except Exception as ex:
                         if fut is not None:
@@ -4962,6 +4962,18 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             else:
                 footer = None
             fields = None
+        if reference and not messageable.permissions_for(guild.me).send_messages:
+            guild = messageable.guild
+            channel = messageable
+            message = reference
+            user = message.author
+            s = f"Oops, it appears I do not have permission to reply to your command [here](https://discord.com/channels/{guild.id}/{channel.id}/{message.id}).\nPlease contact an admin of the server if you believe this is a mistake!"
+            colour = await self.get_colour(self.user)
+            emb = discord.Embed(colour=colour)
+            emb.set_author(**get_author(self.user))
+            emb.description = s
+            await user.send(embed=emb)
+            return remaining
         return self.send_as_embeds(
             messageable,
             description="\n".join(as_str(i) for i in ex.args),
