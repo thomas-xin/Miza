@@ -37,7 +37,7 @@ def create_driver():
 	service = browser["service"](browser["path"])
 	options = browser["options"]()
 	options.add_argument("--headless")
-	# options.add_argument("--disable-gpu")
+	options.add_argument("--disable-gpu")
 	options.add_argument("--no-sandbox")
 	options.add_argument("--deny-permission-prompts")
 	options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36")
@@ -88,6 +88,7 @@ def create_driver():
 			)
 		else:
 			raise
+	driver.get("file://")
 	driver.folder = folder
 	return driver
 
@@ -309,6 +310,7 @@ class Bot:
 		drivers.append(driver)
 		time.sleep(1)
 		elems = driver.find_elements(by=class_name, value="mantine-1q3qenk")
+		driver.get("file://")
 		if elems:
 			print("Mage: censored")
 			return False
