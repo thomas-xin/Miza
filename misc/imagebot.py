@@ -280,6 +280,7 @@ class Bot:
 		# 	if elems:
 		# 		elems[0].click()
 
+		time.sleep(2)
 		elems = driver.find_elements(by=webdriver.common.by.By.ID, value="mantine-R3bm")
 		if elems:
 			d.execute_script("document.getElementById('mantine-R3bm').style['z-index'] = -3")
@@ -503,7 +504,7 @@ class Bot:
 			if random.randint(0, 2) and self.cache.get(prompt):
 				return self.cache[prompt].pop(0), 0
 			funcs.append(self.art_mage)
-		if not url and not dalle2:
+		if not url and not dalle2 and nsfw:
 			funcs.append(self.art_textsynth)
 		if not specified and not url:
 			if not openjourney:
