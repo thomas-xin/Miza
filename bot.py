@@ -4963,16 +4963,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 footer = None
             fields = None
         if reference and not messageable.permissions_for(guild.me).send_messages:
-            guild = messageable.guild
-            channel = messageable
-            message = reference
-            user = message.author
-            s = f"Oops, it appears I do not have permission to reply to your command [here](https://discord.com/channels/{guild.id}/{channel.id}/{message.id}).\nPlease contact an admin of the server if you believe this is a mistake!"
-            colour = await self.get_colour(self.user)
-            emb = discord.Embed(colour=colour)
-            emb.set_author(**get_author(self.user))
-            emb.description = s
-            return create_task(user.send(embed=emb))
+            return create_task(self.missing_perms(messageable, reference))
         return self.send_as_embeds(
             messageable,
             description="\n".join(as_str(i) for i in ex.args),
@@ -4982,6 +4973,18 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             reference=reference,
             footer=footer,
         )
+
+    async def missing_perms(self, messageable, reference):
+        guild = messageable.guild
+        channel = messageable
+        message = reference
+        user = message.author
+        s = f"Oops, it appears I do not have permission to reply to your command [here](https://discord.com/channels/{guild.id}/{channel.id}/{message.id}).\nPlease contact an admin of the server if you believe this is a mistake!"
+        colour = await self.get_colour(self.user)
+        emb = discord.Embed(colour=colour)
+        emb.set_author(**get_author(self.user))
+        emb.description = s
+        return await user.send(embed=emb)
 
     async def reaction_add(self, raw, data):
         channel = await self.fetch_channel(raw.channel_id)
