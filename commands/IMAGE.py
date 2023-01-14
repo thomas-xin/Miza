@@ -1572,6 +1572,15 @@ class Art(Command):
         if specified:
             req += " ".join(f"{k} {v}" for k, v in kwargs.items() if k in specified)
         nsfw = is_nsfw(channel)
+        if not nsfw and prompt and "openai_key" in AUTH:
+            import openai
+            openai.api_key = AUTH["openai_key"]
+            resp = openai.Moderation.create(
+                input=prompt,
+            )
+            results = resp.results[0].categories
+            if results.hate or results["self-harm"] or results["sexual/minors"] or results["violence/graphic"]:
+                PermissionError("NSFW filter detected in non-NSFW channel. If you believe this was a mistake, please try again.")
         emb = None
         fn = None
         with discord.context_managers.Typing(channel):
