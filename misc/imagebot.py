@@ -285,7 +285,7 @@ class Bot:
 		elems = driver.find_elements(by=webdriver.common.by.By.ID, value="mantine-R3bm")
 		if elems:
 			driver.execute_script("document.getElementById('mantine-R3bm').style['z-index'] = -3")
-		time.sleep(1)
+			time.sleep(1)
 
 		bar = driver.find_element(by=webdriver.common.by.By.ID, value="search-bar")
 		try:
