@@ -462,13 +462,13 @@ class Bot:
 				if resp.status_code not in range(200, 400):
 					print("CAI create:", resp)
 					print(resp.text)
-					return
+					return "", 0
 				try:
 					self.cai_channel = resp.json()["external_id"]
 				except KeyError:
 					print("CAI create:", resp)
 					print(resp.text)
-					return
+					return "", 0
 			chat_history = self.chat_history.copy()
 			for k, v in self.promises:
 				k = k.replace(":", "")
@@ -564,7 +564,7 @@ class Bot:
 			print(resp.text)
 			self.cai_ready = False
 			self.cai_channel = None
-			return
+			return "", 0
 		lines = [line.strip() for line in resp.text.splitlines()]
 		e1 = json.loads(lines[-2]) if len(lines) > 1 else {}
 		e2 = json.loads(lines[-1])

@@ -3252,7 +3252,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                             timeout=timeout,                # timeout delay for the whole function
                         )
                         # Add a callback to typing in the channel if the command takes too long
-                        if fut is None and not hasattr(command, "typing"):
+                        if fut is None and not hasattr(command, "typing") and not getattr(message, "simulated", False):
                             create_task(delayed_callback(future, sqrt(3), channel.trigger_typing, repeat=True))
                         if getattr(message, "slash", None):
                             create_task(delayed_callback(future, 1, self.defer_interaction, message))
@@ -3331,6 +3331,19 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         if fut is not None:
                             await fut
                         command.used.pop(u_id, None)
+                        out_fut = self.send_exception(channel, ex, message)
+                        return remaining
+                    except discord.Forbidden as ex:
+                        if fut is not None:
+                            await fut
+                        if not channel.permissions_for(guild.me).send_messages:
+                            s = "Oops, it appears I do not have permission to reply to your command [here](https://discord.com/channels/683328402232573954/731709481863479436/1063846529728778321).\nPlease contact an admin of the server if you believe this is a mistake!"
+                            colour = await self.get_colour(self.user)
+                            emb = discord.Embed(colour=colour)
+                            emb.set_author(**get_author(self.user))
+                            emb.description = s
+                            await user.send(embed=emb)
+                            return remaining
                         out_fut = self.send_exception(channel, ex, message)
                         return remaining
                     # Represents all other errors
@@ -5535,6 +5548,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 name = str(member)
                 self.usernames.pop(name, None)
             if member.guild.id in self._guilds:
+                member.guild._members.pop(member.id, None)
                 member.guild._member_count = len(member.guild._members)
                 if "guilds" in self.data:
                     self.data.guilds.register(member.guild, force=False)

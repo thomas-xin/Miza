@@ -1432,7 +1432,7 @@ class Personality(Command):
     async def __call__(self, bot, flags, guild, message, user, argv, **void):
         if not AUTH.get("openai_key"):
             raise ModuleNotFoundError("No OpenAI key found for customisable personality.")
-        if "d" in flags:
+        if "d" in flags or argv == "default":
             self.data.personalities.pop(guild.id, None)
             return css_md(f"My personality for {sqr_md(guild)} has been reset.")
         if not argv:

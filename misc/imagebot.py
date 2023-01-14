@@ -280,6 +280,11 @@ class Bot:
 		# 	if elems:
 		# 		elems[0].click()
 
+		elems = driver.find_elements(by=webdriver.common.by.By.ID, value="mantine-R3bm")
+		if elems:
+			d.execute_script("document.getElementById('mantine-R3bm').style['z-index'] = -3")
+		time.sleep(1)
+
 		bar = driver.find_element(by=webdriver.common.by.By.ID, value="search-bar")
 		try:
 			bar.send_keys(prompt)
@@ -302,6 +307,11 @@ class Bot:
 				elems.clear()
 			time.sleep(1)
 		drivers.append(driver)
+		time.sleep(1)
+		elems = driver.find_elements(by=class_name, value="mantine-1q3qenk")
+		if elems:
+			print("Mage: censored")
+			return False
 
 		headers = {
 			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
@@ -350,6 +360,8 @@ class Bot:
 				return ims2.pop(0)
 			else:
 				self.cache.pop(prompt, None)
+			print("DeepAI: censored")
+			return False
 		print(resp.status_code, resp.text)
 
 	def art_openjourney(self, prompt, kwargs=None):
@@ -402,8 +414,8 @@ class Bot:
 			p = np.sum(im.resize((32, 32)).convert("L"))
 			if p > 1024:
 				return b
-			print("Openjourney response censored")
-			return
+			print("Openjourney: censored")
+			return False
 		print(resp.status_code, resp.text)
 
 	def art_openjourney_local(self, prompt, kwargs=None):
@@ -485,16 +497,16 @@ class Bot:
 			return b
 		print(resp.status_code, resp.text)
 
-	def art(self, prompt, url="", url2="", kwargs={}, specified=False, dalle2=False, openjourney=False):
+	def art(self, prompt, url="", url2="", kwargs={}, specified=False, dalle2=False, openjourney=False, nsfw=False):
 		funcs = []
 		if not specified and not url:
 			if random.randint(0, 2) and self.cache.get(prompt):
 				return self.cache[prompt].pop(0), 0
 			funcs.append(self.art_mage)
-			funcs.append(self.art_openjourney)
 		if not url:
 			funcs.append(self.art_textsynth)
 		if not specified and not url:
+			funcs.append(self.art_openjourney)
 			funcs.append(self.art_deepai)
 			if dalle2:
 				funcs.insert(0, self.art_dalle)
@@ -509,6 +521,8 @@ class Bot:
 					return im, 180000
 				else:
 					return im, 0
+			elif im is False and not nsfw:
+				raise PermissionError("NSFW filter detected in non-NSFW channel. If you believe this was a mistake, please try again.")
 
 if __name__ == "__main__":
 	import sys

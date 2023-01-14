@@ -1571,6 +1571,7 @@ class Art(Command):
                 req += " " + url2
         if specified:
             req += " ".join(f"{k} {v}" for k, v in kwargs.items() if k in specified)
+        nsfw = is_nsfw(channel)
         emb = None
         fn = None
         with discord.context_managers.Typing(channel):
@@ -1583,7 +1584,7 @@ class Art(Command):
                 #     self.imagebot.token = AUTH.get("openai_key_2")
                 # else:
                 self.imagebot.token = AUTH.get("openai_key")
-                tup = await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2=dalle2, openjourney=openjourney, timeout=480)
+                tup = await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2=dalle2, openjourney=openjourney, nsfw=nsfw, timeout=480)
                 if tup:
                     fn, cost = tup
                     if fn and cost:
