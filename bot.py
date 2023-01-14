@@ -4972,8 +4972,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             emb = discord.Embed(colour=colour)
             emb.set_author(**get_author(self.user))
             emb.description = s
-            await user.send(embed=emb)
-            return remaining
+            return create_task(user.send(embed=emb))
         return self.send_as_embeds(
             messageable,
             description="\n".join(as_str(i) for i in ex.args),
