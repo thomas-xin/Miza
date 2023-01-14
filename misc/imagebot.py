@@ -465,7 +465,7 @@ class Bot:
 							prompt=prompt,
 							timesteps=int(kwargs.get("--num-inference-steps", 50)),
 							guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
-							image_count=4,
+							image_count=1,
 							width=512,
 							height=512,
 						)),
