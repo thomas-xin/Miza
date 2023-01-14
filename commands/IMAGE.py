@@ -1580,7 +1580,7 @@ class Art(Command):
             )
             results = resp.results[0].categories
             if results.hate or results["self-harm"] or results["sexual/minors"] or results["violence/graphic"]:
-                PermissionError("NSFW filter detected in non-NSFW channel. If you believe this was a mistake, please try again.")
+                raise PermissionError("NSFW filter detected in non-NSFW channel. If you believe this was a mistake, please try again.")
         emb = None
         fn = None
         with discord.context_managers.Typing(channel):
