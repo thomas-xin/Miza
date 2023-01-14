@@ -1575,7 +1575,7 @@ class Art(Command):
         emb = None
         fn = None
         with discord.context_managers.Typing(channel):
-            with tracebacksuppressor:
+            try:
                 dalle2 = name.startswith("dalle")
                 openjourney = "journey" in name
                 if dalle2 and premium < 2:
@@ -1612,6 +1612,10 @@ class Art(Command):
                                     "Uh-oh, it appears your tokens have run out! Check ~wallet to view your balance, top up using a donation [here]({bot.kofi_url}), "
                                     + "or purchase a subscription to gain temporary unlimited usage!"
                                 )
+            except PermissionError:
+                raise
+            except:
+                print_exc()
         if not fn and not specified and not url:
             if openjourney:
                 fn = await create_future(self.imagebot.art_openjourney_local, prompt, kwargs)
