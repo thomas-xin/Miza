@@ -49,7 +49,7 @@ def create_driver():
 	service = browser["service"](browser["path"])
 	options = browser["options"]()
 	options.add_argument("--headless")
-	# options.add_argument("--disable-gpu")
+	options.add_argument("--disable-gpu")
 	options.add_argument("--no-sandbox")
 	options.add_argument("--deny-permission-prompts")
 	options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36")
@@ -112,6 +112,7 @@ def create_driver():
 	# 	confirm.click()
 	# except:
 	# 	print_exc()
+	driver.get("file://")
 	return driver
 
 LAST_DRIVER = 0
@@ -877,6 +878,7 @@ class Bot:
 				return res
 			res = self.clean_response(q, res)
 		drivers.append(driver)
+		driver.get("file://")
 		return res
 
 	def bing(self, q, raw=False):
@@ -909,6 +911,7 @@ class Bot:
 				return res
 			res = self.clean_response(q, res)
 		drivers.append(driver)
+		driver.get("file://")
 		return res
 
 	def ai(self, u, q, refs=(), im=None):
