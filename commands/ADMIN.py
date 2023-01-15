@@ -1524,6 +1524,7 @@ class UpdateMuteRoles(Database):
     )
 
     failed = set()
+    last = 0
 
     async def get(self, guild):
         with suppress(KeyError):
@@ -1543,6 +1544,8 @@ class UpdateMuteRoles(Database):
         return role
 
     async def __call__(self):
+        if utc() - self.last <= 720:
+            return
         for g_id in deque(self.data):
             guild = self.bot.cache.guilds.get(g_id)
             try:
@@ -1555,7 +1558,7 @@ class UpdateMuteRoles(Database):
                     self.data.pop(g_id)
                 role = await self.get(guild)
                 for channel in guild.channels:
-                    if not channel.permissions_synced and channel.id not in self.failed and role not in channel.overwrites:
+                    if not channel.permissions_synced and channel.id not in self.failed and channel.permissions_for(role).send_messages:
                         perms = channel.permissions_for(guild.me)
                         if perms.manage_channels and perms.manage_roles:
                             try:
@@ -1564,6 +1567,7 @@ class UpdateMuteRoles(Database):
                                 self.failed.add(channel.id)
                             except:
                                 print_exc()
+        self.last = utc()
 
     def _day_(self):
         self.failed.clear()
