@@ -193,7 +193,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             time.sleep(delay)
         if force:
             touch(self.shutdown)
-        force_kill(self.proc)
+        # force_kill(self.proc)
 
     def command_options(self, usage, compare=False):
         # default = False
@@ -3540,8 +3540,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             else:
                 with tracebacksuppressor:
                     kwargs["avatar_url"] = await self.data.exec.uproxy(avatar_url)
-        if hasattr(channel, "simulated") or hasattr(channel, "recipient"):
-            message = await channel.send(*args, **kwargs)
+        if hasattr(channel, "simulated") or hasattr(channel, "recipient") or not hasattr(channel, "create_webhook"):
+            message = await discord.abc.Messageable.send(channel, *args, **kwargs)
             reacts = kwargs.pop("reacts", None)
         else:
             if args and args[0] and args[0].count(":") >= 2 and channel.guild.me.guild_permissions.manage_roles:
