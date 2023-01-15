@@ -37,7 +37,7 @@ def create_driver():
 	service = browser["service"](browser["path"])
 	options = browser["options"]()
 	options.add_argument("--headless")
-	options.add_argument("--disable-gpu")
+	# options.add_argument("--disable-gpu")
 	options.add_argument("--no-sandbox")
 	options.add_argument("--deny-permission-prompts")
 	options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36")
@@ -117,6 +117,9 @@ def get_driver():
 			driver = create_driver()
 	exc.submit(ensure_drivers)
 	return driver
+def return_driver(d):
+	d.get("file://")
+	drivers.append(d)
 def update():
 	if time.time() - LAST_DRIVER >= 3600:
 		globals()["LAST_DRIVER"] = time.time()
@@ -129,9 +132,8 @@ def update():
 		except:
 			pass
 		else:
-			d.get("file://")
 			drivers.clear()
-			drivers.append(d)
+			return_driver(d)
 
 def safecomp(gen):
 	while True:
@@ -178,6 +180,9 @@ class Bot:
 			self.proxies.update("http://" + p for p in proxies)
 			if self.proxies:
 				self.ptime = time.time()
+				break
+			else:
+				time.sleep(1)
 		proxies = list(self.proxies)
 		# print(proxies)
 		if time.time() - self.btime > 480:
@@ -298,7 +303,11 @@ class Bot:
 		generate.click()
 
 		elems = None
+		i = 0
 		while not elems:
+			if i >= 120:
+				print("Mage: unavailable")
+				return False
 			elems = driver.find_elements(by=tag_name, value="img")
 			for e in reversed(elems):
 				a = e.get_attribute("src")
@@ -307,10 +316,10 @@ class Bot:
 			else:
 				elems.clear()
 			time.sleep(1)
-		drivers.append(driver)
+			i += 1
 		time.sleep(1)
 		elems = driver.find_elements(by=class_name, value="mantine-1q3qenk")
-		driver.get("file://")
+		return_driver(driver)
 		if elems:
 			print("Mage: censored")
 			return False

@@ -2365,8 +2365,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     data = expr.split(":")
                     mult = 1
                     while len(data):
-                        t += await self.eval_math(data[-1]) * mult
-                        data = data[:-1]
+                        t += await self.eval_math(data.pop(-1)) * mult
                         if mult <= 60:
                             mult *= 60
                         elif mult <= 3600:
@@ -3551,10 +3550,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     permissions.use_external_emojis = True
                     await everyone.edit(permissions=permissions, reason="I need to send emojis 🙃")
             mchannel = None
-            while not mchannel:
+            for i in range(25):
                 mchannel = channel.parent if hasattr(channel, "thread") or isinstance(channel, discord.Thread) else channel
                 if not mchannel:
                     await asyncio.sleep(0.2)
+                else:
+                    break
             w = await self.ensure_webhook(mchannel, bypass=True)
             kwargs.pop("wait", None)
             reacts = kwargs.pop("reacts", None)
@@ -5915,7 +5916,10 @@ def webserver_communicate(bot):
     while not bot.closed and bot.server:
         with tracebacksuppressor:
             while True:
-                b = bot.server.stderr.readline().lstrip(b"\x00").rstrip()
+                b = bot.server.stderr.readline()
+                if not b:
+                    raise EOFError("Webserver response empty.")
+                b = b.lstrip(b"\x00").rstrip()
                 if b:
                     s = as_str(b)
                     if s[0] == "~":

@@ -49,7 +49,7 @@ def create_driver():
 	service = browser["service"](browser["path"])
 	options = browser["options"]()
 	options.add_argument("--headless")
-	options.add_argument("--disable-gpu")
+	# options.add_argument("--disable-gpu")
 	options.add_argument("--no-sandbox")
 	options.add_argument("--deny-permission-prompts")
 	options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36")
@@ -140,6 +140,9 @@ def get_driver():
 			driver = create_driver()
 	exc.submit(ensure_drivers)
 	return driver
+def return_driver(d):
+	d.get("file://")
+	drivers.append(d)
 def update():
 	if time.time() - LAST_DRIVER >= 3600:
 		globals()["LAST_DRIVER"] = time.time()
@@ -152,9 +155,8 @@ def update():
 		except:
 			pass
 		else:
-			d.get("file://")
 			drivers.clear()
-			drivers.append(d)
+			return_driver(d)
 
 def safecomp(gen):
 	while True:
@@ -280,6 +282,9 @@ class Bot:
 			self.proxies.update("http://" + p for p in proxies)
 			if self.proxies:
 				self.ptime = time.time()
+				break
+			else:
+				time.sleep(1)
 		proxies = list(self.proxies)
 		# print(proxies)
 		if time.time() - self.btime > 480:
@@ -481,7 +486,7 @@ class Bot:
 				lines.append(s)
 		if literal_question(q):
 			res = (self.google, self.bing)[random.randint(0, 1)](q, raw=True)
-			start = "GOOGLE: "
+			start = "[GOOGLE] "
 			if len(self.gpttokens(res)) > 128:
 				summ = self.answer_summarise("facebook/bart-large-cnn", q + "\n" + res, max_length=96, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
 				res = lim_str(res.replace("\n", " "), 256, mode="right") + "\n" + summ
@@ -619,14 +624,14 @@ class Bot:
 		res = ""
 		if (not refs and self.premium > 1 or literal_question(q)):
 			res = (self.google, self.bing)[random.randint(0, 1)](q, raw=True)
-			s = "GOOGLE: "
+			s = "[GOOGLE] "
 			if len(self.gpttokens(res)) > 128:
 				summ = self.answer_summarise("facebook/bart-large-cnn", q + "\n" + res, max_length=96, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
 				res = lim_str(res.replace("\n", " "), 256, mode="right") + "\n" + summ
 			res = s + res + "\n"
 			lines.append(res)
 		for k, v in refs:
-			if not k.startswith("REPLIED TO: "):
+			if not k.startswith("[REPLIED TO] "):
 				continue
 			if len(self.gpttokens(v)) > 36:
 				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
@@ -637,7 +642,7 @@ class Bot:
 			s = self.answer_summarise("facebook/bart-large-cnn", s, max_length=384, min_length=32).replace("\n", ". ").strip()
 		lines.append(s)
 		for k, v in refs:
-			if k.startswith("REPLIED TO: "):
+			if k.startswith("[REPLIED TO] "):
 				continue
 			k = k.replace(":", "")
 			if len(self.gpttokens(v)) > 36:
@@ -861,24 +866,21 @@ class Bot:
 			elem = driver.find_element(by=webdriver.common.by.By.ID, value="rso")
 		except:
 			print("Google: Timed out.")
-			drivers.append(driver)
+			return_driver(driver)
 			return ""
 		res = elem.text
+		return_driver(driver)
 		# print("Google response:", res)
 		if res.startswith("Calculator result\n"):
 			res = " ".join(res.split("\n", 3)[1:3])
 			if raw:
-				drivers.append(driver)
 				return res
 		else:
 			res = "\n".join(r.strip() for r in res.splitlines() if valid_response(r))
 			res = lim_str(res, 3072, mode="right")
 			if raw:
-				drivers.append(driver)
 				return res
 			res = self.clean_response(q, res)
-		drivers.append(driver)
-		driver.get("file://")
 		return res
 
 	def bing(self, q, raw=False):
@@ -894,24 +896,21 @@ class Bot:
 			elem = driver.find_element(by=webdriver.common.by.By.ID, value="b_results")
 		except:
 			print("Bing: Timed out.")
-			drivers.append(driver)
+			return_driver(driver)
 			return ""
 		res = elem.text
+		return_driver(driver)
 		# print("Bing response:", res)
 		if driver.find_elements(by=webdriver.common.by.By.ID, value="rcCalB"):
 			res = " ".join(res.split("\n", 3)[:2])
 			if raw:
-				drivers.append(driver)
 				return res
 		else:
 			res = "\n".join(r.strip() for r in res.splitlines() if valid_response(r))
 			res = lim_str(res, 3072, mode="right")
 			if raw:
-				drivers.append(driver)
 				return res
 			res = self.clean_response(q, res)
-		drivers.append(driver)
-		driver.get("file://")
 		return res
 
 	def ai(self, u, q, refs=(), im=None):

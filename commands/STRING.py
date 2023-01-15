@@ -1064,6 +1064,8 @@ class Ask(Command):
                                         name = bot.name + "2"
                             await create_future(cb.appendleft, (name, unicode_prune(m.content)))
                             i += 1
+                if not q:
+                    q = "Hi!"
         else:
             cb.name = bot.name
             cb.premium = premium

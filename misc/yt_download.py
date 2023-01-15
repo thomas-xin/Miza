@@ -109,6 +109,9 @@ def get_driver():
 			driver = create_driver()
 	exc.submit(ensure_drivers)
 	return driver
+def return_driver(d):
+	d.get("file://")
+	drivers.append(d)
 def update():
 	if time.time() - LAST_DRIVER >= 3600:
 		globals()["LAST_DRIVER"] = time.time()
@@ -121,9 +124,8 @@ def update():
 		except:
 			pass
 		else:
-			d.get("file://")
 			drivers.clear()
-			drivers.append(d)
+			return_driver(d)
 
 def safecomp(gen):
 	while True:
