@@ -1555,8 +1555,9 @@ class UpdateMuteRoles(Database):
                     self.data.pop(g_id)
                 role = await self.get(guild)
                 for channel in guild.channels:
-                    if channel.permissions_for(guild.me).manage_channels and channel.permissions_for(guild.me).manage_roles and not channel.permissions_synced and channel.id not in self.failed:
-                        if role not in channel.overwrites:
+                    if not channel.permissions_synced and channel.id not in self.failed and role not in channel.overwrites:
+                        perms = channel.permissions_for(guild.me)
+                        if perms.manage_channels and perms.manage_roles:
                             try:
                                 await channel.set_permissions(target=role, overwrite=self.mute)
                             except discord.Forbidden:

@@ -3941,11 +3941,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         await asyncio.sleep(2)
         errored = 0
         while not self.closed:
-            async with Delay(1):
+            async with Delay(3):
                 async with tracebacksuppressor:
                     create_task(self.update_status())
                     with MemoryTimer("update_bytes"):
-                        net = psutil.net_io_counters()
+                        net = await create_future(psutil.net_io_counters)
                         net_bytes = net.bytes_sent + net.bytes_recv
                         if not hasattr(self, "net_bytes"):
                             self.net_bytes = deque(maxlen=3)
