@@ -64,7 +64,7 @@ async def respond(s):
             else:
                 code = None
                 try:
-                    code = compile(c, "miza", "eval")
+                    code = compile(c, "<miza>", "eval")
                 except SyntaxError:
                     pass
                 else:

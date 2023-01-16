@@ -5660,23 +5660,21 @@ class AudioClientInterface:
                 raise
             try:
                 self.killed = True
-                for client in self.clients.values():
-                    if client:
-                        client.kill()
-                if is_strict_running(self.proc):
-                    force_kill(self.proc)
-                self.clients.clear()
-                self.returns.clear()
+                for auds in self.players.values():
+                    if auds:
+                        with tracebacksuppressor:
+                            client.kill()
+                await asyncio.sleep(1)
                 futs = deque()
                 for guild in bot.client.guilds:
                     futs.append(create_task(self.guild.change_voice_state(channel=None)))
-                    # member = guild.get_member(bot.user.id)
-                    # if member:
-                    #     voice = member.voice
-                    #     if voice:
-                    #         futs.append(create_task(member.move_to(None)))
                 for fut in futs:
                     await fut
+                if is_strict_running(self.proc):
+                    force_kill(self.proc)
+                self.players.clear()
+                self.clients.clear()
+                self.returns.clear()
                 print("Restarting audio client...")
                 self.__init__()
                 if "audio" in bot.data:
@@ -5685,7 +5683,9 @@ class AudioClientInterface:
             except:
                 print_exc()
                 time.sleep(1)
-                force_kill(PROC)
+                with suppress():
+                    await bot.close()
+                touch(bot.restart)
             raise
         finally:
             self.returns.pop(key, None)

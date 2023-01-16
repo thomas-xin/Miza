@@ -560,13 +560,12 @@ class CustomAudio(collections.abc.Hashable):
                 cnt = inf
             else:
                 cnt = sum(1 for m in self.acsi.channel.members if not m.bot)
+            if cnt < 2 and not self.queue and self.timeout < utc() - 240:
+                return self.kill(css_md(f"🎵 Automatically disconnected from {sqr_md(guild)}: Queue empty. 🎵"))
             if not cnt:
                 # Timeout for leaving is 240 seconds
                 if self.timeout < utc() - 240:
-                    if self.queue:
-                        return self.kill(css_md(f"🎵 Automatically disconnected from {sqr_md(guild)}: All channels empty. 🎵"))
-                    else:
-                        return self.kill(css_md(f"🎵 Automatically disconnected from {sqr_md(guild)}: Queue empty. 🎵"))
+                    return self.kill(css_md(f"🎵 Automatically disconnected from {sqr_md(guild)}: All channels empty. 🎵"))
                 perms = self.acsi.channel.permissions_for(guild.me)
                 if not perms.connect or not perms.speak:
                     return self.kill(css_md(f"🎵 Automatically disconnected from {sqr_md(guild)}: No permission to connect/speak in {sqr_md(self.acsi.channel)}. 🎵"))

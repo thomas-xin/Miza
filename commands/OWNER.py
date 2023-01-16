@@ -124,7 +124,7 @@ class Restart(Command):
             touch(bot.shutdown)
         else:
             touch(bot.restart)
-        bot.close()
+        # bot.close()
         del client
         del bot
         f = lambda x: mpf("1.8070890240038886796397791962945558584863687305069e-12") * x + mpf("6214315.6770607604120060484376689964637894379472455")
