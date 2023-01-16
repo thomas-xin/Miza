@@ -307,7 +307,7 @@ class Bot:
 		while not elems:
 			if i >= 120:
 				print("Mage: unavailable")
-				return False
+				return
 			elems = driver.find_elements(by=tag_name, value="img")
 			for e in reversed(elems):
 				a = e.get_attribute("src")
