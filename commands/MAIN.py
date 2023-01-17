@@ -42,7 +42,7 @@ help_descriptions = fcdict((
     ("fun", "Text-based games and other fun features"),
     ("owner", "Restricted owner-only commands; highly volatile"),
     ("nsfw", "Not Safe For Work; only usable in 18+ channels"),
-    ("misc", "Miscellaneous; restricted to trusted servers"),
+    ("misc", "Miscellaneous, mostly not relevant to Discord and restricted to trusted servers"),
 ))
 
 

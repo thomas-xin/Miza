@@ -75,6 +75,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         1052645761638215761: 2,
         1052647823188967444: 3,
     }
+    active_categories = set(AUTH.setdefault("active_categories", ["MAIN", "STRING", "ADMIN", "VOICE", "IMAGE", "WEBHOOK", "FUN"]))
 
     def __init__(self, cache_size=65536, timeout=24):
         # Initializes client (first in __mro__ of class inheritance)
@@ -2683,7 +2684,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         sub_kill()
         if not mod:
             modload = deque()
-            files = [i for i in os.listdir("commands") if is_code(i)]
+            files = [i for i in os.listdir("commands") if is_code(i) and i.rsplit(".", 1)[0] in self.active_categories]
             for f in files:
                 modload.append(create_future_ex(self.get_module, f, priority=True))
             create_future_ex(self.start_audio_client)
@@ -2694,7 +2695,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
     # Loads all modules in the commands folder and initializes bot commands and databases.
     def get_modules(self):
-        files = [i for i in os.listdir("commands") if is_code(i)]
+        files = [i for i in os.listdir("commands") if is_code(i) and i.rsplit(".", 1)[0] in self.active_categories]
         self.categories = fcdict()
         self.dbitems = fcdict()
         self.commands = fcdict()
@@ -3220,7 +3221,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                             channel = guild.channel
                         # Automatically start typing if the command is time consuming
                         tc = getattr(command, "time_consuming", False)
-                        if not loop and tc:
+                        if not loop and tc and not getattr(message, "simulated", False):
                             fut = create_task(discord.abc.Messageable.trigger_typing(channel))
                         # Get maximum time allowed for command to process
                         if isnan(u_perm):
@@ -3938,7 +3939,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         await self.send_event("_call_")
                 self.update_users()
 
-    # The slow update loop that runs once every 1 second.
+    # The slow update loop that runs once every 3 second2.
     async def slow_loop(self):
         await asyncio.sleep(2)
         errored = 0
@@ -5823,7 +5824,7 @@ def userIter4(x):
 PORT = AUTH.get("webserver_port", 80)
 IND = "\x7f"
 
-def update_file_cache(files=None, recursive=True):
+def update_file_cache(files=None):
     if files is None:
         files = deque(sorted(file[len(IND):] for file in os.listdir("cache") if file.startswith(IND)))
     bot.file_count = len(files)
@@ -5839,9 +5840,9 @@ def update_file_cache(files=None, recursive=True):
             with tracebacksuppressor:
                 os.remove(fn)
                 print(curr, "deleted.")
-                update_file_cache(files, recursive=False)
-    if not recursive:
-        return
+                # update_file_cache(files, recursive=False)
+    # if not recursive:
+    #     return
     attachments = (file for file in sorted(set(file for file in os.listdir("cache") if file.startswith("attachment_"))))
     attachments = deque(attachments)
     while len(attachments) > 8192:
@@ -5944,11 +5945,11 @@ class SimulatedMessage:
         self._state = bot._state
         self.created_at = datetime.datetime.utcfromtimestamp(int(t) / 1e6)
         self.ip = name
-        self.id = time_snowflake(self.created_at, high=True)
+        self.id = time_snowflake(self.created_at, high=True) - 1
         self.content = content
         self.response = deque()
         if recursive:
-            author = self.__class__(bot, content, (ip2int(name) + MIZA_EPOCH) * 1000, name, nick, recursive=False)
+            author = self.__class__(bot, content, (ip2int(name) + MIZA_EPOCH) * 1000 + 1, name, nick, recursive=False)
             author.response = self.response
             author.message = self
             author.dm_channel = author

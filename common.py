@@ -1161,7 +1161,10 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
                     fields["embeds"] = embeds
                 if tts:
                     fields["tts"] = tts
-                message = await discord.abc.Messageable.send(channel, content, **fields)
+                if getattr(message, "simulated", False):
+                    message = await channel.send(content, **fields)
+                else:
+                    message = await discord.abc.Messageable.send(channel, content, **fields)
                 for a in message.attachments:
                     print("<attachment>", a.url)
                 return message
@@ -1197,6 +1200,8 @@ async def send_with_react(channel, *args, reacts=None, reference=None, mention=F
     try:
         if reference or "buttons" in kwargs or "embeds" in kwargs:
             sent = await send_with_reply(channel, reference, *args, mention=mention, **kwargs)
+        elif getattr(channel, "simulated", False):
+            sent = await channel.send(*args, **kwargs)
         else:
             sent = await discord.abc.Messageable.send(channel, *args, **kwargs)
         if reacts:

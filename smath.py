@@ -154,6 +154,8 @@ print_exc = lambda *args: sys.stdout.write(("\n".join(as_str(i) for i in args) +
 loop = lambda x: repeat(None, x)
 
 def try_int(i):
+    if type(i) is str and not i.isnumeric():
+        return i
     try:
         return int(i)
     except:

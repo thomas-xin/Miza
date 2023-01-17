@@ -181,7 +181,7 @@ tsc_list = SheetPull(
 
 
 class CS_mem2flag(Command):
-    name = ["CS_m2f"]
+    name = ["mem2flag", "m2f", "CS_m2f"]
     description = "Returns a sequence of Cave Story TSC commands to set a certain memory address to a certain value."
     usage = "<0:address> <1:value(1)>?"
     example = ("cs_m2f 49e6e8 123",)
@@ -196,7 +196,7 @@ class CS_mem2flag(Command):
 
 
 class CS_flag2mem(Command):
-    name = ["CS_f2m"]
+    name = ["flag2mem", "f2m", "CS_f2m"]
     description = "Returns the memory offset and specific bit pointed to by a given flag number."
     usage = "<flag>"
     example = ("cs_f2m A036",)
@@ -211,7 +211,7 @@ class CS_flag2mem(Command):
 
 
 class CS_num2val(Command):
-    name = ["CS_n2v"]
+    name = ["num2val", "n2v", "CS_n2v"]
     description = "Returns a TSC value representing the desired number, within a certain number of characters."
     usage = "<0:number> <1:length(4)>?"
     example = ("cs_n2v 12345",)
@@ -226,7 +226,7 @@ class CS_num2val(Command):
 
 
 class CS_val2num(Command):
-    name = ["CS_v2n"]
+    name = ["val2num", "v2n", "CS_v2n"]
     description = "Returns the number encoded by a given TSC value."
     usage = "<tsc_value>"
     example = ("cs_v2n CCCC",)
@@ -238,7 +238,7 @@ class CS_val2num(Command):
 
 class CS_hex2xml(Command):
     time_consuming = True
-    name = ["CS_h2x"]
+    name = ["hex2xml", "h2x", "CS_h2x"]
     description = "Converts a given Cave Story hex patch to an xml file readable by Booster's Lab."
     usage = "<hex_data>"
     example = ("cs_h2x 0x481D27 C3",)
@@ -307,6 +307,7 @@ class CS_hex2xml(Command):
 
 class CS_npc(Command):
     time_consuming = True
+    name = ["npc"]
     description = "Searches the Cave Story NPC list for an NPC by name or ID."
     usage = "<query> <condensed{?c}>?"
     example = ("cs_npc misery",)
@@ -345,7 +346,7 @@ class CS_npc(Command):
 
 
 class CS_flag(Command):
-    name = ["CS_OOB", "CS_flags"]
+    name = ["OOB", "CS_OOB", "CS_flags"]
     description = "Searches the Cave Story OOB flags list for a memory variable."
     usage = "<query> <condensed{?c}>?"
     example = ("cs_oob key",)
@@ -423,312 +424,6 @@ class CS_Database(Database):
         entity_list.update()
         tsc_list.update()
         douclub.update()
-
-
-# class MathQuiz(Command):
-#     name = ["MathTest", "MQ"]
-#     min_level = 1
-#     description = "Starts a math quiz in the current channel."
-#     usage = "(easy|hard)? <disable{?d}>?"
-#     flags = "aed"
-#     rate_limit = 3
-
-#     async def __call__(self, channel, guild, flags, argv, **void):
-#         mathdb = self.bot.data.mathtest
-#         if "d" in flags:
-#             if channel.id in mathdb.data:
-#                 mathdb.data.pop(channel.id)
-#             return italics(css_md(f"Disabled math quizzes for {sqr_md(channel)}."))
-#         if not argv:
-#             argv = "easy"
-#         elif argv not in ("easy", "hard"):
-#             raise TypeError("Invalid quiz mode.")
-#         mathdb.data[channel.id] = cdict(mode=argv, answer=None)
-#         return italics(css_md(f"Enabled {argv} math quiz for {sqr_md(channel)}."))
-
-
-# class UpdateMathTest(Database):
-#     name = "mathtest"
-#     no_file = True
-
-#     def __load__(self):
-#         s = "⁰¹²³⁴⁵⁶⁷⁸⁹"
-#         ss = {str(i): s[i] for i in range(len(s))}
-#         ss["-"] = "⁻"
-#         self.sst = "".maketrans(ss)
-
-#     def format(self, x, y, op):
-#         length = 6
-#         xs = str(x)
-#         xs = " " * (length - len(xs)) + xs
-#         ys = str(y)
-#         ys = " " * (length - len(ys)) + ys
-#         return " " + xs + "\n" + op + ys
-
-#     def eqtrans(self, eq):
-#         return str(eq).replace("**", "^").replace("exp", "e^").replace("*", "∙")
-
-#     # Addition of 2 numbers less than 10000
-#     def addition(self):
-#         x = xrand(10000)
-#         y = xrand(10000)
-#         s = self.format(x, y, "+")
-#         return s, x + y
-
-#     # Subtraction of 2 numbers, result must be greater than or equal to 0
-#     def subtraction(self):
-#         x = xrand(12000)
-#         y = xrand(8000)
-#         if x < y:
-#             x, y = y, x
-#         s = self.format(x, y, "-")
-#         return s, x - y
-
-#     # Addition of 2 numbers 2~20
-#     def multiplication(self):
-#         x = xrand(2, 20)
-#         y = xrand(2, 20)
-#         s = self.format(x, y, "×")
-#         return s, x * y
-
-#     # Addition of 2 numbers 13~99
-#     def multiplication2(self):
-#         x = xrand(13, 100)
-#         y = xrand(13, 100)
-#         s = self.format(x, y, "×")
-#         return s, x * y
-
-#     # Division result between 2 and 13
-#     def division(self):
-#         y = xrand(2, 20)
-#         x = xrand(2, 14) * y
-#         s = self.format(x, y, "/")
-#         return s, x // y
-
-#     # Power of 2
-#     def exponentiation(self):
-#         x = xrand(2, 20)
-#         y = xrand(2, max(3, 14 / x))
-#         s = str(x) + "^" + str(y)
-#         return s, x ** y
-
-#     # Power of 2 or 3
-#     def exponentiation2(self):
-#         x = xrand(2, 4)
-#         if x == 2:
-#             y = xrand(7, 35)
-#         else:
-#             y = xrand(5, 11)
-#         s = str(x) + "^" + str(y)
-#         return s, x ** y
-
-#     # Square root result between 2 and 19
-#     def square_root(self):
-#         x = xrand(2, 20)
-#         y = x ** 2
-#         s = "√" + str(y)
-#         return s, x
-
-#     # Square root result between 21 and 99
-#     def square_root2(self):
-#         x = xrand(21, 1000)
-#         y = x ** 2
-#         s = "√" + str(y)
-#         return s, x
-
-#     # Scientific number form, exponent between -3 and 5
-#     def scientific(self):
-#         x = xrand(100, 10000)
-#         x /= 10 ** int(math.log10(x))
-#         y = xrand(-3, 6)
-#         s = str(x) + "×10^" + str(y)
-#         return s, round(x * 10 ** y, 9)
-
-#     # Like division but may result in a finite decimal
-#     def fraction(self):
-#         y = choice([2, 4, 5, 10])
-#         x = xrand(3, 20)
-#         mult = xrand(4) + 1
-#         y *= mult
-#         x *= mult
-#         s = self.format(x, y, "/")
-#         return s, round(x / y, 9)
-
-#     # An infinite recurring decimal number of up to 3 digits
-#     def recurring(self):
-#         x = "".join(str(xrand(10)) for _ in loop(xrand(2, 4)))
-#         s = "0." + "".join(x[i % len(x)] for i in range(28)) + "..."
-#         ans = "0.[" + x + "]"
-#         return s, ans
-
-#     # Quadratic equation with a = 1
-#     def equation(self):
-#         a = xrand(1, 10)
-#         b = xrand(1, 10)
-#         if xrand(2):
-#             a = -a
-#         if xrand(2):
-#             b = -b
-#         bx = -a - b
-#         cx = a * b
-#         s = "x^2 "
-#         if bx:
-#             s += ("+", "-")[bx < 0] + " " + (str(abs(bx))) * (abs(bx) != 1) +  "x "
-#         s += ("+", "-")[cx < 0] + " " + str(abs(cx)) + " = 0"
-#         return s, [a, b]
-
-#     # Quadratic equation with all values up to 13
-#     async def equation2(self):
-#         a = xrand(1, 14)
-#         b = xrand(1, 14)
-#         c = xrand(1, 14)
-#         d = xrand(1, 14)
-#         if xrand(2):
-#             a = -a
-#         if xrand(2):
-#             b = -b
-#         if xrand(2):
-#             c = -c
-#         if xrand(2):
-#             d = -d
-#         st = "(" + str(a) + "*x+" + str(b) + ")*(" + str(c) + "*x+" + str(d) + ")"
-#         a = [-sympy.Number(b) / a, -sympy.Number(d) / c]
-#         q = await create_future(sympy.expand, st, timeout=8)
-#         q = self.eqtrans(q).replace("∙", "") + " = 0"
-#         return q, a
-
-#     # A derivative or integral
-#     async def calculus(self):
-#         amount = xrand(2, 5)
-#         s = []
-#         for i in range(amount):
-#             t = xrand(3)
-#             if t == 0:
-#                 a = xrand(1, 7)
-#                 e = xrand(-3, 8)
-#                 if xrand(2):
-#                     a = -a
-#                 s.append(str(a) + "x^(" + str(e) + ")")
-#             elif t == 1:
-#                 a = xrand(5)
-#                 if a <= 1:
-#                     a = "e"
-#                 s.append("+-"[xrand(2)] + str(a) + "^x")
-#             elif t == 2:
-#                 a = xrand(6)
-#                 if a < 1:
-#                     a = 1
-#                 if xrand(2):
-#                     a = -a
-#                 op = ["sin", "cos", "tan", "sec", "csc", "cot", "log"]
-#                 s.append(str(a) + "*" + choice(op) + "(x)")
-#         st = ""
-#         for i in s:
-#             if st and i[0] not in "+-":
-#                 st += "+"
-#             st += i
-#         ans = await self.bot.solve_math(st, xrand(2147483648), 0, 1)
-#         a = ans[0]
-#         q = self.eqtrans(a)
-#         if xrand(2):
-#             q = "Dₓ " + q
-#             op = sympy.diff
-#         else:
-#             q = "∫ " + q
-#             op = sympy.integrate
-#         a = await create_future(op, a, timeout=8)
-#         return q, a
-
-#     # Selects a random math question based on difficulty.
-#     async def generateMathQuestion(self, mode):
-#         easy = (
-#             self.addition,
-#             self.subtraction,
-#             self.multiplication,
-#             self.division,
-#             self.exponentiation,
-#             self.square_root,
-#             self.scientific,
-#             self.fraction,
-#             self.recurring,
-#             self.equation,
-#         )
-#         hard = (
-#             self.multiplication2,
-#             self.exponentiation2,
-#             self.square_root2,
-#             self.equation2,
-#             self.calculus,
-#         )
-#         modes = {"easy": easy, "hard": hard}
-#         qa = choice(modes[mode])()
-#         if awaitable(qa):
-#             return await qa
-#         return qa
-
-#     async def newQuestion(self, channel):
-#         q, a = await self.generateMathQuestion(self.data[channel.id].mode)
-#         msg = "```\n" + q + "```"
-#         self.data[channel.id].answer = a
-#         await channel.send(msg)
-
-#     async def __call__(self):
-#         bot = self.bot
-#         for c_id in self.data:
-#             if self.data[c_id].answer is None:
-#                 self.data[c_id].answer = nan
-#                 channel = await bot.fetch_channel(c_id)
-#                 await self.newQuestion(channel)
-
-#     messages = cdict(
-#         correct=[
-#             "Great work!",
-#             "Very nice!",
-#             "Congrats!",
-#             "Nice job! Keep going!",
-#             "That is correct!",
-#             "Bullseye!",
-#         ],
-#         incorrect=[
-#             "Aw, close, keep trying!",
-#             "Oops, not quite, try again!",
-#         ],
-#     )
-
-#     async def _nocommand_(self, message, **void):
-#         bot = self.bot
-#         channel = message.channel
-#         if channel.id in self.data:
-#             if message.author.id != bot.id:
-#                 msg = message.content.strip("|").strip("`")
-#                 if not msg or msg.casefold() != msg:
-#                     return
-#                 # Ignore commented messages
-#                 if msg.startswith("#") or msg.startswith("//") or msg.startswith("\\"):
-#                     return
-#                 try:
-#                     x = await bot.solve_math(msg, message.author, 0, 1)
-#                     x = await create_future(sympy.sympify, x[0], timeout=6)
-#                 except:
-#                     return
-#                 correct = False
-#                 a = self.data[channel.id].answer
-#                 if type(a) is list:
-#                     if x in a:
-#                         correct = True
-#                 else:
-#                     a = await create_future(sympy.sympify, a, timeout=6)
-#                     d = await create_future(sympy.Add, x, -a, timeout=12)
-#                     z = await create_future(sympy.simplify, d, timeout=18)
-#                     correct = z == 0
-#                 if correct:
-#                     create_task(self.newQuestion(channel))
-#                     pull = self.messages.correct
-#                 else:
-#                     pull = self.messages.incorrect
-#                 high = (len(pull) - 1) ** 2
-#                 i = isqrt(random.randint(0, high))
-#                 await channel.send(pull[i])
 
 
 class Wav2Png(Command):
@@ -848,8 +543,38 @@ class SpectralPulse(Command):
             await bot.send_with_file(channel, "", fn2, filename=n2, reference=message)
 
 
+class MCEnchant(Command):
+    name = ["Enchant", "GenerateEnchant"]
+    description = "Given an item and custom enchant values, generates a Minecraft /give command. An old misc command brought back."
+    usage = "<item> (<enchantment>|<level>)*"
+    example = ("enchant diamond_sword sharpness 8, fire_aspect 3, sweeping", "enchant diamond_axe mending unbreaking XI silk_touch", "enchant netherite_shovel efficiency 2000 looting vanishing_curse")
+    rate_limit = (4, 5)
+
+    def __call__(self, args, **void):
+        import enchant_generator
+        if not args:
+            raise ArgumentError("Input string is empty.")
+        item = args.pop(0)
+        return fix_md(enchant_generator.generate_enchant(item, args))
+
+
+class BTD6Paragon(Command):
+    name = ["Paragon", "GenerateParagon"]
+    description = "Given a tower and provided parameters, generates a list of Bloons TD 6 optimised paragon sacrifices. Parameters are \"p\" for pops, \"g\" for cash generated, \"t\" for Geraldo totems, and \"l\" for additional tower limit."
+    usage = "<tower> <sacrifices>* <parameters>*"
+    example = ("paragon dartmonkey 520 050 2*025", "paragon boat 400000p 30l", "paragon monkey_ace 2x500 2x050 2x005")
+    rate_limit = (4, 5)
+
+    def __call__(self, args, **void):
+        import paragon_calc
+        if not args:
+            raise ArgumentError("Input string is empty.")
+        return "\xad" + paragon_calc.parse(args)
+
+
 class DeviantArt(Command):
     server_only = True
+    name = ["DASubscribe"]
     min_level = 2
     description = "Subscribes to a DeviantArt Gallery, reposting links to all new posts."
     usage = "(add|remove)? <url> <reversed{?r}>?"

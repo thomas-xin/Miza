@@ -6,6 +6,7 @@ from install_update import *
 if not os.path.exists("auth.json") or not os.path.getsize("auth.json"):
     print("Authentication file not found. Generating empty template...")
     d = {
+        "active_categories": ["MAIN", "STRING", "ADMIN", "VOICE", "IMAGE", "WEBHOOK", "FUN", "OWNER"],
         "prefix": "~",
         "slash_commands": False,
         "webserver_address": "0.0.0.0",
