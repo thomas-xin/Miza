@@ -2055,6 +2055,7 @@ proc_args = cdict(
 async def start_proc(k, i):
     proc = await asyncio.create_subprocess_exec(
         *proc_args[k],
+        limit=8388608,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
     )

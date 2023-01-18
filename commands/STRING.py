@@ -1107,7 +1107,7 @@ class Ask(Command):
                 history=history,
                 refs=refs,
                 im=im,
-                prompt=(u, q),
+                prompt=(name, q),
             )
             out, cost = await process_image("CBAI", "$", [inputs])
             if cost:
