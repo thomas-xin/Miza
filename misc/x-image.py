@@ -2379,11 +2379,11 @@ def cb_exists(cid):
 def CBAI(inputs):
     locals().update(inputs)
     try:
-        cb = CBOTS[channel.id]
+        cb = CBOTS[channel_id]
         if cb.personality != personality:
             raise KeyError
     except KeyError:
-        cb = CBOTS[channel.id] = convobot.Bot( 
+        cb = CBOTS[channel_id] = convobot.Bot( 
             key=key,
             cai_token=cai_token,
             name=name,

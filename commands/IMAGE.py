@@ -5,6 +5,7 @@ try:
 except ModuleNotFoundError:
     import youtube_dl
 import aiohttp
+imagebot = None
 
 getattr(youtube_dl, "__builtins__", {})["print"] = print
 
@@ -1448,6 +1449,7 @@ class Art(Command):
     sdiff_sem = Semaphore(1, 256, rate_limit=1)
     fut = None
     import imagebot
+    globals()["imagebot"] = imagebot
     imagebot = imagebot.Bot(token=AUTH.get("openai_key"))
 
     async def __call__(self, bot, guild, user, channel, message, name, args, flags, **void):
