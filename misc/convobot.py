@@ -7,6 +7,11 @@ from transformers import GPT2TokenizerFast, AutoTokenizer, AutoModelForQuestionA
 from fp.fp import FreeProxy
 from traceback import print_exc
 
+def print(*args, sep=" ", end="\n"):
+	s = sep.join(map(str, args)) + end
+	b = s.encode("utf-8")
+	return sys.stdout.buffer.write(b)
+
 try:
 	exc = concurrent.futures.exc_worker
 except AttributeError:
