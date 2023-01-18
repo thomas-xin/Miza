@@ -2450,15 +2450,6 @@ def caption(im, q=None, cid=None):
     p2 = m.config.id2label[idx].strip()
     return (p1, p2)
 
-def IBART(prompt, url, url2, kwargs, specified, dalle2=False, openjourney=False, nsfw=False, key=None):
-    try:
-        ib = CBOTS[None]
-    except KeyError:
-        ib = CBOTS[None] = imagebot.Bot(token=key)
-    if key:
-        ib.token = key
-    return ib.art(prompt, url, url2, kwargs, specified, dalle2, openjourney, nsfw)
-
 def IBAOL(prompt, url, kwargs, key=None):
     try:
         ib = CBOTS[None]
