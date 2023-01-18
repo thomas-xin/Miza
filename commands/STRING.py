@@ -1029,31 +1029,30 @@ class Ask(Command):
             else:
                 reference = None
             p1 = p2 = None
-            if TrOCRProcessor:
-                if reference and (find_urls(reference.content) or reference.attachments or reference.embeds):
-                    url = f"https://discord.com/channels/0/{channel.id}/{reference.id}"
-                    found = await bot.follow_url(url)
-                    if found and found[0] != url and is_image(found[0]) is not None:
-                        urls.append(found[0])
-                if find_urls(message.content) or message.attachments or message.embeds:
-                    url = f"https://discord.com/channels/0/{channel.id}/{message.id}"
-                    found = await bot.follow_url(url)
-                    if found and found[0] != url and is_image(found[0]) is not None:
-                        urls.append(found[0])
-                        if not find_urls(q):
-                            if q:
-                                q += " "
-                            q += found[0]
-                if urls:
-                    url = im = urls[-1]
-                    p1, p2 = await process_image(url, "caption", [q, channel.id], fix=True)
-                    if p1 or p2:
-                        print(p1)
-                        print(p2)
-                        if p1:
-                            refs.append(("IMAGE", p1))
-                        if p2:
-                            refs.append(("ANSWER", p2))
+            if reference and (find_urls(reference.content) or reference.attachments or reference.embeds):
+                url = f"https://discord.com/channels/0/{channel.id}/{reference.id}"
+                found = await bot.follow_url(url)
+                if found and found[0] != url and is_image(found[0]) is not None:
+                    urls.append(found[0])
+            if find_urls(message.content) or message.attachments or message.embeds:
+                url = f"https://discord.com/channels/0/{channel.id}/{message.id}"
+                found = await bot.follow_url(url)
+                if found and found[0] != url and is_image(found[0]) is not None:
+                    urls.append(found[0])
+                    if not find_urls(q):
+                        if q:
+                            q += " "
+                        q += found[0]
+            if urls:
+                url = im = urls[-1]
+                p1, p2 = await process_image(url, "caption", [q, channel.id], fix=True)
+                if p1 or p2:
+                    print(p1)
+                    print(p2)
+                    if p1:
+                        refs.append(("IMAGE", p1))
+                    if p2:
+                        refs.append(("ANSWER", p2))
             if reference and reference.content:
                 ref = False
                 async for m in bot.history(channel, limit=2, before=message.id, after=reference.id):
