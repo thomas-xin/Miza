@@ -2076,7 +2076,7 @@ async def get_idle_proc(ptype, fix=False):
     if fix:
         proc = PROCS[ptype][0]
         if not proc or not is_strict_running(proc):
-            PROCS[ptype][0] = proc = await start_proc(ptype, i)
+            PROCS[ptype][0] = proc = await start_proc(ptype, 0)
         return proc
     p = [p for p in PROCS[ptype] if p and not p.sem.is_busy()]
     if not p:
