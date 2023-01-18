@@ -2425,7 +2425,7 @@ def caption(im, q=None, cid=None):
         return (p1, "")
     if VVQA:
         p, m = VVQA
-    except AttributeError:
+    else:
         p = ViltProcessor.from_pretrained("dandelin/vilt-b32-finetuned-vqa")
         m = ViltForQuestionAnswering.from_pretrained("dandelin/vilt-b32-finetuned-vqa")
         globals()["VVQA"] = (p, m)

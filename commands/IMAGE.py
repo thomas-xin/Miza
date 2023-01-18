@@ -5,6 +5,7 @@ try:
 except ModuleNotFoundError:
     import youtube_dl
 import aiohttp
+import imagebot
 
 getattr(youtube_dl, "__builtins__", {})["print"] = print
 
