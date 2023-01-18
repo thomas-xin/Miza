@@ -203,7 +203,6 @@ def parse(args):
 	if tier5 > 0:
 		cash += M_CASH
 		tiers += tier5 * 4
-		tier5 = min(tier5, M_TIER5)
 	pops = floor(pops + generated * 4)
 	output.append(f"Current effective cash: {ceil(cash)}")
 	output.append(f"Current effective pops: {pops}")
@@ -342,42 +341,43 @@ def parse(args):
 					break
 		atowers.sort(key=lambda t: tcost(t))
 		power = total_power(cash, pops, tier5, tiers, totems)
-		cp = atowers[0]
-		temp = (atowers.copy(), cash, pops, tier5, tiers, totems)
-		if tiers >= M_TIERS + tier_count(cp) or cash >= M_CASH + tcost(cp):
-			rp = power
-			if rp > p:
-				rp = p
-			removed = 0
-			while atowers and len(atowers) < limit:
-				cp = atowers[0]
-				t = tier_count(cp)
-				c = tcost(cp)
-				estp = total_power(cash - c, pops, tier5, tiers - t, totems)
-				atowers.pop(0)
-				power = estp
-				cash -= c
-				tiers -= t
-				if estp < rp:
-					if removed > 1 or tiers < M_TIERS:
-						break
-					removed += 1
-			while power < rp:
-				cp, cc = ll_crosspaths[0], ll_ccosts[0]
-				# for cp, cc in zip(ll_crosspaths, ll_ccosts):
-					# if sum(map(int, cp)) < tc:
-						# break
-				atowers.append(cp)
-				t = tier_count(cp)
-				tc -= t
-				cash += cc
-				tiers += t
-				power = total_power(cash, pops, tier5, tiers, totems)
-			if len(atowers) > limit:
-				atowers, cash, pops, tier5, tiers, totems = temp
-				power = total_power(cash, pops, tier5, tiers, totems)
-			else:
-				atowers.sort(key=lambda t: tcost(t))
+		if atowers:
+			cp = atowers[0]
+			temp = (atowers.copy(), cash, pops, tier5, tiers, totems)
+			if tiers >= M_TIERS + tier_count(cp) or cash >= M_CASH + tcost(cp):
+				rp = power
+				if rp > p:
+					rp = p
+				removed = 0
+				while atowers and len(atowers) < limit:
+					cp = atowers[0]
+					t = tier_count(cp)
+					c = tcost(cp)
+					estp = total_power(cash - c, pops, tier5, tiers - t, totems)
+					atowers.pop(0)
+					power = estp
+					cash -= c
+					tiers -= t
+					if estp < rp:
+						if removed > 1 or tiers < M_TIERS:
+							break
+						removed += 1
+				while power < rp:
+					cp, cc = ll_crosspaths[0], ll_ccosts[0]
+					# for cp, cc in zip(ll_crosspaths, ll_ccosts):
+						# if sum(map(int, cp)) < tc:
+							# break
+					atowers.append(cp)
+					t = tier_count(cp)
+					tc -= t
+					cash += cc
+					tiers += t
+					power = total_power(cash, pops, tier5, tiers, totems)
+				if len(atowers) > limit:
+					atowers, cash, pops, tier5, tiers, totems = temp
+					power = total_power(cash, pops, tier5, tiers, totems)
+				else:
+					atowers.sort(key=lambda t: tcost(t))
 		asacs = []
 		curr = ""
 		count = 0

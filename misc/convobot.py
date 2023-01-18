@@ -245,7 +245,7 @@ class Bot:
 	bad_proxies = set()
 	btime = 0
 
-	def __init__(self, token="", key="", cai_token="", email="", password="", name="Miza", personality=DEFPER, premium=0):
+	def __init__(self, token="", key="", cai_token="", cai_channel=None, email="", password="", name="Miza", personality=DEFPER, premium=0):
 		self.token = token
 		self.key = key
 		self.cai_token = cai_token
@@ -257,7 +257,7 @@ class Bot:
 		self.chat_history = []
 		self.chat_history_ids = None
 		self.cai_ready = False
-		self.cai_channel = None
+		self.cai_channel = cai_channel if personality == CAIPER else None
 		self.timestamp = time.time()
 		self.premium = premium
 		self.last_cost = 0

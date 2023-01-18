@@ -12,13 +12,6 @@ except:
     convobot = None
 
 try:
-    from transformers import TrOCRProcessor, VisionEncoderDecoderModel, ViltProcessor, ViltForQuestionAnswering
-except ImportError:
-    TrOCRProcessor = None
-else:
-    from PIL import Image
-
-try:
     rapidapi_key = AUTH["rapidapi_key"]
     if not rapidapi_key:
         raise
@@ -1003,155 +996,15 @@ class Ask(Command):
             else:
                 q = argv
         print(f"{message.author}:", q)
-        if q.casefold() in ("how", "how?"):
-            a = "https://imgur.com/gallery/8cfRt"
-            if channel.id in self.convos:
-                cb = self.convos[channel.id]
-                await create_future(cb.append, (message.author.display_name, q))
-                cb.append((bot.name, a))
-            await send_with_reply(channel, message, a)
-            return
-        elif q.casefold() == "https://youtube.com/watch?v=":
-            a = "dQw4w9WgXcQ"
-            if channel.id in self.convos:
-                cb = self.convos[channel.id]
-                await create_future(cb.append, (message.author.display_name, q))
-                cb.append((bot.name, a))
-            await send_with_reply(channel, message, a)
-            return
         premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
-        try:
-            cb = self.convos[channel.id]
-            if guild and getattr(cb, "personality", None) != bot.commands.personality[0].retrieve(guild.id):
-                raise KeyError
-            if utc() - cb.timestamp > 86400:
-                raise KeyError
-        except KeyError:
-            if not convobot:
-                cb = None
-            else:
-                # if guild.id == 312733374831788034:
-                #     cb_key = AUTH.get("openai_key_2")
-                # else:
-                cb_key = AUTH.get("openai_key")
-                cb = self.convos[channel.id] = await create_future(convobot.Bot,
-                    key=cb_key,
-                    cai_token=AUTH.get("cai_token"),
-                    email=AUTH.get("openai_email"),
-                    password=AUTH.get("openai_password"),
-                    name=bot.name,
-                    personality=bot.commands.personality[0].retrieve((guild or channel).id),
-                    premium=premium,
-                )
-                caic = bot.data.cai_channels.get(channel.id)
-                if caic:
-                    cb.cai_channel = caic
-                i = 0
-                if not getattr(message, "simulated", False):
-                    async for m in bot.history(channel, limit=5):
-                        if m.id == message.id:
-                            continue
-                        if i >= cb.history_length:
-                            break
-                        if m.content:
-                            if m.author.id == bot.id:
-                                name = bot.name
-                            else:
-                                name = m.author.display_name
-                                if name == bot.name:
-                                    name = m.author.name
-                                    if name == bot.name:
-                                        name = bot.name + "2"
-                            await create_future(cb.appendleft, (name, unicode_prune(m.content)))
-                            i += 1
-                if not q:
-                    q = "Hi!"
-        else:
-            cb.name = bot.name
-            cb.premium = premium
-            cb.timestamp = utc()
-        im = None
-        emb = None
-        if cb:
-            with discord.context_managers.Typing(channel):
-                urls = []
-                refs = []
-                if getattr(message, "reference", None):
-                    reference = message.reference.resolved
-                else:
-                    reference = None
-                p1 = p2 = None
-                if TrOCRProcessor:
-                    if reference and (find_urls(reference.content) or reference.attachments or reference.embeds):
-                        url = f"https://discord.com/channels/0/{channel.id}/{reference.id}"
-                        found = await bot.follow_url(url)
-                        if found and found[0] != url and is_image(found[0]) is not None:
-                            urls.append(found[0])
-                    if find_urls(message.content) or message.attachments or message.embeds:
-                        url = f"https://discord.com/channels/0/{channel.id}/{message.id}"
-                        found = await bot.follow_url(url)
-                        if found and found[0] != url and is_image(found[0]) is not None:
-                            urls.append(found[0])
-                            if not find_urls(q):
-                                if q:
-                                    q += " "
-                                q += found[0]
-                    for url in urls:
-                        resp = await process_image(url, "resize_max", ["-nogif", 512, "auto"], timeout=60)
-                        im = await create_future(Image.open, resp[0])
-                        if im.mode != "RGB":
-                            image = await create_future(im.convert, "RGB")
-                        else:
-                            image = im
-                        try:
-                            p1 = self.analysed[url]
-                        except KeyError:
-                            p1 = p2 = None
-                            try:
-                                p, m = self.vgpt
-                            except AttributeError:
-                                p = await create_future(TrOCRProcessor.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
-                                m = await create_future(VisionEncoderDecoderModel.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
-                                self.vgpt = (p, m)
-                            with tracebacksuppressor:
-                                impv = await create_future(p, image, return_tensors="pt")
-                                pixel_values = impv.pixel_values
-                                generated_ids = await create_future(m.generate, pixel_values)
-                                generated_text = p.batch_decode(generated_ids, skip_special_tokens=True)[0]
-                                p1 = generated_text.strip()
-                                if p1:
-                                    if len(self.analysed) > 4096:
-                                        self.analysed.pop(next(iter(self.analysed)), None)
-                                    self.analysed[url] = p1
-                        try:
-                            p, m = self.vvqa
-                        except AttributeError:
-                            p = await create_future(ViltProcessor.from_pretrained, "dandelin/vilt-b32-finetuned-vqa")
-                            m = await create_future(ViltForQuestionAnswering.from_pretrained, "dandelin/vilt-b32-finetuned-vqa")
-                            self.vvqa = (p, m)
-                        spl = q.split()
-                        t = " ".join(w for w in spl if not find_urls(w))[:96]
-                        with tracebacksuppressor:
-                            encoding = await create_future(p, image, t, return_tensors="pt")
-                            outputs = m(**encoding)
-                            logits = outputs.logits
-                            idx = logits.argmax(-1).item()
-                            p2 = m.config.id2label[idx].strip()
-                        if p1 or p2:
-                            print(p1)
-                            print(p2)
-                            if p1:
-                                refs.append(("IMAGE", p1))
-                            if p2:
-                                refs.append(("ANSWER", p2))
-                if reference and reference.content:# and not find_urls(reference.content):
-                    ref = False
-                    async for m in bot.history(channel, limit=2, before=message.id, after=reference.id):
-                        if m and m.content:
-                            ref = True
-                            break
-                    if ref:
-                        m = reference
+        h = await process_image("lambda cid: bool(CBOTS.get(cid))", "$", [channel.id], fix=True)
+        if not h:
+            history = []
+            if not getattr(message, "simulated", False):
+                async for m in bot.history(channel, limit=5):
+                    if m.id == message.id:
+                        continue
+                    if m.content:
                         if m.author.id == bot.id:
                             name = bot.name
                         else:
@@ -1160,61 +1013,132 @@ class Ask(Command):
                                 name = m.author.name
                                 if name == bot.name:
                                     name = bot.name + "2"
-                        c = reference.content
-                        urls = find_urls(c)
-                        for url in urls:
-                            if is_image(url) is not None:
-                                capt = url.rsplit("/", 1)[-1]
-                                c = c.replace(url, f"[Image {capt}]")
-                            elif p2:
-                                capt = url.rsplit("/", 1)[-1]
-                                c = c.replace(url, f"[Image {capt}]")
-                        refs.insert(0, ("REPLIED TO: " + name, c))
-                urls = find_urls(q)
-                for url in urls:
-                    if is_image(url) is not None:
-                        capt = url.rsplit("/", 1)[-1]
-                        q = q.replace(url, f"[Image {capt}]")
-                    elif p2:
-                        capt = url.rsplit("/", 1)[-1]
-                        q = q.replace(url, f"[Image {capt}]")
-                m = message
-                if m.author.id == bot.id:
-                    name = bot.name
-                else:
-                    name = m.author.display_name
-                    if name == bot.name:
-                        name = m.author.name
-                        if name == bot.name:
-                            name = bot.name + "2"
-                out, cost = await create_future(cb.ai, name, q, refs=refs, im=im)
-                if cost:
-                    if "costs" in bot.data:
-                        bot.data.costs.put(user.id, cost)
-                        if guild:
-                            bot.data.costs.put(guild.id, cost)
-                    if bot.is_trusted(guild) >= 2:
-                        for uid in bot.data.trusted[guild.id]:
-                            if bot.premium_level(uid, absolute=True) >= 2:
-                                break
-                        else:
-                            uid = next(iter(bot.data.trusted[guild.id]))
-                        u = await bot.fetch_user(uid)
+                        t = (name, unicode_prune(m.content))
+                        history.insert(0, t)
+            if not q:
+                q = "Hi!"
+        else:
+            history = ()
+        im = None
+        emb = None
+        urls = []
+        refs = []
+        with discord.context_managers.Typing(channel):
+            if getattr(message, "reference", None):
+                reference = message.reference.resolved
+            else:
+                reference = None
+            p1 = p2 = None
+            if TrOCRProcessor:
+                if reference and (find_urls(reference.content) or reference.attachments or reference.embeds):
+                    url = f"https://discord.com/channels/0/{channel.id}/{reference.id}"
+                    found = await bot.follow_url(url)
+                    if found and found[0] != url and is_image(found[0]) is not None:
+                        urls.append(found[0])
+                if find_urls(message.content) or message.attachments or message.embeds:
+                    url = f"https://discord.com/channels/0/{channel.id}/{message.id}"
+                    found = await bot.follow_url(url)
+                    if found and found[0] != url and is_image(found[0]) is not None:
+                        urls.append(found[0])
+                        if not find_urls(q):
+                            if q:
+                                q += " "
+                            q += found[0]
+                if urls:
+                    url = im = urls[-1]
+                    p1, p2 = await process_image(url, "caption", [q, channel.id], fix=True)
+                    if p1 or p2:
+                        print(p1)
+                        print(p2)
+                        if p1:
+                            refs.append(("IMAGE", p1))
+                        if p2:
+                            refs.append(("ANSWER", p2))
+            if reference and reference.content:
+                ref = False
+                async for m in bot.history(channel, limit=2, before=message.id, after=reference.id):
+                    if m and m.content:
+                        ref = True
+                        break
+                if ref:
+                    m = reference
+                    if m.author.id == bot.id:
+                        name = bot.name
                     else:
-                        u = user
-                    data = bot.data.users.get(u.id)
-                    if data and data.get("trial"):
-                        bot.data.users.add_diamonds(user, cost / -25000)
-                        if data.get("diamonds", 0) < 1:
-                            bot.premium_level(u)
-                            emb = discord.Embed(colour=rand_colour())
-                            emb.set_author(**get_author(bot.user))
-                            emb.description = (
-                                "Uh-oh, it appears your tokens have run out! Check ~wallet to view your balance, top up using a donation [here]({bot.kofi_url}), "
-                                + "or purchase a subscription to gain temporary unlimited usage!"
-                            )
+                        name = m.author.display_name
+                        if name == bot.name:
+                            name = m.author.name
+                            if name == bot.name:
+                                name = bot.name + "2"
+                    c = reference.content
+                    urls = find_urls(c)
+                    for url in urls:
+                        if is_image(url) is not None:
+                            capt = url.rsplit("/", 1)[-1]
+                            c = c.replace(url, f"[Image {capt}]")
+                        elif p2:
+                            capt = url.rsplit("/", 1)[-1]
+                            c = c.replace(url, f"[Image {capt}]")
+                    refs.insert(0, ("REPLIED TO: " + name, c))
+            urls = find_urls(q)
+            for url in urls:
+                if is_image(url) is not None:
+                    capt = url.rsplit("/", 1)[-1]
+                    q = q.replace(url, f"[Image {capt}]")
+                elif p2:
+                    capt = url.rsplit("/", 1)[-1]
+                    q = q.replace(url, f"[Image {capt}]")
+            m = message
+            if m.author.id == bot.id:
+                name = bot.name
+            else:
+                name = m.author.display_name
+                if name == bot.name:
+                    name = m.author.name
+                    if name == bot.name:
+                        name = bot.name + "2"
+            inputs = dict(
+                channel_id=channel.id,
+                personality=bot.commands.personality[0].retrieve(guild.id),
+                key=AUTH.get("openai_key"),
+                cai_token=AUTH.get("cai_token"),
+                name=bot.name,
+                personality=bot.commands.personality[0].retrieve((guild or channel).id),
+                premium=premium,
+                caic=bot.data.cai_channels.get(channel.id),
+                history=history,
+                refs=refs,
+                im=im,
+                prompt=q,
+            )
+            out, cost = await process_image("CBAI", "$", [inputs])
+            if cost:
+                if "costs" in bot.data:
+                    bot.data.costs.put(user.id, cost)
+                    if guild:
+                        bot.data.costs.put(guild.id, cost)
+                if bot.is_trusted(guild) >= 2:
+                    for uid in bot.data.trusted[guild.id]:
+                        if bot.premium_level(uid, absolute=True) >= 2:
+                            break
+                    else:
+                        uid = next(iter(bot.data.trusted[guild.id]))
+                    u = await bot.fetch_user(uid)
+                else:
+                    u = user
+                data = bot.data.users.get(u.id)
+                if data and data.get("trial"):
+                    bot.data.users.add_diamonds(user, cost / -25000)
+                    if data.get("diamonds", 0) < 1:
+                        bot.premium_level(u)
+                        emb = discord.Embed(colour=rand_colour())
+                        emb.set_author(**get_author(bot.user))
+                        emb.description = (
+                            "Uh-oh, it appears your tokens have run out! Check ~wallet to view your balance, top up using a donation [here]({bot.kofi_url}), "
+                            + "or purchase a subscription to gain temporary unlimited usage!"
+                        )
         if out:
-            caic = cb.cai_channel
+            caic = await process_image("lambda cid: CBOTS[cid].cai_channel", "$", [channel.id], fix=True)
             if caic:
                 bot.data.cai_channels[channel.id] = caic
             else:

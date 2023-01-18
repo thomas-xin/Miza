@@ -10,6 +10,7 @@ Resampling = getattr(Image, "Resampling", Image)
 Transpose = getattr(Image, "Transpose", Image)
 Transform = getattr(Image, "Transform", Image)
 Image.MAX_IMAGE_PIXELS = 4294967296
+from transformers import TrOCRProcessor, VisionEncoderDecoderModel, ViltProcessor, ViltForQuestionAnswering
 from zipfile import ZipFile
 import matplotlib.pyplot as plt
 colorlib = colorspace.colorlib()
@@ -736,7 +737,7 @@ def create_gif(in_type, args, delay):
     for url in images:
         data = get_request(url)
         try:
-            img = get_image(data, None)
+            img = get_image(data)
         except (PIL.UnidentifiedImageError, OverflowError, TypeError):
             if len(data) < 268435456:
                 video2img(data, maxsize, round(1000 / delay) if delay else None, out, data=data)
@@ -1023,7 +1024,7 @@ def orbit_gif2(image, orbitals, duration, extras):
 
 def orbit_gif(image, orbitals, duration, extras):
     if extras:
-        extras = [get_image(url, url) for url in extras[:orbitals]]
+        extras = [get_image(url) for url in extras[:orbitals]]
     else:
         duration /= orbitals
     try:
@@ -1753,7 +1754,7 @@ def blend_op(image, url, operation, amount, recursive=True):
     else:
         raise TypeError("Invalid image operation: \"" + op + '"')
     try:
-        image2 = get_image(url, url)
+        image2 = get_image(url)
     except TypeError as ex:
         s = ex.args[0]
         search = 'Filetype "audio/'
@@ -2207,7 +2208,7 @@ def get_mask(image):
     return expand_mask(mask, radius=4)
 
 def inpaint(image, url):
-    image2 = get_image(url, url, nodel=True)
+    image2 = get_image(url, nodel=True)
     if image2.mode == "LA":
         image2 = image2.getchannel("L")
     elif "RGB" in image2.mode or "P" in image2.mode:
@@ -2368,6 +2369,94 @@ discord_emoji = re.compile("^https?:\\/\\/(?:[a-z]+\\.)?discord(?:app)?\\.com\\/
 is_discord_emoji = lambda url: discord_emoji.search(url)
 
 
+sys.path.append("misc")
+import convobot, imagebot
+
+CBOTS = {}
+def cb_exists(cid):
+    return cid in CBOTS
+
+def CBAI(inputs):
+    locals().update(inputs)
+    try:
+        cb = CBOTS[channel.id]
+        if cb.personality != personality:
+            raise KeyError
+    except KeyError:
+        cb = CBOTS[channel.id] = convobot.Bot( 
+            key=key,
+            cai_token=cai_token,
+            name=name,
+            personality=personality,
+            premium=premium,
+        )
+        for t in history:
+            cb.appendleft(t)
+    if im:
+        try:
+            im = cb.image
+        except AttributeError:
+            im = get_image(im)
+    return cb.ai(q, refs=refs, im=im)
+
+VGPT = VVQA = None
+def caption(im, q=None, cid=None):
+    if cid and cid in CBOTS and CBOTS[cid].cai_channel:
+        CBOTS[cid].image = im
+        return ("", "")
+    im = resize_max(im, 512, "auto")
+    if im.mode != "RGB":
+        image = im.convert("RGB")
+    else:
+        image = im
+    p1 = p2 = None
+    if VGPT:
+        p, m = VGPT
+    else:
+        p = TrOCRProcessor.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
+        m = VisionEncoderDecoderModel.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
+        globals()["VGPT"] = (p, m)
+    impv = p(image, return_tensors="pt")
+    pixel_values = impv.pixel_values
+    generated_ids = m.generate(pixel_values)
+    generated_text = p.batch_decode(generated_ids, skip_special_tokens=True)[0]
+    p1 = generated_text.strip()
+    if not q:
+        return (p1, "")
+    if VVQA:
+        p, m = VVQA
+    except AttributeError:
+        p = ViltProcessor.from_pretrained("dandelin/vilt-b32-finetuned-vqa")
+        m = ViltForQuestionAnswering.from_pretrained("dandelin/vilt-b32-finetuned-vqa")
+        globals()["VVQA"] = (p, m)
+    spl = q.split()
+    t = " ".join(w for w in spl if not is_url(w))[:96]
+    encoding = p(image, t, return_tensors="pt")
+    outputs = m(**encoding)
+    logits = outputs.logits
+    idx = logits.argmax(-1).item()
+    p2 = m.config.id2label[idx].strip()
+    return (p1, p2)
+
+def IBART(prompt, url, url2, kwargs, specified, dalle2=dalle2, openjourney=openjourney, nsfw=nsfw, key=None):
+    try:
+        ib = CBOTS[None]
+    except KeyError:
+        ib = CBOTS[None] = imagebot.Bot(token=key)
+    if key:
+        ib.token = key
+    return ib.art(prompt, url, url2, kwargs, specified, dalle2, openjourney, nsfw, key)
+
+def IBAOL(prompt, url, kwargs, key=None):
+    try:
+        ib = CBOTS[None]
+    except KeyError:
+        ib = CBOTS[None] = imagebot.Bot(token=key)
+    if key:
+        ib.token = key
+    return ib.openjourney_local(url, kwargs)
+
+
 def write_to(fn, data):
     with open(fn, "wb") as f:
         f.write(data)
@@ -2489,7 +2578,6 @@ def ImageIterator(image):
             break
         yield image
 
-
 class ImageSequence(Image.Image):
 
     def __init__(self, *images, copy=False, func=None, args=()):
@@ -2522,9 +2610,10 @@ class ImageSequence(Image.Image):
             return getattr(self._images[self._position], key)
 
 
-def get_image(url, out, nodel=False):
+def get_image(url, out=None, nodel=False):
     if isinstance(url, Image.Image):
         return url
+    out = out or url
     if type(url) not in (bytes, bytearray, io.BytesIO):
         save = None
         if is_url(url):

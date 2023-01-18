@@ -6,13 +6,6 @@ except ModuleNotFoundError:
     import youtube_dl
 import aiohttp
 
-try:
-    from transformers import TrOCRProcessor, VisionEncoderDecoderModel
-except ImportError:
-    TrOCRProcessor = None
-from PIL import Image
-import imagebot
-
 getattr(youtube_dl, "__builtins__", {})["print"] = print
 
 
@@ -1546,16 +1539,7 @@ class Art(Command):
         if not prompt:
             if not url:
                 raise ArgumentError("Please input a valid prompt.")
-            if TrOCRProcessor:
-                processor = await create_future(TrOCRProcessor.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
-                model = await create_future(VisionEncoderDecoderModel.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
-                b = await bot.get_request(url)
-                with tracebacksuppressor:
-                    image = Image.open(io.BytesIO(b)).convert("RGB")
-                    pixel_values = processor(image, return_tensors="pt").pixel_values
-                    generated_ids = await create_future(model.generate, pixel_values)
-                    generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
-                    prompt = generated_text.strip()
+            prompt, _ = await process_image(url, "caption", [], fix=True)
             if not prompt:
                 prompt = "art"
             print(url, prompt)
@@ -1589,11 +1573,7 @@ class Art(Command):
                 openjourney = "journey" in name
                 if dalle2 and premium < 2:
                     raise PermissionError("Premium subscription required to perform DALL·E 2 operations.")
-                # if dalle2 and guild.id == 312733374831788034:
-                #     self.imagebot.token = AUTH.get("openai_key_2")
-                # else:
-                self.imagebot.token = AUTH.get("openai_key")
-                tup = await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2=dalle2, openjourney=openjourney, nsfw=nsfw, timeout=480)
+                tup = await process_image("IBART", "$", [prompt, url, url2, kwargs, specified, dalle2, openjourney, nsfw, AUTH.get("openai_key")], fix=True, timeout=480)
                 if tup:
                     fn, cost = tup
                     if fn and cost:
@@ -1627,7 +1607,7 @@ class Art(Command):
                 print_exc()
         if not fn and not specified and not url:
             if openjourney:
-                fn = await create_future(self.imagebot.art_openjourney_local, prompt, kwargs)
+                fn = await process_image("IBAOL", "$", [prompt, kwargs], fix=True, timeout=480)
         if not fn:
             if self.fut:
                 with tracebacksuppressor:
@@ -1704,10 +1684,6 @@ class Art(Command):
                             with open(image_2, "rb") as f:
                                 image_2b = f.read()
                         with tracebacksuppressor:
-                            # if guild.id == 312733374831788034:
-                            #     self.imagebot.token = AUTH.get("openai_key_2")
-                            # else:
-                            self.imagebot.token = AUTH.get("openai_key")
                             fn, cost = await create_future(self.imagebot.dalle_i2i, prompt, image_1b, image_2b, timeout=60)
                             done = True
                             if fn and cost:

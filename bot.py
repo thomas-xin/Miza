@@ -3939,6 +3939,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         await self.send_event("_call_")
                 self.update_users()
 
+    api_latency = inf
     # The slow update loop that runs once every 3 second2.
     async def slow_loop(self):
         await asyncio.sleep(2)

@@ -2071,7 +2071,12 @@ def proc_start():
         PROCS[k] = [None] * v
         create_task(start_proc(k, 0))
 
-async def get_idle_proc(ptype):
+async def get_idle_proc(ptype, fix=False):
+    if fix:
+        proc = PROCS[ptype][0]
+        if not proc or not is_strict_running(proc):
+            PROCS[ptype][0] = proc = await start_proc(ptype, i)
+        return proc
     p = [p for p in PROCS[ptype] if p and not p.sem.is_busy()]
     if not p:
         if None in PROCS[ptype]:
@@ -2083,11 +2088,11 @@ async def get_idle_proc(ptype):
         proc = p[0]
     return proc
 
-async def sub_submit(ptype, command, _timeout=12):
+async def sub_submit(ptype, command, fix=False, _timeout=12):
     if BOT[0]:
         BOT[0].activity += 1
     ts = ts_us()
-    proc = await get_idle_proc(ptype)
+    proc = await get_idle_proc(ptype, fix=fix)
     while ts in PROC_RESP:
         ts += 1
     PROC_RESP[ts] = concurrent.futures.Future()
@@ -2095,7 +2100,7 @@ async def sub_submit(ptype, command, _timeout=12):
     s = f"~{ts}~{repr(command.encode('utf-8'))}\n".encode("utf-8")
     await proc.sem()
     if not is_strict_running(proc):
-        proc = await get_idle_proc(ptype)
+        proc = await get_idle_proc(ptype, fix=fix)
     async with proc.sem:
         try:
             proc.stdin.write(s)
@@ -2107,7 +2112,7 @@ async def sub_submit(ptype, command, _timeout=12):
             except LookupError:
                 raise ex
             force_kill(proc)
-            PROCS[ptype][i] = await start_proc(ptype, i)
+            PROCS[ptype][i] = None
             raise
         finally:
             PROC_RESP.pop(ts, None)
@@ -2127,7 +2132,7 @@ def process_math(expr, prec=64, rat=False, timeout=12, variables=None):
     return sub_submit("math", (expr, prec, rat, variables), _timeout=timeout)
 
 # Sends an operation to the image subprocess pool.
-def process_image(image, operation, args, timeout=24):
+def process_image(image, operation, args=[], fix=False, timeout=24):
     args = astype(args, list)
     for i, a in enumerate(args):
         if type(a) is mpf:
@@ -2141,7 +2146,7 @@ def process_image(image, operation, args, timeout=24):
         return repr(arg)
 
     command = "[" + ",".join(map(as_arg, args)) + "]"
-    return sub_submit("image", (image, operation, command), _timeout=timeout)
+    return sub_submit("image", (image, operation, command), fix=fix, _timeout=timeout)
 
 
 def evalex(exc):
