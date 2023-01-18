@@ -2438,7 +2438,7 @@ def caption(im, q=None, cid=None):
     p2 = m.config.id2label[idx].strip()
     return (p1, p2)
 
-def IBART(prompt, url, url2, kwargs, specified, dalle2=dalle2, openjourney=openjourney, nsfw=nsfw, key=None):
+def IBART(prompt, url, url2, kwargs, specified, dalle2=False, openjourney=False, nsfw=False, key=None):
     try:
         ib = CBOTS[None]
     except KeyError:
