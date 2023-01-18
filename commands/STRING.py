@@ -997,7 +997,7 @@ class Ask(Command):
                 q = argv
         print(f"{message.author}:", q)
         premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
-        h = await process_image("lambda cid: bool(CBOTS.get(cid))", "$", [channel.id], fix=True)
+        h = await process_image("lambda cid: bool(CBOTS.get(cid))", "$", [channel.id], fix=1)
         if not h:
             history = []
             if not getattr(message, "simulated", False):
@@ -1045,7 +1045,7 @@ class Ask(Command):
                         q += found[0]
             if urls:
                 url = im = urls[-1]
-                p1, p2 = await process_image(url, "caption", [q, channel.id], fix=True)
+                p1, p2 = await process_image(url, "caption", [q, channel.id], fix=1)
                 if p1 or p2:
                     print(p1)
                     print(p2)
@@ -1136,7 +1136,7 @@ class Ask(Command):
                             + "or purchase a subscription to gain temporary unlimited usage!"
                         )
         if out:
-            caic = await process_image("lambda cid: CBOTS[cid].cai_channel", "$", [channel.id], fix=True)
+            caic = await process_image("lambda cid: CBOTS[cid].cai_channel", "$", [channel.id], fix=1)
             if caic:
                 bot.data.cai_channels[channel.id] = caic
             else:

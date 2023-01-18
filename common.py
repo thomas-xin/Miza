@@ -2072,11 +2072,12 @@ def proc_start():
         PROCS[k] = [None] * v
         create_task(start_proc(k, 0))
 
-async def get_idle_proc(ptype, fix=False):
-    if fix:
-        proc = PROCS[ptype][0]
+async def get_idle_proc(ptype, fix=None):
+    if fix is not None:
+        i = fix % PROC_COUNT[ptype]
+        proc = PROCS[ptype][i]
         if not proc or not is_strict_running(proc):
-            PROCS[ptype][0] = proc = await start_proc(ptype, 0)
+            PROCS[ptype][i] = proc = await start_proc(ptype, i)
         return proc
     p = [p for p in PROCS[ptype] if p and not p.sem.is_busy()]
     if not p:
@@ -2089,7 +2090,7 @@ async def get_idle_proc(ptype, fix=False):
         proc = p[0]
     return proc
 
-async def sub_submit(ptype, command, fix=False, _timeout=12):
+async def sub_submit(ptype, command, fix=None, _timeout=12):
     if BOT[0]:
         BOT[0].activity += 1
     ts = ts_us()
@@ -2133,7 +2134,7 @@ def process_math(expr, prec=64, rat=False, timeout=12, variables=None):
     return sub_submit("math", (expr, prec, rat, variables), _timeout=timeout)
 
 # Sends an operation to the image subprocess pool.
-def process_image(image, operation, args=[], fix=False, timeout=24):
+def process_image(image, operation, args=[], fix=None, timeout=24):
     args = astype(args, list)
     for i, a in enumerate(args):
         if type(a) is mpf:

@@ -1542,7 +1542,7 @@ class Art(Command):
         if not prompt:
             if not url:
                 raise ArgumentError("Please input a valid prompt.")
-            prompt, _ = await process_image(url, "caption", [], fix=True)
+            prompt, _ = await process_image(url, "caption", [])
             if not prompt:
                 prompt = "art"
             print(url, prompt)
@@ -1576,7 +1576,7 @@ class Art(Command):
                 openjourney = "journey" in name
                 if dalle2 and premium < 2:
                     raise PermissionError("Premium subscription required to perform DALL·E 2 operations.")
-                tup = await process_image("IBART", "$", [prompt, url, url2, kwargs, specified, dalle2, openjourney, nsfw, AUTH.get("openai_key")], fix=True, timeout=480)
+                tup = await process_image("IBART", "$", [prompt, url, url2, kwargs, specified, dalle2, openjourney, nsfw, AUTH.get("openai_key")], timeout=480)
                 if tup:
                     fn, cost = tup
                     if fn and cost:
@@ -1610,7 +1610,7 @@ class Art(Command):
                 print_exc()
         if not fn and not specified and not url:
             if openjourney:
-                fn = await process_image("IBAOL", "$", [prompt, kwargs], fix=True, timeout=480)
+                fn = await process_image("IBAOL", "$", [prompt, kwargs], fix=2, timeout=480)
         if not fn:
             if self.fut:
                 with tracebacksuppressor:
