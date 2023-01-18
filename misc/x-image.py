@@ -2409,7 +2409,7 @@ def CBAI(inputs):
             im = cb.image
         except AttributeError:
             im = get_image(im)
-    return cb.ai(prompt, refs=refs, im=im)
+    return cb.ai(*prompt, refs=refs, im=im)
 
 VGPT = VVQA = None
 def caption(im, q=None, cid=None):
@@ -2457,7 +2457,7 @@ def IBART(prompt, url, url2, kwargs, specified, dalle2=False, openjourney=False,
         ib = CBOTS[None] = imagebot.Bot(token=key)
     if key:
         ib.token = key
-    return ib.art(prompt, url, url2, kwargs, specified, dalle2, openjourney, nsfw, key)
+    return ib.art(prompt, url, url2, kwargs, specified, dalle2, openjourney, nsfw)
 
 def IBAOL(prompt, url, kwargs, key=None):
     try:

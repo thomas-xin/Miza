@@ -1741,6 +1741,8 @@ class ServerProtector(Database):
                 i = text.split(": ", 1)[-1]
                 if i.isnumeric():
                     i = int(i)
+                    if i == bot.id:
+                        return i
                     print(i)
                     try:
                         u = await self.bot.fetch_user(i)
