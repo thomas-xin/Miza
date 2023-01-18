@@ -5922,6 +5922,7 @@ def webserver_communicate(bot):
             while True:
                 b = bot.server.stderr.readline()
                 if not b:
+                    bot.server = None
                     raise EOFError("Webserver response empty.")
                 b = b.lstrip(b"\x00").rstrip()
                 if b:

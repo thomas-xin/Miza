@@ -1103,7 +1103,7 @@ class Ask(Command):
                 name=bot.name,
                 personality=bot.commands.personality[0].retrieve((guild or channel).id),
                 premium=premium,
-                caic=bot.data.cai_channels.get(channel.id),
+                cai_channel=bot.data.cai_channels.get(channel.id),
                 history=history,
                 refs=refs,
                 im=im,

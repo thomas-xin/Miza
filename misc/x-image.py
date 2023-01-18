@@ -2377,7 +2377,18 @@ def cb_exists(cid):
     return cid in CBOTS
 
 def CBAI(inputs):
-    locals().update(inputs)
+    channel_id = inputs["channel_id"]
+    key = inputs["key"]
+    cai_token = inputs["cai_token"]
+    name = inputs["name"]
+    personality = inputs["personality"]
+    premium = inputs["premium"]
+    cai_channel = inputs["cai_channel"]
+    history = inputs["history"]
+    refs = inputs["refs"]
+    im = inputs["im"]
+    prompt = inputs["prompt"]
+    # locals().update(inputs)
     try:
         cb = CBOTS[channel_id]
         if cb.personality != personality:
@@ -2386,6 +2397,7 @@ def CBAI(inputs):
         cb = CBOTS[channel_id] = convobot.Bot( 
             key=key,
             cai_token=cai_token,
+            cai_channel=cai_channel,
             name=name,
             personality=personality,
             premium=premium,
@@ -2397,7 +2409,7 @@ def CBAI(inputs):
             im = cb.image
         except AttributeError:
             im = get_image(im)
-    return cb.ai(q, refs=refs, im=im)
+    return cb.ai(prompt, refs=refs, im=im)
 
 VGPT = VVQA = None
 def caption(im, q=None, cid=None):
