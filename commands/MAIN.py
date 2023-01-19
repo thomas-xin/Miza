@@ -798,6 +798,11 @@ class Info(Command):
                         is_self = False
                     if bot.is_owner(u.id):
                         st.append("My owner ❤️")
+                    deleted = False
+                    with suppress(LookupError):
+                        deleted = bot.data.users[u.id]["deleted"]
+                    if deleted:
+                        st.append("Deleted User ⚠️")
                     is_sys = False
                     if getattr(u, "system", None):
                         st.append("Discord System ⚙️")
@@ -814,7 +819,7 @@ class Info(Command):
                         if uf.system and not is_sys:
                             st.append("Discord System ⚙️")
                         if uf.staff:
-                            st.append("Discord Staff ⚠️")
+                            st.append("Discord Staff 👮")
                         if uf.partner:
                             st.append("Discord Partner 🎀:")
                         if uf.bug_hunter_level_2:
@@ -2212,16 +2217,18 @@ class UpdateUsers(Database):
     async def _nocommand_(self, message, msg, force=False, flags=(), truemention=True, **void):
         bot = self.bot
         user = message.author
-        if force or msg and bot.is_mentioned(message, bot, message.guild):
+        channel = message.channel
+        guild = message.guild
+        if force or msg and bot.is_mentioned(message, bot, guild):
             if user.bot:
                 with suppress(AttributeError):
-                    async for m in self.bot.data.channel_cache.get(message.channel):
+                    async for m in self.bot.data.channel_cache.get(channel):
                         user = m.author
-                        if bot.get_perms(user.id, message.guild) <= -inf:
+                        if bot.get_perms(user.id, guild) <= -inf:
                             return
                         if not user.bot:
                             break
-            send = lambda *args, **kwargs: send_with_reply(message.channel, not flags and message, *args, **kwargs)
+            send = lambda *args, **kwargs: send_with_reply(channel, not flags and message, *args, **kwargs)
             out = None
             count = self.data.get(user.id, EMPTY).get("last_talk", 0)
             # Simulates a randomized conversation
@@ -2232,9 +2239,9 @@ class UpdateUsers(Database):
                 argv = argv.removeprefix(f"@{bot.name}")
                 argv = argv.removesuffix(f"@{bot.name}")
                 argv = argv.strip()
-                with bot.ExceptionSender(message.channel, reference=message):
+                with bot.ExceptionSender(channel, reference=message):
                     for ask in bot.commands.ask:
-                        await ask(message, message.guild, message.channel, user, argv, name="ask", flags=flags)
+                        await ask(message, guild, channel, user, argv, name="ask", flags=flags)
                 return
             if count:
                 if count < 2 or count == 2 and xrand(2):
@@ -2304,7 +2311,7 @@ class UpdateUsers(Database):
                     out = f"Yo, what's good, {user.display_name}? Need me for anything?"
                 prefix = bot.get_prefix(message.guild)
                 out += f" Use `{prefix}help` or `/help` for help!"
-                send = lambda *args, **kwargs: send_with_react(message.channel, *args, reacts="❎", reference=not flags and message, **kwargs)
+                send = lambda *args, **kwargs: send_with_react(channel, *args, reacts="❎", reference=not flags and message, **kwargs)
             add_dict(self.data, {user.id: {"last_talk": 1, "last_mention": 1}})
             self.data[user.id]["last_used"] = utc()
             await send(out)
@@ -2317,5 +2324,23 @@ class UpdateUsers(Database):
                 self.data.get(user.id, EMPTY).pop("last_talk", None)
             self.data.get(user.id, EMPTY).pop("last_mention", None)
         if not getattr(message, "simulated", None):
-            self.data.setdefault(user.id, {})["last_channel"] = message.channel.id
+            self.data.setdefault(user.id, {})["last_channel"] = channel.id
+            stored = self.data[user.id].setdefault("stored", {})
+            if channel.id in stored:
+                m_id = stored[channel.id]
+                try:
+                    await bot.fetch_message(m_id, channel)
+                except:
+                    print_exc()
+                    stored[channel.id] = message.id
+            elif len(stored) >= 5:
+                m_id, c_id = choice(stored.items())
+                try:
+                    c = await bot.fetch_channel(c_id)
+                    m = await bot.fetch_message(m_id, c)
+                except:
+                    print_exc()
+                    stored[channel.id] = message.id
+            else:
+                stored[channel.id] = message.id
         self.update(user.id)

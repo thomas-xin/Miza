@@ -5191,6 +5191,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             except discord.NotFound:
                 return
             emoji = self._upgrade_partial_emoji(payload.emoji)
+            if user.id == self.deleted_user:
+                print("Deleted user RAW_REACTION_ADD", channel, user, message, emoji)
             await self.seen(user, message.channel, message.guild, event="reaction", raw="Adding a reaction")
             if user.id != self.id:
                 if "users" in self.data:
@@ -5210,9 +5212,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 message = await self.fetch_message(payload.message_id, channel=channel)
             except discord.NotFound:
                 return
+            emoji = payload.emoji
+            if user.id == self.deleted_user:
+                print("Deleted user RAW_REACTION_REMOVE", channel, user, message, emoji)
             await self.seen(user, message.channel, message.guild, event="reaction", raw="Removing a reaction")
             if user.id != self.id:
-                reaction = str(payload.emoji)
+                reaction = str(emoji)
                 await self.react_callback(message, reaction, user)
                 await self.check_to_delete(message, reaction, user)
 
@@ -5240,6 +5245,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         @self.event
         async def on_typing(channel, user, when):
             await self.send_event("_typing_", channel=channel, user=user)
+            if user.id == self.deleted_user:
+                print("Deleted user TYPING", channel, user)
             await self.seen(user, getattr(channel, "guild", None), delay=10, event="typing", raw="Typing")
 
         # Message send event: processes new message. calls _send_ and _seen_ bot database events.
@@ -5249,8 +5256,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             guild = message.guild
             if guild:
                 create_task(self.send_event("_send_", message=message))
-            await self.seen(message.author, message.channel, message.guild, event="message", raw="Sending a message")
-            await self.react_callback(message, None, message.author)
+            user = message.author
+            channel = message.channel
+            if user.id == self.deleted_user:
+                print("Deleted user MESSAGE", channel, user, message)
+            await self.seen(user, channel, guild, event="message", raw="Sending a message")
+            await self.react_callback(message, None, user)
             await self.handle_message(message, False)
 
         # Socket response event: if the event was an interaction, create a virtual message with the arguments as the content, then process as if it were a regular command.
@@ -5420,6 +5431,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 async with after.sem:
                     pass
             self.add_message(after, files=False, force=True)
+            if before.author.id == self.deleted_user or after.author.id == self.deleted_user:
+                print("Deleted user RAW_MESSAGE_EDIT", after.channel, before.author, after.author, before, after)
             if raw or before.content != after.content:
                 if "users" in self.data:
                     self.data.users.add_xp(after.author, xrand(1, 4))
@@ -5522,6 +5535,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 self.usernames.pop(b, None)
                 self.usernames[a] = after
             await self.send_event("_user_update_", before=before, after=after)
+            if before.id == self.deleted_user or after.id == self.deleted_user:
+                print("Deleted user USER_UPDATE", before, after)
             await self.seen(after, event="misc", raw="Editing their profile")
 
         # Member update event: calls _member_update_ and _seen_ bot database events.

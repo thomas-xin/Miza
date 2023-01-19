@@ -1109,7 +1109,7 @@ class Ask(Command):
                 im=im,
                 prompt=(name, q),
             )
-            out, cost = await process_image("CBAI", "$", [inputs], timeout=420)
+            out, cost = await process_image("CBAI", "$", [inputs], fix=1, timeout=420)
             if cost:
                 if "costs" in bot.data:
                     bot.data.costs.put(user.id, cost)
