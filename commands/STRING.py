@@ -1045,7 +1045,7 @@ class Ask(Command):
                         q += found[0]
             if urls:
                 url = im = urls[-1]
-                p1, p2 = await process_image(url, "caption", [q, channel.id], fix=1)
+                p1, p2 = await process_image(url, "caption", ["-nogif", q, channel.id], fix=1)
                 if p1 or p2:
                     print(p1)
                     print(p2)
@@ -1101,7 +1101,7 @@ class Ask(Command):
                 key=AUTH.get("openai_key"),
                 cai_token=AUTH.get("cai_token"),
                 name=bot.name,
-                personality=bot.commands.personality[0].retrieve((guild or channel).id),
+                personality=bot.commands.personality[0].retrieve((channel or guild).id),
                 premium=premium,
                 cai_channel=bot.data.cai_channels.get(channel.id),
                 history=history,
@@ -1353,15 +1353,15 @@ class Personality(Command):
             # return self.bot.data.personalities.pop(i, None) or defper
         return self.bot.data.personalities.get(i) or defper
 
-    async def __call__(self, bot, flags, guild, message, user, argv, **void):
+    async def __call__(self, bot, flags, guild, channel, message, user, argv, **void):
         if not AUTH.get("openai_key"):
             raise ModuleNotFoundError("No OpenAI key found for customisable personality.")
         if "d" in flags or argv == "default":
-            self.data.personalities.pop(guild.id, None)
-            return css_md(f"My personality for {sqr_md(guild)} has been reset.")
+            self.data.personalities.pop(channel.id, None)
+            return css_md(f"My personality for {sqr_md(channel)} has been reset.")
         if not argv:
-            p = self.decode(self.retrieve(guild.id))
-            return ini_md(f"My current personality for {sqr_md(guild)} is {sqr_md(p)}. Enter keywords to modify the AI for default GPT-based chat, or enter \"character.ai\" for the assigned character.ai bot instead.")
+            p = self.decode(self.retrieve(channel.id))
+            return ini_md(f"My current personality for {sqr_md(channel)} is {sqr_md(p)}. Enter keywords to modify the AI for default GPT-based chat, or enter \"character.ai\" for the assigned character.ai bot instead.")
         # if max(bot.is_trusted(guild), bot.premium_level(user) * 2) < 2:
         #     raise PermissionError(f"Sorry, unfortunately this feature is for premium users only. Please make sure you have a subscription level of minimum 2 from {bot.kofi_url}, or try out ~trial if you haven't already!")
         p = self.encode(argv)#.replace(",", " ").replace("  ", " ").replace(" ", ", "))
@@ -1400,11 +1400,11 @@ class Personality(Command):
                     "Apologies, my AI has detected that your input may be inappropriate.\n"
                     + "Please reword or consider contacting the support server if you believe this is a mistake!"
                 )
-        bot.data.personalities[guild.id] = p
-        for channel in guild.channels:
-            bot.data.cai_channels.pop(channel.id, None)
-            bot.commands.ask[0].convos.pop(channel.id, None)
-        return css_md(f"My personality description for {sqr_md(guild)} has been changed to {sqr_md(p)}.")
+        bot.data.personalities[channel.id] = p
+        # for channel in guild.channels:
+        bot.data.cai_channels.pop(channel.id, None)
+        bot.commands.ask[0].convos.pop(channel.id, None)
+        return css_md(f"My personality description for {sqr_md(channel)} has been changed to {sqr_md(p)}.")
 
 
 class UpdatePersonalities(Database):
