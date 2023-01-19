@@ -1243,7 +1243,7 @@ class Reminder(Command):
         remind_as = user
         # This parser is so unnecessarily long for what it does...
         keyed = False
-        for i in range(256)
+        for i in range(256):
             temp = argv.casefold()
             if name == "remind" and temp.startswith("me "):
                 argv = argv[3:]
