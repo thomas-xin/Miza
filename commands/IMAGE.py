@@ -1282,7 +1282,6 @@ class Steganography(Command):
     async def __call__(self, bot, user, message, channel, args, name, **void):
         for a in message.attachments:
             args.insert(0, a.url)
-        ts = ts_us()
         if not args:
             raise ArgumentError("Please input an image by URL or attachment.")
         urls = await bot.follow_url(args.pop(0))
@@ -1305,41 +1304,9 @@ class Steganography(Command):
         else:
             msg = str(user.id)
         remsg = " ".join(args)
-        args = (
-            sys.executable,
-            "misc/steganography.py",
-            f"cache/{ts}.png",
-            msg,
-        )
         fon = url.rsplit("/", 1)[-1].rsplit(".", 1)[0]
         with discord.context_managers.Typing(channel):
-            with open(f"cache/{ts}.png", "wb") as f:
-                await create_future(f.write, b)
-            print(args)
-            proc = psutil.Popen(args, cwd=os.getcwd(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            try:
-                await create_future(proc.wait, timeout=3200)
-            except (T0, T1, T2):
-                with tracebacksuppressor:
-                    force_kill(proc)
-                raise
-            else:
-                text = proc.stdout.read().decode("utf-8", "replace").strip()
-                if text.startswith("Copyright detected"):
-                    i = text.split(": ", 1)[-1]
-                    if i.isnumeric():
-                        i = int(i)
-                        try:
-                            u = await bot.fetch_user(i)
-                        except:
-                            pass
-                        else:
-                            pe = PermissionError(f"Copyright detected; image belongs to {user_mention(u.id)}")
-                            pe.no_react = True
-                            raise pe
-                    pe = PermissionError(text)
-                    pe.no_react = True
-                    raise pe
+            fn = await self.call(b, msg)
         fn = f"cache/{ts}~1.png"
         if name == "nft":
             f = CompatFile(fn, filename=f"{fon}.png")
@@ -1347,6 +1314,43 @@ class Steganography(Command):
             await self.bot.send_as_webhook(message.channel, remsg, files=[f], username=user.display_name, avatar_url=url)
         else:
             await bot.send_with_file(channel, f'Successfully created image with encoded message "{msg}".', fn, filename=f"{fon}.png", reference=message)
+
+    async def call(self, b, msg=""):
+        ts = ts_us()
+        args = (
+            sys.executable,
+            "misc/steganography.py",
+            f"cache/{ts}.png",
+            msg,
+        )
+        with open(f"cache/{ts}.png", "wb") as f:
+            await create_future(f.write, b)
+        print(args)
+        proc = psutil.Popen(args, cwd=os.getcwd(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            await create_future(proc.wait, timeout=3200)
+        except (T0, T1, T2):
+            with tracebacksuppressor:
+                force_kill(proc)
+            raise
+        else:
+            text = proc.stdout.read().decode("utf-8", "replace").strip()
+            if text.startswith("Copyright detected"):
+                i = text.split(": ", 1)[-1]
+                if i.isnumeric():
+                    i = int(i)
+                    try:
+                        u = await bot.fetch_user(i)
+                    except:
+                        pass
+                    else:
+                        pe = PermissionError(f"Copyright detected; image belongs to {user_mention(u.id)}")
+                        pe.no_react = True
+                        raise pe
+                pe = PermissionError(text)
+                pe.no_react = True
+                raise pe
+        return f"cache/{ts}~1.png"
 
     async def _callback_(self, bot, message, reaction, user, vals, **void):
         u_id, c_id, m_id = map(int, vals.split("_", 2))
@@ -1764,6 +1768,11 @@ class Art(Command):
         #     )
         # else:
         #     emb = None
+        if isinstance(fn, str):
+            with open(fn, "rb") as f:
+                fn = f.read()
+        with tracebacksuppressor:
+            fn = await bot.commands.steganography[0].call(fn, str(bot.id))
         await bot.send_with_file(channel, "", fn, filename=lim_str(prompt, 96) + ".png", reference=message, reacts="🔳", embed=emb)
 
 

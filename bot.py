@@ -2826,9 +2826,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 if not msg:
                     return
             else:
-                msg = msg[3:]
-                while msg.startswith("\n"):
-                    msg = msg[1:]
+                msg = msg[3:].lstrip("\n")
                 check = "callback-"
                 with suppress(ValueError):
                     msg = msg[:msg.index("\n")]
@@ -2865,9 +2863,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 msg = zwdecode(msg)
                 args = msg.split("q")
             else:
-                msg = msg[3:]
-                while msg[0] == "\n":
-                    msg = msg[1:]
+                msg = msg[3:].lstrip("\n")
                 check = "callback-"
                 msg = msg.splitlines()[0]
                 msg = msg[len(check):]
@@ -5739,7 +5735,7 @@ class AudioClientInterface:
         i = b"~0~Fa\n"
         proc.stdin.write(i)
         proc.stdin.flush()
-        while True:
+        while not bot.closed and is_strict_running(proc):
             s = proc.stdout.readline().rstrip()
             if s:
                 if s.startswith(b"~"):
@@ -5747,12 +5743,15 @@ class AudioClientInterface:
                     if s == b"bot.audio.returns[0].set_result(0)":
                         break
                 print(as_str(s))
-            time.sleep(0.1)
+            time.sleep(0.2)
         self.written = True
         self.fut.set_result(self)
         with tracebacksuppressor:
             while not bot.closed and is_strict_running(proc):
-                s = proc.stdout.readline().rstrip()
+                s = proc.stdout.readline()
+                if not s:
+                    raise EOFError
+                s = s.rstrip()
                 if s:
                     if s[:1] == b"~":
                         bot.activity += 1
@@ -5895,11 +5894,11 @@ def as_file(file, filename=None, ext=None, rename=True):
         with open(f"cache/{IND}{out}", "wb") as f:
             f.write(file)
     elif rename:
-        while True:
+        for i in range(100):
             with suppress(PermissionError):
                 os.rename(file, f"cache/{IND}{out}~{lim_str(filename, 64).translate(filetrans)}")
                 break
-            time.sleep(0.1)
+            time.sleep(0.3)
     else:
         fn = file.rsplit("/", 1)[-1][1:].rsplit(".", 1)[0].split("~", 1)[0]
     try:

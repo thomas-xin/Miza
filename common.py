@@ -2290,14 +2290,18 @@ def create_future_ex(func, *args, timeout=None, priority=False, **kwargs):
 
 # Forces the operation to be a coroutine regardless of whether it is or not. Regular functions are executed in the thread pool.
 async def _create_future(obj, *args, loop, timeout, priority, **kwargs):
-    while asyncio.iscoroutinefunction(obj):
+    for i in range(256):
+        if not asyncio.iscoroutinefunction(obj):
+            break
         obj = obj(*args, **kwargs)
     if callable(obj):
         if asyncio.iscoroutinefunction(obj.__call__) or not is_main_thread():
             obj = obj.__call__(*args, **kwargs)
         else:
             obj = await wrap_future(create_future_ex(obj, *args, timeout=timeout, priority=priority, **kwargs), loop=loop)
-    while awaitable(obj):
+    for i in range(256):
+        if not awaitable(obj):
+            break
         if timeout is not None:
             obj = await asyncio.wait_for(obj, timeout=timeout)
         else:
@@ -2790,7 +2794,8 @@ class Stream(io.IOBase):
         att = 0
         while self.buflen < self.BUF * 4:
             try:
-                self.buf.write(next(self.iter))
+                b = next(self.iter)
+                self.buf.write(b)
             except StopIteration:
                 with suppress():
                     self.resp.close()
@@ -2800,6 +2805,8 @@ class Stream(io.IOBase):
                     raise
                 att += 1
                 self.reset()
+            else:
+                self.buflen += len(b)
         with suppress():
             self.resp.close()
 

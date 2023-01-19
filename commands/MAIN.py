@@ -1243,7 +1243,7 @@ class Reminder(Command):
         remind_as = user
         # This parser is so unnecessarily long for what it does...
         keyed = False
-        while True:
+        for i in range(256)
             temp = argv.casefold()
             if name == "remind" and temp.startswith("me "):
                 argv = argv[3:]
@@ -2058,12 +2058,14 @@ class UpdateUsers(Database):
         with suppress(SemaphoreOverflowError):
             async with self.semaphore:
                 changed = False
-                while len(self.flavour_buffer) < 32:
+                for i in range(64):
                     out = await self.bot.data.flavour.get()
                     if out:
                         self.flavour_buffer.append(out)
                         self.flavour_set.add(out)
                         changed = True
+                        if len(self.flavour_buffer) >= 32:
+                            break
                 amount = len(self.flavour_set)
                 if changed and (not amount & amount - 1):
                     self.flavour = tuple(self.flavour_set)
@@ -2335,12 +2337,15 @@ class UpdateUsers(Database):
                     stored[channel.id] = message.id
             elif len(stored) >= 5:
                 m_id, c_id = choice(stored.items())
-                try:
-                    c = await bot.fetch_channel(c_id)
-                    m = await bot.fetch_message(m_id, c)
-                except:
-                    print_exc()
-                    stored[channel.id] = message.id
-            else:
+                if c_id not in bot.cache.channels:
+                    stored.pop(c_id, None)
+                else:
+                    try:
+                        m = await bot.fetch_message(m_id, c)
+                    except:
+                        print_exc()
+                        stored.pop(c_id, None)
+                        stored[channel.id] = message.id
+            if channel.id in bot.cache.channels:
                 stored[channel.id] = message.id
         self.update(user.id)

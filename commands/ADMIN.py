@@ -1742,7 +1742,7 @@ class ServerProtector(Database):
                 if i.isnumeric():
                     i = int(i)
                     if i == self.bot.id:
-                        return i
+                        return text
                     print(i)
                     try:
                         u = await self.bot.fetch_user(i)
