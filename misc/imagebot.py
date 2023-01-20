@@ -41,7 +41,7 @@ def create_driver():
 	folder = os.path.join(os.getcwd(), f"d~{ts}")
 	service = browser["service"](browser["path"])
 	options = browser["options"]()
-	options.add_argument("--headless")
+	# options.add_argument("--headless")
 	# options.add_argument("--disable-gpu")
 	options.add_argument("--no-sandbox")
 	options.add_argument("--deny-permission-prompts")
@@ -124,7 +124,7 @@ def get_driver():
 	return driver
 def return_driver(d):
 	d.get("file://")
-	drivers.append(d)
+	drivers.insert(0, d)
 def update():
 	if time.time() - LAST_DRIVER >= 3600:
 		globals()["LAST_DRIVER"] = time.time()
@@ -298,14 +298,16 @@ class Bot:
 			time.sleep(1)
 
 		bar = driver.find_element(by=webdriver.common.by.By.ID, value="search-bar")
+		bar.clear()
 		try:
 			bar.send_keys(prompt)
 		except selenium.common.exceptions.WebDriverException:
 			driver.execute_script("document.getElementById('search-bar').focus()")
 			driver.execute_script(f"document.execCommand('insertText', false, {repr(prompt)});")
 
-		generate = driver.find_element(by=webdriver.common.by.By.ID, value="ZQvTCDloXyqgqlOiDvup")
-		generate.click()
+		driver.execute_script("document.getElementById('ZQvTCDloXyqgqlOiDvup').click()")
+		# generate = driver.find_element(by=webdriver.common.by.By.ID, value="ZQvTCDloXyqgqlOiDvup")
+		# generate.click()
 
 		elems = None
 		i = 0

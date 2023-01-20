@@ -147,7 +147,7 @@ def get_driver():
 	return driver
 def return_driver(d):
 	d.get("file://")
-	drivers.append(d)
+	drivers.insert(0, d)
 def update():
 	if time.time() - LAST_DRIVER >= 3600:
 		globals()["LAST_DRIVER"] = time.time()
