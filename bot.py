@@ -5460,6 +5460,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         message.guild = None
                     message.id = payload.message_id
                     message.author = await self.fetch_user(self.deleted_user)
+                    message.author.name = "Unknown User"
                     history = discord.abc.Messageable.history(channel, limit=101, around=message)
                     async def flatten_into_cache(history):
                         messages = await history.flatten()

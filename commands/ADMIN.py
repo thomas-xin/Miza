@@ -2238,38 +2238,69 @@ class UpdateUserLogs(Database):
         except (EOFError, discord.NotFound):
             self.data.pop(guild.id)
             return
-        # Colour: Black
-        emb = discord.Embed(colour=1)
-        emb.set_author(**get_author(user))
-        # Check audit log to find whether user left or was kicked/banned
+        await asyncio.sleep(1)
+        deleted = None
         prune = None
         kick = None
         ban = None
-        with tracebacksuppressor(StopIteration):
-            ts = utc()
-            futs = [create_task(guild.audit_logs(limit=4, action=getattr(discord.AuditLogAction, action)).flatten()) for action in ("ban", "kick", "member_prune")]
-            bans = await futs[0]
-            kicks = await futs[1]
-            prunes = await futs[2]
-            for log in bans:
-                if ts - utc_ts(log.created_at) < 3:
-                    if log.target.id == user.id:
-                        ban = cdict(id=log.user.id, reason=log.reason)
-                        raise StopIteration
-            for log in kicks:
-                if ts - utc_ts(log.created_at) < 3:
-                    if log.target.id == user.id:
-                        kick = cdict(id=log.user.id, reason=log.reason)
-                        raise StopIteration
-            for log in prunes:
-                if ts - utc_ts(log.created_at) < 3:
+        bot = self.bot
+        if "users" in bot.data:
+            try:
+                stored = bot.data.users[user.id]["stored"]
+            except LookupError:
+                pass
+            else:
+                for c_id, m_id in tuple(stored.items()):
                     try:
-                        reason = f"{log.extra.delete_member_days} days of inactivity"
-                    except AttributeError:
-                        reason = None
-                    prune = cdict(id=log.user.id, reason=reason)
-                    raise StopIteration
-        if ban is not None:
+                        c = bot.cache.channels[c_id]
+                    except KeyError:
+                        stored.pop(c_id)
+                        continue
+                    try:
+                        m = await c.fetch_message(m_id)
+                    except:
+                        print_exc()
+                        stored.pop(c_id, None)
+                        continue
+                    if m.author.id == bot.deleted_user:
+                        print(user, "deleted!!")
+                        user.deleted = True
+                        bot.data.users[user.id]["deleted"] = True
+                    break
+        if bot.data.users.get(user.id, {}).get("deleted"):
+            # Colour: Black
+            emb = discord.Embed(colour=1)
+            emb.set_author(**get_author(user))
+            # Check audit log to find whether user left or was kicked/banned
+            with tracebacksuppressor(StopIteration):
+                ts = utc()
+                futs = [create_task(guild.audit_logs(limit=4, action=getattr(discord.AuditLogAction, action)).flatten()) for action in ("ban", "kick", "member_prune")]
+                bans = await futs[0]
+                kicks = await futs[1]
+                prunes = await futs[2]
+                for log in bans:
+                    if ts - utc_ts(log.created_at) < 3:
+                        if log.target.id == user.id:
+                            ban = cdict(id=log.user.id, reason=log.reason)
+                            raise StopIteration
+                for log in kicks:
+                    if ts - utc_ts(log.created_at) < 3:
+                        if log.target.id == user.id:
+                            kick = cdict(id=log.user.id, reason=log.reason)
+                            raise StopIteration
+                for log in prunes:
+                    if ts - utc_ts(log.created_at) < 3:
+                        try:
+                            reason = f"{log.extra.delete_member_days} days of inactivity"
+                        except AttributeError:
+                            reason = None
+                        prune = cdict(id=log.user.id, reason=reason)
+                        raise StopIteration
+        else:
+            deleted = True
+        if deleted is not None:
+            emb.description = f"{user_mention(user.id)} has been deleted."
+        elif ban is not None:
             emb.description = f"{user_mention(user.id)} has been banned by {user_mention(ban.id)}."
             if ban.reason:
                 emb.description += f"\nReason: *`{no_md(ban.reason)}`*"
