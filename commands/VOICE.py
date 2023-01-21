@@ -2527,7 +2527,7 @@ class AudioDownloader:
             if str(end) != "None":
                 end = round_min(min(float(end), 86400))
                 args.extend(("-to", str(end)))
-        args.extend(("-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", "rgb24", "-video_size", "x".join(map(str, size)), "-i", "-", "-an", "-crf", "24"))
+        args.extend(("-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", "rgb24", "-video_size", "x".join(map(str, size)), "-i", "-", "-an", "-pix_fmt", "yuv420p", "-crf", "24"))
         afile = f"cache/-{ts}-.pcm"
         if len(urls) > 1:
             outf = f"{info['name']} +{len(urls) - 1}.{fmt}"
@@ -2847,7 +2847,7 @@ class AudioDownloader:
             if not copy and ast:
                 args.extend(("-ar", sr, "-ac", ac, "-b:a", str(br)))
                 if vst:
-                    args.extend(("-crf", "24"))
+                    args.extend(("-pix_fmt", "yuv420p", "-crf", "24"))
             if copy:
                 args.extend(("-c", "copy", fn))
             elif container:
