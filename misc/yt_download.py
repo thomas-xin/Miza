@@ -29,7 +29,7 @@ def create_driver():
 	folder = os.path.join(os.getcwd(), f"d~{ts}")
 	service = browser["service"](browser["path"])
 	options = browser["options"]()
-	options.add_argument("--headless")
+	# options.add_argument("--headless")
 	# options.add_argument("--disable-gpu")
 	options.add_argument("--no-sandbox")
 	options.add_argument("--deny-permission-prompts")
@@ -152,12 +152,18 @@ def yt_download(url, fmt="mp3", timeout=256):
 		elems = None
 		while not elems:
 			if fmt == "mp3":
+				cn = "bit256"
 				elems = driver.find_elements(by=class_name, value="bit256")
 			else:
-				for q in (1080, 720, 480, 360, 240, 144):
-					elems = driver.find_elements(by=class_name, value=f"v{q}p")
-					if elems:
-						break
+				try:
+					for f in (60, ""):
+						for q in (1080, 720, 480, 360, 240, 144):
+							cn = f"v{q}p{f}"
+							elems = driver.find_elements(by=class_name, value=cn)
+							if elems:
+								raise StopIteration
+				except StopIteration:
+					pass
 			if not elems:
 				elems = driver.find_elements(by=class_name, value="alert")
 				if elems:
@@ -165,63 +171,23 @@ def yt_download(url, fmt="mp3", timeout=256):
 			time.sleep(0.2)
 			if time.time() - t > 16:
 				raise TimeoutError("Widget failed to load.")
-		elems[0].click()
-
-		time.sleep(1)
-		driver.switch_to.window(w)
+		driver.execute_script(f"document.getElementsByClassName('{cn}')[0].click()")
 
 		t = time.time()
 		elems = None
 		while not elems:
-			elems = list(safecomp(e for e in driver.find_elements(by=css_selector, value="*") if e.text == "CONVERT" or e.text == "DOWNLOAD"))
 			time.sleep(1)
 			driver.switch_to.window(w)
-			# if time.time() - t > 16:
-				# raise TimeoutError("Convert button failed to load.")
-		# time.sleep(10)
+			elems = driver.find_elements(by=class_name, value="rounded-2xl")
+			if elems and elems[0].text.upper() == "CLOSE":
+				elems.clear()
 		if not os.path.exists(folder):
 			os.mkdir(folder)
-		if elems[0].text == "CONVERT":
-			try:
-				e = driver.find_element(by=xpath, value="//iframe[2]")
-			except:
-				pass
-			else:
-				driver.execute_script("arguments[0].setAttribute('style', 'z-index:-2147483648')", e)
-			elems[0].click()
+		driver.execute_script("document.getElementsByClassName('rounded-2xl')[0].click()")
 
-			t = time.time()
-			while True:
-				if elems:
-					try:
-						if elems[0].text == "DOWNLOAD":
-							break
-					except selenium.common.exceptions.StaleElementReferenceException:
-						elems = ()
-				if not elems:
-					try:
-						for e in driver.find_elements(by=css_selector, value="*"):
-							if e.text == "DOWNLOAD":
-								elems = (e,)
-							elif "Convert Status: failed" in e.text:
-								raise RuntimeError("Conversion failed.")
-					except selenium.common.exceptions.StaleElementReferenceException:
-						elems = ()
-				time.sleep(1)
-				if time.time() - t > timeout:
-					raise TimeoutError("Download button failed to load.")
-				driver.switch_to.window(w)
-		try:
-			e = driver.find_element(by=xpath, value="//iframe[2]")
-		except:
-			pass
-		else:
-			driver.execute_script("arguments[0].setAttribute('style', 'z-index:-2147483648')", e)
-		elems[0].click()
-
-		titles = list(safecomp(e for e in driver.find_elements(by=css_selector, value="*") if "Download " in e.text))
-		if titles:
-			title = titles[0].text.split("Download ", 1)[-1].split("\n", 1)[0]
+		elems = driver.find_elements(by=class_name, value="text-xl")
+		if elems:
+			title = elems[-1].text.split(None, 1)[-1]
 		else:
 			title = url.split("?", 1)[0].rsplit("/", 1)[-1]
 
