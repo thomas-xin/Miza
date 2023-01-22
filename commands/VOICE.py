@@ -3528,7 +3528,7 @@ class Connect(Command):
             joining = True
         else:
             auds = bot.data.audio.players[guild.id]
-            if auds.acsi.channel != vc_:
+            if not auds.acsi or auds.acsi.channel != vc_:
                 await auds.move_unmute(auds.acsi, vc_)
                 joining = True
         if not guild.me:
