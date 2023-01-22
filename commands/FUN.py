@@ -1854,7 +1854,7 @@ class React(Command):
             emoji = e_id
         # This reaction indicates that the emoji was valid
         await message.add_reaction(emoji)
-        curr.append(a, e_id)
+        curr.append(a, str(emoji))
         following[guild.id] = mdict({i: curr[i] for i in sorted(curr)})
         return css_md(f"Added {sqr_md(a)} ➡️ {sqr_md(emoji)} to the auto react list for {sqr_md(guild)}.")
 
@@ -1898,7 +1898,7 @@ class React(Command):
         else:
             content += f"{len(curr)} auto reactions currently assigned for {str(guild).replace('`', '')}:```*"
             key = lambda x: "\n" + ", ".join(x)
-            msg = ini_md(iter2str({k: curr[k] for k in tuple(curr)[pos:pos + page]}, key=key))
+            msg = ini_md(iter2str({k: as_str(curr[k]) for k in tuple(curr)[pos:pos + page]}, key=key))
         colour = await self.bot.data.colours.get(worst_url(guild))
         emb = discord.Embed(
             description=content + msg,
