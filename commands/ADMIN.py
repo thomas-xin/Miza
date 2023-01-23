@@ -1739,6 +1739,7 @@ class ServerProtector(Database):
             if text.startswith("Copyright detected"):
                 print(text)
                 i = text.split(": ", 1)[-1]
+                text = f"Copyright detected in cache: {i}"
                 if i.isnumeric():
                     i = int(i)
                     print(i)

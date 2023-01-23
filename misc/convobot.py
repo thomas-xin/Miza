@@ -695,6 +695,7 @@ class Bot:
 			start = p
 		prompt = start + "\n\n" + prompt
 		print("GPTV3 prompt:", prompt)
+		sys.stdout.flush()
 		pc = len(self.gpttokens(prompt))
 		response = None
 		text = ""
