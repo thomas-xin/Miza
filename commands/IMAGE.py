@@ -1614,7 +1614,7 @@ class Art(Command):
                 print_exc()
         if not fn and not specified and not url:
             if openjourney:
-                fn = await process_image("IBAOL", "$", [prompt, kwargs], fix=2, timeout=480)
+                fn = await process_image("IBAOL", "$", [prompt, kwargs], fix=2, timeout=1200)
         if not fn:
             if self.fut:
                 with tracebacksuppressor:

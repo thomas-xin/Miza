@@ -1742,6 +1742,8 @@ class ServerProtector(Database):
                 if i.isnumeric():
                     i = int(i)
                     if i == self.bot.id:
+                        react = await create_future(self.bot.data.emojis.get, "ai_art.gif")
+                        await message.add_reaction(react)
                         return text
                     print(i)
                     try:

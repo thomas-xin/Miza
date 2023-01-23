@@ -1045,7 +1045,7 @@ class Ask(Command):
                         q += found[0]
             if urls:
                 url = im = urls[-1]
-                p1, p2 = await process_image(url, "caption", ["-nogif", q, channel.id], fix=1)
+                p1, p2 = await process_image(url, "caption", ["-nogif", q, channel.id], fix=1, timeout=60)
                 if p1 or p2:
                     print(p1)
                     print(p2)
@@ -1109,7 +1109,7 @@ class Ask(Command):
                 im=im,
                 prompt=(name, q),
             )
-            out, cost = await process_image("CBAI", "$", [inputs], fix=1, timeout=420)
+            out, cost = await process_image("CBAI", "$", [inputs], fix=1, timeout=600)
             if cost:
                 if "costs" in bot.data:
                     bot.data.costs.put(user.id, cost)
