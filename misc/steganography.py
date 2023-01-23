@@ -267,6 +267,7 @@ while True:
 # print(bs, w, h)
 
 copydetect = True
+inverted = False
 np.random.seed(time.time_ns() & 4294967295)
 spl = list(im.split())
 if len(spl) > 3:
