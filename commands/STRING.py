@@ -1407,8 +1407,8 @@ class Personality(Command):
         return css_md(f"My personality description for {sqr_md(channel)} has been changed to {sqr_md(p)}.")
 
 
-# class UpdatePersonalities(Database):
-#     name = "personalities"
+class UpdatePersonalities(Database):
+    name = "personalities"
 
 #     def __call__(self, **void):
 #         if convobot:
