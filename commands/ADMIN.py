@@ -2267,10 +2267,10 @@ class UpdateUserLogs(Database):
                         user.deleted = True
                         bot.data.users[user.id]["deleted"] = True
                     break
-        if bot.data.users.get(user.id, {}).get("deleted"):
-            # Colour: Black
-            emb = discord.Embed(colour=1)
-            emb.set_author(**get_author(user))
+        # Colour: Black
+        emb = discord.Embed(colour=1)
+        emb.set_author(**get_author(user))
+        if not bot.data.users.get(user.id, {}).get("deleted"):
             # Check audit log to find whether user left or was kicked/banned
             with tracebacksuppressor(StopIteration):
                 ts = utc()
