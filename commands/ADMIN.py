@@ -1735,16 +1735,12 @@ class ServerProtector(Database):
             if known:
                 text = known
             else:
-                text = proc.stdout.read().decode("utf-8", "replace").strip()
+                text = proc.stdout.read().decode("utf-8", "replace").strip().rsplit("\n", 1)[-1]
             if text.startswith("Copyright detected"):
                 print(text)
                 i = text.split(": ", 1)[-1]
                 if i.isnumeric():
                     i = int(i)
-                    if i == self.bot.id:
-                        react = await create_future(self.bot.data.emojis.get, "ai_art.gif")
-                        await message.add_reaction(react)
-                        return text
                     print(i)
                     try:
                         u = await self.bot.fetch_user(i)
@@ -1753,9 +1749,13 @@ class ServerProtector(Database):
                     else:
                         print(u)
                         if u.id == message.author.id:
-                            return
+                            return text
                         if str(u.id) in message.content:
-                            return
+                            return text
+                        if u.bot:
+                            react = await create_future(self.bot.data.emojis.get, "ai_art.gif")
+                            await message.add_reaction(react)
+                            return text
                         create_task(send_with_react(
                             u,
                             (

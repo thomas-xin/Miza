@@ -5,11 +5,11 @@ try:
 except:
     print_exc()
     googletrans = None
-try:
-    import convobot
-except:
-    print_exc()
-    convobot = None
+# try:
+#     import convobot
+# except:
+#     print_exc()
+#     convobot = None
 
 try:
     rapidapi_key = AUTH["rapidapi_key"]
@@ -1407,12 +1407,12 @@ class Personality(Command):
         return css_md(f"My personality description for {sqr_md(channel)} has been changed to {sqr_md(p)}.")
 
 
-class UpdatePersonalities(Database):
-    name = "personalities"
+# class UpdatePersonalities(Database):
+#     name = "personalities"
 
-    def __call__(self, **void):
-        if convobot:
-            create_future_ex(convobot.update)
+#     def __call__(self, **void):
+#         if convobot:
+#             create_future_ex(convobot.update)
 
 
 class Random(Command):

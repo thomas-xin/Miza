@@ -3,8 +3,6 @@ import concurrent.futures
 import selenium, requests, torch, openai, httpx
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
-from transformers import AutoTokenizer, AutoModelForQuestionAnswering, AutoModelForCausalLM, pipeline
-from diffusers import StableDiffusionPipeline
 from fp.fp import FreeProxy
 import numpy as np
 from PIL import Image
@@ -437,6 +435,7 @@ class Bot:
 		print(resp.status_code, resp.text)
 
 	def art_openjourney_local(self, prompt, kwargs=None):
+		from diffusers import StableDiffusionPipeline
 		if not any(w in prompt for w in ("style", "stylised", "stylized")):
 			prompt += ", mdjrny-v4 style"
 		pipe = getattr(self.__class__, "ojp", None)

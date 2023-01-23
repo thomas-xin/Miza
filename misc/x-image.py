@@ -10,7 +10,6 @@ Resampling = getattr(Image, "Resampling", Image)
 Transpose = getattr(Image, "Transpose", Image)
 Transform = getattr(Image, "Transform", Image)
 Image.MAX_IMAGE_PIXELS = 4294967296
-from transformers import TrOCRProcessor, VisionEncoderDecoderModel, ViltProcessor, ViltForQuestionAnswering
 from zipfile import ZipFile
 import matplotlib.pyplot as plt
 colorlib = colorspace.colorlib()
@@ -2370,13 +2369,13 @@ is_discord_emoji = lambda url: discord_emoji.search(url)
 
 
 sys.path.append("misc")
-import convobot, imagebot
 
 CBOTS = {}
 def cb_exists(cid):
     return cid in CBOTS
 
 def CBAI(inputs):
+    import convobot
     channel_id = inputs["channel_id"]
     key = inputs["key"]
     cai_token = inputs["cai_token"]
@@ -2413,6 +2412,7 @@ def CBAI(inputs):
 
 VGPT = VVQA = None
 def caption(im, q=None, cid=None):
+    from transformers import TrOCRProcessor, VisionEncoderDecoderModel, ViltProcessor, ViltForQuestionAnswering
     if cid and cid in CBOTS and CBOTS[cid].cai_channel:
         CBOTS[cid].image = im
         return ("", "")
@@ -2451,6 +2451,7 @@ def caption(im, q=None, cid=None):
     return (p1, p2)
 
 def IBAOL(prompt, url, kwargs, key=None):
+    import imagebot
     try:
         ib = CBOTS[None]
     except KeyError:

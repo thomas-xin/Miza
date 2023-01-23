@@ -1605,7 +1605,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             fn = f"cache/attachment_{attachment.id}.bin"
             if fn in self.cache.attachments:
                 if self.cache.attachments[fn]:
-                    await self.data.prot.call(message, fn, self.cache.attachments[fn])
+                    await self.data.prot.call(message, fn, known=self.cache.attachments[fn])
                 return
             if not os.path.exists(fn):
                 data = await self.get_attachment(str(attachment.url))

@@ -117,94 +117,101 @@ delete(sd)
 delete("log.txt")
 
 
-# Main watchdog loop.
-att = 0
-while not os.path.exists(sd):
-    delete(rs)
-    delete(hb)
-    proc = psutil.Popen([python, "bot.py"])
-    start = time.time()
-    print("Bot started with PID \033[1;34;40m" + str(proc.pid) + "\033[1;37;40m.")
-    time.sleep(12)
-    try:
-        alive = True
-        if proc.is_running():
-            print("\033[1;32;40mHeartbeat started\033[1;37;40m.")
-            while alive:
-                if not os.path.exists(hb):
-                    if os.path.exists(hb_ack):
-                        os.rename(hb_ack, hb)
-                    else:
-                        with open(hb, "wb"):
-                            pass
-                print(
-                    "\033[1;36;40m Heartbeat at "
-                    + str(datetime.datetime.now())
-                    + "\033[1;37;40m."
-                )
-                for i in range(64):
-                    time.sleep(0.25)
-                    ld = os.listdir()
-                    if rs in ld or sd in ld:
-                        alive = False
+try:
+    # Main watchdog loop.
+    att = 0
+    while not os.path.exists(sd):
+        delete(rs)
+        delete(hb)
+        proc = psutil.Popen([python, "bot.py"])
+        start = time.time()
+        print("Bot started with PID \033[1;34;40m" + str(proc.pid) + "\033[1;37;40m.")
+        time.sleep(12)
+        try:
+            alive = True
+            if proc.is_running():
+                print("\033[1;32;40mHeartbeat started\033[1;37;40m.")
+                while alive:
+                    if not os.path.exists(hb):
+                        if os.path.exists(hb_ack):
+                            os.rename(hb_ack, hb)
+                        else:
+                            with open(hb, "wb"):
+                                pass
+                    print(
+                        "\033[1;36;40m Heartbeat at "
+                        + str(datetime.datetime.now())
+                        + "\033[1;37;40m."
+                    )
+                    for i in range(64):
+                        time.sleep(0.25)
+                        ld = os.listdir()
+                        if rs in ld or sd in ld:
+                            alive = False
+                            break
+                    if os.path.exists(hb):
                         break
-                if os.path.exists(hb):
-                    break
-            for child in proc.children(recursive=True):
-                try:
-                    child.terminate()
+                for child in proc.children(recursive=True):
                     try:
-                        child.wait(timeout=2)
+                        child.terminate()
+                        try:
+                            child.wait(timeout=2)
+                        except psutil.TimeoutExpired:
+                            child.kill()
+                    except:
+                        traceback.print_exc()
+                try:
+                    proc.terminate()
+                    try:
+                        proc.wait(timeout=2)
                     except psutil.TimeoutExpired:
-                        child.kill()
-                except:
-                    traceback.print_exc()
+                        proc.kill()
+                except psutil.NoSuchProcess:
+                    pass
+                if os.path.exists(sd):
+                    break
+            if time.time() - start < 60:
+                att += 1
+            else:
+                att = 0
+            if att > 16:
+                print("\033[1;31;40mBot crashed 16 times in a row. Waiting 5 minutes before trying again.\033[1;37;40m")
+                time.sleep(300)
+                att = 0
+            if alive:
+                print("\033[1;31;40mBot failed to acknowledge heartbeat signal, restarting...\033[1;37;40m")
+            else:
+                print("\033[1;31;40mBot sent restart signal, advancing...\033[1;37;40m")
+        except KeyboardInterrupt:
+            raise
+        except:
+            traceback.print_exc()
+        time.sleep(0.5)
+        import importlib
+        importlib.reload(install_update)
+        time.sleep(0.5)
+finally:
+    while True:
+        try:
             try:
+                for child in proc.children():
+                    if child.is_running():
+                        child.terminate()
+                        try:
+                            child.wait(timeout=2)
+                        except psutil.TimeoutExpired:
+                            child.kill()
+            except:
+                traceback.print_exc()
+            if proc.is_running():
                 proc.terminate()
                 try:
                     proc.wait(timeout=2)
                 except psutil.TimeoutExpired:
                     proc.kill()
-            except psutil.NoSuchProcess:
-                pass
-            if os.path.exists(sd):
-                break
-        if time.time() - start < 60:
-            att += 1
-        else:
-            att = 0
-        if att > 16:
-            print("\033[1;31;40mBot crashed 16 times in a row. Waiting 5 minutes before trying again.\033[1;37;40m")
-            time.sleep(300)
-            att = 0
-        if alive:
-            print("\033[1;31;40mBot failed to acknowledge heartbeat signal, restarting...\033[1;37;40m")
-        else:
-            print("\033[1;31;40mBot sent restart signal, advancing...\033[1;37;40m")
-    except KeyboardInterrupt:
-        raise
-    except:
-        traceback.print_exc()
-    time.sleep(0.5)
-    import importlib
-    importlib.reload(install_update)
-    time.sleep(0.5)
-
-if proc.is_running():
-    try:
-        for child in proc.children():
-            child.terminate()
-            try:
-                child.wait(timeout=2)
-            except psutil.TimeoutExpired:
-                child.kill()
-    except:
-        traceback.print_exc()
-    proc.terminate()
-    try:
-        proc.wait(timeout=2)
-    except psutil.TimeoutExpired:
-        proc.kill()
+            break
+        except:
+            traceback.print_exc()
 
 delete(sd)
 delete(rs)

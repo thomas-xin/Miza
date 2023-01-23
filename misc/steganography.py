@@ -100,12 +100,16 @@ def hash_reduce(l):
 		# amax = amin + 1
 	im = Image.fromarray(l, mode="L")
 	im = im.resize((4, 4), resample=Resampling.LANCZOS)
-	im = im.point(lambda x: int(x >= aavg))
-	bi = np.array(im, dtype=np.uint8).ravel()
-	bo = np.zeros(len(bi) // 8, dtype=np.uint8)
-	for i in range(8):
-		bo += bi[i::8] << (7 - i)
-	return bo
+	out = []
+	for ia in (np.floor(aavg), np.ceil(aavg)):
+		i2 = im.point(lambda x: int(x >= ia))
+		bi = np.array(i2, dtype=np.uint8).ravel()
+		bo = np.zeros(len(bi) // 8, dtype=np.uint8)
+		for i in range(8):
+			bo += bi[i::8] << (7 - i)
+		out.append(bo)
+	# print(aavg, out)
+	return out
 
 # Reduces an image to a 12-bit rgb 32x32 square, returning an additional greyscale luma component
 def split_to(im):
@@ -117,31 +121,43 @@ def split_to(im):
 def hash_to(im, msg, skip=False):
 	if skip:
 		h, s, l, g = split_to(im)
-		rh = hash_reduce(g)
+		rhs = hash_reduce(g)
 	else:
-		h, s, l, g, rh = compare_to(im, msg)
+		h, s, l, g, rhs = compare_to(im, msg)
 	sl = s + (l << 4)
 	hg = h + (g << 4)
 	hb = hg.tobytes() + sl.tobytes()
-	s = base64.b64encode(hb).rstrip(b"=").decode("ascii") + ":" + msg + "\n"
-	for fd in (f"iman/{rh[0]}/{rh[1]}.txt", f"iman/{255 - rh[0]}/{255 - rh[1]}.txt"):
-		folder = fd.rsplit("/", 1)[0]
-		if not os.path.exists(folder):
-			os.mkdir(folder)
-		with open(fd, "a", encoding="utf-8") as f:
-			f.write(s)
+	for rh in rhs:
+		for i, fd in enumerate((f"iman/{rh[0]}/{rh[1]}.txt", f"iman/{255 - rh[0]}/{255 - rh[1]}.txt")):
+			s = base64.b64encode(hb).rstrip(b"=").decode("ascii") + f";{i}:" + msg + "\n"
+			folder = fd.rsplit("/", 1)[0]
+			if not os.path.exists(folder):
+				os.mkdir(folder)
+			with open(fd, "a", encoding="utf-8") as f:
+				f.write(s)
 
 def compare_to(im, msg):
 	h, s, l, g = split_to(im)
-	rh = hash_reduce(g)
-	fd = f"iman/{rh[0]}/{rh[1]}.txt"
+	rhs = hash_reduce(g)
+	# rhs = [[8, 236]]
+	# rhs = [[247, 19]]
+	for rh in rhs:
+		fd = f"iman/{rh[0]}/{rh[1]}.txt"
+		if os.path.exists(fd):
+			break
 
 	if os.path.exists(fd):
 		with open(fd, "r", encoding="utf-8") as f:
 			d = f.readlines()
 
 		for line in d:
-			k, v = line.split(":", 1)
+			i = line.index(":")
+			k, v = line[:i], line[i + 1:]
+			if k[-2] == ";":
+				invert = int(k[-1])
+				k = k[:-2]
+			else:
+				invert = False
 			v = v[:-1]
 			hb2 = np.frombuffer(base64.b64decode(k.encode("ascii") + b"=="), dtype=np.uint8)
 			half = len(hb2) >> 1
@@ -151,17 +167,23 @@ def compare_to(im, msg):
 			s2 = sl2 & 15
 			l2 = sl2 >> 4
 
-			heff = np.sqrt(65536 - (255 - s) * (255 - s2)) / 256
+			# print(h)
+			# print(s)
+			# print(l)
+			heff = np.sqrt(900 - (30 - s) * (30 - s2), dtype=np.float32) / 30
 			hd = np.sum((128 - np.abs((h - h2) - 128)) * heff) / 128 / 1024
-			seff = np.sqrt(65536 - (255 - l) * (255 - l2)) / 256
+			seff = np.sqrt(900 - (30 - l) * (30 - l2), dtype=np.float32) / 30
 			sd = np.sum(np.abs(s - s2) * seff) / 15 / 1024
-			ld = np.sum(np.abs(l - l2)) / 15 / 1024
-			gd = np.sum(np.abs(g - g2)) / 15 / 1024
-			gd2 = np.sum(np.abs(15 - g - g2)) / 15 / 1024
+			if invert:
+				gd = np.sum(np.abs(15 - g - g2), dtype=np.float32) / 15 / 1024
+				ld = np.sum(np.abs(15 - l - l2), dtype=np.float32) / 15 / 1024
+			else:
+				gd = np.sum(np.abs(g - g2), dtype=np.float32) / 15 / 1024
+				ld = np.sum(np.abs(l - l2), dtype=np.float32) / 15 / 1024
 
-			# print(hd, sd, ld, gd, gd2)
-			R = (hd + sd) / 2 + min(ld, gd, gd2)
-			print(rh, R)
+			# print(hd, sd, ld, gd, invert)
+			R = (hd + sd) + min(ld, gd * 2)
+			# print(rh, R, v)
 			if R <= 3:
 				if v == msg:
 					print("No copyright detected.")
@@ -169,7 +191,7 @@ def compare_to(im, msg):
 				print("Copyright detected in hashing:", v)
 				raise SystemExit
 
-	return h, s, l, g, rh
+	return h, s, l, g, rhs
 
 if not os.path.exists("iman"):
 	os.mkdir("iman")
@@ -180,7 +202,12 @@ if test:
 
 fn = sys.argv[1]
 msg = " ".join(sys.argv[2:])
-im = Image.open(fn)
+if fn.startswith("https://") or fn.startswith("http://"):
+	import requests, io
+	im = Image.open(io.BytesIO(requests.get(fn).content))
+	fn = fn.rsplit("/", 1)[-1]
+else:
+	im = Image.open(fn)
 if getattr(im, "text", None) and im.text.get("copyright"):
 	if im.text["copyright"] != msg:
 		print("Copyright detected in metadata:", im.text["copyright"])
