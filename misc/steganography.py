@@ -137,7 +137,8 @@ def hash_to(im, msg, skip=False):
 				f.write(s)
 
 def compare_to(im, msg):
-	h, s, l, g = split_to(im)
+	tups = list(split_to(im))
+	g = tups[-1]
 	rhs = hash_reduce(g)
 	rhs = [[18, 237]]
 	# rhs = [[247, 19]]
@@ -150,6 +151,7 @@ def compare_to(im, msg):
 		with open(fd, "r", encoding="utf-8") as f:
 			d = f.readlines()
 
+		h, s, l, g = map(np.float32, tups)
 		for line in d:
 			i = line.index(":")
 			k, v = line[:i], line[i + 1:]
@@ -170,7 +172,6 @@ def compare_to(im, msg):
 			# print(h)
 			# print(s)
 			# print(l)
-			h, l, s, g = map(np.float32, (h, l, s, g))
 			h2, l2, s2, g2 = map(np.float32, (h2, l2, s2, g2))
 			heff = np.sqrt(900 - (30 - s) * (30 - s2)) / 30
 			# print(np.abs(np.abs(h - h2) - 8))
@@ -195,7 +196,7 @@ def compare_to(im, msg):
 				print("Copyright detected in hashing:", v)
 				raise SystemExit
 
-	return h, s, l, g, rhs
+	return *tups, rhs
 
 if not os.path.exists("iman"):
 	os.mkdir("iman")
