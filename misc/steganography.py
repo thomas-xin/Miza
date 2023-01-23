@@ -139,7 +139,7 @@ def hash_to(im, msg, skip=False):
 def compare_to(im, msg):
 	h, s, l, g = split_to(im)
 	rhs = hash_reduce(g)
-	# rhs = [[8, 236]]
+	rhs = [[18, 237]]
 	# rhs = [[247, 19]]
 	for rh in rhs:
 		fd = f"iman/{rh[0]}/{rh[1]}.txt"
@@ -170,21 +170,25 @@ def compare_to(im, msg):
 			# print(h)
 			# print(s)
 			# print(l)
-			heff = np.sqrt(900 - (30 - s) * (30 - s2), dtype=np.float32) / 30
-			hd = np.sum((128 - np.abs((h - h2) - 128)) * heff) / 128 / 1024
-			seff = np.sqrt(900 - (30 - l) * (30 - l2), dtype=np.float32) / 30
+			h, l, s, g = map(np.float32, (h, l, s, g))
+			h2, l2, s2, g2 = map(np.float32, (h2, l2, s2, g2))
+			heff = np.sqrt(900 - (30 - s) * (30 - s2)) / 30
+			print(np.abs(np.abs(h - h2) - 8))
+			hd = np.sum((8 - np.abs(np.abs(h - h2) - 8)) * heff) / 8 / 1024
+			seff = np.sqrt(900 - (30 - l) * (30 - l2)) / 30
 			sd = np.sum(np.abs(s - s2) * seff) / 15 / 1024
 			if invert:
-				gd = np.sum(np.abs(15 - g - g2), dtype=np.float32) / 15 / 1024
-				ld = np.sum(np.abs(15 - l - l2), dtype=np.float32) / 15 / 1024
+				gd = np.sum(np.abs(15 - g - g2)) / 15 / 1024
+				ld = np.sum(np.abs(15 - l - l2)) / 15 / 1024
 			else:
-				gd = np.sum(np.abs(g - g2), dtype=np.float32) / 15 / 1024
-				ld = np.sum(np.abs(l - l2), dtype=np.float32) / 15 / 1024
+				gd = np.sum(np.abs(g - g2)) / 15 / 1024
+				ld = np.sum(np.abs(l - l2)) / 15 / 1024
+			print(np.abs(l - l2))
 
-			# print(hd, sd, ld, gd, invert)
-			R = (hd + sd) + min(ld, gd * 2)
-			# print(rh, R, v)
-			if R <= 3:
+			print(hd, sd, ld, gd, invert)
+			R = (hd + sd) / 2 + min(ld, gd * 2)
+			print(rh, R, v)
+			if R <= 0.05:
 				if v == msg:
 					print("No copyright detected.")
 					raise SystemExit
