@@ -128,19 +128,21 @@ def hash_to(im, msg, skip=False):
 	hg = h + (g << 4)
 	hb = hg.tobytes() + sl.tobytes()
 	for rh in rhs:
-		for i, fd in enumerate((f"iman/{rh[0]}/{rh[1]}.txt", f"iman/{255 - rh[0]}/{255 - rh[1]}.txt")):
-			s = base64.b64encode(hb).rstrip(b"=").decode("ascii") + f";{i}:" + msg + "\n"
-			folder = fd.rsplit("/", 1)[0]
-			if not os.path.exists(folder):
-				os.mkdir(folder)
-			with open(fd, "a", encoding="utf-8") as f:
-				f.write(s)
+		i = 0
+		fd = f"iman/{rh[0]}/{rh[1]}.txt"
+		# for i, fd in enumerate((f"iman/{rh[0]}/{rh[1]}.txt", f"iman/{255 - rh[0]}/{255 - rh[1]}.txt")):
+		s = base64.b64encode(hb).rstrip(b"=").decode("ascii") + f";{i}:" + msg + "\n"
+		folder = fd.rsplit("/", 1)[0]
+		if not os.path.exists(folder):
+			os.mkdir(folder)
+		with open(fd, "a", encoding="utf-8") as f:
+			f.write(s)
 
 def compare_to(im, msg):
 	tups = list(split_to(im))
 	g = tups[-1]
 	rhs = hash_reduce(g)
-	rhs = [[18, 237]]
+	# rhs = [[18, 237]]
 	# rhs = [[247, 19]]
 	for rh in rhs:
 		fd = f"iman/{rh[0]}/{rh[1]}.txt"
@@ -156,10 +158,10 @@ def compare_to(im, msg):
 			i = line.index(":")
 			k, v = line[:i], line[i + 1:]
 			if k[-2] == ";":
-				invert = int(k[-1])
+				inverted = int(k[-1])
 				k = k[:-2]
 			else:
-				invert = False
+				inverted = False
 			v = v[:-1]
 			hb2 = np.frombuffer(base64.b64decode(k.encode("ascii") + b"=="), dtype=np.uint8)
 			half = len(hb2) >> 1
@@ -178,7 +180,7 @@ def compare_to(im, msg):
 			hd = np.sum((8 - np.abs(np.abs(h - h2) - 8)) * heff) / 8 / 1024
 			seff = np.sqrt(900 - (30 - l) * (30 - l2)) / 30
 			sd = np.sum(np.abs(s - s2) * seff) / 15 / 1024
-			if invert:
+			if inverted:
 				gd = np.sum(np.abs(15 - g - g2)) / 15 / 1024
 				ld = np.sum(np.abs(15 - l - l2)) / 15 / 1024
 			else:
@@ -186,7 +188,7 @@ def compare_to(im, msg):
 				ld = np.sum(np.abs(l - l2)) / 15 / 1024
 			# print(np.abs(l - l2))
 
-			# print(hd, sd, ld, gd, invert)
+			# print(hd, sd, ld, gd, inverted)
 			R = (hd + sd) / 2 + min(ld, gd * 2)
 			# print(rh, R, v)
 			if R <= 0.05:
@@ -285,10 +287,13 @@ for i in (2, 0, 1):
 			if copydetect:
 				reader.append(np.sum(target & 2 > 0) + np.sum(target & 1) >= pa)
 			if len(reader) == 8 and copydetect and reader != [True] * 8:
-				if not write:
-					print("No copyright detected.")
-					raise SystemExit
-				copydetect = False
+				if reader == [False] * 8:
+					inverted = True
+				else:
+					if not write:
+						print("No copyright detected.")
+						raise SystemExit
+					copydetect = False
 
 			bit = next(it, False)
 			if test:
@@ -313,6 +318,7 @@ for i in (2, 0, 1):
 					np.random.shuffle(rind)
 
 				if bit:
+					# rv[:] = 255
 					v = np.clip(rv, 3, None, out=rv)
 					if entropy != 0:
 						v[rind] |= 3
@@ -328,6 +334,7 @@ for i in (2, 0, 1):
 						t = v[mask]
 						v[mask] = np.add(t, r2[:len(t)], out=t, casting="unsafe")
 				else:
+					# rv[:] = 0
 					v = np.clip(rv, None, 252, out=rv)
 					if entropy != 0:
 						v[rind] &= 252
@@ -342,6 +349,7 @@ for i in (2, 0, 1):
 						mask = ind == 3
 						t = v[mask]
 						v[mask] = np.add(t, r2[:len(t)], out=t, casting="unsafe")
+				# v = rv
 				target[:] = v.reshape(target.shape)
 
 	spl[i] = Image.fromarray(a, mode="L")
@@ -362,8 +370,9 @@ if copydetect:
 	byted = np.zeros(len(reader) // 8, dtype=np.uint8)
 	for i in range(8):
 		byted |= bitd[i::8] << np.uint8(i)
+	if inverted:
+		byted ^= 255
 	b = byted.tobytes()
-	# print(b)
 	while b and b[-1] != 255:
 		b = b[:-1]
 else:
@@ -379,7 +388,6 @@ try:
 	x = b[:l - 1]
 	y = invert(b[l:l * 2 - 1])
 	z = b[l * 2:l * 3 - 1]
-	# print(x, y, z)
 	if x == y:
 		b = x
 	elif x == z:
