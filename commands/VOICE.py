@@ -2627,7 +2627,7 @@ class AudioDownloader:
         # Add the audio to the rendered video, without re-encoding the entire frames
         args = ["./ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y"]
         args.extend(("-i", fnv, "-f", "s16le", "-ac", "2", "-ar", str(SAMPLE_RATE), "-i", afile))
-        ac = "libfdk_aac" if fmt == "mp4" else "libopus"
+        ac = "aac" if fmt == "mp4" else "libopus"
         args.extend(("-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", ac, "-b:a", "224k", fn))
         print(args)
         subprocess.run(args, stderr=subprocess.PIPE)
