@@ -1334,6 +1334,7 @@ class Personality(Command):
     example = ("personality character.ai", "personality mischievous, cunning", "personality dry, sarcastic, snarky", "personality sweet, loving", "personality The following is a conversation between Miza and humans. Miza is an AI who is loyal friendly playful cute, intelligent and helpful, and slightly flirtatious when appropriate.")
     flags = "aed"
     rate_limit = (18, 24)
+    defper = "The following is a conversation between Miza and humans. Miza is an AI who is loyal friendly playful cute, intelligent and helpful, and slightly flirtatious when appropriate."
 
     def encode(self, p):
         return p.replace(
@@ -1347,11 +1348,7 @@ class Personality(Command):
         return p
 
     def retrieve(self, i):
-        defper = "The following is a conversation between Miza and humans. Miza is an AI who is loyal friendly playful cute, intelligent and helpful, and slightly flirtatious when appropriate."
-        # defper = "loyal friendly playful cute"
-        # if self.bot.premium_level(i) < 2:
-            # return self.bot.data.personalities.pop(i, None) or defper
-        return self.bot.data.personalities.get(i) or defper
+        return self.bot.data.personalities.get(i) or self.defper
 
     async def __call__(self, bot, flags, guild, channel, message, user, argv, **void):
         if not AUTH.get("openai_key"):
@@ -1361,7 +1358,11 @@ class Personality(Command):
             return css_md(f"My personality for {sqr_md(channel)} has been reset.")
         if not argv:
             p = self.decode(self.retrieve(channel.id))
+            if p == self.defper:
+                p = "loyal friendly playful cute, intelligent and helpful, and slightly flirtatious when appropriate"
             return ini_md(f"My current personality for {sqr_md(channel)} is {sqr_md(p)}. Enter keywords to modify the AI for default GPT-based chat, or enter \"character.ai\" for the assigned character.ai bot instead.")
+        if len(argv) > 512:
+            raise OverflowError("Maximum personality prompt size is 512 characters.")
         # if max(bot.is_trusted(guild), bot.premium_level(user) * 2) < 2:
         #     raise PermissionError(f"Sorry, unfortunately this feature is for premium users only. Please make sure you have a subscription level of minimum 2 from {bot.kofi_url}, or try out ~trial if you haven't already!")
         p = self.encode(argv)#.replace(",", " ").replace("  ", " ").replace(" ", ", "))
