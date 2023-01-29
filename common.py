@@ -1115,7 +1115,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
             data["tts"] = tts
     body = orjson.dumps(data)
     exc = RuntimeError
-    for i in range(xrand(12, 17)):
+    for i in range(xrand(3, 6)):
         try:
             if files:
                 form = aiohttp.FormData()

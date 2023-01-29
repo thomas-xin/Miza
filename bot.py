@@ -1561,11 +1561,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     author = message.author
                     try:
                         if guild._members[author.id] != author:
-                            raise KeyError
+                            guild._members[author.id] = author
+                            if "guilds" in self.data:
+                                self.data.guilds.register(guild, force=False)
                     except KeyError:
-                        guild._members[author.id] = author
-                        if "guilds" in self.data:
-                            self.data.guilds.register(guild, force=False)
+                        pass
             if files and not message.author.bot:
                 if (utc_dt() - created_at).total_seconds() < 7200:
                     for attachment in message.attachments:
@@ -3616,10 +3616,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         return message
 
     # Sends a list of embeds to the target sendable, using a webhook when possible.
-    async def _send_embeds(self, sendable, embeds, reacts=None, reference=None, force=True):
+    async def _send_embeds(self, sendable, embeds, reacts=None, reference=None, force=True, exc=True):
         s_id = verify_id(sendable)
         sendable = await self.fetch_messageable(s_id)
-        with self.ExceptionSender(sendable, reference=reference):
+        if exc:
+            ctx = self.ExceptionSender(sendable, reference=reference)
+        else:
+            ctx = tracebacksuppressor
+        with ctx:
             if not embeds:
                 return
             guild = getattr(sendable, "guild", None)
@@ -3708,7 +3712,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             )
 
     # Adds embeds to the embed sender, waiting for the next update event.
-    def send_embeds(self, channel, embeds=None, embed=None, reacts=None, reference=None):
+    def send_embeds(self, channel, embeds=None, embed=None, reacts=None, reference=None, exc=True):
         if embeds is not None and not issubclass(type(embeds), collections.abc.Collection):
             embeds = (embeds,)
         if embed is not None:
@@ -3726,9 +3730,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         c_id = verify_id(channel)
         user = self.cache.users.get(c_id)
         if user is not None:
-            create_task(self._send_embeds(user, embeds, reacts, reference))
+            create_task(self._send_embeds(user, embeds, reacts, reference, exc=exc))
         elif reference:
-            create_task(self._send_embeds(channel, embeds, reacts, reference))
+            create_task(self._send_embeds(channel, embeds, reacts, reference, exc=exc))
         else:
             if reacts:
                 embeds = [e.to_dict() for e in embeds]
@@ -3739,7 +3743,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if len(embs) > 2048:
                 self.embed_senders[c_id] = embs[-2048:]
 
-    def send_as_embeds(self, channel, description=None, title=None, fields=None, md=nofunc, author=None, footer=None, thumbnail=None, image=None, images=None, colour=None, reacts=None, reference=None):
+    def send_as_embeds(self, channel, description=None, title=None, fields=None, md=nofunc, author=None, footer=None, thumbnail=None, image=None, images=None, colour=None, reacts=None, reference=None, exc=True):
         if type(description) is discord.Embed:
             emb = description
             description = emb.description or None
@@ -3757,9 +3761,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             description = None
         if not description and not fields and not thumbnail and not image and not images:
             return fut_nop
-        return create_task(self._send_as_embeds(channel, description, title, fields, md, author, footer, thumbnail, image, images, colour, reacts, reference))
+        return create_task(self._send_as_embeds(channel, description, title, fields, md, author, footer, thumbnail, image, images, colour, reacts, reference, exc=exc))
 
-    async def _send_as_embeds(self, channel, description=None, title=None, fields=None, md=nofunc, author=None, footer=None, thumbnail=None, image=None, images=None, colour=None, reacts=None, reference=None):
+    async def _send_as_embeds(self, channel, description=None, title=None, fields=None, md=nofunc, author=None, footer=None, thumbnail=None, image=None, images=None, colour=None, reacts=None, reference=None, exc=True):
         fin_col = col = None
         if colour is None:
             if author:
@@ -3890,7 +3894,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         embs.append(emb)
                     embs[i].set_image(url=img)
                     embs[i].url = img
-        return self.send_embeds(channel, embeds=embs, reacts=reacts, reference=reference)
+        return self.send_embeds(channel, embeds=embs, reacts=reacts, reference=reference, exc=exc)
 
     # Updates all embed senders.
     def update_embeds(self, force=False):
@@ -3911,7 +3915,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             self.embed_senders[s_id] = embeds = embeds[len(embs):]
             if not embeds:
                 self.embed_senders.pop(s_id)
-            create_task(self._send_embeds(s_id, embs, force=force))
+            create_task(self._send_embeds(s_id, embs, force=force, exc=False))
             sent = True
         return sent
 
@@ -4970,6 +4974,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             reacts=reacts,
             reference=reference,
             footer=footer,
+            exc=False,
         )
 
     async def missing_perms(self, messageable, reference):

@@ -205,10 +205,10 @@ def parse(args):
 		tiers += tier5 * 4
 	pops = floor(pops + generated * 4)
 	output.append(f"Current effective cash: {ceil(cash)}")
-	output.append(f"Current effective pops: {pops}")
+	output.append(f"Current effective pops (p/g): {pops}")
 	output.append(f"Current tier5 count: {tier5}")
 	output.append(f"Current upgrade count: {tiers}")
-	output.append(f"Current totem count: {totems}")
+	output.append(f"Current totem count (t): {totems}")
 	power = total_power(cash, pops, tier5, tiers, totems)
 	output.append(f"Current power: {power}")
 	p = power
@@ -396,7 +396,10 @@ def parse(args):
 			asacs.append(curr)
 		s = " ".join(asacs)
 		if power >= p:
-			d = p2d(power)
+			d2 = p2d(power)
+			if d2 > d:
+				d = d2
+				a = d2p(d)
 			output.append(f"**Power required for degree {d}: {a}**")
 			output.append(f"Recommended additional sacrifices: {s}")
 			# if verbose:

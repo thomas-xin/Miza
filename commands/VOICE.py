@@ -814,8 +814,6 @@ class AudioQueue(alist):
                 auds.announce(italics(ini_md(f"🎵 Now playing {sqr_md(e.name)}, added by {sqr_md(name)}! 🎵")), aio=True)
 
     def start_queue(self):
-        if self.sem.is_busy():
-            return
         with tracebacksuppressor:
             auds = self.auds
             try:
@@ -823,15 +821,18 @@ class AudioQueue(alist):
             except (TypeError, AttributeError):
                 auds.kill()
                 raise
+            if self.sem.is_busy():
+                return
             if not auds.source and self:
                 e = self[0]
                 source = None
                 with self.sem:
                     with tracebacksuppressor:
                         source = ytdl.get_stream(e, force=True)
+                if self.sem.is_busy():
+                    self.sem.wait()
                 if not source:
-                    if self.sem.is_busy():
-                        self.sem.wait()
+                    e["url"] = ""
                     return self.update_load()
                 with self.sem:
                     self.announce_play(e)
@@ -2736,7 +2737,7 @@ class AudioDownloader:
                         copy = True
             else:
                 copy = False
-            args = alist((ffmpeg, "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y"))
+            args = alist((ffmpeg, "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y", "-protocol_whitelist", "file,http,https,tcp,tls"))
             if vst:
                 if len(vst) > 1:
                     codec_map = {}
