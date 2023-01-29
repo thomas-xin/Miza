@@ -2768,10 +2768,10 @@ class AudioDownloader:
                     vsf = f"cache/{ts}~video.concat"
                     with open(vsf, "w", encoding="utf-8") as f:
                         f.write(vsc)
+                    args.extend(("-f", "concat"))
                 else:
                     vsf = vsc = vst[0]
             if len(ast) > 1:
-                args.extend(("-f", "s16le", "-ar", "48k", "-ac", "2"))
                 asf = "-"
             else:
                 stream = ast[0]["stream"]
@@ -2846,6 +2846,8 @@ class AudioDownloader:
                 fn = f"cache/\x7f{ts}~" + outf.translate(filetrans)
             elif fmt == "mkv":
                 fmt = "matroska"
+            if asf == "-":
+                args.extend(("-f", "s16le"))
             if not copy and ast:
                 args.extend(("-ar", sr, "-ac", ac, "-b:a", str(br)))
                 if vst:
