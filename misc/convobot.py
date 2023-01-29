@@ -577,8 +577,13 @@ class Bot:
 			self.cai_channel = None
 			return "", 0
 		lines = [line.strip() for line in resp.text.splitlines()]
-		e1 = json.loads(lines[-2]) if len(lines) > 1 else {}
-		e2 = json.loads(lines[-1])
+		try:
+			e1 = json.loads(lines[-2]) if len(lines) > 1 else {}
+			e2 = json.loads(lines[-1])
+		except json.decoder.JSONDecodeError:
+			print_exc()
+			print(resp.text)
+			return "", 0
 		if e2.get("abort", False):
 			e2 = e1
 			aborted = True
