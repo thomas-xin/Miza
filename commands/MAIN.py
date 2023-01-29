@@ -1661,8 +1661,15 @@ class UpdateUrgentReminders(Database):
                             p[0] += p[4]
                             i += 1
                         p[0] = max(utc() + 1, p[0])
-                        channel = await self.bot.fetch_messageable(c_id)
-                        message = await self.bot.fetch_message(m_id, channel)
+                        try:
+                            message = self.bot.cache.messages[m_id]
+                            if not message.reactions:
+                                raise KeyError
+                        except KeyError:
+                            channel = await self.bot.fetch_messageable(c_id)
+                            message = await discord.abc.Messageable.fetch_message(channel, m_id)
+                        else:
+                            channel = message.channel
                         for react in message.reactions:
                             if str(react) == "✅":
                                 if react.count > 1:
