@@ -16,7 +16,10 @@ colorlib = colorspace.colorlib()
 from math import *
 
 write, sys.stdout.write = sys.stdout.write, lambda *args, **kwargs: None
-import pygame
+try:
+    import pygame
+except ImportError:
+    pygame = None
 sys.stdout.write = write
 
 if not hasattr(time, "time_ns"):

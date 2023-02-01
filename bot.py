@@ -93,7 +93,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         )
         self.cache_size = cache_size
         # Base cache: contains all other caches
-        self.cache = fcdict((c, fdict()) for c in self.caches)
+        self.cache = fcdict((c, cdict()) for c in self.caches)
         self.timeout = timeout
         self.set_classes()
         self.set_client_events()
@@ -1850,6 +1850,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
     # Updates bot cache from the discord.py client cache, using automatic feeding to mitigate the need for slow dict.update() operations.
     def update_cache_feed(self):
+        self.cache = fcdict((c, cdict()) for c in self.caches)
         self.cache.guilds._feed = (self._guilds, getattr(self, "sub_guilds", {}))
         self.cache.emojis._feed = (self._emojis,)
         self.cache.users._feed = (self._users,)
