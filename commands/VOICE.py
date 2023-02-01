@@ -2621,8 +2621,8 @@ class AudioDownloader:
                             buf = self.emptybuff
                         afp.write(buf)
                         asize += len(buf)
-                    with suppress():
-                        os.remove(cfn)
+                    # with suppress():
+                    #     os.remove(cfn)
         proc.stdin.close()
         proc.wait()
         # Add the audio to the rendered video, without re-encoding the entire frames
@@ -2632,9 +2632,9 @@ class AudioDownloader:
         args.extend(("-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", ac, "-b:a", "224k", fn))
         print(args)
         subprocess.run(args, stderr=subprocess.PIPE)
-        with suppress():
-            os.remove(fnv)
-            os.remove(afile)
+        # with suppress():
+            # os.remove(fnv)
+            # os.remove(afile)
         return fn, outf
 
     emptybuff = b"\x00" * (48000 * 2 * 2)
