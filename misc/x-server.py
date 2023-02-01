@@ -2253,6 +2253,7 @@ def ensure_parent(proc, parent):
                 pass
         if not is_strict_running(parent):
             force_kill(psutil.Process())
+            break
         time.sleep(6)
 
 if __name__ == "__main__":

@@ -42,7 +42,7 @@ for mod in modlist:
                     break
             v = pkg_resources.get_distribution(name).version
             if version is not None:
-                s = repr(v) + op + repr(version)
+                s = repr(v.split(".")) + op + repr(version.split("."))
                 assert eval(s, {}, {})
         except:
             # Modules may require an older version, replace current version if necessary

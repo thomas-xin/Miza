@@ -1136,7 +1136,7 @@ if __name__ == "__main__":
                     except psutil.TimeoutExpired:
                         c.kill()
                 p.terminate()
-                p.wait()
+                break
             time.sleep(12)
     import threading
     threading.Thread(target=ensure_parent, daemon=True).start()

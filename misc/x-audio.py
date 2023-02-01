@@ -980,6 +980,7 @@ def ensure_parent(proc, parent):
         if not is_strict_running(parent) or getattr(client, "closed", False):
             await_fut(kill())
             force_kill(psutil.Process())
+            break
         time.sleep(6)
 
 
