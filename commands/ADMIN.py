@@ -3087,6 +3087,8 @@ class UpdateRolePreservers(Database):
             nick = cdict(nick=self.bot.data.nickpreservers[guild.id][user.id])
         except KeyError:
             nick = {}
+        if (not nick or nick == user.display_name) and (not roles or {r.id for r in roles} == {r.id for r in user.roles[1:]}):
+            return
         try:
             await user.edit(roles=roles, reason="RolePreserver", **nick)
         except discord.Forbidden:
@@ -3126,6 +3128,8 @@ class UpdateNickPreservers(Database):
             return
         with suppress(KeyError):
             return self.bot.data.rolepreservers[guild.id][user.id]
+        if not nick or nick == user.display_name:
+            return
         await user.edit(nick=nick, reason="NickPreserver")
         self.data[guild.id].pop(user.id, None)
         print(f"NickPreserver: Granted {nick} to {user} in {guild}.")

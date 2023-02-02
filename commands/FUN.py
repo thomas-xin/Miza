@@ -2105,6 +2105,53 @@ class UpdateDogpiles(Database):
             self.bot.data.users.add_gold(message.author, len(content) / 4 + 32)
 
 
+class DadJoke(Command):
+    server_only = True
+    min_level = 3
+    description = "Causes ⟨MIZA⟩ to automatically nickname a user whenever they say \"I am <something>\" or some variant."
+    usage = "(enable|disable)?"
+    example = ("dadjoke enable",)
+    flags = "aed"
+    rate_limit = 0.5
+
+    async def __call__(self, flags, guild, name, **void):
+        update = self.data.dadjokes.update
+        bot = self.bot
+        following = bot.data.dadjokes
+        curr = following.get(guild.id, False)
+        if "d" in flags:
+            if guild.id in following:
+                following.pop(guild.id)
+            return css_md(f"Disabled dadjoke nicknaming for {sqr_md(guild)}.")
+        if "e" in flags or "a" in flags:
+            following[guild.id] = True
+            return css_md(f"Enabled dadjoke nicknaming for {sqr_md(guild)}.")
+        if curr:
+            return ini_md(f"Dadjoke nicknaming is currently enabled in {sqr_md(guild)}.")
+        return ini_md(f'Dadjoke nicknaming is currently disabled in {sqr_md(guild)}. Use "{bot.get_prefix(guild)}{name} enable" to enable.')
+
+
+class UpdateDadjokes(Database):
+    name = "dadjokes"
+    reg = re.compile(r"(?:(?:(?<=^)|(?<=[.,;:?!]\s))i(?:m| am)\s|(?:(?<=^)|(?<=\s))i'm\s){1}[^.,;:?!]+(?:[.,;:?!]{2,}|(?=[.,;:?!]|$))", re.I | re.M)
+
+    async def _nocommand_(self, message, **void):
+        if message.guild is None or not message.content:
+            return
+        if not self.data.get(message.guild.id):
+            return
+        s = message.clean_content
+        m = self.reg.search(s)
+        if not m:
+            return
+        user = message.author
+        text = m.group()
+        i = text.casefold().index("m")
+        nick = text[1 + 1:].lstrip()
+        if nick != user.display_name:
+            await user.edit(nick=nick, reason="Pranked!")
+
+
 class Daily(Command):
     name = ["Quests", "Quest", "Tasks", "Challenges", "Dailies"]
     description = "Shows your list of daily quests."
