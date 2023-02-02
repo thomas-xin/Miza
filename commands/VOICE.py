@@ -2558,7 +2558,7 @@ class AudioDownloader:
                     if not (info.get("video") and info["video"].startswith("https://www.yt-download.org/download/")):
                         self.get_stream(info, video=True, force=True, download=False)
                     video = info["video"]
-                    if video == info["stream"] and is_youtube_url(info["url"]) and has_ytd:
+                    if (video == info["stream"] or xrand(2)) and is_youtube_url(info["url"]) and has_ytd:
                         data = self.extract_backup(info["url"], video=True)
                         video = info["video"] = get_best_video(data)
                     vidinfo = as_str(subprocess.check_output(["./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "default=nokey=1:noprint_wrappers=1", video])).strip()
@@ -2582,7 +2582,7 @@ class AudioDownloader:
                         if w != w2 or h != h2:
                             vf += f",pad=width={w2}:height={h2}:x=-1:y=-1:color=black"
                     args.extend(("-vf", vf))
-                    # Pipe to main process, as raw video is extremely bloated and easily overflows hundreds of GB data
+                    # Pipe to main process, as raw video is extremely bloated and easily overflows hundreds of GB disk
                     args.extend(("-f", "rawvideo", "-pix_fmt", "rgb24", "-"))
                     cfn = fut.result()[0]
                     print(args)
@@ -2621,8 +2621,8 @@ class AudioDownloader:
                             buf = self.emptybuff
                         afp.write(buf)
                         asize += len(buf)
-                    with suppress():
-                        os.remove(cfn)
+                    # with suppress():
+                    #     os.remove(cfn)
         proc.stdin.close()
         proc.wait()
         # Add the audio to the rendered video, without re-encoding the entire frames
@@ -2632,9 +2632,9 @@ class AudioDownloader:
         args.extend(("-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", ac, "-b:a", "224k", fn))
         print(args)
         subprocess.run(args, stderr=subprocess.PIPE)
-        with suppress():
-            os.remove(fnv)
-            os.remove(afile)
+        # with suppress():
+            # os.remove(fnv)
+            # os.remove(afile)
         return fn, outf
 
     emptybuff = b"\x00" * (48000 * 2 * 2)
