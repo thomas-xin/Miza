@@ -102,6 +102,7 @@ class EmptyContext(contextlib.AbstractContextManager):
     __exit__ = lambda *args: None
     __aenter__ = lambda self, *args: as_fut(self)
     __aexit__ = lambda *args: emptyfut
+    __call__ = lambda self, *args: self
 
 emptyctx = EmptyContext()
 
@@ -2100,10 +2101,11 @@ async def sub_submit(ptype, command, fix=None, _timeout=12):
     PROC_RESP[ts] = concurrent.futures.Future()
     command = "[" + ",".join(map(repr, command[:2])) + "," + ",".join(map(str, command[2:])) + "]"
     s = f"~{ts}~{repr(command.encode('utf-8'))}\n".encode("utf-8")
-    await proc.sem()
+    sem = emptyctx if fix else proc.sem
+    await sem()
     if not is_strict_running(proc):
         proc = await get_idle_proc(ptype, fix=fix)
-    async with proc.sem:
+    async with sem:
         try:
             proc.stdin.write(s)
             await proc.stdin.drain()
