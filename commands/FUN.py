@@ -2147,8 +2147,13 @@ class UpdateDadjokes(Database):
         user = message.author
         text = m.group().strip()
         i = text.casefold().index("m")
-        nick = text[i + 1:].lstrip()
-        if nick != user.display_name:
+        spl = text[i + 1:].lstrip().split()
+        nick = ""
+        while spl and len(nick) + len(spl[0]) <= 32:
+            nick += spl.pop(0)
+        if spl and not nick:
+            nick = lim_str(spl[0], 32)
+        if nick and nick != user.display_name:
             await user.edit(nick=nick, reason="Pranked!")
 
 
