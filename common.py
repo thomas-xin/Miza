@@ -2101,8 +2101,11 @@ async def sub_submit(ptype, command, fix=None, _timeout=12):
     PROC_RESP[ts] = concurrent.futures.Future()
     command = "[" + ",".join(map(repr, command[:2])) + "," + ",".join(map(str, command[2:])) + "]"
     s = f"~{ts}~{repr(command.encode('utf-8'))}\n".encode("utf-8")
-    sem = emptyctx if fix else proc.sem
-    await sem()
+    if fix:
+        sem = emptyctx
+    else:
+        sem = proc.sem
+        await sem()
     if not is_strict_running(proc):
         proc = await get_idle_proc(ptype, fix=fix)
     async with sem:
