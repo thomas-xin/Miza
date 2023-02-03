@@ -2245,8 +2245,9 @@ class UpdateUsers(Database):
                 create_task(message.add_reaction("👀"))
             if msg and "ask" in bot.commands:# and random.random() > math.atan(count / 16) / 4:
                 argv = message.clean_content.strip()
-                argv = argv.removeprefix(f"@{bot.display_name}")
-                argv = argv.removesuffix(f"@{bot.display_name}")
+                me = guild.me if guild else bot
+                argv = argv.removeprefix(f"@{me.display_name}")
+                argv = argv.removesuffix(f"@{me.display_name}")
                 argv = argv.strip()
                 with bot.ExceptionSender(channel, reference=message):
                     for ask in bot.commands.ask:
