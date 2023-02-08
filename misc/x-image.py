@@ -22,6 +22,8 @@ except ImportError:
     pygame = None
 sys.stdout.write = write
 
+hwaccel = "d3d11va" if os.name == "nt" else "auto"
+
 if not hasattr(time, "time_ns"):
     time.time_ns = lambda: int(time.time() * 1e9)
 
@@ -699,7 +701,7 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
                     size = (960, 540)
         fn2 = fn + ".gif"
         f_in = fn if direct else url
-        command = ["./ffmpeg", "-threads", "2", "-hide_banner", "-nostdin", "-v", "error", "-y", "-hwaccel", "auto", "-i", f_in, "-vf"]
+        command = ["./ffmpeg", "-threads", "2", "-hide_banner", "-nostdin", "-v", "error", "-y", "-hwaccel", hwaccel, "-i", f_in, "-vf"]
         w, h = max_size(*size, maxsize)
         fps = fps or orig_fps or 30
         step = 1
@@ -2784,7 +2786,7 @@ def evalImg(url, operation, args):
                 resp = zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
             else:
                 command = [
-                    "./ffmpeg", "-threads", "2", "-hide_banner", "-v", "error", "-y", "-hwaccel", "auto",
+                    "./ffmpeg", "-threads", "2", "-hide_banner", "-v", "error", "-y", "-hwaccel", hwaccel,
                     "-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", ("rgb24" if mode == "RGB" else "rgba"),
                     "-video_size", "x".join(map(str, size))
                 ]

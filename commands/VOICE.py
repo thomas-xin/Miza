@@ -2520,7 +2520,7 @@ class AudioDownloader:
         except:
             fps = 30
         # First produce a silent video file (I would have stored it as raw, except that overflows storage really bad)
-        args = ["./ffmpeg", "-nostdin", "-hide_banner", "-hwaccel", "auto", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y"]
+        args = ["./ffmpeg", "-nostdin", "-hide_banner", "-hwaccel", hwaccel, "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y"]
         if len(urls) != 1:
             if str(start) != "None":
                 start = round_min(float(start))
@@ -2562,7 +2562,7 @@ class AudioDownloader:
                         data = self.extract_backup(info["url"], video=True)
                         video = info["video"] = get_best_video(data)
                     vidinfo = as_str(subprocess.check_output(["./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "default=nokey=1:noprint_wrappers=1", video])).strip()
-                    args = alist(("./ffmpeg", "-nostdin", "-hwaccel", "auto", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y"))
+                    args = alist(("./ffmpeg", "-nostdin", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y"))
                     if len(urls) == 1:
                         if str(start) != "None":
                             start = round_min(float(start))
@@ -2737,7 +2737,7 @@ class AudioDownloader:
                         copy = True
             else:
                 copy = False
-            args = alist((ffmpeg, "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y", "-protocol_whitelist", "file,http,https,tcp,tls"))
+            args = alist((ffmpeg, "-nostdin", "-hide_banner", "-v", "error", "-hwaccel", hwaccel, "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y", "-protocol_whitelist", "file,http,https,tcp,tls"))
             if vst:
                 if len(vst) > 1:
                     codec_map = {}

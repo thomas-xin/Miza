@@ -31,6 +31,8 @@ from zipfile import ZipFile
 import urllib.request, urllib.parse
 import nacl.secret
 
+hwaccel = "d3d11va" if os.name == "nt" else "auto"
+
 utils = discord.utils
 reqs = alist(requests.Session() for i in range(6))
 url_parse = urllib.parse.quote_plus

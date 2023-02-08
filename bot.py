@@ -3536,7 +3536,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             else:
                 with tracebacksuppressor:
                     kwargs["avatar_url"] = await self.data.exec.uproxy(avatar_url)
-        if hasattr(channel, "simulated") or hasattr(channel, "recipient") or not hasattr(channel, "send"):
+        if hasattr(channel, "simulated") or not getattr(channel, "guild", None) or hasattr(channel, "recipient") or not hasattr(channel, "send"):
             kwargs.pop("username", None)
             kwargs.pop("avatar_url", None)
             message = await discord.abc.Messageable.send(channel, *args, **kwargs)
