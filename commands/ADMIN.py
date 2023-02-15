@@ -1303,7 +1303,7 @@ class Crosspost(Command):
             )
             return
         target = await bot.fetch_channel(argv)
-        if not target.guild.get_member(user.id) or not target.permissions_for(target.guild.me).read_messages or not target.permissions_for(target.guild.get_member(user.id)).read_messages:
+        if not bot.is_owner(user) and (not target.guild.get_member(user.id) or not target.permissions_for(target.guild.me).read_messages or not target.permissions_for(target.guild.get_member(user.id)).read_messages):
             raise PermissionError("Cannot follow channels without read message permissions.")
         channels = data.setdefault(target.id, set())
         channels.add(channel.id)
@@ -2640,7 +2640,7 @@ class UpdateMessageLogs(Database):
         if bulk:
             return
         guild = message.guild
-        if guild.id not in self.data:
+        if not guild or guild.id not in self.data:
             return
         c_id = self.data[guild.id]
         try:
