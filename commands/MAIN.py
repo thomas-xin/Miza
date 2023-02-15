@@ -943,7 +943,7 @@ class Profile(Command):
         profile = bot.data.users.get(target.id, EMPTY)
         if setting is None:
             description = profile.get("description", "")
-            if is_url(description.rsplit(None, 1)[-1]):
+            if description and is_url(description.rsplit(None, 1)[-1]):
                 description += "\n"
             thumbnail = profile.get("thumbnail")
             birthday = profile.get("birthday")
