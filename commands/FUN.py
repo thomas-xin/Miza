@@ -2156,6 +2156,7 @@ class UpdateDadjokes(Database):
         if spl and not nick:
             nick = lim_str(spl[0], 32)
         if nick and nick != user.display_name:
+            create_task(send_with_reply(message.channel, message, f"Hi, {nick}! {get_random_emoji()}"))
             await user.edit(nick=nick, reason="Pranked!")
 
 
