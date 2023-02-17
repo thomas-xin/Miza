@@ -570,7 +570,7 @@ class UpdateExec(Database):
                 c_id = choice([c_id for c_id, flag in self.data.items() if flag & 16])
                 channel = await bot.fetch_channel(c_id)
                 m = channel.guild.me
-                message = await bot.send_as_webhook(channel, f"{fn.rsplit('/', 1)[-1]} ({i})", files=fs, username=m.display_name, avatar_url=best_url(m), recurse=False))
+                message = await bot.send_as_webhook(channel, f"{fn.rsplit('/', 1)[-1]} ({i})", files=fs, username=m.display_name, avatar_url=best_url(m), recurse=False)
                 for a in message.attachments:
                     urls.append(str(a.url))
                 i += 1
