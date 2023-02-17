@@ -1584,9 +1584,9 @@ function mergeFile(blob) {
             with open(r, "r", encoding="utf-8") as f:
                 with open(tn, "w", encoding="utf-8") as g:
                     s = f.read()
-                url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
-                s = s.replace('""', f'"{url}"', 1)
-                g.write(s)
+                    url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
+                    s = s.replace('""', f'"{url}"', 1)
+                    g.write(s)
         else:
             high = int(kwargs.get("index") or cp.request.headers.get("x-index", "0"))
             os.rename(n + "0", fn)
