@@ -625,7 +625,7 @@ class Server:
                 return b
             elif not os.path.exists(p):
                 raise FileNotFoundError(p)
-            elif not download and p.endswith("~.forward$") and mime == "text/html" and os.path.getsize(p) < 1048576:
+            elif p.endswith("~.forward$") and mime == "text/html" and os.path.getsize(p) < 1048576:
                 with open(p, "r", encoding="utf-8") as f:
                     resp = f.read(1048576)
                 s = resp
@@ -696,7 +696,7 @@ class Server:
         headers.pop("Host", None)
         headers.update(Request.header())
         for url in urls:
-            resp = reqs.next().get(url, headers=headers, stream=False)
+            resp = reqs.next().get(url, headers=headers, stream=True)
             it = resp.iter_content(262144)
             try:
                 while True:
