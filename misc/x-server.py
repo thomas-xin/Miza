@@ -1565,6 +1565,7 @@ function mergeFile(blob) {
         print(ts, fn)
         code = 307
         ftype = 3
+        b = ts.bit_length() + 7 >> 3
         url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
         s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--></html>'
         print(s)
