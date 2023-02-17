@@ -2716,7 +2716,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 return 0
         i = 0
         for f in os.listdir("cache"):
-            if f[0] in "\x7f~!" and not f.endswith("~.temp$") or f.startswith("attachment_") or f.startswith("emoji_"):
+            if f[0] in "\x7f~!" and not f.split("@", 1)[0].endswith("~.temp$") or f.startswith("attachment_") or f.startswith("emoji_"):
                 pass
             else:
                 i += 1

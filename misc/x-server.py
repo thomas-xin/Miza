@@ -687,18 +687,18 @@ class Server:
                             mime = info[2]
                             if download and len(urls) == 1:
                                 raise cp.HTTPRedirect(urls[0], status="307")
-                            return self.concat(p, urls)
+                            return self.concat(p, urls, name=info[0])
 # s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--></html>'
             return cp.lib.static.serve_file(p, content_type=mime, disposition="attachment" if download else None)
     files._cp_config = {"response.stream": True}
 
-    def concat(self, fn, urls, download=False):
+    def concat(self, fn, urls, name="", download=False):
         print("Cat", urls)
         headers = fcdict(cp.request.headers)
         headers.pop("Remote-Addr", None)
         headers.pop("Host", None)
         headers.update(Request.header())
-        on = fn.replace("~.forward$", "~.temp$")
+        on = fn.replace("~.forward$", "~.temp$@" + name)
         with open(on, "wb") as f:
             for url in urls:
                 if url.startswith("D$"):
@@ -1590,7 +1590,7 @@ function mergeFile(blob) {
                     s = s.replace('""', f'"{url}"', 1)
                     g.write(s)
             if os.path.exists(n + "0"):
-                os.rename(n + "0", fn.split("~", 1)[0] + "~.temp$")
+                os.rename(n + "0", fn.split("~", 1)[0] + "~.temp$@" + name)
         else:
             high = int(kwargs.get("index") or cp.request.headers.get("x-index", "0"))
             os.rename(n + "0", fn)
@@ -1646,7 +1646,7 @@ function mergeFile(blob) {
         s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--></html>'
         with open(fn, "w", encoding="utf-8") as f:
             f.write(s)
-        os.remove(of)
+        os.rename(of, of.split("~", 1)[0] + "~.temp$@" + name)
 
     @cp.expose(("proxy",))
     @hostmap
