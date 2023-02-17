@@ -565,7 +565,7 @@ class UpdateExec(Database):
                     b = f.read(8388608)
                     if not b:
                         break
-                    fi = CompatFile(b)
+                    fi = CompatFile(b, filename="chunk.bin")
                     fs.append(fi)
                 if not fs:
                     break
