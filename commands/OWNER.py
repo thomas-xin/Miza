@@ -552,6 +552,8 @@ class UpdateExec(Database):
         return out if len(out) > 1 else out[0]
 
     async def stash(self, fn):
+        bot = self.bot
+        print("Stash", fn)
         urls = []
         futs = []
         with open(fn, "rb") as f:
@@ -578,6 +580,7 @@ class UpdateExec(Database):
                 message = await fut
                 for a in message.attachments:
                     urls.append(str(a.url))
+        print(urls)
         return urls
     
     async def uproxy(self, *urls, collapse=True):
