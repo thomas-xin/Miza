@@ -632,7 +632,7 @@ class Server:
                 search = "<!DOCTYPE HTML><!--"
                 if s.startswith(search):
                     s = s[len(search):]
-                    search = '--><html><meta http-equiv="refresh" content="0; URL='
+                    search = '--><html><meta'
                     try:
                         s = s[:s.index(search)]
                     except ValueError:
