@@ -2720,7 +2720,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 if not f.split("@", 1)[0].endswith("~.temp$"):
                     fn = "cache/" + f
                     if f[0] == "\x7f" and os.path.getsize(fn) > 1048576:
-                        requests.patch(self.webserver + f"/replace_file?fn={fn}")
+                        reqs.next().patch(self.webserver + f"/replace_file?fn={urllib.parse.quote_plus(fn)}")
                     continue
             elif f.startswith("attachment_") or f.startswith("emoji_"):
                 continue
@@ -5911,7 +5911,7 @@ def as_file(file, filename=None, ext=None, rename=True):
                 os.rename(file, fo)
                 break
             time.sleep(0.3)
-        reqs.next().patch(self.webserver + f"/replace_file?fn={fo}")
+        reqs.next().patch(self.webserver + f"/replace_file?fn={urllib.parse.quote_plus(fo)}")
     else:
         fn = file.rsplit("/", 1)[-1][1:].rsplit(".", 1)[0].split("~", 1)[0]
     try:
