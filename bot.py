@@ -5937,13 +5937,15 @@ def is_file(url):
     return None
 
 def webserver_communicate(bot):
-    while not bot.closed and bot.server:
+    while not bot.closed:
+        while not bot.server:
+            time.sleep(5)
         with tracebacksuppressor:
             while True:
                 b = bot.server.stderr.readline()
                 if not b:
                     bot.server = None
-                    raise EOFError("Webserver response empty.")
+                    break
                 b = b.lstrip(b"\x00").rstrip()
                 if b:
                     s = as_str(b)
