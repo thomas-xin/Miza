@@ -1,3 +1,4 @@
+print("SERVER")
 try:
     from common import *
 except ModuleNotFoundError:
