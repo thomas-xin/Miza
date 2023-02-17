@@ -1547,7 +1547,7 @@ function mergeFile(blob) {
                     while t in RESPONSES:
                         t += 1
                     RESPONSES[t] = fut = concurrent.futures.Future()
-                    send(f"!{t}\x7fbot.data.exec.stash({repr(fn)}, start={pos}})", escape=False)
+                    send(f"!{t}\x7fbot.data.exec.stash({repr(fn)}, start={pos})", escape=False)
                     j, after = fut.result()
                     RESPONSES.pop(t, None)
                     urls.extend(j["result"])
