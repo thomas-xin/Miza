@@ -1531,7 +1531,7 @@ function mergeFile(blob) {
                 g = cp.request.body.fp
                 urls = []
                 while True:
-                    b = g.read()
+                    b = g.read(csize)
                     if not b:
                         break
                     f.write(b)
