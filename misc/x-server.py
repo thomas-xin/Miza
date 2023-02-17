@@ -1517,7 +1517,8 @@ function mergeFile(blob) {
     @cp.expose
     @hostmap
     def upload_chunk(self, **kwargs):
-        s = cp.request.remote.ip + "%" + cp.request.headers.get("x-file-name", "untitled")
+        name = cp.request.headers.get("x-file-name", "untitled")
+        s = cp.request.remote.ip + "%" + name
         h = hash(s) % 2 ** 48
         xi = cp.request.headers.get("x-index", "0")
         fn = f"cache/{h}%" + xi
