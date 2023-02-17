@@ -567,7 +567,7 @@ class UpdateExec(Database):
                         break
                     fi = CompatFile(b)
                     fs.append(fi)
-                if not fs
+                if not fs:
                     break
                 c_id = choice([c_id for c_id, flag in self.data.items() if flag & 16])
                 channel = await bot.fetch_channel(c_id)
