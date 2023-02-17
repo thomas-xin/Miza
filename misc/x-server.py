@@ -1631,6 +1631,7 @@ function mergeFile(blob) {
             self.replace_file(fn[3:])
         return HOST + "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
 
+    @cp.expose
     def replace_file(self, fn):
         print("Replace", fn)
         of = fn
