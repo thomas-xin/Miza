@@ -550,6 +550,35 @@ class UpdateExec(Database):
                     self.bot.data.proxies.update(0)
                     c += 1
         return out if len(out) > 1 else out[0]
+
+    async def stash(self, fn):
+        urls = []
+        futs = []
+        with open(fn, "rb") as f:
+            while True:
+                fs = []
+                while len(fs) < 10:
+                    b = f.read(8388608)
+                    if not b:
+                        break
+                    fi = CompatFile(b)
+                    fs.append(fi)
+                if not fs:
+                    break
+                c_id = choice([c_id for c_id, flag in self.data.items() if flag & 16])
+                channel = await bot.fetch_channel(c_id)
+                m = channel.guild.me
+                if len(futs) >= 5:
+                    message = await futs.pop(0)
+                    for a in message.attachments:
+                        urls.append(str(a.url))
+                fut = create_task(bot.send_as_webhook(channel, files=fs, username=m.display_name, avatar_url=best_url(m), recurse=False))
+                futs.append(fut)
+            for fut in futs:
+                message = await fut
+                for a in message.attachments:
+                    urls.append(str(a.url))
+        return urls
     
     async def uproxy(self, *urls, collapse=True):
         out = [None] * len(urls)

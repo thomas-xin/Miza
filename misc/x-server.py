@@ -616,7 +616,7 @@ class Server:
                 return b
             elif not os.path.exists(p):
                 raise FileNotFoundError(p)
-            elif not download and p.endswith("~.forward$") and mime == "text/html" and os.path.getsize(p) < 8192:
+            elif not download and p.endswith("~.forward$") and mime == "text/html" and os.path.getsize(p) < 1048576:
                 with open(p, "r", encoding="utf-8") as f:
                     resp = f.read(1048576)
                 s = resp
@@ -666,8 +666,37 @@ class Server:
                             f = resp.raw
                             # f = ForwardedRequest(resp, 98304)
                             return cp.lib.file_generator(f, 262144)
+                        elif ftype == 3:
+                            yield self.cat(resp)
+# s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--></html>'
             return cp.lib.static.serve_file(p, content_type=mime, disposition="attachment" if download else None)
     files._cp_config = {"response.stream": True}
+
+    def cat(self, resp):
+        s = resp.split("/>", 1)[-1]
+        infd, urld, _ = s.split("-->", 2)
+        info = orjson.loads(infd.removeprefix("<!--"))
+        urls = orjson.loads(urld.removeprefix("<!--"))
+        if download:
+            disp = "attachment;filename=" + info[0]
+        else:
+            disp = "filename=" + info[0]
+        cp.response.headers["Content-Disposition"] = disp
+        cp.response.headers["Content-Length"] = info[1]
+        cp.response.headers["Content-Type"] = info[2]
+        headers = fcdict(cp.request.headers)
+        headers.pop("Remote-Addr", None)
+        headers.pop("Host", None)
+        headers.update(Request.header())
+        for url in urls:
+            resp = reqs.next().get(url, headers=headers, stream=False)
+            it = resp.iter_content(262144)
+            try:
+                while True:
+                    b = next(it)
+                    yield b
+            except StopIteration:
+                pass
 
     @cp.expose
     @hostmap
@@ -1496,6 +1525,8 @@ function mergeFile(blob) {
                     with open(gn, "rb") as g:
                         shutil.copyfileobj(g, f)
                     os.remove(gn)
+        with tracebacksuppressor:
+            self.replace_file(fn)
         b = ts.bit_length() + 7 >> 3
         return "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
 
@@ -1507,7 +1538,35 @@ function mergeFile(blob) {
         fn = f"../cache/{IND}{ts}~" + url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
         subprocess.run([sys.executable, "downloader.py", url, fn], cwd="misc")
         b = ts.bit_length() + 7 >> 3
+        with tracebacksuppressor:
+            self.replace_file(fn[3:])
         return HOST + "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
+
+    def replace_file(self, fn):
+        of = fn
+        size = os.path.getsize(of)
+        if size > 1073741824:
+            raise OverflowError
+        name = of.rsplit("/", 1)[-1]
+        mime = get_mime(of)
+        t = ts_us()
+        while t in RESPONSES:
+            t += 1
+        RESPONSES[t] = fut = concurrent.futures.Future()
+        send(f"!{t}\x7fbot.data.exec.stash({repr(fn)})", escape=False)
+        j, after = fut.result()
+        RESPONSES.pop(t, None)
+        urls = j["result"]
+        assert urls
+        ts = int(fn.split("~", 1)[0].rsplit(IND, 1)[-1])
+        fn = fn.split("~", 1)[0] + "~.forward$"
+        code = 307
+        ftype = 3
+        url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
+        s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--></html>'
+        with open(fn, "w", encoding="utf-8") as f:
+            f.write(s)
+        os.remove(of)
 
     @cp.expose(("proxy",))
     @hostmap
