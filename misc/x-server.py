@@ -681,23 +681,27 @@ class Server:
                             info = orjson.loads(infd.removeprefix("<!--"))
                             urls = orjson.loads(urld.removeprefix("<!--"))
                             disp = "filename=" + info[0]
-                            cp.response.headers["Content-Disposition"] = disp
+                            # cp.response.headers["Content-Disposition"] = disp
                             # cp.response.headers["Content-Length"] = info[1]
-                            cp.response.headers["Content-Type"] = info[2]
-                            return self.concat(urls)
+                            # cp.response.headers["Content-Type"] = info[2]
+                            mime = info[2]
+                            p = self.concat(p, urls)
 # s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--></html>'
             return cp.lib.static.serve_file(p, content_type=mime, disposition="attachment" if download else None)
     files._cp_config = {"response.stream": True}
 
-    def concat(self, urls):
+    def concat(self, urls, fn):
         print("Cat", urls)
         headers = fcdict(cp.request.headers)
         headers.pop("Remote-Addr", None)
         headers.pop("Host", None)
         headers.update(Request.header())
-        for url in urls:
-            resp = reqs.next().get(url, headers=headers)
-            yield resp.content
+        on = fn.replace("~.forward$", "~.temp$")
+        with open(on, "wb") as f:
+            for url in urls:
+                resp = reqs.next().get(url, headers=headers)
+                f.write(resp.content)
+        return on
             # resp = reqs.next().get(url, headers=headers, stream=True)
             # it = resp.iter_content(262144)
             # try:

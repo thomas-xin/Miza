@@ -2716,7 +2716,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 return 0
         i = 0
         for f in os.listdir("cache"):
-            if f[0] in "\x7f~!" or f.startswith("attachment_") or f.startswith("emoji_"):
+            if f[0] in "\x7f~!" and not f.endswith("~.temp$") or f.startswith("attachment_") or f.startswith("emoji_"):
                 pass
             else:
                 i += 1
@@ -5847,7 +5847,7 @@ IND = "\x7f"
 
 def update_file_cache(files=None):
     if files is None:
-        files = deque(sorted(file[len(IND):] for file in os.listdir("cache") if file.startswith(IND)))
+        files = deque(sorted(file[len(IND):] for file in os.listdir("cache") if file.startswith(IND) and not file.endswith("~.forward$")))
     bot.file_count = len(files)
     bot.storage_ratio = min(1, max(bot.file_count / 65536, bot.disk / (1 << 34)))
     for t in os.walk("saves"):
