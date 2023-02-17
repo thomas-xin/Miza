@@ -696,14 +696,16 @@ class Server:
         headers.pop("Host", None)
         headers.update(Request.header())
         for url in urls:
-            resp = reqs.next().get(url, headers=headers, stream=True)
-            it = resp.iter_content(262144)
-            try:
-                while True:
-                    b = next(it)
-                    yield b
-            except StopIteration:
-                pass
+            resp = reqs.next().get(url, headers=headers)
+            yield resp.content
+            # resp = reqs.next().get(url, headers=headers, stream=True)
+            # it = resp.iter_content(262144)
+            # try:
+            #     while True:
+            #         b = next(it)
+            #         yield b
+            # except StopIteration:
+            #     pass
 
     @cp.expose
     @hostmap
