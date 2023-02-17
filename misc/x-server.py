@@ -667,26 +667,25 @@ class Server:
                             # f = ForwardedRequest(resp, 98304)
                             return cp.lib.file_generator(f, 262144)
                         elif ftype == 3:
+                            s = resp.split("/>", 1)[-1]
+                            infd, urld, _ = s.split("-->", 2)
+                            info = orjson.loads(infd.removeprefix("<!--"))
+                            urls = orjson.loads(urld.removeprefix("<!--"))
+                            disp = "filename=" + info[0]
+                            cp.response.headers["Content-Disposition"] = disp
+                            cp.response.headers["Content-Length"] = info[1]
+                            cp.response.headers["Content-Type"] = info[2]
                             return self.concat(resp)
 # s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--></html>'
             return cp.lib.static.serve_file(p, content_type=mime, disposition="attachment" if download else None)
     files._cp_config = {"response.stream": True}
 
-    def concat(self, resp):
-        print("Cat", resp)
-        s = resp.split("/>", 1)[-1]
-        infd, urld, _ = s.split("-->", 2)
-        info = orjson.loads(infd.removeprefix("<!--"))
-        urls = orjson.loads(urld.removeprefix("<!--"))
-        disp = "filename=" + info[0]
-        cp.response.headers["Content-Disposition"] = disp
-        cp.response.headers["Content-Length"] = info[1]
-        cp.response.headers["Content-Type"] = info[2]
+    def concat(self, urls):
+        print("Cat", urls)
         headers = fcdict(cp.request.headers)
         headers.pop("Remote-Addr", None)
         headers.pop("Host", None)
         headers.update(Request.header())
-        print(urls)
         for url in urls:
             resp = reqs.next().get(url, headers=headers, stream=False)
             it = resp.iter_content(262144)
