@@ -1636,7 +1636,7 @@ function mergeFile(blob) {
         print("Replace", fn)
         of = fn
         size = os.path.getsize(of)
-        name = of.rsplit("/", 1)[-1]
+        name = of.rsplit("/", 1)[-1].split("~", 1)[-1]
         mime = get_mime(of)
         t = ts_us()
         while t in RESPONSES:
