@@ -667,12 +667,13 @@ class Server:
                             # f = ForwardedRequest(resp, 98304)
                             return cp.lib.file_generator(f, 262144)
                         elif ftype == 3:
-                            return self.cat(resp)
+                            return self.concat(resp)
 # s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--></html>'
             return cp.lib.static.serve_file(p, content_type=mime, disposition="attachment" if download else None)
     files._cp_config = {"response.stream": True}
 
-    def cat(self, resp):
+    def concat(self, resp):
+        print("Cat", resp)
         s = resp.split("/>", 1)[-1]
         infd, urld, _ = s.split("-->", 2)
         info = orjson.loads(infd.removeprefix("<!--"))
@@ -688,6 +689,7 @@ class Server:
         headers.pop("Remote-Addr", None)
         headers.pop("Host", None)
         headers.update(Request.header())
+        print(urls)
         for url in urls:
             resp = reqs.next().get(url, headers=headers, stream=False)
             it = resp.iter_content(262144)
@@ -1546,8 +1548,8 @@ function mergeFile(blob) {
         print("Replace", fn)
         of = fn
         size = os.path.getsize(of)
-        if size > 1073741824:
-            raise OverflowError
+        if size > 1073741824 or size < 1048576:
+            return
         name = of.rsplit("/", 1)[-1]
         mime = get_mime(of)
         t = ts_us()
