@@ -555,8 +555,8 @@ class UpdateExec(Database):
         bot = self.bot
         print("Stash", fn)
         urls = []
-        futs = []
         with open(fn, "rb") as f:
+            i = 0
             while True:
                 fs = []
                 while len(fs) < 10:
@@ -570,16 +570,10 @@ class UpdateExec(Database):
                 c_id = choice([c_id for c_id, flag in self.data.items() if flag & 16])
                 channel = await bot.fetch_channel(c_id)
                 m = channel.guild.me
-                if len(futs) >= 5:
-                    message = await futs.pop(0)
-                    for a in message.attachments:
-                        urls.append(str(a.url))
-                fut = create_task(bot.send_as_webhook(channel, files=fs, username=m.display_name, avatar_url=best_url(m), recurse=False))
-                futs.append(fut)
-            for fut in futs:
-                message = await fut
+                message = await bot.send_as_webhook(channel, f"{fn.rsplit('/', 1)[-1]} ({i})", files=fs, username=m.display_name, avatar_url=best_url(m), recurse=False))
                 for a in message.attachments:
                     urls.append(str(a.url))
+                i += 1
         print(urls)
         return urls
     

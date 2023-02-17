@@ -344,7 +344,16 @@ class Server:
                     pass
                 else:
                     url, code, ftype = orjson.loads(s)
-                    d["original_url"] = url
+                    if ftype == 3:
+                        s = resp.split("/>", 1)[-1]
+                        infd, urld, _ = s.split("-->", 2)
+                        info = orjson.loads(infd.removeprefix("<!--"))
+                        urls = orjson.loads(urld.removeprefix("<!--"))
+                        d["filename"] = info[0]
+                        d["size"] = info[1]
+                        d["mimetype"] = info[2]
+                    else:
+                        d["original_url"] = url
         return orjson.dumps(d)
 
     image_loaders = {}
