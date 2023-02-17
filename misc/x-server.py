@@ -690,7 +690,7 @@ class Server:
             return cp.lib.static.serve_file(p, content_type=mime, disposition="attachment" if download else None)
     files._cp_config = {"response.stream": True}
 
-    def concat(self, urls, fn):
+    def concat(self, fn, urls):
         print("Cat", urls)
         headers = fcdict(cp.request.headers)
         headers.pop("Remote-Addr", None)
