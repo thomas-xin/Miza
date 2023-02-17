@@ -1636,8 +1636,6 @@ function mergeFile(blob) {
         print("Replace", fn)
         of = fn
         size = os.path.getsize(of)
-        if size > 1073741824 or size < 1048576:
-            return
         name = of.rsplit("/", 1)[-1]
         mime = get_mime(of)
         t = ts_us()
@@ -1662,6 +1660,7 @@ function mergeFile(blob) {
         with open(fn, "w", encoding="utf-8") as f:
             f.write(s)
         os.rename(of, of.split("~", 1)[0] + "~.temp$@" + name)
+        return url
 
     @cp.expose(("proxy",))
     @hostmap
