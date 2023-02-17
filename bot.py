@@ -5945,6 +5945,7 @@ def webserver_communicate(bot):
                 b = bot.server.stderr.readline()
                 if not b:
                     bot.server = None
+                    bot.start_webserver()
                     break
                 b = b.lstrip(b"\x00").rstrip()
                 if b:

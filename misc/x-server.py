@@ -675,7 +675,7 @@ class Server:
                             cp.response.headers["Content-Disposition"] = disp
                             cp.response.headers["Content-Length"] = info[1]
                             cp.response.headers["Content-Type"] = info[2]
-                            return self.concat(resp)
+                            return self.concat(urls)
 # s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--></html>'
             return cp.lib.static.serve_file(p, content_type=mime, disposition="attachment" if download else None)
     files._cp_config = {"response.stream": True}
