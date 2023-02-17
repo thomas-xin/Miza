@@ -1552,6 +1552,8 @@ function mergeFile(blob) {
                     j, after = fut.result()
                     RESPONSES.pop(t, None)
                     urls.extend(j["result"])
+                size = os.path.getsize(fn)
+                mime = get_mime(fn)
                 fn = f"cache/{h}%!"
                 urls = [url.replace("https://cdn.discordapp.com/attachments/", "D$") for url in urls]
                 print(urls)
