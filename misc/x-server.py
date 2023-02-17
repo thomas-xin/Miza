@@ -673,7 +673,7 @@ class Server:
                             urls = orjson.loads(urld.removeprefix("<!--"))
                             disp = "filename=" + info[0]
                             cp.response.headers["Content-Disposition"] = disp
-                            cp.response.headers["Content-Length"] = info[1]
+                            # cp.response.headers["Content-Length"] = info[1]
                             cp.response.headers["Content-Type"] = info[2]
                             return self.concat(urls)
 # s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--></html>'
