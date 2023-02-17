@@ -694,26 +694,26 @@ class Server:
 
     def concat(self, fn, urls, name="", download=False):
         print("Cat", urls)
+        on = fn.replace("~.forward$", "~.temp$@" + name)
+        # self._concat(on, urls)
+        # return on
+        fut = create_future_ex(self._concat, on, urls)
+        for i in range(3):
+            if os.path.exists(on):
+                break
+            time.sleep(0.5)
+        with open(on, "rb") as f:
+            while not fut.done():
+                b = f.read(262144)
+                if not b:
+                    continue
+                yield b
+
+    def _concat(self, on, urls):
         headers = fcdict(cp.request.headers)
         headers.pop("Remote-Addr", None)
         headers.pop("Host", None)
         headers.update(Request.header())
-        on = fn.replace("~.forward$", "~.temp$@" + name)
-        self._concat(on, urls)
-        return on
-        # fut = create_future_ex(self._concat, on, urls)
-        # for i in range(3):
-        #     if os.path.exists(on):
-        #         break
-        #     time.sleep(0.5)
-        # with open(on, "rb") as f:
-        #     while not fut.done():
-        #         b = f.read(262144)
-        #         if not b:
-        #             continue
-        #         yield b
-
-    def _concat(self, on, urls):
         with open(on, "wb") as f:
             for url in urls:
                 if url.startswith("D$"):
