@@ -667,7 +667,7 @@ class Server:
                             # f = ForwardedRequest(resp, 98304)
                             return cp.lib.file_generator(f, 262144)
                         elif ftype == 3:
-                            yield self.cat(resp)
+                            return self.cat(resp)
 # s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--></html>'
             return cp.lib.static.serve_file(p, content_type=mime, disposition="attachment" if download else None)
     files._cp_config = {"response.stream": True}
