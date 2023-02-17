@@ -551,12 +551,14 @@ class UpdateExec(Database):
                     c += 1
         return out if len(out) > 1 else out[0]
 
-    async def stash(self, fn):
+    async def stash(self, fn, start=0, end=inf):
         bot = self.bot
         print("Stash", fn)
         urls = []
         with open(fn, "rb") as f:
-            i = 0
+            if start:
+                f.seek(start)
+            i = start
             while True:
                 fs = []
                 while len(fs) < 10:
@@ -565,7 +567,7 @@ class UpdateExec(Database):
                         break
                     fi = CompatFile(b)
                     fs.append(fi)
-                if not fs:
+                if not fs or f.tell() >= end:
                     break
                 c_id = choice([c_id for c_id, flag in self.data.items() if flag & 16])
                 channel = await bot.fetch_channel(c_id)
@@ -573,7 +575,7 @@ class UpdateExec(Database):
                 message = await bot.send_as_webhook(channel, f"{fn.rsplit('/', 1)[-1]} ({i})", files=fs, username=m.display_name, avatar_url=best_url(m), recurse=False)
                 for a in message.attachments:
                     urls.append(str(a.url))
-                i += 1
+                i += 83886080
         print(urls)
         return urls
     

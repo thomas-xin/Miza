@@ -685,12 +685,14 @@ class Server:
                             # cp.response.headers["Content-Length"] = info[1]
                             # cp.response.headers["Content-Type"] = info[2]
                             mime = info[2]
+                            if download and len(urls) == 1:
+                                raise cp.HTTPRedirect(urls[0], status="307")
                             p = self.concat(p, urls)
 # s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--></html>'
             return cp.lib.static.serve_file(p, content_type=mime, disposition="attachment" if download else None)
     files._cp_config = {"response.stream": True}
 
-    def concat(self, fn, urls):
+    def concat(self, fn, urls, download=False):
         print("Cat", urls)
         headers = fcdict(cp.request.headers)
         headers.pop("Remote-Addr", None)
@@ -699,6 +701,8 @@ class Server:
         on = fn.replace("~.forward$", "~.temp$")
         with open(on, "wb") as f:
             for url in urls:
+                if url.startswith("D$"):
+                    url = "https://cdn.discordapp.com/attachments/" + url[2:]
                 resp = reqs.next().get(url, headers=headers)
                 f.write(resp.content)
         return on
@@ -1515,8 +1519,49 @@ function mergeFile(blob) {
     def upload_chunk(self, **kwargs):
         s = cp.request.remote.ip + "%" + cp.request.headers.get("x-file-name", "untitled")
         h = hash(s) % 2 ** 48
-        fn = f"cache/{h}%" + cp.request.headers.get("x-index", "0")
+        xi = cp.request.headers.get("x-index", "0")
+        fn = f"cache/{h}%" + xi
         with open(fn, "wb") as f:
+            if int(xi) == 0 and cp.request.headers.get("Referer") == "https://mizabot.xyz/files":
+                pos = 0
+                csize = 83886080
+                g = cp.request.body.fp
+                urls = []
+                while True:
+                    b = g.read()
+                    if not b:
+                        break
+                    f.write(b)
+                    if f.tell() > pos + csize:
+                        t = ts_us()
+                        while t in RESPONSES:
+                            t += 1
+                        RESPONSES[t] = fut = concurrent.futures.Future()
+                        send(f"!{t}\x7fbot.data.exec.stash({repr(fn)}, start={pos}, end={pos + csize})", escape=False)
+                        j, after = fut.result()
+                        RESPONSES.pop(t, None)
+                        urls.extend(j["result"])
+                        pos += csize
+                if f.tell() > pos:
+                    t = ts_us()
+                    while t in RESPONSES:
+                        t += 1
+                    RESPONSES[t] = fut = concurrent.futures.Future()
+                    send(f"!{t}\x7fbot.data.exec.stash({repr(fn)}, start={pos}})", escape=False)
+                    j, after = fut.result()
+                    RESPONSES.pop(t, None)
+                    urls.extend(j["result"])
+                fn = f"cache/{h}%!"
+                urls = [url.replace("https://cdn.discordapp.com/attachments/", "D$") for url in urls]
+                print(urls)
+                assert urls
+                code = 307
+                ftype = 3
+                url = ""
+                s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--></html>'
+                with open(fn, "w", encoding="utf-8") as f:
+                    f.write(s)
+                return
             shutil.copyfileobj(cp.request.body.fp, f)
 
     @cp.expose
@@ -1529,18 +1574,28 @@ function mergeFile(blob) {
         h = hash(s) % 2 ** 48
         n = f"cache/{h}%"
         fn = f"cache/{IND}{ts}~" + name
-        high = int(kwargs.get("index") or cp.request.headers.get("x-index", "0"))
-        os.rename(n + "0", fn)
-        if high > 1:
-            with open(fn, "ab") as f:
-                for i in range(1, high):
-                    gn = n + str(i)
-                    with open(gn, "rb") as g:
-                        shutil.copyfileobj(g, f)
-                    os.remove(gn)
-        with tracebacksuppressor:
-            self.replace_file(fn)
+        r = n + "!"
+        tn = fn.split("~", 1)[0] + "~.forward$"
         b = ts.bit_length() + 7 >> 3
+        if os.path.exists(r):
+            with open(r, "r", encoding="utf-8") as f:
+                with open(tn, "w", encoding="utf-8") as g:
+                    s = g.read()
+                url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
+                s = s.replace('""', f'"{url}"', 1)
+                f.write(s)
+        else:
+            high = int(kwargs.get("index") or cp.request.headers.get("x-index", "0"))
+            os.rename(n + "0", fn)
+            if high > 1:
+                with open(fn, "ab") as f:
+                    for i in range(1, high):
+                        gn = n + str(i)
+                        with open(gn, "rb") as g:
+                            shutil.copyfileobj(g, f)
+                        os.remove(gn)
+            with tracebacksuppressor:
+                self.replace_file(fn)
         return "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
 
     @cp.expose
@@ -1571,17 +1626,17 @@ function mergeFile(blob) {
         j, after = fut.result()
         RESPONSES.pop(t, None)
         urls = j["result"]
+        urls = [url.replace("https://cdn.discordapp.com/attachments/", "D$") for url in urls]
         print(urls)
         assert urls
         ts = int(of.split("~", 1)[0].rsplit(IND, 1)[-1])
         fn = of.split("~", 1)[0] + "~.forward$"
-        print(ts, fn)
+        # print(ts, fn)
         code = 307
         ftype = 3
         b = ts.bit_length() + 7 >> 3
         url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
         s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--></html>'
-        print(s)
         with open(fn, "w", encoding="utf-8") as f:
             f.write(s)
         os.remove(of)
