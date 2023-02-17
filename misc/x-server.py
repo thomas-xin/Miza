@@ -678,10 +678,7 @@ class Server:
         infd, urld, _ = s.split("-->", 2)
         info = orjson.loads(infd.removeprefix("<!--"))
         urls = orjson.loads(urld.removeprefix("<!--"))
-        if download:
-            disp = "attachment;filename=" + info[0]
-        else:
-            disp = "filename=" + info[0]
+        disp = "filename=" + info[0]
         cp.response.headers["Content-Disposition"] = disp
         cp.response.headers["Content-Length"] = info[1]
         cp.response.headers["Content-Type"] = info[2]
