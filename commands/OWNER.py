@@ -553,7 +553,7 @@ class UpdateExec(Database):
 
     async def stash(self, fn, start=0, end=inf):
         bot = self.bot
-        print("Stash", fn)
+        print("Stash", fn, start, end)
         urls = []
         with open(fn, "rb") as f:
             if start:
@@ -575,7 +575,7 @@ class UpdateExec(Database):
                 message = await bot.send_as_webhook(channel, f"{fn.rsplit('/', 1)[-1]} ({i})", files=fs, username=m.display_name, avatar_url=best_url(m), recurse=False)
                 for a in message.attachments:
                     urls.append(str(a.url))
-                i += 83886080
+                i = f.tell()
         print(urls)
         return urls
     

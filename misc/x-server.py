@@ -687,7 +687,7 @@ class Server:
                             mime = info[2]
                             if download and len(urls) == 1:
                                 raise cp.HTTPRedirect(urls[0], status="307")
-                            p = self.concat(p, urls)
+                            return self.concat(p, urls)
 # s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--></html>'
             return cp.lib.static.serve_file(p, content_type=mime, disposition="attachment" if download else None)
     files._cp_config = {"response.stream": True}
@@ -704,8 +704,10 @@ class Server:
                 if url.startswith("D$"):
                     url = "https://cdn.discordapp.com/attachments/" + url[2:]
                 resp = reqs.next().get(url, headers=headers)
-                f.write(resp.content)
-        return on
+                b = resp.content
+                f.write(b)
+                yield b
+        # return on
             # resp = reqs.next().get(url, headers=headers, stream=True)
             # it = resp.iter_content(262144)
             # try:
@@ -1587,6 +1589,8 @@ function mergeFile(blob) {
                     url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
                     s = s.replace('""', f'"{url}"', 1)
                     g.write(s)
+            if os.path.exists(n + "0"):
+                os.rename(n + "0", fn.split("~", 1)[0] + "~.temp$")
         else:
             high = int(kwargs.get("index") or cp.request.headers.get("x-index", "0"))
             os.rename(n + "0", fn)
