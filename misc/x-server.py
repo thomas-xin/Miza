@@ -1543,6 +1543,7 @@ function mergeFile(blob) {
         return HOST + "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
 
     def replace_file(self, fn):
+        print("Replace", fn)
         of = fn
         size = os.path.getsize(of)
         if size > 1073741824:
@@ -1553,17 +1554,20 @@ function mergeFile(blob) {
         while t in RESPONSES:
             t += 1
         RESPONSES[t] = fut = concurrent.futures.Future()
-        send(f"!{t}\x7fbot.data.exec.stash({repr(fn)})", escape=False)
+        send(f"!{t}\x7fbot.data.exec.stash({repr(of)})", escape=False)
         j, after = fut.result()
         RESPONSES.pop(t, None)
         urls = j["result"]
+        print(urls)
         assert urls
-        ts = int(fn.split("~", 1)[0].rsplit(IND, 1)[-1])
-        fn = fn.split("~", 1)[0] + "~.forward$"
+        ts = int(of.split("~", 1)[0].rsplit(IND, 1)[-1])
+        fn = of.split("~", 1)[0] + "~.forward$"
+        print(ts, fn)
         code = 307
         ftype = 3
         url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
         s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--></html>'
+        print(s)
         with open(fn, "w", encoding="utf-8") as f:
             f.write(s)
         os.remove(of)
