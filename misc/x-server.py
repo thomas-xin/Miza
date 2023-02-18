@@ -237,6 +237,7 @@ est_time = utc()
 est_last = -inf
 
 def estimate_life():
+    return inf
     global est_time, est_last
     with tracebacksuppressor:
         hosted = sorted(int(f[1:].split("~", 1)[0]) / 1e6 for f in os.listdir("cache") if f.startswith(IND))
@@ -1193,7 +1194,7 @@ class Server:
 
         for file in files:
             fn = file.filename
-            sfn = f"cache/{IND}{ts}~{fn}"
+            sfn = f"saves/filehost/{IND}{ts}~{fn}"
             futs.append(create_future_ex(copy_file, file.file, sfn))
             b = ts.bit_length() + 7 >> 3
             href = f"/view/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
@@ -1592,7 +1593,7 @@ function mergeFile(blob) {
         s = cp.request.remote.ip + "%" + name
         h = hash(s) % 2 ** 48
         n = f"cache/{h}%"
-        fn = f"cache/{IND}{ts}~" + name
+        fn = f"saves/filehost/{IND}{ts}~" + name
         r = n + "!"
         tn = fn.split("~", 1)[0] + "~.forward$"
         b = ts.bit_length() + 7 >> 3
@@ -1624,7 +1625,7 @@ function mergeFile(blob) {
     def upload_url(self, **kwargs):
         ts = time.time_ns() // 1000
         url = kwargs["url"]
-        fn = f"../cache/{IND}{ts}~" + url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
+        fn = f"../saves/filehost/{IND}{ts}~" + url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
         subprocess.run([sys.executable, "downloader.py", url, fn], cwd="misc")
         b = ts.bit_length() + 7 >> 3
         with tracebacksuppressor:
@@ -1780,7 +1781,7 @@ body {
     @hostmap
     def forward(self, **kwargs):
         ts = time.time_ns() // 1000
-        fn = f"cache/{IND}{ts}~.forward$"
+        fn = f"saves/filehost/{IND}{ts}~.forward$"
         url = kwargs.get("url")
         if not url:
             raise FileNotFoundError

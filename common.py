@@ -2396,7 +2396,7 @@ def exec_tb(s, *args, **kwargs):
         exec(s, *args, **kwargs)
 
 
-def find_file(path, cwd="cache", ind="\x7f"):
+def find_file(path, cwd="saves/filehost", ind="\x7f"):
     # if no file name is inputted, return no content
     if not path:
         raise EOFError

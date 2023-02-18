@@ -124,6 +124,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         # O(1) time complexity for searching directory
         directory = frozenset(os.listdir())
         [os.mkdir(folder) for folder in ("cache", "saves") if folder not in directory]
+        if not os.path.exists("saves/filehost"):
+            os.mkdir("saves/filehost")
         try:
             self.token = AUTH["discord_token"]
         except KeyError:
@@ -5846,27 +5848,26 @@ PORT = AUTH.get("webserver_port", 80)
 IND = "\x7f"
 
 def update_file_cache(files=None):
-    if files is None:
-        files = deque(sorted(file[len(IND):] for file in os.listdir("cache") if file.startswith(IND) and not file.endswith("~.forward$")))
-    bot.file_count = len(files)
-    bot.storage_ratio = min(1, max(bot.file_count / 65536, bot.disk / (1 << 34)))
-    for t in os.walk("saves"):
-        bot.file_count += len(t[-1])
-    if bot.storage_ratio >= 1:
-        curr = files.popleft()
-        ct = int(curr.rsplit(".", 1)[0].split("~", 1)[0])
-        fn = "cache/" + IND + curr
-        t = utc()
-        if t - ct > 86400 * 60 and t - os.path.getatime(fn) > 86400 * 30:
-            with tracebacksuppressor:
-                os.remove(fn)
-                print(curr, "deleted.")
+    # if files is None:
+    #     files = deque(sorted(file[len(IND):] for file in os.listdir("cache") if file.startswith(IND) and not file.endswith("~.forward$")))
+    # bot.file_count = len(files)
+    # bot.storage_ratio = min(1, max(bot.file_count / 65536, bot.disk / (1 << 34)))
+    # for t in os.walk("saves"):
+    #     bot.file_count += len(t[-1])
+    # if bot.storage_ratio >= 1:
+    #     curr = files.popleft()
+    #     ct = int(curr.rsplit(".", 1)[0].split("~", 1)[0])
+    #     fn = "cache/" + IND + curr
+    #     t = utc()
+    #     if t - ct > 86400 * 60 and t - os.path.getatime(fn) > 86400 * 30:
+    #         with tracebacksuppressor:
+    #             os.remove(fn)
+    #             print(curr, "deleted.")
                 # update_file_cache(files, recursive=False)
     # if not recursive:
     #     return
-    attachments = (file for file in sorted(set(file for file in os.listdir("cache") if file.startswith("attachment_"))))
-    attachments = deque(attachments)
-    while len(attachments) > 8192:
+    attachments = deque(file for file in sorted(file for file in os.listdir("cache") if file.startswith("attachment_")))
+    while len(attachments) > 4096:
         with tracebacksuppressor:
             file = "cache/" + attachments.popleft()
             if os.path.exists(file):
@@ -5880,7 +5881,7 @@ def update_file_cache(files=None):
 def as_file(file, filename=None, ext=None, rename=True):
     if rename:
         fn = round(ts_us())
-        for fi in os.listdir("cache"):
+        for fi in os.listdir("saves/server"):
             if fi.startswith(f"{IND}{fn}~"):
                 fn += 1
         out = str(fn)
@@ -5897,12 +5898,12 @@ def as_file(file, filename=None, ext=None, rename=True):
             filename = file.filename or filename
             file = fp.read()
     if issubclass(type(file), bytes):
-        with open(f"cache/{IND}{out}", "wb") as f:
+        with open(f"saves/filehost/{IND}{out}", "wb") as f:
             f.write(file)
     elif rename:
         for i in range(100):
             with suppress(PermissionError):
-                os.rename(file, f"cache/{IND}{out}~{lim_str(filename, 64).translate(filetrans)}")
+                os.rename(file, f"saves/filehost/{IND}{out}~{lim_str(filename, 64).translate(filetrans)}")
                 break
             time.sleep(0.3)
     else:
@@ -5931,9 +5932,9 @@ def is_file(url):
             if endpoint in ("view", "file", "files", "download"):
                 path = u.split("/", 2)[1].split("?", 1)[0]
                 fn = f"{IND}{path}"
-                for file in os.listdir("cache"):
+                for file in os.listdir("saves/filehost"):
                     if file.rsplit(".", 1)[0].split("~", 1)[0][1:] == path:
-                        return f"cache/{file}"
+                        return f"saves/filehost/{file}"
     return None
 
 def webserver_communicate(bot):
