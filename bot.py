@@ -2717,14 +2717,22 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if self._globals["VOICE"].ytdl.download_sem.active:
                 return 0
         i = 0
-        for f in os.listdir("cache"):
+        for f in os.listdir("saves/filehost"):
             if f[0] in "\x7f~!":
+                fn = "saves/filehost/" + f
                 if not f.split("@", 1)[0].endswith("~.temp$"):
-                    fn = "cache/" + f
                     if f[0] == "\x7f" and os.path.getsize(fn) > 1048576:
                         reqs.next().patch(self.webserver + f"/replace_file?fn={urllib.parse.quote_plus(fn)}")
                     continue
-            elif f.startswith("attachment_") or f.startswith("emoji_"):
+                if utc() - os.path.getatime(fn) <= 86400:
+                    continue
+            i += 1
+            try:
+                os.remove("saves/filehost/" + f)
+            except:
+                print_exc()
+        for f in os.listdir("cache"):
+            if f.startswith("attachment_") or f.startswith("emoji_"):
                 continue
             i += 1
             try:
@@ -5871,7 +5879,7 @@ def update_file_cache(files=None):
                 # update_file_cache(files, recursive=False)
     # if not recursive:
     #     return
-    attachments = deque(file for file in sorted(file for file in os.listdir("cache") if file.startswith("attachment_")))
+    attachments = deque(file for file in sorted((file for file in os.listdir("cache") if file.startswith("attachment_")), key=lambda file: int(file.split("_", 1)[-1].split(".", 1)[0])))
     while len(attachments) > 4096:
         with tracebacksuppressor:
             file = "cache/" + attachments.popleft()
