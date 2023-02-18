@@ -326,8 +326,9 @@ class UpdateExec(Database):
                 glob["auds"] = bot.data.audio.players[message.guild.id]
             if term & 32:
                 proc = await asyncio.create_subprocess_shell(proc, stdout=subprocess.PIPE, limit=65536)
-                output = await proc.stdout.read()
-                output = as_str(output)
+                out = await proc.stdout.read()
+                err = await proc.stderr.read()
+                output = (as_str(out) + "\n" + as_str(err)).strip()
                 if output:
                     glob["_"] = output
                 return output
