@@ -421,7 +421,7 @@ class Server:
             st = os.stat(p)
             fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
             attachment = filename or fn
-            a2 = url_unparse(attachment)
+            a2 = url_unparse(attachment).removeprefix(".temp$@")
             cp.response.headers["Attachment-Filename"] = attachment
             if endpoint.startswith("p"):
                 s = """<!DOCTYPE html>
@@ -1104,7 +1104,7 @@ class Server:
             with sem:
                 fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
                 attachment = filename or fn
-                a2 = url_unparse(attachment)
+                a2 = url_unparse(attachment).removeprefix(".temp$@")
                 f_url = url.replace("/file/", "/f/")
                 mim = get_mime(p)
                 description = mim + f", {byte_scale(os.path.getsize(p))}B"
