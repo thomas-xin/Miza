@@ -2894,9 +2894,16 @@ class AudioDownloader:
                                         b = f.read(1048576)
                                         if not b:
                                             break
-                                        proc.stdin.write(b)
+                                        try:
+                                            proc.stdin.write(b)
+                                        except OSError:
+                                            print_exc()
+                                            print(proc.stderr.read())
+                                            break
                             with suppress():
                                 os.remove(cfn)
+                            if not proc.is_running():
+                                break
                     proc.stdin.flush()
                     proc.stdin.close()
                     proc.wait()

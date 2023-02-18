@@ -566,7 +566,7 @@ class UpdateExec(Database):
                     b = f.read(8388608)
                     if not b:
                         break
-                    fi = CompatFile(b, filename="chunk.bin")
+                    fi = CompatFile(b, filename="c.b")
                     fs.append(fi)
                 if not fs:
                     break
@@ -579,7 +579,29 @@ class UpdateExec(Database):
                 i = f.tell()
         print(urls)
         return urls
-    
+
+    async def delete(self, urls):
+        bot = self.bot
+        print("Delete", urls)
+        mids = set()
+        for url in urls:
+            mid = int(url.split("/attachments/", 1)[-1].split("/", 1)[0])
+            mids.add(mid)
+        cids = [c_id for c_id, flag in self.data.items() if flag & 16]
+        channels = []
+        for cid in cids:
+            channel = await bot.fetch_channel(cid)
+            channels.append(channel)
+        for mid in mids:
+            for c in channels:
+                try:
+                    m = await bot.fetch_message(mid, c)
+                except:
+                    continue
+                await bot.silent_delete(m)
+                break
+        return mids
+
     async def uproxy(self, *urls, collapse=True):
         out = [None] * len(urls)
         files = [None] * len(urls)

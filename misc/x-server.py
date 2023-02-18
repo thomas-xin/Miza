@@ -689,7 +689,6 @@ class Server:
                             if download and len(urls) == 1:
                                 raise cp.HTTPRedirect(urls[0], status="307")
                             return self.concat(p, urls, name=info[0])
-# s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--></html>'
             return cp.lib.static.serve_file(p, content_type=mime, disposition="attachment" if download else None)
     files._cp_config = {"response.stream": True}
 
@@ -1585,7 +1584,9 @@ function mergeFile(blob) {
                 code = 307
                 ftype = 3
                 url = ""
-                s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--></html>'
+                n = ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)
+                key = base64.b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
+                s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--><!--KEY={key}--></html>'
                 with open(fn, "w", encoding="utf-8") as f:
                     f.write(s)
                 return
@@ -1604,6 +1605,7 @@ function mergeFile(blob) {
         r = n + "!"
         tn = fn.split("~", 1)[0] + "~.forward$"
         b = ts.bit_length() + 7 >> 3
+        q = ""
         if os.path.exists(r):
             with open(r, "r", encoding="utf-8") as f:
                 with open(tn, "w", encoding="utf-8") as g:
@@ -1611,6 +1613,8 @@ function mergeFile(blob) {
                     url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
                     s = s.replace('""', f'"{url}"', 1)
                     g.write(s)
+            key = s.split("<!--KEY=", 1)[-1].split("-", 1)[0]
+            q = f"?key={key}"
             if os.path.exists(n + "0"):
                 os.rename(n + "0", fn.split("~", 1)[0] + "~.temp$@" + name)
         else:
@@ -1625,7 +1629,7 @@ function mergeFile(blob) {
                         os.remove(gn)
             with tracebacksuppressor:
                 self.replace_file(fn)
-        return "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
+        return "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=") + q
 
     @cp.expose
     @hostmap
@@ -1668,11 +1672,13 @@ function mergeFile(blob) {
         ftype = 3
         b = ts.bit_length() + 7 >> 3
         url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
-        s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--></html>'
+        n = ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)
+        key = base64.b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
+        s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--><!--KEY={key}--></html>'
         with open(fn, "w", encoding="utf-8") as f:
             f.write(s)
         os.rename(of, f"saves/filehost/{IND}{ts}~.temp$@" + name)
-        return url
+        return url + f"?key={key}"
 
     @cp.expose(("proxy",))
     @hostmap
