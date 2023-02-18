@@ -319,7 +319,7 @@ class Server:
         mime = get_mime(p)
         f_url = cp.url(qs=cp.request.query_string).replace("/fileinfo/", "/f/")
         st = os.stat(p)
-        fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND).removeprefix(".temp$")
+        fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND).removeprefix(".temp$@")
         t = utc()
         ti = max(st.st_atime + 30 * 86400, st.st_ctime + 60 * 86400, t)
         d = dict(
