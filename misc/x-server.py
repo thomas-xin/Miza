@@ -173,8 +173,8 @@ if os.path.exists("domain.cert.pem") and os.path.exists("private.key.pem"):
 			if not url.startswith("https://mizabot.") and not url.startswith("https://i.mizabot."):
 				if url.startswith("https://csnftcg.mizabot."):
 					raise cp.HTTPRedirect(f"https://csnftcg.mizabot.xyz:9604/{url.rsplit('/', 1)[-1]}", 307)
-				time.sleep(10)
-				raise cp.HTTPRedirect(f"https://mizabot.xyz/{url.rsplit('/', 1)[-1]}", 307)
+				# time.sleep(10)
+				# raise cp.HTTPRedirect(f"https://mizabot.xyz/{url.rsplit('/', 1)[-1]}", 307)
 			return func(*args, **kwargs)
 		return decorator
 	def e404(status, message, traceback, version):
@@ -1633,6 +1633,7 @@ function mergeFile(blob) {
         return HOST + "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
 
     @cp.expose
+    @hostmap
     def replace_file(self, fn):
         print("Replace", fn)
         of = fn
