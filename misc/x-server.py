@@ -1632,13 +1632,12 @@ function mergeFile(blob) {
             self.replace_file(fn[3:])
         return HOST + "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
 
+    @cp.expose
     def replace_file(self, fn):
         print("Replace", fn)
         of = fn
         size = os.path.getsize(of)
-        if size > 1073741824 or size < 1048576:
-            return
-        name = of.rsplit("/", 1)[-1]
+        name = of.rsplit("/", 1)[-1].split("~", 1)[-1]
         mime = get_mime(of)
         t = ts_us()
         while t in RESPONSES:
@@ -1651,8 +1650,11 @@ function mergeFile(blob) {
         urls = [url.replace("https://cdn.discordapp.com/attachments/", "D$") for url in urls]
         print(urls)
         assert urls
-        ts = int(of.split("~", 1)[0].rsplit(IND, 1)[-1])
-        fn = of.split("~", 1)[0] + "~.forward$"
+        try:
+            ts = int(of.split("~", 1)[0].rsplit(IND, 1)[-1])
+        except ValueError:
+            ts = time.time_ns() // 1000
+        fn = f"saves/filehost/{IND}{ts}~.forward$"
         # print(ts, fn)
         code = 307
         ftype = 3
@@ -1661,7 +1663,8 @@ function mergeFile(blob) {
         s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--></html>'
         with open(fn, "w", encoding="utf-8") as f:
             f.write(s)
-        os.rename(of, of.split("~", 1)[0] + "~.temp$@" + name)
+        os.rename(of, f"saves/filehost/{IND}{ts}~.temp$@" + name)
+        return url
 
     @cp.expose(("proxy",))
     @hostmap

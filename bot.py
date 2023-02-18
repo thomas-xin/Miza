@@ -2718,14 +2718,19 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 return 0
         i = 0
         for f in os.listdir("cache"):
-            if f[0] in "\x7f~!" and not f.split("@", 1)[0].endswith("~.temp$") or f.startswith("attachment_") or f.startswith("emoji_"):
-                pass
-            else:
-                i += 1
-                try:
-                    os.remove("cache/" + f)
-                except:
-                    print_exc()
+            if f[0] in "\x7f~!":
+                if not f.split("@", 1)[0].endswith("~.temp$"):
+                    fn = "cache/" + f
+                    if f[0] == "\x7f" and os.path.getsize(fn) > 1048576:
+                        reqs.next().patch(self.webserver + f"/replace_file?fn={urllib.parse.quote_plus(fn)}")
+                    continue
+            elif f.startswith("attachment_") or f.startswith("emoji_"):
+                continue
+            i += 1
+            try:
+                os.remove("cache/" + f)
+            except:
+                print_exc()
         if i > 1:
             print(f"{i} cached files flagged for deletion.")
         return i
@@ -5901,11 +5906,13 @@ def as_file(file, filename=None, ext=None, rename=True):
         with open(f"saves/filehost/{IND}{out}", "wb") as f:
             f.write(file)
     elif rename:
+        fo = f"saves/filehost/{IND}{out}~{lim_str(filename, 64).translate(filetrans)}"
         for i in range(100):
             with suppress(PermissionError):
-                os.rename(file, f"saves/filehost/{IND}{out}~{lim_str(filename, 64).translate(filetrans)}")
+                os.rename(file, fo)
                 break
             time.sleep(0.3)
+        reqs.next().patch(self.webserver + f"/replace_file?fn={urllib.parse.quote_plus(fo)}")
     else:
         fn = file.rsplit("/", 1)[-1][1:].rsplit(".", 1)[0].split("~", 1)[0]
     try:
