@@ -928,7 +928,7 @@ class Bot:
 		tup = (u, q)
 		while len(self.chat_history) > self.history_length:
 			self.chat_history.pop(0)
-		if self.personality == CAIPER or self.personality == DEFPER and req_long(q):
+		if self.premium < 2 and self.personality == CAIPER or self.personality == DEFPER and req_long(q):
 			response, cost = self.caichat(u, q, refs=refs, im=im)
 			if response:
 				return self.after(tup, (self.name, response)), cost

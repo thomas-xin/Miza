@@ -719,7 +719,14 @@ class Server:
             for url in urls:
                 if url.startswith("D$"):
                     url = "https://cdn.discordapp.com/attachments/" + url[2:]
-                resp = reqs.next().get(url, headers=headers)
+                for i in range(6):
+                    try:
+                        resp = reqs.next().get(url, headers=headers)
+                    except:
+                        print(traceback.format_exc())
+                    else:
+                        break
+                    time.sleep(i ** 2 + 1)
                 b = resp.content
                 f.write(b)
         # return on
