@@ -200,7 +200,7 @@ HEADERS = {
 }
 
 CHEADERS = {"Cache-Control": "public, max-age=3600, stale-while-revalidate=1073741824, stale-if-error=1073741824"}
-SHEADERS = {"Cache-Control": "public, max-age=30, stale-while-revalidate=1073741824, stale-if-error=1073741824"}
+SHEADERS = {"Cache-Control": "public, max-age=5, stale-while-revalidate=1073741824, stale-if-error=1073741824"}
 CHEADERS.update(HEADERS)
 SHEADERS.update(HEADERS)
 
