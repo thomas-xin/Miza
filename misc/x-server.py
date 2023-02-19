@@ -1689,10 +1689,10 @@ function mergeFile(blob) {
     def edit(self, path, key=None):
         if not key:
             raise PermissionError("Key not found.")
-        p = find_file(path, ind=ind)
+        p = find_file(path)
         if p.split("~", 1)[-1].startswith(".temp$@"):
             os.remove(p)
-            p = find_file(path, ind=ind)
+            p = find_file(path)
         if not p.split("~", 1)[-1].startswith(".forward$"):
             raise TypeError("File is not editable.")
         with open(p, "r", encoding="utf-8") as f:
@@ -1749,10 +1749,10 @@ function mergeFile(blob) {
     def delete(self, path, key=None):
         if not key:
             raise PermissionError("Key not found.")
-        p = find_file(path, ind=ind)
+        p = find_file(path)
         if p.split("~", 1)[-1].startswith(".temp$@"):
             os.remove(p)
-            p = find_file(path, ind=ind)
+            p = find_file(path)
         if not p.split("~", 1)[-1].startswith(".forward$"):
             return os.remove(p)
         with open(p, "r", encoding="utf-8") as f:
