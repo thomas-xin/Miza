@@ -5878,7 +5878,7 @@ def update_file_cache():
 def as_file(file, filename=None, ext=None, rename=True):
     if rename:
         fn = round(ts_us())
-        for fi in os.listdir("saves/server"):
+        for fi in os.listdir("saves/filehost"):
             if fi.startswith(f"{IND}{fn}~"):
                 fn += 1
         out = str(fn)

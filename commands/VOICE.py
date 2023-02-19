@@ -5200,7 +5200,7 @@ class Download(Command):
                 msg="",
                 file=f,
                 filename=out,
-                rename=False,
+                rename=True,
                 reference=reference,
             )
             if resp.attachments and type(f) is str:
