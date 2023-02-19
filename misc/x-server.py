@@ -1651,6 +1651,8 @@ function mergeFile(blob) {
         of = fn
         size = os.path.getsize(of)
         name = of.rsplit("/", 1)[-1].split("~", 1)[-1]
+        if name.startswith(".temp$") or name.startswith(".forward$"):
+            raise PermissionError
         mime = get_mime(of)
         t = ts_us()
         while t in RESPONSES:
@@ -1680,6 +1682,104 @@ function mergeFile(blob) {
             f.write(s)
         os.rename(of, f"saves/filehost/{IND}{ts}~.temp$@" + name)
         return url + f"?key={key}"
+
+    @cp.expose
+    @cp.tools.accept(media="multipart/form-data")
+    @hostmap
+    def edit(self, path, key=None):
+        if not key:
+            raise PermissionError("Key not found.")
+        p = find_file(path, ind=ind)
+        if p.split("~", 1)[-1].startswith(".temp$@"):
+            os.remove(p)
+            p = find_file(path, ind=ind)
+        if not p.split("~", 1)[-1].startswith(".forward$"):
+            raise TypeError("File is not editable.")
+        with open(p, "r", encoding="utf-8") as f:
+            orig = f.read()
+        if key != orig.split("<!--KEY=", 1)[-1].split("-", 1)[0]:
+            raise PermissionError("Incorrect key.")
+        os.remove(p)
+        urls = orjson.loads(orig.split("<!--", 3)[-1].split("-->", 1)[0])
+        t = ts_us()
+        while t in RESPONSES:
+            t += 1
+        RESPONSES[t] = fut = concurrent.futures.Future()
+        send(f"!{t}\x7fbot.data.exec.delete({repr(urls)})", escape=False)
+        j, after = fut.result()
+        RESPONSES.pop(t, None)
+        ts = time.time_ns() // 1000
+        name = kwargs.get("name", "") or cp.request.headers.get("x-file-name", "untitled")
+        s = cp.request.remote.ip + "%" + name
+        h = hash(s) % 2 ** 48
+        n = f"cache/{h}%"
+        fn = f"saves/filehost/{IND}{ts}~" + name
+        r = n + "!"
+        tn = fn.split("~", 1)[0] + "~.forward$"
+        b = ts.bit_length() + 7 >> 3
+        q = ""
+        if os.path.exists(r):
+            with open(r, "r", encoding="utf-8") as f:
+                with open(tn, "w", encoding="utf-8") as g:
+                    s = f.read()
+                    url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
+                    s = s.replace('""', f'"{url}"', 1)
+                    g.write(s)
+            key = s.split("<!--KEY=", 1)[-1].split("-", 1)[0]
+            q = f"?key={key}"
+            if os.path.exists(n + "0"):
+                os.rename(n + "0", fn.split("~", 1)[0] + "~.temp$@" + name)
+        else:
+            high = int(kwargs.get("index") or cp.request.headers.get("x-index", "0"))
+            os.rename(n + "0", fn)
+            if high > 1:
+                with open(fn, "ab") as f:
+                    for i in range(1, high):
+                        gn = n + str(i)
+                        with open(gn, "rb") as g:
+                            shutil.copyfileobj(g, f)
+                        os.remove(gn)
+            with tracebacksuppressor:
+                url = self.replace_file(fn)
+                return "/p/" + url.split("/f/", 1)[-1]
+        return "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=") + q
+
+    @cp.expose
+    @hostmap
+    def delete(self, path, key=None):
+        if not key:
+            raise PermissionError("Key not found.")
+        p = find_file(path, ind=ind)
+        if p.split("~", 1)[-1].startswith(".temp$@"):
+            os.remove(p)
+            p = find_file(path, ind=ind)
+        if not p.split("~", 1)[-1].startswith(".forward$"):
+            return os.remove(p)
+        with open(p, "r", encoding="utf-8") as f:
+            orig = f.read()
+        if key != orig.split("<!--KEY=", 1)[-1].split("-", 1)[0]:
+            raise PermissionError("Incorrect key.")
+        os.remove(p)
+        urls = orjson.loads(orig.split("<!--", 3)[-1].split("-->", 1)[0])
+        t = ts_us()
+        while t in RESPONSES:
+            t += 1
+        RESPONSES[t] = fut = concurrent.futures.Future()
+        send(f"!{t}\x7fbot.data.exec.delete({repr(urls)})", escape=False)
+        j, after = fut.result()
+        RESPONSES.pop(t, None)
+        return """<!DOCTYPE html>
+<html>
+<meta http-equiv="refresh" content="0; URL=/">
+<body onload="myFunction()" style="background-color:#000">
+<script>
+function myFunction() {
+  alert("File successfully deleted. Returning to home.");
+}
+</script>
+</body>
+</html>
+"""
 
     @cp.expose(("proxy",))
     @hostmap
