@@ -1686,7 +1686,7 @@ function mergeFile(blob) {
     @cp.expose
     @cp.tools.accept(media="multipart/form-data")
     @hostmap
-    def edit(self, path, key=None):
+    def edit(self, path, key=None, **kwargs):
         if not key:
             raise PermissionError("Key not found.")
         path = str(int.from_bytes(base64.urlsafe_b64decode(path.encode("ascii") + b"=="), "big"))
@@ -1747,7 +1747,7 @@ function mergeFile(blob) {
 
     @cp.expose
     @hostmap
-    def delete(self, path, key=None):
+    def delete(self, path, key=None, **kwargs):
         if not key:
             raise PermissionError("Key not found.")
         path = str(int.from_bytes(base64.urlsafe_b64decode(path.encode("ascii") + b"=="), "big"))
