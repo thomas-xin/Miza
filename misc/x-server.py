@@ -1551,6 +1551,7 @@ function mergeFile(blob) {
                 csize = 83886080
                 g = cp.request.body.fp
                 urls = []
+                mids = []
                 while True:
                     b = g.read(csize)
                     if not b:
@@ -1564,7 +1565,9 @@ function mergeFile(blob) {
                         send(f"!{t}\x7fbot.data.exec.stash({repr(fn)}, start={pos}, end={pos + csize})", escape=False)
                         j, after = fut.result()
                         RESPONSES.pop(t, None)
-                        urls.extend(j["result"])
+                        url1, mid1 = j["result"]
+                        urls.extend(url1)
+                        mids.extend(mid1)
                         pos += csize
                 if f.tell() > pos:
                     t = ts_us()
@@ -1574,7 +1577,9 @@ function mergeFile(blob) {
                     send(f"!{t}\x7fbot.data.exec.stash({repr(fn)}, start={pos})", escape=False)
                     j, after = fut.result()
                     RESPONSES.pop(t, None)
-                    urls.extend(j["result"])
+                    url1, mid1 = j["result"]
+                    urls.extend(url1)
+                    mids.extend(mid1)
                 size = os.path.getsize(fn)
                 mime = get_mime(fn)
                 fn = f"cache/{h}%!"
@@ -1586,7 +1591,7 @@ function mergeFile(blob) {
                 url = ""
                 n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 63)
                 key = base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
-                s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--><!--KEY={key}--></html>'
+                s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--><!--KEY={key}--><!--MID={mids}--></html>'
                 with open(fn, "w", encoding="utf-8") as f:
                     f.write(s)
                 return
@@ -1661,7 +1666,7 @@ function mergeFile(blob) {
         send(f"!{t}\x7fbot.data.exec.stash({repr(of)})", escape=False)
         j, after = fut.result()
         RESPONSES.pop(t, None)
-        urls = j["result"]
+        urls, mids = j["result"]
         urls = [url.replace("https://cdn.discordapp.com/attachments/", "D$") for url in urls]
         print(urls)
         assert urls
@@ -1677,7 +1682,7 @@ function mergeFile(blob) {
         url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
         n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 63)
         key = base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
-        s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--><!--KEY={key}--></html>'
+        s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--><!--KEY={key}--><!--MID={json.dumps(mids)}--></html>'
         with open(fn, "w", encoding="utf-8") as f:
             f.write(s)
         os.rename(of, f"saves/filehost/{IND}{ts}~.temp$@" + name)
@@ -1701,13 +1706,12 @@ function mergeFile(blob) {
         if key != orig.split("<!--KEY=", 1)[-1].split("-", 1)[0]:
             raise PermissionError("Incorrect key.")
         os.remove(p)
-        urls = orjson.loads(orig.split("<!--", 3)[-1].split("-->", 1)[0])
-        urls = ["https://cdn.discordapp.com/attachments/" + url[2:] if url.startswith("D$") else url for url in urls]
+        mids = orjson.loads(orig.split("<!--MID=", 1)[-1].split("-->", 1)[0])
         t = ts_us()
         while t in RESPONSES:
             t += 1
         RESPONSES[t] = fut = concurrent.futures.Future()
-        send(f"!{t}\x7fbot.data.exec.delete({repr(urls)})", escape=False)
+        send(f"!{t}\x7fbot.data.exec.delete({repr(mids)})", escape=False)
         j, after = fut.result()
         RESPONSES.pop(t, None)
         ts = time.time_ns() // 1000
@@ -1763,13 +1767,12 @@ function mergeFile(blob) {
         if key != orig.split("<!--KEY=", 1)[-1].split("-", 1)[0]:
             raise PermissionError("Incorrect key.")
         os.remove(p)
-        urls = orjson.loads(orig.split("<!--", 3)[-1].split("-->", 1)[0])
-        urls = ["https://cdn.discordapp.com/attachments/" + url[2:] if url.startswith("D$") else url for url in urls]
+        mids = orjson.loads(orig.split("<!--MID=", 1)[-1].split("-->", 1)[0])
         t = ts_us()
         while t in RESPONSES:
             t += 1
         RESPONSES[t] = fut = concurrent.futures.Future()
-        send(f"!{t}\x7fbot.data.exec.delete({repr(urls)})", escape=False)
+        send(f"!{t}\x7fbot.data.exec.delete({repr(mids)})", escape=False)
         j, after = fut.result()
         RESPONSES.pop(t, None)
         return """<!DOCTYPE html>

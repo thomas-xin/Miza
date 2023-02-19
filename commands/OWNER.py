@@ -556,6 +556,7 @@ class UpdateExec(Database):
         bot = self.bot
         print("Stash", fn, start, end)
         urls = []
+        mids = []
         with open(fn, "rb") as f:
             if start:
                 f.seek(start)
@@ -576,31 +577,34 @@ class UpdateExec(Database):
                 message = await bot.send_as_webhook(channel, f"{fn.rsplit('/', 1)[-1]} ({i})", files=fs, username=m.display_name, avatar_url=best_url(m), recurse=False)
                 for a in message.attachments:
                     urls.append(str(a.url))
+                mids.append(message.id)
                 i = f.tell()
-        print(urls)
-        return urls
+        print(urls, mids)
+        return urls, mids
 
-    async def delete(self, urls):
+    async def delete(self, mids):
         bot = self.bot
-        print("Delete", urls)
-        mids = set()
-        for url in urls:
-            mid = int(url.split("/attachments/", 1)[-1].split("/", 1)[0])
-            mids.add(mid)
+        print("Delete", mids)
         cids = [c_id for c_id, flag in self.data.items() if flag & 16]
         channels = []
         for cid in cids:
             channel = await bot.fetch_channel(cid)
             channels.append(channel)
-        for mid in mids:
-            for c in channels:
-                try:
-                    m = await bot.fetch_message(mid, c)
-                except:
-                    continue
-                await bot.silent_delete(m)
-                break
-        return mids
+        create_task(self._delete, channels, mids)
+
+    async def _delete(self, channels, mids):
+        deleted = []
+        with tracebacksuppressor:
+            for mid in mids:
+                for c in channels:
+                    try:
+                        m = await bot.fetch_message(mid, c)
+                    except:
+                        continue
+                    await bot.silent_delete(m)
+                    deleted.append(m.id)
+                    break
+        return deleted
 
     async def uproxy(self, *urls, collapse=True):
         out = [None] * len(urls)
