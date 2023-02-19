@@ -976,7 +976,7 @@ if os.name == "nt":
         s = subprocess.check_output(f'dir /a /w /s "{path}"', shell=True)
         spl = s.splitlines()
         finfo = spl[-2].strip().decode("ascii")
-        print(finfo)
+        # print(finfo)
         fc, fs = finfo.split("File(s)")
         fc = int(fc)
         fs = int(fs.removesuffix("bytes").replace(",", "").strip())

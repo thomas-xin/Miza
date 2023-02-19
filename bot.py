@@ -4021,10 +4021,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     with MemoryTimer("handle_update"):
                         await self.handle_update()
 
-    # The slowest update loop that runs once a minute. Used for slow operations, such as the bot database autosave event.
-    async def minute_loop(self):
+    # The slowest update loop that runs once every 5 minutes. Used for slow operations, such as the bot database autosave event.
+    async def global_loop(self):
         while not self.closed:
-            async with Delay(60):
+            async with Delay(300):
                 async with tracebacksuppressor:
                     with MemoryTimer("update"):
                         await create_future(self.update, priority=True)
@@ -5088,7 +5088,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                             self.events.append(f, func)
             print(f"Database event count: {sum(len(v) for v in self.events.values())}")
             await self.fetch_user(self.deleted_user)
-            create_task(self.minute_loop())
+            create_task(self.global_loop())
             create_task(self.slow_loop())
             create_task(self.lazy_loop())
             create_task(self.fast_loop())
