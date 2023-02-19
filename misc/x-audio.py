@@ -915,6 +915,15 @@ async def received_message(self, msg):
             'd': time.time_ns() // 1000000,
         }
         await self.send_as_json(payload)
+        payload = {
+            'op': self.SPEAKING,
+            'd': {
+                'delay': 0,
+                'speaking': 1,
+                'ssrc': self._connection.ssrc,
+            },
+        }
+        await self.send_as_json(payload)
     elif op == self.HEARTBEAT_ACK:
         if self._keep_alive:
             self._keep_alive.ack()
