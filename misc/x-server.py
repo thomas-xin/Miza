@@ -1630,7 +1630,7 @@ function mergeFile(blob) {
                     url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
                     s = s.replace('""', f'"{url}"', 1)
                     g.write(s)
-            key = s.split("<!--KEY=", 1)[-1].split("-", 1)[0]
+            key = s.split("<!--KEY=", 1)[-1].split("-->", 1)[0]
             q = f"?key={key}"
             if os.path.exists(n + "0"):
                 os.rename(n + "0", fn.split("~", 1)[0] + "~.temp$@" + name)
@@ -1720,7 +1720,7 @@ function mergeFile(blob) {
             raise TypeError("File is not editable.")
         with open(p, "r", encoding="utf-8") as f:
             orig = f.read()
-        if key != orig.split("<!--KEY=", 1)[-1].split("-", 1)[0]:
+        if key != orig.split("<!--KEY=", 1)[-1].split("-->", 1)[0]:
             raise PermissionError("Incorrect key.")
         os.remove(p)
         mids = orjson.loads(orig.split("<!--MID=", 1)[-1].split("-->", 1)[0])
@@ -1748,7 +1748,7 @@ function mergeFile(blob) {
                     url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
                     s = s.replace('""', f'"{url}"', 1)
                     g.write(s)
-            key = s.split("<!--KEY=", 1)[-1].split("-", 1)[0]
+            key = s.split("<!--KEY=", 1)[-1].split("-->", 1)[0]
             q = f"?key={key}"
             if os.path.exists(n + "0"):
                 os.rename(n + "0", fn.split("~", 1)[0] + "~.temp$@" + name)
@@ -1785,7 +1785,7 @@ function mergeFile(blob) {
             return os.remove(p)
         with open(p, "r", encoding="utf-8") as f:
             orig = f.read()
-        if key != orig.split("<!--KEY=", 1)[-1].split("-", 1)[0]:
+        if key != orig.split("<!--KEY=", 1)[-1].split("-->", 1)[0]:
             raise PermissionError("Incorrect key.")
         os.remove(p)
         mids = orjson.loads(orig.split("<!--MID=", 1)[-1].split("-->", 1)[0])
