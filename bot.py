@@ -5940,6 +5940,12 @@ def webserver_communicate(bot):
     while not bot.closed:
         while not bot.server:
             time.sleep(5)
+        try:
+            assert reqs.next().get(self.webserver + "/ip").content
+        except:
+            print_exc()
+            bot.server = None
+            bot.start_webserver()
         with tracebacksuppressor:
             while True:
                 b = bot.server.stderr.readline()
