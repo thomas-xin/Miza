@@ -1702,6 +1702,7 @@ function mergeFile(blob) {
             raise PermissionError("Incorrect key.")
         os.remove(p)
         urls = orjson.loads(orig.split("<!--", 3)[-1].split("-->", 1)[0])
+        urls = ["https://cdn.discordapp.com/attachments/" + url[2:] if url.startswith("D$") else url for url in urls]
         t = ts_us()
         while t in RESPONSES:
             t += 1
@@ -1763,6 +1764,7 @@ function mergeFile(blob) {
             raise PermissionError("Incorrect key.")
         os.remove(p)
         urls = orjson.loads(orig.split("<!--", 3)[-1].split("-->", 1)[0])
+        urls = ["https://cdn.discordapp.com/attachments/" + url[2:] if url.startswith("D$") else url for url in urls]
         t = ts_us()
         while t in RESPONSES:
             t += 1
