@@ -2720,27 +2720,23 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if f[0] in "\x7f~!":
                 fn = "saves/filehost/" + f
                 if not f.split("@", 1)[0].endswith("~.temp$"):
-                    if f[0] == "\x7f" and os.path.getsize(fn) > 1048576:
-                        reqs.next().patch(self.webserver + f"/replace_file?fn={urllib.parse.quote_plus(fn)}")
+                    # if f[0] == "\x7f" and os.path.getsize(fn) > 1048576:
+                    #     reqs.next().patch(self.webserver + f"/replace_file?fn={urllib.parse.quote_plus(fn)}")
                     continue
-                if utc() - os.path.getatime(fn) <= 86400:
-                    continue
-            i += 1
-            try:
+                # if utc() - os.path.getatime(fn) <= 86400:
+                #     continue
+            with tracebacksuppressor:
                 os.remove("saves/filehost/" + f)
-            except:
-                print_exc()
+                i += 1
         attachments = deque()
         for f in os.listdir("cache"):
             if f.startswith("attachment_"):
                 attachments.append(f)
             if f.startswith("emoji_"):
                 continue
-            i += 1
-            try:
+            with tracebacksuppressor:
                 os.remove("cache/" + f)
-            except:
-                print_exc()
+                i += 1
         attachments = sorted(attachments, key=lambda f: int(f.split("_", 1)[-1].split(".", 1)[0]))
         while len(attachments) > 4096:
             with tracebacksuppressor:
@@ -2752,6 +2748,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         return i
 
     def backup(self):
+        self.clear_cache()
         with tracebacksuppressor:
             fn = f"backup/saves.{datetime.datetime.utcnow().date()}.wb"
             if os.path.exists(fn):
@@ -2804,7 +2801,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             self.users_updated = True
         if force or day:
             fut = self.send_event("_save_")
-            self.clear_cache()
             await_fut(fut)
         if day:
             self.backup()
