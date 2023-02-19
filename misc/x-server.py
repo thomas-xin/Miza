@@ -1141,7 +1141,7 @@ class Server:
 <meta name="twitter:title" content="{a2}"><meta property="twitter:url" content="{f_url}"><meta property="og:image" content="{i_url}">\
 <meta property="og:image:type" content="{mim}"><meta property="og:url" content="{f_url}"><meta name="og:description" content="{description}">"""
         else:
-            fn = "Miza"
+            a2 = "Miza"
             description = "A multipurpose Discord bot."
         i = data.index(b'</title>') + 8
         s = """<!doctype html><html lang="en"><head>
@@ -1152,7 +1152,7 @@ class Server:
 <meta name="theme-color" content="#694777"/>\
 <link rel="apple-touch-icon" href="/logo256.png"/>\
 <link rel="manifest" href="/manifest.json"/>""" + meta
-        t = f'<title>{fn}</title><meta name="description" content="{description}"/>'
+        t = f'<title>{a2}</title><meta name="description" content="{description}"/>'
         data = s.encode("utf-8") + t.encode("utf-8") + data[i:]
         cp.response.headers.update(CHEADERS)
         cp.response.headers["Content-Type"] = mime
