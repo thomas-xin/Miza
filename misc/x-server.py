@@ -1694,7 +1694,8 @@ function mergeFile(blob) {
     def edit(self, path, key=None, **kwargs):
         if not key:
             raise PermissionError("Key not found.")
-        path = str(int.from_bytes(base64.urlsafe_b64decode(path.encode("ascii") + b"=="), "big"))
+        ots = int.from_bytes(base64.urlsafe_b64decode(path.encode("ascii") + b"=="), "big")
+        path = str(ots)
         p = find_file(path)
         if p.split("~", 1)[-1].startswith(".temp$@"):
             os.remove(p)
@@ -1714,7 +1715,7 @@ function mergeFile(blob) {
         send(f"!{t}\x7fbot.data.exec.delete({repr(mids)})", escape=False)
         j, after = fut.result()
         RESPONSES.pop(t, None)
-        ts = time.time_ns() // 1000
+        ts = ots
         name = kwargs.get("name", "") or cp.request.headers.get("x-file-name", "untitled")
         s = cp.request.remote.ip + "%" + name
         h = hash(s) % 2 ** 48
