@@ -1872,7 +1872,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     def update_subs(self):
         self.sub_guilds = dict(self._guilds) or self.sub_guilds
         self.sub_channels = dict(chain.from_iterable(guild._channels.items() for guild in self.sub_guilds.values())) or self.sub_channels
-        if not self.guilds_ready.done():
+        if not hasattr(self, "guilds_ready") or not self.guilds_ready.done():
             return
         for guild in self.guilds:
             if len(guild._members) != guild.member_count:
