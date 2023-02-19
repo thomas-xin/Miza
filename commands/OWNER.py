@@ -593,6 +593,7 @@ class UpdateExec(Database):
         create_task(self._delete(channels, mids))
 
     async def _delete(self, channels, mids):
+        bot = self.bot
         deleted = []
         with tracebacksuppressor:
             for mid in mids:
@@ -604,6 +605,7 @@ class UpdateExec(Database):
                     await bot.silent_delete(m)
                     deleted.append(m.id)
                     break
+        print("Deleted", deleted)
         return deleted
 
     async def uproxy(self, *urls, collapse=True):
