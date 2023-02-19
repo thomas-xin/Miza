@@ -2966,6 +2966,7 @@ class AudioDownloader:
                                 os.remove(loopf)
                             os.remove(fn2)
             if not mid:
+                assert os.path.exists(fn)
                 return fn, outf
             self.other_x += 1
             with open(fn, "rb") as f:
