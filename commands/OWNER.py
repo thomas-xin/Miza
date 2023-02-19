@@ -590,7 +590,7 @@ class UpdateExec(Database):
         for cid in cids:
             channel = await bot.fetch_channel(cid)
             channels.append(channel)
-        create_task(self._delete, channels, mids)
+        create_task(self._delete(channels, mids))
 
     async def _delete(self, channels, mids):
         deleted = []
