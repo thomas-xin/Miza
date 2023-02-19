@@ -5052,7 +5052,7 @@ class Download(Command):
                     msg="",
                     file=f,
                     filename=out,
-                    rename=False,
+                    rename=True,
                     reference=message,
                 ))
             return
