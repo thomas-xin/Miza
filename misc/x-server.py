@@ -11,6 +11,7 @@ except ModuleNotFoundError:
     b = f.read()
     code = compile(b, "common.py", "exec", optimize=1)
     exec(code, globals())
+import weakref
 
 
 try:
@@ -297,6 +298,8 @@ def get_geo(ip):
 
 class Server:
 
+    serving = {}
+
     @cp.expose
     @hostmap
     def fileinfo(self, path, **void):
@@ -421,7 +424,12 @@ class Server:
             st = os.stat(p)
             fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
             attachment = filename or fn
-            a2 = url_unparse(attachment).removeprefix(".temp$@")
+            a2 = url_unparse(attachment)
+            if a2.startswith(".temp$@"):
+                a2 = a2[7:]
+                a3 = True
+            else:
+                a3 = False
             cp.response.headers["Attachment-Filename"] = attachment
             if endpoint.startswith("p"):
                 s = """<!DOCTYPE html>
@@ -669,7 +677,7 @@ class Server:
                             send(headers)
                             send(cp.response.headers)
                             cp.response.status = int(resp.status_code)
-                            if float(fcdict(resp.headers).get("Content-Length", inf)) <= 8388608:
+                            if float(fcdict(resp.headers).get("Content-Length", inf)) <= 16777216:
                                 b = resp.content
                                 cp.response.headers["Content-Type"] = magic.from_buffer(b)
                                 return b
@@ -689,7 +697,11 @@ class Server:
                             if download and len(urls) == 1:
                                 raise cp.HTTPRedirect(urls[0], status="307")
                             return self.concat(p, urls, name=info[0])
-            return cp.lib.static.serve_file(p, content_type=mime, disposition="attachment" if download else None)
+            f = open(p, "rb")
+            resp = cp.lib.static.serve_fileobj(f, content_type=mime, disposition="attachment" if download else None, name=a2)
+            if a3:
+                self.serving.setdefault(p, weakref.WeakSet()).append(f)
+            return resp
     files._cp_config = {"response.stream": True}
 
     def concat(self, fn, urls, name="", download=False):
@@ -966,17 +978,17 @@ class Server:
 
             cp.response.headers["Accept-Ranges"] = "bytes"
             cp.response.headers.update(CHEADERS)
-            cp.response.headers["Content-Disposition"] = "attachment; " * bool(d) + "filename=" + json.dumps(name + fmt)
+            # cp.response.headers["Content-Disposition"] = "attachment; " * bool(d) + "filename=" + json.dumps(name + fmt)
             if af():
                 f = open(fni, "rb")
-                count = 1048576
+                # count = 1048576
             else:
                 f = DownloadingFile(fni, af=af)
                 if d:
                     cp.response.status = 202
-                count = 262144
-            cp.response.headers["Content-Type"] = f"audio/{fmt[1:]}"
-            return cp.lib.file_generator(f, count)
+                # count = 262144
+            # cp.response.headers["Content-Type"] = f"audio/{fmt[1:]}"
+            return cp.lib.serve_fileobj(f, content_type=f"audio/{fmt[1:]}", disposition="attachment" if d else "", name=name + fmt)
         else:
             RESPONSES[t] = fut = concurrent.futures.Future()
             count = 1 if is_url(q) else 10
@@ -1698,6 +1710,10 @@ function mergeFile(blob) {
         path = str(ots)
         p = find_file(path)
         if p.split("~", 1)[-1].startswith(".temp$@"):
+            if p in self.serving:
+                for f in self.serving.pop(p):
+                    f.close()
+                time.sleep(0.2)
             os.remove(p)
             p = find_file(path)
         if not p.split("~", 1)[-1].startswith(".forward$"):
@@ -1759,6 +1775,10 @@ function mergeFile(blob) {
         path = str(int.from_bytes(base64.urlsafe_b64decode(path.encode("ascii") + b"=="), "big"))
         p = find_file(path)
         if p.split("~", 1)[-1].startswith(".temp$@"):
+            if p in self.serving:
+                for f in self.serving.pop(p):
+                    f.close()
+                time.sleep(0.2)
             os.remove(p)
             p = find_file(path)
         if not p.split("~", 1)[-1].startswith(".forward$"):
