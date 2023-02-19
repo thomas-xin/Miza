@@ -373,7 +373,7 @@ class Server:
             ind = "!"
             path = path[1:]
         elif not path.startswith("@"):
-            b = path.lstrip("~").split(".", 1)[0].encode("utf-8") + b"=="
+            b = path.lstrip("~").split(".", 1)[0].encode("ascii") + b"=="
             if b.startswith(b"dQ"):
                 c = b[2:]
                 if (len(c) - 1) & 3 == 0:
@@ -384,7 +384,7 @@ class Server:
                 except FileNotFoundError:
                     pass
                 else:
-                    url = cp.request.base + "/i/" + c.rstrip(b"=").decode("utf-8", "replace") + ".gif"
+                    url = cp.request.base + "/i/" + c.rstrip(b"=").decode("ascii", "replace") + ".gif"
                     return f"""<!DOCTYPE html>
 <html><head>
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
@@ -1689,6 +1689,7 @@ function mergeFile(blob) {
     def edit(self, path, key=None):
         if not key:
             raise PermissionError("Key not found.")
+        path = str(int.from_bytes(base64.urlsafe_b64decode(path.encode("ascii") + b"=="), "big"))
         p = find_file(path)
         if p.split("~", 1)[-1].startswith(".temp$@"):
             os.remove(p)
@@ -1749,6 +1750,7 @@ function mergeFile(blob) {
     def delete(self, path, key=None):
         if not key:
             raise PermissionError("Key not found.")
+        path = str(int.from_bytes(base64.urlsafe_b64decode(path.encode("ascii") + b"=="), "big"))
         p = find_file(path)
         if p.split("~", 1)[-1].startswith(".temp$@"):
             os.remove(p)
