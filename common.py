@@ -971,8 +971,18 @@ def touch(file):
     with open(file, "ab"):
         pass
 
-
-get_folder_size = lambda path=".": sum(get_folder_size(f.path) if f.is_dir() else f.stat().st_size for f in os.scandir(path))
+if os.name == "nt":
+    def get_folder_size(path="."):
+        s = subprocess.check_output(f'dir /a /w /s "{path}"', shell=True)
+        spl = s.splitlines()
+        finfo = spl[-2].strip().decode("ascii")
+        print(finfo)
+        fc, fs = finfo.split("File(s)")
+        fc = int(fc)
+        fs = int(fs.removesuffix("bytes").replace(",", "").strip())
+        return fc, fs
+else:
+    _get_folder_size = lambda path=".": len(os.listdir(path)), sum(get_folder_size(f.path) if f.is_dir() else f.stat().st_size for f in os.scandir(path))
 
 
 # Checks if an object can be used in "await" operations.

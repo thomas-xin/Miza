@@ -2499,7 +2499,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     async def get_disk(self):
         with tracebacksuppressor(SemaphoreOverflowError, FileNotFoundError):
             async with self.disk_semaphore:
-                self.disk = await create_future(get_folder_size, ".", priority=True)
+                self.file_count, self.disk = await create_future(get_folder_size, ".", priority=True)
         return self.disk
 
     # Gets the status of the bot.
@@ -2513,12 +2513,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             stats += [sum(st[0] for st in resp), sum(st[1] for st in resp), 0]
             cpu = psutil.cpu_count(logical=True)
             mem = psutil.virtual_memory()
-            disk = self.disk
             # CPU is totalled across all cores
             stats[0] /= cpu
             # Memory is in %
             stats[1] *= mem.total / 100
-            stats[2] = disk
+            stats[2] = self.disk
             self.size2 = fcdict()
             files = os.listdir("misc")
             for f in files:
@@ -2731,14 +2730,23 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 os.remove("saves/filehost/" + f)
             except:
                 print_exc()
+        attachments = deque()
         for f in os.listdir("cache"):
-            if f.startswith("attachment_") or f.startswith("emoji_"):
+            if f.startswith("attachment_"):
+                attachments.append(f)
+            if f.startswith("emoji_"):
                 continue
             i += 1
             try:
                 os.remove("cache/" + f)
             except:
                 print_exc()
+        attachments = sorted(attachments, key=lambda f: int(f.split("_", 1)[-1].split(".", 1)[0]))
+        while len(attachments) > 4096:
+            with tracebacksuppressor:
+                f = "cache/" + attachments.pop(0)
+                if os.path.exists(f):
+                    os.remove(f)
         if i > 1:
             print(f"{i} cached files flagged for deletion.")
         return i
@@ -5860,31 +5868,7 @@ def userIter4(x):
 PORT = AUTH.get("webserver_port", 80)
 IND = "\x7f"
 
-def update_file_cache(files=None):
-    # if files is None:
-    #     files = deque(sorted(file[len(IND):] for file in os.listdir("cache") if file.startswith(IND) and not file.endswith("~.forward$")))
-    # bot.file_count = len(files)
-    # bot.storage_ratio = min(1, max(bot.file_count / 65536, bot.disk / (1 << 34)))
-    # for t in os.walk("saves"):
-    #     bot.file_count += len(t[-1])
-    # if bot.storage_ratio >= 1:
-    #     curr = files.popleft()
-    #     ct = int(curr.rsplit(".", 1)[0].split("~", 1)[0])
-    #     fn = "cache/" + IND + curr
-    #     t = utc()
-    #     if t - ct > 86400 * 60 and t - os.path.getatime(fn) > 86400 * 30:
-    #         with tracebacksuppressor:
-    #             os.remove(fn)
-    #             print(curr, "deleted.")
-                # update_file_cache(files, recursive=False)
-    # if not recursive:
-    #     return
-    attachments = deque(file for file in sorted((file for file in os.listdir("cache") if file.startswith("attachment_")), key=lambda file: int(file.split("_", 1)[-1].split(".", 1)[0])))
-    while len(attachments) > 4096:
-        with tracebacksuppressor:
-            file = "cache/" + attachments.popleft()
-            if os.path.exists(file):
-                os.remove(file)
+def update_file_cache():
     attachments = {t for t in bot.cache.attachments.items() if type(t[-1]) is bytes}
     while len(attachments) > 512:
         a_id = next(iter(attachments))

@@ -337,7 +337,7 @@ class Bot:
 			tokenizer = AutoTokenizer.from_pretrained(m)
 			model = AutoModelForQuestionAnswering.from_pretrained(m)
 			self.models[m] = (tokenizer, model)
-		inputs = tokenizer(q[:512], c[:2048], return_tensors="pt", max_length=4096, truncation=True)
+		inputs = tokenizer(q[:384], c[:1024], return_tensors="pt", max_length=4096, truncation=True)
 		with torch.no_grad():
 			outputs = model(**inputs)
 		answer_start_index = outputs.start_logits.argmax()
@@ -621,8 +621,8 @@ class Bot:
 			lines.append(f"{self.name}: Hiya! Can I help with anything? {e1}\n")
 			if len(chat_history) < 2:
 				e2 = random.choice(("😊", "🥰", "😉", "😛", "😌"))
-				lines.append(f"{u}: What's the integral of 4x+1?\n")
-				lines.append(f"{self.name}: It's 2x^2+x+C! {e2}\n")
+				lines.append(f"{u}: Could I please have a hug?\n")
+				lines.append(f"{self.name}: Of course! *hugs* {e2}\n")
 		for k, v in self.promises:
 			k = k.replace(":", "")
 			s = f"{k}: {v}\n"
@@ -699,7 +699,7 @@ class Bot:
 		else:
 			start = p
 		prompt = start + "\n\n" + prompt
-		print("GPTV3 prompt:", prompt)
+		print("GPT prompt:", prompt)
 		sys.stdout.flush()
 		pc = len(self.gpttokens(prompt))
 		response = None
@@ -861,7 +861,7 @@ class Bot:
 		else:
 			cost = 0
 		text = text.strip()
-		print(f"GPTV3 {model} response:", text)
+		print(f"GPT {model} response:", text)
 		return text, cost
 
 	def google(self, q, raw=False):
@@ -928,7 +928,7 @@ class Bot:
 		tup = (u, q)
 		while len(self.chat_history) > self.history_length:
 			self.chat_history.pop(0)
-		if self.premium < 2 and self.personality == CAIPER or self.personality == DEFPER and req_long(q):
+		if self.personality == CAIPER or self.premium < 2 and self.personality == DEFPER and req_long(q):
 			response, cost = self.caichat(u, q, refs=refs, im=im)
 			if response:
 				return self.after(tup, (self.name, response)), cost
