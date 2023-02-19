@@ -700,7 +700,7 @@ class Server:
             f = open(p, "rb")
             resp = cp.lib.static.serve_fileobj(f, content_type=mime, disposition="attachment" if download else None, name=a2)
             if a3:
-                self.serving.setdefault(p, weakref.WeakSet()).append(f)
+                self.serving.setdefault(p, weakref.WeakSet()).add(f)
             return resp
     files._cp_config = {"response.stream": True}
 
