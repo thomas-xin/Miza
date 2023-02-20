@@ -333,6 +333,7 @@ class Server:
             mimetype=mime,
             raw=f_url,
             dl=f_url.replace("/f/", "/d/", 1),
+            timestamp=max(st.st_mtime, st.st_ctime),
         )
         if p.endswith("~.forward$") and mime == "text/html":
             with open(p, "r", encoding="utf-8") as f:
