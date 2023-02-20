@@ -1715,7 +1715,8 @@ function mergeFile(blob) {
                 for f in self.serving.pop(p):
                     f.close()
                 time.sleep(0.2)
-            os.remove(p)
+            with tracebacksuppressor:
+                os.remove(p)
             p = find_file(path)
         if not p.split("~", 1)[-1].startswith(".forward$"):
             raise TypeError("File is not editable.")
@@ -1748,8 +1749,9 @@ function mergeFile(blob) {
                     s = f.read()
                     url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
                     s = s.replace('""', f'"{url}"', 1)
+                    t1, t2 = s.split("<!--KEY=", 1)
+                    s = t1 + f"<!--KEY={key}-->" + t2.split("-->", 1)[-1]
                     g.write(s)
-            key = s.split("<!--KEY=", 1)[-1].split("-->", 1)[0]
             q = f"?key={key}"
             if os.path.exists(n + "0"):
                 os.rename(n + "0", fn.split("~", 1)[0] + "~.temp$@" + name)
