@@ -1664,7 +1664,7 @@ function mergeFile(blob) {
 
     @cp.expose
     @hostmap
-    def replace_file(self, fn):
+    def replace_file(self, fn, key=None):
         print("Replace", fn)
         of = fn
         size = os.path.getsize(of)
@@ -1694,7 +1694,7 @@ function mergeFile(blob) {
         b = ts.bit_length() + 7 >> 3
         url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
         n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
-        key = base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
+        key = key or base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
         s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--><!--KEY={key}--><!--MID={json.dumps(mids)}--></html>'
         with open(fn, "w", encoding="utf-8") as f:
             f.write(s)
@@ -1766,7 +1766,7 @@ function mergeFile(blob) {
                             shutil.copyfileobj(g, f)
                         os.remove(gn)
             with tracebacksuppressor:
-                url = self.replace_file(fn)
+                url = self.replace_file(fn, key=key)
                 return "/p/" + url.split("/f/", 1)[-1]
         return "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=") + q
 
