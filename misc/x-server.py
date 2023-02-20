@@ -691,9 +691,9 @@ class Server:
                             info = orjson.loads(infd.removeprefix("<!--"))
                             urls = orjson.loads(urld.removeprefix("<!--"))
                             disp = "filename=" + info[0]
-                            # cp.response.headers["Content-Disposition"] = disp
+                            cp.response.headers["Content-Disposition"] = disp
                             # cp.response.headers["Content-Length"] = info[1]
-                            # cp.response.headers["Content-Type"] = info[2]
+                            cp.response.headers["Content-Type"] = info[2]
                             mime = info[2]
                             if download and len(urls) == 1:
                                 raise cp.HTTPRedirect(urls[0], status="307")
