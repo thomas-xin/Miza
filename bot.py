@@ -2264,6 +2264,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         "^=": "__pow__",
         "%=": "__mod__",
     }
+    consts = {
+        "k": 1 << 10,
+        "M": 1 << 20,
+        "G": 1 << 30,
+        "T": 1 << 40,
+        "P": 1 << 50,
+        "E": 1 << 60,
+        "Z": 1 << 70,
+        "Y": 1 << 80,
+    }
 
     # Evaluates a math formula to a float value, using a math process from the subprocess pool when necessary.
     async def eval_math(self, expr, default=0, op=True):
@@ -2298,7 +2308,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         except:
                             return ast.literal_eval(f)
         except (ValueError, TypeError, SyntaxError):
-            r = await self.solve_math(f, 128, 0)
+            r = await self.solve_math(f, 128, 0, variables=self.consts)
         x = r[0]
         with suppress(TypeError):
             while True:
