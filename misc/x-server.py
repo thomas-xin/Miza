@@ -721,6 +721,9 @@ class Server:
                 if not b:
                     continue
                 yield b
+            b = f.read(1073741824)
+            if b:
+                yield b
 
     def _concat(self, on, urls):
         headers = fcdict(cp.request.headers)
