@@ -989,7 +989,7 @@ class Server:
                     cp.response.status = 202
                 # count = 262144
             # cp.response.headers["Content-Type"] = f"audio/{fmt[1:]}"
-            return cp.lib.serve_fileobj(f, content_type=f"audio/{fmt[1:]}", disposition="attachment" if d else "", name=name + fmt)
+            return cp.lib.static.serve_fileobj(f, content_type=f"audio/{fmt[1:]}", disposition="attachment" if d else "", name=name + fmt)
         else:
             RESPONSES[t] = fut = concurrent.futures.Future()
             count = 1 if is_url(q) else 10
