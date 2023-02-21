@@ -418,10 +418,10 @@ class Server:
         with sem:
             endpoint = cp.url(qs=cp.request.query_string, base="")[1:].split("/", 1)[0]
             download = download and download[0] not in "0fFnN" or endpoint.startswith("d")
-            if download:
-                mime = MIMES.get(p.rsplit("/", 1)[-1].rsplit(".", 1)[-1])
-            else:
-                mime = get_mime(p)
+            # if download:
+            #     mime = MIMES.get(p.rsplit("/", 1)[-1].rsplit(".", 1)[-1])
+            # else:
+            mime = get_mime(p)
             st = os.stat(p)
             fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
             attachment = filename or fn
