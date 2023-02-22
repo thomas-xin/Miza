@@ -2372,10 +2372,12 @@ class AudioDownloader:
                 create_future_ex(callback)
             f = self.cache.get(fn)
             if f is not None:
-                entry["file"] = f
                 # Assign file duration estimate to queue entry
                 # This could be done better, this current implementation is technically not thread-safe
                 try:
+                    if not os.path.exists("cache/" + f.file):
+                        raise KeyError
+                    entry["file"] = f
                     if f.loaded:
                         entry["duration"] = f.duration()
                     else:
