@@ -696,7 +696,7 @@ class Server:
                             cp.response.headers["Content-Type"] = info[2]
                             mime = info[2]
                             if download and len(urls) == 1:
-                                raise cp.HTTPRedirect(urls[0], status="307")
+                                raise cp.HTTPRedirect("https://cdn.discordapp.com/attachments/" + urls[0][2:], status="307")
                             return self.concat(p, urls, name=info[0])
             f = open(p, "rb")
             resp = cp.lib.static.serve_fileobj(f, content_type=mime, disposition="attachment" if download else None, name=a2)

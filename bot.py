@@ -2733,8 +2733,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     # if f[0] == "\x7f" and os.path.getsize(fn) > 1048576:
                     #     reqs.next().patch(self.webserver + f"/replace_file?fn={urllib.parse.quote_plus(fn)}")
                     continue
-                # if utc() - os.path.getatime(fn) <= 86400:
-                #     continue
+                if utc() - os.path.getatime(fn) <= 60:
+                    continue
             with tracebacksuppressor:
                 os.remove("saves/filehost/" + f)
                 i += 1
