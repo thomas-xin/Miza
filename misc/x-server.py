@@ -987,12 +987,12 @@ class Server:
             # cp.response.headers["Content-Disposition"] = "attachment; " * bool(d) + "filename=" + json.dumps(name + fmt)
             if af():
                 f = open(fni, "rb")
-                # count = 1048576
             else:
                 f = DownloadingFile(fni, af=af)
                 if d:
                     cp.response.status = 202
-                # count = 262144
+                cp.response.headers["Content-Type"] = f"audio/{fmt[1:]}"
+                return cp.lib.file_generator(f, 262144)
             # cp.response.headers["Content-Type"] = f"audio/{fmt[1:]}"
             return cp.lib.static.serve_fileobj(f, content_type=f"audio/{fmt[1:]}", disposition="attachment" if d else "", name=name + fmt)
         else:
