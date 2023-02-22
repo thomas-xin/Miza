@@ -2519,7 +2519,7 @@ class DownloadingFile(io.IOBase):
         return getattr(self.fp, k)
 
     def seek(self, pos):
-        while os.path.getsize(fn) < pos:
+        while os.path.getsize(self.fn) < pos:
             if self.af():
                 break
             time.sleep(0.1)
