@@ -2534,8 +2534,13 @@ class DownloadingFile(io.IOBase):
             while s < size:
                 time.sleep(2 / 3)
                 b = self._read(size - s)
-                if not b and self.af():
-                    break
+                if not b:
+                    if self.af():
+                        b = self._read(size - s)
+                        if not b:
+                            break
+                    else:
+                        continue
                 s += len(b)
                 buf.append(b)
             b = b"".join(buf)
