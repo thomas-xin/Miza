@@ -5715,7 +5715,7 @@ class AudioClientInterface:
                 await asyncio.sleep(1)
                 futs = deque()
                 for guild in bot.client.guilds:
-                    futs.append(create_task(self.guild.change_voice_state(channel=None)))
+                    futs.append(create_task(guild.change_voice_state(channel=None)))
                 for fut in futs:
                     await fut
                 if is_strict_running(self.proc):
