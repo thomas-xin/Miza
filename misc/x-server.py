@@ -432,83 +432,7 @@ class Server:
             else:
                 a3 = False
             cp.response.headers["Attachment-Filename"] = attachment
-            if endpoint.startswith("p"):
-                s = """<!DOCTYPE html>
-<html>
-    <head>
-        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
-        <style>
-        body {
-            text-align: center;
-            font-family: 'Comic Sans MS';
-        }
-        img {
-            margin-top: 32px;
-            display: block;
-            margin-left: auto;
-            margin-right: auto;
-        }
-        a:link {
-            color: #ffff00;
-            text-decoration: none;
-        }
-        a:visited {
-            color: #ffff00;
-            text-decoration: none;
-        }
-        a:hover {
-            color: #ff0000;
-            text-decoration: underline;
-        }
-        a:active {
-            color: #00ff00;
-            text-decoration: underline;
-        }
-        </style>"""
-                f_url = cp.url(qs=cp.request.query_string).replace("/preview/", "/p/")
-                o_url = HOST + cp.url(qs=cp.request.query_string, base="").replace("/preview/", "/p/")
-                s_url = f_url.replace("/p/", "/f/")
-                i_url = f_url.replace("/p/", "/i/") + ".gif"
-                url = o_url.replace("/p/", "/f/")
-                s += f"""
-        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-        <meta name="twitter:image:src" content="{i_url}">
-        <meta name="twitter:card" content="summary_large_image">
-        <meta name="twitter:title" content="{a2}">
-        <meta property="og:image" content="{i_url}">
-    </head>
-    <body style="background-color:black;">
-        <h1 style="color:white;">{a2}</h1>"""
-                t = utc()
-                ti = max(st.st_atime + 30 * 86400, st.st_ctime + 60 * 86400, t)
-                s += f"""
-                <p style="color:#00ffff;">File size: {byte_scale(st.st_size)}B</p>
-                <p style="color:#bf7fff;">Estimated file lifetime: {sec2time(ti - t)}</p>"""
-                s += f'\n<a href="{url}">{url}<br></a>'
-                preview = deque()
-                if mime.startswith("image/"):
-                    preview.append(f'<img width="480" src="{s_url}" alt="{url.rsplit("/", 1)[-1]}">')
-                elif mime.startswith("audio/"):
-                    preview.append(f'<div align="center"><audio controls><source src="{s_url}" type="{mime}"></audio></div>')
-                elif mime.startswith("video/"):
-                    preview.append(f'<div align="center"><video width="480" playsinline controls><source src="{s_url}" type="{mime}"></video></div>')
-                elif mime.startswith("text/"):
-                    preview.append(f'<a href="{url}">{url}<br></a>')
-                preview.append(f'<a style="color:#0000ff;" href="{s_url.replace("/f/", "/d/")}">Download</a>')
-                if not preview:
-                    preview.append(f'<img src="{cp.request.base}/static/hug.gif" alt="Miza-Dottie-Hug" style="width:14.2857%;height:14.2857%;">')
-                s += "\n" + "\n".join(preview)
-                s += f"""
-        <p><a style="color:#bfffbf;" href="{o_url}">Share this page!</a></p>""" + """
-        <p><a style="color:#7fffff;" href="/upload">Back to main file host</a></p>
-    </body>
-</html>"""
-                b = s.encode("utf-8", "replace")
-                cp.response.headers["Content-Type"] = "text/html"
-                cp.response.headers["Content-Length"] = len(b)
-                cp.response.headers["ETag"] = create_etag(b)
-                return b
-            elif endpoint.startswith("r") and (mime in ("image/webp", "image/apng") or mime.split("/", 1)[0] == "video"):
+            if endpoint.startswith("r") and (mime in ("image/webp", "image/apng") or mime.split("/", 1)[0] == "video"):
                 preview = "cache/%" + p.rsplit("/", 1)[-1].split(".", 1)[0] + ".gif"
                 image_loaders = self.image_loaders
                 if (not os.path.exists(preview) or not os.path.getsize(preview)) and preview not in image_loaders:
@@ -709,52 +633,72 @@ class Server:
 
     def concat(self, fn, urls, name="", download=False):
         print("Cat", urls)
-        on = fn.replace("~.forward$", "~.temp$@" + name)
-        # self._concat(on, urls)
-        # return on
-        fut = create_future_ex(self._concat, on, urls)
-        for i in range(3):
+        on = fn.replace("~.forward$", "!.temp$@" + name)
+        pn = fn.replace("~.forward$", "~.temp$@" + name)
+        try:
+            fut = self.serving[on]
+        except KeyError:
+            fut = create_future_ex(self._concat, urls, on, pn)
+            self.serving[on] = fut
+        for i in range(10):
             if os.path.exists(on):
                 break
             time.sleep(0.5)
+        if os.path.exists(pn):
+            f = open(pn, "rb")
+            resp = cp.lib.static.serve_fileobj(f, content_type=mime, disposition="attachment" if download else None, name=name)
+            self.serving.setdefault(pn, weakref.WeakSet()).add(f)
+            return resp
         with open(on, "rb") as f:
-            while not fut.done():
+            while not fut.done() and on in self.serving:
                 b = f.read(262144)
                 if not b:
                     continue
                 yield b
-            b = f.read(1073741824)
-            if b:
+            while True:
+                b = f.read(262144)
+                if not b:
+                    return
                 yield b
 
-    def _concat(self, on, urls):
+    def _concat(self, urls, on, pn):
         headers = fcdict(cp.request.headers)
         headers.pop("Remote-Addr", None)
         headers.pop("Host", None)
         headers.update(Request.header())
+        pos = 0
+        futs = []
         with open(on, "wb") as f:
             for url in urls:
+                if len(futs) >= 8:
+                    futs.pop(0).result()
                 if url.startswith("D$"):
                     url = "https://cdn.discordapp.com/attachments/" + url[2:]
                 for i in range(6):
                     try:
-                        resp = reqs.next().get(url, headers=headers)
+                        resp = reqs.next().get(url, headers=headers, stream=True)
+                        resp.raise_for_status()
+                        return resp
                     except:
                         print(traceback.format_exc())
-                    else:
-                        break
                     time.sleep(i ** 2 + 1)
-                b = resp.content
-                f.write(b)
-        # return on
-            # resp = reqs.next().get(url, headers=headers, stream=True)
-            # it = resp.iter_content(262144)
-            # try:
-            #     while True:
-            #         b = next(it)
-            #         yield b
-            # except StopIteration:
-            #     pass
+                fs = pos + int(headers.get("Content-Length") or headers.get("x-goog-stored-content-length"))
+                f.truncate(fs)
+                futs.append(create_future_ex(self.chunk_into, resp, on, pos))
+                pos = fs
+        for fut in futs:
+            fut.result()
+        self.serving.pop(on, None)
+        while True:
+            try:
+                os.rename(on, pn)
+            except PermissionError:
+                time.sleep(1)
+
+    def chunk_into(self, resp, on, pos):
+        with open(on, "rb+") as f:
+            f.seek(pos)
+            f.write(resp.content)
 
     @cp.expose
     @hostmap
