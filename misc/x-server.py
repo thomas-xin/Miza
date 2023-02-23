@@ -662,38 +662,39 @@ class Server:
                 yield b
 
     def _concat(self, urls, on, pn):
-        headers = fcdict(cp.request.headers)
-        headers.pop("Remote-Addr", None)
-        headers.pop("Host", None)
-        headers.update(Request.header())
-        pos = 0
-        futs = []
-        with open(on, "wb") as f:
-            for url in urls:
-                if len(futs) >= 8:
-                    futs.pop(0).result()
-                if url.startswith("D$"):
-                    url = "https://cdn.discordapp.com/attachments/" + url[2:]
-                for i in range(6):
-                    try:
-                        resp = reqs.next().get(url, headers=headers, stream=True)
-                        resp.raise_for_status()
-                        break
-                    except:
-                        print(traceback.format_exc())
-                    time.sleep(i ** 2 + 1)
-                fs = pos + int(headers.get("Content-Length") or headers.get("x-goog-stored-content-length"))
-                f.truncate(fs)
-                futs.append(create_future_ex(self.chunk_into, resp, on, pos))
-                pos = fs
-        for fut in futs:
-            fut.result()
-        self.serving.pop(on, None)
-        while True:
-            try:
-                os.rename(on, pn)
-            except PermissionError:
-                time.sleep(1)
+        with tracebacksuppressor:
+            headers = fcdict(cp.request.headers)
+            headers.pop("Remote-Addr", None)
+            headers.pop("Host", None)
+            headers.update(Request.header())
+            pos = 0
+            futs = []
+            with open(on, "wb") as f:
+                for url in urls:
+                    if len(futs) >= 8:
+                        futs.pop(0).result()
+                    if url.startswith("D$"):
+                        url = "https://cdn.discordapp.com/attachments/" + url[2:]
+                    for i in range(6):
+                        try:
+                            resp = reqs.next().get(url, headers=headers, stream=True)
+                            resp.raise_for_status()
+                            break
+                        except:
+                            print(traceback.format_exc())
+                        time.sleep(i ** 2 + 1)
+                    fs = pos + int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length"))
+                    f.truncate(fs)
+                    futs.append(create_future_ex(self.chunk_into, resp, on, pos))
+                    pos = fs
+            for fut in futs:
+                fut.result()
+            self.serving.pop(on, None)
+            while True:
+                try:
+                    os.rename(on, pn)
+                except PermissionError:
+                    time.sleep(1)
 
     def chunk_into(self, resp, on, pos):
         with open(on, "rb+") as f:
