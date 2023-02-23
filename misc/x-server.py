@@ -247,22 +247,16 @@ def estimate_life():
             ts = 0
         else:
             ts = hosted[0]
-        t = ts_us()
-        while t in RESPONSES:
-            t += 1
-        RESPONSES[t] = fut = concurrent.futures.Future()
-        send(f"!{t}\x7fbot.storage_ratio", escape=False)
-        j, after = fut.result()
-        RESPONSES.pop(t, None)
+        res = self.bot_exec(f"bot.storage_ratio")
         try:
-            last = (utc() - ts) / j.get("result", 1)
+            last = (utc() - ts) / res
         except ZeroDivisionError:
             last = inf
         send(last)
         est_time = utc() - last
         est_last = utc()
 
-estimate_life_after = lambda t: time.sleep(t) or estimate_life()
+# estimate_life_after = lambda t: time.sleep(t) or estimate_life()
 
 # create_future_ex(estimate_life_after, 10)
 
@@ -772,14 +766,7 @@ class Server:
                 raise FileNotFoundError
             if not regexp("https:\\/\\/images-ext-[0-9]+\\.discordapp\\.net\\/external\\/").match(source) and not source.startswith("https://media.discordapp.net/"):
                 if not source.startswith(cp.request.base):
-                    t = ts_us()
-                    while t in RESPONSES:
-                        t += 1
-                    RESPONSES[t] = fut = concurrent.futures.Future()
-                    send(f"!{t}\x7fbot.data.exec.proxy({repr(source)})", escape=False)
-                    j, after = fut.result()
-                    RESPONSES.pop(t, None)
-                    source = j["result"]
+                    source = self.bot_exec(f"bot.data.exec.proxy({repr(source)})")
             data, mime = fetch_static("waifu2x/main.js")
             srcline = f'currentImage.src = "{source}";\n    currentImage.crossOrigin = "";'
             data = data.replace(b'currentImage.src = "w2wbinit.png";', srcline.encode("utf-8", "replace"))
@@ -894,24 +881,14 @@ class Server:
             if fmt not in ("mp3", "opus", "ogg", "wav"):
                 raise TypeError
             fmt = "." + fmt
-            RESPONSES[t] = fut = concurrent.futures.Future()
-            send(f"!{t}\x7fbot.audio.returns[{t}]=VOICE.ytdl.search({repr(q)})[0]", escape=False)
-            fut.result()
-            RESPONSES[t] = fut = concurrent.futures.Future()
-            send(f"!{t}\x7fVOICE.ytdl.get_stream(bot.audio.returns[{t}],force=True,download=False)", escape=False)
-            fut.result()
-            RESPONSES[t] = fut = concurrent.futures.Future()
-            send(f"!{t}\x7f(bot.audio.returns[{t}].get('name'),bot.audio.returns[{t}].get('url'))", escape=False)
-            j, after = fut.result()
-            name, url = j["result"]
+            self.bot_exec(f"bot.audio.returns[{t}]=VOICE.ytdl.search({repr(q)})[0]")
+            self.bot_exec(f"VOICE.ytdl.get_stream(bot.audio.returns[{t}],force=True,download=False)")
+            name, url = self.bot_exec(f"(bot.audio.returns[{t}].get('name'),bot.audio.returns[{t}].get('url'))")
             if not name or not url:
                 raise FileNotFoundError
             h = shash(url)
             fn = "~" + h + fmt
-            RESPONSES[t] = fut = concurrent.futures.Future()
-            send(f"!{t}\x7fbot.audio.returns[{t}]=VOICE.ytdl.get_stream(bot.audio.returns[{t}],download={repr(fmt)},asap=True)", escape=False)
-            fut.result()
-            RESPONSES.pop(t, None)
+            self.bot_exec(f"bot.audio.returns[{t}]=VOICE.ytdl.get_stream(bot.audio.returns[{t}],download={repr(fmt)},asap=True)")
             fni = "cache/" + fn
 
             def af():
@@ -919,16 +896,12 @@ class Server:
                     return
                 if not os.path.getsize(fni):
                     return
-                RESPONSES[t] = fut = concurrent.futures.Future()
                 try:
-                    send(f"!{t}\x7fbool(getattr(bot.audio.returns[{t}], 'loaded', None))", escape=False)
-                    j, after = fut.result()
-                    RESPONSES.pop(t, None)
+                    res = self.bot_exec(f"bool(getattr(bot.audio.returns[{t}], 'loaded', None))")
                 except:
                     print_exc()
-                    RESPONSES.pop(t, None)
                     return True
-                return j["result"] is not False
+                return res is not False
 
             cp.response.headers["Accept-Ranges"] = "bytes"
             cp.response.headers.update(CHEADERS)
@@ -944,12 +917,8 @@ class Server:
             # cp.response.headers["Content-Type"] = f"audio/{fmt[1:]}"
             return cp.lib.static.serve_fileobj(f, content_type=f"audio/{fmt[1:]}", disposition="attachment" if d else "", name=name + fmt)
         else:
-            RESPONSES[t] = fut = concurrent.futures.Future()
             count = 1 if is_url(q) else 10
-            send(f"!{t}\x7f[VOICE.copy_entry(e) for e in VOICE.ytdl.search({repr(q)},count={count})]", escape=False)
-            j, after = fut.result()
-            RESPONSES.pop(t, None)
-            res = j["result"]
+            res = self.bot_exec(f"[VOICE.copy_entry(e) for e in VOICE.ytdl.search({repr(q)},count={count})]")
         cp.response.headers.update(CHEADERS)
         cp.response.headers["Content-Type"] = "application/json"
         return orjson.dumps(res)
@@ -1169,26 +1138,12 @@ class Server:
                         break
                     f.write(b)
                     if f.tell() > pos + csize:
-                        t = ts_us()
-                        while t in RESPONSES:
-                            t += 1
-                        RESPONSES[t] = fut = concurrent.futures.Future()
-                        send(f"!{t}\x7fbot.data.exec.stash({repr(fn)}, start={pos}, end={pos + csize})", escape=False)
-                        j, after = fut.result()
-                        RESPONSES.pop(t, None)
-                        url1, mid1 = j["result"]
+                        url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fn)}, start={pos}, end={pos + csize})")
                         urls.extend(url1)
                         mids.extend(mid1)
                         pos += csize
                 if f.tell() > pos:
-                    t = ts_us()
-                    while t in RESPONSES:
-                        t += 1
-                    RESPONSES[t] = fut = concurrent.futures.Future()
-                    send(f"!{t}\x7fbot.data.exec.stash({repr(fn)}, start={pos})", escape=False)
-                    j, after = fut.result()
-                    RESPONSES.pop(t, None)
-                    url1, mid1 = j["result"]
+                    url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fn)}, start={pos})")
                     urls.extend(url1)
                     mids.extend(mid1)
                 size = os.path.getsize(fn)
@@ -1250,24 +1205,13 @@ class Server:
                         with open(gn, "rb") as g:
                             shutil.copyfileobj(g, f)
                         while f.tell() > pos + csize:
-                            RESPONSES[t] = fut = concurrent.futures.Future()
-                            send(f"!{t}\x7fbot.data.exec.stash({repr(fn)}, start={pos}, end={pos + csize})", escape=False)
-                            j, after = fut.result()
-                            RESPONSES.pop(t, None)
-                            url1, mid1 = j["result"]
+                            url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fn)}, start={pos}, end={pos + csize})")
                             urls.extend(url1)
                             mids.extend(mid1)
                             pos += csize
                         os.remove(gn)
             if os.path.getsize(fn) > pos:
-                t = ts_us()
-                while t in RESPONSES:
-                    t += 1
-                RESPONSES[t] = fut = concurrent.futures.Future()
-                send(f"!{t}\x7fbot.data.exec.stash({repr(fn)}, start={pos})", escape=False)
-                j, after = fut.result()
-                RESPONSES.pop(t, None)
-                url1, mid1 = j["result"]
+                url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fn)}, start={pos})")
                 urls.extend(url1)
                 mids.extend(mid1)
             size = os.path.getsize(fn)
@@ -1315,14 +1259,7 @@ class Server:
         if name.startswith(".temp$") or name.startswith(".forward$"):
             raise PermissionError
         mime = get_mime(of)
-        t = ts_us()
-        while t in RESPONSES:
-            t += 1
-        RESPONSES[t] = fut = concurrent.futures.Future()
-        send(f"!{t}\x7fbot.data.exec.stash({repr(of)})", escape=False)
-        j, after = fut.result()
-        RESPONSES.pop(t, None)
-        urls, mids = j["result"]
+        urls, mids = self.bot_exec(f"bot.data.exec.stash({repr(of)})")
         urls = [url.replace("https://cdn.discordapp.com/attachments/", "D$") for url in urls]
         print(urls)
         assert urls
@@ -1368,13 +1305,7 @@ class Server:
             raise PermissionError("Incorrect key.")
         os.remove(p)
         mids = orjson.loads(orig.split("<!--MID=", 1)[-1].split("-->", 1)[0])
-        t = ts_us()
-        while t in RESPONSES:
-            t += 1
-        RESPONSES[t] = fut = concurrent.futures.Future()
-        send(f"!{t}\x7fbot.data.exec.delete({repr(mids)})", escape=False)
-        j, after = fut.result()
-        RESPONSES.pop(t, None)
+        self.bot_exec(f"bot.data.exec.delete({repr(mids)})")
         ts = ots
         name = kwargs.get("name", "") or cp.request.headers.get("x-file-name", "untitled")
         s = cp.request.remote.ip + "%" + name
@@ -1434,13 +1365,7 @@ class Server:
             raise PermissionError("Incorrect key.")
         os.remove(p)
         mids = orjson.loads(orig.split("<!--MID=", 1)[-1].split("-->", 1)[0])
-        t = ts_us()
-        while t in RESPONSES:
-            t += 1
-        RESPONSES[t] = fut = concurrent.futures.Future()
-        send(f"!{t}\x7fbot.data.exec.delete({repr(mids)})", escape=False)
-        j, after = fut.result()
-        RESPONSES.pop(t, None)
+        self.bot_exec(f"bot.data.exec.delete({repr(mids)})")
         return """<!DOCTYPE html>
 <html>
 <meta http-equiv="refresh" content="0; URL=/">
@@ -1672,15 +1597,9 @@ body {
         if token != at:
             if cp.url(base="").strip("/") != at:
                 raise InterruptedError
-        t = ts_us()
-        while t in RESPONSES:
-            t += 1
-        RESPONSES[t] = fut = concurrent.futures.Future()
-        send(f"!{t}\x7fbot.backup()", escape=False)
-        j, after = fut.result()
-        RESPONSES.pop(t, None)
+        backup = self.bot_exec(f"bot.backup()")
         cp.response.headers.update(CHEADERS)
-        return cp.lib.static.serve_file(os.getcwd() + "/" + j["result"], content_type="application/octet-stream", disposition="attachment")
+        return cp.lib.static.serve_file(os.getcwd() + "/" + backup, content_type="application/octet-stream", disposition="attachment")
     backup._cp_config = {"response.stream": True}
 
     @cp.expose(("eval", "exec"))
@@ -1690,14 +1609,8 @@ body {
             raise InterruptedError
         url = cp.url(base="", qs=cp.request.query_string)
         content = urllib.parse.unquote(url.lstrip("/").split("/", 2)[-1])
-        t = ts_us()
-        while t in RESPONSES:
-            t += 1
-        RESPONSES[t] = fut = concurrent.futures.Future()
-        send(f"!{t}\x7f{content}", escape=False)
-        j, after = fut.result()
-        RESPONSES.pop(t, None)
-        return orjson.dumps(j["result"])
+        res = self.bot_exec(content)
+        return orjson.dumps(res)
 
     @cp.expose
     @hostmap
@@ -1823,101 +1736,8 @@ body {
     @cp.expose
     @hostmap
     def api_status(self):
-        t = ts_us()
-        while t in RESPONSES:
-            t += 1
-        RESPONSES[t] = fut = concurrent.futures.Future()
-        content = f'bot.status()'
-        send(f"!{t}\x7f{content}", escape=False)
-        j, after = fut.result()
-        RESPONSES.pop(t, None)
-        return orjson.dumps(j["result"])
-
-    mpimg = {}
-
-    @cp.expose
-    @hostmap
-    def mpinsights_old(self):
-        values = self.mpget()
-        for i in range(3):
-            values[i] = int(values[i])
-        if "text/html" not in cp.request.headers.get("Accept", ""):
-            self.ensure_mpins()
-            histories = [None] * len(values)
-            hours = histories.copy()
-            for k in range(len(histories)):
-                width = np.clip(len(self.ins_data[k]), 3, 960)
-                histories[k] = list(supersample(self.ins_data[k], width))
-                hours[k] = len(self.ins_data[k])
-            return json.dumps(dict(
-                current=dict(
-                    live_users=values[2],
-                    active_users=values[1],
-                    total_users=values[0],
-                    total_playtime=values[4],
-                    total_use_time=values[3],
-                    average_playtime=values[5],
-                ),
-                historical=dict(
-                    live_users=[histories[2], hours[2]],
-                    active_users=[histories[1], hours[2]],
-                    total_users=[histories[0], hours[2]],
-                    total_playtime=[histories[4], hours[2]],
-                    total_use_time=[histories[3], hours[2]],
-                    average_playtime=[histories[5], hours[2]],
-                ),
-            )).encode("utf-8")
-        create_future_ex(self.ensure_mpins)
-        return """<!DOCTYPE html><html>
-<head>
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
-    <meta charset="utf-8">
-    <title>Insights</title>
-    <meta content="Miza Player Insights" property="og:title">
-    <meta content="See the activity history for the Miza Player program!" property="og:description">
-    <meta content="{cp.url()}" property="og:url">
-    <meta property="og:image" content="https://github.com/thomas-xin/Miza/raw/e62dfccef0cce3b0fc3b8a09fb3ca3edfedd8ab0/misc/sky-rainbow.gif">
-    <meta content="#BF7FFF" data-react-helmet="true" name="theme-color">
-    <style>
-        body {
-            font-family:Rockwell;
-            background:black;
-            color:#bfbfbf;
-            text-align:center;
-        }
-        .center {
-            display: block;
-            margin-left: auto;
-            margin-right: auto;
-            max-width: 100%;
-        }
-        .home {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            font-size: 20px;
-        }
-    </style>
-</head>""" + f"""
-<body>
-    <h1 style="color:white">Miza Player Insights</h1>
-    <h2 style="color:white">Get Miza Player <a href="https://github.com/thomas-xin/Miza-Player">here</a>!</h2>
-    Live users: {values[2]}
-    <img class="center" src="https://mizabot.xyz/mpins/2">
-    Active users: {values[1]}
-    <img class="center" src="https://mizabot.xyz/mpins/1">
-    Total users: {values[0]}
-    <img class="center" src="https://mizabot.xyz/mpins/0">
-    <br>
-    Total playtime: {sec2time(values[4])}
-    <img class="center" src="https://mizabot.xyz/mpins/4">
-    Total use time: {sec2time(values[3])}
-    <img class="center" src="https://mizabot.xyz/mpins/3">
-    Average playtime per user: {sec2time(values[5])}
-    <img class="center" src="https://mizabot.xyz/mpins/5">
-    <a class="home" href="/miscellaneous">Back</a>
-</body>
-</html>"""
+        status = self.bot_exec(f"bot.status()")
+        return orjson.dumps(status)
 
     def ensure_mpins(self):
         try:
@@ -1938,38 +1758,6 @@ body {
                 self.ins_wait = None
         except:
             send(traceback.format_exc())
-
-    @cp.expose
-    @cp.config(**{"response.timeout": 7200})
-    @hostmap
-    def mpins(self, k):
-        k = int(k)
-        try:
-            fn = self.mpimg[k]
-        except KeyError:
-            pass
-        else:
-            if os.path.exists(fn) and utc() - os.path.getmtime(fn) < 20:
-                return cp.lib.static.serve_file(fn, content_type="image/png")
-        while self.ins_wait:
-            self.ins_wait.result()
-        width = np.clip(len(self.ins_data[k]), 3, 960)
-        arr = list(supersample(self.ins_data[k], width))
-
-        t = ts_us()
-        while t in RESPONSES:
-            t += 1
-        RESPONSES[t] = fut = concurrent.futures.Future()
-        arr_repr = "pickle.loads(" + repr(pickle.dumps(arr)) + ")"
-        hours = len(self.ins_data[k])
-        content = f'await process_image("plt_mp", "$", ({arr_repr}, {hours}, {k}))'
-        send(f"!{t}\x7f{content}", escape=False)
-        j, after = fut.result()
-        RESPONSES.pop(t, None)
-        self.mpimg[k] = fn = os.path.abspath(f"misc/{k}.png")
-        with open(fn, "rb") as f:
-            return f.read()
-
 
     # names = ("total_users", "active_users", "live_users", "active_seconds", "live_seconds", "seconds_per_user")
     def mpget(self):
@@ -2070,16 +1858,21 @@ body {
             uid = found[0]
         else:
             uid = None
+        res = self.bot_exec(f"bot.donate({repr(name)},{repr(uid)},{amount},{repr(msg)})")
+        print(res)
+        return as_str(res)
+
+    def bot_exec(self, s):
         t = ts_us()
         while t in RESPONSES:
             t += 1
         RESPONSES[t] = fut = concurrent.futures.Future()
-        send(f"!{t}\x7fbot.donate({repr(name)},{repr(uid)},{amount},{repr(msg)})", escape=False)
-        j, after = fut.result()
-        RESPONSES.pop(t, None)
-        res = j["result"]
-        print(res)
-        return as_str(res)
+        send(f"!{t}\x7f{s}", escape=False)
+        try:
+            j, after = fut.result()
+        finally:
+            RESPONSES.pop(t, None)
+        return j["result"]
 
     rapidapi = 0
     @cp.expose(("commands",))
@@ -2139,14 +1932,7 @@ body {
             args = smart_split(argv)
         except ValueError:
             args = argv.split()
-        t = ts_us()
-        while t in RESPONSES:
-            t += 1
-        RESPONSES[t] = fut = concurrent.futures.Future()
-        send(f"!{t}\x7fbot.commands.{command}[0](bot=bot,channel=None,flags='v',args={repr(args)},argv={repr(argv)})", escape=False)
-        j, after = fut.result()
-        RESPONSES.pop(t, None)
-        url = j["result"]
+        url = self.bot_exec(f"bot.commands.{command}[0](bot=bot,channel=None,flags='v',args={repr(args)},argv={repr(argv)})")
         refresh = float(refresh or 60)
         if fcdict(cp.request.headers).get("Accept") == "application/json":
             return url
