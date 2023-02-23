@@ -322,18 +322,24 @@ class Server:
         mime = get_mime(p)
         f_url = cp.url(qs=cp.request.query_string).replace("/fileinfo/", "/f/")
         st = os.stat(p)
-        fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND).removeprefix(".temp$@")
+        fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
+        if fn.startswith(".temp$@"):
+            fn = fn[7:]
+            a3 = True
+        else:
+            a3 = False
         t = utc()
         ti = max(st.st_atime + 30 * 86400, st.st_ctime + 60 * 86400, t)
         d = dict(
             id=p.rsplit("/", 1)[-1].split("~", 1)[0].lstrip(IND),
             filename=fn,
-            ttl=ti - t,
+            ttl=-1,
             size=st.st_size,
             mimetype=mime,
             raw=f_url,
             dl=f_url.replace("/f/", "/d/", 1),
             timestamp=max(st.st_mtime, st.st_ctime),
+            in_cache=a3,
         )
         if p.endswith("~.forward$") and mime == "text/html":
             with open(p, "r", encoding="utf-8") as f:
@@ -418,9 +424,6 @@ class Server:
         with sem:
             endpoint = cp.url(qs=cp.request.query_string, base="")[1:].split("/", 1)[0]
             download = download and download[0] not in "0fFnN" or endpoint.startswith("d")
-            # if download:
-            #     mime = MIMES.get(p.rsplit("/", 1)[-1].rsplit(".", 1)[-1])
-            # else:
             mime = get_mime(p)
             st = os.stat(p)
             fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
@@ -1144,372 +1147,17 @@ class Server:
         cp.response.headers["ETag"] = create_etag(data)
         return data
 
-    @cp.expose
-    @cp.config(**{"response.timeout": 7200})
-    @hostmap
-    def upload_file(self, *args, **kwargs):
-        ip = cp.request.remote.ip
-        files = args + tuple(kwargs.values())
-        files = [file for file in files if file.filename]
-        if not files:
-            raise EOFError
-        ts = time.time_ns() // 1000
-        urls = deque()
-        futs = deque()
-
-        def copy_file(obj, fn):
-            with open(fn, "wb") as f:
-                shutil.copyfileobj(obj, f)
-
-        for file in files:
-            fn = file.filename
-            sfn = f"saves/filehost/{IND}{ts}~{fn}"
-            futs.append(create_future_ex(copy_file, file.file, sfn))
-            b = ts.bit_length() + 7 >> 3
-            href = f"/view/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
-            url = HOST + href
-            data = (href, url, sfn)
-            urls.append(data)
-            send(ip + "\t" + fn + "\t" + str(data))
-            ts += 1
-        s = """<!DOCTYPE html>
-<html>
-    <head>
-        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
-        <style>
-        body {
-            text-align: center;
-            font-family: 'Comic Sans MS';
-        }
-        img {
-            margin-top: 32px;
-            display: block;
-            margin-left: auto;
-            margin-right: auto;
-        }
-        a:link {
-            color: #ffff00;
-            text-decoration: none;
-        }
-        a:visited {
-            color: #ffff00;
-            text-decoration: none;
-        }
-        a:hover {
-            color: #ff0000;
-            text-decoration: underline;
-        }
-        a:active {
-            color: #00ff00;
-            text-decoration: underline;
-        }
-        </style>
-    </head>
-    <body style="background-color:black;">
-        <h1 style="color:white;">Upload successful!</h1>"""
-        for fut in futs:
-            fut.result()
-        s += f"""
-        <p style="color:#00ffff;">Total file size: {byte_scale(sum(os.path.getsize(f[2]) for f in urls))}B</p>
-        <p style="color:#bf7fff;">Estimated file lifetime: 2 months</p>"""
-        for fi in urls:
-            s += f'\n<a href="{fi[0]}">{fi[1]}<br></a>'
-        preview = deque()
-        for f in urls:
-            mime = get_mime(f[2])
-            if mime.startswith("image/"):
-                preview.append(f'<img width="480" src="{f[0].replace("/view/", "/preview/")}" alt="{f[2].split("~", 1)[-1]}">')
-            elif mime.startswith("audio/"):
-                preview.append(f'<div align="center"><audio controls><source src="{f[0]}" type="{mime}"></audio></div>')
-            elif mime.startswith("video/"):
-                preview.append(f'<div align="center"><video width="480" controls><source src="{f[0]}" type="{mime}"></video></div>')
-            elif mime.startswith("text/"):
-                preview.append(f'<a href="{fi[0].replace("/view/", "/files/")}">{fi[1].replace("/view/", "/files/")}</a>')
-            else:
-                preview.append(f'<a href="{fi[0].replace("/view/", "/download/")}">{fi[1].replace("/view/", "/files/")}</a>')
-        if not preview:
-            preview.append(f'<img src="{cp.request.base}/static/hug.gif" alt="Miza-Dottie-Hug" style="width:14.2857%;height:14.2857%;">')
-        s += "\n" + "\n".join(preview)
-        s += """
-        <p><a href="/upload">Click here to upload another file!</a></p>
-    </body>
-</html>"""
-        return s
-
-    @cp.expose
-    @hostmap
-    def upload(self):
-        global est_last
-        ip = cp.request.remote.ip
-        colour = hex(colour2raw(hue2colour(xrand(1536))))[2:].upper()
-        if utc() - est_last > 1800:
-            est_last = utc()
-            create_future_ex(estimate_life)
-# Code adapted from https://github.com/mailopl/html5-xhr2-chunked-file-upload-slice
-        data = f"""<!DOCTYPE html>
-<html>
-<head>
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000"
-     crossorigin="anonymous"></script>
-    <meta charset="utf-8">
-    <title>Files</title>
-    <meta content="Files" property="og:title">
-    <meta content="Upload a file here!" property="og:description">
-    <meta content="{cp.url()}" property="og:url">
-    <meta property="og:image" content="https://raw.githubusercontent.com/thomas-xin/Image-Test/master/sky-rainbow.gif">
-    <meta content="#BF7FFF" data-react-helmet="true" name="theme-color">
-    <link href="https://unpkg.com/boxicons@2.0.7/css/boxicons.min.css" rel="stylesheet">
-</head>""" + """
-<script type="text/javascript">
-const BYTES_PER_CHUNK = 2097152; // 2MB chunk sizes.
-var slices; // slices, value that gets decremented
-var slicesTotal; // total amount of slices, constant once calculated
-
-/**
- * Calculates slices and indirectly uploads a chunk of a file via uploadFile()
-**/
-function sendRequest() {
-    var xhr;
-    var blob = document.getElementById('fileToUpload').files[0];
-
-    var start = 0;
-    var end;
-    var index = 0;
-
-    // calculate the number of slices 
-    slices = Math.ceil(blob.size / BYTES_PER_CHUNK);
-    slicesTotal = slices;
-
-    while(start < blob.size) {
-        end = start + BYTES_PER_CHUNK;
-        if(end > blob.size) {
-            end = blob.size;
-        }
-
-        uploadFile(blob, index, start, end);
-
-        start = end;
-        index++;
-    }
-}
-
-/**
- * Blob to ArrayBuffer (needed ex. on Android 4.0.4)
-**/
-var str2ab_blobreader = function(str, callback) {
-    var blob;
-    BlobBuilder = window.MozBlobBuilder || window.WebKitBlobBuilder || window.BlobBuilder;
-    if (typeof(BlobBuilder) !== 'undefined') {
-      var bb = new BlobBuilder();
-      bb.append(str);
-      blob = bb.getBlob();
-    } else {
-      blob = new Blob([str]);
-    }
-    var f = new FileReader();
-    f.onload = function(e) {
-        callback(e.target.result)
-    }
-    f.readAsArrayBuffer(blob);
-}
-/**
- * Performs actual upload, adjustes progress bars
- *
- * @param blob
- * @param index
- * @param start
- * @param end
- */
-function uploadFile(blob, index, start, end) {
-    var xhr;
-    var end;
-    var chunk;
-
-    xhr = new XMLHttpRequest();
-
-    xhr.onreadystatechange = function() {
-        if(xhr.readyState == 4) {
-            if(xhr.responseText) {
-                alert(xhr.responseText);
-            }
-
-            slices--;
-
-            // if we have finished all slices
-            if(slices == 0) {
-                mergeFile(blob);
-                progressBar.max = progressBar.value = 100;
-				percentageDiv.innerHTML = "100%";
-            }
-        }
-    };
-
-    if (blob.webkitSlice) {
-        chunk = blob.webkitSlice(start, end);
-    } else if (blob.mozSlice) {
-        chunk = blob.mozSlice(start, end);
-    } else {
-		chunk = blob.slice(start, end); 
-    }
-
-    xhr.addEventListener("load",  function (evt) {
-    	var percentageDiv = document.getElementById("percent");
-		var progressBar = document.getElementById("progressBar");
-    }, false);
-
-	xhr.upload.addEventListener("progress", function (evt) {
-		var percentageDiv = document.getElementById("percent");  
-		var progressBar = document.getElementById("progressBar");
-
-		if (evt.lengthComputable) {
-            progressBar.max = slicesTotal;
-            progressBar.value = index;
-            percentageDiv.innerHTML = Math.round(index/slicesTotal * 10000) / 100 + "%";
-		} 
-	}, false);
-
-
-    xhr.open("post", "upload_chunk", true);
-    xhr.setRequestHeader("X-File-Name", blob.name);             // custom header with filename and full size
-	xhr.setRequestHeader("X-File-Size", blob.size);
-	xhr.setRequestHeader("X-Index", index);                     // part identifier
-    
-    if (blob.webkitSlice) {                                     // android default browser in version 4.0.4 has webkitSlice instead of slice()
-    	var buffer = str2ab_blobreader(chunk, function(buf) {   // we cannot send a blob, because body payload will be empty
-       		xhr.send(buf);                                      // thats why we send an ArrayBuffer
-    	});	
-    } else {
-    	xhr.send(chunk);                                        // but if we support slice() everything should be ok
-    }
-}
-
-/**
- *  Function executed once all of the slices has been sent, "TO MERGE THEM ALL!"
-**/
-function mergeFile(blob) {
-    var xhr;
-    var fd;
-
-    xhr = new XMLHttpRequest();
-    xhr.onreadystatechange = function() {
-		if (xhr.readyState == XMLHttpRequest.DONE) {
-			window.location.replace(xhr.responseText);
-		}
-	}
-
-    fd = new FormData();
-    fd.append("name", blob.name);
-    fd.append("index", slicesTotal);
-
-    xhr.open("POST", "merge", true);
-    xhr.send(fd);
-}
-</script>
-
-<style>
-    body {
-        font-family: 'Comic Sans MS';
-    }
-    .select {
-        vertical-align: center;
-        background: transparent;
-        color: white;
-        width: 100%;
-        height: 100%;
-        font-weight: 400;
-        align-items: center;
-    }
-    .center {
-        margin: 0;
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        -ms-transform: translate(-50%, -50%);
-        transform: translate(-50%, -50%);
-    }
-    a:link {
-        color: #ffff00;
-        text-decoration: none;
-    }
-    a:visited {
-        color: #ffff00;
-        text-decoration: none;
-    }
-    a:hover {
-        color: #ff0000;
-        text-decoration: underline;
-    }
-    a:active {
-        color: #00ff00;
-        text-decoration: underline;
-    }
-    """ + f"""
-</style>
-<body>
-    <video playsinline autoplay muted loop poster="https://cdn.discordapp.com/attachments/691915140198826005/846945647873490944/GpAy.webp" style="position:fixed;right:0;bottom:0;min-width:100%;min-height:100%;z-index:-1;">
-        <source src="https://cdn.discordapp.com/attachments/691915140198826005/846587863797203004/GpAy.mp4" type="video/mp4">
-    </video>
-    <link href="/static/hamburger.css" rel="stylesheet">
-    <div class="hamburger">
-        <input
-            type="checkbox"
-            title="Toggle menu"
-        />
-        <div class="items select">
-            <a href="/" data-popup="Home">
-                <video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
-                    <source src="https://cdn.discordapp.com/attachments/691915140198826005/846592940075515904/miza_by_smudgedpasta_de1q8lu-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOj.mp4" type="video/mp4">
-                </video>
-            </a>
-            <a href="/mizatlas" data-popup="Command Atlas">
-                <video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
-                    <source src="https://cdn.discordapp.com/attachments/691915140198826005/846593904635281408/miza_has_a_leaf_blower_by_smudgedpasta_de6t2dl-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJz.mp4" type="video/mp4">
-                </video>
-            </a>
-            <a href="/upload" data-popup="File Host">
-                <video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
-                    <source src="https://cdn.discordapp.com/attachments/691915140198826005/846593561444745226/magical_babey_mode_by_smudgedpasta_de1q8ky-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIi.mp4" type="video/mp4">
-                </video>
-            </a>
-            <a href="/apidoc" data-popup="API Documentation">
-                <video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
-                    <source src="https://cdn.discordapp.com/attachments/691915140198826005/846590061901381632/deahc7l-a9773147-259d-4226-b0b6-195c6eb1f3c0.pngtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOi.mp4" type="video/mp4">
-                </video>
-            </a>
-            <a 
-                href="/time"
-                data-popup="Clock"
-                class='bx bx-time'></a>
-        </div>
-        <div class="hambg"></div>
-    </div>
-    <div class="center">
-		<div id="percent" align="center" style="color:white;">
-            <h1>Upload a file here!</h1>
-            <a href="/redirect">Click here to shorten or proxy a URL!</a>
-        </div><br>
-		<input style="color:white;" type="file" name="file" id="fileToUpload">
-		<button onclick="sendRequest()">Upload</button><br>
-		<div align="center"><progress id="progressBar" value="0" max="100"></progress></div>
-	</div>
-</body>
-</html>"""
-        cp.response.headers.update(CHEADERS)
-        cp.response.headers["Content-Type"] = "text/html"
-        cp.response.headers["Content-Length"] = len(data)
-        cp.response.headers["ETag"] = create_etag(data)
-        return data
-
-    @cp.expose
+    @cp.expose(("upload_single",))
     @hostmap
     def upload_chunk(self, **kwargs):
         name = cp.request.headers.get("x-file-name", "untitled")
         s = cp.request.remote.ip + "%" + name
         h = hash(s) % 2 ** 48
+        single = "/upload_single" in cp.url()
         xi = cp.request.headers.get("x-index", "0")
         fn = f"cache/{h}%" + xi
         with open(fn, "wb") as f:
-            if int(xi) == 0 and cp.request.headers.get("Referer") == "https://mizabot.xyz/files":
+            if single or int(xi) == 0 and cp.request.headers.get("Referer") == "https://mizabot.xyz/files":
                 pos = 0
                 csize = 83886080
                 g = cp.request.body.fp
@@ -1559,6 +1207,8 @@ function mergeFile(blob) {
                     f.write(s)
                 return
             shutil.copyfileobj(cp.request.body.fp, f)
+        if single:
+            return self.merge(name=name, index=0)
 
     @cp.expose
     @cp.tools.accept(media="multipart/form-data")
@@ -1574,7 +1224,8 @@ function mergeFile(blob) {
         tn = fn.split("~", 1)[0] + "~.forward$"
         b = ts.bit_length() + 7 >> 3
         q = ""
-        if os.path.exists(r):
+        high = int(kwargs.get("index") or cp.request.headers.get("x-index", 0))
+        if high == 0 and os.path.exists(r):
             with open(r, "r", encoding="utf-8") as f:
                 with open(tn, "w", encoding="utf-8") as g:
                     s = f.read()
@@ -1586,18 +1237,60 @@ function mergeFile(blob) {
             if os.path.exists(n + "0"):
                 os.rename(n + "0", fn.split("~", 1)[0] + "~.temp$@" + name)
         else:
-            high = int(kwargs.get("index") or cp.request.headers.get("x-index", "0"))
-            os.rename(n + "0", fn)
+            pos = 0
+            csize = 83886080
+            urls = []
+            mids = []
+            # os.rename(n + "0", fn)
+            of = n + "0"
             if high > 1:
                 with open(fn, "ab") as f:
                     for i in range(1, high):
                         gn = n + str(i)
                         with open(gn, "rb") as g:
                             shutil.copyfileobj(g, f)
+                        while f.tell() > pos + csize:
+                            RESPONSES[t] = fut = concurrent.futures.Future()
+                            send(f"!{t}\x7fbot.data.exec.stash({repr(fn)}, start={pos}, end={pos + csize})", escape=False)
+                            j, after = fut.result()
+                            RESPONSES.pop(t, None)
+                            url1, mid1 = j["result"]
+                            urls.extend(url1)
+                            mids.extend(mid1)
+                            pos += csize
                         os.remove(gn)
-            with tracebacksuppressor:
-                url = self.replace_file(fn)
-                return "/p/" + url.split("/f/", 1)[-1]
+            if os.path.getsize(fn) > pos:
+                t = ts_us()
+                while t in RESPONSES:
+                    t += 1
+                RESPONSES[t] = fut = concurrent.futures.Future()
+                send(f"!{t}\x7fbot.data.exec.stash({repr(fn)}, start={pos})", escape=False)
+                j, after = fut.result()
+                RESPONSES.pop(t, None)
+                url1, mid1 = j["result"]
+                urls.extend(url1)
+                mids.extend(mid1)
+            size = os.path.getsize(fn)
+            mime = get_mime(fn)
+            urls = [url.replace("https://cdn.discordapp.com/attachments/", "D$") for url in urls]
+            print(urls)
+            assert urls
+            try:
+                ts = int(of.split("~", 1)[0].rsplit(IND, 1)[-1])
+            except ValueError:
+                ts = time.time_ns() // 1000
+            fn = f"saves/filehost/{IND}{ts}~.forward$"
+            code = 307
+            ftype = 3
+            b = ts.bit_length() + 7 >> 3
+            url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
+            n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
+            key = key or base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
+            s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--><!--KEY={key}--><!--MID={json.dumps(mids)}--></html>'
+            with open(fn, "w", encoding="utf-8") as f:
+                f.write(s)
+            q = f"?key={key}"
+            os.rename(of, f"saves/filehost/{IND}{ts}~.temp$@" + name)
         return "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=") + q
 
     @cp.expose
@@ -1638,7 +1331,6 @@ function mergeFile(blob) {
         except ValueError:
             ts = time.time_ns() // 1000
         fn = f"saves/filehost/{IND}{ts}~.forward$"
-        # print(ts, fn)
         code = 307
         ftype = 3
         b = ts.bit_length() + 7 >> 3

@@ -2744,6 +2744,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 attachments.append(f)
             if f.startswith("emoji_"):
                 continue
+            if utc() - os.path.getmtime(f) <= 3600:
+                continue
             with tracebacksuppressor:
                 os.remove("cache/" + f)
                 i += 1
