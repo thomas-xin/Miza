@@ -678,7 +678,7 @@ class Server:
                     try:
                         resp = reqs.next().get(url, headers=headers, stream=True)
                         resp.raise_for_status()
-                        return resp
+                        break
                     except:
                         print(traceback.format_exc())
                     time.sleep(i ** 2 + 1)
