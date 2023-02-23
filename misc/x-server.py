@@ -1285,7 +1285,7 @@ class Server:
             b = ts.bit_length() + 7 >> 3
             url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
             n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
-            key = key or base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
+            key = base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
             s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--><!--KEY={key}--><!--MID={json.dumps(mids)}--></html>'
             with open(fn, "w", encoding="utf-8") as f:
                 f.write(s)
