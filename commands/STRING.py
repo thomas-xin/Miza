@@ -1,6 +1,8 @@
 print = PRINT
 
 try:
+    import httpcore
+    httpcore.SyncHTTPTransport = None # Remove outdated dependency typecheck
     import googletrans
 except:
     print_exc()
