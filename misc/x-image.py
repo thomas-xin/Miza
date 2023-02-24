@@ -2395,7 +2395,7 @@ def CBAI(inputs):
     # locals().update(inputs)
     try:
         cb = CBOTS[channel_id]
-        if cb.personality != personality:
+        if cb.personality != personality or cb.cai_channel != cai_channel:
             raise KeyError
     except KeyError:
         cb = CBOTS[channel_id] = convobot.Bot( 
@@ -2408,6 +2408,8 @@ def CBAI(inputs):
         )
         for t in history:
             cb.appendleft(t)
+    else:
+        cb.premium = premium
     if im:
         try:
             im = cb.image
