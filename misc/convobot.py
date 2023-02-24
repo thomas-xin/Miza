@@ -491,7 +491,7 @@ class Bot:
 				lines.append(s)
 		if literal_question(q):
 			res = (self.google, self.bing)[random.randint(0, 1)](q, raw=True)
-			start = "[GOOGLE] "
+			start = "[GOOGLE]: "
 			if len(self.gpttokens(res)) > 128:
 				summ = self.answer_summarise("facebook/bart-large-cnn", q + "\n" + res, max_length=96, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
 				res = lim_str(res.replace("\n", " "), 256, mode="right") + "\n" + summ
@@ -634,14 +634,14 @@ class Bot:
 		res = ""
 		if (not refs and self.premium > 1 or literal_question(q)):
 			res = (self.google, self.bing)[random.randint(0, 1)](q, raw=True)
-			s = "[GOOGLE] "
+			s = "[GOOGLE]: "
 			if len(self.gpttokens(res)) > 128:
 				summ = self.answer_summarise("facebook/bart-large-cnn", q + "\n" + res, max_length=96, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
 				res = lim_str(res.replace("\n", " "), 256, mode="right") + "\n" + summ
 			res = s + res + "\n"
 			lines.append(res)
 		for k, v in refs:
-			if not k.startswith("[REPLIED TO] "):
+			if not k.startswith("[REPLIED TO]: "):
 				continue
 			if len(self.gpttokens(v)) > 36:
 				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
@@ -652,7 +652,7 @@ class Bot:
 			s = self.answer_summarise("facebook/bart-large-cnn", s, max_length=384, min_length=32).replace("\n", ". ").strip()
 		lines.append(s)
 		for k, v in refs:
-			if k.startswith("[REPLIED TO] "):
+			if k.startswith("[REPLIED TO]: "):
 				continue
 			k = k.replace(":", "")
 			if len(self.gpttokens(v)) > 36:
