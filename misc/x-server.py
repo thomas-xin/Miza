@@ -1199,23 +1199,23 @@ class Server:
             # os.rename(n + "0", fn)
             of = n + "0"
             if high > 1:
-                with open(fn, "ab") as f:
+                with open(of, "ab") as f:
                     for i in range(1, high):
                         gn = n + str(i)
                         with open(gn, "rb") as g:
                             shutil.copyfileobj(g, f)
                         while f.tell() > pos + csize:
-                            url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fn)}, start={pos}, end={pos + csize})")
+                            url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(of)}, start={pos}, end={pos + csize})")
                             urls.extend(url1)
                             mids.extend(mid1)
                             pos += csize
                         os.remove(gn)
-            if os.path.getsize(fn) > pos:
-                url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fn)}, start={pos})")
+            if os.path.getsize(of) > pos:
+                url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(of)}, start={pos})")
                 urls.extend(url1)
                 mids.extend(mid1)
-            size = os.path.getsize(fn)
-            mime = get_mime(fn)
+            size = os.path.getsize(of)
+            mime = get_mime(of)
             urls = [url.replace("https://cdn.discordapp.com/attachments/", "D$") for url in urls]
             print(urls)
             assert urls

@@ -665,7 +665,7 @@ class Bot:
 		lines.append(ns)
 		longer = req_long(q)
 		if self.premium < 2:
-			if not res:
+			if not res and self.premium < 1:
 				model = "text-bloom-001"
 				temp = 0.9
 				limit = 2000
