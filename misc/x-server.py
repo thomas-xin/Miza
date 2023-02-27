@@ -615,12 +615,11 @@ class Server:
                             cp.response.headers["Content-Disposition"] = disp
                             # cp.response.headers["Content-Length"] = info[1]
                             cp.response.headers["Content-Type"] = info[2]
-                            mime = info[2]
                             referrer = cp.request.headers.get("Referer")
                             print(p, len(urls), referrer)
                             if download and len(urls) == 1 and not referrer:
                                 raise cp.HTTPRedirect("https://cdn.discordapp.com/attachments/" + urls[0][2:], status="307")
-                            return self.concat(p, urls, name=info[0])
+                            return self.concat(p, urls, name=info[0], mime=info[2])
             f = open(p, "rb")
             resp = cp.lib.static.serve_fileobj(f, content_type=mime, disposition="attachment" if download else None, name=a2)
             if a3:
@@ -628,7 +627,7 @@ class Server:
             return resp
     files._cp_config = {"response.stream": True}
 
-    def concat(self, fn, urls, name="", download=False):
+    def concat(self, fn, urls, name="", download=False, mime=None):
         print("Cat", urls)
         on = fn.replace("~.forward$", "!.temp$@" + name)
         pn = fn.replace("~.forward$", "~.temp$@" + name)
