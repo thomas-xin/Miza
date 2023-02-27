@@ -516,12 +516,12 @@ class Bot:
 
 	def art(self, prompt, url="", url2="", kwargs={}, specified=False, dalle2=False, openjourney=False, nsfw=False):
 		funcs = []
+		if not url and not dalle2 and nsfw:
+			funcs.append(self.art_textsynth)
 		if not specified and not url:
 			if random.randint(0, 2) and self.cache.get(prompt):
 				return self.cache[prompt].pop(0), 0
 			funcs.append(self.art_mage)
-		if not url and not dalle2 and nsfw:
-			funcs.append(self.art_textsynth)
 		if not specified and not url:
 			if not openjourney:
 				funcs.append(self.art_openjourney)

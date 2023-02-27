@@ -686,12 +686,12 @@ class Server:
                     pos = fs
             for fut in futs:
                 fut.result()
-            self.serving.pop(on, None)
             while True:
                 try:
                     os.rename(on, pn)
                 except PermissionError:
                     time.sleep(1)
+            self.serving.pop(on, None)
 
     def chunk_into(self, resp, on, pos):
         with open(on, "rb+") as f:
