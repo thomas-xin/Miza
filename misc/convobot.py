@@ -453,6 +453,8 @@ class Bot:
 		return res
 
 	def check_google(self, q):
+		if q.count(" ") < 2:
+			return False
 		if not literal_question(q):
 			resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", q, ("question", "information", "action"))
 			if resp["question"] < 0.5:
