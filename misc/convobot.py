@@ -454,10 +454,10 @@ class Bot:
 
 	def check_google(self, q):
 		if not literal_question(q):
-			resp = cb.answer_classify("joeddav/xlm-roberta-large-xnli", q, ("question", "information", "action"))
+			resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", q, ("question", "information", "action"))
 			if resp["question"] < 0.5:
 				return False
-		resp = cb.answer_classify("joeddav/xlm-roberta-large-xnli", q, ("personal question", "not personal"))
+		resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", q, ("personal question", "not personal"))
 		return resp["not personal"] >= 0.5
 
 	def caichat(self, u, q, refs=(), im=None):
