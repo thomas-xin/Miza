@@ -628,7 +628,6 @@ class Server:
     files._cp_config = {"response.stream": True}
 
     def concat(self, fn, urls, name="", download=False, mime=None):
-        print("Cat", urls)
         on = fn.replace("~.forward$", "!.temp$@" + name)
         pn = fn.replace("~.forward$", "~.temp$@" + name)
         try:
@@ -658,6 +657,7 @@ class Server:
                 yield b
 
     def _concat(self, urls, on, pn):
+	print("Cat", urls)
         with tracebacksuppressor:
             headers = fcdict(cp.request.headers)
             headers.pop("Remote-Addr", None)
