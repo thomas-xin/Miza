@@ -585,7 +585,7 @@ class Bot:
 			self.cai_ready = False
 			self.cai_channel = None
 			return "", 0
-		lines = [line.strip() for line in resp.text.splitlines()]
+		lines = list(filter(bool, (line.strip() for line in resp.text.replace("\n", " " * 8).split(" " * 8))))
 		try:
 			e1 = json.loads(lines[-2]) if len(lines) > 1 else {}
 			e2 = json.loads(lines[-1])
