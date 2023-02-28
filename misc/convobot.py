@@ -503,14 +503,14 @@ class Bot:
 					v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
 				s = f"{k}: {v}\n"
 				lines.append(s)
-			s = f"###\nQuestion: {q}\n"
+			s = f"###\n{u}: {q}"
 			if len(self.gpttokens(s)) > 388:
 				s = self.answer_summarise("facebook/bart-large-cnn", s, max_length=384, min_length=32).replace("\n", ". ").strip()
 			lines.append(s)
 		if lines:
 			prompt = "".join(lines)
 		else:
-			prompt = q
+			prompt = f"{u}: {q}"
 		print("CAI prompt:", prompt)
 		idt = ""
 		iot = ""
@@ -571,7 +571,7 @@ class Bot:
 			headers=headers,
 		)
 		if resp.status_code not in range(200, 400):
-			print("CAI:", resp)
+			print("CAI error:", resp)
 			print(resp.text)
 			self.cai_ready = False
 			self.cai_channel = None
@@ -594,7 +594,7 @@ class Bot:
 		text = u.join(re.split(names, text))
 		print("CAI response:", text)
 		if aborted:
-			self.cai_ready = False
+			# self.cai_ready = False
 			text2, cost = self.gptcomplete(u, q, refs=refs, start=text)
 			return text + " " + text2, cost
 		else:
@@ -928,7 +928,7 @@ class Bot:
 		tup = (u, q)
 		while len(self.chat_history) > self.history_length:
 			self.chat_history.pop(0)
-		if self.personality == CAIPER or self.premium < 2 and self.personality == DEFPER and req_long(q):
+		if self.personality == CAIPER or self.premium < 2 and self.personality == DEFPER:
 			response, cost = self.caichat(u, q, refs=refs, im=im)
 			if response:
 				return self.after(tup, (self.name, response)), cost

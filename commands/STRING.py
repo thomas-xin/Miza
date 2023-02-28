@@ -1098,6 +1098,9 @@ class Ask(Command):
                     name = m.author.name
                     if name == bot.name:
                         name = bot.name + "2"
+            cai_channel = bot.data.cai_channels.get(channel.id)
+            if len(history) >= 2:
+                cai_channel = None
             inputs = dict(
                 channel_id=channel.id,
                 key=AUTH.get("openai_key"),
@@ -1105,7 +1108,7 @@ class Ask(Command):
                 name=bot.name,
                 personality=bot.commands.personality[0].retrieve((channel or guild).id),
                 premium=premium,
-                cai_channel=bot.data.cai_channels.get(channel.id),
+                cai_channel=cai_channel,
                 history=history,
                 refs=refs,
                 im=im,
