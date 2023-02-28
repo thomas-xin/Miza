@@ -385,7 +385,8 @@ class Bot:
 			zscp = self.models[m]
 		except KeyError:
 			zscp = self.models[m] = pipeline("zero-shot-classification", model=m)
-		return zscp(q, labels, truncation=True)
+		resp = zscp(q, labels, truncation=True)
+		return dict(zip(resp["labels"], resp["scores"]))
 
 	def clean_response(self, q, res):
 		res = res.strip()
@@ -451,6 +452,14 @@ class Bot:
 		print("Roberta response:", res)
 		return res
 
+	def check_google(self, q):
+		if not literal_question(q):
+			resp = cb.answer_classify("joeddav/xlm-roberta-large-xnli", q, ("question", "information", "action"))
+			if resp["question"] < 0.5:
+				return False
+		resp = cb.answer_classify("joeddav/xlm-roberta-large-xnli", q, ("personal question", "not personal"))
+		return resp["not personal"] >= 0.5
+
 	def caichat(self, u, q, refs=(), im=None):
 		headers = {
 			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
@@ -489,7 +498,7 @@ class Bot:
 				k = k.replace(":", "")
 				s = f"{k}: {v}\n"
 				lines.append(s)
-		if literal_question(q):
+		if self.check_google(q):
 			res = (self.google, self.bing)[random.randint(0, 1)](q, raw=True)
 			start = "[GOOGLE]: "
 			if len(self.gpttokens(res)) > 128:
@@ -633,7 +642,7 @@ class Bot:
 			s = f"{k}: {v}\n"
 			lines.append(s)
 		res = ""
-		if (not refs and self.premium > 1 or literal_question(q)):
+		if self.check_google(q):
 			res = (self.google, self.bing)[random.randint(0, 1)](q, raw=True)
 			s = "[GOOGLE]: "
 			if len(self.gpttokens(res)) > 128:
@@ -996,8 +1005,7 @@ class Bot:
 			k, v = t2
 			if self.premium > 1:
 				labels = ("promise", "information", "example")
-				response = self.answer_classify("joeddav/xlm-roberta-large-xnli", v, labels)
-				data = dict(zip(response["labels"], response["scores"]))
+				resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", v, labels)
 			if len(self.gpttokens(v)) > 36:
 				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=8).replace("\n", ". ").strip()
 				t2 = (k, v)
@@ -1005,7 +1013,7 @@ class Bot:
 			if len(self.gpttokens(v)) > 28:
 				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=24, min_length=6).replace("\n", ". ").strip()
 				t1 = (k, v)
-			if self.premium > 1 and data["promise"] >= 0.5:
+			if self.premium > 1 and resp["promise"] >= 0.5:
 				if len(self.promises) >= 6:
 					self.promises = self.promises[2:]
 				self.promises.append(t1)
