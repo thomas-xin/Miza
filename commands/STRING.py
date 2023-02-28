@@ -1003,7 +1003,7 @@ class Ask(Command):
         history = []
         reset = False
         if not h:
-            if not getattr(message, "simulated", False):
+            if not getattr(message, "simulated", False) and not bot.data.cai_channels.get(channel.id):
                 async for m in bot.history(channel, limit=5):
                     if m.id == message.id:
                         continue

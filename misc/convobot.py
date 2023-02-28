@@ -626,13 +626,13 @@ class Bot:
 					except KeyError:
 						temp[em] = 1
 				ems.clear()
-				return sorted(temp, key=temp.get, reverse=True)[:2]
+				return (em for em in temp if em in sorted(temp, key=temp.get, reverse=True)[:2])
 			s = ems.copy()
 			ems.clear()
 			return s
 
 		for c in text:
-			print(c, ord(c), ems)
+			# print(c, ord(c), ems)
 			if ord(c) >= 127744 or c in "?!":
 				ems.append(c)
 				continue
