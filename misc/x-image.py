@@ -2407,7 +2407,7 @@ def CBAI(inputs):
             premium=premium,
         )
         for t in history:
-            cb.appendleft(t)
+            cb.append(t)
     else:
         cb.premium = premium
     if im:

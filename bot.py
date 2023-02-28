@@ -1146,7 +1146,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             before = cdict(id=before)
         if type(after) is int:
             after = cdict(id=after)
-        if not getattr(channel, "simulated", None):
+        if getattr(channel, "simulated", None):
             return
         async for message in discord.abc.Messageable.history(channel, limit=limit, before=before, after=after):
             if message.id not in found:
