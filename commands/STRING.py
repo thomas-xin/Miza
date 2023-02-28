@@ -1000,8 +1000,9 @@ class Ask(Command):
         print(f"{message.author}:", q)
         premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
         h = await process_image("lambda cid: bool(CBOTS.get(cid))", "$", [channel.id], fix=1)
+        history = []
+        reset = False
         if not h:
-            history = []
             if not getattr(message, "simulated", False):
                 async for m in bot.history(channel, limit=5):
                     if m.id == message.id:
@@ -1020,7 +1021,26 @@ class Ask(Command):
             if not q:
                 q = "Hi!"
         else:
-            history = ()
+            t = await process_image("lambda cid: CBOTS.get(cid).timestamp", "$", [channel.id], fix=1)
+            if utc() - t > 28800:
+                async for m in bot.history(channel, limit=5):
+                    if m.id == message.id:
+                        continue
+                    if m.content:
+                        if m.author.id == bot.id:
+                            break
+                        else:
+                            name = m.author.display_name
+                            if name == bot.name:
+                                name = m.author.name
+                                if name == bot.name:
+                                    name = bot.name + "2"
+                        t = (name, unicode_prune(m.content))
+                        history.insert(0, t)
+                else:
+                    reset = True
+                    if not q:
+                        q = "Hi!"
         im = None
         emb = None
         urls = []
@@ -1099,7 +1119,7 @@ class Ask(Command):
                     if name == bot.name:
                         name = bot.name + "2"
             cai_channel = bot.data.cai_channels.get(channel.id)
-            if len(history) >= 2:
+            if reset:
                 cai_channel = None
             inputs = dict(
                 channel_id=channel.id,
