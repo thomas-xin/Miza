@@ -5224,7 +5224,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 return
             emoji = self._upgrade_partial_emoji(payload.emoji)
             if user.id == self.deleted_user:
-                print("Deleted user RAW_REACTION_ADD", channel, user, message, emoji)
+                print("Deleted user RAW_REACTION_ADD", channel, user, message, emoji, channel.id, message.id)
             await self.seen(user, message.channel, message.guild, event="reaction", raw="Adding a reaction")
             if user.id != self.id:
                 if "users" in self.data:
@@ -5246,7 +5246,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 return
             emoji = payload.emoji
             if user.id == self.deleted_user:
-                print("Deleted user RAW_REACTION_REMOVE", channel, user, message, emoji)
+                print("Deleted user RAW_REACTION_REMOVE", channel, user, message, emoji, channel.id, message.id)
             await self.seen(user, message.channel, message.guild, event="reaction", raw="Removing a reaction")
             if user.id != self.id:
                 reaction = str(emoji)
@@ -5278,7 +5278,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         async def on_typing(channel, user, when):
             await self.send_event("_typing_", channel=channel, user=user)
             if user.id == self.deleted_user:
-                print("Deleted user TYPING", channel, user)
+                print("Deleted user TYPING", channel, user, channel.id)
             await self.seen(user, getattr(channel, "guild", None), delay=10, event="typing", raw="Typing")
 
         # Message send event: processes new message. calls _send_ and _seen_ bot database events.
@@ -5291,7 +5291,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             user = message.author
             channel = message.channel
             if user.id == self.deleted_user:
-                print("Deleted user MESSAGE", channel, user, message)
+                print("Deleted user MESSAGE", channel, user, message, channel.id, message.id)
             await self.seen(user, channel, guild, event="message", raw="Sending a message")
             await self.react_callback(message, None, user)
             await self.handle_message(message, False)
@@ -5464,7 +5464,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     pass
             self.add_message(after, files=False, force=True)
             if before.author.id == self.deleted_user or after.author.id == self.deleted_user:
-                print("Deleted user RAW_MESSAGE_EDIT", after.channel, before.author, after.author, before, after)
+                print("Deleted user RAW_MESSAGE_EDIT", after.channel, before.author, after.author, before, after, after.channel.id, after.id)
             if raw or before.content != after.content:
                 if "users" in self.data:
                     self.data.users.add_xp(after.author, xrand(1, 4))
@@ -5569,7 +5569,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 self.usernames[a] = after
             await self.send_event("_user_update_", before=before, after=after)
             if before.id == self.deleted_user or after.id == self.deleted_user:
-                print("Deleted user USER_UPDATE", before, after)
+                print("Deleted user USER_UPDATE", before, after, before.id, after.id)
             await self.seen(after, event="misc", raw="Editing their profile")
 
         # Member update event: calls _member_update_ and _seen_ bot database events.
