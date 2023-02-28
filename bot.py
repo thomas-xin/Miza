@@ -5607,16 +5607,23 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
         # Member leave event: calls _leave_ bot database event.
         @self.event
-        async def on_member_remove(member):
-            if member.id not in self.cache.members:
-                name = str(member)
+        async def on_member_remove(before):
+            after = await self._fetch_user(before.id)
+            b = str(before)
+            a = str(after)
+            if b != a:
+                self.usernames.pop(b, None)
+                self.usernames[a] = after
+                await self.send_event("_user_update_", before=before, after=after)
+            if after.id not in self.cache.members:
+                name = str(after)
                 self.usernames.pop(name, None)
-            if member.guild.id in self._guilds:
-                member.guild._members.pop(member.id, None)
-                member.guild._member_count = len(member.guild._members)
+            if after.guild.id in self._guilds:
+                after.guild._members.pop(after.id, None)
+                after.guild._member_count = len(after.guild._members)
                 if "guilds" in self.data:
-                    self.data.guilds.register(member.guild, force=False)
-            await self.send_event("_leave_", user=member, guild=member.guild)
+                    self.data.guilds.register(after.guild, force=False)
+            await self.send_event("_leave_", user=after, guild=after.guild)
 
         # Channel create event: calls _channel_create_ bot database event.
         @self.event
