@@ -612,7 +612,7 @@ class Bot:
 			self.cai_ready = True
 		return text, 0
 
-	def emoji_clean(text):
+	def emoji_clean(self, text):
 		ems = []
 		out = []
 
