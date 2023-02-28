@@ -603,7 +603,7 @@ class Bot:
 		text = random.choice(e2.get("replies") or [{}]).get("text", "").strip()
 		print("CAI response:", text)
 		names = "[Uu][Tt][Ss][Ee]{2}[Ss][Rr]?[TtFf]?"
-		text = u.join(re.split(names, text))
+		text = u.join(re.split(names, text)).removeprefix("Miza: ")
 		text = self.emoji_clean(text)
 		if aborted:
 			print("CAI aborted!")
