@@ -598,10 +598,11 @@ class Bot:
 			aborted = True
 		else:
 			aborted = False
-		names = "[Uu][Tt][Ss][Ee]{2}[Ss][Rr]?[TtFf]?"
 		text = random.choice(e2.get("replies") or [{}]).get("text", "").strip()
-		text = u.join(re.split(names, text))
 		print("CAI response:", text)
+		names = "[Uu][Tt][Ss][Ee]{2}[Ss][Rr]?[TtFf]?"
+		text = u.join(re.split(names, text))
+		text = self.emoji_clean(text)
 		if aborted:
 			print("CAI aborted!")
 			# self.cai_ready = False
@@ -610,6 +611,36 @@ class Bot:
 		else:
 			self.cai_ready = True
 		return text, 0
+
+	def emoji_clean(text):
+		ems = []
+		out = []
+
+		def clean_ems():
+			s = ()
+			if len(ems) > 2:
+				temp = {}
+				for em in ems:
+					try:
+						temp[em] += 1
+					except KeyError:
+						temp[em] = 1
+				ems.clear()
+				return sorted(temp, key=temp.get, reverse=True)[:2]
+			s = ems.copy()
+			ems.clear()
+			return s
+
+		for c in text:
+			print(c, ord(c), ems)
+			if ord(c) >= 127744 or c in "?!":
+				ems.append(c)
+				continue
+			if ems:
+				out.extend(clean_ems())
+			out.append(c)
+		out.extend(clean_ems())
+		return "".join(out)
 
 	tokeniser = None
 	def gpttokens(self, s):
