@@ -5618,12 +5618,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if after.id not in self.cache.members:
                 name = str(after)
                 self.usernames.pop(name, None)
-            if after.guild.id in self._guilds:
-                after.guild._members.pop(after.id, None)
-                after.guild._member_count = len(after.guild._members)
+            if before.guild.id in self._guilds:
+                before.guild._members.pop(after.id, None)
+                before.guild._member_count = len(before.guild._members)
                 if "guilds" in self.data:
-                    self.data.guilds.register(after.guild, force=False)
-            await self.send_event("_leave_", user=after, guild=after.guild)
+                    self.data.guilds.register(before.guild, force=False)
+            await self.send_event("_leave_", user=after, guild=before.guild)
 
         # Channel create event: calls _channel_create_ bot database event.
         @self.event
