@@ -5,7 +5,7 @@ from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from transformers import GPT2TokenizerFast, AutoTokenizer, AutoModelForQuestionAnswering, AutoModelForCausalLM, pipeline, set_seed
 from fp.fp import FreeProxy
-from traceback import print_exc
+print_exc = lambda: sys.stdout.write(traceback.format_exc())
 
 def print(*args, sep=" ", end="\n"):
 	s = sep.join(map(str, args)) + end
@@ -591,7 +591,7 @@ class Bot:
 			e2 = json.loads(lines[-1])
 		except json.decoder.JSONDecodeError:
 			print_exc()
-			print(resp.text)
+			print("CAI invalid:", resp.text)
 			return "", 0
 		if e2.get("abort", False):
 			e2 = e1

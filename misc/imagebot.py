@@ -6,7 +6,7 @@ from selenium.webdriver.common.keys import Keys
 from fp.fp import FreeProxy
 import numpy as np
 from PIL import Image
-from traceback import print_exc
+print_exc = lambda: sys.stdout.write(traceback.format_exc())
 
 def print(*args, sep=" ", end="\n"):
 	s = sep.join(map(str, args)) + end
