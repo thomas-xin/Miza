@@ -1,4 +1,4 @@
-import os, sys, time, urllib, json, io, random, re
+import os, sys, time, urllib, json, io, random, re, traceback
 import concurrent.futures
 import selenium, requests, torch, openai, httpx
 from selenium import webdriver
