@@ -594,6 +594,7 @@ class Bot:
 		text = u.join(re.split(names, text))
 		print("CAI response:", text)
 		if aborted:
+			print("CAI aborted!")
 			# self.cai_ready = False
 			text2, cost = self.gptcomplete(u, q, refs=refs, start=text)
 			return text + " " + text2, cost
@@ -665,7 +666,7 @@ class Bot:
 		lines.append(ns)
 		longer = req_long(q)
 		if self.premium < 2:
-			if not res and self.premium < 1:
+			if not res and self.premium < 1 and not start:
 				model = "text-bloom-001"
 				temp = 0.9
 				limit = 2000
