@@ -531,6 +531,17 @@ class Bot:
 							globals()["chatgpt"] = None
 						else:
 							globals()["chatgpt"] = ChatGPT()
+						if chatgpt.session is None:
+							asyncio.run(chatgpt.refresh_session())
+						url = "https://chat.openai.com/backend-api/conversations"
+						data = {
+							"is_visible": False,
+						}
+						ok, json, response = asyncio.run(chatgpt._api_patch_request(url, data))
+						if ok:
+							pass
+						else:
+							chatgpt.log.error("Failed to delete conversations")
 					print("ChatGPT prompt:", q)
 					fut.set_result("".join(chatgpt.ask_stream(q)).strip())
 				asyncio.main_new_loop.call_soon_threadsafe(run_chatgpt, q, fut)
@@ -540,7 +551,7 @@ class Bot:
 					resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", q, ("answer", "As an AI language model", "ChatGPT"))
 					print(resp)
 					if resp["As an AI language model"] > 0.5 or resp["ChatGPT"] > 0.5:
-						res = None
+						pass#res = None
 					elif req_long(q):
 						self.cai_ready = False
 						return res, 0
