@@ -958,7 +958,7 @@ class Match(Command):
 
 
 class Ask(Command):
-    _timeout_ = 8
+    _timeout_ = 24
     alias = ["How"]
     description = "Ask me any question, and I'll answer it. Premium Lv1 enables Google and GPT-Curie, Premium Lv2 enables GPT-Davinci; check that using ~serverinfo, or apply it with ~premium!"
     usage = "<string>"
