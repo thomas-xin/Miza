@@ -1,4 +1,4 @@
-import os, sys, time, urllib, json, io, random, re, traceback
+import os, sys, time, asyncio, urllib, json, io, random, re, traceback
 import concurrent.futures
 import selenium, requests, torch, openai, httpx
 from selenium import webdriver
@@ -525,8 +525,13 @@ class Bot:
 						res = None
 			if not res and cvalid:
 				start = "[CHATGPT]: "
+				try:
+					asyncio.get_event_loop()
+				except RuntimeError:
+					asyncio.set_event_loop(asyncio.new_event_loop())
 				res = "".join(chatgpt.ask_stream(q)).strip()
 				if res:
+					print("ChatGPT:", res)
 					resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", q, ("answer", "refusal"))
 					if resp["refusal"] > 0.5:
 						res = None

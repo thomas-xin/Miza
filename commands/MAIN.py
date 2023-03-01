@@ -1917,7 +1917,7 @@ class UpdateUsers(Database):
                         await asyncio.sleep(0.1)
 
     def __load__(self):
-        self.semaphore = Semaphore(1, 2, delay=0.5)
+        self.semaphore = Semaphore(1, 2, delay=0.5, rate_limit=8)
         self.facts = None
         self.flavour_buffer = deque()
         self.flavour_set = set()
