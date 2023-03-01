@@ -8,6 +8,10 @@ from fp.fp import FreeProxy
 print_exc = lambda: sys.stdout.write(traceback.format_exc())
 
 try:
+	try:
+		asyncio.get_event_loop()
+	except RuntimeError:
+		asyncio.set_event_loop(asyncio.new_event_loop())
 	from chatgpt_wrapper import ChatGPT
 except ImportError:
 	chatgpt = None
@@ -525,10 +529,6 @@ class Bot:
 						res = None
 			if not res and cvalid:
 				start = "[CHATGPT]: "
-				try:
-					asyncio.get_event_loop()
-				except RuntimeError:
-					asyncio.set_event_loop(asyncio.new_event_loop())
 				res = "".join(chatgpt.ask_stream(q)).strip()
 				if res:
 					print("ChatGPT:", res)
