@@ -526,13 +526,13 @@ class Bot:
 				async def run_chatgpt(q, fut):
 					if not hasattr(chatgpt, "ask_stream"):
 						try:
-							from chatgpt_wrapper import ChatGPT
+							from chatgpt_wrapper import AsyncChatGPT
 						except ImportError:
 							globals()["chatgpt"] = None
 						else:
-							globals()["chatgpt"] = ChatGPT()
+							globals()["chatgpt"] = AsyncChatGPT()
 						if chatgpt.session is None:
-							chatgpt.refresh_session()
+							await chatgpt.refresh_session()
 						url = "https://chat.openai.com/backend-api/conversations"
 						data = {
 							"is_visible": False,
@@ -544,7 +544,7 @@ class Bot:
 							chatgpt.log.error("Failed to delete conversations")
 					print("ChatGPT prompt:", q)
 					resp = []
-					async for w in chatgpt.agpt.ask_stream(q):
+					async for w in chatgpt.ask_stream(q):
 						resp.append(w)
 					fut.set_result("".join(resp).strip())
 				asyncio.main_new_loop.create_task(run_chatgpt(q, fut))
