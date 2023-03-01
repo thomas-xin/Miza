@@ -1046,7 +1046,7 @@ class Ask(Command):
         urls = []
         refs = []
         with discord.context_managers.Typing(channel):
-            fut = process_image("CBIP", "&", [], fix=1, timeout=360)
+            fut = create_task(process_image("CBIP", "&", [], fix=1, timeout=360))
             if getattr(message, "reference", None):
                 reference = message.reference.resolved
             else:

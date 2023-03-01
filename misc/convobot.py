@@ -525,7 +525,11 @@ class Bot:
 						res = None
 			if not res and cvalid:
 				start = "[CHATGPT]: "
-				res = "".join(chatgpt.ask_stream(q)).strip()
+				fut = concurrent.futures.Future()
+				async def chatgpt(q, fut):
+					fut.set_result("".join(chatgpt.ask_stream(q)).strip())
+				asyncio.main_new_loop.call_soon_threadsafe(self.chatgpt, q, fut)
+				res = fut.result(timeout=120)
 				if res:
 					print("ChatGPT:", res)
 					resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", q, ("answer", "refusal"))

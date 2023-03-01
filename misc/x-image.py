@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import os, sys, io, time, concurrent.futures, subprocess, psutil, collections, traceback, re, requests, blend_modes, pdf2image, zipfile, contextlib, filetype, pyqrcode, ast, colorspace, pickle
+import os, sys, io, time, concurrent.futures, asyncio, subprocess, psutil, collections, traceback, re, requests, blend_modes, pdf2image, zipfile, contextlib, filetype, pyqrcode, ast, colorspace, pickle
 import numpy as np
 import PIL
 from PIL import Image, ImageCms, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhance, ImageMath, ImageStat
@@ -2890,7 +2890,7 @@ def evaluate(ts, args):
 
 
 if __name__ == "__main__":
-	def ensure_parent():
+	async def ensure_parent():
 		parent = psutil.Process(os.getppid())
 		while True:
 			if not is_strict_running(parent):
@@ -2903,33 +2903,37 @@ if __name__ == "__main__":
 						c.kill()
 				p.terminate()
 				break
-			time.sleep(12)
-	import concurrent.futures.thread
-	concurrent.futures.thread.threading.Thread(target=ensure_parent, daemon=True).start()
-	exc = concurrent.futures.ThreadPoolExecutor(max_workers=9)
-	while True:
-		argv = sys.stdin.readline()
-		if not argv:
-			raise SystemExit
-		argv = argv.rstrip()
-		if argv[0] == "~":
-			ts, s = argv[1:].split("~", 1)
-			try:
-				args = eval(literal_eval(s))
-				if args[1] == "&":
-					args[1] = "$"
-					evaluate(ts, args)
-				elif "plt_special" in args or "plt_mp" in args:
-					evaluate(ts, args)
-				else:
-					exc.submit(evaluate, ts, args)
-			except Exception as ex:
-				sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_exception({repr(ex)})\n".encode("utf-8"))
-				sys.stdout.buffer.write(f"~print({s}, end='')\n".encode("utf-8"))
-				sys.stdout.buffer.write(f"~print({repr(traceback.format_exc())}, end='')\n".encode("utf-8"))
-				sys.stdout.flush()
-			while len(CACHE) > 32:
+			await asyncio.sleep(12)
+	loop = asyncio.create_event_loop()
+	asyncio.set_event_loop(loop)
+	asyncio.main_new_loop = loop
+	loop.create_task(ensure_parent())
+	exc = concurrent.futures.ThreadPoolExecutor(max_workers=10)
+	async def update_loop():
+		while True:
+			argv = await asyncio.wrap_future(exc.submit(sys.stdin.readline))
+			if not argv:
+				raise SystemExit
+			argv = argv.rstrip()
+			if argv[0] == "~":
+				ts, s = argv[1:].split("~", 1)
 				try:
-					CACHE.pop(next(iter(CACHE)))
-				except RuntimeError:
-					pass
+					args = eval(literal_eval(s))
+					if args[1] == "&":
+						args[1] = "$"
+						evaluate(ts, args)
+					elif "plt_special" in args or "plt_mp" in args:
+						evaluate(ts, args)
+					else:
+						exc.submit(evaluate, ts, args)
+				except Exception as ex:
+					sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_exception({repr(ex)})\n".encode("utf-8"))
+					sys.stdout.buffer.write(f"~print({s}, end='')\n".encode("utf-8"))
+					sys.stdout.buffer.write(f"~print({repr(traceback.format_exc())}, end='')\n".encode("utf-8"))
+					sys.stdout.flush()
+				while len(CACHE) > 32:
+					try:
+						CACHE.pop(next(iter(CACHE)))
+					except RuntimeError:
+						pass
+	loop.run_until_complete(update_loop())
