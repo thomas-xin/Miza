@@ -1046,7 +1046,10 @@ class Ask(Command):
         urls = []
         refs = []
         with discord.context_managers.Typing(channel):
-            fut = create_task(process_image("CBIP", "&", [], fix=1, timeout=360))
+            if not self.convos:
+                fut = create_task(process_image("CBIP", "&", [], fix=1, timeout=360))
+            else:
+                fut = None
             if getattr(message, "reference", None):
                 reference = message.reference.resolved
             else:
@@ -1068,7 +1071,7 @@ class Ask(Command):
                         q += found[0]
             if urls:
                 url = im = urls[-1]
-                p1, p2 = await process_image(url, "caption", ["-nogif", q, channel.id], fix=1, timeout=60)
+                p1, p2 = await process_image(url, "caption", ["-nogif", q, channel.id], fix=1, timeout=300)
                 if p1 or p2:
                     print(p1)
                     print(p2)
@@ -1135,7 +1138,8 @@ class Ask(Command):
                 im=im,
                 prompt=(name, q),
             )
-            await fut
+            if fut:
+                await fut
             out, cost = await process_image("CBAI", "$", [inputs], fix=1, timeout=420)
             if cost:
                 if "costs" in bot.data:

@@ -510,7 +510,9 @@ class Bot:
 		if req_long(q) or self.check_google(q):
 			res = True
 			cvalid = chatgpt and time.time() - getattr(chatgpt, "rate", 0) >= 3600
-			if (len(q) > 128 or q.count(" ") > 10 or req_long(q)):
+			if (len(q) > 128 or q.count(" ") > 10:
+				res = None
+			elif req_long(q)) and cvalid:
 				res = None
 			if res:
 				start = "[GOOGLE]: "
@@ -526,7 +528,7 @@ class Bot:
 			if not res and cvalid:
 				start = "[CHATGPT]: "
 				fut = concurrent.futures.Future()
-				async def run_chatgpt(q, fut):
+				def run_chatgpt(q, fut):
 					fut.set_result("".join(chatgpt.ask_stream(q)).strip())
 				asyncio.main_new_loop.call_soon_threadsafe(run_chatgpt, q, fut)
 				res = fut.result(timeout=120)

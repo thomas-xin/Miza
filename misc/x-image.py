@@ -2485,7 +2485,7 @@ def write_video(proc, data):
 	except:
 		print(traceback.format_exc(), end="")
 
-def from_bytes(b, save=None):
+def from_bytes(b, save=None, nogif=False):
 	if b[:4] == b"<svg" or b[:5] == b"<?xml":
 		resp = requests.post("https://www.svgtopng.me/api/svgtopng/upload-file", headers=header(), files={"files": ("temp.svg", b, "image/svg+xml"), "format": (None, "PNG"), "forceTransparentWhite": (None, "true"), "jpegQuality": (None, "256")})
 		with ZipFile(io.BytesIO(resp.content), compression=zipfile.ZIP_DEFLATED, strict_timestamps=False) as z:
@@ -2522,7 +2522,10 @@ def from_bytes(b, save=None):
 		cmd = ("./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,avg_frame_rate", "-of", "csv=s=x:p=0", fn)
 		print(cmd)
 		p = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		cmd2 = ["./ffmpeg", "-hide_banner", "-v", "error", "-y", "-i", fn, "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0", "-"]
+		cmd2 = ["./ffmpeg", "-hide_banner", "-v", "error", "-y", "-i", fn, "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0"]
+        if nogif:
+            cmd2.extend(("-vframes", "1"))
+        cmd2.append("-")
 		print(cmd2)
 		proc = psutil.Popen(cmd2, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1048576)
 		bcount = 4 if fmt == "rgba" else 3
@@ -2624,7 +2627,7 @@ class ImageSequence(Image.Image):
 			return getattr(self._images[self._position], key)
 
 
-def get_image(url, out=None, nodel=False):
+def get_image(url, out=None, nodel=False, nogif=False):
 	if isinstance(url, Image.Image):
 		return url
 	out = out or url
@@ -2644,7 +2647,7 @@ def get_image(url, out=None, nodel=False):
 				data = get_request(url)
 			if len(data) > 8589934592:
 				raise OverflowError("Max file size to load is 8GB.")
-			image = from_bytes(data, save)
+			image = from_bytes(data, save, nogif=nogif)
 			CACHE[url] = image
 		else:
 			if os.path.getsize(url) > 8589934592:
@@ -2656,7 +2659,7 @@ def get_image(url, out=None, nodel=False):
 					os.remove(url)
 				except:
 					pass
-			image = from_bytes(data, save)
+			image = from_bytes(data, save, nogif=nogif)
 	else:
 		if len(url) > 8589934592:
 			raise OverflowError("Max file size to load is 8GB.")
@@ -2678,6 +2681,10 @@ def evalImg(url, operation, args):
 		dur = args.pop(-1) * 1000
 		args.pop(-1)
 	if operation != "$":
+        if args and args[0] == "-nogif":
+            nogif = args.pop(0)
+        else:
+            nogif = False
 		if args and args[-1] == "-raw":
 			args.pop(-1)
 			image = get_request(url)
@@ -2686,7 +2693,7 @@ def evalImg(url, operation, args):
 				nodel = args.pop(-1)
 			else:
 				nodel = False
-			image = get_image(url, out, nodel=nodel)
+			image = get_image(url, out, nodel=nodel, nogif=nogif)
 		# -gif is a special case where the output is always an animated format (gif, mp4, mkv etc)
 		if args and args[-1] == "-gif":
 			args.pop(-1)
@@ -2699,8 +2706,7 @@ def evalImg(url, operation, args):
 			new = eval(operation)(image, *args)
 		else:
 			try:
-				if args and args[0] == "-nogif":
-					args = args[1:]
+				if nogif:
 					raise EOFError
 				image.seek(1)
 			except EOFError:
