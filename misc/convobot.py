@@ -551,6 +551,8 @@ class Bot:
 				res = fut.result(timeout=240)
 				if res:
 					print("ChatGPT response:", res)
+					if len(self.gpttokens(res)) > 1200:
+						res = self.answer_summarise("facebook/bart-large-cnn", res, max_length=1024, min_length=512).strip()
 					resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", q, ("answer", "As an AI language model", "ChatGPT"))
 					print(resp)
 					if resp["As an AI language model"] > 0.5 or resp["ChatGPT"] > 0.5:
