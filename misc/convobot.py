@@ -18,6 +18,8 @@ except AttributeError:
 	exc = concurrent.futures.exc_worker = concurrent.futures.ThreadPoolExecutor(max_workers=64)
 drivers = selenium.__dict__.setdefault("-drivers", [])
 
+chatgpt = True
+
 from math import *
 def lim_str(s, maxlen=10, mode="centre"):
 	if maxlen is None:
@@ -522,7 +524,7 @@ class Bot:
 				start = "[CHATGPT]: "
 				fut = concurrent.futures.Future()
 				def run_chatgpt(q, fut):
-					if "chatgpt" not in globals():
+					if not hasattr(chatgpt, "ask_stream"):
 						try:
 							from chatgpt_wrapper import ChatGPT
 						except ImportError:
