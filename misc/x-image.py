@@ -2916,8 +2916,8 @@ if __name__ == "__main__":
 			ts, s = argv[1:].split("~", 1)
 			try:
 				args = eval(literal_eval(s))
-				if args[0] == "&":
-					args[0] = "$"
+				if args[1] == "&":
+					args[1] = "$"
 					evaluate(ts, args)
 				elif "plt_special" in args or "plt_mp" in args:
 					evaluate(ts, args)
