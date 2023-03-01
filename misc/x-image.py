@@ -22,6 +22,36 @@ except ImportError:
 	pygame = None
 sys.stdout.write = write
 
+def wrap_future(fut, loop=None):
+    if getattr(fut, "done", None) and fut.done():
+        res = fut.result()
+        if res is None:
+            return emptyfut
+        return as_fut(res)
+    if loop is None:
+        loop = asyncio.main_new_loop
+    wrapper = loop.create_future()
+
+    def set_suppress(res, is_exception=False):
+        try:
+            if is_exception:
+                wrapper.set_exception(res)
+            else:
+                wrapper.set_result(res)
+        except (RuntimeError, asyncio.InvalidStateError):
+            pass
+
+    def on_done(*void):
+        try:
+            res = fut.result()
+        except Exception as ex:
+            loop.call_soon_threadsafe(set_suppress, ex, True)
+        else:
+            loop.call_soon_threadsafe(set_suppress, res)
+
+    fut.add_done_callback(on_done)
+    return wrapper
+
 hwaccel = "d3d11va" if os.name == "nt" else "auto"
 
 if not hasattr(time, "time_ns"):
@@ -2917,7 +2947,7 @@ if __name__ == "__main__":
 	exc = concurrent.futures.ThreadPoolExecutor(max_workers=10)
 	async def update_loop():
 		while True:
-			argv = await asyncio.wrap_future(exc.submit(sys.stdin.readline))
+			argv = await wrap_future(exc.submit(sys.stdin.readline))
 			if not argv:
 				raise SystemExit
 			argv = argv.rstrip()
