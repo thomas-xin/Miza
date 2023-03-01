@@ -23,11 +23,6 @@ except ImportError:
 sys.stdout.write = write
 
 def wrap_future(fut, loop=None):
-    if getattr(fut, "done", None) and fut.done():
-        res = fut.result()
-        if res is None:
-            return emptyfut
-        return as_fut(res)
     if loop is None:
         loop = asyncio.main_new_loop
     wrapper = loop.create_future()
