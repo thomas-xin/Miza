@@ -39,18 +39,18 @@ else:
 
 from math import *
 def lim_str(s, maxlen=10, mode="centre"):
-    if maxlen is None:
-        return s
-    if type(s) is not str:
-        s = str(s)
-    over = (len(s) - maxlen) / 2
-    if over > 0:
-        if mode == "centre":
-            half = len(s) / 2
-            s = s[:ceil(half - over - 1)] + ".." + s[ceil(half + over + 1):]
-        else:
-            s = s[:maxlen - 3] + "..."
-    return s
+	if maxlen is None:
+		return s
+	if type(s) is not str:
+		s = str(s)
+	over = (len(s) - maxlen) / 2
+	if over > 0:
+		if mode == "centre":
+			half = len(s) / 2
+			s = s[:ceil(half - over - 1)] + ".." + s[ceil(half + over + 1):]
+		else:
+			s = s[:maxlen - 3] + "..."
+	return s
 
 class_name = webdriver.common.by.By.CLASS_NAME
 css_selector = webdriver.common.by.By.CSS_SELECTOR
