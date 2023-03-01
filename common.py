@@ -2989,13 +2989,13 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
                 return data
             if session:
                 req = session
-                resp = req.request(method.upper(), url, headers=headers, files=files, data=data, timeout=timeout)
+                resp = req.request(method.upper(), url, headers=headers, files=files, data=data, timeout=timeout, verify=ssl)
             elif bypass:
                 req = reqs.next()
-                resp = req.request(method.upper(), url, headers=headers, files=files, data=data, timeout=timeout)
+                resp = req.request(method.upper(), url, headers=headers, files=files, data=data, timeout=timeout, verify=ssl)
             else:
                 req = requests
-                resp = getattr(req, method)(url, headers=headers, files=files, data=data, timeout=timeout, ssl=ssl)
+                resp = getattr(req, method)(url, headers=headers, files=files, data=data, timeout=timeout, verify=ssl)
             if BOT[0]:
                 BOT[0].activity += 1
             if resp.status_code >= 400:
