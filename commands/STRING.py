@@ -1385,7 +1385,7 @@ class Personality(Command):
             p = self.decode(self.retrieve(channel.id))
             if p == self.defper:
                 p = "loyal friendly playful cute, intelligent and helpful, and slightly flirtatious when appropriate"
-            return ini_md(f"My current personality for {sqr_md(channel)} is {sqr_md(p)}. Enter keywords to modify the AI for default GPT-based chat, or enter \"character.ai\" for the assigned character.ai bot instead.")
+            return ini_md(f"My current personality for {sqr_md(channel)} is {sqr_md(p)}. Enter keywords for this command to modify the AI for default GPT-based chat, enter \"default\" to reset, or enter \"character.ai\" for the assigned character.ai bot instead.")
         if len(argv) > 512:
             raise OverflowError("Maximum personality prompt size is 512 characters.")
         # if max(bot.is_trusted(guild), bot.premium_level(user) * 2) < 2:
