@@ -523,7 +523,7 @@ class Bot:
 			if not res and cvalid:
 				start = "[CHATGPT]: "
 				fut = concurrent.futures.Future()
-				def run_chatgpt(q, fut):
+				async def run_chatgpt(q, fut):
 					if not hasattr(chatgpt, "ask_stream"):
 						try:
 							from chatgpt_wrapper import ChatGPT
@@ -537,17 +537,20 @@ class Bot:
 						data = {
 							"is_visible": False,
 						}
-						ok, json, response = asyncio.run(chatgpt._api_patch_request(url, data))
+						ok, json, response = await chatgpt._api_patch_request(url, data)
 						if ok:
 							pass
 						else:
 							chatgpt.log.error("Failed to delete conversations")
 					print("ChatGPT prompt:", q)
-					fut.set_result("".join(chatgpt.ask_stream(q)).strip())
-				asyncio.main_new_loop.call_soon_threadsafe(run_chatgpt, q, fut)
+					resp = []
+					async for w in chatgpt.agpt.ask_stream(q):
+						resp.append(w)
+					fut.set_result("".join(resp).strip())
+				asyncio.main_new_loop.create_task(run_chatgpt(q, fut))
 				res = fut.result(timeout=240)
 				if res:
-					print("ChatGPT:", res)
+					print("ChatGPT response:", res)
 					resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", q, ("answer", "As an AI language model", "ChatGPT"))
 					print(resp)
 					if resp["As an AI language model"] > 0.5 or resp["ChatGPT"] > 0.5:
