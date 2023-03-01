@@ -2523,9 +2523,9 @@ def from_bytes(b, save=None, nogif=False):
 		print(cmd)
 		p = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		cmd2 = ["./ffmpeg", "-hide_banner", "-v", "error", "-y", "-i", fn, "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0"]
-        if nogif:
-            cmd2.extend(("-vframes", "1"))
-        cmd2.append("-")
+		if nogif:
+			cmd2.extend(("-vframes", "1"))
+		cmd2.append("-")
 		print(cmd2)
 		proc = psutil.Popen(cmd2, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1048576)
 		bcount = 4 if fmt == "rgba" else 3
@@ -2681,10 +2681,10 @@ def evalImg(url, operation, args):
 		dur = args.pop(-1) * 1000
 		args.pop(-1)
 	if operation != "$":
-        if args and args[0] == "-nogif":
-            nogif = args.pop(0)
-        else:
-            nogif = False
+		if args and args[0] == "-nogif":
+			nogif = args.pop(0)
+		else:
+			nogif = False
 		if args and args[-1] == "-raw":
 			args.pop(-1)
 			image = get_request(url)
