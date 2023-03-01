@@ -507,7 +507,7 @@ class Bot:
 				k = k.replace(":", "")
 				s = f"{k}: {v}\n"
 				lines.append(s)
-		if self.check_google(q):
+		if req_long(q) or self.check_google(q):
 			res = True
 			cvalid = chatgpt and time.time() - getattr(chatgpt, "rate", 0) >= 3600
 			if (len(q) > 128 or q.count(" ") > 10 or req_long(q)):
