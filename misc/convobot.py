@@ -530,7 +530,7 @@ class Bot:
 						except ImportError:
 							globals()["chatgpt"] = None
 						else:
-							globals()["chatgpt"] = AsyncChatGPT()
+							globals()["chatgpt"] = await AsyncChatGPT().create(timeout=220)
 						if chatgpt.session is None:
 							await chatgpt.refresh_session()
 						url = "https://chat.openai.com/backend-api/conversations"
