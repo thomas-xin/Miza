@@ -385,7 +385,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 json.dump(j, f, indent="\t")
 
     def start_webserver(self):
-        if self.server:
+        if self.server and is_strict_running(self.server):
             with suppress():
                 force_kill(self.server)
         if os.path.exists("misc/x-server.py") and PORT:
@@ -5960,13 +5960,11 @@ def webserver_communicate(bot):
             assert reqs.next().get(f"https://127.0.0.1:{PORT}/ip").content
         except:
             print_exc()
-            bot.server = None
             bot.start_webserver()
         with tracebacksuppressor:
             while True:
                 b = bot.server.stderr.readline()
                 if not b:
-                    bot.server = None
                     bot.start_webserver()
                     break
                 b = b.lstrip(b"\x00").rstrip()
