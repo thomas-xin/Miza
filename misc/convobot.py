@@ -1,5 +1,5 @@
 import os, sys, time, urllib, json, io, random, re, traceback
-import concurrent.futures
+import concurrent.futures, asyncio
 import selenium, requests, torch, openai, httpx
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
