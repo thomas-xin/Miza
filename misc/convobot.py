@@ -532,7 +532,7 @@ class Bot:
 						else:
 							globals()["chatgpt"] = ChatGPT()
 						if chatgpt.session is None:
-							asyncio.run(chatgpt.refresh_session())
+							chatgpt.refresh_session()
 						url = "https://chat.openai.com/backend-api/conversations"
 						data = {
 							"is_visible": False,
