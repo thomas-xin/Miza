@@ -2151,7 +2151,7 @@ def process_math(expr, prec=64, rat=False, timeout=12, variables=None):
     return sub_submit("math", (expr, prec, rat, variables), _timeout=timeout)
 
 # Sends an operation to the image subprocess pool.
-def process_image(image, operation, args=[], fix=None, timeout=24):
+def process_image(image, operation, args=[], fix=None, timeout=36):
     args = astype(args, list)
     for i, a in enumerate(args):
         if type(a) is mpf:
