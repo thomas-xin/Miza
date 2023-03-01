@@ -46,6 +46,7 @@ def send(*args, escape=True):
         force_kill(psutil.Process())
 
 print = send
+print_exc = lambda: send(traceback.format_exc())
 
 def create_etag(data):
     n = len(data)
@@ -231,7 +232,7 @@ def fetch_static(path, ignore=False):
     except:
         if not ignore:
             send(path)
-            send(traceback.format_exc())
+            print_exc()
         raise
 
 est_time = utc()
@@ -677,7 +678,7 @@ class Server:
                             resp.raise_for_status()
                             break
                         except:
-                            print(traceback.format_exc())
+                            print_exc()
                         time.sleep(i ** 2 + 1)
                     fs = pos + int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length"))
                     f.truncate(fs)
@@ -1509,86 +1510,6 @@ body {
         url = f"/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
         raise cp.HTTPRedirect(url, status=307)
 
-    @cp.expose(("timezones",))
-    @hostmap
-    def timezone(self):
-        ip = cp.request.remote.ip
-        try:
-            data = get_geo(ip)
-            tz = data["timezone"]
-            dt = datetime.datetime.now(pytz.timezone(tz))
-            colour = hex(colour2raw(hue2colour(xrand(1536))))[2:].upper()
-            html = """<!DOCTYPE html>
-<html>
-    <head>
-        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
-        <meta charset="utf-8">
-        <title>Timezones</title>
-        <meta content="Timezones" property="og:title">
-        <meta content="Find your current timezone here!" property="og:description">
-        <meta content=\"""" + cp.url() + """\" property="og:url">
-        <meta property="og:image" content="https://raw.githubusercontent.com/thomas-xin/Image-Test/master/sky-rainbow.gif">
-        <meta content="#""" + colour + """\" data-react-helmet="true" name="theme-color">
-        <meta http-equiv="refresh" content="60">
-        <link rel="stylesheet" type="text/css" href="/static/timezonestyles.css">
-        <link href="https://unpkg.com/boxicons@2.0.7/css/boxicons.min.css" rel="stylesheet">
-    </head>
-    <body>""" + f"""
-        <link href="/static/hamburger.css" rel="stylesheet">
-        <div class="hamburger">
-            <input
-                type="checkbox"
-                title="Toggle menu"
-            />
-            <div class="items select">
-                <a href="/" data-popup="Home">
-                    <video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
-                        <source src="https://cdn.discordapp.com/attachments/691915140198826005/846592940075515904/miza_by_smudgedpasta_de1q8lu-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOj.mp4" type="video/mp4">
-                    </video>
-                </a>
-                <a href="/mizatlas" data-popup="Command Atlas">
-                    <video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
-                        <source src="https://cdn.discordapp.com/attachments/691915140198826005/846593904635281408/miza_has_a_leaf_blower_by_smudgedpasta_de6t2dl-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJz.mp4" type="video/mp4">
-                    </video>
-                </a>
-                <a href="/upload" data-popup="File Host">
-                    <video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
-                        <source src="https://cdn.discordapp.com/attachments/691915140198826005/846593561444745226/magical_babey_mode_by_smudgedpasta_de1q8ky-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIi.mp4" type="video/mp4">
-                    </video>
-                </a>
-                <a href="/apidoc" data-popup="API Documentation">
-                    <video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
-                        <source src="https://cdn.discordapp.com/attachments/691915140198826005/846590061901381632/deahc7l-a9773147-259d-4226-b0b6-195c6eb1f3c0.pngtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOi.mp4" type="video/mp4">
-                    </video>
-                </a>
-                <a 
-                    href="/time"
-                    data-popup="Clock"
-                    class='bx bx-time'></a>
-            </div>
-            <div class="hambg"></div>
-        </div>
-        <div class="main">
-            <h3>Estimated time:</h3>
-            <h1>""" + str(dt) + """</h1>
-            <h2>Detected timezone: """ + tz + f"""</h2>
-            <p class="align_left">
-                <a class="glow" href="/time">Refresh</a>
-            </p>
-            <p class="align_right">
-                <a class="glow" href="/">Home</a>
-            </p>
-        </div>
-        <video playsinline autoplay muted loop class="border" style="width:14.2857%;height:14.2857%;">
-            <source src="https://cdn.discordapp.com/attachments/691915140198826005/846593561444745226/magical_babey_mode_by_smudgedpasta_de1q8ky-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIi.mp4" type="video/mp4">
-        </video>
-    </body>
-</html>"""
-            return html
-        except:
-            send(traceback.format_exc())
-            raise
-
     @cp.expose
     @hostmap
     def backup(self, token="~"):
@@ -1756,7 +1677,7 @@ body {
                 self.ins_wait.set_result(None)
                 self.ins_wait = None
         except:
-            send(traceback.format_exc())
+            print_exc()
 
     # names = ("total_users", "active_users", "live_users", "active_seconds", "live_seconds", "seconds_per_user")
     def mpget(self):
@@ -1786,7 +1707,7 @@ body {
                 os.rename("saves/mpdata.json", "saves/mpdata\x7f\x7f.json")
                 os.rename("saves/mpdata\x7f.json", "saves/mpdata.json")
         except:
-            send(traceback.format_exc())
+            print_exc()
 
     def mpact_update(self):
         try:
@@ -1803,7 +1724,7 @@ body {
                 os.rename("saves/mpact.json", "saves/mpact\x7f\x7f.json")
                 os.rename("saves/mpact\x7f.json", "saves/mpact.json")
         except:
-            send(traceback.format_exc())
+            print_exc()
 
     def mp_activity(self):
         try:
@@ -1820,7 +1741,7 @@ body {
                     self.mpact_update()
                     self.mpimg.clear()
             except:
-                send(traceback.format_exc())
+                print_exc()
             time.sleep(60)
 
     @cp.expose

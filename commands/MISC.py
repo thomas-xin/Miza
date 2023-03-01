@@ -47,14 +47,7 @@ class DouClub:
             })
         return output
 
-try:
-    douclub = DouClub(AUTH["knack_id"], AUTH["knack_secret"])
-except KeyError:
-    douclub = cdict(
-        search=lambda *void1, **void2: exec('raise FileNotFoundError("Unable to search Doukutsu Club.")'),
-        update=lambda: None,
-        pull=lambda: None,
-    )
+douclub = None
 
 
 async def searchForums(query):
@@ -774,3 +767,18 @@ class UpdateDeviantArt(Database):
         for c_id in tuple(self.data):
             create_task(self.processPart(total, c_id))
         self.time = utc()
+
+
+while True:
+    try:
+        douclub = DouClub(AUTH["knack_id"], AUTH["knack_secret"])
+    except KeyError:
+        douclub = cdict(
+            search=lambda *void1, **void2: exec('raise FileNotFoundError("Unable to search Doukutsu Club.")'),
+            update=lambda: None,
+            pull=lambda: None,
+        )
+    except:
+        print_exc()
+        continue
+    break

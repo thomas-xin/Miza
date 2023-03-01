@@ -2787,9 +2787,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         with tracebacksuppressor:
             for i, u in self.data.items():
                 if getattr(u, "update", None):
-                    if u.update(force=True):
-                        saved.append(i)
-                        time.sleep(0.05)
+                    with MemoryTimer(str(u)):
+                        if u.update(force=True):
+                            saved.append(i)
+                            time.sleep(0.05)
         if not self.closed and hasattr(self, "total_bytes"):
             with tracebacksuppressor:
                 s = "{'net_bytes': " + str(self.total_bytes) + "}"

@@ -3541,10 +3541,10 @@ class __logPrinter:
         if self.file is None:
             return
         while True:
-            with Delay(1):
+            with Delay(10):
                 self.flush()
             while not os.path.exists("common.py") or self.closed:
-                time.sleep(0.5)
+                time.sleep(1)
 
     def __call__(self, *args, sep=" ", end="\n", prefix="", file=None, **void):
         out = str(sep).join(i if type(i) is str else str(i) for i in args) + str(end) + str(prefix)

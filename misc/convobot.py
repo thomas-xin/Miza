@@ -7,6 +7,13 @@ from transformers import GPT2TokenizerFast, AutoTokenizer, AutoModelForQuestionA
 from fp.fp import FreeProxy
 print_exc = lambda: sys.stdout.write(traceback.format_exc())
 
+try:
+	from chatgpt_wrapper import ChatGPT
+except ImportError:
+	chatgpt = None
+else:
+	chatgpt = ChatGPT()
+
 def print(*args, sep=" ", end="\n"):
 	s = sep.join(map(str, args)) + end
 	b = s.encode("utf-8")
@@ -501,13 +508,36 @@ class Bot:
 				s = f"{k}: {v}\n"
 				lines.append(s)
 		if self.check_google(q):
-			res = (self.google, self.bing)[random.randint(0, 1)](q, raw=True)
-			start = "[GOOGLE]: "
-			if len(self.gpttokens(res)) > 128:
-				summ = self.answer_summarise("facebook/bart-large-cnn", q + "\n" + res, max_length=96, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
-				res = lim_str(res.replace("\n", " "), 256, mode="right") + "\n" + summ
-			res = start + res + "\n"
-			lines.append(res)
+			res = True
+			cvalid = chatgpt and time.time() - getattr(chatgpt, "rate", 0) >= 3600
+			if (len(q) > 128 or q.count(" ") > 10 or req_long(q)):
+				res = None
+			if res:
+				start = "[GOOGLE]: "
+				res = (self.google, self.bing)[random.randint(0, 1)](q, raw=True)
+				if len(self.gpttokens(res)) > 128:
+					summ = self.answer_summarise("facebook/bart-large-cnn", q + "\n" + res, max_length=96, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
+					res = lim_str(res.replace("\n", " "), 256, mode="right") + "\n" + summ
+				if res and cvalid:
+					anss = (f'"{q}"', f'not "{q}"')
+					resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", q, anss)
+					if resp[anss[1]] > 0.5:
+						res = None
+			if not res and cvalid:
+				start = "[CHATGPT]: "
+				res = "".join(chatgpt.ask_stream(q)).strip()
+				if res:
+					resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", q, ("answer", "refusal"))
+					if resp["refusal"] > 0.5:
+						res = None
+					elif req_long(q):
+						self.cai_ready = False
+						return res, 0
+				else:
+					chatgpt.rate = time.time() + 3600
+			if res:
+				res = start + res + "\n"
+				lines.append(res)
 		if refs or lines:
 			for k, v in refs:
 				if len(self.gpttokens(v)) > 36:
