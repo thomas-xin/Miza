@@ -3399,7 +3399,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         return remaining
 
     async def process_http_command(self, t, name, nick, command):
-        url = f"{self.webserver}/commands/{t}\x7f0"
+        url = f"https://127.0.0.1:{PORT}/commands/{t}\x7f0"
         out = "[]"
         with tracebacksuppressor:
             message = SimulatedMessage(self, command, t, name, nick)
@@ -3417,11 +3417,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 await self.react_callback(message, None, message.author)
                 out = orjson.dumps(list(message.response))
             url = f"{self.webserver}/commands/{t}\x7f{after}"
-        await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, bypass=False, decode=True, aio=True)
+        await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, bypass=False, decode=True, aio=True, ssl=False)
 
     async def process_http_eval(self, t, proc):
         glob = self._globals
-        url = f"{self.webserver}/commands/{t}\x7f0"
+        url = f"https://127.0.0.1:{PORT}/commands/{t}\x7f0"
         out = '{"result":null}'
         with tracebacksuppressor:
             code = None
@@ -3459,7 +3459,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             except TypeError:
                 out = orjson.dumps(dict(result=repr(output)))
             # print(url, out)
-        await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, bypass=False, decode=True, aio=True)
+        await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, bypass=False, decode=True, aio=True, ssl=False)
 
     async def load_guild_http(self, guild):
         _members = {}
@@ -5957,7 +5957,7 @@ def webserver_communicate(bot):
         while not bot.server:
             time.sleep(5)
         try:
-            assert reqs.next().get(self.webserver + "/ip").content
+            assert reqs.next().get(f"https://127.0.0.1:{PORT}/ip").content
         except:
             print_exc()
             bot.server = None
