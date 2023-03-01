@@ -526,9 +526,9 @@ class Bot:
 			if not res and cvalid:
 				start = "[CHATGPT]: "
 				fut = concurrent.futures.Future()
-				async def chatgpt(q, fut):
+				async def run_chatgpt(q, fut):
 					fut.set_result("".join(chatgpt.ask_stream(q)).strip())
-				asyncio.main_new_loop.call_soon_threadsafe(self.chatgpt, q, fut)
+				asyncio.main_new_loop.call_soon_threadsafe(run_chatgpt, q, fut)
 				res = fut.result(timeout=120)
 				if res:
 					print("ChatGPT:", res)
