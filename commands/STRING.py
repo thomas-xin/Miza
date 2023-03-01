@@ -1046,6 +1046,7 @@ class Ask(Command):
         urls = []
         refs = []
         with discord.context_managers.Typing(channel):
+            fut = process_image("CBIP", "&", [], fix=1, timeout=360)
             if getattr(message, "reference", None):
                 reference = message.reference.resolved
             else:
@@ -1134,6 +1135,7 @@ class Ask(Command):
                 im=im,
                 prompt=(name, q),
             )
+            await fut
             out, cost = await process_image("CBAI", "$", [inputs], fix=1, timeout=420)
             if cost:
                 if "costs" in bot.data:

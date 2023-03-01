@@ -1,4 +1,4 @@
-import os, sys, time, threading, asyncio, urllib, json, io, random, re, traceback
+import os, sys, time, urllib, json, io, random, re, traceback
 import concurrent.futures
 import selenium, requests, torch, openai, httpx
 from selenium import webdriver
@@ -18,24 +18,12 @@ except AttributeError:
 	exc = concurrent.futures.exc_worker = concurrent.futures.ThreadPoolExecutor(max_workers=64)
 drivers = selenium.__dict__.setdefault("-drivers", [])
 
-async def import_chatgpt():
-	try:
-		from chatgpt_wrapper import ChatGPT
-	except ImportError:
-		globals()["chatgpt"] = None
-	else:
-		globals()["chatgpt"] = ChatGPT()
-if threading.current_thread() is threading.main_thread():
-	asyncio.run(import_chatgpt())
+try:
+	from chatgpt_wrapper import ChatGPT
+except ImportError:
+	globals()["chatgpt"] = None
 else:
-	async def _await_fut(fut, ret):
-		out = await fut
-		ret.set_result(out)
-		return ret
-	fut = concurrent.futures.Future()
-	afut = _await_fut(import_chatgpt(), fut)
-	cfut = asyncio.base_main_loop.create_task(afut)
-	fut.result()
+	globals()["chatgpt"] = ChatGPT()
 
 from math import *
 def lim_str(s, maxlen=10, mode="centre"):
