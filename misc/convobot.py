@@ -653,6 +653,7 @@ class Bot:
 		if e2.get("abort", False):
 			e2 = e1
 			aborted = True
+			print("CAI aborted!")
 		else:
 			aborted = False
 		text = random.choice(e2.get("replies") or [{}]).get("text", "").strip()
@@ -660,8 +661,7 @@ class Bot:
 		names = "[Uu][Tt][Ss][Ee]{2}[Ss][Rr]?[TtFf]?"
 		text = u.join(re.split(names, text)).removeprefix("Miza: ")
 		text = self.emoji_clean(text)
-		if aborted:
-			print("CAI aborted!")
+		if aborted or not text or text[-1].isalnum():
 			# self.cai_ready = False
 			text2, cost = self.gptcomplete(u, q, refs=refs, start=text)
 			return text + " " + text2, cost
