@@ -2989,10 +2989,10 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
                 return data
             if session:
                 req = session
-                resp = req.request(method.upper(), url, headers=headers, files=files, data=data, timeout=timeout, ssl=ssl)
+                resp = req.request(method.upper(), url, headers=headers, files=files, data=data, timeout=timeout)
             elif bypass:
                 req = reqs.next()
-                resp = req.request(method.upper(), url, headers=headers, files=files, data=data, timeout=timeout, ssl=ssl)
+                resp = req.request(method.upper(), url, headers=headers, files=files, data=data, timeout=timeout)
             else:
                 req = requests
                 resp = getattr(req, method)(url, headers=headers, files=files, data=data, timeout=timeout, ssl=ssl)
