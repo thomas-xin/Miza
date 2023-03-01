@@ -2904,7 +2904,7 @@ if __name__ == "__main__":
 				p.terminate()
 				break
 			await asyncio.sleep(12)
-	loop = asyncio.create_event_loop()
+	loop = asyncio.new_event_loop()
 	asyncio.set_event_loop(loop)
 	asyncio.main_new_loop = loop
 	loop.create_task(ensure_parent())
