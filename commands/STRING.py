@@ -968,7 +968,6 @@ class Ask(Command):
     rate_limit = (12, 16) if "openai_key" in AUTH else (2, 3)
     slash = True
 
-    cbip = None
     convos = {}
     analysed = {}
 
@@ -1047,10 +1046,7 @@ class Ask(Command):
         urls = []
         refs = []
         with discord.context_managers.Typing(channel):
-            if not self.cbip:
-                fut = self.cbip = create_task(process_image("CBIP", "&", [], fix=1, timeout=360))
-            else:
-                fut = None
+            fut = self.cbip = create_task(process_image("CBIP", "$", [], fix=1, timeout=360))
             if getattr(message, "reference", None):
                 reference = message.reference.resolved
             else:
