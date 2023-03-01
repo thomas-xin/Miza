@@ -2111,7 +2111,7 @@ async def sub_submit(ptype, command, fix=None, _timeout=12):
     proc = await get_idle_proc(ptype, fix=fix)
     while ts in PROC_RESP:
         ts += 1
-    PROC_RESP[ts] = concurrent.futures.Future()
+    PROC_RESP[ts] = fut = concurrent.futures.Future()
     command = "[" + ",".join(map(repr, command[:2])) + "," + ",".join(map(str, command[2:])) + "]"
     s = f"~{ts}~{repr(command.encode('utf-8'))}\n".encode("utf-8")
     if fix:
