@@ -510,9 +510,9 @@ class Bot:
 		if req_long(q) or self.check_google(q):
 			res = True
 			cvalid = chatgpt and time.time() - getattr(chatgpt, "rate", 0) >= 3600
-			if (len(q) > 128 or q.count(" ") > 10:
+			if len(q) > 128 or q.count(" ") > 10:
 				res = None
-			elif req_long(q)) and cvalid:
+			elif req_long(q) and cvalid:
 				res = None
 			if res:
 				start = "[GOOGLE]: "
