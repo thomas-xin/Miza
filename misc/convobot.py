@@ -531,11 +531,11 @@ class Bot:
 				def run_chatgpt(q, fut):
 					fut.set_result("".join(chatgpt.ask_stream(q)).strip())
 				asyncio.main_new_loop.call_soon_threadsafe(run_chatgpt, q, fut)
-				res = fut.result(timeout=120)
+				res = fut.result(timeout=240)
 				if res:
 					print("ChatGPT:", res)
-					resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", q, ("answer", "refusal"))
-					if resp["refusal"] > 0.5:
+					resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", q, ("answer", "As an AI language model"))
+					if resp["As an AI language model"] > 0.5:
 						res = None
 					elif req_long(q):
 						self.cai_ready = False

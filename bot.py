@@ -5958,13 +5958,14 @@ def webserver_communicate(bot):
     while not bot.closed:
         while not bot.server:
             time.sleep(5)
+        time.sleep(5)
         try:
             assert reqs.next().get(f"https://127.0.0.1:{PORT}/ip").content
         except:
             print_exc()
             bot.start_webserver()
         with tracebacksuppressor:
-            while True:
+            while bot.server and is_strict_running(bot.server):
                 b = bot.server.stderr.readline()
                 if not b:
                     bot.start_webserver()
