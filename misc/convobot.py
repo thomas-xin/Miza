@@ -592,7 +592,7 @@ class Bot:
 		if lines:
 			prompt = "".join(lines)
 		else:
-			prompt = f"{u}: {q}"
+			prompt = f"{u}: {q}" if q else ""
 		print("CAI prompt:", prompt)
 		sys.stdout.flush()
 		idt = ""
@@ -678,7 +678,7 @@ class Bot:
 		names = "[Uu][Tt][Ss][Ee]{2}[Ss][Rr]?[TtFf]?"
 		text = u.join(re.split(names, text)).removeprefix("Miza: ")
 		text = self.emoji_clean(text)
-		if aborted or not text or text[-1].isalnum():
+		if aborted or len(text) < 2 or text[-1].isalnum() and (text[-2].isalnum() or text[-2] == " "):
 			# self.cai_ready = False
 			text2, cost = self.gptcomplete(u, q, refs=refs, start=text)
 			return text + " " + text2, cost
