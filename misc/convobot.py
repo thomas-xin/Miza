@@ -1008,7 +1008,7 @@ class Bot:
 					presence_penalty=0.4,
 					user=str(hash(u)),
 				)
-			except openai.error.InvalidRequestError:
+			except openai.error.InvalidRequestError, :
 				response = openai.ChatCompletion.create(
 					model=model,
 					messages=messages,
@@ -1026,10 +1026,32 @@ class Bot:
 				m = response["choices"][0]["message"]
 				role = m["role"]
 				text = m["content"]
-				cost = response["usage"]["total_tokens"] * cm
+				cost += response["usage"]["total_tokens"] * cm
 				# rc = len(self.gpttokens(role, model="text-davinci-003"))
 				# rc += len(self.gpttokens(text, model="text-davinci-003"))
 				# cost = (pc + rc) * cm
+				resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", q, ("answer", "As an AI language model"))
+				print(resp)
+				if resp["As an AI language model"] > 2 / 3:
+					messages = [messages[0], messages[-1]]
+					messages.append(m)
+					messages.append(dict(role="user", content=f"Please respond as {self.name}, not assistant!"))
+					print("ChatGPT prompt:", messages)
+					response = openai.ChatCompletion.create(
+						model=model,
+						messages=messages,
+						temperature=0.8,
+						max_tokens=512,
+						top_p=1,
+						frequency_penalty=0.8,
+						presence_penalty=0.4,
+						user=str(hash(u)),
+					)
+					print(response)
+					m = response["choices"][0]["message"]
+					role = m["role"]
+					text = m["content"]
+					cost += response["usage"]["total_tokens"] * cm
 				if len(self.gpttokens(text)) > 512:
 					text = self.answer_summarise("facebook/bart-large-cnn", text, max_length=500, min_length=256).strip()
 		if not text:
@@ -1060,7 +1082,7 @@ class Bot:
 			if response:
 				text = response.choices[0].text
 				rc = len(self.gpttokens(text, model="text-davinci-003"))
-				cost = (pc + rc) * cm
+				cost += (pc + rc) * cm
 		text = text.strip()
 		print(f"GPT {model} response:", text)
 		return text, cost
