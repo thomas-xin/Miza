@@ -478,7 +478,7 @@ class SpectralPulse(Command):
             "-fps": "30",
             "-sample_rate": "48000",
             "-amplitude": "0.1",
-            "-smudge_ratio": "0.9",
+            "-smudge_ratio": "0.875",
             "-speed": "2",
             "-lower_bound": "A0",
             "-higher_bound": "F#10",

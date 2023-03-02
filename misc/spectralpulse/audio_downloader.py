@@ -1802,6 +1802,7 @@ class AudioDownloader:
 
 	# Gets the stream URL of a queue entry, `download` being a redundant variable kept for compatibility.
 	def get_stream(self, entry, force=False, download=True):
+		video = entry.get("video", None)
 		stream = entry.get("stream", None)
 		icon = entry.get("icon", None)
 		# Use SHA-256 hash of URL to avoid filename conflicts
@@ -1812,6 +1813,7 @@ class AudioDownloader:
 			return None
 		entry["stream"] = "none"
 		searched = False
+		name = entry.get("name")
 		# If "research" tag is set, entry does not contain full data and requires another search
 		if "research" in entry:
 			try:
@@ -1823,22 +1825,26 @@ class AudioDownloader:
 				entry.pop("research", None)
 				raise
 			else:
-				stream = entry.get("stream", None)
-				icon = entry.get("icon", None)
-				video = entry.get("video", None)
+				name = entry["name"]
+				stream = entry.get("stream")
+				icon = entry.get("icon")
+				video = entry.get("video")
 		# If stream is still not found or is a soundcloud audio fragment playlist file, perform secondary youtube-dl search
 		if stream in (None, "none"):
 			data = self.search(entry["url"])
+			name = data[0]["name"]
 			stream = data[0].get("stream") or data[0]["url"]
 			icon = data[0].setdefault("icon", data[0]["url"])
 			video = data[0].setdefault("video", data[0]["url"])
 			entry["duration"] = data[0].get("duration")
 		if not searched and (not is_url(stream) or not isfinite(float(entry.get("duration") or inf)) or stream.startswith("ytsearch:") or stream.startswith("https://cf-hls-media.sndcdn.com/") or expired(stream)):
 			data = self.extract(entry["url"])
+			name = data[0]["name"]
 			stream = data[0].get("stream") or data[0]["url"]
 			icon = data[0].setdefault("icon", data[0]["url"])
 			video = data[0].setdefault("video", data[0]["url"])
 			entry.update(data[0])
+		entry["name"] = name
 		entry["stream"] = stream
 		entry["icon"] = icon
 		entry["video"] = video

@@ -360,7 +360,7 @@ if __name__ == "__main__":
 					opt = "-y"
 			args = ["ffmpeg", opt, "-hide_banner", "-loglevel", "error", "-i", f_in, "-f", "wav", f3]
 			print(" ".join(args))
-			proc = psutil.Popen(args, stderr=subprocess.PIPE)
+			self.proc = proc = psutil.Popen(args, stderr=subprocess.PIPE)
 			# Wait for wav file to appear before continuing
 			try:
 				fl = os.path.getsize(f3)
@@ -536,7 +536,11 @@ if __name__ == "__main__":
 			# Calculate required amount of input data to read, converting to 32 bit floats
 			req = (res_scale) - len(self.buffer)
 			if req > 0:
-				data = self.file.read(req << 2)
+				data = b""
+				n = req << 2
+				while n > 0 and self.proc.is_running():
+					data += self.file.read(n)
+					n -= len(data)
 				self.buffer = np.concatenate((self.buffer, np.frombuffer(data, dtype=np.float32)))
 			else:
 				data = True
