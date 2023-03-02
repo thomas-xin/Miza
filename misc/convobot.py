@@ -801,7 +801,7 @@ class Bot:
 		# 	cm = 200
 		else:
 			model = "gpt-3.5-turbo"
-			temp = 0.7
+			temp = 0.8
 			limit = 4000
 			cm = 20
 		if longer:
@@ -823,9 +823,8 @@ class Bot:
 				start = f"You are roleplaying {self.name}, {p} AI."
 				if searched:
 					dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
-					start += f" Use info from Google. Current time: {dtn}"
-				else:
-					start += " Express emotion when appropriate!"
+					start += f" Use Google when applicable. Current time: {dtn}."
+				start += " Express emotion when appropriate, and don't hold back!"
 			else:
 				start = f"The following is a conversation between {self.name} and humans. {self.name} is {p} AI."
 		else:
@@ -834,9 +833,8 @@ class Bot:
 					start = f"You are roleplaying {self.name}, a {DEFDEF} AI."
 					if searched:
 						dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
-						start += f" Use info from Google. Current time: {dtn}"
-					else:
-						start += " Express emotion when appropriate!"
+						start += f" Use Google when applicable. Current time: {dtn}."
+					start += " Express emotion when appropriate, and don't hold back!"
 				else:
 					start = p
 			else:
@@ -1040,7 +1038,7 @@ class Bot:
 					response = openai.ChatCompletion.create(
 						model=model,
 						messages=messages,
-						temperature=0.8,
+						temperature=0.9,
 						max_tokens=512,
 						top_p=1,
 						frequency_penalty=0.8,
