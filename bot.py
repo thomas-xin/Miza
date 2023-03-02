@@ -4608,6 +4608,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
         discord.http.Route.BASE = f"https://discord.com/api/{api}"
         discord.Member.permissions_in = lambda self, channel: discord.Permissions.none() if not getattr(channel, "permissions_for", None) else channel.permissions_for(self)
+        discord.VoiceChannel._get_channel = lambda self: as_fut(self)
 
         async def received_message(self, msg, /):
             if type(msg) is bytes:
