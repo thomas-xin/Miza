@@ -157,14 +157,15 @@ class Mute(Command):
                     except LookupError:
                         pass
                     else:
-                        mutelist.pops(ind)["u"]
-                        if 0 in ind:
-                            with suppress(LookupError):
-                                bot.data.mutes.listed.remove(guild.id, key=lambda x: x[-1])
-                            if mutelist:
-                                bot.data.mutes.listed.insort((mutelist[0]["t"], guild.id), key=lambda x: x[0])
+                        mute = mutelist.pops(ind)[0]
+                        mute["t"] = 0
+                        mutelist.insort(mute, key=lambda x: x["t"])
+                        with suppress(LookupError):
+                            bot.data.mutes.listed.remove(guild.id, key=lambda x: x[-1])
+                        if mutelist:
+                            bot.data.mutes.listed.insort((mutelist[0]["t"], guild.id), key=lambda x: x[0])
                         update(guild.id)
-                    create_task(channel.send(css_md(f"Successfully unmuted {sqr_md(user)} in {sqr_md(guild)}.")))
+                    # create_task(channel.send(css_md(f"Successfully unmuted {sqr_md(user)} in {sqr_md(guild)}.")))
                     continue
                 create_task(channel.send(italics(ini_md(f"Current mute for {sqr_md(user)} in {sqr_md(guild)}: {sqr_md(time_until(mute['t']))}."))))
             return
