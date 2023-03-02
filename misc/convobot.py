@@ -523,31 +523,36 @@ class Bot:
 			if not res and cvalid:
 				start = "[CHATGPT]: "
 				fut = concurrent.futures.Future()
-				def run_chatgpt(q, fut):
+				async def run_chatgpt(q, fut):
 					if not hasattr(chatgpt, "ask_stream"):
 						try:
-							from chatgpt_wrapper import ChatGPT
+							from chatgpt_wrapper import AsyncChatGPT
 						except ImportError:
 							globals()["chatgpt"] = None
 						else:
-							globals()["chatgpt"] = ChatGPT()
+							globals()["chatgpt"] = await AsyncChatGPT().create(timeout=220)
 						if chatgpt.session is None:
-							chatgpt.refresh_session()
+							await chatgpt.refresh_session()
 						url = "https://chat.openai.com/backend-api/conversations"
 						data = {
 							"is_visible": False,
 						}
-						ok, json, response = asyncio.run(chatgpt._api_patch_request(url, data))
+						ok, json, response = await chatgpt._api_patch_request(url, data)
 						if ok:
 							pass
 						else:
 							chatgpt.log.error("Failed to delete conversations")
 					print("ChatGPT prompt:", q)
-					fut.set_result("".join(chatgpt.ask_stream(q)).strip())
-				asyncio.main_new_loop.call_soon_threadsafe(run_chatgpt, q, fut)
+					resp = []
+					async for w in chatgpt.ask_stream(q):
+						resp.append(w)
+					fut.set_result("".join(resp).strip())
+				asyncio.main_new_loop.create_task(run_chatgpt(q, fut))
 				res = fut.result(timeout=240)
 				if res:
-					print("ChatGPT:", res)
+					print("ChatGPT response:", res)
+					if len(self.gpttokens(res)) > 1200:
+						res = self.answer_summarise("facebook/bart-large-cnn", res, max_length=1024, min_length=512).strip()
 					if req_long(q):
 						resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", q, ("answer", "As an AI language model", "ChatGPT"))
 						print(resp)
@@ -649,6 +654,7 @@ class Bot:
 		if e2.get("abort", False):
 			e2 = e1
 			aborted = True
+			print("CAI aborted!")
 		else:
 			aborted = False
 		text = random.choice(e2.get("replies") or [{}]).get("text", "").strip()
@@ -656,8 +662,7 @@ class Bot:
 		names = "[Uu][Tt][Ss][Ee]{2}[Ss][Rr]?[TtFf]?"
 		text = u.join(re.split(names, text)).removeprefix("Miza: ")
 		text = self.emoji_clean(text)
-		if aborted:
-			print("CAI aborted!")
+		if aborted or not text or text[-1].isalnum():
 			# self.cai_ready = False
 			text2, cost = self.gptcomplete(u, q, refs=refs, start=text)
 			return text + " " + text2, cost
