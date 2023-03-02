@@ -847,7 +847,7 @@ class Bot:
 			ins.pop(0)
 			print(ins)
 			for line in reversed(ins):
-				k, v = line.split(": ", 1)
+				k, v = line.strip().split(": ", 1)
 				m = {}
 				if k in (self.name, "[CHATGPT]"):
 					m["role"] = "assistant"
