@@ -1008,7 +1008,7 @@ class Bot:
 					presence_penalty=0.4,
 					user=str(hash(u)),
 				)
-			except openai.error.InvalidRequestError, :
+			except openai.error.InvalidRequestError:
 				response = openai.ChatCompletion.create(
 					model=model,
 					messages=messages,
