@@ -2423,7 +2423,7 @@ def CBAI(inputs):
 	# locals().update(inputs)
 	try:
 		cb = CBOTS[channel_id]
-		if cb.personality != personality or cb.cai_channel != cai_channel:
+		if cb.personality != personality or cb.cai_channel != cai_channel or inputs.get("reset"):
 			raise KeyError
 	except KeyError:
 		cb = CBOTS[channel_id] = convobot.Bot( 

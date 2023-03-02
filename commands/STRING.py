@@ -968,7 +968,7 @@ class Ask(Command):
     rate_limit = (12, 16) if "openai_key" in AUTH else (2, 3)
     slash = True
 
-    convos = {}
+    reset = {}
     analysed = {}
 
     async def __call__(self, message, guild, channel, user, argv, name, flags=(), **void):
@@ -1134,6 +1134,7 @@ class Ask(Command):
                 refs=refs,
                 im=im,
                 prompt=(name, q),
+                reset=self.reset.pop(channel.id, None),
             )
             if fut:
                 await fut
@@ -1355,7 +1356,7 @@ class UpdateCAIChannels(Database):
 
 class Personality(Command):
     server_only = True
-    name = ["ChangePersonality"]
+    name = ["ResetChat", "ClearChat", "ChangePersonality"]
     min_level = 2
     description = "Customises ⟨MIZA⟩'s personality for ~ask in the current server. Will attempt to use the highest available GPT-family tier unless the personality is set to \"character.ai\", in which case the assigned character on said site will be used instead. Experimental long descriptions are now supported."
     usage = "<traits>* <default{?d}>?"
@@ -1378,11 +1379,18 @@ class Personality(Command):
     def retrieve(self, i):
         return self.bot.data.personalities.get(i) or self.defper
 
-    async def __call__(self, bot, flags, guild, channel, message, user, argv, **void):
+    async def __call__(self, bot, flags, guild, channel, message, name, user, argv, **void):
+        if "chat" in name:
+            bot.data.personalities[channel.id] = p
+            bot.data.cai_channels.pop(channel.id, None)
+            bot.commands.ask[0].reset[channel.id] = True
+            return css_md(f"Conversations for {sqr_md(channel)} have been reset.")
         if not AUTH.get("openai_key"):
             raise ModuleNotFoundError("No OpenAI key found for customisable personality.")
         if "d" in flags or argv == "default":
-            self.data.personalities.pop(channel.id, None)
+            bot.data.personalities.pop(channel.id, None)
+            bot.data.cai_channels.pop(channel.id, None)
+            bot.commands.ask[0].reset[channel.id] = True
             return css_md(f"My personality for {sqr_md(channel)} has been reset.")
         if not argv:
             p = self.decode(self.retrieve(channel.id))
@@ -1430,9 +1438,8 @@ class Personality(Command):
                     + "Please reword or consider contacting the support server if you believe this is a mistake!"
                 )
         bot.data.personalities[channel.id] = p
-        # for channel in guild.channels:
         bot.data.cai_channels.pop(channel.id, None)
-        bot.commands.ask[0].convos.pop(channel.id, None)
+        bot.commands.ask[0].reset[channel.id] = True
         return css_md(f"My personality description for {sqr_md(channel)} has been changed to {sqr_md(p)}.")
 
 

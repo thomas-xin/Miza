@@ -1,9 +1,10 @@
-import os, sys, time, urllib, json, io, random, re, traceback
+import os, sys, time, datetime, urllib, json, io, random, re, traceback
 import concurrent.futures, asyncio
 import selenium, requests, torch, openai, httpx
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
-from transformers import GPT2TokenizerFast, AutoTokenizer, AutoModelForQuestionAnswering, AutoModelForCausalLM, pipeline, set_seed
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering, AutoModelForCausalLM, pipeline, set_seed
+import tiktoken
 from fp.fp import FreeProxy
 print_exc = lambda: sys.stdout.write(traceback.format_exc())
 
@@ -238,8 +239,8 @@ swap = {
 	"My": "Your",
 	"my": "your",
 }
-# DEFPER = "loyal friendly playful cute"
-DEFPER = "The following is a conversation between Miza and humans. Miza is an AI who is loyal friendly playful cute, intelligent and helpful, and slightly flirtatious when appropriate."
+DEFDEF = "loyal friendly playful cute, intelligent and helpful, and slightly flirtatious"
+DEFPER = f"The following is a conversation between Miza and humans. Miza is an AI who is {DEFDEF} when appropriate."
 CAIPER = "character.ai"
 
 
@@ -522,9 +523,8 @@ class Bot:
 						res = None
 			if not res and cvalid:
 				start = "[CHATGPT]: "
-				fut = concurrent.futures.Future()
-				async def run_chatgpt(q, fut):
-					if not hasattr(chatgpt, "ask_stream"):
+				async def run_chatgpt(q, fut=None):
+					if not hasattr(chatgpt, "ask_stream") or time.time() - chatgpt.timestamp >= 25200:
 						try:
 							from chatgpt_wrapper import AsyncChatGPT
 						except ImportError:
@@ -542,17 +542,32 @@ class Bot:
 							pass
 						else:
 							chatgpt.log.error("Failed to delete conversations")
+						p = f"{DEFDEF} when appropriate"
+						resp = []
+						async for w in chatgpt.ask_stream(f"Please roleplay as {self.name}, an AI who is {p}."):
+							resp.append(w)
+						s = "".join(resp)
+						print("ChatGPT init:", s)
+						chatgpt.timestamp = time.time()
 					print("ChatGPT prompt:", q)
+					sys.stdout.flush()
 					resp = []
 					async for w in chatgpt.ask_stream(q):
 						resp.append(w)
-					fut.set_result("".join(resp).strip())
-				asyncio.main_new_loop.create_task(run_chatgpt(q, fut))
-				res = fut.result(timeout=240)
+					res = "".join(resp).strip()
+					if fut:
+						fut.set_result(res)
+					return res
+				if hasattr(asyncio, "main_new_loop"):
+					fut = concurrent.futures.Future()
+					asyncio.main_new_loop.create_task(run_chatgpt(q, fut))
+					res = fut.result(timeout=240)
+				else:
+					res = asyncio.run(run_chatgpt(q))
 				if res:
 					print("ChatGPT response:", res)
-					if len(self.gpttokens(res)) > 1200:
-						res = self.answer_summarise("facebook/bart-large-cnn", res, max_length=1024, min_length=512).strip()
+					if len(self.gpttokens(res)) > 512:
+						res = self.answer_summarise("facebook/bart-large-cnn", res, max_length=500, min_length=256).strip()
 					if req_long(q):
 						resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", q, ("answer", "As an AI language model", "ChatGPT"))
 						print(resp)
@@ -579,6 +594,7 @@ class Bot:
 		else:
 			prompt = f"{u}: {q}"
 		print("CAI prompt:", prompt)
+		sys.stdout.flush()
 		idt = ""
 		iot = ""
 		irp = ""
@@ -700,11 +716,13 @@ class Bot:
 		out.extend(clean_ems())
 		return "".join(out)
 
-	tokeniser = None
-	def gpttokens(self, s):
-		if not self.tokeniser:
-			self.tokeniser = GPT2TokenizerFast.from_pretrained("gpt2")
-		return self.tokeniser(s)["input_ids"]
+	# tokeniser = None
+	def gpttokens(self, s, model="gpt2"):
+		# if not self.tokeniser:
+		# 	self.tokeniser = GPT2TokenizerFast.from_pretrained("gpt2")
+		# return self.tokeniser(s)["input_ids"]
+		enc = tiktoken.encoding_for_model(model)
+		return enc.encode(s)
 
 	def gptcomplete(self, u, q, refs=(), start=""):
 		openai.api_key = self.key
@@ -720,7 +738,7 @@ class Bot:
 			lines.append(f"{self.name}: Hiya! Can I help with anything? {e1}\n")
 			if len(chat_history) < 2:
 				e2 = random.choice(("😊", "🥰", "😉", "😛", "😌"))
-				lines.append(f"{u}: Could I please have a hug?\n")
+				lines.append(f"{u}: Can I have a hug?\n")
 				lines.append(f"{self.name}: Of course! *hugs* {e2}\n")
 		for k, v in self.promises:
 			k = k.replace(":", "")
@@ -730,6 +748,7 @@ class Bot:
 			k = k.replace(":", "")
 			s = f"{k}: {v}\n"
 			lines.append(s)
+		searched = False
 		res = ""
 		if self.check_google(q):
 			res = (self.google, self.bing)[random.randint(0, 1)](q, raw=True)
@@ -739,6 +758,7 @@ class Bot:
 				res = lim_str(res.replace("\n", " "), 256, mode="right") + "\n" + summ
 			res = s + res + "\n"
 			lines.append(res)
+			searched = True
 		for k, v in refs:
 			if not k.startswith("[REPLIED TO]: "):
 				continue
@@ -774,18 +794,23 @@ class Bot:
 				temp = 0.8
 				limit = 2000
 				cm = 0
+		# else:
+		# 	model = "text-davinci-003"
+		# 	temp = 0.7
+		# 	limit = 4000
+		# 	cm = 200
 		else:
-			model = "text-davinci-003"
+			model = "gpt-3.5-turbo"
 			temp = 0.7
 			limit = 4000
-			cm = 200
+			cm = 20
 		if longer:
 			soft = limit / 4
 		else:
 			soft = limit / 2
-		prompt = ""
-		while lines and len(prompt) < soft * 4:
-			prompt = lines.pop(-1) + prompt
+		ins = []
+		while lines and sum(map(len, ins)) < soft * 4:
+			ins.append(lines.pop(-1))
 		p = per
 		if self.name.casefold() not in p.casefold():
 			if not p:
@@ -794,15 +819,54 @@ class Bot:
 				p = "an " + p
 			else:
 				p = "a " + p
-			start = f"The following is a conversation between {self.name} and humans. {self.name} is {p} AI."
+			if model == "gpt-3.5-turbo":
+				start = f"You are {self.name}, {p} AI."
+				if searched:
+					dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
+					start += f" Use info from Google. Current time: {dtn}"
+			else:
+				start = f"The following is a conversation between {self.name} and humans. {self.name} is {p} AI."
 		else:
-			start = p
-		prompt = start + "\n\n" + prompt
-		print("GPT prompt:", prompt)
-		sys.stdout.flush()
-		pc = len(self.gpttokens(prompt))
+			if model == "gpt-3.5-turbo":
+				if p == DEFPER:
+					start = f"You are {self.name}, a {DEFDEF} AI."
+					if searched:
+						dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
+						start += f" Use info from Google. Current time: {dtn}"
+				else:
+					start = p
+			else:
+				start = p
+		if model == "gpt-3.5-turbo":
+			m = dict(role="system", content=start)
+			messages = [m]
+			pc = len(self.gpttokens(m["role"], "text-davinci-003"))
+			pc += len(self.gpttokens(m["content"], "text-davinci-003"))
+			ins.pop(0)
+			print(ins)
+			for line in reversed(ins):
+				k, v = line.split(": ", 1)
+				m = {}
+				if k in (self.name, "[CHATGPT]"):
+					m["role"] = "assistant"
+					m["content"] = v
+				else:
+					m["role"] = "user"
+					m["content"] = line
+				messages.append(m)
+				pc += len(self.gpttokens(m["role"], "text-davinci-003"))
+				pc += len(self.gpttokens(m["content"], "text-davinci-003"))
+			print("ChatGPT prompt:", messages)
+			sys.stdout.flush()
+		else:
+			prompt = "".join(reversed(ins))
+			prompt = start + "\n\n" + prompt
+			print("GPT prompt:", prompt)
+			sys.stdout.flush()
+			pc = len(self.gpttokens(prompt, "text-davinci-003"))
 		response = None
 		text = ""
+		cost = 0
 		exclusive = {"text-neox-001", "text-bloom-001"}
 		if model in exclusive:
 			headers = {
@@ -928,6 +992,42 @@ class Bot:
 				print(resp.status_code, resp.text)
 				model = "text-curie-001"
 				cm = 20
+		elif model == "gpt-3.5-turbo":
+			try:
+				response = openai.ChatCompletion.create(
+					model=model,
+					messages=messages,
+					temperature=temp,
+					max_tokens=limit - pc - 64,
+					top_p=1,
+					frequency_penalty=0.8,
+					presence_penalty=0.4,
+					user=str(hash(u)),
+				)
+			except openai.error.InvalidRequestError:
+				response = openai.ChatCompletion.create(
+					model=model,
+					messages=messages,
+					temperature=temp,
+					max_tokens=int((limit - pc) * 0.75),
+					top_p=1,
+					frequency_penalty=0.8,
+					presence_penalty=0.4,
+					user=str(hash(u)),
+				)
+			except:
+				print_exc()
+			if response:
+				print(response)
+				m = response["choices"][0]["message"]
+				role = m["role"]
+				text = m["content"]
+				cost = response["usage"]["total_tokens"] * cm
+				# rc = len(self.gpttokens(role, model="text-davinci-003"))
+				# rc += len(self.gpttokens(text, model="text-davinci-003"))
+				# cost = (pc + rc) * cm
+				if len(self.gpttokens(text)) > 512:
+					text = self.answer_summarise("facebook/bart-large-cnn", text, max_length=500, min_length=256).strip()
 		if not text:
 			try:
 				response = openai.Completion.create(
@@ -953,12 +1053,10 @@ class Bot:
 				)
 			except:
 				print_exc()
-		if response and not text:
-			text = response.choices[0].text
-			rc = len(self.gpttokens(text))
-			cost = (pc + rc) * cm
-		else:
-			cost = 0
+			if response:
+				text = response.choices[0].text
+				rc = len(self.gpttokens(text, model="text-davinci-003"))
+				cost = (pc + rc) * cm
 		text = text.strip()
 		print(f"GPT {model} response:", text)
 		return text, cost
