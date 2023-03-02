@@ -820,19 +820,23 @@ class Bot:
 			else:
 				p = "a " + p
 			if model == "gpt-3.5-turbo":
-				start = f"You are {self.name}, {p} AI."
+				start = f"You are roleplaying {self.name}, {p} AI."
 				if searched:
 					dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
 					start += f" Use info from Google. Current time: {dtn}"
+				else:
+					start += " Express emotion when appropriate!"
 			else:
 				start = f"The following is a conversation between {self.name} and humans. {self.name} is {p} AI."
 		else:
 			if model == "gpt-3.5-turbo":
 				if p == DEFPER:
-					start = f"You are {self.name}, a {DEFDEF} AI."
+					start = f"You are roleplaying {self.name}, a {DEFDEF} AI."
 					if searched:
 						dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
 						start += f" Use info from Google. Current time: {dtn}"
+					else:
+						start += " Express emotion when appropriate!"
 				else:
 					start = p
 			else:
