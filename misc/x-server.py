@@ -647,8 +647,8 @@ class Server:
 		for i in range(10):
 			if os.path.exists(pn):
 				break
-            if os.path.exists(on) and os.path.getsize(on) > 8388608 or fut.done():
-                break
+			if os.path.exists(on) and os.path.getsize(on) > 8388608 or fut.done():
+				break
 			time.sleep(0.5)
 		if os.path.exists(pn):
 			f = open(pn, "rb")
