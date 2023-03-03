@@ -3,7 +3,14 @@ import concurrent.futures, asyncio
 import selenium, requests, torch, openai, httpx
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
-from transformers import AutoTokenizer, AutoModelForQuestionAnswering, AutoModelForCausalLM, pipeline, set_seed
+for i in range(3):
+	try:
+		from transformers import AutoTokenizer, AutoModelForQuestionAnswering, AutoModelForCausalLM, pipeline, set_seed
+	except ImportError:
+		time.sleep(i + 1)
+	else:
+		break
+    
 import tiktoken
 from fp.fp import FreeProxy
 print_exc = lambda: sys.stdout.write(traceback.format_exc())
@@ -766,10 +773,6 @@ class Bot:
 				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
 			s = f"{k}: {v}\n"
 			lines.append(s)
-		s = f"{u}: {q}\n"
-		if len(self.gpttokens(s)) > 388:
-			s = self.answer_summarise("facebook/bart-large-cnn", s, max_length=384, min_length=32).replace("\n", ". ").strip()
-		lines.append(s)
 		for k, v in refs:
 			if k.startswith("[REPLIED TO]: "):
 				continue
@@ -778,6 +781,10 @@ class Bot:
 				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
 			s = f"{k}: {v}\n"
 			lines.append(s)
+		s = f"{u}: {q}\n"
+		if len(self.gpttokens(s)) > 388:
+			s = self.answer_summarise("facebook/bart-large-cnn", s, max_length=384, min_length=32).replace("\n", ". ").strip()
+		lines.append(s)
 		ns = f"{self.name}:"
 		if start:
 			ns += " " + start
@@ -857,7 +864,7 @@ class Bot:
 				if k in (self.name, "[CHATGPT]"):
 					m["role"] = "assistant"
 					m["content"] = v
-				elif k in ("[GOOGLE]", "[IMAGE]", "[SHORT ANSWER]"):
+				elif k in ("[GOOGLE]",):
 					m["role"] = "assistant"
 					m["content"] = line
 				else:
