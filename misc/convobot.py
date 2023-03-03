@@ -805,7 +805,7 @@ class Bot:
 			temp = 0.8
 			limit = 4000
 			cm = 20
-			reprompt = f"Please respond as {self.name}, not assistant!"
+			reprompt = f"Please respond as {self.name} without prefixing, not Assistant!"
 		if longer:
 			soft = limit / 4
 		else:
@@ -825,7 +825,7 @@ class Bot:
 				start = f"You are roleplaying {self.name}, {p} AI."
 				if searched:
 					dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
-					start += f" Use Google when applicable. Current time: {dtn}."
+					start += f" Use Google when relevant. Current time: {dtn}."
 				start += " Express emotion when appropriate, and don't hold back!"
 			else:
 				start = f"The following is a conversation between {self.name} and humans. {self.name} is {p} AI."
@@ -835,7 +835,7 @@ class Bot:
 					start = f"You are roleplaying {self.name}, a {DEFDEF} AI."
 					if searched:
 						dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
-						start += f" Use Google when applicable. Current time: {dtn}."
+						start += f" Use Google when relevant. Current time: {dtn}."
 					start += " Express emotion when appropriate, and don't hold back!"
 				else:
 					start = p
@@ -857,6 +857,9 @@ class Bot:
 				if k in (self.name, "[CHATGPT]"):
 					m["role"] = "assistant"
 					m["content"] = v
+				elif k == "[GOOGLE]":
+					m["role"] = "assistant"
+					m["content"] = line
 				else:
 					m["role"] = "user"
 					m["content"] = line
@@ -1197,6 +1200,8 @@ class Bot:
 				return self.after(tup, (self.name, response)), cost
 			response = "Sorry, I don't know."
 		return self.after(tup, (self.name, response)), 0
+
+	ask = ai
 
 	def append(self, tup):
 		if not self.chat_history or tup != self.chat_history[-1]:

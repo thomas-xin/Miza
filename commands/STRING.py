@@ -1055,12 +1055,12 @@ class Ask(Command):
             if reference and (find_urls(reference.content) or reference.attachments or reference.embeds):
                 url = f"https://discord.com/channels/0/{channel.id}/{reference.id}"
                 found = await bot.follow_url(url)
-                if found and found[0] != url and is_image(found[0]) is not None:
+                if found and found[0] != url and (is_image(found[0]) is not None or is_video(found[0]) is not None):
                     urls.append(found[0])
             if find_urls(message.content) or message.attachments or message.embeds:
                 url = f"https://discord.com/channels/0/{channel.id}/{message.id}"
                 found = await bot.follow_url(url)
-                if found and found[0] != url and is_image(found[0]) is not None:
+                if found and found[0] != url and (is_image(found[0]) is not None or is_video(found[0]) is not None):
                     urls.append(found[0])
                     if not find_urls(q):
                         if q:
@@ -1095,7 +1095,7 @@ class Ask(Command):
                     c = reference.content
                     urls = find_urls(c)
                     for url in urls:
-                        if is_image(url) is not None:
+                        if is_image(url) is not None or is_video(url) is not None:
                             capt = url.rsplit("/", 1)[-1]
                             c = c.replace(url, f"[Image {capt}]")
                         elif p2:
@@ -1104,7 +1104,7 @@ class Ask(Command):
                     refs.insert(0, ("REPLIED TO: " + name, c))
             urls = find_urls(q)
             for url in urls:
-                if is_image(url) is not None:
+                if is_image(url) is not None or is_video(url) is not None:
                     capt = url.rsplit("/", 1)[-1]
                     q = q.replace(url, f"[Image {capt}]")
                 elif p2:
