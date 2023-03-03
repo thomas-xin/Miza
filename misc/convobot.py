@@ -848,7 +848,8 @@ class Bot:
 			pc += len(self.gpttokens(m["content"], "text-davinci-003"))
 			ins.pop(0)
 			print(ins)
-			ins[0] += f"({reprompt})"
+			if ins[0]:
+				ins[0] += f"({reprompt})"
 			for line in reversed(ins):
 				line = line.strip()
 				k, v = line.split(": ", 1)
