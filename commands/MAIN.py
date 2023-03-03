@@ -119,7 +119,7 @@ class Help(Command):
                 + f"Alternatively, visit [`mizatlas`]({bot.webserver}/mizatlas) for a full command list and tester.\n\n"
                 + f"If you're an admin and wish to disable me in a particular channel, check out `{prefix}ec`!\n"
                 + f"Want to try the premium features, unsure about anything, or have a bug to report? check out the [`support server`]({bot.rcc_invite})!\n"
-                + f"Finally, donate to me [`here`]({bot.kofi_url}), or purchase a premium subscription [`here`]({bot.rapidapi_url})! Any support is greatly appreciated!"
+                + f"Finally, donate to me or purchase a subscription [`here`]({bot.kofi_url})! Any support is greatly appreciated!"
             )
         embed.colour = discord.Colour(help_colours[catg])
         if not catg:
