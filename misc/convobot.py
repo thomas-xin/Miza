@@ -1053,7 +1053,7 @@ class Bot:
 					print(response)
 					m = response["choices"][0]["message"]
 					role = m["role"]
-					text = m["content"]
+					text = m["content"].removeprefix(f"{self.name}: ")
 					cost += response["usage"]["total_tokens"] * cm
 				if len(self.gpttokens(text)) > 512:
 					text = self.answer_summarise("facebook/bart-large-cnn", text, max_length=500, min_length=256).strip()
