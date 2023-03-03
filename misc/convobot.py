@@ -783,6 +783,7 @@ class Bot:
 			ns += " " + start
 		lines.append(ns)
 		longer = req_long(q)
+		reprompt = ""
 		if self.premium < 2:
 			if not res and self.premium < 1 and not start:
 				model = "text-bloom-001"
@@ -804,6 +805,7 @@ class Bot:
 			temp = 0.8
 			limit = 4000
 			cm = 20
+			reprompt = f"Please respond as {self.name}, not assistant!"
 		if longer:
 			soft = limit / 4
 		else:
@@ -846,8 +848,10 @@ class Bot:
 			pc += len(self.gpttokens(m["content"], "text-davinci-003"))
 			ins.pop(0)
 			print(ins)
+			ins[0] += f"({reprompt})"
 			for line in reversed(ins):
-				k, v = line.strip().split(": ", 1)
+				line = line.strip()
+				k, v = line.split(": ", 1)
 				m = {}
 				if k in (self.name, "[CHATGPT]"):
 					m["role"] = "assistant"
@@ -1033,7 +1037,7 @@ class Bot:
 				if resp["As an AI language model"] > 2 / 3:
 					messages = [messages[0], messages[-1]]
 					messages.append(m)
-					messages.append(dict(role="user", content=f"Please respond as {self.name}, not assistant!"))
+					messages.append(dict(role="user", content=reprompt))
 					print("ChatGPT prompt:", messages)
 					response = openai.ChatCompletion.create(
 						model=model,
