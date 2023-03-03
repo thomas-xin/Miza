@@ -633,6 +633,20 @@ class Server:
 		pn = fn.replace("~.forward$", "~.temp$@" + name)
 		try:
 			fut = self.serving[on]
+            for i in range(3):
+                if os.path.exists(on):
+                    break
+                time.sleep(1)
+            else:
+                if not os.path.exists(on):
+                    if os.path.exists(pn):
+                        f = open(pn, "rb")
+                        resp = cp.lib.static.serve_fileobj(f, content_type=mime, disposition="attachment" if download else None, name=name)
+                        if a3:
+                            self.serving.setdefault(p, weakref.WeakSet()).add(f)
+                        return resp
+                    self.serving.pop(on, None)
+                    raise KeyError
 		except KeyError:
 			fut = create_future_ex(self._concat, urls, on, pn)
 			self.serving[on] = fut
