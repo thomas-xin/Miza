@@ -3288,7 +3288,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         # Send bot event: user has executed command
                         await self.send_event("_command_", user=user, command=command, loop=loop, message=message)
                         # Process response to command if there is one
-                        if response is not None and not hasattr(message, "channel"):
+                        if response is not None and not hasattr(response, "channel"):
                             if fut is not None:
                                 await fut
                             # Raise exceptions returned by the command

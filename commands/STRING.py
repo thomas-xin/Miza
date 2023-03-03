@@ -1378,7 +1378,6 @@ class Personality(Command):
 
     async def __call__(self, bot, flags, guild, channel, message, name, user, argv, **void):
         if "chat" in name:
-            bot.data.personalities[channel.id] = p
             bot.data.cai_channels.pop(channel.id, None)
             bot.commands.ask[0].reset[channel.id] = True
             return css_md(f"Conversations for {sqr_md(channel)} have been reset.")
