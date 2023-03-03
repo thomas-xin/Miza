@@ -568,12 +568,12 @@ class Bot:
 					print("ChatGPT response:", res)
 					if len(self.gpttokens(res)) > 512:
 						res = self.answer_summarise("facebook/bart-large-cnn", res, max_length=500, min_length=256).strip()
-					if req_long(q):
-						resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", q, ("answer", "As an AI language model", "ChatGPT"))
-						print(resp)
-						if resp["As an AI language model"] <= 0.5 and resp["ChatGPT"] <= 0.5:
-							self.cai_ready = False
-							return res, 0
+					# if req_long(q):
+					resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", q, ("answer", "As an AI language model", "ChatGPT"))
+					print(resp)
+					if resp["As an AI language model"] <= 0.5 and resp["ChatGPT"] <= 0.5:
+						self.cai_ready = False
+						return res, 0
 				else:
 					chatgpt.rate = time.time() + 3600
 			if res:

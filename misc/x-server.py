@@ -647,7 +647,7 @@ class Server:
 		for i in range(120):
 			if os.path.exists(pn):
 				break
-			if os.path.exists(on) and os.path.getsize(on) > 8388608 or fut.done():
+			if os.path.exists(on) and self.serving.get(on + "~buffer") or fut.done():
 				break
 			time.sleep(0.5)
 		if os.path.exists(pn):
@@ -696,15 +696,19 @@ class Server:
 					pos = fs
 			for fut in futs:
 				fut.result()
+                self.serving[on + "~buffer"] = True
 			create_future_ex(self.rename_after, on, pn)
 
 	def rename_after(self, on, pn):
-		while True:
-			try:
-				os.rename(on, pn)
-			except PermissionError:
-				time.sleep(1)
-		self.serving.pop(on, None)
+        try:
+            while True:
+                try:
+                    os.rename(on, pn)
+                except PermissionError:
+                    time.sleep(1)
+        finally:
+            self.serving.pop(on, None)
+            self.serving.pop(on + "~buffer", None)
 
 	def chunk_into(self, resp, on, pos):
 		with open(on, "rb+") as f:
