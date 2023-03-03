@@ -1028,16 +1028,16 @@ class Bot:
 				print(response)
 				m = response["choices"][0]["message"]
 				role = m["role"]
-				text = m["content"]
+				text = m["content"].removeprefix(f"{self.name}: ")
 				cost += response["usage"]["total_tokens"] * cm
 				# rc = len(self.gpttokens(role, model="text-davinci-003"))
 				# rc += len(self.gpttokens(text, model="text-davinci-003"))
 				# cost = (pc + rc) * cm
-				resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", q, ("answer", "As an AI language model"))
+				resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", text, ("answer", "As an AI language model"))
 				print(resp)
 				if resp["As an AI language model"] > 2 / 3:
 					messages = [messages[0], messages[-1]]
-					messages.append(m)
+					messages.append(dict(role=role, content=text))
 					messages.append(dict(role="user", content=reprompt))
 					print("ChatGPT prompt:", messages)
 					response = openai.ChatCompletion.create(
