@@ -638,20 +638,14 @@ class Server:
 					break
 				time.sleep(1)
 			else:
-				if not os.path.exists(on):
-					if os.path.exists(pn):
-						f = open(pn, "rb")
-						resp = cp.lib.static.serve_fileobj(f, content_type=mime, disposition="attachment" if download else None, name=name)
-						if a3:
-							self.serving.setdefault(p, weakref.WeakSet()).add(f)
-						return resp
+				if not os.path.exists(on) and not os.path.exists(pn):
 					self.serving.pop(on, None)
 					raise KeyError
 		except KeyError:
 			fut = create_future_ex(self._concat, urls, on, pn)
 			self.serving[on] = fut
 		for i in range(10):
-			if os.path.exists(on):
+			if os.path.exists(on) or os.path.exists(pn):
 				break
 			time.sleep(0.5)
 		if os.path.exists(pn):
@@ -700,12 +694,15 @@ class Server:
 					pos = fs
 			for fut in futs:
 				fut.result()
-			while True:
-				try:
-					os.rename(on, pn)
-				except PermissionError:
-					time.sleep(1)
-			self.serving.pop(on, None)
+			create_future_ex(self.rename_after, on, pn)
+
+	def rename_after(self, on, pn):
+		while True:
+			try:
+				os.rename(on, pn)
+			except PermissionError:
+				time.sleep(1)
+		self.serving.pop(on, None)
 
 	def chunk_into(self, resp, on, pos):
 		with open(on, "rb+") as f:
