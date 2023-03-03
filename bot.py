@@ -2729,12 +2729,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         for f in os.listdir("saves/filehost"):
             if f[0] in "\x7f~!":
                 fn = "saves/filehost/" + f
-                if not f.split("@", 1)[0].endswith("~.temp$"):
-                    # if f[0] == "\x7f" and os.path.getsize(fn) > 1048576:
-                    #     reqs.next().patch(self.webserver + f"/replace_file?fn={urllib.parse.quote_plus(fn)}")
-                    continue
-                if utc() - os.path.getatime(fn) <= 60:
-                    continue
+                if not f.split("@", 1)[0].endswith("!.temp$"):
+                    if not f.split("@", 1)[0].endswith("~.temp$"):
+                        continue
+                    if utc() - os.path.getatime(fn) <= 60:
+                        continue
             with tracebacksuppressor:
                 os.remove("saves/filehost/" + f)
                 i += 1
