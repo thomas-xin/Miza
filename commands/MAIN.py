@@ -2253,7 +2253,9 @@ class UpdateUsers(Database):
                 argv = argv.strip()
                 with bot.ExceptionSender(channel, reference=message):
                     for ask in bot.commands.ask:
-                        await ask(message, guild, channel, user, argv, name="ask", flags=flags)
+                        m = await ask(message, guild, channel, user, argv, name="ask", flags=flags)
+                        if "exec" in bot.data and not message.guild:
+                            await bot.data.exec._nocommand_(message=m)
                 return
             if count:
                 if count < 2 or count == 2 and xrand(2):

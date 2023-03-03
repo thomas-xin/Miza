@@ -399,7 +399,7 @@ class UpdateExec(Database):
     async def _nocommand_(self, message, **void):
         bot = self.bot
         channel = message.channel
-        if bot.is_owner(message.author.id) and channel.id in self.data:
+        if bot.id != message.author.id and bot.is_owner(message.author.id) and channel.id in self.data:
             flag = self.data[channel.id]
             # Both main and virtual terminals may be active simultaneously
             for f in (flag & 1, flag & 4, flag & 32):

@@ -1187,8 +1187,7 @@ class Ask(Command):
                     )
                     reacts = "🚫"
             s = lim_str(code + escape_roles(out), 2000)
-            await send_with_react(channel, s, embed=emb, reacts=reacts, reference=message)
-            return
+            return await send_with_react(channel, s, embed=emb, reacts=reacts, reference=message)
         q = single_space(q).strip().translate(bot.mtrans).replace("?", "\u200b").strip("\u200b")
         out = None
         q = grammarly_2_point_0(q)
@@ -1272,8 +1271,7 @@ class Ask(Command):
                     "How about a question for you?",
                 )
                 resp = choice(response) + " " + choice(bot.data.users.questions)
-            await send_with_reply(channel, message, resp)
-            out = None
+            return await send_with_reply(channel, message, resp)
         elif any(q.startswith(i) for i in ("why ", "are ", "was ", "you ", "you're ")):
             out = alist(
                 "Wouldn't know, might Google help?",
@@ -1307,8 +1305,7 @@ class Ask(Command):
             for _hello in bot.commands.hello:
                 out = await _hello(bot, user, q.split(None, 1)[0], "".join(q.split(None, 1)[1:]), guild)
                 if out:
-                    await send_with_reply(channel, message, escape_roles(out))
-                    return
+                    return await send_with_reply(channel, message, escape_roles(out))
         else:
             out = alist(
                 "Yeah!",
@@ -1337,7 +1334,7 @@ class Ask(Command):
             out = out[ihash(q) % len(out)]
         if out:
             q = q[0].upper() + q[1:]
-            await send_with_reply(channel, message, escape_roles(f"\xad{q}? {out}"))
+            return await send_with_reply(channel, message, escape_roles(f"\xad{q}? {out}"))
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
         u_id = int(vals)
