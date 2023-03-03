@@ -857,7 +857,7 @@ class Bot:
 				if k in (self.name, "[CHATGPT]"):
 					m["role"] = "assistant"
 					m["content"] = v
-				elif k == "[GOOGLE]":
+				elif k in ("[GOOGLE]", "[IMAGE]", "[SHORT ANSWER]"):
 					m["role"] = "assistant"
 					m["content"] = line
 				else:

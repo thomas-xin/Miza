@@ -1073,9 +1073,9 @@ class Ask(Command):
                     print(p1)
                     print(p2)
                     if p1:
-                        refs.append(("IMAGE", p1))
+                        refs.append(("[IMAGE]", p1))
                     if p2:
-                        refs.append(("ANSWER", p2))
+                        refs.append(("[SHORT ANSWER]", p2))
             if reference and reference.content:
                 ref = False
                 async for m in bot.history(channel, limit=2, before=message.id, after=reference.id):
