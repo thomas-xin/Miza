@@ -696,19 +696,19 @@ class Server:
 					pos = fs
 			for fut in futs:
 				fut.result()
-                self.serving[on + "~buffer"] = True
+				self.serving[on + "~buffer"] = True
 			create_future_ex(self.rename_after, on, pn)
 
 	def rename_after(self, on, pn):
-        try:
-            while True:
-                try:
-                    os.rename(on, pn)
-                except PermissionError:
-                    time.sleep(1)
-        finally:
-            self.serving.pop(on, None)
-            self.serving.pop(on + "~buffer", None)
+		try:
+			while True:
+				try:
+					os.rename(on, pn)
+				except PermissionError:
+					time.sleep(1)
+		finally:
+			self.serving.pop(on, None)
+			self.serving.pop(on + "~buffer", None)
 
 	def chunk_into(self, resp, on, pos):
 		with open(on, "rb+") as f:
