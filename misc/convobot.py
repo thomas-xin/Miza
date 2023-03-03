@@ -784,7 +784,7 @@ class Bot:
 		lines.append(ns)
 		longer = req_long(q)
 		reprompt = ""
-		if self.premium < 2 and not start:
+		if self.premium < 2 or start:
 			if not res and self.premium < 1 and not start:
 				model = "text-bloom-001"
 				temp = 0.9
