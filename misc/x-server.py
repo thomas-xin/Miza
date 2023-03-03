@@ -644,7 +644,7 @@ class Server:
 		except KeyError:
 			fut = create_future_ex(self._concat, urls, on, pn)
 			self.serving[on] = fut
-		for i in range(10):
+		for i in range(120):
 			if os.path.exists(pn):
 				break
 			if os.path.exists(on) and os.path.getsize(on) > 8388608 or fut.done():
