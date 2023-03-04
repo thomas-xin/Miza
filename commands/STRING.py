@@ -1242,7 +1242,7 @@ class Ask(Command):
             if not caids:
                 return
             print("Resetting", caids)
-            await process_image("CBOTS[cid].deletes", "$", [caids], fix=1)
+            await process_image("lambda cid, caids: CBOTS[cid].deletes(caids)", "$", [channel.id, caids], fix=1)
             create_task(message.edit(content=css_md("[This message has been reset.]")))
             create_task(message.add_reaction("❎"))
             if m:
