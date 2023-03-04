@@ -2850,7 +2850,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             else:
                 reacode = None
             m = self.cache.messages.get(message.id)
-            if getattr(m, "_react_callback_"):
+            if getattr(m, "_react_callback_", None):
                 await asyncio.wait_for(
                     f._callback_(
                         message=message,
