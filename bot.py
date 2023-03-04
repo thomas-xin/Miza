@@ -2845,6 +2845,27 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             u_perm = self.get_perms(user.id, message.guild)
             if u_perm <= -inf:
                 return
+            if reaction is not None:
+                reacode = str(reaction).encode("utf-8")
+            else:
+                reacode = None
+            m = self.cache.messages.get(message.id)
+            if getattr(m, "_react_callback_"):
+                await asyncio.wait_for(
+                    f._callback_(
+                        message=message,
+                        channel=message.channel,
+                        guild=message.guild,
+                        reaction=reacode,
+                        user=user,
+                        perm=u_perm,
+                        vals="",
+                        argv="",
+                        bot=self,
+                    ),
+                    timeout=timeout)
+                await self.send_event("_callback_", user=user, command=f, loop=False, message=message)
+                return
             msg = message.content.strip("*")
             if not msg and message.embeds:
                 msg = str(message.embeds[0].description).strip("*")
@@ -2871,10 +2892,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 if self.react_sem.get(message.id, 0) - utc() > 1:
                     return
                 await asyncio.sleep(0.2)
-            if reaction is not None:
-                reacode = str(reaction).encode("utf-8")
-            else:
-                reacode = None
             msg = message.content.strip("*")
             if not msg and message.embeds:
                 msg = str(message.embeds[0].description).strip("*")
@@ -2992,9 +3009,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                                 create_task(self.garbage_collect(u))
 
     # Processes a message, runs all necessary commands and bot events. May be called from another source.
-    async def process_message(self, message, msg, edit=True, orig=None, loop=False, slash=False):
+    async def process_message(self, message, msg=None, edit=True, orig=None, loop=False, slash=False):
         if self.closed:
             return 0
+        msg = msg if msg is not None else message.content
         cpy = msg
         # Get user, channel, guild that the message belongs to
         user = message.author
@@ -3403,7 +3421,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         with tracebacksuppressor:
             message = SimulatedMessage(self, command, t, name, nick)
             self.cache.users[message.author.id] = message.author
-            after = await self.process_message(message, command, slash=True)
+            after = await self.process_message(message, msg=command, slash=True)
             if after != -1:
                 if after is not None:
                     after += utc()
@@ -4132,7 +4150,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         with self.ExceptionSender(message.channel, reference=message):
             if msg and msg[0] == "\\":
                 cpy = msg[1:]
-            await self.process_message(message, cpy, edit, msg)
+            await self.process_message(message, msg=cpy, edit=edit, orig=msg)
 
     def set_classes(self):
         bot = self
@@ -5352,7 +5370,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         message.content = single_space(message.content.strip())
                         message.channel = channel
                         message.noref = True
-                        await self.process_message(message, message.content, slash=True)
+                        await self.process_message(message, msg=message.content, slash=True)
                     elif d["type"] == 3:
                         custom_id = cdata.get("custom_id", "")
                         if "?" in custom_id:

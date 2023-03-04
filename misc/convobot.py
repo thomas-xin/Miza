@@ -10,7 +10,7 @@ for i in range(3):
 		time.sleep(i + 1)
 	else:
 		break
-    
+
 import tiktoken
 from fp.fp import FreeProxy
 print_exc = lambda: sys.stdout.write(traceback.format_exc())
@@ -272,7 +272,7 @@ class Bot:
 		self.chat_history = []
 		self.chat_history_ids = None
 		self.cai_ready = False
-		self.cai_channel = cai_channel if personality == CAIPER else None
+		self.cai_channel = cai_channel
 		self.timestamp = time.time()
 		self.premium = premium
 		self.last_cost = 0
@@ -494,19 +494,19 @@ class Bot:
 				if resp.status_code not in range(200, 400):
 					print("CAI create:", resp)
 					print(resp.text)
-					return "", 0
+					return "", 0, ()
 				try:
 					self.cai_channel = resp.json()["external_id"]
 				except KeyError:
 					print("CAI create:", resp)
 					print(resp.text)
-					return "", 0
-			chat_history = self.chat_history.copy()
+					return "", 0, ()
+			# chat_history = self.chat_history.copy()
 			for k, v in self.promises:
 				k = k.replace(":", "")
 				s = f"{k}: {v}\n"
 				lines.append(s)
-			for k, v in chat_history:
+			for k, v in self.chat_history:
 				k = k.replace(":", "")
 				s = f"{k}: {v}\n"
 				lines.append(s)
@@ -575,12 +575,22 @@ class Bot:
 					print("ChatGPT response:", res)
 					if len(self.gpttokens(res)) > 512:
 						res = self.answer_summarise("facebook/bart-large-cnn", res, max_length=500, min_length=256).strip()
-					# if req_long(q):
-					resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", q, ("answer", "As an AI language model", "ChatGPT"))
-					print(resp)
-					if resp["As an AI language model"] <= 0.5 and resp["ChatGPT"] <= 0.5:
-						self.cai_ready = False
-						return res, 0
+					errs = (
+						"Your ChatGPT session is not usable.",
+						"Failed to read response from ChatGPT.",
+						"Generation stopped",
+					)
+					err = any(res.startswith(s) for s in errs)
+					if not err:
+						resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", q, ("answer", "As an AI language model"))
+						print(resp)
+						err = resp["As an AI language model"] > 0.5:
+						if not err:
+							self.cai_ready = False
+							return res, 0, ()
+					else:
+						res = ""
+						chatgpt.timestamp = 0
 				else:
 					chatgpt.rate = time.time() + 3600
 			if res:
@@ -680,18 +690,22 @@ class Bot:
 			print("CAI aborted!")
 		else:
 			aborted = False
-		text = random.choice(e2.get("replies") or [{}]).get("text", "").strip()
+		replies = e2.get("replies") or [{}]
+		text = random.choice(replies).get("text", "").strip()
+		caids = [e2.get("last_user_msg_id")]
+		caids.extend(r.get("id") for r in replies)
+		caids = list(filter(bool, caids))
 		print("CAI response:", text)
 		names = "[Uu][Tt][Ss][Ee]{2}[Ss][Rr]?[TtFf]?"
-		text = u.join(re.split(names, text)).removeprefix("Miza: ")
+		text = u.join(re.split(names, text)).removeprefix("[REPLIED TO]: ").removeprefix("Miza: ")
 		text = self.emoji_clean(text)
 		if aborted or len(text) < 2 or text[-1].isalpha() and (text[-2].isalnum() or text[-2] == " "):
 			# self.cai_ready = False
 			text2, cost = self.gptcomplete(u, q, refs=refs, start=text)
-			return text + " " + text2, cost
+			return text + " " + text2, cost, caids
 		else:
 			self.cai_ready = True
-		return text, 0
+		return text, 0, caids
 
 	def emoji_clean(self, text):
 		ems = []
@@ -1164,25 +1178,26 @@ class Bot:
 		tup = (u, q)
 		while len(self.chat_history) > self.history_length:
 			self.chat_history.pop(0)
+		caids = ()
 		if self.personality == CAIPER or self.premium < 2 and self.personality == DEFPER:
-			response, cost = self.caichat(u, q, refs=refs, im=im)
+			response, cost, caids = self.caichat(u, q, refs=refs, im=im)
 			if response:
-				return self.after(tup, (self.name, response)), cost
+				return self.after(tup, (self.name, response)), cost, caids
 		# if self.premium > 0 or random.randint(0, 1):
 		response, cost = self.gptcomplete(u, q, refs=refs)
 		if response:
-			return self.after(tup, (self.name, response)), cost
+			return self.after(tup, (self.name, response)), cost, caids
 		if refs and refs[-1][0] in ("IMAGE", "ANSWER"):
 			if len(refs) > 1:
 				response = refs[-2][1] + ", " + refs[-1][1]
 			else:
 				response = refs[-1][1]
 			if response:
-				return self.after(tup, (self.name, response)), 0
+				return self.after(tup, (self.name, response)), 0, caids
 		if self.premium > 0 and literal_question(q):
 			response = (self.google, self.bing)[random.randint(0, 1)](q)
 			if response:
-				return self.after(tup, (self.name, response)), 0
+				return self.after(tup, (self.name, response)), 0, caids
 			googled = True
 		else:
 			googled = False
@@ -1197,16 +1212,37 @@ class Bot:
 		if not googled and not response:
 			response = (self.google, self.bing)[random.randint(0, 1)](q)
 			if response:
-				return self.after(tup, (self.name, response)), 0
+				return self.after(tup, (self.name, response)), 0, caids
 		if not response:
 			response = reso
 		response = response.replace("  ", " ")
 		if not response:
 			response, cost = self.gptcomplete(u, q, refs=refs)
 			if response:
-				return self.after(tup, (self.name, response)), cost
+				return self.after(tup, (self.name, response)), cost, caids
 			response = "Sorry, I don't know."
-		return self.after(tup, (self.name, response)), 0
+		return self.after(tup, (self.name, response)), 0, caids
+
+	def deletes(self, caids):
+		headers = {
+			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
+			# "DNT": "1",
+			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
+			"Content-Type": "application/json",
+			"cache-control": "no-cache",
+			"Authorization": f"Token {self.cai_token}",
+		}
+		resp = requests.post(
+			"https://beta.character.ai/chat/history/msgs/delete/",
+			headers=headers,
+			data=json.dumps(dict(
+				history_id=self.cai_channel,
+				ids_to_delete=caids,
+				regenerating=False
+			)),
+		)
+		print("CAI delete:", resp)
+		self.chat_history = self.chat_history[:-2]
 
 	ask = ai
 

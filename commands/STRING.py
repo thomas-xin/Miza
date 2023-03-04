@@ -968,6 +968,7 @@ class Ask(Command):
     rate_limit = (12, 16) if "openai_key" in AUTH else (2, 3)
     slash = True
 
+    last = {}
     reset = {}
     analysed = {}
 
@@ -1043,6 +1044,7 @@ class Ask(Command):
                         q = "Hi!"
         im = None
         emb = None
+        caids = None
         urls = []
         refs = []
         with discord.context_managers.Typing(channel):
@@ -1138,7 +1140,20 @@ class Ask(Command):
             )
             if fut:
                 await fut
-            out, cost = await process_image("CBAI", "$", [inputs], fix=1, timeout=420)
+            tup = await process_image("CBAI", "$", [inputs], fix=1, timeout=420)
+            out = tup[0]
+            if len(tup) > 1:
+                cost = tup[1]
+                if len(tup) > 2:
+                    caids = tup[2]
+                else:
+                    caids = ()
+            else:
+                cost = 0
+                caids = ()
+            if caids:
+                message.caids = (caids.pop(0),)
+                # out = zwencode("zzz" + "z".join("".join(chr(ord(c) + 49) for c in str(i)) for i in caids) + "zzz")
             if cost:
                 if "costs" in bot.data:
                     bot.data.costs.put(user.id, cost)
@@ -1164,187 +1179,81 @@ class Ask(Command):
                             "Uh-oh, it appears your tokens have run out! Check ~wallet to view your balance, top up using a donation [here]({bot.kofi_url}), "
                             + "or purchase a subscription to gain temporary unlimited usage!"
                         )
-        if out:
             caic = await process_image("lambda cid: CBOTS[cid].cai_channel", "$", [channel.id], fix=1)
             if caic:
                 bot.data.cai_channels[channel.id] = caic
             else:
                 bot.data.cai_channels.pop(channel.id)
-            print(out)
-            code = "\xad"
-            reacts = None
-            if False:#not emb and premium < 2 and not random.randint(0, 16):
-                oo = bot.data.users.get(user.id, {}).get("opt_out")
-                if not oo:
-                    code = f"*```callback-string-ask-{user.id}-\nReact with 🚫 to never show the below message again.```*\n"
-                    emb = discord.Embed(colour=rand_colour())
-                    emb.set_author(**get_author(bot.user))
-                    emb.description = (
-                        "Looking for my more advanced and intelligent GPT-DaVinci chatbot to talk to?\n"
-                        + "Unfortunately the service for it had to be cut short, as the API services were too expensive for my creator to keep up given the size of my audience.\n"
-                        + f"However, if you would still wish to use the service for your user or server, it is available for subscription [here]({bot.kofi_url}), to help fund API usage; any support is greatly appreciated!\n"
-                        + "Additionally if you would like to try out the premium features without paying, you may enable a temporary trial by using the ~trial command!"
-                    )
-                    reacts = "🚫"
-            s = lim_str(code + escape_roles(out), 2000)
-            return await send_with_react(channel, s, embed=emb, reacts=reacts, reference=message)
-        q = single_space(q).strip().translate(bot.mtrans).replace("?", "\u200b").strip("\u200b")
-        out = None
-        q = grammarly_2_point_0(q)
-        if q == "why":
-            out = "Because! :3"
-        elif q == "what":
-            out = "Nothing! 🙃"
-        elif q == "who":
-            out = "Who, me?"
-        elif q == "when":
-            out = "Right now!"
-        elif q == "where":
-            out = "Here, dummy!"
-        elif any(q.startswith(i) for i in ("what's ", "whats ", "what is ")) and regexp("[0-9]").search(q) and regexp("[+\\-*/\\\\^()").search(q):
-            q = q[5:]
-            q = q[q.index(" ") + 1:]
-            try:
-                if 0 <= q.rfind("<") < q.find(">"):
-                    q = verify_id(q[q.rindex("<") + 1:q.index(">")])
-                num = int(q)
-            except ValueError:
-                for _math in bot.commands.math:
-                    answer = await _math(bot, q, "ask", channel, guild, {}, user)
-                    if answer:
-                        await send_with_reply(channel, "h" not in flags and message, answer)
-                out = None
-            else:
-                if bot.in_cache(num) and "info" in bot.commands:
-                    for _info in bot.commands.info:
-                        await _info(num, None, "info", guild, channel, bot, user, "")
-                    out = None
-                else:
-                    resp = await bot.solve_math(f"factorize {num}", timeout=20)
-                    factors = safe_eval(resp[0])
-                    out = f"{num}'s factors are `{', '.join(str(i) for i in factors)}`. If you'd like more information, try {bot.get_prefix(guild)}math!"
-        elif q.startswith("who's ") or q.startswith("whos ") or q.startswith("who is "):
-            q = q[4:].split(None, 1)[-1]
-            member = await bot.fetch_member_ex(q, guild, allow_banned=False, fuzzy=None)
-            if member:
-                if "info" in bot.commands:
-                    for _info in bot.commands.info:
-                        await _info(q, None, "info", guild, channel, bot, user, "")
-                    out = None
-            else:
-                members = guild.members
-                members.remove(bot.user)
-                members.remove(user)
-                target = choice(choice(members).name, choice(members).display_name)
-                out = alist(
-                    f"Maybe it's your {random.choice(['therapist', 'doctor', 'parent', 'sibling', 'friend'])}!",
-                    f"Hm, perhaps {target}!",
-                    f"I am certain it's {target}!",
-                    f"I think {target} might know... 👀",
-                    "Me. 😏",
+        print("Result:", out)
+        code = "\xad"
+        reacts = []
+        if caids:
+            reacts.extend("🔄", "🗑️")
+        if False:#not emb and premium < 2 and not random.randint(0, 16):
+            oo = bot.data.users.get(user.id, {}).get("opt_out")
+            if not oo:
+                code = f"*```callback-string-ask-{user.id}-\nReact with 🚫 to never show the below message again.```*\n"
+                emb = discord.Embed(colour=rand_colour())
+                emb.set_author(**get_author(bot.user))
+                emb.description = (
+                    "Looking for my more advanced and intelligent GPT-DaVinci chatbot to talk to?\n"
+                    + "Unfortunately the service for it had to be cut short, as the API services were too expensive for my creator to keep up given the size of my audience.\n"
+                    + f"However, if you would still wish to use the service for your user or server, it is available for subscription [here]({bot.kofi_url}), to help fund API usage; any support is greatly appreciated!\n"
+                    + "Additionally if you would like to try out the premium features without paying, you may enable a temporary trial by using the ~trial command!"
                 )
-                out = out[ihash(q) % len(out)]
-        elif random.random() < 0.0625 + math.atan(count / 7) / 4:
-            if xrand(3):
-                if guild:
-                    bots = [member for member in guild.members if member.bot and member.id != bot.id]
-                answers = (
-                    "Don't you have any work you should be doing?",
-                    "Error: System backend refused connection. Please try again later.",
-                    "That's interesting, gimme a minute to think about it.",
-                    "Ay, I'm busy, ask me later!",
-                    "¯\_(ツ)_/¯",
-                    "Hm, I dunno, have you tried asking Google?",
-                    "Apologies, didn't quite catch that, could you repeat?",
-                    "Ay, ask me later, I'm busy with my 10 hour tunez! 🎧",
-                    "Eh?",
-                    f"My AI is ever growing, I think you should run. {get_random_emoji()}",
-                    "Be sure to check out ~topic if you're ever in need of questions to answer! Oh, what was that again?",
-                )
-                if bots:
-                    answers += (f"🥱 I'm tired... go ask {user_mention(choice(bots).id)}...",)
-                resp = choice(answers)
+                reacts.append("🚫")
+        s = lim_str(code + escape_roles(out), 2000)
+        m = await send_with_react(channel, s, embed=emb, reacts=reacts, reference=message)
+        if caids:
+            m.caids = caids
+        m2 = self.last.get(channel.id)
+        if m2:
+            if guild.me.permissions_in(channel).manage_messages:
+                create_task(m2.clear_reaction("🔄"))
+                await m2.clear_reaction("🗑️")
             else:
-                response = (
-                    "I think it's time for me to ask a question of my own!",
-                    "While I think about my answer, here's a question for you:",
-                    "How about a question for you?",
-                )
-                resp = choice(response) + " " + choice(bot.data.users.questions)
-            return await send_with_reply(channel, message, resp)
-        elif any(q.startswith(i) for i in ("why ", "are ", "was ", "you ", "you're ")):
-            out = alist(
-                "Wouldn't know, might Google help?",
-                f"Just to tease you, I refuse to answer. {get_random_emoji()}",
-                f"Ask a {choice('therapist', 'doctor', 'parent', 'sibling', 'friend')}!",
-                "Why not?",
-                "It's obvious, isn't it? 😏",
-                "Meh, does it matter?",
-                "Why do you think?",
-                "Who knows?",
-            )
-            out = out[ihash(q) % len(out)]
-        elif q.startswith("when "):
-            dt = utc_dt()
-            year = dt.year
-            out = alist(
-                f"In the year {random.randint(year, year + 10000)}!",
-                f"In {sec2time(xrand(601) * 60)}!",
-                f"I'm only a bot, {user_mention(choice(bot.owners))} hasn't figured out time travel code yet!",
-                f"Maybe go {choice('browse some social media', 'watch some YouTube')} and see if it's happened afterwards!",
-                "Tomorrow?",
-                "In a million years...",
-                "Do you want it to happen now? Go out there and do it!",
-                "Didn't that happen yesterday?",
-                "Never. 😏",
-                "How about an hour?",
-                "Try it and find out!",
-            )
-            out = out[ihash(q) % len(out)]
-        elif getattr((bot.commands.get(q.split(None, 1)[0]) or (None,))[0], "__name__", None) == "Hello":
-            for _hello in bot.commands.hello:
-                out = await _hello(bot, user, q.split(None, 1)[0], "".join(q.split(None, 1)[1:]), guild)
-                if out:
-                    return await send_with_reply(channel, message, escape_roles(out))
-        else:
-            out = alist(
-                "Yeah!",
-                "Heck yeah!",
-                "Uuuhhhmmm... Yes...?",
-                "Mhm! 😊",
-                "I believe so?",
-                "What? No!",
-                "Yeah!",
-                "Yes :3",
-                "Totally!",
-                "Maybe?",
-                "Definitely!",
-                "Of course!",
-                "I think so!",
-                "I suppose so?",
-                "Perhaps?",
-                "Maybe not...",
-                "Probably not?",
-                "I guess not",
-                "Nah 🙃",
-                "Does it really matter?",
-                "I dunno. ¯\_(ツ)_/¯",
-                "Don't think so...",
-            )
-            out = out[ihash(q) % len(out)]
-        if out:
-            q = q[0].upper() + q[1:]
-            return await send_with_reply(channel, message, escape_roles(f"\xad{q}? {out}"))
+                create_task(m2.clear_reaction("🔄", guild.me))
+                await m2.clear_reaction("🗑️", guild.me)
+        self.last[channel.id] = m
+        m.react_callback = self._callback_
+        return m
 
-    async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
+    async def _callback_(self, bot, message, reaction=3, user=None, perm=None, vals="", **void):
         u_id = int(vals)
         if not reaction or u_id != user.id:
             return
-        if reaction.decode("utf-8", "replace") not in ("🚫", "⛔"):
+        channel = message.channel
+        r = reaction.decode("utf-8", "replace")
+        if r in ("🚫", "⛔"):
+            bot.data.users.setdefault(user.id, {})["opt_out"] = True
+            bot.data.users.update(user.id)
+            return await message.edit(embeds=())
+        if r == "🔄":
+            if getattr(self.last.get(channel.id), "id", None) != message.id:
+                raise IndexError("Only resetting the last message is possible.")
+            caids = list(getattr(message, "caids", []))
+            if getattr(message, "reference", None):
+                m = message.reference.cached_message
+                caids.extend(getattr(m, "caids", []))
+            else:
+                m = None
+            if not caids:
+                return
+            print("Resetting", caids)
+            await process_image("CBOTS[cid].deletes", "$", [caids], fix=1)
+            create_task(message.edit(content=css_md("[This message has been reset.]")))
+            create_task(message.add_reaction("❎"))
+            if m:
+                await bot.process_message(m)
             return
-        bot.data.users.setdefault(user.id, {})["opt_out"] = True
-        bot.data.users.update(user.id)
-        await message.edit(embeds=())
+        if r == "🗑️":
+            print("Resetting", channel)
+            bot.data.cai_channels.pop(channel.id, None)
+            self.reset[channel.id] = True
+            self.last.pop(channel.id, None)
+            create_task(message.edit(content=css_md("[The conversation has been reset.]")))
+            create_task(message.add_reaction("❎"))
+            return
 
 
 class UpdateCAIChannels(Database):
@@ -1380,6 +1289,7 @@ class Personality(Command):
         if "chat" in name:
             bot.data.cai_channels.pop(channel.id, None)
             bot.commands.ask[0].reset[channel.id] = True
+            bot.commands.ask[0].last.pop(channel.id, None)
             return css_md(f"Conversations for {sqr_md(channel)} have been reset.")
         if not AUTH.get("openai_key"):
             raise ModuleNotFoundError("No OpenAI key found for customisable personality.")
@@ -1387,6 +1297,7 @@ class Personality(Command):
             bot.data.personalities.pop(channel.id, None)
             bot.data.cai_channels.pop(channel.id, None)
             bot.commands.ask[0].reset[channel.id] = True
+            bot.commands.ask[0].last.pop(channel.id, None)
             return css_md(f"My personality for {sqr_md(channel)} has been reset.")
         if not argv:
             p = self.decode(self.retrieve(channel.id))
@@ -1436,6 +1347,7 @@ class Personality(Command):
         bot.data.personalities[channel.id] = p
         bot.data.cai_channels.pop(channel.id, None)
         bot.commands.ask[0].reset[channel.id] = True
+        bot.commands.ask[0].last.pop(channel.id, None)
         return css_md(f"My personality description for {sqr_md(channel)} has been changed to {sqr_md(p)}.")
 
 
