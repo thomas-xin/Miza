@@ -1221,7 +1221,7 @@ class Ask(Command):
         return m
 
     async def _callback_(self, bot, message, reaction=3, user=None, perm=None, vals="", **void):
-        u_id = int(vals)
+        u_id = int(vals) if vals else user.id
         if not reaction or u_id != user.id:
             return
         channel = message.channel
