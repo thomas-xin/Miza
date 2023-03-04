@@ -1550,11 +1550,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         except KeyError:
             pass
         else:
-            if not getattr(m, "replaceable", True):
+            if force < 2 and isinstance(m, self.ExtendedMessage) and not getattr(m, "replaceable", True):
                 return m
             if getattr(m, "slash", False):
                 message.slash = m.slash
-        if cache and message.id not in self.cache.messages or force:
+        if cache and not m or force:
             created_at = message.created_at
             if created_at.tzinfo:
                 created_at = created_at.replace(tzinfo=None)
@@ -4401,7 +4401,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     json=True,
                 )
                 message = self.__class__.new(channel=self.channel, data=resp)
-                return bot.add_message(message, force=True)
+                return bot.add_message(message, force=2)
 
             def __init__(self, message):
                 self.message = message
@@ -5483,7 +5483,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 after.sem = Semaphore(3, 1, rate_limit=20.09)
                 async with after.sem:
                     pass
-            self.add_message(after, files=False, force=True)
+            self.add_message(after, files=False, force=2)
             if before.author.id == self.deleted_user or after.author.id == self.deleted_user:
                 print("Deleted user RAW_MESSAGE_EDIT", after.channel, before.author, after.author, before, after, after.channel.id, after.id)
             if raw or before.content != after.content:
