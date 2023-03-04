@@ -2178,6 +2178,8 @@ def evalex(exc):
         with suppress(TypeError, SyntaxError, ValueError):
             s = ast.literal_eval(s)
         ex = RuntimeError(s)
+        if exc.startswith("PROC_RESP["):
+            ex = eval(exc.split("(", 1)[0] + f"({repr(ex)})")
     return ex
 
 # Evaluates an an expression, raising it if it is an exception.
