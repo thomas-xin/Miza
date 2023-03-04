@@ -1204,6 +1204,7 @@ class Ask(Command):
                 reacts.append("🚫")
         s = lim_str(code + escape_roles(out), 2000)
         m = await send_with_react(channel, s, embed=emb, reacts=reacts, reference=message)
+        m.replaceable = False
         if caids:
             m.caids = caids
         m2 = self.last.get(channel.id)
@@ -1215,7 +1216,8 @@ class Ask(Command):
                 create_task(m2.clear_reaction("🔄", guild.me))
                 await m2.clear_reaction("🗑️", guild.me)
         self.last[channel.id] = m
-        m.react_callback = self._callback_
+        m._react_callback_ = self._callback_
+        bot.add_message(m, files=False, force=True)
         return m
 
     async def _callback_(self, bot, message, reaction=3, user=None, perm=None, vals="", **void):

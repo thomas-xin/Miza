@@ -1550,6 +1550,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         except KeyError:
             pass
         else:
+            if not getattr(m, "replaceable", True):
+                return m
             if getattr(m, "slash", False):
                 message.slash = m.slash
         if cache and message.id not in self.cache.messages or force:
@@ -2852,7 +2854,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             m = self.cache.messages.get(message.id)
             if getattr(m, "_react_callback_", None):
                 await asyncio.wait_for(
-                    f._callback_(
+                    m._react_callback_(
                         message=message,
                         channel=message.channel,
                         guild=message.guild,
