@@ -2853,19 +2853,17 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 reacode = None
             m = self.cache.messages.get(message.id)
             if getattr(m, "_react_callback_", None):
-                await asyncio.wait_for(
-                    m._react_callback_(
-                        message=message,
-                        channel=message.channel,
-                        guild=message.guild,
-                        reaction=reacode,
-                        user=user,
-                        perm=u_perm,
-                        vals="",
-                        argv="",
-                        bot=self,
-                    ),
-                    timeout=timeout)
+                await m._react_callback_(
+                    message=message,
+                    channel=message.channel,
+                    guild=message.guild,
+                    reaction=reacode,
+                    user=user,
+                    perm=u_perm,
+                    vals="",
+                    argv="",
+                    bot=self,
+                )
                 await self.send_event("_callback_", user=user, command=f, loop=False, message=message)
                 return
             msg = message.content.strip("*")
