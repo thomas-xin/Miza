@@ -1236,11 +1236,11 @@ class Ask(Command):
             caids = list(getattr(message, "caids", []))
             if getattr(message, "reference", None):
                 m = message.reference.cached_message
+                if m.author.id != user.id:
+                    return
                 caids.extend(getattr(m, "caids", []))
             else:
                 m = None
-            if not caids:
-                return
             print("Resetting", caids)
             await process_image("lambda cid, caids: CBOTS[cid].deletes(caids)", "$", [channel.id, caids], fix=1)
             create_task(message.edit(content=css_md("[This message has been reset.]")))
@@ -1249,6 +1249,10 @@ class Ask(Command):
                 await bot.process_message(m)
             return
         if r == "🗑️":
+            if getattr(message, "reference", None):
+                m = message.reference.cached_message
+                if m.author.id != user.id:
+                    return
             print("Resetting", channel)
             bot.data.cai_channels.pop(channel.id, None)
             self.reset[channel.id] = True

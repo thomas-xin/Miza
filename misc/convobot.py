@@ -1224,24 +1224,25 @@ class Bot:
 		return self.after(tup, (self.name, response)), 0, caids
 
 	def deletes(self, caids):
-		headers = {
-			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
-			# "DNT": "1",
-			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
-			"Content-Type": "application/json",
-			"cache-control": "no-cache",
-			"Authorization": f"Token {self.cai_token}",
-		}
-		resp = requests.post(
-			"https://beta.character.ai/chat/history/msgs/delete/",
-			headers=headers,
-			data=json.dumps(dict(
-				history_id=self.cai_channel,
-				ids_to_delete=caids,
-				regenerating=False
-			)),
-		)
-		print("CAI delete:", resp)
+		if caids:
+			headers = {
+				"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
+				# "DNT": "1",
+				"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
+				"Content-Type": "application/json",
+				"cache-control": "no-cache",
+				"Authorization": f"Token {self.cai_token}",
+			}
+			resp = requests.post(
+				"https://beta.character.ai/chat/history/msgs/delete/",
+				headers=headers,
+				data=json.dumps(dict(
+					history_id=self.cai_channel,
+					ids_to_delete=caids,
+					regenerating=False
+				)),
+			)
+			print("CAI delete:", resp)
 		self.chat_history = self.chat_history[:-2]
 
 	ask = ai
