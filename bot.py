@@ -1548,7 +1548,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         try:
             m = self.cache.messages[message.id]
         except KeyError:
-            pass
+            m = None
         else:
             if force < 2 and isinstance(m, self.ExtendedMessage) and not getattr(m, "replaceable", True):
                 return m
