@@ -2864,7 +2864,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     argv="",
                     bot=self,
                 )
-                await self.send_event("_callback_", user=user, command=f, loop=False, message=message)
+                # await self.send_event("_callback_", user=user, command=f, loop=False, message=message)
                 return
             msg = message.content.strip("*")
             if not msg and message.embeds:
@@ -2943,7 +2943,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                                 bot=self,
                             ),
                             timeout=timeout)
-                        await self.send_event("_callback_", user=user, command=f, loop=False, message=message)
+                        await self.send_event("_command_", user=user, command=f, loop=False, message=message)
                         break
             self.react_sem.pop(message.id, None)
 
