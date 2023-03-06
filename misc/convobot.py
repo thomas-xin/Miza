@@ -585,7 +585,7 @@ class Bot:
 						resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", q, ("answer", "As an AI language model"))
 						print(resp)
 						err = resp["As an AI language model"] > 0.5
-						if not err:
+						if not err and req_long(q):
 							self.cai_ready = False
 							return res, 0, ()
 					else:

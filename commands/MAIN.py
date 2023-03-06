@@ -2156,6 +2156,8 @@ class UpdateUsers(Database):
             add_dict(self.data, {user.id: {"last_mention": 1}})
             self.data[user.id]["last_used"] = t
             self.update(user.id)
+            with suppress():
+                message.noresponse = True
             raise CommandCancelledError
 
     def get_xp(self, user):
@@ -2226,6 +2228,8 @@ class UpdateUsers(Database):
         self.update(user.id)
 
     async def _nocommand_(self, message, msg, force=False, flags=(), truemention=True, **void):
+        if getattr(message, "noresponse", False):
+            return
         bot = self.bot
         user = message.author
         channel = message.channel
@@ -2252,7 +2256,39 @@ class UpdateUsers(Database):
                 argv = argv.removesuffix(f"@{me.display_name}")
                 argv = argv.strip()
                 with bot.ExceptionSender(channel, reference=message):
+                    u_perm = bot.get_perms(user.id, guild)
                     for ask in bot.commands.ask:
+                        command = ask
+                        req = command.min_level
+                        if not isnan(u_perm):
+                            if not u_perm >= req:
+                                raise command.perm_error(u_perm, req, "for command ask")
+                            x = command.rate_limit
+                            if x:
+                                x2 = x
+                                if user.id in bot.owners:
+                                    x = x2 = 0
+                                elif isinstance(x, collections.abc.Sequence):
+                                    x = x2 = x[not bot.is_trusted(getattr(guild, "id", 0))]
+                                    x /= 2 ** bot.premium_level(user)
+                                    x2 /= 2 ** bot.premium_level(user, absolute=True)
+                                # remaining += x
+                                d = command.used
+                                t = d.get(u_id, -inf)
+                                wait = utc() - t - x
+                                if wait > min(1 - x, -1):
+                                    if x < x2 and (utc() - t - x2) < min(1 - x2, -1):
+                                        bot.data.users.add_diamonds(user, (x - x2) / 100)
+                                    if wait < 0:
+                                        w = -wait
+                                        d[u_id] = max(t, utc()) + w
+                                        await asyncio.sleep(w)
+                                    if len(d) >= 4096:
+                                        with suppress(RuntimeError):
+                                            d.pop(next(iter(d)))
+                                    d[u_id] = max(t, utc())
+                                else:
+                                    raise TooManyRequests(f"Command has a rate limit of {sec2time(x)}; please wait {sec2time(-wait)}.")
                         m = await ask(message, guild, channel, user, argv, name="ask", flags=flags)
                         if "exec" in bot.data and not message.guild:
                             await bot.data.exec._nocommand_(message=m)
