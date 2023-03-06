@@ -42,4 +42,4 @@ tiktoken>=0.2.0
 torch>=1.13.1
 transformers>=4.26.1
 tsc_utils>=0.2.3
-yt-dlp>=2023.2.17
+yt-dlp>=2023.3.4
