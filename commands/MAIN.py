@@ -2257,6 +2257,7 @@ class UpdateUsers(Database):
                 argv = argv.strip()
                 with bot.ExceptionSender(channel, reference=message):
                     u_perm = bot.get_perms(user.id, guild)
+                    u_id = user.id
                     for ask in bot.commands.ask:
                         command = ask
                         req = command.min_level
