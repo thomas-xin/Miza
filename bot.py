@@ -3723,7 +3723,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 await self.send_as_webhook(sendable, embeds=embs, username=m.display_name, avatar_url=url, reacts=reacts)
 
     async def defer_interaction(self, message):
-        with tracebacksuppressor:
+        with suppress():
             if hasattr(message, "int_id"):
                 int_id, int_token = message.int_id, message.int_token
             elif hasattr(message, "slash"):
