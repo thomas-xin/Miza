@@ -1191,7 +1191,7 @@ class Server:
 	@hostmap
 	def merge(self, **kwargs):
 		ts = time.time_ns() // 1000
-		x_name = cp.request.headers.get("x-file-name", "untitled")
+		x_name = kwargs.get("x-file-name") or cp.request.headers.get("x-file-name", "untitled")
 		name = kwargs.get("name") or x_name
 		s = cp.request.remote.ip + "%" + x_name
 		h = hash(s) % 2 ** 48
