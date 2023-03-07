@@ -652,10 +652,12 @@ class Server:
 				break
 			time.sleep(0.5)
 		if os.path.exists(pn):
-			f = open(pn, "rb")
-			resp = cp.lib.static.serve_fileobj(f, content_type=mime, disposition="attachment" if download else None, name=name)
-			self.serving.setdefault(pn, weakref.WeakSet()).add(f)
-			return resp
+			with open(pn, "rb") as f:
+				resp = cp.lib.static.serve_fileobj(f, content_type=mime, disposition="attachment" if download else None, name=name)
+				self.serving.setdefault(pn, weakref.WeakSet()).add(f)
+				yield from resp
+			self.serving.setdefault(pn, weakref.WeakSet()).discard(f)
+			return
 		with open(on, "rb") as f:
 			while not fut.done() and on in self.serving:
 				b = f.read(262144)
