@@ -1209,7 +1209,10 @@ class Ask(Command):
             m.caids = caids
         m2 = self.last.get(channel.id)
         if m2:
-            if not guild or guild.me.permissions_in(channel).manage_messages:
+            if not guild:
+                create_task(m2.remove_reaction("🔄"))
+                await m2.remove_reaction("🗑️")
+            elif guild.me.permissions_in(channel).manage_messages:
                 create_task(m2.clear_reaction("🔄"))
                 await m2.clear_reaction("🗑️")
             else:
