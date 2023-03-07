@@ -1347,7 +1347,7 @@ class Server:
 		kwargs["?ts"] = ots
 		kwargs["?key"] = key
 		url = self.merge(**kwargs)
-		print("EDITED", url)
+		print("Edited", url)
 		return url
 		# ts = ots
 		# x_name = kwargs.get("x-file-name") or cp.request.headers.get("x-file-name", "untitled")
