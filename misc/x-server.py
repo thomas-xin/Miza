@@ -1204,6 +1204,7 @@ class Server:
 		tn = fn.split("~", 1)[0] + "~.forward$"
 		b = ts.bit_length() + 7 >> 3
 		q = ""
+		print("Merge", fn)
 		high = int(kwargs.get("index") or cp.request.headers.get("x-index", 0))
 		if high == 0 and os.path.exists(r):
 			with open(r, "r", encoding="utf-8") as f:
@@ -1233,7 +1234,10 @@ class Server:
 								url1, mid1 = self.chunking.pop(gn)
 								pos += csize
 								f.seek(pos)
+								os.remove(gn)
 								continue
+						else:
+							f.seek(os.path.getsize(of))
 						while f.tell() > pos + csize:
 							url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(of)}, start={pos}, end={pos + csize})")
 							urls.extend(url1)
