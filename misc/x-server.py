@@ -1147,7 +1147,7 @@ class Server:
 		xi = cp.request.headers.get("x-index", "0")
 		fn = f"cache/{h}%" + xi
 		with open(fn, "wb") as f:
-			if single or int(xi) == 0 and cp.request.headers.get("Referer") == "https://mizabot.xyz/files":
+			if single:
 				pos = 0
 				csize = 83886080
 				g = cp.request.body.fp
