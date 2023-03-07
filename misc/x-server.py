@@ -1232,6 +1232,8 @@ class Server:
 								shutil.copyfileobj(g, f)
 							if gn in self.chunking and os.path.getsize(gn) == csize:
 								url1, mid1 = self.chunking.pop(gn)
+								urls.extend(url1)
+								mids.extend(mid1)
 								pos += csize
 								f.seek(pos)
 								os.remove(gn)
@@ -1344,7 +1346,9 @@ class Server:
 		self.bot_exec(f"bot.data.exec.delete({repr(mids)})")
 		kwargs["?ts"] = ots
 		kwargs["?key"] = key
-		return self.merge(**kwargs)
+		url = self.merge(**kwargs)
+		print("EDITED", url)
+		return url
 		# ts = ots
 		# x_name = kwargs.get("x-file-name") or cp.request.headers.get("x-file-name", "untitled")
 		# name = kwargs.get("name") or x_name
