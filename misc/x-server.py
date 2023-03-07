@@ -1238,7 +1238,7 @@ class Server:
 								continue
 						else:
 							f.seek(os.path.getsize(of))
-						while f.tell() > pos + csize:
+						while f.tell() >= pos + csize:
 							url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(of)}, start={pos}, end={pos + csize})")
 							urls.extend(url1)
 							mids.extend(mid1)
