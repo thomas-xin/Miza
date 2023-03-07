@@ -429,7 +429,7 @@ class Server:
 				a3 = True
 			else:
 				a3 = False
-			cp.response.headers["Attachment-Filename"] = attachment
+			cp.response.headers["Attachment-Filename"] = a2
 			if endpoint.startswith("r") and (mime in ("image/webp", "image/apng") or mime.split("/", 1)[0] == "video"):
 				preview = "cache/%" + p.rsplit("/", 1)[-1].split(".", 1)[0] + ".gif"
 				image_loaders = self.image_loaders
@@ -923,7 +923,6 @@ class Server:
 					return True
 				return res is not False
 
-			cp.response.headers["Accept-Ranges"] = "bytes"
 			cp.response.headers.update(CHEADERS)
 			if af():
 				f = open(fni, "rb")
@@ -933,6 +932,7 @@ class Server:
 					cp.response.status = 202
 				cp.response.headers["Content-Type"] = f"audio/{fmt[1:]}"
 				cp.response.headers["Content-Disposition"] = "attachment; " * bool(d) + "filename=" + json.dumps(name + fmt)
+				cp.response.headers.pop("Accept-Ranges", None)
 				return cp.lib.file_generator(f, 262144)
 			# cp.response.headers["Content-Type"] = f"audio/{fmt[1:]}"
 			return cp.lib.static.serve_fileobj(f, content_type=f"audio/{fmt[1:]}", disposition="attachment" if d else "", name=name + fmt)
