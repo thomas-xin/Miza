@@ -618,6 +618,7 @@ class Server:
 							cp.response.headers["Content-Type"] = info[2]
 							referrer = cp.request.headers.get("Referer")
 							print(p, len(urls), referrer)
+							cp.response.headers["Attachment-Filename"] = info[0]
 							if download and len(urls) == 1 and not referrer:
 								raise cp.HTTPRedirect("https://cdn.discordapp.com/attachments/" + urls[0][2:], status="307")
 							cp.response.headers.pop("Accept-Ranges", None)
