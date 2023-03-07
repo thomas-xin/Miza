@@ -900,7 +900,7 @@ class Server:
 			if not fmt:
 				fmt = "opus" if d else "mp3"
 			if fmt not in ("mp3", "opus", "ogg", "wav"):
-				raise TypeError
+				raise TypeError(fmt)
 			fmt = "." + fmt
 			self.bot_exec(f"bot.audio.returns[{t}]=VOICE.ytdl.search({repr(q)})[0]")
 			self.bot_exec(f"VOICE.ytdl.get_stream(bot.audio.returns[{t}],force=True,download=False)")
@@ -1137,6 +1137,7 @@ class Server:
 		cp.response.headers["ETag"] = create_etag(data)
 		return data
 
+	chunking = {}
 	@cp.expose(("upload_single",))
 	@hostmap
 	def upload_chunk(self, **kwargs):
@@ -1145,11 +1146,11 @@ class Server:
 		h = hash(s) % 2 ** 48
 		single = "/upload_single" in cp.url()
 		xi = cp.request.headers.get("x-index", "0")
-		fn = f"cache/{h}%" + xi
+		fn = f"cache/{h}%" + str(xi)
+		csize = 83886080
 		with open(fn, "wb") as f:
 			if single:
 				pos = 0
-				csize = 83886080
 				g = cp.request.body.fp
 				urls = []
 				mids = []
@@ -1181,10 +1182,11 @@ class Server:
 				s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--><!--KEY={key}--><!--MID={mids}--></html>'
 				with open(fn, "w", encoding="utf-8") as f:
 					f.write(s)
-				return
+				return self.merge(name=name, index=0)
 			shutil.copyfileobj(cp.request.body.fp, f)
-		if single:
-			return self.merge(name=name, index=0)
+		if os.path.getsize(fn) == csize:
+			url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fn)})")
+			self.chunking[fn] = (url1, mid1)
 
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
@@ -1219,7 +1221,6 @@ class Server:
 			csize = 83886080
 			urls = []
 			mids = []
-			# os.rename(n + "0", fn)
 			of = n + "0"
 			if high > 1:
 				with open(of, "ab") as f:
@@ -1227,11 +1228,14 @@ class Server:
 						gn = n + str(i)
 						with open(gn, "rb") as g:
 							shutil.copyfileobj(g, f)
-						while f.tell() > pos + csize:
-							url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(of)}, start={pos}, end={pos + csize})")
-							urls.extend(url1)
-							mids.extend(mid1)
-							pos += csize
+						if gn in self.chunking and os.path.getsize(gn) == csize:
+							url1, mid1 = self.chunking.pop(gn)
+						else:
+							while f.tell() > pos + csize:
+								url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(of)}, start={pos}, end={pos + csize})")
+								urls.extend(url1)
+								mids.extend(mid1)
+						pos += csize
 						os.remove(gn)
 			if os.path.getsize(of) > pos:
 				url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(of)}, start={pos})")
