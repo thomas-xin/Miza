@@ -1184,7 +1184,7 @@ class Server:
 					f.write(s)
 				return self.merge(name=name, index=0)
 			shutil.copyfileobj(cp.request.body.fp, f)
-		if os.path.getsize(fn) == csize:
+		if int(xi) and os.path.getsize(fn) == csize:
 			url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fn)})")
 			self.chunking[fn] = (url1, mid1)
 
@@ -1224,21 +1224,23 @@ class Server:
 			of = n + "0"
 			if high > 1:
 				with open(of, "ab") as f:
-					for i in range(1, high):
-						gn = n + str(i)
-						with open(gn, "rb") as g:
-							shutil.copyfileobj(g, f)
-						if gn in self.chunking and os.path.getsize(gn) == csize:
-							url1, mid1 = self.chunking.pop(gn)
-							pos += csize
-							f.seek(pos)
-						else:
-							while f.tell() > pos + csize:
-								url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(of)}, start={pos}, end={pos + csize})")
-								urls.extend(url1)
-								mids.extend(mid1)
+					for i in range(high):
+						if i:
+							gn = n + str(i)
+							with open(gn, "rb") as g:
+								shutil.copyfileobj(g, f)
+							if gn in self.chunking and os.path.getsize(gn) == csize:
+								url1, mid1 = self.chunking.pop(gn)
 								pos += csize
-						os.remove(gn)
+								f.seek(pos)
+								continue
+						while f.tell() > pos + csize:
+							url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(of)}, start={pos}, end={pos + csize})")
+							urls.extend(url1)
+							mids.extend(mid1)
+							pos += csize
+						if i:
+							os.remove(gn)
 			if os.path.getsize(of) > pos:
 				url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(of)}, start={pos})")
 				urls.extend(url1)
