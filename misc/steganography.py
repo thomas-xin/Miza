@@ -200,9 +200,6 @@ def compare_to(im, msg):
 
 	return *tups, rhs
 
-if not os.path.exists("iman"):
-	os.mkdir("iman")
-
 test = "-t" in sys.argv
 if test:
 	sys.argv.remove("-t")
@@ -242,10 +239,12 @@ it = iter(bb)
 ic = 0
 reader = []
 
-if write and i_entropy >= ie_req:
-	hash_to(im, msg)
-else:
-	compare_to(im, msg)
+# if not os.path.exists("iman"):
+	# os.mkdir("iman")
+# if write and i_entropy >= ie_req:
+	# hash_to(im, msg)
+# else:
+	# compare_to(im, msg)
 
 lim = 60 * 8 / 3
 w = h = int(np.ceil(np.sqrt(lim)))
