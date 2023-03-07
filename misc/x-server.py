@@ -1230,6 +1230,7 @@ class Server:
 							shutil.copyfileobj(g, f)
 						if gn in self.chunking and os.path.getsize(gn) == csize:
 							url1, mid1 = self.chunking.pop(gn)
+							f.seek(pos + csize)
 						else:
 							while f.tell() > pos + csize:
 								url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(of)}, start={pos}, end={pos + csize})")
