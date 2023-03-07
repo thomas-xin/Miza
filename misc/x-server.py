@@ -354,7 +354,7 @@ class Server:
 						s = resp.split("/>", 1)[-1]
 						infd, urld, _ = s.split("-->", 2)
 						info = orjson.loads(infd.removeprefix("<!--"))
-						urls = orjson.loads(urld.removeprefix("<!--"))
+						# urls = orjson.loads(urld.removeprefix("<!--"))
 						d["filename"] = info[0]
 						d["size"] = info[1]
 						d["mimetype"] = info[2]
