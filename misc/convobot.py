@@ -713,11 +713,12 @@ class Bot:
 		out = []
 
 		def clean_ems():
+			end = ""
 			s = []
 			if ems and ems[0] == " ":
 				s.append(ems.pop(0))
 			if len(ems) > 1 and ems[-1] == " ":
-				s.append(ems.pop(-1))
+				end = ems.pop(-1)
 			if len(ems) > 3:
 				temp = {}
 				for em in ems:
@@ -726,8 +727,10 @@ class Bot:
 					except KeyError:
 						temp[em] = 1
 				ems.clear()
-				return (em for em in temp if em in sorted(temp, key=temp.get, reverse=True)[:3])
+				ems.extend(em for em in temp if em in sorted(temp, key=temp.get, reverse=True)[:3])
 			s.extend(ems)
+			if end:
+				s.append(end)
 			ems.clear()
 			return s
 
