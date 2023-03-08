@@ -687,14 +687,14 @@ class Server:
 			futs = []
 			with open(on, "wb") as f:
 				for url in urls:
-					if len(futs) >= 8:
+					if len(futs) >= 16:
 						fut = futs.pop(0)
 						fut.result()
 						buf += fut.buf
 						self.serving[on + "~buffer"] = buf
 					if url.startswith("D$"):
 						url = "https://cdn.discordapp.com/attachments/" + url[2:]
-					for i in range(6):
+					for i in range(16):
 						try:
 							resp = reqs.next().get(url, headers=headers, stream=True)
 							resp.raise_for_status()
@@ -702,10 +702,11 @@ class Server:
 						except:
 							print_exc()
 						time.sleep(i ** 2 + 1)
-					fs = pos + int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length"))
+					bsize = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length"))
+					fs = pos + bsize
 					f.truncate(fs)
 					fut = create_future_ex(self.chunk_into, resp, on, pos)
-					fut.buf = fs
+					fut.buf = bsize
 					futs.append(fut)
 					pos = fs
 			for fut in futs:
