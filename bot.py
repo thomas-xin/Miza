@@ -2517,11 +2517,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     async def get_hosted(self):
         size = 0
         for fn in os.listdir("saves/filehost"):
-            if "$" in fn and fn.rsplit("$", 1)[0] == "~.forward":
-                size += int(fn.rsplit("$", 1)[-1])
-            else:
-                p = "saves/filehost/" + fn
-                size += os.path.getsize(p)
+            with tracebacksuppressor:
+                if "$" in fn and fn.rsplit("$", 1)[0] == "~.forward":
+                    size += int(fn.rsplit("$", 1)[-1])
+                else:
+                    p = "saves/filehost/" + fn
+                    size += os.path.getsize(p)
         self.total_hosted = size
         return size
 
