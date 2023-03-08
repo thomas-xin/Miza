@@ -1209,15 +1209,12 @@ class Ask(Command):
             m.caids = caids
         m2 = self.last.get(channel.id)
         if m2:
-            if not guild:
-                create_task(m2.remove_reaction("🔄"))
-                await m2.remove_reaction("🗑️")
-            elif guild.me.permissions_in(channel).manage_messages:
+            if guild and guild.me.permissions_in(channel).manage_messages:
                 create_task(m2.clear_reaction("🔄"))
                 await m2.clear_reaction("🗑️")
             else:
-                create_task(m2.clear_reaction("🔄", guild.me))
-                await m2.clear_reaction("🗑️", guild.me)
+                create_task(m2.remove_reaction("🔄", bot.user))
+                await m2.remove_reaction("🗑️", bot.user)
         self.last[channel.id] = m
         m._react_callback_ = self._callback_
         bot.add_message(m, files=False, force=True)
