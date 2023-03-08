@@ -2514,6 +2514,18 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 self.file_count, self.disk = await create_future(get_folder_size, ".", priority=True)
         return self.disk
 
+    async def get_hosted(self):
+        size = 0
+        for fn in os.listdir("saves/filehost"):
+            with tracebacksuppressor:
+                if "$" in fn and fn.rsplit("$", 1)[0].endswith("~.forward"):
+                    size += int(fn.rsplit("$", 1)[-1])
+                else:
+                    p = "saves/filehost/" + fn
+                    size += os.path.getsize(p)
+        self.total_hosted = size
+        return size
+
     # Gets the status of the bot.
     async def get_state(self):
         with tracebacksuppressor:
@@ -2586,6 +2598,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     "Active audio players": active_audio_players,
                     "Activity count": self.activity,
                     "Total data transmitted": byte_scale(bot.total_bytes) + "B",
+                    "Hosted storage": byte_scale(bot.total_hosted) + "B",
                     "System time": datetime.datetime.now(),
                     "Current uptime": dyn_time_diff(utc(), bot.start_time),
                 },
@@ -3723,7 +3736,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 await self.send_as_webhook(sendable, embeds=embs, username=m.display_name, avatar_url=url, reacts=reacts)
 
     async def defer_interaction(self, message):
-        with tracebacksuppressor:
+        with suppress():
             if hasattr(message, "int_id"):
                 int_id, int_token = message.int_id, message.int_token
             elif hasattr(message, "slash"):
@@ -4060,6 +4073,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     await asyncio.sleep(1)
                     with MemoryTimer("get_disk"):
                         await self.get_disk()
+                    with MemoryTimer("get_hosted"):
+                        await self.get_hosted()
                     await asyncio.sleep(1)
                     with MemoryTimer("update_subs"):
                         await create_future(self.update_subs, priority=True)

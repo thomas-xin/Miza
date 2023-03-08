@@ -336,7 +336,7 @@ class Server:
 			timestamp=max(st.st_mtime, st.st_ctime),
 			in_cache=a3,
 		)
-		if p.endswith("~.forward$") and mime == "text/html":
+		if "$" in p and p.rsplit("$", 1)[0].endswith("~.forward") and mime == "text/html":
 			with open(p, "r", encoding="utf-8") as f:
 				resp = f.read(1048576)
 			s = resp
@@ -354,7 +354,7 @@ class Server:
 						s = resp.split("/>", 1)[-1]
 						infd, urld, _ = s.split("-->", 2)
 						info = orjson.loads(infd.removeprefix("<!--"))
-						urls = orjson.loads(urld.removeprefix("<!--"))
+						# urls = orjson.loads(urld.removeprefix("<!--"))
 						d["filename"] = info[0]
 						d["size"] = info[1]
 						d["mimetype"] = info[2]
@@ -557,7 +557,7 @@ class Server:
 				return b
 			elif not os.path.exists(p):
 				raise FileNotFoundError(p)
-			elif p.endswith("~.forward$") and mime == "text/html" and os.path.getsize(p) < 1048576:
+			elif "$" in p and p.rsplit("$", 1)[0].endswith("~.forward") and mime == "text/html" and os.path.getsize(p) < 1048576:
 				with open(p, "r", encoding="utf-8") as f:
 					resp = f.read(1048576)
 				s = resp
@@ -631,8 +631,9 @@ class Server:
 	files._cp_config = {"response.stream": True}
 
 	def concat(self, fn, urls, name="", download=False, mime=None):
-		on = fn.replace("~.forward$", "!.temp$@" + name)
-		pn = fn.replace("~.forward$", "~.temp$@" + name)
+		stn = fn.rsplit("~.forward$", 1)[0]
+		on = stn + "!.temp$@" + name
+		pn = stn + "~.temp$@" + name
 		try:
 			fut = self.serving[on]
 			for i in range(3):
@@ -1201,12 +1202,12 @@ class Server:
 		n = f"cache/{h}%"
 		fn = f"saves/filehost/{IND}{ts}~" + name
 		r = n + "!"
-		tn = fn.split("~", 1)[0] + "~.forward$"
 		b = ts.bit_length() + 7 >> 3
 		q = ""
 		print("Merge", fn)
 		high = int(kwargs.get("index") or cp.request.headers.get("x-index", 0))
 		if high == 0 and os.path.exists(r):
+			tn = fn.split("~", 1)[0] + "~.forward$" + str(os.path.getsize(r))
 			with open(r, "r", encoding="utf-8") as f:
 				with open(tn, "w", encoding="utf-8") as g:
 					s = f.read()
@@ -1260,7 +1261,7 @@ class Server:
 				ts = int(of.split("~", 1)[0].rsplit(IND, 1)[-1])
 			except ValueError:
 				ts = time.time_ns() // 1000
-			fn = f"saves/filehost/{IND}{ts}~.forward$"
+			fn = f"saves/filehost/{IND}{ts}~.forward${size}"
 			code = 307
 			ftype = 3
 			b = ts.bit_length() + 7 >> 3
@@ -1305,7 +1306,7 @@ class Server:
 			ts = int(of.split("~", 1)[0].rsplit(IND, 1)[-1])
 		except ValueError:
 			ts = time.time_ns() // 1000
-		fn = f"saves/filehost/{IND}{ts}~.forward$"
+		fn = f"saves/filehost/{IND}{ts}~.forward${size}"
 		code = 307
 		ftype = 3
 		b = ts.bit_length() + 7 >> 3
@@ -1349,43 +1350,6 @@ class Server:
 		url = self.merge(**kwargs)
 		print("Edited", url)
 		return url
-		# ts = ots
-		# x_name = kwargs.get("x-file-name") or cp.request.headers.get("x-file-name", "untitled")
-		# name = kwargs.get("name") or x_name
-		# s = cp.request.remote.ip + "%" + x_name
-		# h = hash(s) % 2 ** 48
-		# n = f"cache/{h}%"
-		# fn = f"saves/filehost/{IND}{ts}~" + name
-		# r = n + "!"
-		# tn = fn.split("~", 1)[0] + "~.forward$"
-		# b = ts.bit_length() + 7 >> 3
-		# q = ""
-		# if os.path.exists(r):
-		# 	with open(r, "r", encoding="utf-8") as f:
-		# 		with open(tn, "w", encoding="utf-8") as g:
-		# 			s = f.read()
-		# 			url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
-		# 			s = s.replace('""', f'"{url}"', 1)
-		# 			t1, t2 = s.split("<!--KEY=", 1)
-		# 			s = t1 + f"<!--KEY={key}-->" + t2.split("-->", 1)[-1]
-		# 			g.write(s)
-		# 	q = f"?key={key}"
-		# 	if os.path.exists(n + "0"):
-		# 		os.rename(n + "0", fn.split("~", 1)[0] + "~.temp$@" + name)
-		# else:
-		# 	high = int(kwargs.get("index") or cp.request.headers.get("x-index", "0"))
-		# 	os.rename(n + "0", fn)
-		# 	if high > 1:
-		# 		with open(fn, "ab") as f:
-		# 			for i in range(1, high):
-		# 				gn = n + str(i)
-		# 				with open(gn, "rb") as g:
-		# 					shutil.copyfileobj(g, f)
-		# 				os.remove(gn)
-		# 	with tracebacksuppressor:
-		# 		url = self.replace_file(fn, key=key)
-		# 		return "/p/" + url.split("/f/", 1)[-1]
-		# return "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=") + q
 
 	@cp.expose
 	@hostmap

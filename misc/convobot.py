@@ -593,6 +593,7 @@ class Bot:
 						chatgpt.timestamp = 0
 				else:
 					chatgpt.rate = time.time() + 3600
+					chatgpt.timestamp = 0
 			if res:
 				res = start + res + "\n"
 				lines.append(res)
@@ -843,27 +844,27 @@ class Bot:
 			else:
 				p = "a " + p
 			if model == "gpt-3.5-turbo":
-				start = f"You are roleplaying {self.name}, {p} AI."
+				nstart = f"You are roleplaying {self.name}, {p} AI."
 				if searched:
 					dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
-					start += f" Use Google when relevant. Current time: {dtn}."
-				start += " Express emotion when appropriate, and don't hold back!"
+					nstart += f" Use Google when relevant. Current time: {dtn}."
+				nstart += " Express emotion when appropriate, and don't hold back!"
 			else:
-				start = f"The following is a conversation between {self.name} and humans. {self.name} is {p} AI."
+				nstart = f"The following is a conversation between {self.name} and humans. {self.name} is {p} AI."
 		else:
 			if model == "gpt-3.5-turbo":
 				if p == DEFPER:
-					start = f"You are roleplaying {self.name}, a {DEFDEF} AI."
+					nstart = f"You are roleplaying {self.name}, a {DEFDEF} AI."
 					if searched:
 						dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
-						start += f" Use Google when relevant. Current time: {dtn}."
-					start += " Express emotion when appropriate, and don't hold back!"
+						nstart += f" Use Google when relevant. Current time: {dtn}."
+					nstart += " Express emotion when appropriate, and don't hold back!"
 				else:
-					start = p
+					nstart = p
 			else:
-				start = p
+				nstart = p
 		if model == "gpt-3.5-turbo":
-			m = dict(role="system", content=start)
+			m = dict(role="system", content=nstart)
 			messages = [m]
 			pc = len(self.gpttokens(m["role"], "text-davinci-003"))
 			pc += len(self.gpttokens(m["content"], "text-davinci-003"))
@@ -891,7 +892,7 @@ class Bot:
 			sys.stdout.flush()
 		else:
 			prompt = "".join(reversed(ins))
-			prompt = start + "\n\n" + prompt
+			prompt = bstart + "\n\n" + prompt
 			print("GPT prompt:", prompt)
 			sys.stdout.flush()
 			pc = len(self.gpttokens(prompt, "text-davinci-003"))
@@ -1112,6 +1113,8 @@ class Bot:
 				cost += (pc + rc) * cm
 		text = text.strip()
 		print(f"GPT {model} response:", text)
+		if start and text.startswith(f"{self.name}: "):
+			text = ""
 		return text, cost
 
 	def google(self, q, raw=False):
