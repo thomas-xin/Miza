@@ -1220,9 +1220,9 @@ class Ask(Command):
         bot.add_message(m, files=False, force=True)
         return m
 
-    async def _callback_(self, bot, message, reaction=3, user=None, perm=None, vals="", **void):
+    async def _callback_(self, bot, message, reaction=3, user=None, perm=0, vals="", **void):
         u_id = int(vals) if vals else user.id
-        if not reaction or u_id != user.id:
+        if not reaction or u_id != user.id and perm < 3:
             return
         channel = message.channel
         r = reaction.decode("utf-8", "replace")
@@ -1243,8 +1243,11 @@ class Ask(Command):
                 m = None
             print("Resetting", caids)
             await process_image("lambda cid, caids: CBOTS[cid].deletes(caids)", "$", [channel.id, caids], fix=1)
-            create_task(message.edit(content=css_md("[This message has been reset.]")))
-            create_task(message.add_reaction("❎"))
+            colour = await bot.get_colour(bot.user)
+            emb = discord.Embed(colour=colour, description=css_md("[This message has been reset.]"))
+            emb.set_author(**get_author(bot.user))
+            create_task(message.edit(embed=emb))
+            # create_task(message.add_reaction("❎"))
             if m:
                 await bot.process_message(m)
             return
@@ -1257,8 +1260,12 @@ class Ask(Command):
             bot.data.cai_channels.pop(channel.id, None)
             self.reset[channel.id] = True
             self.last.pop(channel.id, None)
-            create_task(message.edit(content=css_md("[The conversation has been reset.]")))
-            create_task(message.add_reaction("❎"))
+            colour = await bot.get_colour(bot.user)
+            emb = discord.Embed(colour=colour, description=css_md("[The conversation has been reset.]"))
+            emb.set_author(**get_author(bot.user))
+            await message.edit(embed=emb)
+            # create_task(message.edit(content=css_md("[The conversation has been reset.]")))
+            # create_task(message.add_reaction("❎"))
             return
 
 
