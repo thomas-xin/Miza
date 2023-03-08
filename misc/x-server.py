@@ -687,7 +687,7 @@ class Server:
 			futs = []
 			with open(on, "wb") as f:
 				for url in urls:
-					if len(futs) >= 16:
+					if len(futs) >= 16 or futs and futs[0].done():
 						fut = futs.pop(0)
 						fut.result()
 						buf += fut.buf
