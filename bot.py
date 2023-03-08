@@ -2514,6 +2514,17 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 self.file_count, self.disk = await create_future(get_folder_size, ".", priority=True)
         return self.disk
 
+    async def get_hosted(self):
+        size = 0
+        for fn in os.listdir("saves/filehost"):
+            p = "saves/filehost/" + fn
+            if "$" in fn and fn.rsplit("$", 1)[0] == "~.forward":
+                size += int(fn.rsplit("$", 1)[-1])
+            else:
+                size += os.path.getsize(fn)
+        self.total_hosted = size
+        return size
+
     # Gets the status of the bot.
     async def get_state(self):
         with tracebacksuppressor:
@@ -2586,6 +2597,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     "Active audio players": active_audio_players,
                     "Activity count": self.activity,
                     "Total data transmitted": byte_scale(bot.total_bytes) + "B",
+                    "Hosted storage": byte_scale(bot.total_hosted) + "B",
                     "System time": datetime.datetime.now(),
                     "Current uptime": dyn_time_diff(utc(), bot.start_time),
                 },
@@ -4060,6 +4072,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     await asyncio.sleep(1)
                     with MemoryTimer("get_disk"):
                         await self.get_disk()
+                    with MemoryTimer("get_hosted"):
+                        await self.get_hosted()
                     await asyncio.sleep(1)
                     with MemoryTimer("update_subs"):
                         await create_future(self.update_subs, priority=True)
