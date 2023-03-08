@@ -2518,7 +2518,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         size = 0
         for fn in os.listdir("saves/filehost"):
             with tracebacksuppressor:
-                if "$" in fn and fn.rsplit("$", 1)[0] == "~.forward":
+                if "$" in fn and fn.rsplit("$", 1)[0].endswith("~.forward"):
                     size += int(fn.rsplit("$", 1)[-1])
                 else:
                     p = "saves/filehost/" + fn
