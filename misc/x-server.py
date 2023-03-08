@@ -1189,6 +1189,7 @@ class Server:
 			url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fn)})")
 			self.chunking[fn] = (url1, mid1)
 
+	merged = {}
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
 	@hostmap
@@ -1200,80 +1201,86 @@ class Server:
 		s = cp.request.remote.ip + "%" + x_name
 		h = hash(s) % 2 ** 48
 		n = f"cache/{h}%"
-		fn = f"saves/filehost/{IND}{ts}~" + name
-		r = n + "!"
-		b = ts.bit_length() + 7 >> 3
-		q = ""
-		print("Merge", fn)
-		high = int(kwargs.get("index") or cp.request.headers.get("x-index", 0))
-		if high == 0 and os.path.exists(r):
-			tn = fn.split("~", 1)[0] + "~.forward$" + str(os.path.getsize(r))
-			with open(r, "r", encoding="utf-8") as f:
-				with open(tn, "w", encoding="utf-8") as g:
-					s = f.read()
-					url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
-					s = s.replace('""', f'"{url}"', 1)
-					g.write(s)
-			key = key or s.split("<!--KEY=", 1)[-1].split("-->", 1)[0]
-			q = f"?key={key}"
-			if os.path.exists(n + "0"):
-				os.rename(n + "0", fn.split("~", 1)[0] + "~.temp$@" + name)
-		else:
-			pos = 0
-			csize = 83886080
-			urls = []
-			mids = []
-			of = n + "0"
-			if high > 1:
-				with open(of, "ab") as f:
-					for i in range(high):
-						if i:
-							gn = n + str(i)
-							with open(gn, "rb") as g:
-								shutil.copyfileobj(g, f)
-							if gn in self.chunking and os.path.getsize(gn) == csize:
-								url1, mid1 = self.chunking.pop(gn)
+		if self.merged.get(n):
+			return
+		self.merged[n] = True
+		try:
+			fn = f"saves/filehost/{IND}{ts}~" + name
+			r = n + "!"
+			b = ts.bit_length() + 7 >> 3
+			q = ""
+			print("Merge", fn)
+			high = int(kwargs.get("index") or cp.request.headers.get("x-index", 0))
+			if high == 0 and os.path.exists(r):
+				tn = fn.split("~", 1)[0] + "~.forward$" + str(os.path.getsize(r))
+				with open(r, "r", encoding="utf-8") as f:
+					with open(tn, "w", encoding="utf-8") as g:
+						s = f.read()
+						url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
+						s = s.replace('""', f'"{url}"', 1)
+						g.write(s)
+				key = key or s.split("<!--KEY=", 1)[-1].split("-->", 1)[0]
+				q = f"?key={key}"
+				if os.path.exists(n + "0"):
+					os.rename(n + "0", fn.split("~", 1)[0] + "~.temp$@" + name)
+			else:
+				pos = 0
+				csize = 83886080
+				urls = []
+				mids = []
+				of = n + "0"
+				if high > 1:
+					with open(of, "ab") as f:
+						for i in range(high):
+							if i:
+								gn = n + str(i)
+								with open(gn, "rb") as g:
+									shutil.copyfileobj(g, f)
+								if gn in self.chunking and os.path.getsize(gn) == csize:
+									url1, mid1 = self.chunking.pop(gn)
+									urls.extend(url1)
+									mids.extend(mid1)
+									pos += csize
+									f.seek(pos)
+									os.remove(gn)
+									continue
+							else:
+								f.seek(os.path.getsize(of))
+							while f.tell() >= pos + csize:
+								url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(of)}, start={pos}, end={pos + csize})")
 								urls.extend(url1)
 								mids.extend(mid1)
 								pos += csize
-								f.seek(pos)
+							if i:
 								os.remove(gn)
-								continue
-						else:
-							f.seek(os.path.getsize(of))
-						while f.tell() >= pos + csize:
-							url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(of)}, start={pos}, end={pos + csize})")
-							urls.extend(url1)
-							mids.extend(mid1)
-							pos += csize
-						if i:
-							os.remove(gn)
-			if os.path.getsize(of) > pos:
-				url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(of)}, start={pos})")
-				urls.extend(url1)
-				mids.extend(mid1)
-			size = os.path.getsize(of)
-			mime = get_mime(of)
-			urls = [url.replace("https://cdn.discordapp.com/attachments/", "D$") for url in urls]
-			print(urls)
-			assert urls
-			try:
-				ts = int(of.split("~", 1)[0].rsplit(IND, 1)[-1])
-			except ValueError:
-				ts = time.time_ns() // 1000
-			fn = f"saves/filehost/{IND}{ts}~.forward${size}"
-			code = 307
-			ftype = 3
-			b = ts.bit_length() + 7 >> 3
-			url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
-			if not key:
-				n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
-				key = base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
-			s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--><!--KEY={key}--><!--MID={json.dumps(mids)}--></html>'
-			with open(fn, "w", encoding="utf-8") as f:
-				f.write(s)
-			q = f"?key={key}"
-			os.rename(of, f"saves/filehost/{IND}{ts}~.temp$@" + name)
+				if os.path.getsize(of) > pos:
+					url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(of)}, start={pos})")
+					urls.extend(url1)
+					mids.extend(mid1)
+				size = os.path.getsize(of)
+				mime = get_mime(of)
+				urls = [url.replace("https://cdn.discordapp.com/attachments/", "D$") for url in urls]
+				print(urls)
+				assert urls
+				try:
+					ts = int(of.split("~", 1)[0].rsplit(IND, 1)[-1])
+				except ValueError:
+					ts = time.time_ns() // 1000
+				fn = f"saves/filehost/{IND}{ts}~.forward${size}"
+				code = 307
+				ftype = 3
+				b = ts.bit_length() + 7 >> 3
+				url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
+				if not key:
+					n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
+					key = base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
+				s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--><!--KEY={key}--><!--MID={json.dumps(mids)}--></html>'
+				with open(fn, "w", encoding="utf-8") as f:
+					f.write(s)
+				q = f"?key={key}"
+				os.rename(of, f"saves/filehost/{IND}{ts}~.temp$@" + name)
+		finally:
+			self.merged.pop(n, None)
 		return "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=") + q
 
 	@cp.expose
@@ -1319,6 +1326,7 @@ class Server:
 		os.rename(of, f"saves/filehost/{IND}{ts}~.temp$@" + name)
 		return url + f"?key={key}"
 
+	edited = {}
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
 	@hostmap
@@ -1342,12 +1350,18 @@ class Server:
 			orig = f.read()
 		if key != orig.split("<!--KEY=", 1)[-1].split("-->", 1)[0]:
 			raise PermissionError("Incorrect key.")
-		os.remove(p)
-		mids = orjson.loads(orig.split("<!--MID=", 1)[-1].split("-->", 1)[0])
-		self.bot_exec(f"bot.data.exec.delete({repr(mids)})")
-		kwargs["?ts"] = ots
-		kwargs["?key"] = key
-		url = self.merge(**kwargs)
+		if self.edited.get(ots):
+			return
+		self.edited[ots] = True
+		try:
+			os.remove(p)
+			mids = orjson.loads(orig.split("<!--MID=", 1)[-1].split("-->", 1)[0])
+			self.bot_exec(f"bot.data.exec.delete({repr(mids)})")
+			kwargs["?ts"] = ots
+			kwargs["?key"] = key
+			url = self.merge(**kwargs)
+		finally:
+			self.edited.pop(ots, None)
 		print("Edited", url)
 		return url
 

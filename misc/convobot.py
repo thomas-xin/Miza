@@ -713,8 +713,12 @@ class Bot:
 		out = []
 
 		def clean_ems():
-			s = ()
-			if len(ems) > 2:
+			s = []
+			if ems and ems[0] == " ":
+				s.append(ems.pop(0))
+			if len(ems) > 1 and ems[-1] == " ":
+				s.append(ems.pop(-1))
+			if len(ems) > 3:
 				temp = {}
 				for em in ems:
 					try:
@@ -722,14 +726,14 @@ class Bot:
 					except KeyError:
 						temp[em] = 1
 				ems.clear()
-				return (em for em in temp if em in sorted(temp, key=temp.get, reverse=True)[:2])
-			s = ems.copy()
+				return (em for em in temp if em in sorted(temp, key=temp.get, reverse=True)[:3])
+			s.extend(ems)
 			ems.clear()
 			return s
 
 		for c in text:
 			# print(c, ord(c), ems)
-			if ord(c) >= 127744 or c in "?!":
+			if ord(c) >= 127744 or c in "?! ":
 				ems.append(c)
 				continue
 			if ems:
