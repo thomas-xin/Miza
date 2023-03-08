@@ -662,6 +662,9 @@ class Server:
 			return
 		with open(on, "rb") as f:
 			while not fut.done() and on in self.serving:
+				if f.tell() + 262144 >= self.serving.get(on + "~buffer", 0):
+					time.sleep(2)
+					continue
 				b = f.read(262144)
 				if not b:
 					continue
@@ -679,12 +682,16 @@ class Server:
 			headers.pop("Remote-Addr", None)
 			headers.pop("Host", None)
 			headers.update(Request.header())
+			buf = 0
 			pos = 0
 			futs = []
 			with open(on, "wb") as f:
 				for url in urls:
 					if len(futs) >= 8:
-						futs.pop(0).result()
+						fut = futs.pop(0)
+						fut.result()
+						buf += fut.buf
+						self.serving[on + "~buffer"] = buf
 					if url.startswith("D$"):
 						url = "https://cdn.discordapp.com/attachments/" + url[2:]
 					for i in range(6):
@@ -697,11 +704,14 @@ class Server:
 						time.sleep(i ** 2 + 1)
 					fs = pos + int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length"))
 					f.truncate(fs)
-					futs.append(create_future_ex(self.chunk_into, resp, on, pos))
+					fut = create_future_ex(self.chunk_into, resp, on, pos)
+					fut.buf = fs
+					futs.append(fut)
 					pos = fs
 			for fut in futs:
 				fut.result()
-				self.serving[on + "~buffer"] = True
+				buf += fut.buf
+				self.serving[on + "~buffer"] = buf
 			create_future_ex(self.rename_after, on, pn)
 
 	def rename_after(self, on, pn):
