@@ -2747,7 +2747,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 if not f.split("@", 1)[0].endswith("!.temp$"):
                     if not f.split("@", 1)[0].endswith("~.temp$"):
                         continue
-                    if utc() - os.path.getatime(fn) <= 60:
+                    if utc() - os.path.getmtime(fn) <= 60:
                         continue
             with tracebacksuppressor:
                 os.remove("saves/filehost/" + f)
