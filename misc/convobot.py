@@ -899,7 +899,7 @@ class Bot:
 			sys.stdout.flush()
 		else:
 			prompt = "".join(reversed(ins))
-			prompt = bstart + "\n\n" + prompt
+			prompt = nstart + "\n\n" + prompt
 			print("GPT prompt:", prompt)
 			sys.stdout.flush()
 			pc = len(self.gpttokens(prompt, "text-davinci-003"))
