@@ -5083,7 +5083,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if reaction.count > 1:
                 reaction.count -= 1
         else:
-            with tracebacksuppressor:
+            with tracebacksuppressor(ValueError):
                 reaction = message._remove_reaction(data, emoji, user.id)
         if not reaction:
             message = await discord.abc.Messageable.fetch_message(channel, raw.message_id)
