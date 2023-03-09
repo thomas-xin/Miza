@@ -447,7 +447,8 @@ class UpdateExec(Database):
                     await send_with_react(channel, self.prepare_string(traceback.format_exc()), reacts="❎", reference=message)
         # Relay DM messages
         elif message.guild is None:
-            if bot.is_blacklisted(message.author.id):
+            v = bot.data.blacklist.get(message.author.id) or 0
+            if v > 1:
                 return await channel.send(
                     "Your message could not be delivered because you don't share a server with the recipient or you disabled direct messages on your shared server, "
                     + "recipient is only accepting direct messages from friends, or you were blocked by the recipient.",
@@ -455,6 +456,8 @@ class UpdateExec(Database):
             user = message.author
             if "dailies" in bot.data:
                 bot.data.dailies.progress_quests(user, "talk")
+            if v:
+                return
             emb = await bot.as_embed(message)
             col = await bot.get_colour(user)
             emb.colour = discord.Colour(col)
@@ -1011,18 +1014,20 @@ class Suspend(Command):
     example = ("block 201548633244565504",)
     flags = "aed"
 
-    async def __call__(self, bot, user, guild, args, flags, **void):
+    async def __call__(self, bot, user, guild, args, flags, name, **void):
+        v = 1 if name == "block" else 2
+        nlist = name + " list" if name != "blacklist" else name
         if len(args) >= 1:
             user = await bot.fetch_user(verify_id(args[0]))
             if "d" in flags:
                 bot.data.blacklist.pop(user.id, None)
-                return css_md(f"{sqr_md(user)} has been removed from the blacklist.")
+                return css_md(f"{sqr_md(user)} has been removed from the {nlist}.")
             if "a" in flags or "e" in flags:
-                bot.data.blacklist[user.id] = True
-                return css_md(f"{sqr_md(user)} has been added to the blacklist.")
-            susp = bot.is_blacklisted(user.id)
-            return css_md(f"{sqr_md(user)} is currently {'not' if not susp else ''} blacklisted.")
-        return css_md(f"User blacklist: {no_md(list(bot.cache.users.get(u, u) for u in bot.data.blacklist))}")
+                bot.data.blacklist[user.id] = v
+                return css_md(f"{sqr_md(user)} has been added to the {nlist}.")
+            susp = (bot.data.blacklist.get(user.id) or 0) >= v
+            return css_md(f"{sqr_md(user)} is currently {'not' if not susp else ''} {name}ed.")
+        return css_md(f"User blacklist:\n{iter2str(bot.data.blacklist)}")
 
 
 class UpdateBlacklist(Database):

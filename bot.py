@@ -2179,7 +2179,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         if self.is_owner(u_id) or u_id == self.id:
             return False
         with suppress(KeyError):
-            return u_id in self.data.blacklist
+            return (self.data.blacklist.get(u_id) or 0) > 1
         return True
 
     dangerous_command = bold(css_md(uni_str('[WARNING: POTENTIALLY DANGEROUS COMMAND ENTERED. REPEAT COMMAND WITH "?f" FLAG TO CONFIRM.]'), force=True))
