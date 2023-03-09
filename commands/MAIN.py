@@ -2291,7 +2291,7 @@ class UpdateUsers(Database):
                                 else:
                                     raise TooManyRequests(f"Command has a rate limit of {sec2time(x)}; please wait {sec2time(-wait)}.")
                         m = await ask(message, guild, channel, user, argv, name="ask", flags=flags)
-                        if "exec" in bot.data and not message.guild and ("blacklist" not in bot.data or (bot.data.blacklist.get(user) or 0) < 1):
+                        if "exec" in bot.data and not message.guild and ("blacklist" not in bot.data or (bot.data.blacklist.get(user.id) or 0) < 1):
                             await bot.data.exec._nocommand_(message=m)
                 return
             if count:
