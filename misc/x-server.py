@@ -1256,7 +1256,7 @@ class Server:
 				if not key:
 					n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
 					key = base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
-				self.replacers[(ts, key)] = create_future_ex(self.replace_file(fn, key=key, delay=60, dep=lambda: self.replacers.get((ts, key))))
+				self.replacers[(ts, key)] = create_future_ex(self.replace_file, fn, key=key, delay=60, dep=lambda: self.replacers.get((ts, key)))
 				return "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=") + f"?key={key}"
 			else:
 				pos = 0
@@ -1354,7 +1354,6 @@ class Server:
 		if delay:
 			time.sleep(delay)
 			if dep and not dep():
-				self.bot_exec(f"bot.data.exec.delete({repr(mids)})")
 				return
 		mime = get_mime(of)
 		urls, mids = self.bot_exec(f"bot.data.exec.stash({repr(of)})")
