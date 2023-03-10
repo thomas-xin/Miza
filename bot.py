@@ -2741,17 +2741,17 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if self._globals["VOICE"].ytdl.download_sem.active:
                 return 0
         i = 0
-        for f in os.listdir("saves/filehost"):
-            if f[0] in "\x7f~!":
-                fn = "saves/filehost/" + f
-                if not f.split("@", 1)[0].endswith("!.temp$"):
-                    if not f.split("@", 1)[0].endswith("~.temp$"):
-                        continue
-                    if utc() - os.path.getmtime(fn) <= 60:
-                        continue
-            with tracebacksuppressor:
-                os.remove("saves/filehost/" + f)
-                i += 1
+        # for f in os.listdir("saves/filehost"):
+        #     if f[0] in "\x7f~!":
+        #         fn = "saves/filehost/" + f
+        #         if not f.split("@", 1)[0].endswith("!.temp$"):
+        #             if not f.split("@", 1)[0].endswith("~.temp$"):
+        #                 continue
+        #             if utc() - os.path.getmtime(fn) <= 60:
+        #                 continue
+        #     with tracebacksuppressor:
+        #         os.remove("saves/filehost/" + f)
+        #         i += 1
         attachments = deque()
         for f in os.listdir("cache"):
             if f.startswith("attachment_"):
