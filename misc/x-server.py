@@ -624,7 +624,7 @@ class Server:
 								raise cp.HTTPRedirect("https://cdn.discordapp.com/attachments/" + urls[0][2:], status="307")
 							cp.response.headers.pop("Accept-Ranges", None)
 							stn = p.rsplit("~.forward$", 1)[0].replace("saves/filehost/", "cache/")
-							pn = stn + "~.temp$@" + name
+							pn = stn + "~.temp$@" + info[0]
 							if os.path.exists(pn):
 								f = open(pn, "rb")
 								resp = cp.lib.static.serve_fileobj(f, content_type=mime, disposition="attachment" if download else None, name=info[0])
