@@ -313,7 +313,7 @@ class Server:
 		else:
 			path = path[1:]
 		if not p:
-			p = find_file(path, ind=ind)
+			p = find_file(path, cwd=("saves/filehost", "cache"), ind=ind)
 		mime = get_mime(p)
 		f_url = cp.url(qs=cp.request.query_string).replace("/fileinfo/", "/f/")
 		st = os.stat(p)
@@ -1075,7 +1075,7 @@ class Server:
 			else:
 				path = path[1:]
 			if not p:
-				p = find_file(path, ind=ind)
+				p = find_file(path, cwd=("cache", "saves/filehost"), ind=ind)
 			sem = SEMAPHORES.get(p)
 			if not sem:
 				while len(SEMAPHORES) >= 4096:

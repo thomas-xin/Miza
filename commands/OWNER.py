@@ -815,48 +815,6 @@ class Miza_Player:
         return self.send("server.__setattr__('mpresponse', {None: 'status_freq=6000'})")
 
 
-# class DownloadServer(Command):
-#     name = ["SaveServer", "ServerDownload"]
-#     min_level = nan
-#     description = "Downloads all posted messages in the target server into a sequence of .txt files."
-#     usage = "<server_id>?"
-#     flags = "f"
-#     _timeout_ = 512
-
-#     async def __call__(self, bot, argv, flags, channel, guild, **void):
-#         if "f" not in flags:
-#             return bot.dangerous_command
-#         if argv:
-#             g_id = verify_id(argv)
-#             guild = await bot.fetch_guild(g_id)
-#         with discord.context_managers.Typing(channel):
-#             send = channel.send
-
-#             # Create callback function to send all results of the guild download.
-#             async def callback(channel, messages, **void):
-#                 b = bytes()
-#                 fn = str(channel) + " (" + str(channel.id) + ")"
-#                 for i, message in enumerate(messages, 1):
-#                     temp = ("\n\n" + message_repr(message, username=True)).encode("utf-8")
-#                     if len(temp) + len(b) > 8388608:
-#                         await send(file=CompatFile(io.BytesIO(b), filename=fn + ".txt"))
-#                         fn += "_"
-#                         b = temp[2:]
-#                     else:
-#                         if b:
-#                             b += temp
-#                         else:
-#                             b += temp[2:]
-#                     if not i & 8191:
-#                         await asyncio.sleep(0.2)
-#                 if b:
-#                     await send(file=CompatFile(io.BytesIO(b), filename=fn + ".txt"))
-
-#             await self.bot.data.counts.getGuildHistory(guild, callback=callback)
-#         response = uni_str("Download Complete.")
-#         return bold(ini_md(sqr_md(response)))
-
-
 class UpdateTrusted(Database):
     name = "trusted"
 
