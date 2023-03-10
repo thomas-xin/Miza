@@ -1202,11 +1202,11 @@ class Server:
 				s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--><!--KEY={key}--><!--MID={mids}--></html>'
 				with open(fn, "w", encoding="utf-8") as f:
 					f.write(s)
-				return self.merge(name=name, index=0)
+				return self.merge(name=name, index=1)
 			shutil.copyfileobj(cp.request.body.fp, f)
-		if int(xi) and os.path.getsize(fn) == csize:
-			url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fn)})")
-			self.chunking[fn] = (url1, mid1)
+		# if int(xi) and os.path.getsize(fn) == csize:
+		# 	url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fn)})")
+		# 	self.chunking[fn] = (url1, mid1)
 
 	merged = {}
 	@cp.expose
@@ -1242,6 +1242,22 @@ class Server:
 				q = f"?key={key}"
 				if os.path.exists(n + "0"):
 					os.rename(n + "0", f"cache/{IND}{ts}" + "~.temp$@" + name)
+			elif 1:
+				of = n + "0"
+				fn = f"cache/{IND}{ts}~.temp$@{name}"
+				os.rename(of, fn)
+				if high > 1:
+					with open(fn, "ab") as f:
+						for i in range(1, high):
+							gn = n + str(i)
+							with open(gn, "rb") as g:
+								shutil.copyfileobj(g, f)
+				b = ts.bit_length() + 7 >> 3
+				if not key:
+					n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
+					key = base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
+				self.replacers.add(create_future_ex(self.replace_file(fn, key=key)))
+				return "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
 			else:
 				pos = 0
 				csize = 83886080
@@ -1281,10 +1297,6 @@ class Server:
 				urls = [url.replace("https://cdn.discordapp.com/attachments/", "D$") for url in urls]
 				print(urls)
 				assert urls
-				try:
-					ts = int(of.split("~", 1)[0].rsplit(IND, 1)[-1])
-				except ValueError:
-					ts = time.time_ns() // 1000
 				fn = f"saves/filehost/{IND}{ts}~.forward${size}"
 				code = 307
 				ftype = 3
@@ -1314,6 +1326,7 @@ class Server:
 			self.replace_file(fn[3:])
 		return HOST + "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
 
+	replacers = weakref.WeakSet()
 	@cp.expose
 	@hostmap
 	def replace_file(self, fn, key=None):
@@ -1337,7 +1350,7 @@ class Server:
 		key = key or base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
 		fn = f"saves/filehost/{IND}{ts}~.forward${size}"
 		if os.path.exists(fn):
-			return 
+			return url + f"?key={key}"
 		mime = get_mime(of)
 		urls, mids = self.bot_exec(f"bot.data.exec.stash({repr(of)})")
 		urls = [url.replace("https://cdn.discordapp.com/attachments/", "D$") for url in urls]
