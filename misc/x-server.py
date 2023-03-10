@@ -322,7 +322,12 @@ class Server:
 			fn = fn[7:]
 			a3 = True
 		else:
-			a3 = False
+			try:
+				p2 = find_file(path, cwd="cache", ind=ind)
+			except FileNotFoundError:
+				a3 = False
+			else:
+				a3 = True
 		t = utc()
 		ti = max(st.st_atime + 30 * 86400, st.st_ctime + 60 * 86400, t)
 		d = dict(
@@ -361,6 +366,7 @@ class Server:
 						d["chunks"] = ["https://cdn.discordapp.com/attachments/" + url[2:] for url in urls]
 					else:
 						d["original_url"] = url
+		cp.response.headers["Content-Type"] = "application/json"
 		return orjson.dumps(d)
 
 	image_loaders = {}
