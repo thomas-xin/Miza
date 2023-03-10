@@ -1256,8 +1256,8 @@ class Server:
 				if not key:
 					n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
 					key = base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
-				self.replacers.add(create_future_ex(self.replace_file(fn, key=key)))
-				return "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
+				self.replacers[(ts, key)] = create_future_ex(self.replace_file(fn, key=key, delay=60, dep=lambda: self.replacers.get((ts, key))))
+				return "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=") + f"?key={key}"
 			else:
 				pos = 0
 				csize = 83886080
@@ -1326,10 +1326,10 @@ class Server:
 			self.replace_file(fn[3:])
 		return HOST + "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
 
-	replacers = weakref.WeakSet()
+	replacers = weakref.WeakValueDictionary()
 	@cp.expose
 	@hostmap
-	def replace_file(self, fn, key=None):
+	def replace_file(self, fn, key=None, delay=0, dep=None):
 		if not os.path.exists(fn):
 			raise PermissionError
 		print("Replace", fn)
@@ -1351,8 +1351,16 @@ class Server:
 		fn = f"saves/filehost/{IND}{ts}~.forward${size}"
 		if os.path.exists(fn):
 			return url + f"?key={key}"
+		if delay:
+			time.sleep(delay)
+			if dep and not dep():
+				self.bot_exec(f"bot.data.exec.delete({repr(mids)})")
+				return
 		mime = get_mime(of)
 		urls, mids = self.bot_exec(f"bot.data.exec.stash({repr(of)})")
+		if dep and not dep():
+			self.bot_exec(f"bot.data.exec.delete({repr(mids)})")
+			return
 		urls = [url.replace("https://cdn.discordapp.com/attachments/", "D$") for url in urls]
 		print(urls)
 		assert urls
@@ -1376,27 +1384,32 @@ class Server:
 		ots = int.from_bytes(base64.urlsafe_b64decode(path.encode("ascii") + b"=="), "big")
 		path = str(ots)
 		p = find_file(path, cwd=("cache", "saves/filehost"))
-		if p.split("~", 1)[-1].startswith(".temp$@"):
-			if p in self.serving:
-				for f in self.serving.pop(p):
-					f.close()
-				time.sleep(0.2)
-			with tracebacksuppressor:
-				os.remove(p)
-			p = find_file(path)
-		if not p.split("~", 1)[-1].startswith(".forward$"):
-			raise TypeError("File is not editable.")
-		with open(p, "r", encoding="utf-8") as f:
-			orig = f.read()
-		if key != orig.split("<!--KEY=", 1)[-1].split("-->", 1)[0]:
-			raise PermissionError("Incorrect key.")
+		replaceable = (ots, key) in self.replacers
+		if replaceable:
+			self.replacers.pop((ots, key))
+		else:
+			if p.split("~", 1)[-1].startswith(".temp$@"):
+				if p in self.serving:
+					for f in self.serving.pop(p):
+						f.close()
+					time.sleep(0.2)
+				with tracebacksuppressor:
+					os.remove(p)
+				p = find_file(path)
+			if not p.split("~", 1)[-1].startswith(".forward$"):
+				raise TypeError("File is not editable.")
+			with open(p, "r", encoding="utf-8") as f:
+				orig = f.read()
+			if key != orig.split("<!--KEY=", 1)[-1].split("-->", 1)[0]:
+				raise PermissionError("Incorrect key.")
 		if self.edited.get(ots):
 			return
 		self.edited[ots] = True
 		try:
 			os.remove(p)
-			mids = orjson.loads(orig.split("<!--MID=", 1)[-1].split("-->", 1)[0])
-			self.bot_exec(f"bot.data.exec.delete({repr(mids)})")
+			if not replaceable:
+				mids = orjson.loads(orig.split("<!--MID=", 1)[-1].split("-->", 1)[0])
+				self.bot_exec(f"bot.data.exec.delete({repr(mids)})")
 			kwargs["?ts"] = ots
 			kwargs["?key"] = key
 			url = self.merge(**kwargs)
@@ -1412,22 +1425,27 @@ class Server:
 			raise PermissionError("Key not found.")
 		path = str(int.from_bytes(base64.urlsafe_b64decode(path.encode("ascii") + b"=="), "big"))
 		p = find_file(path, cwd=("cache", "saves/filehost"))
-		if p.split("~", 1)[-1].startswith(".temp$@"):
-			if p in self.serving:
-				for f in self.serving.pop(p):
-					f.close()
-				time.sleep(0.2)
-			os.remove(p)
-			p = find_file(path)
-		if not p.split("~", 1)[-1].startswith(".forward$"):
-			return os.remove(p)
-		with open(p, "r", encoding="utf-8") as f:
-			orig = f.read()
-		if key != orig.split("<!--KEY=", 1)[-1].split("-->", 1)[0]:
-			raise PermissionError("Incorrect key.")
+		replaceable = (ots, key) in self.replacers
+		if replaceable:
+			self.replacers.pop((ots, key))
+		else:
+			if p.split("~", 1)[-1].startswith(".temp$@"):
+				if p in self.serving:
+					for f in self.serving.pop(p):
+						f.close()
+					time.sleep(0.2)
+				os.remove(p)
+				p = find_file(path)
+			if not p.split("~", 1)[-1].startswith(".forward$"):
+				return os.remove(p)
+			with open(p, "r", encoding="utf-8") as f:
+				orig = f.read()
+			if key != orig.split("<!--KEY=", 1)[-1].split("-->", 1)[0]:
+				raise PermissionError("Incorrect key.")
 		os.remove(p)
-		mids = orjson.loads(orig.split("<!--MID=", 1)[-1].split("-->", 1)[0])
-		self.bot_exec(f"bot.data.exec.delete({repr(mids)})")
+		if not replaceable:
+			mids = orjson.loads(orig.split("<!--MID=", 1)[-1].split("-->", 1)[0])
+			self.bot_exec(f"bot.data.exec.delete({repr(mids)})")
 		return """<!DOCTYPE html>
 <html>
 <meta http-equiv="refresh" content="0; URL=/">
