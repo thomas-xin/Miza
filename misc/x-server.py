@@ -1428,7 +1428,8 @@ class Server:
 	def delete(self, path, key=None, **kwargs):
 		if not key:
 			raise PermissionError("Key not found.")
-		path = str(int.from_bytes(base64.urlsafe_b64decode(path.encode("ascii") + b"=="), "big"))
+		ots = int.from_bytes(base64.urlsafe_b64decode(path.encode("ascii") + b"=="), "big")
+		path = str(ots)
 		p = find_file(path, cwd=("cache", "saves/filehost"))
 		replaceable = (ots, key) in self.replacers
 		if replaceable:
