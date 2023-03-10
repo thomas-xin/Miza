@@ -5957,13 +5957,17 @@ def as_file(file, filename=None, ext=None, rename=True):
         with open(f"saves/filehost/{IND}{out}", "wb") as f:
             f.write(file)
     elif rename:
-        fo = f"saves/filehost/{IND}{out}~{lim_str(filename, 64).translate(filetrans)}"
+        fo = f"cache/{IND}{out}~.temp$@{lim_str(filename, 64).translate(filetrans)}"
         for i in range(100):
             with suppress(PermissionError):
                 os.rename(file, fo)
                 break
             time.sleep(0.3)
-        reqs.next().patch(self.webserver + f"/replace_file?fn={urllib.parse.quote_plus(fo)}")
+        create_task(Request(
+            self.webserver + f"/replace_file?fn={urllib.parse.quote_plus(fo)}&delay={random.random() * 60}",
+            method="PATCH",
+            aio=True,
+        ))
     else:
         fn = file.rsplit("/", 1)[-1][1:].rsplit(".", 1)[0].split("~", 1)[0]
     try:

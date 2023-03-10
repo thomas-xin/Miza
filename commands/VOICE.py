@@ -4033,6 +4033,7 @@ class AudioSettings(Command):
                 if "f" in flags:
                     bot.data.audiosettings.pop(guild.id, None)
                 if auds.queue and res:
+                    auds.clear_next()
                     await create_future(auds.play, auds.source, pos, timeout=18)
                 succ = "Permanently" if "f" in flags else "Successfully"
                 return italics(css_md(f"{succ} reset all audio settings for {sqr_md(guild)}."))
@@ -4087,6 +4088,7 @@ class AudioSettings(Command):
             if auds.queue:
                 if type(op) is str and op not in "loop repeat shuffle quiet stay":
                     # Attempt to adjust audio setting by re-initializing FFmpeg player
+                    auds.clear_next()
                     try:
                         await create_future(auds.play, auds.source, auds.pos, timeout=12)
                     except (T0, T1, T2):
