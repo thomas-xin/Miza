@@ -354,10 +354,11 @@ class Server:
 						s = resp.split("/>", 1)[-1]
 						infd, urld, _ = s.split("-->", 2)
 						info = orjson.loads(infd.removeprefix("<!--"))
-						# urls = orjson.loads(urld.removeprefix("<!--"))
+						urls = orjson.loads(urld.removeprefix("<!--"))
 						d["filename"] = info[0]
 						d["size"] = info[1]
 						d["mimetype"] = info[2]
+						d["chunks"] = ["https://cdn.discordapp.com/attachments/" + url[2:] for url in urls]
 					else:
 						d["original_url"] = url
 		return orjson.dumps(d)
@@ -408,7 +409,7 @@ class Server:
 		else:
 			path = path[1:]
 		if not p:
-			p = find_file(path, ind=ind)
+			p = find_file(path, cwd=("cache", "saves/filehost"), ind=ind)
 		sem = SEMAPHORES.get(p)
 		if not sem:
 			while len(SEMAPHORES) >= 4096:
@@ -622,7 +623,15 @@ class Server:
 							if download and len(urls) == 1 and not referrer:
 								raise cp.HTTPRedirect("https://cdn.discordapp.com/attachments/" + urls[0][2:], status="307")
 							cp.response.headers.pop("Accept-Ranges", None)
-							return self.concat(p, urls, name=info[0], mime=info[2])
+							stn = p.rsplit("~.forward$", 1)[0].replace("saves/filehost/", "cache/")
+							pn = stn + "~.temp$@" + name
+							if os.path.exists(pn):
+								f = open(pn, "rb")
+								resp = cp.lib.static.serve_fileobj(f, content_type=mime, disposition="attachment" if download else None, name=info[0])
+								if a3:
+									self.serving.setdefault(p, weakref.WeakSet()).add(f)
+								return resp
+							return self.concat(p, urls, name=info[0], mime=info[2], stn=stn)
 			f = open(p, "rb")
 			resp = cp.lib.static.serve_fileobj(f, content_type=mime, disposition="attachment" if download else None, name=a2)
 			if a3:
@@ -630,8 +639,7 @@ class Server:
 			return resp
 	files._cp_config = {"response.stream": True}
 
-	def concat(self, fn, urls, name="", download=False, mime=None):
-		stn = fn.rsplit("~.forward$", 1)[0]
+	def concat(self, fn, urls, name="", download=False, mime=None, stn=""):
 		on = stn + "!.temp$@" + name
 		pn = stn + "~.temp$@" + name
 		try:
@@ -1233,7 +1241,7 @@ class Server:
 				key = key or s.split("<!--KEY=", 1)[-1].split("-->", 1)[0]
 				q = f"?key={key}"
 				if os.path.exists(n + "0"):
-					os.rename(n + "0", fn.split("~", 1)[0] + "~.temp$@" + name)
+					os.rename(n + "0", f"cache/{IND}{ts}" + "~.temp$@" + name)
 			else:
 				pos = 0
 				csize = 83886080
@@ -1289,7 +1297,7 @@ class Server:
 				with open(fn, "w", encoding="utf-8") as f:
 					f.write(s)
 				q = f"?key={key}"
-				os.rename(of, f"saves/filehost/{IND}{ts}~.temp$@" + name)
+				os.rename(of, f"cache/{IND}{ts}~.temp$@" + name)
 		finally:
 			self.merged.pop(n, None)
 		return "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=") + q
@@ -1309,32 +1317,40 @@ class Server:
 	@cp.expose
 	@hostmap
 	def replace_file(self, fn, key=None):
+		if not os.path.exists(fn):
+			raise PermissionError
 		print("Replace", fn)
 		of = fn
 		size = os.path.getsize(of)
 		name = of.rsplit("/", 1)[-1].split("~", 1)[-1]
-		if name.startswith(".temp$") or name.startswith(".forward$"):
+		if name.startswith(".forward$"):
 			raise PermissionError
+		if name.startswith(".temp$@"):
+			name = name[7:]
+		try:
+			ts = int(of.split("~", 1)[0].rsplit(IND, 1)[-1])
+		except ValueError:
+			ts = time.time_ns() // 1000
+		b = ts.bit_length() + 7 >> 3
+		url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
+		n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
+		key = key or base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
+		fn = f"saves/filehost/{IND}{ts}~.forward${size}"
+		if os.path.exists(fn):
+			return 
 		mime = get_mime(of)
 		urls, mids = self.bot_exec(f"bot.data.exec.stash({repr(of)})")
 		urls = [url.replace("https://cdn.discordapp.com/attachments/", "D$") for url in urls]
 		print(urls)
 		assert urls
-		try:
-			ts = int(of.split("~", 1)[0].rsplit(IND, 1)[-1])
-		except ValueError:
-			ts = time.time_ns() // 1000
-		fn = f"saves/filehost/{IND}{ts}~.forward${size}"
 		code = 307
 		ftype = 3
-		b = ts.bit_length() + 7 >> 3
-		url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
-		n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
-		key = key or base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
 		s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--><!--KEY={key}--><!--MID={json.dumps(mids)}--></html>'
 		with open(fn, "w", encoding="utf-8") as f:
 			f.write(s)
-		os.rename(of, f"saves/filehost/{IND}{ts}~.temp$@" + name)
+		on = f"cache/{IND}{ts}~.temp$@" + name
+		if of != on:
+			os.rename(of, on)
 		return url + f"?key={key}"
 
 	edited = {}
@@ -1346,7 +1362,7 @@ class Server:
 			raise PermissionError("Key not found.")
 		ots = int.from_bytes(base64.urlsafe_b64decode(path.encode("ascii") + b"=="), "big")
 		path = str(ots)
-		p = find_file(path)
+		p = find_file(path, cwd=("cache", "saves/filehost"))
 		if p.split("~", 1)[-1].startswith(".temp$@"):
 			if p in self.serving:
 				for f in self.serving.pop(p):
@@ -1382,7 +1398,7 @@ class Server:
 		if not key:
 			raise PermissionError("Key not found.")
 		path = str(int.from_bytes(base64.urlsafe_b64decode(path.encode("ascii") + b"=="), "big"))
-		p = find_file(path)
+		p = find_file(path, cwd=("cache", "saves/filehost"))
 		if p.split("~", 1)[-1].startswith(".temp$@"):
 			if p in self.serving:
 				for f in self.serving.pop(p):

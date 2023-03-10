@@ -1027,7 +1027,7 @@ class Suspend(Command):
                 return css_md(f"{sqr_md(user)} has been added to the {nlist}.")
             susp = (bot.data.blacklist.get(user.id) or 0) >= v
             return css_md(f"{sqr_md(user)} is currently {'not' if not susp else ''} {name}ed.")
-        return css_md(f"User blacklist:\n{iter2str(bot.data.blacklist)}")
+        return css_md(f"User blacklist:{iter2str(bot.data.blacklist)}")
 
 
 class UpdateBlacklist(Database):

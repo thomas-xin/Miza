@@ -2776,11 +2776,19 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     def backup(self):
         self.clear_cache()
         with tracebacksuppressor:
-            fn = f"backup/saves.{datetime.datetime.utcnow().date()}.wb"
+            date = datetime.datetime.utcnow().date()
+            fn = f"backup/saves.{date}.wb"
             if os.path.exists(fn):
                 if utc() - os.path.getmtime(fn) < 60:
                     return fn
                 os.remove(fn)
+            for i in range(30):
+                d2 = date - datetime.timedelta(days=i + 1)
+                f2 = f"backup/saves.{d2}.wb"
+                if os.path.exists(f2):
+                    os.remove(f2)
+                    continue
+                break
             lines = as_str(subprocess.run([sys.executable, "neutrino.py", "-c0", "../saves", "../" + fn], stderr=subprocess.PIPE, cwd="misc").stdout).splitlines()
             s = "\n".join(line for line in lines if not line.startswith("\r"))
             print(s)

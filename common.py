@@ -2416,10 +2416,13 @@ def find_file(path, cwd="saves/filehost", ind="\x7f"):
     # do not include "." in the path name
     path = path.rsplit(".", 1)[0]
     fn = f"{ind}{path}"
-    for file in reversed(os.listdir(cwd)):
-        # file cache is stored as "{timestamp}~{name}", search for file via timestamp
-        if file[-1] != ind and file.rsplit(".", 1)[0].split("~", 1)[0] == fn:
-            return os.getcwd() + "/" + cwd + "/" + file
+    if not isinstance(cwd, (tuple, list)):
+        cwd = (cwd,)
+    for wd in cwd:
+        for fi in reversed(os.listdir(wd)):
+            # file cache is stored as "{timestamp}~{name}", search for file via timestamp
+            if fi[-1] != ind and fi.rsplit(".", 1)[0].split("~", 1)[0] == fn:
+                return wd + "/" + fi
     raise FileNotFoundError(path)
 
 
