@@ -1456,7 +1456,7 @@ class Server:
 		for line in lines:
 			ts, key = line.rstrip().split(":", 1)
 			try:
-				fn = find_file(ts, cwd="cache", ind=ind)
+				fn = find_file(ts, cwd="cache", ind=IND)
 				self.replace_file(fn, key)
 			except:
 				print_exc()
