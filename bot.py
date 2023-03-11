@@ -5961,9 +5961,11 @@ def as_file(file, filename=None, ext=None, rename=True):
             filename = file.filename or filename
             file = fp.read()
     if issubclass(type(file), bytes):
-        with open(f"saves/filehost/{IND}{out}", "wb") as f:
+        with open(f"cache/temp{out}", "wb") as f:
             f.write(file)
-    elif rename:
+        file = f"cache/temp{out}"
+        rename = True
+    if rename:
         fo = f"cache/{IND}{out}~.temp$@{lim_str(filename, 64).translate(filetrans)}"
         for i in range(100):
             with suppress(PermissionError):
