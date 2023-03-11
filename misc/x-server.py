@@ -1290,6 +1290,7 @@ class Server:
 		if size > 16777216:
 			if mime.split("/", 1)[0] == "video":
 				with tracebacksuppressor(StopIteration):
+					print("Convert", of, mime, size)
 					if mime.split("/", 1)[-1] in ("mp4", "webm"):
 						dur = get_duration(of)
 						if dur > 3600:
@@ -1319,44 +1320,77 @@ class Server:
 								print_exc()
 							if resp and resp.strip() == "yuv420p":
 								raise StopIteration
-					args = [
-						"./ffmpeg",
-						"-hide_banner",
-						"-v",
-						"error",
-						"-nostdin",
-						"-y",
-						"-hwaccel",
-						hwaccel,
-						"-i",
-						of,
-						"-pix_fmt",
-						"yuv420p",
-					]
-					if dur <= 60:
-						fmt = "webm"
-						fo = f"{of}.{fmt}"
-						args.extend((
-							"-c:v",
-							"libsvtav1",
-							"-crf",
-							"42",
-							fo,
-						))
-					else:
-						fmt = "mp4"
-						fo = f"{of}.{fmt}"
-						args.extend((
-							"-c:v",
-							"h264",
-							"-crf",
-							"30",
-							fo,
-						))
-					print(args)
-					proc = psutil.Popen(args, stdin=subprocess.DEVNULL)
-					fut = create_future_ex(proc.wait, timeout=3600)
-					fut.result(timeout=3600)
+					done = False
+					if dur > 60 and size <= 524288000:
+						with tracebacksuppressor:
+							header = Request.header()
+							header["origin"] = header["referer"] = "https://www.mp4compress.com/"
+							with open(of, "rb") as f:
+								resp = reqs.next().post(
+									"https://www.mp4compress.com/",
+									files=dict(upfile=(f"temp{ts_us()}.mp4", f, "video/mp4"), submitfile=(None, "")),
+									headers=header,
+								)
+							resp.raise_for_status()
+							assert 'Completed: <a href="' in resp.text
+							url = resp.text.split('Completed: <a href="', 1)[-1].split('"', 1)[0]
+							print(url)
+							with reqs.next().get(
+								url,
+								headers=header,
+								stream=True,
+							) as resp:
+								resp.raise_for_status()
+								it = resp.iter_content(65536)
+								fmt = "mp4"
+								fo = f"{of}.{fmt}"
+								with open(fo, "wb") as f:
+									with suppress(StopIteration):
+										while True:
+											b = next(it)
+											if not b:
+												break
+											f.write(b)
+							done = True
+					if not done:
+						args = [
+							"./ffmpeg",
+							"-hide_banner",
+							"-v",
+							"error",
+							"-nostdin",
+							"-y",
+							"-hwaccel",
+							hwaccel,
+							"-i",
+							of,
+							"-pix_fmt",
+							"yuv420p",
+						]
+						if dur <= 60:
+							fmt = "webm"
+							fo = f"{of}.{fmt}"
+							args.extend((
+								"-c:v",
+								"libsvtav1",
+								"-crf",
+								"42",
+								fo,
+							))
+						else:
+							fmt = "mp4"
+							fo = f"{of}.{fmt}"
+							args.extend((
+								"-c:v",
+								"h264",
+								"-crf",
+								"30",
+								fo,
+							))
+						print(args)
+						proc = psutil.Popen(args, stdin=subprocess.DEVNULL)
+						fut = create_future_ex(proc.wait, timeout=3600)
+						fut.result(timeout=3600)
 					assert os.path.exists(fo) and os.path.getsize(fo)
 					name = of.rsplit("/", 1)[-1].split("~", 1)[-1]
 					if name.startswith(".temp$@"):
