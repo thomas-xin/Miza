@@ -1333,7 +1333,7 @@ class Server:
 						"-pix_fmt",
 						"yuv420p",
 					]
-					if dur <= 300:
+					if dur <= 60:
 						fmt = "webm"
 						fo = f"{of}.{fmt}"
 						args.extend((
@@ -1365,6 +1365,7 @@ class Server:
 						ts = int(of.split("~", 1)[0].rsplit(IND, 1)[-1])
 					except ValueError:
 						ts = time.time_ns() // 1000
+					name = name.rsplit(".", 1)[0]
 					os.remove(of)
 					of = f"cache/{IND}{ts}~.temp$@{name}.{fmt}"
 					os.rename(fo, of)
