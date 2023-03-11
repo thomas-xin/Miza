@@ -5969,8 +5969,8 @@ def as_file(file, filename=None, ext=None, rename=True):
                 os.rename(file, fo)
                 break
             time.sleep(0.3)
-		n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
-		key = base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
+        n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
+        key = base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
         create_task(Request(
             self.webserver + f"/api_register_replacer?fn={out}&key={key}",
             method="PUT",
