@@ -2451,7 +2451,7 @@ class AudioDownloader:
             if str(end) != "None":
                 end = round_min(min(float(end), 86400))
                 args.extend(("-to", str(end)))
-        args.extend(("-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", "rgb24", "-video_size", "x".join(map(str, size)), "-i", "-", "-an", "-pix_fmt", "yuv420p", "-crf", "24"))
+        args.extend(("-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", "rgb24", "-video_size", "x".join(map(str, size)), "-i", "-", "-an", "-pix_fmt", "yuv420p", "-crf", "28"))
         afile = f"cache/-{ts}-.pcm"
         if len(urls) > 1:
             outf = f"{info['name']} +{len(urls) - 1}.{fmt}"
@@ -2683,7 +2683,7 @@ class AudioDownloader:
                                 t += 1
                                 s2, w2, h2 = codec_map[url].splitlines()
                                 if selc == "av1" or selc.startswith("vp"):
-                                    container = "mkv"
+                                    container = "webm"
                                 elif selc.startswith("h26"):
                                     container = "mp4"
                                 vst[i] = self.download_file(url, selc, size=((w2, h2), (width, height)), auds=auds, ts=t, container=container)[0].rsplit("/", 1)[-1]
@@ -2774,7 +2774,7 @@ class AudioDownloader:
             if not copy and ast:
                 args.extend(("-ar", sr, "-ac", ac, "-b:a", str(br)))
                 if vst:
-                    args.extend(("-pix_fmt", "yuv420p", "-crf", "24"))
+                    args.extend(("-pix_fmt", "yuv420p", "-crf", "28"))
             if copy:
                 args.extend(("-c", "copy", fn))
             elif container:
