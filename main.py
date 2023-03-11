@@ -68,7 +68,7 @@ if os.name == "nt":
         print("Download complete; extracting new FFmpeg installation...")
         f = "misc/ffmpeg.zip"
         with zipfile.ZipFile(f) as z:
-            names = [name for name in z.namelist() if "/bin/" in name and (".exe" in name or ".dll" in name)]
+            names = [name for name in z.namelist() if "bin/" in name and (".exe" in name or ".dll" in name)]
             for i, name in enumerate(names):
                 print(f"{i}/{len(names)}")
                 fn = name.rsplit("/", 1)[-1]
