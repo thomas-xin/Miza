@@ -1357,7 +1357,7 @@ class Server:
 					proc = psutil.Popen(args, stdin=subprocess.DEVNULL)
 					fut = create_future_ex(proc.wait, timeout=3600)
 					fut.result(timeout=3600)
-					assert os.path.exists(fo)
+					assert os.path.exists(fo) and os.path.getsize(fo)
 					name = of.rsplit("/", 1)[-1].split("~", 1)[-1]
 					if name.startswith(".temp$@"):
 						name = name[7:]
@@ -1417,7 +1417,7 @@ class Server:
 			f.write(f"{ts}:{key}\n")
 
 	def in_replacer(self, ts, key):
-		if not os.path.exists("saves/filehost/-1.txt"):
+		if not os.path.exists("saves/filehost/-1.txt") or not os.path.getsize("saves/filehost/-1.txt"):
 			return
 		with open("saves/filehost/-1.txt", "r", encoding="ascii") as f:
 			lines = f.readlines()
@@ -1425,18 +1425,19 @@ class Server:
 		return line in lines
 
 	def remove_replacer(self, ts, key):
-		if not os.path.exists("saves/filehost/-1.txt"):
+		if not os.path.exists("saves/filehost/-1.txt") or not os.path.getsize("saves/filehost/-1.txt"):
 			return
 		with open("saves/filehost/-1.txt", "r+", encoding="ascii") as f:
 			lines = set(f.readlines())
 			line = f"{ts}:{key}\n"
 			if line not in lines:
-				return
+				return False
 			lines.discard(line)
 			f.seek(0)
 			s = "".join(lines)
 			f.write(s)
 			f.truncate(len(s))
+		return True
 
 	replace_fut = None
 	@cp.expose
@@ -1449,7 +1450,7 @@ class Server:
 		self.replace_fut = create_future_ex(self.update_replacers)
 
 	def update_replacers(self):
-		if not os.path.exists("saves/filehost/-1.txt"):
+		if not os.path.exists("saves/filehost/-1.txt") or not os.path.getsize("saves/filehost/-1.txt"):
 			return
 		with open("saves/filehost/-1.txt", "r", encoding="ascii") as f:
 			lines = f.readlines()
@@ -1473,9 +1474,8 @@ class Server:
 		ots = int.from_bytes(base64.urlsafe_b64decode(path.encode("ascii") + b"=="), "big")
 		path = str(ots)
 		p = find_file(path, cwd=("cache", "saves/filehost"))
-		if ".temp$@" in p:
-			self.remove_replacer(ots, key)
-		else:
+		replaceable = self.remove_replacer(ots, key)
+		if not replaceable:
 			if p.split("~", 1)[-1].startswith(".temp$@"):
 				if p in self.serving:
 					for f in self.serving.pop(p):
@@ -1514,9 +1514,8 @@ class Server:
 		ots = int.from_bytes(base64.urlsafe_b64decode(path.encode("ascii") + b"=="), "big")
 		path = str(ots)
 		p = find_file(path, cwd=("cache", "saves/filehost"))
-		if ".temp$@" in p:
-			self.remove_replacer(ots, key)
-		else:
+		replaceable = self.remove_replacer(ots, key)
+		if not replaceable:
 			if p.split("~", 1)[-1].startswith(".temp$@"):
 				if p in self.serving:
 					for f in self.serving.pop(p):
