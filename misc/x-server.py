@@ -1473,7 +1473,8 @@ class Server:
 		ots = int.from_bytes(base64.urlsafe_b64decode(path.encode("ascii") + b"=="), "big")
 		path = str(ots)
 		p = find_file(path, cwd=("cache", "saves/filehost"))
-		self.remove_replacer(ots, key)
+		if ".temp$@" in p:
+			self.remove_replacer(ots, key)
 		else:
 			if p.split("~", 1)[-1].startswith(".temp$@"):
 				if p in self.serving:
