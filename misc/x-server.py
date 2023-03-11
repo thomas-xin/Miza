@@ -1391,7 +1391,7 @@ class Server:
 						proc = psutil.Popen(args, stdin=subprocess.DEVNULL)
 						fut = create_future_ex(proc.wait, timeout=3600)
 						fut.result(timeout=3600)
-					assert os.path.exists(fo) and os.path.getsize(fo)
+					assert os.path.exists(fo) and os.path.getsize(fo) and os.path.getsize(fo) < size
 					name = of.rsplit("/", 1)[-1].split("~", 1)[-1]
 					if name.startswith(".temp$@"):
 						name = name[7:]
