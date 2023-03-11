@@ -1248,7 +1248,7 @@ class Server:
 				q = f"?key={key}"
 				if os.path.exists(n + "0"):
 					os.rename(n + "0", f"cache/{IND}{ts}" + "~.temp$@" + name)
-			elif 1:
+			else:
 				of = n + "0"
 				fn = f"cache/{IND}{ts}~.temp$@{name}"
 				os.rename(of, fn)
@@ -1262,60 +1262,8 @@ class Server:
 				if not key:
 					n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
 					key = base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
-				self.replacers[(ts, key)] = create_future_ex(self.replace_file, fn, key=key, delay=random.random() * 60, dep=lambda: self.replacers.get((ts, key)))
+				self.register_replacer(ts, key)
 				return "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=") + f"?key={key}"
-			else:
-				pos = 0
-				csize = 83886080
-				urls = []
-				mids = []
-				of = n + "0"
-				if high > 1:
-					with open(of, "ab") as f:
-						for i in range(high):
-							if i:
-								gn = n + str(i)
-								with open(gn, "rb") as g:
-									shutil.copyfileobj(g, f)
-								if gn in self.chunking and os.path.getsize(gn) == csize:
-									url1, mid1 = self.chunking.pop(gn)
-									urls.extend(url1)
-									mids.extend(mid1)
-									pos += csize
-									f.seek(pos)
-									os.remove(gn)
-									continue
-							else:
-								f.seek(os.path.getsize(of))
-							while f.tell() >= pos + csize:
-								url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(of)}, start={pos}, end={pos + csize})")
-								urls.extend(url1)
-								mids.extend(mid1)
-								pos += csize
-							if i:
-								os.remove(gn)
-				if os.path.getsize(of) > pos:
-					url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(of)}, start={pos})")
-					urls.extend(url1)
-					mids.extend(mid1)
-				size = os.path.getsize(of)
-				mime = get_mime(of)
-				urls = [url.replace("https://cdn.discordapp.com/attachments/", "D$") for url in urls]
-				print(urls)
-				assert urls
-				fn = f"saves/filehost/{IND}{ts}~.forward${size}"
-				code = 307
-				ftype = 3
-				b = ts.bit_length() + 7 >> 3
-				url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
-				if not key:
-					n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
-					key = base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
-				s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--><!--KEY={key}--><!--MID={json.dumps(mids)}--></html>'
-				with open(fn, "w", encoding="utf-8") as f:
-					f.write(s)
-				q = f"?key={key}"
-				os.rename(of, f"cache/{IND}{ts}~.temp$@" + name)
 		finally:
 			self.merged.pop(n, None)
 		return "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=") + q
@@ -1332,15 +1280,96 @@ class Server:
 			self.replace_file(fn[3:])
 		return HOST + "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
 
-	replacers = weakref.WeakValueDictionary()
-	@cp.expose
-	@hostmap
-	def replace_file(self, fn, key=None, delay=0, dep=None):
+	def replace_file(self, fn, key=None, delay=0):
 		if not os.path.exists(fn):
-			raise PermissionError
+			return
 		print("Replace", fn)
 		of = fn
 		size = os.path.getsize(of)
+		mime = get_mime(of)
+		if size > 16777216:
+			if mime.split("/", 1)[0] == "video":
+				with tracebacksuppressor(StopIteration):
+					if mime.split("/", 1)[-1] in ("mp4", "webm"):
+						dur = get_duration(of)
+						if dur > 3600:
+							raise StopIteration
+						if size / dur <= 1048576:
+							args = [
+								"./ffprobe",
+								"-v",
+								"error",
+								"-show_entries",
+								"stream=pix_fmt",
+								"-of",
+								"default=noprint_wrappers=1:nokey=1",
+								of,
+							]
+							resp = None
+							try:
+								proc = psutil.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
+								fut = create_future_ex(proc.wait, timeout=8)
+								res = fut.result(timeout=8)
+								resp = proc.stdout.read()
+							except:
+								with suppress():
+									force_kill(proc)
+								with suppress():
+									resp = proc.stdout.read()
+								print_exc()
+							if resp and resp.strip() == "yuv420p":
+								raise StopIteration
+					args = [
+						"./ffmpeg",
+						"-hide_banner",
+						"-v",
+						"error",
+						"-nostdin",
+						"-y",
+						"-hwaccel",
+						hwaccel,
+						"-i",
+						of,
+						"-pix_fmt",
+						"yuv420p",
+					]
+					if dur <= 300:
+						fmt = "webm"
+						fo = f"{of}.{fmt}"
+						args.extend((
+							"-c:v",
+							"libsvtav1",
+							"-crf",
+							"42",
+							fo,
+						))
+					else:
+						fmt = "mp4"
+						fo = f"{of}.{fmt}"
+						args.extend((
+							"-c:v",
+							"h264",
+							"-crf",
+							"30",
+							fo,
+						))
+					print(args)
+					proc = psutil.Popen(args, stdin=subprocess.DEVNULL)
+					fut = create_future_ex(proc.wait, timeout=3600)
+					fut.result(timeout=3600)
+					assert os.path.exists(fo)
+					name = of.rsplit("/", 1)[-1].split("~", 1)[-1]
+					if name.startswith(".temp$@"):
+						name = name[7:]
+					try:
+						ts = int(of.split("~", 1)[0].rsplit(IND, 1)[-1])
+					except ValueError:
+						ts = time.time_ns() // 1000
+					os.remove(of)
+					of = f"cache/{IND}{ts}~.temp$@{name}.{fmt}"
+					os.rename(fo, of)
+					size = os.path.getsize(of)
+					mime = get_mime(of)
 		name = of.rsplit("/", 1)[-1].split("~", 1)[-1]
 		if name.startswith(".forward$"):
 			raise PermissionError
@@ -1357,13 +1386,9 @@ class Server:
 		fn = f"saves/filehost/{IND}{ts}~.forward${size}"
 		if os.path.exists(fn):
 			return url + f"?key={key}"
-		if delay:
-			time.sleep(delay)
-			if dep and not dep():
-				return
-		mime = get_mime(of)
+		self.register_replacer(ts, key)
 		urls, mids = self.bot_exec(f"bot.data.exec.stash({repr(of)})")
-		if dep and not dep():
+		if not self.in_replacer(ts, key):
 			self.bot_exec(f"bot.data.exec.delete({repr(mids)})")
 			return
 		urls = [url.replace("https://cdn.discordapp.com/attachments/", "D$") for url in urls]
@@ -1377,7 +1402,66 @@ class Server:
 		on = f"cache/{IND}{ts}~.temp$@" + name
 		if of != on:
 			os.rename(of, on)
+		self.remove_replacer(ts, key)
 		return url + f"?key={key}"
+
+	@cp.expose
+	@hostmap
+	def api_register_replacer(self, ts, key):
+		if cp.request.remote.ip != "127.0.0.1":
+			raise PermissionError
+		return self.register_replacer(ts, key)
+
+	def register_replacer(self, ts, key):
+		with open("saves/filehost/-1.txt", "a", encoding="ascii") as f:
+			f.write(f"{ts}:{key}\n")
+
+	def in_replacer(self, ts, key):
+		if not os.path.exists("saves/filehost/-1.txt"):
+			return
+		with open("saves/filehost/-1.txt", "r", encoding="ascii") as f:
+			lines = f.readlines()
+		line = f"{ts}:{key}\n"
+		return line in lines
+
+	def remove_replacer(self, ts, key):
+		if not os.path.exists("saves/filehost/-1.txt"):
+			return
+		with open("saves/filehost/-1.txt", "r+", encoding="ascii") as f:
+			lines = set(f.readlines())
+			line = f"{ts}:{key}\n"
+			if line not in lines:
+				return
+			lines.discard(line)
+			f.seek(0)
+			s = "".join(lines)
+			f.write(s)
+			f.truncate(len(s))
+
+	replace_fut = None
+	@cp.expose
+	@hostmap
+	def api_update_replacers(self):
+		if cp.request.remote.ip != "127.0.0.1":
+			raise PermissionError
+		if self.replace_fut and not self.replace_fut.done():
+			return
+		self.replace_fut = create_future_ex(self.update_replacers)
+
+	def update_replacers(self):
+		if not os.path.exists("saves/filehost/-1.txt"):
+			return
+		with open("saves/filehost/-1.txt", "r", encoding="ascii") as f:
+			lines = f.readlines()
+		for line in lines:
+			ts, key = line.rstrip().split(":", 1)
+			try:
+				fn = find_file(ts, cwd="cache", ind=ind)
+				self.replace_file(fn, key)
+			except:
+				print_exc()
+			finally:
+				self.remove_replacer(ts, key)
 
 	edited = {}
 	@cp.expose
@@ -1389,9 +1473,7 @@ class Server:
 		ots = int.from_bytes(base64.urlsafe_b64decode(path.encode("ascii") + b"=="), "big")
 		path = str(ots)
 		p = find_file(path, cwd=("cache", "saves/filehost"))
-		replaceable = (ots, key) in self.replacers
-		if replaceable:
-			self.replacers.pop((ots, key))
+		self.remove_replacer(ots, key)
 		else:
 			if p.split("~", 1)[-1].startswith(".temp$@"):
 				if p in self.serving:
@@ -1431,9 +1513,7 @@ class Server:
 		ots = int.from_bytes(base64.urlsafe_b64decode(path.encode("ascii") + b"=="), "big")
 		path = str(ots)
 		p = find_file(path, cwd=("cache", "saves/filehost"))
-		replaceable = (ots, key) in self.replacers
-		if replaceable:
-			self.replacers.pop((ots, key))
+		self.remove_replacers(ots, key)
 		else:
 			if p.split("~", 1)[-1].startswith(".temp$@"):
 				if p in self.serving:

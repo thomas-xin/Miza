@@ -2854,9 +2854,9 @@ def evalImg(url, operation, args):
 					else:
 						command.extend(("-i", "-", "-c:a", "copy"))
 					if new.get("count", inf) <= 16:
-						crf = 8
+						crf = 18
 					else:
-						crf = max(17, min(51, round(log(np.prod(size), 2) * 6 - 92)))
+						crf = max(24, min(51, round(log(np.prod(size), 2) * 6 - 92)))
 					command.extend(("-crf", str(crf), "-pix_fmt"))
 					if mode == "RGB":
 						command.extend(("yuva420p", "-c:v", "vp9"))

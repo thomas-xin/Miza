@@ -4092,6 +4092,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         for sem in tuple(SEMS.values()):
                             sem._update_bin()
                     create_future_ex(self.cache_reduce, priority=True)
+                    await asyncio.sleep(1)
+                    create_task(Request(
+                        self.webserver + f"/api_update_replacers",
+                        method="GET",
+                        aio=True,
+                    ))
 
     # Heartbeat loop: Repeatedly deletes a file to inform the watchdog process that the bot's event loop is still running.
     async def heartbeat_loop(self):
@@ -5963,9 +5969,11 @@ def as_file(file, filename=None, ext=None, rename=True):
                 os.rename(file, fo)
                 break
             time.sleep(0.3)
+		n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
+		key = base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
         create_task(Request(
-            self.webserver + f"/replace_file?fn={urllib.parse.quote_plus(fo)}&delay={random.random() * 60}",
-            method="PATCH",
+            self.webserver + f"/api_register_replacer?fn={out}&key={key}",
+            method="PUT",
             aio=True,
         ))
     else:
