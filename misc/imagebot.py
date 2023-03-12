@@ -234,7 +234,7 @@ class Bot:
 			if "A" not in im.mode:
 				im.putalpha(im.convert("L").point(lambda x: x ^ 255))
 				b = io.BytesIO()
-				im.save(b, format="png")
+				im.save(b, format="webp", lossless=False, quality=50)
 				b.seek(0)
 				image_2b = b.read()
 			resp = openai.Image.create_edit(
@@ -256,7 +256,7 @@ class Bot:
 			else:
 				im = Image.new("LA", (512, 512), 0)
 				b = io.BytesIO()
-				im.save(b, format="png")
+				im.save(b, format="webp", lossless=False, quality=50)
 				b.seek(0)
 				image_2b = b.read()
 				resp = openai.Image.create_edit(
@@ -368,7 +368,7 @@ class Bot:
 				p = np.sum(im.resize((32, 32)).convert("L"))
 				if p > 1024:
 					b = io.BytesIO()
-					im.save(b, format="png")
+					im.save(b, format="webp", lossless=False, quality=50)
 					b.seek(0)
 					ims2.append(b.read())
 			if ims2:
@@ -449,7 +449,7 @@ class Bot:
 			self.__class__.ojp = pipe
 		im = pipe(prompt).images[0]
 		b = io.BytesIO()
-		im.save(b, format="png")
+		im.save(b, format="webp", lossless=False, quality=50)
 		print("OpenjourneyL:", b)
 		b.seek(0)
 		return b.read()

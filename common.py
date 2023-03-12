@@ -1257,26 +1257,26 @@ def select_voice_channel(user, channel):
 typing = lambda self: create_task(self.trigger_typing())
 
 
-# Gets the string representation of a url object with the maximum allowed image size for discord, replacing webp with png format when possible.
-def to_png(url):
+# Gets the string representation of a url object with the maximum allowed image size for discord, replacing png with webp format when possible.
+def to_webp(url):
     if type(url) is not str:
         url = str(url)
     if url.endswith("?size=1024"):
         url = url[:-10] + "?size=4096"
     if "/embed/" not in url[:48]:
         url = url.replace("/cdn.discordapp.com/", "/media.discordapp.net/")
-    return url.replace(".webp", ".png")
+    return url.replace(".png", ".webp")
 
-def to_png_ex(url):
+def to_webp_ex(url):
     if type(url) is not str:
         url = str(url)
     if url.endswith("?size=1024"):
         url = url[:-10] + "?size=256"
     if "/embed/" not in url[:48]:
         url = url.replace("/cdn.discordapp.com/", "/media.discordapp.net/")
-    return url.replace(".webp", ".png")
+    return url.replace(".png", ".webp")
 
-def get_url(obj, f=to_png):
+def get_url(obj, f=to_webp):
     if type(obj) is str:
         return obj
     for attr in ("display_avatar", "avatar_url", "icon_url", "icon"):
@@ -1289,7 +1289,7 @@ proxy_url = lambda obj: get_url(obj) or (obj.proxy_url if is_image(obj.proxy_url
 # Finds the best URL for a discord object's icon.
 best_url = lambda obj: get_url(obj) or obj.url
 # Finds the worst URL for a discord object's icon.
-worst_url = lambda obj: get_url(obj, to_png_ex) or obj.url
+worst_url = lambda obj: get_url(obj, to_webp_ex) or obj.url
 
 def get_author(user, u_id=None):
     url = best_url(user)
@@ -1883,6 +1883,7 @@ MIMES = cdict(
     jpg="image/jpeg",
     gif="image/gif",
     webp="image/webp",
+    webm="video/webm",
     mp3="audio/mpeg",
     ogg="audio/ogg",
     opus="audio/opus",

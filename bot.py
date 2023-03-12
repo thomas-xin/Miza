@@ -1692,7 +1692,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
     async def get_proxy_url(self, user):
         if hasattr(user, "webhook"):
-            url = user.webhook.avatar_url_as(format="png", size=4096)
+            url = user.webhook.avatar_url_as(format="webp", size=4096)
         else:
             url = best_url(user)
         if not url:

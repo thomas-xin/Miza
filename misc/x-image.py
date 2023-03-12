@@ -3,7 +3,8 @@
 import os, sys, io, time, concurrent.futures, asyncio, subprocess, psutil, collections, traceback, re, requests, blend_modes, pdf2image, zipfile, contextlib, filetype, pyqrcode, ast, colorspace, pickle
 import numpy as np
 import PIL
-from PIL import Image, ImageCms, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhance, ImageMath, ImageStat
+from PIL import Image, ImageCms, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhance, ImageMath, ImageStat, ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 import pillow_heif
 pillow_heif.register_heif_opener()
 Resampling = getattr(Image, "Resampling", Image)
@@ -2532,7 +2533,7 @@ def from_bytes(b, save=None, nogif=False):
 	if mime == "application/zip":
 		z = zipfile.ZipFile(io.BytesIO(data), compression=zipfile.ZIP_DEFLATED, strict_timestamps=False)
 		return ImageSequence(*(Image.open(z.open(f.filename)) for f in z.filelist if not f.is_dir()))
-	if mime.split("/", 1)[0] == "image" and mime.split("/", 1)[-1] in "blp bmp cur dcx dds dib emf eps fits flc fli fpx ftex gbr gd heif heic icns ico im imt iptc jpeg jpg mcidas mic mpo msp naa pcd pcx pixar png ppm psd sgi sun spider tga tiff wal webp wmf xbm".split():
+	if mime.split("/", 1)[0] == "image" and mime.split("/", 1)[-1] in "blp bmp cur dcx dds dib emf eps fits flc fli fpx ftex gbr gd heif heic icns ico im imt iptc jpeg jpg mcidas mic mpo msp naa pcd pcx pixar png ppm psd sgi sun spider tga tiff wal wmf xbm".split():
 		try:
 			return Image.open(out)
 		except PIL.UnidentifiedImageError:
@@ -2723,7 +2724,7 @@ def evalImg(url, operation, args):
 		# -gif is a special case where the output is always an animated format (gif, mp4, mkv etc)
 		if args and args[-1] == "-gif":
 			args.pop(-1)
-			if fmt in ("png", "jpg", "jpeg", "bmp"):
+			if fmt in ("png", "jpg", "jpeg", "bmp", "webp"):
 				fmt = "gif"
 			if fmt == "gif" and np.prod(image.size) > 262144:
 				size = max_size(*image.size, 512)
@@ -2812,7 +2813,7 @@ def evalImg(url, operation, args):
 							yield next(it)
 
 				frames = frameit(first, it)
-			if getattr(first, "audio", None) and fmt == "gif":
+			if getattr(first, "audio", None) and fmt in ("webp", "gif", "apng"):
 				fmt = "mp4"
 			out = "cache/" + str(ts) + "." + fmt
 			mode = str(first.mode)
@@ -2820,15 +2821,15 @@ def evalImg(url, operation, args):
 				mode = "RGBA"
 			size = first.size
 			if fmt == "zip":
-				resp = zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
+				resp = zipfile.ZipFile(out, "w", compression=zipfile.ZIP_STORED, allowZip64=True)
 			else:
 				command = [
 					"./ffmpeg", "-threads", "2", "-hide_banner", "-v", "error", "-y", "-hwaccel", hwaccel,
 					"-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", ("rgb24" if mode == "RGB" else "rgba"),
-					"-video_size", "x".join(map(str, size))
+					"-video_size", "x".join(map(str, size)), "-i", "-",
 				]
-				if fmt in ("gif", "webp", "apng"):
-					command.extend(("-i", "-", "-gifflags", "-offsetting"))
+				if fmt in ("gif", "apng"):
+					command.extend(("-gifflags", "-offsetting"))
 					if new["count"] > 4096:
 						# vf = None
 						vf = "split[s0][s1];[s0]palettegen=reserve_transparent=1:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle:alpha_threshold=128"
@@ -2844,22 +2845,28 @@ def evalImg(url, operation, args):
 					else:
 						command.extend(("-loop", "0"))
 					command.extend(("-f", fmt))
+				elif fmt == "webp":
+					if mode == "RGBA":
+						command.extend(("-c:v", "libwebp_anim", "-pix_fmt", "yuva420p"))
+					else:
+						command.extend(("-c:v", "libwebp", "-pix_fmt", "yuv420p"))
+					command.extend(("-lossless", "0", "-q:v", "24", "-loop", "0"))
 				else:
 					if getattr(first, "audio", None):
-						command.extend(("-i", "-", "-i", first.audio["url"]))
+						command.extend(("-i", first.audio["url"]))
 						if first.audio["codec"] not in ("mp3", "mpeg", "ogg", "opus", "aac"):
 							command.extend(("-c:a", "libopus", "-b:a", "224k"))
 						else:
 							command.extend(("-c:a", "copy"))
 					else:
-						command.extend(("-i", "-", "-c:a", "copy"))
+						command.extend(("-c:a", "copy"))
 					if new.get("count", inf) <= 16:
 						crf = 18
 					else:
 						crf = max(24, min(51, round(log(np.prod(size), 2) * 6 - 92)))
 					command.extend(("-crf", str(crf), "-pix_fmt"))
-					if mode == "RGB":
-						command.extend(("yuva420p", "-c:v", "vp9"))
+					if mode == "RGBA":
+						command.extend(("yuva420p", "-c:v", "libsvtav1"))
 					else:
 						command.extend(("yuv420p", "-c:v", "h264"))
 					# command.append("-shortest")
@@ -2875,26 +2882,26 @@ def evalImg(url, operation, args):
 					if frame.mode != mode:
 						frame = frame.convert(mode)
 					if fmt == "zip":
-						frame.save(b, "png")
+						frame.save(b, format="webp", lossless=False, quality=67)
 					else:
 						b = frame.tobytes()
 				elif type(frame) is io.BytesIO:
 					if fmt == "zip":
 						with Image.open(frame) as im:
-							im.save(b, "png")
+							im.save(b, format="webp", lossless=False, quality=67)
 					else:
 						b = frame.read()
 				else:
 					if fmt == "zip":
 						with Image.open(io.BytesIO(frame)) as im:
-							im.save(b, "png")
+							im.save(b, format="webp", lossless=False, quality=67)
 					else:
 						b = frame
 				if fmt == "zip":
 					b.seek(0)
 					n = len(str(new["count"]))
 					s = f"%0{n}d" % i
-					resp.writestr(f"{s}.png", data=b.read())
+					resp.writestr(f"{s}.webp", data=b.read())
 				else:
 					proc.stdin.write(b)
 			if fmt == "zip":
@@ -2904,8 +2911,12 @@ def evalImg(url, operation, args):
 				proc.wait()
 			return [out]
 	if isinstance(new, Image.Image):
-		new.save(out, "png")
-		return [out]
+		if new.entropy() > 4:
+			out = "cache/" + str(ts) + ".webp"
+			new.save(out, format="webp", lossless=False, quality=67)
+		else:
+			new.save(out, format="png", optimize=True)
+			return [out]
 	elif type(new) is str and new.startswith("$"):
 		return [new[1:]]
 	return new

@@ -684,7 +684,7 @@ class Info(Command):
         return emb
 
     async def getMimicData(self, p, flags={}):
-        url = to_png(p.url)
+        url = to_webp(p.url)
         name = p.name
         colour = await self.bot.get_colour(p)
         emb = discord.Embed(colour=colour)

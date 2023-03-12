@@ -1280,6 +1280,148 @@ class Server:
 			self.replace_file(fn[3:])
 		return HOST + "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
 
+	def optimise_video(self, of, size, mime):
+		print("Convert", of, mime, size)
+		if mime.split("/", 1)[-1] in ("mp4", "webm"):
+			dur = get_duration(of)
+			if dur > 3600:
+				raise StopIteration
+			if size / dur <= 1048576:
+				args = [
+					"./ffprobe",
+					"-v",
+					"error",
+					"-show_entries",
+					"stream=pix_fmt",
+					"-of",
+					"default=noprint_wrappers=1:nokey=1",
+					of,
+				]
+				resp = None
+				try:
+					proc = psutil.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
+					fut = create_future_ex(proc.wait, timeout=8)
+					res = fut.result(timeout=8)
+					resp = proc.stdout.read()
+				except:
+					with suppress():
+						force_kill(proc)
+					with suppress():
+						resp = proc.stdout.read()
+					print_exc()
+				if resp and resp.strip() == "yuv420p":
+					raise StopIteration
+		done = False
+		if dur > 60 and size <= 524288000 and mime.split("/", 1)[0] == "video":
+			with tracebacksuppressor:
+				header = Request.header()
+				header["origin"] = header["referer"] = "https://www.mp4compress.com/"
+				with open(of, "rb") as f:
+					resp = reqs.next().post(
+						"https://www.mp4compress.com/",
+						files=dict(upfile=(f"temp{ts_us()}.mp4", f, "video/mp4"), submitfile=(None, "")),
+						headers=header,
+					)
+				resp.raise_for_status()
+				if 'Completed: <a href="' not in resp.text:
+					s = resp.text.split('<form class="form" role="form" action="https://www.mp4compress.com/" method="post" enctype="multipart/form-data">', 1)[0]
+					s = s.rsplit("</p>", 1)[-1].strip()
+					if s:
+						print(s)
+					raise FileNotFoundError('Completed: <a href="')
+				url = resp.text.split('Completed: <a href="', 1)[-1].split('"', 1)[0]
+				print(url)
+				with reqs.next().get(
+					url,
+					headers=header,
+					stream=True,
+				) as resp:
+					resp.raise_for_status()
+					it = resp.iter_content(65536)
+					fmt = "mp4"
+					fo = f"{of}.{fmt}"
+					with open(fo, "wb") as f:
+						with suppress(StopIteration):
+							while True:
+								b = next(it)
+								if not b:
+									break
+								f.write(b)
+				done = True
+		if not done:
+			args = [
+				"./ffmpeg",
+				"-hide_banner",
+				"-v",
+				"error",
+				"-nostdin",
+				"-y",
+				"-hwaccel",
+				hwaccel,
+				"-i",
+				of,
+				"-pix_fmt",
+				"yuv420p",
+			]
+			if dur <= 60:
+				fmt = "webm"
+				fo = f"{of}.{fmt}"
+				args.extend((
+					"-c:v",
+					"libsvtav1",
+					"-crf",
+					"42",
+					fo,
+				))
+			else:
+				fmt = "mp4"
+				fo = f"{of}.{fmt}"
+				args.extend((
+					"-c:v",
+					"h264",
+					"-crf",
+					"30",
+					fo,
+				))
+			print(args)
+			proc = psutil.Popen(args, stdin=subprocess.DEVNULL)
+			fut = create_future_ex(proc.wait, timeout=3600)
+			fut.result(timeout=3600)
+		assert os.path.exists(fo) and os.path.getsize(fo) and os.path.getsize(fo) < size
+		name = of.rsplit("/", 1)[-1].split("~", 1)[-1]
+		if name.startswith(".temp$@"):
+			name = name[7:]
+		try:
+			ts = int(of.split("~", 1)[0].rsplit(IND, 1)[-1])
+		except ValueError:
+			ts = time.time_ns() // 1000
+		name = name.rsplit(".", 1)[0]
+		os.remove(of)
+		of = f"cache/{IND}{ts}~.temp$@{name}.{fmt}"
+		os.rename(fo, of)
+		size = os.path.getsize(of)
+		mime = get_mime(of)
+		return of
+
+	def optimise_image(self, of, size, mime):
+		fmt = "webp"
+		fo = self.bot_exec(f"process_image({repr(of)},resize_mult,[1,1,'auto','-f',{repr(fmt)}],timeout=120)")
+		assert os.path.exists(fo) and os.path.getsize(fo) and os.path.getsize(fo) < size
+		name = of.rsplit("/", 1)[-1].split("~", 1)[-1]
+		if name.startswith(".temp$@"):
+			name = name[7:]
+		try:
+			ts = int(of.split("~", 1)[0].rsplit(IND, 1)[-1])
+		except ValueError:
+			ts = time.time_ns() // 1000
+		name = name.rsplit(".", 1)[0]
+		os.remove(of)
+		of = f"cache/{IND}{ts}~.temp$@{name}.{fmt}"
+		os.rename(fo, of)
+		size = os.path.getsize(of)
+		mime = get_mime(of)
+		return of
+
 	def replace_file(self, fn, key=None, delay=0):
 		if not os.path.exists(fn):
 			return
@@ -1287,129 +1429,16 @@ class Server:
 		of = fn
 		size = os.path.getsize(of)
 		mime = get_mime(of)
-		if size > 16777216:
-			if mime.split("/", 1)[0] == "video":
-				with tracebacksuppressor(StopIteration):
-					print("Convert", of, mime, size)
-					if mime.split("/", 1)[-1] in ("mp4", "webm"):
-						dur = get_duration(of)
-						if dur > 3600:
-							raise StopIteration
-						if size / dur <= 1048576:
-							args = [
-								"./ffprobe",
-								"-v",
-								"error",
-								"-show_entries",
-								"stream=pix_fmt",
-								"-of",
-								"default=noprint_wrappers=1:nokey=1",
-								of,
-							]
-							resp = None
-							try:
-								proc = psutil.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
-								fut = create_future_ex(proc.wait, timeout=8)
-								res = fut.result(timeout=8)
-								resp = proc.stdout.read()
-							except:
-								with suppress():
-									force_kill(proc)
-								with suppress():
-									resp = proc.stdout.read()
-								print_exc()
-							if resp and resp.strip() == "yuv420p":
-								raise StopIteration
-					done = False
-					if dur > 60 and size <= 524288000:
-						with tracebacksuppressor:
-							header = Request.header()
-							header["origin"] = header["referer"] = "https://www.mp4compress.com/"
-							with open(of, "rb") as f:
-								resp = reqs.next().post(
-									"https://www.mp4compress.com/",
-									files=dict(upfile=(f"temp{ts_us()}.mp4", f, "video/mp4"), submitfile=(None, "")),
-									headers=header,
-								)
-							resp.raise_for_status()
-							if 'Completed: <a href="' not in resp.text:
-								s = resp.text.split('<form class="form" role="form" action="https://www.mp4compress.com/" method="post" enctype="multipart/form-data">', 1)[0]
-								s = s.rsplit("</p>", 1)[-1].strip()
-								if s:
-									print(s)
-								raise FileNotFoundError('Completed: <a href="')
-							url = resp.text.split('Completed: <a href="', 1)[-1].split('"', 1)[0]
-							print(url)
-							with reqs.next().get(
-								url,
-								headers=header,
-								stream=True,
-							) as resp:
-								resp.raise_for_status()
-								it = resp.iter_content(65536)
-								fmt = "mp4"
-								fo = f"{of}.{fmt}"
-								with open(fo, "wb") as f:
-									with suppress(StopIteration):
-										while True:
-											b = next(it)
-											if not b:
-												break
-											f.write(b)
-							done = True
-					if not done:
-						args = [
-							"./ffmpeg",
-							"-hide_banner",
-							"-v",
-							"error",
-							"-nostdin",
-							"-y",
-							"-hwaccel",
-							hwaccel,
-							"-i",
-							of,
-							"-pix_fmt",
-							"yuv420p",
-						]
-						if dur <= 60:
-							fmt = "webm"
-							fo = f"{of}.{fmt}"
-							args.extend((
-								"-c:v",
-								"libsvtav1",
-								"-crf",
-								"42",
-								fo,
-							))
-						else:
-							fmt = "mp4"
-							fo = f"{of}.{fmt}"
-							args.extend((
-								"-c:v",
-								"h264",
-								"-crf",
-								"30",
-								fo,
-							))
-						print(args)
-						proc = psutil.Popen(args, stdin=subprocess.DEVNULL)
-						fut = create_future_ex(proc.wait, timeout=3600)
-						fut.result(timeout=3600)
-					assert os.path.exists(fo) and os.path.getsize(fo) and os.path.getsize(fo) < size
-					name = of.rsplit("/", 1)[-1].split("~", 1)[-1]
-					if name.startswith(".temp$@"):
-						name = name[7:]
-					try:
-						ts = int(of.split("~", 1)[0].rsplit(IND, 1)[-1])
-					except ValueError:
-						ts = time.time_ns() // 1000
-					name = name.rsplit(".", 1)[0]
-					os.remove(of)
-					of = f"cache/{IND}{ts}~.temp$@{name}.{fmt}"
-					os.rename(fo, of)
-					size = os.path.getsize(of)
-					mime = get_mime(of)
+		if size > 8388608:
+			with tracebacksuppressor(StopIteration):
+				if mime.split("/", 1)[0] == "video" or mime in ("image/gif", "image/apng"):
+					of = self.optimise_video(of, size, mime)
+				elif mime in ("image/bmp", "image/tiff", "image/xbm", "image/heic", "image/heif"):
+					of = self.optimise_image(of, size, mime)
+				else:
+					raise StopIteration
+				size = os.path.getsize(of)
+				mime = get_mime(of)
 		name = of.rsplit("/", 1)[-1].split("~", 1)[-1]
 		if name.startswith(".forward$"):
 			raise PermissionError

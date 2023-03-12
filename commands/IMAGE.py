@@ -201,7 +201,7 @@ class IMG(Command):
             await bot.ignore_interaction(message)
 
 
-async def get_image(bot, user, message, args, argv, default=2, raw=False, ext="png"):
+async def get_image(bot, user, message, args, argv, default=2, raw=False, ext="webp"):
     try:
         # Take input from any attachments, or otherwise the message contents
         if message.attachments:
@@ -362,7 +362,7 @@ class ColourDeficiency(Command):
                 name = name[:name.rindex(".")]
         except ValueError:
             name = "unknown"
-        ext = "png"
+        ext = "webp"
         if not name.endswith("." + ext):
             name += "." + ext
         with discord.context_managers.Typing(channel):
@@ -1076,6 +1076,11 @@ class Resize(Command):
                     if "." in name:
                         name = name[:name.rindex(".")]
                     name += ".png"
+            elif fn.endswith(".webp"):
+                if not name.endswith(".webp"):
+                    if "." in name:
+                        name = name[:name.rindex(".")]
+                    name += ".webp"
         await bot.send_with_file(channel, "", fn, filename=name, reference=message)
 
 
@@ -1307,23 +1312,23 @@ class Steganography(Command):
         fon = url.rsplit("/", 1)[-1].rsplit(".", 1)[0]
         with discord.context_managers.Typing(channel):
             fn = await self.call(b, msg)
-        fn = f"cache/{ts}~1.png"
+        fn = f"cache/{ts}~1.webp"
         if name == "nft":
-            f = CompatFile(fn, filename=f"{fon}.png")
+            f = CompatFile(fn, filename=f"{fon}.webp")
             url = await self.bot.get_proxy_url(user)
             await self.bot.send_as_webhook(message.channel, remsg, files=[f], username=user.display_name, avatar_url=url)
         else:
-            await bot.send_with_file(channel, f'Successfully created image with encoded message "{msg}".', fn, filename=f"{fon}.png", reference=message)
+            await bot.send_with_file(channel, f'Successfully created image with encoded message "{msg}".', fn, filename=f"{fon}.webp", reference=message)
 
     async def call(self, b, msg=""):
         ts = ts_us()
         args = (
             sys.executable,
             "misc/steganography.py",
-            f"cache/{ts}.png",
+            f"cache/{ts}.webp",
             msg,
         )
-        with open(f"cache/{ts}.png", "wb") as f:
+        with open(f"cache/{ts}.webp", "wb") as f:
             await create_future(f.write, b)
         print(args)
         proc = psutil.Popen(args, cwd=os.getcwd(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -1350,7 +1355,7 @@ class Steganography(Command):
                 pe = PermissionError(text)
                 pe.no_react = True
                 raise pe
-        return f"cache/{ts}~1.png"
+        return f"cache/{ts}~1.webp"
 
     async def _callback_(self, bot, message, reaction, user, vals, **void):
         u_id, c_id, m_id = map(int, vals.split("_", 2))
@@ -1402,7 +1407,7 @@ class Waifu2x(Command):
                         resp = await process_image(url, "resize_mult", ["-nogif", 1, 1, "auto"], timeout=60)
                         with open(resp[0], "rb") as f:
                             image = await create_future(f.read)
-                        ext = "png"
+                        ext = "webp"
                     else:
                         ext = "jpeg"
                 else:
@@ -1773,7 +1778,7 @@ class Art(Command):
                 fn = f.read()
         with tracebacksuppressor:
             fn = await bot.commands.steganography[0].call(fn, str(bot.id))
-        await bot.send_with_file(channel, "", fn, filename=lim_str(prompt, 96) + ".png", reference=message, reacts="🔳", embed=emb)
+        await bot.send_with_file(channel, "", fn, filename=lim_str(prompt, 96) + ".webp", reference=message, reacts="🔳", embed=emb)
 
 
 class UpdateImages(Database):

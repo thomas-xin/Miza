@@ -617,7 +617,7 @@ class UpdateExec(Database):
         sendable = [c_id for c_id, flag in self.data.items() if flag & 16]
         for i, url in enumerate(urls):
             if isinstance(url, (bytes, memoryview)):
-                files[i] = cdict(fut=as_fut(url), filename="untitled.png")
+                files[i] = cdict(fut=as_fut(url), filename="untitled.webp")
                 continue
             if not is_url(url):
                 continue
@@ -634,7 +634,7 @@ class UpdateExec(Database):
                         self.temp[url] = concurrent.futures.Future()
                     fn = url.rsplit("/", 1)[-1].split("?", 1)[0]
                     if "." not in fn:
-                        fn += ".png"
+                        fn += ".webp"
                     elif fn.endswith(".pnglarge") or fn.endswith(".jpglarge"):
                         fn = fn[:-5]
                     files[i] = cdict(fut=create_future(reqs.next().get, url, stream=True), filename=fn, url=url)
