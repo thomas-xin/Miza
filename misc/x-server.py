@@ -1332,7 +1332,12 @@ class Server:
 									headers=header,
 								)
 							resp.raise_for_status()
-							assert 'Completed: <a href="' in resp.text
+							if 'Completed: <a href="' not in resp.text:
+								s = resp.text.split('<form class="form" role="form" action="https://www.mp4compress.com/" method="post" enctype="multipart/form-data">', 1)[0]
+								s = s.rsplit("</p>", 1)[-1].strip()
+								if s:
+									print(s)
+								raise FileNotFoundError('Completed: <a href="')
 							url = resp.text.split('Completed: <a href="', 1)[-1].split('"', 1)[0]
 							print(url)
 							with reqs.next().get(

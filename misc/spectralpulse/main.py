@@ -23,6 +23,7 @@ if __name__ == "__main__":
 
 np = numpy
 deque = collections.deque
+hwaccel = "d3d11va" if os.name == "nt" else "auto"
 
 # Simple function to detect URLs
 url_match = re.compile("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s`|\"'\\])>]+$")
@@ -381,10 +382,10 @@ if __name__ == "__main__":
 					fl = 0
 			if render:
 				# Start ffmpeg process to convert output bitmap images and wav audio into a mp4 video
-				args = ["ffmpeg", "-y", "-hwaccel", "auto", "-hide_banner", "-loglevel", "error", "-r", str(fps), "-f", "rawvideo", "-pix_fmt", "rgb24", "-video_size", "x".join(str(i) for i in screensize), "-i", "-"]
+				args = ["ffmpeg", "-y", "-hwaccel", hwaccel, "-hide_banner", "-loglevel", "error", "-r", str(fps), "-f", "rawvideo", "-pix_fmt", "rgb24", "-video_size", "x".join(str(i) for i in screensize), "-i", "-"]
 				# if play:
 				args.extend(("-f", "wav", "-i", f3, "-b:a", "256k"))
-				args.extend(("-c:v", "h264", "-crf", "20"))
+				args.extend(("-c:v", "h264", "-pix_fmt", "yuv420p", "-crf", "28"))
 				if not skip:
 					d = round((screensize[0] - self.cutoff) / speed / fps * 1000)
 					args.extend(("-af", f"adelay=delays={d}:all=1"))
