@@ -2403,7 +2403,6 @@ async def delayed_callback(fut, delay, func, *args, repeat=False, exc=False, **k
     except:
         if exc:
             raise
-        break
 
 
 def exec_tb(s, *args, **kwargs):
