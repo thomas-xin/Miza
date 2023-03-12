@@ -2914,6 +2914,7 @@ def evalImg(url, operation, args):
 		if new.entropy() > 4:
 			out = "cache/" + str(ts) + ".webp"
 			new.save(out, format="webp", lossless=False, quality=67)
+			return [out]
 		else:
 			new.save(out, format="png", optimize=True)
 			return [out]
