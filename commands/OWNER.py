@@ -568,7 +568,8 @@ class UpdateExec(Database):
                 if i and end - i > 83886080 and "hmac_signed_session" in AUTH:
                     try:
                         b = f.read(503316480)
-                        resp = requests.post(
+                        resp = await create_future(
+                            reqs.next().post,
                             AUTH.hmac_signed_url,
                             files=dict(
                                 file=("c.7z", io.BytesIO(b), "application/octet-stream"),
@@ -577,7 +578,6 @@ class UpdateExec(Database):
                                 authenticated="true",
                                 hmac_signed_session=AUTH.hmac_signed_session,
                             ),
-                            timeout=360,
                         )
                         resp.raise_for_status()
                         url = resp.json()["url"].split("?", 1)[0]

@@ -1429,7 +1429,7 @@ class Server:
 				with open(of, "rb") as f:
 					resp = reqs.next().post(
 						"https://www.mp4compress.com/",
-						files=dict(upfile=(f"temp{ts_us()}.mp4", f, "video/mp4"), submitfile=(None, "")),
+						files=dict(upfile=(f"record{ts_us()}.mp4", f, "video/mp4"), submitfile=(None, "")),
 						headers=header,
 					)
 				resp.raise_for_status()
