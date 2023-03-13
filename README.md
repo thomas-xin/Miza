@@ -31,14 +31,12 @@
 </p>
 
 <p align="center">
-Miza's dedicated creator loves to find ways to make Miza bigger and better all the time, with lots of code, optimization
-and fun to be had! with Features Including: <b>Moderation, Music, Fun, Image Manipulation, and more!</b>
+Miza's dedicated creator constantly strives to make her bigger, better and more fun by optimizing the code and adding exciting features such as Moderation, Music, Fun, Image Manipulation, and more! </b>
 </p>
 
 <p align="center">
-Please support the development of Miza here if you enjoy her services, or would like access to her premium features!<br>
-https://ko-fi.com/mizabot<br>
-Miza has been free to use for 3 years now since the start of her development, but is quickly becoming more expensive to sustain. Any donations are greatly appreciated, and 100% will go towards supporting Miza's future!
+If you enjoy Miza's services or would like access to her premium features, please consider supporting her development by donating at https://ko-fi.com/mizabot.<br>
+Although Miza has been free to use for the past 3 years, it is becoming increasingly expensive to maintain her services. Your donations will help us to continue to support Miza's future!
 </p>
 
 <h2 align="center">
