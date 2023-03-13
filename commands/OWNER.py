@@ -555,6 +555,7 @@ class UpdateExec(Database):
                     c += 1
         return out if len(out) > 1 else out[0]
 
+    hmac_sem = Semaphore(5, 1, rate_limit=5)
     async def stash(self, fn, start=0, end=inf):
         bot = self.bot
         print("Stash", fn, start, end)
@@ -565,22 +566,25 @@ class UpdateExec(Database):
                 f.seek(start)
             i = start
             while i < end:
-                if i and end - i > 83886080 and "hmac_signed_session" in AUTH:
+                if i and end - i > 83886080 and "hmac_signed_session" in AUTH and not self.hmac_sem.busy:
                     try:
-                        b = f.read(503316480)
-                        resp = await create_future(
-                            reqs.next().post,
-                            AUTH.hmac_signed_url,
-                            files=dict(
-                                file=("c.7z", io.BytesIO(b), "application/octet-stream"),
-                            ),
-                            cookies=dict(
-                                authenticated="true",
-                                hmac_signed_session=AUTH.hmac_signed_session,
-                            ),
-                        )
-                        resp.raise_for_status()
-                        url = resp.json()["url"].split("?", 1)[0]
+                        async with self.hmac_sem:
+                            b = await create_future(f.read, 503316480)
+                            if not b:
+                                break
+                            resp = await create_future(
+                                reqs.next().post,
+                                AUTH.hmac_signed_url,
+                                files=dict(
+                                    file=("c.7z", io.BytesIO(b), "application/octet-stream"),
+                                ),
+                                cookies=dict(
+                                    authenticated="true",
+                                    hmac_signed_session=AUTH.hmac_signed_session,
+                                ),
+                            )
+                            resp.raise_for_status()
+                            url = resp.json()["url"].split("?", 1)[0]
                     except:
                         print_exc()
                         f.seek(i)

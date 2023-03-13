@@ -128,6 +128,21 @@ cheroot.server.HTTPServer.communicate = communicate
 actually_static = set(os.listdir("misc/static"))
 mapped_static = {k[:-5]: k for k in actually_static if k.endswith(".html")}
 
+def map_url(url):
+	return url.removeprefix(
+		"https://"
+	).replace(
+		"cdn.discordapp.com/attachments/", "D$"
+	).replace(
+		".amazonaws.com/www.guilded.gg/ContentMediaGenericFiles/", "G$"
+	)
+def remap_url(url):
+	return "https://" + url.replace(
+		"D$", "cdn.discordapp.com/attachments/"
+	).replace(
+		"G$", ".amazonaws.com/www.guilded.gg/ContentMediaGenericFiles/"
+	)
+
 class EndpointRedirects(Dispatcher):
 
 	def __call__(self, path):
@@ -363,7 +378,7 @@ class Server:
 						d["filename"] = info[0]
 						d["size"] = info[1]
 						d["mimetype"] = info[2]
-						d["chunks"] = ["https://cdn.discordapp.com/attachments/" + url[2:] for url in urls]
+						d["chunks"] = [remap_url(url) for url in urls]
 					else:
 						d["original_url"] = url
 		cp.response.headers["Content-Type"] = "application/json"
@@ -630,7 +645,7 @@ class Server:
 								cp.response.headers["Content-Length"] = info[1]
 								return
 							if download and len(urls) == 1 and not referrer:
-								raise cp.HTTPRedirect("https://cdn.discordapp.com/attachments/" + urls[0][2:], status="307")
+								raise cp.HTTPRedirect(remap_url(urls[0]), status="307")
 							cp.response.headers.pop("Accept-Ranges", None)
 							stn = p.rsplit("~.forward$", 1)[0].replace("saves/filehost/", "cache/")
 							pn = stn + "~.temp$@" + info[0]
@@ -710,7 +725,7 @@ class Server:
 						buf += fut.buf
 						self.serving[on + "~buffer"] = buf
 					if url.startswith("D$"):
-						url = "https://cdn.discordapp.com/attachments/" + url[2:]
+						url = remap_url(url)
 					for i in range(16):
 						try:
 							resp = reqs.next().get(url, headers=headers, stream=True)
@@ -1307,7 +1322,7 @@ class Server:
 				size = os.path.getsize(fn)
 				mime = get_mime(fn)
 				fn = f"cache/{h}%!"
-				urls = [url.replace("https://cdn.discordapp.com/attachments/", "D$") for url in urls]
+				urls = [map_url(url) for url in urls]
 				print(urls)
 				assert urls
 				code = 307
@@ -1570,7 +1585,7 @@ class Server:
 		if not self.in_replacer(ts, key):
 			self.bot_exec(f"bot.data.exec.delete({repr(mids)})")
 			return
-		urls = [url.replace("https://cdn.discordapp.com/attachments/", "D$") for url in urls]
+		urls = [map_url(url) for url in urls]
 		print(urls)
 		assert urls
 		code = 307
