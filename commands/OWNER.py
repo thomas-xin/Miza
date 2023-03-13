@@ -565,7 +565,7 @@ class UpdateExec(Database):
                 f.seek(start)
             i = start
             while i < end:
-                if end - i > 83886080 and "hmac_signed_session" in AUTH:
+                if i and end - i > 83886080 and "hmac_signed_session" in AUTH:
                     try:
                         b = f.read(503316480)
                         resp = requests.post(
