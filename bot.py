@@ -2758,7 +2758,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 attachments.append(f)
             if f.startswith("emoji_"):
                 continue
-            if utc() - os.path.getmtime("cache/" + f) <= 3600:
+            if utc() - os.path.getmtime("cache/" + f) <= 86400:
                 continue
             with tracebacksuppressor:
                 os.remove("cache/" + f)
@@ -3495,7 +3495,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             try:
                 out = orjson.dumps(dict(result=output))
             except TypeError:
-                out = orjson.dumps(dict(result=repr(output)))
+                try:
+                    out = json.dumps(dict(result=output), cls=MultiEncoder)
+                except TypeError:
+                    out = orjson.dumps(dict(result=repr(output)))
             # print(url, out)
         await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, bypass=False, decode=True, aio=True, ssl=False)
 

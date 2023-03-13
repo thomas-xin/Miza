@@ -563,7 +563,7 @@ class Server:
 				cp.response.headers["ETag"] = create_etag(b)
 				return b
 			elif not os.path.exists(p):
-				raise FileNotFoundError(p)
+				raise FileNotFoundError(404, p)
 			elif "$" in p and p.rsplit("$", 1)[0].endswith("~.forward") and mime == "text/html" and os.path.getsize(p) < 1048576:
 				with open(p, "r", encoding="utf-8") as f:
 					resp = f.read(1048576)
@@ -626,6 +626,9 @@ class Server:
 							referrer = cp.request.headers.get("Referer")
 							print(p, len(urls), referrer)
 							cp.response.headers["Attachment-Filename"] = info[0]
+							if cp.request.method == "HEAD":
+								cp.response.headers["Content-Length"] = info[1]
+								return
 							if download and len(urls) == 1 and not referrer:
 								raise cp.HTTPRedirect("https://cdn.discordapp.com/attachments/" + urls[0][2:], status="307")
 							cp.response.headers.pop("Accept-Ranges", None)
@@ -932,7 +935,7 @@ class Server:
 			self.bot_exec(f"VOICE.ytdl.get_stream(bot.audio.returns[{t}],force=True,download=False)")
 			name, url = self.bot_exec(f"(bot.audio.returns[{t}].get('name'),bot.audio.returns[{t}].get('url'))")
 			if not name or not url:
-				raise FileNotFoundError
+				raise FileNotFoundError(500, v)
 			h = shash(url)
 			fn = "~" + h + fmt
 			self.bot_exec(f"bot.audio.returns[{t}]=VOICE.ytdl.get_stream(bot.audio.returns[{t}],download={repr(fmt)},asap=True)")
@@ -1026,10 +1029,117 @@ class Server:
 		url = data[0]["content"].replace("/d/", "/f/")
 		raise cp.HTTPRedirect(url, status="307")
 
-	@cp.expose(("index", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "time", "mpinsights"))
+	@cp.expose
 	@hostmap
-	def index(self, path=None, filename=None, *args, **kwargs):
+	def filelist(self, path=None):
+		cp.response.headers["Content-Type"] = "application/json"
+		try:
+			sessid = int(cp.request.cookie["sessid"])
+		except (KeyError, ValueError):
+			return "[]"
+		else:
+			adata = bot_exec(f"bot.data.sessions.get({repr(sessid)})")
+		if not adata:
+			cp.response.cookie["sessid"] = ""
+			return "[]"
+		if "email" not in adata:
+			if "id" not in adata:
+				return "[]"
+			fdata = bot_exec(f"bot.data.drives.get({adata.id},[])")
+		else:
+			if "id" in adata:
+				fdata = bot_exec(
+					f"bot.data.drives.setdefault({repr(adata.email)},set()).update(bot.data.drives.pop({adata.id},[]))\n"
+					+ f"return bot.data.drives.get({repr(adata.email)},[])"
+				)
+			else:
+				fdata = bot_exec(f"bot.data.drives.get({repr(adata.email)},[])")
+		if not path:
+			return orjson.dumps(fdata)
+		cpath = path.split("/")
+		while cpath:
+			fold = cpath.pop(0)
+			for e in fdata:
+				if isinstance(e, dict) and e.get("i") == fold:
+					fdata = e.get("f")
+					break
+			else:
+				raise FileNotFoundError(404, path, fold)
+		return orjson.dumps(fdata)
+
+	@cp.expose(("index", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "user", "login", "logout", "mpinsights"))
+	@hostmap
+	def index(self, path=None, filename=None, *args, code=None, **kwargs):
 		url = cp.url(qs=cp.request.query_string)
+		if "/user" in url:
+			try:
+				sessid = int(cp.request.cookie["sessid"])
+			except (KeyError, ValueError):
+				adata = None
+			else:
+				adata = bot_exec(f"bot.data.sessions.get({repr(sessid)})")
+			t = utc()
+			if not adata:
+				if not code:
+					cp.response.cookie["sessid"] = ""
+					raise cp.HTTPRedirect(url.replace("/user", "/login"))
+				resp = reqs.next().post(
+					f"https://discord.com/api/oauth2/token",
+					data=dict(
+						client_id=AUTH.get("discord_id") or bot_exec("bot.id"),
+						client_secret=AUTH["discord_secret"],
+						grant_type="authorization_code",
+						code=code,
+						redirect_uri="https://mizabot.xyz/user",
+					),
+				)
+				resp.raise_for_status()
+				adata = cdict(resp.json())
+				adata.id = round_random(t * 1e6)
+				adata.expiry = t + adata.expires_in
+				adata.refreshed = 0
+			t = utc()
+			if t > adata.expiry:
+				resp = reqs.next().post(
+					f"https://discord.com/api/oauth2/token",
+					data=dict(
+						client_id=AUTH.get("discord_id") or bot_exec("bot.id"),
+						client_secret=AUTH["discord_secret"],
+						grant_type="refresh_token",
+						refresh_token=adata.refresh_token,
+					),
+				)
+				resp.raise_for_status()
+				adata.update(resp.json())
+				adata.expiry = t + adata.expires_in
+			t = utc()
+			if t > adata.refreshed + 30:
+				resp = reqs.next().get(
+					"https://discord.com/api/users/@me",
+					headers={"Authorization": f"{adata.token_type} {adata.access_token}"},
+				)
+				resp.raise_for_status()
+				adata.update(resp.json())
+				adata.refreshed = t
+			sessid = adata.id
+			if "email" in adata and "id" in adata:
+				bot_exec(
+					f"bot.data.accounts.setdefault({repr(adata.email)},{{}})['uid']={adata.id}\n"
+					+ f"bot.data.users.setdefault({adata.id},{{}})['email']={repr(adata.email)}"
+				)
+			cp.response.cookie["sessid"] = sessid
+			cp.response.cookie["email"] = adata.get("email") or ""
+			cp.response.cookie["name"] = adata.get("username") or adata.email.split("@", 1)[0]
+			cp.response.cookie["uid"] = int(adata.get("id", 0)) or ""
+			if "id" in adata:
+				adata["icon"] = bot_exec(
+					f"bot.cache.users[{adata.id}]=await bot.fetch_user({adata.id})\n"
+					+ f"return best_url(bot.cache.users[{adata.id}])"
+				)
+			else:
+				adata.pop("icon")
+			bot_exec(f"bot.data.sessions[{repr(sessid)}]={repr(adata)}")
+			cp.response.cookie["icon"] = adata.get("icon")
 		if "/p/" in url:
 			raise cp.HTTPRedirect(url.replace("/p/", "/file/"), status=307)
 		if "/preview/" in url:
@@ -1736,7 +1846,7 @@ body {
 		fn = f"saves/filehost/{IND}{ts}~.forward$"
 		url = kwargs.get("url")
 		if not url:
-			raise FileNotFoundError
+			raise FileNotFoundError(422, "url")
 		code = int(kwargs.get("code", 307))
 		ftype = int(kwargs.get("ftype", 1))
 		s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/></html>'

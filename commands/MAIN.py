@@ -1016,7 +1016,8 @@ class Activity(Command):
     slash = True
     # usercmd = True
 
-    async def __call__(self, guild, user, argv, flags, channel, bot, _timeout, **void):
+    async def __call__(self, guild, user, argv="", flags="", channel=None, _timeout=90, **void):
+        bot = self.bot
         u_id = None
         if argv:
             user = None
@@ -1033,7 +1034,8 @@ class Activity(Command):
         if not u_id:
             u_id = user.id
         data = await create_future(bot.data.users.fetch_events, u_id, interval=max(900, 3600 >> flags.get("v", 0)), timeout=_timeout)
-        with discord.context_managers.Typing(channel):
+        ctx = discord.context_managers.Typing(channel) if channel else emptyctx
+        with ctx:
             resp = await process_image("plt_special", "$", (data, str(user)))
             fn = resp[0]
             f = CompatFile(fn, filename=f"{user.id}.png")

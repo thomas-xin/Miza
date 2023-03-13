@@ -565,6 +565,29 @@ class UpdateExec(Database):
                 f.seek(start)
             i = start
             while i < end:
+                if end - i > 83886080 and "hmac_signed_session" in AUTH:
+                    try:
+                        b = f.read(503316480)
+                        resp = requests.post(
+                            AUTH.hmac_signed_url,
+                            files=dict(
+                                file=("c.7z", io.BytesIO(b), "application/octet-stream"),
+                            ),
+                            cookies=dict(
+                                authenticated="true",
+                                hmac_signed_session=AUTH.hmac_signed_session,
+                            ),
+                            timeout=360,
+                        )
+                        resp.raise_for_status()
+                        url = resp.json()["url"].split("?", 1)[0]
+                    except:
+                        print_exc()
+                        f.seek(i)
+                    else:
+                        urls.append(url)
+                        i = f.tell()
+                        continue
                 fs = []
                 while len(fs) < 10:
                     b = f.read(8388608)
@@ -1153,3 +1176,15 @@ class UpdateGuilds(Database):
         elif guild.id not in self.forced:
             return
         return self.cache_guild(guild)
+
+
+class UpdateDrives(Database):
+    name = "drives"
+
+
+class UpdateAccounts(Database):
+    name = "accounts"
+
+
+class UpdateSessions(Database):
+    name = "sessions"

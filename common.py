@@ -392,6 +392,12 @@ class CommandCancelledError(RuntimeError):
 
 python = sys.executable
 
+class MultiEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, (set, frozenset, alist, np.ndarray)):
+            return list(obj)
+        return json.JSONEncoder.default(self, obj)
+
 
 with open("auth.json", "rb") as f:
     AUTH = cdict(eval(f.read()))
@@ -401,14 +407,12 @@ with tracebacksuppressor:
     enc_key = AUTH["encryption_key"]
 
 if not enc_key:
-    enc_key = AUTH["encryption_key"] = as_str(base64.b64encode(randbytes(32)).rstrip(b"="))
+    enc_key = (AUTH.get("discord_secret") or AUTH.get("discord_token") or as_str(base64.b64encode(randbytes(32)).rstrip(b"=")))[:32]
+    AUTH["encryption_key"] = enc_key 
     with open("auth.json", "w", encoding="utf-8") as f:
         json.dump(AUTH, f, indent=4)
 
 enc_key += "=="
-if (len(enc_key) - 1) & 3 == 0:
-    enc_key += "="
-
 enc_box = nacl.secret.SecretBox(base64.b64decode(enc_key)[:32])
 
 encrypt = lambda s: b">~MIZA~>" + enc_box.encrypt(s if type(s) in (bytes, memoryview) else str(s).encode("utf-8"))
@@ -2424,7 +2428,7 @@ def find_file(path, cwd="saves/filehost", ind="\x7f"):
             # file cache is stored as "{timestamp}~{name}", search for file via timestamp
             if fi[-1] != ind and fi.rsplit(".", 1)[0].split("~", 1)[0] == fn:
                 return wd + "/" + fi
-    raise FileNotFoundError(path)
+    raise FileNotFoundError(404, path)
 
 
 class open2(io.IOBase):
