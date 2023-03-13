@@ -697,7 +697,7 @@ class Bot:
 		caids.extend(r.get("id") for r in replies)
 		caids = list(filter(bool, caids))
 		print("CAI response:", text)
-		names = "[Uu][Tt][Ss][Ee]{2}[Ss][Rr]?[TtFf]?"
+		names = "[Uu][Tt][Ss][Ee]{2}[Rr]?[Ss][Rr]?[TtFf]?"
 		text = u.join(re.split(names, text)).removeprefix("[REPLIED TO]: ").removeprefix("Miza: ")
 		text = self.emoji_clean(text)
 		if aborted or len(text) < 2 or text[-1].isalpha() and (text[-2].isalnum() or text[-2] == " "):
@@ -1189,7 +1189,7 @@ class Bot:
 		while len(self.chat_history) > self.history_length:
 			self.chat_history.pop(0)
 		caids = ()
-		if self.personality == CAIPER or self.premium < 2 and self.personality == DEFPER:
+		if self.personality == CAIPER or (self.premium < 2 and self.personality == DEFPER and (not self.chat_history or q and q != self.chat_history[0][1])):
 			response, cost, caids = self.caichat(u, q, refs=refs, im=im)
 			if response:
 				return self.after(tup, (self.name, response)), cost, caids

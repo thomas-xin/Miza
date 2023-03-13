@@ -1052,22 +1052,22 @@ class Server:
 		except (KeyError, ValueError):
 			return "[]"
 		else:
-			adata = bot_exec(f"bot.data.sessions.get({repr(sessid)})")
+			adata = self.bot_exec(f"bot.data.sessions.get({repr(sessid)})")
 		if not adata:
 			cp.response.cookie["sessid"] = ""
 			return "[]"
 		if "email" not in adata:
 			if "id" not in adata:
 				return "[]"
-			fdata = bot_exec(f"bot.data.drives.get({adata.id},[])")
+			fdata = self.bot_exec(f"bot.data.drives.get({adata.id},[])")
 		else:
 			if "id" in adata:
-				fdata = bot_exec(
+				fdata = self.bot_exec(
 					f"bot.data.drives.setdefault({repr(adata.email)},set()).update(bot.data.drives.pop({adata.id},[]))\n"
 					+ f"return bot.data.drives.get({repr(adata.email)},[])"
 				)
 			else:
-				fdata = bot_exec(f"bot.data.drives.get({repr(adata.email)},[])")
+				fdata = self.bot_exec(f"bot.data.drives.get({repr(adata.email)},[])")
 		if not path:
 			return orjson.dumps(fdata)
 		cpath = path.split("/")
@@ -1091,7 +1091,7 @@ class Server:
 			except (KeyError, ValueError):
 				adata = None
 			else:
-				adata = bot_exec(f"bot.data.sessions.get({repr(sessid)})")
+				adata = self.bot_exec(f"bot.data.sessions.get({repr(sessid)})")
 			t = utc()
 			if not adata:
 				if not code:
@@ -1100,7 +1100,7 @@ class Server:
 				resp = reqs.next().post(
 					f"https://discord.com/api/oauth2/token",
 					data=dict(
-						client_id=AUTH.get("discord_id") or bot_exec("bot.id"),
+						client_id=AUTH.get("discord_id") or self.bot_exec("bot.id"),
 						client_secret=AUTH["discord_secret"],
 						grant_type="authorization_code",
 						code=code,
@@ -1117,7 +1117,7 @@ class Server:
 				resp = reqs.next().post(
 					f"https://discord.com/api/oauth2/token",
 					data=dict(
-						client_id=AUTH.get("discord_id") or bot_exec("bot.id"),
+						client_id=AUTH.get("discord_id") or self.bot_exec("bot.id"),
 						client_secret=AUTH["discord_secret"],
 						grant_type="refresh_token",
 						refresh_token=adata.refresh_token,
@@ -1137,7 +1137,7 @@ class Server:
 				adata.refreshed = t
 			sessid = adata.id
 			if "email" in adata and "id" in adata:
-				bot_exec(
+				self.bot_exec(
 					f"bot.data.accounts.setdefault({repr(adata.email)},{{}})['uid']={adata.id}\n"
 					+ f"bot.data.users.setdefault({adata.id},{{}})['email']={repr(adata.email)}"
 				)
@@ -1146,13 +1146,13 @@ class Server:
 			cp.response.cookie["name"] = adata.get("username") or adata.email.split("@", 1)[0]
 			cp.response.cookie["uid"] = int(adata.get("id", 0)) or ""
 			if "id" in adata:
-				adata["icon"] = bot_exec(
+				adata["icon"] = self.bot_exec(
 					f"bot.cache.users[{adata.id}]=await bot.fetch_user({adata.id})\n"
 					+ f"return best_url(bot.cache.users[{adata.id}])"
 				)
 			else:
 				adata.pop("icon")
-			bot_exec(f"bot.data.sessions[{repr(sessid)}]={repr(adata)}")
+			self.bot_exec(f"bot.data.sessions[{repr(sessid)}]={repr(adata)}")
 			cp.response.cookie["icon"] = adata.get("icon")
 		if "/p/" in url:
 			raise cp.HTTPRedirect(url.replace("/p/", "/file/"), status=307)
