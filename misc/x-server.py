@@ -1408,7 +1408,7 @@ class Server:
 		print("Convert", of, mime, size)
 		if mime.split("/", 1)[-1] in ("mp4", "webm"):
 			dur = get_duration(of)
-			if dur > 3600:
+			if dur > 3600 and size > 524288000:
 				raise StopIteration
 			if size / dur <= 1048576:
 				args = [
