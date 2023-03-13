@@ -724,8 +724,7 @@ class Server:
 						fut.result()
 						buf += fut.buf
 						self.serving[on + "~buffer"] = buf
-					if url.startswith("D$"):
-						url = remap_url(url)
+					url = remap_url(url)
 					for i in range(16):
 						try:
 							resp = reqs.next().get(url, headers=headers, stream=True)
