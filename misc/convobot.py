@@ -676,7 +676,7 @@ class Bot:
 			print(resp.text)
 			self.cai_ready = False
 			self.cai_channel = None
-			return "", 0
+			return "", 0, ()
 		lines = list(filter(bool, (line.strip() for line in resp.text.replace("\n", " " * 33).split(" " * 33))))
 		try:
 			e1 = json.loads(lines[-2]) if len(lines) > 1 else {}
