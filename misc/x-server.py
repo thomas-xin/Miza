@@ -1048,7 +1048,7 @@ class Server:
 	def filelist(self, path=None):
 		cp.response.headers["Content-Type"] = "application/json"
 		try:
-			sessid = int(cp.request.cookie["sessid"])
+			sessid = int(cp.request.cookie["sessid"].value)
 		except (KeyError, ValueError):
 			return "[]"
 		else:
@@ -1087,7 +1087,7 @@ class Server:
 		url = cp.url(qs=cp.request.query_string)
 		if "/user" in url:
 			try:
-				sessid = int(cp.request.cookie["sessid"])
+				sessid = int(cp.request.cookie["sessid"].value)
 			except (KeyError, ValueError):
 				adata = None
 			else:
