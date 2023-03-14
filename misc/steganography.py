@@ -240,11 +240,12 @@ entropy = min(1, abs(i_entropy) ** 3 / 384)
 write = bool(msg)
 mb = msg.encode("utf-8")
 its = 3
-b = [b"\xaa"]
+b = [b"\x00\xaa"]
 for n in range(its):
 	b.append(mb)
 	b.append(b"\xaa")
 	mb = invert(mb)
+b.append(b"\x00")
 b = b"".join(b)
 bb = list(bool(i & 1 << j) for i in b for j in range(8))
 bs = len(bb)
@@ -278,6 +279,7 @@ while True:
 			lim *= np.sqrt(2)
 # print(bs, w, h)
 
+begin = False
 copydetect = True
 inverted = False
 np.random.seed(time.time_ns() & 4294967295)
@@ -298,7 +300,11 @@ for i in (2, 0, 1):
 			pa = (ey - sy) * (ex - sx)
 			target = a[sy:ey].T[sx:ex]
 			if copydetect:
+				# print(np.sum(target & 2 > 0) + np.sum(target & 1), pa)
 				reader.append(np.sum(target & 2 > 0) + np.sum(target & 1) >= pa)
+			if len(reader) == 8 and not begin:
+				reader.clear()
+				begin = True
 			if len(reader) == 8 and copydetect:
 				if reader != [0, 1] * 4:
 					if reader == [1, 0] * 4:
@@ -309,7 +315,7 @@ for i in (2, 0, 1):
 							raise SystemExit
 						copydetect = False
 
-			bit = next(it, True if x * h + y & 8 else False)
+			bit = next(it, False if x * h + y & 8 else True)
 			if test:
 				if bit:
 					target[:] = 255
