@@ -250,7 +250,7 @@ b = [bytes([its])]
 for n in range(its):
 	b.append(mb)
 	mb = invert(mb)
-b.append(b"\xaa" * (its - 1))
+b.append(b"\xaa" * (its * 2 - 1))
 b = b"".join(b)
 bb = list(bool(i & 1 << j) for i in b for j in range(8))
 bs = len(bb)
@@ -266,21 +266,21 @@ reader = []
 	# compare_to(im, msg)
 
 w = h = 17
-while True:
-	if abs(w / h - ar) / ar < 1 / 32:
-		break
-	if w / h > ar:
-		if (w - 1) * h >= lim:
-			w -= 1
-		else:
-			h += 1
-			lim *= np.sqrt(2)
-	else:
-		if w * (h - 1) >= lim:
-			h -= 1
-		else:
-			w += 1
-			lim *= np.sqrt(2)
+# while True:
+	# if abs(w / h - ar) / ar < 1 / 32:
+		# break
+	# if w / h > ar:
+		# if (w - 1) * h >= lim:
+			# w -= 1
+		# else:
+			# h += 1
+			# lim *= np.sqrt(2)
+	# else:
+		# if w * (h - 1) >= lim:
+			# h -= 1
+		# else:
+			# w += 1
+			# lim *= np.sqrt(2)
 # print(bs, w, h)
 
 counted = True
@@ -345,7 +345,7 @@ if w & 1 and h & 1:
 for p in corners:
 	vis.pop(p, None)
 cornerdata = []
-tiles = corners + list(vis)
+tiles = corners + list(reversed(vis))
 for p, (x, y) in enumerate(tiles):
 	if p == len(corners) and copydetect:
 		nc = sum(cornerdata)
@@ -361,10 +361,10 @@ for p, (x, y) in enumerate(tiles):
 					raise SystemExit
 				copydetect = False
 	counted = p >= len(corners)
-	sx = round_random(x * im.width / w)
-	ex = round_random((x + 1) * im.width / w)
-	sy = round_random(y * im.height / h)
-	ey = round_random((y + 1) * im.height / h)
+	sx = round(x * im.width / w)
+	ex = round((x + 1) * im.width / w)
+	sy = round(y * im.height / h)
+	ey = round((y + 1) * im.height / h)
 	pa = (ey - sy) * (ex - sx)
 	order = [0, 1, 2]
 	seed = p
@@ -374,10 +374,11 @@ for p, (x, y) in enumerate(tiles):
 	for i in order[seed:] + order[:seed]:
 		a = ars[i]
 		target = a[sy:ey].T[sx:ex]
-		rc = np.sum(target & 2 > 0) + np.sum(target & 1)
+		rc = np.sum(target & 2 > 0) * 2
+		# print(rc, pa)
 		if copydetect:
 			if not counted:
-				cornerdata.append(rc >= pa * np.sqrt(2))
+				cornerdata.append(rc >= pa / np.sqrt(2))
 			else:
 				reader.append(rc >= pa)
 
@@ -394,14 +395,15 @@ for p, (x, y) in enumerate(tiles):
 			rv = target.ravel()
 
 			if entropy != 1:
-				r1 = np.random.randint(-1, 1, pa // 2, dtype=np.int8)
+				r1 = np.random.randint(-1, 1, ceil(pa / 2), dtype=np.int8)
 				r1 |= 1
 				r1 <<= 1
-				r1 = np.tile(r1, (2, 1)).T.ravel()
-				r2 = np.random.randint(0, 4, pa // 2, dtype=np.int8)
+				r1 = np.tile(r1, (2, 1)).T.ravel()[:len(pa)]
+				r2 = np.random.randint(0, 4, ceil(pa / 2), dtype=np.int8)
 				r2[r2 == 0] = -3
 				r2[r2 > 0] = 1
-				r2 = np.tile(r2, (2, 1)).T.ravel()
+				r2 = np.tile(r2, (2, 1)).T.ravel()[:len(pa)]
+				# print(r1, r2)
 
 			if entropy != 0:
 				rind = np.zeros(len(rv), dtype=np.bool_)
@@ -410,26 +412,29 @@ for p, (x, y) in enumerate(tiles):
 
 			if bit:
 				# rv[:] = 255
-				v = np.clip(rv, 3, 251, out=rv)
+				v = np.clip(rv, 2, 253, out=rv)
 				if entropy != 0:
-					v[rind] |= 3
+					v[rind] |= 2
+					v[rind] &= 254
 				if entropy != 1:
+					# must be &2 = 2
 					ind = v & 3
 					mask = ind == 0
 					t = v[mask]
-					v[mask] = np.subtract(t, r2[:len(t)], out=t, casting="unsafe")
+					v[mask] = np.subtract(t, r1[:len(t)], out=t, casting="unsafe")
 					mask = ind == 1
 					t = v[mask]
-					v[mask] = np.add(t, r1[:len(t)], out=t, casting="unsafe")
-					mask = ind == 2
-					t = v[mask]
 					v[mask] = np.add(t, r2[:len(t)], out=t, casting="unsafe")
+					mask = ind == 3
+					t = v[mask]
+					v[mask] = np.subtract(t, r1[:len(t)], out=t, casting="unsafe")
 			else:
 				# rv[:] = 0
-				v = np.clip(rv, 4, 252, out=rv)
+				v = np.clip(rv, 0, 251, out=rv)
 				if entropy != 0:
 					v[rind] &= 252
 				if entropy != 1:
+					# must be &2 = 0
 					ind = v & 3
 					mask = ind == 1
 					t = v[mask]
@@ -465,6 +470,7 @@ while len(reader) & 7:
 # print(reader)
 
 if copydetect:
+	# print(reader)
 	bitd = np.array(reader, dtype=np.bool_)
 	b = np.zeros(len(reader) // 8, dtype=np.uint8)
 	for i in range(8):
@@ -483,9 +489,9 @@ try:
 		raise ValueError
 	its = b[0]
 	b = b[1:]
+	# print(b, its)
 	while len(b) and (len(b) % its or b[-1] == 170):
 		b = b[:-1]
-	# print(b)
 	if not len(b) or len(b) % its:
 		raise ValueError
 	l = len(b) // its
@@ -497,11 +503,23 @@ try:
 		dups.append(bi)
 	dups = np.asanyarray(dups, dtype=np.uint8).T
 	# print(dups)
+	errs = 0
 	d = []
 	for i in range(l):
 		u, c = np.unique(dups[i], return_counts=True)
 		a = np.argsort(c)
-		d.append(u[a][-1])
+		if np.max(c) > 1:
+			c = u[a][-1]
+		else:
+			if errs >= 3:
+				raise ValueError
+			errs += 1
+			l = [n for n in u if 32 <= n < 128]
+			if not l:
+				c = u[-1]
+			else:
+				c = l[0]
+		d.append(c)
 		# print(dups[i])
 		# print(np.unique(dups[i], return_counts=True))
 	b = bytes(d)
