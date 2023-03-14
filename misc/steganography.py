@@ -298,27 +298,30 @@ if not core[0] == core[1] == core[2]:
 		raise SystemExit
 	copydetect = False
 
-for i in (2, 0, 1):
-	a = ars[i]
-	ex = 0
-	for x in range(w):
-		sx = ex
-		ex = round_random((x + 1) * im.width / w)
-		ey = 0
-		for y in range(h):
-			counted = x and y and x != w - 1 and y != h - 1 and not x == y == (w - 1) / 2
-			sy = ey
-			ey = round_random((y + 1) * im.height / h)
-			pa = (ey - sy) * (ex - sx)
+ex = 0
+for x in range(w):
+	sx = ex
+	ex = round_random((x + 1) * im.width / w)
+	ey = 0
+	for y in range(h):
+		sy = ey
+		ey = round_random((y + 1) * im.height / h)
+		counted = x and y and x != w - 1 and y != h - 1 and not x == y == (w - 1) / 2
+		pa = (ey - sy) * (ex - sx)
+		for i in (2, 0, 1):
+			a = ars[i]
 			target = a[sy:ey].T[sx:ex]
+			rc = np.sum(target & 2 > 0) + np.sum(target & 1)
+			# print(rc, pa)
 			if copydetect and counted:
-				# print(np.sum(target & 2 > 0) + np.sum(target & 1), pa)
-				reader.append(np.sum(target & 2 > 0) + np.sum(target & 1) >= pa)
+				reader.append(rc >= pa)
 			if len(reader) == 8 and copydetect:
-				if sum(1 for i, n in enumerate(reader) if n == (i & 1)) >= 6:
+				nc = sum(1 for i, n in enumerate(reader) if n == (i & 1))
+				if nc >= 6:
 					pass
 				else:
-					if sum(1 for i, n in enumerate(reader) if n != (i & 1)) >= 6:
+					ic = sum(1 for i, n in enumerate(reader) if n != (i & 1))
+					if ic >= 6:
 						inverted = True
 					else:
 						if not write:
@@ -388,7 +391,8 @@ for i in (2, 0, 1):
 				# v = rv
 				target[:] = v.reshape(target.shape)
 
-	spl[i] = Image.fromarray(a, mode="L")
+for i in range(len(ars)):
+	spl[i] = Image.fromarray(ars[i], mode="L")
 
 try:
 	next(it)
@@ -424,6 +428,7 @@ try:
 	x = b[:l - 1]
 	y = invert(b[l:l * 2 - 1])
 	z = b[l * 2:l * 3 - 1]
+	print(x, y, z)
 	if x == y:
 		b = x
 	elif x == z:
