@@ -67,8 +67,8 @@ zfailed = set()
 
 import cherrypy, cheroot, logging, ssl, socket
 from cherrypy._cpdispatch import Dispatcher
-httputil = cp.lib.httputil
 cp = cherrypy
+httputil = cp.lib.httputil
 from cheroot import errors
 errors.SSLEOFError = ssl.SSLEOFError
 
