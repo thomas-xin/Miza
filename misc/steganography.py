@@ -204,6 +204,13 @@ test = "-t" in sys.argv
 if test:
 	sys.argv.remove("-t")
 
+if "-i" in sys.argv:
+	i = sys.argv.index("-i")
+	its = int(sys.argv[i + 1])
+	sys.argv = sys.argv[:i] + sys.argv[i + 2:]
+else:
+	its = 5
+
 if "-o" in sys.argv:
 	i = sys.argv.index("-o")
 	ofn = sys.argv[i + 1]
@@ -219,7 +226,7 @@ if fn.startswith("https://") or fn.startswith("http://"):
 	fn = fn.rsplit("/", 1)[-1]
 else:
 	im = Image.open(fn)
-if getattr(im, "text", None) and im.text.get("copyright"):
+if getattr(im, "text", None) and im.text.get("copyright") and not test:
 	if im.text["copyright"] != msg:
 		print("Copyright detected in metadata:", im.text["copyright"])
 		raise SystemExit
@@ -239,12 +246,11 @@ entropy = min(1, abs(i_entropy) ** 3 / 384)
 
 write = bool(msg)
 mb = msg.encode("utf-8")
-its = 3
-b = [b"\xaa"]
+b = [bytes([its])]
 for n in range(its):
 	b.append(mb)
-	b.append(b"\xaa")
 	mb = invert(mb)
+b.append(b"\xaa" * (its - 1))
 b = b"".join(b)
 bb = list(bool(i & 1 << j) for i in b for j in range(8))
 bs = len(bb)
@@ -259,7 +265,7 @@ reader = []
 # else:
 	# compare_to(im, msg)
 
-w = h = 15
+w = h = 17
 while True:
 	if abs(w / h - ar) / ar < 1 / 32:
 		break
@@ -277,6 +283,7 @@ while True:
 			lim *= np.sqrt(2)
 # print(bs, w, h)
 
+counted = True
 copydetect = True
 inverted = False
 np.random.seed(time.time_ns() & 4294967295)
@@ -285,121 +292,173 @@ if len(spl) > 3:
 	spl[-1] = spl[-1].point(lambda x: max(x, 8))
 
 ars = [np.array(pl, dtype=np.uint8) for pl in spl[:3]]
-sx, ex = round_random((w - 1) / 2 * im.width / w), round_random((w + 1) / 2 * im.width / w)
-sy, ey = round_random((h - 1) / 2 * im.height / h), round_random((h + 1) / 2 * im.height / h)
-pa = (ey - sy) * (ex - sx)
-core = []
-for a in ars:
-	target = a[sy:ey].T[sx:ex]
-	core.append(np.sum(target & 2 > 0) + np.sum(target & 1) >= pa)
-if not core[0] == core[1] == core[2]:
-	if not write:
-		print("No copyright detected.")
-		raise SystemExit
-	copydetect = False
+# sx, ex = round_random((w - 1) / 2 * im.width / w), round_random((w + 1) / 2 * im.width / w)
+# sy, ey = round_random((h - 1) / 2 * im.height / h), round_random((h + 1) / 2 * im.height / h)
+# pa = (ey - sy) * (ex - sx)
+# core = []
+# for a in ars:
+	# target = a[sy:ey].T[sx:ex]
+	# core.append(np.sum(target & 2 > 0) + np.sum(target & 1) >= pa)
+# if not core[0] == core[1] == core[2]:
+	# if not write:
+		# print("No copyright detected.")
+		# raise SystemExit
+	# copydetect = False
 
-ex = 0
-for x in range(w):
-	sx = ex
-	ex = round_random((x + 1) * im.width / w)
-	ey = 0
-	for y in range(h):
-		sy = ey
-		ey = round_random((y + 1) * im.height / h)
-		counted = x and y and x != w - 1 and y != h - 1 and not x == y == (w - 1) / 2
-		pa = (ey - sy) * (ex - sx)
-		for i in (2, 0, 1):
-			a = ars[i]
-			target = a[sy:ey].T[sx:ex]
-			rc = np.sum(target & 2 > 0) + np.sum(target & 1)
-			# print(rc, pa)
-			if copydetect and counted:
-				reader.append(rc >= pa)
-			if len(reader) == 8 and copydetect:
-				nc = sum(1 for i, n in enumerate(reader) if n == (i & 1))
-				if nc >= 6:
-					pass
-				else:
-					ic = sum(1 for i, n in enumerate(reader) if n != (i & 1))
-					if ic >= 6:
-						inverted = True
-					else:
-						if not write:
-							print("No copyright detected.")
-							raise SystemExit
-						copydetect = False
+vis = {}
+x = y = 0
+di = 3
+for p in range(w * h):
+	# print((x, y))
+	if (x, y) in vis:
+		break
+	vis[(x, y)] = True
+	if di == 0:
+		if x <= 0 or (x - 1, y) in vis:
+			di = 3
+	elif di == 1:
+		if y <= 0 or (x, y - 1) in vis:
+			di = 0
+	elif di == 2:
+		if x >= w - 1 or (x + 1, y) in vis:
+			di = 1
+	elif di == 3:
+		if y >= h - 1 or (x, y + 1) in vis:
+			di = 2
+	if di == 0:
+		x -= 1
+	elif di == 1:
+		y -= 1
+	elif di == 2:
+		x += 1
+	elif di == 3:
+		y += 1
 
-			if counted:
-				bit = next(it, False if x * h + y & 8 else True)
+corners = [
+	(0, 0),
+	(0, h - 1),
+	(w - 1, h - 1),
+	(w - 1, 0),
+]
+if w & 1 and h & 1:
+	corners.append((w >> 1, h >> 1))
+for p in corners:
+	vis.pop(p, None)
+cornerdata = []
+tiles = corners + list(vis)
+for p, (x, y) in enumerate(tiles):
+	if p == len(corners) and copydetect:
+		nc = sum(cornerdata)
+		if nc >= len(corners) - 1:
+			pass
+		else:
+			ic = len(corners) - nc
+			if ic >= len(corners) - 1:
+				inverted = True
 			else:
-				bit = True
-			if test:
-				if bit:
-					target[:] = 255
-				else:
-					target[:] = 0
-			elif write:
-				rv = target.ravel()
+				if not write:
+					print("No copyright detected.")
+					raise SystemExit
+				copydetect = False
+	counted = p >= len(corners)
+	sx = round_random(x * im.width / w)
+	ex = round_random((x + 1) * im.width / w)
+	sy = round_random(y * im.height / h)
+	ey = round_random((y + 1) * im.height / h)
+	pa = (ey - sy) * (ex - sx)
+	order = [0, 1, 2]
+	seed = p
+	if seed & 1:
+		order = order[::-1]
+	seed = (seed >> 1) % 3
+	for i in order[seed:] + order[:seed]:
+		a = ars[i]
+		target = a[sy:ey].T[sx:ex]
+		rc = np.sum(target & 2 > 0) + np.sum(target & 1)
+		if copydetect:
+			if not counted:
+				cornerdata.append(rc >= pa * np.sqrt(2))
+			else:
+				reader.append(rc >= pa)
 
-				if entropy != 1:
-					r1 = np.random.randint(-1, 1, pa // 2, dtype=np.int8)
-					r1 |= 1
-					r1 <<= 1
-					r1 = np.tile(r1, (2, 1)).T.ravel()
-					r2 = np.random.randint(0, 4, pa // 2, dtype=np.int8)
-					r2[r2 == 0] = -3
-					r2[r2 > 0] = 1
-					r2 = np.tile(r2, (2, 1)).T.ravel()
+		if counted:
+			bit = next(it, False if x * h + y & 8 else True)
+		else:
+			bit = True
+		if test:
+			if bit:
+				target[:] = 255
+			else:
+				target[:] = 0
+		elif write:
+			rv = target.ravel()
 
+			if entropy != 1:
+				r1 = np.random.randint(-1, 1, pa // 2, dtype=np.int8)
+				r1 |= 1
+				r1 <<= 1
+				r1 = np.tile(r1, (2, 1)).T.ravel()
+				r2 = np.random.randint(0, 4, pa // 2, dtype=np.int8)
+				r2[r2 == 0] = -3
+				r2[r2 > 0] = 1
+				r2 = np.tile(r2, (2, 1)).T.ravel()
+
+			if entropy != 0:
+				rind = np.zeros(len(rv), dtype=np.bool_)
+				rind[:int(len(rv) * entropy)] = True
+				np.random.shuffle(rind)
+
+			if bit:
+				# rv[:] = 255
+				v = np.clip(rv, 3, 251, out=rv)
 				if entropy != 0:
-					rind = np.zeros(len(rv), dtype=np.bool_)
-					rind[:int(len(rv) * entropy)] = True
-					np.random.shuffle(rind)
+					v[rind] |= 3
+				if entropy != 1:
+					ind = v & 3
+					mask = ind == 0
+					t = v[mask]
+					v[mask] = np.subtract(t, r2[:len(t)], out=t, casting="unsafe")
+					mask = ind == 1
+					t = v[mask]
+					v[mask] = np.add(t, r1[:len(t)], out=t, casting="unsafe")
+					mask = ind == 2
+					t = v[mask]
+					v[mask] = np.add(t, r2[:len(t)], out=t, casting="unsafe")
+			else:
+				# rv[:] = 0
+				v = np.clip(rv, 4, 252, out=rv)
+				if entropy != 0:
+					v[rind] &= 252
+				if entropy != 1:
+					ind = v & 3
+					mask = ind == 1
+					t = v[mask]
+					v[mask] = np.subtract(t, r2[:len(t)], out=t, casting="unsafe")
+					mask = ind == 2
+					t = v[mask]
+					v[mask] = np.add(t, r1[:len(t)], out=t, casting="unsafe")
+					mask = ind == 3
+					t = v[mask]
+					v[mask] = np.add(t, r2[:len(t)], out=t, casting="unsafe")
+			# v = rv
+			target[:] = v.reshape(target.shape)
 
-				if bit:
-					# rv[:] = 255
-					v = np.clip(rv, 3, 251, out=rv)
-					if entropy != 0:
-						v[rind] |= 3
-					if entropy != 1:
-						ind = v & 3
-						mask = ind == 0
-						t = v[mask]
-						v[mask] = np.subtract(t, r2[:len(t)], out=t, casting="unsafe")
-						mask = ind == 1
-						t = v[mask]
-						v[mask] = np.add(t, r1[:len(t)], out=t, casting="unsafe")
-						mask = ind == 2
-						t = v[mask]
-						v[mask] = np.add(t, r2[:len(t)], out=t, casting="unsafe")
-				else:
-					# rv[:] = 0
-					v = np.clip(rv, 4, 252, out=rv)
-					if entropy != 0:
-						v[rind] &= 252
-					if entropy != 1:
-						ind = v & 3
-						mask = ind == 1
-						t = v[mask]
-						v[mask] = np.subtract(t, r2[:len(t)], out=t, casting="unsafe")
-						mask = ind == 2
-						t = v[mask]
-						v[mask] = np.add(t, r1[:len(t)], out=t, casting="unsafe")
-						mask = ind == 3
-						t = v[mask]
-						v[mask] = np.add(t, r2[:len(t)], out=t, casting="unsafe")
-				# v = rv
-				target[:] = v.reshape(target.shape)
-
-for i in range(len(ars)):
-	spl[i] = Image.fromarray(ars[i], mode="L")
+if write:
+	for i in range(len(ars)):
+		spl[i] = Image.fromarray(ars[i], mode="L")
 
 try:
 	next(it)
 except StopIteration:
 	pass
 else:
-	raise EOFError
+	i = 1
+	try:
+		for i in range(1, 4096):
+			next(it)
+	except StopIteration:
+		pass
+	raise EOFError(i)
 
 while len(reader) & 7:
 	reader.pop(-1)
@@ -407,44 +466,46 @@ while len(reader) & 7:
 
 if copydetect:
 	bitd = np.array(reader, dtype=np.bool_)
-	byted = np.zeros(len(reader) // 8, dtype=np.uint8)
+	b = np.zeros(len(reader) // 8, dtype=np.uint8)
 	for i in range(8):
-		byted |= bitd[i::8] << np.uint8(i)
+		b |= bitd[i::8] << np.uint8(i)
 	if inverted:
-		byted ^= 255
-	b = byted.tobytes()
-	while b and b[-1] != 170:
+		b ^= 255
+	# print(b)
+	while len(b) and b[-1] != 170:
 		b = b[:-1]
 else:
 	b = b""
 
 try:
-	if not b or b[0] != 170 or b[-1] != 170:
+	# print(b)
+	if len(b) < 1 or b[-1] != 170:
 		raise ValueError
+	its = b[0]
 	b = b[1:]
-	if len(b) % 3:
+	while len(b) and (len(b) % its or b[-1] == 170):
+		b = b[:-1]
+	# print(b)
+	if not len(b) or len(b) % its:
 		raise ValueError
-	l = len(b) // 3
-	x = b[:l - 1]
-	y = invert(b[l:l * 2 - 1])
-	z = b[l * 2:l * 3 - 1]
-	print(x, y, z)
-	if x == y:
-		b = x
-	elif x == z:
-		b = x
-	elif y == z:
-		b = z
-	else:
-		d = []
-		for i in range(l - 1):
-			if x[i] == y[i]:
-				d.append(x[i])
-			elif x[i] == z[i]:
-				d.append(x[i])
-			else:
-				d.append(z[i])
-		b = bytes(d)
+	l = len(b) // its
+	dups = []
+	for i in range(its):
+		bi = b[i * l:i * l + l]
+		if i & 1:
+			bi ^= 255
+		dups.append(bi)
+	dups = np.asanyarray(dups, dtype=np.uint8).T
+	# print(dups)
+	d = []
+	for i in range(l):
+		u, c = np.unique(dups[i], return_counts=True)
+		a = np.argsort(c)
+		d.append(u[a][-1])
+		# print(dups[i])
+		# print(np.unique(dups[i], return_counts=True))
+	b = bytes(d)
+	# print(b)
 	s = b.decode("utf-8")
 	if s == msg:
 		raise ValueError
