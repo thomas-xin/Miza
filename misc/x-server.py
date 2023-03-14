@@ -125,36 +125,25 @@ def communicate(self):
 	return False
 cheroot.server.HTTPConnection.communicate = communicate
 
+httputil = cp.lib.httputil
 def process_headers(self):
 	headers = self.headers
 	for name, value in self.header_list:
-		# Call title() now (and use dict.__method__(headers))
-		# so title doesn't have to be called twice.
 		name = name.title()
 		value = value.strip()
-
 		headers[name] = httputil.decode_TEXT_maybe(value)
-
-		# Some clients, notably Konquoror, supply multiple
-		# cookies on different lines with the same key. To
-		# handle this case, store all cookies in self.cookie.
 		if name == 'Cookie':
 			try:
 				self.cookie.load(value)
 			except CookieError as exc:
 				print_exc()
 				# raise cherrypy.HTTPError(400, str(exc))
-
 	if not dict.__contains__(headers, 'Host'):
-		# All Internet-based HTTP/1.1 servers MUST respond with a 400
-		# (Bad Request) status code to any HTTP/1.1 request message
-		# which lacks a Host header field.
 		if self.protocol >= (1, 1):
 			msg = "HTTP/1.1 requires a 'Host' request header."
 			raise cherrypy.HTTPError(400, msg)
 	else:
 		headers['Host'] = httputil.SanitizedHost(dict.get(headers, 'Host'))
-
 	host = dict.get(headers, 'Host')
 	if not host:
 		host = self.local.name or self.local.ip
