@@ -279,6 +279,8 @@ class Bot:
 		self.last_cost = 0
 		self.history_length = 4 if premium < 1 else 6
 		self.fp = FreeProxy()
+		self.session = requests.Session()
+		self.session.cookies["CookieConsent"] = "true"
 
 	def get_proxy(self, retry=True):
 		if self.proxies and time.time() - self.ctime <= 20:
@@ -478,7 +480,7 @@ class Bot:
 		headers = {
 			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
 			# "DNT": "1",
-			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
+			# "X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
 			"Content-Type": "application/json",
 			"cache-control": "no-cache",
 			"Authorization": f"Token {self.cai_token}",
@@ -488,7 +490,7 @@ class Bot:
 		lines = []
 		if not self.cai_ready:
 			if not self.cai_channel:
-				resp = requests.post(
+				resp = self.session.post(
 					"https://beta.character.ai/chat/history/create/",
 					data=json.dumps(dict(character_external_id=miza_id)),
 					headers=headers,
@@ -628,7 +630,7 @@ class Bot:
 			b = b.read()
 			h2 = headers.copy()
 			h2.pop("Content-Type")
-			resp = requests.post(
+			resp = self.session.post(
 				"https://beta.character.ai/chat/upload-image/",
 				files=(("image", b),),
 				headers=h2,
@@ -641,7 +643,7 @@ class Bot:
 				idt = "AUTO_IMAGE_CAPTIONING"
 				iot = "UPLOADED"
 				irp = "https://characterai.io/i/400/static/user/" + resp.json()["value"]
-		resp = requests.post(
+		resp = self.session.post(
 			"https://beta.character.ai/chat/streaming/",
 			data=json.dumps(dict(
 				character_external_id=miza_id,
