@@ -315,8 +315,10 @@ for i in (2, 0, 1):
 				# print(np.sum(target & 2 > 0) + np.sum(target & 1), pa)
 				reader.append(np.sum(target & 2 > 0) + np.sum(target & 1) >= pa)
 			if len(reader) == 8 and copydetect:
-				if reader != [0, 1] * 4:
-					if reader == [1, 0] * 4:
+				if sum(1 for i, n in enumerate(reader) if n == (i & 1)) >= 6:
+					pass
+				else:
+					if sum(1 for i, n in enumerate(reader) if n != (i & 1)) >= 6:
 						inverted = True
 					else:
 						if not write:
