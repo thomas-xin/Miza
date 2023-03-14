@@ -1052,7 +1052,7 @@ class Server:
 		except (KeyError, ValueError):
 			return "[]"
 		else:
-			adata = self.bot_exec(f"bot.data.sessions.get({repr(sessid)})")
+			adata = cdict(self.bot_exec(f"bot.data.sessions.get({repr(sessid)})"))
 		if not adata:
 			cp.response.cookie["sessid"] = ""
 			return "[]"
@@ -1091,7 +1091,7 @@ class Server:
 			except (KeyError, ValueError):
 				adata = None
 			else:
-				adata = self.bot_exec(f"bot.data.sessions.get({repr(sessid)})")
+				adata = cdict(self.bot_exec(f"bot.data.sessions.get({repr(sessid)})"))
 			t = utc()
 			if not adata:
 				if not code:
