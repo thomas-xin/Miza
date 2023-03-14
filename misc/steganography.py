@@ -219,10 +219,10 @@ if fn.startswith("https://") or fn.startswith("http://"):
 	fn = fn.rsplit("/", 1)[-1]
 else:
 	im = Image.open(fn)
-# if getattr(im, "text", None) and im.text.get("copyright"):
-	# if im.text["copyright"] != msg:
-		# print("Copyright detected in metadata:", im.text["copyright"])
-		# raise SystemExit
+if getattr(im, "text", None) and im.text.get("copyright"):
+	if im.text["copyright"] != msg:
+		print("Copyright detected in metadata:", im.text["copyright"])
+		raise SystemExit
 
 if "RGB" not in im.mode:
 	im = im.convert("RGBA")
