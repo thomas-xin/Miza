@@ -498,6 +498,8 @@ class Bot:
 				if resp.status_code not in range(200, 400):
 					print("CAI error:", resp)
 					print(resp.text)
+					if self.personality == CAIPER:
+						resp.raise_for_status()
 					return "", 0, ()
 				try:
 					self.cai_channel = resp.json()["external_id"]
@@ -636,8 +638,10 @@ class Bot:
 				headers=h2,
 			)
 			if resp.status_code not in range(200, 400):
-				print("CAI create:", resp)
+				print("CAI upload:", resp)
 				print(resp.text)
+				if self.personality == CAIPER:
+					resp.raise_for_status()
 			else:
 				print("CAI upload:", resp)
 				idt = "AUTO_IMAGE_CAPTIONING"
@@ -683,6 +687,8 @@ class Bot:
 			print(resp.text)
 			self.cai_ready = False
 			self.cai_channel = None
+			if self.personality == CAIPER:
+				resp.raise_for_status()
 			return "", 0, ()
 		lines = list(filter(bool, (line.strip() for line in resp.text.replace("\n", " " * 33).split(" " * 33))))
 		try:
