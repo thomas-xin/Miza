@@ -65,8 +65,9 @@ prev_date = utc_dt().date()
 zfailed = set()
 
 
-import cherrypy, cheroot, logging, ssl
+import cherrypy, cheroot, logging, ssl, socket
 from cherrypy._cpdispatch import Dispatcher
+httputil = cp.lib.httputil
 cp = cherrypy
 from cheroot import errors
 errors.SSLEOFError = ssl.SSLEOFError
@@ -125,7 +126,6 @@ def communicate(self):
 	return False
 cheroot.server.HTTPConnection.communicate = communicate
 
-httputil = cp.lib.httputil
 def process_headers(self):
 	headers = self.headers
 	for name, value in self.header_list:
