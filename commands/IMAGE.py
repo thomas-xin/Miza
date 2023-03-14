@@ -1778,7 +1778,7 @@ class Art(Command):
                 fn = f.read()
         with tracebacksuppressor:
             fn = await bot.commands.steganography[0].call(fn, str(bot.id))
-        await bot.send_with_file(channel, "", fn, filename=lim_str(prompt, 96) + ".webp", reference=message, reacts="🔳", embed=emb)
+        await bot.send_with_file(channel, "", fn, filename=lim_str(prompt, 96) + ".png", reference=message, reacts="🔳", embed=emb)
 
 
 class UpdateImages(Database):

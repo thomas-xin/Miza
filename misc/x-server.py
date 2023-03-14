@@ -1109,7 +1109,7 @@ class Server:
 				)
 				resp.raise_for_status()
 				adata = cdict(resp.json())
-				adata.id = round_random(t * 1e6)
+				adata.ts = round_random(t * 1e6)
 				adata.expiry = t + adata.expires_in
 				adata.refreshed = 0
 			t = utc()
@@ -1147,7 +1147,7 @@ class Server:
 			cp.response.cookie["uid"] = int(adata.get("id", 0)) or ""
 			if "id" in adata:
 				adata["icon"] = self.bot_exec(
-					f"bot.cache.users[{adata.id}]=await bot.fetch_user({adata.id})\n"
+					f"bot.cache.users[{adata.id}]=await bot.fetch_user({adata.id});"
 					+ f"return best_url(bot.cache.users[{adata.id}])"
 				)
 			else:

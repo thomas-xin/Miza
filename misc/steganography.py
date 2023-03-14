@@ -204,6 +204,13 @@ test = "-t" in sys.argv
 if test:
 	sys.argv.remove("-t")
 
+if "-o" in sys.argv:
+	i = sys.argv.index("-o")
+	ofn = sys.argv[i + 1]
+	sys.argv = sys.argv[:i] + sys.argv[i + 2:]
+else:
+	ofn = None
+
 fn = sys.argv[1]
 msg = " ".join(sys.argv[2:])
 if fn.startswith("https://") or fn.startswith("http://"):
@@ -232,7 +239,13 @@ entropy = min(1, abs(i_entropy) ** 3 / 384)
 
 write = bool(msg)
 mb = msg.encode("utf-8")
-b = b"\xff" + b"\xff".join((mb, invert(mb), mb)) + b"\xff" * 2
+its = 3
+b = [b"\xaa"]
+for n in range(its):
+	b.append(mb)
+	b.append(b"\xaa")
+	mb = invert(mb)
+b = b"".join(b)
 bb = list(bool(i & 1 << j) for i in b for j in range(8))
 bs = len(bb)
 it = iter(bb)
@@ -286,16 +299,17 @@ for i in (2, 0, 1):
 			target = a[sy:ey].T[sx:ex]
 			if copydetect:
 				reader.append(np.sum(target & 2 > 0) + np.sum(target & 1) >= pa)
-			if len(reader) == 8 and copydetect and reader != [True] * 8:
-				if reader == [False] * 8:
-					inverted = True
-				else:
-					if not write:
-						print("No copyright detected.")
-						raise SystemExit
-					copydetect = False
+			if len(reader) == 8 and copydetect:
+				if reader != [0, 1] * 4:
+					if reader == [1, 0] * 4:
+						inverted = True
+					else:
+						if not write:
+							print("No copyright detected.")
+							raise SystemExit
+						copydetect = False
 
-			bit = next(it, False)
+			bit = next(it, True if x * h + y & 8 else False)
 			if test:
 				if bit:
 					target[:] = 255
@@ -319,7 +333,7 @@ for i in (2, 0, 1):
 
 				if bit:
 					# rv[:] = 255
-					v = np.clip(rv, 3, None, out=rv)
+					v = np.clip(rv, 3, 251, out=rv)
 					if entropy != 0:
 						v[rind] |= 3
 					if entropy != 1:
@@ -335,7 +349,7 @@ for i in (2, 0, 1):
 						v[mask] = np.add(t, r2[:len(t)], out=t, casting="unsafe")
 				else:
 					# rv[:] = 0
-					v = np.clip(rv, None, 252, out=rv)
+					v = np.clip(rv, 4, 252, out=rv)
 					if entropy != 0:
 						v[rind] &= 252
 					if entropy != 1:
@@ -373,15 +387,15 @@ if copydetect:
 	if inverted:
 		byted ^= 255
 	b = byted.tobytes()
-	while b and b[-1] != 255:
+	while b and b[-1] != 170:
 		b = b[:-1]
 else:
 	b = b""
 
 try:
-	if not b or b[0] != 255 or b[-1] != 255:
+	if not b or b[0] != 170 or b[-1] != 170:
 		raise ValueError
-	b = b[1:-1]
+	b = b[1:]
 	if len(b) % 3:
 		raise ValueError
 	l = len(b) // 3
@@ -411,12 +425,12 @@ except (ValueError, UnicodeDecodeError):
 	# print(b)
 	if write:
 		im = Image.merge(im.mode, spl)
-		fn = fn.rsplit(".", 1)[0] + "~1.png"
+		fn = ofn or fn.rsplit(".", 1)[0] + "~1.png"
 		meta = PngInfo()
 		meta.add_text("copyright", msg)
-		im.save(fn, pnginfo=meta)
+		im.save(fn, format="png", optimize=True, pnginfo=meta)
 	print("No copyright detected.")
 else:
-	if i_entropy >= ie_req:
-		hash_to(im, s, skip=True)
+	# if i_entropy >= ie_req:
+		# hash_to(im, s, skip=True)
 	print("Copyright detected in steganography:", s)

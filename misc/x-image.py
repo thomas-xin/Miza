@@ -2699,7 +2699,7 @@ def evalImg(url, operation, args):
 	globals()["CURRENT_FRAME"] = 0
 	ts = time.time_ns() // 1000
 	out = "cache/" + str(ts) + ".png"
-	fmt = "png"
+	fmt = "default"
 	dur = None
 	if len(args) > 1 and args[-2] == "-f":
 		fmt = args.pop(-1)
@@ -2724,7 +2724,7 @@ def evalImg(url, operation, args):
 		# -gif is a special case where the output is always an animated format (gif, mp4, mkv etc)
 		if args and args[-1] == "-gif":
 			args.pop(-1)
-			if fmt in ("png", "jpg", "jpeg", "bmp", "webp"):
+			if fmt in ("default", "png", "jpg", "jpeg", "bmp", "webp"):
 				fmt = "gif"
 			if fmt == "gif" and np.prod(image.size) > 262144:
 				size = max_size(*image.size, 512)
@@ -2791,7 +2791,7 @@ def evalImg(url, operation, args):
 			if duration > dur:
 				duration = dur
 		if video:
-			if fmt in ("png", "jpg", "jpeg", "bmp"):
+			if fmt in ("default", "png", "jpg", "jpeg", "bmp"):
 				fmt = "gif"
 			print(duration, new["count"])
 			# if new["count"] <= 1024:
@@ -2813,8 +2813,10 @@ def evalImg(url, operation, args):
 							yield next(it)
 
 				frames = frameit(first, it)
-			if getattr(first, "audio", None) and fmt in ("webp", "gif", "apng"):
+			if getattr(first, "audio", None) and fmt in ("default", "webp", "gif", "apng"):
 				fmt = "mp4"
+			elif fmt == "default":
+				fmt = "webp"
 			out = "cache/" + str(ts) + "." + fmt
 			mode = str(first.mode)
 			if mode == "P":
@@ -2911,9 +2913,13 @@ def evalImg(url, operation, args):
 				proc.wait()
 			return [out]
 	if isinstance(new, Image.Image):
-		if new.entropy() > 4:
+		if new.entropy() > 4 and fmt in ("default", "webp"):
 			out = "cache/" + str(ts) + ".webp"
 			new.save(out, format="webp", lossless=False, quality=67)
+			return [out]
+		elif fmt in ("default", "webp"):
+			out = "cache/" + str(ts) + ".webp"
+			new.save(out, format="webp", lossless=True, quality=80)
 			return [out]
 		else:
 			new.save(out, format="png", optimize=True)
