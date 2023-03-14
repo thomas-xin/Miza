@@ -281,6 +281,7 @@ class Bot:
 		self.fp = FreeProxy()
 		self.session = requests.Session()
 		self.session.cookies["CookieConsent"] = "true"
+		self.forbidden = []
 
 	def get_proxy(self, retry=True):
 		if self.proxies and time.time() - self.ctime <= 20:
@@ -498,6 +499,8 @@ class Bot:
 				if resp.status_code not in range(200, 400):
 					print("CAI error:", resp)
 					print(resp.text)
+					if resp.status_code in (401, 403):
+						self.forbidden.append("CAI")
 					if self.personality == CAIPER:
 						resp.raise_for_status()
 					return "", 0, ()
@@ -640,6 +643,8 @@ class Bot:
 			if resp.status_code not in range(200, 400):
 				print("CAI upload:", resp)
 				print(resp.text)
+				if resp.status_code in (401, 403):
+					self.forbidden.append("CAI")
 				if self.personality == CAIPER:
 					resp.raise_for_status()
 			else:
@@ -687,6 +692,8 @@ class Bot:
 			print(resp.text)
 			self.cai_ready = False
 			self.cai_channel = None
+			if resp.status_code in (401, 403):
+				self.forbidden.append("CAI")
 			if self.personality == CAIPER:
 				resp.raise_for_status()
 			return "", 0, ()
@@ -1206,9 +1213,10 @@ class Bot:
 			self.chat_history.pop(0)
 		caids = ()
 		if self.personality == CAIPER or (self.premium < 2 and self.personality == DEFPER and (not self.chat_history or q and q != self.chat_history[0][1])):
-			response, cost, caids = self.caichat(u, q, refs=refs, im=im)
-			if response:
-				return self.after(tup, (self.name, response)), cost, caids
+			if "CAI" not in self.forbidden:
+				response, cost, caids = self.caichat(u, q, refs=refs, im=im)
+				if response:
+					return self.after(tup, (self.name, response)), cost, caids
 		# if self.premium > 0 or random.randint(0, 1):
 		response, cost = self.gptcomplete(u, q, refs=refs)
 		if response:
