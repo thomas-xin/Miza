@@ -133,7 +133,7 @@ def process_headers(self):
 		value = value.strip()
 		headers[name] = httputil.decode_TEXT_maybe(value)
 		if name == 'Cookie':
-			with suppress()
+			with suppress():
 				self.cookie.load(value)
 				# raise cherrypy.HTTPError(400, str(exc))
 	if not dict.__contains__(headers, 'Host'):
