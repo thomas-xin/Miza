@@ -135,7 +135,7 @@ def process_headers(self):
 		if name == 'Cookie':
 			try:
 				self.cookie.load(value)
-			except CookieError as exc:
+			except:
 				print_exc()
 				# raise cherrypy.HTTPError(400, str(exc))
 	if not dict.__contains__(headers, 'Host'):
