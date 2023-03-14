@@ -1312,9 +1312,9 @@ class Steganography(Command):
         fon = url.rsplit("/", 1)[-1].rsplit(".", 1)[0]
         with discord.context_managers.Typing(channel):
             fn = await self.call(b, msg)
-        fn = f"cache/{ts}~1.webp"
+        fn = f"cache/{ts}~1.png"
         if name == "nft":
-            f = CompatFile(fn, filename=f"{fon}.webp")
+            f = CompatFile(fn, filename=f"{fon}.png")
             url = await self.bot.get_proxy_url(user)
             await self.bot.send_as_webhook(message.channel, remsg, files=[f], username=user.display_name, avatar_url=url)
         else:
@@ -1325,10 +1325,12 @@ class Steganography(Command):
         args = (
             sys.executable,
             "misc/steganography.py",
-            f"cache/{ts}.webp",
+            f"cache/{ts}.png",
             msg,
+            "-o",
+            f"cache/{ts}~1.png",
         )
-        with open(f"cache/{ts}.webp", "wb") as f:
+        with open(f"cache/{ts}.png", "wb") as f:
             await create_future(f.write, b)
         print(args)
         proc = psutil.Popen(args, cwd=os.getcwd(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -1355,7 +1357,7 @@ class Steganography(Command):
                 pe = PermissionError(text)
                 pe.no_react = True
                 raise pe
-        return f"cache/{ts}~1.webp"
+        return f"cache/{ts}~1.png"
 
     async def _callback_(self, bot, message, reaction, user, vals, **void):
         u_id, c_id, m_id = map(int, vals.split("_", 2))

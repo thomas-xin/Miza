@@ -2421,6 +2421,7 @@ def CBAI(inputs):
 	refs = inputs["refs"]
 	im = inputs["im"]
 	prompt = inputs["prompt"]
+	bl = inputs.get("bl")
 	# locals().update(inputs)
 	try:
 		cb = CBOTS[channel_id]
@@ -2440,6 +2441,7 @@ def CBAI(inputs):
 			cb.append(t)
 	else:
 		cb.premium = premium
+	cb.bl = bl
 	if im:
 		try:
 			im = cb.image

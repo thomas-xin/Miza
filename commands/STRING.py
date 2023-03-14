@@ -979,6 +979,7 @@ class Ask(Command):
         bot.data.users[user.id]["last_used"] = utc()
         bot.data.users.update(user.id)
         await bot.seen(user, event="misc", raw="Talking to me")
+        bl = bot.data.blacklist.get(user.id) or 0
 
         if "dailies" in bot.data:
             bot.data.dailies.progress_quests(user, "talk")
@@ -998,7 +999,8 @@ class Ask(Command):
                     q = "Hi!"
             else:
                 q = argv
-        print(f"{message.author}:", q)
+        if not bl:
+            print(f"{message.author}:", q)
         premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
         h = await process_image("lambda cid: bool(CBOTS.get(cid))", "$", [channel.id], fix=1)
         history = []
@@ -1072,8 +1074,9 @@ class Ask(Command):
                 url = im = urls[-1]
                 p1, p2 = await process_image(url, "caption", ["-nogif", q, channel.id], fix=1, timeout=300)
                 if p1 or p2:
-                    print(p1)
-                    print(p2)
+                    if not bl:
+                        print(p1)
+                        print(p2)
                     if p1:
                         refs.append(("[IMAGE]", p1))
                     if p2:
@@ -1137,6 +1140,7 @@ class Ask(Command):
                 im=im,
                 prompt=(name, q),
                 reset=self.reset.pop(channel.id, None),
+                bl=bl,
             )
             if fut:
                 await fut
@@ -1184,7 +1188,8 @@ class Ask(Command):
                 bot.data.cai_channels[channel.id] = caic
             else:
                 bot.data.cai_channels.pop(channel.id)
-        print("Result:", out)
+        if not bl:
+            print("Result:", out)
         code = "\xad"
         reacts = []
         # if caids:

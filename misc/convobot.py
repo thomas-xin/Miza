@@ -259,6 +259,7 @@ class Bot:
 	ptime = 0
 	bad_proxies = set()
 	btime = 0
+	bl = False
 
 	def __init__(self, token="", key="", cai_token="", cai_channel=None, email="", password="", name="Miza", personality=DEFPER, premium=0):
 		self.token = token
@@ -459,7 +460,8 @@ class Bot:
 					r.append(line)
 				response = "\n".join(r)
 		res = response.strip().replace("  ", " ")
-		print("Roberta response:", res)
+		if not self.bl:
+			print("Roberta response:", res)
 		return res
 
 	def check_google(self, q):
@@ -492,7 +494,7 @@ class Bot:
 					headers=headers,
 				)
 				if resp.status_code not in range(200, 400):
-					print("CAI create:", resp)
+					print("CAI error:", resp)
 					print(resp.text)
 					return "", 0, ()
 				try:
@@ -572,7 +574,8 @@ class Bot:
 				else:
 					res = asyncio.run(run_chatgpt(q))
 				if res:
-					print("ChatGPT response:", res)
+					if not self.bl:
+						print("ChatGPT response:", res)
 					if len(self.gpttokens(res)) > 512:
 						res = self.answer_summarise("facebook/bart-large-cnn", res, max_length=500, min_length=256).strip()
 					errs = (
@@ -583,7 +586,8 @@ class Bot:
 					err = any(res.startswith(s) for s in errs)
 					if not err:
 						resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", res, ("answer", "As an AI language model"))
-						print(resp)
+						if not self.bl:
+							print(resp)
 						err = resp["As an AI language model"] > 0.5
 						if not err and req_long(q):
 							self.cai_ready = False
@@ -611,7 +615,8 @@ class Bot:
 			prompt = "".join(lines)
 		else:
 			prompt = f"{u}: {q}" if q else ""
-		print("CAI prompt:", prompt)
+		if not self.bl:
+			print("CAI prompt:", prompt)
 		sys.stdout.flush()
 		idt = ""
 		iot = ""
@@ -696,7 +701,8 @@ class Bot:
 		caids = [e2.get("last_user_msg_id")]
 		caids.extend(r.get("id") for r in replies)
 		caids = list(filter(bool, caids))
-		print("CAI response:", text)
+		if not self.bl:
+			print("CAI response:", text)
 		names = "[Uu][Tt][Ss][Ee]{2}[Rr]?[Ss][Rr]?[TtFf]?"
 		text = u.join(re.split(names, text)).removeprefix("[REPLIED TO]: ").removeprefix("Miza: ")
 		text = self.emoji_clean(text)
@@ -876,7 +882,7 @@ class Bot:
 			pc = len(self.gpttokens(m["role"], "text-davinci-003"))
 			pc += len(self.gpttokens(m["content"], "text-davinci-003"))
 			ins.pop(0)
-			print(ins)
+			# print(ins)
 			if ins[0].strip():
 				ins[0] += f"({reprompt})"
 			for line in reversed(ins):
@@ -900,7 +906,8 @@ class Bot:
 		else:
 			prompt = "".join(reversed(ins))
 			prompt = nstart + "\n\n" + prompt
-			print("GPT prompt:", prompt)
+			if not self.bl:
+				print("GPT prompt:", prompt)
 			sys.stdout.flush()
 			pc = len(self.gpttokens(prompt, "text-davinci-003"))
 		response = None
@@ -1119,7 +1126,8 @@ class Bot:
 				rc = len(self.gpttokens(text, model="text-davinci-003"))
 				cost += (pc + rc) * cm
 		text = text.strip()
-		print(f"GPT {model} response:", text)
+		if not self.bl:
+			print(f"GPT {model} response:", text)
 		if start and text.startswith(f"{self.name}: "):
 			text = ""
 		return text, cost
