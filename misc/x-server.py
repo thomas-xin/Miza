@@ -133,10 +133,8 @@ def process_headers(self):
 		value = value.strip()
 		headers[name] = httputil.decode_TEXT_maybe(value)
 		if name == 'Cookie':
-			try:
+			with suppress()
 				self.cookie.load(value)
-			except:
-				print_exc()
 				# raise cherrypy.HTTPError(400, str(exc))
 	if not dict.__contains__(headers, 'Host'):
 		if self.protocol >= (1, 1):
