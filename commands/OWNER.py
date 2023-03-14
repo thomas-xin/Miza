@@ -1170,6 +1170,7 @@ class UpdateGuilds(Database):
             m.name = cm.name
             m.nick = cm.nick
             m.guild_permissions = discord.Permissions(cm.gp)
+            m.guild = guild
             m.bot = cm.bot
             guild._members[m.id] = m
         return guild._members

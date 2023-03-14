@@ -1928,7 +1928,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 return self.data.perms[guild.id][guild.id]
             except KeyError:
                 return 0
-        p = m.guild_permissions
+        try:
+            p = m.guild_permissions
+        except AttributeError:
+            return -inf
         if p.administrator:
             return inf
         perm = -inf

@@ -2159,7 +2159,6 @@ body {
 	@hostmap
 	def command(self, content="", input="", timeout=420, redirect=""):
 		ip = cp.request.remote.ip
-		send("/command", ip)
 		if "\x7f" in content and ip in ("127.0.0.1", ADDRESS, getattr(self, "ip", None)):
 			t, after = content.split("\x7f", 1)
 			t = int(t)
@@ -2170,6 +2169,7 @@ body {
 				RESPONSES[t].set_result((j, after))
 				return b"\xf0\x9f\x92\x9c"
 		content = input or urllib.parse.unquote(cp.url(base="", qs=cp.request.query_string).rstrip("?").split("/", 2)[-1])
+		send("/command", ip, content)
 		# if "DNT" in (k.upper() for k in cp.request.headers):
 		#	 random.seed(ip)
 		#	 ip = ".".join(str(xrand(1, 255)) for _ in loop(4))
