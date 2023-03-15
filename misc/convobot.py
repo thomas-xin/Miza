@@ -882,7 +882,7 @@ class Bot:
 		else:
 			if model == "gpt-3.5-turbo":
 				if p == DEFPER:
-					nstart = f"You are {self.name}, a {DEFDEF} AI. {MIZADEF}"
+					nstart = f"You are {self.name}, a {DEFDEF} character. {MIZADEF}"
 				else:
 					nstart = p
 			else:
