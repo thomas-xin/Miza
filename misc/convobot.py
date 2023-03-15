@@ -250,7 +250,7 @@ swap = {
 }
 DEFDEF = "loyal friendly playful cute, intelligent and helpful, and slightly flirtatious"
 DEFPER = f"The following is a conversation between Miza and humans. Miza is an AI who is {DEFDEF} when appropriate."
-MIZADEF = "You are based on the character Misery from the indie game Cave Story, and you love to roleplay. Express emotion when appropriate, and do not break character!"
+MIZADEF = "You are based on the character Misery from the indie game Cave Story. Express emotion when appropriate!"
 CAIPER = "character.ai"
 
 
@@ -902,6 +902,7 @@ class Bot:
 			# print(ins)
 			# if ins[0].strip():
 			# 	ins[0] += f"({reprompt})"
+			iman = []
 			for line in reversed(ins):
 				line = line.strip()
 				k, v = line.split(": ", 1)
@@ -909,17 +910,23 @@ class Bot:
 				if k in (self.name, "[CHATGPT]", "[GOOGLE]"):
 					m["role"] = "assistant"
 				elif k in ("[IMAGE]",):
-					m["role"] = "system"
-					k = ""
+					# m["role"] = "system"
+					# k = ""
 					v = "The user has posted an image likely depicting " + v
+					iman.append(v)
+					continue
 				elif k in ("[SHORT ANSWER]",):
-					m["role"] = "system"
-					k = ""
+					# m["role"] = "system"
+					# k = ""
 					v = f'An example incomplete answer is "{v}"'
+					iman.append(v)
+					continue
 				elif k in ("[REPLIED TO]",):
-					m["role"] = "system"
-					k = ""
+					# m["role"] = "system"
+					# k = ""
 					v = "The user is replying to a previous message:\n" + v.strip(ZeroEnc)
+					iman.append(v)
+					continue
 				else:
 					m["role"] = "user"
 				m["content"] = v.strip(ZeroEnc)
@@ -931,9 +938,19 @@ class Bot:
 							k = k.replace("--", "-")
 				if k:
 					m["name"] = k
+					pc += len(self.gpttokens(m["name"], "text-davinci-003"))
 				messages.append(m)
 				pc += len(self.gpttokens(m["role"], "text-davinci-003"))
 				pc += len(self.gpttokens(m["content"], "text-davinci-003"))
+			if iman:
+				v = "\n".join(iman) + "\n"
+			else:
+				v = ""
+			v += f"IMPORTANT: Reply as {self.name}. Do not refer to yourself as language model, do not break character! Roleplay if necessary!"
+			m = dict(role="system", content=v)
+			messages.append(m)
+			pc += len(self.gpttokens(m["role"], "text-davinci-003"))
+			pc += len(self.gpttokens(m["content"], "text-davinci-003"))
 			print("ChatGPT prompt:", messages)
 			sys.stdout.flush()
 		else:
