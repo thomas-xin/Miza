@@ -915,14 +915,14 @@ class Bot:
 				elif k in ("[SHORT ANSWER]",):
 					m["role"] = "system"
 					k = ""
-					v = f'A short, incomplete answer would be "{v}"'
+					v = f'An example answer is "{v}"'
 				elif k in ("[REPLIED TO]",):
 					m["role"] = "system"
 					k = ""
-					v = "The user is replying to a previous message:\n" + v
+					v = "The user is replying to a previous message:\n" + v.strip(ZeroEnc)
 				else:
 					m["role"] = "user"
-				m["content"] = v
+				m["content"] = v.strip(ZeroEnc)
 				if not k.isalnum():
 					k = unicode_prune(k)
 					if not k.isalnum():
