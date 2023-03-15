@@ -1045,6 +1045,7 @@ class Ask(Command):
                     if not q:
                         q = "Hi!"
         im = None
+        fr = fm = None
         emb = None
         caids = None
         urls = []
@@ -1061,11 +1062,13 @@ class Ask(Command):
                 found = await bot.follow_url(url)
                 if found and found[0] != url and (is_image(found[0]) is not None or is_video(found[0]) is not None):
                     urls.append(found[0])
+                    fr = found[0]
             if find_urls(message.content) or message.attachments or message.embeds:
                 url = f"https://discord.com/channels/0/{channel.id}/{message.id}"
                 found = await bot.follow_url(url)
                 if found and found[0] != url and (is_image(found[0]) is not None or is_video(found[0]) is not None):
                     urls.append(found[0])
+                    fm = found[0]
                     if not find_urls(q):
                         if q:
                             q += " "
@@ -1099,11 +1102,10 @@ class Ask(Command):
                                 name = bot.name + "2"
                     c = reference.content
                     urls = find_urls(c)
+                    if fr:
+                        urls[-1] = fr
                     for url in urls:
-                        if url == im:
-                            capt = im.rsplit("/", 1)[-1]
-                            q = q.replace(url, f"[Image {capt}]")
-                        elif is_image(url) is not None or is_video(url) is not None:
+                        if is_image(url) is not None or is_video(url) is not None:
                             capt = url.rsplit("/", 1)[-1]
                             c = c.replace(url, f"[Image {capt}]")
                         elif p2:
@@ -1111,11 +1113,10 @@ class Ask(Command):
                             c = c.replace(url, f"[Image {capt}]")
                     refs.insert(0, ("[REPLIED TO]: " + name, c))
             urls = find_urls(q)
+            if fm:
+                urls[-1] = fm
             for url in urls:
-                if url == im:
-                    capt = im.rsplit("/", 1)[-1]
-                    q = q.replace(url, f"[Image {capt}]")
-                elif is_image(url) is not None or is_video(url) is not None:
+                if is_image(url) is not None or is_video(url) is not None:
                     capt = url.rsplit("/", 1)[-1]
                     q = q.replace(url, f"[Image {capt}]")
                 elif p2:
