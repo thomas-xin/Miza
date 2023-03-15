@@ -250,7 +250,7 @@ swap = {
 }
 DEFDEF = "loyal friendly playful cute, intelligent and helpful, and slightly flirtatious"
 DEFPER = f"The following is a conversation between Miza and humans. Miza is an AI who is {DEFDEF} when appropriate."
-MIZADEF = "You are based on the character Misery from the indie game Cave Story. Express emotion when appropriate!"
+MIZADEF = "You are based on the character Misery from Cave Story. Express emotion when appropriate!"
 CAIPER = "character.ai"
 
 
@@ -785,14 +785,14 @@ class Bot:
 		chat_history = self.chat_history.copy()
 		lines = []
 		if per == DEFPER:
-			# if len(chat_history) < 4:
-			e1 = random.choice((":3", ":D", ";3", ":>", ":0", ";w;", ":P", "^ω^"))
-			lines.append(f"{u}: Hi!\n")
-			lines.append(f"{self.name}: Hiya! Can I help with anything? {e1}\n")
-			if len(chat_history) < 2:
-				e2 = random.choice(("😊", "🥰", "😉", "😛", "😌"))
-				lines.append(f"{u}: Can I have a hug?\n")
-				lines.append(f"{self.name}: Of course! *hugs* {e2}\n")
+			if len(chat_history) < 4:
+				e1 = random.choice((":3", ":D", ";3", ":>", ":0", ";w;", ":P", "^ω^"))
+				lines.append(f"{u}: Hi!\n")
+				lines.append(f"{self.name}: Hiya! Can I help with anything? {e1}\n")
+				if len(chat_history) < 2:
+					e2 = random.choice(("😊", "🥰", "😉", "😛", "😌"))
+					lines.append(f"{u}: Can I have a hug?\n")
+					lines.append(f"{self.name}: Of course! *hugs* {e2}\n")
 		for k, v in self.promises:
 			k = k.replace(":", "")
 			s = f"{k}: {v}\n"
@@ -876,9 +876,6 @@ class Bot:
 				p = "a " + p
 			if model == "gpt-3.5-turbo":
 				nstart = f"You are {self.name}, {p} AI."
-				if searched:
-					dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
-					nstart += f" Use Google when relevant, but don't reveal personal info. Current time: {dtn}."
 				nstart += " Express emotion when appropriate, and don't break character!"
 			else:
 				nstart = f"The following is a conversation between {self.name} and humans. {self.name} is {p} AI."
@@ -886,9 +883,6 @@ class Bot:
 			if model == "gpt-3.5-turbo":
 				if p == DEFPER:
 					nstart = f"You are {self.name}, a {DEFDEF} AI. {MIZADEF}"
-					if searched:
-						dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
-						nstart += f" Use Google when relevant, but don't reveal personal info. Current time: {dtn}."
 				else:
 					nstart = p
 			else:
@@ -942,10 +936,12 @@ class Bot:
 				messages.append(m)
 				pc += len(self.gpttokens(m["role"], "text-davinci-003"))
 				pc += len(self.gpttokens(m["content"], "text-davinci-003"))
+			v = ""
+			if searched:
+				dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
+				v += f"Use Google info when relevant, but don't reveal personal info. Current time: {dtn}\n"
 			if iman:
-				v = "\n".join(iman) + "\n"
-			else:
-				v = ""
+				v += "\n".join(iman) + "\n"
 			v += f"IMPORTANT: Reply as {self.name}. Do not refer to yourself as language model, do not break character! Roleplay if necessary!"
 			m = dict(role="system", content=v)
 			messages.append(m)
