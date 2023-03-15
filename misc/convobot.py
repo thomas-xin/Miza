@@ -923,7 +923,7 @@ class Bot:
 				else:
 					m["role"] = "user"
 				m["content"] = v.strip(ZeroEnc)
-				if not k.isalnum():
+				if k.isascii() or not k.isalnum():
 					k = unicode_prune(k)
 					if not k.isalnum():
 						k = "".join((c if c.isalnum() else "-") for c in k).strip("-")
