@@ -1367,8 +1367,8 @@ class Bot:
 		chat_history = self.chat_history[:8 - self.history_length]
 		self.chat_history = self.chat_history[8 - self.history_length:]
 		summ_start = "The following is a summary of the prior conversation:\n"
-		if chat_history[0].startswith(summ_start):
-			chat_history[0] = chat_history[0][len(summ_start):]
+		if chat_history[0][1].startswith(summ_start):
+			chat_history[0] = (chat_history[0][0], chat_history[0][1][len(summ_start):])
 		lines = []
 		for k, v in self.promises:
 			k = k.replace(":", "")
