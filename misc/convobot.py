@@ -285,6 +285,7 @@ class Bot:
 		self.session = requests.Session()
 		self.session.cookies["CookieConsent"] = "true"
 		self.forbidden = []
+		self.summed = False
 
 	def get_proxy(self, retry=True):
 		if self.proxies and time.time() - self.ctime <= 20:
@@ -1240,7 +1241,7 @@ class Bot:
 
 	def ai(self, u, q, refs=(), im=None):
 		tup = (u, q)
-		if len(self.chat_history) + len(self.promises) > self.history_length:
+		if self.chat_history and (not self.summed or len(self.chat_history) + len(self.promises) > self.history_length):
 			self.rerender()
 		caids = ()
 		if self.personality == CAIPER or (self.premium < 2 and self.personality == DEFPER and (not self.chat_history or q and q != self.chat_history[0][1])):
@@ -1360,6 +1361,7 @@ class Bot:
 			while len(self.chat_history) > self.history_length:
 				self.chat_history.pop(0)
 			return
+		if len(self.chat_history) < 4: return
 		chat_history = self.chat_history[:8 - self.history_length]
 		self.chat_history = self.chat_history[8 - self.history_length:]
 		summ_start = "The following is a summary of the prior conversation:\n"
