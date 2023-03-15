@@ -1100,7 +1100,10 @@ class Ask(Command):
                     c = reference.content
                     urls = find_urls(c)
                     for url in urls:
-                        if is_image(url) is not None or is_video(url) is not None:
+                        if url == im:
+                            capt = im.rsplit("/", 1)[-1]
+                            q = q.replace(url, f"[Image {capt}]")
+                        elif is_image(url) is not None or is_video(url) is not None:
                             capt = url.rsplit("/", 1)[-1]
                             c = c.replace(url, f"[Image {capt}]")
                         elif p2:
@@ -1109,7 +1112,10 @@ class Ask(Command):
                     refs.insert(0, ("[REPLIED TO]: " + name, c))
             urls = find_urls(q)
             for url in urls:
-                if is_image(url) is not None or is_video(url) is not None:
+                if url == im:
+                    capt = im.rsplit("/", 1)[-1]
+                    q = q.replace(url, f"[Image {capt}]")
+                elif is_image(url) is not None or is_video(url) is not None:
                     capt = url.rsplit("/", 1)[-1]
                     q = q.replace(url, f"[Image {capt}]")
                 elif p2:
