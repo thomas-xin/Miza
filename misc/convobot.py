@@ -12,7 +12,6 @@ for i in range(3):
 		break
 
 from collections2 import *
-import urllib.parse
 
 import tiktoken
 from fp.fp import FreeProxy
@@ -914,8 +913,11 @@ class Bot:
 				m["content"] = v
 				if not k.isalnum():
 					k = unicode_prune(k)
-					k = "".join((c if c.isalnum() else urllib.parse.quote(c)) for c in k)
-				m["name"] = k
+					k = "".join((c if c.isalnum() else "-" for c in k)
+					while "--" in k:
+						k = k.replace("--", "-")
+				if k:
+					m["name"] = k
 				messages.append(m)
 				pc += len(self.gpttokens(m["role"], "text-davinci-003"))
 				pc += len(self.gpttokens(m["content"], "text-davinci-003"))
