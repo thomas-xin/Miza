@@ -913,7 +913,7 @@ class Bot:
 				m["content"] = v
 				if not k.isalnum():
 					k = unicode_prune(k)
-					k = "".join((c if c.isalnum() else "-" for c in k)
+					k = "".join((c if c.isalnum() else "-") for c in k)
 					while "--" in k:
 						k = k.replace("--", "-")
 				if k:
