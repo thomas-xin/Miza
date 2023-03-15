@@ -4466,7 +4466,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     return self.__getattribute__(k)
                 except AttributeError:
                     pass
-                return object.__getattribute__(object.__getattribute__(self, "message"), k)
+                m = object.__getattribute__(self, "message")
+                if not isinstance(m, self.__class__):
+                    return getattr(m, k)
+                return object.__getattribute__(m, k)
 
         class LoadedMessage(discord.Message):
             pass
