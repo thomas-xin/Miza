@@ -806,8 +806,8 @@ class Bot:
 		if self.check_google(q):
 			res = (self.google, self.bing)[random.randint(0, 1)](q, raw=True)
 			s = "[GOOGLE]: "
-			if len(self.gpttokens(res)) > 128:
-				summ = self.answer_summarise("facebook/bart-large-cnn", q + "\n" + res, max_length=96, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
+			if len(self.gpttokens(res)) > 144:
+				summ = self.answer_summarise("facebook/bart-large-cnn", q + "\n" + res, max_length=128, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
 				res = lim_str(res.replace("\n", " "), 256, mode="right") + "\n" + summ
 			res = s + res + "\n"
 			lines.append(res)
@@ -908,14 +908,27 @@ class Bot:
 				m = {}
 				if k in (self.name, "[CHATGPT]", "[GOOGLE]"):
 					m["role"] = "assistant"
+				elif k in ("[IMAGE]",):
+					m["role"] = "system"
+					k = ""
+					v = "The user has posted an image likely depicting " + v
+				elif k in ("[SHORT ANSWER]",):
+					m["role"] = "system"
+					k = ""
+					v = f'A short, incomplete answer would be "{v}"'
+				elif k in ("[REPLIED TO]",):
+					m["role"] = "system"
+					k = ""
+					v = "The user is replying to a previous message:\n" + v
 				else:
 					m["role"] = "user"
 				m["content"] = v
 				if not k.isalnum():
 					k = unicode_prune(k)
-					k = "".join((c if c.isalnum() else "-") for c in k)
-					while "--" in k:
-						k = k.replace("--", "-")
+					if not k.isalnum():
+						k = "".join((c if c.isalnum() else "-") for c in k).strip("-")
+						while "--" in k:
+							k = k.replace("--", "-")
 				if k:
 					m["name"] = k
 				messages.append(m)
