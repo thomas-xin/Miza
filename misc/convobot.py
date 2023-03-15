@@ -914,7 +914,7 @@ class Bot:
 				m["content"] = v
 				if not k.isalnum():
 					k = unicode_prune(k)
-					k = "".join(c for c in k if c.isalnum() else urllib.parse.quote(c) for c in k)
+					k = "".join((c if c.isalnum() else urllib.parse.quote(c)) for c in k)
 				m["name"] = k
 				messages.append(m)
 				pc += len(self.gpttokens(m["role"], "text-davinci-003"))
