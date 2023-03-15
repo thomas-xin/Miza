@@ -1260,7 +1260,7 @@ class Ask(Command):
             emb = discord.Embed(colour=colour, description=css_md("[This message has been reset.]"))
             emb.set_author(**get_author(bot.user))
             create_task(message.edit(embed=emb))
-            # create_task(message.add_reaction("❎"))
+            create_task(message.add_reaction("❎"))
             if m:
                 await bot.process_message(m)
             return
@@ -1278,7 +1278,7 @@ class Ask(Command):
             emb.set_author(**get_author(bot.user))
             await message.edit(embed=emb)
             # create_task(message.edit(content=css_md("[The conversation has been reset.]")))
-            # create_task(message.add_reaction("❎"))
+            create_task(message.add_reaction("❎"))
             return
 
 
