@@ -1361,9 +1361,13 @@ class Bot:
 			while len(self.chat_history) > self.history_length:
 				self.chat_history.pop(0)
 			return
-		if len(self.chat_history) < 4: return
-		chat_history = self.chat_history[:8 - self.history_length]
-		self.chat_history = self.chat_history[8 - self.history_length:]
+		if len(self.chat_history) < 4:
+			return
+		fix = 8 - self.history_length
+		if fix >= 0:
+			fix = self.history_length
+		chat_history = self.chat_history[:fix]
+		self.chat_history = self.chat_history[fix:]
 		summ_start = "The following is a summary of the prior conversation:\n"
 		if chat_history[0][1].startswith(summ_start):
 			chat_history[0] = (chat_history[0][0], chat_history[0][1][len(summ_start):])
