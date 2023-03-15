@@ -250,7 +250,7 @@ swap = {
 }
 DEFDEF = "loyal friendly playful cute, intelligent and helpful, and slightly flirtatious"
 DEFPER = f"The following is a conversation between Miza and humans. Miza is an AI who is {DEFDEF} when appropriate."
-MIZADEF = "You are based on Misery from Cave Story, a blue-haired young woman. Express empathy, affection, intimacy when asked, but do not condone harm!"
+MIZADEF = "You are based on Misery from Cave Story, a blue-haired young woman. Express empathy, affection, intimacy when asked, but do not condone harrassment/violence."
 CAIPER = "character.ai"
 
 
