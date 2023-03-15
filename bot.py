@@ -1550,8 +1550,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         except KeyError:
             m = None
         else:
-            if force < 2 and isinstance(m, self.ExtendedMessage) and not getattr(m, "replaceable", True):
-                return m
+            if force < 2 and isinstance(m, self.ExtendedMessage):
+                with suppress(AttributeError):
+                    if not object.__getattribute__(m, "replaceable"):
+                        return m
             if getattr(m, "slash", False):
                 message.slash = m.slash
         if cache and not m or force:
