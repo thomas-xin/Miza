@@ -1363,13 +1363,13 @@ class Bot:
 			return
 		if len(self.chat_history) < 4:
 			return
-		fix = 8 - self.history_length
-		if fix >= 0:
-			fix = self.history_length
+		fix = -8
+		if fix <= -len(self.chat_history):
+			fix = self.history_length - 3
 		chat_history = self.chat_history[:fix]
 		self.chat_history = self.chat_history[fix:]
 		summ_start = "The following is a summary of the prior conversation:\n"
-		if chat_history[0][1].startswith(summ_start):
+		if chat_history and chat_history[0][1].startswith(summ_start):
 			chat_history[0] = (chat_history[0][0], chat_history[0][1][len(summ_start):])
 		lines = []
 		for k, v in self.promises:
@@ -1385,6 +1385,7 @@ class Bot:
 		v = summ_start + v
 		print("Chat summary:", v)
 		self.chat_history.insert(0, (f"[CHATGPT]:", v))
+		self.promises.clear()
 
 	def after(self, t1, t2):
 		exc.submit(self._after, t1, t2)
