@@ -915,7 +915,7 @@ class Bot:
 				elif k in ("[SHORT ANSWER]",):
 					m["role"] = "system"
 					k = ""
-					v = f'An example answer is "{v}"'
+					v = f'An example incomplete answer is "{v}"'
 				elif k in ("[REPLIED TO]",):
 					m["role"] = "system"
 					k = ""
