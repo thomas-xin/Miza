@@ -1007,7 +1007,7 @@ class Ask(Command):
         reset = False
         if not h:
             if not getattr(message, "simulated", False) and not bot.data.cai_channels.get(channel.id):
-                async for m in bot.history(channel, limit=5):
+                async for m in bot.history(channel, limit=12):
                     if m.id == message.id:
                         continue
                     if m.content:
@@ -1026,7 +1026,7 @@ class Ask(Command):
         else:
             t = await process_image("lambda cid: CBOTS.get(cid).timestamp", "$", [channel.id], fix=1)
             if utc() - t > 28800:
-                async for m in bot.history(channel, limit=5):
+                async for m in bot.history(channel, limit=12):
                     if m.id == message.id:
                         continue
                     if m.content:
