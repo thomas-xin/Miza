@@ -2451,7 +2451,13 @@ def CBAI(inputs):
 
 VGPT = VVQA = None
 def caption(im, q=None, cid=None):
-	from transformers import TrOCRProcessor, VisionEncoderDecoderModel, ViltProcessor, ViltForQuestionAnswering
+	for i in range(3):
+		try:
+			from transformers import TrOCRProcessor, VisionEncoderDecoderModel, ViltProcessor, ViltForQuestionAnswering
+		except ImportError:
+			time.sleep(i + 1)
+		else:
+			break
 	if cid and cid in CBOTS and CBOTS[cid].cai_channel:
 		CBOTS[cid].image = im
 		return ("", "")
