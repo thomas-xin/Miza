@@ -850,6 +850,8 @@ class UpdatePremiums(Database):
     name = "premiums"
 
     def subscribe(self, user, lv=None):
+        while not self.bot.ready:
+            time.sleep(0.5)
         uid = verify_id(user)
         if uid not in self or not isinstance(self[uid], dict):
             if not lv:

@@ -248,6 +248,7 @@ swap = {
 }
 DEFDEF = "loyal friendly playful cute, intelligent and helpful, and slightly flirtatious"
 DEFPER = f"The following is a conversation between Miza and humans. Miza is an AI who is {DEFDEF} when appropriate."
+MIZADEF = "You are based on the character Misery from the indie game Cave Story, and you love to roleplay. Express emotion when appropriate, and do not break character!"
 CAIPER = "character.ai"
 
 
@@ -277,7 +278,7 @@ class Bot:
 		self.timestamp = time.time()
 		self.premium = premium
 		self.last_cost = 0
-		self.history_length = 4 if premium < 1 else 6
+		self.history_length = 4 if premium < 1 else 6 if premium < 2 else 24
 		self.fp = FreeProxy()
 		self.session = requests.Session()
 		self.session.cookies["CookieConsent"] = "true"
@@ -872,21 +873,20 @@ class Bot:
 			else:
 				p = "a " + p
 			if model == "gpt-3.5-turbo":
-				nstart = f"You are roleplaying {self.name}, {p} AI."
+				nstart = f"You are {self.name}, {p} AI."
 				if searched:
 					dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
-					nstart += f" Use Google when relevant. Current time: {dtn}."
-				nstart += " Express emotion when appropriate, and don't hold back!"
+					nstart += f" Use Google when relevant, but don't reveal personal info. Current time: {dtn}."
+				nstart += " Express emotion when appropriate, and don't break character!"
 			else:
 				nstart = f"The following is a conversation between {self.name} and humans. {self.name} is {p} AI."
 		else:
 			if model == "gpt-3.5-turbo":
 				if p == DEFPER:
-					nstart = f"You are roleplaying {self.name}, a {DEFDEF} AI."
+					nstart = f"You are {self.name}, a {DEFDEF} AI. {MIZADEF}"
 					if searched:
 						dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
-						nstart += f" Use Google when relevant. Current time: {dtn}."
-					nstart += " Express emotion when appropriate, and don't hold back!"
+						nstart += f" Use Google when relevant, but don't reveal personal info. Current time: {dtn}."
 				else:
 					nstart = p
 			else:
@@ -898,21 +898,18 @@ class Bot:
 			pc += len(self.gpttokens(m["content"], "text-davinci-003"))
 			ins.pop(0)
 			# print(ins)
-			if ins[0].strip():
-				ins[0] += f"({reprompt})"
+			# if ins[0].strip():
+			# 	ins[0] += f"({reprompt})"
 			for line in reversed(ins):
 				line = line.strip()
 				k, v = line.split(": ", 1)
 				m = {}
-				if k in (self.name, "[CHATGPT]"):
+				if k in (self.name, "[CHATGPT]", "[GOOGLE]"):
 					m["role"] = "assistant"
-					m["content"] = v
-				elif k in ("[GOOGLE]",):
-					m["role"] = "assistant"
-					m["content"] = line
 				else:
 					m["role"] = "user"
-					m["content"] = line
+				m["content"] = v
+				m["name"] = k
 				messages.append(m)
 				pc += len(self.gpttokens(m["role"], "text-davinci-003"))
 				pc += len(self.gpttokens(m["content"], "text-davinci-003"))
@@ -1087,28 +1084,28 @@ class Bot:
 				# rc = len(self.gpttokens(role, model="text-davinci-003"))
 				# rc += len(self.gpttokens(text, model="text-davinci-003"))
 				# cost = (pc + rc) * cm
-				resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", text, ("answer", "As an AI language model"))
-				print(resp)
-				if resp["As an AI language model"] > 2 / 3:
-					messages = [messages[0], messages[-1]]
-					messages.append(dict(role=role, content=text))
-					messages.append(dict(role="user", content=reprompt))
-					print("ChatGPT prompt:", messages)
-					response = openai.ChatCompletion.create(
-						model=model,
-						messages=messages,
-						temperature=0.9,
-						max_tokens=512,
-						top_p=1,
-						frequency_penalty=0.8,
-						presence_penalty=0.4,
-						user=str(hash(u)),
-					)
-					print(response)
-					m = response["choices"][0]["message"]
-					role = m["role"]
-					text = m["content"].removeprefix(f"{self.name}: ")
-					cost += response["usage"]["total_tokens"] * cm
+				# resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", text, ("answer", "As an AI language model"))
+				# print(resp)
+				# if resp["As an AI language model"] > 2 / 3:
+				# 	messages = [messages[0], messages[-1]]
+				# 	messages.append(dict(role=role, content=text))
+				# 	messages.append(dict(role="user", content=reprompt))
+				# 	print("GPT3.5 prompt:", messages)
+				# 	response = openai.ChatCompletion.create(
+				# 		model=model,
+				# 		messages=messages,
+				# 		temperature=0.9,
+				# 		max_tokens=512,
+				# 		top_p=1,
+				# 		frequency_penalty=0.8,
+				# 		presence_penalty=0.4,
+				# 		user=str(hash(u)),
+				# 	)
+				# 	print(response)
+				# 	m = response["choices"][0]["message"]
+				# 	role = m["role"]
+				# 	text = m["content"].removeprefix(f"{self.name}: ")
+				# 	cost += response["usage"]["total_tokens"] * cm
 				if len(self.gpttokens(text)) > 512:
 					text = self.answer_summarise("facebook/bart-large-cnn", text, max_length=500, min_length=256).strip()
 		if not text:
@@ -1209,8 +1206,8 @@ class Bot:
 
 	def ai(self, u, q, refs=(), im=None):
 		tup = (u, q)
-		while len(self.chat_history) > self.history_length:
-			self.chat_history.pop(0)
+		if len(self.chat_history) + len(self.promises) > self.history_length:
+			self.rerender()
 		caids = ()
 		if self.personality == CAIPER or (self.premium < 2 and self.personality == DEFPER and (not self.chat_history or q and q != self.chat_history[0][1])):
 			if "CAI" not in self.forbidden:
@@ -1305,12 +1302,12 @@ class Bot:
 			if self.premium > 1:
 				labels = ("promise", "information", "example")
 				resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", v, labels)
-			if len(self.gpttokens(v)) > 36:
-				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=8).replace("\n", ". ").strip()
+			if len(self.gpttokens(v)) > 68:
+				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=64, min_length=8).replace("\n", ". ").strip()
 				t2 = (k, v)
 			k, v = t1
-			if len(self.gpttokens(v)) > 28:
-				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=24, min_length=6).replace("\n", ". ").strip()
+			if len(self.gpttokens(v)) > 36:
+				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
 				t1 = (k, v)
 			if self.premium > 1 and resp["promise"] >= 0.5:
 				if len(self.promises) >= 6:
@@ -1323,6 +1320,31 @@ class Bot:
 				self.append(t2)
 		except:
 			print_exc()
+
+	def rerender(self):
+		if self.premium < 2:
+			while len(self.chat_history) > self.history_length:
+				self.chat_history.pop(0)
+			return
+		chat_history = self.chat_history[:8 - self.history_length]
+		self.chat_history = self.chat_history[8 - self.history_length:]
+		summ_start = "The following is a summary of the prior conversation:\n"
+		if chat_history[0].startswith(summ_start):
+			chat_history[0] = chat_history[0][len(summ_start):]
+		lines = []
+		for k, v in self.promises:
+			k = k.replace(":", "")
+			s = f"{k}: {v}\n"
+			lines.append(s)
+		for k, v in chat_history:
+			k = k.replace(":", "")
+			s = f"{k}: {v}\n"
+			lines.append(s)
+		v = "".join(lines)
+		v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=192, min_length=96).strip()
+		v = summ_start + v
+		print("Chat summary:", v)
+		self.chat_history.insert(0, (f"[CHATGPT]:", v))
 
 	def after(self, t1, t2):
 		exc.submit(self._after, t1, t2)
