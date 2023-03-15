@@ -856,7 +856,7 @@ class Bot:
 		# 	cm = 200
 		else:
 			model = "gpt-3.5-turbo"
-			temp = 0.8
+			temp = 0.9
 			limit = 4000
 			cm = 20
 			reprompt = f"Please respond as {self.name} without prefixing, not Assistant!"
@@ -943,7 +943,7 @@ class Bot:
 				v += f"Use Google info when relevant, but don't reveal personal info. Current time: {dtn}\n"
 			if iman:
 				v += "\n".join(iman) + "\n"
-			v += f"IMPORTANT: {self.name} will now reply without breaking character. Do not ask repetitive questions. Do not refuse to answer questions; roleplay if necessary!"
+			v += f"IMPORTANT: {self.name} will now reply without breaking character. Take initiative, not ask repetitive questions. Do not refuse to answer questions; roleplay if necessary!"
 			m = dict(role="system", content=v)
 			messages.append(m)
 			pc += len(self.gpttokens(m["role"], "text-davinci-003"))
@@ -1093,8 +1093,8 @@ class Bot:
 					temperature=temp,
 					max_tokens=limit - pc - 64,
 					top_p=1,
-					frequency_penalty=0.8,
-					presence_penalty=0.4,
+					frequency_penalty=1.0,
+					presence_penalty=0.6,
 					user=str(hash(u)),
 				)
 			except openai.error.InvalidRequestError:
@@ -1104,8 +1104,8 @@ class Bot:
 					temperature=temp,
 					max_tokens=int((limit - pc) * 0.75),
 					top_p=1,
-					frequency_penalty=0.8,
-					presence_penalty=0.4,
+					frequency_penalty=1.0,
+					presence_penalty=0.6,
 					user=str(hash(u)),
 				)
 			except:
