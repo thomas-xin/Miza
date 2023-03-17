@@ -1713,7 +1713,7 @@ class Server:
 				sn = f.read()
 			s = sn.split("/>", 1)[-1]
 			spl = s.split("-->", 3)
-			if len(spl) != :
+			if len(spl) != 4:
 				continue
 			infd, urld, key, midd = spl
 			info = orjson.loads(infd.removeprefix("<!--"))
