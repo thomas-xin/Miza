@@ -1591,7 +1591,7 @@ class Server:
 			ts = int(of.split("~", 1)[0].rsplit(IND, 1)[-1])
 		except ValueError:
 			ts = time.time_ns() // 1000
-		ha1 = hash_file(of)
+		ha1 = self.hash_file(of)
 		ha2 = ha1[:4] + ha2[-4:]
 		for fp in os.listdir("saves/filehost"):
 			fl = fp.split("~", 1)[-1]
