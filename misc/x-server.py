@@ -703,9 +703,13 @@ class Server:
 			return resp
 	files._cp_config = {"response.stream": True}
 
+	nullfut = concurrent.futures.Future()
+	nullfut.set_result(None)
 	def concat(self, fn, urls, name="", download=False, mime=None, stn="", waiter=False):
 		on = stn + "!.temp$@" + name
 		pn = stn + "~.temp$@" + name
+		if waiter and os.path.exists(pn) and os.path.getsize(pn):
+			return self.nullfut
 		try:
 			fut = self.serving[on]
 			for i in range(3):
@@ -1723,6 +1727,8 @@ class Server:
 			info = orjson.loads(infd.removeprefix("<!--"))
 			urls = orjson.loads(urld.removeprefix("<!--").removeprefix("URL="))
 			mids = orjson.loads(midd.removeprefix("<!--").removeprefix("MID="))
+			while key.startswith("<--KEY="):
+				key = key[7:]
 			urls = [remap_url(url) for url in urls]
 			stn = p.rsplit("~.forward$", 1)[0].replace("saves/filehost/", "cache/")
 			pn = stn + "~.temp$@" + info[0]
