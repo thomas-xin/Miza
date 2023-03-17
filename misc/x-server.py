@@ -1592,7 +1592,7 @@ class Server:
 		except ValueError:
 			ts = time.time_ns() // 1000
 		ha1 = self.hash_file(of)
-		ha2 = ha1[:4] + ha2[-4:]
+		ha2 = ha1[:4] + ha1[-4:]
 		for fp in os.listdir("saves/filehost"):
 			fl = fp.split("~", 1)[-1]
 			if not fl.startswith(".forward$"):
