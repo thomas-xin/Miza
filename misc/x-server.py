@@ -708,8 +708,6 @@ class Server:
 		pn = stn + "~.temp$@" + name
 		try:
 			fut = self.serving[on]
-			if waiter:
-				return fut
 			for i in range(3):
 				if os.path.exists(on):
 					break
@@ -723,6 +721,9 @@ class Server:
 			self.serving[on] = fut
 		if waiter:
 			return fut
+		return self.wconcat(on, pn, name, download, mime)
+
+	def wconcat(self, on, pn, name, download, mime):
 		for i in range(120):
 			if os.path.exists(pn):
 				break
