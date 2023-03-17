@@ -1720,6 +1720,7 @@ class Server:
 			info = orjson.loads(infd.removeprefix("<!--"))
 			urls = orjson.loads(urld.removeprefix("<!--").removeprefix("URL="))
 			mids = orjson.loads(midd.removeprefix("<!--").removeprefix("MID="))
+			urls = [remap_url(url) for url in urls]
 			stn = p.rsplit("~.forward$", 1)[0].replace("saves/filehost/", "cache/")
 			pn = stn + "~.temp$@" + info[0]
 			self.concat(pn, urls, name=info[0], mime=info[2], stn=stn, waiter=True).result()
