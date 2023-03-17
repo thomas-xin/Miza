@@ -1704,6 +1704,10 @@ class Server:
 			+ (f'<!--SHA{ha1}-->' if ha1 else "")
 			+ '</html>'
 		)
+		with suppress(FileNotFoundError):
+			while True:
+				pn = find_file(ts, cwd="saves/filehost")
+				os.remove(pn)
 		with open(fn, "w", encoding="utf-8") as f:
 			f.write(s)
 		on = f"cache/{IND}{ts}~.temp$@" + name
@@ -1730,6 +1734,8 @@ class Server:
 			while key.startswith("<!--KEY="):
 				key = key[8:]
 			urls = [remap_url(url) for url in urls]
+			if not is_url(urls[0]):
+				continue
 			stn = p.rsplit("~.forward$", 1)[0].replace("saves/filehost/", "cache/")
 			pn = stn + "~.temp$@" + info[0]
 			self.concat(pn, urls, name=info[0], mime=info[2], stn=stn, waiter=True).result()
