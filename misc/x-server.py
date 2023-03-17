@@ -1690,11 +1690,11 @@ class Server:
 			if not self.in_replacer(ts, key):
 				self.bot_exec(f"bot.data.exec.delete({repr(mids)})")
 				return
-			urls = [map_url(url) for url in urls]
 			print(urls)
 			assert urls
 		else:
 			urls = mids = []
+		urls = [map_url(url) for url in urls]
 		code = 307
 		ftype = 3
 		jdn = json.dumps(name).replace("<", '"\u003c"').replace(">", '"\u003e"')
