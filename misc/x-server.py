@@ -152,6 +152,8 @@ actually_static = set(os.listdir("misc/static"))
 mapped_static = {k[:-5]: k for k in actually_static if k.endswith(".html")}
 
 def map_url(url):
+	if not isinstance(url, str):
+		return url
 	return url.removeprefix(
 		"https://"
 	).replace(
@@ -160,6 +162,8 @@ def map_url(url):
 		".amazonaws.com/www.guilded.gg/ContentMediaGenericFiles/", "G$"
 	)
 def remap_url(url):
+	if not isinstance(url, str):
+		return url
 	return "https://" + url.replace(
 		"D$", "cdn.discordapp.com/attachments/"
 	).replace(
@@ -609,7 +613,7 @@ class Server:
 				return b
 			elif not os.path.exists(p):
 				raise FileNotFoundError(404, p)
-			elif "$" in p and p.rsplit("$", 1)[0].endswith("~.forward") and mime == "text/html" and os.path.getsize(p) < 1048576:
+			elif "$" in p and p.split("$", 1)[0].endswith("~.forward") and mime == "text/html" and os.path.getsize(p) < 1048576:
 				with open(p, "r", encoding="utf-8") as f:
 					resp = f.read(1048576)
 				s = resp
