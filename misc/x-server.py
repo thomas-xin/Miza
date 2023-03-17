@@ -1633,9 +1633,9 @@ class Server:
 				mids = []
 				ha1 = ha2 = ""
 				break
+		size = os.path.getsize(of)
+		mime = get_mime(of)
 		if not urls:
-			size = os.path.getsize(of)
-			mime = get_mime(of)
 			if size > 8388608:
 				with tracebacksuppressor(StopIteration):
 					if mime.split("/", 1)[0] == "video" or mime in ("image/gif", "image/apng"):
