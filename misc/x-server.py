@@ -404,7 +404,7 @@ class Server:
 						urls = [remap_url(url) for url in urls]
 						# print(urls)
 						if len(urls) == 1 and not is_url(urls[0]):
-							urls = self._fileinfo(f"@{url}").get("chunks", ())
+							urls = self._fileinfo(f"@{urls[0]}").get("chunks", ())
 						d["chunks"] = urls
 					else:
 						d["original_url"] = url
