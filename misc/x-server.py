@@ -1744,7 +1744,7 @@ class Server:
 			stn = p.rsplit("~.forward$", 1)[0].replace("saves/filehost/", "cache/")
 			pn = stn + "~.temp$@" + info[0]
 			self.concat(pn, urls, name=info[0], mime=info[2], stn=stn, waiter=True).result()
-			self.replace_file(pn, key=key, urls=urls, mids=mids)
+			self.replace_file(pn, name=info[0], key=key, urls=urls, mids=mids)
 
 	@cp.expose
 	@hostmap
