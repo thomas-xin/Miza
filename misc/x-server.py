@@ -1613,7 +1613,7 @@ class Server:
 				continue
 			with open("saves/filehost/" + fp, "r+", encoding="utf-8") as f:
 				sn = f.read()
-				if "<!--SHA" not in s:
+				if "<!--SHA" not in sn:
 					continue
 				s = sn.split("<!--SHA", 1)[-1]
 				fh1, s = s.split("-->", 1)
