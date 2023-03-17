@@ -162,7 +162,7 @@ def map_url(url):
 		".amazonaws.com/www.guilded.gg/ContentMediaGenericFiles/", "G$"
 	)
 def remap_url(url):
-	if not isinstance(url, str):
+	if not isinstance(url, str) or url.startswith("https://"):
 		return url
 	return "https://" + url.replace(
 		"D$", "cdn.discordapp.com/attachments/"
