@@ -670,6 +670,7 @@ class Server:
 							if cp.request.method == "HEAD":
 								cp.response.headers["Content-Length"] = info[1]
 								return
+							print(urls)
 							if len(urls) == 1:
 								url = remap_url(urls[0])
 								if not is_url(url):
