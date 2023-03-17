@@ -397,7 +397,7 @@ class Server:
 						s = resp.split("/>", 1)[-1]
 						infd, urld, _ = s.split("-->", 2)
 						info = orjson.loads(infd.removeprefix("<!--"))
-						urls = orjson.loads(urld.removeprefix("<!--"))
+						urls = orjson.loads(urld.removeprefix("<!--").removeprefix("URL="))
 						d["filename"] = info[0]
 						d["size"] = info[1]
 						d["mimetype"] = info[2]
@@ -667,7 +667,7 @@ class Server:
 							s = resp.split("/>", 1)[-1]
 							infd, urld, _ = s.split("-->", 2)
 							info = orjson.loads(infd.removeprefix("<!--"))
-							urls = orjson.loads(urld.removeprefix("<!--"))
+							urls = orjson.loads(urld.removeprefix("<!--URL="))
 							disp = "filename=" + info[0]
 							cp.response.headers["Content-Disposition"] = disp
 							# cp.response.headers["Content-Length"] = info[1]
@@ -703,11 +703,13 @@ class Server:
 			return resp
 	files._cp_config = {"response.stream": True}
 
-	def concat(self, fn, urls, name="", download=False, mime=None, stn=""):
+	def concat(self, fn, urls, name="", download=False, mime=None, stn="", waiter=False):
 		on = stn + "!.temp$@" + name
 		pn = stn + "~.temp$@" + name
 		try:
 			fut = self.serving[on]
+			if waiter:
+				return fut
 			for i in range(3):
 				if os.path.exists(on):
 					break
@@ -719,6 +721,8 @@ class Server:
 		except KeyError:
 			fut = create_future_ex(self._concat, urls, on, pn)
 			self.serving[on] = fut
+		if waiter:
+			return fut
 		for i in range(120):
 			if os.path.exists(pn):
 				break
@@ -1368,7 +1372,7 @@ class Server:
 				url = ""
 				n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
 				key = base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
-				s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--><!--KEY={key}--><!--MID={mids}--></html>'
+				s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta/><!--["{name}","{size}","{mime}"]--><!--URL={json.dumps(urls, separators=(",", ":"))}--><!--KEY={key}--><!--MID={mids}--></html>'
 				with open(fn, "w", encoding="utf-8") as f:
 					f.write(s)
 				return self.merge(name=name, index=1)
@@ -1629,15 +1633,15 @@ class Server:
 				fh1, s = s.split("-->", 1)
 				if fh1 != ha1:
 					continue
-				if s.startswith("<!--REF"):
-					s = s.removeprefix("<!--REF")
+				if s.startswith("<!--REF="):
+					s = s.removeprefix("<!--REF=")
 					refs = orjson.loads(s.split("-->", 1)[0])
 					refs.append(ts)
 				else:
 					refs = [ts]
 				i = sn.index("<!--SHA") + len("<!--SHA") + len(fh1) + len("-->")
 				f.seek(i)
-				f.write(f'<!--REF{json.dumps(refs)}--></html>')
+				f.write(f'<!--REF=[{",".join(map(str, refs))}]--></html>')
 				t2 = int(fp.split("~", 1)[0].rsplit(IND, 1)[-1])
 				urls = [t2]
 				mids = []
@@ -1667,7 +1671,7 @@ class Server:
 		n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
 		key = key or base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
 		# na2 = lim_str(name, 96).replace("$", "-")
-		fn = f"saves/filehost/{IND}{ts}~.forward${size}${ha2 or ' '}$"#{na2}"
+		fn = f"saves/filehost/{IND}{ts}~.forward${size}${ha2 or ' '}${na2}.$"
 		if os.path.exists(fn) and not urls:
 			return url + f"?key={key}"
 		if urls:
@@ -1688,7 +1692,7 @@ class Server:
 		jdn = json.dumps(name).replace("<", '"\u003c"').replace(">", '"\u003e"')
 		s = (
 			f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/>'
-			+ f'<!--[{jdn},{size},"{mime}"]--><!--{json.dumps(urls)}--><!--KEY={key}--><!--MID={json.dumps(mids)}-->'
+			+ f'<!--[{jdn},{size},"{mime}"]--><!--URL={json.dumps(urls, separators=(",", ":"))}--><!--KEY={key}--><!--MID={json.dumps(mids)}-->'
 			+ (f'<!--SHA{ha1}-->' if ha1 else "")
 			+ '</html>'
 		)
@@ -1699,6 +1703,23 @@ class Server:
 			os.rename(of, on)
 		self.remove_replacer(ts, key)
 		return url + f"?key={key}"
+
+	def bump(self):
+		for fp in os.listdir("saves/filehost"):
+			if fp.count("$") >= 4:
+				continue
+			p = "saves/filehost/" + fp
+			with open(p, "r", encoding="utf-8") as f:
+				sn = f.read()
+			s = sn.split("/>", 1)[-1]
+			infd, urld, key, midd  = s.split("-->", 3)
+			info = orjson.loads(infd.removeprefix("<!--"))
+			urls = orjson.loads(urld.removeprefix("<!--").removeprefix("URL="))
+			mids = orjson.loads(midd.removeprefix("<!--").removeprefix("MID="))
+			stn = p.rsplit("~.forward$", 1)[0].replace("saves/filehost/", "cache/")
+			pn = stn + "~.temp$@" + info[0]
+			self.concat(pn, urls, name=info[0], mime=info[2], stn=stn, waiter=True).result()
+			self.replace_file(pn, key=key, urls=urls, mids=mids)
 
 	@cp.expose
 	@hostmap
@@ -1785,11 +1806,13 @@ class Server:
 				orig = f.read()
 			if key != orig.split("<!--KEY=", 1)[-1].split("-->", 1)[0]:
 				raise PermissionError("Incorrect key.")
+			self.delete_link(p, orig)
+		else:
+			os.remove(p)
 		if self.edited.get(ots):
 			return
 		self.edited[ots] = True
 		try:
-			os.remove(p)
 			if not replaceable:
 				mids = orjson.loads(orig.split("<!--MID=", 1)[-1].split("-->", 1)[0])
 				self.bot_exec(f"bot.data.exec.delete({repr(mids)})")
@@ -1800,6 +1823,48 @@ class Server:
 			self.edited.pop(ots, None)
 		print("Edited", url)
 		return url
+
+	def delete_link(self, p, text=None):
+		if not text:
+			with open(p, "r", encoding="utf-8") as f:
+				text = f.read()
+		s = text.split("/>", 1)[-1]
+		infd, urld, _k, midd, ext  = s.split("-->", 4)
+		# info = orjson.loads(infd.removeprefix("<!--"))
+		urls = orjson.loads(urld.removeprefix("<!--URL="))
+		mids = orjson.loads(midd.removeprefix("<!--MID="))
+		spl = ext.split("-->")
+		if len(spl) > 0:
+			ha1 = orjson.loads(spl[0].removeprefix("<!--SHA="))
+			if len(spl) > 1:
+				fids = orjson.loads(spl[1].removeprefix("<!--REF="))
+				newref = None
+				for fid in fids:
+					with tracebacksuppressor(FileNotFoundError):
+						p2 = find_file(fid, "saves/filehost")
+						with open(p2, "r+", encoding="utf-8") as f:
+							sn = f.read()
+							if not newref:
+								newref = fid
+								i = sn.index("<!--URL=") + len("<!--URL=")
+								s = sn[i:].split("-->", 1)[-1]
+								f.seek(i)
+								f.write(json.dumps(urls, separators=(",", ":")))
+								f.write(s)
+								f.seek(0)
+								sn = f.read()
+								i = sn.index("<!--MID=") + len("<!--MID=")
+								s = sn[i:].split("-->", 1)[-1]
+								f.seek(i)
+								f.write(json.dumps(mids, separators=(",", ":")))
+								f.write(s)
+							else:
+								i = sn.index("<!--URL=") + len("<!--URL=")
+								s = sn[i:].split("-->", 1)[-1]
+								f.seek(i)
+								f.write(json.dumps([newref], separators=(",", ":")))
+								f.write(s)
+		os.remove(p)
 
 	@cp.expose
 	@hostmap
@@ -1824,7 +1889,9 @@ class Server:
 				orig = f.read()
 			if key != orig.split("<!--KEY=", 1)[-1].split("-->", 1)[0]:
 				raise PermissionError("Incorrect key.")
-		os.remove(p)
+			self.delete_link(p, text=orig)
+		else:
+			os.remove(p)
 		if not replaceable:
 			mids = orjson.loads(orig.split("<!--MID=", 1)[-1].split("-->", 1)[0])
 			self.bot_exec(f"bot.data.exec.delete({repr(mids)})")
