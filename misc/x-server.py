@@ -332,14 +332,9 @@ def get_geo(ip):
 class Server:
 
 	serving = {}
-
-	@cp.expose
-	@hostmap
-	def fileinfo(self, path, **void):
+	def _fileinfo(self, path, **void):
 		orig_path = path
 		ind = IND
-		p = None
-		cp.response.headers.update(SHEADERS)
 		if path.startswith("!"):
 			ind = "!"
 			path = path[1:]
@@ -350,8 +345,7 @@ class Server:
 			path = str(int.from_bytes(base64.urlsafe_b64decode(b), "big"))
 		else:
 			path = path[1:]
-		if not p:
-			p = find_file(path, cwd=("saves/filehost", "cache"), ind=ind)
+		p = find_file(path, cwd=("saves/filehost", "cache"), ind=ind)
 		mime = get_mime(p)
 		f_url = cp.url(qs=cp.request.query_string).replace("/fileinfo/", "/f/")
 		st = os.stat(p)
@@ -379,6 +373,7 @@ class Server:
 			timestamp=max(st.st_mtime, st.st_ctime),
 			in_cache=a3,
 		)
+		print(p)
 		if "$" in p and p.rsplit("$", 1)[0].endswith("~.forward") and mime == "text/html":
 			with open(p, "r", encoding="utf-8") as f:
 				resp = f.read(1048576)
@@ -403,10 +398,17 @@ class Server:
 						d["mimetype"] = info[2]
 						urls = [remap_url(url) for url in urls]
 						if len(urls) == 1 and not is_url(urls[0]):
-							urls = self.fileinfo(f"@{url}").get("chunks", ())
+							urls = self._fileinfo(f"@{url}").get("chunks", ())
 						d["chunks"] = urls
 					else:
 						d["original_url"] = url
+		return d
+
+	@cp.expose
+	@hostmap
+	def fileinfo(self, path, **void):
+		cp.response.headers.update(SHEADERS)
+		d = self._fileinfo(path)
 		cp.response.headers["Content-Type"] = "application/json"
 		return orjson.dumps(d)
 
@@ -675,7 +677,7 @@ class Server:
 								url = remap_url(urls[0])
 								if not is_url(url):
 									p = find_file(url, cwd=("cache", "saves/filehost"))
-									urls = self.fileinfo(f"@{url}").get("chunks", ())
+									urls = self._fileinfo(f"@{url}").get("chunks", ())
 							if download and len(urls) == 1 and not referrer:
 								raise cp.HTTPRedirect(url, status="307")
 							cp.response.headers.pop("Accept-Ranges", None)
