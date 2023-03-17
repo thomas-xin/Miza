@@ -1712,7 +1712,10 @@ class Server:
 			with open(p, "r", encoding="utf-8") as f:
 				sn = f.read()
 			s = sn.split("/>", 1)[-1]
-			infd, urld, key, midd  = s.split("-->", 3)
+			spl = s.split("-->", 3)
+			if len(spl) != :
+				continue
+			infd, urld, key, midd = spl
 			info = orjson.loads(infd.removeprefix("<!--"))
 			urls = orjson.loads(urld.removeprefix("<!--").removeprefix("URL="))
 			mids = orjson.loads(midd.removeprefix("<!--").removeprefix("MID="))
