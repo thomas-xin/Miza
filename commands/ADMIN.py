@@ -654,7 +654,7 @@ class RoleGiver(Command):
     name = ["Verifier"]
     min_level = 3
     min_display = "3+"
-    description = "Adds an automated role giver to the current channel. Triggered by a keyword in messages, only applicable to users with permission level >= 0."
+    description = "Adds an automated role giver to the current channel. Triggered by a keyword in messages, only applicable to users with permission level >= 0 and account age >= 7d."
     usage = "<0:react_to>? <1:role>? <delete_messages{?x}>? <disable{?d}>?"
     example = ("rolegiver lol lol_role", "rolegiver n*gger muted")
     flags = "aedx"
@@ -3006,7 +3006,7 @@ class UpdateRolegivers(Database):
         user = message.author
         guild = message.guild
         bot = self.bot
-        if bot.get_perms(user, message.guild) < 0:
+        if bot.get_perms(user, message.guild) < 0 or utc() - user.created_at.timestamp() < 86400 * 7:
             return
         assigned = self.data.get(message.channel.id, ())
         for k in assigned:

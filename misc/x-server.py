@@ -1569,50 +1569,111 @@ class Server:
 		mime = get_mime(of)
 		return of
 
-	def replace_file(self, fn, key=None, delay=0):
+	def hash_file(self, fn):
+		if os.name != "nt":
+			return ""
+		args = ["certutil", "-hashfile", fn, "sha384"]
+		print(args)
+		s = subprocess.check_output(args)
+		try:
+			return s.splitlines()[1]
+		except:
+			print(s)
+			print_exc()
+		return ""
+
+	def replace_file(self, fn, key=None, delay=0, name=None, urls=None, mids=None):
 		if not os.path.exists(fn):
 			return
 		print("Replace", fn)
 		of = fn
-		size = os.path.getsize(of)
-		mime = get_mime(of)
-		if size > 8388608:
-			with tracebacksuppressor(StopIteration):
-				if mime.split("/", 1)[0] == "video" or mime in ("image/gif", "image/apng"):
-					of = self.optimise_video(of, size, mime)
-				elif mime in ("image/bmp", "image/tiff", "image/xbm", "image/heic", "image/heif"):
-					of = self.optimise_image(of, size, mime)
-				else:
-					raise StopIteration
-				size = os.path.getsize(of)
-				mime = get_mime(of)
-		name = of.rsplit("/", 1)[-1].split("~", 1)[-1]
-		if name.startswith(".forward$"):
-			raise PermissionError
-		if name.startswith(".temp$@"):
-			name = name[7:]
 		try:
 			ts = int(of.split("~", 1)[0].rsplit(IND, 1)[-1])
 		except ValueError:
 			ts = time.time_ns() // 1000
+		ha1 = hash_file(of)
+		ha2 = ha1[:4] + ha2[-4:]
+		for fp in os.listdir("saves/filehost"):
+			fl = fp.split("~", 1)[-1]
+			if not fl.startswith(".forward$"):
+				continue
+			fl = fl.split("$", 1)[-1]
+			if "$" not in fl:
+				continue
+			fh2 = fl.split("$", 2)[1].strip()
+			if fh2 != ha2:
+				continue
+			with open("saves/filehost/" + fp, "r+", encoding="utf-8") as f:
+				sn = f.read()
+				if "<!--SHA" not in s:
+					continue
+				s = sn.split("<!--SHA", 1)[-1]
+				fh1, s = s.split("-->", 1)
+				if fh1 != ha1:
+					continue
+				if s.startswith("<!--REF"):
+					s = s.removeprefix("<!--REF")
+					refs = orjson.loads(s.split("-->"))
+					refs.append(ts)
+				else:
+					refs = [ts]
+				i = sn.index("<!--SHA") + len("<!--SHA") + len(fh1) + len("-->")
+				f.seek(i)
+				f.write(f'<!--REF{json.dumps(refs)}--></html>')
+				t2 = int(fp.split("~", 1)[0].rsplit(IND, 1)[-1])
+				urls = [t2]
+				mids = []
+				ha1 = ha2 = ""
+				break
+		if not urls:
+			size = os.path.getsize(of)
+			mime = get_mime(of)
+			if size > 8388608:
+				with tracebacksuppressor(StopIteration):
+					if mime.split("/", 1)[0] == "video" or mime in ("image/gif", "image/apng"):
+						of = self.optimise_video(of, size, mime)
+					elif mime in ("image/bmp", "image/tiff", "image/xbm", "image/heic", "image/heif"):
+						of = self.optimise_image(of, size, mime)
+					else:
+						raise StopIteration
+					size = os.path.getsize(of)
+					mime = get_mime(of)
+		if not name:
+			name = of.rsplit("/", 1)[-1].split("~", 1)[-1]
+			if name.startswith(".forward$"):
+				raise PermissionError
+			if name.startswith(".temp$@"):
+				name = name[7:]
 		b = ts.bit_length() + 7 >> 3
 		url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
 		n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
 		key = key or base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
-		fn = f"saves/filehost/{IND}{ts}~.forward${size}"
-		if os.path.exists(fn):
+		na2 = lim_str(name, 96).replace("$", "-")
+		fn = f"saves/filehost/{IND}{ts}~.forward${size}${ha2 or ' '}${na2}"
+		if os.path.exists(fn) and not urls:
 			return url + f"?key={key}"
-		self.register_replacer(ts, key)
-		urls, mids = self.bot_exec(f"bot.data.exec.stash({repr(of)})")
-		if not self.in_replacer(ts, key):
-			self.bot_exec(f"bot.data.exec.delete({repr(mids)})")
-			return
-		urls = [map_url(url) for url in urls]
-		print(urls)
-		assert urls
+		if urls:
+			pass
+		elif size > 0:
+			self.register_replacer(ts, key)
+			urls, mids = self.bot_exec(f"bot.data.exec.stash({repr(of)})")
+			if not self.in_replacer(ts, key):
+				self.bot_exec(f"bot.data.exec.delete({repr(mids)})")
+				return
+			urls = [map_url(url) for url in urls]
+			print(urls)
+			assert urls
+		else:
+			urls = mids = []
 		code = 307
 		ftype = 3
-		s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/><!--["{name}","{size}","{mime}"]--><!--{json.dumps(urls)}--><!--KEY={key}--><!--MID={json.dumps(mids)}--></html>'
+		jdn = json.dumps(name).replace("<", '"\u003c"').replace(">", '"\u003e"')
+		s = (
+			f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/>'
+			+ f'<!--[{jdn},{size},"{mime}"]--><!--{json.dumps(urls)}--><!--KEY={key}--><!--MID={json.dumps(mids)}-->'
+			+ (f'<!--SHA{ha1}-->' if ha1 else "")
+			+ '</html>'
+		)
 		with open(fn, "w", encoding="utf-8") as f:
 			f.write(s)
 		on = f"cache/{IND}{ts}~.temp$@" + name

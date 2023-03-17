@@ -395,11 +395,11 @@ for p, (x, y) in enumerate(tiles):
 			rv = target.ravel()
 
 			if entropy != 1:
-				r1 = np.random.randint(-1, 1, ceil(pa / 2), dtype=np.int8)
+				r1 = np.random.randint(-1, 1, np.ceil(pa / 2), dtype=np.int8)
 				r1 |= 1
 				r1 <<= 1
 				r1 = np.tile(r1, (2, 1)).T.ravel()[:len(pa)]
-				r2 = np.random.randint(0, 4, ceil(pa / 2), dtype=np.int8)
+				r2 = np.random.randint(0, 4, np.ceil(pa / 2), dtype=np.int8)
 				r2[r2 == 0] = -3
 				r2[r2 > 0] = 1
 				r2 = np.tile(r2, (2, 1)).T.ravel()[:len(pa)]
@@ -488,6 +488,8 @@ try:
 	if len(b) < 1 or b[-1] != 170:
 		raise ValueError
 	its = b[0]
+	if its not in range(2, 8):
+		raise ValueError
 	b = b[1:]
 	# print(b, its)
 	while len(b) and (len(b) % its or b[-1] == 170):
