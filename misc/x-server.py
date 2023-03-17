@@ -373,12 +373,12 @@ class Server:
 			timestamp=max(st.st_mtime, st.st_ctime),
 			in_cache=a3,
 		)
-		print(p)
-		if "$" in p and p.rsplit("$", 1)[0].endswith("~.forward") and mime == "text/html":
+		# print(p)
+		if "$" in p and p.split("$", 1)[0].endswith("~.forward") and mime == "text/html":
 			with open(p, "r", encoding="utf-8") as f:
 				resp = f.read(1048576)
 			s = resp
-			print(s)
+			# print(s)
 			search = "<!DOCTYPE HTML><!--"
 			if s.startswith(search):
 				s = s[len(search):]
@@ -398,7 +398,7 @@ class Server:
 						d["size"] = info[1]
 						d["mimetype"] = info[2]
 						urls = [remap_url(url) for url in urls]
-						print(urls)
+						# print(urls)
 						if len(urls) == 1 and not is_url(urls[0]):
 							urls = self._fileinfo(f"@{url}").get("chunks", ())
 						d["chunks"] = urls
