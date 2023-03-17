@@ -1576,7 +1576,7 @@ class Server:
 		print(args)
 		s = subprocess.check_output(args)
 		try:
-			return s.splitlines()[1]
+			return s.splitlines()[1].decode("ascii")
 		except:
 			print(s)
 			print_exc()
@@ -1648,8 +1648,8 @@ class Server:
 		url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
 		n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
 		key = key or base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
-		na2 = lim_str(name, 96).replace("$", "-")
-		fn = f"saves/filehost/{IND}{ts}~.forward${size}${ha2 or ' '}${na2}"
+		# na2 = lim_str(name, 96).replace("$", "-")
+		fn = f"saves/filehost/{IND}{ts}~.forward${size}${ha2 or ' '}$"#{na2}"
 		if os.path.exists(fn) and not urls:
 			return url + f"?key={key}"
 		if urls:
