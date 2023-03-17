@@ -678,12 +678,12 @@ class Server:
 							if cp.request.method == "HEAD":
 								cp.response.headers["Content-Length"] = info[1]
 								return
+							urls = [remap_url(url) for url in urls]
 							print(urls)
 							if len(urls) == 1:
-								url = remap_url(urls[0])
-								if not is_url(url):
-									p = find_file(url, cwd=("cache", "saves/filehost"))
-									urls = self._fileinfo(f"@{url}").get("chunks", ())
+								if not is_url(urls[0]):
+									p = find_file(urls[0], cwd=("cache", "saves/filehost"))
+									urls = self._fileinfo(f"@{urls[0]}").get("chunks", ())
 							if download and len(urls) == 1 and not referrer:
 								raise cp.HTTPRedirect(url, status="307")
 							cp.response.headers.pop("Accept-Ranges", None)
@@ -764,7 +764,6 @@ class Server:
 						fut.result()
 						buf += fut.buf
 						self.serving[on + "~buffer"] = buf
-					url = remap_url(url)
 					for i in range(16):
 						try:
 							resp = reqs.next().get(url, headers=headers, stream=True)
