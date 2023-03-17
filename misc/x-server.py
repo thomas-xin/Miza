@@ -1727,8 +1727,8 @@ class Server:
 			info = orjson.loads(infd.removeprefix("<!--"))
 			urls = orjson.loads(urld.removeprefix("<!--").removeprefix("URL="))
 			mids = orjson.loads(midd.removeprefix("<!--").removeprefix("MID="))
-			while key.startswith("<--KEY="):
-				key = key[7:]
+			while key.startswith("<!--KEY="):
+				key = key[8:]
 			urls = [remap_url(url) for url in urls]
 			stn = p.rsplit("~.forward$", 1)[0].replace("saves/filehost/", "cache/")
 			pn = stn + "~.temp$@" + info[0]
