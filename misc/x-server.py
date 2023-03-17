@@ -1643,8 +1643,8 @@ class Server:
 					continue
 				if s.startswith("<!--REF="):
 					s = s.removeprefix("<!--REF=")
-					refs = orjson.loads(s.split("-->", 1)[0])
-					refs.append(ts)
+					refs = set(orjson.loads(s.split("-->", 1)[0]))
+					refs.add(ts)
 				else:
 					refs = [ts]
 				i = sn.index("<!--SHA") + len("<!--SHA") + len(fh1) + len("-->")
