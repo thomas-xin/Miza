@@ -2419,7 +2419,7 @@ def find_file(path, cwd="saves/filehost", ind="\x7f"):
     if not path:
         raise EOFError
     # do not include "." in the path name
-    path = path.rsplit(".", 1)[0]
+    path = str(path).rsplit(".", 1)[0]
     fn = f"{ind}{path}"
     if not isinstance(cwd, (tuple, list)):
         cwd = (cwd,)
