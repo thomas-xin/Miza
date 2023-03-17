@@ -401,7 +401,10 @@ class Server:
 						d["filename"] = info[0]
 						d["size"] = info[1]
 						d["mimetype"] = info[2]
-						d["chunks"] = [remap_url(url) for url in urls]
+						urls = [remap_url(url) for url in urls]
+						if len(urls) == 1 and not is_url(urls[0]):
+							urls = self.fileinfo(f"@{url}").get("chunks", ())
+						d["chunks"] = urls
 					else:
 						d["original_url"] = url
 		cp.response.headers["Content-Type"] = "application/json"
@@ -667,8 +670,13 @@ class Server:
 							if cp.request.method == "HEAD":
 								cp.response.headers["Content-Length"] = info[1]
 								return
+							if len(urls) == 1:
+								url = remap_url(urls[0])
+								if not is_url(url):
+									p = find_file(url, cwd=("cache", "saves/filehost"))
+									urls = self.fileinfo(f"@{url}").get("chunks", ())
 							if download and len(urls) == 1 and not referrer:
-								raise cp.HTTPRedirect(remap_url(urls[0]), status="307")
+								raise cp.HTTPRedirect(url, status="307")
 							cp.response.headers.pop("Accept-Ranges", None)
 							stn = p.rsplit("~.forward$", 1)[0].replace("saves/filehost/", "cache/")
 							pn = stn + "~.temp$@" + info[0]
@@ -1372,10 +1380,10 @@ class Server:
 		name = kwargs.get("name") or x_name
 		s = cp.request.remote.ip + "%" + x_name
 		h = hash(s) % 2 ** 48
-		n = f"cache/{h}%"
-		if self.merged.get(n):
+		nh = n = f"cache/{h}%"
+		if self.merged.get(nh):
 			return
-		self.merged[n] = True
+		self.merged[nh] = True
 		try:
 			fn = f"saves/filehost/{IND}{ts}~" + name
 			r = n + "!"
@@ -1412,7 +1420,7 @@ class Server:
 				self.register_replacer(ts, key)
 				return "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=") + f"?key={key}"
 		finally:
-			self.merged.pop(n, None)
+			self.merged.pop(nh, None)
 		return "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=") + q
 
 	@cp.expose
