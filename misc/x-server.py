@@ -1584,7 +1584,9 @@ class Server:
 		print(args)
 		s = subprocess.check_output(args)
 		try:
-			return s.splitlines()[1].decode("ascii")
+			s = s.splitlines()[1].decode("ascii")
+			print(s)
+			return s
 		except:
 			print(s)
 			print_exc()
@@ -1621,7 +1623,7 @@ class Server:
 					continue
 				if s.startswith("<!--REF"):
 					s = s.removeprefix("<!--REF")
-					refs = orjson.loads(s.split("-->"))
+					refs = orjson.loads(s.split("-->", 1)[0])
 					refs.append(ts)
 				else:
 					refs = [ts]
