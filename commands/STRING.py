@@ -959,8 +959,8 @@ class Match(Command):
 
 class Ask(Command):
     _timeout_ = 24
-    alias = ["How"]
-    description = "Ask me any question, and I'll answer it. Premium Lv1 enables Google and GPT-Curie, Premium Lv2 enables GPT-Davinci; check that using ~serverinfo, or apply it with ~premium!"
+    alias = ["GPT2", "GPT3", "GPT4"]
+    description = f"Ask me any question, and I'll answer it. See {bot.kofi_url} for premium level specifications; check using ~serverinfo, or apply it with ~premium!"
     usage = "<string>"
     example = ("ask what's the date?", "ask what is the square root of 3721?", "ask can I have a hug?")
     # flags = "h"
@@ -1002,48 +1002,59 @@ class Ask(Command):
         if not bl:
             print(f"{message.author}:", q)
         premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
+        if name == "gpt2":
+            premium = min(1, premium)
+        elif name == "gpt3":
+            if premium < 2:
+                raise PermissionError(f"Distributed premium level 1 or higher required; please see {bot.kofi_url} for more info!")
+            premium = 2
+        elif name == "gpt3":
+            if premium < 5:
+                raise PermissionError(f"Distributed premium level 3 or higher required; please see {bot.kofi_url} for more info!")
+            premium = 5
         h = await process_image("lambda cid: bool(CBOTS.get(cid))", "$", [channel.id], fix=1)
         history = []
-        reset = False
-        if not h:
-            if not getattr(message, "simulated", False) and not bot.data.cai_channels.get(channel.id):
-                async for m in bot.history(channel, limit=12):
-                    if m.id == message.id:
-                        continue
-                    if m.content:
-                        if m.author.id == bot.id:
-                            name = bot.name
-                        else:
-                            name = m.author.display_name
-                            if name == bot.name:
-                                name = m.author.name
+        if not self.reset.get(channel.id, None):
+            reset = False
+            if not h:
+                if not getattr(message, "simulated", False) and not bot.data.cai_channels.get(channel.id):
+                    async for m in bot.history(channel, limit=12):
+                        if m.id == message.id:
+                            continue
+                        if m.content:
+                            if m.author.id == bot.id:
+                                name = bot.name
+                            else:
+                                name = m.author.display_name
                                 if name == bot.name:
-                                    name = bot.name + "2"
-                        t = (name, unicode_prune(m.content))
-                        history.insert(0, t)
-            if not q:
-                q = "Hi!"
-        else:
-            t = await process_image("lambda cid: CBOTS.get(cid).timestamp", "$", [channel.id], fix=1)
-            if utc() - t > 28800:
-                async for m in bot.history(channel, limit=12):
-                    if m.id == message.id:
-                        continue
-                    if m.content:
-                        if m.author.id == bot.id:
-                            break
-                        else:
-                            name = m.author.display_name
-                            if name == bot.name:
-                                name = m.author.name
+                                    name = m.author.name
+                                    if name == bot.name:
+                                        name = bot.name + "2"
+                            t = (name, unicode_prune(m.content))
+                            history.insert(0, t)
+                if not q:
+                    q = "Hi!"
+            else:
+                t = await process_image("lambda cid: CBOTS.get(cid).timestamp", "$", [channel.id], fix=1)
+                if utc() - t > 28800:
+                    async for m in bot.history(channel, limit=12):
+                        if m.id == message.id:
+                            continue
+                        if m.content:
+                            if m.author.id == bot.id:
+                                break
+                            else:
+                                name = m.author.display_name
                                 if name == bot.name:
-                                    name = bot.name + "2"
-                        t = (name, unicode_prune(m.content))
-                        history.insert(0, t)
-                else:
-                    reset = True
-                    if not q:
-                        q = "Hi!"
+                                    name = m.author.name
+                                    if name == bot.name:
+                                        name = bot.name + "2"
+                            t = (name, unicode_prune(m.content))
+                            history.insert(0, t)
+                    else:
+                        reset = True
+                        if not q:
+                            q = "Hi!"
         im = None
         fr = fm = None
         emb = None

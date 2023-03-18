@@ -1585,7 +1585,7 @@ class Art(Command):
             try:
                 dalle2 = name.startswith("dalle")
                 openjourney = "journey" in name
-                if dalle2 and premium < 2:
+                if dalle2 and premium < 4:
                     raise PermissionError("Premium subscription required to perform DALL·E 2 operations.")
                 tup = await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2, openjourney, nsfw, timeout=480)
                 if tup:
