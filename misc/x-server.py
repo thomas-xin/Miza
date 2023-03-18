@@ -1842,9 +1842,9 @@ class Server:
 		urls = orjson.loads(urld.removeprefix("<!--URL="))
 		mids = orjson.loads(midd.removeprefix("<!--MID="))
 		spl = ext.split("-->")
-		if len(spl) > 0:
+		if len(spl) > 1:
 			ha1 = orjson.loads(spl[0].removeprefix("<!--SHA="))
-			if len(spl) > 1:
+			if len(spl) > 2:
 				fids = orjson.loads(spl[1].removeprefix("<!--REF="))
 				newref = None
 				for fid in fids:
