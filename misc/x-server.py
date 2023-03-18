@@ -1873,7 +1873,10 @@ class Server:
 							sn = f.read()
 							if not newref:
 								i = sn.index("<!--URL=") + len("<!--URL=")
-								s = sn[i:].split("-->", 1)[-1]
+								u, s = sn[i:].split("-->", 1)
+								url1 = orjson.loads(u)
+								if is_url(url1[0]):
+									continue
 								f.seek(i)
 								f.write(json.dumps(urls, separators=(",", ":")))
 								f.write(s)
