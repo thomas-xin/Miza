@@ -958,6 +958,7 @@ class Bot:
 			pc += len(self.gpttokens(m["content"], "text-davinci-003"))
 			print("ChatGPT prompt:", messages)
 			sys.stdout.flush()
+			prompt = None
 		else:
 			prompt = "".join(reversed(ins))
 			prompt = nstart + "\n\n" + prompt
@@ -1094,30 +1095,34 @@ class Bot:
 				model = "text-curie-001"
 				cm = 20
 		elif model in ("gpt-3.5-turbo", "gpt-4"):
-			try:
-				response = openai.ChatCompletion.create(
-					model=model,
-					messages=messages,
-					temperature=temp,
-					max_tokens=limit - pc - 64,
-					top_p=1,
-					frequency_penalty=1.0,
-					presence_penalty=0.6,
-					user=str(hash(u)),
-				)
-			except openai.error.InvalidRequestError:
-				response = openai.ChatCompletion.create(
-					model=model,
-					messages=messages,
-					temperature=temp,
-					max_tokens=int((limit - pc) * 0.75),
-					top_p=1,
-					frequency_penalty=1.0,
-					presence_penalty=0.6,
-					user=str(hash(u)),
-				)
-			except:
-				print_exc()
+			for i in range(3):
+				try:
+					response = openai.ChatCompletion.create(
+						model=model,
+						messages=messages,
+						temperature=temp,
+						max_tokens=limit - pc - 64,
+						top_p=1,
+						frequency_penalty=1.0,
+						presence_penalty=0.6,
+						user=str(hash(u)),
+					)
+				except openai.error.InvalidRequestError:
+					response = openai.ChatCompletion.create(
+						model=model,
+						messages=messages,
+						temperature=temp,
+						max_tokens=int((limit - pc) * 0.75),
+						top_p=1,
+						frequency_penalty=1.0,
+						presence_penalty=0.6,
+						user=str(hash(u)),
+					)
+				except:
+					print_exc()
+				else:
+					break
+				time.sleep(i + 1)
 			if response:
 				print(response)
 				m = response["choices"][0]["message"]
@@ -1152,6 +1157,13 @@ class Bot:
 				if len(self.gpttokens(text)) > 512:
 					text = self.answer_summarise("facebook/bart-large-cnn", text, max_length=500, min_length=256).strip()
 		if not text:
+			if not prompt:
+				prompt = "".join(reversed(ins))
+				prompt = nstart + "\n\n" + prompt
+				if not self.bl:
+					print("GPT prompt:", prompt)
+				sys.stdout.flush()
+				pc = len(self.gpttokens(prompt, "text-davinci-003"))
 			try:
 				response = openai.Completion.create(
 					model=model,
