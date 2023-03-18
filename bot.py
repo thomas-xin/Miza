@@ -2644,7 +2644,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             with open(fn, "rb") as f:
                 b = f.read()
             code = compile(b, fn, "exec", optimize=1)
-            exec(code, mod)
+            exec(code, mod, dict(bot=self))
             self._globals[module] = mod
             commands = deque()
             dataitems = deque()
