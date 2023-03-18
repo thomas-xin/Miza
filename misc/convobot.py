@@ -1119,7 +1119,7 @@ class Bot:
 						user=str(hash(u)),
 					)
 				except:
-					print_exc()
+					raise
 				else:
 					break
 				time.sleep(i + 1)
