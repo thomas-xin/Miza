@@ -1896,7 +1896,7 @@ class Server:
 								f.write(s)
 						if not newref:
 							newref = fid
-							os.rename(p2, p2.replace("$ $", ha1[:4] + ha1[-4:], 1)
+							os.rename(p2, p2.replace("$ $", ha1[:4] + ha1[-4:], 1))
 
 	@cp.expose
 	@hostmap
