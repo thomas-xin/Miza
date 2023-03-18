@@ -880,20 +880,20 @@ class Bot:
 				p = "an " + p
 			else:
 				p = "a " + p
-			if model == "gpt-3.5-turbo":
+			if model in ("gpt-3.5-turbo", "gpt-4"):
 				nstart = f"You are {self.name}, {p} AI."
 				nstart += " Express emotion when appropriate, and don't break character!"
 			else:
 				nstart = f"The following is a conversation between {self.name} and humans. {self.name} is {p} AI."
 		else:
-			if model == "gpt-3.5-turbo":
+			if model in ("gpt-3.5-turbo", "gpt-4"):
 				if p == DEFPER:
 					nstart = f"You are {self.name}, a {DEFDEF} character. {MIZADEF}"
 				else:
 					nstart = p
 			else:
 				nstart = p
-		if model == "gpt-3.5-turbo":
+		if model in ("gpt-3.5-turbo", "gpt-4"):
 			m = dict(role="system", content=nstart)
 			messages = [m]
 			pc = len(self.gpttokens(m["role"], "text-davinci-003"))
@@ -1093,7 +1093,7 @@ class Bot:
 				print(resp.status_code, resp.text)
 				model = "text-curie-001"
 				cm = 20
-		elif model == "gpt-3.5-turbo":
+		elif model in ("gpt-3.5-turbo", "gpt-4"):
 			try:
 				response = openai.ChatCompletion.create(
 					model=model,
@@ -1387,7 +1387,8 @@ class Bot:
 			s = f"{k}: {v}\n"
 			lines.append(s)
 		v = "".join(lines)
-		v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=192, min_length=96).strip()
+		if len(self.gpttokens(v)) > 208:
+			v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=192, min_length=96).strip()
 		v = summ_start + v
 		print("Chat summary:", v)
 		self.chat_history.insert(0, (f"[SYSTEM]:", v))
