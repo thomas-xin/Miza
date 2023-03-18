@@ -960,7 +960,7 @@ class Match(Command):
 class Ask(Command):
     _timeout_ = 24
     alias = ["GPT2", "GPT3", "GPT4"]
-    description = f"Ask me any question, and I'll answer it. See {bot.kofi_url} for premium level specifications; check using ~serverinfo, or apply it with ~premium!"
+    description = ""
     usage = "<string>"
     example = ("ask what's the date?", "ask what is the square root of 3721?", "ask can I have a hug?")
     # flags = "h"
@@ -974,6 +974,7 @@ class Ask(Command):
 
     async def __call__(self, message, guild, channel, user, argv, name, flags=(), **void):
         bot = self.bot
+        self.description = f"Ask me any question, and I'll answer it. See {bot.kofi_url} for premium level specifications; check using ~serverinfo, or apply it with ~premium!"
         count = bot.data.users.get(user.id, {}).get("last_talk", 0)
         add_dict(bot.data.users, {user.id: {"last_talk": 1, "last_mention": 1}})
         bot.data.users[user.id]["last_used"] = utc()
