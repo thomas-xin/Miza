@@ -2487,7 +2487,7 @@ def caption(im, q=None, cid=None):
 		m = ViltForQuestionAnswering.from_pretrained("dandelin/vilt-b32-finetuned-vqa")
 		globals()["VVQA"] = (p, m)
 	spl = q.split()
-	t = " ".join(w for w in spl if not is_url(w))[:96]
+	t = " ".join(w for w in spl if not is_url(w))[:32]
 	encoding = p(image, t, return_tensors="pt")
 	outputs = m(**encoding)
 	logits = outputs.logits

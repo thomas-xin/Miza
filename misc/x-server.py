@@ -1854,6 +1854,7 @@ class Server:
 		if not text:
 			with open(p, "r", encoding="utf-8") as f:
 				text = f.read()
+		os.remove(p)
 		s = text.split("/>", 1)[-1]
 		infd, urld, _k, midd, ext  = s.split("-->", 4)
 		# info = orjson.loads(infd.removeprefix("<!--"))
@@ -1871,7 +1872,6 @@ class Server:
 						with open(p2, "r+", encoding="utf-8") as f:
 							sn = f.read()
 							if not newref:
-								newref = fid
 								i = sn.index("<!--URL=") + len("<!--URL=")
 								s = sn[i:].split("-->", 1)[-1]
 								f.seek(i)
@@ -1890,7 +1890,9 @@ class Server:
 								f.seek(i)
 								f.write(json.dumps([newref], separators=(",", ":")))
 								f.write(s)
-		os.remove(p)
+						if not newref:
+							newref = fid
+							os.rename(p2, p)
 
 	@cp.expose
 	@hostmap
