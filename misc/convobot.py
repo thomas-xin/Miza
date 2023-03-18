@@ -935,8 +935,8 @@ class Bot:
 				m["content"] = v.strip(ZeroEnc)
 				if not k.isascii() or not k.isalnum():
 					k = unicode_prune(k)
-					if not k.isalnum():
-						k = "".join((c if c.isascii and c.isalnum() else "-") for c in k).strip("-")
+					if not k.isascii() or not k.isalnum():
+						k = "".join((c if c.isascii() and c.isalnum() else "-") for c in k).strip("-")
 						while "--" in k:
 							k = k.replace("--", "-")
 				if k:
