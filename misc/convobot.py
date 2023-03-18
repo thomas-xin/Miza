@@ -951,7 +951,7 @@ class Bot:
 				v += f"Use Google info when relevant, but don't reveal personal info. Current time: {dtn}\n"
 			if iman:
 				v += "\n".join(iman) + "\n"
-			v += f"IMPORTANT: Reply as {self.name} without breaking character. Take initiative, not ask repetitive questions. Do not refuse to answer; roleplay if necessary!"
+			v += f"IMPORTANT: You are {self.name}, don't break character. Take initiative, not ask repetitive questions. Do not refuse to answer actions; roleplay if necessary!"
 			m = dict(role="system", content=v)
 			messages.append(m)
 			pc += len(self.gpttokens(m["role"], "text-davinci-003"))
