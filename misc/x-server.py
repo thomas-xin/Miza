@@ -1622,39 +1622,40 @@ class Server:
 		except ValueError:
 			ts = time.time_ns() // 1000
 		ha1 = self.hash_file(of)
-		ha2 = ha1[:4] + ha1[-4:]
-		for fp in os.listdir("saves/filehost"):
-			fl = fp.split("~", 1)[-1]
-			if not fl.startswith(".forward$"):
-				continue
-			fl = fl.split("$", 1)[-1]
-			if "$" not in fl:
-				continue
-			fh2 = fl.split("$", 2)[1].strip()
-			if fh2 != ha2:
-				continue
-			with open("saves/filehost/" + fp, "r+", encoding="utf-8") as f:
-				sn = f.read()
-				if "<!--SHA" not in sn:
+		if ha1:
+			ha2 = ha1[:4] + ha1[-4:]
+			for fp in os.listdir("saves/filehost"):
+				fl = fp.split("~", 1)[-1]
+				if not fl.startswith(".forward$"):
 					continue
-				s = sn.split("<!--SHA", 1)[-1]
-				fh1, s = s.split("-->", 1)
-				if fh1 != ha1:
+				fl = fl.split("$", 1)[-1]
+				if "$" not in fl:
 					continue
-				if s.startswith("<!--REF="):
-					s = s.removeprefix("<!--REF=")
-					refs = set(orjson.loads(s.split("-->", 1)[0]))
-					refs.add(ts)
-				else:
-					refs = [ts]
-				i = sn.index("<!--SHA") + len("<!--SHA") + len(fh1) + len("-->")
-				f.seek(i)
-				f.write(f'<!--REF=[{",".join(map(str, refs))}]--></html>')
-				t2 = int(fp.split("~", 1)[0].rsplit(IND, 1)[-1])
-				urls = [t2]
-				mids = []
-				ha1 = ha2 = ""
-				break
+				fh2 = fl.split("$", 2)[1].strip()
+				if fh2 != ha2:
+					continue
+				with open("saves/filehost/" + fp, "r+", encoding="utf-8") as f:
+					sn = f.read()
+					if "<!--SHA=" not in sn:
+						continue
+					s = sn.split("<!--SHA=", 1)[-1]
+					fh1, s = s.split("-->", 1)
+					if fh1 != ha1:
+						continue
+					if s.startswith("<!--REF="):
+						s = s.removeprefix("<!--REF=")
+						refs = set(orjson.loads(s.split("-->", 1)[0]))
+						refs.add(ts)
+					else:
+						refs = [ts]
+					i = sn.index("<!--SHA=") + len("<!--SHA=") + len(fh1) + len("-->")
+					f.seek(i)
+					f.write(f'<!--REF=[{",".join(map(str, refs))}]--></html>')
+					t2 = int(fp.split("~", 1)[0].rsplit(IND, 1)[-1])
+					urls = [t2]
+					mids = []
+					ha1 = ha2 = ""
+					break
 		size = os.path.getsize(of)
 		mime = get_mime(of)
 		if not urls:
@@ -1701,7 +1702,7 @@ class Server:
 		s = (
 			f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/>'
 			+ f'<!--[{jdn},{size},"{mime}"]--><!--URL={json.dumps(urls, separators=(",", ":"))}--><!--KEY={key}--><!--MID={json.dumps(mids)}-->'
-			+ (f'<!--SHA{ha1}-->' if ha1 else "")
+			+ (f'<!--SHA={ha1}-->' if ha1 else "")
 			+ '</html>'
 		)
 		with suppress(FileNotFoundError):
@@ -1860,7 +1861,7 @@ class Server:
 		mids = orjson.loads(midd.removeprefix("<!--MID="))
 		spl = ext.split("-->")
 		if len(spl) > 1:
-			ha1 = orjson.loads(spl[0].removeprefix("<!--SHA="))
+			ha1 = spl[0].removeprefix("<!--SHA").lstrip("=")
 			if len(spl) > 2:
 				fids = orjson.loads(spl[1].removeprefix("<!--REF="))
 				newref = None
