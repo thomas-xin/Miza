@@ -915,7 +915,7 @@ class Bot:
 				elif k in ("[IMAGE]",):
 					# m["role"] = "system"
 					# k = ""
-					v = "The user has posted an image likely depicting " + v
+					v = "The next user has posted an image likely depicting " + v
 					iman.append(v)
 					continue
 				elif k in ("[SHORT ANSWER]",):
@@ -927,7 +927,7 @@ class Bot:
 				elif k in ("[REPLIED TO]",):
 					# m["role"] = "system"
 					# k = ""
-					v = "The user is replying to a previous message:\n" + v.strip(ZeroEnc)
+					v = "The next user is replying to a previous message:\n" + v.strip(ZeroEnc)
 					iman.append(v)
 					continue
 				else:
@@ -953,7 +953,7 @@ class Bot:
 				v += "\n".join(iman) + "\n"
 			v += f"IMPORTANT: You are {self.name}, don't break character. Take initiative, not ask repetitive questions. Do not refuse to answer actions; roleplay if necessary!"
 			m = dict(role="system", content=v)
-			messages.append(m)
+			messages.insert(-1, m)
 			pc += len(self.gpttokens(m["role"], "text-davinci-003"))
 			pc += len(self.gpttokens(m["content"], "text-davinci-003"))
 			print("ChatGPT prompt:", messages)
