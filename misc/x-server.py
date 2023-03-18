@@ -162,7 +162,7 @@ def map_url(url):
 		".amazonaws.com/www.guilded.gg/ContentMediaGenericFiles/", "G$"
 	)
 def remap_url(url):
-	if not isinstance(url, str):
+	if not isinstance(url, str) or url.startswith("https://"):
 		return url
 	return "https://" + url.replace(
 		"D$", "cdn.discordapp.com/attachments/"
@@ -703,9 +703,13 @@ class Server:
 			return resp
 	files._cp_config = {"response.stream": True}
 
+	nullfut = concurrent.futures.Future()
+	nullfut.set_result(None)
 	def concat(self, fn, urls, name="", download=False, mime=None, stn="", waiter=False):
 		on = stn + "!.temp$@" + name
 		pn = stn + "~.temp$@" + name
+		if waiter and os.path.exists(pn) and os.path.getsize(pn):
+			return self.nullfut
 		try:
 			fut = self.serving[on]
 			for i in range(3):
@@ -1639,8 +1643,8 @@ class Server:
 					continue
 				if s.startswith("<!--REF="):
 					s = s.removeprefix("<!--REF=")
-					refs = orjson.loads(s.split("-->", 1)[0])
-					refs.append(ts)
+					refs = set(orjson.loads(s.split("-->", 1)[0]))
+					refs.add(ts)
 				else:
 					refs = [ts]
 				i = sn.index("<!--SHA") + len("<!--SHA") + len(fh1) + len("-->")
@@ -1686,11 +1690,11 @@ class Server:
 			if not self.in_replacer(ts, key):
 				self.bot_exec(f"bot.data.exec.delete({repr(mids)})")
 				return
-			urls = [map_url(url) for url in urls]
 			print(urls)
 			assert urls
 		else:
 			urls = mids = []
+		urls = [map_url(url) for url in urls]
 		code = 307
 		ftype = 3
 		jdn = json.dumps(name).replace("<", '"\u003c"').replace(">", '"\u003e"')
@@ -1700,6 +1704,10 @@ class Server:
 			+ (f'<!--SHA{ha1}-->' if ha1 else "")
 			+ '</html>'
 		)
+		with suppress(FileNotFoundError):
+			while True:
+				pn = find_file(ts, cwd="saves/filehost")
+				os.remove(pn)
 		with open(fn, "w", encoding="utf-8") as f:
 			f.write(s)
 		on = f"cache/{IND}{ts}~.temp$@" + name
@@ -1717,17 +1725,26 @@ class Server:
 				sn = f.read()
 			s = sn.split("/>", 1)[-1]
 			spl = s.split("-->", 4)
-			if len(spl) != 5:
+			if len(spl) >= 5:
+				infd, urld, key, midd, _ = spl[:5]
+			elif len(spl) >= 3:
+				infd, urld, _ = spl[:3]
+				key = ""
+				midd = "[]"
+			else:
 				continue
-			infd, urld, key, midd, _ = spl
 			info = orjson.loads(infd.removeprefix("<!--"))
 			urls = orjson.loads(urld.removeprefix("<!--").removeprefix("URL="))
 			mids = orjson.loads(midd.removeprefix("<!--").removeprefix("MID="))
+			while key.startswith("<!--KEY="):
+				key = key[8:]
 			urls = [remap_url(url) for url in urls]
+			if not is_url(urls[0]):
+				continue
 			stn = p.rsplit("~.forward$", 1)[0].replace("saves/filehost/", "cache/")
 			pn = stn + "~.temp$@" + info[0]
 			self.concat(pn, urls, name=info[0], mime=info[2], stn=stn, waiter=True).result()
-			self.replace_file(pn, key=key, urls=urls, mids=mids)
+			self.replace_file(pn, name=info[0], key=key, urls=urls, mids=mids)
 
 	@cp.expose
 	@hostmap
