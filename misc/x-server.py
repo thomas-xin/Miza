@@ -1862,7 +1862,7 @@ class Server:
 		mids = orjson.loads(midd.removeprefix("<!--MID="))
 		spl = ext.split("-->")
 		if len(spl) > 1:
-			ha1 = spl[0].removeprefix("<!--SHA").lstrip("=")
+			ha1 = spl[0].removeprefix("<!--SHA=")
 			if len(spl) > 2:
 				fids = orjson.loads(spl[1].removeprefix("<!--REF="))
 				newref = None
@@ -1883,6 +1883,7 @@ class Server:
 								s = sn[i:].split("-->", 1)[-1]
 								f.seek(i)
 								f.write(json.dumps(mids, separators=(",", ":")))
+								f.write(f"<!--SHA={ha1}-->")
 								f.write(s)
 							else:
 								i = sn.index("<!--URL=") + len("<!--URL=")
