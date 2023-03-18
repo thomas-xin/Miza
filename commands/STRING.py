@@ -960,7 +960,7 @@ class Match(Command):
 class Ask(Command):
     _timeout_ = 24
     alias = ["GPT2", "GPT3", "GPT4"]
-    description = ""
+    description = "Ask me any question, and I'll answer it. Check using ~serverinfo, or apply it with ~premium!"
     usage = "<string>"
     example = ("ask what's the date?", "ask what is the square root of 3721?", "ask can I have a hug?")
     # flags = "h"
