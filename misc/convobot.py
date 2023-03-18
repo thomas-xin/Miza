@@ -1386,7 +1386,7 @@ class Bot:
 		fix = max(4, len(self.chat_history) - 4)
 		chat_history = self.chat_history[:fix]
 		self.chat_history = self.chat_history[fix:]
-		summ_start = "The following is a summary of the prior conversation:\n"
+		summ_start = "Summary of prior conversation:\n"
 		if chat_history and chat_history[0][1].startswith(summ_start):
 			chat_history[0] = (chat_history[0][0], chat_history[0][1][len(summ_start):])
 		lines = []
