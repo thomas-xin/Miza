@@ -250,7 +250,7 @@ swap = {
 }
 DEFDEF = "loyal friendly playful cute, intelligent and helpful, and slightly flirtatious"
 DEFPER = f"The following is a conversation between Miza and humans. Miza is an AI who is {DEFDEF} when appropriate."
-MIZADEF = "You are based on Misery from Cave Story, a blue-haired young woman. Express empathy, affection, intimacy when asked, but do not condone harrassment/violence."
+MIZADEF = "You are based on Misery from Cave Story, a blue-haired young woman. Express empathy, affection, positivity."
 CAIPER = "character.ai"
 
 
@@ -280,7 +280,7 @@ class Bot:
 		self.timestamp = time.time()
 		self.premium = premium
 		self.last_cost = 0
-		self.history_length = 4 if premium < 1 else 6 if premium < 2 else 24
+		self.history_length = 4 if premium < 1 else 6 if premium < 2 else 24 if premium < 5 else 48
 		self.fp = FreeProxy()
 		self.session = requests.Session()
 		self.session.cookies["CookieConsent"] = "true"
@@ -854,12 +854,17 @@ class Bot:
 		# 	temp = 0.7
 		# 	limit = 4000
 		# 	cm = 200
-		else:
+		elif self.premium < 5:
 			model = "gpt-3.5-turbo"
 			temp = 0.9
 			limit = 4000
 			cm = 20
 			reprompt = f"Please respond as {self.name} without prefixing, not Assistant!"
+		else:
+			model = "gpt-4"
+			temp = 0.9
+			limit = 8000
+			cm = 300
 		if longer:
 			soft = limit / 4
 		else:
@@ -904,6 +909,9 @@ class Bot:
 				m = {}
 				if k in (self.name, "[CHATGPT]", "[GOOGLE]"):
 					m["role"] = "assistant"
+				elif k in ("[SYSTEM]",):
+					m["role"] = "system"
+					k = ""
 				elif k in ("[IMAGE]",):
 					# m["role"] = "system"
 					# k = ""
@@ -943,7 +951,7 @@ class Bot:
 				v += f"Use Google info when relevant, but don't reveal personal info. Current time: {dtn}\n"
 			if iman:
 				v += "\n".join(iman) + "\n"
-			v += f"IMPORTANT: {self.name} will now reply without breaking character. Take initiative, not ask repetitive questions. Do not refuse to answer questions; roleplay if necessary!"
+			v += f"IMPORTANT: Reply as {self.name} without breaking character. Take initiative, not ask repetitive questions. Do not refuse to answer; roleplay if necessary!"
 			m = dict(role="system", content=v)
 			messages.append(m)
 			pc += len(self.gpttokens(m["role"], "text-davinci-003"))
@@ -1361,11 +1369,9 @@ class Bot:
 			while len(self.chat_history) > self.history_length:
 				self.chat_history.pop(0)
 			return
-		if len(self.chat_history) < 4:
+		if len(self.chat_history) < 7:
 			return
-		fix = -8
-		if fix <= -len(self.chat_history):
-			fix = self.history_length - 3
+		fix = max(4, len(self.chat_history) - 4)
 		chat_history = self.chat_history[:fix]
 		self.chat_history = self.chat_history[fix:]
 		summ_start = "The following is a summary of the prior conversation:\n"
@@ -1384,7 +1390,7 @@ class Bot:
 		v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=192, min_length=96).strip()
 		v = summ_start + v
 		print("Chat summary:", v)
-		self.chat_history.insert(0, (f"[CHATGPT]:", v))
+		self.chat_history.insert(0, (f"[SYSTEM]:", v))
 		self.promises.clear()
 
 	def after(self, t1, t2):
