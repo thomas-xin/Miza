@@ -1997,7 +1997,7 @@ status_order = tuple(status_text)
 # Subprocess pool for resource-consuming operations.
 PROC_COUNT = cdict()
 PROCS = cdict()
-PROC_RESP = weakref.WeakValueDictionary()
+PROC_RESP = {}#weakref.WeakValueDictionary()
 
 # Gets amount of processes running in pool.
 sub_count = lambda: sum(sum(1 for p in v if p.is_running()) for v in PROCS.values())
@@ -2148,6 +2148,7 @@ def sub_kill(start=True):
         if is_strict_running(p):
             create_future_ex(force_kill, p)
     PROCS.clear()
+    PROC_RESP.clear()
     if start:
         return proc_start()
 

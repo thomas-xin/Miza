@@ -838,6 +838,7 @@ class Bot:
 		lines.append(ns)
 		longer = req_long(q)
 		reprompt = ""
+		cm2 = None
 		if self.premium < 2 or start:
 			if not res and self.premium < 1 and not start:
 				model = "text-bloom-001"
@@ -865,6 +866,7 @@ class Bot:
 			temp = 0.9
 			limit = 8000
 			cm = 300
+			cm2 = 600
 		if longer:
 			soft = limit / 4
 		else:
@@ -1128,7 +1130,8 @@ class Bot:
 				m = response["choices"][0]["message"]
 				role = m["role"]
 				text = m["content"].removeprefix(f"{self.name}: ")
-				cost += response["usage"]["total_tokens"] * cm
+				cost += response["usage"]["prompt_tokens"] * cm
+				cost += response["usage"]["completion_tokens"] * (cm2 or cm)
 				# rc = len(self.gpttokens(role, model="text-davinci-003"))
 				# rc += len(self.gpttokens(text, model="text-davinci-003"))
 				# cost = (pc + rc) * cm
