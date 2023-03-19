@@ -1261,7 +1261,7 @@ class Ask(Command):
             caids = list(getattr(message, "caids", []))
             if getattr(message, "reference", None):
                 m = message.reference.cached_message
-                if m.author.id != user.id:
+                if m.author.id != user.id and perm < 3:
                     return
                 caids.extend(getattr(m, "caids", []))
             else:
@@ -1279,7 +1279,7 @@ class Ask(Command):
         if r == "🗑️":
             if getattr(message, "reference", None):
                 m = message.reference.cached_message
-                if m.author.id != user.id:
+                if m.author.id != user.id and perm < 3:
                     return
             print("Resetting", channel)
             bot.data.cai_channels.pop(channel.id, None)
