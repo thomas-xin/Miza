@@ -1120,17 +1120,17 @@ class Bot:
 						presence_penalty=0.6,
 						user=str(hash(u)),
 					)
-				except openai.error.InvalidRequestError:
-					response = openai.ChatCompletion.create(
-						model=model,
-						messages=messages,
-						temperature=temp,
-						max_tokens=int((limit - pc) * 0.75),
-						top_p=1,
-						frequency_penalty=1.0,
-						presence_penalty=0.6,
-						user=str(hash(u)),
-					)
+				# except openai.error.InvalidRequestError:
+				# 	response = openai.ChatCompletion.create(
+				# 		model=model,
+				# 		messages=messages,
+				# 		temperature=temp,
+				# 		max_tokens=int((limit - pc) * 0.75),
+				# 		top_p=1,
+				# 		frequency_penalty=1.0,
+				# 		presence_penalty=0.6,
+				# 		user=str(hash(u)),
+				# 	)
 				except:
 					if i >= 2:
 						raise
