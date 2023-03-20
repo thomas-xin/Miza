@@ -1142,6 +1142,8 @@ class Bot:
 						uoai = None
 						costs = 1
 					elif "Incorrect API key provided: " in str(ex):
+						print(openai.api_key)
+						print_exc()
 						expapi = openai.api_key
 						openai.api_key = self.key
 						uoai = None
@@ -1150,7 +1152,7 @@ class Bot:
 						print_exc()
 				else:
 					break
-				time.sleep(1 << i)
+				time.sleep(i * 3 + 1)
 			if response:
 				print(response)
 				m = response["choices"][0]["message"]

@@ -764,9 +764,13 @@ class Server:
 		headers.pop("Remote-Addr", None)
 		headers.pop("Host", None)
 		headers.update(Request.header())
-		resp = reqs.next().get(urls[0], headers=headers)
+		resp = reqs.next().get(urls[0], headers=headers, stream=True)
 		resp.raise_for_status()
-		b = resp.content
+		b = []
+		it = resp.iter_content(262144)
+		while sum(map(len, b)) < 8388608:
+			b.append(next(it))
+		b = b"".join(b)
 		print("PreCat", urls[0], resp, len(b))
 		yield b
 		fut = create_future_ex(self._concat, urls, on, pn)
@@ -1149,7 +1153,7 @@ class Server:
 				raise FileNotFoundError(404, path, fold)
 		return orjson.dumps(fdata)
 
-	@cp.expose(("index", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "user", "login", "logout", "mpinsights"))
+	@cp.expose(("index", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "user", "login", "logout", "mpinsights", "createredirect"))
 	@hostmap
 	def index(self, path=None, filename=None, *args, code=None, **kwargs):
 		url = cp.url(qs=cp.request.query_string)
@@ -1717,7 +1721,7 @@ class Server:
 		ftype = 3
 		jdn = json.dumps(name).replace("<", '"\u003c"').replace(">", '"\u003e"')
 		s = (
-			f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/>'
+			f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0;URL={url}"/>'
 			+ f'<!--[{jdn},{size},"{mime}"]--><!--URL={json.dumps(urls, separators=(",", ":"))}--><!--KEY={key}--><!--MID={json.dumps(mids)}-->'
 			+ (f'<!--SHA={ha1}-->' if ha1 else "")
 			+ '</html>'
@@ -1944,9 +1948,8 @@ class Server:
 		if not replaceable:
 			mids = orjson.loads(orig.split("<!--MID=", 1)[-1].split("-->", 1)[0])
 			self.bot_exec(f"bot.data.exec.delete({repr(mids)})")
-		return """<!DOCTYPE html>
-<html>
-<meta http-equiv="refresh" content="0; URL=/">
+		return """<!DOCTYPE html><html>
+<meta http-equiv="refresh" content="0;URL=/">
 <body onload="myFunction()" style="background-color:#000">
 <script>
 function myFunction() {
@@ -1954,121 +1957,7 @@ function myFunction() {
 }
 </script>
 </body>
-</html>
-"""
-
-	@cp.expose(("proxy",))
-	@hostmap
-	def redirect(self):
-		data = """<!doctype HTML><html>
-<link href="https://unpkg.com/boxicons@2.0.7/css/boxicons.min.css" rel="stylesheet">
-<style>
-body {
-	font-family: 'Rockwell';
-	color: #00ffff;
-	background: black;
-}
-.center {
-	margin: 0;
-	position: absolute;
-	top: 50%;
-	left: 50%;
-	-ms-transform: translate(-50%, -50%);
-	transform: translate(-50%, -50%);
-}
-.tooltip {
-  position: relative;
-  display: inline-block;
-  border-bottom: 1px dotted black;
-}
-.tooltip .tooltiptext {
-  visibility: hidden;
-  width: 120px;
-  background-color: rgba(0, 0, 0, 0.5);
-  color: #fff;
-  text-align: center;
-  border-radius: 6px;
-  padding: 5px 0;
-  position: absolute;
-  z-index: 1;
-}
-.tooltip:hover .tooltiptext {
-  visibility: visible;
-}
-</style>
-<body>
-	<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000"
-	 crossorigin="anonymous"></script>
-	<video playsinline autoplay muted loop poster="https://cdn.discordapp.com/attachments/691915140198826005/846945647873490944/GpAy.webp" style="position:fixed;right:0;bottom:0;min-width:100%;min-height:100%;z-index:-1;">
-		<source src="https://cdn.discordapp.com/attachments/691915140198826005/846587863797203004/GpAy.mp4" type="video/mp4">
-	</video>
-	<link href="/static/hamburger.css" rel="stylesheet">
-	<div class="hamburger">
-		<input
-			type="checkbox"
-			title="Toggle menu"
-		/>
-		<div class="items select">
-			<a href="/" data-popup="Home">
-				<video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
-					<source src="https://cdn.discordapp.com/attachments/691915140198826005/846592940075515904/miza_by_smudgedpasta_de1q8lu-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOj.mp4" type="video/mp4">
-				</video>
-			</a>
-			<a href="/mizatlas" data-popup="Command Atlas">
-				<video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
-					<source src="https://cdn.discordapp.com/attachments/691915140198826005/846593904635281408/miza_has_a_leaf_blower_by_smudgedpasta_de6t2dl-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJz.mp4" type="video/mp4">
-				</video>
-			</a>
-			<a href="/upload" data-popup="File Host">
-				<video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
-					<source src="https://cdn.discordapp.com/attachments/691915140198826005/846593561444745226/magical_babey_mode_by_smudgedpasta_de1q8ky-pre.jpgtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIi.mp4" type="video/mp4">
-				</video>
-			</a>
-			<a href="/apidoc" data-popup="API Documentation">
-				<video playsinline autoplay muted loop width="36" height="36" style="z-index:-1;">
-					<source src="https://cdn.discordapp.com/attachments/691915140198826005/846590061901381632/deahc7l-a9773147-259d-4226-b0b6-195c6eb1f3c0.pngtokeneyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOi.mp4" type="video/mp4">
-				</video>
-			</a>
-			<a 
-				href="/time"
-				data-popup="Clock"
-				class='bx bx-time'></a>
-		</div>
-		<div class="hambg"></div>
-	</div>
-	<div class="center">
-		<h1 style="color: white;">Create a redirect or proxy URL here!</h1>
-		<form action="" method="get" class="form-example">
-			<h2>URL</h2>
-			<div class="tooltip">
-				<input type=url name="url" style="width:240;"/>
-				<span class="tooltiptext"> The URL to forward.</span>
-			</div>
-			<h2>Status Code</h2>
-			<div class="tooltip">
-				<input type=number name="code" value="307" min="100" max="599"/>
-				<span class="tooltiptext"> The status code returned by the response. Should be one of {301, 302, 303, 307, 308} for a redirect.</span>
-			</div>
-			<h2>Type</h2>
-			<div class="tooltip">
-				<input type=radio value="1" name="ftype" checked=true/>Redirect
-				<span class="tooltiptext"> A redirect page will simply forward users to the destination.</span>
-			</div>
-			<div class="tooltip">
-				<input type=radio value="2" name="ftype"/>Proxy
-				<span class="tooltiptext"> A proxy page will forward the data from the destination to the user.</span>
-			</div>
-			<br><br>
-			<input type=submit value="Create" formaction="/forward" formenctype="application/x-www-form-urlencoded" formmethod="post"/>
-		</form>
-	</div>
-</body>
 </html>"""
-		cp.response.headers.update(CHEADERS)
-		cp.response.headers["Content-Type"] = "text/html"
-		cp.response.headers["Content-Length"] = len(data)
-		cp.response.headers["ETag"] = create_etag(data)
-		return data
 
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
@@ -2076,16 +1965,28 @@ body {
 	def forward(self, **kwargs):
 		ts = time.time_ns() // 1000
 		fn = f"saves/filehost/{IND}{ts}~.forward$"
-		url = kwargs.get("url")
-		if not url:
-			raise FileNotFoundError(422, "url")
+		urls = kwargs.get("urls")
+		if not urls:
+			url = kwargs.get("url")
+			if not url:
+				raise FileNotFoundError(422, "Missing urls field")
+			urls = [url]
 		code = int(kwargs.get("code", 307))
 		ftype = int(kwargs.get("ftype", 1))
-		s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0; URL={url}"/></html>'
-		with open(fn, "w", encoding="utf-8") as f:
-			f.write(s)
 		b = ts.bit_length() + 7 >> 3
 		url = f"/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
+		if len(urls) == 1:
+			s = f'<!DOCTYPE HTML><!--["{urls[0]}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0;URL={urls[0]}"/></html>'
+		else:
+			with reqs.next().head(urls[0], headers=Request.header(), stream=True) as resp:
+				mime = resp.headers.get("Content-Type") or "text/html"
+			ftype = 3
+			s =  (
+				f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0;URL={url}"/>'
+				+ f'<!--["Multi-redirect",0,"{mime}"]--><!--URL={json.dumps(urls, separators=(",", ":"))}--></html>'
+			)
+		with open(fn, "w", encoding="utf-8") as f:
+			f.write(s)
 		raise cp.HTTPRedirect(url, status=307)
 
 	@cp.expose
