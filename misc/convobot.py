@@ -784,7 +784,7 @@ class Bot:
 			per = DEFPER
 		chat_history = self.chat_history.copy()
 		lines = []
-		if per == DEFPER:
+		if per == DEFPER and premium < 5:
 			if len(chat_history) < 4:
 				e1 = random.choice((":3", ":D", ";3", ":>", ":0", ";w;", ":P", "^ω^"))
 				lines.append(f"{u}: Hi!\n")
@@ -839,7 +839,7 @@ class Bot:
 		reprompt = ""
 		cm2 = None
 		if self.premium < 2 or start:
-			if not res and self.premium < 1 and not start:
+			if not res and not start and q.count(" ") < 2:
 				model = "text-bloom-001"
 				temp = 0.9
 				limit = 2000

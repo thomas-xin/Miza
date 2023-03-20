@@ -1206,9 +1206,9 @@ class Ask(Command):
                         bot.data.token_balances[uoai] = -cost
                 elif oai and oai != AUTH.get("openai_key"):
                     try:
-                        bot.data.token_balances[oai] -= cost
+                        bot.data.token_balances[oai] -= cost * 6 // 5
                     except KeyError:
-                        bot.data.token_balances[oai] = -cost
+                        bot.data.token_balances[oai] = -cost * 6 // 5
                 else:
                     if bot.is_trusted(guild) >= 2:
                         for uid in bot.data.trusted[guild.id]:
