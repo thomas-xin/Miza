@@ -1013,6 +1013,8 @@ class Ask(Command):
             if premium < 5:
                 raise PermissionError(f"Distributed premium level 3 or higher required; please see {bot.kofi_url} for more info!")
             premium = 5
+        elif premium > 4:
+            premium = 4
         h = await process_image("lambda cid: bool(CBOTS.get(cid))", "$", [channel.id], fix=1)
         history = []
         reset = False
