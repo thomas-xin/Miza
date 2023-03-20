@@ -1907,16 +1907,32 @@ class UpdateUsers(Database):
     mentionspam = re.compile("<@[!&]?[0-9]+>")
 
     async def garbage_collect(self):
-        for i in tuple(self.data):
-            if type(i) is str:
-                if i.startswith("#"):
+        bot = self.bot
+        data = self.data
+        for key in tuple(data):
+            if type(key) is str:
+                if key.startswith("#"):
                     c_id = int(i[1:].rstrip("\x7f"))
                     try:
-                        await self.bot.fetch_channel(c_id)
+                        await bot.fetch_channel(c_id)
                     except:
-                        print(f"Deleting {i} from {self}...")
-                        self.data.pop(i, None)
+                        print(f"Deleting {key} from {self}...")
+                        data.pop(key, None)
                         await asyncio.sleep(0.1)
+                continue
+            try:
+                if not data[key]:
+                    raise LookupError
+                with suppress(KeyError):
+                    d = bot.cache.guilds[key]
+                    continue
+                d = await bot.fetch_messageable(key)
+                if d is not None:
+                    continue
+            except:
+                print_exc()
+            print(f"Deleting {key} from {self}...")
+            data.pop(key, None)
 
     def __load__(self):
         self.semaphore = Semaphore(1, 2, delay=0.5, rate_limit=8)

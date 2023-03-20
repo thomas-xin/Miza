@@ -146,6 +146,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         self.started = False
         self.bot_ready = False
         self.ready = False
+        self.initialisation_complete = False
         self.stat_timer = 0
         self.last_check = 0
         self.status_iter = xrand(4)
@@ -457,7 +458,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                                 continue
                         except:
                             print_exc()
-                        print(f"Deleting {key} from {str(obj)}...")
+                        print(f"Deleting {key} from {obj}...")
                         data.pop(key, None)
 
     # Calls a bot event, triggered by client events or others, across all bot databases. Calls may be sync or async.
@@ -5185,6 +5186,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             print("Guilds ready.")
             create_task(self.heartbeat_loop())
             force_kill(self.heartbeat_proc)
+            self.initialisation_complete = True
             print("Initialisation complete.")
 
     def set_client_events(self):

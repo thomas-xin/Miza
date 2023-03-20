@@ -1243,7 +1243,7 @@ class Ask(Command):
         reacts = []
         # if caids:
         reacts.extend(("🔄", "🗑️"))
-        if False:#not emb and premium < 2 and not random.randint(0, 16):
+        if not emb and premium < 2 and not random.randint(0, 16):
             oo = bot.data.users.get(user.id, {}).get("opt_out")
             if not oo:
                 code = f"*```callback-string-ask-{user.id}-\nReact with 🚫 to never show the below message again.```*\n"
