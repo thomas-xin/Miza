@@ -768,8 +768,9 @@ class Server:
 		resp.raise_for_status()
 		b = []
 		it = resp.iter_content(262144)
-		while sum(map(len, b)) < 8388608:
-			b.append(next(it))
+		with suppress(StopIteration):
+			while sum(map(len, b)) < 8388608:
+				b.append(next(it))
 		b = b"".join(b)
 		print("PreCat", urls[0], resp, len(b))
 		yield b
