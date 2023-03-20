@@ -1912,7 +1912,7 @@ class UpdateUsers(Database):
         for key in tuple(data):
             if type(key) is str:
                 if key.startswith("#"):
-                    c_id = int(i[1:].rstrip("\x7f"))
+                    c_id = int(key[1:].rstrip("\x7f"))
                     try:
                         await bot.fetch_channel(c_id)
                     except:
@@ -1926,7 +1926,7 @@ class UpdateUsers(Database):
                 with suppress(KeyError):
                     d = bot.cache.guilds[key]
                     continue
-                d = await bot.fetch_messageable(key)
+                d = await bot.fetch_user(key)
                 if d is not None:
                     continue
             except:
