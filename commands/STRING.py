@@ -1146,6 +1146,17 @@ class Ask(Command):
             cai_channel = bot.data.cai_channels.get(channel.id)
             if reset:
                 cai_channel = None
+            if bot.is_trusted(guild) >= 2:
+                for uid in bot.data.trusted[guild.id]:
+                    if bot.premium_level(uid, absolute=True) >= 2:
+                        break
+                else:
+                    uid = next(iter(bot.data.trusted[guild.id]))
+                u = await bot.fetch_user(uid)
+            else:
+                u = user
+            data = bot.data.users.get(u.id, {})
+            oai = data.get("trial") and data.get("openai_key")
             inputs = dict(
                 channel_id=channel.id,
                 key=AUTH.get("openai_key"),
@@ -1159,21 +1170,23 @@ class Ask(Command):
                 im=im,
                 prompt=(name, q),
                 reset=self.reset.pop(channel.id, None),
+                bals={k: v for k, v in bot.data.token_balances.items() if v < 0},
+                oai=oai,
                 bl=bl,
             )
             if fut:
                 await fut
             tup = await process_image("CBAI", "$", [inputs], fix=1, timeout=420)
             out = tup[0]
+            caids = ()
             if len(tup) > 1:
                 cost = tup[1]
                 if len(tup) > 2:
                     caids = tup[2]
-                else:
-                    caids = ()
+                    if len(tup) > 3:
+                        uoai = tup[3]
             else:
                 cost = 0
-                caids = ()
             if caids:
                 message.caids = (caids.pop(0),)
                 # out = zwencode("zzz" + "z".join("".join(chr(ord(c) + 49) for c in str(i)) for i in caids) + "zzz")
@@ -1182,26 +1195,37 @@ class Ask(Command):
                     bot.data.costs.put(user.id, cost)
                     if guild:
                         bot.data.costs.put(guild.id, cost)
-                if bot.is_trusted(guild) >= 2:
-                    for uid in bot.data.trusted[guild.id]:
-                        if bot.premium_level(uid, absolute=True) >= 2:
-                            break
-                    else:
-                        uid = next(iter(bot.data.trusted[guild.id]))
-                    u = await bot.fetch_user(uid)
+                if uoai:
+                    try:
+                        bot.data.token_balances[uoai] -= cost
+                    except KeyError:
+                        bot.data.token_balances[uoai] = -cost
+                elif oai and oai != AUTH.get("openai_key"):
+                    try:
+                        bot.data.token_balances[oai] -= cost
+                    except KeyError:
+                        bot.data.token_balances[oai] = -cost
                 else:
-                    u = user
-                data = bot.data.users.get(u.id)
-                if data and data.get("trial"):
-                    bot.data.users.add_diamonds(user, cost / -25000)
-                    if data.get("diamonds", 0) < 1:
-                        bot.premium_level(u)
-                        emb = discord.Embed(colour=rand_colour())
-                        emb.set_author(**get_author(bot.user))
-                        emb.description = (
-                            "Uh-oh, it appears your tokens have run out! Check ~wallet to view your balance, top up using a donation [here]({bot.kofi_url}), "
-                            + "or purchase a subscription to gain temporary unlimited usage!"
-                        )
+                    if bot.is_trusted(guild) >= 2:
+                        for uid in bot.data.trusted[guild.id]:
+                            if bot.premium_level(uid, absolute=True) >= 2:
+                                break
+                        else:
+                            uid = next(iter(bot.data.trusted[guild.id]))
+                        u = await bot.fetch_user(uid)
+                    else:
+                        u = user
+                    data = bot.data.users.get(u.id)
+                    if data and data.get("trial"):
+                        bot.data.users.add_diamonds(user, cost / -25000)
+                        if data.get("diamonds", 0) < 1:
+                            bot.premium_level(u)
+                            emb = discord.Embed(colour=rand_colour())
+                            emb.set_author(**get_author(bot.user))
+                            emb.description = (
+                                "Uh-oh, it appears your tokens have run out! Check ~wallet to view your balance, top up using a donation [here]({bot.kofi_url}), "
+                                + "or purchase a subscription to gain temporary unlimited usage!"
+                            )
             caic = await process_image("lambda cid: CBOTS[cid].cai_channel", "$", [channel.id], fix=1)
             if caic:
                 bot.data.cai_channels[channel.id] = caic

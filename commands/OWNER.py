@@ -903,6 +903,10 @@ class UpdatePremiums(Database):
         return rm
 
 
+class UpdateTokenBalances(Database):
+    name = "token_balances"
+
+
 class UpdateCosts(Database):
     name = "costs"
 

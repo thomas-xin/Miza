@@ -210,7 +210,7 @@ class Bot:
 		return random.choice(tuple(self.proxies))
 
 	def check_proxy(self, p):
-		url = "https://discord.com/api/v0"
+		url = "https://raw.githubusercontent.com/thomas-xin/Miza/master/misc/deleter.py"
 		with httpx.Client(timeout=3, http2=True, proxies=p, verify=False) as reqx:
 			resp = reqx.get(url)
 			return resp.content

@@ -779,7 +779,6 @@ class Bot:
 		return enc.encode(s)
 
 	def gptcomplete(self, u, q, refs=(), start=""):
-		openai.api_key = self.key
 		per = self.personality
 		if per == CAIPER:
 			per = DEFPER
@@ -971,6 +970,7 @@ class Bot:
 		response = None
 		text = ""
 		cost = 0
+		uoai = None
 		exclusive = {"text-neox-001", "text-bloom-001"}
 		if model in exclusive:
 			headers = {
@@ -1097,6 +1097,17 @@ class Bot:
 				model = "text-curie-001"
 				cm = 20
 		elif model in ("gpt-3.5-turbo", "gpt-4"):
+			oai = getattr(self, "oai", None)
+			bals = getattr(self, "bals", {})
+			if oai:
+				openai.api_key = oai
+				costs = 0
+			elif bals:
+				openai.api_key = uoai = sorted(bals, key=bals.get, reverse=True)[0]
+				costs = -1
+			else:
+				openai.api_key = self.key
+				costs = 1
 			for i in range(3):
 				try:
 					response = openai.ChatCompletion.create(
@@ -1124,6 +1135,9 @@ class Bot:
 					if i >= 2:
 						raise
 					print_exc()
+					openai.api_key = self.key
+					uoai = None
+					costs = 1
 				else:
 					break
 				time.sleep(i + 1)
@@ -1132,8 +1146,8 @@ class Bot:
 				m = response["choices"][0]["message"]
 				role = m["role"]
 				text = m["content"].removeprefix(f"{self.name}: ")
-				cost += response["usage"]["prompt_tokens"] * cm
-				cost += response["usage"]["completion_tokens"] * (cm2 or cm)
+				cost += response["usage"]["prompt_tokens"] * cm * costs
+				cost += response["usage"]["completion_tokens"] * (cm2 or cm) * costs
 				# rc = len(self.gpttokens(role, model="text-davinci-003"))
 				# rc += len(self.gpttokens(text, model="text-davinci-003"))
 				# cost = (pc + rc) * cm
@@ -1202,7 +1216,7 @@ class Bot:
 			print(f"GPT {model} response:", text)
 		if start and text.startswith(f"{self.name}: "):
 			text = ""
-		return text, cost
+		return text, cost, uoai
 
 	def google(self, q, raw=False):
 		words = q.split()
@@ -1269,15 +1283,16 @@ class Bot:
 		if self.chat_history and (not self.summed or len(self.chat_history) + len(self.promises) > self.history_length):
 			self.rerender()
 		caids = ()
+		uoai = None
 		if self.personality == CAIPER or (self.premium < 2 and self.personality == DEFPER and (not self.chat_history or q and q != self.chat_history[0][1])):
 			if "CAI" not in self.forbidden:
 				response, cost, caids = self.caichat(u, q, refs=refs, im=im)
 				if response:
 					return self.after(tup, (self.name, response)), cost, caids
 		# if self.premium > 0 or random.randint(0, 1):
-		response, cost = self.gptcomplete(u, q, refs=refs)
+		response, cost, uoai = self.gptcomplete(u, q, refs=refs)
 		if response:
-			return self.after(tup, (self.name, response)), cost, caids
+			return self.after(tup, (self.name, response)), cost, caids, uoai
 		if refs and refs[-1][0] in ("IMAGE", "ANSWER"):
 			if len(refs) > 1:
 				response = refs[-2][1] + ", " + refs[-1][1]
@@ -1308,9 +1323,9 @@ class Bot:
 			response = reso
 		response = response.replace("  ", " ")
 		if not response:
-			response, cost = self.gptcomplete(u, q, refs=refs)
+			response, cost, uoai = self.gptcomplete(u, q, refs=refs)
 			if response:
-				return self.after(tup, (self.name, response)), cost, caids
+				return self.after(tup, (self.name, response)), cost, caids, uoai
 			response = "Sorry, I don't know."
 		return self.after(tup, (self.name, response)), 0, caids
 

@@ -2383,7 +2383,7 @@ class Wallet(Command):
     description = "Shows the target users' wallet, or enables a token-based trial of ⟨MIZA⟩'s premium features, where 1 💎 = 25000 quota."
     usage = "<users>* <trial{?t}>?"
     flags = "t"
-    example = ("bal", "wallet @Miza")
+    example = ("bal", "wallet @Miza", "trial <OpenAI API key>")
     rate_limit = (3, 4)
     multi = True
     slash = ("Wallet", "Trial")
@@ -2394,7 +2394,7 @@ class Wallet(Command):
             if premium >= 2:
                 raise OverflowError("You already have a registered premium subscription and are permitted to use all features without additional costs.")
             data = bot.data.users.get(user.id, {})
-            if data.get("trial"):
+            if data.get("trial") and not :
                 data.pop("trial", 0)
                 bot.premium_level(user)
                 bot.data.users.update(user.id)
@@ -2402,10 +2402,34 @@ class Wallet(Command):
             elif data.get("diamonds", 0) < 1:
                 raise PermissionError("Insufficient funds. Requires at least 1 diamond 💎 to activate.")
             else:
-                data["trial"] = 2
+                if argv:
+                    key = argv
+                    import openai
+                    openai.api_key = key
+                    resp = openai.Moderation.create(
+                        input="lol",
+                    )
+                    data["openai_key"] = key
+                if data.get("openai_key"):
+                    data["trial"] = 3
+                    enable_message = (
+                        "You now have access to all premium Lv3 features, with cost directly transferred to your OpenAI account."
+                        + "GPT-4 access is supported even if not available through the key, however such quota debts incurred may be stored and used by other users."
+                        + "Use this command again with no arguments to disable.\n"
+                    )
+                else:
+                    data["trial"] = 2
+                    enable_message = (
+                        "You now have access to all premium Lv2 features, with a quota at the cost of your diamond currency (💎)."
+                        + "It will automatically be disabled when you run out; check your balance using ~wallet.\n"
+                    )
                 bot.premium_level(user)
                 bot.data.users.update(user.id)
-                return css_md(f"Successfully enabled trial mode for {sqr_md(user)}. You now have access to all premium Lv2 features, with a quota at the cost of your diamond currency (💎). It will automatically be disabled when you run out; check your balance using ~wallet!")
+                return css_md(
+                    f"Successfully enabled trial mode for {sqr_md(user)}."
+                    + enable_message
+                    + f"Be sure to assign an OpenAI key if you would like to fund your own use of Lv3 premium!"
+                )
         users = await bot.find_users(argl, args, user, guild)
         if not users:
             raise LookupError("No results found.")

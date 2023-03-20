@@ -725,9 +725,9 @@ class Server:
 			self.serving[on] = fut
 		if waiter:
 			return fut
-		return self.wconcat(on, pn, name, download, mime)
+		return self.wconcat(on, pn, name, download, mime, fut)
 
-	def wconcat(self, on, pn, name, download, mime):
+	def wconcat(self, on, pn, name, download, mime, fut):
 		for i in range(120):
 			if os.path.exists(pn):
 				break

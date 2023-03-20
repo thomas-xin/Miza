@@ -1587,10 +1587,22 @@ class Art(Command):
                 openjourney = "journey" in name
                 if dalle2 and premium < 4:
                     raise PermissionError("Premium subscription required to perform DALL·E 2 operations.")
+                if bot.is_trusted(guild) >= 2:
+                    for uid in bot.data.trusted[guild.id]:
+                        if bot.premium_level(uid, absolute=True) >= 2:
+                            break
+                    else:
+                        uid = next(iter(bot.data.trusted[guild.id]))
+                    u = await bot.fetch_user(uid)
+                else:
+                    u = user
+                data = bot.data.users.get(u.id, {})
+                oai = data.get("trial") and data.get("openai_key")
+                self.imagebot.token = oai or AUTH.get("openai_key")
                 tup = await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2, openjourney, nsfw, timeout=480)
                 if tup:
                     fn, cost = tup
-                    if fn and cost:
+                    if fn and cost and not oai:
                         if "costs" in bot.data:
                             bot.data.costs.put(user.id, cost)
                             if guild:
@@ -1698,9 +1710,21 @@ class Art(Command):
                             with open(image_2, "rb") as f:
                                 image_2b = f.read()
                         with tracebacksuppressor:
+                             if bot.is_trusted(guild) >= 2:
+                                for uid in bot.data.trusted[guild.id]:
+                                    if bot.premium_level(uid, absolute=True) >= 2:
+                                        break
+                                else:
+                                    uid = next(iter(bot.data.trusted[guild.id]))
+                                u = await bot.fetch_user(uid)
+                            else:
+                                u = user
+                            data = bot.data.users.get(u.id, {})
+                            oai = data.get("trial") and data.get("openai_key")
+                            self.imagebot.token = oai or AUTH.get("openai_key")
                             fn, cost = await create_future(self.imagebot.dalle_i2i, prompt, image_1b, image_2b, timeout=60)
                             done = True
-                            if fn and cost:
+                            if fn and cost and not oai:
                                 if "costs" in bot.data:
                                     bot.data.costs.put(user.id, cost)
                                     if guild:
