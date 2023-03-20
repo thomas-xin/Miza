@@ -1103,7 +1103,7 @@ class Bot:
 				openai.api_key = oai
 				costs = 0
 			elif bals:
-				openai.api_key = uoai = sorted(bals, key=bals.get, reverse=True)[0]
+				openai.api_key = uoai = sorted(bals, key=bals.get)[0]
 				costs = -1
 			else:
 				openai.api_key = self.key
