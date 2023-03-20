@@ -1178,15 +1178,17 @@ class Ask(Command):
                 await fut
             tup = await process_image("CBAI", "$", [inputs], fix=1, timeout=420)
             out = tup[0]
+            cost = 0
             caids = ()
+            expapi = None
             if len(tup) > 1:
                 cost = tup[1]
                 if len(tup) > 2:
                     caids = tup[2]
                     if len(tup) > 3:
                         uoai = tup[3]
-            else:
-                cost = 0
+                        if len(tup) > 4:
+                            expapi = tup[4]
             if caids:
                 message.caids = (caids.pop(0),)
                 # out = zwencode("zzz" + "z".join("".join(chr(ord(c) + 49) for c in str(i)) for i in caids) + "zzz")
@@ -1226,6 +1228,8 @@ class Ask(Command):
                                 "Uh-oh, it appears your tokens have run out! Check ~wallet to view your balance, top up using a donation [here]({bot.kofi_url}), "
                                 + "or purchase a subscription to gain temporary unlimited usage!"
                             )
+            if expapi:
+                bot.data.token_balances.pop(expapi, None)
             caic = await process_image("lambda cid: CBOTS[cid].cai_channel", "$", [channel.id], fix=1)
             if caic:
                 bot.data.cai_channels[channel.id] = caic

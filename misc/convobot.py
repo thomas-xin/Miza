@@ -971,6 +971,7 @@ class Bot:
 		text = ""
 		cost = 0
 		uoai = None
+		expapi = None
 		exclusive = {"text-neox-001", "text-bloom-001"}
 		if model in exclusive:
 			headers = {
@@ -1099,16 +1100,18 @@ class Bot:
 		elif model in ("gpt-3.5-turbo", "gpt-4"):
 			oai = getattr(self, "oai", None)
 			bals = getattr(self, "bals", {})
-			if oai:
-				openai.api_key = oai
-				costs = 0
-			elif bals:
-				openai.api_key = uoai = sorted(bals, key=bals.get)[0]
-				costs = -1
-			else:
-				openai.api_key = self.key
-				costs = 1
-			for i in range(3):
+			tries = 7
+			for i in range(tries):
+				if oai:
+					openai.api_key = oai
+					costs = 0
+				elif bals:
+					openai.api_key = uoai = sorted(bals, key=bals.get)[0]
+					bals.pop(uoai)
+					costs = -1
+				else:
+					openai.api_key = self.key
+					costs = 1
 				try:
 					response = openai.ChatCompletion.create(
 						model=model,
@@ -1132,16 +1135,22 @@ class Bot:
 				# 		user=str(hash(u)),
 				# 	)
 				except Exception as ex:
-					if i >= 2:
+					if i >= tries - 1:
 						raise
-					if " does not exist" not in repr(ex):
+					if " does not exist" in str(ex) or i >= tries - 2:
+						openai.api_key = self.key
+						uoai = None
+						costs = 1
+					elif "Incorrect API key provided: " in str(ex):
+						expapi = openai.api_key
+						openai.api_key = self.key
+						uoai = None
+						costs = 1
+					else:
 						print_exc()
-					openai.api_key = self.key
-					uoai = None
-					costs = 1
 				else:
 					break
-				time.sleep(i + 1)
+				time.sleep(1 << i)
 			if response:
 				print(response)
 				m = response["choices"][0]["message"]
@@ -1217,7 +1226,7 @@ class Bot:
 			print(f"GPT {model} response:", text)
 		if start and text.startswith(f"{self.name}: "):
 			text = ""
-		return text, cost, uoai
+		return text, cost, uoai, expapi
 
 	def google(self, q, raw=False):
 		words = q.split()
@@ -1285,15 +1294,16 @@ class Bot:
 			self.rerender()
 		caids = ()
 		uoai = None
+		expapi = None
 		if self.personality == CAIPER or (self.premium < 2 and self.personality == DEFPER and (not self.chat_history or q and q != self.chat_history[0][1])):
 			if "CAI" not in self.forbidden:
 				response, cost, caids = self.caichat(u, q, refs=refs, im=im)
 				if response:
 					return self.after(tup, (self.name, response)), cost, caids
 		# if self.premium > 0 or random.randint(0, 1):
-		response, cost, uoai = self.gptcomplete(u, q, refs=refs)
+		response, cost, uoai, expapi = self.gptcomplete(u, q, refs=refs)
 		if response:
-			return self.after(tup, (self.name, response)), cost, caids, uoai
+			return self.after(tup, (self.name, response)), cost, caids, uoai, expapi
 		if refs and refs[-1][0] in ("IMAGE", "ANSWER"):
 			if len(refs) > 1:
 				response = refs[-2][1] + ", " + refs[-1][1]
@@ -1324,9 +1334,9 @@ class Bot:
 			response = reso
 		response = response.replace("  ", " ")
 		if not response:
-			response, cost, uoai = self.gptcomplete(u, q, refs=refs)
+			response, cost, uoai, expapi = self.gptcomplete(u, q, refs=refs)
 			if response:
-				return self.after(tup, (self.name, response)), cost, caids, uoai
+				return self.after(tup, (self.name, response)), cost, caids, uoai, expapi
 			response = "Sorry, I don't know."
 		return self.after(tup, (self.name, response)), 0, caids
 
