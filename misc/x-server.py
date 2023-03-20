@@ -703,13 +703,11 @@ class Server:
 			return resp
 	files._cp_config = {"response.stream": True}
 
-	nullfut = concurrent.futures.Future()
-	nullfut.set_result(None)
 	def concat(self, fn, urls, name="", download=False, mime=None, stn="", waiter=False):
 		on = stn + "!.temp$@" + name
 		pn = stn + "~.temp$@" + name
 		if waiter and os.path.exists(pn) and os.path.getsize(pn):
-			return self.nullfut
+			return newfut
 		try:
 			fut = self.serving[on]
 			for i in range(3):
@@ -721,27 +719,32 @@ class Server:
 					self.serving.pop(on, None)
 					raise KeyError
 		except KeyError:
-			fut = create_future_ex(self._concat, urls, on, pn)
-			self.serving[on] = fut
+			if waiter:
+				return create_future_ex(self._concat, urls, on, pn)
+			return self._peek(urls, on, pn, name, download, mime)
 		if waiter:
 			return fut
 		return self.wconcat(on, pn, name, download, mime, fut)
 
-	def wconcat(self, on, pn, name, download, mime, fut):
+	def wconcat(self, on, pn, name, download, mime, fut, start=0):
 		for i in range(120):
 			if os.path.exists(pn):
 				break
-			if os.path.exists(on) and self.serving.get(on + "~buffer") or fut.done():
+			if os.path.exists(on) and self.serving.get(on + "~buffer", 0) >= start or fut.done():
 				break
 			time.sleep(0.5)
 		if os.path.exists(pn):
 			with open(pn, "rb") as f:
+				if start:
+					f.seek(start)
 				resp = cp.lib.static.serve_fileobj(f, content_type=mime, disposition="attachment" if download else None, name=name)
 				self.serving.setdefault(pn, weakref.WeakSet()).add(f)
 				yield from resp
 			self.serving.setdefault(pn, weakref.WeakSet()).discard(f)
 			return
 		with open(on, "rb") as f:
+			if start:
+				f.seek(start)
 			while not fut.done() and on in self.serving:
 				if f.tell() + 262144 >= self.serving.get(on + "~buffer", 0):
 					time.sleep(2)
@@ -755,6 +758,20 @@ class Server:
 				if not b:
 					return
 				yield b
+
+	def _peek(self, urls, on, pn, name, download, mime):
+		headers = fcdict(cp.request.headers)
+		headers.pop("Remote-Addr", None)
+		headers.pop("Host", None)
+		headers.update(Request.header())
+		resp = reqs.next().get(urls[0], headers=headers)
+		resp.raise_for_status()
+		b = resp.content
+		print("PreCat", urls[0], resp, len(b))
+		yield b
+		fut = create_future_ex(self._concat, urls, on, pn)
+		self.serving[on] = fut
+		yield from self.wconcat(on, pn, name, download, mime, fut, start=len(b))
 
 	def _concat(self, urls, on, pn):
 		print("Cat", urls)

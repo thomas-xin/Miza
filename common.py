@@ -89,7 +89,7 @@ __setloop__()
 
 emptyfut = fut_nop = asyncio.Future(loop=eloop)
 fut_nop.set_result(None)
-newfut = concurrent.futures.Future()
+newfut = nullfut = concurrent.futures.Future()
 newfut.set_result(None)
 
 def as_fut(obj):
