@@ -974,7 +974,7 @@ class Ask(Command):
 
     async def __call__(self, message, guild, channel, user, argv, name, flags=(), **void):
         bot = self.bot
-        self.description = f"Ask me any question, and I'll answer it. See {bot.kofi_url} for premium level specifications; check using ~serverinfo, or apply it with ~premium!"
+        self.description = f"Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. See {bot.kofi_url} for premium tier chatbot specifications; check using ~serverinfo, or apply it with ~premium!"
         count = bot.data.users.get(user.id, {}).get("last_talk", 0)
         add_dict(bot.data.users, {user.id: {"last_talk": 1, "last_mention": 1}})
         bot.data.users[user.id]["last_used"] = utc()
