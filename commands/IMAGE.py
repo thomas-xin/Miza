@@ -1710,7 +1710,7 @@ class Art(Command):
                             with open(image_2, "rb") as f:
                                 image_2b = f.read()
                         with tracebacksuppressor:
-                             if bot.is_trusted(guild) >= 2:
+                            if bot.is_trusted(guild) >= 2:
                                 for uid in bot.data.trusted[guild.id]:
                                     if bot.premium_level(uid, absolute=True) >= 2:
                                         break

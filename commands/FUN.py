@@ -2394,7 +2394,7 @@ class Wallet(Command):
             if premium >= 2:
                 raise OverflowError("You already have a registered premium subscription and are permitted to use all features without additional costs.")
             data = bot.data.users.get(user.id, {})
-            if data.get("trial") and not :
+            if data.get("trial"):
                 data.pop("trial", 0)
                 bot.premium_level(user)
                 bot.data.users.update(user.id)
