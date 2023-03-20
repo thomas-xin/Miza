@@ -1131,10 +1131,11 @@ class Bot:
 				# 		presence_penalty=0.6,
 				# 		user=str(hash(u)),
 				# 	)
-				except:
+				except Exception as ex:
 					if i >= 2:
 						raise
-					print_exc()
+					if " does not exist" not in repr(ex):
+						print_exc()
 					openai.api_key = self.key
 					uoai = None
 					costs = 1
