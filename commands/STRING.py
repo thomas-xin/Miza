@@ -1250,10 +1250,8 @@ class Ask(Command):
                 emb = discord.Embed(colour=rand_colour())
                 emb.set_author(**get_author(bot.user))
                 emb.description = (
-                    "Looking for my more advanced and intelligent GPT-DaVinci chatbot to talk to?\n"
-                    + "Unfortunately the service for it had to be cut short, as the API services were too expensive for my creator to keep up given the size of my audience.\n"
-                    + f"However, if you would still wish to use the service for your user or server, it is available for subscription [here]({bot.kofi_url}), to help fund API usage; any support is greatly appreciated!\n"
-                    + "Additionally if you would like to try out the premium features without paying, you may enable a temporary trial by using the ~trial command!"
+                    f"Looking for my more intelligent chatbots to talk to? Please check out my [kofi]({bot.kofi_url}) to help fund API usage; any support is greatly appreciated!\n"
+                    + "Alternatively if you would like to try out the premium features without paying, you may enable a temporary trial by using the ~trial command!"
                 )
                 reacts.append("🚫")
         s = lim_str(code + escape_roles(out), 2000)
