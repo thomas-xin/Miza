@@ -784,7 +784,7 @@ class Bot:
 			per = DEFPER
 		chat_history = self.chat_history.copy()
 		lines = []
-		if per == DEFPER and premium < 5:
+		if per == DEFPER and self.premium < 5:
 			if len(chat_history) < 4:
 				e1 = random.choice((":3", ":D", ";3", ":>", ":0", ";w;", ":P", "^ω^"))
 				lines.append(f"{u}: Hi!\n")
