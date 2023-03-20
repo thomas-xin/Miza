@@ -1971,6 +1971,8 @@ function myFunction() {
 			if not url:
 				raise FileNotFoundError(422, "Missing urls field")
 			urls = [url]
+		elif isinstance(urls, str):
+			urls = orjson.loads(urls)
 		code = int(kwargs.get("code", 307))
 		ftype = int(kwargs.get("ftype", 1))
 		b = ts.bit_length() + 7 >> 3
