@@ -1295,7 +1295,7 @@ class Bot:
 		caids = ()
 		uoai = None
 		expapi = None
-		if self.personality == CAIPER or (self.premium < 2 and self.personality == DEFPER and (not self.chat_history or q and q != self.chat_history[0][1])):
+		if self.personality == CAIPER:# or (self.premium < 2 and self.personality == DEFPER and (not self.chat_history or q and q != self.chat_history[0][1])):
 			if "CAI" not in self.forbidden:
 				response, cost, caids = self.caichat(u, q, refs=refs, im=im)
 				if response:

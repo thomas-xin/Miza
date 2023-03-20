@@ -1332,7 +1332,7 @@ class Personality(Command):
     server_only = True
     name = ["ResetChat", "ClearChat", "ChangePersonality"]
     min_level = 2
-    description = "Customises ⟨MIZA⟩'s personality for ~ask in the current server. Will attempt to use the highest available GPT-family tier unless the personality is set to \"character.ai\", in which case the assigned character on said site will be used instead. Experimental long descriptions are now supported."
+    description = "Customises ⟨MIZA⟩'s personality for ~ask in the current server. Will attempt to use the highest available GPT-family tier. Experimental long descriptions are now supported."
     usage = "<traits>* <default{?d}>?"
     example = ("personality character.ai", "personality mischievous, cunning", "personality dry, sarcastic, snarky", "personality sweet, loving", "personality The following is a conversation between Miza and humans. Miza is an AI who is loyal friendly playful cute, intelligent and helpful, and slightly flirtatious when appropriate.")
     flags = "aed"
@@ -1354,6 +1354,7 @@ class Personality(Command):
         return self.bot.data.personalities.get(i) or self.defper
 
     async def __call__(self, bot, flags, guild, channel, message, name, user, argv, **void):
+        self.description = f"Customises {bot.name}'s personality for ~ask in the current server. Will attempt to use the highest available GPT-family tier; see {bot.kofi_url} for more info. Experimental long descriptions are now supported."
         if "chat" in name:
             bot.data.cai_channels.pop(channel.id, None)
             bot.commands.ask[0].reset[channel.id] = True
