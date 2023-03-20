@@ -1977,7 +1977,7 @@ function myFunction() {
 		ftype = int(kwargs.get("ftype", 1))
 		b = ts.bit_length() + 7 >> 3
 		url = f"/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
-		if len(urls) == 1:
+		if len(urls) <= 1:
 			s = f'<!DOCTYPE HTML><!--["{urls[0]}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0;URL={urls[0]}"/></html>'
 		else:
 			with reqs.next().head(urls[0], headers=Request.header(), stream=True) as resp:
