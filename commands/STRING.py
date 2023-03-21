@@ -1156,7 +1156,7 @@ class Ask(Command):
                 cai_channel = None
             if bot.is_trusted(guild) >= 2:
                 for uid in bot.data.trusted[guild.id]:
-                    if bot.premium_level(uid, absolute=True) >= 2:
+                    if uid and bot.premium_level(uid, absolute=True) >= 2:
                         break
                 else:
                     uid = next(iter(bot.data.trusted[guild.id]))
@@ -1218,7 +1218,7 @@ class Ask(Command):
                 else:
                     if bot.is_trusted(guild) >= 2:
                         for uid in bot.data.trusted[guild.id]:
-                            if bot.premium_level(uid, absolute=True) >= 2:
+                            if uid and bot.premium_level(uid, absolute=True) >= 2:
                                 break
                         else:
                             uid = next(iter(bot.data.trusted[guild.id]))
