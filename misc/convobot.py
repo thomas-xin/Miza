@@ -264,9 +264,10 @@ class Bot:
 	btime = 0
 	bl = False
 
-	def __init__(self, token="", key="", cai_token="", cai_channel=None, email="", password="", name="Miza", personality=DEFPER, premium=0):
+	def __init__(self, token="", key="", huggingface_token="", cai_token="", cai_channel=None, email="", password="", name="Miza", personality=DEFPER, premium=0):
 		self.token = token
 		self.key = key
+		self.huggingface_token = huggingface_token
 		self.cai_token = cai_token
 		self.email = email
 		self.password = password
@@ -402,7 +403,7 @@ class Bot:
 		try:
 			zscp = self.models[m]
 		except KeyError:
-			zscp = self.models[m] = pipeline("zero-shot-classification", model=m)
+			zscp = self.models[m] = pipeline("zero-shot-classification", model=m, use_auth_token=self.huggingface_token)
 		resp = zscp(q, labels, truncation=True)
 		return dict(zip(resp["labels"], resp["scores"]))
 
