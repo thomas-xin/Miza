@@ -215,12 +215,18 @@ class AudioPlayer(discord.AudioSource):
 		channel = client.get_channel(verify_id(channel))
 		self = cls(channel.guild)
 		players[channel.guild.id] = concurrent.futures.Future()
-		if not self.vc:
-			if channel.guild.me.voice:
-				await channel.guild.change_voice_state(channel=None)
-			self.vc = await channel.connect(timeout=7, reconnect=True)
-		players[channel.guild.id].set_result(self)
-		players[channel.guild.id] = self
+		try:
+			if not self.vc:
+				if channel.guild.me.voice:
+					await channel.guild.change_voice_state(channel=None)
+				self.vc = await channel.connect(timeout=7, reconnect=True)
+		except Exception as ex:
+			players[channel.guild.id].set_exception(ex)
+			players.pop(channel.guild.id)
+			raise
+		else:
+			players[channel.guild.id].set_result(self)
+			players[channel.guild.id] = self
 
 	@classmethod
 	def from_guild(cls, guild):

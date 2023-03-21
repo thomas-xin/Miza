@@ -304,7 +304,7 @@ class CustomAudio(collections.abc.Hashable):
             return getattr(self.__getattribute__("queue"), key)
         except AttributeError:
             pass
-        self.fut.result(timeout=12)
+        self.fut.result(timeout=4)
         return getattr(self.__getattribute__("acsi"), key)
 
     def __dir__(self):
@@ -346,7 +346,7 @@ class CustomAudio(collections.abc.Hashable):
         return abs(self.stats.speed)
 
     def _epos(self):
-        self.fut.result(timeout=12)
+        self.fut.result(timeout=4)
         pos = self.acsi.pos
         if not pos[1] and self.queue:
             dur = e_dur(self.queue[0].get("duration"))
