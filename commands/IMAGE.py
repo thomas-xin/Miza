@@ -1589,7 +1589,7 @@ class Art(Command):
                     raise PermissionError("Premium subscription required to perform DALL·E 2 operations.")
                 if bot.is_trusted(guild) >= 2:
                     for uid in bot.data.trusted[guild.id]:
-                        if bot.premium_level(uid, absolute=True) >= 2:
+                        if uid and bot.premium_level(uid, absolute=True) >= 2:
                             break
                     else:
                         uid = next(iter(bot.data.trusted[guild.id]))
@@ -1609,7 +1609,7 @@ class Art(Command):
                                 bot.data.costs.put(guild.id, cost)
                         if bot.is_trusted(guild) >= 2:
                             for uid in bot.data.trusted[guild.id]:
-                                if bot.premium_level(uid, absolute=True) >= 2:
+                                if uid and bot.premium_level(uid, absolute=True) >= 2:
                                     break
                             else:
                                 uid = next(iter(bot.data.trusted[guild.id]))
@@ -1712,7 +1712,7 @@ class Art(Command):
                         with tracebacksuppressor:
                             if bot.is_trusted(guild) >= 2:
                                 for uid in bot.data.trusted[guild.id]:
-                                    if bot.premium_level(uid, absolute=True) >= 2:
+                                    if uid and bot.premium_level(uid, absolute=True) >= 2:
                                         break
                                 else:
                                     uid = next(iter(bot.data.trusted[guild.id]))
@@ -1731,7 +1731,7 @@ class Art(Command):
                                         bot.data.costs.put(guild.id, cost)
                                 if bot.is_trusted(guild) >= 2:
                                     for uid in reversed(bot.data.trusted[guild.id]):
-                                        if bot.premium_level(uid, absolute=True) >= 2:
+                                        if uid and bot.premium_level(uid, absolute=True) >= 2:
                                             break
                                     u = await bot.fetch_user(uid)
                                 else:
