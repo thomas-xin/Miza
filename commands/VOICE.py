@@ -467,14 +467,14 @@ class CustomAudio(collections.abc.Hashable):
     # Update event, ensures audio is playing correctly and moves, leaves, or rejoins voice when necessary.
     def update(self, *void1, **void2):
         with tracebacksuppressor:
-            if not self.guild.me.voice:
+            guild = self.guild
+            if not guild.me.voice:
                 return self.kill(css_md(f"🎵 Automatically disconnected from {sqr_md(guild)}. 🎵"))
             try:
                 self.fut.result(timeout=12)
             except:
                 print_exc()
                 return self.kill()
-            guild = self.guild
             t = utc()
             if getattr(self, "player", None) is not None and self.stats.speed and not self.paused:
                 if t - self.player.get("time", 0) >= 0:

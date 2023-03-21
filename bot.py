@@ -4725,7 +4725,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             try:
                 func = self._discord_parsers[event]
             except KeyError:
-                print(f"Unknown event {event}.")
+                print(f"Unknown event {event}.", data)
+                self._discord_parsers[event] = lambda data: None
             else:
                 func(data)
             removed = deque()
