@@ -209,6 +209,7 @@ class AudioPlayer(discord.AudioSource):
 	listening = False
 	# Empty opus packet data
 	emptyopus = b"\xfc\xff\xfe"
+	silent = False
 
 	@classmethod
 	async def join(cls, channel):
@@ -221,11 +222,13 @@ class AudioPlayer(discord.AudioSource):
 					await channel.guild.change_voice_state(channel=None)
 				self.vc = await channel.connect(timeout=7, reconnect=True)
 		except Exception as ex:
-			players[channel.guild.id].set_exception(ex)
-			players.pop(channel.guild.id)
+			if channel.guild.id in players:
+				players[channel.guild.id].set_exception(ex)
+				players.pop(channel.guild.id)
 			raise
 		else:
-			players[channel.guild.id].set_result(self)
+			if channel.guild.id in players:
+				players[channel.guild.id].set_result(self)
 			players[channel.guild.id] = self
 
 	@classmethod
@@ -291,7 +294,10 @@ class AudioPlayer(discord.AudioSource):
 
 	def read(self):
 		if not self.queue or not self.queue[0]:
-			return self.emptyopus
+			if self.silent:
+				self.vc.pause()
+			self.silent = True
+			return self.emptyopus * 3
 		out = b""
 		try:
 			out = self.queue[0][0].read()

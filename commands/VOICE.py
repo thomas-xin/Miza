@@ -454,6 +454,7 @@ class CustomAudio(collections.abc.Hashable):
         if self.acsi:
             with tracebacksuppressor(AttributeError):
                 self.acsi.kill()
+        create_task(self.bot.audio.asubmit(f"players.pop({self.guild.id},None)"))
         if self.guild.me and self.guild.me.voice:
             create_task(self.guild.change_voice_state(channel=None))
         self.bot.data.audio.players.pop(self.guild.id, None)
@@ -466,6 +467,8 @@ class CustomAudio(collections.abc.Hashable):
     # Update event, ensures audio is playing correctly and moves, leaves, or rejoins voice when necessary.
     def update(self, *void1, **void2):
         with tracebacksuppressor:
+            if not self.guild.me.voice:
+                return self.kill(css_md(f"🎵 Automatically disconnected from {sqr_md(guild)}. 🎵"))
             try:
                 self.fut.result(timeout=12)
             except:

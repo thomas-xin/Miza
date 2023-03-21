@@ -143,8 +143,8 @@ class Execute(Command):
     multi = True
 
     async def __call__(self, bot, user, message, channel, guild, argl, args, argv, **void):
-        envs = []
         env = (user, channel)
+        envs = [env]
         while args:
             if args[0] == "as":
                 args.pop(0)
@@ -200,6 +200,7 @@ class Execute(Command):
         except IndexError:
             pass
             # raise ArgumentError('"run" must be specified as a separator.')
+        print(envs, argv)
         futs = deque()
         for u, c in envs:
             fake_message = copy.copy(message)
