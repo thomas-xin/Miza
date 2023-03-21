@@ -476,10 +476,10 @@ class Bot:
 		if q.count(" ") < 2:
 			return False
 		if not literal_question(q):
-			resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", q, ("question", "information", "action"))
+			resp = self.answer_classify("vicgalle/xlm-roberta-large-xnli-anli", q, ("question", "information", "action"))
 			if resp["question"] < 0.5:
 				return False
-		resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", q, ("personal question", "not personal"))
+		resp = self.answer_classify("vicgalle/xlm-roberta-large-xnli-anli", q, ("personal question", "not personal"))
 		return resp["not personal"] >= 0.5
 
 	def caichat(self, u, q, refs=(), im=None):
@@ -539,7 +539,7 @@ class Bot:
 					res = lim_str(res.replace("\n", " "), 256, mode="right") + "\n" + summ
 				if res and cvalid:
 					anss = (f'"{q}"', f'not "{q}"')
-					resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", q, anss)
+					resp = self.answer_classify("vicgalle/xlm-roberta-large-xnli-anli", q, anss)
 					if resp[anss[1]] > 0.5:
 						res = None
 			if not res and cvalid:
@@ -597,7 +597,7 @@ class Bot:
 					)
 					err = any(res.startswith(s) for s in errs)
 					if not err:
-						resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", res, ("answer", "As an AI language model"))
+						resp = self.answer_classify("vicgalle/xlm-roberta-large-xnli-anli", res, ("answer", "As an AI language model"))
 						if not self.bl:
 							print(resp)
 						err = resp["As an AI language model"] > 0.5
@@ -1164,7 +1164,7 @@ class Bot:
 				# rc = len(self.gpttokens(role, model="text-davinci-003"))
 				# rc += len(self.gpttokens(text, model="text-davinci-003"))
 				# cost = (pc + rc) * cm
-				# resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", text, ("answer", "As an AI language model"))
+				# resp = self.answer_classify("vicgalle/xlm-roberta-large-xnli-anli", text, ("answer", "As an AI language model"))
 				# print(resp)
 				# if resp["As an AI language model"] > 2 / 3:
 				# 	messages = [messages[0], messages[-1]]
@@ -1390,7 +1390,7 @@ class Bot:
 			k, v = t2
 			if self.premium > 1:
 				labels = ("promise", "information", "example")
-				resp = self.answer_classify("joeddav/xlm-roberta-large-xnli", v, labels)
+				resp = self.answer_classify("vicgalle/xlm-roberta-large-xnli-anli", v, labels)
 			if len(self.gpttokens(v)) > 68:
 				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=64, min_length=8).replace("\n", ". ").strip()
 				t2 = (k, v)
