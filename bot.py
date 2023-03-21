@@ -425,7 +425,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
     # A garbage collector for empty and unassigned objects in the database.
     async def garbage_collect(self, obj):
-        if not self.ready or hasattr(obj, "no_delete") or not any(hasattr(obj, i) for i in ("channel", "garbage")):
+        if not self.ready or hasattr(obj, "no_delete") or not any(hasattr(obj, i) for i in ("channel", "garbage")) and not getattr(obj, "garbage_collect", None):
             return
         with MemoryTimer("gc_" + obj.name):
             with tracebacksuppressor(SemaphoreOverflowError):
