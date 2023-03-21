@@ -657,7 +657,7 @@ class Info(Command):
             t2 = len(g._threads)
             v = len(voice_channels(g))
             c = len(g.categories)
-            channelinfo = f"Text: {t}\nThreads: {t2}\nVoice: {v}\nCategory: {c}"
+            channelinfo = f"Text: {t}\nThread: {t2}\nVoice: {v}\nCategory: {c}"
             if x > t + v + c:
                 channelinfo += f"\nOther: {t + v + c - x}"
             emb.add_field(name=f"Channels ({x + t2})", value=channelinfo, inline=1)

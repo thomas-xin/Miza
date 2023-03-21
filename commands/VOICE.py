@@ -4416,7 +4416,7 @@ class Player(Command):
     server_only = True
     buttons = demap({
         b'\xe2\x8f\xaf\xef\xb8\x8f': 0,
-        b'\xf0\x9f\x94\x84': 1,
+        b'\xf0\x9f\x94\x81': 1,
         b'\xf0\x9f\x94\x80': 2,
         b'\xe2\x8f\xae': 3,
         b'\xe2\x8f\xad': 4,
@@ -4453,10 +4453,13 @@ class Player(Command):
             output += skips * "🚫"
         else:
             output = "Queue is currently empty. "
-        if auds.stats.loop:
-            output += "🔄"
-        if auds.stats.shuffle:
-            output += "🔀"
+        if auds.stats.repeat:
+            output += "🔂"
+        else:
+            if auds.stats.loop:
+                output += "🔁"
+            if auds.stats.shuffle:
+                output += "🔀"
         if auds.stats.quiet:
             output += "🔕"
         if q:
@@ -4564,7 +4567,15 @@ class Player(Command):
                 if i == 0:
                     await create_future(auds.pause, unpause=True)
                 elif i == 1:
-                    auds.stats.loop = bool(auds.stats.loop ^ 1)
+                    if auds.stats.loop:
+                        auds.stats.loop = False
+                        auds.stats.repeat = True
+                    elif auds.stats.repeat:
+                        auds.stats.loop = False
+                        auds.stats.repeat = False
+                    else:
+                        auds.stats.loop = True
+                        auds.stats.repeat = False
                 elif i == 2:
                     auds.stats.shuffle = bool(auds.stats.shuffle ^ 1)
                 elif i == 3 or i == 4:
