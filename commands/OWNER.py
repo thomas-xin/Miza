@@ -1165,8 +1165,9 @@ class UpdateGuilds(Database):
     def _bot_ready_(self, **void):
         bot = self.bot
         for guild in bot.cache.guilds.values():
-            if guild.member_count > len(guild._members) and guild.id in self:
-                self.load_guild(guild)
+            with tracebacksuppressor:
+                if guild.id in self:
+                    self.load_guild(guild)
 
     def load_guild(self, guild):
         mdata = self.get(guild.id, [])
