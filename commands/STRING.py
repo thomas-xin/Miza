@@ -1168,6 +1168,7 @@ class Ask(Command):
             inputs = dict(
                 channel_id=channel.id,
                 key=AUTH.get("openai_key"),
+                huggingface_token=AUTH.get("huggingface_key"),
                 cai_token=AUTH.get("cai_token"),
                 name=bot.name,
                 personality=bot.commands.personality[0].retrieve((channel or guild).id),
