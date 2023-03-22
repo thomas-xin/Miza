@@ -1783,31 +1783,35 @@ class Server:
 			raise PermissionError
 		return self.register_replacer(ts, key)
 
+	replacer_sem = Semaphore(1, inf, rate_limit=0.0625)
 	def register_replacer(self, ts, key):
-		with open("saves/filehost/-1.txt", "a", encoding="ascii") as f:
-			f.write(f"{ts}:{key}\n")
+		with self.replacer_sem:
+			with open("saves/filehost/-1.txt", "a", encoding="ascii") as f:
+				f.write(f"{ts}:{key}\n")
 
 	def in_replacer(self, ts, key):
 		if not os.path.exists("saves/filehost/-1.txt") or not os.path.getsize("saves/filehost/-1.txt"):
 			return
-		with open("saves/filehost/-1.txt", "r", encoding="ascii") as f:
-			lines = f.readlines()
+		with self.replacer_sem:
+			with open("saves/filehost/-1.txt", "r", encoding="ascii") as f:
+				lines = f.readlines()
 		line = f"{ts}:{key}\n"
 		return line in lines
 
 	def remove_replacer(self, ts, key):
 		if not os.path.exists("saves/filehost/-1.txt") or not os.path.getsize("saves/filehost/-1.txt"):
 			return
-		with open("saves/filehost/-1.txt", "r+", encoding="ascii") as f:
-			lines = set(f.readlines())
-			line = f"{ts}:{key}\n"
-			if line not in lines:
-				return False
-			lines.discard(line)
-			f.seek(0)
-			s = "".join(lines)
-			f.write(s)
-			f.truncate(len(s))
+		with self.replacer_sem:
+			with open("saves/filehost/-1.txt", "r+", encoding="ascii") as f:
+				lines = set(f.readlines())
+				line = f"{ts}:{key}\n"
+				if line not in lines:
+					return False
+				lines.discard(line)
+				f.seek(0)
+				s = "".join(lines)
+				f.write(s)
+				f.truncate(len(s))
 		return True
 
 	replace_fut = None
@@ -1823,8 +1827,9 @@ class Server:
 	def update_replacers(self):
 		if not os.path.exists("saves/filehost/-1.txt") or not os.path.getsize("saves/filehost/-1.txt"):
 			return
-		with open("saves/filehost/-1.txt", "r", encoding="ascii") as f:
-			lines = f.readlines()
+		with self.replacer_sem:
+			with open("saves/filehost/-1.txt", "r", encoding="ascii") as f:
+				lines = f.readlines()
 		for line in lines:
 			ts, key = line.rstrip().split(":", 1)
 			try:
