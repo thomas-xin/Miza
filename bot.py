@@ -3020,7 +3020,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
     # Handles all updates to the bot. Manages the bot's status and activity on discord, and updates all databases.
     async def handle_update(self, force=False):
-        if utc() - self.last_check > 2 or force:
+        if utc() - self.last_check > 5 or force:
             semaphore = self.semaphore if not force else emptyctx
             with suppress(SemaphoreOverflowError):
                 with semaphore:
@@ -3032,8 +3032,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         for u in self.data.values():
                             if not u._semaphore.busy:
                                 trace(create_future(u, priority=True))
-                            if not u._garbage_semaphore.busy:
-                                create_task(self.garbage_collect(u))
 
     # Processes a message, runs all necessary commands and bot events. May be called from another source.
     async def process_message(self, message, msg=None, edit=True, orig=None, loop=False, slash=False):
@@ -4102,12 +4100,17 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                             sem._update_bin()
                     create_future_ex(self.cache_reduce, priority=True)
                     await asyncio.sleep(1)
-                    create_task(Request(
-                        f"https://127.0.0.1:{PORT}/api_update_replacers",
-                        method="GET",
-                        aio=True,
-                        ssl=False,
-                    ))
+                    with tracebacksuppressor:
+                        await Request(
+                            f"https://127.0.0.1:{PORT}/api_update_replacers",
+                            method="GET",
+                            aio=True,
+                            ssl=False,
+                        )
+                    await asyncio.sleep(1)
+                    for u in self.data.values():
+                        if not u._garbage_semaphore.busy:
+                            create_task(self.garbage_collect(u))
 
     # Heartbeat loop: Repeatedly deletes a file to inform the watchdog process that the bot's event loop is still running.
     async def heartbeat_loop(self):
