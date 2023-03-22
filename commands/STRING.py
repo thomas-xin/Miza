@@ -1156,7 +1156,7 @@ class Ask(Command):
                 cai_channel = None
             if bot.is_trusted(guild) >= 2:
                 for uid in bot.data.trusted[guild.id]:
-                    if bot.premium_level(uid, absolute=True) >= 2:
+                    if uid and bot.premium_level(uid, absolute=True) >= 2:
                         break
                 else:
                     uid = next(iter(bot.data.trusted[guild.id]))
@@ -1168,6 +1168,7 @@ class Ask(Command):
             inputs = dict(
                 channel_id=channel.id,
                 key=AUTH.get("openai_key"),
+                huggingface_token=AUTH.get("huggingface_key"),
                 cai_token=AUTH.get("cai_token"),
                 name=bot.name,
                 personality=bot.commands.personality[0].retrieve((channel or guild).id),
@@ -1218,7 +1219,7 @@ class Ask(Command):
                 else:
                     if bot.is_trusted(guild) >= 2:
                         for uid in bot.data.trusted[guild.id]:
-                            if bot.premium_level(uid, absolute=True) >= 2:
+                            if uid and bot.premium_level(uid, absolute=True) >= 2:
                                 break
                         else:
                             uid = next(iter(bot.data.trusted[guild.id]))

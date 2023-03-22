@@ -1589,7 +1589,7 @@ class Art(Command):
                     raise PermissionError("Premium subscription required to perform DALL·E 2 operations.")
                 if bot.is_trusted(guild) >= 2:
                     for uid in bot.data.trusted[guild.id]:
-                        if bot.premium_level(uid, absolute=True) >= 2:
+                        if uid and bot.premium_level(uid, absolute=True) >= 2:
                             break
                     else:
                         uid = next(iter(bot.data.trusted[guild.id]))
@@ -1609,7 +1609,7 @@ class Art(Command):
                                 bot.data.costs.put(guild.id, cost)
                         if bot.is_trusted(guild) >= 2:
                             for uid in bot.data.trusted[guild.id]:
-                                if bot.premium_level(uid, absolute=True) >= 2:
+                                if uid and bot.premium_level(uid, absolute=True) >= 2:
                                     break
                             else:
                                 uid = next(iter(bot.data.trusted[guild.id]))
@@ -1686,16 +1686,16 @@ class Art(Command):
                 image_1b = image_2b = None
                 done = False
                 if url:
-                    resp = await process_image(url, "resize_to", ["-nogif", 512, 512, "auto"], timeout=60)
+                    resp = await process_image(url, "resize_to", ["-nogif", 512, 512, "auto", "-f", "png"], timeout=60)
                     image_1 = resp[0]
                     if inpaint and url2:
                         image_2b = await bot.get_request(url2)
                     if inpaint and not url2:
-                        resp = await process_image(image_1, "get_mask", ["-nogif", "-nodel"], timeout=60)
+                        resp = await process_image(image_1, "get_mask", ["-nogif", "-nodel", "-f", "png"], timeout=60)
                         image_2 = resp[0]
-                        resp = await process_image(image_1, "inpaint", [image_2, "-nodel"], timeout=60)
+                        resp = await process_image(image_1, "inpaint", [image_2, "-nodel", "-f", "png"], timeout=60)
                         image_1 = resp[0]
-                        resp = await process_image(image_2, "expand_mask", ["-nogif", 12], timeout=60)
+                        resp = await process_image(image_2, "expand_mask", ["-nogif", 12, "-f", "png"], timeout=60)
                         image_2 = resp[0]
                         print(image_1, image_2)
                     if "--strength" not in kwargs:
@@ -1712,7 +1712,7 @@ class Art(Command):
                         with tracebacksuppressor:
                             if bot.is_trusted(guild) >= 2:
                                 for uid in bot.data.trusted[guild.id]:
-                                    if bot.premium_level(uid, absolute=True) >= 2:
+                                    if uid and bot.premium_level(uid, absolute=True) >= 2:
                                         break
                                 else:
                                     uid = next(iter(bot.data.trusted[guild.id]))
@@ -1731,7 +1731,7 @@ class Art(Command):
                                         bot.data.costs.put(guild.id, cost)
                                 if bot.is_trusted(guild) >= 2:
                                     for uid in reversed(bot.data.trusted[guild.id]):
-                                        if bot.premium_level(uid, absolute=True) >= 2:
+                                        if uid and bot.premium_level(uid, absolute=True) >= 2:
                                             break
                                     u = await bot.fetch_user(uid)
                                 else:

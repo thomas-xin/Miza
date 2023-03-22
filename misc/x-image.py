@@ -2412,6 +2412,7 @@ def CBIP():
 def CBAI(inputs):
 	channel_id = inputs["channel_id"]
 	key = inputs["key"]
+	ht = inputs["huggingface_token"]
 	cai_token = inputs["cai_token"]
 	name = inputs["name"]
 	personality = inputs["personality"]
@@ -2433,6 +2434,7 @@ def CBAI(inputs):
 	except KeyError:
 		cb = CBOTS[channel_id] = convobot.Bot( 
 			key=key,
+			huggingface_token=ht,
 			cai_token=cai_token,
 			cai_channel=cai_channel,
 			name=name,
