@@ -1789,18 +1789,10 @@ class Server:
 			raise PermissionError
 		return self.register_replacer(ts, key)
 
-	replacer_sem = Semaphore(1, inf, rate_limit=0.0625)
+	replacer_sem = Semaphore(1, inf, rate_limit=1)
 	def register_replacer(self, ts, key):
 		with self.replacer_sem:
-			if os.path.exists("saves/filehost/-1.txt"):
-				mode = "r+"
-				fs = os.path.getsize("saves/filehost/-1.txt")
-			else:
-				mode = "w"
-				fs = 0
-			with open("saves/filehost/-1.txt", "r+", encoding="ascii") as f:
-				if fs:
-					f.seek(fs)
+			with open("saves/filehost/-1.txt", "a", encoding="ascii") as f:
 				f.write(f"{ts}:{key}\n")
 
 	def in_replacer(self, ts, key):
