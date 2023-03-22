@@ -562,6 +562,7 @@ class UpdateExec(Database):
         print("Stash", fn, start, end)
         urls = []
         mids = []
+        end = min(end, os.path.getsize(fn))
         with open(fn, "rb") as f:
             if start:
                 f.seek(start)
