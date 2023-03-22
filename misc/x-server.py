@@ -1710,8 +1710,8 @@ class Server:
 		key = key or base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
 		na2 = lim_str(name, 96).replace("$", "-")
 		fn = f"saves/filehost/{IND}{ts}~.forward${size}${ha2 or ' '}${na2}.$"
-		if os.path.exists(fn) and not urls:
-			return url + f"?key={key}"
+		# if os.path.exists(fn) and not urls:
+		# 	return url + f"?key={key}"
 		if urls:
 			pass
 		elif size > 0:
