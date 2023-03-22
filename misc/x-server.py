@@ -1792,7 +1792,15 @@ class Server:
 	replacer_sem = Semaphore(1, inf, rate_limit=0.0625)
 	def register_replacer(self, ts, key):
 		with self.replacer_sem:
-			with open("saves/filehost/-1.txt", "a", encoding="ascii") as f:
+			if os.path.exists("saves/filehost/-1.txt"):
+				mode = "r+"
+				fs = os.path.getsize("saves/filehost/-1.txt")
+			else:
+				mode = "w"
+				fs = 0
+			with open("saves/filehost/-1.txt", "r+", encoding="ascii") as f:
+				if fs:
+					f.seek(fs)
 				f.write(f"{ts}:{key}\n")
 
 	def in_replacer(self, ts, key):
