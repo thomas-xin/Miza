@@ -1789,7 +1789,7 @@ class Server:
 			raise PermissionError
 		return self.register_replacer(ts, key)
 
-	replacer_sem = Semaphore(1, inf, rate_limit=1)
+	replacer_sem = Semaphore(1, inf, rate_limit=0.0625)
 	def register_replacer(self, ts, key):
 		with self.replacer_sem:
 			with open("saves/filehost/-1.txt", "a", encoding="ascii") as f:
@@ -1814,10 +1814,10 @@ class Server:
 				if line not in lines:
 					return False
 				lines.discard(line)
-				f.seek(0)
 				s = "".join(lines)
-				f.write(s)
 				f.truncate(len(s))
+				f.seek(0)
+				f.write(s)
 		return True
 
 	replace_fut = None
