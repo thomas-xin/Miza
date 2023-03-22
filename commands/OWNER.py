@@ -1143,6 +1143,10 @@ class UpdateImagePools(Database):
         return choice(data)
 
 
+class UpdateGuildSettings(Database):
+    name = "guildsettings"
+
+
 class UpdateGuilds(Database):
     name = "guilds"
     forced = set()
