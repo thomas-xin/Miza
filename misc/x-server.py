@@ -801,7 +801,11 @@ class Server:
 					for i in range(16):
 						try:
 							resp = reqs.next().get(url, headers=headers, stream=True)
+							if resp.status_code in (403, 404):
+								raise FileNotFoundError
 							resp.raise_for_status()
+							break
+						except FileNotFoundError:
 							break
 						except:
 							print_exc()
@@ -1744,8 +1748,6 @@ class Server:
 
 	def bump(self):
 		for fp in os.listdir("saves/filehost"):
-			if fp.count("$") >= 4:
-				continue
 			p = "saves/filehost/" + fp
 			with open(p, "r", encoding="utf-8") as f:
 				sn = f.read()
@@ -1770,6 +1772,8 @@ class Server:
 			stn = p.rsplit("~.forward$", 1)[0].replace("saves/filehost/", "cache/")
 			pn = stn + "~.temp$@" + info[0]
 			self.concat(pn, urls, name=info[0], mime=info[2], stn=stn, waiter=True).result()
+			if fp.count("$") >= 4:
+				continue
 			self.replace_file(pn, name=info[0], key=key, urls=urls, mids=mids)
 
 	@cp.expose
