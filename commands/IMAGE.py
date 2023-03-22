@@ -1691,11 +1691,11 @@ class Art(Command):
                     if inpaint and url2:
                         image_2b = await bot.get_request(url2)
                     if inpaint and not url2:
-                        resp = await process_image(image_1, "get_mask", ["-nogif", "-nodel"], timeout=60)
+                        resp = await process_image(image_1, "get_mask", ["-nogif", "-nodel", "-f", "png"], timeout=60)
                         image_2 = resp[0]
-                        resp = await process_image(image_1, "inpaint", [image_2, "-nodel"], timeout=60)
+                        resp = await process_image(image_1, "inpaint", [image_2, "-nodel", "-f", "png"], timeout=60)
                         image_1 = resp[0]
-                        resp = await process_image(image_2, "expand_mask", ["-nogif", 12], timeout=60)
+                        resp = await process_image(image_2, "expand_mask", ["-nogif", 12, "-f", "png"], timeout=60)
                         image_2 = resp[0]
                         print(image_1, image_2)
                     if "--strength" not in kwargs:
