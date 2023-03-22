@@ -2847,6 +2847,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             await_fut(fut)
         if day:
             self.backup()
+            for u in self.data.values():
+                if not u._garbage_semaphore.busy:
+                    create_task(self.garbage_collect(u))
 
     async def as_rewards(self, diamonds, gold=Dummy):
         if type(diamonds) is not int:
@@ -4109,10 +4112,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                             aio=True,
                             ssl=False,
                         )
-                    await asyncio.sleep(1)
-                    for u in self.data.values():
-                        if not u._garbage_semaphore.busy:
-                            create_task(self.garbage_collect(u))
 
     # Heartbeat loop: Repeatedly deletes a file to inform the watchdog process that the bot's event loop is still running.
     async def heartbeat_loop(self):
