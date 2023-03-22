@@ -810,9 +810,10 @@ class Bot:
 			if len(self.gpttokens(res)) > 144:
 				summ = self.answer_summarise("facebook/bart-large-cnn", q + "\n" + res, max_length=128, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
 				res = lim_str(res.replace("\n", " "), 256, mode="right") + "\n" + summ
-			res = s + res + "\n"
-			lines.append(res)
-			searched = True
+			if res:
+				res = s + res + "\n"
+				lines.append(res)
+				searched = True
 		for k, v in refs:
 			if not k.startswith("[REPLIED TO]: "):
 				continue
