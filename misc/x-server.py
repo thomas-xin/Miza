@@ -100,18 +100,21 @@ def communicate(self):
 		if not req.close_connection:
 			return True
 	except socket.error as ex:
-		errnum = ex.args[0]
-		# sadly SSL sockets return a different (longer) time out string
-		timeout_errs = 'timed out', 'The read operation timed out', 'EOF occurred in violation of protocol'
-		if errnum in timeout_errs:
-			if (not request_seen) or (req and req.started_request):
-				self._conditional_error(req, '408 Request Timeout')
-		elif errnum not in errors.socket_errors_to_ignore:
-			self.server.error_log(
-				'socket.error %s' % repr(errnum),
-				level=logging.WARNING, traceback=True,
-			)
-			self._conditional_error(req, '500 Internal Server Error')
+		if "EOF occurred in violation of protocol" in ex.args[0]:
+			print(repr(ex))
+		else:
+			errnum = ex.args[0]
+			# sadly SSL sockets return a different (longer) time out string
+			timeout_errs = ('timed out', 'The read operation timed out')
+			if errnum in timeout_errs:
+				if (not request_seen) or (req and req.started_request):
+					self._conditional_error(req, '408 Request Timeout')
+			elif errnum not in errors.socket_errors_to_ignore:
+				self.server.error_log(
+					'socket.error %s' % repr(errnum),
+					level=logging.WARNING, traceback=True,
+				)
+				self._conditional_error(req, '500 Internal Server Error')
 	except (KeyboardInterrupt, SystemExit):
 		raise
 	except (errors.FatalSSLAlert, errors.SSLEOFError) as ex:
