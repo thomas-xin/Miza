@@ -1650,6 +1650,14 @@ class Server:
 			ts = int(of.split("~", 1)[0].rsplit(IND, 1)[-1])
 		except ValueError:
 			ts = time.time_ns() // 1000
+		try:
+			assert os.path.exists(find_file(ts, cwd="saves/filehost"))
+		except:
+			pass
+		else:
+			return
+		# if os.path.exists(fn) and not urls:
+		# 	return url + f"?key={key}"
 		ha1 = self.hash_file(of)
 		if ha1:
 			ha2 = ha1[:4] + ha1[-4:]
@@ -1710,8 +1718,6 @@ class Server:
 		key = key or base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
 		na2 = lim_str(name, 96).replace("$", "-")
 		fn = f"saves/filehost/{IND}{ts}~.forward${size}${ha2 or ' '}${na2}.$"
-		# if os.path.exists(fn) and not urls:
-		# 	return url + f"?key={key}"
 		if urls:
 			pass
 		elif size > 0:
