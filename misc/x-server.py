@@ -1477,12 +1477,11 @@ class Server:
 	def upload_url(self, **kwargs):
 		ts = time.time_ns() // 1000
 		url = kwargs["url"]
-		fn = f"../saves/filehost/{IND}{ts}~" + url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
+		fn = f"../cache/{IND}{ts}~.temp$@" + url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0]
 		subprocess.run([sys.executable, "downloader.py", url, fn], cwd="misc")
 		b = ts.bit_length() + 7 >> 3
-		with tracebacksuppressor:
-			self.replace_file(fn[3:])
-		return HOST + "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
+		ts, key = self.register_replacer(ts)
+		return HOST + "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=") + "?key=" + key
 
 	def optimise_video(self, of, size, mime):
 		print("Convert", of, mime, size)
@@ -1797,10 +1796,14 @@ class Server:
 		return self.register_replacer(ts, key)
 
 	replacer_sem = Semaphore(1, inf, rate_limit=0.0625)
-	def register_replacer(self, ts, key):
+	def register_replacer(self, ts, key=None):
+		if not key:
+			n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
+			key = base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
 		with self.replacer_sem:
 			with open("saves/filehost/-1.txt", "a", encoding="ascii") as f:
 				f.write(f"{ts}:{key}\n")
+		return (ts, key)
 
 	def in_replacer(self, ts, key):
 		if not os.path.exists("saves/filehost/-1.txt") or not os.path.getsize("saves/filehost/-1.txt"):
