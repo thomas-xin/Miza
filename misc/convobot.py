@@ -1185,6 +1185,7 @@ class Bot:
 					temperature=temp,
 					max_tokens=limit - pc - 64,
 					top_p=1,
+					stop=[f"{self.name}: "],
 					frequency_penalty=0.8,
 					presence_penalty=0.4,
 					user=str(hash(u)),
