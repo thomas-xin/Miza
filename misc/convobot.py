@@ -1115,7 +1115,8 @@ class Bot:
 					openai.api_key = self.key
 					costs = 1
 				try:
-					response = openai.ChatCompletion.create(
+					response = exc.submit(
+						openai.ChatCompletion.create,
 						model=model,
 						messages=messages,
 						temperature=temp,
@@ -1124,7 +1125,7 @@ class Bot:
 						frequency_penalty=1.0,
 						presence_penalty=0.6,
 						user=str(hash(u)),
-					)
+					).result(timeout=120)
 				# except openai.error.InvalidRequestError:
 				# 	response = openai.ChatCompletion.create(
 				# 		model=model,
