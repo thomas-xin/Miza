@@ -1375,12 +1375,12 @@ class Bot:
 			if self.premium > 1:
 				labels = ("promise", "information", "example")
 				resp = self.answer_classify("vicgalle/xlm-roberta-large-xnli-anli", v, labels)
-			if len(self.gpttokens(v)) > 120:
-				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=128, min_length=8).replace("\n", ". ").strip()
+			if len(self.gpttokens(v)) > 104:
+				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=96, min_length=8).replace("\n", ". ").strip()
 				t2 = (k, v)
 			k, v = t1
-			if len(self.gpttokens(v)) > 68:
-				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=64, min_length=6).replace("\n", ". ").strip()
+			if len(self.gpttokens(v)) > 52:
+				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=48, min_length=6).replace("\n", ". ").strip()
 				t1 = (k, v)
 			if self.premium > 1 and resp["promise"] >= 0.5:
 				if len(self.promises) >= 6:
@@ -1389,8 +1389,8 @@ class Bot:
 				self.promises.append(t2)
 				print("Promises:", self.promises)
 			else:
-				self.append(t1)
-				self.append(t2)
+				self.chat_history.append(t1)
+				self.chat_history.append(t2)
 		except:
 			print_exc()
 
