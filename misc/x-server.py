@@ -776,7 +776,9 @@ class Server:
 				b.append(next(it))
 		b = b"".join(b)
 		print("PreCat", urls[0], resp, len(b))
-		yield b
+		yield b[:4194304]
+		if len(b) > 4194304:
+			yield b[4194304:]
 		fut = create_future_ex(self._concat, urls, on, pn)
 		self.serving[on] = fut
 		yield from self.wconcat(on, pn, name, download, mime, fut, start=len(b))
