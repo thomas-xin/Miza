@@ -1204,6 +1204,7 @@ class Bot:
 			except:
 				print_exc()
 			if response:
+				print(response)
 				text = response.choices[0].text
 				rc = len(self.gpttokens(text, model="text-davinci-003"))
 				cost += (pc + rc) * cm

@@ -1913,9 +1913,7 @@ class UpdateUsers(Database):
             if type(key) is str:
                 if key.startswith("#"):
                     c_id = int(key[1:].rstrip("\x7f"))
-                    try:
-                        await bot.fetch_channel(c_id)
-                    except:
+                    if c_id not in bot.cache.channels:
                         print(f"Deleting {key} from {self}...")
                         data.pop(key, None)
                         await asyncio.sleep(0.1)
@@ -1923,9 +1921,6 @@ class UpdateUsers(Database):
             try:
                 if not data[key]:
                     raise LookupError
-                with suppress(KeyError):
-                    d = bot.cache.guilds[key]
-                    continue
                 d = await bot.fetch_user(key)
                 if d is not None:
                     continue
