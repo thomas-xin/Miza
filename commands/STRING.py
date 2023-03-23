@@ -1122,10 +1122,7 @@ class Ask(Command):
                         else:
                             urls = [fr]
                     for url in urls:
-                        if is_image(url) is not None or is_video(url) is not None:
-                            capt = url.rsplit("/", 1)[-1]
-                            c = c.replace(url, f"[Image {capt}]")
-                        elif p2:
+                        if p2 or is_image(url) is not None or is_video(url) is not None:
                             capt = url.rsplit("/", 1)[-1]
                             c = c.replace(url, f"[Image {capt}]")
                     refs.insert(0, ("[REPLIED TO]: " + name, c))
@@ -1136,12 +1133,21 @@ class Ask(Command):
                 else:
                     urls = [fm]
             for url in urls:
-                if is_image(url) is not None or is_video(url) is not None:
+                if p2 or is_image(url) is not None or is_video(url) is not None:
                     capt = url.rsplit("/", 1)[-1]
-                    q = q.replace(url, f"[Image {capt}]")
-                elif p2:
-                    capt = url.rsplit("/", 1)[-1]
-                    q = q.replace(url, f"[Image {capt}]")
+                    if p1:
+                        if p2:
+                            capti = f"[Image {capt}:{p1}:{p2}]"
+                            refs = refs[:-2]
+                        else:
+                            capti = f"[Image {capt}:{p1}]"
+                            refs = refs[:-1]
+                    elif p2:
+                        capti = f"[Image {capt}:{p2}]"
+                        refs.pop(-1)
+                    else:
+                        capti = f"[Image {capt}]"
+                    q = q.replace(url, capti)
             m = message
             if m.author.id == bot.id:
                 name = bot.name
