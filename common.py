@@ -2130,7 +2130,18 @@ async def sub_submit(ptype, command, fix=None, _timeout=12):
         try:
             proc.stdin.write(s)
             await proc.stdin.drain()
-            resp = await asyncio.wait_for(wrap_future(PROC_RESP[ts]), timeout=_timeout)
+            fut = wrap_future(PROC_RESP[ts])
+            tries = ceil(_timeout / 3)
+            for i in range(tries)
+                if ts not in PROC_RESP:
+                    raise ConnectionResetError("Response disconnected.")
+                try:
+                    resp = await asyncio.wait_for(fut, timeout=3)
+                except T1:
+                    if i >= tries - 1:
+                        raise
+                else:
+                    break
         except (BrokenPipeError, OSError, asyncio.TimeoutError) as ex:
             try:
                 i = PROCS[ptype].index(proc)
