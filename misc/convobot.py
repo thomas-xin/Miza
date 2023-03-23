@@ -840,7 +840,7 @@ class Bot:
 		longer = req_long(q)
 		reprompt = ""
 		cm2 = None
-		if self.premium < 2 or start:
+		if self.premium < 2:
 			if not res and not start and q.count(" ") < 2:
 				model = "text-bloom-001"
 				temp = 0.9
@@ -851,11 +851,11 @@ class Bot:
 				temp = 0.8
 				limit = 2000
 				cm = 0
-		# else:
-		# 	model = "text-davinci-003"
-		# 	temp = 0.7
-		# 	limit = 4000
-		# 	cm = 200
+		elif start:
+			model = "text-davinci-003"
+			temp = 0.8
+			limit = 4000
+			cm = 200
 		elif self.premium < 5:
 			model = "gpt-3.5-turbo"
 			temp = 0.9
@@ -1103,6 +1103,7 @@ class Bot:
 			oai = getattr(self, "oai", None)
 			bals = getattr(self, "bals", {})
 			tries = 7
+			stop = ["As an AI", "as an AI"]
 			for i in range(tries):
 				if oai:
 					openai.api_key = oai
@@ -1126,17 +1127,6 @@ class Bot:
 						presence_penalty=0.6,
 						user=str(hash(u)),
 					).result(timeout=120)
-				# except openai.error.InvalidRequestError:
-				# 	response = openai.ChatCompletion.create(
-				# 		model=model,
-				# 		messages=messages,
-				# 		temperature=temp,
-				# 		max_tokens=int((limit - pc) * 0.75),
-				# 		top_p=1,
-				# 		frequency_penalty=1.0,
-				# 		presence_penalty=0.6,
-				# 		user=str(hash(u)),
-				# 	)
 				except Exception as ex:
 					if i >= tries - 1:
 						raise
@@ -1154,40 +1144,17 @@ class Bot:
 					else:
 						print_exc()
 				else:
-					break
+					if response:
+						m = response["choices"][0]["message"]
+						if m: break
+					stop = []
 				time.sleep(i * 3 + 1)
 			if response:
 				print(response)
-				m = response["choices"][0]["message"]
 				role = m["role"]
-				text = m["content"].removeprefix(f"{self.name}: ")
+				text = m["content"].removeprefix(f"{self.name} says: ").removeprefix(f"{self.name}: ")
 				cost += response["usage"]["prompt_tokens"] * cm * costs
 				cost += response["usage"]["completion_tokens"] * (cm2 or cm) * costs
-				# rc = len(self.gpttokens(role, model="text-davinci-003"))
-				# rc += len(self.gpttokens(text, model="text-davinci-003"))
-				# cost = (pc + rc) * cm
-				# resp = self.answer_classify("vicgalle/xlm-roberta-large-xnli-anli", text, ("answer", "As an AI language model"))
-				# print(resp)
-				# if resp["As an AI language model"] > 2 / 3:
-				# 	messages = [messages[0], messages[-1]]
-				# 	messages.append(dict(role=role, content=text))
-				# 	messages.append(dict(role="user", content=reprompt))
-				# 	print("GPT3.5 prompt:", messages)
-				# 	response = openai.ChatCompletion.create(
-				# 		model=model,
-				# 		messages=messages,
-				# 		temperature=0.9,
-				# 		max_tokens=512,
-				# 		top_p=1,
-				# 		frequency_penalty=0.8,
-				# 		presence_penalty=0.4,
-				# 		user=str(hash(u)),
-				# 	)
-				# 	print(response)
-				# 	m = response["choices"][0]["message"]
-				# 	role = m["role"]
-				# 	text = m["content"].removeprefix(f"{self.name}: ")
-				# 	cost += response["usage"]["total_tokens"] * cm
 				if len(self.gpttokens(text)) > 512:
 					text = self.answer_summarise("facebook/bart-large-cnn", text, max_length=500, min_length=256).strip()
 		if not text:
