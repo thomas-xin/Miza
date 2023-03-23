@@ -1103,7 +1103,7 @@ class Bot:
 			oai = getattr(self, "oai", None)
 			bals = getattr(self, "bals", {})
 			tries = 7
-			stop = ["As an AI", "as an AI"]
+			stop = ["As an AI", "as an AI", "AI language model"]
 			for i in range(tries):
 				if oai:
 					openai.api_key = oai
@@ -1156,9 +1156,11 @@ class Bot:
 						if len(text) >= 2 and text[-1] == " " and text[-2] not in ".!?":
 							redo = True
 						text = text.strip()
-						if not redo and (not text or len(self.gpttokens(text)) < 7):
+						if not redo and (not text or len(self.gpttokens(text)) < 8):
 							redo = True
 						if redo:
+							if not i and len(self.gpttokens(text)) < 16:
+								continue
 							t2, c2, *irr = self.gptcomplete(u, q, refs=refs, start=text)
 							text += " " + t2
 							cost += c2
