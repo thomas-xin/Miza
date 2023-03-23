@@ -1141,14 +1141,14 @@ class Bot:
 						raise
 					if " does not exist" in str(ex) or i >= tries - 2:
 						openai.api_key = self.key
-						uoai = None
+						uoai = oai = bals = None
 						costs = 1
 					elif "Incorrect API key provided: " in str(ex):
 						print(openai.api_key)
 						print_exc()
 						expapi = openai.api_key
 						openai.api_key = self.key
-						uoai = None
+						uoai = oai = bals = None
 						costs = 1
 					else:
 						print_exc()
