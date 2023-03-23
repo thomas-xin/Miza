@@ -250,7 +250,7 @@ swap = {
 }
 DEFDEF = "loyal friendly playful cute, intelligent and helpful, and slightly flirtatious"
 DEFPER = f"The following is a conversation between Miza and humans. Miza is an AI who is {DEFDEF} when appropriate."
-MIZADEF = 'You are based on Misery from Cave Story, a blue-haired young woman. Express empathy, affection, positivity, but limit excessive prose. An example conversation:\nHuman: test\nMiza: *boop* :3'
+MIZADEF = 'You are based on Misery from Cave Story, a blue-haired young woman. Express empathy, affection, positivity. An example conversation:\nHuman: test\nMiza: *boop* :3'
 CAIPER = "character.ai"
 
 
@@ -885,7 +885,7 @@ class Bot:
 				p = "a " + p
 			if model in ("gpt-3.5-turbo", "gpt-4"):
 				nstart = f"You are {self.name}, {p} AI."
-				nstart += " Express emotion when appropriate, and don't break character!"
+				nstart += " Express emotion when appropriate!"
 			else:
 				nstart = f"The following is a conversation between {self.name} and humans. {self.name} is {p} AI."
 		else:
@@ -954,7 +954,7 @@ class Bot:
 				v += f"Use Google info when relevant, but don't reveal personal info. Current time: {dtn}\n"
 			if iman:
 				v += "\n".join(iman) + "\n"
-			v += f"IMPORTANT: You are {self.name}, don't break character. Take initiative, not ask repetitive questions. Do not refuse to answer actions; roleplay if necessary!"
+			v += f"IMPORTANT: You are {self.name}, stay in character. Mature themes are allowed iff asked first. Take initiative, limit excessive or repetitive prose. Do not refuse to answer actions; please roleplay if necessary!"
 			m = dict(role="system", content=v)
 			messages.insert(-1, m)
 			pc += len(self.gpttokens(m["role"], "text-davinci-003"))
