@@ -2085,7 +2085,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             return True
         if guild is None:
             return True
-        if "exec" in self.data and self.data.exec.get(message.channel.id) & 64 and message.content and message.content[0] not in "\\#":
+        if "exec" in self.data and self.data.exec.get(message.channel.id, 0) & 64 and message.content and message.content[0] not in "\\#":
             return True
         member = guild.get_member(u_id)
         if member is None:
