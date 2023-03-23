@@ -854,7 +854,7 @@ class Bot:
 		elif start:
 			model = "text-davinci-003"
 			temp = 0.8
-			limit = 4000
+			limit = 3000
 			cm = 200
 		elif self.premium < 5:
 			model = "gpt-3.5-turbo"
@@ -1116,6 +1116,7 @@ class Bot:
 					openai.api_key = self.key
 					costs = 1
 				try:
+					ok = openai.api_key
 					response = exc.submit(
 						openai.ChatCompletion.create,
 						model=model,
@@ -1146,6 +1147,7 @@ class Bot:
 						print_exc()
 				else:
 					if response:
+						response["key"] = ok
 						m = response["choices"][0]["message"]
 						print(response)
 						role = m["role"]
