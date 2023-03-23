@@ -233,6 +233,7 @@ class Exec(Command):
         log=8,
         proxy=16,
         shell=32,
+        chat=64,
     ))
 
     def __call__(self, bot, flags, argv, message, channel, guild, **void):
