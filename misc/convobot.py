@@ -1128,7 +1128,7 @@ class Bot:
 						frequency_penalty=1.0,
 						presence_penalty=0.6,
 						user=str(hash(u)),
-					).result(timeout=120)
+					).result(timeout=60)
 				except Exception as ex:
 					if i >= tries - 1:
 						raise
