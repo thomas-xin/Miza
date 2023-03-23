@@ -100,7 +100,7 @@ def communicate(self):
 		if not req.close_connection:
 			return True
 	except socket.error as ex:
-		if "EOF occurred in violation of protocol" in ex.args[0]:
+		if "EOF occurred in violation of protocol" in str(ex):
 			print(repr(ex))
 		else:
 			errnum = ex.args[0]
