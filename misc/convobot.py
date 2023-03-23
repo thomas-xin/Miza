@@ -1424,7 +1424,7 @@ class Bot:
 			v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=192, min_length=96).strip()
 		v = summ_start + v
 		print("Chat summary:", v)
-		self.chat_history.insert(0, (f"[SYSTEM]:", v))
+		self.chat_history.insert(0, ("[SYSTEM]", v))
 		self.promises.clear()
 
 	def after(self, t1, t2):
