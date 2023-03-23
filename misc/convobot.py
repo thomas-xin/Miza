@@ -1125,6 +1125,7 @@ class Bot:
 						max_tokens=limit - pc - 64,
 						top_p=1,
 						stop=stop,
+						logit_bias={self.gpttokens("AI", model)[0]: -2},
 						frequency_penalty=1.0,
 						presence_penalty=0.6,
 						user=str(hash(u)),
