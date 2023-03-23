@@ -728,7 +728,7 @@ class Bot:
 		text = self.emoji_clean(text)
 		if aborted or len(text) < 2 or text[-1].isalpha() and (text[-2].isalnum() or text[-2] == " "):
 			# self.cai_ready = False
-			text2, cost = self.gptcomplete(u, q, refs=refs, start=text)
+			text2, cost, *irr = self.gptcomplete(u, q, refs=refs, start=text)
 			return text + " " + text2, cost, caids
 		else:
 			self.cai_ready = True
@@ -1123,6 +1123,7 @@ class Bot:
 						temperature=temp,
 						max_tokens=limit - pc - 64,
 						top_p=1,
+						stop=stop,
 						frequency_penalty=1.0,
 						presence_penalty=0.6,
 						user=str(hash(u)),
@@ -1146,13 +1147,23 @@ class Bot:
 				else:
 					if response:
 						m = response["choices"][0]["message"]
-						if m: break
+						print(response)
+						role = m["role"]
+						text = m["content"].removeprefix(f"{self.name} says: ").removeprefix(f"{self.name}: ")
+						redo = False
+						if len(text) >= 2 and text[-1] == " " and text[-2] not in ".!?":
+							redo = True
+						text = text.strip()
+						if not redo and (not text or len(self.gpttokens(text)) < 7):
+							redo = True
+						if redo:
+							t2, c2, *irr = self.gptcomplete(u, q, refs=refs, start=text)
+							text += " " + t2
+							cost += c2
+						break
 					stop = []
 				time.sleep(i * 3 + 1)
 			if response:
-				print(response)
-				role = m["role"]
-				text = m["content"].removeprefix(f"{self.name} says: ").removeprefix(f"{self.name}: ")
 				cost += response["usage"]["prompt_tokens"] * cm * costs
 				cost += response["usage"]["completion_tokens"] * (cm2 or cm) * costs
 				if len(self.gpttokens(text)) > 512:
