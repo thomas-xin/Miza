@@ -786,6 +786,7 @@ class Bot:
 		chat_history = self.chat_history.copy()
 		oai = getattr(self, "oai", None)
 		bals = getattr(self, "bals", {})
+		cost = 0
 		lines = []
 		if per == DEFPER and self.premium < 2:
 			if len(chat_history) < 4:
@@ -1011,7 +1012,6 @@ class Bot:
 			pc = len(self.gpttokens(prompt, "text-davinci-003"))
 		response = None
 		text = ""
-		cost = 0
 		uoai = None
 		expapi = None
 		exclusive = {"text-neox-001", "text-bloom-001"}
