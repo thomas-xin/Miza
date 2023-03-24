@@ -8,7 +8,7 @@ class Purge(Command):
     min_level = 3
     description = "Deletes a number of messages from a certain user in current channel."
     usage = "<1:users>? <0:count(1)>? <ignore{?i}|range{?r}|hide{?h}>*"
-    example = ("purge @Miza 3", "purge 50")
+    example = ("purge @Miza 3", "purge 50", "purge_range 1038565892185222287 1128125804136579235")
     flags = "fiaehr"
     rate_limit = (7, 12)
     multi = True

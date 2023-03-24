@@ -952,7 +952,7 @@ class Bot:
 				pc += len(self.gpttokens(m["role"], "text-davinci-003"))
 				pc += len(self.gpttokens(m["content"], "text-davinci-003"))
 			text = res = None
-			if q:
+			if q and len(q.split(None, 1)) > 1:
 				mes = messages[-2:]
 				m = dict(role="system", content='Say "!" if the input is personal, otherwise formulate as internet search query beginning with "$"')
 				mes.append(m)
