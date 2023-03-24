@@ -1163,7 +1163,7 @@ class Bot:
 				cm = 20
 		elif model in ("gpt-3.5-turbo", "gpt-4"):
 			tries = 7
-			stop = ["As an AI", "as an AI", "AI language model"]
+			stop = ["As an AI", "as an AI", "AI language model", "as a language model"]
 			for i in range(tries):
 				if oai:
 					openai.api_key = oai
