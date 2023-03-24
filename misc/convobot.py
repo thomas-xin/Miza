@@ -1004,8 +1004,8 @@ class Bot:
 						else:
 							break
 			if res:
-				if len(self.gpttokens(res)) > 288:
-					summ = self.answer_summarise("facebook/bart-large-cnn", q + "\n" + res, max_length=256, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
+				if len(self.gpttokens(res)) > 400:
+					summ = self.answer_summarise("facebook/bart-large-cnn", q + "\n" + res, max_length=384, min_length=128).replace("\n", ". ").replace(": ", " -").strip()
 					res = lim_str(res.replace("\n", " "), 384, mode="right") + "\n" + summ
 				if res:
 					m = dict(role="system", name="GOOGLE", content=res.strip())
@@ -1462,9 +1462,9 @@ class Bot:
 			while len(self.chat_history) > self.history_length:
 				self.chat_history.pop(0)
 			return
-		if len(self.chat_history) < 7:
+		if len(self.chat_history) < 5:
 			return
-		fix = max(4, len(self.chat_history) - 4)
+		fix = max(3, len(self.chat_history) - 3)
 		chat_history = self.chat_history[:fix]
 		self.chat_history = self.chat_history[fix:]
 		summ_start = "Summary of prior conversation:\n"
@@ -1480,8 +1480,8 @@ class Bot:
 			s = f"{k}: {v}\n"
 			lines.append(s)
 		v = "".join(lines)
-		if len(self.gpttokens(v)) > 208:
-			v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=192, min_length=96).strip()
+		if len(self.gpttokens(v)) > 256:
+			v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=240, min_length=96).strip()
 		v = summ_start + v
 		print("Chat summary:", v)
 		self.chat_history.insert(0, ("[SYSTEM]", v))
