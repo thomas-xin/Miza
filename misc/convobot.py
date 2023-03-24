@@ -1170,7 +1170,7 @@ class Bot:
 				time.sleep(i * 3 + 1)
 			if response:
 				cost += response["usage"]["prompt_tokens"] * cm * costs
-				cost += response["usage"]["completion_tokens"] * (cm2 or cm) * costs
+				cost += response["usage"].get("completion_tokens", 0) * (cm2 or cm) * costs
 				if len(self.gpttokens(text)) > 512:
 					text = self.answer_summarise("facebook/bart-large-cnn", text, max_length=500, min_length=256).strip()
 		if not text:
