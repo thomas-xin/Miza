@@ -398,11 +398,11 @@ for p, (x, y) in enumerate(tiles):
 				r1 = np.random.randint(-1, 1, int(np.ceil(pa / 2)), dtype=np.int8)
 				r1 |= 1
 				r1 <<= 1
-				r1 = np.tile(r1, (2, 1)).T.ravel()[:len(pa)]
+				r1 = np.tile(r1, (2, 1)).T.ravel()[:pa]
 				r2 = np.random.randint(0, 4, int(np.ceil(pa / 2)), dtype=np.int8)
 				r2[r2 == 0] = -3
 				r2[r2 > 0] = 1
-				r2 = np.tile(r2, (2, 1)).T.ravel()[:len(pa)]
+				r2 = np.tile(r2, (2, 1)).T.ravel()[:pa]
 				# print(r1, r2)
 
 			if entropy != 0:
