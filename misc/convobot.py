@@ -967,6 +967,7 @@ class Bot:
 				else:
 					openai.api_key = self.key
 					costs = 1
+				print("ChatGPT query:", mes)
 				resp = openai.ChatCompletion.create(
 					messages=mes,
 					temperature=0,
@@ -981,14 +982,16 @@ class Bot:
 			if text and text.startswith("$"):
 				t2 = text[1:].strip()
 				if t2:
+					print("Google search:", t2)
 					res = (self.google, self.bing)[random.randint(0, 1)](t2, raw=True)
 			if res:
 				if len(self.gpttokens(res)) > 288:
 					summ = self.answer_summarise("facebook/bart-large-cnn", q + "\n" + res, max_length=256, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
 					res = lim_str(res.replace("\n", " "), 384, mode="right") + "\n" + summ
-				m = dict(role="system", name="[GOOGLE]", content=res.strip())
-				messages.insert(-1, m)
-				searched = True
+				if res:
+					m = dict(role="system", name="GOOGLE", content=res.strip())
+					messages.insert(-1, m)
+					searched = True
 			v = ""
 			if searched:
 				dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
