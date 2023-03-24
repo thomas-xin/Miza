@@ -804,16 +804,16 @@ class Bot:
 			lines.append(s)
 		searched = False
 		res = ""
-		if self.check_google(q):
-			res = (self.google, self.bing)[random.randint(0, 1)](q, raw=True)
-			s = "[GOOGLE]: "
-			if len(self.gpttokens(res)) > 144:
-				summ = self.answer_summarise("facebook/bart-large-cnn", q + "\n" + res, max_length=128, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
-				res = lim_str(res.replace("\n", " "), 256, mode="right") + "\n" + summ
-			if res:
-				res = s + res + "\n"
-				lines.append(res)
-				searched = True
+		# if self.check_google(q):
+		# 	res = (self.google, self.bing)[random.randint(0, 1)](q, raw=True)
+		# 	s = "[GOOGLE]: "
+		# 	if len(self.gpttokens(res)) > 144:
+		# 		summ = self.answer_summarise("facebook/bart-large-cnn", q + "\n" + res, max_length=128, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
+		# 		res = lim_str(res.replace("\n", " "), 256, mode="right") + "\n" + summ
+		# 	if res:
+		# 		res = s + res + "\n"
+		# 		lines.append(res)
+		# 		searched = True
 		for k, v in refs:
 			if not k.startswith("[REPLIED TO]: "):
 				continue
@@ -948,6 +948,34 @@ class Bot:
 				messages.append(m)
 				pc += len(self.gpttokens(m["role"], "text-davinci-003"))
 				pc += len(self.gpttokens(m["content"], "text-davinci-003"))
+			text = res = None
+			if q:
+				mes = messages[-2:]
+				m = dict(role="system", content='Say "!" if the input is personal, otherwise formulate as internet search query beginning with "$"')
+				mes.append(m)
+				stop = ["!", "As an AI", "as an AI", "AI language model"]
+				resp = openai.ChatCompletion.create(
+					messages=mes,
+					temperature=0,
+					top_p=0,
+					max_tokens=64,
+					stop=stop,
+					model="gpt-3.5-turbo",
+				)
+				cost += resp["usage"]["prompt_tokens"] * cm * costs
+				cost += resp["usage"].get("completion_tokens", 0) * (cm2 or cm) * costs
+				text = resp["choices"][0]["message"]["content"]
+			if text and text.startswith("$"):
+				t2 = text[1:].strip()
+				if t2:
+					res = (self.google, self.bing)[random.randint(0, 1)](t2, raw=True)
+			if res:
+				if len(self.gpttokens(res)) > 288:
+					summ = self.answer_summarise("facebook/bart-large-cnn", q + "\n" + res, max_length=256, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
+					res = lim_str(res.replace("\n", " "), 384, mode="right") + "\n" + summ
+				m = dict(role="system", name="[GOOGLE]", content=res.strip())
+				messages.insert(-1, m)
+				searched = True
 			v = ""
 			if searched:
 				dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
@@ -1122,7 +1150,7 @@ class Bot:
 						model=model,
 						messages=messages,
 						temperature=temp,
-						max_tokens=limit - pc - 64,
+						max_tokens=min(512, limit - pc - 64),
 						top_p=1,
 						stop=stop,
 						logit_bias={self.gpttokens("AI", model)[0]: -2},
@@ -1186,7 +1214,7 @@ class Bot:
 					model=model,
 					prompt=prompt,
 					temperature=temp,
-					max_tokens=limit - pc - 64,
+					max_tokens=min(512, limit - pc - 64),
 					top_p=1,
 					stop=[f"{self.name}: "],
 					frequency_penalty=0.8,
@@ -1198,7 +1226,7 @@ class Bot:
 					model=model,
 					prompt=prompt,
 					temperature=temp,
-					max_tokens=int((limit - pc) * 0.75),
+					max_tokens=min(384, int((limit - pc) * 0.75)),
 					top_p=1,
 					frequency_penalty=0.8,
 					presence_penalty=0.4,
