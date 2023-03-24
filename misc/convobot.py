@@ -784,6 +784,8 @@ class Bot:
 		if per == CAIPER:
 			per = DEFPER
 		chat_history = self.chat_history.copy()
+		oai = getattr(self, "oai", None)
+		bals = getattr(self, "bals", {})
 		lines = []
 		if per == DEFPER and self.premium < 2:
 			if len(chat_history) < 4:
@@ -954,6 +956,16 @@ class Bot:
 				m = dict(role="system", content='Say "!" if the input is personal, otherwise formulate as internet search query beginning with "$"')
 				mes.append(m)
 				stop = ["!", "As an AI", "as an AI", "AI language model"]
+				if oai:
+					openai.api_key = oai
+					costs = 0
+				elif bals:
+					openai.api_key = uoai = sorted(bals, key=bals.get)[0]
+					bals.pop(uoai)
+					costs = -1
+				else:
+					openai.api_key = self.key
+					costs = 1
 				resp = openai.ChatCompletion.create(
 					messages=mes,
 					temperature=0,
@@ -1128,8 +1140,6 @@ class Bot:
 				model = "text-curie-001"
 				cm = 20
 		elif model in ("gpt-3.5-turbo", "gpt-4"):
-			oai = getattr(self, "oai", None)
-			bals = getattr(self, "bals", {})
 			tries = 7
 			stop = ["As an AI", "as an AI", "AI language model"]
 			for i in range(tries):
