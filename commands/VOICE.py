@@ -468,7 +468,7 @@ class CustomAudio(collections.abc.Hashable):
     def update(self, *void1, **void2):
         with tracebacksuppressor:
             guild = self.guild
-            if self.fut.done() and not guild.me.voice:
+            if self.fut.done() and not guild.me or not guild.me.voice:
                 return self.kill(css_md(f"🎵 Automatically disconnected from {sqr_md(guild)}. 🎵"))
             try:
                 self.fut.result(timeout=12)
