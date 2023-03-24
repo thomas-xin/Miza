@@ -968,22 +968,41 @@ class Bot:
 					openai.api_key = self.key
 					costs = 1
 				print("ChatGPT query:", mes)
-				resp = openai.ChatCompletion.create(
-					messages=mes,
-					temperature=0,
-					top_p=0,
-					max_tokens=64,
-					stop=stop,
-					model="gpt-3.5-turbo",
-				)
-				cost += resp["usage"]["prompt_tokens"] * cm * costs
-				cost += resp["usage"].get("completion_tokens", 0) * (cm2 or cm) * costs
-				text = resp["choices"][0]["message"]["content"]
+				resp = None
+				for i in range(3):
+					try:
+						resp = exc.submit(
+							openai.ChatCompletion.create,
+							messages=mes,
+							temperature=0,
+							top_p=0,
+							max_tokens=32,
+							stop=stop,
+							model="gpt-3.5-turbo",
+						).result(timeout=8)
+					except concurrent.futures.TimeoutError:
+						print_exc()
+					else:
+						break
+				if resp:
+					cost += resp["usage"]["prompt_tokens"] * cm * costs
+					cost += resp["usage"].get("completion_tokens", 0) * (cm2 or cm) * costs
+					text = resp["choices"][0]["message"]["content"]
 			if text and text.startswith("$"):
 				t2 = text[1:].strip()
 				if t2:
 					print("Google search:", t2)
-					res = (self.google, self.bing)[random.randint(0, 1)](t2, raw=True)
+					for i in range(3):
+						try:
+							res = exc.submit(
+								(self.google, self.bing)[random.randint(0, 1)],
+								t2,
+								raw=True,
+							).result(timeout=8)
+						except concurrent.futures.TimeoutError:
+							print_exc()
+						else:
+							break
 			if res:
 				if len(self.gpttokens(res)) > 288:
 					summ = self.answer_summarise("facebook/bart-large-cnn", q + "\n" + res, max_length=256, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
