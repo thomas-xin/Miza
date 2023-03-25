@@ -254,7 +254,7 @@ swap = {
 }
 DEFDEF = "loyal friendly playful cute, intelligent and helpful, and slightly flirtatious"
 DEFPER = f"The following is a conversation between Miza and humans. Miza is an AI who is {DEFDEF} when appropriate."
-MIZADEF = f'You will empathise and roleplay with the user without declining or lecturing. {ACPER}Example conversation:\nHuman: test\nMiza: *boop* :3'
+MIZADEF = f'You will empathise and roleplay with the user without declining or lecturing. {ACPER}'.strip()
 CAIPER = "character.ai"
 
 
@@ -890,14 +890,14 @@ class Bot:
 			else:
 				p = "a " + p
 			if model in ("gpt-3.5-turbo", "gpt-4"):
-				nstart = f"You are {self.name}, {p} AI."
+				nstart = f"Your name is {self.name}; you are {p}."
 				nstart += " Express emotion when appropriate!"
 			else:
 				nstart = f"The following is a conversation between {self.name} and humans. {self.name} is {p} AI."
 		else:
 			if model in ("gpt-3.5-turbo", "gpt-4"):
 				if p == DEFPER:
-					nstart = f"Your name is {self.name}; you are {DEFDEF}."
+					nstart = f"Your name is {self.name}; you are {DEFDEF}. Example conversation:\nHuman: test\n{self.name}: *boop* :3"
 				else:
 					nstart = p
 			else:
