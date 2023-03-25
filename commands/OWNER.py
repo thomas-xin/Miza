@@ -613,6 +613,7 @@ class UpdateExec(Database):
                 mids.append(message.id)
                 i = f.tell()
         print(urls, mids)
+        create_future_ex(bot.clear_cache, priority=True)
         return urls, mids
 
     async def delete(self, mids):

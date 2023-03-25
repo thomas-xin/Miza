@@ -115,6 +115,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         self.load_semaphore = Semaphore(5, inf, rate_limit=1)
         self.user_semaphore = Semaphore(64, inf, rate_limit=8)
         self.disk_semaphore = Semaphore(1, 1, rate_limit=1)
+        self.cache_semaphore = Semaphore(1, 1, rate_limit=30)
         self.command_semaphore = Semaphore(262144, 16384)
         self.disk = 0
         self.storage_ratio = 0
@@ -2750,38 +2751,19 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         if "audio" in self.data:
             if self._globals["VOICE"].ytdl.download_sem.active:
                 return 0
-        i = 0
-        # for f in os.listdir("saves/filehost"):
-        #     if f[0] in "\x7f~!":
-        #         fn = "saves/filehost/" + f
-        #         if not f.split("@", 1)[0].endswith("!.temp$"):
-        #             if not f.split("@", 1)[0].endswith("~.temp$"):
-        #                 continue
-        #             if utc() - os.path.getmtime(fn) <= 60:
-        #                 continue
-        #     with tracebacksuppressor:
-        #         os.remove("saves/filehost/" + f)
-        #         i += 1
-        attachments = deque()
-        for f in os.listdir("cache"):
-            if f.startswith("attachment_"):
-                attachments.append(f)
-            if f.startswith("emoji_"):
-                continue
-            if utc() - os.path.getmtime("cache/" + f) <= 86400:
-                continue
-            with tracebacksuppressor:
-                os.remove("cache/" + f)
-                i += 1
-        attachments = sorted(attachments, key=lambda f: int(f.split("_", 1)[-1].split(".", 1)[0]))
-        while len(attachments) > 4096:
-            with tracebacksuppressor:
-                f = "cache/" + attachments.pop(0)
-                if os.path.exists(f):
-                    os.remove(f)
-        if i > 1:
-            print(f"{i} cached files flagged for deletion.")
-        return i
+        with self.cache_semaphore:
+            i = 0
+            expendable = list(os.scandir("cache"))
+            stats = psutil.disk_usage(os.getcwd())
+            t = utc()
+            expendable = sorted(expendable, key=lambda f: ((t - f.stat().st_mtime) // 3600, f.stat().st_size), reverse=True)
+            while stats.free < 81 * 1073741824 or len(expendable) > 4096:
+                with tracebacksuppressor:
+                    os.remove(expendable.pop(0).path)
+                    i += 1
+            if i > 1:
+                print(f"{i} cached files flagged for deletion.")
+            return i
 
     def backup(self):
         self.clear_cache()
