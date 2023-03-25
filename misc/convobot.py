@@ -1021,7 +1021,7 @@ class Bot:
 							break
 			if res:
 				if len(self.gpttokens(res)) > 400:
-					summ = self.answer_summarise("facebook/bart-large-cnn", q + "\n" + res, max_length=384, min_length=128).replace("\n", ". ").replace(": ", " -").strip()
+					summ = self.answer_summarise("facebook/bart-large-cnn", q + "\n" + res, max_length=384, min_length=256).replace("\n", ". ").replace(": ", " -").strip()
 					res = lim_str(res.replace("\n", " "), 384, mode="right") + "\n" + summ
 				if res:
 					m = dict(role="system", name="GOOGLE", content=res.strip())

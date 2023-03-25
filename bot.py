@@ -5037,7 +5037,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             reacts="❎"
         if not isinstance(ex, TooManyRequests):
             footer = None
-            fields = (("Unexpected or confusing error?", f"Consider joining the [support server]({self.rcc_invite}) for help and bug reports!"),)
+            fields = (("Unexpected or confusing error?", f"Use {self.get_prefix(getattr(messageable, 'guild', None))}help for help, or consider joining the [support server]({self.rcc_invite}) for bug reports!"),)
         else:
             if not random.randint(0, 5):
                 footer = dict(text=f"Running into the rate limit often? Consider donating using one of the subscriptions here, which will grant shorter rate limits amongst other feature improvements! {self.kofi_url}")

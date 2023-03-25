@@ -2145,7 +2145,7 @@ async def sub_submit(ptype, command, fix=None, _timeout=12):
         except (BrokenPipeError, OSError, asyncio.TimeoutError) as ex:
             try:
                 i = PROCS[ptype].index(proc)
-            except LookupError:
+            except (LookupError, ValueError):
                 raise ex
             force_kill(proc)
             PROCS[ptype][i] = None
