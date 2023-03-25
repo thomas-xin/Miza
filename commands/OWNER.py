@@ -653,7 +653,16 @@ class UpdateExec(Database):
             if not is_url(url):
                 continue
             try:
-                out[i] = self.bot.data.proxies[0][uhash(url)]
+                uhu = uhash(url)
+                out[i] = self.bot.data.proxies[0][uhu]
+                if not xrand(16):
+
+                    def verify(url, uhu):
+                        with reqs.next().head(url, stream=True) as resp:
+                            if resp.status_code not in range(200, 400):
+                                self.bot.data.proxies[0].pop(uhu, None)
+
+                    create_future_ex(verify, out[i], uhu)
             except KeyError:
                 if not sendable:
                     out[i] = url
