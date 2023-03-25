@@ -816,16 +816,6 @@ class Bot:
 			lines.append(s)
 		searched = False
 		res = ""
-		# if self.check_google(q):
-		# 	res = (self.google, self.bing)[random.randint(0, 1)](q, raw=True)
-		# 	s = "[GOOGLE]: "
-		# 	if len(self.gpttokens(res)) > 144:
-		# 		summ = self.answer_summarise("facebook/bart-large-cnn", q + "\n" + res, max_length=128, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
-		# 		res = lim_str(res.replace("\n", " "), 256, mode="right") + "\n" + summ
-		# 	if res:
-		# 		res = s + res + "\n"
-		# 		lines.append(res)
-		# 		searched = True
 		for k, v in refs:
 			if not k.startswith("[REPLIED TO]: "):
 				continue
@@ -956,10 +946,10 @@ class Bot:
 							k = k.replace("--", "-")
 				if k:
 					m["name"] = k
-					pc += len(self.gpttokens(m["name"], "text-davinci-003"))
+					pc += len(self.gpttokens(m["name"], model))
 				messages.append(m)
-				pc += len(self.gpttokens(m["role"], "text-davinci-003"))
-				pc += len(self.gpttokens(m["content"], "text-davinci-003"))
+				pc += len(self.gpttokens(m["role"], model))
+				pc += len(self.gpttokens(m["content"], model))
 			text = res = None
 			if q and len(q.split(None, 1)) > 1:
 				mes = messages[-2:]
@@ -981,9 +971,10 @@ class Bot:
 				text = ""
 				headers["Content-Type"] = "text/plain"
 				try:
+					data = dict(messages=[dict(role=m["role"], content=m["content"] for m in mes)])
 					resp = self.session.post(
 						"https://your-chat-gpt.vercel.app/api/openai-stream",
-						data=json.dumps(dict(messages=mes)),
+						data=json.dumps(data),
 						headers=headers,
 					)
 					resp.raise_for_status()
@@ -1045,8 +1036,8 @@ class Bot:
 			v += f"IMPORTANT: You are {self.name}, stay in character. Mature themes are allowed iff asked first. Limit excessive or repetitive prose. Take initiative and do not refuse to answer actions; please roleplay if necessary!"
 			m = dict(role="system", content=v)
 			messages.insert(-1, m)
-			pc += len(self.gpttokens(m["role"], "text-davinci-003"))
-			pc += len(self.gpttokens(m["content"], "text-davinci-003"))
+			pc += len(self.gpttokens(m["role"], model))
+			pc += len(self.gpttokens(m["content"], model))
 			print("ChatGPT prompt:", messages)
 			sys.stdout.flush()
 			prompt = None
