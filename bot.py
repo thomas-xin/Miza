@@ -2757,7 +2757,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             stats = psutil.disk_usage(os.getcwd())
             t = utc()
             expendable = sorted(expendable, key=lambda f: ((t - f.stat().st_atime) // 3600, (t - f.stat().st_mtime) // 3600, f.stat().st_size), reverse=True)
-            while stats.free < 81 * 1073741824 or len(expendable) > 4096 or (t - expendable[0].stat().st_atime) > 3600 * 6:
+            while stats.free < 81 * 1073741824 or len(expendable) > 4096 or (t - expendable[0].stat().st_atime) > 3600 * 12:
                 with tracebacksuppressor:
                     os.remove(expendable.pop(0).path)
                     i += 1
