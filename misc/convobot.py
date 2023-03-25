@@ -957,7 +957,7 @@ class Bot:
 			text = res = None
 			if q and len(q.split(None, 1)) > 1:
 				mes = messages[-2:]
-				m = dict(role="system", content='Say "!" if the input is personal, otherwise formulate as internet search query beginning with "$"')
+				m = dict(role="system", content='Say "!" if the input is personal or you have a definite answer, otherwise formulate as internet search query beginning with "$"')
 				mes.append(m)
 				dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
 				m = dict(role="system", content=f"Current time: {dtn}")
