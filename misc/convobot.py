@@ -979,6 +979,7 @@ class Bot:
 					mes[-2]["content"],
 				)
 				if resp["results"][0]["flagged"]:
+					print(resp)
 					text = "!"
 				if not text:
 					headers["Content-Type"] = "text/plain"
