@@ -787,6 +787,15 @@ class Bot:
 		oai = getattr(self, "oai", None)
 		bals = getattr(self, "bals", {})
 		cost = 0
+		headers = {
+			"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
+			"DNT": "1",
+			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
+			"Content-Type": "application/json",
+			"cache-control": "no-cache",
+			"x-use-cache": "false",
+			"x-wait-for-model": "true",
+		}
 		lines = []
 		if per == DEFPER and self.premium < 2:
 			if len(chat_history) < 4:
@@ -820,8 +829,8 @@ class Bot:
 		for k, v in refs:
 			if not k.startswith("[REPLIED TO]: "):
 				continue
-			if len(self.gpttokens(v)) > 36:
-				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
+			if len(self.gpttokens(v)) > 52:
+				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=48, min_length=12).replace("\n", ". ").strip()
 			s = f"{k}: {v}\n"
 			lines.append(s)
 		for k, v in refs:
@@ -969,29 +978,45 @@ class Bot:
 					costs = 1
 				print("ChatGPT query:", mes)
 				resp = None
-				for i in range(3):
-					try:
-						resp = exc.submit(
-							openai.ChatCompletion.create,
-							messages=mes,
-							temperature=0,
-							top_p=0,
-							max_tokens=32,
-							stop=stop,
-							model="gpt-3.5-turbo",
-						).result(timeout=8)
-					except concurrent.futures.TimeoutError:
-						print_exc()
-					else:
-						break
-				if resp:
-					cost += resp["usage"]["prompt_tokens"] * cm * costs
-					cost += resp["usage"].get("completion_tokens", 0) * (cm2 or cm) * costs
-					text = resp["choices"][0]["message"]["content"]
+				text = ""
+				headers["Content-Type"] = "text/plain"
+				try:
+					resp = self.session.post(
+						"https://your-chat-gpt.vercel.app/api/openai-stream",
+						data=orjson.dumps(dict(messages=mes)),
+						headers=headers,
+					)
+					resp.raise_for_status()
+					if not resp.content:
+						raise EOFError("Content empty.")
+					text = resp.text
+				except:
+					print_exc()
+				if not text:
+					for i in range(3):
+						try:
+							resp = exc.submit(
+								openai.ChatCompletion.create,
+								messages=mes,
+								temperature=0,
+								top_p=0,
+								max_tokens=32,
+								stop=stop,
+								model="gpt-3.5-turbo",
+							).result(timeout=8)
+						except concurrent.futures.TimeoutError:
+							print_exc()
+						else:
+							break
+					if resp:
+						cost += resp["usage"]["prompt_tokens"] * cm * costs
+						cost += resp["usage"].get("completion_tokens", 0) * (cm2 or cm) * costs
+						text = resp["choices"][0]["message"]["content"]
+			if text:
+				print("Google search:", t2)
 			if text and text.startswith("$"):
 				t2 = text[1:].strip()
 				if t2:
-					print("Google search:", t2)
 					for i in range(3):
 						try:
 							res = exc.submit(
@@ -1038,15 +1063,6 @@ class Bot:
 		expapi = None
 		exclusive = {"text-neox-001", "text-bloom-001"}
 		if model in exclusive:
-			headers = {
-				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
-				"DNT": "1",
-				"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
-				"Content-Type": "application/json",
-				"cache-control": "no-cache",
-				"x-use-cache": "false",
-				"x-wait-for-model": "true",
-			}
 			p = None
 			for i in range(8):
 				if not p and i < 5:
