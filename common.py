@@ -2131,7 +2131,7 @@ async def sub_submit(ptype, command, fix=None, _timeout=12):
             proc.stdin.write(s)
             await proc.stdin.drain()
             fut = PROC_RESP[ts]
-            tries = ceil(_timeout / 3) if _timeout and isfinite(_timeout) else 3600
+            tries = ceil(_timeout / 3) if _timeout and is_finite(_timeout) else 3600
             for i in range(tries):
                 if ts not in PROC_RESP:
                     raise ConnectionResetError("Response disconnected.")
