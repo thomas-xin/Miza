@@ -1020,7 +1020,7 @@ class Bot:
 			if text:
 				print("Google search:", text)
 			if text and text.startswith("$"):
-				t2 = text[1:].strip()
+				t2 = text.strip("$").strip()
 				if t2:
 					for i in range(3):
 						try:
