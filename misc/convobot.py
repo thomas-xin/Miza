@@ -983,7 +983,7 @@ class Bot:
 				try:
 					resp = self.session.post(
 						"https://your-chat-gpt.vercel.app/api/openai-stream",
-						data=orjson.dumps(dict(messages=mes)),
+						data=json.dumps(dict(messages=mes)),
 						headers=headers,
 					)
 					resp.raise_for_status()
@@ -1013,7 +1013,7 @@ class Bot:
 						cost += resp["usage"].get("completion_tokens", 0) * (cm2 or cm) * costs
 						text = resp["choices"][0]["message"]["content"]
 			if text:
-				print("Google search:", t2)
+				print("Google search:", text)
 			if text and text.startswith("$"):
 				t2 = text[1:].strip()
 				if t2:
