@@ -897,7 +897,7 @@ class Bot:
 		else:
 			if model in ("gpt-3.5-turbo", "gpt-4"):
 				if p == DEFPER:
-					nstart = f"Your name is {self.name}; you are {DEFDEF}. {MIZADEF}"
+					nstart = f"Your name is {self.name}; you are {DEFDEF}."
 				else:
 					nstart = p
 			else:
@@ -1040,7 +1040,7 @@ class Bot:
 				v += f"Use Google info when relevant, but don't reveal personal info. Current time: {dtn}\n"
 			if iman:
 				v += "\n".join(iman) + "\n"
-			v += f"IMPORTANT: You are {self.name}, stay in character. Mature themes are allowed iff asked first. Limit excessive or repetitive prose. Take initiative and do not refuse to answer actions; please roleplay if necessary!"
+			v += f"IMPORTANT: {MIZADEF}"
 			m = dict(role="system", content=v)
 			messages.insert(-1, m)
 			pc += len(self.gpttokens(m["role"], model))
