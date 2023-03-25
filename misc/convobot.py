@@ -971,7 +971,7 @@ class Bot:
 				text = ""
 				headers["Content-Type"] = "text/plain"
 				try:
-					data = dict(messages=[dict(role=m["role"], content=m["content"] for m in mes)])
+					data = dict(messages=[dict(role=m["role"], content=m["content"]) for m in mes])
 					resp = self.session.post(
 						"https://your-chat-gpt.vercel.app/api/openai-stream",
 						data=json.dumps(data),
