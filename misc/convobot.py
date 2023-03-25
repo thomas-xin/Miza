@@ -1227,7 +1227,8 @@ class Bot:
 						if len(text) >= 2 and text[-1] == " " and text[-2] not in ".!?":
 							redo = True
 						text = text.strip()
-						if not redo and (not text or len(self.gpttokens(text)) < 8):
+						if not text or len(self.gpttokens(text)) < 8:
+							text = ""
 							redo = True
 						if redo:
 							if not i and len(self.gpttokens(text)) < 16:
