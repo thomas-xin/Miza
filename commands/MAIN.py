@@ -1924,6 +1924,8 @@ class UpdateUsers(Database):
                 d = await bot.fetch_user(key)
                 if d is not None:
                     continue
+            except (LookupError, discord.NotFound):
+                pass
             except:
                 print_exc()
             print(f"Deleting {key} from {self}...")

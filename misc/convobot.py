@@ -955,6 +955,9 @@ class Bot:
 				mes = messages[-2:]
 				m = dict(role="system", content='Say "!" if the input is personal, otherwise formulate as internet search query beginning with "$"')
 				mes.append(m)
+				dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
+				m = dict(role="system", content=f"Current time: {dtn}")
+				mes.insert(0, m)
 				stop = ["!", "As an AI", "as an AI", "AI language model"]
 				if oai:
 					openai.api_key = oai
@@ -966,12 +969,12 @@ class Bot:
 				else:
 					openai.api_key = self.key
 					costs = 1
-				print("ChatGPT query:", mes)
 				resp = None
 				text = ""
 				headers["Content-Type"] = "text/plain"
 				try:
 					data = dict(messages=[dict(role=m["role"], content=m["content"]) for m in mes])
+					print("ChatGPT query:", data)
 					resp = self.session.post(
 						"https://your-chat-gpt.vercel.app/api/openai-stream",
 						data=json.dumps(data),
