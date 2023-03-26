@@ -2695,11 +2695,11 @@ def get_image(url, out=None, nodel=False, nogif=False):
 				raise OverflowError("Max file size to load is 8GB.")
 			with open(url, "rb") as f:
 				data = f.read()
-			if not nodel and out != url and out:
-				try:
-					os.remove(url)
-				except:
-					pass
+			# if not nodel and out != url and out:
+			# 	try:
+			# 		os.remove(url)
+			# 	except:
+			# 		pass
 			image = from_bytes(data, save, nogif=nogif)
 	else:
 		if len(url) > 8589934592:
