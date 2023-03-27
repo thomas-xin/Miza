@@ -841,7 +841,7 @@ class Bot:
 		lines.append(s)
 		ns = f"{self.name}:"
 		if start:
-			ns += " " + start
+			ns += " " + start.strip()
 		lines.append(ns)
 		longer = req_long(q)
 		reprompt = ""
@@ -1206,7 +1206,7 @@ class Bot:
 						max_tokens=min(512, limit - pc - 64),
 						top_p=1,
 						stop=stop,
-						logit_bias={self.gpttokens("AI", model)[0]: -2},
+						logit_bias={self.gpttokens("AI", model)[0]: -0.5},
 						frequency_penalty=1.0,
 						presence_penalty=0.6,
 						user=str(hash(u)),
@@ -1244,7 +1244,7 @@ class Bot:
 						if redo:
 							if not i and len(self.gpttokens(text)) < 16:
 								continue
-							t2, c2, *irr = self.gptcomplete(u, q, refs=refs, start=text)
+							t2, c2, *irr = self.gptcomplete(u, q, refs=refs, start=text or " ")
 							text += " " + t2
 							cost += c2
 						break
