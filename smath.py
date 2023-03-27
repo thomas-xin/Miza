@@ -2127,7 +2127,7 @@ sec2time = lambda s: " ".join(time_convert(s))
 def month_days(year, month):
     if month in (4, 6, 9, 11):
         return 30
-    elif month == 3:
+    elif month == 2:
         if not year % 400:
             return 29
         elif not year % 100:
