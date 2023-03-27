@@ -1040,7 +1040,7 @@ class Bot:
 				if res:
 					m = dict(role="system", name="GOOGLE", content=res.strip())
 					messages.insert(-1, m)
-					searched = True
+					searched = content
 			v = ""
 			if searched:
 				dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
@@ -1206,7 +1206,7 @@ class Bot:
 						max_tokens=min(512, limit - pc - 64),
 						top_p=1,
 						stop=stop,
-						logit_bias={self.gpttokens("AI", model)[0]: -0.5},
+						# logit_bias={self.gpttokens("AI", model)[0]: -0.5},
 						frequency_penalty=1.0,
 						presence_penalty=0.6,
 						user=str(hash(u)),
@@ -1244,6 +1244,8 @@ class Bot:
 						if redo:
 							if not i and len(self.gpttokens(text)) < 16:
 								continue
+							if searched:
+								refs = list(refs) + [("[GOOGLE]", searched)]
 							t2, c2, *irr = self.gptcomplete(u, q, refs=refs, start=text or " ")
 							text += " " + t2
 							cost += c2
