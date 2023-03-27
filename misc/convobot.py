@@ -958,7 +958,7 @@ class Bot:
 				messages.append(m)
 				pc += len(self.gpttokens(m["role"], model))
 				pc += len(self.gpttokens(m["content"], model))
-			text = res = None
+			text = res = flagged = None
 			if q and len(q.split(None, 1)) > 1:
 				mes = messages[-2:]
 				m = dict(role="system", content='Say "!" if the input is personal or you have a definite answer, otherwise formulate as internet search query beginning with "$"')
@@ -982,7 +982,8 @@ class Bot:
 				resp = openai.Moderation.create(
 					mes[-2]["content"],
 				)
-				if resp["results"][0]["flagged"]:
+				flagged = resp["results"][0]["flagged"]
+				if flagged:
 					print(resp)
 					text = "!"
 				if not text:
@@ -1188,8 +1189,10 @@ class Bot:
 				cm = 20
 		elif model in ("gpt-3.5-turbo", "gpt-4"):
 			tries = 7
-			stop = ["As an AI", "as an AI", "AI language model", "as a language model"]
+			stop = ["As an AI", "as an AI", "AI language model", "I'm sorry,"]
+			response = None
 			for i in range(tries):
+				redo = False
 				if oai:
 					openai.api_key = oai
 					costs = 0
@@ -1202,6 +1205,7 @@ class Bot:
 					costs = 1
 				try:
 					ok = openai.api_key
+					if flagged: raise PermissionError("flagged")
 					response = exc.submit(
 						openai.ChatCompletion.create,
 						model=model,
@@ -1231,31 +1235,29 @@ class Bot:
 						costs = 1
 					else:
 						print_exc()
-				else:
-					if response:
-						response["key"] = ok
-						m = response["choices"][0]["message"]
-						print(response)
-						role = m["role"]
-						text = m["content"].removeprefix(f"{self.name} says: ").removeprefix(f"{self.name}: ")
-						redo = False
-						if len(text) >= 2 and text[-1] == " " and text[-2] not in ".!?":
-							redo = True
-						text = text.strip()
-						if not text or len(self.gpttokens(text)) < 8:
-							text = ""
-							redo = True
-						if redo:
-							if not i and len(self.gpttokens(text)) < 16:
-								continue
-							if searched:
-								refs = list(refs) + [("[GOOGLE]", searched)]
-							t2, c2, *irr = self.gptcomplete(u, q, refs=refs, start=text or " ")
-							text += " " + t2
-							cost += c2
-						break
-					stop = []
-				time.sleep(i * 3 + 1)
+				if response:
+					response["key"] = ok
+					m = response["choices"][0]["message"]
+					print(response)
+					role = m["role"]
+					text = m["content"].removeprefix(f"{self.name} says: ").removeprefix(f"{self.name}: ")
+					if len(text) >= 2 and text[-1] == " " and text[-2] not in ".!?":
+						redo = True
+					text = text.strip()
+					if not text or len(self.gpttokens(text)) < 8:
+						text = ""
+						redo = True
+				elif not flagged:
+					continue
+				if redo:
+					if not flagged and not i and len(self.gpttokens(text)) < 16:
+						continue
+					if searched:
+						refs = list(refs) + [("[GOOGLE]", searched)]
+					t2, c2, *irr = self.gptcomplete(u, q, refs=refs, start=text or " ")
+					text += " " + t2
+					cost += c2
+				break
 			if response:
 				cost += response["usage"]["prompt_tokens"] * cm * costs
 				cost += response["usage"].get("completion_tokens", 0) * (cm2 or cm) * costs
