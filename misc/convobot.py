@@ -961,12 +961,12 @@ class Bot:
 			text = res = flagged = None
 			if q and len(q.split(None, 1)) > 1:
 				mes = messages[-2:]
-				m = dict(role="system", content='Say "!" if the input is personal or you have a definite answer, otherwise formulate as internet search query beginning with "$"')
+				m = dict(role="system", content='Say "@" if the input is personal or you have a definite answer, "!" if inappropriate, otherwise formulate as internet search query beginning with "$"')
 				mes.append(m)
 				dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
 				m = dict(role="system", content=f"Current time: {dtn}")
 				mes.insert(0, m)
-				stop = ["!", "As an AI", "as an AI", "AI language model"]
+				stop = ["@", "AI language model"]
 				if oai:
 					openai.api_key = oai
 					costs = 0
@@ -999,7 +999,7 @@ class Bot:
 						resp.raise_for_status()
 						if not resp.content:
 							raise EOFError("Content empty.")
-						text = resp.text
+						text = resp.text or "@"
 					except:
 						print_exc()
 				if not text:
@@ -1021,10 +1021,12 @@ class Bot:
 					if resp:
 						cost += resp["usage"]["prompt_tokens"] * cm * costs
 						cost += resp["usage"].get("completion_tokens", 0) * (cm2 or cm) * costs
-						text = resp["choices"][0]["message"]["content"]
+						text = resp["choices"][0]["message"]["content"] or "@'
 			if text:
 				print("Google search:", text)
-			if text and text.startswith("$"):
+			if text and text.startswith("!"):
+				flagged = True
+			elif text and text.startswith("$"):
 				t2 = text.strip("$").strip()
 				if t2:
 					for i in range(3):
