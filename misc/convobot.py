@@ -1021,7 +1021,7 @@ class Bot:
 					if resp:
 						cost += resp["usage"]["prompt_tokens"] * cm * costs
 						cost += resp["usage"].get("completion_tokens", 0) * (cm2 or cm) * costs
-						text = resp["choices"][0]["message"]["content"] or "@'
+						text = resp["choices"][0]["message"]["content"] or "@"
 			if text:
 				print("Google search:", text)
 			if text and text.startswith("!"):
