@@ -889,17 +889,21 @@ class Bot:
 				p = "an " + p
 			else:
 				p = "a " + p
-			if model in ("gpt-3.5-turbo", "gpt-4"):
+			if model in ("gpt-3.5-turbo", "gpt-4", "text-davinci-003"):
 				nstart = f"Your name is {self.name}; you are {p}."
 				nstart += " Express emotion when appropriate!"
+				if model == "text-davinci-003":
+					nstart += " " + MIZADEF
 			else:
 				nstart = f"The following is a conversation between {self.name} and humans. {self.name} is {p} AI."
 		else:
-			if model in ("gpt-3.5-turbo", "gpt-4"):
+			if model in ("gpt-3.5-turbo", "gpt-4", "text-davinci-003"):
 				if p == DEFPER:
 					nstart = f"Your name is {self.name}; you are {DEFDEF}. Example conversation:\nHuman: test\n{self.name}: *boop* :3"
 				else:
 					nstart = p
+				if model == "text-davinci-003":
+					nstart += " " + MIZADEF
 			else:
 				nstart = p
 		if model in ("gpt-3.5-turbo", "gpt-4"):
@@ -1040,7 +1044,7 @@ class Bot:
 				if res:
 					m = dict(role="system", name="GOOGLE", content=res.strip())
 					messages.insert(-1, m)
-					searched = content
+					searched = res.strip()
 			v = ""
 			if searched:
 				dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
