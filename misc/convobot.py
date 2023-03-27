@@ -972,7 +972,6 @@ class Bot:
 					costs = 0
 				elif bals:
 					openai.api_key = uoai = sorted(bals, key=bals.get)[0]
-					bals.pop(uoai)
 					costs = -1
 				else:
 					openai.api_key = self.key
@@ -1195,19 +1194,19 @@ class Bot:
 			response = None
 			for i in range(tries):
 				redo = False
-				if oai:
-					openai.api_key = oai
-					costs = 0
-				elif bals:
-					openai.api_key = uoai = sorted(bals, key=bals.get)[0]
-					bals.pop(uoai)
-					costs = -1
-				else:
-					openai.api_key = self.key
-					costs = 1
 				try:
-					ok = openai.api_key
 					if flagged: raise PermissionError("flagged")
+					if oai:
+						openai.api_key = oai
+						costs = 0
+					elif bals:
+						openai.api_key = uoai = sorted(bals, key=bals.get)[0]
+						bals.pop(uoai)
+						costs = -1
+					else:
+						openai.api_key = self.key
+						costs = 1
+					ok = openai.api_key
 					response = exc.submit(
 						openai.ChatCompletion.create,
 						model=model,
@@ -1273,6 +1272,16 @@ class Bot:
 					print("GPT prompt:", prompt)
 				sys.stdout.flush()
 				pc = len(self.gpttokens(prompt, "text-davinci-003"))
+			if oai:
+				openai.api_key = oai
+				costs = 0
+			elif bals:
+				openai.api_key = uoai = sorted(bals, key=bals.get)[0]
+				bals.pop(uoai)
+				costs = -1
+			else:
+				openai.api_key = self.key
+				costs = 1
 			try:
 				response = openai.Completion.create(
 					model=model,
