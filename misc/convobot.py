@@ -893,7 +893,7 @@ class Bot:
 				nstart = f"Your name is {self.name}; you are {p}."
 				nstart += " Express emotion when appropriate!"
 				if model == "text-davinci-003":
-					nstart += " " + MIZADEF
+					nstart += "\n" + MIZADEF
 			else:
 				nstart = f"The following is a conversation between {self.name} and humans. {self.name} is {p} AI."
 		else:
@@ -903,7 +903,7 @@ class Bot:
 				else:
 					nstart = p
 				if model == "text-davinci-003":
-					nstart += " " + MIZADEF
+					nstart += "\n" + MIZADEF
 			else:
 				nstart = p
 		if model in ("gpt-3.5-turbo", "gpt-4"):
