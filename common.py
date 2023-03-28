@@ -548,7 +548,7 @@ class FileHashDict(collections.abc.MutableMapping):
         if self.path and not os.path.exists(self.path):
             os.mkdir(self.path)
             self.iter = []
-        self.db = sqlite3.connect("saves/extdb.json", check_same_thread=False)
+        self.db = sqlite3.connect(f"{self.path}/~~", check_same_thread=False)
         self.cur = self.db.cursor()
         self.cur.execute(f"CREATE TABLE IF NOT EXISTS '{self.path}' (key VARCHAR(256) PRIMARY KEY, value BLOB)")
         self.comp = set(self.c.keys())
