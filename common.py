@@ -534,7 +534,7 @@ def select_and_dumps(data, mode="safe", compress=True):
 class FileHashDict(collections.abc.MutableMapping):
 
     sem = Semaphore(64, 128, 0.3, 1)
-    cache_size = 4096
+    cache_size = 256
 
     def __init__(self, *args, path="", **kwargs):
         if not kwargs and len(args) == 1:
