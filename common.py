@@ -552,7 +552,7 @@ class FileHashDict(collections.abc.MutableMapping):
             self.iter = []
         self.cur.execute(f"CREATE TABLE IF NOT EXISTS '{self.path}' (key VARCHAR(256) PRIMARY KEY, value BLOB)")
         self.comp = set(self.c.keys())
-        self.codb = set(r[0] for r in c.execute(f"SELECT key FROM '{self.path}'"))
+        self.codb = set(r[0] for r in self.cur.execute(f"SELECT key FROM '{self.path}'"))
         if self.comp:
             self.data.pop("~", None)
             print(f"{self.path}: Successfully loaded {len(self.comp)} compressed entries.")
