@@ -749,9 +749,9 @@ class FileHashDict(collections.abc.MutableMapping):
         self.modified.clear()
         deleted = list(self.deleted)
         self.deleted.clear()
+        inter = modified.union(deleted)
         if modified or deleted:
             self.iter = None
-            inter = modified.union(deleted
             for k in inter:
                 if k in self.codb:
                     self.cur.execute(f"DELETE FROM '{self.path}' WHERE key=?", (k,))
@@ -814,7 +814,7 @@ class FileHashDict(collections.abc.MutableMapping):
         while len(self.data) > self.cache_size:
             with suppress(RuntimeError):
                 self.data.pop(next(iter(self.data)))
-        return modified.union(deleted)
+        return inter
 
 
 def safe_save(fn, s):
