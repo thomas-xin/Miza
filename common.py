@@ -485,22 +485,26 @@ def select_and_loads(s, mode="safe", size=None):
         if s[0] == 128:
             data = pickle.loads(s)
     if data is None:
-        if mode == "unsafe":
-            s = s.strip(b"\x00")
+        if 0:#mode == "unsafe":
             if not s:
                 raise FileNotFoundError
             data = eval(compile(s, "<loader>", "eval", optimize=2, dont_inherit=False))
         else:
-            if b"{" in s:
+            if not s.startswith(b"{") and b"{" in s:
                 s = s[s.index(b"{"):s.rindex(b"}") + 1]
             data = orjson.loads(s)
     return data
 
 def select_and_dumps(data, mode="safe", compress=True):
     if mode == "unsafe":
-        s = pickle.dumps(data)
+        try:
+            if isinstance(data, dict) and not isinstance(next(iter(data)), str):
+                raise TypeError
+            s = orjson.dumps(data)
+        except TypeError:
+            s = pickle.dumps(data)
         if len(s) > 32768 and compress:
-            t = bytes2zip(s, lzma=len(s) < 16777216)
+            t = bytes2zip(s, lzma=len(s) > 16777216)
             if len(t) < len(s):
                 s = t
         return s
@@ -532,9 +536,10 @@ class FileHashDict(collections.abc.MutableMapping):
         if self.path and not os.path.exists(self.path):
             os.mkdir(self.path)
             self.iter = []
-        with tracebacksuppressor(LookupError):
-            self["~"]
-            print(f"{self.path}: Successfully loaded {len(self['~'])} compressed entries.")
+        self.comp = set(self.c.keys())
+        if self.comp:
+            self.data.pop("~", None)
+            print(f"{self.path}: Successfully loaded {len(self.comp)} compressed entries.")
         self.c_updated = False
 
     __hash__ = lambda self: lambda self: hash(self.path)
@@ -573,9 +578,8 @@ class FileHashDict(collections.abc.MutableMapping):
             gen = set(try_int(i) for i in os.listdir(self.path) if not i.endswith("\x7f") and i not in self.deleted)
             if self.modified:
                 gen.update(self.modified)
-            c = self.c
-            if c:
-                gen.update(c.keys())
+            if self.comp:
+                gen.update(self.comp)
             gen.discard("~")
             self.iter = alist(gen)
         return self.iter
@@ -601,7 +605,7 @@ class FileHashDict(collections.abc.MutableMapping):
             raise KeyError(k)
         with suppress(KeyError):
             return self.data[k]
-        if k != "~":
+        if k != "~" and k in self.comp:
             with suppress(KeyError):
                 return self.c[k]
         fn = self.key_path(k)
@@ -653,6 +657,7 @@ class FileHashDict(collections.abc.MutableMapping):
         try:
             if remove and k in self.c:
                 self.c.pop(k, None)
+                self.comp.discard(k)
                 self.c_updated = True
             if force:
                 out = self[k]
@@ -703,6 +708,7 @@ class FileHashDict(collections.abc.MutableMapping):
         self.deleted.clear()
         self.c_updated = len(self.c)
         self.c.clear()
+        self.comp.clear()
         self.data.clear()
         with suppress(FileNotFoundError):
             shutil.rmtree(self.path)
@@ -720,8 +726,8 @@ class FileHashDict(collections.abc.MutableMapping):
             if old:
                 if self.deleted:
                     old.difference_update(self.deleted)
-                if self.c:
-                    old.difference_update(self.c)
+                if self.comp:
+                    old.difference_update(self.comp)
             if old:
                 for k in old:
                     with tracebacksuppressor:
@@ -730,6 +736,9 @@ class FileHashDict(collections.abc.MutableMapping):
         if self.c_updated:
             modified.add("~")
             self.c_updated = False
+            self.comp = set(self.c.keys())
+        else:
+            self.data.pop("~", None)
         self.modified.clear()
         for k in modified:
             fn = self.key_path(k)
