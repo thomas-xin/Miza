@@ -841,7 +841,7 @@ class Bot:
 		lines.append(s)
 		ns = f"{self.name}:"
 		if start:
-			ns += " " + start
+			ns += " " + start.strip()
 		lines.append(ns)
 		longer = req_long(q)
 		reprompt = ""
@@ -889,17 +889,21 @@ class Bot:
 				p = "an " + p
 			else:
 				p = "a " + p
-			if model in ("gpt-3.5-turbo", "gpt-4"):
+			if model in ("gpt-3.5-turbo", "gpt-4", "text-davinci-003"):
 				nstart = f"Your name is {self.name}; you are {p}."
 				nstart += " Express emotion when appropriate!"
+				if model == "text-davinci-003":
+					nstart += "\n" + MIZADEF
 			else:
 				nstart = f"The following is a conversation between {self.name} and humans. {self.name} is {p} AI."
 		else:
-			if model in ("gpt-3.5-turbo", "gpt-4"):
+			if model in ("gpt-3.5-turbo", "gpt-4", "text-davinci-003"):
 				if p == DEFPER:
 					nstart = f"Your name is {self.name}; you are {DEFDEF}. Example conversation:\nHuman: test\n{self.name}: *boop* :3"
 				else:
 					nstart = p
+				if model == "text-davinci-003":
+					nstart += "\n" + MIZADEF
 			else:
 				nstart = p
 		if model in ("gpt-3.5-turbo", "gpt-4"):
@@ -954,21 +958,20 @@ class Bot:
 				messages.append(m)
 				pc += len(self.gpttokens(m["role"], model))
 				pc += len(self.gpttokens(m["content"], model))
-			text = res = None
+			text = res = flagged = None
 			if q and len(q.split(None, 1)) > 1:
 				mes = messages[-2:]
-				m = dict(role="system", content='Say "!" if the input is personal or you have a definite answer, otherwise formulate as internet search query beginning with "$"')
+				m = dict(role="system", content='Say "@" if the input is personal or you have a definite answer, "!" if inappropriate, otherwise formulate as internet search query beginning with "$"')
 				mes.append(m)
 				dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
 				m = dict(role="system", content=f"Current time: {dtn}")
 				mes.insert(0, m)
-				stop = ["!", "As an AI", "as an AI", "AI language model"]
+				stop = ["@", "AI language model"]
 				if oai:
 					openai.api_key = oai
 					costs = 0
 				elif bals:
 					openai.api_key = uoai = sorted(bals, key=bals.get)[0]
-					bals.pop(uoai)
 					costs = -1
 				else:
 					openai.api_key = self.key
@@ -978,7 +981,8 @@ class Bot:
 				resp = openai.Moderation.create(
 					mes[-2]["content"],
 				)
-				if resp["results"][0]["flagged"]:
+				flagged = resp["results"][0]["flagged"]
+				if flagged:
 					print(resp)
 					text = "!"
 				if not text:
@@ -994,7 +998,7 @@ class Bot:
 						resp.raise_for_status()
 						if not resp.content:
 							raise EOFError("Content empty.")
-						text = resp.text
+						text = resp.text or "@"
 					except:
 						print_exc()
 				if not text:
@@ -1016,10 +1020,12 @@ class Bot:
 					if resp:
 						cost += resp["usage"]["prompt_tokens"] * cm * costs
 						cost += resp["usage"].get("completion_tokens", 0) * (cm2 or cm) * costs
-						text = resp["choices"][0]["message"]["content"]
+						text = resp["choices"][0]["message"]["content"] or "@"
 			if text:
 				print("Google search:", text)
-			if text and text.startswith("$"):
+			if text and text.startswith("!"):
+				flagged = True
+			elif text and text.startswith("$"):
 				t2 = text.strip("$").strip()
 				if t2:
 					for i in range(3):
@@ -1040,7 +1046,7 @@ class Bot:
 				if res:
 					m = dict(role="system", name="GOOGLE", content=res.strip())
 					messages.insert(-1, m)
-					searched = True
+					searched = res.strip()
 			v = ""
 			if searched:
 				dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
@@ -1184,19 +1190,22 @@ class Bot:
 				cm = 20
 		elif model in ("gpt-3.5-turbo", "gpt-4"):
 			tries = 7
-			stop = ["As an AI", "as an AI", "AI language model", "as a language model"]
+			stop = ["As an AI", "as an AI", "AI language model", "I'm sorry,"]
+			response = None
 			for i in range(tries):
-				if oai:
-					openai.api_key = oai
-					costs = 0
-				elif bals:
-					openai.api_key = uoai = sorted(bals, key=bals.get)[0]
-					bals.pop(uoai)
-					costs = -1
-				else:
-					openai.api_key = self.key
-					costs = 1
+				redo = False
 				try:
+					if flagged: raise PermissionError("flagged")
+					if oai:
+						openai.api_key = oai
+						costs = 0
+					elif bals:
+						openai.api_key = uoai = sorted(bals, key=bals.get)[0]
+						bals.pop(uoai)
+						costs = -1
+					else:
+						openai.api_key = self.key
+						costs = 1
 					ok = openai.api_key
 					response = exc.submit(
 						openai.ChatCompletion.create,
@@ -1206,7 +1215,7 @@ class Bot:
 						max_tokens=min(512, limit - pc - 64),
 						top_p=1,
 						stop=stop,
-						logit_bias={self.gpttokens("AI", model)[0]: -2},
+						# logit_bias={self.gpttokens("AI", model)[0]: -0.5},
 						frequency_penalty=1.0,
 						presence_penalty=0.6,
 						user=str(hash(u)),
@@ -1227,29 +1236,29 @@ class Bot:
 						costs = 1
 					else:
 						print_exc()
-				else:
-					if response:
-						response["key"] = ok
-						m = response["choices"][0]["message"]
-						print(response)
-						role = m["role"]
-						text = m["content"].removeprefix(f"{self.name} says: ").removeprefix(f"{self.name}: ")
-						redo = False
-						if len(text) >= 2 and text[-1] == " " and text[-2] not in ".!?":
-							redo = True
-						text = text.strip()
-						if not text or len(self.gpttokens(text)) < 8:
-							text = ""
-							redo = True
-						if redo:
-							if not i and len(self.gpttokens(text)) < 16:
-								continue
-							t2, c2, *irr = self.gptcomplete(u, q, refs=refs, start=text)
-							text += " " + t2
-							cost += c2
-						break
-					stop = []
-				time.sleep(i * 3 + 1)
+				if response:
+					response["key"] = ok
+					m = response["choices"][0]["message"]
+					print(response)
+					role = m["role"]
+					text = m["content"].removeprefix(f"{self.name} says: ").removeprefix(f"{self.name}: ")
+					if len(text) >= 2 and text[-1] == " " and text[-2] not in ".!?":
+						redo = True
+					text = text.strip()
+					if not text or len(self.gpttokens(text)) < 8:
+						text = ""
+						redo = True
+				elif not flagged:
+					continue
+				if redo:
+					if not flagged and not i and len(self.gpttokens(text)) < 16:
+						continue
+					if searched:
+						refs = list(refs) + [("[GOOGLE]", searched)]
+					t2, c2, *irr = self.gptcomplete(u, q, refs=refs, start=text or " ")
+					text += " " + t2
+					cost += c2
+				break
 			if response:
 				cost += response["usage"]["prompt_tokens"] * cm * costs
 				cost += response["usage"].get("completion_tokens", 0) * (cm2 or cm) * costs
@@ -1263,6 +1272,16 @@ class Bot:
 					print("GPT prompt:", prompt)
 				sys.stdout.flush()
 				pc = len(self.gpttokens(prompt, "text-davinci-003"))
+			if oai:
+				openai.api_key = oai
+				costs = 0
+			elif bals:
+				openai.api_key = uoai = sorted(bals, key=bals.get)[0]
+				bals.pop(uoai)
+				costs = -1
+			else:
+				openai.api_key = self.key
+				costs = 1
 			try:
 				response = openai.Completion.create(
 					model=model,
