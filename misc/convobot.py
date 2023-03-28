@@ -285,7 +285,7 @@ class Bot:
 		self.timestamp = time.time()
 		self.premium = premium
 		self.last_cost = 0
-		self.history_length = 4 if premium < 1 else 6 if premium < 2 else 24 if premium < 5 else 48
+		self.history_length = 4 if premium < 1 else 6 if premium < 2 else 24 if premium < 4 else 48
 		self.fp = FreeProxy()
 		self.session = requests.Session()
 		self.session.cookies["CookieConsent"] = "true"
@@ -862,7 +862,7 @@ class Bot:
 			temp = 0.8
 			limit = 3000
 			cm = 200
-		elif self.premium < 5:
+		elif self.premium < 4:
 			model = "gpt-3.5-turbo"
 			temp = 0.9
 			limit = 4000
