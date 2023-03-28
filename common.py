@@ -535,7 +535,7 @@ class FileHashDict(collections.abc.MutableMapping):
 
     sem = Semaphore(64, 128, 0.3, 1)
     cache_size = 4096
-    db = sqlite3.connect("saves/extdb.json")
+    db = sqlite3.connect("saves/extdb.json", check_same_thread=False)
     cur = db.cursor()
 
     def __init__(self, *args, path="", **kwargs):
