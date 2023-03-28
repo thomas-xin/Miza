@@ -2526,6 +2526,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         return self.disk
 
     async def get_hosted(self):
+        self.__dict__.setdefault("total_hosted", 0)
         size = 0
         for fn in os.listdir("saves/filehost"):
             with tracebacksuppressor(ValueError):
@@ -2569,6 +2570,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             self.status_sem.wait()
             return self.status_data
         with self.status_sem:
+            self.status_data = {}
             active = self.get_active()
             size = (
                 np.sum(deque(self.size.values()), dtype=np.uint32, axis=0)
@@ -4069,8 +4071,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         while not self.closed:
             async with Delay(300):
                 async with tracebacksuppressor:
-                    with MemoryTimer("update"):
-                        await create_future(self.update, priority=True)
                     await asyncio.sleep(1)
                     with MemoryTimer("update_file_cache"):
                         await create_future(update_file_cache)
@@ -4096,6 +4096,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                             aio=True,
                             ssl=False,
                         )
+                    with MemoryTimer("update"):
+                        await create_future(self.update, priority=True)
 
     # Heartbeat loop: Repeatedly deletes a file to inform the watchdog process that the bot's event loop is still running.
     async def heartbeat_loop(self):
