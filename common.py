@@ -716,7 +716,7 @@ class FileHashDict(collections.abc.MutableMapping):
         if not self.c_updated:
             t = utc()
             old = {try_int(f.name) for f in os.scandir(self.path) if not f.name.endswith("\x7f") and t - f.stat().st_mtime > 3600}
-            old.pop("~", None)
+            old.discard("~")
             if old:
                 if self.deleted:
                     old.difference_update(self.deleted)
