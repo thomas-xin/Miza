@@ -724,7 +724,7 @@ class FileHashDict(collections.abc.MutableMapping):
             if old:
                 for k in old:
                     with suppress(KeyError):
-                        self.c[k] = self.pop(k)
+                        self.c[k] = self.pop(k, force=True)
                 self.c_updated = True
         if self.c_updated:
             self.modified.add("~")
