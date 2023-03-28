@@ -764,6 +764,10 @@ class FileHashDict(collections.abc.MutableMapping):
                     self.c.pop(k, None)
                     self.comp.discard(k)
                     self.c_updated = True
+        cinter = self.comp.intersection(self.codb):
+        for k in cinter:
+            self.c.pop(k, None)
+            self.comp.discard(k)
         if not self.c_updated:
             t = utc()
             old = {try_int(f.name) for f in os.scandir(self.path) if not f.name.endswith("\x7f") and t - f.stat().st_mtime > 86400}
