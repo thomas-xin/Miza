@@ -498,7 +498,7 @@ def select_and_loads(s, mode="safe", size=None):
 def select_and_dumps(data, mode="safe", compress=True):
     if mode == "unsafe":
         try:
-            if isinstance(data, dict) and not isinstance(next(iter(data)), str):
+            if data and isinstance(data, dict) and not isinstance(next(iter(data)), str):
                 raise TypeError
             s = orjson.dumps(data)
         except TypeError:
