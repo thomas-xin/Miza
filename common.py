@@ -777,7 +777,7 @@ class FileHashDict(collections.abc.MutableMapping):
                         d = select_and_dumps(d, mode="unsafe", compress=True)
                         self.cur.execute(
                             f"INSERT INTO '{self.path}' ('key', 'value') VALUES ('{k}', ?) "
-                                + "ON CONFLICT(key) DO UPDATE SET 'value' = ?;",
+                                + "ON CONFLICT(key) DO UPDATE SET 'value' = ?",
                             [d, d],
                         )
                         # self.c[k] = self.pop(k, force=True, remove=False)
