@@ -750,7 +750,7 @@ class FileHashDict(collections.abc.MutableMapping):
         if modified or deleted:
             self.iter = None
             inter = modified.union(deleted)
-            inter.intersection_update(self.comp)
+            inter.update(self.comp)
             for k in inter:
                 if k in self.codb:
                     self.cur.execute(f"DELETE FROM '{self.path}' WHERE key=?", (k,))
@@ -781,7 +781,7 @@ class FileHashDict(collections.abc.MutableMapping):
                             [d, d],
                         )
                         # self.c[k] = self.pop(k, force=True, remove=False)
-                self.c_updated = True
+                # self.c_updated = True
         if self.c_updated:
             modified.add("~")
             self.c_updated = False
