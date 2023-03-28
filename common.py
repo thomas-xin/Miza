@@ -764,7 +764,7 @@ class FileHashDict(collections.abc.MutableMapping):
                     self.c.pop(k, None)
                     self.comp.discard(k)
                     self.c_updated = True
-        cinter = self.comp.intersection(self.codb):
+        cinter = self.comp.intersection(self.codb)
         for k in cinter:
             self.c.pop(k, None)
             self.comp.discard(k)
