@@ -736,9 +736,11 @@ class FileHashDict(collections.abc.MutableMapping):
         self.modified.clear()
         self.deleted.clear()
         self.c_updated = len(self.c)
-        self.c.clear()
+        self.data["~"] = {}
         self.comp.clear()
         self.data.clear()
+        self.cur.execute(f"DELETE FROM '{self.path}'")
+        self.codb.clear()
         with suppress(FileNotFoundError):
             shutil.rmtree(self.path)
         os.mkdir(self.path)
@@ -769,7 +771,7 @@ class FileHashDict(collections.abc.MutableMapping):
             if old:
                 if self.deleted:
                     old.difference_update(self.deleted)
-                if self.comp:
+                if self.codb:
                     old.difference_update(self.codb)
             if old:
                 print(f"{self.path}: Old {len(old)}")
