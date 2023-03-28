@@ -570,14 +570,14 @@ class FileHashDict(collections.abc.MutableMapping):
 
     def keys(self):
         if self.iter is None or self.modified or self.deleted:
-            gen = (try_int(i) for i in os.listdir(self.path) if not i.endswith("\x7f") and i not in self.deleted)
+            gen = set(try_int(i) for i in os.listdir(self.path) if not i.endswith("\x7f") and i not in self.deleted)
             if self.modified:
-                gen = set(gen)
                 gen.update(self.modified)
-            self.iter = alist(gen)
             c = self.c
             if c:
-                self.iter.update(c.keys())
+                gen.update(c.keys())
+            gen.discard("~")
+            self.iter = alist(gen)
         return self.iter
 
     def values(self):
