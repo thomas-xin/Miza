@@ -751,8 +751,7 @@ class FileHashDict(collections.abc.MutableMapping):
         self.deleted.clear()
         if modified or deleted:
             self.iter = None
-            inter = modified.union(deleted)
-            inter.update(self.comp)
+            inter = modified.union(deleted
             for k in inter:
                 if k in self.codb:
                     self.cur.execute(f"DELETE FROM '{self.path}' WHERE key=?", (k,))
@@ -766,6 +765,7 @@ class FileHashDict(collections.abc.MutableMapping):
             t = utc()
             old = {try_int(f.name) for f in os.scandir(self.path) if not f.name.endswith("\x7f") and t - f.stat().st_mtime > 86400}
             old.discard("~")
+            old.update(self.comp)
             if old:
                 if self.deleted:
                     old.difference_update(self.deleted)
