@@ -634,6 +634,8 @@ class FileHashDict(collections.abc.MutableMapping):
                 data = select_and_loads(s, mode="unsafe")
                 self.data[k] = data
                 return data
+            if k == "~~":
+                raise TypeError("Attempted to load SQL database inappropriately")
         fn = self.key_path(k)
         if not os.path.exists(fn):
             fn += "\x7f\x7f"
@@ -773,6 +775,8 @@ class FileHashDict(collections.abc.MutableMapping):
             t = utc()
             old = {try_int(f.name) for f in os.scandir(self.path) if not f.name.endswith("\x7f") and t - f.stat().st_mtime > 3600}
             old.discard("~")
+            old.discard("~~")
+            old.discard("~~-journal")
             old.update(self.comp)
             if old:
                 if self.deleted:
