@@ -509,8 +509,9 @@ def select_and_dumps(data, mode="safe", compress=True):
             if len(data) and isinstance(data, dict) and not isinstance(next(iter(data)), str):
                 raise TypeError
             if isinstance(data, (set, frozenset)):
-                data = list(data)
-            s = orjson.dumps(data)
+                data = b"$" + orjson.dumps(list(data))
+            else:
+                s = orjson.dumps(data)
         except TypeError:
             s = pickle.dumps(data)
         if len(s) > 32768 and compress:
