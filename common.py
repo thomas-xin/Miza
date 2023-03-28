@@ -710,7 +710,7 @@ class FileHashDict(collections.abc.MutableMapping):
         return self
 
     def __update__(self):
-        modified = frozenset(self.modified)
+        modified = set(self.modified)
         if modified:
             self.iter = None
         if not self.c_updated:
@@ -723,7 +723,7 @@ class FileHashDict(collections.abc.MutableMapping):
                     old.difference_update(self.c)
             if old:
                 for k in old:
-                    with suppress(KeyError):
+                    with tracebacksuppressor:
                         self.c[k] = self.pop(k, force=True, remove=False)
                 self.c_updated = True
         if self.c_updated:
