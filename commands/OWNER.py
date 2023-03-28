@@ -872,9 +872,11 @@ class UpdatePremiums(Database):
             d = cdict(ts=time.time(), lv=lv, gl=set())
             self[uid] = d
         d = self[uid]
-        if d["lv"] != lv or len(d["gl"]) > pl:
+        if d["lv"] != lv:
             d["lv"] = lv
-            pl = self.prem_limit(lv)
+            self.update(uid)
+        pl = self.prem_limit(lv)
+        if len(d["gl"]) > pl:
             while len(d["gl"]) > pl:
                 i = d["gl"].pop()
                 if i in self.bot.data.trusted:
