@@ -89,7 +89,8 @@ class Restart(Command):
                 await create_future(bot.update, force=True, priority=True)
                 # Send the bot "offline"
                 print("Going offline...")
-                await bot.change_presence(status=discord.Status.invisible)
+                with tracebacksuppressor:
+                    await asyncio.wait_for(bot.change_presence(status=discord.Status.invisible), timeout=3)
                 # Kill math and image subprocesses
                 print("Killing math and image subprocesses...")
                 with tracebacksuppressor:
