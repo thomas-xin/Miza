@@ -1811,7 +1811,7 @@ class UpdateEnabled(Database):
 
 class UpdateMessages(Database):
     name = "messages"
-    semaphore = Semaphore(80, 1, delay=1, rate_limit=16)
+    semaphore = Semaphore(8, 1, delay=1, rate_limit=8)
     closed = False
     hue = 0
 
