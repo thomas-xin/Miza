@@ -481,18 +481,26 @@ def select_and_loads(s, mode="safe", size=None):
                     raise OverflowError(f"Data input size too large ({x} > {size}).")
             s = z.read(n)
     data = None
+    if not s:
+        return data
     with tracebacksuppressor:
         if s[0] == 128:
             data = pickle.loads(s)
     if data is None:
-        if 0:#mode == "unsafe":
-            if not s:
-                raise FileNotFoundError
-            data = eval(compile(s, "<loader>", "eval", optimize=2, dont_inherit=False))
-        else:
-            if not s.startswith(b"{") and b"{" in s:
-                s = s[s.index(b"{"):s.rindex(b"}") + 1]
-            data = orjson.loads(s)
+        # if mode == "unsafe":
+        #     if not s:
+        #         raise FileNotFoundError
+        #     data = eval(compile(s, "<loader>", "eval", optimize=2, dont_inherit=False))
+        # else:
+        tcls = None
+        if s[0] == b"$" and s[1] == b"[":
+            s = memoryview(s)[1:]
+            tcls = set
+        elif s[0] not in b"{[" and b"{" in s:
+            s = memoryview(s)[s.index(b"{"):s.rindex(b"}") + 1]
+        data = orjson.loads(s)
+        if tcls:
+            data = tcls(data)
     return data
 
 def select_and_dumps(data, mode="safe", compress=True):
@@ -500,6 +508,8 @@ def select_and_dumps(data, mode="safe", compress=True):
         try:
             if len(data) and isinstance(data, dict) and not isinstance(next(iter(data)), str):
                 raise TypeError
+            if isinstance(data, (set, frozenset)):
+                data = list(data)
             s = orjson.dumps(data)
         except TypeError:
             s = pickle.dumps(data)
