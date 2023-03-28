@@ -577,7 +577,7 @@ class FileHashDict(collections.abc.MutableMapping):
             self.iter = alist(gen)
             c = self.c
             if c:
-                self.iter.update(c)
+                self.iter.update(c.keys())
         return self.iter
 
     def values(self):
@@ -1339,7 +1339,7 @@ def get_author(user, u_id=None):
     url = best_url(user)
     bot = BOT[0]
     if bot and "proxies" in bot.data:
-        url2 = bot.data.proxies[0].get(uhash(url))
+        url2 = bot.data.proxies.get(uhash(url))
         if url2:
             url = url2
         else:
