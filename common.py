@@ -638,7 +638,7 @@ class FileHashDict(collections.abc.MutableMapping):
             k = int(k)
         self.deleted.discard(k)
         if k in self.c:
-            self.c.discard(k)
+            self.c.pop(k, None)
             self.c_updated = True
         self.data[k] = v
         self.modified.add(k)
