@@ -600,6 +600,7 @@ class FileHashDict(collections.abc.MutableMapping):
                 gen.update(self.codb)
             gen.discard("~")
             gen.discard("~~")
+            gen.discard("~~-journal")
             self.iter = alist(gen)
         return self.iter
 
