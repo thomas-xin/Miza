@@ -1250,6 +1250,8 @@ class Bot:
 						redo = True
 				elif not flagged:
 					continue
+				else:
+					redo = True
 				if redo:
 					if not flagged and not i and len(self.gpttokens(text)) < 16:
 						continue
