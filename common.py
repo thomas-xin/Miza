@@ -18,6 +18,7 @@ MultiAutoImporter(
     "shutil",
     "filetype",
     "inspect",
+    "sqlite",
     pool=import_exc,
     _globals=globals(),
 )
@@ -534,6 +535,8 @@ class FileHashDict(collections.abc.MutableMapping):
 
     sem = Semaphore(64, 128, 0.3, 1)
     cache_size = 4096
+    db = sqlite3.connect("saves/extdb.json")
+    cur = db.cursor()
 
     def __init__(self, *args, path="", **kwargs):
         if not kwargs and len(args) == 1:
@@ -547,7 +550,9 @@ class FileHashDict(collections.abc.MutableMapping):
         if self.path and not os.path.exists(self.path):
             os.mkdir(self.path)
             self.iter = []
+        self.cur.execute(f"CREATE TABLE IF NOT EXISTS '{self.path}' (key VARCHAR(256) PRIMARY KEY, value BLOB)")
         self.comp = set(self.c.keys())
+        self.codb = set(r[0] for r in c.execute(f"SELECT key FROM '{self.path}'"))
         if self.comp:
             self.data.pop("~", None)
             print(f"{self.path}: Successfully loaded {len(self.comp)} compressed entries.")
@@ -616,9 +621,15 @@ class FileHashDict(collections.abc.MutableMapping):
             raise KeyError(k)
         with suppress(KeyError):
             return self.data[k]
-        if k != "~" and k in self.comp:
-            with suppress(KeyError):
-                return self.c[k]
+        if k != "~":
+            if k in self.comp:
+                with suppress(KeyError):
+                    return self.c[k]
+            if k in self.codb:
+                s = next(self.cur.execute(f"SELECT value FROM '{self.path}' WHERE key=?", (k,)))[0]
+                data = select_and_loads(s, mode="unsafe")
+                self.data[k] = data
+                return data
         fn = self.key_path(k)
         if not os.path.exists(fn):
             fn += "\x7f\x7f"
@@ -666,10 +677,15 @@ class FileHashDict(collections.abc.MutableMapping):
     def pop(self, k, *args, force=False, remove=True):
         fn = self.key_path(k)
         try:
-            if remove and k in self.c:
-                self.c.pop(k, None)
-                self.comp.discard(k)
-                self.c_updated = True
+            if remove:
+                if k in self.codb:
+                    self.cur.execute(f"DELETE FROM '{self.path}' WHERE key=?", (k,))
+                    self.codb.discard(k)
+                    self.c_updated = True
+                elif k in self.comp:
+                    self.c.pop(k, None)
+                    self.comp.discard(k)
+                    self.c_updated = True
             if force:
                 out = self[k]
                 self.deleted.add(k)
@@ -736,9 +752,14 @@ class FileHashDict(collections.abc.MutableMapping):
             inter = modified.union(deleted)
             inter.intersection_update(self.comp)
             for k in inter:
-                self.c.pop(k, None)
-                self.comp.discard(k)
-                self.c_updated = True
+                if k in self.codb:
+                    self.cur.execute(f"DELETE FROM '{self.path}' WHERE key=?", (k,))
+                    self.codb.discard(k)
+                    self.c_updated = True
+                elif k in self.comp:
+                    self.c.pop(k, None)
+                    self.comp.discard(k)
+                    self.c_updated = True
         if not self.c_updated:
             t = utc()
             old = {try_int(f.name) for f in os.scandir(self.path) if not f.name.endswith("\x7f") and t - f.stat().st_mtime > 86400}
@@ -752,12 +773,21 @@ class FileHashDict(collections.abc.MutableMapping):
                 print(f"{self.path}: Old {len(old)}")
                 for k in old:
                     with tracebacksuppressor:
-                        self.c[k] = self.pop(k, force=True, remove=False)
+                        d = self.pop(k, force=True, remove=False)
+                        d = select_and_dumps(d, mode="unsafe", compress=True)
+                        self.cur.execute(
+                            f"INSERT INTO '{self.path}' ('key', 'value') VALUES ('{k}', ?) "
+                                + "ON CONFLICT(key) DO UPDATE SET 'value' = ?;",
+                            [d, d],
+                        )
+                        # self.c[k] = self.pop(k, force=True, remove=False)
                 self.c_updated = True
         if self.c_updated:
             modified.add("~")
             self.c_updated = False
             self.comp = set(self.c.keys())
+            self.db.commit()
+            self.codb = set(r[0] for r in self.cur.execute(f"SELECT key FROM '{self.path}'"))
         else:
             self.data.pop("~", None)
         for k in modified:

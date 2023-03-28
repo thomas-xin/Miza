@@ -1009,7 +1009,7 @@ discord.gateway.DiscordVoiceWebSocket.initial_connection = initial_connection
 async def kill():
 	futs = deque()
 	with suppress(ConnectionResetError):
-		await client.change_presence(status=discord.Status.invisible)
+		futs.append(create_task(client.change_presence(status=discord.Status.invisible)))
 	for vc in client.voice_clients:
 		futs.append(create_task(vc.disconnect(force=True)))
 	for fut in futs:
