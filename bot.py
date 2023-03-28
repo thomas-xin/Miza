@@ -3534,7 +3534,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 i = n & 1
                 if not i and getattr(guild, "_member_count", len(guild._members)) > 250:
                     i = 1
-                fut = create_task(asyncio.wait_for(funcs[i](guild), timeout=None if i else 420))
+                fut = create_task(asyncio.wait_for(funcs[i](guild), timeout=None if i else 30))
                 fut.guild = guild
                 if len(futs) >= 8:
                     pops = [a for a, fut in enumerate(futs) if fut.done()]
