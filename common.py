@@ -551,7 +551,8 @@ class FileHashDict(collections.abc.MutableMapping):
 
     @property
     def c(self):
-        return self.setdefault("~", {})
+        self.data["~"] = c = self.get("~", {})
+        return c
 
     @property
     def full(self):
