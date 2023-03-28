@@ -5151,7 +5151,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             create_task(self.global_loop())
             create_task(self.slow_loop())
             create_task(self.lazy_loop())
-            create_task(self.fast_loop())
             print("Update loops initiated.")
             futs = alist()
             futs.add(create_future(self.update_slash_commands, priority=True))
@@ -5177,6 +5176,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             print("Guilds ready.")
             create_task(self.heartbeat_loop())
             force_kill(self.heartbeat_proc)
+            create_task(self.fast_loop())
             self.initialisation_complete = True
             print("Initialisation complete.")
 

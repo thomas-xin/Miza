@@ -2509,7 +2509,7 @@ class UpdateMessageCache(Database):
                 print(f"Message Database: {len(saving)} files updated.")
             deleted = 0
             limit = str(self.get_fn(time_snowflake(dtn() - datetime.timedelta(days=28))))
-            for f in os.listdir(self.files):
+            for f in sorted(os.listdir(self.files), key=lambda f: int(f.rstrip("\x7f"))):
                 if f.isnumeric() and f < limit or f.endswith("\x7f"):
                     with tracebacksuppressor(FileNotFoundError):
                         os.remove(self.files + "/" + f)
