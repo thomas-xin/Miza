@@ -535,8 +535,6 @@ class FileHashDict(collections.abc.MutableMapping):
 
     sem = Semaphore(64, 128, 0.3, 1)
     cache_size = 4096
-    db = sqlite3.connect("saves/extdb.json", check_same_thread=False)
-    cur = db.cursor()
 
     def __init__(self, *args, path="", **kwargs):
         if not kwargs and len(args) == 1:
@@ -550,6 +548,8 @@ class FileHashDict(collections.abc.MutableMapping):
         if self.path and not os.path.exists(self.path):
             os.mkdir(self.path)
             self.iter = []
+        self.db = sqlite3.connect("saves/extdb.json", check_same_thread=False)
+        self.cur = db.cursor()
         self.cur.execute(f"CREATE TABLE IF NOT EXISTS '{self.path}' (key VARCHAR(256) PRIMARY KEY, value BLOB)")
         self.comp = set(self.c.keys())
         self.codb = set(r[0] for r in self.cur.execute(f"SELECT key FROM '{self.path}'"))
