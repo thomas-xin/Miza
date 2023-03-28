@@ -532,18 +532,26 @@ class FileHashDict(collections.abc.MutableMapping):
         if self.path and not os.path.exists(self.path):
             os.mkdir(self.path)
             self.iter = []
+        with tracebacksuppressor(LookupError):
+            self["~"]
+            print(f"{self.path}: Successfully loaded {len(self['~'])} compressed entries.")
+        self.c_updated = False
 
     __hash__ = lambda self: lambda self: hash(self.path)
     __str__ = lambda self: self.__class__.__name__ + "(" + str(self.data) + ")"
     __repr__ = lambda self: self.__class__.__name__ + "(" + str(self.full) + ")"
     __call__ = lambda self, k: self.__getitem__(k)
     __len__ = lambda self: len(self.keys())
-    __contains__ = lambda self, k: (k in self.data or k in self.keys()) and k not in self.deleted
+    __contains__ = lambda self, k: k in self.keys()
     __eq__ = lambda self, other: self.data == other
     __ne__ = lambda self, other: self.data != other
 
     def key_path(self, k):
         return f"{self.path}/{k}"
+
+    @property
+    def c(self):
+        return self.get("~", {})
 
     @property
     def full(self):
@@ -566,6 +574,9 @@ class FileHashDict(collections.abc.MutableMapping):
                 gen = set(gen)
                 gen.update(self.modified)
             self.iter = alist(gen)
+            c = self.c
+            if c:
+                self.iter.update(c)
         return self.iter
 
     def values(self):
@@ -589,6 +600,9 @@ class FileHashDict(collections.abc.MutableMapping):
             raise KeyError(k)
         with suppress(KeyError):
             return self.data[k]
+        if k != "~":
+            with suppress(KeyError):
+                return self.c[k]
         fn = self.key_path(k)
         if not os.path.exists(fn):
             fn += "\x7f\x7f"
@@ -622,6 +636,9 @@ class FileHashDict(collections.abc.MutableMapping):
         with suppress(ValueError):
             k = int(k)
         self.deleted.discard(k)
+        if k in self.c:
+            self.c.discard(k)
+            self.c_updated = True
         self.data[k] = v
         self.modified.add(k)
 
@@ -633,6 +650,9 @@ class FileHashDict(collections.abc.MutableMapping):
     def pop(self, k, *args, force=False):
         fn = self.key_path(k)
         try:
+            if k in self.c:
+                self.c.discard(k)
+                self.c_updated = True
             if force:
                 out = self[k]
                 self.deleted.add(k)
@@ -679,6 +699,9 @@ class FileHashDict(collections.abc.MutableMapping):
         if self.iter:
             self.iter.clear()
         self.modified.clear()
+        self.deleted.clear()
+        self.c_updated = len(self.c)
+        self.c.clear()
         self.data.clear()
         with suppress(FileNotFoundError):
             shutil.rmtree(self.path)
@@ -689,6 +712,22 @@ class FileHashDict(collections.abc.MutableMapping):
         modified = frozenset(self.modified)
         if modified:
             self.iter = None
+        if not self.c_updated:
+            t = utc()
+            old = {try_int(f.name) for f in os.scandir(self.path) if not f.name.endswith("\x7f") and t - f.stat().st_mtime > 3600}
+            if old:
+                if self.deleted:
+                    old.difference_update(self.deleted)
+                if self.c:
+                    old.difference_update(self.c)
+            if old:
+                for k in old:
+                    with suppress(KeyError):
+                        self.c[k] = self.pop(k)
+                self.c_updated = True
+        if self.c_updated:
+            self.modified.add("~")
+            self.c_updated = False
         self.modified.clear()
         for k in modified:
             fn = self.key_path(k)

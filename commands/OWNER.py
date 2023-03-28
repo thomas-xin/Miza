@@ -872,7 +872,7 @@ class UpdatePremiums(Database):
             d = cdict(ts=time.time(), lv=lv, gl=set())
             self[uid] = d
         d = self[uid]
-        if d["lv"] != lv:
+        if d["lv"] != lv or len(d["gl"]) > pl:
             d["lv"] = lv
             pl = self.prem_limit(lv)
             while len(d["gl"]) > pl:
