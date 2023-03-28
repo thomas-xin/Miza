@@ -785,6 +785,9 @@ class FileHashDict(collections.abc.MutableMapping):
                                 + "ON CONFLICT(key) DO UPDATE SET 'value' = ?",
                             [d, d],
                         )
+                        if k in self.comp:
+                            self.c.pop(k, None)
+                            self.comp.discard(k)
                         # self.c[k] = self.pop(k, force=True, remove=False)
                 self.c_updated = True
         if self.c_updated:
