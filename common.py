@@ -509,7 +509,7 @@ def select_and_dumps(data, mode="safe", compress=True):
             if len(data) and isinstance(data, dict) and not isinstance(next(iter(data)), str):
                 raise TypeError
             if isinstance(data, (set, frozenset)):
-                data = b"$" + orjson.dumps(list(data))
+                s = b"$" + orjson.dumps(list(data))
             else:
                 s = orjson.dumps(data)
         except TypeError:
