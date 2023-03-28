@@ -599,6 +599,7 @@ class FileHashDict(collections.abc.MutableMapping):
             if self.codb:
                 gen.update(self.codb)
             gen.discard("~")
+            gen.discard("~~")
             self.iter = alist(gen)
         return self.iter
 
