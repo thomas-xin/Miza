@@ -18,7 +18,7 @@ MultiAutoImporter(
     "shutil",
     "filetype",
     "inspect",
-    "sqlite",
+    "sqlite3",
     pool=import_exc,
     _globals=globals(),
 )
