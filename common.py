@@ -494,7 +494,7 @@ def select_and_loads(s, mode="safe", size=None):
         #     data = eval(compile(s, "<loader>", "eval", optimize=2, dont_inherit=False))
         # else:
         tcls = None
-        if s[0] == b"$" and s[1] == b"[":
+        if s[0] in b"$" and s[1] in b"[":
             s = memoryview(s)[1:]
             tcls = set
         elif s[0] not in b"{[" and b"{" in s:
