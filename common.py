@@ -552,7 +552,7 @@ class FileHashDict(collections.abc.MutableMapping):
         self.cur = self.db.cursor()
         self.cur.execute(f"CREATE TABLE IF NOT EXISTS '{self.path}' (key VARCHAR(256) PRIMARY KEY, value BLOB)")
         self.comp = set(self.c.keys())
-        self.codb = set(r[0] for r in self.cur.execute(f"SELECT key FROM '{self.path}'"))
+        self.codb = set(try_int(r[0]) for r in self.cur.execute(f"SELECT key FROM '{self.path}'"))
         if self.comp:
             self.data.pop("~", None)
             print(f"{self.path}: Successfully loaded {len(self.comp)} compressed entries.")
@@ -596,6 +596,8 @@ class FileHashDict(collections.abc.MutableMapping):
                 gen.update(self.modified)
             if self.comp:
                 gen.update(self.comp)
+            if self.codb:
+                gen.update(self.codb)
             gen.discard("~")
             self.iter = alist(gen)
         return self.iter
@@ -768,7 +770,7 @@ class FileHashDict(collections.abc.MutableMapping):
                 if self.deleted:
                     old.difference_update(self.deleted)
                 if self.comp:
-                    old.difference_update(self.comp)
+                    old.difference_update(self.codb)
             if old:
                 print(f"{self.path}: Old {len(old)}")
                 for k in old:
@@ -787,7 +789,7 @@ class FileHashDict(collections.abc.MutableMapping):
             self.c_updated = False
             self.comp = set(self.c.keys())
             self.db.commit()
-            self.codb = set(r[0] for r in self.cur.execute(f"SELECT key FROM '{self.path}'"))
+            self.codb = set(try_int(r[0]) for r in self.cur.execute(f"SELECT key FROM '{self.path}'"))
         else:
             self.data.pop("~", None)
         for k in modified:
