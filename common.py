@@ -641,9 +641,9 @@ class FileHashDict(collections.abc.MutableMapping):
         with suppress(ValueError):
             k = int(k)
         self.deleted.discard(k)
-        if k in self.c:
-            self.c.pop(k, None)
-            self.c_updated = True
+        # if k in self.comp:
+        #     self.c.pop(k, None)
+        #     self.c_updated = True
         self.data[k] = v
         self.modified.add(k)
 
@@ -717,8 +717,17 @@ class FileHashDict(collections.abc.MutableMapping):
 
     def __update__(self):
         modified = set(self.modified)
-        if modified:
+        self.modified.clear()
+        deleted = list(self.deleted)
+        self.deleted.clear()
+        if modified or deleted:
             self.iter = None
+            inter = modified.union(deleted)
+            inter.intersection_update(self.comp)
+            for k in inter:
+                self.c.pop(k, None)
+                self.comp.discard(k)
+                self.c_updated = True
         if not self.c_updated:
             t = utc()
             old = {try_int(f.name) for f in os.scandir(self.path) if not f.name.endswith("\x7f") and t - f.stat().st_mtime > 86400}
@@ -729,6 +738,7 @@ class FileHashDict(collections.abc.MutableMapping):
                 if self.comp:
                     old.difference_update(self.comp)
             if old:
+                print(f"{self.path}: Old {len(old)}")
                 for k in old:
                     with tracebacksuppressor:
                         self.c[k] = self.pop(k, force=True, remove=False)
@@ -739,7 +749,6 @@ class FileHashDict(collections.abc.MutableMapping):
             self.comp = set(self.c.keys())
         else:
             self.data.pop("~", None)
-        self.modified.clear()
         for k in modified:
             fn = self.key_path(k)
             try:
@@ -750,10 +759,6 @@ class FileHashDict(collections.abc.MutableMapping):
             s = select_and_dumps(d, mode="unsafe", compress=True)
             with self.sem:
                 safe_save(fn, s)
-        deleted = list(self.deleted)
-        if deleted:
-            self.iter = None
-        self.deleted.clear()
         for k in deleted:
             self.data.pop(k, None)
             fn = self.key_path(k)

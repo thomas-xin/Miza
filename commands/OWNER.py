@@ -527,7 +527,7 @@ class UpdateExec(Database):
             except KeyError:
                 new = await_fut(self._proxy(url))
                 self.bot.data.proxies[h] = new
-                self.bot.data.proxies.update(0)
+                # self.bot.data.proxies.update(0)
                 return new
         return url
     
@@ -554,7 +554,7 @@ class UpdateExec(Database):
                         self.bot.data.proxies[uhash(urls[i])] = out[i] = message.embeds[c].thumbnail.proxy_url
                     except IndexError:
                         break
-                    self.bot.data.proxies.update(0)
+                    # self.bot.data.proxies.update(0)
                     c += 1
         return out if len(out) > 1 else out[0]
 
@@ -720,7 +720,7 @@ class UpdateExec(Database):
                         self.bot.data.proxies[uhash(urls[i])] = out[i] = url
                     except IndexError:
                         break
-                    self.bot.data.proxies.update(0)
+                    # self.bot.data.proxies.update(0)
                     with suppress(KeyError, RuntimeError):
                         self.temp.pop(urls[i]).set_result(out[i])
                     c += 1
@@ -759,10 +759,10 @@ class UpdateProxies(Database):
     name = "proxies"
     limit = 65536
 
-    def __load__(self, **void):
-        if 0 not in self:
-            # self.clear()
-            self[0] = {}
+    # def __load__(self, **void):
+    #     if 0 not in self:
+    #         self.clear()
+    #         self[0] = {}
 
 
 class Immortalise(Command):
