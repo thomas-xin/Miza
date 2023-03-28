@@ -781,7 +781,7 @@ class FileHashDict(collections.abc.MutableMapping):
                             [d, d],
                         )
                         # self.c[k] = self.pop(k, force=True, remove=False)
-                # self.c_updated = True
+                self.c_updated = True
         if self.c_updated:
             modified.add("~")
             self.c_updated = False
