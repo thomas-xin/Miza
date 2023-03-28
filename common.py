@@ -648,11 +648,11 @@ class FileHashDict(collections.abc.MutableMapping):
             return self[k]
         return default
 
-    def pop(self, k, *args, force=False):
+    def pop(self, k, *args, force=False, remove=True):
         fn = self.key_path(k)
         try:
-            if k in self.c:
-                self.c.discard(k)
+            if remove and k in self.c:
+                self.c.pop(k, None)
                 self.c_updated = True
             if force:
                 out = self[k]
@@ -724,7 +724,7 @@ class FileHashDict(collections.abc.MutableMapping):
             if old:
                 for k in old:
                     with suppress(KeyError):
-                        self.c[k] = self.pop(k, force=True)
+                        self.c[k] = self.pop(k, force=True, remove=False)
                 self.c_updated = True
         if self.c_updated:
             self.modified.add("~")
