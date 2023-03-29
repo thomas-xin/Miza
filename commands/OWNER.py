@@ -969,7 +969,7 @@ class UpdateChannelCache(Database):
     name = "channel_cache"
     channel = True
 
-    async def get(self, channel, as_message=True):
+    async def get(self, channel, as_message=True, force=False):
         if hasattr(channel, "simulated"):
             yield channel.message
             return
@@ -981,13 +981,15 @@ class UpdateChannelCache(Database):
                 try:
                     if m_id < min_time:
                         raise OverflowError
-                    message = await self.bot.fetch_message(m_id, channel)
+                    message = await self.bot.fetch_message(m_id, channel=channel if force else None)
                     if getattr(message, "deleted", None):
                         continue
                 except (discord.NotFound, discord.Forbidden, OverflowError):
                     if deletable:
                         self.data[c_id].discard(m_id)
                 except (TypeError, ValueError, discord.HTTPException):
+                    if not force:
+                        break
                     print_exc()
                 else:
                     yield message
