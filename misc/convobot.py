@@ -66,7 +66,7 @@ def create_driver():
 	folder = os.path.join(os.getcwd(), f"d~{ts}")
 	service = browser["service"](browser["path"])
 	options = browser["options"]()
-	options.add_argument("--headless")
+	# options.add_argument("--headless")
 	# options.add_argument("--disable-gpu")
 	options.add_argument("--no-sandbox")
 	options.add_argument("--deny-permission-prompts")
@@ -100,7 +100,7 @@ def create_driver():
 		else:
 			raise
 	except selenium.common.WebDriverException as ex:
-		argv = " ".join(args)
+		argv = " ".join(ex.args)
 		search = "unrecognized Microsoft Edge version"
 		if search in argv and "Chrome" in argv:
 			v = argv.split("Stacktrace", 1)[0].rsplit("/", 1)[-1].strip()
@@ -920,7 +920,7 @@ class Bot:
 				line = line.strip()
 				k, v = line.split(": ", 1)
 				m = {}
-				if k in (self.name, "[CHATGPT]", "[GOOGLE]"):
+				if k in (self.name, "[CHATGPT]", "[GOOGLE]", "[BING]"):
 					m["role"] = "assistant"
 				elif k in ("[SYSTEM]",):
 					m["role"] = "system"
@@ -961,7 +961,8 @@ class Bot:
 			text = res = flagged = None
 			if q and len(q.split(None, 1)) > 1:
 				mes = messages[-2:]
-				m = dict(role="system", content='Say "@" if the input is personal or you have a definite answer, "!" if inappropriate, otherwise formulate as internet search query beginning with "$"')
+				q2 = 'Say "@" if you have a definite answer, "!" if inappropriate/personal, "%" followed by query if maths question, else formulate as google search prepended with "$"'
+				m = dict(role="system", content=q2)
 				mes.append(m)
 				dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
 				m = dict(role="system", content=f"Current time: {dtn}")
@@ -1021,8 +1022,15 @@ class Bot:
 						cost += resp["usage"]["prompt_tokens"] * cm * costs
 						cost += resp["usage"].get("completion_tokens", 0) * (cm2 or cm) * costs
 						text = resp["choices"][0]["message"]["content"] or "@"
+			sname = "GOOGLE"
 			if text:
-				print("Google search:", text)
+				if text.startswith("%"):
+					stype = "3"
+					sname = "WOLFRAMALPHA"
+				else:
+					stype = random.randint(0, 2)
+					sname = ("GOOGLE", "BING", "YAHOO")[stype]
+				print(sname.capitalize(), "search:", text)
 			if text and text.startswith("!"):
 				flagged = True
 			elif text and text.startswith("$"):
@@ -1031,9 +1039,22 @@ class Bot:
 					for i in range(3):
 						try:
 							res = exc.submit(
-								(self.google, self.bing)[random.randint(0, 1)],
+								getattr(self, sname.lower())[stype],
 								t2,
 								raw=True,
+							).result(timeout=8)
+						except concurrent.futures.TimeoutError:
+							print_exc()
+						else:
+							break
+			elif text and text.startswith("%"):
+				t2 = text.strip("%").strip()
+				if t2:
+					for i in range(3):
+						try:
+							res = exc.submit(
+								self.wolframalpha,
+								t2,
 							).result(timeout=8)
 						except concurrent.futures.TimeoutError:
 							print_exc()
@@ -1044,13 +1065,13 @@ class Bot:
 					summ = self.answer_summarise("facebook/bart-large-cnn", q + "\n" + res, max_length=384, min_length=256).replace("\n", ". ").replace(": ", " -").strip()
 					res = lim_str(res.replace("\n", " "), 384, mode="right") + "\n" + summ
 				if res:
-					m = dict(role="system", name="GOOGLE", content=res.strip())
+					m = dict(role="system", name=sname, content=res.strip())
 					messages.insert(-1, m)
 					searched = res.strip()
 			v = ""
 			if searched:
 				dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
-				v += f"Use Google info when relevant, but don't reveal personal info. Current time: {dtn}\n"
+				v += f"Use {sname.capitalize()} info when relevant, but don't reveal personal info. Current time: {dtn}\n"
 			if iman:
 				v += "\n".join(iman) + "\n"
 			v += MIZADEF
@@ -1256,7 +1277,7 @@ class Bot:
 					if not flagged and not i and len(self.gpttokens(text)) < 16:
 						continue
 					if searched:
-						refs = list(refs) + [("[GOOGLE]", searched)]
+						refs = list(refs) + [(f"[{sname}]", searched)]
 					t2, c2, *irr = self.gptcomplete(u, q, refs=refs, start=text or " ")
 					text += " " + t2
 					cost += c2
@@ -1337,9 +1358,10 @@ class Bot:
 			return_driver(driver)
 			return ""
 		res = elem.text
-		return_driver(driver)
 		# print("Google response:", res)
-		if res.startswith("Calculator result\n"):
+		calcs = res.startswith("Calculator result\n")
+		return_driver(driver)
+		if calcs:
 			res = " ".join(res.split("\n", 3)[1:3])
 			if raw:
 				return res
@@ -1367,9 +1389,10 @@ class Bot:
 			return_driver(driver)
 			return ""
 		res = elem.text
-		return_driver(driver)
 		# print("Bing response:", res)
-		if driver.find_elements(by=webdriver.common.by.By.ID, value="rcCalB"):
+		calcs = driver.find_elements(by=webdriver.common.by.By.ID, value="rcCalB")
+		return_driver(driver)
+		if calcs:
 			res = " ".join(res.split("\n", 3)[:2])
 			if raw:
 				return res
@@ -1380,6 +1403,57 @@ class Bot:
 				return res
 			res = self.clean_response(q, res)
 		return res
+
+	def yahoo(self, q, raw=False):
+		words = q.split()
+		q = " ".join(swap.get(w, w) for w in words)
+		driver = get_driver()
+		search = f"https://search.yahoo.com/search?p={urllib.parse.quote_plus(q)}"
+		fut = exc.submit(driver.get, search)
+		fut.result(timeout=16)
+		time.sleep(1)
+
+		try:
+			elem = driver.find_element(by=webdriver.common.by.By.CLASS_NAME, value="searchCenterMiddle")
+		except:
+			print("Yahoo: Timed out.")
+			return_driver(driver)
+			return ""
+		res = elem.text
+		# print("Yahoo response:", res)
+		calcs = driver.find_elements(by=webdriver.common.by.By.ID, value="appMathCalculator")
+		return_driver(driver)
+		if calcs:
+			res = " ".join(res.split("\n", 3)[:2])
+			if raw:
+				return res
+		else:
+			res = "\n".join(r.strip() for r in res.splitlines() if valid_response(r))
+			res = lim_str(res, 3072, mode="right")
+			if raw:
+				return res
+			res = self.clean_response(q, res)
+		return res
+
+	def wolframalpha(self, q):
+		words = q.split()
+		q = " ".join(swap.get(w, w) for w in words)
+		driver = get_driver()
+		search = f"https://www.wolframalpha.com/input?i={urllib.parse.quote_plus(q)}"
+		fut = exc.submit(driver.get, search)
+		fut.result(timeout=16)
+		time.sleep(8)
+
+		lines = []
+		e1 = driver.find_elements(by=webdriver.common.by.By.TAG_NAME, value="h2")[:-1]
+		e2 = driver.find_elements(by=webdriver.common.by.By.TAG_NAME, value="img")[2:]
+		while e1 or e2:
+			if e1:
+				lines.append(e1.pop(0).text)
+			if e2:
+				lines.append(e2.pop(0).get_attribute("alt"))
+		return_driver(driver)
+		return "\n".join(lines)
 
 	def ai(self, u, q, refs=(), im=None):
 		tup = (u, q)

@@ -656,6 +656,8 @@ class UpdateExec(Database):
             try:
                 uhu = uhash(url)
                 out[i] = self.bot.data.proxies[uhu]
+                if not out[i]:
+                    raise KeyError
                 if not xrand(16):
 
                     def verify(url, uhu):

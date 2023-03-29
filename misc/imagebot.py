@@ -73,7 +73,7 @@ def create_driver():
 		else:
 			raise
 	except selenium.common.WebDriverException as ex:
-		argv = " ".join(args)
+		argv = " ".join(ex.args)
 		search = "unrecognized Microsoft Edge version"
 		if search in argv and "Chrome" in argv:
 			v = argv.split("Stacktrace", 1)[0].rsplit("/", 1)[-1].strip()
