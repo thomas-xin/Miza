@@ -529,8 +529,9 @@ class CustomAudio(collections.abc.Hashable):
     async def connect_to(self, channel=None):
         if not self.acsi:
             try:
-                self.acsi = AudioClientSubInterface(self, channel)
-                await self.acsi.start()
+                acsi = AudioClientSubInterface(self, channel)
+                await acsi.start()
+                self.acsi = acsi
                 self.fut.set_result(self.acsi)
             except Exception as ex:
                 self.fut.set_exception(ex)
