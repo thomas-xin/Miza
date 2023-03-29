@@ -1125,7 +1125,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         position = min(length, round(length * ratio))
         return as_fut("⬜" * position + "⬛" * (length - position))
 
-    async def history(self, channel, limit=200, before=None, after=None):
+    async def history(self, channel, limit=200, before=None, after=None, care=True):
         c = self.in_cache(verify_id(channel))
         if c is None:
             c = channel
@@ -1135,7 +1135,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             channel = await self.get_dm(channel)
         found = set()
         if "channel_cache" in self.data:
-            async for message in self.data.channel_cache.get(channel.id):
+            async for message in self.data.channel_cache.get(channel.id, as_message=care, force=False):
+                if isinstance(message, int):
+                    message = cdict(id=message)
                 if before:
                     if message.id >= time_snowflake(before):
                         continue

@@ -46,7 +46,7 @@ class Purge(Command):
             found = False
             if dt is None or after is None or dt > after:
                 async with bot.guild_semaphore:
-                    async for m in bot.history(channel, limit=None, before=dt, after=after):
+                    async for m in bot.history(channel, limit=None, before=dt, after=after, care=uset is not universal_set):
                         found = True
                         dt = m.id
                         if uset is None and m.author.bot or uset and m.author.id in uset:
@@ -56,7 +56,7 @@ class Purge(Command):
                                 break
         else:
             async with bot.guild_semaphore:
-                async for m in bot.history(channel, limit=None, before=end, after=start):
+                async for m in bot.history(channel, limit=None, before=end, after=start, care=uset is not universal_set):
                     if uset is None and m.author.bot or uset and m.author.id in uset:
                         delD.append(m)
         if len(delD) >= 64 and "f" not in flags:
