@@ -88,12 +88,13 @@ if os.name == "nt":
         os.mkdir("misc/poppler")
         subprocess.run([sys.executable, "downloader.py", "https://cdn.discordapp.com/attachments/731709481863479436/899556463016554496/Poppler.zip", "poppler.zip"], cwd="misc")
         import zipfile, io
-        print("Download complete; extracting new Poppler installation...")
         f = "misc/poppler.zip"
-        with zipfile.ZipFile(f) as z:
-            z.extractall("misc/poppler")
-        print("Poppler extraction complete.")
-        os.remove(f)
+        print("Download complete; extracting new Poppler installation...")
+        if os.path.exists(f):
+            with zipfile.ZipFile(f) as z:
+                z.extractall("misc/poppler")
+            print("Poppler extraction complete.")
+            os.remove(f)
 else:
     try:
         subprocess.run(ffmpeg)
