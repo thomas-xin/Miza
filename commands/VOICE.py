@@ -284,7 +284,7 @@ class CustomAudio(collections.abc.Hashable):
                 bot.data.audio.players[guild.id] = self
                 self.stats.update(bot.data.audiosettings.get(guild.id, {}))
             self.timeout = utc()
-            return create_future_ex(self.connect_to, channel)
+            return create_task(self.connect_to(channel))
 
     def __str__(self):
         classname = str(self.__class__).replace("'>", "")
@@ -526,10 +526,11 @@ class CustomAudio(collections.abc.Hashable):
             elif m.voice.deaf or m.voice.mute or m.voice.afk:
                 await m.edit(mute=False)
 
-    def connect_to(self, channel=None):
+    async def connect_to(self, channel=None):
         if not self.acsi:
             try:
                 self.acsi = AudioClientSubInterface(self, channel)
+                await self.acsi.start()
                 self.fut.set_result(self.acsi)
             except Exception as ex:
                 self.fut.set_exception(ex)
@@ -1071,7 +1072,7 @@ class AudioFileLink:
 class AudioClientSubInterface:
 
     afters = None
-    bot = None
+    bot = channel = None
 
     @classmethod
     def from_guild(cls, guild):
@@ -1118,7 +1119,11 @@ class AudioClientSubInterface:
         if channel:
             self.channel = channel
             self.guild = channel.guild
-            bot.audio.submit(f"!await AP.join({channel.id})")
+
+    async def start(self):
+        if self.channel:
+            bot = self.bot
+            bot.audio.asubmit(f"!await AP.join({self.channel.id})")
             bot.audio.clients[self.guild.id] = self
 
     def __str__(self):
