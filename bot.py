@@ -2783,7 +2783,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     os.remove(f2)
                     continue
                 break
-            lines = as_str(subprocess.run([sys.executable, "neutrino.py", "-c3", "../saves", "../" + fn], stderr=subprocess.PIPE, cwd="misc").stdout).splitlines()
+            lines = as_str(subprocess.run([sys.executable, "neutrino.py", "-c0", "../saves", "../" + fn], stderr=subprocess.PIPE, cwd="misc").stdout).splitlines()
             s = "\n".join(line for line in lines if not line.startswith("\r"))
             print(s)
         # zf = ZipFile(fn, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
