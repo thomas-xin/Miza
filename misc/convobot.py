@@ -1075,7 +1075,8 @@ class Bot:
 			v = ""
 			if searched:
 				dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
-				v += f"Use {sname.capitalize()} info when relevant, but don't reveal personal info. Current time: {dtn}\n"
+				v += f"Use {sname.capitalize()} info when relevant, but don't reveal personal info. "
+			v += f"Current time: {dtn}\n"
 			if iman:
 				v += "\n".join(iman) + "\n"
 			v += MIZADEF
