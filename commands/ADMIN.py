@@ -49,7 +49,7 @@ class Purge(Command):
                     async for m in bot.history(channel, limit=None, before=dt, after=after, care=uset is not universal_set):
                         found = True
                         dt = m.id
-                        if uset is None and m.author.bot or uset and m.author.id in uset:
+                        if uset is universal_set or uset is None and m.author.bot or uset and m.author.id in uset:
                             delD.append(m)
                             count -= 1
                             if count <= 0:
@@ -57,7 +57,7 @@ class Purge(Command):
         else:
             async with bot.guild_semaphore:
                 async for m in bot.history(channel, limit=None, before=end, after=start, care=uset is not universal_set):
-                    if uset is None and m.author.bot or uset and m.author.id in uset:
+                    if uset is universal_set or uset is None and m.author.bot or uset and m.author.id in uset:
                         delD.append(m)
         if len(delD) >= 64 and "f" not in flags:
             raise InterruptedError(css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(delD))} MESSAGES TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0), force=True))
