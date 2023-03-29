@@ -1190,7 +1190,7 @@ class UpdateGuilds(Database):
 
     def load_guild(self, guild):
         mdata = self.get(guild.id, [])
-        for cm in mdata:
+        for cm in map(cdict, mdata):
             if cm.id in guild._members:
                 continue
             m = self.bot.GhostUser()
