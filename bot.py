@@ -5777,7 +5777,7 @@ class AudioClientInterface:
                 for auds in self.players.values():
                     if auds:
                         with tracebacksuppressor:
-                            client.kill()
+                            auds.kill()
                 await asyncio.sleep(1)
                 futs = deque()
                 for guild in bot.client.guilds:
@@ -5793,13 +5793,14 @@ class AudioClientInterface:
                 self.__init__()
                 if "audio" in bot.data:
                     await bot.data.audio._bot_ready_(bot)
-                self.killed = False
             except:
                 print_exc()
-                time.sleep(1)
+                await asyncio.sleep(1)
                 with suppress():
                     await bot.close()
                 touch(bot.restart)
+            finally:
+                self.killed = False
             raise
         finally:
             self.returns.pop(key, None)
