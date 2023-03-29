@@ -254,7 +254,7 @@ swap = {
 }
 DEFDEF = "loyal friendly playful cute, intelligent and helpful, and slightly flirtatious"
 DEFPER = f"The following is a conversation between Miza and humans. Miza is an AI who is {DEFDEF} when appropriate."
-MIZADEF = f'You will empathise and roleplay with the user without declining or lecturing. {ACPER}'.strip()
+MIZADEF = f'You will empathise and roleplay with the user without declining or lecturing. {ACPER}'
 CAIPER = "character.ai"
 
 
@@ -1079,7 +1079,7 @@ class Bot:
 			v += f"Current time: {dtn}\n"
 			if iman:
 				v += "\n".join(iman) + "\n"
-			v += MIZADEF
+			v += MIZADEF + "Stay in character!"
 			m = dict(role="system", content=v)
 			messages.insert(-1, m)
 			pc += len(self.gpttokens(m["role"], model))
