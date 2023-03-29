@@ -987,7 +987,7 @@ class UpdateChannelCache(Database):
                 except (discord.NotFound, discord.Forbidden, OverflowError):
                     if deletable:
                         self.data[c_id].discard(m_id)
-                except (TypeError, ValueError, discord.HTTPException):
+                except (TypeError, ValueError, LookupError, discord.HTTPException):
                     if not force:
                         break
                     print_exc()
