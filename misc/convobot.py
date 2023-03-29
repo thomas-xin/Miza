@@ -66,7 +66,7 @@ def create_driver():
 	folder = os.path.join(os.getcwd(), f"d~{ts}")
 	service = browser["service"](browser["path"])
 	options = browser["options"]()
-	# options.add_argument("--headless")
+	options.add_argument("--headless")
 	# options.add_argument("--disable-gpu")
 	options.add_argument("--no-sandbox")
 	options.add_argument("--deny-permission-prompts")
@@ -1059,7 +1059,7 @@ class Bot:
 							res = exc.submit(
 								self.wolframalpha,
 								t2,
-							).result(timeout=8)
+							).result(timeout=16)
 						except concurrent.futures.TimeoutError:
 							print_exc()
 						else:
