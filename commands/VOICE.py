@@ -1124,7 +1124,7 @@ class AudioClientSubInterface:
     async def start(self):
         if self.channel:
             bot = self.bot
-            bot.audio.asubmit(f"!await AP.join({self.channel.id})")
+            await bot.audio.asubmit(f"!await AP.join({self.channel.id})")
             bot.audio.clients[self.guild.id] = self
 
     def __str__(self):
