@@ -1043,7 +1043,7 @@ class Bot:
 					for i in range(3):
 						try:
 							res = exc.submit(
-								getattr(self, sname.lower())[stype],
+								getattr(self, sname.lower()),
 								t2,
 								raw=True,
 							).result(timeout=8)
