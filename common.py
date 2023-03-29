@@ -788,7 +788,7 @@ class FileHashDict(collections.abc.MutableMapping):
                     with tracebacksuppressor:
                         d = self.pop(k, force=True)
                         self.deleted.discard(k)
-                        deleted.append(key)
+                        deleted.append(k)
                         d = select_and_dumps(d, mode="unsafe", compress=True)
                         self.cur.execute(
                             f"INSERT INTO '{self.path}' ('key', 'value') VALUES ('{k}', ?) "
