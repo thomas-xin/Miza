@@ -692,11 +692,10 @@ class FileHashDict(collections.abc.MutableMapping):
                     self.c.pop(k, None)
                     self.comp.discard(k)
                     self.c_updated = True
+                self.deleted.add(k)
             if force:
                 out = self[k]
-                self.deleted.add(k)
                 return self.data.pop(k, out)
-            self.deleted.add(k)
             return self.data.pop(k, None)
         except KeyError:
             if not os.path.exists(fn):
@@ -787,7 +786,9 @@ class FileHashDict(collections.abc.MutableMapping):
                 print(f"{self.path}: Old {len(old)}")
                 for k in old:
                     with tracebacksuppressor:
-                        d = self.pop(k, force=True, remove=False)
+                        d = self.pop(k, force=True)
+                        self.deleted.discard(k)
+                        deleted.add(key)
                         d = select_and_dumps(d, mode="unsafe", compress=True)
                         self.cur.execute(
                             f"INSERT INTO '{self.path}' ('key', 'value') VALUES ('{k}', ?) "
