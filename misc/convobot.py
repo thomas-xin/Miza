@@ -918,7 +918,11 @@ class Bot:
 			iman = []
 			for line in reversed(ins):
 				line = line.strip()
-				k, v = line.split(": ", 1)
+				if ": " not in line:
+					k = line.rstrip(":")
+					v = "\t"
+				else:
+					k, v = line.split(": ", 1)
 				m = {}
 				if k in (self.name, "[CHATGPT]", "[GOOGLE]"):
 					m["role"] = "assistant"
