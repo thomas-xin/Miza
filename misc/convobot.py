@@ -1073,8 +1073,8 @@ class Bot:
 					messages.insert(-1, m)
 					searched = res.strip()
 			v = ""
+			dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
 			if searched:
-				dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
 				v += f"Use {sname.capitalize()} info when relevant, but don't reveal personal info. "
 			v += f"Current time: {dtn}\n"
 			if iman:
