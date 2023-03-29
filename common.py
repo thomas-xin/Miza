@@ -408,7 +408,9 @@ with tracebacksuppressor:
     enc_key = AUTH["encryption_key"]
 
 if not enc_key:
-    enc_key = (AUTH.get("discord_secret") or AUTH.get("discord_token") or as_str(base64.b64encode(randbytes(32)).rstrip(b"=")))[:32]
+    enc_key = (AUTH.get("discord_secret") or AUTH.get("discord_token") or as_str(base64.b64encode(randbytes(32)).rstrip(b"=")))[:43]
+    while len(enc_key) < 43:
+        enc_key += "A"
     AUTH["encryption_key"] = enc_key 
     with open("auth.json", "w", encoding="utf-8") as f:
         json.dump(AUTH, f, indent=4)
