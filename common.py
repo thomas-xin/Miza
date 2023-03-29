@@ -625,21 +625,22 @@ class FileHashDict(collections.abc.MutableMapping):
             raise KeyError(k)
         with suppress(KeyError):
             return self.data[k]
-        if k != "~":
-            if k in self.comp:
-                with suppress(KeyError):
-                    return self.c[k]
-            if k in self.codb:
-                s = next(self.cur.execute(f"SELECT value FROM '{self.path}' WHERE key=?", (k,)))[0]
-                data = select_and_loads(s, mode="unsafe")
-                self.data[k] = data
-                return data
-            if k == "~~":
-                raise TypeError("Attempted to load SQL database inappropriately")
         fn = self.key_path(k)
         if not os.path.exists(fn):
             fn += "\x7f\x7f"
             if not os.path.exists(fn):
+                if k != "~":
+                    if k in self.comp:
+                        with suppress(KeyError):
+                            return self.c[k]
+                    if k in self.codb:
+                        s = next(self.cur.execute(f"SELECT value FROM '{self.path}' WHERE key=?", (k,)))[0]
+                        if s:
+                            data = select_and_loads(s, mode="unsafe")
+                            self.data[k] = data
+                            return data
+                    elif k == "~~":
+                        raise TypeError("Attempted to load SQL database inappropriately")
                 raise KeyError(k)
         with self.sem:
             with open(fn, "rb") as f:

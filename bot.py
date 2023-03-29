@@ -2777,7 +2777,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     return fn
                 os.remove(fn)
             for i in range(30):
-                d2 = date - datetime.timedelta(days=i + 2)
+                d2 = date - datetime.timedelta(days=i + 3)
                 f2 = f"backup/saves.{d2}.wb"
                 if os.path.exists(f2):
                     os.remove(f2)
