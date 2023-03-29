@@ -486,7 +486,7 @@ def select_and_loads(s, mode="safe", size=None):
         return data
     with tracebacksuppressor:
         if s[0] == 128:
-            data = pickle.loads(s)
+            return pickle.loads(s)
     if data is None:
         # if mode == "unsafe":
         #     if not s:
@@ -786,8 +786,7 @@ class FileHashDict(collections.abc.MutableMapping):
                 print(f"{self.path}: Old {len(old)}")
                 for k in old:
                     with tracebacksuppressor:
-                        d = self.pop(k, force=True)
-                        self.deleted.discard(k)
+                        d = self[k]
                         deleted.append(k)
                         d = select_and_dumps(d, mode="unsafe", compress=True)
                         self.cur.execute(
