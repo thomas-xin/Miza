@@ -1286,12 +1286,12 @@ class Ask(Command):
     async def remove_reacts(self, message):
         guild = message.guild
         with tracebacksuppressor:
-            if guild and guild.me.permissions_in(message.channel).manage_messages:
+            if guild and guild.me and guild.me.permissions_in(message.channel).manage_messages:
                 create_task(message.clear_reaction("🔄"))
                 await message.clear_reaction("🗑️")
             else:
-                create_task(message.remove_reaction("🔄", bot.user))
-                await message.remove_reaction("🗑️", bot.user)
+                create_task(message.remove_reaction("🔄", self.bot.user))
+                await message.remove_reaction("🗑️", self.bot.user)
 
     async def _callback_(self, bot, message, reaction=3, user=None, perm=0, vals="", **void):
         u_id = int(vals) if vals else user.id
