@@ -1267,6 +1267,7 @@ class Ask(Command):
                     + "If you are looking for improved knowledge, memory and intelligence, reduced censorship, or ability to connect to the internet, "
                     + f"please check out my [kofi]({bot.kofi_url}) to help fund API, as these features are significantly more expensive!\n"
                     + "Any support is greatly appreciated and contributes directly towards service and future development.\n"
+                    + f"Legacy chat models below GPT-3 may be invoked using {bot.get_prefix(guild)}gpt2.\n"
                     + "Alternatively if you would like to manage pricing yourself through an OpenAI account (and/or free trial), check out the ~trial command!"
                 )
                 reacts.append("🚫")
