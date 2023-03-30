@@ -549,7 +549,7 @@ class Bot:
 			"x-wait-for-model": "true",
 		}
 		lines = []
-		if per == DEFPER and self.premium < 2:
+		if per == DEFPER and self.premium < 0:
 			if len(chat_history) < 4:
 				e1 = random.choice((":3", ":D", ";3", ":>", ":0", ";w;", ":P", "^ω^"))
 				lines.append(f"{u}: Hi!\n")
@@ -986,6 +986,16 @@ class Bot:
 						openai.api_key = self.key
 						costs = 1
 					ok = openai.api_key
+					if not stop and not chat_history:
+						resp = openai.Moderation.create(
+							q,
+						)
+						flagged = resp["results"][0]["flagged"]
+						if not flagged:
+							text = self.chatgpt(f"{u}: {q}")
+							if text:
+								response = None
+								break
 					response = exc.submit(
 						openai.ChatCompletion.create,
 						model=model,
