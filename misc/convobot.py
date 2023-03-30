@@ -706,6 +706,7 @@ class Bot:
 				pc += len(self.gpttokens(m["role"], model))
 				pc += len(self.gpttokens(m["content"], model))
 			text = res = flagged = None
+			if self.premium >= 2 and q and len(q.split(None)) > 1:
 				if oai:
 					openai.api_key = oai
 					costs = 0
