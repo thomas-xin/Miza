@@ -1284,8 +1284,9 @@ class Ask(Command):
         return m
 
     async def remove_reacts(self, message):
+        guild = message.guild
         with tracebacksuppressor:
-            if guild and message.guild and guild.me.permissions_in(channel).manage_messages:
+            if guild and guild.me.permissions_in(channel).manage_messages:
                 create_task(m2.clear_reaction("🔄"))
                 await m2.clear_reaction("🗑️")
             else:
