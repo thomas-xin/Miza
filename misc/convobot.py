@@ -726,7 +726,7 @@ class Bot:
 				resp = None
 				q2 = 'Say "@" if you have a definite answer, "!" if inappropriate/personal, "%" followed by query if maths question, else formulate as google search prepended with "$"'
 				if not text and random.randint(0, 1):
-					q4 = f"Context:\n{messages[-2].content}\n\n" if len(messages) > 2 and messages[-2]["content"] else ""
+					q4 = f'Context:\n{messages[-2]["content"]}\n\n' if len(messages) > 2 and messages[-2]["content"] else ""
 					q3 = q4 + "For the below question: " + q2 + ".\n" + q
 					try:
 						text = self.chatgpt(q3)
@@ -1033,7 +1033,7 @@ class Bot:
 					redo = True
 				if redo:
 					if not flagged and not i and len(self.gpttokens(text)) < 16:
-						continue
+						text = ""
 					if searched:
 						refs = list(refs) + [(f"[{sname}]", searched)]
 					t2, c2, *irr = self.gptcomplete(u, q, refs=refs, start=text or " ")
