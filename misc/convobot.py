@@ -702,7 +702,7 @@ class Bot:
 				if k:
 					m["name"] = k
 					pc += len(self.gpttokens(m["name"], model))
-				messages.insert(-1, m)
+				messages.append(m)
 				pc += len(self.gpttokens(m["role"], model))
 				pc += len(self.gpttokens(m["content"], model))
 			text = res = flagged = None
