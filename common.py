@@ -838,6 +838,7 @@ class FileHashDict(collections.abc.MutableMapping):
         self.cur.execute(f"DELETE FROM '{self.path}' WHERE value=''")
         self.cur.execute("VACUUM")
         self.db.commit()
+        self.codb = set(try_int(r[0]) for r in self.cur.execute(f"SELECT key FROM '{self.path}'") if r)
 
 
 def safe_save(fn, s):
