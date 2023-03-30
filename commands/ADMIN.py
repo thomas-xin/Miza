@@ -2473,7 +2473,7 @@ class UpdateMessageCache(Database):
             print_exc()
             data = pickle.dumps(saved)
         if len(data) > 32768:
-            out = bytes2zip(data, lzma=len(data) < 16777216)
+            out = bytes2zip(data, lzma=len(data) > 16777216)
             if len(out) < len(data):
                 data = out
         out = encrypt(data)
@@ -2492,14 +2492,14 @@ class UpdateMessageCache(Database):
                 i += 1
                 if not i & 3 or len(messages) > 65536:
                     await asyncio.sleep(0.3)
-            while len(self.loaded) > 512:
+            while len(self.loaded) > 64:
                 with suppress(RuntimeError):
                     self.loaded.pop(next(iter(self.loaded)))
                 i += 1
                 if not i % 6:
                     await asyncio.sleep(0.2)
             if not self.save_sem.is_busy():
-                while len(self.raws) > 512:
+                while len(self.raws) > 64:
                     with suppress(RuntimeError):
                         self.raws.pop(next(iter(self.raws)))
                     i += 1
