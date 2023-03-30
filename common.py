@@ -834,6 +834,10 @@ class FileHashDict(collections.abc.MutableMapping):
                 self.data.pop(next(iter(self.data)))
         return inter
 
+    def vacuum(self):
+        self.cur.execute("VACUUM")
+        self.db.commit()
+
 
 def safe_save(fn, s):
     if os.path.exists(fn):
@@ -3637,6 +3641,7 @@ class Database(collections.abc.MutableMapping, collections.abc.Hashable, collect
     setdefault = lambda self, k, v: self.data.setdefault(k, v)
     keys = lambda self: self.data.keys()
     discard = lambda self, k: self.data.pop(k, None)
+    vacuum = lambda self: self.data.vacuum()
 
     def update(self, modified=None, force=False):
         if hasattr(self, "no_file"):
