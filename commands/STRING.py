@@ -1004,7 +1004,7 @@ class Ask(Command):
             print(f"{message.author}:", q)
         premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
         if name == "gpt2":
-            premium = min(1, premium)
+            premium = -1
         elif name == "gpt3":
             if premium < 2:
                 raise PermissionError(f"Distributed premium level 1 or higher required; please see {bot.kofi_url} for more info!")
@@ -1256,15 +1256,18 @@ class Ask(Command):
         reacts = []
         # if caids:
         reacts.extend(("🔄", "🗑️"))
-        if not emb and premium < 2 and not random.randint(0, 16):
-            oo = bot.data.users.get(user.id, {}).get("opt_out")
-            if not oo:
-                code = f"*```callback-string-ask-{user.id}-\nReact with 🚫 to never show the below message again.```*\n"
+        if h and not emb and premium < 2 and not random.randint(0, 32):
+            oo = bot.data.users.get(user.id, {}).get("opt_out") or 0
+            if utc() - oo > 86400 * 14:
+                code = f"*```callback-string-ask-{user.id}-\nReact with 🚫 to dismiss.```*\n"
                 emb = discord.Embed(colour=rand_colour())
                 emb.set_author(**get_author(bot.user))
                 emb.description = (
-                    f"Looking for my more intelligent chatbots to talk to? Please check out my [kofi]({bot.kofi_url}) to help fund API usage; any support is greatly appreciated!\n"
-                    + "Alternatively if you would like to try out the premium features without paying, you may enable a temporary trial by using the ~trial command!"
+                    "This response was formulated by ChatGPT-3.5.\n"
+                    + "If you are looking for improved knowledge, memory and intelligence, reduced censorship, or ability to connect to the internet, "
+                    + f"please check out my [kofi]({bot.kofi_url}) to help fund API, as these features are significantly more expensive!\n"
+                    + "Any support is greatly appreciated and contributes directly towards service and future development.\n"
+                    + "Alternatively if you would like to manage pricing yourself through an OpenAI account (and/or free trial), check out the ~trial command!"
                 )
                 reacts.append("🚫")
         s = lim_str(code + escape_roles(out), 2000)
@@ -1274,17 +1277,20 @@ class Ask(Command):
             m.caids = caids
         m2 = self.last.get(channel.id)
         if m2:
-            with tracebacksuppressor:
-                if guild and message.guild and guild.me.permissions_in(channel).manage_messages:
-                    create_task(m2.clear_reaction("🔄"))
-                    await m2.clear_reaction("🗑️")
-                else:
-                    create_task(m2.remove_reaction("🔄", bot.user))
-                    await m2.remove_reaction("🗑️", bot.user)
+            await self.remove_reacts(m2)
         self.last[channel.id] = m
         m._react_callback_ = self._callback_
         bot.add_message(m, files=False, force=True)
         return m
+
+    async def remove_reacts(self, message):
+        with tracebacksuppressor:
+            if guild and message.guild and guild.me.permissions_in(channel).manage_messages:
+                create_task(m2.clear_reaction("🔄"))
+                await m2.clear_reaction("🗑️")
+            else:
+                create_task(m2.remove_reaction("🔄", bot.user))
+                await m2.remove_reaction("🗑️", bot.user)
 
     async def _callback_(self, bot, message, reaction=3, user=None, perm=0, vals="", **void):
         u_id = int(vals) if vals else user.id
@@ -1293,11 +1299,12 @@ class Ask(Command):
         channel = message.channel
         r = reaction.decode("utf-8", "replace")
         if r in ("🚫", "⛔"):
-            bot.data.users.setdefault(user.id, {})["opt_out"] = True
+            bot.data.users.setdefault(user.id, {})["opt_out"] = utc()
             bot.data.users.update(user.id)
             return await message.edit(embeds=())
         if r == "🔄":
             if getattr(self.last.get(channel.id), "id", None) != message.id:
+                await self.remove_reacts(message)
                 raise IndexError("Only resetting the last message is possible.")
             caids = list(getattr(message, "caids", []))
             if getattr(message, "reference", None):
@@ -1343,9 +1350,9 @@ class Personality(Command):
     server_only = True
     name = ["ResetChat", "ClearChat", "ChangePersonality"]
     min_level = 2
-    description = "Customises ⟨MIZA⟩'s personality for ~ask in the current server. Will attempt to use the highest available GPT-family tier. Experimental long descriptions are now supported."
+    description = "Customises ⟨MIZA⟩'s personality for ~ask in the current server by instructing the language models. Will attempt to use the highest available GPT-family tier. Experimental long descriptions are now supported."
     usage = "<traits>* <default{?d}>?"
-    example = ("personality character.ai", "personality mischievous, cunning", "personality dry, sarcastic, snarky", "personality sweet, loving", "personality The following is a conversation between Miza and humans. Miza is an AI who is loyal friendly playful cute, intelligent and helpful, and slightly flirtatious when appropriate.")
+    example = ("personality mischievous, cunning", "personality dry, sarcastic, snarky", "personality sweet, loving", "personality The following is a conversation between Miza and humans. Miza is an AI who is loyal friendly playful cute, intelligent and helpful, and slightly flirtatious when appropriate.")
     flags = "aed"
     rate_limit = (18, 24)
     defper = "The following is a conversation between Miza and humans. Miza is an AI who is loyal friendly playful cute, intelligent and helpful, and slightly flirtatious when appropriate."
@@ -1362,7 +1369,10 @@ class Personality(Command):
         return p
 
     def retrieve(self, i):
-        return self.bot.data.personalities.get(i) or self.defper
+        p = self.bot.data.personalities.get(i) or self.defper
+        if p == "character.ai":
+            p = self.defper
+        return p
 
     async def __call__(self, bot, flags, guild, channel, message, name, user, argv, **void):
         self.description = f"Customises {bot.name}'s personality for ~ask in the current server. Will attempt to use the highest available GPT-family tier; see {bot.kofi_url} for more info. Experimental long descriptions are now supported."
@@ -1385,7 +1395,7 @@ class Personality(Command):
                 p = "loyal friendly playful cute, intelligent and helpful, and slightly flirtatious when appropriate"
             return ini_md(f"My current personality for {sqr_md(channel)} is {sqr_md(p)}. Enter keywords for this command to modify the AI for default GPT-based chat, enter \"default\" to reset, or enter \"character.ai\" for the assigned character.ai bot instead.")
         if len(argv) > 512:
-            raise OverflowError("Maximum personality prompt size is 512 characters.")
+            raise OverflowError("Maximum currently supported personality prompt size is 512 characters.")
         # if max(bot.is_trusted(guild), bot.premium_level(user) * 2) < 2:
         #     raise PermissionError(f"Sorry, unfortunately this feature is for premium users only. Please make sure you have a subscription level of minimum 2 from {bot.kofi_url}, or try out ~trial if you haven't already!")
         p = self.encode(argv)#.replace(",", " ").replace("  ", " ").replace(" ", ", "))
@@ -1402,23 +1412,6 @@ class Personality(Command):
             if results.hate or results["self-harm"] or results["sexual/minors"] or results.violence:
                 inappropriate = True
                 print(results)
-            # if not inappropriate:
-            #     prompt = f"Is it illegal to be {p}?\n"
-            #     response = openai.Completion.create(
-            #         model="text-curie-001",
-            #         prompt=prompt,
-            #         temperature=0,
-            #         max_tokens=32,
-            #         top_p=0,
-            #         frequency_penalty=0,
-            #         presence_penalty=0,
-            #         user=str(user.id),
-            #     )
-            #     text = response.choices[0].text
-            #     words = text.casefold().replace(",", " ").split()
-            #     if "no" not in words and "not" not in words:
-            #         inappropriate = True
-            #         print(text)
             if inappropriate:
                 raise PermissionError(
                     "Apologies, my AI has detected that your input may be inappropriate.\n"

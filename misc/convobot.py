@@ -486,258 +486,6 @@ class Bot:
 		resp = self.answer_classify("vicgalle/xlm-roberta-large-xnli-anli", q, ("personal question", "not personal"))
 		return resp["not personal"] >= 0.5
 
-	def caichat(self, u, q, refs=(), im=None):
-		headers = {
-			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
-			# "DNT": "1",
-			# "X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
-			"Content-Type": "application/json",
-			"cache-control": "no-cache",
-			"Authorization": f"Token {self.cai_token}",
-		}
-		miza_id = "uBA8BVN2JgEC06sUU2KMtX-xv-X10rJEqvjgenJXfP4"
-		miza_iid = "internal_id:cc102978-48f5-40b7-9867-bd39732dd6fb"
-		lines = []
-		if not self.cai_ready:
-			if not self.cai_channel:
-				resp = self.session.post(
-					"https://beta.character.ai/chat/history/create/",
-					data=json.dumps(dict(character_external_id=miza_id)),
-					headers=headers,
-				)
-				if resp.status_code not in range(200, 400):
-					print("CAI error:", resp)
-					print(resp.text)
-					if resp.status_code in (401, 403):
-						self.forbidden.append("CAI")
-					if self.personality == CAIPER:
-						resp.raise_for_status()
-					return "", 0, ()
-				try:
-					self.cai_channel = resp.json()["external_id"]
-				except KeyError:
-					print("CAI create:", resp)
-					print(resp.text)
-					return "", 0, ()
-			# chat_history = self.chat_history.copy()
-			for k, v in self.promises:
-				k = k.replace(":", "")
-				s = f"{k}: {v}\n"
-				lines.append(s)
-			for k, v in self.chat_history:
-				k = k.replace(":", "")
-				s = f"{k}: {v}\n"
-				lines.append(s)
-		if req_long(q) or self.check_google(q):
-			res = True
-			cvalid = chatgpt and time.time() - getattr(chatgpt, "rate", 0) >= 3600
-			if len(q) > 128 or q.count(" ") > 10:
-				res = None
-			elif req_long(q) and cvalid:
-				res = None
-			if res:
-				start = "[GOOGLE]: "
-				res = (self.google, self.bing)[random.randint(0, 1)](q, raw=True)
-				if len(self.gpttokens(res)) > 128:
-					summ = self.answer_summarise("facebook/bart-large-cnn", q + "\n" + res, max_length=96, min_length=64).replace("\n", ". ").replace(": ", " -").strip()
-					res = lim_str(res.replace("\n", " "), 256, mode="right") + "\n" + summ
-				if res and cvalid:
-					anss = (f'"{q}"', f'not "{q}"')
-					resp = self.answer_classify("vicgalle/xlm-roberta-large-xnli-anli", q, anss)
-					if resp[anss[1]] > 0.5:
-						res = None
-			if not res and cvalid:
-				start = "[CHATGPT]: "
-				async def run_chatgpt(q, fut=None):
-					if not hasattr(chatgpt, "ask_stream") or time.time() - chatgpt.timestamp >= 25200:
-						try:
-							from chatgpt_wrapper import AsyncChatGPT
-						except ImportError:
-							globals()["chatgpt"] = None
-						else:
-							globals()["chatgpt"] = await AsyncChatGPT().create(timeout=220)
-						if chatgpt.session is None:
-							await chatgpt.refresh_session()
-						url = "https://chat.openai.com/backend-api/conversations"
-						data = {
-							"is_visible": False,
-						}
-						ok, json, response = await chatgpt._api_patch_request(url, data)
-						if ok:
-							pass
-						else:
-							chatgpt.log.error("Failed to delete conversations")
-						p = f"{DEFDEF} when appropriate"
-						resp = []
-						async for w in chatgpt.ask_stream(f"Please roleplay as {self.name}, an AI who is {p}."):
-							resp.append(w)
-						s = "".join(resp)
-						print("ChatGPT init:", s)
-						chatgpt.timestamp = time.time()
-					print("ChatGPT prompt:", q)
-					sys.stdout.flush()
-					resp = []
-					async for w in chatgpt.ask_stream(q):
-						resp.append(w)
-					res = "".join(resp).strip()
-					if fut:
-						fut.set_result(res)
-					return res
-				if hasattr(asyncio, "main_new_loop"):
-					fut = concurrent.futures.Future()
-					asyncio.main_new_loop.create_task(run_chatgpt(q, fut))
-					res = fut.result(timeout=240)
-				else:
-					res = asyncio.run(run_chatgpt(q))
-				if res:
-					if not self.bl:
-						print("ChatGPT response:", res)
-					if len(self.gpttokens(res)) > 512:
-						res = self.answer_summarise("facebook/bart-large-cnn", res, max_length=500, min_length=256).strip()
-					errs = (
-						"Your ChatGPT session is not usable.",
-						"Failed to read response from ChatGPT.",
-						"Generation stopped",
-					)
-					err = any(res.startswith(s) for s in errs)
-					if not err:
-						resp = self.answer_classify("vicgalle/xlm-roberta-large-xnli-anli", res, ("answer", "As an AI language model"))
-						if not self.bl:
-							print(resp)
-						err = resp["As an AI language model"] > 0.5
-						if not err and req_long(q):
-							self.cai_ready = False
-							return res, 0, ()
-					else:
-						res = ""
-						chatgpt.timestamp = 0
-				else:
-					chatgpt.rate = time.time() + 3600
-					chatgpt.timestamp = 0
-			if res:
-				res = start + res + "\n"
-				lines.append(res)
-		if refs or lines:
-			for k, v in refs:
-				if len(self.gpttokens(v)) > 36:
-					v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
-				s = f"{k}: {v}\n"
-				lines.append(s)
-			s = f"###\n{u}: {q}"
-			if len(self.gpttokens(s)) > 388:
-				s = self.answer_summarise("facebook/bart-large-cnn", s, max_length=384, min_length=32).replace("\n", ". ").strip()
-			lines.append(s)
-		if lines:
-			prompt = "".join(lines)
-		else:
-			prompt = f"{u}: {q}" if q else ""
-		if not self.bl:
-			print("CAI prompt:", prompt)
-		sys.stdout.flush()
-		idt = ""
-		iot = ""
-		irp = ""
-		if im:
-			b = io.BytesIO()
-			im.save(b, "WEBP")
-			b.seek(0)
-			b = b.read()
-			h2 = headers.copy()
-			h2.pop("Content-Type")
-			resp = self.session.post(
-				"https://beta.character.ai/chat/upload-image/",
-				files=(("image", b),),
-				headers=h2,
-			)
-			if resp.status_code not in range(200, 400):
-				print("CAI upload:", resp)
-				print(resp.text)
-				if resp.status_code in (401, 403):
-					self.forbidden.append("CAI")
-				if self.personality == CAIPER:
-					resp.raise_for_status()
-			else:
-				print("CAI upload:", resp)
-				idt = "AUTO_IMAGE_CAPTIONING"
-				iot = "UPLOADED"
-				irp = "https://characterai.io/i/400/static/user/" + resp.json()["value"]
-		resp = self.session.post(
-			"https://beta.character.ai/chat/streaming/",
-			data=json.dumps(dict(
-				character_external_id=miza_id,
-				chunks_to_pad=8,
-				enable_tti=False,
-				filter_candidates=None,
-				history_external_id=self.cai_channel,
-				image_description="",
-				image_description_type=idt,
-				image_origin_type=iot,
-				image_rel_path=irp,
-				initial_timeout=None,
-				insert_beginning=None,
-				is_proactive=False,
-				livetune_coeff=None,
-				model_server_address=None,
-				override_prefix=None,
-				override_rank=None,
-				parent_msg_id=None,
-				prefix_limit=None,
-				prefix_token_limit=None,
-				rank_candidates=None,
-				ranking_method="random",
-				seen_msg_ids=[],
-				staging=False,
-				stream_every_n_steps=16,
-				stream_params=None,
-				text=prompt,
-				tgt=miza_iid,
-				translate_candidates=None,
-				voice_enabled=False,
-			)),
-			headers=headers,
-		)
-		if resp.status_code not in range(200, 400):
-			print("CAI error:", resp)
-			print(resp.text)
-			self.cai_ready = False
-			self.cai_channel = None
-			if resp.status_code in (401, 403):
-				self.forbidden.append("CAI")
-			if self.personality == CAIPER:
-				resp.raise_for_status()
-			return "", 0, ()
-		lines = list(filter(bool, (line.strip() for line in resp.text.replace("\n", " " * 33).split(" " * 33))))
-		try:
-			e1 = json.loads(lines[-2]) if len(lines) > 1 else {}
-			e2 = json.loads(lines[-1])
-		except json.decoder.JSONDecodeError:
-			print_exc()
-			print("CAI invalid:", resp.text)
-			return "", 0, ()
-		if e2.get("abort", False):
-			e2 = e1
-			aborted = True
-			print("CAI aborted!")
-		else:
-			aborted = False
-		replies = e2.get("replies") or [{}]
-		text = random.choice(replies).get("text", "").strip()
-		caids = [e2.get("last_user_msg_id")]
-		caids.extend(r.get("id") for r in replies)
-		caids = list(filter(bool, caids))
-		if not self.bl:
-			print("CAI response:", text)
-		names = "[Uu][Tt][Ss][Ee]{2}[Rr]?[Ss][Rr]?[TtFf]?"
-		text = u.join(re.split(names, text)).removeprefix("[REPLIED TO]: ").removeprefix("Miza: ")
-		text = self.emoji_clean(text)
-		if aborted or len(text) < 2 or text[-1].isalpha() and (text[-2].isalnum() or text[-2] == " "):
-			# self.cai_ready = False
-			text2, cost, *irr = self.gptcomplete(u, q, refs=refs, start=text)
-			return text + " " + text2, cost, caids
-		else:
-			self.cai_ready = True
-		return text, 0, caids
-
 	def emoji_clean(self, text):
 		ems = []
 		out = []
@@ -837,16 +585,15 @@ class Bot:
 			lines.append(s)
 		s = f"{u}: {q}\n"
 		if len(self.gpttokens(s)) > 388:
-			s = self.answer_summarise("facebook/bart-large-cnn", s, max_length=384, min_length=32).replace("\n", ". ").strip()
+			s = self.answer_summarise("facebook/bart-large-cnn", s, max_length=384, min_length=256).replace("\n", ". ").strip()
 		lines.append(s)
 		ns = f"{self.name}:"
 		if start:
 			ns += " " + start.strip()
 		lines.append(ns)
 		longer = req_long(q)
-		reprompt = ""
 		cm2 = None
-		if self.premium < 2:
+		if self.premium < 0:
 			if not res and not start and q.count(" ") < 2:
 				model = "text-bloom-001"
 				temp = 0.9
@@ -867,7 +614,6 @@ class Bot:
 			temp = 0.9
 			limit = 4000
 			cm = 20
-			reprompt = f"Please respond as {self.name} without prefixing, not Assistant!"
 		else:
 			model = "gpt-4"
 			temp = 0.9
@@ -912,9 +658,6 @@ class Bot:
 			pc = len(self.gpttokens(m["role"], "text-davinci-003"))
 			pc += len(self.gpttokens(m["content"], "text-davinci-003"))
 			ins.pop(0)
-			# print(ins)
-			# if ins[0].strip():
-			# 	ins[0] += f"({reprompt})"
 			iman = []
 			for line in reversed(ins):
 				line = line.strip()
@@ -924,7 +667,7 @@ class Bot:
 				else:
 					k, v = line.split(": ", 1)
 				m = {}
-				if k in (self.name, "[CHATGPT]", "[GOOGLE]", "[BING]"):
+				if k in (self.name, "[CHATGPT]", "[GOOGLE]", "[BING]", "[YAHOO]", "[WOLFRAMALPHA]"):
 					m["role"] = "assistant"
 				elif k in ("[SYSTEM]",):
 					m["role"] = "system"
@@ -963,15 +706,6 @@ class Bot:
 				pc += len(self.gpttokens(m["role"], model))
 				pc += len(self.gpttokens(m["content"], model))
 			text = res = flagged = None
-			if q and len(q.split(None, 1)) > 1:
-				mes = messages[-2:]
-				q2 = 'Say "@" if you have a definite answer, "!" if inappropriate/personal, "%" followed by query if maths question, else formulate as google search prepended with "$"'
-				m = dict(role="system", content=q2)
-				mes.append(m)
-				dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
-				m = dict(role="system", content=f"Current time: {dtn}")
-				mes.insert(0, m)
-				stop = ["@", "AI language model"]
 				if oai:
 					openai.api_key = oai
 					costs = 0
@@ -981,16 +715,30 @@ class Bot:
 				else:
 					openai.api_key = self.key
 					costs = 1
-				resp = None
-				text = ""
 				resp = openai.Moderation.create(
-					mes[-2]["content"],
+					q,
 				)
 				flagged = resp["results"][0]["flagged"]
 				if flagged:
 					print(resp)
 					text = "!"
+				resp = None
+				if not text and random.randint(0, 1):
+					q2 = 'Say "@" if you have a definite answer, "!" if inappropriate/personal, "%" followed by query if maths question, else formulate as google search prepended with "$"'
+					q4 = f"Context:\n{mes[-2].content}\n\n" if len(mes) > 2 and mes[-2].content else ""
+					q3 = q4 + "For the below question: " + q2 + ".\n" + q
+					try:
+						text = self.chatgpt(q3)
+					except:
+						print_exc()
 				if not text:
+					mes = messages[-2:]
+					m = dict(role="system", content=q2)
+					mes.append(m)
+					dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
+					m = dict(role="system", content=f"Current time: {dtn}")
+					mes.insert(0, m)
+					stop = ["@", "AI language model"]
 					headers["Content-Type"] = "text/plain"
 					try:
 						data = dict(messages=[dict(role=m["role"], content=m["content"]) for m in mes])
@@ -1216,12 +964,16 @@ class Bot:
 				cm = 20
 		elif model in ("gpt-3.5-turbo", "gpt-4"):
 			tries = 7
-			stop = ["As an AI", "as an AI", "AI language model", "I'm sorry,"]
+			if self.premium < 2:
+				stop = []
+			else:
+				stop = ["As an AI", "as an AI", "AI language model", "I'm sorry,"]
 			response = None
 			for i in range(tries):
 				redo = False
 				try:
-					if flagged: raise PermissionError("flagged")
+					if flagged:
+						raise PermissionError("flagged")
 					if oai:
 						openai.api_key = oai
 						costs = 0
@@ -1438,6 +1190,71 @@ class Bot:
 			if raw:
 				return res
 			res = self.clean_response(q, res)
+		return res
+
+	def chatgpt(self, q):
+		if time.time() - getattr(chatgpt, "rate", 0) < 0:
+			return ""
+		async def run_chatgpt(q, fut=None):
+			if not hasattr(chatgpt, "ask_stream") or time.time() - chatgpt.timestamp >= 3600:
+				try:
+					from chatgpt_wrapper import AsyncChatGPT
+				except ImportError:
+					globals()["chatgpt"] = None
+				else:
+					globals()["chatgpt"] = await AsyncChatGPT().create(timeout=220)
+				if chatgpt.session is None:
+					await chatgpt.refresh_session()
+				url = "https://chat.openai.com/backend-api/conversations"
+				data = {
+					"is_visible": False,
+				}
+				ok, json, response = await chatgpt._api_patch_request(url, data)
+				if ok:
+					pass
+				else:
+					chatgpt.log.error("Failed to delete conversations")
+					chatgpt.rate = time.time() + 3600
+				# resp = []
+				# async for w in chatgpt.ask_stream(""):
+				# 	resp.append(w)
+				# s = "".join(resp)
+				# print("ChatGPT init:", s)
+				chatgpt.timestamp = time.time()
+			print("ChatGPT prompt:", q)
+			sys.stdout.flush()
+			resp = []
+			async for w in chatgpt.ask_stream(q):
+				resp.append(w)
+			res = "".join(resp).strip()
+			if fut:
+				fut.set_result(res)
+			return res
+		if hasattr(asyncio, "main_new_loop"):
+			fut = concurrent.futures.Future()
+			asyncio.main_new_loop.create_task(run_chatgpt(q, fut))
+			res = fut.result(timeout=240)
+		else:
+			res = asyncio.run(run_chatgpt(q))
+		if res:
+			if not self.bl:
+				print("ChatGPT response:", res)
+			# if len(self.gpttokens(res)) > 512:
+			# 	res = self.answer_summarise("facebook/bart-large-cnn", res, max_length=500, min_length=256).strip()
+			errs = (
+				"Your ChatGPT session is not usable.",
+				"Failed to read response from ChatGPT.",
+				"Generation stopped",
+			)
+			err = any(res.startswith(s) for s in errs)
+			if not err:
+				return res
+			else:
+				res = ""
+				chatgpt.timestamp = 0
+		else:
+			chatgpt.rate = time.time() + 3600
+			chatgpt.timestamp = 0
 		return res
 
 	def wolframalpha(self, q):
