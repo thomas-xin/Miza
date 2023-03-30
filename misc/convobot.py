@@ -986,7 +986,7 @@ class Bot:
 						openai.api_key = self.key
 						costs = 1
 					ok = openai.api_key
-					if not stop and not chat_history:
+					if not stop and (not chat_history or len(self.gpttokens(q)) > 64):
 						resp = openai.Moderation.create(
 							q,
 						)
