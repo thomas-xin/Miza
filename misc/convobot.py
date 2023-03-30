@@ -702,7 +702,7 @@ class Bot:
 				if k:
 					m["name"] = k
 					pc += len(self.gpttokens(m["name"], model))
-				messages.append(m)
+				messages.insert(-1, m)
 				pc += len(self.gpttokens(m["role"], model))
 				pc += len(self.gpttokens(m["content"], model))
 			text = res = flagged = None
@@ -992,7 +992,9 @@ class Bot:
 						)
 						flagged = resp["results"][0]["flagged"]
 						if not flagged:
-							text = self.chatgpt(f"{u}: {q}")
+							prompt = "".join(reversed(ins))
+							prompt = nstart + "\n\n" + prompt
+							text = self.chatgpt(prompt).removeprefix(f"{self.name}: ")
 							if text:
 								response = None
 								break
