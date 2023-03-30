@@ -2835,9 +2835,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             await_fut(fut)
         if day:
             self.backup()
+            futs = deque()
+            das = deque()
             for u in self.data.values():
-                if not u._garbage_semaphore.busy:
-                    create_task(self.garbage_collect(u))
+                if not xrand(5) and not u._garbage_semaphore.busy:
+                    futs.append(create_task(self.garbage_collect(u)))
+                    das.append(u)
+            for fut in futs:
+                await fut
+            for u in das:
+                await u.vacuum()
 
     async def as_rewards(self, diamonds, gold=Dummy):
         if type(diamonds) is not int:
