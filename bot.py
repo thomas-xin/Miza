@@ -2842,7 +2842,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     futs.append(create_task(self.garbage_collect(u)))
                     das.append(u)
             for fut in futs:
-                await fut
+                await_fut(fut)
             for u in das:
                 u.vacuum()
 
