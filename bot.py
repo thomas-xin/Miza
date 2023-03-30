@@ -2844,7 +2844,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             for fut in futs:
                 await fut
             for u in das:
-                await create_future(u.vacuum, priority=True)
+                u.vacuum()
 
     async def as_rewards(self, diamonds, gold=Dummy):
         if type(diamonds) is not int:
