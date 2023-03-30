@@ -828,7 +828,7 @@ class Bot:
 			v += f"Current time: {dtn}\n"
 			if iman:
 				v += "\n".join(iman) + "\n"
-			v += MIZADEF + "Stay in character!"
+			v += MIZADEF + "Stay in character!!"
 			m = dict(role="system", content=v)
 			messages.insert(-1, m)
 			pc += len(self.gpttokens(m["role"], model))
