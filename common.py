@@ -836,6 +836,7 @@ class FileHashDict(collections.abc.MutableMapping):
 
     def vacuum(self):
         self.cur.execute(f"DELETE FROM '{self.path}' WHERE value=''")
+        self.db.commit()
         self.cur.execute("VACUUM")
         self.db.commit()
         self.codb = set(try_int(r[0]) for r in self.cur.execute(f"SELECT key FROM '{self.path}'") if r)
