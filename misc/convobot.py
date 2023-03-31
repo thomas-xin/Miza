@@ -268,7 +268,7 @@ class Bot:
 	btime = 0
 	bl = False
 
-	def __init__(self, token="", key="", huggingface_token="", cai_token="", cai_channel=None, email="", password="", name="Miza", personality=DEFPER, premium=0):
+	def __init__(self, token="", key="", huggingface_token="", cai_token="", summary=None, email="", password="", name="Miza", personality=DEFPER, premium=0):
 		self.token = token
 		self.key = key
 		self.huggingface_token = huggingface_token
@@ -281,7 +281,9 @@ class Bot:
 		self.chat_history = []
 		self.chat_history_ids = None
 		self.cai_ready = False
-		self.cai_channel = cai_channel
+		self.summary = summary
+		if summary:
+			self.chat_history.insert(0, ("[SYSTEM]", v))
 		self.timestamp = time.time()
 		self.premium = premium
 		self.last_cost = 0
@@ -1348,11 +1350,6 @@ class Bot:
 		caids = ()
 		uoai = None
 		expapi = None
-		if self.personality == CAIPER:# or (self.premium < 2 and self.personality == DEFPER and (not self.chat_history or q and q != self.chat_history[0][1])):
-			if "CAI" not in self.forbidden:
-				response, cost, caids = self.caichat(u, q, refs=refs, im=im)
-				if response:
-					return self.after(tup, (self.name, response)), cost, caids
 		# if self.premium > 0 or random.randint(0, 1):
 		response, cost, uoai, expapi = self.gptcomplete(u, q, refs=refs)
 		if response:
@@ -1394,25 +1391,6 @@ class Bot:
 		return self.after(tup, (self.name, response)), 0, caids
 
 	def deletes(self, caids):
-		if caids:
-			headers = {
-				"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
-				# "DNT": "1",
-				"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
-				"Content-Type": "application/json",
-				"cache-control": "no-cache",
-				"Authorization": f"Token {self.cai_token}",
-			}
-			resp = requests.post(
-				"https://beta.character.ai/chat/history/msgs/delete/",
-				headers=headers,
-				data=json.dumps(dict(
-					history_id=self.cai_channel,
-					ids_to_delete=caids,
-					regenerating=False
-				)),
-			)
-			print("CAI delete:", resp)
 		self.chat_history = self.chat_history[:-2]
 
 	ask = ai
@@ -1491,6 +1469,7 @@ class Bot:
 			v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=lim, min_length=64).strip()
 		v = summ_start + v
 		print("Chat summary:", v)
+		self.summary = v
 		self.chat_history.insert(0, ("[SYSTEM]", v))
 		self.promises.clear()
 

@@ -2418,7 +2418,7 @@ def CBAI(inputs):
 	name = inputs["name"]
 	personality = inputs["personality"]
 	premium = inputs["premium"]
-	cai_channel = inputs["cai_channel"]
+	summary = inputs["summary"]
 	history = inputs["history"]
 	refs = inputs["refs"]
 	im = inputs["im"]
@@ -2429,15 +2429,15 @@ def CBAI(inputs):
 	# locals().update(inputs)
 	try:
 		cb = CBOTS[channel_id]
-		if cb.personality != personality or cb.cai_channel != cai_channel or inputs.get("reset"):
-			cai_channel = None
+		if cb.personality != personality or inputs.get("reset"):
+			summary = None
 			raise KeyError
 	except KeyError:
 		cb = CBOTS[channel_id] = convobot.Bot( 
 			key=key,
 			huggingface_token=ht,
 			cai_token=cai_token,
-			cai_channel=cai_channel,
+			summary=summary,
 			name=name,
 			personality=personality,
 			premium=premium,

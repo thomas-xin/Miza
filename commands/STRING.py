@@ -1020,7 +1020,7 @@ class Ask(Command):
         reset = False
         if not self.reset.get(channel.id, None):
             if not h:
-                if not getattr(message, "simulated", False) and not bot.data.cai_channels.get(channel.id):
+                if not getattr(message, "simulated", False) and not bot.data.chat_histories.get(channel.id):
                     async for m in bot.history(channel, limit=12):
                         if m.id == message.id:
                             continue
@@ -1157,9 +1157,9 @@ class Ask(Command):
                     name = m.author.name
                     if name == bot.name:
                         name = bot.name + "2"
-            cai_channel = bot.data.cai_channels.get(channel.id)
+            summary = bot.data.chat_histories.get(channel.id)
             if reset:
-                cai_channel = None
+                summary = None
             if bot.is_trusted(guild) >= 2:
                 for uid in bot.data.trusted[guild.id]:
                     if uid and bot.premium_level(uid, absolute=True) >= 2:
@@ -1180,7 +1180,7 @@ class Ask(Command):
                 name=bot.name,
                 personality=bot.commands.personality[0].retrieve((channel or guild).id),
                 premium=premium,
-                cai_channel=cai_channel,
+                summary=summary,
                 history=history,
                 refs=refs,
                 im=im,
@@ -1246,11 +1246,11 @@ class Ask(Command):
                             )
             if expapi:
                 bot.data.token_balances.pop(expapi, None)
-            caic = await process_image("lambda cid: CBOTS[cid].cai_channel", "$", [channel.id], fix=1)
+            caic = await process_image("lambda cid: CBOTS[cid].summary", "$", [channel.id], fix=1)
             if caic:
-                bot.data.cai_channels[channel.id] = caic
+                bot.data.chat_histories[channel.id] = caic
             else:
-                bot.data.cai_channels.pop(channel.id)
+                bot.data.chat_histories.pop(channel.id)
         if not bl:
             print("Result:", out)
         code = "\xad"
@@ -1333,7 +1333,7 @@ class Ask(Command):
                 if m.author.id != user.id and perm < 3:
                     return
             print("Resetting", channel)
-            bot.data.cai_channels.pop(channel.id, None)
+            bot.data.chat_histories.pop(channel.id, None)
             self.reset[channel.id] = True
             self.last.pop(channel.id, None)
             colour = await bot.get_colour(bot.user)
@@ -1345,8 +1345,8 @@ class Ask(Command):
             return
 
 
-class UpdateCAIChannels(Database):
-    name = "cai_channels"
+class UpdateChatHistories(Database):
+    name = "chat_histories"
 
 
 class Personality(Command):
@@ -1380,7 +1380,7 @@ class Personality(Command):
     async def __call__(self, bot, flags, guild, channel, message, name, user, argv, **void):
         self.description = f"Customises {bot.name}'s personality for ~ask in the current server. Will attempt to use the highest available GPT-family tier; see {bot.kofi_url} for more info. Experimental long descriptions are now supported."
         if "chat" in name:
-            bot.data.cai_channels.pop(channel.id, None)
+            bot.data.chat_histories.pop(channel.id, None)
             bot.commands.ask[0].reset[channel.id] = True
             bot.commands.ask[0].last.pop(channel.id, None)
             return css_md(f"Conversations for {sqr_md(channel)} have been reset.")
@@ -1388,7 +1388,7 @@ class Personality(Command):
             raise ModuleNotFoundError("No OpenAI key found for customisable personality.")
         if "d" in flags or argv == "default":
             bot.data.personalities.pop(channel.id, None)
-            bot.data.cai_channels.pop(channel.id, None)
+            bot.data.chat_histories.pop(channel.id, None)
             bot.commands.ask[0].reset[channel.id] = True
             bot.commands.ask[0].last.pop(channel.id, None)
             return css_md(f"My personality for {sqr_md(channel)} has been reset.")
@@ -1421,7 +1421,7 @@ class Personality(Command):
                     + "Please reword or consider contacting the support server if you believe this is a mistake!"
                 )
         bot.data.personalities[channel.id] = p
-        bot.data.cai_channels.pop(channel.id, None)
+        bot.data.chat_histories.pop(channel.id, None)
         bot.commands.ask[0].reset[channel.id] = True
         bot.commands.ask[0].last.pop(channel.id, None)
         return css_md(f"My personality description for {sqr_md(channel)} has been changed to {sqr_md(p)}.")
