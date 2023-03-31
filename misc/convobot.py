@@ -729,7 +729,7 @@ class Bot:
 					q4 = f'Previous context:\n{messages[-2]["content"]}\n\n' if len(messages) > 2 and messages[-2]["content"] else ""
 					q3 = q4 + "For the below question: " + q2 + ".\n" + q
 					try:
-						if random.randint(0, 1):
+						if not random.randint(0, 3):
 							text = self.vai(q3)
 						if not text:
 							text = self.chatgpt(q3)
@@ -1000,7 +1000,7 @@ class Bot:
 								nstart = "Assume y" + nstart[1:]
 							prompt = nstart + "\n\n" + prompt
 							if random.randint(0, 1):
-								text = self.vis(prompt)
+								text = self.vai(prompt)
 							if not text:
 								text = self.chatgpt(prompt)
 							text = text.removeprefix(f"{self.name}: ")
