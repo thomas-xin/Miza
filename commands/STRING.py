@@ -1189,6 +1189,7 @@ class Ask(Command):
                 bals={k: v for k, v in bot.data.token_balances.items() if v < 0},
                 oai=oai,
                 bl=bl,
+                nsfw=is_nsfw(channel),
             )
             if fut:
                 await fut

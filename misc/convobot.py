@@ -643,7 +643,7 @@ class Bot:
 				nstart = f"Your name is {self.name}; you are {p}."
 				nstart += " Express emotion when appropriate!"
 				if model == "text-davinci-003":
-					nstart += "\n" + (MIZADEF if self.premium < 2 else MIZAAC)
+					nstart += "\n" + (MIZAAC if self.nsfw else MIZADEF)
 			else:
 				nstart = f"The following is a conversation between {self.name} and humans. {self.name} is {p} AI."
 		else:
@@ -653,7 +653,7 @@ class Bot:
 				else:
 					nstart = p
 				if model == "text-davinci-003":
-					nstart += "\n" + (MIZADEF if self.premium < 2 else MIZAAC)
+					nstart += "\n" + (MIZAAC if self.nsfw else MIZADEF)
 			else:
 				nstart = p
 		if model in ("gpt-3.5-turbo", "gpt-4"):
@@ -835,7 +835,7 @@ class Bot:
 			v += f"Current time: {dtn}\n"
 			if iman:
 				v += "\n".join(iman) + "\n"
-			v += (MIZADEF if self.premium < 2 else MIZAAC) + "Stay in character!!"
+			v += (MIZAAC if self.nsfw else MIZADEF) + "Stay in character!!"
 			m = dict(role="system", content=v)
 			messages.insert(-1, m)
 			pc += len(self.gpttokens(m["role"], model))
@@ -972,7 +972,7 @@ class Bot:
 				cm = 20
 		elif model in ("gpt-3.5-turbo", "gpt-4"):
 			tries = 7
-			if self.premium < 2:
+			if self.premium < 2 or not self.nsfw:
 				stop = None
 			else:
 				stop = ["s an AI", "AI language model", "I'm sorry,", "language model"]
@@ -1065,7 +1065,7 @@ class Bot:
 					t2, c2, *irr = self.gptcomplete(u, q, refs=refs, start=text or " ")
 					text += " " + t2
 					cost += c2
-				elif not self.jailbroken:
+				elif not self.jailbroken and self.nsfw:
 					resp = openai.Moderation.create(
 						text,
 					)

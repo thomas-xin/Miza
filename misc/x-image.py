@@ -2426,6 +2426,7 @@ def CBAI(inputs):
 	bl = inputs.get("bl")
 	oai = inputs.get("oai")
 	bals = inputs.get("bals")
+	nsfw = inputs.get("nsfw")
 	# locals().update(inputs)
 	try:
 		cb = CBOTS[channel_id]
@@ -2450,6 +2451,7 @@ def CBAI(inputs):
 	cb.bl = bl
 	cb.oai = oai
 	cb.bals = bals
+	cb.nsfw = nsfw
 	if im:
 		try:
 			im = cb.image
