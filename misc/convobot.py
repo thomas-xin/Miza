@@ -971,7 +971,7 @@ class Bot:
 			if self.premium < 2:
 				stop = None
 			else:
-				stop = ["As an AI", "as an AI", "AI language model", "I'm sorry,"]
+				stop = ["s an AI", "AI language model", "I'm sorry,", "language model"]
 			response = None
 			for i in range(tries):
 				redo = False
@@ -1042,7 +1042,7 @@ class Bot:
 					print(response)
 					role = m["role"]
 					text = m["content"].removeprefix(f"{self.name} says: ").removeprefix(f"{self.name}: ")
-					if len(text) >= 2 and text[-1] == " " and text[-2] not in ".!?":
+					if len(text) >= 2 and text[-1] == " " and text[-2] not in ".!?" or text.endswith(' "'):
 						redo = True
 					text = text.strip()
 					if not text or len(self.gpttokens(text)) < 8:
