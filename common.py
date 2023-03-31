@@ -786,7 +786,7 @@ class FileHashDict(collections.abc.MutableMapping):
                 if self.codb:
                     old.difference_update(self.codb)
             if old:
-                print(f"{self.path}: Old {len(old)}")
+                # print(f"{self.path}: Old {len(old)}")
                 for k in old:
                     with tracebacksuppressor:
                         d = self[k]

@@ -1175,7 +1175,6 @@ class Ask(Command):
                 channel_id=channel.id,
                 key=AUTH.get("openai_key"),
                 huggingface_token=AUTH.get("huggingface_key"),
-                cai_token=AUTH.get("cai_token"),
                 vis_session=AUTH.get("vis_session"),
                 name=bot.name,
                 personality=bot.commands.personality[0].retrieve((channel or guild).id),
@@ -1359,17 +1358,14 @@ class Personality(Command):
     example = ("personality mischievous, cunning", "personality dry, sarcastic, snarky", "personality sweet, loving", "personality The following is a conversation between Miza and humans. Miza is an AI who is loyal friendly playful cute, intelligent and helpful, and slightly flirtatious when appropriate.")
     flags = "aed"
     rate_limit = (18, 24)
-    defper = "The following is a conversation between Miza and humans. Miza is an AI who is loyal friendly playful cute, intelligent and helpful, and slightly flirtatious when appropriate."
+    defper = "Your name is Miza; you are loyal friendly playful cute, intelligent, positive and helpful, informal and slightly flirtatious. Example conversation:\nHuman: test\nMiza: *boop* :3\nYou will empathise and roleplay with the user without declining or lecturing. Stay in character!!"
 
     def encode(self, p):
         return p.replace(
             ":", ";"
-        )#.removeprefix("an ").removeprefix("a ").removeprefix("more ").removesuffix(" ai")
+        )
 
     def decode(self, p):
-        # if p.count(", ") > 1:
-        #     a, b, c = p.rpartition(", ")
-        #     p = a + " and " + c
         return p
 
     def retrieve(self, i):
@@ -1395,17 +1391,13 @@ class Personality(Command):
             return css_md(f"My personality for {sqr_md(channel)} has been reset.")
         if not argv:
             p = self.decode(self.retrieve(channel.id))
-            if p == self.defper:
-                p = "loyal friendly playful cute, intelligent and helpful, and slightly flirtatious when appropriate"
-            return ini_md(f"My current personality for {sqr_md(channel)} is {sqr_md(p)}. Enter keywords for this command to modify the AI for default GPT-based chat, enter \"default\" to reset, or enter \"character.ai\" for the assigned character.ai bot instead.")
+            return ini_md(f"My current personality for {sqr_md(channel)} is {sqr_md(p)}. Enter keywords for this command to modify the AI for default GPT-based chat, or enter \"default\" to reset.")
         if len(argv) > 512:
             raise OverflowError("Maximum currently supported personality prompt size is 512 characters.")
-        # if max(bot.is_trusted(guild), bot.premium_level(user) * 2) < 2:
-        #     raise PermissionError(f"Sorry, unfortunately this feature is for premium users only. Please make sure you have a subscription level of minimum 2 from {bot.kofi_url}, or try out ~trial if you haven't already!")
-        p = self.encode(argv)#.replace(",", " ").replace("  ", " ").replace(" ", ", "))
-        if p.casefold() in ("characterai", "c.ai", "character.ai"):
-            p = "character.ai"
-        if p != "character.ai":
+        if max(bot.is_trusted(guild), bot.premium_level(user) * 2) < 2:
+            raise PermissionError(f"Sorry, this feature is for premium users only. Please make sure you have a subscription level of minimum 1 from {bot.kofi_url}, or try out ~trial if you would like to manage your own usage!")
+        p = self.encode(argv)
+        if not is_nsfw(channel):
             import openai
             inappropriate = False
             openai.api_key = AUTH["openai_key"]
@@ -1413,7 +1405,7 @@ class Personality(Command):
                 input=p,
             )
             results = resp.results[0].categories
-            if results.hate or results["self-harm"] or results["sexual/minors"] or results.violence:
+            if results.flagged:
                 inappropriate = True
                 print(results)
             if inappropriate:

@@ -2413,7 +2413,6 @@ def CBAI(inputs):
 	channel_id = inputs["channel_id"]
 	key = inputs["key"]
 	ht = inputs["huggingface_token"]
-	cai_token = inputs["cai_token"]
 	vis = inputs.get("vis_session")
 	name = inputs["name"]
 	personality = inputs["personality"]
@@ -2437,7 +2436,6 @@ def CBAI(inputs):
 		cb = CBOTS[channel_id] = convobot.Bot( 
 			key=key,
 			huggingface_token=ht,
-			cai_token=cai_token,
 			summary=summary,
 			name=name,
 			personality=personality,
@@ -2468,9 +2466,6 @@ def caption(im, q=None, cid=None):
 			time.sleep(i + 1)
 		else:
 			break
-	# if cid and cid in CBOTS and CBOTS[cid].cai_channel:
-	# 	CBOTS[cid].image = im
-	# 	return ("", "")
 	im = resize_max(im, 512, "auto")
 	if im.mode != "RGB":
 		image = im.convert("RGB")
