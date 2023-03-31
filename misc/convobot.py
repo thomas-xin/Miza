@@ -1349,7 +1349,7 @@ class Bot:
 			print_exc()
 			self.vis_r = time.time() + 86400
 			return ""
-		return "\n".join(line.strip().removeprefix("<p>").removesuffix("</p>").strip() for line in data["response"].replace("<br>", "\n").split lines())
+		return "\n".join(line.strip().removeprefix("<p>").removesuffix("</p>").strip() for line in data["response"].replace("<br>", "\n").splitlines())
 
 	def ai(self, u, q, refs=(), im=None):
 		tup = (u, q)
