@@ -2133,7 +2133,7 @@ class DadJoke(Command):
 
 class UpdateDadjokes(Database):
     name = "dadjokes"
-    reg = re.compile(r"(?:(?:(?<=^)|(?<=[.,;:?!]\s))i(?:m| am)\s|(?:(?<=^)|(?<=\s))i'm\s){1}[^.,;:?!]+(?:[.,;:?!]{2,}|(?=[.,;:?!]|$))", re.I | re.M)
+    reg = re.compile(r"(?:(?:(?<=^)|(?<=[.,;:?!\(]\s))i(?:m| am)\s|(?:(?<=^)|(?<=\s))i'm\s){1}[^.,;:?!\)]+(?:[.,;:?!]{2,}|(?=[.,;:?!\)]|$))", re.I | re.M)
 
     async def _nocommand_(self, message, **void):
         if message.guild is None or not message.content:
@@ -2149,12 +2149,13 @@ class UpdateDadjokes(Database):
         i = text.casefold().index("m")
         spl = text[i + 1:].lstrip().split()
         nick = ""
-        while spl and len(nick) + len(spl[0]) <= 32:
+        while spl and len(nick) + len(spl[0]) <= 31:
             if nick:
                 nick += " "
             nick += spl.pop(0)
         if spl and not nick:
-            nick = lim_str(spl[0], 32)
+            nick = spl[0]
+        nick = lim_str(nick, 32)
         if nick and nick != user.display_name:
             create_task(send_with_reply(message.channel, message, f"Hi, {nick}! {get_random_emoji()}"))
             await user.edit(nick=nick, reason="Pranked!")
