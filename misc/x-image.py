@@ -2466,9 +2466,9 @@ def caption(im, q=None, cid=None):
 			time.sleep(i + 1)
 		else:
 			break
-	if cid and cid in CBOTS and CBOTS[cid].cai_channel:
-		CBOTS[cid].image = im
-		return ("", "")
+	# if cid and cid in CBOTS and CBOTS[cid].cai_channel:
+	# 	CBOTS[cid].image = im
+	# 	return ("", "")
 	im = resize_max(im, 512, "auto")
 	if im.mode != "RGB":
 		image = im.convert("RGB")
