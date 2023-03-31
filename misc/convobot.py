@@ -283,7 +283,7 @@ class Bot:
 		self.cai_ready = False
 		self.summary = summary
 		if summary:
-			self.chat_history.insert(0, ("[SYSTEM]", v))
+			self.chat_history.insert(0, ("[SYSTEM]", summary))
 		self.timestamp = time.time()
 		self.premium = premium
 		self.last_cost = 0
