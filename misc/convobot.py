@@ -986,7 +986,7 @@ class Bot:
 						openai.api_key = self.key
 						costs = 1
 					ok = openai.api_key
-					if not stop and (not chat_history or len(self.gpttokens(q)) > 64):
+					if not stop and random.randint(0, 1) and (not chat_history or len(self.gpttokens(q)) > 8):
 						resp = openai.Moderation.create(
 							q,
 						)
@@ -1435,8 +1435,9 @@ class Bot:
 			s = f"{k}: {v}\n"
 			lines.append(s)
 		v = "".join(lines)
-		if len(self.gpttokens(v)) > 256:
-			v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=240, min_length=96).strip()
+		lim = 240 if self.premium >= 2 else 80
+		if len(self.gpttokens(v)) > lim + 16:
+			v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=lim, min_length=64).strip()
 		v = summ_start + v
 		print("Chat summary:", v)
 		self.chat_history.insert(0, ("[SYSTEM]", v))
