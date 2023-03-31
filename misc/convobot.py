@@ -999,7 +999,11 @@ class Bot:
 							if nstart:
 								nstart = "Assume y" + nstart[1:]
 							prompt = nstart + "\n\n" + prompt
-							text = self.chatgpt(prompt).removeprefix(f"{self.name}: ")
+							if random.randint(0, 1):
+								text = self.vis(prompt)
+							if not text:
+								text = self.chatgpt(prompt)
+							text = text.removeprefix(f"{self.name}: ")
 							if text:
 								response = None
 								break
