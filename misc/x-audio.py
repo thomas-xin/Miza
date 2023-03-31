@@ -240,7 +240,7 @@ class AudioPlayer(discord.AudioSource):
 		else:
 			if type(fut) is cls:
 				return fut
-			return fut.result(timeout=4)
+			return fut.result(timeout=7)
 		self = cls(guild)
 		if self.vc:
 			return self

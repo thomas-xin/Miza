@@ -725,11 +725,14 @@ class Bot:
 					text = "!"
 				resp = None
 				q2 = 'Say "@" if you have a definite answer, "!" if inappropriate/personal, "%" followed by query if maths question, else formulate as google search prepended with "$"'
-				if not text and random.randint(0, 1):
+				if not text:
 					q4 = f'Context:\n{messages[-2]["content"]}\n\n' if len(messages) > 2 and messages[-2]["content"] else ""
 					q3 = q4 + "For the below question: " + q2 + ".\n" + q
 					try:
-						text = self.chatgpt(q3)
+						if random.randint(0, 1):
+							text = self.vai(q3)
+						if not text:
+							text = self.chatgpt(q3)
 					except:
 						print_exc()
 				if not text:
@@ -987,12 +990,14 @@ class Bot:
 						costs = 1
 					ok = openai.api_key
 					if not stop and random.randint(0, 1) and (not chat_history or len(self.gpttokens(q)) > 8):
+						prompt = "".join(reversed(ins))
 						resp = openai.Moderation.create(
-							q,
+							prompt,
 						)
 						flagged = resp["results"][0]["flagged"]
 						if not flagged:
-							prompt = "".join(reversed(ins))
+							if nstart:
+								nstart = "Assume y" + nstart[1:]
 							prompt = nstart + "\n\n" + prompt
 							text = self.chatgpt(prompt).removeprefix(f"{self.name}: ")
 							if text:
@@ -1205,6 +1210,26 @@ class Bot:
 			res = self.clean_response(q, res)
 		return res
 
+	def wolframalpha(self, q):
+		words = q.split()
+		q = " ".join(swap.get(w, w) for w in words)
+		driver = get_driver()
+		search = f"https://www.wolframalpha.com/input?i={urllib.parse.quote_plus(q)}"
+		fut = exc.submit(driver.get, search)
+		fut.result(timeout=16)
+		time.sleep(8)
+
+		lines = []
+		e1 = driver.find_elements(by=webdriver.common.by.By.TAG_NAME, value="h2")[:-1]
+		e2 = driver.find_elements(by=webdriver.common.by.By.TAG_NAME, value="img")[2:]
+		while e1 or e2:
+			if e1:
+				lines.append(e1.pop(0).text)
+			if e2:
+				lines.append(e2.pop(0).get_attribute("alt"))
+		return_driver(driver)
+		return "\n".join(lines)
+
 	def chatgpt(self, q):
 		if time.time() - getattr(chatgpt, "rate", 0) < 0:
 			return ""
@@ -1270,25 +1295,47 @@ class Bot:
 			chatgpt.timestamp = 0
 		return res
 
-	def wolframalpha(self, q):
-		words = q.split()
-		q = " ".join(swap.get(w, w) for w in words)
-		driver = get_driver()
-		search = f"https://www.wolframalpha.com/input?i={urllib.parse.quote_plus(q)}"
-		fut = exc.submit(driver.get, search)
-		fut.result(timeout=16)
-		time.sleep(8)
-
-		lines = []
-		e1 = driver.find_elements(by=webdriver.common.by.By.TAG_NAME, value="h2")[:-1]
-		e2 = driver.find_elements(by=webdriver.common.by.By.TAG_NAME, value="img")[2:]
-		while e1 or e2:
-			if e1:
-				lines.append(e1.pop(0).text)
-			if e2:
-				lines.append(e2.pop(0).get_attribute("alt"))
-		return_driver(driver)
-		return "\n".join(lines)
+	vis_c = vis_r = 0
+	def vai(self, q):
+		if not self.vis_s or self.vis_r > time.time():
+			return ""
+		if self.vis_c > 48:
+			self.vis_r = max(self.vis_r + 86400, time.time())
+			resp = requests.post(
+				"https://app.visus.ai/t/kxzsjtzfxu/query/clfw3bcof01uqfbey053r4o93/clfw3bcoj01urfbey5czzjaji/?index=&_data=routes%2F_dashboard%2B%2Ft%2B%2F%24teamId%2B%2Fquery%2B%2F%24aiId.%24conversationId%2B%2Findex",
+				data={"newName": "", "intent": "clear-convo"},
+				headers={"Content-Type": "application/x-www-form-urlencoded;charset=UTF-8", "User-Agent": "Mozilla/5.1"},
+				cookies={"__session": vis_s},
+			)
+			print(resp)
+		print("Visus prompt:", q)
+		rid = "-".join("".join(hex(random.randint(0, 15))[2:] for i in range(n)) for n in (8, 4, 4, 4, 12))
+		resp = requests.post(
+			"https://app.visus.ai/api/query",
+			data=json.dumps({
+				"aiId": "clfw3bcof01uqfbey053r4o93",
+				"teamId": "clfw3bcnv01uffbeypnj1bmrx",
+				"conversationId": "clfw3bcoj01urfbey5czzjaji",
+				"userId": "google-oauth2|111998687181999014199",
+				"focusedFiles": [],
+				"rId": rid,
+				"query": q,
+			}),
+			headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.1"},
+			cookies={"__session": self.vis_s},
+		)
+		try:
+			resp.raise_for_status()
+			if not resp.content:
+				raise EOFError
+			data = resp.json()
+			if not data.get("success"):
+				raise ValueError(data)
+		except:
+			print_exc()
+			self.vis_r = time.time() + 86400
+			return ""
+		return data["response"].strip().removeprefix("<p>").removesuffix("</p>").strip()
 
 	def ai(self, u, q, refs=(), im=None):
 		tup = (u, q)

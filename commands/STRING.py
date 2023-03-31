@@ -1176,6 +1176,7 @@ class Ask(Command):
                 key=AUTH.get("openai_key"),
                 huggingface_token=AUTH.get("huggingface_key"),
                 cai_token=AUTH.get("cai_token"),
+                vis_session=AUTH.get("vis_session"),
                 name=bot.name,
                 personality=bot.commands.personality[0].retrieve((channel or guild).id),
                 premium=premium,

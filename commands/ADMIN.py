@@ -1680,8 +1680,8 @@ class ServerProtector(Database):
     async def _channel_delete_(self, channel, guild, **void):
         if channel.id in self.bot.cache.deleted:
             return
+        user = None
         if not isinstance(channel, discord.Thread) and channel.permissions_for(guild.me).view_audit_log:
-            user = None
             audits = guild.audit_logs(limit=5, action=discord.AuditLogAction.channel_delete)
             ts = utc()
             cnt = {}

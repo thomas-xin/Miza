@@ -2414,6 +2414,7 @@ def CBAI(inputs):
 	key = inputs["key"]
 	ht = inputs["huggingface_token"]
 	cai_token = inputs["cai_token"]
+	vis = inputs.get("vis_session")
 	name = inputs["name"]
 	personality = inputs["personality"]
 	premium = inputs["premium"]
@@ -2441,6 +2442,7 @@ def CBAI(inputs):
 			personality=personality,
 			premium=premium,
 		)
+		cb.vis_s = vis
 		for t in history:
 			cb.append(t)
 	else:
