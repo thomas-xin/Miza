@@ -1260,11 +1260,11 @@ class Ask(Command):
                     data = bot.data.users.get(u.id)
                     data.pop("trial", None)
                     bot.premium_level(u)
-                        emb = discord.Embed(colour=rand_colour())
-                        emb.set_author(**get_author(bot.user))
-                        emb.description = (
-                            f"Uh-oh, it appears your API key credit was blocked! Please make sure your payment methods are functional, or buy a consistent subscription [here]({bot.kofi_url})!"
-                        )
+                    emb = discord.Embed(colour=rand_colour())
+                    emb.set_author(**get_author(bot.user))
+                    emb.description = (
+                        f"Uh-oh, it appears your API key credit was blocked! Please make sure your payment methods are functional, or buy a consistent subscription [here]({bot.kofi_url})!"
+                    )
             caic = await process_image("lambda cid: CBOTS[cid].summary", "$", [channel.id], fix=1)
             if caic:
                 bot.data.chat_histories[channel.id] = caic
