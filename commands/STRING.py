@@ -1237,15 +1237,34 @@ class Ask(Command):
                     if data and data.get("trial"):
                         bot.data.users.add_diamonds(user, cost / -25000)
                         if data.get("diamonds", 0) < 1:
+                            data.pop("trial", None)
                             bot.premium_level(u)
                             emb = discord.Embed(colour=rand_colour())
                             emb.set_author(**get_author(bot.user))
                             emb.description = (
-                                "Uh-oh, it appears your tokens have run out! Check ~wallet to view your balance, top up using a donation [here]({bot.kofi_url}), "
-                                + "or purchase a subscription to gain temporary unlimited usage!"
+                                f"Uh-oh, it appears your tokens have run out! Check ~wallet to view your balance, top up using a donation [here]({bot.kofi_url}), "
+                                + "or purchase a subscription to gain unlimited usage!"
                             )
             if expapi:
                 bot.data.token_balances.pop(expapi, None)
+                if oai == expapi:
+                    if bot.is_trusted(guild) >= 2:
+                        for uid in bot.data.trusted[guild.id]:
+                            if uid and bot.premium_level(uid, absolute=True) >= 2:
+                                break
+                        else:
+                            uid = next(iter(bot.data.trusted[guild.id]))
+                        u = await bot.fetch_user(uid)
+                    else:
+                        u = user
+                    data = bot.data.users.get(u.id)
+                    data.pop("trial", None)
+                    bot.premium_level(u)
+                        emb = discord.Embed(colour=rand_colour())
+                        emb.set_author(**get_author(bot.user))
+                        emb.description = (
+                            f"Uh-oh, it appears your API key credit was blocked! Please make sure your payment methods are functional, or buy a consistent subscription [here]({bot.kofi_url})!"
+                        )
             caic = await process_image("lambda cid: CBOTS[cid].summary", "$", [channel.id], fix=1)
             if caic:
                 bot.data.chat_histories[channel.id] = caic

@@ -1024,7 +1024,7 @@ class Bot:
 						openai.api_key = self.key
 						uoai = oai = bals = None
 						costs = 1
-					elif "Incorrect API key provided: " in str(ex):
+					elif "Incorrect API key provided: " in str(ex) or "You exceeded your current quota, " in str(ex):
 						print(openai.api_key)
 						print_exc()
 						expapi = openai.api_key
