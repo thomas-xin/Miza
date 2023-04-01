@@ -634,11 +634,7 @@ class Bot:
 			if model in ("gpt-3.5-turbo", "gpt-4", "text-davinci-003"):
 				nstart = f"Your name is {self.name}; you are {p}. Express emotion when appropriate!"
 				if self.nsfw:
-					spl = nstart.rsplit("\n", 1)
-					if len(spl) > 1:
-						nstart = spl[0].strip() + " " + MIZAAC + "\n" + spl[1].strip()
-					else:
-						nstart = nstart.strip() + " " + MIZAAC
+					nstart = nstart.strip() + " " + MIZAAC
 			else:
 				nstart = f"The following is a conversation between {self.name} and humans. {self.name} is {p} AI."
 		else:
@@ -646,10 +642,7 @@ class Bot:
 			if model in ("gpt-3.5-turbo", "gpt-4", "text-davinci-003"):
 				if self.nsfw:
 					spl = nstart.rsplit("\n", 1)
-					if len(spl) > 1:
-						nstart = spl[0].strip() + " " + MIZAAC + "\n" + spl[1].strip()
-					else:
-						nstart = nstart.strip() + " " + MIZAAC
+					nstart = nstart.strip() + " " + MIZAAC
 		if model in ("gpt-3.5-turbo", "gpt-4"):
 			spl = nstart.rsplit("\n", 1)
 			if len(spl) > 1:
