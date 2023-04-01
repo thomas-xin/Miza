@@ -995,7 +995,7 @@ class Bot:
 						if not flagged:
 							if nstart:
 								nstart = "Assume y" + nstart[1:]
-							prompt = nstart + "\n\n" + prompt
+							prompt = nstart + "\n" + nend + "\n\n" + prompt
 							if random.randint(0, 1):
 								text = self.vai(prompt)
 							if not text:

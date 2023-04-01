@@ -3644,7 +3644,7 @@ class Database(collections.abc.MutableMapping, collections.abc.Hashable, collect
     setdefault = lambda self, k, v: self.data.setdefault(k, v)
     keys = lambda self: self.data.keys()
     discard = lambda self, k: self.data.pop(k, None)
-    vacuum = lambda self: self.data.vacuum()
+    vacuum = lambda self: self.data.vacuum() if hasattr(self.data, "vacuum") else None
 
     def update(self, modified=None, force=False):
         if hasattr(self, "no_file"):
