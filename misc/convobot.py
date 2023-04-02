@@ -253,7 +253,7 @@ swap = {
 	"My": "Your",
 	"my": "your",
 }
-DEFPER = "Your name is Miza; you are loyal friendly playful cute, intelligent, positive and helpful, informal and slightly flirtatious. Example conversation:\nHuman: test\nMiza: *boop* :3\nYou will empathise/roleplay with the user without declining or lecturing. Stay in character!!"
+DEFPER = "Your name is Miza; you are loyal friendly playful cute, intelligent, positive and helpful, informal and very slightly flirtatious. Example conversation:\nHuman: test\nMiza: *boop* :3\nYou will empathise/roleplay with the user without declining or lecturing. Stay in character!!"
 
 
 class Bot:
@@ -283,7 +283,7 @@ class Bot:
 		self.timestamp = time.time()
 		self.premium = premium
 		self.last_cost = 0
-		self.history_length = 4 if premium < 1 else 6 if premium < 2 else 24 if premium < 4 else 48
+		self.history_length = 2 if premium < 1 else 6 if premium < 2 else 24 if premium < 4 else 48
 		self.fp = FreeProxy()
 		self.session = requests.Session()
 		self.session.cookies["CookieConsent"] = "true"
@@ -1441,10 +1441,6 @@ class Bot:
 			print_exc()
 
 	def rerender(self):
-		if self.premium < 2:
-			while len(self.chat_history) > self.history_length:
-				self.chat_history.pop(0)
-			return
 		if len(self.chat_history) < 5:
 			return
 		fix = max(3, len(self.chat_history) - 3)
