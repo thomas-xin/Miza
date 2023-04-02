@@ -742,7 +742,7 @@ class Bot:
 					mes.insert(0, m)
 					stop = ["@", "AI language model"]
 					try:
-						data = dict(messages=[dict(role=m["role"], content=m["content"]) for m in mes], temperature=0, top_p=0, stop=stop, max_tokens=32)
+						data = dict(messages=[dict(role=m["role"], content=m["content"]) for m in mes], temperature=0, top_p=0, stop=stop, max_tokens=32, model="gpt-3.5-turbo")
 						text = self.ycg(data, headers=headers) or "@"
 					except EOFError:
 						pass
@@ -968,9 +968,9 @@ class Bot:
 				try:
 					if flagged:
 						raise PermissionError("flagged")
-					if not random.randint(0, 2):
+					if not random.randint(0, 2) and model == "gpt-3.5-turbo":
 						try:
-							data = dict(messages=messages, temperature=temp, max_tokens=512, frequency_penalty=1.0, presence_penalty=0.6, top_p=1, stop=stop)
+							data = dict(messages=messages, temperature=temp, max_tokens=512, frequency_penalty=1.0, presence_penalty=0.6, top_p=1, stop=stop, model="gpt-3.5-turbo")
 							text = self.ycg(data, headers=headers)
 						except EOFError:
 							pass
