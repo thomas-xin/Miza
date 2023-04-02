@@ -1348,7 +1348,7 @@ class Bot:
 		return "\n".join(line.strip().removeprefix("<p>").removesuffix("</p>").strip() for line in data["response"].replace("<br>", "\n").splitlines()).replace("<em>", "*").replace("</em>", "*")
 
 	you_r = 0
-	def ycg(data, headers={}):
+	def ycg(self, data, headers={}):
 		if self.you_r > time.time():
 			raise EOFError
 		print("YourChat query:", data)
