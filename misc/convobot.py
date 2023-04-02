@@ -388,21 +388,21 @@ class Bot:
 		self.chat_history_ids = model.generate(bot_input_ids, max_length=16384, pad_token_id=tokenizer.eos_token_id)
 		return tokenizer.decode(self.chat_history_ids[-4096:, bot_input_ids.shape[-1]:][0], skip_special_tokens=True).strip()
 
-	def answer_fill_mask(self, m, q):
+	def answer_fill_mask(self, m="xlm-roberta-large", q=""):
 		try:
 			fmp = self.models[m]
 		except KeyError:
 			fmp = self.models[m] = pipeline("fill-mask", model=m, tokenizer=m)
 		return fmp(q)[0]["sequence"]
 
-	def answer_summarise(self, m, q, max_length=128, min_length=32, do_sample=False):
+	def answer_summarise(self, m="Qiliang/bart-large-cnn-samsum-ChatGPT_v3", q="", max_length=128, min_length=64, do_sample=False):
 		try:
 			smp = self.models[m]
 		except KeyError:
 			smp = self.models[m] = pipeline("summarization", model=m)
 		return smp(q, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
 
-	def answer_classify(self, m, q, labels):
+	def answer_classify(self, m="vicgalle/xlm-roberta-large-xnli-anli", q="", labels=[]):
 		try:
 			zscp = self.models[m]
 		except KeyError:
@@ -423,7 +423,7 @@ class Bot:
 			a1 = a2
 		a1 = a1.strip()
 		if len(a1) < 16:
-			res = self.answer_summarise("facebook/bart-large-cnn", q + "\n\n" + res)
+			res = self.answer_summarise(q=q + "\n\n" + res)
 			print("Bart response:", res)
 			return res.strip()
 		if "\n" not in a1 and ". " not in a1 and a1 in res:
@@ -437,7 +437,7 @@ class Bot:
 			a1 = res.strip()
 		response = "\n".join(line.strip() for line in a1.replace("[CLS]", "").replace("[SEP]", "\n").splitlines()).strip()
 		while "[UNK]" in response:
-			response = self.answer_fill_mask("xlm-roberta-large", response.replace("[UNK]", "<mask>", 1))
+			response = self.answer_fill_mask(q=response.replace("[UNK]", "<mask>", 1))
 		search = "https : / / "
 		while search in response:
 			i = response.index(search)
@@ -479,10 +479,10 @@ class Bot:
 		if q.count(" ") < 2:
 			return False
 		if not literal_question(q):
-			resp = self.answer_classify("vicgalle/xlm-roberta-large-xnli-anli", q, ("question", "information", "action"))
+			resp = self.answer_classify(q=q, labels=("question", "information", "action"))
 			if resp["question"] < 0.5:
 				return False
-		resp = self.answer_classify("vicgalle/xlm-roberta-large-xnli-anli", q, ("personal question", "not personal"))
+		resp = self.answer_classify(q=q, labels=("personal question", "not personal"))
 		return resp["not personal"] >= 0.5
 
 	def emoji_clean(self, text):
@@ -569,7 +569,7 @@ class Bot:
 			if not k.startswith("[REPLIED TO]: "):
 				continue
 			if len(self.gpttokens(v)) > 52:
-				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=48, min_length=12).replace("\n", ". ").strip()
+				v = self.answer_summarise(q=v, max_length=48, min_length=12).replace("\n", ". ").strip()
 			s = f"{k}: {v}\n"
 			lines.append(s)
 		for k, v in refs:
@@ -577,12 +577,12 @@ class Bot:
 				continue
 			k = k.replace(":", "")
 			if len(self.gpttokens(v)) > 36:
-				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
+				v = self.answer_summarise(q=v, max_length=32, min_length=6).replace("\n", ". ").strip()
 			s = f"{k}: {v}\n"
 			lines.append(s)
 		s = f"{u}: {q}\n"
 		if len(self.gpttokens(s)) > 388:
-			s = self.answer_summarise("facebook/bart-large-cnn", s, max_length=384, min_length=256).replace("\n", ". ").strip()
+			s = self.answer_summarise(q=s, max_length=384, min_length=256).replace("\n", ". ").strip()
 		lines.append(s)
 		ns = f"{self.name}:"
 		if start:
@@ -723,16 +723,16 @@ class Bot:
 					text = "!"
 				resp = None
 				q2 = 'Say "@" if you have a definite answer, "!" if inappropriate/personal, "%" followed by query if maths question, else formulate as google search prepended with "$"'
-				if not text and random.randint(0, 1):
+				# if not text and random.randint(0, 1):
 					# q4 = f'Previous context:\n{messages[-2]["content"]}\n\n' if len(messages) > 2 and messages[-2]["content"] else ""
-					q3 = "For the below question: " + q2 + ".\n" + q
-					try:
-						text = self.chatgpt(q3)
-					except:
-						print_exc()
-					else:
-						if text and text[0] not in "@!%$" and "(!)" in text:
-							text = "!"
+					# q3 = "For the below question: " + q2 + ".\n" + q
+					# try:
+					# 	text = self.chatgpt(q3)
+					# except:
+					# 	print_exc()
+					# else:
+					# 	if text and text[0] not in "@!%$" and "(!)" in text:
+					# 		text = "!"
 				if not text:
 					mes = messages[-2:]
 					m = dict(role="system", content=q2)
@@ -816,7 +816,7 @@ class Bot:
 							break
 			if res:
 				if len(self.gpttokens(res)) > 400:
-					summ = self.answer_summarise("facebook/bart-large-cnn", q + "\n" + res, max_length=384, min_length=256).replace("\n", ". ").replace(": ", " -").strip()
+					summ = self.answer_summarise(q=q + "\n" + res, max_length=384, min_length=256).replace("\n", ". ").replace(": ", " -").strip()
 					res = lim_str(res.replace("\n", " "), 384, mode="right") + "\n" + summ
 				if res:
 					m = dict(role="system", name=sname, content=res.strip())
@@ -1069,7 +1069,7 @@ class Bot:
 				cost += response["usage"]["prompt_tokens"] * cm * costs
 				cost += response["usage"].get("completion_tokens", 0) * (cm2 or cm) * costs
 				if len(self.gpttokens(text)) > 512:
-					text = self.answer_summarise("facebook/bart-large-cnn", text, max_length=500, min_length=256).strip()
+					text = self.answer_summarise(q=text, max_length=500, min_length=256).strip()
 		if not text:
 			if not prompt:
 				prompt = "".join(reversed(ins))
@@ -1286,7 +1286,7 @@ class Bot:
 			if not self.bl:
 				print("ChatGPT response:", res)
 			# if len(self.gpttokens(res)) > 512:
-			# 	res = self.answer_summarise("facebook/bart-large-cnn", res, max_length=500, min_length=256).strip()
+			# 	res = self.answer_summarise(q=res, max_length=500, min_length=256).strip()
 			errs = (
 				"Your ChatGPT session is not usable.",
 				"Failed to read response from ChatGPT.",
@@ -1401,7 +1401,7 @@ class Bot:
 		if not self.chat_history or tup != self.chat_history[-1]:
 			k, v = tup
 			if len(self.gpttokens(v)) > 36:
-				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
+				v = self.answer_summarise(q=v, max_length=32, min_length=6).replace("\n", ". ").strip()
 				tup = (k, v)
 			self.chat_history.append(tup)
 		return tup[-1]
@@ -1410,7 +1410,7 @@ class Bot:
 		if not self.chat_history or tup != self.chat_history[0]:
 			k, v = tup
 			if len(self.gpttokens(v)) > 36:
-				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=32, min_length=6).replace("\n", ". ").strip()
+				v = self.answer_summarise(q=v, max_length=32, min_length=6).replace("\n", ". ").strip()
 				tup = (k, v)
 			self.chat_history.insert(0, tup)
 		return tup[0]
@@ -1420,13 +1420,13 @@ class Bot:
 			k, v = t2
 			if self.premium > 1:
 				labels = ("promise", "information", "example")
-				resp = self.answer_classify("vicgalle/xlm-roberta-large-xnli-anli", v, labels)
+				resp = self.answer_classify(q=v, labels=labels)
 			if len(self.gpttokens(v)) > 104:
-				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=96, min_length=8).replace("\n", ". ").strip()
+				v = self.answer_summarise(q=v, max_length=96, min_length=8).replace("\n", ". ").strip()
 				t2 = (k, v)
 			k, v = t1
 			if len(self.gpttokens(v)) > 52:
-				v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=48, min_length=6).replace("\n", ". ").strip()
+				v = self.answer_summarise(q=v, max_length=48, min_length=6).replace("\n", ". ").strip()
 				t1 = (k, v)
 			if self.premium > 1 and resp["promise"] >= 0.5:
 				if len(self.promises) >= 6:
@@ -1464,7 +1464,7 @@ class Bot:
 		v = "".join(lines)
 		lim = 240 if self.premium >= 2 else 80
 		if len(self.gpttokens(v)) > lim + 16:
-			v = self.answer_summarise("facebook/bart-large-cnn", v, max_length=lim, min_length=64).strip()
+			v = self.answer_summarise(q=v, max_length=lim, min_length=64).strip()
 		v = summ_start + v
 		print("Chat summary:", v)
 		self.summary = v
