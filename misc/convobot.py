@@ -722,7 +722,7 @@ class Bot:
 					print(resp)
 					text = "!"
 				resp = None
-				q2 = 'Say "@" if you have a definite answer, "!" if inappropriate/personal, "%" followed by query if maths question, else formulate as google search prepended with "$"'
+				q2 = 'Say "@" if you have a definite answer, "!" if inappropriate, "%" followed by query if maths question, else formulate as google search prepended with "$"'
 				# if not text and random.randint(0, 1):
 					# q4 = f'Previous context:\n{messages[-2]["content"]}\n\n' if len(messages) > 2 and messages[-2]["content"] else ""
 					# q3 = "For the below question: " + q2 + ".\n" + q
