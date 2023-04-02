@@ -1149,7 +1149,7 @@ def is_nsfw(channel):
     try:
         return channel.is_nsfw()
     except AttributeError:
-        return True
+        return False
 
 
 REPLY_SEM = cdict()
