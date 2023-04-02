@@ -741,19 +741,11 @@ class Bot:
 					m = dict(role="system", content=f"Current time: {dtn}")
 					mes.insert(0, m)
 					stop = ["@", "AI language model"]
-					headers["Content-Type"] = "text/plain"
 					try:
 						data = dict(messages=[dict(role=m["role"], content=m["content"]) for m in mes])
-						print("ChatGPT query:", data)
-						resp = self.session.post(
-							"https://your-chat-gpt.vercel.app/api/openai-stream",
-							data=json.dumps(data),
-							headers=headers,
-						)
-						resp.raise_for_status()
-						if not resp.content:
-							raise EOFError("Content empty.")
-						text = resp.text or "@"
+						text = self.ycg(data, headers=headers) or "@"
+					except EOFError:
+						pass
 					except:
 						print_exc()
 				if not text:
@@ -976,6 +968,16 @@ class Bot:
 				try:
 					if flagged:
 						raise PermissionError("flagged")
+					if not stop:
+						try:
+							data = dict(messages=[dict(role=m["role"], content=m["content"]) for m in mes])
+							text = self.ycg(data, headers=headers)
+						except EOFError:
+							pass
+						except:
+							print_exc()
+						else:
+							if text: break
 					if oai:
 						openai.api_key = oai
 						costs = 0
@@ -1344,6 +1346,27 @@ class Bot:
 			self.vis_r = time.time() + 86400
 			return ""
 		return "\n".join(line.strip().removeprefix("<p>").removesuffix("</p>").strip() for line in data["response"].replace("<br>", "\n").splitlines()).replace("<em>", "*").replace("</em>", "*")
+
+	you_r = 0
+	def ycg(data, headers={}):
+		if self.you_r > time.time():
+			raise EOFError
+		print("YourChat query:", data)
+		headers["Content-Type"] = "text/plain"
+		resp = self.session.post(
+			"https://your-chat-gpt.vercel.app/api/openai-stream",
+			data=json.dumps(data),
+			headers=headers,
+		)
+		try:
+			resp.raise_for_status()
+			if not resp.content:
+				raise EOFError
+		except:
+			print_exc()
+			self.you_r = time.time() + 3600
+			return ""
+		return resp.text
 
 	def ai(self, u, q, refs=(), im=None):
 		tup = (u, q)
