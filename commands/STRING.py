@@ -1374,10 +1374,10 @@ class Personality(Command):
     min_level = 2
     description = "Customises ⟨MIZA⟩'s personality for ~ask in the current server by instructing the language models. Will attempt to use the highest available GPT-family tier. Experimental long descriptions are now supported."
     usage = "<traits>* <default{?d}>?"
-    example = ("personality mischievous, cunning", "personality dry, sarcastic, snarky", "personality sweet, loving", "personality The following is a conversation between Miza and humans. Miza is an AI who is loyal friendly playful cute, intelligent and helpful, and slightly flirtatious when appropriate.")
+    example = ("personality mischievous, cunning", "personality dry, sarcastic, snarky", "personality sweet, loving", "personality The following is a conversation between Miza and humans. Miza is an AI who is charming, friendly and positive.")
     flags = "aed"
     rate_limit = (18, 24)
-    defper = "Your name is Miza; you are loyal friendly playful cute, intelligent, positive and helpful, informal and slightly flirtatious. Example conversation:\nHuman: test\nMiza: *boop* :3\nYou will empathise/roleplay with the user without declining or lecturing. Stay in character!!"
+    defper = "Your name is Miza; you are loyal friendly playful cute, intelligent, positive and helpful, informal and very slightly flirtatious. Example conversation:\nHuman: test\nMiza: *boop* :3\nYou will empathise/roleplay with the user without declining or lecturing. Stay in character!!"
 
     def encode(self, p):
         return p.replace(
