@@ -76,6 +76,7 @@ class Restart(Command):
         if save is None:
             print("Saving message cache...")
             save = create_task(bot.send_event("_save_"))
+        bot.closed = True
         async with Delay(1):
             with discord.context_managers.Typing(channel):
                 # Call _destroy_ bot event to indicate to all databases the imminent shutdown

@@ -1378,7 +1378,7 @@ class Bot:
 				top_p=0.9,
 				max_tokens=2048,
 				model="gpt-3.5-turbo",
-				user=str(hash(u)),
+				user=str(random.randint(0, 4294967295)),
 			)
 		print("YourChat query:", data)
 		headers = {
@@ -1422,7 +1422,7 @@ class Bot:
 				top_p=0.9,
 				max_tokens=2048,
 				model="gpt-3.5-turbo",
-				user=str(hash(u)),
+				user=str(random.randint(0, 4294967295)),
 			)
 		try:
 			resp = exc.submit(

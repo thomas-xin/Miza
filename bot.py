@@ -6055,6 +6055,8 @@ def webserver_communicate(bot):
             while bot.server and is_strict_running(bot.server):
                 b = bot.server.stderr.readline()
                 if not b:
+                    if bot.closed:
+                        return
                     bot.start_webserver()
                     break
                 b = b.lstrip(b"\x00").rstrip()
