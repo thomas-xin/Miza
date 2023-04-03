@@ -42,7 +42,7 @@ class Translate(Command):
             raise RuntimeError("Unable to load Google Translate.")
         if not argv:
             raise ArgumentError("Input string is empty.")
-        trans.client.headers.update(Request.header())
+        self.trans.client.headers.update(Request.header())
         spl = argv.split(" ", 3)
         if len(spl) > 1 and spl[0] in ("google", "chatgpt"):
             engine = spl.pop(0)
@@ -67,14 +67,18 @@ class Translate(Command):
             dests.remove(src)
             translated[0] = text
         odest = tuple(dests)
+        if src == "auto":
+            fut = create_future(self.trans.translate, arg, src=src, dest=dest)
+        else:
+            fut = None
         if engine == "chatgpt":
             await self.chatgpt_translate(user, text, src, dests, translated, comments)
         elif engine == "google":
             await self.google_translate(user, text, src, dests, translated, comments)
         else:
             raise NotImplementedError(engine)
-        if src == "auto":
-            resp = await create_future(self.trans.translate, arg, src=src, dest=dest)
+        if fut:
+            resp = await fut
             footer = dict(text=f"Detected language: {resp.src}")
             if getattr(resp, "extra_data", None) and resp.extra_data.get("origin_pronunciation"):
                 footer["text"] += "\nOriginal pronunciation: " + resp.extra_data["origin_pronunciation"]
