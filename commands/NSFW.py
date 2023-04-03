@@ -438,7 +438,7 @@ class Verify(Command):
     no_parse = True
     rate_limit = (1, 6)
 
-    async def __call__(self, bot, user, channel, guild, name, **void):
+    async def __call__(self, bot, user, channel, guild, name, flags, **void):
         if not bot.is_nsfw(channel):
             raise PermissionError(f"This command is only available in {uni_str('NSFW')} channels.")
         following = bot.data.nsfw
