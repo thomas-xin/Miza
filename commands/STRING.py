@@ -56,6 +56,8 @@ class Translate(Command):
         dests = []
         while len(spl) > 1 and (dest := (self.renamed.get(c := spl[0].casefold()) or (self.languages.get(c) and c))):
             spl.pop(0)
+            if len(spl) == 1:
+                spl = spl[0].split(" ", 1)
             dest = lim_str(dest, 32)
             dests.append(dest)
         if not dests:
