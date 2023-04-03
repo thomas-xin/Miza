@@ -2324,7 +2324,7 @@ class UpdateUserLogs(Database):
 class UpdateMessageCache(Database):
     name = "message_cache"
     # no_file = True
-    # files = "saves/message_cache"
+    files = "saves/message_cache"
     raws = {}
     loaded = {}
     saving = {}
