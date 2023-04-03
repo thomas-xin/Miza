@@ -81,7 +81,7 @@ class Translate(Command):
             if s2 == d:
                 return True
             d2 = self.languages.get(d) or d
-            if s2 = d2:
+            if s2 == d2:
                 return True
             if s == d2:
                 return True
