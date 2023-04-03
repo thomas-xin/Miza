@@ -95,10 +95,12 @@ class Translate(Command):
         output = ""
         for lang, i in zip(odest, translated):
             tran, comm = translated[i], comments.get(i)
-            output += bold((googletrans.LANGUAGES.get(lang.casefold()) or lang).capitalize()) + "\n" + tran
+            lname = (googletrans.LANGUAGES.get(lang.casefold()) or lang).capitalize()
+            output += bold(lname) + "\n" + tran.removeprefix(lname).strip(": ")
             if comm:
                 output += "\n> " + comm
-        self.bot.send_as_embeds(channel, output, author=get_author(user), footer=footer, reference=message)
+            output += "\n"
+        self.bot.send_as_embeds(channel, output.strip(), author=get_author(user), footer=footer, reference=message)
 
     async def google_translate(self, bot, guild, channel, user, text, src, dests, translated, comments):
 
