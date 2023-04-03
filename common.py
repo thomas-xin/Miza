@@ -830,6 +830,7 @@ class FileHashDict(collections.abc.MutableMapping):
                 os.remove(fn + "\x7f")
             with suppress(FileNotFoundError):
                 os.remove(fn + "\x7f\x7f")
+        t = utc()
         for fn in (f.path for f in os.scandir(self.path) if f.name.endswith("\x7f") and t - f.stat().st_mtime > 3600):
             with suppress(FileNotFoundError, PermissionError):
                 os.remove(fn)
