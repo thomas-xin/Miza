@@ -197,6 +197,8 @@ class Translate(Command):
         while lines and dests:
             line = lines.pop(0)
             lang = dests.pop(0)
+            if lines and not dests:
+                line += "\n" + "\n".join(lines)
             lname = (googletrans.LANGUAGES.get(lang.casefold()) or lang).capitalize()
             line = line.removeprefix("Informal ").removeprefix(lname).removeprefix(":").strip()
             i = len(futs)
