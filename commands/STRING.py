@@ -35,6 +35,7 @@ class Translate(Command):
     if googletrans:
         languages = demap(googletrans.LANGUAGES)
         trans = googletrans.Translator()
+        trans.client = s = requests.Session()
         renamed = dict(chinese="zh-cn", zh="zh-cn", auto="auto", automatic="auto", none="auto", null="auto")
 
     async def __call__(self, bot, guild, channel, argv, user, message, **void):
@@ -84,7 +85,8 @@ class Translate(Command):
             raise NotImplementedError(engine)
         if fut:
             resp = await fut
-            footer = dict(text=f"Detected language: {resp.src}")
+            src = resp.src.casefold()
+            footer = dict(text=f"Detected language: {(googletrans.LANGUAGES.get(src) or src).capitalize()}")
             if getattr(resp, "extra_data", None) and resp.extra_data.get("origin_pronunciation"):
                 footer["text"] += "\nOriginal pronunciation: " + resp.extra_data["origin_pronunciation"]
         else:
@@ -93,7 +95,7 @@ class Translate(Command):
         output = ""
         for lang, i in zip(odest, translated):
             tran, comm = translated[i], comments.get(i)
-            output += bold((googletrans.LANGUAGES.get(lang) or lang).capitalize()) + "\n" + tran
+            output += bold((googletrans.LANGUAGES.get(lang.casefold()) or lang).capitalize()) + "\n" + tran
             if comm:
                 output += "\n> " + comm
         self.bot.send_as_embeds(channel, output, author=get_author(user), footer=footer, reference=message)
@@ -121,7 +123,7 @@ class Translate(Command):
             prompt = f"{text}\n\nTranslate the above from {src} informally into "
         else:
             prompt = f"{text}\n\nTranslate the above informally into "
-        prompt += ",".join((googletrans.LANGUAGES.get(lang) or lang).capitalize() for lang in dests) + ', beginning with "⦚".'
+        prompt += ",".join((googletrans.LANGUAGES.get(lang) or lang).capitalize() for lang in dests) + ', beginning with "•".'
         if bot.is_trusted(guild) >= 2:
             for uid in bot.data.trusted[guild.id]:
                 if uid and bot.premium_level(uid, absolute=True) >= 2:
@@ -165,7 +167,7 @@ class Translate(Command):
                     bot.data.token_balances[oai] -= cost * 6 // 5
                 except KeyError:
                     bot.data.token_balances[oai] = -cost * 6 // 5
-        lines = [line2 for line in out.split("⦚") if (line2 := line.strip())]
+        lines = [line2 for line in out.split("•") if (line2 := line.strip())]
         print("ChatGPT Translate:", user, text, src, dests, lines)
 
         async def translate_into(arg, src, dest, i):

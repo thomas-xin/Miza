@@ -1365,7 +1365,7 @@ class Bot:
 			print_exc()
 			self.vis_r = time.time() + 86400
 			return ""
-		return "\n".join(line.strip().removeprefix("<p>").removesuffix("</p>").strip() for line in data["response"].replace("<br>", "\n").splitlines()).replace("<em>", "*").replace("</em>", "*")
+		return "\n".join(line.strip().removeprefix("<p>").removesuffix("</p>").strip() for line in data["response"].replace("<br>", "\n").splitlines()).replace("<em>", "*").replace("</em>", "*").replace("<ul>", "").replace("</ul>", "").replace("<li>", "•").replace("</li>", "")
 
 	you_r = 0
 	def ycg(self, data):
