@@ -93,6 +93,7 @@ class Translate(Command):
         self.bot.send_as_embeds(channel, output, author=get_author(user), footer=footer, reference=message)
 
     async def google_translate(self, user, text, src, dests, translated, comments):
+        bot = self.bot
 
         async def translate_into(arg, src, dest, i):
             resp = await create_future(self.trans.translate, arg, src=src, dest=dest)
@@ -109,6 +110,7 @@ class Translate(Command):
             await fut
 
     async def chatgpt_translate(self, user, text, src, dests, translated, comments):
+        bot = self.bot
         uid = user.id
         if src and src != "auto":
             src = googletrans.LANGUAGES.get(src) or src
