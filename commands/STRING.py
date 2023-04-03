@@ -26,7 +26,7 @@ class Translate(Command):
     time_consuming = True
     name = ["TR"]
     description = "Translates a string into another language."
-    usage = "<0:language(en)>? <1:string>"
+    usage = "<2:engine{google|chatgpt}>? <1:src_language(en)>? <0:dest_languages(en)>* <-1:string>"
     example = ("translate english 你好", "tr zh-cn bonjour")
     flags = "v"
     no_parse = True
@@ -35,30 +35,142 @@ class Translate(Command):
     if googletrans:
         languages = demap(googletrans.LANGUAGES)
         trans = googletrans.Translator()
-        trans.client.headers["DNT"] = "1"
+        renamed = dict(chinese="zh-cn", zh="zh-cn")
 
-    async def __call__(self, channel, argv, user, message, **void):
+    async def __call__(self, bot, guild, channel, argv, user, message, **void):
         if not googletrans:
             raise RuntimeError("Unable to load Google Translate.")
         if not argv:
             raise ArgumentError("Input string is empty.")
-        self.trans.client.headers["X-Forwarded-For"] = ".".join(str(xrand(1, 255)) for _ in loop(4))
-        try:
-            lang, arg = argv.split(None, 1)
-        except ValueError:
-            lang = "en"
-            arg = argv
+        trans.client.headers.update(Request.header())
+        spl = argv.split(" ", 3)
+        if len(spl) > 1 and spl[0] in ("google", "chatgpt"):
+            engine = spl.pop(0)
         else:
-            if lang.casefold() not in self.languages:
-                arg = argv
-                lang = "en"
-        resp = await create_future(self.trans.translate, arg, dest=lang)
-        footer = dict(text=f"Detected language: {resp.src}")
-        if getattr(resp, "pronunciation", None):
-            fields = (("Pronunciation", resp.pronunciation),)
+            engine = "google"
+        if len(spl) > 2 and (src := (self.renamed.get(c := spl[0].casefold()) or (self.languages.get(c) and c))):
+            spl.pop(0)
+            src = lim_str(src, 32)
         else:
-            fields = None
-        self.bot.send_as_embeds(channel, resp.text, fields=fields, author=get_author(user), footer=footer, reference=message)
+            src = "auto"
+        dests = []
+        while len(spl) > 1 and (dest := (self.renamed.get(c := spl[0].casefold()) or (self.languages.get(c) and c))):
+            spl.pop(0)
+            dest = lim_str(dest, 32)
+            dests.append(dest)
+        if not dests:
+            dests.append("en")
+        text = " ".join(spl)
+        translated = {}
+        comments = {}
+        if src in dests:
+            dests.remove(src)
+            translated[0] = text
+        odest = tuple(dests)
+        if engine == "chatgpt":
+            await self.chatgpt_translate(user, text, src, dests, translated, comments)
+        elif engine == "google":
+            await self.google_translate(user, text, src, dests, translated, comments)
+        else:
+            raise NotImplementedError(engine)
+        if src == "auto":
+            resp = await create_future(self.trans.translate, arg, src=src, dest=dest)
+            footer = dict(text=f"Detected language: {resp.src}")
+            if getattr(resp, "extra_data", None) and resp.extra_data.get("origin_pronunciation"):
+                footer["text"] += "\nOriginal pronunciation: " + resp.extra_data["origin_pronunciation"]
+        else:
+            footer = None
+        output = ""
+        for lang, i in zip(odest, translated):
+            tran, comm = translated[i], comments.get(i)
+            output += bold(lang) + "\n" + tran
+            if comm:
+                output += "\n> " + comm
+        self.bot.send_as_embeds(channel, output, author=get_author(user), footer=footer, reference=message)
+
+    async def chatgpt_translate(user, text, src, dests, translated, comments):
+        uid = user.id
+        if src and src != "auto":
+            src = googletrans.LANGUAGES.get(src) or src
+            prompt = f"{text}\n\nTranslate the above from {src} informally into "
+        else:
+            prompt = f"{text}\n\nTranslate the above informally into "
+        prompt += ",".join(dest) + ', beginning with "⦚".'
+        if bot.is_trusted(guild) >= 2:
+            for uid in bot.data.trusted[guild.id]:
+                if uid and bot.premium_level(uid, absolute=True) >= 2:
+                    break
+            else:
+                uid = next(iter(bot.data.trusted[guild.id]))
+            u = await bot.fetch_user(uid)
+        else:
+            u = user
+        data = bot.data.users.get(u.id, {})
+        oai = data.get("trial") and data.get("openai_key")
+        inputs = dict(
+            prompt=prompt,
+            key=AUTH.get("openai_key"),
+            huggingface_token=AUTH.get("huggingface_key"),
+            vis_session=AUTH.get("vis_session"),
+            bals={k: v for k, v in bot.data.token_balances.items() if v < 0},
+            oai=oai,
+            nsfw=bot.is_nsfw(channel),
+        )
+        resp = await process_image("CBAI", "$", [inputs], fix=1, timeout=192)
+        out = tup[0]
+        cost = 0
+        uoai = None
+        if len(tup) > 1:
+            cost = tup[1]
+            if len(tup) > 2:
+                uoai = tup[2]
+        if cost:
+            if "costs" in bot.data:
+                bot.data.costs.put(user.id, cost)
+                if guild:
+                    bot.data.costs.put(guild.id, cost)
+            if uoai:
+                try:
+                    bot.data.token_balances[uoai] -= cost
+                except KeyError:
+                    bot.data.token_balances[uoai] = -cost
+            elif oai and oai != AUTH.get("openai_key"):
+                try:
+                    bot.data.token_balances[oai] -= cost * 6 // 5
+                except KeyError:
+                    bot.data.token_balances[oai] = -cost * 6 // 5
+        lines = [line2 for line in out.split("⦚") if (line2 := line.strip())]
+        print("ChatGPT Translate:", user, text, src, dests, lines)
+
+        async def translate_into(arg, src, dest, i):
+            translated[i] = line
+            resp = await create_future(self.trans.translate, arg, src=src, dest=dest)
+            if getattr(resp, "extra_data", None) and resp.extra_data.get("origin_pronunciation"):
+                comments[i] = resp.extra_data["origin_pronunciation"]
+
+        futs = deque()
+        while lines and dests:
+            line = lines.pop(0)
+            i = len(translated)
+            futs.append(create_task(translate_into(line, dests.pop(0), src, i)))
+        for fut in futs:
+            await fut
+
+    def google_translate(user, text, src, dests, translated, comments):
+
+        async def translate_into(arg, src, dest, i):
+            resp = await create_future(self.trans.translate, arg, src=src, dest=dest)
+            translated[i] = resp.text
+            if getattr(resp, "pronunciation", None):
+                comments[i] = resp.pronunciation
+
+        futs = deque()
+        while dests:
+            dest = dests.pop(0)
+            i = len(translated)
+            futs.append(create_task(translate_into(text, src, dests.pop(0), i)))
+        for fut in futs:
+            await fut
 
 
 class Math(Command):
@@ -1196,6 +1308,7 @@ class Ask(Command):
             out = tup[0]
             cost = 0
             caids = ()
+            uoai = None
             expapi = None
             if len(tup) > 1:
                 cost = tup[1]
@@ -1413,14 +1526,15 @@ class Personality(Command):
             return ini_md(f"My current personality for {sqr_md(channel)} is {sqr_md(p)}. Enter keywords for this command to modify the AI for default GPT-based chat, or enter \"default\" to reset.")
         if len(argv) > 512:
             raise OverflowError("Maximum currently supported personality prompt size is 512 characters.")
-        if max(bot.is_trusted(guild), bot.premium_level(user) * 2) < 2:
-            raise PermissionError(f"Sorry, this feature is currently for premium users only. Please make sure you have a subscription level of minimum 1 from {bot.kofi_url}, or try out ~trial if you would like to manage/fund your own usage!")
+        # if max(bot.is_trusted(guild), bot.premium_level(user) * 2) < 2:
+        #     raise PermissionError(f"Sorry, this feature is currently for premium users only. Please make sure you have a subscription level of minimum 1 from {bot.kofi_url}, or try out ~trial if you would like to manage/fund your own usage!")
         p = self.encode(argv)
         if not bot.is_nsfw(channel):
             import openai
             inappropriate = False
             openai.api_key = AUTH["openai_key"]
-            resp = openai.Moderation.create(
+            resp = await create_future(
+                openai.Moderation.create,
                 input=p,
             )
             results = resp.results[0].categories

@@ -2457,6 +2457,28 @@ def CBAI(inputs):
 			im = get_image(im)
 	return cb.ai(*prompt, refs=refs, im=im)
 
+def CBAU(inputs):
+	prompt = inputs["prompt"]
+	key = inputs["key"]
+	ht = inputs["huggingface_token"]
+	vis = inputs.get("vis_session")
+	oai = inputs.get("oai")
+	bals = inputs.get("bals")
+	nsfw = inputs.get("nsfw")
+	try:
+		cb = CBOTS["TR"]
+	except KeyError:
+		cb = CBOTS["TR"] = convobot.Bot( 
+			key=key,
+			huggingface_token=ht,
+			premium=0,
+		)
+		cb.vis_s = vis
+	cb.oai = oai
+	cb.bals = bals
+	cb.nsfw = nsfw
+	return cb.au(prompt, refs=refs, im=im)
+
 VGPT = VVQA = None
 def caption(im, q=None, cid=None):
 	for i in range(3):

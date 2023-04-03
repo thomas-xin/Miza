@@ -523,7 +523,7 @@ class Bot:
 		return "".join(out)
 
 	# tokeniser = None
-	def gpttokens(self, s, model="gpt2"):
+	def gpttokens(self, s, model="gpt-3.5-turbo"):
 		# if not self.tokeniser:
 		# 	self.tokeniser = GPT2TokenizerFast.from_pretrained("gpt2")
 		# return self.tokeniser(s)["input_ids"]
@@ -654,8 +654,8 @@ class Bot:
 				nend = ""
 			m = dict(role="system", content=nstart)
 			messages = [m]
-			pc = len(self.gpttokens(m["role"], "text-davinci-003"))
-			pc += len(self.gpttokens(m["content"], "text-davinci-003"))
+			pc = len(self.gpttokens(m["role"]))
+			pc += len(self.gpttokens(m["content"]))
 			ins.pop(0)
 			iman = []
 			for line in reversed(ins):
@@ -743,8 +743,16 @@ class Bot:
 					mes.insert(0, m)
 					stop = ["@", "AI language model"]
 					try:
-						data = dict(messages=[dict(role=m["role"], content=m["content"]) for m in mes], temperature=0, top_p=0, stop=stop, max_tokens=32, model="gpt-3.5-turbo")
-						text = self.ycg(data, headers=headers) or "@"
+						data = dict(
+							messages=[dict(role=m["role"], content=m["content"]) for m in mes],
+							temperature=0,
+							top_p=0,
+							max_tokens=32,
+							stop=stop,
+							model="gpt-3.5-turbo",
+							user=str(hash(u)),
+						)
+						text = self.ycg(data) or "@"
 					except EOFError:
 						pass
 					except:
@@ -760,6 +768,7 @@ class Bot:
 								max_tokens=32,
 								stop=stop,
 								model="gpt-3.5-turbo",
+								user=str(hash(u)),
 							).result(timeout=8)
 						except concurrent.futures.TimeoutError:
 							print_exc()
@@ -836,7 +845,7 @@ class Bot:
 			if not self.bl:
 				print("GPT prompt:", prompt)
 			sys.stdout.flush()
-			pc = len(self.gpttokens(prompt, "text-davinci-003"))
+			pc = len(self.gpttokens(prompt, model))
 		response = None
 		text = ""
 		uoai = None
@@ -971,8 +980,18 @@ class Bot:
 						raise PermissionError("flagged")
 					if not random.randint(0, 2) and model == "gpt-3.5-turbo":
 						try:
-							data = dict(messages=messages, temperature=temp, max_tokens=512, frequency_penalty=1.0, presence_penalty=0.6, top_p=1, stop=stop, model="gpt-3.5-turbo")
-							text = self.ycg(data, headers=headers).removeprefix(f"{self.name}: ")
+							data = dict(
+								model=model,
+								messages=messages,
+								temperature=temp,
+								max_tokens=min(2048, limit - pc - 64),
+								top_p=1,
+								stop=stop,
+								frequency_penalty=1.0,
+								presence_penalty=0.6,
+								user=str(hash(u)),
+							)
+							text = self.ycg(data).removeprefix(f"{self.name}: ")
 						except EOFError:
 							pass
 						except:
@@ -1013,7 +1032,7 @@ class Bot:
 						model=model,
 						messages=messages,
 						temperature=temp,
-						max_tokens=min(512, limit - pc - 64),
+						max_tokens=min(2048, limit - pc - 64),
 						top_p=1,
 						stop=stop,
 						# logit_bias={self.gpttokens("AI", model)[0]: -0.5},
@@ -1071,8 +1090,8 @@ class Bot:
 			if response:
 				cost += response["usage"]["prompt_tokens"] * cm * costs
 				cost += response["usage"].get("completion_tokens", 0) * (cm2 or cm) * costs
-				if len(self.gpttokens(text)) > 512:
-					text = self.answer_summarise(q=text, max_length=500, min_length=256).strip()
+				# if len(self.gpttokens(text)) > 512:
+				# 	text = self.answer_summarise(q=text, max_length=500, min_length=256).strip()
 		if not text:
 			if not prompt:
 				prompt = "".join(reversed(ins))
@@ -1096,7 +1115,7 @@ class Bot:
 					model=model,
 					prompt=prompt,
 					temperature=temp,
-					max_tokens=min(512, limit - pc - 64),
+					max_tokens=min(768, limit - pc - 64),
 					top_p=1,
 					stop=[f"{self.name}: "],
 					frequency_penalty=0.8,
@@ -1108,7 +1127,7 @@ class Bot:
 					model=model,
 					prompt=prompt,
 					temperature=temp,
-					max_tokens=min(384, int((limit - pc) * 0.75)),
+					max_tokens=min(512, int((limit - pc) * 0.75)),
 					top_p=1,
 					frequency_penalty=0.8,
 					presence_penalty=0.4,
@@ -1349,11 +1368,25 @@ class Bot:
 		return "\n".join(line.strip().removeprefix("<p>").removesuffix("</p>").strip() for line in data["response"].replace("<br>", "\n").splitlines()).replace("<em>", "*").replace("</em>", "*")
 
 	you_r = 0
-	def ycg(self, data, headers={}):
+	def ycg(self, data):
 		if self.you_r > time.time():
 			raise EOFError
+		if isinstance(data, str):
+			data = dict(
+				messages=[dict(role="user", content=data) for m in mes],
+				temperature=0.7,
+				top_p=0.9,
+				max_tokens=2048,
+				model="gpt-3.5-turbo",
+				user=str(hash(u)),
+			)
 		print("YourChat query:", data)
-		headers["Content-Type"] = "text/plain"
+		headers = {
+			"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
+			"DNT": "1",
+			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
+			"Content-Type": "text/plain"
+		}
 		resp = self.session.post(
 			"https://your-chat-gpt.vercel.app/api/openai-stream",
 			data=json.dumps(data),
@@ -1368,6 +1401,55 @@ class Bot:
 			self.you_r = time.time() + 3600
 			return ""
 		return resp.text
+
+	def cgp(self, data):
+		oai = getattr(self, "oai", None)
+		bals = getattr(self, "bals", {})
+		uoai = None
+		if oai:
+			openai.api_key = oai
+			costs = 0
+		elif bals:
+			openai.api_key = uoai = sorted(bals, key=bals.get)[0]
+			costs = -1
+		else:
+			openai.api_key = self.key
+			costs = 1
+		if isinstance(data, str):
+			data = dict(
+				messages=[dict(role="user", content=data) for m in mes],
+				temperature=0.7,
+				top_p=0.9,
+				max_tokens=2048,
+				model="gpt-3.5-turbo",
+				user=str(hash(u)),
+			)
+		try:
+			resp = exc.submit(
+				openai.ChatCompletion.create,
+				**data,
+			).result(timeout=60)
+		except concurrent.futures.TimeoutError:
+			print_exc()
+		else:
+			if resp:
+				cost += resp["usage"]["prompt_tokens"] * cm * costs
+				cost += resp["usage"].get("completion_tokens", 0) * (cm2 or cm) * costs
+				text = resp["choices"][0]["message"]["content"]
+				return text, cost, uoai
+
+	def au(self, prompt):
+		funcs = [self.chatgpt, self.vai, self.ycg, self.cgp]
+		random.shuffle(funcs)
+		resp = None
+		while not resp:
+			try:
+				resp = funcs.pop(0)(prompt)
+			except EOFError:
+				pass
+		if not isinstance(resp, tuple):
+			return (resp,)
+		return resp
 
 	def ai(self, u, q, refs=(), im=None):
 		tup = (u, q)

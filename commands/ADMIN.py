@@ -2497,15 +2497,15 @@ class UpdateMessageCache(Database):
                     break
             if deleted >= 8:
                 print(f"Message Database: {deleted} files deleted.")
-            if os.path.exists(self.files + "/~"):
+            if os.path.exists(self.files + "/~~~"):
                 self.setmtime()
 
     def getmtime(self):
         try:
-            return os.path.getmtime(self.files + "/~")
+            return os.path.getmtime(self.files + "/~~~")
         except FileNotFoundError:
             return utc() - 28 * 86400
-    setmtime = lambda self: open(self.files + "/~", "wb").close()
+    setmtime = lambda self: open(self.files + "/~~~", "wb").close()
 
     async def _minute_loop_(self):
         await self._save_()

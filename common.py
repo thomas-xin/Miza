@@ -604,10 +604,7 @@ class FileHashDict(collections.abc.MutableMapping):
                 gen.update(self.comp)
             if self.codb:
                 gen.update(self.codb)
-            gen.discard("~")
-            gen.discard("~~")
-            gen.discard("~~-journal")
-            self.iter = alist(gen)
+            self.iter = alist(i for i in gen if not isinstance(i, str) or not i.startswith("~"))
         return self.iter
 
     def values(self):
@@ -645,7 +642,7 @@ class FileHashDict(collections.abc.MutableMapping):
                             data = select_and_loads(self.decode(s), mode="unsafe")
                             self.data[k] = data
                             return data
-                    elif k == "~~":
+                    elif k.startswith("~"):
                         raise TypeError("Attempted to load SQL database inappropriately")
                 raise KeyError(k)
         with self.sem:
@@ -782,10 +779,7 @@ class FileHashDict(collections.abc.MutableMapping):
             self.comp.discard(k)
         if not self.c_updated:
             t = utc()
-            old = {try_int(f.name) for f in os.scandir(self.path) if not f.name.endswith("\x7f") and t - f.stat().st_mtime > 3600}
-            old.discard("~")
-            old.discard("~~")
-            old.discard("~~-journal")
+            old = {try_int(f.name) for f in os.scandir(self.path) if not f.name.endswith("\x7f") and not f.name.startswith("~") and t - f.stat().st_mtime > 3600}
             old.update(self.comp)
             if old:
                 if self.deleted:
