@@ -2160,6 +2160,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             premiums.subscribe(user, lv)
         return lv
 
+    def is_nsfw(self, channel):
+        if is_nsfw(channel):
+            return True
+        if "nsfw" in self.data and getattr(channel, "recipient", None):
+            return self.data.nsfw.get(channel.recipient.id, False)
+
     async def donate(self, name, uid, amount, msg):
         channel = self.get_channel(320915703102177293)
         if not channel:
@@ -4219,7 +4225,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 me = bot.user
                 name = "DM"
                 topic = None
-                is_nsfw = lambda *self: True
+                is_nsfw = lambda self: bot.is_nsfw(self.channel)
                 is_news = lambda *self: False
 
             def __init__(self, user, channel, **void):

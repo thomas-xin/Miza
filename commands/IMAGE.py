@@ -1569,7 +1569,7 @@ class Art(Command):
                 req += " " + url2
         if specified:
             req += " ".join(f"{k} {v}" for k, v in kwargs.items() if k in specified)
-        nsfw = is_nsfw(channel)
+        nsfw = bot.is_nsfw(channel)
         if not nsfw and prompt and "openai_key" in AUTH:
             import openai
             openai.api_key = AUTH["openai_key"]

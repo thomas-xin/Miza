@@ -340,7 +340,7 @@ class Neko(Command):
         return self.bot.data.imagepools.get(file, fetch, self.threshold, args=(nekos, tag))
 
     async def __call__(self, bot, channel, flags, args, argv, **void):
-        isNSFW = is_nsfw(channel)
+        isNSFW = bot.is_nsfw(channel)
         if "l" in flags or argv == "list":
             text = "Available tags in **" + channel.name + "**:\n```ini\n"
             available = [k for k, v in neko_tags.items() if not v or isNSFW]
@@ -355,6 +355,8 @@ class Neko(Command):
                 if neko_tags.get(tag, 0) == True:
                     tagNSFW = True
                     if not isNSFW:
+                        if hasattr(channel, "recipient"):
+                            raise PermissionError(f"This tag is only available in {uni_str('NSFW')} channels. Please verify your age using ~verify within a NSFW channel to enable NSFW in DMs.")
                         raise PermissionError(f"This tag is only available in {uni_str('NSFW')} channels.")
                 selected.append(tag)
         if "r" in flags:
@@ -407,8 +409,10 @@ class Lewd(Command):
     no_parse = True
     rate_limit = (1, 6)
 
-    async def __call__(self, args, flags, message, channel, **void):
-        if not is_nsfw(channel):
+    async def __call__(self, bot, args, flags, message, channel, **void):
+        if not bot.is_nsfw(channel):
+            if hasattr(channel, "recipient"):
+                raise PermissionError(f"This command is only available in {uni_str('NSFW')} channels. Please verify your age using ~verify within a NSFW channel to enable NSFW in DMs.")
             raise PermissionError(f"This command is only available in {uni_str('NSFW')} channels.")
         objs = await searchRandomNSFW(" ".join(args), 12)
         url = verify_url(objs[0].strip().replace(" ", "%20"))
@@ -423,3 +427,28 @@ class Lewd(Command):
         embed = discord.Embed(colour=await self.bot.get_colour(url))
         embed.set_image(url=url)
         await send_with_react(channel, embed=embed, reacts="🔳")
+
+
+class Verify(Command):
+    name = ["AgeVerify"]
+    min_level = 0
+    description = "Verifies your account age as 18+, allowing you to access NSFW-restricted commands within DM channels."
+    usage = "(enable|disable)?"
+    example = ("verify enable", "verify disable")
+    no_parse = True
+    rate_limit = (1, 6)
+
+    async def __call__(self, bot, user, channel, guild, name, **void):
+        if not bot.is_nsfw(channel):
+            raise PermissionError(f"This command is only available in {uni_str('NSFW')} channels.")
+        following = bot.data.nsfw
+        curr = following.get(guild.id)
+        if "d" in flags:
+            following.pop(guild.id, None)
+            return italics(css_md(f"Disabled NSFW DMs for {sqr_md(user)}."))
+        elif "e" in flags or "a" in flags:
+            following[guild.id] = True
+            return italics(css_md(f"Enabled NSFW DMs for {sqr_md(user)}."))
+        if not curr:
+            return ini_md(f'NSFW DMs are currently disabled for {sqr_md(user)}. Use "{bot.get_prefix(guild)}{name} enable" to enable.')
+        return ini_md(f"NSFW DMs are currently disabled for {sqr_md(user)}.")

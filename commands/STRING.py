@@ -1188,7 +1188,7 @@ class Ask(Command):
                 bals={k: v for k, v in bot.data.token_balances.items() if v < 0},
                 oai=oai,
                 bl=bl,
-                nsfw=is_nsfw(channel),
+                nsfw=bot.is_nsfw(channel),
             )
             if fut:
                 await fut
@@ -1416,7 +1416,7 @@ class Personality(Command):
         if max(bot.is_trusted(guild), bot.premium_level(user) * 2) < 2:
             raise PermissionError(f"Sorry, this feature is currently for premium users only. Please make sure you have a subscription level of minimum 1 from {bot.kofi_url}, or try out ~trial if you would like to manage/fund your own usage!")
         p = self.encode(argv)
-        if not is_nsfw(channel):
+        if not bot.is_nsfw(channel):
             import openai
             inappropriate = False
             openai.api_key = AUTH["openai_key"]
@@ -1430,7 +1430,7 @@ class Personality(Command):
             if inappropriate:
                 raise PermissionError(
                     "Apologies, my AI has detected that your input may be inappropriate.\n"
-                    + "Please reword or consider contacting the support server if you believe this is a mistake!"
+                    + "Please move to a NSFW channel, reword, or consider contacting the support server if you believe this is a mistake!"
                 )
         bot.data.personalities[channel.id] = p
         bot.data.chat_histories.pop(channel.id, None)
@@ -1522,8 +1522,10 @@ class Topic(Command):
         elif "p" in flags:
             return "\u200b" + choice(bot.data.users.pickup_lines)
         elif "n" in flags:
-            if is_nsfw(channel):
+            if bot.is_nsfw(channel):
                 return "\u200b" + choice(bot.data.users.nsfw_pickup_lines)
+            if hasattr(channel, "recipient"):
+                raise PermissionError(f"This tag is only available in {uni_str('NSFW')} channels. Please verify your age using ~verify within a NSFW channel to enable NSFW in DMs.")
             raise PermissionError(f"This tag is only available in {uni_str('NSFW')} channels.")
         return "\u200b" + choice(bot.data.users.questions)
 
