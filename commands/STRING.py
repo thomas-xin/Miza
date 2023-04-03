@@ -35,7 +35,7 @@ class Translate(Command):
     if googletrans:
         languages = demap(googletrans.LANGUAGES)
         trans = googletrans.Translator()
-        renamed = dict(chinese="zh-cn", zh="zh-cn")
+        renamed = dict(chinese="zh-cn", zh="zh-cn", auto="auto", automatic="auto", none="auto", null="auto")
 
     async def __call__(self, bot, guild, channel, argv, user, message, **void):
         if not googletrans:
@@ -68,7 +68,7 @@ class Translate(Command):
             translated[0] = text
         odest = tuple(dests)
         if src == "auto":
-            fut = create_future(self.trans.translate, text, src=src, dest=dest)
+            fut = create_future(self.trans.translate, text, src=src, dest=dests[0])
         else:
             fut = None
         if engine == "google":
