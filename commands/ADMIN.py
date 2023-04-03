@@ -2330,8 +2330,8 @@ class UpdateMessageCache(Database):
     saving = {}
     save_sem = Semaphore(1, 512, 5, 30)
     search_sem = Semaphore(20, 512, rate_limit=5)
-    encode = encrypt
-    decode = decrypt
+    encode = lambda s, e: encrypt(e)
+    decode = lambda s, e: decrypt(e)
 
     # def __init__(self, *args):
     #     super().__init__(*args)
