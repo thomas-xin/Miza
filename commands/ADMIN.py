@@ -2393,7 +2393,7 @@ class UpdateMessageCache(Database):
     def save_message(self, message):
         fn = self.get_fn(message.id)
         saving = self.saving.setdefault(fn, {})
-        saving[message.id] = message
+        saving[fn] = message
         return message
 
     def saves(self, fn, messages):
