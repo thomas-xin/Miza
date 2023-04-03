@@ -972,7 +972,7 @@ class Bot:
 					if not random.randint(0, 2) and model == "gpt-3.5-turbo":
 						try:
 							data = dict(messages=messages, temperature=temp, max_tokens=512, frequency_penalty=1.0, presence_penalty=0.6, top_p=1, stop=stop, model="gpt-3.5-turbo")
-							text = self.ycg(data, headers=headers)
+							text = self.ycg(data, headers=headers).removeprefix(f"{self.name}: ")
 						except EOFError:
 							pass
 						except:
