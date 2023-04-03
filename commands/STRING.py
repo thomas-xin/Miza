@@ -69,10 +69,10 @@ class Translate(Command):
 
         if src == "auto":
             resp2 = await create_future(self.trans.translate, text, src="auto", dest="en")
-            src2 = resp2.src
+            src2 = resp2.src.casefold()
         else:
             resp2 = None
-            src2 = src
+            src2 = src.casefold()
 
         def equiv(s, d):
             if s == d:
@@ -88,9 +88,10 @@ class Translate(Command):
 
         odest = tuple(dests)
         dests = [d for d in dests if not equiv(d, src2)]
-        if len(odest) != len(dests):
-            translated[-1] = text
-            odest = (src2,) + tuple(dests)
+        # if len(odest) != len(dests):
+        #     translated[-1] = text
+        #     odest = (src2,) + tuple(dests)
+        odest = tuple(dests)
         if engine == "google":
             await self.google_translate(bot, guild, channel, user, text, src, dests, translated, comments)
         elif engine == "chatgpt":
