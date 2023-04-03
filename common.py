@@ -751,9 +751,12 @@ class FileHashDict(collections.abc.MutableMapping):
         self.data.clear()
         self.cur.execute(f"DELETE FROM '{self.path}'")
         self.codb.clear()
-        with suppress(FileNotFoundError):
+        try:
             shutil.rmtree(self.path)
-        os.mkdir(self.path)
+        except (PermissionError, FileNotFoundError):
+            pass
+        else:
+            os.mkdir(self.path)
         return self
 
     def __update__(self):
@@ -795,7 +798,7 @@ class FileHashDict(collections.abc.MutableMapping):
                     with tracebacksuppressor:
                         d = self[k]
                         deleted.append(k)
-                        d = select_and_dumps(self.encode(d), mode="unsafe", compress=True)
+                        d = self.encode(select_and_dumps(d, mode="unsafe", compress=True))
                         self.cur.execute(
                             f"INSERT INTO '{self.path}' ('key', 'value') VALUES ('{k}', ?) "
                                 + "ON CONFLICT(key) DO UPDATE SET 'value' = ?",
@@ -821,7 +824,7 @@ class FileHashDict(collections.abc.MutableMapping):
             except KeyError:
                 self.deleted.add(k)
                 continue
-            s = select_and_dumps(self.encode(d), mode="unsafe", compress=True)
+            s = self.encode(select_and_dumps(d, mode="unsafe", compress=True))
             with self.sem:
                 safe_save(fn, s)
         for k in deleted:
