@@ -538,7 +538,7 @@ class FileHashDict(collections.abc.MutableMapping):
     sem = Semaphore(64, 128, 0.3, 1)
     cache_size = 256
 
-    def __init__(self, *args, path="", **kwargs):
+    def __init__(self, *args, path="", encode=None, decode=None, **kwargs):
         if not kwargs and len(args) == 1:
             self.data = args[0]
         else:
@@ -559,6 +559,8 @@ class FileHashDict(collections.abc.MutableMapping):
             self.data.pop("~", None)
             print(f"{self.path}: Successfully loaded {len(self.comp)} compressed entries.")
         self.c_updated = False
+        self.encode = encode or lambda s: s
+        self.decode = decode or lambda s: s
 
     __hash__ = lambda self: lambda self: hash(self.path)
     __str__ = lambda self: self.__class__.__name__ + "(" + str(self.data) + ")"
@@ -640,7 +642,7 @@ class FileHashDict(collections.abc.MutableMapping):
                     if k in self.codb:
                         s = next(self.cur.execute(f"SELECT value FROM '{self.path}' WHERE key=?", (k,)))[0]
                         if s:
-                            data = select_and_loads(s, mode="unsafe")
+                            data = select_and_loads(self.decode(s), mode="unsafe")
                             self.data[k] = data
                             return data
                     elif k == "~~":
@@ -651,7 +653,7 @@ class FileHashDict(collections.abc.MutableMapping):
                 s = f.read()
         data = BaseException
         with tracebacksuppressor:
-            data = select_and_loads(s, mode="unsafe")
+            data = select_and_loads(self.decode(s), mode="unsafe")
         if data is BaseException:
             fn = fn.rstrip("\x7f")
             for file in sorted(os.listdir("backup"), reverse=True):
@@ -661,7 +663,7 @@ class FileHashDict(collections.abc.MutableMapping):
                     else:
                         with zipfile.ZipFile("backup/" + file, allowZip64=True, strict_timestamps=False) as z:
                             s = z.read(fn)
-                    data = select_and_loads(s, mode="unsafe")
+                    data = select_and_loads(self.decode(s), mode="unsafe")
                     self.modified.add(k)
                     print(f"Successfully recovered backup of {fn} from {file}.")
                     break
@@ -793,7 +795,7 @@ class FileHashDict(collections.abc.MutableMapping):
                     with tracebacksuppressor:
                         d = self[k]
                         deleted.append(k)
-                        d = select_and_dumps(d, mode="unsafe", compress=True)
+                        d = select_and_dumps(self.encode(d), mode="unsafe", compress=True)
                         self.cur.execute(
                             f"INSERT INTO '{self.path}' ('key', 'value') VALUES ('{k}', ?) "
                                 + "ON CONFLICT(key) DO UPDATE SET 'value' = ?",
@@ -819,7 +821,7 @@ class FileHashDict(collections.abc.MutableMapping):
             except KeyError:
                 self.deleted.add(k)
                 continue
-            s = select_and_dumps(d, mode="unsafe", compress=True)
+            s = select_and_dumps(self.encode(d), mode="unsafe", compress=True)
             with self.sem:
                 safe_save(fn, s)
         for k in deleted:
@@ -3571,6 +3573,8 @@ class Database(collections.abc.MutableMapping, collections.abc.Hashable, collect
     bot = None
     rate_limit = 3
     name = "data"
+    encode = None
+    decode = None
 
     def __init__(self, bot, catg):
         name = self.name
@@ -3578,7 +3582,7 @@ class Database(collections.abc.MutableMapping, collections.abc.Hashable, collect
         fhp = "saves/" + name
         if not getattr(self, "no_file", False):
             if os.path.exists(fhp):
-                data = self.data = FileHashDict(path=fhp)
+                data = self.data = FileHashDict(path=fhp, encode=self.encode, decode=self.decode)
             else:
                 self.file = fhp + ".json"
                 self.updated = False
@@ -3593,7 +3597,7 @@ class Database(collections.abc.MutableMapping, collections.abc.Hashable, collect
                         print(self.file)
                         print_exc()
                         raise FileNotFoundError
-                    data = FileHashDict(data, path=fhp)
+                    data = FileHashDict(data, path=fhp, encode=self.encode, decode=self.decode)
                     data.modified.update(data.data.keys())
                     self.data = data
                 except FileNotFoundError:
@@ -3601,9 +3605,9 @@ class Database(collections.abc.MutableMapping, collections.abc.Hashable, collect
         else:
             data = self.data = {}
         if data is None:
-            self.data = FileHashDict(path=fhp)
+            self.data = FileHashDict(path=fhp, encode=self.encode, decode=self.decode)
         if not issubclass(type(self.data), collections.abc.MutableMapping):
-            self.data = FileHashDict(dict.fromkeys(self.data), path=fhp)
+            self.data = FileHashDict(dict.fromkeys(self.data), path=fhp, encode=self.encode, decode=self.decode)
         bot.database[name] = bot.data[name] = self
         self.catg = catg
         self.bot = bot

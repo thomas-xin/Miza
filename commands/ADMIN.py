@@ -2323,18 +2323,20 @@ class UpdateUserLogs(Database):
 
 class UpdateMessageCache(Database):
     name = "message_cache"
-    no_file = True
-    files = "saves/message_cache"
+    # no_file = True
+    # files = "saves/message_cache"
     raws = {}
     loaded = {}
     saving = {}
     save_sem = Semaphore(1, 512, 5, 30)
     search_sem = Semaphore(20, 512, rate_limit=5)
+    encode = encrypt
+    decode = decrypt
 
-    def __init__(self, *args):
-        super().__init__(*args)
-        if not os.path.exists(self.files):
-            os.mkdir(self.files)
+    # def __init__(self, *args):
+    #     super().__init__(*args)
+    #     if not os.path.exists(self.files):
+    #         os.mkdir(self.files)
 
     def get_fn(self, m_id):
         return  m_id // 10 ** 13
@@ -2346,24 +2348,25 @@ class UpdateMessageCache(Database):
         try:
             data = self.raws[fn]
         except KeyError:
-            path = self.files + "/" + str(fn)
-            if not os.path.exists(path):
-                path += "\x7f"
-                if not os.path.exists(path):
-                    return
-            try:
-                with open(path, "rb") as f:
-                    b = f.read()
-                out = zipped = decrypt(b)
-                with tracebacksuppressor(zipfile.BadZipFile):
-                    out = zip2bytes(zipped)
-                if out[0] == 128:
-                    data = pickle.loads(out)
-                else:
-                    data = orjson.loads(out)
-            except:
-                print_exc()
-                data = {}
+            data = self.get(fn, {})
+            # path = self.files + "/" + str(fn)
+            # if not os.path.exists(path):
+            #     path += "\x7f"
+            #     if not os.path.exists(path):
+            #         return
+            # try:
+            #     with open(path, "rb") as f:
+            #         b = f.read()
+            #     out = zipped = decrypt(b)
+            #     with tracebacksuppressor(zipfile.BadZipFile):
+            #         out = zip2bytes(zipped)
+            #     if out[0] == 128:
+            #         data = pickle.loads(out)
+            #     else:
+            #         data = orjson.loads(out)
+            # except:
+            #     print_exc()
+            #     data = {}
             if type(data) is not dict:
                 data = {as_str(m["id"]): m for m in data}
             self.raws[fn] = data
@@ -2463,21 +2466,22 @@ class UpdateMessageCache(Database):
                     m["embeds"] = embeds
             m["id"] = str(m_id)
             saved[m["id"]] = m
-        path = self.files + "/" + str(fn)
-        if not saved:
-            if os.path.exists(path):
-                return os.remove(path)
-        try:
-            data = orjson.dumps(saved)
-        except:
-            print_exc()
-            data = pickle.dumps(saved)
-        if len(data) > 32768:
-            out = bytes2zip(data, lzma=len(data) > 16777216)
-            if len(out) < len(data):
-                data = out
-        out = encrypt(data)
-        safe_save(path, out)
+        self[fn] = saved
+        # path = self.files + "/" + str(fn)
+        # if not saved:
+        #     if os.path.exists(path):
+        #         return os.remove(path)
+        # try:
+        #     data = orjson.dumps(saved)
+        # except:
+        #     print_exc()
+        #     data = pickle.dumps(saved)
+        # if len(data) > 32768:
+        #     out = bytes2zip(data, lzma=len(data) > 16777216)
+        #     if len(out) < len(data):
+        #         data = out
+        # out = encrypt(data)
+        # safe_save(path, out)
         return len(saved)
 
     async def _save_(self, **void):

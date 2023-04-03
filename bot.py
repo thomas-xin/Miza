@@ -4868,6 +4868,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         
         discord.state.ConnectionState.create_message = lambda self, *, channel, data: create_message(self, channel, data)
 
+        @property
+        def cached_message(self):
+            m_id = self.message_id
+            m = bot.cache.messages.get(m_id)
+            if m:
+                return m
+            return bot.data.message_cache.load_message(m_id)
+
+        discord.message.MessageReference.cached_message = cached_message
+
         async def _request(self, bucket, files, form, method, url, kwargs, lock, maybe_lock=None):
             for tries in range(5):
                 if files:
