@@ -698,7 +698,7 @@ class Bot:
 						while "--" in k:
 							k = k.replace("--", "-")
 				if k:
-					m["name"] = k
+					m["name"] = lim_str(k, 48)
 					pc += len(self.gpttokens(m["name"], model))
 				messages.append(m)
 				pc += len(self.gpttokens(m["role"], model))
