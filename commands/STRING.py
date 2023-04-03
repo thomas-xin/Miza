@@ -87,7 +87,7 @@ class Translate(Command):
         output = ""
         for lang, i in zip(odest, translated):
             tran, comm = translated[i], comments.get(i)
-            output += bold(lang) + "\n" + tran
+            output += bold((googletrans.LANGUAGES.get(lang) or lang).capitalize()) + "\n" + tran
             if comm:
                 output += "\n> " + comm
         self.bot.send_as_embeds(channel, output, author=get_author(user), footer=footer, reference=message)
@@ -115,7 +115,7 @@ class Translate(Command):
             prompt = f"{text}\n\nTranslate the above from {src} informally into "
         else:
             prompt = f"{text}\n\nTranslate the above informally into "
-        prompt += ",".join(dest) + ', beginning with "⦚".'
+        prompt += ",".join(dests) + ', beginning with "⦚".'
         if bot.is_trusted(guild) >= 2:
             for uid in bot.data.trusted[guild.id]:
                 if uid and bot.premium_level(uid, absolute=True) >= 2:
