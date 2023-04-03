@@ -2339,7 +2339,7 @@ class UpdateMessageCache(Database):
     #         os.mkdir(self.files)
 
     def get_fn(self, m_id):
-        return  m_id // 10 ** 14
+        return  m_id // 10 ** 12
 
     def load_file(self, fn, raw=False):
         if not raw:
@@ -2380,7 +2380,7 @@ class UpdateMessageCache(Database):
             return self.loaded[fn][m_id]
         found = self.load_file(fn)
         if not found:
-            fn = self.get_fn(m_id * 10)
+            fn = self.get_fn(m_id // 10)
             with suppress(KeyError):
                 return self.saving[fn][m_id]
             if fn in self.loaded:
