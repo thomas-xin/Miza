@@ -87,7 +87,7 @@ class Translate(Command):
                 return True
 
         odest = tuple(dests)
-        dests = [d for d in enumerate(dests) if not equiv(d, src2)]
+        dests = [d for d in dests if not equiv(d, src2)]
         if len(odest) != dests:
             translated[-1] = text
             odest = tuple(dests)
