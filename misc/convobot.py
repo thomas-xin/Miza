@@ -1425,6 +1425,7 @@ class Bot:
 				model="gpt-3.5-turbo",
 				user=str(random.randint(0, 4294967295)),
 			)
+		cm = cm2 = 20
 		try:
 			resp = exc.submit(
 				openai.ChatCompletion.create,
@@ -1440,7 +1441,7 @@ class Bot:
 				return text, cost, uoai
 
 	def au(self, prompt):
-		funcs = [self.chatgpt, self.vai, self.ycg, self.cgp]
+		funcs = [self.chatgpt, self.vai, self.ycg, self.cgp, self.cgp, self.cgp]
 		random.shuffle(funcs)
 		resp = None
 		while not resp:
