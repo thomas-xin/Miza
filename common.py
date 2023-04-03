@@ -642,7 +642,7 @@ class FileHashDict(collections.abc.MutableMapping):
                             data = select_and_loads(self.decode(s), mode="unsafe")
                             self.data[k] = data
                             return data
-                    elif k.startswith("~"):
+                    elif isinstance(k, str) and k.startswith("~"):
                         raise TypeError("Attempted to load SQL database inappropriately")
                 raise KeyError(k)
         with self.sem:
