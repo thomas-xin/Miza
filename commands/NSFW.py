@@ -435,20 +435,34 @@ class Verify(Command):
     description = "Verifies your account age as 18+, allowing you to access NSFW-restricted commands within DM channels."
     usage = "(enable|disable)?"
     example = ("verify enable", "verify disable")
+    flags = "aed"
     no_parse = True
     rate_limit = (1, 6)
 
     async def __call__(self, bot, user, channel, guild, name, flags, **void):
-        if not bot.is_nsfw(channel):
-            raise PermissionError(f"This command is only available in {uni_str('NSFW')} channels.")
         following = bot.data.nsfw
-        curr = following.get(guild.id)
+        if not bot.is_nsfw(channel):
+            if user.id not in following:
+                raise PermissionError(f"This command is only available in {uni_str('NSFW')} channels, or for users who have posted in at least one {uni_str('NSFW')} channel shared with {bot.name}.")
+        curr = following.get(user.id)
         if "d" in flags:
-            following.pop(guild.id, None)
+            following[user.id] = False
             return italics(css_md(f"Disabled NSFW DMs for {sqr_md(user)}."))
         elif "e" in flags or "a" in flags:
-            following[guild.id] = True
+            following[user.id] = True
             return italics(css_md(f"Enabled NSFW DMs for {sqr_md(user)}."))
         if not curr:
             return ini_md(f'NSFW DMs are currently disabled for {sqr_md(user)}. Use "{bot.get_prefix(guild)}{name} enable" to enable.')
         return ini_md(f"NSFW DMs are currently disabled for {sqr_md(user)}.")
+
+
+class UpdateNSFW(Database):
+    name = "nsfw"
+    user = True
+
+    def _send_(self, message, **void):
+        channel = message.channel
+        if is_nsfw(channel):
+            user = message.author
+            if user.id not in self:
+                self[user.id] = False

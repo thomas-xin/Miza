@@ -767,11 +767,6 @@ class UpdateProxies(Database):
     #         self[0] = {}
 
 
-class UpdateNSFW(Database):
-    name = "nsfw"
-    user = True
-
-
 class Immortalise(Command):
     name = ["Immortalize"]
     min_level = nan
