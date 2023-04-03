@@ -90,7 +90,7 @@ class Translate(Command):
         dests = [d for d in dests if not equiv(d, src2)]
         if len(odest) != dests:
             translated[-1] = text
-            odest = tuple(dests)
+            odest = (src2,) + tuple(dests)
         if engine == "google":
             await self.google_translate(bot, guild, channel, user, text, src, dests, translated, comments)
         elif engine == "chatgpt":
@@ -197,7 +197,7 @@ class Translate(Command):
             line = lines.pop(0)
             lang = dests.pop(0)
             lname = (googletrans.LANGUAGES.get(lang.casefold()) or lang).capitalize()
-            line = line.removeprefix(lname).removeprefix(":").strip()
+            line = line.removeprefix("Informal ").removeprefix(lname).removeprefix(":").strip()
             i = len(futs)
             futs.append(create_task(translate_into(line, lang, "en" if src == "auto" else src, i)))
         for fut in futs:
