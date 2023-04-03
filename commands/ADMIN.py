@@ -2513,11 +2513,12 @@ class UpdateMessageCache(Database):
                 print(f"Message Database: {len(saving)} files updated.")
             deleted = 0
             limit = str(self.get_fn(time_snowflake(dtn() - datetime.timedelta(days=28))))
-            for f in sorted((fi for fn in os.listdir(self.files) if (fi := fn.rstrip("\x7f")) not in ("~", "~~", "-1")), key=lambda f: int(f)):
-                if f.isnumeric() and f < limit or f.endswith("\x7f"):
-                    with tracebacksuppressor(FileNotFoundError):
-                        os.remove(self.files + "/" + f)
-                        deleted += 1
+            for f in sort(self.keys()):
+                if f < limit:
+                    self.pop(f, None)
+                    deleted += 1
+                else:
+                    break
             if deleted >= 8:
                 print(f"Message Database: {deleted} files deleted.")
             if os.path.exists(self.files + "/-1"):
