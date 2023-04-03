@@ -71,10 +71,10 @@ class Translate(Command):
             fut = create_future(self.trans.translate, text, src=src, dest=dest)
         else:
             fut = None
-        if engine == "chatgpt":
-            await self.chatgpt_translate(user, text, src, dests, translated, comments)
-        elif engine == "google":
+        if engine == "google":
             await self.google_translate(user, text, src, dests, translated, comments)
+        elif engine == "chatgpt":
+            await self.chatgpt_translate(user, text, src, dests, translated, comments)
         else:
             raise NotImplementedError(engine)
         if fut:
@@ -92,7 +92,23 @@ class Translate(Command):
                 output += "\n> " + comm
         self.bot.send_as_embeds(channel, output, author=get_author(user), footer=footer, reference=message)
 
-    async def chatgpt_translate(user, text, src, dests, translated, comments):
+    async def google_translate(self, user, text, src, dests, translated, comments):
+
+        async def translate_into(arg, src, dest, i):
+            resp = await create_future(self.trans.translate, arg, src=src, dest=dest)
+            translated[i] = resp.text
+            if getattr(resp, "pronunciation", None):
+                comments[i] = resp.pronunciation
+
+        futs = deque()
+        while dests:
+            dest = dests.pop(0)
+            i = len(translated)
+            futs.append(create_task(translate_into(text, src, dests.pop(0), i)))
+        for fut in futs:
+            await fut
+
+    async def chatgpt_translate(self, user, text, src, dests, translated, comments):
         uid = user.id
         if src and src != "auto":
             src = googletrans.LANGUAGES.get(src) or src
@@ -157,22 +173,6 @@ class Translate(Command):
             line = lines.pop(0)
             i = len(translated)
             futs.append(create_task(translate_into(line, dests.pop(0), src, i)))
-        for fut in futs:
-            await fut
-
-    async def google_translate(user, text, src, dests, translated, comments):
-
-        async def translate_into(arg, src, dest, i):
-            resp = await create_future(self.trans.translate, arg, src=src, dest=dest)
-            translated[i] = resp.text
-            if getattr(resp, "pronunciation", None):
-                comments[i] = resp.pronunciation
-
-        futs = deque()
-        while dests:
-            dest = dests.pop(0)
-            i = len(translated)
-            futs.append(create_task(translate_into(text, src, dests.pop(0), i)))
         for fut in futs:
             await fut
 
