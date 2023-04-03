@@ -2339,7 +2339,7 @@ class UpdateMessageCache(Database):
     #         os.mkdir(self.files)
 
     def get_fn(self, m_id):
-        return  m_id // 10 ** 13
+        return  m_id // 10 ** 14
 
     def load_file(self, fn, raw=False):
         if not raw:
@@ -2349,24 +2349,6 @@ class UpdateMessageCache(Database):
             data = self.raws[fn]
         except KeyError:
             data = self.get(fn, {})
-            # path = self.files + "/" + str(fn)
-            # if not os.path.exists(path):
-            #     path += "\x7f"
-            #     if not os.path.exists(path):
-            #         return
-            # try:
-            #     with open(path, "rb") as f:
-            #         b = f.read()
-            #     out = zipped = decrypt(b)
-            #     with tracebacksuppressor(zipfile.BadZipFile):
-            #         out = zip2bytes(zipped)
-            #     if out[0] == 128:
-            #         data = pickle.loads(out)
-            #     else:
-            #         data = orjson.loads(out)
-            # except:
-            #     print_exc()
-            #     data = {}
             if type(data) is not dict:
                 data = {as_str(m["id"]): m for m in data}
             self.raws[fn] = data
@@ -2398,7 +2380,14 @@ class UpdateMessageCache(Database):
             return self.loaded[fn][m_id]
         found = self.load_file(fn)
         if not found:
-            raise KeyError(m_id)
+            fn = self.get_fn(m_id * 10)
+            with suppress(KeyError):
+                return self.saving[fn][m_id]
+            if fn in self.loaded:
+                return self.loaded[fn][m_id]
+            found = self.load_file(fn)
+            if not found:
+                raise KeyError(m_id)
         return found[m_id]
 
     def save_message(self, message):
@@ -2467,21 +2456,6 @@ class UpdateMessageCache(Database):
             m["id"] = str(m_id)
             saved[m["id"]] = m
         self[fn] = saved
-        # path = self.files + "/" + str(fn)
-        # if not saved:
-        #     if os.path.exists(path):
-        #         return os.remove(path)
-        # try:
-        #     data = orjson.dumps(saved)
-        # except:
-        #     print_exc()
-        #     data = pickle.dumps(saved)
-        # if len(data) > 32768:
-        #     out = bytes2zip(data, lzma=len(data) > 16777216)
-        #     if len(out) < len(data):
-        #         data = out
-        # out = encrypt(data)
-        # safe_save(path, out)
         return len(saved)
 
     async def _save_(self, **void):
@@ -2514,6 +2488,8 @@ class UpdateMessageCache(Database):
             deleted = 0
             limit = str(self.get_fn(time_snowflake(dtn() - datetime.timedelta(days=28))))
             for f in sort(self.keys()):
+                if f == -1:
+                    continue
                 if f < limit:
                     self.pop(f, None)
                     deleted += 1
@@ -2521,15 +2497,15 @@ class UpdateMessageCache(Database):
                     break
             if deleted >= 8:
                 print(f"Message Database: {deleted} files deleted.")
-            if os.path.exists(self.files + "/-1"):
+            if os.path.exists(self.files + "/~"):
                 self.setmtime()
 
     def getmtime(self):
         try:
-            return os.path.getmtime(self.files + "/-1")
+            return os.path.getmtime(self.files + "/~")
         except FileNotFoundError:
             return utc() - 28 * 86400
-    setmtime = lambda self: open(self.files + "/-1", "wb").close()
+    setmtime = lambda self: open(self.files + "/~", "wb").close()
 
     async def _minute_loop_(self):
         await self._save_()
