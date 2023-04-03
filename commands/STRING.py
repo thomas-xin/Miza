@@ -72,9 +72,9 @@ class Translate(Command):
         else:
             fut = None
         if engine == "google":
-            await self.google_translate(bot, guild, user, text, src, dests, translated, comments)
+            await self.google_translate(bot, guild, channel, user, text, src, dests, translated, comments)
         elif engine == "chatgpt":
-            await self.chatgpt_translate(bot, guild, user, text, src, dests, translated, comments)
+            await self.chatgpt_translate(bot, guild, channel, user, text, src, dests, translated, comments)
         else:
             raise NotImplementedError(engine)
         if fut:
@@ -92,7 +92,7 @@ class Translate(Command):
                 output += "\n> " + comm
         self.bot.send_as_embeds(channel, output, author=get_author(user), footer=footer, reference=message)
 
-    async def google_translate(self, bot, guild, user, text, src, dests, translated, comments):
+    async def google_translate(self, bot, guild, channel, user, text, src, dests, translated, comments):
 
         async def translate_into(arg, src, dest, i):
             resp = await create_future(self.trans.translate, arg, src=src, dest=dest)
@@ -108,7 +108,7 @@ class Translate(Command):
         for fut in futs:
             await fut
 
-    async def chatgpt_translate(self, bot, guild, user, text, src, dests, translated, comments):
+    async def chatgpt_translate(self, bot, guild, channel, user, text, src, dests, translated, comments):
         uid = user.id
         if src and src != "auto":
             src = googletrans.LANGUAGES.get(src) or src
