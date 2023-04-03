@@ -1403,6 +1403,7 @@ class Bot:
 		return resp.text
 
 	def cgp(self, data):
+		cost = 0
 		oai = getattr(self, "oai", None)
 		bals = getattr(self, "bals", {})
 		uoai = None
