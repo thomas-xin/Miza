@@ -104,7 +104,7 @@ class Translate(Command):
         while dests:
             dest = dests.pop(0)
             i = len(translated)
-            futs.append(create_task(translate_into(text, src, dests.pop(0), i)))
+            futs.append(create_task(translate_into(text, src, dest, i)))
         for fut in futs:
             await fut
 
