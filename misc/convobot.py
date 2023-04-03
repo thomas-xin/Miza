@@ -1373,7 +1373,7 @@ class Bot:
 			raise EOFError
 		if isinstance(data, str):
 			data = dict(
-				messages=[dict(role="user", content=data) for m in mes],
+				messages=[dict(role="user", content=data)],
 				temperature=0.7,
 				top_p=0.9,
 				max_tokens=2048,
@@ -1417,7 +1417,7 @@ class Bot:
 			costs = 1
 		if isinstance(data, str):
 			data = dict(
-				messages=[dict(role="user", content=data) for m in mes],
+				messages=[dict(role="user", content=data)],
 				temperature=0.7,
 				top_p=0.9,
 				max_tokens=2048,

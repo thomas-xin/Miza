@@ -172,7 +172,7 @@ class Translate(Command):
         while lines and dests:
             line = lines.pop(0)
             i = len(translated)
-            futs.append(create_task(translate_into(line, dests.pop(0), src, i)))
+            futs.append(create_task(translate_into(line, dests.pop(0), "en" if src == "auto" else src, i)))
         for fut in futs:
             await fut
 
