@@ -2478,7 +2478,7 @@ def CBAU(inputs):
 	cb.oai = oai
 	cb.bals = bals
 	cb.nsfw = nsfw
-	return cb.au(prompt, refs=refs, im=im)
+	return cb.au(prompt)
 
 VGPT = VVQA = None
 def caption(im, q=None, cid=None):
