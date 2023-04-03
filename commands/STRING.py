@@ -68,7 +68,7 @@ class Translate(Command):
             translated[0] = text
         odest = tuple(dests)
         if src == "auto":
-            fut = create_future(self.trans.translate, arg, src=src, dest=dest)
+            fut = create_future(self.trans.translate, text, src=src, dest=dest)
         else:
             fut = None
         if engine == "chatgpt":
