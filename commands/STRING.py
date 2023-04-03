@@ -111,7 +111,7 @@ class Translate(Command):
         futs = deque()
         while dests:
             dest = dests.pop(0)
-            i = len(translated)
+            i = len(futs)
             futs.append(create_task(translate_into(text, src, dest, i)))
         for fut in futs:
             await fut
@@ -179,7 +179,7 @@ class Translate(Command):
         futs = deque()
         while lines and dests:
             line = lines.pop(0)
-            i = len(translated)
+            i = len(futs)
             futs.append(create_task(translate_into(line, dests.pop(0), "en" if src == "auto" else src, i)))
         for fut in futs:
             await fut
