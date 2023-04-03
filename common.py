@@ -543,6 +543,8 @@ class FileHashDict(collections.abc.MutableMapping):
             self.data = args[0]
         else:
             self.data = dict(*args, **kwargs)
+        self.encode = encode or (lambda s: s)
+        self.decode = decode or (lambda s: s)
         self.path = path.rstrip("/")
         self.modified = set()
         self.deleted = set()
@@ -559,8 +561,6 @@ class FileHashDict(collections.abc.MutableMapping):
             self.data.pop("~", None)
             print(f"{self.path}: Successfully loaded {len(self.comp)} compressed entries.")
         self.c_updated = False
-        self.encode = encode or (lambda s: s)
-        self.decode = decode or (lambda s: s)
 
     __hash__ = lambda self: lambda self: hash(self.path)
     __str__ = lambda self: self.__class__.__name__ + "(" + str(self.data) + ")"
