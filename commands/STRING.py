@@ -156,7 +156,7 @@ class Translate(Command):
         for fut in futs:
             await fut
 
-    def google_translate(user, text, src, dests, translated, comments):
+    async def google_translate(user, text, src, dests, translated, comments):
 
         async def translate_into(arg, src, dest, i):
             resp = await create_future(self.trans.translate, arg, src=src, dest=dest)
