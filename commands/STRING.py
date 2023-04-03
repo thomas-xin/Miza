@@ -66,25 +66,39 @@ class Translate(Command):
         text = " ".join(spl)
         translated = {}
         comments = {}
-        if src in dests:
-            dests.remove(src)
-            translated[0] = text
-        if self.languages.get(src) in dests:
-            dests.remove(self.languages[src])
-            translated[0] = text
-        odest = tuple(dests)
+
         if src == "auto":
-            fut = create_future(self.trans.translate, text, src=src, dest=dests[0])
+            resp2 = await create_future(self.trans.translate, text, src="auto", dest="en")
+            src2 = resp2.src
         else:
-            fut = None
+            resp2 = None
+            src2 = src
+
+        def equiv(s, d):
+            if s == d:
+                return True
+            s2 = self.languages.get(s) or s
+            if s2 == d:
+                return True
+            d2 = self.languages.get(d) or d
+            if s2 = d2:
+                return True
+            if s == d2:
+                return True
+
+        odest = tuple(dests)
+        dests = [d for d in enumerate(dests) if not equiv(d, src2)]
+        if len(odest) != dests:
+            translated[-1] = text
+            odest = tuple(dests)
         if engine == "google":
             await self.google_translate(bot, guild, channel, user, text, src, dests, translated, comments)
         elif engine == "chatgpt":
             await self.chatgpt_translate(bot, guild, channel, user, text, src, dests, translated, comments)
         else:
             raise NotImplementedError(engine)
-        if fut:
-            resp = await fut
+        if resp2:
+            resp = resp2
             src = resp.src.casefold()
             footer = dict(text=f"Detected language: {(googletrans.LANGUAGES.get(src) or src).capitalize()}")
             if getattr(resp, "extra_data", None) and resp.extra_data.get("origin_pronunciation"):
