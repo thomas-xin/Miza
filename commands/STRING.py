@@ -68,6 +68,9 @@ class Translate(Command):
         if src in dests:
             dests.remove(src)
             translated[0] = text
+        if self.languages.get(src) in dests:
+            dests.remove(self.languages[src])
+            translated[0] = text
         odest = tuple(dests)
         if src == "auto":
             fut = create_future(self.trans.translate, text, src=src, dest=dests[0])
@@ -86,6 +89,7 @@ class Translate(Command):
                 footer["text"] += "\nOriginal pronunciation: " + resp.extra_data["origin_pronunciation"]
         else:
             footer = None
+        print(footer, odest, translated, comments)
         output = ""
         for lang, i in zip(odest, translated):
             tran, comm = translated[i], comments.get(i)
@@ -165,7 +169,7 @@ class Translate(Command):
         print("ChatGPT Translate:", user, text, src, dests, lines)
 
         async def translate_into(arg, src, dest, i):
-            translated[i] = line
+            translated[i] = arg
             resp = await create_future(self.trans.translate, arg, src=src, dest=dest)
             if getattr(resp, "extra_data", None) and resp.extra_data.get("origin_pronunciation"):
                 comments[i] = resp.extra_data["origin_pronunciation"]
