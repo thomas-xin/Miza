@@ -2487,7 +2487,7 @@ class UpdateMessageCache(Database):
                 print(f"Message Database: {len(saving)} files updated.")
             deleted = 0
             limit = str(self.get_fn(time_snowflake(dtn() - datetime.timedelta(days=28))))
-            for f in sort(self.keys()):
+            for f in sorted(k for k in self.keys() if k.isnumeric()):
                 if f == -1:
                     continue
                 if f < limit:
