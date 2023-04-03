@@ -88,7 +88,7 @@ class Translate(Command):
 
         odest = tuple(dests)
         dests = [d for d in dests if not equiv(d, src2)]
-        if len(odest) != dests:
+        if len(odest) != len(dests):
             translated[-1] = text
             odest = (src2,) + tuple(dests)
         if engine == "google":
