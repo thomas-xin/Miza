@@ -580,9 +580,10 @@ class Bot:
 				v = self.answer_summarise(q=v, max_length=32, min_length=6).replace("\n", ". ").strip()
 			s = f"{k}: {v}\n"
 			lines.append(s)
+		tq = q
+		if len(self.gpttokens(tq)) > 388:
+			tq = self.answer_summarise(q=tq, max_length=384, min_length=256).replace("\n", ". ").strip()
 		s = f"{u}: {q}\n"
-		if len(self.gpttokens(s)) > 388:
-			s = self.answer_summarise(q=s, max_length=384, min_length=256).replace("\n", ". ").strip()
 		lines.append(s)
 		ns = f"{self.name}:"
 		if start:
