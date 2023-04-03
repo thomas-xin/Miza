@@ -136,7 +136,7 @@ class Translate(Command):
             oai=oai,
             nsfw=bot.is_nsfw(channel),
         )
-        resp = await process_image("CBAU", "$", [inputs], fix=1, timeout=192)
+        tup = await process_image("CBAU", "$", [inputs], fix=1, timeout=192)
         out = tup[0]
         cost = 0
         uoai = None
