@@ -1414,7 +1414,7 @@ class Personality(Command):
         if len(argv) > 512:
             raise OverflowError("Maximum currently supported personality prompt size is 512 characters.")
         if max(bot.is_trusted(guild), bot.premium_level(user) * 2) < 2:
-            raise PermissionError(f"Sorry, this feature is for premium users only. Please make sure you have a subscription level of minimum 1 from {bot.kofi_url}, or try out ~trial if you would like to manage your own usage!")
+            raise PermissionError(f"Sorry, this feature is currently for premium users only. Please make sure you have a subscription level of minimum 1 from {bot.kofi_url}, or try out ~trial if you would like to manage/fund your own usage!")
         p = self.encode(argv)
         if not is_nsfw(channel):
             import openai
