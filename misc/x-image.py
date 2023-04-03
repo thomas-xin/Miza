@@ -2458,6 +2458,7 @@ def CBAI(inputs):
 	return cb.ai(*prompt, refs=refs, im=im)
 
 def CBAU(inputs):
+	CBIP()
 	prompt = inputs["prompt"]
 	key = inputs["key"]
 	ht = inputs["huggingface_token"]
