@@ -96,7 +96,7 @@ class Translate(Command):
         for lang, i in zip(odest, translated):
             tran, comm = translated[i], comments.get(i)
             lname = (googletrans.LANGUAGES.get(lang.casefold()) or lang).capitalize()
-            output += bold(lname) + "\n" + tran.removeprefix(lname).strip(": ")
+            output += bold(lname) + "\n" + tran
             if comm:
                 output += "\n> " + comm
             output += "\n"
@@ -181,8 +181,11 @@ class Translate(Command):
         futs = deque()
         while lines and dests:
             line = lines.pop(0)
+            lang = dests.pop(0)
+            lname = (googletrans.LANGUAGES.get(lang.casefold()) or lang).capitalize()
+            line = line.removeprefix(lname).removeprefix(":").strip()
             i = len(futs)
-            futs.append(create_task(translate_into(line, dests.pop(0), "en" if src == "auto" else src, i)))
+            futs.append(create_task(translate_into(line, lang, "en" if src == "auto" else src, i)))
         for fut in futs:
             await fut
 
