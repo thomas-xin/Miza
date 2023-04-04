@@ -113,7 +113,7 @@ class Translate(Command):
             lname = (googletrans.LANGUAGES.get(lang.casefold()) or lang).capitalize()
             output += bold(lname) + "\n" + tran
             if comm:
-                output += "\n> " + comm
+                output += "".join("\n> " + line for line in comm.splitlines())
             output += "\n"
         self.bot.send_as_embeds(channel, output.strip(), author=get_author(user), footer=footer, reference=message)
 
