@@ -1511,7 +1511,9 @@ class Ask(Command):
                 )
                 reacts.append("🚫")
         # s = lim_str(code + escape_roles(out), 2000)
-        while len(s) > 2000:
+        ref = message
+        s = escape_roles(s)
+        while len(code) + len(s) > 2000:
             t = []
             while s:
                 cl = sum(map(len, t))
@@ -1539,9 +1541,10 @@ class Ask(Command):
                 s = s[1999 - cl:]
             t.insert(0, "\xad")
             t = "".join(t).strip()
-            create_task(send_with_reply(channel, t, reference=message))
-            message = None
-        m = await send_with_react(channel, s, embed=emb, reacts=reacts, reference=message)
+            create_task(send_with_reply(channel, t, reference=ref))
+            ref = None
+            await asyncio.sleep(0.25)
+        m = await send_with_react(channel, code + s, embed=emb, reacts=reacts, reference=ref)
         m.replaceable = False
         if caids:
             m.caids = caids
