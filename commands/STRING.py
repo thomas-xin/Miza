@@ -137,9 +137,9 @@ class Translate(Command):
         uid = user.id
         if src and src != "auto":
             src = googletrans.LANGUAGES.get(src) or src
-            prompt = f"{text}\n###\nTranslate the above from {src} informally into "
+            prompt = f'"""\n{text}\n"""\nTranslate the above from {src} informally into '
         else:
-            prompt = f"{text}\n###\nTranslate the above informally into "
+            prompt = f'"""\n{text}\n"""\nTranslate the above informally into '
         prompt += ",".join((googletrans.LANGUAGES.get(lang) or lang).capitalize() for lang in dests) + ', beginning with "•".'
         if bot.is_trusted(guild) >= 2:
             for uid in bot.data.trusted[guild.id]:
