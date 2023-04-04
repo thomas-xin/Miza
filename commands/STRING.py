@@ -46,7 +46,7 @@ class Translate(Command):
         self.trans.client.headers.update(Request.header())
         spl = argv.split(" ", 3)
         if len(spl) > 1 and spl[0].casefold() in ("google", "chatgpt"):
-            engine = spl.pop(0)
+            engine = spl.pop(0).casefold()
         else:
             engine = "google"
         if len(spl) > 2 and (src := (self.renamed.get(c := spl[0].casefold()) or (self.languages.get(c) and c))):
