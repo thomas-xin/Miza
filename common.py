@@ -2310,7 +2310,7 @@ def process_image(image, operation, args=[], fix=None, timeout=36):
                 args[i] = "pickle.loads(" + as_str(orjson.dumps(pickle.dumps(a))) + ")"
 
     def as_arg(arg):
-        if isinstance(arg, str) and arg.startswith("pickle.loads(") or arg.startswith("orjson.loads("):
+        if isinstance(arg, str) and (arg.startswith("pickle.loads(") or arg.startswith("orjson.loads(")):
             return arg
         return repr(arg)
 
