@@ -1512,7 +1512,7 @@ class Ask(Command):
                 reacts.append("🚫")
         # s = lim_str(code + escape_roles(out), 2000)
         ref = message
-        s = escape_roles(s)
+        s = escape_roles(out)
         while len(code) + len(s) > 2000:
             t = []
             while s:
