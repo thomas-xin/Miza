@@ -1541,7 +1541,7 @@ class Ask(Command):
                 s = s[1999 - cl:]
             t.insert(0, "\xad")
             t = "".join(t).strip()
-            create_task(send_with_reply(channel, t, reference=ref))
+            create_task(send_with_react(channel, t, reference=ref))
             ref = None
             await asyncio.sleep(0.25)
         m = await send_with_react(channel, code + s, embed=emb, reacts=reacts, reference=ref)
