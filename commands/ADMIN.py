@@ -660,7 +660,6 @@ class RoleGiver(Command):
     flags = "aedx"
     no_parse = True
     rate_limit = (9, 12)
-    slash = True
 
     async def __call__(self, argv, args, user, channel, guild, perm, flags, **void):
         update = self.bot.data.rolegivers.update

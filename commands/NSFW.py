@@ -453,7 +453,7 @@ class Verify(Command):
             return italics(css_md(f"Enabled NSFW DMs for {sqr_md(user)}."))
         if not curr:
             return ini_md(f'NSFW DMs are currently disabled for {sqr_md(user)}. Use "{bot.get_prefix(guild)}{name} enable" to enable.')
-        return ini_md(f"NSFW DMs are currently disabled for {sqr_md(user)}.")
+        return ini_md(f"NSFW DMs are currently enabled for {sqr_md(user)}.")
 
 
 class UpdateNSFW(Database):

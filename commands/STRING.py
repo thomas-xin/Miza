@@ -26,8 +26,8 @@ class Translate(Command):
     time_consuming = True
     name = ["TR"]
     description = "Translates a string into another language."
-    usage = "<2:engine{google|chatgpt}>? <1:src_language(en)>? <0:dest_languages(en)>* <-1:string>"
-    example = ("translate english 你好", "tr zh-cn bonjour")
+    usage = "<0:engine{google|chatgpt}>? <2:src_language(en)>? <1:dest_languages(en)>* <-1:string>"
+    example = ("translate english 你好", "tr google chinese bonjour", "translate chatgpt auto spanish french italian thank you!")
     flags = "v"
     no_parse = True
     rate_limit = (6, 9)
@@ -45,7 +45,7 @@ class Translate(Command):
             raise ArgumentError("Input string is empty.")
         self.trans.client.headers.update(Request.header())
         spl = argv.split(" ", 3)
-        if len(spl) > 1 and spl[0] in ("google", "chatgpt"):
+        if len(spl) > 1 and spl[0].casefold() in ("google", "chatgpt"):
             engine = spl.pop(0)
         else:
             engine = "google"
@@ -63,7 +63,7 @@ class Translate(Command):
             dests.append(dest)
         if not dests:
             dests.append("en")
-        text = " ".join(spl)
+        text = " ".join(spl).removeprefix("\\")
         translated = {}
         comments = {}
 
@@ -108,7 +108,7 @@ class Translate(Command):
             footer = None
         print(footer, odest, translated, comments)
         output = ""
-        for lang, i in zip(odest, translated):
+        for lang, i in zip(odest, range(len(translated))):
             tran, comm = translated[i], comments.get(i)
             lname = (googletrans.LANGUAGES.get(lang.casefold()) or lang).capitalize()
             output += bold(lname) + "\n" + tran
@@ -205,6 +205,94 @@ class Translate(Command):
             futs.append(create_task(translate_into(line, lang, "en" if src == "auto" else src, i)))
         for fut in futs:
             await fut
+
+
+class Translator(Command):
+    name = ["AutoTranslate"]
+    min_level = 2
+    description = 'Adds an automated translator to the current channel. Specify a list of languages to translate between, and optionally a translation engine. All non-command messages that do not begin with "#" will be passed through the translator.'
+    usage = "<0:engine{google|chatgpt}>? <1:languages(en)>* <disable{?d}>?"
+    example = ("translator chatgpt english german russian", "autotranslate korean polish")
+    flags = "aed"
+    rate_limit = (9, 12)
+
+    async def __call__(self, bot, user, channel, guild, name, flags, args, **void):
+        following = bot.data.translators
+        curr = cdict(following.get(channel.id, {}))
+        if "d" in flags:
+            following.pop(channel.id)
+            return italics(css_md(f"Disabled translator service for {sqr_md(channel)}."))
+        elif "e" in flags or "a" in flags:
+            tr = bot.commands.translate[0]
+            curr = cdict(engine="Google", languages=[])
+            if args[0].casefold() in ("google", "chatgpt"):
+                curr.engine = "ChatGPT" if args.pop(0) == "chatgpt" else "Google"
+            for arg in args:
+                if (dest := (tr.renamed.get(c := arg.casefold()) or (tr.languages.get(c) and c))):
+                    dest = (googletrans.LANGUAGES.get(dest) or dest).capitalize()
+                    curr.languages.append(dest)
+            if not curr:
+                raise EOFError("No valid languages detected. Only Google Translate listed languages are currently supported.")
+            following[channel.id] = curr
+            return italics(ini_md(f"Successfully set translation languages for {sqr_md(channel)} {sqr_md(curr.engine)}:{iter2str(curr.languages)}"))
+        if not curr:
+            return ini_md(f'No auto translator currently set for {sqr_md(channel)}.')
+        return ini_md(f"Current translation languages set for {sqr_md(channel)} {sqr_md(curr.engine)}:{iter2str(curr.languages)}")
+
+
+class UpdateTranslators(Database):
+    name = "translators"
+    channel = True
+
+    async def _nocommand_(self, message, msg, **void):
+        if getattr(message, "noresponse", False):
+            return
+        curr = self.get(message.channel.id)
+        if not curr:
+            return
+        if not msg or msg.startswith("#"):
+            return
+        bot = self.bot
+        user = message.author
+        channel = message.channel
+        guild = message.guild
+        argv = "\\" + message.clean_content.strip()
+        with bot.ExceptionSender(channel, reference=message):
+            u_perm = bot.get_perms(user.id, guild)
+            u_id = user.id
+            for tr in bot.commands.translate:
+                command = tr
+                req = command.min_level
+                if not isnan(u_perm):
+                    if not u_perm >= req:
+                        raise command.perm_error(u_perm, req, "for command tr")
+                    x = command.rate_limit
+                    if x:
+                        x2 = x
+                        if user.id in bot.owners:
+                            x = x2 = 0
+                        elif isinstance(x, collections.abc.Sequence):
+                            x = x2 = x[not bot.is_trusted(getattr(guild, "id", 0))]
+                            x /= 2 ** bot.premium_level(user)
+                            x2 /= 2 ** bot.premium_level(user, absolute=True)
+                        # remaining += x
+                        d = command.used
+                        t = d.get(u_id, -inf)
+                        wait = utc() - t - x
+                        if wait > min(1 - x, -1):
+                            if x < x2 and (utc() - t - x2) < min(1 - x2, -1):
+                                bot.data.users.add_diamonds(user, (x - x2) / 100)
+                            if wait < 0:
+                                w = -wait
+                                d[u_id] = max(t, utc()) + w
+                                await asyncio.sleep(w)
+                            if len(d) >= 4096:
+                                with suppress(RuntimeError):
+                                    d.pop(next(iter(d)))
+                            d[u_id] = max(t, utc())
+                        else:
+                            raise TooManyRequests(f"Command has a rate limit of {sec2time(x)}; please wait {sec2time(-wait)}.")
+                await tr(message, guild, channel, user, argv, name="tr", flags=flags)
 
 
 class Math(Command):
@@ -369,70 +457,42 @@ class ID2Time(Command):
 
 
 class Fancy(Command):
-    name = ["FancyText"]
-    description = "Creates translations of a string using unicode fonts."
+    name = ["Chaos", "ZalgoText", "Zalgo", "FormatText", "Format", "FancyText"]
+    description = "Creates fun string translations using unicode fonts."
     usage = "<string>"
-    example = ("fancy This is a cool message",)
+    example = ("fancy This is a cool message", "zalgo This is a cool message", "format This is a cool message")
     rate_limit = (4, 5)
     no_parse = True
-    slash = True
+    slash = ("Fancy", "Zalgo", "Format")
 
-    def __call__(self, channel, argv, message, **void):
-        if not argv:
-            raise ArgumentError("Input string is empty.")
-        fields = deque()
-        for i in range(len(UNIFMTS) - 1):
-            s = uni_str(argv, i)
-            if i == len(UNIFMTS) - 2:
-                s = s[::-1]
-            fields.append((f"Font {i + 1}", s + "\n"))
-        self.bot.send_as_embeds(channel, fields=fields, author=dict(name=lim_str(argv, 256)), reference=message)
-
-
-class Zalgo(Command):
-    name = ["Chaos", "ZalgoText"]
-    description = "Generates random combining accent symbols between characters in a string."
-    usage = "<string>"
-    example = ("zalgo This is a cool message",)
-    rate_limit = (4, 5)
-    no_parse = True
-    slash = True
     chrs = [chr(n) for n in zalgo_map]
     randz = lambda self: choice(self.chrs)
     def zalgo(self, s, x):
         if unfont(s) == s:
             return "".join(c + self.randz() for c in s)
         return s[0] + "".join("".join(self.randz() + "\u200b" for i in range(x + 1 >> 1)) + c + "\u200a" + "".join(self.randz() + "\u200b" for i in range(x >> 1)) for c in s[1:])
-
-    async def __call__(self, channel, argv, message, **void):
-        if not argv:
-            raise ArgumentError("Input string is empty.")
-        fields = deque()
-        for i in range(1, 9):
-            s = self.zalgo(argv, i)
-            fields.append((f"Level {i}", s + "\n"))
-        self.bot.send_as_embeds(channel, fields=fields, author=dict(name=lim_str(argv, 256)), reference=message)
-
-
-class Format(Command):
-    name = ["FormatText"]
-    description = "Creates neatly fomatted text using combining unicode characters."
-    usage = "<string>"
-    example = ("format This is a cool message",)
-    rate_limit = (4, 5)
-    no_parse = True
-    slash = True
     formats = "".join(chr(i) for i in (0x30a, 0x325, 0x303, 0x330, 0x30c, 0x32d, 0x33d, 0x353, 0x35b, 0x20f0))
 
-    def __call__(self, channel, argv, message, **void):
+    def __call__(self, channel, name, argv, message, **void):
         if not argv:
             raise ArgumentError("Input string is empty.")
         fields = deque()
-        for i, f in enumerate(self.formats):
-            s = "".join(c + f for c in argv)
-            fields.append((f"Format {i}", s + "\n"))
-        s = "".join("_" if c in " _" else c if c in "gjpqy" else c + chr(818) for c in argv)
-        fields.append((f"Format {i + 1}", s))
+        if "fancy" in name:
+            for i in range(len(UNIFMTS) - 1):
+                s = uni_str(argv, i)
+                if i == len(UNIFMTS) - 2:
+                    s = s[::-1]
+                fields.append((f"Font {i + 1}", s + "\n"))
+        elif "format" in name:
+            for i, f in enumerate(self.formats):
+                s = "".join(c + f for c in argv)
+                fields.append((f"Format {i}", s + "\n"))
+            s = "".join("_" if c in " _" else c if c in "gjpqy" else c + chr(818) for c in argv)
+            fields.append((f"Format {i + 1}", s))
+        else:
+            for i in range(1, 9):
+                s = self.zalgo(argv, i)
+                fields.append((f"Level {i}", s + "\n"))
         self.bot.send_as_embeds(channel, fields=fields, author=dict(name=lim_str(argv, 256)), reference=message)
 
 
