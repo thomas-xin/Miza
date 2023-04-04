@@ -1,4 +1,4 @@
-import os, sys, time, urllib, json, io, random, subprocess, base64, traceback
+import os, sys, time, urllib, orjson, io, random, subprocess, base64, traceback
 import concurrent.futures
 import selenium, requests, torch, openai, httpx
 from selenium import webdriver
@@ -478,7 +478,7 @@ class Bot:
 					resp = reqx.post(
 						"https://api.textsynth.com/v1/engines/stable_diffusion/text_to_image",
 						headers=headers,
-						data=json.dumps(dict(
+						data=orjson.dumps(dict(
 							prompt=prompt,
 							timesteps=int(kwargs.get("--num-inference-steps", 50)),
 							guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),

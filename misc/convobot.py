@@ -1,4 +1,4 @@
-import os, sys, time, datetime, urllib, json, io, random, re, traceback
+import os, sys, time, datetime, urllib, orjson, io, random, re, traceback
 import concurrent.futures, asyncio
 import selenium, requests, torch, openai, httpx
 from selenium import webdriver
@@ -913,7 +913,7 @@ class Bot:
 							resp = reqx.post(
 								"https://api.textsynth.com/v1/engines/gptneox_20B/completions",
 								headers=headers,
-								data=json.dumps(dict(
+								data=orjson.dumps(dict(
 									prompt=prompt,
 									temperature=temp,
 									top_k=128,
@@ -928,7 +928,7 @@ class Bot:
 							resp = reqx.post(
 								"https://api-inference.huggingface.co/models/bigscience/bloom",
 								headers=headers,
-								data=json.dumps(dict(
+								data=orjson.dumps(dict(
 									inputs=prompt,
 									parameters=dict(
 										do_sample=True,
@@ -966,7 +966,7 @@ class Bot:
 						for line in lines:
 							if line:
 								try:
-									d = json.loads(line)
+									d = orjson.loads(line)
 								except:
 									print(lines)
 									raise
@@ -1377,7 +1377,7 @@ class Bot:
 		rid = "-".join("".join(hex(random.randint(0, 15))[2:] for i in range(n)) for n in (8, 4, 4, 4, 12))
 		resp = requests.post(
 			"https://app.visus.ai/api/query",
-			data=json.dumps({
+			data=orjson.dumps({
 				"aiId": "clfw3bcof01uqfbey053r4o93",
 				"teamId": "clfw3bcnv01uffbeypnj1bmrx",
 				"conversationId": "clfw3bcoj01urfbey5czzjaji",
@@ -1424,7 +1424,7 @@ class Bot:
 		}
 		resp = self.session.post(
 			"https://your-chat-gpt.vercel.app/api/openai-stream",
-			data=json.dumps(data),
+			data=orjson.dumps(data),
 			headers=headers,
 		)
 		try:

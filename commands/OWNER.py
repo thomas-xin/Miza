@@ -1018,6 +1018,56 @@ class UpdateChannelCache(Database):
             pass
 
 
+class UpdateChannelHistories(Database):
+    name = "channel_histories"
+    channel = True
+
+    async def get(self, channel, as_message=True, force=False):
+        if hasattr(channel, "simulated"):
+            yield channel.message
+            return
+        c_id = verify_id(channel)
+        min_time = time_snowflake(dtn() - datetime.timedelta(days=14))
+        deletable = False
+        for m_id in sorted(self.data.get(c_id, ()), reverse=True):
+            if as_message:
+                try:
+                    if m_id < min_time:
+                        raise OverflowError
+                    message = await self.bot.fetch_message(m_id, channel=channel if force else None)
+                    if getattr(message, "deleted", None):
+                        continue
+                except (discord.NotFound, discord.Forbidden, OverflowError):
+                    if deletable:
+                        self.data[c_id].discard(m_id)
+                except (TypeError, ValueError, LookupError, discord.HTTPException):
+                    if not force:
+                        break
+                    print_exc()
+                else:
+                    yield message
+                deletable = True
+            else:
+                yield m_id
+
+    def add(self, c_id, m_id):
+        s = self.data.setdefault(c_id, set())
+        s.add(m_id)
+        self.update(c_id)
+        while len(s) > 32768:
+            try:
+                s.discard(next(iter(s)))
+            except RuntimeError:
+                pass
+    
+    def _delete_(self, message, **void):
+        try:
+            self.data[message.channel.id].discard(message.id)
+            self.update(message.channel.id)
+        except (AttributeError, KeyError):
+            pass
+
+
 class Suspend(Command):
     name = ["Block", "Blacklist"]
     min_level = nan
