@@ -874,7 +874,7 @@ class Bot:
 			if not self.bl:
 				print("GPT prompt:", prompt)
 			sys.stdout.flush()
-			pc = len(self.gpttokens(prompt, model))
+			pc = len(self.gpttokens(prompt))
 		response = None
 		text = ""
 		uoai = None
