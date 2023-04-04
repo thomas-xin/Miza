@@ -67,9 +67,12 @@ class Translate(Command):
         translated = {}
         comments = {}
 
-        if src == "auto":
+        if src.casefold() == "auto":
             resp2 = await create_future(self.trans.translate, text, src="auto", dest="en")
             src2 = resp2.src.casefold()
+        elif src.casefold() != "en":
+            resp2 = create_future(self.trans.translate, text, src="auto", dest="en")
+            src2 = src.casefold()
         else:
             resp2 = None
             src2 = src.casefold()
@@ -99,7 +102,7 @@ class Translate(Command):
         else:
             raise NotImplementedError(engine)
         if resp2:
-            resp = resp2
+            resp = await create_future(resp2)
             src = resp.src.casefold()
             footer = dict(text=f"Detected language: {(googletrans.LANGUAGES.get(src) or src).capitalize()}")
             if getattr(resp, "extra_data", None) and resp.extra_data.get("origin_pronunciation"):
@@ -298,6 +301,7 @@ class UpdateTranslators(Database):
                             raise TooManyRequests(f"Command has a rate limit of {sec2time(x)}; please wait {sec2time(-wait)}.")
                 ctx = discord.context_managers.Typing(channel) if channel else emptyctx
                 with ctx:
+                    print("Translator:", user, argv)
                     await tr(bot, guild, channel, argv, user, message)
 
 
