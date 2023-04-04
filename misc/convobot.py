@@ -431,6 +431,12 @@ class Bot:
 			smp = self.models[m] = pipeline("summarization", model=m)
 		return smp(q, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
 
+	def auto_summarise(self, q="", max_length=128, min_length=64):
+		if q and sum(c.isascii() for c in q) / len(q) > 0.6:
+			return self.answer_summarise(q=v, max_length=max_length, min_length=min_length)
+		else:
+			return lim_str(v, int(max_length * 1.5))
+
 	def answer_classify(self, m="vicgalle/xlm-roberta-large-xnli-anli", q="", labels=[]):
 		try:
 			zscp = self.models[m]
@@ -598,7 +604,7 @@ class Bot:
 			if not k.startswith("[REPLIED TO]: "):
 				continue
 			if len(self.gpttokens(v)) > 52:
-				v = self.answer_summarise(q=v, max_length=48, min_length=12).replace("\n", ". ").strip()
+				v = self.auto_summarise(q=v, max_length=48, min_length=18).replace("\n", ". ").strip()
 			s = f"{k}: {v}\n"
 			lines.append(s)
 		for k, v in refs:
@@ -606,12 +612,12 @@ class Bot:
 				continue
 			k = k.replace(":", "")
 			if len(self.gpttokens(v)) > 36:
-				v = self.answer_summarise(q=v, max_length=32, min_length=6).replace("\n", ". ").strip()
+				v = self.auto_summarise(q=v, max_length=32, min_length=12).replace("\n", ". ").strip()
 			s = f"{k}: {v}\n"
 			lines.append(s)
 		tq = q
-		if len(self.gpttokens(tq)) > 388:
-			tq = self.answer_summarise(q=tq, max_length=384, min_length=256).replace("\n", ". ").strip()
+		if len(self.gpttokens(tq)) > 400:
+			tq = self.auto_summarise(q=tq, max_length=384, min_length=256).replace("\n", ". ").strip()
 		s = f"{u}: {q}\n"
 		lines.append(s)
 		ns = f"{self.name}:"
@@ -847,7 +853,7 @@ class Bot:
 							break
 			if res:
 				if len(self.gpttokens(res)) > 400:
-					summ = self.answer_summarise(q=q + "\n" + res, max_length=384, min_length=256).replace("\n", ". ").replace(": ", " -").strip()
+					summ = self.auto_summarise(q=q + "\n" + res, max_length=384, min_length=256).replace("\n", ". ").replace(": ", " -").strip()
 					res = lim_str(res.replace("\n", " "), 384, mode="right") + "\n" + summ
 				if res:
 					m = dict(role="system", name=sname, content=res.strip())
@@ -1538,7 +1544,7 @@ class Bot:
 		if not self.chat_history or tup != self.chat_history[-1]:
 			k, v = tup
 			if len(self.gpttokens(v)) > 36:
-				v = self.answer_summarise(q=v, max_length=32, min_length=6).replace("\n", ". ").strip()
+				v = self.auto_summarise(q=v, max_length=32, min_length=6).replace("\n", ". ").strip()
 				tup = (k, v)
 			self.chat_history.append(tup)
 		return tup[-1]
@@ -1547,7 +1553,7 @@ class Bot:
 		if not self.chat_history or tup != self.chat_history[0]:
 			k, v = tup
 			if len(self.gpttokens(v)) > 36:
-				v = self.answer_summarise(q=v, max_length=32, min_length=6).replace("\n", ". ").strip()
+				v = self.auto_summarise(q=v, max_length=32, min_length=6).replace("\n", ". ").strip()
 				tup = (k, v)
 			self.chat_history.insert(0, tup)
 		return tup[0]
@@ -1558,13 +1564,13 @@ class Bot:
 			if self.premium > 1:
 				labels = ("promise", "information", "example")
 				resp = self.answer_classify(q=v, labels=labels)
-			if len(self.gpttokens(v)) > 104:
-				v = self.answer_summarise(q=v, max_length=96, min_length=8).replace("\n", ". ").strip()
+			if len(self.gpttokens(v)) > 144:
+				self.auto_summarise(q=v, max_length=128, min_length=96).replace("\n", ". ").strip()
 				t2 = (k, v)
 			k, v = t1
-			if len(self.gpttokens(v)) > 52:
-				v = self.answer_summarise(q=v, max_length=48, min_length=6).replace("\n", ". ").strip()
-				t1 = (k, v)
+			if len(self.gpttokens(v)) > 104:
+				self.auto_summarise(q=v, max_length=96, min_length=72).replace("\n", ". ").strip()
+				t2 = (k, v)
 			if self.premium > 1 and resp["promise"] >= 0.5:
 				if len(self.promises) >= 6:
 					self.promises = self.promises[2:]
@@ -1601,7 +1607,7 @@ class Bot:
 		v = "".join(lines)
 		lim = 240 if self.premium >= 2 else 80
 		if len(self.gpttokens(v)) > lim + 16:
-			v = self.answer_summarise(q=v, max_length=lim, min_length=64).strip()
+			v = self.auto_summarise(q=v, max_length=lim, min_length=64).strip()
 		v = summ_start + v
 		print("Chat summary:", v)
 		self.summary = v
