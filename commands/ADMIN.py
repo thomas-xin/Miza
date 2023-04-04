@@ -1243,7 +1243,7 @@ class StarBoard(Command):
             def disp(t):
                 s = f"×{t[0]} -> {sqr_md(bot.get_channel(t[1]))}"
                 if len(t) > 2:
-                    s += ", excludes " + ", ".join(sqr_md(bot.get_channel(i)) for i in t[2:])
+                    s += ", excludes " + ", ".join(sqr_md(bot.get_channel(i)) for i in t[2])
                 return s
 
             msg = ini_md(iter2str({k: curr[k] for k in tuple(curr)[pos:pos + page]}, key=disp))
