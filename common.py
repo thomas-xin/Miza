@@ -2246,7 +2246,7 @@ async def sub_submit(ptype, command, fix=None, _timeout=12):
         ts += 1
     PROC_RESP[ts] = fut = concurrent.futures.Future()
     command = "[" + ",".join(map(repr, command[:2])) + "," + ",".join(map(str, command[2:])) + "]"
-    s = f"~{ts}~".encode("ascii") + orjson.dumps(command) + b"\n"
+    s = f"~{ts}~".encode("ascii") + base64.b64encode(command) + b"\n"
     # s = f"~{ts}~{repr(command.encode('utf-8'))}\n".encode("utf-8")
     if fix:
         sem = emptyctx
@@ -2305,9 +2305,9 @@ def process_image(image, operation, args=[], fix=None, timeout=36):
             args[i] = float(a)
         elif type(a) in (list, deque, np.ndarray, dict):
             try:
-                args[i] = "orjson.loads(" + repr(orjson.dumps(a).decode("utf-8", "replace")) + ")"
+                args[i] = "orjson.loads(" + as_str(orjson.dumps(as_str(orjson.dumps(a)))) + ")"
             except TypeError:
-                args[i] = "pickle.loads(" + repr(pickle.dumps(a)) + ")"
+                args[i] = "pickle.loads(" + as_str(orjson.dumps(pickle.dumps(a))) + ")"
 
     def as_arg(arg):
         if isinstance(arg, str) and arg.startswith("pickle.loads(") or arg.startswith("orjson.loads("):

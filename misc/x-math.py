@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 import sympy, mpmath, math, time, os, sys, subprocess, psutil, traceback, random
-import collections, itertools, pickle, orjson, ast, re
+import collections, itertools, pickle, orjson, base64, ast, re
 import sympy.stats
 import numpy as np
 import sympy.parsing.sympy_parser as parser
@@ -1103,7 +1103,7 @@ def procResp(resp):
 
 def evaluate(ts, args):
 	try:
-		resp = evalSym(*literal_eval(orjson.loads(args)))
+		resp = evalSym(*literal_eval(base64.b64decode(args)))
 		out = procResp(resp)
 		if len(out) > 8388608:
 			raise OverflowError("Output data too large.")

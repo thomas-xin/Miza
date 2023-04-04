@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import os, sys, io, time, concurrent.futures, asyncio, subprocess, psutil, collections, traceback, re, requests, blend_modes, pdf2image, zipfile, contextlib, filetype, pyqrcode, ast, colorspace, pickle, orjson
+import os, sys, io, time, concurrent.futures, asyncio, subprocess, psutil, collections, traceback, re, requests, blend_modes, pdf2image, zipfile, contextlib, filetype, pyqrcode, ast, colorspace, pickle, orjson, base64
 import numpy as np
 import PIL
 from PIL import Image, ImageCms, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhance, ImageMath, ImageStat, ImageFile
@@ -3004,7 +3004,8 @@ if __name__ == "__main__":
 			if argv[0] == "~":
 				ts, s = argv[1:].split("~", 1)
 				try:
-					args = eval(orjson.loads(s))
+					d = base64.b64decode(s)
+					args = eval(d)
 					if args[1] == "&":
 						args[1] = "$"
 						evaluate(ts, args)
