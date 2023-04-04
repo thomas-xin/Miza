@@ -140,7 +140,10 @@ class Translate(Command):
             prompt = f'"""\n{text}\n"""\nTranslate the above from {src} informally into '
         else:
             prompt = f'"""\n{text}\n"""\nTranslate the above informally into '
-        prompt += ",".join((googletrans.LANGUAGES.get(lang) or lang).capitalize() for lang in dests) + ', beginning with "•".'
+        prompt += ",".join((googletrans.LANGUAGES.get(lang) or lang).capitalize() for lang in dests)
+        if len(dests) > 1:
+            prompt += ', each beginning with "•"'
+        prompt += ', without adding extra text!'
         if bot.is_trusted(guild) >= 2:
             for uid in bot.data.trusted[guild.id]:
                 if uid and bot.premium_level(uid, absolute=True) >= 2:
@@ -256,7 +259,8 @@ class UpdateTranslators(Database):
         user = message.author
         channel = message.channel
         guild = message.guild
-        argv = curr["engine"] + " " + " ".join(curr["languages"]) + " " + "\\" + message.clean_content.strip()
+        tr = bot.commands.translate[0]
+        argv = curr["engine"] + " " + " ".join(tr.languages[lang] for lang in curr["languages"]) + " " + "\\" + message.clean_content.strip()
         with bot.ExceptionSender(channel, reference=message):
             u_perm = bot.get_perms(user.id, guild)
             u_id = user.id
