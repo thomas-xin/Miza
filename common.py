@@ -2246,7 +2246,7 @@ async def sub_submit(ptype, command, fix=None, _timeout=12):
         ts += 1
     PROC_RESP[ts] = fut = concurrent.futures.Future()
     command = "[" + ",".join(map(repr, command[:2])) + "," + ",".join(map(str, command[2:])) + "]"
-    s = f"~{ts}~".encode("ascii") + base64.b64encode(command) + b"\n"
+    s = f"~{ts}~".encode("ascii") + base64.b64encode(command.encode("utf-8")) + b"\n"
     # s = f"~{ts}~{repr(command.encode('utf-8'))}\n".encode("utf-8")
     if fix:
         sem = emptyctx

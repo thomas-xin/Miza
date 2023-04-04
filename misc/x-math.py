@@ -1138,4 +1138,4 @@ if __name__ == "__main__":
 		argv = argv.rstrip()
 		if argv[0] == "~":
 			ts, args = argv[1:].split("~", 1)
-			evaluate(ts, args)
+			evaluate(ts, args.encode("ascii"))

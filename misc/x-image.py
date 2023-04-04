@@ -3004,7 +3004,7 @@ if __name__ == "__main__":
 			if argv[0] == "~":
 				ts, s = argv[1:].split("~", 1)
 				try:
-					d = base64.b64decode(s)
+					d = base64.b64decode(s.encode("ascii"))
 					args = eval(d)
 					if args[1] == "&":
 						args[1] = "$"
