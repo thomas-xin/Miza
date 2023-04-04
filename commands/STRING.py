@@ -292,7 +292,7 @@ class UpdateTranslators(Database):
                             d[u_id] = max(t, utc())
                         else:
                             raise TooManyRequests(f"Command has a rate limit of {sec2time(x)}; please wait {sec2time(-wait)}.")
-                await tr(message, guild, channel, user, argv, name="tr", flags=flags)
+                await tr(bot, guild, channel, argv, user, message)
 
 
 class Math(Command):
