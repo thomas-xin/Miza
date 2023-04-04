@@ -1007,7 +1007,7 @@ class Bot:
 				try:
 					if flagged:
 						raise PermissionError("flagged")
-					if not random.randint(0, 2) and model == "gpt-3.5-turbo":
+					if not random.randint(0, 2) and model == "gpt-3.5-turbo" and not self.jailbroken:
 						try:
 							data = dict(
 								model=model,
