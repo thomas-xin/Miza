@@ -1510,7 +1510,37 @@ class Ask(Command):
                     + "Alternatively if you would like to manage pricing yourself through an OpenAI account (and/or free trial), check out the ~trial command!"
                 )
                 reacts.append("🚫")
-        s = lim_str(code + escape_roles(out), 2000)
+        # s = lim_str(code + escape_roles(out), 2000)
+        while len(s) > 2000:
+            t = []
+            while s:
+                cl = sum(map(len, t))
+                spl = s.split("\n\n", 1)
+                if len(spl) > 1 and cl + len(spl[0]) < 1997:
+                    t.append(spl[0])
+                    t.append("\n\n")
+                    s = spl[1]
+                    continue
+                spl = s.split("\n", 1)
+                if len(spl) > 1 and cl + len(spl[0]) < 1998:
+                    t.append(spl[0])
+                    t.append("\n")
+                    s = spl[1]
+                    continue
+                spl = s.split(None, 1)
+                if len(spl) > 1 and cl + len(spl[0]) < 1998:
+                    t.append(spl[0])
+                    t.append(" ")
+                    s = spl[1]
+                    continue
+                if t:
+                    break
+                t.append(s[:1999 - cl])
+                s = s[1999 - cl:]
+            t.insert(0, "\xad")
+            t = "".join(t).strip()
+            create_task(send_with_reply(channel, t, reference=message))
+            message = None
         m = await send_with_react(channel, s, embed=emb, reacts=reacts, reference=message)
         m.replaceable = False
         if caids:
