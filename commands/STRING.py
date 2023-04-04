@@ -222,7 +222,7 @@ class Translator(Command):
         if "d" in flags:
             following.pop(channel.id)
             return italics(css_md(f"Disabled translator service for {sqr_md(channel)}."))
-        elif "e" in flags or "a" in flags:
+        elif args:
             tr = bot.commands.translate[0]
             curr = cdict(engine="Google", languages=[])
             if args[0].casefold() in ("google", "chatgpt"):
