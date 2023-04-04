@@ -2396,6 +2396,8 @@ class UpdateUsers(Database):
                 m_id = stored[channel.id]
                 try:
                     await bot.fetch_message(m_id, channel)
+                except (discord.NotFound, LookupError):
+                    stored[channel.id] = message.id
                 except:
                     print_exc()
                     stored[channel.id] = message.id
@@ -2406,6 +2408,9 @@ class UpdateUsers(Database):
                 else:
                     try:
                         m = await bot.fetch_message(m_id, c)
+                    except (discord.NotFound, LookupError):
+                        stored.pop(c_id, None)
+                        stored[channel.id] = message.id
                     except:
                         print_exc()
                         stored.pop(c_id, None)
