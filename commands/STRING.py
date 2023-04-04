@@ -263,7 +263,7 @@ class UpdateTranslators(Database):
         channel = message.channel
         guild = message.guild
         tr = bot.commands.translate[0]
-        argv = curr["engine"] + " " + " ".join(tr.languages[lang.casefold()] for lang in curr["languages"]) + " " + "\\" + message.clean_content.strip()
+        argv = curr["engine"] + " auto " + " ".join(tr.languages[lang.casefold()] for lang in curr["languages"]) + " " + "\\" + message.clean_content.strip()
         with bot.ExceptionSender(channel, reference=message):
             u_perm = bot.get_perms(user.id, guild)
             u_id = user.id
