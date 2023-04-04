@@ -433,7 +433,7 @@ class Bot:
 
 	def auto_summarise(self, q="", max_length=128, min_length=64):
 		if q and sum(c.isascii() for c in q) / len(q) > 0.6:
-			return self.answer_summarise(q=v, max_length=max_length, min_length=min_length)
+			return self.answer_summarise(q=q, max_length=max_length, min_length=min_length)
 		else:
 			return lim_str(v, int(max_length * 1.5))
 
