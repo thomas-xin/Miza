@@ -137,9 +137,9 @@ class Translate(Command):
         uid = user.id
         if src and src != "auto":
             src = googletrans.LANGUAGES.get(src) or src
-            prompt = f"{text}\n\nTranslate the above from {src} informally into "
+            prompt = f"{text}\n###\nTranslate the above from {src} informally into "
         else:
-            prompt = f"{text}\n\nTranslate the above informally into "
+            prompt = f"{text}\n###\nTranslate the above informally into "
         prompt += ",".join((googletrans.LANGUAGES.get(lang) or lang).capitalize() for lang in dests) + ', beginning with "•".'
         if bot.is_trusted(guild) >= 2:
             for uid in bot.data.trusted[guild.id]:
@@ -292,7 +292,9 @@ class UpdateTranslators(Database):
                             d[u_id] = max(t, utc())
                         else:
                             raise TooManyRequests(f"Command has a rate limit of {sec2time(x)}; please wait {sec2time(-wait)}.")
-                await tr(bot, guild, channel, argv, user, message)
+                ctx = discord.context_managers.Typing(channel) if channel else emptyctx
+                with ctx:
+                    await tr(bot, guild, channel, argv, user, message)
 
 
 class Math(Command):
