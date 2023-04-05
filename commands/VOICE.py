@@ -5166,7 +5166,7 @@ class Download(Command):
 class Transcribe(Command):
     time_consuming = True
     _timeout_ = 75
-    name = ["Whisper", "TranscribeAudio"]
+    name = ["Whisper", "TranscribeAudio", "Caption"]
     description = "Downloads a song from a link, automatically transcribing to English, or a provided language if applicable."
     usage = "<1:language(en)>? <0:search_link>"
     example = ("transcribe https://www.youtube.com/watch?v=kJQP7kiw5Fk", "transcribe Chinese https://www.youtube.com/watch?v=dQw4w9WgXcQ")
