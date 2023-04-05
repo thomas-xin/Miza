@@ -1035,7 +1035,7 @@ class Bot:
 				try:
 					if flagged:
 						raise PermissionError("flagged")
-					if not random.randint(0, 2) and model == "gpt-3.5-turbo" and not self.jailbroken:
+					if not i and not random.randint(0, 2) and model == "gpt-3.5-turbo" and not self.jailbroken:
 						try:
 							data = dict(
 								model=model,
@@ -1049,6 +1049,7 @@ class Bot:
 								user=str(hash(u)),
 							)
 							text = self.ycg(data).removeprefix(f"{self.name}: ").strip()
+							if any(s in text for s in stop): text = ""
 						except EOFError:
 							pass
 						except:
