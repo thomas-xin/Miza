@@ -5256,7 +5256,7 @@ class Transcribe(Command):
                 openai.api_key = uoai = oai
             if m:
                 create_task(m.edit(
-                    content=css_md(f"Transcribing {sqr_md(out)}..."),
+                    content=css_md(f"Transcribing {fni}..."),
                     embed=None,
                 ))
             with open(fni, "rb") as f:
@@ -5272,7 +5272,7 @@ class Transcribe(Command):
         if not tr.equiv(dest, "English"):
             if m:
                 create_task(m.edit(
-                    content=css_md(f"Translating {sqr_md(out)}..."),
+                    content=css_md(f"Translating {fni}..."),
                     embed=None,
                 ))
                 create_task(channel.trigger_typing())
