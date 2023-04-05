@@ -5225,8 +5225,7 @@ class Transcribe(Command):
             fn = "~" + h + ".webm"
             file = await create_future(ytdl.get_stream, entries[0], download=".webm", asap=True)
             fni = "cache/" + fn
-            import openai
-                if bot.is_trusted(guild) >= 2:
+            if bot.is_trusted(guild) >= 2:
                 for uid in bot.data.trusted[guild.id]:
                     if uid and bot.premium_level(uid, absolute=True) >= 2:
                         break
