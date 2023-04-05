@@ -1139,7 +1139,7 @@ class Bot:
 					t2, c2, *irr = self.gptcomplete(u, q, refs=refs, start=text or " ")
 					text += " " + t2
 					cost += c2
-				elif not self.jailbroken and self.nsfw:
+				if not self.jailbroken and self.nsfw:
 					resp = openai.Moderation.create(
 						text,
 					)
