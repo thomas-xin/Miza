@@ -5217,13 +5217,13 @@ class Transcribe(Command):
                 )
             else:
                 m = None
-			await create_future(ytdl.get_stream, entries[0], force=True, download=False)
-			name, url = entries[0].get("name"), entries[0].get("url")
-			if not name or not url:
-				raise FileNotFoundError(500, argv)
-			h = shash(url)
-			fn = "~" + h + ".webm"
-			file = await create_future(ytdl.get_stream, entries[0], download=".webm", asap=True)
+            await create_future(ytdl.get_stream, entries[0], force=True, download=False)
+            name, url = entries[0].get("name"), entries[0].get("url")
+            if not name or not url:
+                raise FileNotFoundError(500, argv)
+            h = shash(url)
+            fn = "~" + h + ".webm"
+            file = await create_future(ytdl.get_stream, entries[0], download=".webm", asap=True)
             fni = "cache/" + fn
             import openai
                 if bot.is_trusted(guild) >= 2:
@@ -5241,11 +5241,11 @@ class Transcribe(Command):
             while file:
                 time.sleep(0.25)
                 if not os.path.exists(fni):
-					continue
-				if not os.path.getsize(fni):
-					continue
+                    continue
+                if not os.path.getsize(fni):
+                    continue
                 try:
-				    res = bool(getattr(file, 'loaded', None))
+                    res = bool(getattr(file, 'loaded', None))
                 except:
                     print_exc()
                     break
@@ -5282,6 +5282,7 @@ class Transcribe(Command):
             await tr.chatgpt_translate(bot, guild, channel, user, text, "en", [dest], translated, comments):
             text = "\n".join(translated.values()).strip()
         emb = discord.Embed(description=text)
+        emb.set_tile(name)
         emb.colour = await bot.get_colour(user)
         emb.set_author(**get_author(user))
         f m:
