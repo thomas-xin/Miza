@@ -1636,7 +1636,7 @@ class Bot:
 				if tc > lim * 2 or (tc > lim * 1.5 and self.premium >= 2):
 					try:
 						prompt = f'"""\n{v}\n"""\n\nSummarise the above into a paragraph, keeping the most important parts.'
-						v = self.au(prompt)
+						v = self.au(prompt)[0]
 					except:
 						print_exc()
 					else:
