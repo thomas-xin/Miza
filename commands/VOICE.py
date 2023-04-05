@@ -2292,7 +2292,7 @@ class AudioDownloader:
         if type(download) is str:
             fn = "~" + h + download
         else:
-            fn = "~" + h + ".webm"
+            fn = "~" + h + ".opus"
         # Use cached file if one already exists
         if self.cache.get(fn) or not download:
             if video:
