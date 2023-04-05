@@ -3816,9 +3816,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             create_task(self._send_embeds(user, embeds, reacts, reference, exc=exc))
             return
         if reference:
-            create_task(self._send_embeds(channel, embeds[0], reacts, reference, exc=exc))
             embeds = list(embeds)
-            embeds.pop(0)
+            create_task(self._send_embeds(channel, [embeds.pop(0)], reacts, reference, exc=exc))
         if reacts:
             embeds = [e.to_dict() for e in embeds]
             for e in embeds:
