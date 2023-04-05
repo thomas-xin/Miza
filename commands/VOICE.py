@@ -5238,7 +5238,7 @@ class Transcribe(Command):
             oai = data.get("trial") and data.get("openai_key") or AUTH.get("openai_key")
             bals = {k: v for k, v in bot.data.token_balances.items() if v < 0}
             while file:
-                time.sleep(0.25)
+                await asyncio.sleep(0.25)
                 if not os.path.exists(fni):
                     continue
                 if not os.path.getsize(fni):
@@ -5267,18 +5267,18 @@ class Transcribe(Command):
                     file=f,
                 )
             resp.raise_for_status()
+        text = resp.json()["text"].strip()
+        tr = bot.commands.translate[0]
+        if not tr.equiv(dest, "English"):
             if m:
                 create_task(m.edit(
                     content=css_md(f"Translating {sqr_md(out)}..."),
                     embed=None,
                 ))
                 create_task(channel.trigger_typing())
-        text = resp.json()["text"].strip()
-        tr = bot.commands.translate[0]
-        if not tr.equiv(dest, "English"):
             translated = {}
             comments = {}
-            await tr.chatgpt_translate(bot, guild, channel, user, text, "en", [dest], translated, comments)
+            await tr.chatgpt_translate(bot, guild, channel, user, text, "English", [dest], translated, comments)
             text = "\n".join(translated.values()).strip()
         emb = discord.Embed(description=text)
         emb.set_tile(name)
