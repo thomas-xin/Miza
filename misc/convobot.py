@@ -1049,7 +1049,7 @@ class Bot:
 								user=str(hash(u)),
 							)
 							text = self.ycg(data).removeprefix(f"{self.name}: ").strip()
-							if any(s in text for s in stop): text = ""
+							if stop and any(s in text for s in stop): text = ""
 						except EOFError:
 							pass
 						except:
