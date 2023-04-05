@@ -443,7 +443,7 @@ class AudioFile:
 		fmt = cdc = self.file.rsplit(".", 1)[-1]
 		if fmt in ("weba", "webm"):
 			fmt = "webm"
-			cdc = "liboopus"
+			cdc = "libopus"
 			cdc2 = "opus"
 		if fmt == "ogg":
 			cdc = "libvorbis"
