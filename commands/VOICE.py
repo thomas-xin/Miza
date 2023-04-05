@@ -5284,7 +5284,7 @@ class Transcribe(Command):
         emb.set_tile(name)
         emb.colour = await bot.get_colour(user)
         emb.set_author(**get_author(user))
-        f m:
+        if m:
             create_task(bot.silent_delete(m, no_log=True))
         reference = getattr(m, "reference", None)
         if reference:
