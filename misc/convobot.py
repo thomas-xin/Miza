@@ -877,6 +877,8 @@ class Bot:
 					summ = self.auto_summarise(q=q + "\n" + res, max_length=500, min_length=384).replace("\n", ". ").replace(": ", " -").strip()
 				if res:
 					m = dict(role="system", name=sname, content=res.strip())
+					pc += len(self.gpttokens(m["role"], model))
+					pc += len(self.gpttokens(m["content"], model))
 					messages.insert(-1, m)
 					searched = res.strip()
 			v = ""
