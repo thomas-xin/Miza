@@ -3814,17 +3814,18 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         user = self.cache.users.get(c_id)
         if user is not None:
             create_task(self._send_embeds(user, embeds, reacts, reference, exc=exc))
-        elif reference:
-            create_task(self._send_embeds(channel, embeds, reacts, reference, exc=exc))
-        else:
-            if reacts:
-                embeds = [e.to_dict() for e in embeds]
-                for e in embeds:
-                    e["reacts"] = reacts
-            embs = set_dict(self.embed_senders, c_id, [])
-            embs.extend(embeds)
-            if len(embs) > 2048:
-                self.embed_senders[c_id] = embs[-2048:]
+            return
+        if reference:
+            create_task(self._send_embeds(channel, embeds[0], reacts, reference, exc=exc))
+            embeds.pop(0)
+        if reacts:
+            embeds = [e.to_dict() for e in embeds]
+            for e in embeds:
+                e["reacts"] = reacts
+        embs = set_dict(self.embed_senders, c_id, [])
+        embs.extend(embeds)
+        if len(embs) > 2048:
+            self.embed_senders[c_id] = embs[-2048:]
 
     def send_as_embeds(self, channel, description=None, title=None, fields=None, md=nofunc, author=None, footer=None, thumbnail=None, image=None, images=None, colour=None, reacts=None, reference=None, exc=True):
         if type(description) is discord.Embed:
