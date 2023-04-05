@@ -1605,9 +1605,12 @@ class Bot:
 			s = f"{k}: {v}\n"
 			lines.append(s)
 		v = "".join(lines)
-		lim = 240 if self.premium >= 2 else 80
-		if len(self.gpttokens(v)) > lim + 16:
-			v = self.auto_summarise(q=v, max_length=lim, min_length=64).strip()
+		lim = 360 if self.premium >= 2 else 120
+		if (tc := len(self.gpttokens(v))) > lim + 16:
+			if tc > lim * 2 and len(self.gpttokens(lines[0])) > lim / 2:
+				lines[0] = lim_str(lines[0], lim * 2)
+				v = "".join(lines)
+			v = self.auto_summarise(q=v, max_length=lim, min_length=lim * 2 // 3).strip()
 		v = summ_start + v
 		print("Chat summary:", v)
 		self.summary = v
