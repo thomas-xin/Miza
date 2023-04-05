@@ -5266,8 +5266,9 @@ class Transcribe(Command):
                     temperature=0.5,
                     file=f,
                 )
-            resp.raise_for_status()
-        text = resp.json()["text"].strip()
+            # resp.raise_for_status()
+        # text = resp.json()["text"].strip()
+        text = resp["text"].strip()
         tr = bot.commands.translate[0]
         if not tr.equiv(dest, "English"):
             if m:
