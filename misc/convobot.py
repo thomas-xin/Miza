@@ -1003,7 +1003,7 @@ class Bot:
 				cm = 20
 		elif model in ("gpt-3.5-turbo", "gpt-4"):
 			tries = 7
-			if self.premium < 2 or not self.nsfw:
+			if self.premium < 2:
 				stop = None
 			else:
 				stop = ["s an AI", "AI language model", "I'm sorry,", "language model"]
@@ -1026,7 +1026,7 @@ class Bot:
 								presence_penalty=0.6,
 								user=str(hash(u)),
 							)
-							text = self.ycg(data).removeprefix(f"{self.name}: ")
+							text = self.ycg(data).removeprefix(f"{self.name}: ").strip()
 						except EOFError:
 							pass
 						except:
@@ -1058,7 +1058,7 @@ class Bot:
 								text = self.vai(prompt)
 							if not text:
 								text = self.chatgpt(prompt)
-							text = text.removeprefix(f"{self.name}: ")
+							text = text.removeprefix(f"{self.name}: ").strip()
 							if text:
 								response = None
 								break
@@ -1096,7 +1096,7 @@ class Bot:
 					m = response["choices"][0]["message"]
 					print(response)
 					role = m["role"]
-					text = m["content"].removeprefix(f"{self.name} says: ").removeprefix(f"{self.name}: ")
+					text = m["content"].removeprefix(f"{self.name} says: ").removeprefix(f"{self.name}: ").strip()
 					if len(text) >= 2 and text[-1] == " " and text[-2] not in ".!?" or text.endswith(' "'):
 						redo = True
 					text = text.strip()
