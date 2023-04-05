@@ -5278,7 +5278,7 @@ class Transcribe(Command):
         if not tr.equiv(dest, "English"):
             translated = {}
             comments = {}
-            await tr.chatgpt_translate(bot, guild, channel, user, text, "en", [dest], translated, comments):
+            await tr.chatgpt_translate(bot, guild, channel, user, text, "en", [dest], translated, comments)
             text = "\n".join(translated.values()).strip()
         emb = discord.Embed(description=text)
         emb.set_tile(name)
