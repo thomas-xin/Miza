@@ -5287,11 +5287,11 @@ class Transcribe(Command):
         emb.set_author(**get_author(user))
         if m:
             create_task(bot.silent_delete(m, no_log=True))
-        reference = getattr(m, "reference", None)
-        if reference:
-            r_id = getattr(m, "message_id", None) or getattr(m, "id", None)
-            reference = bot.cache.messages.get(r_id)
-        bot.send_as_embeds(channel, text, author=get_author(user), reference=reference)
+        # reference = getattr(m, "reference", None)
+        # if reference:
+        #     r_id = getattr(m, "message_id", None) or getattr(m, "id", None)
+        #     reference = bot.cache.messages.get(r_id)
+        bot.send_as_embeds(channel, text, author=get_author(user), reference=message)
 
 
 class UpdateAudio(Database):
