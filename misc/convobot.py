@@ -47,6 +47,22 @@ def lim_str(s, maxlen=10, mode="centre"):
 			s = s[:maxlen - 3] + "..."
 	return s
 
+def lim_tokens(s, maxlen=10, mode="centre"):
+	if maxlen is None:
+		return s
+	if type(s) is not str:
+		s = str(s)
+	enc = tiktoken.get_encoding("cl100k_base")
+	tokens = enc.encode(s)
+	over = (len(tokens) - maxlen) / 2
+	if over > 0:
+		if mode == "centre":
+			half = len(tokens) / 2
+			s = enc.decode(tokens[:ceil(half - over - 1)]) + ".." + enc.decode(tokens[ceil(half + over + 1):])
+		else:
+			s = enc.decode(tokens[:maxlen - 3]) + "..."
+	return s
+
 class_name = webdriver.common.by.By.CLASS_NAME
 css_selector = webdriver.common.by.By.CSS_SELECTOR
 xpath = webdriver.common.by.By.XPATH
@@ -433,9 +449,10 @@ class Bot:
 
 	def auto_summarise(self, q="", max_length=128, min_length=64):
 		if q and sum(c.isascii() for c in q) / len(q) > 0.6:
+			q = lim_tokens(q, max_length + min_length << 1)
 			return self.answer_summarise(q=q, max_length=max_length, min_length=min_length)
 		else:
-			return lim_str(v, int(max_length * 1.5))
+			return lim_tokens(q, max_length)
 
 	def answer_classify(self, m="vicgalle/xlm-roberta-large-xnli-anli", q="", labels=[]):
 		try:
@@ -814,10 +831,12 @@ class Bot:
 						cost += resp["usage"].get("completion_tokens", 0) * (cm2 or cm) * costs
 						text = resp["choices"][0]["message"]["content"] or "@"
 			sname = "GOOGLE"
+			nohist = False
 			if text:
 				if text.startswith("%"):
 					stype = "3"
 					sname = "WOLFRAMALPHA"
+					nohist = True
 				else:
 					stype = random.randint(0, 2)
 					sname = ("GOOGLE", "BING", "YAHOO")[stype]
@@ -851,10 +870,11 @@ class Bot:
 							print_exc()
 						else:
 							break
+			if nohist and len(messages) > 3:
+				messages = [messages[0], messages[-2], messages[-1]]
 			if res:
-				if len(self.gpttokens(res)) > 400:
-					summ = self.auto_summarise(q=q + "\n" + res, max_length=384, min_length=256).replace("\n", ". ").replace(": ", " -").strip()
-					res = lim_str(res.replace("\n", " "), 384, mode="right") + "\n" + summ
+				if len(self.gpttokens(res)) > 512:
+					summ = self.auto_summarise(q=q + "\n" + res, max_length=500, min_length=384).replace("\n", ". ").replace(": ", " -").strip()
 				if res:
 					m = dict(role="system", name=sname, content=res.strip())
 					messages.insert(-1, m)
@@ -1207,7 +1227,7 @@ class Bot:
 				return res
 		else:
 			res = "\n".join(r.strip() for r in res.splitlines() if valid_response(r))
-			res = lim_str(res, 3072, mode="right")
+			# res = lim_str(res, 3072, mode="right")
 			if raw:
 				return res
 			res = self.clean_response(q, res)
@@ -1238,7 +1258,7 @@ class Bot:
 				return res
 		else:
 			res = "\n".join(r.strip() for r in res.splitlines() if valid_response(r))
-			res = lim_str(res, 3072, mode="right")
+			# res = lim_str(res, 3072, mode="right")
 			if raw:
 				return res
 			res = self.clean_response(q, res)
@@ -1269,7 +1289,7 @@ class Bot:
 				return res
 		else:
 			res = "\n".join(r.strip() for r in res.splitlines() if valid_response(r))
-			res = lim_str(res, 3072, mode="right")
+			# res = lim_str(res, 3072, mode="right")
 			if raw:
 				return res
 			res = self.clean_response(q, res)
@@ -1415,7 +1435,7 @@ class Bot:
 				model="gpt-3.5-turbo",
 				user=str(random.randint(0, 4294967295)),
 			)
-		print("YourChat query:", data)
+		print("YourChat prompt:", data)
 		headers = {
 			"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
 			"DNT": "1",
@@ -1544,7 +1564,7 @@ class Bot:
 		if not self.chat_history or tup != self.chat_history[-1]:
 			k, v = tup
 			if len(self.gpttokens(v)) > 36:
-				v = self.auto_summarise(q=v, max_length=32, min_length=6).replace("\n", ". ").strip()
+				v = self.auto_summarise(q=v, max_length=32, min_length=16).replace("\n", ". ").strip()
 				tup = (k, v)
 			self.chat_history.append(tup)
 		return tup[-1]
@@ -1553,7 +1573,7 @@ class Bot:
 		if not self.chat_history or tup != self.chat_history[0]:
 			k, v = tup
 			if len(self.gpttokens(v)) > 36:
-				v = self.auto_summarise(q=v, max_length=32, min_length=6).replace("\n", ". ").strip()
+				v = self.auto_summarise(q=v, max_length=32, min_length=16).replace("\n", ". ").strip()
 				tup = (k, v)
 			self.chat_history.insert(0, tup)
 		return tup[0]
@@ -1564,12 +1584,14 @@ class Bot:
 			if self.premium > 1:
 				labels = ("promise", "information", "example")
 				resp = self.answer_classify(q=v, labels=labels)
-			if len(self.gpttokens(v)) > 144:
-				self.auto_summarise(q=v, max_length=128, min_length=96).replace("\n", ". ").strip()
+			lim = 256 if self.premium >= 2 else 128
+			if len(self.gpttokens(v)) > lim + 16:
+				self.auto_summarise(q=v, max_length=lim, min_length=lim * 2 // 3).replace("\n", ". ").strip()
 				t2 = (k, v)
+			lim -= 32
 			k, v = t1
-			if len(self.gpttokens(v)) > 104:
-				self.auto_summarise(q=v, max_length=96, min_length=72).replace("\n", ". ").strip()
+			if len(self.gpttokens(v)) > lim + 16:
+				self.auto_summarise(q=v, max_length=lim, min_length=lim * 2 // 3).replace("\n", ". ").strip()
 				t2 = (k, v)
 			if self.premium > 1 and resp["promise"] >= 0.5:
 				if len(self.promises) >= 6:
@@ -1606,11 +1628,20 @@ class Bot:
 			lines.append(s)
 		v = "".join(lines)
 		lim = 360 if self.premium >= 2 else 120
-		if (tc := len(self.gpttokens(v))) > lim + 16:
-			if tc > lim * 2 and len(self.gpttokens(lines[0])) > lim / 2:
-				lines[0] = lim_str(lines[0], lim * 2)
-				v = "".join(lines)
-			v = self.auto_summarise(q=v, max_length=lim, min_length=lim * 2 // 3).strip()
+		for i in (0,):
+			if (tc := len(self.gpttokens(v))) > lim + 16:
+				if tc > lim * 2 or (tc > lim * 1.5 and self.premium >= 2):
+					try:
+						prompt = f'"""\n{v}\n"""\n\nSummarise the above into a paragraph, keeping the most important parts.'
+						v = self.au(prompt)
+					except:
+						print_exc()
+					else:
+						break
+				if tc > lim * 1.5 and len(self.gpttokens(lines[0])) > lim * 3 / 4:
+					lines[0] = lim_tokens(lines[0], lim // 2)
+					v = "".join(lines)
+				v = self.auto_summarise(q=v, max_length=lim, min_length=lim * 2 // 3).strip()
 		v = summ_start + v
 		print("Chat summary:", v)
 		self.summary = v
