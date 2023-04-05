@@ -1024,7 +1024,7 @@ class Server:
 			fmt = kwargs.get("fmt")
 			if not fmt:
 				fmt = "opus" if d else "mp3"
-			if fmt not in ("mp3", "opus", "ogg", "wav"):
+			if fmt not in ("mp3", "opus", "webm", "weba", "ogg", "wav"):
 				raise TypeError(fmt)
 			fmt = "." + fmt
 			self.bot_exec(f"bot.audio.returns[{t}]=VOICE.ytdl.search({repr(q)})[0]")

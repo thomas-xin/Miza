@@ -7,6 +7,7 @@ try:
 except:
     print_exc()
     googletrans = None
+import openai
 # try:
 #     import convobot
 # except:
@@ -77,20 +78,8 @@ class Translate(Command):
             resp2 = None
             src2 = src.casefold()
 
-        def equiv(s, d):
-            if s == d:
-                return True
-            s2 = self.languages.get(s) or s
-            if s2 == d:
-                return True
-            d2 = self.languages.get(d) or d
-            if s2 == d2:
-                return True
-            if s == d2:
-                return True
-
         odest = tuple(dests)
-        dests = [d for d in dests if not equiv(d, src2)]
+        dests = [d for d in dests if not self.equiv(d, src2)]
         # if len(odest) != len(dests):
         #     translated[-1] = text
         #     odest = (src2,) + tuple(dests)
@@ -118,7 +107,19 @@ class Translate(Command):
             if comm:
                 output += "".join("\n> " + line for line in comm.splitlines())
             output += "\n"
-        self.bot.send_as_embeds(channel, output.strip(), author=get_author(user), footer=footer, reference=message)
+        bot.send_as_embeds(channel, output.strip(), author=get_author(user), footer=footer, reference=message)
+
+    def equiv(self, s, d):
+        if s == d:
+            return True
+        s2 = self.languages.get(s) or s
+        if s2 == d:
+            return True
+        d2 = self.languages.get(d) or d
+        if s2 == d2:
+            return True
+        if s == d2:
+            return True
 
     async def google_translate(self, bot, guild, channel, user, text, src, dests, translated, comments):
 
@@ -1669,7 +1670,6 @@ class Personality(Command):
         #     raise PermissionError(f"Sorry, this feature is currently for premium users only. Please make sure you have a subscription level of minimum 1 from {bot.kofi_url}, or try out ~trial if you would like to manage/fund your own usage!")
         p = self.encode(argv)
         if not bot.is_nsfw(channel):
-            import openai
             inappropriate = False
             openai.api_key = AUTH["openai_key"]
             resp = await create_future(

@@ -13,6 +13,9 @@ except:
 else:
     has_ytd = True
 from bs4 import BeautifulSoup
+with tracebacksuppressor:
+    import openai
+    import googletrans
 
 # Audio sample rate for both converting and playing
 SAMPLE_RATE = 48000
@@ -2289,7 +2292,7 @@ class AudioDownloader:
         if type(download) is str:
             fn = "~" + h + download
         else:
-            fn = "~" + h + ".opus"
+            fn = "~" + h + ".webm"
         # Use cached file if one already exists
         if self.cache.get(fn) or not download:
             if video:
@@ -2759,6 +2762,9 @@ class AudioDownloader:
                 outf = f"{info['name']}.{fmt}"
                 fn = f"cache/\x7f{ts}~" + outf.translate(filetrans)
             elif fmt == "ogg":
+                args.extend(("-c:a", "libopus"))
+            elif fmt == "weba":
+                fmt = "webm"
                 args.extend(("-c:a", "libopus"))
             elif fmt == "pcm":
                 fmt = "s16le"
@@ -5080,7 +5086,7 @@ class Download(Command):
                 if len(spl) >= 6:
                     start, end = spl[4:6]
                 if not simulated:
-                    if tuple(map(str, (start, end))) == ("None", "None") and not silenceremove and not auds and fmt in ("mp3", "opus", "ogg", "wav"):
+                    if tuple(map(str, (start, end))) == ("None", "None") and not silenceremove and not auds and fmt in ("mp3", "opus", "ogg", "wav", "weba"):
                         view = bot.webserver + "/ytdl?fmt=" + fmt + "&view=" + url
                         download = bot.webserver + "/ytdl?fmt=" + fmt + "&download=" + url
                         # content = view + "\n" + download
@@ -5155,6 +5161,136 @@ class Download(Command):
                     pass
             if not simulated:
                 create_task(bot.silent_delete(message, no_log=True))
+
+
+class Transcribe(Command):
+    time_consuming = True
+    _timeout_ = 75
+    name = ["Whisper", "TranscribeAudio"]
+    description = "Downloads a song from a link, automatically transcribing to English, or a provided language if applicable."
+    usage = "<1:language(en)>? <0:search_link>"
+    example = ("transcribe https://www.youtube.com/watch?v=kJQP7kiw5Fk", "transcribe Chinese https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+    rate_limit = (30, 45)
+    typing = True
+    slash = True
+
+    async def __call__(self, bot, channel, guild, message, name, argv, flags, user, **void):
+        if max(bot.is_trusted(guild), bot.premium_level(user) * 2) < 2:
+            raise PermissionError(f"Sorry, this feature is currently for premium users only. Please make sure you have a subscription level of minimum 1 from {bot.kofi_url}, or try out ~trial if you would like to manage/fund your own usage!")
+        dest = "English"
+        # Attempt to download items in queue if no search query provided
+        if not argv:
+            try:
+                auds = bot.data.audio.players[guild.id]
+                if not auds.queue:
+                    raise LookupError
+                url = auds.queue[0].get("url")
+            except:
+                raise IndexError("Queue not found. Please input a search term, URL, or file.")
+        else:
+            # Parse search query, detecting file format selection if possible
+            if " " in argv:
+                spl = smart_split(argv)
+                if len(spl) >= 1:
+                    tr = bot.commands.translate[0]
+                    arg = spl[0]
+                    if (dest := (tr.renamed.get(c := arg.casefold()) or (tr.languages.get(c) and c))):
+                        dest = (googletrans.LANGUAGES.get(dest) or dest).capitalize()
+                        curr.languages.append(dest)
+                        argv = " ".join(spl[1:])
+            argv = verify_search(argv)
+            # Input must be a URL
+            urls = await bot.follow_url(argv, allow=True, images=False)
+            if not urls:
+                raise TypeError("Input must be a valid URL.")
+            url = urls[0]
+        simulated = getattr(message, "simulated", None)
+        with discord.context_managers.Typing(channel):
+            entries = await create_future(ytdl.search, url)
+            if entries:
+                name = entries[0].get("name")
+            else:
+                name = None
+            if not simulated:
+                m = await message.reply(
+                    ini_md(f"Downloading and converting {sqr_md(ensure_url(url))}..."),
+                )
+            else:
+                m = None
+			await create_future(ytdl.get_stream, entries[0], force=True, download=False)
+			name, url = entries[0].get("name"), entries[0].get("url")
+			if not name or not url:
+				raise FileNotFoundError(500, argv)
+			h = shash(url)
+			fn = "~" + h + ".webm"
+			file = await create_future(ytdl.get_stream, entries[0], download=".webm", asap=True)
+            fni = "cache/" + fn
+            import openai
+                if bot.is_trusted(guild) >= 2:
+                for uid in bot.data.trusted[guild.id]:
+                    if uid and bot.premium_level(uid, absolute=True) >= 2:
+                        break
+                else:
+                    uid = next(iter(bot.data.trusted[guild.id]))
+                u = await bot.fetch_user(uid)
+            else:
+                u = user
+            data = bot.data.users.get(u.id, {})
+            oai = data.get("trial") and data.get("openai_key") or AUTH.get("openai_key")
+            bals = {k: v for k, v in bot.data.token_balances.items() if v < 0}
+            while file:
+                time.sleep(0.25)
+                if not os.path.exists(fni):
+					continue
+				if not os.path.getsize(fni):
+					continue
+                try:
+				    res = bool(getattr(file, 'loaded', None))
+                except:
+                    print_exc()
+                    break
+                if res is not False:
+                    break
+            if bals:
+                openai.api_key = uoai = sorted(bals, key=bals.get)[0]
+            else:
+                openai.api_key = uoai = oai
+            if m:
+                create_task(m.edit(
+                    content=css_md(f"Transcribing {sqr_md(out)}..."),
+                    embed=None,
+                ))
+            with open(fni, "rb") as f:
+                resp = await create_future(
+                    openai.Audio.translate,
+                    model="whisper-1",
+                    temperature=0.5,
+                    file=f,
+                )
+            resp.raise_for_status()
+            if m:
+                create_task(m.edit(
+                    content=css_md(f"Translating {sqr_md(out)}..."),
+                    embed=None,
+                ))
+                create_task(channel.trigger_typing())
+        text = resp.json()["text"].strip()
+        tr = bot.commands.translate[0]
+        if not tr.equiv(dest, "English"):
+            translated = {}
+            comments = {}
+            await tr.chatgpt_translate(bot, guild, channel, user, text, "en", [dest], translated, comments):
+            text = "\n".join(translated.values()).strip()
+        emb = discord.Embed(description=text)
+        emb.colour = await bot.get_colour(user)
+        emb.set_author(**get_author(user))
+        f m:
+            create_task(bot.silent_delete(m, no_log=True))
+        reference = getattr(m, "reference", None)
+        if reference:
+            r_id = getattr(m, "message_id", None) or getattr(m, "id", None)
+            reference = bot.cache.messages.get(r_id)
+        bot.send_as_embeds(channel, text, author=get_author(user), reference=reference)
 
 
 class UpdateAudio(Database):

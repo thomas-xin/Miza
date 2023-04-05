@@ -441,6 +441,10 @@ class AudioFile:
 		if not os.path.exists(ffmpeg):
 			ffmpeg = "./ffmpeg"
 		fmt = cdc = self.file.rsplit(".", 1)[-1]
+		if fmt in ("weba", "webm"):
+			fmt = "webm"
+			cdc = "liboopus"
+			cdc2 = "opus"
 		if fmt == "ogg":
 			cdc = "libvorbis"
 			cdc2 = "vorbis"
