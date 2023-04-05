@@ -5282,7 +5282,7 @@ class Transcribe(Command):
             await tr.chatgpt_translate(bot, guild, channel, user, text, "English", [dest], translated, comments)
             text = "\n".join(translated.values()).strip()
         emb = discord.Embed(description=text)
-        emb.set_tile(name)
+        emb.title = name
         emb.colour = await bot.get_colour(user)
         emb.set_author(**get_author(user))
         if m:
