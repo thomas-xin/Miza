@@ -518,7 +518,7 @@ class Bot:
 		funcs = []
 		if not url and not dalle2 and nsfw:
 			funcs.append(self.art_textsynth)
-		if not specified and not url:
+		if not specified and not url and os.name == "nt":
 			if random.randint(0, 2) and self.cache.get(prompt):
 				return self.cache[prompt].pop(0), 0
 			funcs.append(self.art_mage)
