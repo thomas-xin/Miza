@@ -1449,7 +1449,7 @@ class Waifu2x(Command):
 
 class Art(Command):
     _timeout_ = 150
-    name = ["AIArt", "Inpaint", "StableDiffusion", "Dalle", "Dalle2", "Openjourney", "Midjourney"]
+    name = ["AIArt", "Inpaint", "StableDiffusion", "Dalle", "Dalle2", "Imagine", "Openjourney", "Midjourney"]
     description = "Runs a Stable Diffusion AI art generator on the input prompt or image. Operates on a global queue system for image prompts. Accepts appropriate keyword arguments."
     usage = "<0:prompt> <inpaint{?i}>"
     example = ("art cute kitten", "art https://mizabot.xyz/favicon")
@@ -1570,7 +1570,7 @@ class Art(Command):
         if specified:
             req += " ".join(f"{k} {v}" for k, v in kwargs.items() if k in specified)
         nsfw = bot.is_nsfw(channel)
-        if not nsfw and prompt and "openai_key" in AUTH:
+        if not nsfw and prompt and AUTH.get("openai_key"):
             import openai
             openai.api_key = AUTH["openai_key"]
             resp = openai.Moderation.create(

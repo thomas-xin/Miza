@@ -1378,6 +1378,7 @@ class Server:
 		h = hash(s) % 2 ** 48
 		single = "/upload_single" in cp.url()
 		xi = cp.request.headers.get("x-index", "0")
+		mfs = int(cp.request.headers.get("x-total", 0))
 		fn = f"cache/{h}%" + str(xi)
 		csize = 83886080
 		with open(fn, "wb") as f:
