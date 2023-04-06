@@ -1318,7 +1318,7 @@ class Bot:
 		return_driver(driver)
 		return "\n".join(lines)
 
-	def chatgpt(self, q):
+	def chatgpt(self, q, stop=None):
 		if time.time() - getattr(chatgpt, "rate", 0) < 0:
 			return ""
 		async def run_chatgpt(q, fut=None):
@@ -1384,7 +1384,7 @@ class Bot:
 		return res
 
 	vis_c = vis_r = 0
-	def vai(self, q):
+	def vai(self, q, stop=None):
 		if not self.vis_s or self.vis_r > time.time():
 			return ""
 		if self.vis_c > 48:
@@ -1426,7 +1426,7 @@ class Bot:
 		return "\n".join(html_decode(line.strip().removeprefix("<p>").removesuffix("</p>")).strip() for line in data["response"].replace("<br>", "\n").splitlines()).replace("<em>", "*").replace("</em>", "*").replace("<ul>", "").replace("</ul>", "").replace("<ol>", "").replace("</ol>", "").replace("<li>", "•").replace("</li>", "")
 
 	you_r = 0
-	def ycg(self, data):
+	def ycg(self, data, stop=None):
 		if self.you_r > time.time():
 			raise EOFError
 		if isinstance(data, str):
@@ -1434,6 +1434,7 @@ class Bot:
 				messages=[dict(role="user", content=data)],
 				temperature=0.7,
 				top_p=0.9,
+				stop=stop,
 				max_tokens=2048,
 				model="gpt-3.5-turbo",
 				user=str(random.randint(0, 4294967295)),
@@ -1460,7 +1461,7 @@ class Bot:
 			return ""
 		return resp.text
 
-	def cgp(self, data):
+	def cgp(self, data, stop=None):
 		cost = 0
 		oai = getattr(self, "oai", None)
 		bals = getattr(self, "bals", {})
@@ -1479,6 +1480,7 @@ class Bot:
 				messages=[dict(role="user", content=data)],
 				temperature=0.7,
 				top_p=0.9,
+				stop=stop,
 				max_tokens=2048,
 				model="gpt-3.5-turbo",
 				user=str(random.randint(0, 4294967295)),
@@ -1498,17 +1500,21 @@ class Bot:
 				text = resp["choices"][0]["message"]["content"]
 				return text, cost, uoai
 
-	def au(self, prompt):
+	def au(self, prompt, stop=None):
 		funcs = [self.chatgpt, self.vai, self.ycg, self.cgp, self.cgp, self.cgp]
 		random.shuffle(funcs)
 		resp = None
 		while not resp:
 			try:
-				resp = funcs.pop(0)(prompt)
+				resp = funcs.pop(0)(prompt, stop=stop)
 			except EOFError:
 				pass
 		if not isinstance(resp, tuple):
-			return (resp,)
+			resp = [resp]
+		resp = list(resp)
+		if stop:
+			for s in stop:
+				resp[0] = resp[0].split(s, None)
 		return resp
 
 	def ai(self, u, q, refs=(), im=None):
@@ -1635,8 +1641,11 @@ class Bot:
 			if (tc := len(self.gpttokens(v))) > lim + 16:
 				if tc > lim * 2 or (tc > lim * 1.5 and self.premium >= 2):
 					try:
-						prompt = f'"""\n{v}\n"""\n\nSummarise the above into a paragraph, keeping the most important parts.'
-						v = self.au(prompt)[0]
+						prompt = f'"""\n{v}\n"""\n\nSummarise the above into a paragraph, keeping the most important parts. Do not be repetitive!'
+						v2 = self.au(prompt)[0]
+						if len(self.gpttokens(v2)) < 16:
+							raise ValueError(v2)
+						v = v2
 					except:
 						print_exc()
 					else:
