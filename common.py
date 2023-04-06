@@ -1118,8 +1118,8 @@ else:
     def get_folder_size(path="."):
         fc = fs = 0
         for dirpath, dirnames, filenames in os.walk(path):
+            fc += len(filenames)
             for f in filenames:
-                fc += 1
                 fs += os.path.getsize(os.path.join(dirpath, f))
         return fc, fs
 
