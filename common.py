@@ -1115,7 +1115,13 @@ if os.name == "nt":
         fs = int(fs.removesuffix("bytes").replace(",", "").strip())
         return fc, fs
 else:
-    get_folder_size = lambda path=".": len(os.listdir(path)), sum(get_folder_size(f.path) if f.is_dir() else f.stat().st_size for f in os.scandir(path))
+    def get_folder_size(path="."):
+        fc = fs = 0
+        for dirpath, dirnames, filenames in os.walk(path):
+            for f in filenames:
+                fc += 1
+                fs += os.path.getsize(os.path.join(dirpath, f))
+        return fc, fs
 
 
 # Checks if an object can be used in "await" operations.
