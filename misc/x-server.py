@@ -1429,7 +1429,7 @@ class Server:
 					fut.result()
 					if xi == 0:
 						info.mime = get_mime(fn)
-					url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fns)})")
+					url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fn)})")
 					self.chunking[fn] = (url1, mid1)
 				if xi % 8 == 7:
 					fut.result()
