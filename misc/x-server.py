@@ -1419,17 +1419,21 @@ class Server:
 				return self.merge(name=name, index=1)
 			fut = create_future_ex(shutil.copyfileobj, cp.request.body.fp, f)
 			if mfs > 2 * 1073741824:
-				if xi % 6 == 5:
+				try:
+					info = self.chunking[n]
+				except KeyError:
+					info = self.chunking[n] = cdict(
+						mime="application/octet-stream",
+					)
+				if xi % 8 < 2:
+					fut.result()
+					if xi == 0:
+						info.mime = get_mime(fn)
+					url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fns)})")
+					self.chunking[fn] = (url1, mid1)
+				if xi % 8 == 7:
 					fut.result()
 					fns = []
-					try:
-						info = self.chunking[n]
-					except KeyError:
-						info = self.chunking[n] = cdict(
-							mime="application/octet-stream",
-							urls=[],
-							mids=[],
-						)
 					for i in range(5):
 						ft = n + str(xi - 5 + i)
 						if ft not in self.chunking:
@@ -1437,16 +1441,9 @@ class Server:
 						self.chunking[ft].result(timeout=720)
 						assert os.path.exists(ft)
 						fns.append(ft)
-						if i == 0 and xi < 6:
-							info.mime = get_mime(ft)
 					fns.append(fn)
 					url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fns)})")
-					try:
-						info.urls.extend(url1)
-						info.mids.extend(mid1)
-					except AttributeError:
-						info.urls = url1
-						info.mids = mid1
+					self.chunking[fn] = (url1, mid1)
 				else:
 					try:
 						fut.add_done_callback(self.chunking[fn].set_result)
@@ -1510,6 +1507,9 @@ class Server:
 						url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(gn)})")
 						urls.extend(url1)
 						mids.extend(mid1)
+					elif isinstance(fut, tuple):
+						urls.extend(fut[0])
+						mids.extend(fut[1])
 				urls = [map_url(url) for url in urls]
 				code = 307
 				ftype = 3
