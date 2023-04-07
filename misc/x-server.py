@@ -1431,6 +1431,8 @@ class Server:
 						info.mime = get_mime(fn)
 					url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fn)})")
 					self.chunking[fn] = (url1, mid1)
+					with suppress(PermissionError, FileNotFoundError):
+						os.remove(fn)
 				elif xi % 8 == 7:
 					fut.result()
 					fns = []
@@ -1444,6 +1446,9 @@ class Server:
 					fns.append(fn)
 					url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fns)})")
 					self.chunking[fn] = (url1, mid1)
+					for ft in fns:
+						with suppress(PermissionError, FileNotFoundError):
+							os.remove(ft)
 				else:
 					try:
 						fut.add_done_callback(self.chunking[fn].set_result)
@@ -1498,6 +1503,7 @@ class Server:
 				tn = fn.split("~", 1)[0] + "~.forward$" + str(mfs)
 				urls = []
 				mids = []
+				size = mfs
 				mime = info.mime
 				for i in range(high):
 					gn = nh + str(i)
@@ -1518,7 +1524,7 @@ class Server:
 				s = (
 					f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0;URL={url}"/>'
 					+ f'<!--[{jdn},{size},"{mime}"]--><!--URL={json.dumps(urls, separators=(",", ":"))}--><!--KEY={key}--><!--MID={json.dumps(mids)}-->'
-					+ (f'<!--SHA={ha1}-->' if ha1 else "")
+					+ f'<!--SHA=A-->'
 					+ '</html>'
 				)
 				with open(tn, "w", encoding="utf-8") as f:
