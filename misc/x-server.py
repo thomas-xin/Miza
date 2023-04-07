@@ -1508,8 +1508,8 @@ class Server:
 						if not os.path.exists(gn):
 							raise FileNotFoundError(gn)
 						url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(gn)})")
-					urls.extend(url1)
-					mids.extend(mid1)
+						urls.extend(url1)
+						mids.extend(mid1)
 				urls = [map_url(url) for url in urls]
 				code = 307
 				ftype = 3
