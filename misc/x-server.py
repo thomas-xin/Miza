@@ -1490,7 +1490,7 @@ class Server:
 				q = f"?key={key}"
 				if os.path.exists(n + "0"):
 					os.rename(n + "0", f"cache/{IND}{ts}" + "~.temp$@" + name)
-			elif n in self.chunking:
+			elif nh in self.chunking:
 				info = self.chunking.pop(n)
 				b = ts.bit_length() + 7 >> 3
 				if not key:
@@ -1502,7 +1502,7 @@ class Server:
 				urls, mids = info.urls, info.mids
 				mime = info.mime
 				for i in range(high):
-					gn = n + str(i)
+					gn = nh + str(i)
 					fut = self.chunking.pop(gn, None)
 					if not fut:
 						if not os.path.exists(gn):
@@ -1523,13 +1523,13 @@ class Server:
 				with open(tn, "w", encoding="utf-8") as f:
 					f.write(s)
 			else:
-				of = n + "0"
+				of = nh + "0"
 				fn = f"cache/{IND}{ts}~.temp$@{name}"
 				os.rename(of, fn)
 				if high > 1:
 					with open(fn, "ab") as f:
 						for i in range(1, high):
-							gn = n + str(i)
+							gn = nh + str(i)
 							with open(gn, "rb") as g:
 								shutil.copyfileobj(g, f)
 				b = ts.bit_length() + 7 >> 3
