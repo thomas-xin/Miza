@@ -2761,6 +2761,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         if "audio" in self.data:
             if self._globals["VOICE"].ytdl.download_sem.active:
                 return 0
+        if self.cache_semaphore.busy:
+            return 0
         with self.cache_semaphore:
             i = 0
             expendable = list(os.scandir("cache"))
@@ -4117,7 +4119,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     with MemoryTimer("update"):
                         await create_future(self.update, priority=True)
 
-    # Heartbeat loop: Repeatedly deletes a file to inform the watchdog process that the bot's event loop is still running.
+    # Heartbeat loop: Repeatedly renames a file to inform the watchdog process that the bot's event loop is still running.
     async def heartbeat_loop(self):
         print("Heartbeat Loop initiated.")
         with tracebacksuppressor:

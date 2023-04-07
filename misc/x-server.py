@@ -1377,9 +1377,10 @@ class Server:
 		s = cp.request.remote.ip + "%" + name
 		h = hash(s) % 2 ** 48
 		single = "/upload_single" in cp.url()
-		xi = cp.request.headers.get("x-index", "0")
+		xi = int(cp.request.headers.get("x-index", 0))
 		mfs = int(cp.request.headers.get("x-total", 0))
-		fn = f"cache/{h}%" + str(xi)
+		n = f"cache/{h}%"
+		fn = n + str(xi)
 		csize = 83886080
 		with open(fn, "wb") as f:
 			if single:
@@ -1416,10 +1417,42 @@ class Server:
 				with open(fn, "w", encoding="utf-8") as f:
 					f.write(s)
 				return self.merge(name=name, index=1)
-			shutil.copyfileobj(cp.request.body.fp, f)
-		# if int(xi) and os.path.getsize(fn) == csize:
-		# 	url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fn)})")
-		# 	self.chunking[fn] = (url1, mid1)
+			fut = create_future_ex(shutil.copyfileobj, cp.request.body.fp, f)
+		if mfs > 4 * 1073741824:
+			if xi % 6 == 5:
+				fut.result()
+				fns = []
+				try:
+					info = self.chunking[n]
+				except KeyError:
+					info = self.chunking[n] = cdict(
+						mime="application/octet-stream",
+						urls=[],
+						mids=[],
+					)
+				for i in range(5):
+					ft = n + str(xi - 5 + i)
+					if ft not in self.chunking:
+						self.chunking[ft] = concurent.futures.Future()
+					self.chunking[ft].result(timeout=720)
+					assert os.path.exists(ft)
+					fns.append(ft)
+					if i == 0 and xi < 6:
+						info.mime = get_mime(ft)
+				fns.append(fn)
+				url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fns)})")
+				try:
+					info.urls.extend(url1)
+					info.mids.extend(mid1)
+				except AttributeError:
+					info.urls = url1
+					info.mids = mid1
+			else:
+				try:
+					fut.add_done_callback(self.chunking[fn].set_result)
+				except KeyError:
+					pass
+				self.chunking[fn] = fut
 
 	merged = {}
 	@cp.expose
@@ -1431,6 +1464,7 @@ class Server:
 		x_name = kwargs.get("x-file-name") or cp.request.headers.get("x-file-name", "untitled")
 		name = kwargs.get("name") or x_name
 		s = cp.request.remote.ip + "%" + x_name
+		mfs = int(cp.request.headers.get("x-total", 0))
 		h = hash(s) % 2 ** 48
 		nh = n = f"cache/{h}%"
 		if self.merged.get(nh):
@@ -1455,6 +1489,38 @@ class Server:
 				q = f"?key={key}"
 				if os.path.exists(n + "0"):
 					os.rename(n + "0", f"cache/{IND}{ts}" + "~.temp$@" + name)
+			elif mfs > 4 * 1073741824 and n in self.chunking:
+				info = self.chunking.pop(n)
+				b = ts.bit_length() + 7 >> 3
+				if not key:
+					n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
+					key = base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
+				q = f"?key={key}"
+				url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
+				tn = fn.split("~", 1)[0] + "~.forward$" + str(mfs)
+				urls, mids = info.urls, info.mids
+				mime = info.mime
+				for i in range(high):
+					gn = n + str(i)
+					fut = self.chunking.pop(gn, None)
+					if not fut:
+						if not os.path.exists(gn):
+							raise FileNotFoundError(gn)
+						url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(gn)})")
+					urls.extend(url1)
+					mids.extend(mid1)
+				urls = [map_url(url) for url in urls]
+				code = 307
+				ftype = 3
+				jdn = json.dumps(name).replace("<", '"\u003c"').replace(">", '"\u003e"')
+				s = (
+					f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0;URL={url}"/>'
+					+ f'<!--[{jdn},{size},"{mime}"]--><!--URL={json.dumps(urls, separators=(",", ":"))}--><!--KEY={key}--><!--MID={json.dumps(mids)}-->'
+					+ (f'<!--SHA={ha1}-->' if ha1 else "")
+					+ '</html>'
+				)
+				with open(tn, "w", encoding="utf-8") as f:
+					f.write(s)
 			else:
 				of = n + "0"
 				fn = f"cache/{IND}{ts}~.temp$@{name}"
@@ -1469,8 +1535,8 @@ class Server:
 				if not key:
 					n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
 					key = base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
+				q = f"?key={key}"
 				self.register_replacer(ts, key)
-				return "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=") + f"?key={key}"
 		finally:
 			self.merged.pop(nh, None)
 		return "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=") + q

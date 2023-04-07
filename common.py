@@ -415,6 +415,18 @@ if not enc_key:
     with open("auth.json", "w", encoding="utf-8") as f:
         json.dump(AUTH, f, indent=4)
 
+if AUTH.get("openai_key"):
+    import openai
+    try:
+        openai.api_key = AUTH["openai_key"]
+        resp = openai.Moderation.create(
+            input=str(utc()),
+        )
+    except:
+        print_exc()
+        AUTH["openai_key"] = ""
+        print("OpenAI key has no usable credit. Please verify and fix the key to proceed with relevant commands.")
+
 enc_key += "=="
 enc_box = nacl.secret.SecretBox(base64.b64decode(enc_key)[:32])
 

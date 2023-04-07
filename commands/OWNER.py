@@ -563,6 +563,14 @@ class UpdateExec(Database):
     async def stash(self, fn, start=0, end=inf):
         bot = self.bot
         print("Stash", fn, start, end)
+        if isinstance(fn, (tuple, list)):
+            fl = list(fn)
+            fn = fl.pop(0)
+            if len(fl) > 1:
+                with open(fn, "ab") as f:
+                    for f2 in fl:
+                        with open(f2, "rb") as f:
+                            await create_future(shutil.copyfileobj, f2, fn)
         urls = []
         mids = []
         end = min(end, os.path.getsize(fn))
