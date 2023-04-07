@@ -1456,7 +1456,7 @@ class Server:
 					with suppress(PermissionError, FileNotFoundError):
 						os.remove(ft)
 			else:
-				if self.chunking[fn].done():
+				if fn in self.chunking and self.chunking[fn].done():
 					try:
 						self.chunking[fn].result()
 					except:
