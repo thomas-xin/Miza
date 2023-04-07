@@ -1418,41 +1418,42 @@ class Server:
 					f.write(s)
 				return self.merge(name=name, index=1)
 			fut = create_future_ex(shutil.copyfileobj, cp.request.body.fp, f)
-		if mfs > 4 * 1073741824:
-			if xi % 6 == 5:
-				fut.result()
-				fns = []
-				try:
-					info = self.chunking[n]
-				except KeyError:
-					info = self.chunking[n] = cdict(
-						mime="application/octet-stream",
-						urls=[],
-						mids=[],
-					)
-				for i in range(5):
-					ft = n + str(xi - 5 + i)
-					if ft not in self.chunking:
-						self.chunking[ft] = concurent.futures.Future()
-					self.chunking[ft].result(timeout=720)
-					assert os.path.exists(ft)
-					fns.append(ft)
-					if i == 0 and xi < 6:
-						info.mime = get_mime(ft)
-				fns.append(fn)
-				url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fns)})")
-				try:
-					info.urls.extend(url1)
-					info.mids.extend(mid1)
-				except AttributeError:
-					info.urls = url1
-					info.mids = mid1
-			else:
-				try:
-					fut.add_done_callback(self.chunking[fn].set_result)
-				except KeyError:
-					pass
-				self.chunking[fn] = fut
+			if mfs > 2 * 1073741824:
+				if xi % 6 == 5:
+					fut.result()
+					fns = []
+					try:
+						info = self.chunking[n]
+					except KeyError:
+						info = self.chunking[n] = cdict(
+							mime="application/octet-stream",
+							urls=[],
+							mids=[],
+						)
+					for i in range(5):
+						ft = n + str(xi - 5 + i)
+						if ft not in self.chunking:
+							self.chunking[ft] = concurent.futures.Future()
+						self.chunking[ft].result(timeout=720)
+						assert os.path.exists(ft)
+						fns.append(ft)
+						if i == 0 and xi < 6:
+							info.mime = get_mime(ft)
+					fns.append(fn)
+					url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fns)})")
+					try:
+						info.urls.extend(url1)
+						info.mids.extend(mid1)
+					except AttributeError:
+						info.urls = url1
+						info.mids = mid1
+				else:
+					try:
+						fut.add_done_callback(self.chunking[fn].set_result)
+					except KeyError:
+						pass
+					self.chunking[fn] = fut
+					fut.result()
 
 	merged = {}
 	@cp.expose
