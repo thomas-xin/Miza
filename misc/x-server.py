@@ -1382,80 +1382,94 @@ class Server:
 		n = f"cache/{h}%"
 		fn = n + str(xi)
 		csize = 83886080
-		with open(fn, "wb") as f:
-			if single:
-				pos = 0
-				g = cp.request.body.fp
-				urls = []
-				mids = []
-				while True:
-					b = g.read(csize)
-					if not b:
-						break
-					f.write(b)
-					if f.tell() > pos + csize:
-						url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fn)}, start={pos}, end={pos + csize})")
-						urls.extend(url1)
-						mids.extend(mid1)
-						pos += csize
-				if f.tell() > pos:
-					url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fn)}, start={pos})")
+		f = open(fn, "wb")
+		if single:
+			pos = 0
+			g = cp.request.body.fp
+			urls = []
+			mids = []
+			while True:
+				b = g.read(csize)
+				if not b:
+					break
+				f.write(b)
+				if f.tell() > pos + csize:
+					url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fn)}, start={pos}, end={pos + csize})")
 					urls.extend(url1)
 					mids.extend(mid1)
-				size = os.path.getsize(fn)
-				mime = get_mime(fn)
-				fn = f"cache/{h}%!"
-				urls = [map_url(url) for url in urls]
-				print(urls)
-				assert urls
-				code = 307
-				ftype = 3
-				url = ""
-				n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
-				key = base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
-				s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta/><!--["{name}","{size}","{mime}"]--><!--URL={json.dumps(urls, separators=(",", ":"))}--><!--KEY={key}--><!--MID={mids}--></html>'
-				with open(fn, "w", encoding="utf-8") as f:
-					f.write(s)
-				return self.merge(name=name, index=1)
-			fut = create_future_ex(shutil.copyfileobj, cp.request.body.fp, f)
-			if mfs > 2 * 1073741824:
-				try:
-					info = self.chunking[n]
-				except KeyError:
-					info = self.chunking[n] = cdict(
-						mime="application/octet-stream",
-					)
-				if xi % 8 < 2:
-					fut.result()
-					if xi == 0:
-						info.mime = get_mime(fn)
-					url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fn)})")
-					self.chunking[fn] = (url1, mid1)
+					pos += csize
+			if f.tell() > pos:
+				url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fn)}, start={pos})")
+				urls.extend(url1)
+				mids.extend(mid1)
+			size = os.path.getsize(fn)
+			mime = get_mime(fn)
+			fn = f"cache/{h}%!"
+			urls = [map_url(url) for url in urls]
+			print(urls)
+			assert urls
+			code = 307
+			ftype = 3
+			url = ""
+			n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
+			key = base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
+			s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta/><!--["{name}","{size}","{mime}"]--><!--URL={json.dumps(urls, separators=(",", ":"))}--><!--KEY={key}--><!--MID={mids}--></html>'
+			with open(fn, "w", encoding="utf-8") as f:
+				f.write(s)
+			return self.merge(name=name, index=1)
+		fut = create_future_ex(shutil.copyfileobj, cp.request.body.fp, f)
+		if mfs > 2 * 1073741824:
+			try:
+				info = self.chunking[n]
+			except KeyError:
+				info = self.chunking[n] = cdict(
+					mime="application/octet-stream",
+				)
+			if xi % 8 < 2:
+				fut.result()
+				if xi == 0:
+					info.mime = get_mime(fn)
+				url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fn)})")
+				self.chunking[fn] = (url1, mid1)
+				with suppress(PermissionError, FileNotFoundError):
+					os.remove(fn)
+			elif xi % 8 == 7:
+				fut.result()
+				fns = []
+				for i in range(5):
+					ft = n + str(xi - 5 + i)
+					if ft not in self.chunking:
+						self.chunking[ft] = concurrent.futures.Future()
+					while ft in self.chunking:
+						try:
+							self.chunking[ft].result(timeout=720)
+						except:
+							time.sleep(8)
+						else:
+							break
+					assert os.path.exists(ft)
+					fns.append(ft)
+				fns.append(fn)
+				url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fns)})")
+				self.chunking[fn] = (url1, mid1)
+				for ft in fns:
 					with suppress(PermissionError, FileNotFoundError):
-						os.remove(fn)
-				elif xi % 8 == 7:
-					fut.result()
-					fns = []
-					for i in range(5):
-						ft = n + str(xi - 5 + i)
-						if ft not in self.chunking:
-							self.chunking[ft] = concurrent.futures.Future()
-						self.chunking[ft].result(timeout=720)
-						assert os.path.exists(ft)
-						fns.append(ft)
-					fns.append(fn)
-					url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fns)})")
-					self.chunking[fn] = (url1, mid1)
-					for ft in fns:
-						with suppress(PermissionError, FileNotFoundError):
-							os.remove(ft)
-				else:
+						os.remove(ft)
+			else:
+				if self.chunking[fn].done():
 					try:
-						fut.add_done_callback(self.chunking[fn].set_result)
-					except KeyError:
-						pass
-					self.chunking[fn] = fut
-					fut.result()
+						self.chunking[fn].result()
+					except:
+						self.chunking[fn] = fut
+					else:
+						return
+				try:
+					fut.add_done_callback(self.chunking[fn].set_result)
+				except KeyError:
+					pass
+				self.chunking[fn] = fut
+			return
+		f.close()
 
 	merged = {}
 	@cp.expose

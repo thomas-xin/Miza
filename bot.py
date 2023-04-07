@@ -2507,6 +2507,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     # Gets the external IP address from api.ipify.org
     async def get_ip(self):
         self.ip = await Request("https://api.ipify.org", bypass=False, decode=True, aio=True)
+        return self.ip
         # self.update_ip(resp)
 
     # Gets the amount of active processes, threads, coroutines.
