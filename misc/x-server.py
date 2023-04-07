@@ -1496,7 +1496,8 @@ class Server:
 				q = f"?key={key}"
 				url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
 				tn = fn.split("~", 1)[0] + "~.forward$" + str(mfs)
-				urls, mids = info.urls, info.mids
+				urls = []
+				mids = []
 				mime = info.mime
 				for i in range(high):
 					gn = nh + str(i)

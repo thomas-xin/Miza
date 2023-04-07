@@ -605,23 +605,24 @@ class UpdateExec(Database):
                         urls.append(url)
                         i = f.tell()
                         continue
-                fs = []
-                while len(fs) < 10:
-                    b = f.read(8388608)
-                    if not b:
+                with tracebacksuppressor:
+                    fs = []
+                    while len(fs) < 10:
+                        b = f.read(8388608)
+                        if not b:
+                            break
+                        fi = CompatFile(b, filename="c.b")
+                        fs.append(fi)
+                    if not fs:
                         break
-                    fi = CompatFile(b, filename="c.b")
-                    fs.append(fi)
-                if not fs:
-                    break
-                c_id = choice([c_id for c_id, flag in self.data.items() if flag & 16])
-                channel = await bot.fetch_channel(c_id)
-                m = channel.guild.me
-                message = await bot.send_as_webhook(channel, f"{fn.rsplit('/', 1)[-1]} ({i})", files=fs, username=m.display_name, avatar_url=best_url(m), recurse=False)
-                for a in message.attachments:
-                    urls.append(str(a.url))
-                mids.append(message.id)
-                i = f.tell()
+                    c_id = choice([c_id for c_id, flag in self.data.items() if flag & 16])
+                    channel = await bot.fetch_channel(c_id)
+                    m = channel.guild.me
+                    message = await bot.send_as_webhook(channel, f"{fn.rsplit('/', 1)[-1]} ({i})", files=fs, username=m.display_name, avatar_url=best_url(m), recurse=False)
+                    for a in message.attachments:
+                        urls.append(str(a.url))
+                    mids.append(message.id)
+                    i = f.tell()
         print(urls, mids)
         create_future_ex(bot.clear_cache, priority=True)
         return urls, mids
