@@ -567,10 +567,10 @@ class UpdateExec(Database):
             fl = list(fn)
             fn = fl.pop(0)
             if len(fl) > 1:
-                with open(fn, "ab") as f:
-                    for f2 in fl:
-                        with open(f2, "rb") as f:
-                            await create_future(shutil.copyfileobj, f2, fn)
+                with open(fn, "ab") as f1:
+                    for fc in fl:
+                        with open(fc, "rb") as f2:
+                            await create_future(shutil.copyfileobj, f2, f1)
         urls = []
         mids = []
         end = min(end, os.path.getsize(fn))

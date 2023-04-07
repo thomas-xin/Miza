@@ -1490,7 +1490,7 @@ class Server:
 				q = f"?key={key}"
 				if os.path.exists(n + "0"):
 					os.rename(n + "0", f"cache/{IND}{ts}" + "~.temp$@" + name)
-			elif mfs > 4 * 1073741824 and n in self.chunking:
+			elif n in self.chunking:
 				info = self.chunking.pop(n)
 				b = ts.bit_length() + 7 >> 3
 				if not key:
