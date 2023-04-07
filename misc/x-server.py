@@ -1418,7 +1418,7 @@ class Server:
 				f.write(s)
 			return self.merge(name=name, index=1)
 		fut = create_future_ex(shutil.copyfileobj, cp.request.body.fp, f)
-		if mfs > 2 * 1073741824:
+		if mfs > 4 * 1073741824:
 			try:
 				info = self.chunking[n]
 			except KeyError:
@@ -1462,14 +1462,15 @@ class Server:
 					except:
 						self.chunking[fn] = fut
 					else:
-						return
+						return b""
 				try:
 					fut.add_done_callback(self.chunking[fn].set_result)
 				except KeyError:
 					pass
 				self.chunking[fn] = fut
-			return
+			return b""
 		f.close()
+		return b""
 
 	merged = {}
 	@cp.expose
