@@ -1120,7 +1120,7 @@ class Bot:
 					print(response)
 					role = m["role"]
 					text = m["content"].removeprefix(f"{self.name} says: ").removeprefix(f"{self.name}: ").strip()
-					if len(text) >= 2 and text[-1] == " " and text[-2] not in ".!?" or text.endswith(' "'):
+					if len(text) >= 2 and text[-1] == " " and text[-2] not in ".!?" or text.endswith(' "') or text.endswith('\n"'):
 						redo = True
 					text = text.strip()
 					if not text or len(self.gpttokens(text)) < 8:
