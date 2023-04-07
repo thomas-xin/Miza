@@ -1427,6 +1427,7 @@ class Server:
 					)
 				if xi % 8 < 2:
 					fut.result()
+					f.close()
 					if xi == 0:
 						info.mime = get_mime(fn)
 					url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(fn)})")
@@ -1435,6 +1436,7 @@ class Server:
 						os.remove(fn)
 				elif xi % 8 == 7:
 					fut.result()
+					f.close()
 					fns = []
 					for i in range(5):
 						ft = n + str(xi - 5 + i)
