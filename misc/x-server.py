@@ -1417,8 +1417,8 @@ class Server:
 				with open(fn, "w", encoding="utf-8") as f:
 					f.write(s)
 				return self.merge(name=name, index=1)
-			fut = create_future_ex(shutil.copyfileobj, cp.request.body.fp, f)
 			if mfs > 4 * 1073741824:
+				fut = create_future_ex(shutil.copyfileobj, cp.request.body.fp, f)
 				try:
 					info = self.chunking[n]
 				except KeyError:
@@ -1456,20 +1456,20 @@ class Server:
 						with suppress(PermissionError, FileNotFoundError):
 							os.remove(ft)
 				else:
-					if fn in self.chunking and self.chunking[fn].done():
-						try:
-							self.chunking[fn].result()
-						except:
-							self.chunking[fn] = fut
-						else:
-							fut.result()
-							return
-					try:
+					if fn in self.chunking:
+						if self.chunking[fn].done():
+							try:
+								self.chunking[fn].result()
+							except:
+								self.chunking[fn] = fut
+							else:
+								fut.result()
+								return
 						fut.add_done_callback(self.chunking[fn].set_result)
-					except KeyError:
-						pass
 					self.chunking[fn] = fut
 					fut.result()
+			else:
+				shutil.copyfileobj(cp.request.body.fp, f)
 
 	merged = {}
 	@cp.expose
