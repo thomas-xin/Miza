@@ -850,10 +850,13 @@ class Server:
 						if ex2:
 							raise ex2
 						ms = min(ns, end - pos - s)
+						print(len(resp.content), ms)
 						if len(resp.content) > ms:
 							return resp.content[s:e]
 						return resp.content
 
+					if len(futs) > 2:
+						yield futs.pop(0).result()
 					fut = create_future_ex(get_chunk, u, headers, start, end, pos, ns)
 					futs.append(fut)
 					pos += ns
