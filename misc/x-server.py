@@ -840,7 +840,8 @@ class Server:
 						for i in range(3):
 							resp = reqs.next().get(u, headers=h2, stream=True)
 							if resp.status_code == 416:
-								return b""
+								yield b""
+								return
 							try:
 								resp.raise_for_status()
 							except Exception as ex:
@@ -854,10 +855,10 @@ class Server:
 							ms = min(ns, end - pos - s)
 							if len(resp.content) > ms:
 								yield resp.content[s:e]
-							else:
-								yield resp.content
-						else:
-							yield from resp.iter_content(262144)
+								return
+							yield resp.content
+							return
+						yield from resp.iter_content(262144)
 
 					if len(futs) > 2:
 						yield from futs.pop(0).result()
