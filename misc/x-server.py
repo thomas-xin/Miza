@@ -764,7 +764,7 @@ class Server:
 					return
 				yield b
 
-	def dyn_serve(urls, size=0):
+	def dyn_serve(self, urls, size=0):
 		print("Serve", urls, size)
 		with tracebacksuppressor:
 			headers = fcdict(cp.request.headers)
