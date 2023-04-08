@@ -800,7 +800,7 @@ class Server:
 				ranges.append((0, size))
 			if not size:
 				size = "*"
-			cr = "bytes " + ", ".join(f"{start}-{end}/{size}" for start, end in ranges)
+			cr = "bytes " + ", ".join(f"{start}-{end - 1}/{size}" for start, end in ranges)
 			cp.response.headers["Content-Range"] = cr
 			cp.response.headers["Content-Length"] = str(length)
 			cp.response.headers["Accept-Range"] = "bytes"
