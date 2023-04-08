@@ -807,7 +807,7 @@ class Server:
 			return self._dyn_serve(urls, ranges, headers)
 
 	def _dyn_serve(self, urls, ranges, headers):
-		print("Dynamic Serve:", urls, ranges, headers)
+		# print("Dynamic Serve:", urls, ranges, headers)
 		with tracebacksuppressor:
 			for start, end in ranges:
 				pos = 0
@@ -835,6 +835,7 @@ class Server:
 							e = ""
 						h2 = dict(h.items())
 						h2["range"] = f"bytes={s}-{e}"
+						print("Range:", h2["range"])
 						ex2 = None
 						for i in range(3):
 							try:
