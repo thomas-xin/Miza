@@ -823,7 +823,7 @@ class Server:
 					else:
 						resp = reqs.next().head(u, headers=headers)
 						ns = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
-					print(len(rems), pos, ns, start, end)
+					# print(len(rems), pos, ns, start, end)
 					if pos + ns <= start:
 						pos += ns
 						continue
@@ -1534,7 +1534,7 @@ class Server:
 				with open(fn, "w", encoding="utf-8") as f:
 					f.write(s)
 				return self.merge(name=name, index=1)
-			if mfs > 4 * 1073741824:
+			if mfs > 1 * 1073741824:
 				fut = create_future_ex(shutil.copyfileobj, cp.request.body.fp, f)
 				try:
 					info = self.chunking[n]
