@@ -1577,7 +1577,7 @@ class Server:
 		ts = int(kwargs.get("?ts") or time.time_ns() // 1000)
 		x_name = kwargs.get("x-file-name") or cp.request.headers.get("x-file-name", "untitled")
 		name = kwargs.get("name") or x_name
-		s = cp.request.remote.ip + "%" + name
+		s = cp.request.remote.ip + "%" + x_name
 		print(s)
 		mfs = int(kwargs.get("x-total") or cp.request.headers.get("x-total", 0))
 		h = hash(s) % 2 ** 48
