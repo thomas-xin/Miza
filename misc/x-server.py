@@ -698,7 +698,7 @@ class Server:
 								if a3:
 									self.serving.setdefault(p, weakref.WeakSet()).add(f)
 								return resp
-							if info[1] > 67108864:
+							if info[1] > 33554432:
 								return self.dyn_serve(urls, size=info[1])
 							return self.concat(p, urls, name=info[0], mime=info[2], stn=stn)
 			f = open(p, "rb")
