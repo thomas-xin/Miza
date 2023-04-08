@@ -1557,8 +1557,8 @@ class Server:
 						fut.add_done_callback(self.chunking[fn].set_result)
 					self.chunking[fn] = fut
 					fut.result()
-			else:
-				shutil.copyfileobj(cp.request.body.fp, f)
+				return
+			shutil.copyfileobj(cp.request.body.fp, f)
 
 	merged = {}
 	@cp.expose
