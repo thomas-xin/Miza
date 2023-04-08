@@ -676,13 +676,13 @@ class Server:
 							# cp.response.headers["Content-Length"] = info[1]
 							cp.response.headers["Content-Type"] = info[2]
 							referrer = cp.request.headers.get("Referer")
-							print(p, len(urls), referrer)
+							# print(p, len(urls), referrer)
 							cp.response.headers["Attachment-Filename"] = info[0]
 							if cp.request.method == "HEAD":
 								cp.response.headers["Content-Length"] = info[1]
 								return
 							urls = [remap_url(url) for url in urls]
-							print(urls)
+							# print(urls)
 							if len(urls) == 1:
 								if not is_url(urls[0]):
 									p = find_file(urls[0], cwd=("cache", "saves/filehost"))
@@ -822,6 +822,7 @@ class Server:
 					else:
 						resp = reqs.next().head(u, headers=headers)
 						ns = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
+					print(len(rems), pos, ns, start, end)
 					if pos + ns <= start:
 						pos += ns
 						continue
@@ -858,7 +859,7 @@ class Server:
 								return
 							yield resp.content
 							return
-						yield from resp.iter_content(262144)
+						yield from resp.iter_content(65536)
 
 					if len(futs) > 2:
 						yield from futs.pop(0).result()
@@ -877,7 +878,7 @@ class Server:
 		resp = reqs.next().get(urls[0], headers=headers, stream=True)
 		resp.raise_for_status()
 		b = []
-		it = resp.iter_content(262144)
+		it = resp.iter_content(65536)
 		with suppress(StopIteration):
 			while sum(map(len, b)) < 8388608:
 				b.append(next(it))
