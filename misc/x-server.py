@@ -1565,12 +1565,13 @@ class Server:
 	@cp.tools.accept(media="multipart/form-data")
 	@hostmap
 	def merge(self, **kwargs):
+		kwargs = fcdict(kwargs)
 		key = kwargs.get("?key")
 		ts = int(kwargs.get("?ts") or time.time_ns() // 1000)
 		x_name = kwargs.get("x-file-name") or cp.request.headers.get("x-file-name", "untitled")
 		name = kwargs.get("name") or x_name
-		s = cp.request.remote.ip + "%" + x_name
-		mfs = int(cp.request.headers.get("x-total", 0))
+		s = cp.request.remote.ip + "%" + name
+		mfs = int(kwargs.get("x-total") or cp.request.headers.get("x-total", 0))
 		h = hash(s) % 2 ** 48
 		nh = n = f"cache/{h}%"
 		if self.merged.get(nh):
