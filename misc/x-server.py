@@ -698,7 +698,7 @@ class Server:
 								if a3:
 									self.serving.setdefault(p, weakref.WeakSet()).add(f)
 								return resp
-							if info[1] > 33554432:
+							if info[1] > 64 * 1048576:
 								return self.dyn_serve(urls, size=info[1])
 							return self.concat(p, urls, name=info[0], mime=info[2], stn=stn)
 			f = open(p, "rb")
@@ -881,18 +881,17 @@ class Server:
 		headers.pop("Host", None)
 		headers.pop("Range", None)
 		headers.update(Request.header())
-		resp = reqs.next().get(urls[0], headers=headers, stream=True)
-		resp.raise_for_status()
-		b = []
-		it = resp.iter_content(65536)
-		with suppress(StopIteration):
-			while sum(map(len, b)) < 8388608:
-				b.append(next(it))
-		b = b"".join(b)
-		print("PreCat", urls[0], resp, len(b))
-		yield b[:4194304]
-		if len(b) > 4194304:
-			yield b[4194304:]
+		with reqs.next().get(urls[0], headers=headers, stream=True) as resp:
+			resp.raise_for_status()
+			b = []
+			it = resp.iter_content(65536)
+			with suppress(StopIteration):
+				while sum(map(len, b)) < 8388608:
+					temp = next(it)
+					b.append(temp)
+					yield temp
+			b = b"".join(b)
+			print("PreCat", urls[0], resp, len(b))
 		fut = create_future_ex(self._concat, urls, on, pn)
 		self.serving[on] = fut
 		yield from self.wconcat(on, pn, name, download, mime, fut, start=len(b))
@@ -1534,7 +1533,7 @@ class Server:
 				with open(fn, "w", encoding="utf-8") as f:
 					f.write(s)
 				return self.merge(name=name, index=1)
-			if mfs > 1 * 1073741824:
+			if mfs > 4 * 1073741824:
 				fut = create_future_ex(shutil.copyfileobj, cp.request.body.fp, f)
 				try:
 					info = self.chunking[n]
