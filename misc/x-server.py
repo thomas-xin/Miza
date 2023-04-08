@@ -765,7 +765,7 @@ class Server:
 				yield b
 
 	def dyn_serve(self, urls, size=0):
-		print("Serve", urls, size)
+		# print("Serve", urls, size)
 		with tracebacksuppressor:
 			headers = fcdict(cp.request.headers)
 			headers.pop("Remote-Addr", None)
@@ -807,6 +807,7 @@ class Server:
 			return self._dyn_serve(urls, ranges, headers)
 
 	def _dyn_serve(self, urls, ranges, headers):
+		print("Dynamic Serve:", urls, ranges, headers)
 		with tracebacksuppressor:
 			for start, end in ranges:
 				pos = 0
