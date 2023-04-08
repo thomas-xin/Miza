@@ -1075,8 +1075,8 @@ class Bot:
 						flagged = resp["results"][0]["flagged"]
 						if not flagged:
 							if nstart:
-								nstart = "Assume y" + nstart[1:]
-							prompt = nstart + "\n" + nend + "\n\n" + prompt
+								ns2 = "Assume y" + nstart[1:]
+							prompt = ns2 + "\n" + nend + "\n\n" + prompt
 							if random.randint(0, 1):
 								text = self.vai(prompt)
 							if not text:
@@ -1319,7 +1319,7 @@ class Bot:
 		return "\n".join(lines)
 
 	def chatgpt(self, q, stop=None):
-		if time.time() - getattr(chatgpt, "rate", 0) < 0:
+		if not chatgpt or time.time() - getattr(chatgpt, "rate", 0) < 0:
 			return ""
 		async def run_chatgpt(q, fut=None):
 			if not hasattr(chatgpt, "ask_stream") or time.time() - chatgpt.timestamp >= 3600:
@@ -1328,9 +1328,9 @@ class Bot:
 				except ImportError:
 					globals()["chatgpt"] = None
 				else:
-					globals()["chatgpt"] = await AsyncChatGPT().create(timeout=220)
-				if chatgpt.session is None:
-					await chatgpt.refresh_session()
+					if not hasattr(chatgpt, "ask_stream"):
+						globals()["chatgpt"] = await AsyncChatGPT().create(timeout=220)
+				await chatgpt.refresh_session()
 				url = "https://chat.openai.com/backend-api/conversations"
 				data = {
 					"is_visible": False,
