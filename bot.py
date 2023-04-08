@@ -3087,7 +3087,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 if comm.startswith(check):
                     prefix = self.prefix
                     comm = comm[len(check):].strip()
-                    op = True
+                    op = ("Unintentional command?", f"If you meant to chat with me instead, use {prefix}ask or one of its aliases to avoid accidentally triggering a command in the future!")
                     break
             if comm.startswith(prefix):
                 comm = comm[len(prefix):].strip()
@@ -3429,7 +3429,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                                 pass
                         command.used.pop(u_id, None)
                         print_exc()
-                        out_fut = self.send_exception(channel, ex, message)
+                        out_fut = self.send_exception(channel, ex, message, op=op)
                     if out_fut is not None and getattr(message, "simulated", None):
                         await out_fut
             elif getattr(message, "simulated", None):
@@ -5063,20 +5063,19 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
         discord.http.HTTPClient.request = lambda self, *args, **kwargs: request(self, *args, **kwargs)
 
-    def send_exception(self, messageable, ex, reference=None):
+    def send_exception(self, messageable, ex, reference=None, op=None):
         if getattr(ex, "no_react", None):
             reacts = ""
         else:
             reacts="❎"
-        if not isinstance(ex, TooManyRequests):
-            footer = None
-            fields = (("Unexpected or confusing error?", f"Use {self.get_prefix(getattr(messageable, 'guild', None))}help for help, or consider joining the [support server]({self.rcc_invite}) for bug reports!"),)
+        footer = None
+        fields = None
+        if isinstance(ex, TooManyRequests) and not random.randint(0, 5):
+            fields = (("Running into the rate limit often?", f"Consider donating using one of the subscriptions from my [ko-fi]({self.kofi_url}), which will grant shorter rate limits amongst many feature improvements!"),)
+        elif isinstance(op, tuple):
+            fields = (op,)
         else:
-            if not random.randint(0, 5):
-                footer = dict(text=f"Running into the rate limit often? Consider donating using one of the subscriptions here, which will grant shorter rate limits amongst other feature improvements! {self.kofi_url}")
-            else:
-                footer = None
-            fields = None
+            fields = (("Unexpected or confusing error?", f"Use {self.get_prefix(getattr(messageable, 'guild', None))}help for help, or consider joining the [support server]({self.rcc_invite}) for bug reports!"),)
         if reference and isinstance(ex, discord.Forbidden) and reference.guild and not messageable.permissions_for(reference.guild.me).send_messages:
             return create_task(self.missing_perms(messageable, reference))
         print(reference)
