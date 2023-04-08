@@ -793,13 +793,14 @@ class Server:
 					ranges.append((start, end))
 			except:
 				print_exc()
-			if not ranges:
+			if ranges:
+				cp.response.status = 206
+			else:
+				cp.response.status = 200
 				ranges.append((0, size))
 			if not size:
 				size = "*"
 			cr = "bytes " + ", ".join(f"{start}-{end}/{size}" for start, end in ranges)
-			if length != size:
-				cp.response.status = 206
 			cp.response.headers["Content-Range"] = cr
 			cp.response.headers["Content-Length"] = str(length)
 			cp.response.headers["Accept-Range"] = "bytes"
