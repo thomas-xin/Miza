@@ -1634,7 +1634,8 @@ class Server:
 					key = base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
 				q = f"?key={key}"
 				url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
-				tn = fn.split("~", 1)[0] + "~.forward$" + str(mfs) + ".$"
+				lim_str(name, 96).replace("$", "-")
+				tn = f"saves/filehost/{IND}{ts}~.forward${size}$ ${na2}.$"
 				urls = []
 				mids = []
 				size = mfs
