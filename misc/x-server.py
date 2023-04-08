@@ -824,7 +824,7 @@ class Server:
 						e = end - pos
 						if e >= ns:
 							e = ""
-						h2 = dict(**h)
+						h2 = dict(h.items())
 						h2["range"] = f"bytes={s}-{e}"
 						ex2 = None
 						for i in range(3):
