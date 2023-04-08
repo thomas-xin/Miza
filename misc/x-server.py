@@ -821,7 +821,7 @@ class Server:
 						ns = 8388608
 					else:
 						resp = reqs.next().head(u, headers=headers)
-						ns = resp.headers["Content-Length"]
+						ns = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
 					if pos + ns <= start:
 						pos += ns
 						continue
@@ -835,7 +835,7 @@ class Server:
 							e = ""
 						h2 = dict(h.items())
 						h2["range"] = f"bytes={s}-{e}"
-						print("Range:", h2["range"])
+						# print("Range:", h2["range"])
 						ex2 = None
 						for i in range(3):
 							resp = reqs.next().get(u, headers=h2)
@@ -856,6 +856,7 @@ class Server:
 
 					fut = create_future_ex(get_chunk, u, headers, start, end, pos, ns)
 					futs.append(fut)
+					pos += ns
 				for fut in futs:
 					yield fut.result()
 
@@ -911,7 +912,7 @@ class Server:
 						except:
 							print_exc()
 						time.sleep(i ** 2 + 1)
-					bsize = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length"))
+					bsize = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
 					fs = pos + bsize
 					f.truncate(fs)
 					fut = create_future_ex(self.chunk_into, resp, on, pos)
