@@ -800,6 +800,11 @@ class Server:
 			cr = "bytes " + ", ".join(f"{start}-{end}/{size}" for start, end in ranges)
 			cp.response.headers["Content-Range"] = cr
 			cp.response.headers["Content-Length"] = str(length)
+			cp.response.headers["Accept-Range"] = "bytes"
+			return self._dyn_serve(urls, ranges)
+
+	def _dyn_serve(self, urls, ranges):
+		with tracebacksuppressor:
 			for start, end in ranges:
 				pos = 0
 				rems = urls.copy()
