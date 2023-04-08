@@ -822,7 +822,7 @@ class Server:
 					else:
 						resp = reqs.next().head(u, headers=headers)
 						ns = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
-					print(len(rems), pos, ns, start, end)
+					# print(len(rems), pos, ns, start, end)
 					if pos + ns <= start:
 						pos += ns
 						continue
@@ -865,7 +865,8 @@ class Server:
 						yield from futs.pop(0).result()
 					fut = create_future_ex(get_chunk, u, headers, start, end, pos, ns)
 					futs.append(fut)
-					pos += ns
+					start -= ns
+					end -= ns
 				for fut in futs:
 					yield from fut.result()
 
