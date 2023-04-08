@@ -819,7 +819,7 @@ class Server:
 					if pos >= end:
 						break
 
-					def get_chunk(u, h, s, e, ns):
+					def get_chunk(u, h, start, end, pos, ns):
 						s = start - pos
 						e = end - pos
 						if e >= ns:
@@ -837,12 +837,12 @@ class Server:
 								break
 						if ex2:
 							raise ex2
-						ms = min(ns, e - s)
+						ms = min(ns, end - pos - s)
 						if len(resp.content) > ms:
 							return resp.content[s:e]
 						return resp.content
 
-					fut = create_future_ex(get_chunk, u, headers, s, e, ns)
+					fut = create_future_ex(get_chunk, u, headers, start, end, pos, ns)
 					futs.append(fut)
 				for fut in futs:
 					yield fut.result()
