@@ -808,7 +808,7 @@ class Server:
 
 	def _dyn_serve(self, urls, ranges, headers):
 		# print("Dynamic Serve:", urls, ranges, headers)
-		with tracebacksuppressor:
+		with tracebacksuppressor(GeneratorExit):
 			for start, end in ranges:
 				pos = 0
 				rems = urls.copy()
@@ -838,8 +838,10 @@ class Server:
 						print("Range:", h2["range"])
 						ex2 = None
 						for i in range(3):
+							resp = reqs.next().get(u, headers=h2)
+							if resp.status_code == 416:
+								return b""
 							try:
-								resp = reqs.next().get(u, headers=h2)
 								resp.raise_for_status()
 							except Exception as ex:
 								ex2 = ex
