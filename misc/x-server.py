@@ -790,7 +790,11 @@ class Server:
 					start = int(start)
 					end = int(end)
 					length += end - start
-					ranges.append(end)
+					ranges.append((start, end))
+			except:
+				print_exc()
+			if not ranges:
+				ranges.append((0, size))
 			if not size:
 				size = "*"
 			cr = "bytes " + ", ".join(f"{start}-{end}/{size}" for start, end in ranges)
