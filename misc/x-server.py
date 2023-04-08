@@ -432,7 +432,7 @@ class Server:
 		orig_path = path
 		ind = IND
 		p = None
-		cp.response.headers.update(CHEADERS)
+		cp.response.headers.update(SHEADERS)
 		if path.startswith("!"):
 			ind = "!"
 			path = path[1:]
@@ -698,6 +698,8 @@ class Server:
 								if a3:
 									self.serving.setdefault(p, weakref.WeakSet()).add(f)
 								return resp
+							if info[1] > 67108864:
+								return self.dyn_serve(urls, size=info[1])
 							return self.concat(p, urls, name=info[0], mime=info[2], stn=stn)
 			f = open(p, "rb")
 			resp = cp.lib.static.serve_fileobj(f, content_type=mime, disposition="attachment" if download else None, name=a2)
@@ -762,10 +764,90 @@ class Server:
 					return
 				yield b
 
+	def dyn_serve(urls, size=0):
+		print("Serve", urls, size)
+		with tracebacksuppressor:
+			headers = fcdict(cp.request.headers)
+			headers.pop("Remote-Addr", None)
+			headers.pop("Host", None)
+			headers.pop("Range", None)
+			headers.update(Request.header())
+			brange = cp.request.headers.get("Range", "")
+			brange = brange.removeprefix("bytes=")
+			ranges = []
+			length = 0
+			try:
+				branges = brange.split(",")
+				for s in branges:
+					start, end = s.split("-", 1)
+					if not start:
+						if not end:
+							continue
+						start = size - int(end)
+						end = size
+					elif not end:
+						end = size
+					start = int(start)
+					end = int(end)
+					length += end - start
+					ranges.append(end)
+			if not size:
+				size = "*"
+			cr = "bytes " + ", ".join(f"{start}-{end}/{size}" for start, end in ranges)
+			cp.response.headers["Content-Range"] = cr
+			cp.response.headers["Content-Length"] = str(length)
+			for start, end in ranges:
+				pos = 0
+				rems = urls.copy()
+				futs = []
+				while rems:
+					u = rems.pop(0)
+					if u.startswith("https://s3-us-west-2"):
+						ns = 503316480
+					elif u.startswith("https://cdn.discord"):
+						ns = 8388608
+					else:
+						resp = reqs.next().head(u, headers=headers)
+						ns = resp.headers["Content-Length"]
+					if pos + ns <= start:
+						pos += ns
+						continue
+					if pos >= end:
+						break
+
+					def get_chunk(u, h, s, e, ns):
+						s = start - pos
+						e = end - pos
+						if e >= ns:
+							e = ""
+						h2 = dict(headers)
+						h2["range"] = f"bytes={s}-{e}"
+						ex2 = None
+						for i in range(3):
+							try:
+								resp = reqs.next().get(u, headers=h2)
+								resp.raise_for_status()
+							except Exception as ex:
+								ex2 = ex
+							else:
+								break
+						if ex2:
+							raise ex2
+						ms = min(ns, e - s)
+						if len(resp.content) > ms:
+							return resp.content[s:e]
+						return resp.content
+
+					fut = create_future_ex(get_chunk, u, headers, s, e, ns)
+					futs.append(fut)
+				for fut in futs:
+					yield fut.result()
+
 	def _peek(self, urls, on, pn, name, download, mime):
 		headers = fcdict(cp.request.headers)
 		headers.pop("Remote-Addr", None)
 		headers.pop("Host", None)
+		headers.pop("Range", None)
 		headers.update(Request.header())
 		resp = reqs.next().get(urls[0], headers=headers, stream=True)
 		resp.raise_for_status()
@@ -789,6 +871,7 @@ class Server:
 			headers = fcdict(cp.request.headers)
 			headers.pop("Remote-Addr", None)
 			headers.pop("Host", None)
+			headers.pop("Range", None)
 			headers.update(Request.header())
 			buf = 0
 			pos = 0
@@ -1516,7 +1599,7 @@ class Server:
 					key = base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
 				q = f"?key={key}"
 				url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
-				tn = fn.split("~", 1)[0] + "~.forward$" + str(mfs)
+				tn = fn.split("~", 1)[0] + "~.forward$" + str(mfs) + ".$"
 				urls = []
 				mids = []
 				size = mfs
