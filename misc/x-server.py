@@ -1471,6 +1471,8 @@ class Server:
 		single = "/upload_single" in cp.url()
 		xi = int(cp.request.headers.get("x-index", 0))
 		mfs = int(cp.request.headers.get("x-total", 0))
+		if not xi:
+			print(s)
 		n = f"cache/{h}%"
 		fn = n + str(xi)
 		csize = 83886080
@@ -1576,6 +1578,7 @@ class Server:
 		x_name = kwargs.get("x-file-name") or cp.request.headers.get("x-file-name", "untitled")
 		name = kwargs.get("name") or x_name
 		s = cp.request.remote.ip + "%" + name
+		print(s)
 		mfs = int(kwargs.get("x-total") or cp.request.headers.get("x-total", 0))
 		h = hash(s) % 2 ** 48
 		nh = n = f"cache/{h}%"
