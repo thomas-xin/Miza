@@ -813,6 +813,7 @@ class Server:
 				pos = 0
 				rems = urls.copy()
 				futs = []
+				big = False
 				while rems:
 					u = rems.pop(0)
 					if u.startswith("https://s3-us-west-2"):
@@ -822,14 +823,14 @@ class Server:
 					else:
 						resp = reqs.next().head(u, headers=headers)
 						ns = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
-					# print(len(rems), pos, ns, start, end)
+					print(len(rems), pos, ns, start, end)
 					if pos + ns <= start:
 						pos += ns
 						continue
 					if pos >= end:
 						break
 
-					def get_chunk(u, h, start, end, pos, ns):
+					def get_chunk(u, h, start, end, pos, ns, big):
 						s = start - pos
 						e = end - pos
 						if e >= ns:
@@ -851,7 +852,6 @@ class Server:
 								break
 						if ex2:
 							raise ex2
-						# ms = min(ns, end - pos - s)
 						if resp.status_code != 206:
 							ms = min(ns, end - pos - s)
 							if len(resp.content) > ms:
@@ -859,14 +859,19 @@ class Server:
 								return
 							yield resp.content
 							return
+						if big:
+							yield from resp.iter_content(262144)
+							return
 						yield from resp.iter_content(65536)
 
 					if len(futs) > 2:
 						yield from futs.pop(0).result()
-					fut = create_future_ex(get_chunk, u, headers, start, end, pos, ns)
+					fut = create_future_ex(get_chunk, u, headers, start, end, pos, ns, big)
 					futs.append(fut)
-					start -= ns
-					end -= ns
+					pos = 0
+					start = 0
+					end -= start - ns
+					big = True
 				for fut in futs:
 					yield from fut.result()
 
