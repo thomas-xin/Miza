@@ -1556,7 +1556,7 @@ transform: translate(-50%, -50%);
 				ftype = 3
 				url = ""
 				n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
-				key = base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
+				key = n2p(n)
 				s = f'<!DOCTYPE HTML><!--["{url}",{code},{ftype}]--><html><meta/><!--["{name}","{size}","{mime}"]--><!--URL={json.dumps(urls, separators=(",", ":"))}--><!--KEY={key}--><!--MID={mids}--></html>'
 				with open(fn, "w", encoding="utf-8") as f:
 					f.write(s)
@@ -1638,7 +1638,6 @@ transform: translate(-50%, -50%);
 		try:
 			fn = f"saves/filehost/{IND}{ts}~" + name
 			r = n + "!"
-			b = ts.bit_length() + 7 >> 3
 			q = ""
 			print("Merge", fn)
 			high = int(kwargs.get("index") or cp.request.headers.get("x-index", 0))
@@ -1647,7 +1646,7 @@ transform: translate(-50%, -50%);
 				with open(r, "r", encoding="utf-8") as f:
 					with open(tn, "w", encoding="utf-8") as g:
 						s = f.read()
-						url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
+						url = HOST + "/f/" + n2p(ts)
 						s = s.replace('""', f'"{url}"', 1)
 						g.write(s)
 				key = key or s.split("<!--KEY=", 1)[-1].split("-->", 1)[0]
@@ -1656,12 +1655,11 @@ transform: translate(-50%, -50%);
 					os.rename(n + "0", f"cache/{IND}{ts}" + "~.temp$@" + name)
 			elif nh in self.chunking:
 				info = self.chunking.pop(n)
-				b = ts.bit_length() + 7 >> 3
 				if not key:
 					n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
-					key = base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
+					key = n2p(n)
 				q = f"?key={key}"
-				url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
+				url = HOST + "/f/" + n2p(ts)
 				lim_str(name, 96).replace("$", "-")
 				tn = f"saves/filehost/{IND}{ts}~.forward${size}$ ${na2}.$"
 				urls = []
@@ -1702,15 +1700,14 @@ transform: translate(-50%, -50%);
 							gn = nh + str(i)
 							with open(gn, "rb") as g:
 								shutil.copyfileobj(g, f)
-				b = ts.bit_length() + 7 >> 3
 				if not key:
 					n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
-					key = base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
+					key = n2p(n)
 				q = f"?key={key}"
 				self.register_replacer(ts, key)
 		finally:
 			self.merged.pop(nh, None)
-		return "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=") + q
+		return "/p/" + n2p(ts)
 
 	@cp.expose
 	@hostmap
@@ -1721,7 +1718,7 @@ transform: translate(-50%, -50%);
 		subprocess.run([sys.executable, "downloader.py", url, fn], cwd="misc")
 		b = ts.bit_length() + 7 >> 3
 		ts, key = self.register_replacer(ts)
-		return HOST + "/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=") + "?key=" + key
+		return HOST + "/p/" + n2p(ts)
 
 	def optimise_video(self, of, size, mime):
 		print("Convert", of, mime, size)
@@ -1958,10 +1955,9 @@ transform: translate(-50%, -50%);
 				raise PermissionError
 			if name.startswith(".temp$@"):
 				name = name[7:]
-		b = ts.bit_length() + 7 >> 3
-		url = HOST + "/f/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
+		url = HOST + "/f/" + n2p(ts)
 		n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
-		key = key or base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
+		key = key or n2p(n)
 		na2 = lim_str(name, 96).replace("$", "-")
 		fn = f"saves/filehost/{IND}{ts}~.forward${size}${ha2 or ' '}${na2}.$"
 		if urls:
@@ -2039,7 +2035,7 @@ transform: translate(-50%, -50%);
 	def register_replacer(self, ts, key=None):
 		if not key:
 			n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
-			key = base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
+			n2p(n)
 		with self.replacer_sem:
 			with open("saves/filehost/-1.txt", "a", encoding="ascii") as f:
 				f.write(f"{ts}:{key}\n")
@@ -2244,8 +2240,7 @@ alert("File successfully deleted. Returning to home.");
 			urls = orjson.loads(urls)
 		code = int(kwargs.get("code", 307))
 		ftype = int(kwargs.get("ftype", 1))
-		b = ts.bit_length() + 7 >> 3
-		url = f"/p/" + as_str(base64.urlsafe_b64encode(ts.to_bytes(b, "big"))).rstrip("=")
+		url = f"/p/" + n2p(ts)
 		if len(urls) <= 1:
 			s = f'<!DOCTYPE HTML><!--["{urls[0]}",{code},{ftype}]--><html><meta http-equiv="refresh" content="0;URL={urls[0]}"/></html>'
 		else:
