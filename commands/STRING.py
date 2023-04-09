@@ -1496,7 +1496,7 @@ class Ask(Command):
         reacts = []
         # if caids:
         reacts.extend(("🔄", "🗑️"))
-        if h and not emb and premium < 2 and not random.randint(0, 32):
+        if h and not emb and premium < 2 and (not random.randint(0, 32) or "AI language model" in out):
             oo = bot.data.users.get(user.id, {}).get("opt_out") or 0
             if utc() - oo > 86400 * 14:
                 code = f"*```callback-string-ask-{user.id}-\nReact with 🚫 to dismiss.```*\n"
@@ -1504,7 +1504,7 @@ class Ask(Command):
                 emb.set_author(**get_author(bot.user))
                 emb.description = (
                     "This response was formulated by ChatGPT-3.5.\n"
-                    + "If you are looking for improved knowledge, memory and intelligence, reduced censorship, or ability to connect to the internet, "
+                    + "If you are looking for improved knowledge, memory and intelligence, reduced censorship, ability to connect to the internet, or would simply like to support my developer, "
                     + f"please check out my [kofi]({bot.kofi_url}) to help fund API, as these features are significantly more expensive!\n"
                     + "Any support is greatly appreciated and contributes directly towards service and future development.\n"
                     + f"Legacy chat models below GPT-3 may be invoked using {bot.get_prefix(guild)}gpt2.\n"
