@@ -316,6 +316,8 @@ class Bot:
 			elems = driver.find_elements(by=tag_name, value="img")
 			for e in reversed(elems):
 				a = e.get_attribute("src")
+				if "fdf0bcda49214494b6965064309ed6cc" in a:
+					continue
 				if a.startswith("https://cdn.mage.space/generate/"):
 					break
 			else:
