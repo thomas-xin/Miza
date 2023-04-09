@@ -2145,7 +2145,7 @@ class DadJoke(Command):
                 following.update(guild.id)
             return css_md(f"Set dadjoke nicknaming and responding for {sqr_md(guild)} to {chance}%.")
         if curr:
-            key = lambda p: f"{round(p / 100, 1)%}"
+            key = lambda p: f"{round(p / 100, 1)}%"
             return ini_md(f"Dadjoke nicknaming settings for {sqr_md(guild)}:{iter2str(curr, key=key)}")
         return ini_md(f'Dadjoke nicknaming is currently disabled in {sqr_md(guild)}. Use "{bot.get_prefix(guild)}{name} enable" to enable.')
 

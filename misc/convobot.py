@@ -1616,7 +1616,7 @@ class Bot:
 			if len(self.gpttokens(v)) > lim + 16:
 				self.auto_summarise(q=v, max_length=lim, min_length=lim * 2 // 3).replace("\n", ". ").strip()
 				t1 = (k, v)
-			if 0:#self.premium > 1 and resp["promise"] >= 0.5:
+			if 0: pass#self.premium > 1 and resp["promise"] >= 0.5:
 				# if len(self.promises) >= 6:
 				# 	self.promises = self.promises[2:]
 				# self.promises.append(t1)
