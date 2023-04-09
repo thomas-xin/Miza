@@ -2122,8 +2122,9 @@ class DadJoke(Command):
         mode = args[0][:4] if args else "all"
         if mode not in ("nick", "resp", "all"):
             raise NotImplementedError(f"Unsupported mode {mode}.")
-        cs = args[1] if len(args) > 1 else 100
-        chance = await self.bot.eval_math(cs.rstrip("%"), default=100)
+        chance = args[1] if len(args) > 1 else 100
+        if isinstance(chance, str):
+            chance = await self.bot.eval_math(chance.rstrip("%"), default=100)
         if chance > 100:
             chance = 100
         if "d" in flags or chance <= 0:

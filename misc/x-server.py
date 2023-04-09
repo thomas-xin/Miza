@@ -207,6 +207,7 @@ error_map = {
 	OverflowError: 413,
 	TypeError: 415,
 	ValueError: 417,
+	IsADirectoryError: 418,
 	IOError: 422,
 	RuntimeError: 500,
 	ConnectionError: 502,
@@ -223,14 +224,38 @@ def error_handler(exc=None):
 		exc = sys.exc_info()[1]
 		if not exc:
 			exc = RuntimeError("An unknown error occured.")
-	status = error_map.get(exc) or error_map.get(exc.__class__) or 500
-	resp = errdata.get(status) or errdata.setdefault(status, reqs.next().get(f"https://http.cat/{status}"))
-	head = resp.headers
+	if (dt := datetime.datetime.utcnow()) and (dt.month, dt.day) in ((3, 31), (4, 1), (4, 2)):
+		status = 418
+	else:
+		status = error_map.get(exc) or error_map.get(exc.__class__) or 500
+	if status == 418:
+		head = {}
+		vid = "dQw4w9WgXcQ"
+		url = f"https://http.cat/{status}"
+		mime = "text/html"
+		embed = f"https://www.youtube.com/embed/{vid}"
+        video = f"https://www.youtube.com/watch?v={vid}"
+		w = 1280
+		h = 720
+		body = f"""<!DOCTYPE html>
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta property="og:type" content="video.other">
+<meta property="twitter:player" content="{embed}">
+<meta property="og:video:type" content="{mime}">
+<meta property="og:video:width" content="{w}">
+<meta property="og:video:height" content="{h}">
+<meta name="twitter:image" content="{url}">
+<meta http-equiv="refresh" content=8;url={video}">
+</head><body></body></html>""".encode("utf-8")
+	else:
+		resp = errdata.get(status) or errdata.setdefault(status, reqs.next().get(f"https://http.cat/{status}"))
+		head = resp.headers
+		body = resp.content
 	head.update(HEADERS)
-	head["Content-Length"] = len(resp.content)
+	head["Content-Length"] = len(body)
 	cp.response.status = status
 	cp.response.headers.update(head)
-	cp.response.body = resp.content
+	cp.response.body = body
 
 config = {
 	"global": {
@@ -1307,6 +1332,11 @@ transform: translate(-50%, -50%);
 				raise FileNotFoundError(404, path, fold)
 		return orjson.dumps(fdata)
 
+	@cp.expose
+	@hostmap
+	def teapot(self, *args, **kwargs):
+		raise IsADirectoryError("I'm a teapot.")
+
 	@cp.expose(("index", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "user", "login", "logout", "mpinsights", "createredirect"))
 	@hostmap
 	def index(self, path=None, filename=None, *args, code=None, **kwargs):
@@ -1393,6 +1423,8 @@ transform: translate(-50%, -50%);
 		else:
 			meta += '<meta property="og:image" content="/logo256.png">'
 		meta += '<meta property="og:site_name" content="Miza">'
+		if not xrand(2) and (dt := datetime.datetime.utcnow()) and (dt.month, dt.day) in ((3, 31), (4, 1), (4, 2)):
+			meta += f'<meta http-equiv="refresh" content={xrand(15, 31)};url=https://{cp.request.headers["Host"]}/teapot">'
 		if path:
 			ind = IND
 			p = None
