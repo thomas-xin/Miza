@@ -2595,7 +2595,7 @@ def p2n(b):
         raise FileNotFoundError(*ex.args)
 
 def n2p(n):
-    c = ts.bit_length() + 7 >> 3
+    c = n.bit_length() + 7 >> 3
     return base64.urlsafe_b64encode(n.to_bytes(c, "little")).rstrip(b"=").decode("ascii")
 
 def find_file(path, cwd="saves/filehost", ind="\x7f"):
