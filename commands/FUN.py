@@ -2144,7 +2144,7 @@ class DadJoke(Command):
             else:
                 curr[mode] = chance / 100
                 following.update(guild.id)
-            return css_md(f"Set dadjoke nicknaming and responding for {sqr_md(guild)} to {chance}%.")
+            return css_md(f"Set dadjoke ({mode}) for {sqr_md(guild)} to {chance}%.")
         if curr:
             key = lambda p: f"{round(p / 100, 1)}%"
             return ini_md(f"Dadjoke nicknaming settings for {sqr_md(guild)}:{iter2str(curr, key=key)}")
