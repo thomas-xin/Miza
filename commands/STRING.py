@@ -64,7 +64,9 @@ class Translate(Command):
             dests.append(dest)
         if not dests:
             dests.append("en")
-        text = " ".join(spl).removeprefix("\\")
+        text = " ".join(spl).removeprefix("\\").strip()
+        if not text:
+            raise ArgumentError("Input string is empty.")
         translated = {}
         comments = {}
 
@@ -170,6 +172,11 @@ class Translate(Command):
         )
         tup = await process_image("CBAU", "$", [inputs], fix=1, timeout=192)
         out = tup[0]
+        if out and out[0] == out[-1] == '"' and not text[0] == text[-1] == '"':
+            try:
+                out = orjson.loads(out)
+            except orjson.JSONDecodeError:
+                pass
         cost = 0
         uoai = None
         if len(tup) > 1:

@@ -2324,7 +2324,7 @@ def process_image(image, operation, args=[], fix=None, timeout=36):
         elif type(a) in (list, deque, np.ndarray, dict):
             try:
                 args[i] = "orjson.loads(" + as_str(orjson.dumps(as_str(orjson.dumps(a)))) + ")"
-            except TypeError:
+            except (TypeError, orjson.JSONDecodeError):
                 args[i] = "pickle.loads(" + as_str(orjson.dumps(pickle.dumps(a))) + ")"
 
     def as_arg(arg):

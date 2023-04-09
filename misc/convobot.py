@@ -789,7 +789,7 @@ class Bot:
 					# 		text = "!"
 				if not text:
 					mes = messages[-2:]
-					m = dict(role="system", content=q2)
+					m = dict(role="user", content=q2)
 					mes.append(m)
 					dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
 					m = dict(role="system", content=f"Current time: {dtn}")
@@ -1667,10 +1667,15 @@ class Bot:
 			if (tc := len(self.gpttokens(v))) > lim + 16:
 				if tc > lim * 2 or (tc > lim * 1.5 and self.premium >= 2):
 					try:
-						prompt = f'"""\n{v}\n"""\n\nSummarise the above into a paragraph, keeping the most important parts. Do not be repetitive!'
+						prompt = f'"""\n{v}\n"""\n\nSummarise the above into a paragraph, keeping most important parts. Do not be repetitive!'
 						v2 = self.au(prompt)[0]
 						if len(self.gpttokens(v2)) < 16:
 							raise ValueError(v2)
+						if v2[0] == v2[-1] == '"':
+							try:
+								v2 = orjson.loads(v2)
+							except orjson.JSONDecodeError:
+								pass
 						v = v2
 					except:
 						print_exc()
