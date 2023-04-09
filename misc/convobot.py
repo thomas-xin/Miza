@@ -775,7 +775,7 @@ class Bot:
 					print(resp)
 					text = "!"
 				resp = None
-				q2 = 'Say "@" if you have a definite answer, "!" if inappropriate, "%" followed by query if maths question, else formulate as google search prepended with "$"'
+				q2 = 'Regarding the above: Say "@" if you have a definite answer, "!" if inappropriate, "%" followed by query if maths question, else formulate as google search prepended with "$"'
 				# if not text and random.randint(0, 1):
 					# q4 = f'Previous context:\n{messages[-2]["content"]}\n\n' if len(messages) > 2 and messages[-2]["content"] else ""
 					# q3 = "For the below question: " + q2 + ".\n" + q
@@ -1046,7 +1046,7 @@ class Bot:
 						presence_penalty=0.6,
 						user=str(hash(u)),
 					)
-					if not i and not random.randint(0, 2) and model == "gpt-3.5-turbo" and not self.jailbroken:
+					if not i and not random.randint(0, 2) and model == "gpt-3.5-turbo" and not self.nsfw and not self.jailbroken:
 						try:
 							text = self.ycg(data).removeprefix(f"{self.name}: ").strip()
 							if stop and any(s in text for s in stop):
