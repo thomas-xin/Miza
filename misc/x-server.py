@@ -234,7 +234,7 @@ def error_handler(exc=None):
 		url = f"https://http.cat/{status}"
 		mime = "text/html"
 		embed = f"https://www.youtube.com/embed/{vid}"
-        video = f"https://www.youtube.com/watch?v={vid}"
+		video = f"https://www.youtube.com/watch?v={vid}"
 		w = 1280
 		h = 720
 		body = f"""<!DOCTYPE html>
