@@ -324,6 +324,7 @@ class Bot:
 			i += 1
 		time.sleep(1)
 		elems = driver.find_elements(by=class_name, value="mantine-1q3qenk")
+		driver.delete_all_cookies()
 		return_driver(driver)
 		if elems:
 			print("Mage: censored")
