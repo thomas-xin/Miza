@@ -569,6 +569,7 @@ class FileHashDict(collections.abc.MutableMapping):
         self.cur.execute(f"CREATE TABLE IF NOT EXISTS '{self.path}' (key VARCHAR(256) PRIMARY KEY, value BLOB)")
         self.comp = set(self.c.keys())
         self.codb = set(try_int(r[0]) for r in self.cur.execute(f"SELECT key FROM '{self.path}'") if r)
+        self.db_sem = Semaphore(1, 64)
         if self.comp:
             self.data.pop("~", None)
             print(f"{self.path}: Successfully loaded {len(self.comp)} compressed entries.")
@@ -649,7 +650,8 @@ class FileHashDict(collections.abc.MutableMapping):
                         with suppress(KeyError):
                             return self.c[k]
                     if k in self.codb:
-                        s = next(self.cur.execute(f"SELECT value FROM '{self.path}' WHERE key=?", (k,)))[0]
+                        with self.db_sem:
+                            s = next(self.cur.execute(f"SELECT value FROM '{self.path}' WHERE key=?", (k,)))[0]
                         if s:
                             data = select_and_loads(self.decode(s), mode="unsafe")
                             self.data[k] = data
@@ -701,7 +703,8 @@ class FileHashDict(collections.abc.MutableMapping):
         try:
             if remove:
                 if k in self.codb:
-                    self.cur.execute(f"DELETE FROM '{self.path}' WHERE key=?", (k,))
+                    with self.db_sem:
+                        self.cur.execute(f"DELETE FROM '{self.path}' WHERE key=?", (k,))
                     self.codb.discard(k)
                     self.c_updated = True
                 elif k in self.comp:
@@ -758,7 +761,8 @@ class FileHashDict(collections.abc.MutableMapping):
         self.data["~"] = {}
         self.comp.clear()
         self.data.clear()
-        self.cur.execute(f"DELETE FROM '{self.path}'")
+        with self.db_sem:
+            self.cur.execute(f"DELETE FROM '{self.path}'")
         self.codb.clear()
         try:
             shutil.rmtree(self.path)
@@ -778,7 +782,8 @@ class FileHashDict(collections.abc.MutableMapping):
             self.iter = None
             for k in inter:
                 if k in self.codb:
-                    self.cur.execute(f"DELETE FROM '{self.path}' WHERE key=?", (k,))
+                    with self.db_sem:
+                        self.cur.execute(f"DELETE FROM '{self.path}' WHERE key=?", (k,))
                     self.codb.discard(k)
                     self.c_updated = True
                 elif k in self.comp:
@@ -805,11 +810,12 @@ class FileHashDict(collections.abc.MutableMapping):
                         d = self[k]
                         deleted.append(k)
                         d = self.encode(select_and_dumps(d, mode="unsafe", compress=True))
-                        self.cur.execute(
-                            f"INSERT INTO '{self.path}' ('key', 'value') VALUES ('{k}', ?) "
-                                + "ON CONFLICT(key) DO UPDATE SET 'value' = ?",
-                            [d, d],
-                        )
+                        with self.db_sem:
+                            self.cur.execute(
+                                f"INSERT INTO '{self.path}' ('key', 'value') VALUES ('{k}', ?) "
+                                    + "ON CONFLICT(key) DO UPDATE SET 'value' = ?",
+                                [d, d],
+                            )
                         if k in self.comp:
                             self.c.pop(k, None)
                             self.comp.discard(k)
@@ -820,7 +826,8 @@ class FileHashDict(collections.abc.MutableMapping):
             self.c_updated = False
             self.comp = set(self.c.keys())
             self.db.commit()
-            self.codb = set(try_int(r[0]) for r in self.cur.execute(f"SELECT key FROM '{self.path}'") if r)
+            with self.db_sem:
+                self.codb = set(try_int(r[0]) for r in self.cur.execute(f"SELECT key FROM '{self.path}'") if r)
         else:
             self.data.pop("~", None)
         for k in modified:
@@ -852,11 +859,12 @@ class FileHashDict(collections.abc.MutableMapping):
         return inter
 
     def vacuum(self):
-        self.cur.execute(f"DELETE FROM '{self.path}' WHERE value=''")
-        self.db.commit()
-        self.cur.execute("VACUUM")
-        self.db.commit()
-        self.codb = set(try_int(r[0]) for r in self.cur.execute(f"SELECT key FROM '{self.path}'") if r)
+        with self.db_sem:
+            self.cur.execute(f"DELETE FROM '{self.path}' WHERE value=''")
+            self.db.commit()
+            self.cur.execute("VACUUM")
+            self.db.commit()
+            self.codb = set(try_int(r[0]) for r in self.cur.execute(f"SELECT key FROM '{self.path}'") if r)
 
 
 def safe_save(fn, s):
@@ -2575,6 +2583,16 @@ def exec_tb(s, *args, **kwargs):
     with tracebacksuppressor:
         exec(s, *args, **kwargs)
 
+
+def p2n(b):
+    try:
+        if isinstance(b, str):
+            b = b.decode("ascii")
+        if len(b) % 4:
+            b += b"=="
+        return int.from_bytes(base64.urlsafe_b64decode(b), "big")
+    except Exception as ex:
+        raise FileNotFoundError(*ex.args)
 
 def find_file(path, cwd="saves/filehost", ind="\x7f"):
     # if no file name is inputted, return no content

@@ -382,10 +382,8 @@ class Server:
 			ind = "!"
 			path = path[1:]
 		elif not path.startswith("@"):
-			b = path.lstrip("~").split(".", 1)[0].encode("utf-8") + b"=="
-			if (len(b) - 1) & 3 == 0:
-				b += b"="
-			path = str(int.from_bytes(base64.urlsafe_b64decode(b), "big"))
+			b = path.lstrip("~").split(".", 1)[0]
+			path = str(p2n(b))
 		else:
 			path = path[1:]
 		p = find_file(path, cwd=("saves/filehost", "cache"), ind=ind)
@@ -476,9 +474,7 @@ class Server:
 			b = path.lstrip("~").split(".", 1)[0].encode("ascii") + b"=="
 			if b.startswith(b"dQ"):
 				c = b[2:]
-				if (len(c) - 1) & 3 == 0:
-					c += b"="
-				path = str(int.from_bytes(base64.urlsafe_b64decode(c), "big"))
+				path = str(p2n(c))
 				try:
 					p = find_file(path, ind=ind)
 				except FileNotFoundError:
@@ -497,9 +493,7 @@ class Server:
 <meta name="twitter:image" content="{url}">
 <meta http-equiv="refresh" content="0;url=https://www.youtube.com/watch?v=dQw4w9WgXcQ">
 </head><body></body></html>"""
-			if (len(b) - 1) & 3 == 0:
-				b += b"="
-			path = str(int.from_bytes(base64.urlsafe_b64decode(b), "big"))
+			path = str(p2n(b))
 		else:
 			path = path[1:]
 		if not p:
@@ -1409,9 +1403,7 @@ transform: translate(-50%, -50%);
 				b = path.lstrip("~").split(".", 1)[0].encode("utf-8") + b"=="
 				if b.startswith(b"dQ"):
 					c = b[2:]
-					if (len(c) - 1) & 3 == 0:
-						c += b"="
-					path = str(int.from_bytes(base64.urlsafe_b64decode(c), "big"))
+					path = str(p2n(c))
 					try:
 						p = find_file(path, ind=ind)
 					except FileNotFoundError:
@@ -1431,9 +1423,7 @@ transform: translate(-50%, -50%);
 <meta name="twitter:image" content="{url}">
 <meta http-equiv="refresh" content="0;url=https://www.youtube.com/watch?v=dQw4w9WgXcQ">
 </head><body></body></html>""".encode("utf-8")
-				if (len(b) - 1) & 3 == 0:
-					b += b"="
-				path = str(int.from_bytes(base64.urlsafe_b64decode(b), "big"))
+				path = str(p2n(b))
 			else:
 				path = path[1:]
 			if not p:
@@ -2113,7 +2103,7 @@ transform: translate(-50%, -50%);
 	def edit(self, path, key=None, **kwargs):
 		if not key:
 			raise PermissionError("Key not found.")
-		ots = int.from_bytes(base64.urlsafe_b64decode(path.encode("ascii") + b"=="), "big")
+		ots = p2n(path)
 		path = str(ots)
 		p = find_file(path, cwd=("cache", "saves/filehost"))
 		replaceable = self.remove_replacer(ots, key)
@@ -2203,7 +2193,7 @@ transform: translate(-50%, -50%);
 	def delete(self, path, key=None, **kwargs):
 		if not key:
 			raise PermissionError("Key not found.")
-		ots = int.from_bytes(base64.urlsafe_b64decode(path.encode("ascii") + b"=="), "big")
+		ots = p2n(path)
 		path = str(ots)
 		p = find_file(path, cwd=("cache", "saves/filehost"))
 		replaceable = self.remove_replacer(ots, key)
