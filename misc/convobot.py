@@ -787,8 +787,8 @@ class Bot:
 					# 	if text and text[0] not in "@!%$" and "(!)" in text:
 					# 		text = "!"
 				if not text:
-					mes = messages[-2:]
-					m = dict(role="user", content=q2)
+					mes = messages[-2:-1]
+					m = dict(role="user", content='"""\n' + messages[-1] + '\n"""\n\n' + q2)
 					mes.append(m)
 					dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
 					m = dict(role="system", content=f"Current time: {dtn}")
