@@ -2119,7 +2119,7 @@ class DadJoke(Command):
         bot = self.bot
         following = bot.data.dadjokes
         curr = following.get(guild.id, {})
-        mode == args[0][:4] if args else "all"
+        mode = args[0][:4] if args else "all"
         if mode not in ("nick", "resp", "all"):
             raise NotImplementedError(f"Unsupported mode {mode}.")
         cs = args[1] if len(args) > 1 else 100
