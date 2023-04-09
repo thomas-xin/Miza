@@ -788,7 +788,7 @@ class Bot:
 					# 		text = "!"
 				if not text:
 					mes = messages[-2:-1]
-					m = dict(role="user", content='"""\n' + messages[-1] + '\n"""\n\n' + q2)
+					m = dict(role="user", content='"""\n' + messages[-1]["content"] + '\n"""\n\n' + q2)
 					mes.append(m)
 					dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
 					m = dict(role="system", content=f"Current time: {dtn}")
