@@ -2587,7 +2587,7 @@ def exec_tb(s, *args, **kwargs):
 def p2n(b):
     try:
         if isinstance(b, str):
-            b = b.decode("ascii")
+            b = b.encode("ascii")
         if len(b) % 4:
             b += b"=="
         return int.from_bytes(base64.urlsafe_b64decode(b), "big")
