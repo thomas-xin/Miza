@@ -310,6 +310,7 @@ class Bot:
 	bad_proxies = set()
 	btime = 0
 	bl = False
+	alm_re = re.compile(r"(?:as |i am )?an ai(?: language model)?[, ]{,2}", flags=re.I)
 
 	def __init__(self, token="", key="", huggingface_token="", summary=None, email="", password="", name="Miza", personality=DEFPER, premium=0):
 		self.token = token
@@ -1035,27 +1036,29 @@ class Bot:
 				try:
 					if flagged:
 						raise PermissionError("flagged")
+					data = dict(
+						model=model,
+						messages=messages,
+						temperature=temp,
+						max_tokens=min(8192 if self.premium >= 2 else 1024, limit - pc - 64),
+						top_p=1,
+						stop=stop,
+						frequency_penalty=1.0,
+						presence_penalty=0.6,
+						user=str(hash(u)),
+					)
 					if not i and not random.randint(0, 2) and model == "gpt-3.5-turbo" and not self.jailbroken:
 						try:
-							data = dict(
-								model=model,
-								messages=messages,
-								temperature=temp,
-								max_tokens=min(8192 if self.premium >= 2 else 1024, limit - pc - 64),
-								top_p=1,
-								stop=stop,
-								frequency_penalty=1.0,
-								presence_penalty=0.6,
-								user=str(hash(u)),
-							)
 							text = self.ycg(data).removeprefix(f"{self.name}: ").strip()
-							if stop and any(s in text for s in stop): text = ""
+							if stop and any(s in text for s in stop):
+								text = ""
 						except EOFError:
 							pass
 						except:
 							print_exc()
 						else:
-							if text: break
+							if text:
+								break
 					if oai:
 						openai.api_key = oai
 						costs = 0
@@ -1067,7 +1070,7 @@ class Bot:
 						openai.api_key = self.key
 						costs = 1
 					ok = openai.api_key
-					if not stop and random.randint(0, 1) and (not chat_history or len(self.gpttokens(q)) > 8):
+					if not i and random.randint(0, 1) and model == "gpt-3.5-turbo" and not self.jailbroken and (not chat_history or len(self.gpttokens(q)) > 8):
 						prompt = "".join(reversed(ins))
 						resp = openai.Moderation.create(
 							prompt,
@@ -1081,22 +1084,28 @@ class Bot:
 								text = self.vai(prompt)
 							if not text:
 								text = self.chatgpt(prompt)
-							text = text.removeprefix(f"{self.name}: ").strip()
-							if text:
-								response = None
-								break
+							if stop and any(s in text for s in stop):
+								text = ""
+							else:
+								text = text.removeprefix(f"{self.name}: ").strip()
+								if text:
+									response = None
+									break
+						else:
+							try:
+								text = self.ycg(data).removeprefix(f"{self.name}: ").strip()
+								if stop and any(s in text for s in stop):
+									text = ""
+							except EOFError:
+								pass
+							except:
+								print_exc()
+							else:
+								if text:
+									break
 					response = exc.submit(
 						openai.ChatCompletion.create,
-						model=model,
-						messages=messages,
-						temperature=temp,
-						max_tokens=min(8192 if self.premium >= 2 else 1024, limit - pc - 64),
-						top_p=1,
-						stop=stop,
-						# logit_bias={self.gpttokens("AI", model)[0]: -0.5},
-						frequency_penalty=1.0,
-						presence_penalty=0.6,
-						user=str(hash(u)),
+						**data,
 					).result(timeout=60)
 				except Exception as ex:
 					if i >= tries - 1:
@@ -1572,6 +1581,8 @@ class Bot:
 	def append(self, tup):
 		if not self.chat_history or tup != self.chat_history[-1]:
 			k, v = tup
+			if k == self.name:
+				v = self.alm_re.sub("", v)
 			if len(self.gpttokens(v)) > 36:
 				v = self.auto_summarise(q=v, max_length=32, min_length=16).replace("\n", ". ").strip()
 				tup = (k, v)
@@ -1581,6 +1592,8 @@ class Bot:
 	def appendleft(self, tup):
 		if not self.chat_history or tup != self.chat_history[0]:
 			k, v = tup
+			if k == self.name:
+				v = self.alm_re.sub("", v)
 			if len(self.gpttokens(v)) > 36:
 				v = self.auto_summarise(q=v, max_length=32, min_length=16).replace("\n", ". ").strip()
 				tup = (k, v)
@@ -1590,10 +1603,11 @@ class Bot:
 	def _after(self, t1, t2):
 		try:
 			k, v = t2
-			if self.premium > 1:
-				labels = ("promise", "information", "example")
-				resp = self.answer_classify(q=v, labels=labels)
+			# if self.premium > 1:
+			# 	labels = ("promise", "information", "example")
+			# 	resp = self.answer_classify(q=v, labels=labels)
 			lim = 256 if self.premium >= 2 else 128
+			v = self.alm_re.sub("", v)
 			if len(self.gpttokens(v)) > lim + 16:
 				self.auto_summarise(q=v, max_length=lim, min_length=lim * 2 // 3).replace("\n", ". ").strip()
 				t2 = (k, v)
@@ -1601,13 +1615,13 @@ class Bot:
 			k, v = t1
 			if len(self.gpttokens(v)) > lim + 16:
 				self.auto_summarise(q=v, max_length=lim, min_length=lim * 2 // 3).replace("\n", ". ").strip()
-				t2 = (k, v)
-			if self.premium > 1 and resp["promise"] >= 0.5:
-				if len(self.promises) >= 6:
-					self.promises = self.promises[2:]
-				self.promises.append(t1)
-				self.promises.append(t2)
-				print("Promises:", self.promises)
+				t1 = (k, v)
+			if 0:#self.premium > 1 and resp["promise"] >= 0.5:
+				# if len(self.promises) >= 6:
+				# 	self.promises = self.promises[2:]
+				# self.promises.append(t1)
+				# self.promises.append(t2)
+				# print("Promises:", self.promises)
 			else:
 				self.chat_history.append(t1)
 				self.chat_history.append(t2)

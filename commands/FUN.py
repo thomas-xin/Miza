@@ -2109,25 +2109,44 @@ class DadJoke(Command):
     server_only = True
     min_level = 3
     description = "Causes ⟨MIZA⟩ to automatically nickname a user whenever they say \"I am <something>\" or some variant."
-    usage = "(enable|disable)?"
-    example = ("dadjoke enable",)
+    usage = "(enable|disable)? <mode(nickname|response|all)>? <chance{100}>?"
+    example = ("dadjoke enable", "dadjoke disable")
     flags = "aed"
     rate_limit = 0.5
 
-    async def __call__(self, flags, guild, name, **void):
+    async def __call__(self, flags, guild, name, args, **void):
         update = self.data.dadjokes.update
         bot = self.bot
         following = bot.data.dadjokes
-        curr = following.get(guild.id, False)
-        if "d" in flags:
-            if guild.id in following:
-                following.pop(guild.id)
-            return css_md(f"Disabled dadjoke nicknaming for {sqr_md(guild)}.")
+        curr = following.get(guild.id, {})
+        mode == args[0][:4] if args else "all"
+        if mode not in ("nick", "resp", "all"):
+            raise NotImplementedError(f"Unsupported mode {mode}.")
+        cs = args[1] if len(args) > 1 else 100
+        chance = await self.bot.eval_math(cs.rstrip("%"), default=100)
+        if chance > 100:
+            chance = 100
+        if "d" in flags or chance <= 0:
+            if mode == "all":
+                if guild.id in following:
+                    following.pop(guild.id, None)
+            else:
+                curr.pop(mode, None)
+                if curr:
+                    following.update(guild.id)
+                else:
+                    following.pop(guild.id, None)
+            return css_md(f"Disabled dadjoke ({mode}) for {sqr_md(guild)}.")
         if "e" in flags or "a" in flags:
-            following[guild.id] = True
-            return css_md(f"Enabled dadjoke nicknaming for {sqr_md(guild)}.")
+            if mode == "all":
+                following[guild.id] = dict(nick=1, resp=1)
+            else:
+                curr[mode] = chance / 100
+                following.update(guild.id)
+            return css_md(f"Set dadjoke nicknaming and responding for {sqr_md(guild)} to {chance}%.")
         if curr:
-            return ini_md(f"Dadjoke nicknaming is currently enabled in {sqr_md(guild)}.")
+            key = lambda p: f"{round(p / 100, 1)%}"
+            return ini_md(f"Dadjoke nicknaming settings for {sqr_md(guild)}:{iter2str(curr, key=key)}")
         return ini_md(f'Dadjoke nicknaming is currently disabled in {sqr_md(guild)}. Use "{bot.get_prefix(guild)}{name} enable" to enable.')
 
 

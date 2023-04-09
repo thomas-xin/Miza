@@ -1184,7 +1184,7 @@ class Ask(Command):
     example = ("ask what's the date?", "ask what is the square root of 3721?", "ask can I have a hug?")
     # flags = "h"
     no_parse = True
-    rate_limit = (8, 16)
+    rate_limit = (12, 16)
     slash = True
 
     last = {}
