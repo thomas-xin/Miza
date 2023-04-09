@@ -72,11 +72,11 @@ except:
     print_exc()
     subprocess.run([python, "-m", "pip", "install", "git+https://github.com/thomas-xin/discord.py.git", "--user"])
 
-try:
-    v = pkg_resources.get_distribution("googletrans").version
-    assert v >= "4.0.0rc1"
-except:
-    print_exc()
-    subprocess.run([python, "-m", "pip", "install", "googletrans==4.0.0rc1", "--upgrade", "--user"])
+# try:
+#     v = pkg_resources.get_distribution("googletrans").version
+#     assert v >= "4.0.0rc1"
+# except:
+#     print_exc()
+#     subprocess.run([python, "-m", "pip", "install", "googletrans==4.0.0rc1", "--upgrade", "--user"])
 
 print("Installer terminated.")
