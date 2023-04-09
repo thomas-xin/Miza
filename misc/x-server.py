@@ -227,9 +227,10 @@ def error_handler(exc=None):
 	resp = errdata.get(status) or errdata.setdefault(status, reqs.next().get(f"https://http.cat/{status}"))
 	head = resp.headers
 	head.update(HEADERS)
+	head["Content-Length"] = len(resp.content)
 	cp.response.status = status
 	cp.response.headers.update(head)
-	cp.response.body = b
+	cp.response.body = resp.content
 
 config = {
 	"global": {
