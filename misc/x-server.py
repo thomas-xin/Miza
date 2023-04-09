@@ -224,8 +224,12 @@ def error_handler(exc=None):
 		if not exc:
 			exc = RuntimeError("An unknown error occured.")
 	status = error_map.get(exc) or error_map.get(exc.__class__) or 500
-	cp.response.status = 500
-	b = errdata.get(status) or errdata.setdefault(status, reqs.next().get(f"https://http.cat/{status}").content)
+	resp = errdata.get(status) or errdata.setdefault(status, reqs.next().get(f"https://http.cat/{status}"))
+	head = resp.headers
+	head.update(cp.response.headers)
+	head.update(HEADERS)
+	cp.response.status = status
+	cp.response.headers.update(head)
 	cp.response.body = b
 
 config = {
