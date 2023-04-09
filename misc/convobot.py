@@ -1078,8 +1078,10 @@ class Bot:
 						flagged = resp["results"][0]["flagged"]
 						if not flagged:
 							if nstart:
-								ns2 = "Assume y" + nstart[1:]
-							prompt = ns2 + "\n" + nend + "\n\n" + prompt
+								ns2 = "Assume y" + nstart[1:] + "\n"
+							else:
+								ns2 = ""
+							prompt = ns2 + nend + "\n\n" + prompt
 							if random.randint(0, 1):
 								text = self.vai(prompt)
 							if not text:
