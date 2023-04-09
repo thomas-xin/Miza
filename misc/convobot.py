@@ -323,9 +323,6 @@ class Bot:
 		self.promises = []
 		self.chat_history = []
 		self.chat_history_ids = None
-		if summary:
-			self.chat_history.insert(0, ("[SYSTEM]", summary))
-			self.rerender()
 		self.timestamp = time.time()
 		self.premium = premium
 		self.last_cost = 0
@@ -334,8 +331,10 @@ class Bot:
 		self.session = requests.Session()
 		self.session.cookies["CookieConsent"] = "true"
 		self.forbidden = []
-		self.summed = False
 		self.jailbroken = False
+		if summary:
+			self.chat_history.insert(0, ("[SYSTEM]", summary))
+			self.rerender()
 
 	def get_proxy(self, retry=True):
 		if self.proxies and time.time() - self.ctime <= 20:
@@ -1530,7 +1529,7 @@ class Bot:
 
 	def ai(self, u, q, refs=(), im=None):
 		tup = (u, q)
-		if self.chat_history and (not self.summed or len(self.chat_history) + len(self.promises) > self.history_length):
+		if self.chat_history and len(self.chat_history) + len(self.promises) > self.history_length:
 			self.rerender()
 		caids = ()
 		uoai = None

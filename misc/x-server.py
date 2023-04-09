@@ -197,6 +197,37 @@ class EndpointRedirects(Dispatcher):
 				path = "/static/" + mapped_static[p]
 		return Dispatcher.__call__(self, path)
 
+error_map = {
+	SyntaxError: 400,
+	PermissionError: 401,
+	InterruptedError: 403,
+	FileNotFoundError: 404,
+	FileExistsError: 409,
+	AssertionError: 412,
+	OverflowError: 413,
+	TypeError: 415,
+	ValueError: 417,
+	IOError: 422,
+	RuntimeError: 500,
+	ConnectionError: 502,
+	SystemError: 503,
+	TimeoutError: 504,
+	OSError: 507,
+	RecursionError: 508,
+	GeneratorExit: 510,
+	ReferenceError: 523,
+}
+errdata = {}
+def error_handler(exc=None):
+	if not exc:
+		exc = sys.exc_info()[1]
+		if not exc:
+			exc = RuntimeError("An unknown error occured.")
+	status = error_map.get(exc) or error_map.get(exc.__class__) or 500
+	cherrypy.response.status = 500
+	b = errdata.get(status) or errdata.setdefault(status, reqs.next().get(f"https://http.cat/{status}"))
+	cherrypy.response.body = [b]
+
 config = {
 	"global": {
 		"server.socket_host": ADDRESS,
@@ -209,6 +240,7 @@ config = {
 	},
 	"/": {
 		"request.dispatch": EndpointRedirects(),
+		"request.error_response": error_handler,
 	}
 }
 if os.path.exists("domain.cert.pem") and os.path.exists("private.key.pem"):
@@ -591,12 +623,12 @@ class Server:
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7025724554077000" crossorigin="anonymous"></script>
 <style>
 .center {
-  margin: 0;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  -ms-transform: translate(-50%, -50%);
-  transform: translate(-50%, -50%);
+margin: 0;
+position: absolute;
+top: 50%;
+left: 50%;
+-ms-transform: translate(-50%, -50%);
+transform: translate(-50%, -50%);
 }
 </style>""" + f"""
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
@@ -606,7 +638,7 @@ class Server:
 <meta property="og:image" content="{i_url}">
 <body style="background-color:black;">
 <video class="center" playsinline autoplay muted loop>
-  <source src="{f_url}">
+<source src="{f_url}">
 </video>
 </body>
 </html>""").encode("utf-8")
@@ -615,7 +647,7 @@ class Server:
 				cp.response.headers["ETag"] = create_etag(b)
 				return b
 			elif not os.path.exists(p):
-				raise cp.HTTPRedirect("https://http.cat/404", status=404)
+				raise FileNotFoundError(404, p)
 			elif "$" in p and p.split("$", 1)[0].endswith("~.forward") and mime == "text/html" and os.path.getsize(p) < 1048576:
 				with open(p, "r", encoding="utf-8") as f:
 					resp = f.read(1048576)
@@ -966,7 +998,7 @@ class Server:
 				STATIC.clear()
 				send("Webserver cache cleared.")
 				return b"\xf0\x9f\x92\x9c"
-			raise cp.HTTPRedirect("https://http.cat/403", status=403)
+			raise PermissionError
 		filename = "/".join(filepath)
 		try:
 			data, mime = fetch_static("static/" + filename, ignore=True)
@@ -1023,7 +1055,7 @@ class Server:
 			if not source:
 				source = "https://gitlab.com/20kdc/waifu2x-upconv7-webgl/-/raw/master/w2wbinit.png"
 			if not is_url(source):
-				raise cp.HTTPRedirect("https://http.cat/404", status=404)
+				raise FileNotFoundError
 			if not regexp("https:\\/\\/images-ext-[0-9]+\\.discordapp\\.net\\/external\\/").match(source) and not source.startswith("https://media.discordapp.net/"):
 				if not source.startswith(cp.request.base):
 					source = self.bot_exec(f"bot.data.exec.proxy({repr(source)})")
@@ -1139,13 +1171,13 @@ class Server:
 			if not fmt:
 				fmt = "opus" if d else "mp3"
 			if fmt not in ("mp3", "opus", "webm", "weba", "ogg", "wav"):
-				raise cp.HTTPRedirect("https://http.cat/415", status=415)
+				raise TypeError(fmt)
 			fmt = "." + fmt
 			self.bot_exec(f"bot.audio.returns[{t}]=VOICE.ytdl.search({repr(q)})[0]")
 			self.bot_exec(f"VOICE.ytdl.get_stream(bot.audio.returns[{t}],force=True,download=False)")
 			name, url = self.bot_exec(f"(bot.audio.returns[{t}].get('name'),bot.audio.returns[{t}].get('url'))")
 			if not name or not url:
-				raise cp.HTTPRedirect("https://http.cat/500", status=500)
+				raise FileNotFoundError(500, v)
 			h = shash(url)
 			fn = "~" + h + fmt
 			self.bot_exec(f"bot.audio.returns[{t}]=VOICE.ytdl.get_stream(bot.audio.returns[{t}],download={repr(fmt)},asap=True)")
@@ -1195,7 +1227,7 @@ class Server:
 			t += 1
 		fmt = fmt.strip() or "mp4"
 		if fmt not in ("mp3", "ogg", "opus", "m4a", "flac", "wav", "wma", "mp2", "weba", "vox", "adpcm", "pcm", "8bit", "mid", "midi", "webm", "mp4", "avi", "mov", "m4v", "mkv", "f4v", "flv", "wmv", "gif", "apng", "webp"):
-			raise cp.HTTPRedirect("https://http.cat/415", status=415)
+			raise TypeError
 		start = start.strip() or "-"
 		end = end.strip() or "-"
 		b = self.command(input=f"trim {url} {start} {end} as {fmt}")
@@ -1223,7 +1255,7 @@ class Server:
 			t += 1
 		fmt = fmt.strip() or "mp4"
 		if fmt not in ("mp3", "ogg", "opus", "m4a", "flac", "wav", "wma", "mp2", "weba", "vox", "adpcm", "pcm", "8bit", "mid", "midi", "webm", "mp4", "avi", "mov", "m4v", "mkv", "f4v", "flv", "wmv", "gif", "apng", "webp"):
-			raise cp.HTTPRedirect("https://http.cat/415", status=415)
+			raise TypeError
 		url = " ".join(urls)
 		b = self.command(input=f"concat {m} {url} as {fmt}")
 		data = orjson.loads(b)
@@ -1274,8 +1306,7 @@ class Server:
 					fdata = e.get("f")
 					break
 			else:
-				raise cp.HTTPRedirect("https://http.cat/404", status=404)
-				# raise FileNotFoundError(404, path, fold)
+				raise FileNotFoundError(404, path, fold)
 		return orjson.dumps(fdata)
 
 	@cp.expose(("index", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "user", "login", "logout", "mpinsights", "createredirect"))
@@ -1495,7 +1526,7 @@ class Server:
 		xi = int(cp.request.headers.get("x-index", 0))
 		mfs = int(cp.request.headers.get("x-total", 0))
 		if mfs > 1125899906842624:
-			raise cp.HTTPRedirect("https://http.cat/413", status=413)
+			raise OverflowError
 		if not xi:
 			print(s)
 		n = f"cache/{h}%"
@@ -1648,7 +1679,7 @@ class Server:
 					fut = self.chunking.pop(gn, None)
 					if not fut:
 						if not os.path.exists(gn):
-							raise cp.HTTPRedirect("https://http.cat/404", status=404)
+							raise FileNotFoundError(gn)
 						url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(gn)})")
 						urls.extend(url1)
 						mids.extend(mid1)
@@ -2007,7 +2038,7 @@ class Server:
 	@hostmap
 	def api_register_replacer(self, ts, key):
 		if cp.request.remote.ip != "127.0.0.1":
-			raise cp.HTTPRedirect("https://http.cat/401", status=401)
+			raise PermissionError
 		return self.register_replacer(ts, key)
 
 	replacer_sem = Semaphore(1, inf, rate_limit=0.0625)
@@ -2050,7 +2081,7 @@ class Server:
 	@hostmap
 	def api_update_replacers(self):
 		if cp.request.remote.ip != "127.0.0.1":
-			raise cp.HTTPRedirect("https://http.cat/401", status=401)
+			raise PermissionError
 		if self.replace_fut and not self.replace_fut.done():
 			return
 		self.replace_fut = create_future_ex(self.update_replacers)
@@ -2077,7 +2108,7 @@ class Server:
 	@hostmap
 	def edit(self, path, key=None, **kwargs):
 		if not key:
-			raise cp.HTTPRedirect("https://http.cat/401", status=401)
+			raise PermissionError("Key not found.")
 		ots = int.from_bytes(base64.urlsafe_b64decode(path.encode("ascii") + b"=="), "big")
 		path = str(ots)
 		p = find_file(path, cwd=("cache", "saves/filehost"))
@@ -2092,11 +2123,11 @@ class Server:
 					os.remove(p)
 				p = find_file(path)
 			if not p.split("~", 1)[-1].startswith(".forward$"):
-				raise cp.HTTPRedirect("https://http.cat/403", status=403)
+				raise TypeError("File is not editable.")
 			with open(p, "r", encoding="utf-8") as f:
 				orig = f.read()
 			if key != orig.split("<!--KEY=", 1)[-1].split("-->", 1)[0]:
-				raise cp.HTTPRedirect("https://http.cat/401", status=401)
+				raise PermissionError("Incorrect key.")
 			self.delete_link(p, orig)
 		else:
 			os.remove(p)
@@ -2167,7 +2198,7 @@ class Server:
 	@hostmap
 	def delete(self, path, key=None, **kwargs):
 		if not key:
-			raise cp.HTTPRedirect("https://http.cat/401", status=401)
+			raise PermissionError("Key not found.")
 		ots = int.from_bytes(base64.urlsafe_b64decode(path.encode("ascii") + b"=="), "big")
 		path = str(ots)
 		p = find_file(path, cwd=("cache", "saves/filehost"))
@@ -2185,7 +2216,7 @@ class Server:
 			with open(p, "r", encoding="utf-8") as f:
 				orig = f.read()
 			if key != orig.split("<!--KEY=", 1)[-1].split("-->", 1)[0]:
-				raise cp.HTTPRedirect("https://http.cat/401", status=401)
+				raise PermissionError("Incorrect key.")
 			self.delete_link(p, text=orig)
 		else:
 			os.remove(p)
@@ -2197,7 +2228,7 @@ class Server:
 <body onload="myFunction()" style="background-color:#000">
 <script>
 function myFunction() {
-  alert("File successfully deleted. Returning to home.");
+alert("File successfully deleted. Returning to home.");
 }
 </script>
 </body>
@@ -2213,7 +2244,7 @@ function myFunction() {
 		if not urls:
 			url = kwargs.get("url")
 			if not url:
-				raise cp.HTTPRedirect("https://http.cat/422", status=422)
+				raise IOError("Missing urls field")
 			urls = [url]
 		elif isinstance(urls, str):
 			urls = orjson.loads(urls)
@@ -2241,7 +2272,7 @@ function myFunction() {
 		at = AUTH.get("discord_token")
 		if token != at:
 			if cp.url(base="").strip("/") != at:
-				raise cp.HTTPRedirect("https://http.cat/401", status=401)
+				raise InterruptedError
 		backup = self.bot_exec(f"bot.backup()")
 		cp.response.headers.update(CHEADERS)
 		return cp.lib.static.serve_file(os.getcwd() + "/" + backup, content_type="application/octet-stream", disposition="attachment")
@@ -2251,7 +2282,7 @@ function myFunction() {
 	@hostmap
 	def execute(self, token, *args, **kwargs):
 		if token != AUTH.get("discord_token"):
-			raise cp.HTTPRedirect("https://http.cat/401", status=401)
+			raise InterruptedError
 		url = cp.url(base="", qs=cp.request.query_string)
 		content = urllib.parse.unquote(url.lstrip("/").split("/", 2)[-1])
 		res = self.bot_exec(content)
@@ -2261,7 +2292,7 @@ function myFunction() {
 	@hostmap
 	def eval2(self, token, *args, **kwargs):
 		if token != AUTH.get("discord_token"):
-			raise cp.HTTPRedirect("https://http.cat/401", status=401)
+			raise InterruptedError
 		url = cp.url(base="", qs=cp.request.query_string)
 		content = urllib.parse.unquote(url.split("?", 1)[0].lstrip("/").split("/", 2)[-1])
 		return str(eval(content, globals())).encode("utf-8")
@@ -2482,7 +2513,7 @@ function myFunction() {
 			if secret != KOFI_SECRET:
 				raise KeyError
 		except KeyError:
-			raise cp.HTTPRedirect("https://http.cat/401", status=401)
+			raise PermissionError("Ko-fi Proxy Secret not detected.")
 		send(data)
 		if data["type"] != "Donation":
 			return
@@ -2591,21 +2622,21 @@ function myFunction() {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>""" + """
 img {
-  display: block;
-  margin-left: auto;
-  margin-right: auto;
-  margin-top: auto;
-  margin-bottom: auto;
+display: block;
+margin-left: auto;
+margin-right: auto;
+margin-top: auto;
+margin-bottom: auto;
 }
 .center {
-  margin: 0;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  -ms-transform: translate(-50%, -50%);
-  transform: translate(-50%, -50%);
-  max-width: 100%;
-  max-height: 100%;		
+margin: 0;
+position: absolute;
+top: 50%;
+left: 50%;
+-ms-transform: translate(-50%, -50%);
+transform: translate(-50%, -50%);
+max-width: 100%;
+max-height: 100%;		
 }""" + f"""
 </style>
 </head>
