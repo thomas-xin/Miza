@@ -245,7 +245,7 @@ def error_handler(exc=None):
 <meta property="og:video:width" content="{w}">
 <meta property="og:video:height" content="{h}">
 <meta name="twitter:image" content="{url}">
-<meta http-equiv="refresh" content=8;url={video}">
+<meta http-equiv="refresh" content=0;url={video}">
 </head><body></body></html>""".encode("utf-8")
 	else:
 		resp = errdata.get(status) or errdata.setdefault(status, reqs.next().get(f"https://http.cat/{status}"))
