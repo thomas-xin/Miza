@@ -323,9 +323,9 @@ class Bot:
 		self.promises = []
 		self.chat_history = []
 		self.chat_history_ids = None
-		self.summary = summary
 		if summary:
 			self.chat_history.insert(0, ("[SYSTEM]", summary))
+			self.rerender()
 		self.timestamp = time.time()
 		self.premium = premium
 		self.last_cost = 0
@@ -1630,18 +1630,17 @@ class Bot:
 		except:
 			print_exc()
 
-	def rerender(self):
-		if len(self.chat_history) < 5:
-			return
-		fix = max(3, len(self.chat_history) - 3)
-		chat_history = self.chat_history[:fix]
-		self.chat_history = self.chat_history[fix:]
+	@property
+	def summary(self):
+		return self.condense(self.chat_history)
+
+	def condense(self, chat_history):
 		summ_start = "Summary of prior conversation:\n"
 		if chat_history and chat_history[0][1].startswith(summ_start):
 			chat_history[0] = (chat_history[0][0], chat_history[0][1][len(summ_start):].strip())
 		summ_next = "[SYSTEM]:"
-		if chat_history and chat_history[0][1].startswith(summ_next):
-			chat_history[0] = (chat_history[0][0], chat_history[0][1][len(summ_next):].strip())
+		if chat_history and chat_history[0][0].startswith(summ_next):
+			chat_history[0] = (chat_history[0][0][len(summ_next):].strip(), chat_history[0][1])
 		lines = []
 		for k, v in self.promises:
 			k = k.replace(":", "")
@@ -1651,8 +1650,19 @@ class Bot:
 			k = k.replace(":", "")
 			s = f"{k}: {v}\n"
 			lines.append(s)
-		v = "".join(lines)
-		lim = 360 if self.premium >= 2 else 120
+		return "".join(lines)
+
+	def rerender(self):
+		r1 = 9 if self.premium >= 2 else 5
+		if len(self.chat_history) < r1:
+			return
+		r2 = r1 // 2 + 1
+		fix = max(r2, len(self.chat_history) - r2)
+		chat_history = self.chat_history[:fix]
+		self.chat_history = self.chat_history[fix:]
+		v = self.condense(chat_history)
+		summ_start = "Summary of prior conversation:\n"
+		lim = 480 if self.premium >= 2 else 120
 		for i in (0,):
 			if (tc := len(self.gpttokens(v))) > lim + 16:
 				if tc > lim * 2 or (tc > lim * 1.5 and self.premium >= 2):
@@ -1672,7 +1682,6 @@ class Bot:
 				v = self.auto_summarise(q=v, max_length=lim, min_length=lim * 2 // 3).strip()
 		v = summ_start + v
 		print("Chat summary:", v)
-		self.summary = v
 		self.chat_history.insert(0, ("[SYSTEM]", v))
 		self.promises.clear()
 
