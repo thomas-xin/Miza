@@ -615,7 +615,7 @@ class Server:
 				cp.response.headers["ETag"] = create_etag(b)
 				return b
 			elif not os.path.exists(p):
-				raise FileNotFoundError(404, p)
+				raise cp.HTTPRedirect("https://http.cat/404", status=404)
 			elif "$" in p and p.split("$", 1)[0].endswith("~.forward") and mime == "text/html" and os.path.getsize(p) < 1048576:
 				with open(p, "r", encoding="utf-8") as f:
 					resp = f.read(1048576)
@@ -966,7 +966,7 @@ class Server:
 				STATIC.clear()
 				send("Webserver cache cleared.")
 				return b"\xf0\x9f\x92\x9c"
-			raise PermissionError
+			raise cp.HTTPRedirect("https://http.cat/403", status=403)
 		filename = "/".join(filepath)
 		try:
 			data, mime = fetch_static("static/" + filename, ignore=True)
@@ -1023,7 +1023,7 @@ class Server:
 			if not source:
 				source = "https://gitlab.com/20kdc/waifu2x-upconv7-webgl/-/raw/master/w2wbinit.png"
 			if not is_url(source):
-				raise FileNotFoundError
+				raise cp.HTTPRedirect("https://http.cat/404", status=404)
 			if not regexp("https:\\/\\/images-ext-[0-9]+\\.discordapp\\.net\\/external\\/").match(source) and not source.startswith("https://media.discordapp.net/"):
 				if not source.startswith(cp.request.base):
 					source = self.bot_exec(f"bot.data.exec.proxy({repr(source)})")
@@ -1139,13 +1139,13 @@ class Server:
 			if not fmt:
 				fmt = "opus" if d else "mp3"
 			if fmt not in ("mp3", "opus", "webm", "weba", "ogg", "wav"):
-				raise TypeError(fmt)
+				raise cp.HTTPRedirect("https://http.cat/415", status=415)
 			fmt = "." + fmt
 			self.bot_exec(f"bot.audio.returns[{t}]=VOICE.ytdl.search({repr(q)})[0]")
 			self.bot_exec(f"VOICE.ytdl.get_stream(bot.audio.returns[{t}],force=True,download=False)")
 			name, url = self.bot_exec(f"(bot.audio.returns[{t}].get('name'),bot.audio.returns[{t}].get('url'))")
 			if not name or not url:
-				raise FileNotFoundError(500, v)
+				raise cp.HTTPRedirect("https://http.cat/500", status=500)
 			h = shash(url)
 			fn = "~" + h + fmt
 			self.bot_exec(f"bot.audio.returns[{t}]=VOICE.ytdl.get_stream(bot.audio.returns[{t}],download={repr(fmt)},asap=True)")
@@ -1195,7 +1195,7 @@ class Server:
 			t += 1
 		fmt = fmt.strip() or "mp4"
 		if fmt not in ("mp3", "ogg", "opus", "m4a", "flac", "wav", "wma", "mp2", "weba", "vox", "adpcm", "pcm", "8bit", "mid", "midi", "webm", "mp4", "avi", "mov", "m4v", "mkv", "f4v", "flv", "wmv", "gif", "apng", "webp"):
-			raise TypeError
+			raise cp.HTTPRedirect("https://http.cat/415", status=415)
 		start = start.strip() or "-"
 		end = end.strip() or "-"
 		b = self.command(input=f"trim {url} {start} {end} as {fmt}")
@@ -1223,7 +1223,7 @@ class Server:
 			t += 1
 		fmt = fmt.strip() or "mp4"
 		if fmt not in ("mp3", "ogg", "opus", "m4a", "flac", "wav", "wma", "mp2", "weba", "vox", "adpcm", "pcm", "8bit", "mid", "midi", "webm", "mp4", "avi", "mov", "m4v", "mkv", "f4v", "flv", "wmv", "gif", "apng", "webp"):
-			raise TypeError
+			raise cp.HTTPRedirect("https://http.cat/415", status=415)
 		url = " ".join(urls)
 		b = self.command(input=f"concat {m} {url} as {fmt}")
 		data = orjson.loads(b)
@@ -1274,7 +1274,8 @@ class Server:
 					fdata = e.get("f")
 					break
 			else:
-				raise FileNotFoundError(404, path, fold)
+				raise cp.HTTPRedirect("https://http.cat/404", status=404)
+				# raise FileNotFoundError(404, path, fold)
 		return orjson.dumps(fdata)
 
 	@cp.expose(("index", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "user", "login", "logout", "mpinsights", "createredirect"))
@@ -1493,6 +1494,8 @@ class Server:
 		single = "/upload_single" in cp.url()
 		xi = int(cp.request.headers.get("x-index", 0))
 		mfs = int(cp.request.headers.get("x-total", 0))
+		if mfs > 1125899906842624:
+			raise cp.HTTPRedirect("https://http.cat/413", status=413)
 		if not xi:
 			print(s)
 		n = f"cache/{h}%"
@@ -1645,7 +1648,7 @@ class Server:
 					fut = self.chunking.pop(gn, None)
 					if not fut:
 						if not os.path.exists(gn):
-							raise FileNotFoundError(gn)
+							raise cp.HTTPRedirect("https://http.cat/404", status=404)
 						url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(gn)})")
 						urls.extend(url1)
 						mids.extend(mid1)
@@ -2004,7 +2007,7 @@ class Server:
 	@hostmap
 	def api_register_replacer(self, ts, key):
 		if cp.request.remote.ip != "127.0.0.1":
-			raise PermissionError
+			raise cp.HTTPRedirect("https://http.cat/401", status=401)
 		return self.register_replacer(ts, key)
 
 	replacer_sem = Semaphore(1, inf, rate_limit=0.0625)
@@ -2047,7 +2050,7 @@ class Server:
 	@hostmap
 	def api_update_replacers(self):
 		if cp.request.remote.ip != "127.0.0.1":
-			raise PermissionError
+			raise cp.HTTPRedirect("https://http.cat/401", status=401)
 		if self.replace_fut and not self.replace_fut.done():
 			return
 		self.replace_fut = create_future_ex(self.update_replacers)
@@ -2074,7 +2077,7 @@ class Server:
 	@hostmap
 	def edit(self, path, key=None, **kwargs):
 		if not key:
-			raise PermissionError("Key not found.")
+			raise cp.HTTPRedirect("https://http.cat/401", status=401)
 		ots = int.from_bytes(base64.urlsafe_b64decode(path.encode("ascii") + b"=="), "big")
 		path = str(ots)
 		p = find_file(path, cwd=("cache", "saves/filehost"))
@@ -2089,11 +2092,11 @@ class Server:
 					os.remove(p)
 				p = find_file(path)
 			if not p.split("~", 1)[-1].startswith(".forward$"):
-				raise TypeError("File is not editable.")
+				raise cp.HTTPRedirect("https://http.cat/403", status=403)
 			with open(p, "r", encoding="utf-8") as f:
 				orig = f.read()
 			if key != orig.split("<!--KEY=", 1)[-1].split("-->", 1)[0]:
-				raise PermissionError("Incorrect key.")
+				raise cp.HTTPRedirect("https://http.cat/401", status=401)
 			self.delete_link(p, orig)
 		else:
 			os.remove(p)
@@ -2164,7 +2167,7 @@ class Server:
 	@hostmap
 	def delete(self, path, key=None, **kwargs):
 		if not key:
-			raise PermissionError("Key not found.")
+			raise cp.HTTPRedirect("https://http.cat/401", status=401)
 		ots = int.from_bytes(base64.urlsafe_b64decode(path.encode("ascii") + b"=="), "big")
 		path = str(ots)
 		p = find_file(path, cwd=("cache", "saves/filehost"))
@@ -2182,7 +2185,7 @@ class Server:
 			with open(p, "r", encoding="utf-8") as f:
 				orig = f.read()
 			if key != orig.split("<!--KEY=", 1)[-1].split("-->", 1)[0]:
-				raise PermissionError("Incorrect key.")
+				raise cp.HTTPRedirect("https://http.cat/401", status=401)
 			self.delete_link(p, text=orig)
 		else:
 			os.remove(p)
@@ -2210,7 +2213,7 @@ function myFunction() {
 		if not urls:
 			url = kwargs.get("url")
 			if not url:
-				raise FileNotFoundError(422, "Missing urls field")
+				raise cp.HTTPRedirect("https://http.cat/422", status=422)
 			urls = [url]
 		elif isinstance(urls, str):
 			urls = orjson.loads(urls)
@@ -2238,7 +2241,7 @@ function myFunction() {
 		at = AUTH.get("discord_token")
 		if token != at:
 			if cp.url(base="").strip("/") != at:
-				raise InterruptedError
+				raise cp.HTTPRedirect("https://http.cat/401", status=401)
 		backup = self.bot_exec(f"bot.backup()")
 		cp.response.headers.update(CHEADERS)
 		return cp.lib.static.serve_file(os.getcwd() + "/" + backup, content_type="application/octet-stream", disposition="attachment")
@@ -2248,7 +2251,7 @@ function myFunction() {
 	@hostmap
 	def execute(self, token, *args, **kwargs):
 		if token != AUTH.get("discord_token"):
-			raise InterruptedError
+			raise cp.HTTPRedirect("https://http.cat/401", status=401)
 		url = cp.url(base="", qs=cp.request.query_string)
 		content = urllib.parse.unquote(url.lstrip("/").split("/", 2)[-1])
 		res = self.bot_exec(content)
@@ -2258,7 +2261,7 @@ function myFunction() {
 	@hostmap
 	def eval2(self, token, *args, **kwargs):
 		if token != AUTH.get("discord_token"):
-			raise InterruptedError
+			raise cp.HTTPRedirect("https://http.cat/401", status=401)
 		url = cp.url(base="", qs=cp.request.query_string)
 		content = urllib.parse.unquote(url.split("?", 1)[0].lstrip("/").split("/", 2)[-1])
 		return str(eval(content, globals())).encode("utf-8")
@@ -2479,7 +2482,7 @@ function myFunction() {
 			if secret != KOFI_SECRET:
 				raise KeyError
 		except KeyError:
-			raise PermissionError("Ko-fi Proxy Secret not detected.")
+			raise cp.HTTPRedirect("https://http.cat/401", status=401)
 		send(data)
 		if data["type"] != "Donation":
 			return
