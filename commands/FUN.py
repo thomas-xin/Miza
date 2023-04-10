@@ -2140,7 +2140,7 @@ class DadJoke(Command):
             return css_md(f"Disabled dadjoke ({mode}) for {sqr_md(guild)}.")
         if "e" in flags or "a" in flags:
             if mode == "all":
-                following[guild.id] = dict(nick=1, resp=1)
+                following[guild.id] = dict(nick=chance, resp=chance)
             else:
                 curr[mode] = chance
                 following.update(guild.id)
