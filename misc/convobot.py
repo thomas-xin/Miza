@@ -1632,7 +1632,7 @@ class Bot:
 
 	@property
 	def summary(self):
-		return self.condense(self.chat_history)
+		return "".join(self.condense(self.chat_history))
 
 	def condense(self, chat_history):
 		summ_start = "Summary of prior conversation:\n"
@@ -1650,7 +1650,7 @@ class Bot:
 			k = k.replace(":", "")
 			s = f"{k}: {v}\n"
 			lines.append(s)
-		return "".join(lines)
+		return lines
 
 	def rerender(self):
 		lim = 480 if self.premium >= 2 else 120
@@ -1661,7 +1661,8 @@ class Bot:
 		fix = max(r2, len(self.chat_history) - r2)
 		chat_history = self.chat_history[:fix]
 		self.chat_history = self.chat_history[fix:]
-		v = self.condense(chat_history)
+		lines = self.condense(chat_history)
+		v = "".join(lines)
 		summ_start = "Summary of prior conversation:\n"
 		for i in (0,):
 			if (tc := len(self.gpttokens(v))) > lim + 16:
