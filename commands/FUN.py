@@ -2142,7 +2142,7 @@ class DadJoke(Command):
             if mode == "all":
                 following[guild.id] = dict(nick=1, resp=1)
             else:
-                curr[mode] = chance / 100
+                curr[mode] = chance
                 following.update(guild.id)
             return css_md(f"Set dadjoke ({mode}) for {sqr_md(guild)} to {chance}%.")
         if curr:
@@ -2158,7 +2158,8 @@ class UpdateDadjokes(Database):
     async def _nocommand_(self, message, **void):
         if message.guild is None or not message.content:
             return
-        if not self.data.get(message.guild.id):
+        curr = self.data.get(message.guild.id)
+        if not curr:
             return
         s = message.clean_content
         m = self.reg.search(s)
@@ -2177,8 +2178,11 @@ class UpdateDadjokes(Database):
             nick = spl[0]
         nick = lim_str(nick, 32)
         if nick and nick != user.display_name:
-            create_task(send_with_reply(message.channel, message, f"Hi, {nick}! {get_random_emoji()}"))
-            await user.edit(nick=nick, reason="Pranked!")
+            v = random.random() * 100
+            if v < curr.get("resp", 0):
+                create_task(send_with_reply(message.channel, message, f"Hi, {nick}! {get_random_emoji()}"))
+            if v < curr.get("nick", 0):
+                await user.edit(nick=nick, reason="Pranked!")
 
 
 class Daily(Command):

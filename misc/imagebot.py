@@ -118,7 +118,7 @@ def get_driver():
 		except:
 			print_exc()
 			driver = create_driver()
-	exc.submit(ensure_drivers)
+	# exc.submit(ensure_drivers)
 	return driver
 def return_driver(d):
 	d.get("file://")
