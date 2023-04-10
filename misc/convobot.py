@@ -1653,8 +1653,9 @@ class Bot:
 		return "".join(lines)
 
 	def rerender(self):
-		r1 = 9 if self.premium >= 2 else 5
-		if len(self.chat_history) < r1:
+		lim = 480 if self.premium >= 2 else 120
+		r1 = 6 if self.premium >= 2 else 4
+		if not self.chat_history or len(self.chat_history) < r1 and len(self.gpttokens(self.chat_history[0])) <= lim * 2:
 			return
 		r2 = r1 // 2 + 1
 		fix = max(r2, len(self.chat_history) - r2)
@@ -1662,7 +1663,6 @@ class Bot:
 		self.chat_history = self.chat_history[fix:]
 		v = self.condense(chat_history)
 		summ_start = "Summary of prior conversation:\n"
-		lim = 480 if self.premium >= 2 else 120
 		for i in (0,):
 			if (tc := len(self.gpttokens(v))) > lim + 16:
 				if tc > lim * 2 or (tc > lim * 1.5 and self.premium >= 2):
