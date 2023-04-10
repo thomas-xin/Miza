@@ -1455,7 +1455,7 @@ class Bot:
 				temperature=0.7,
 				top_p=0.9,
 				stop=stop,
-				max_tokens=min(2048, 4000 - len(self.gpttokens(data)),
+				max_tokens=min(2048, 4000 - len(self.gpttokens(data))),
 				model="gpt-3.5-turbo",
 				user=str(random.randint(0, 4294967295)),
 			)
@@ -1501,7 +1501,7 @@ class Bot:
 				temperature=0.7,
 				top_p=0.9,
 				stop=stop,
-				max_tokens=min(2048, 4000 - len(self.gpttokens(data)),
+				max_tokens=min(2048, 4000 - len(self.gpttokens(data))),
 				model="gpt-3.5-turbo",
 				user=str(random.randint(0, 4294967295)),
 			)
