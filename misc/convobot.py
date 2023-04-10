@@ -1403,7 +1403,7 @@ class Bot:
 			chatgpt.timestamp = 0
 		return res
 
-	vis_c = vis_r = 0
+	vis_s = vis_c = vis_r = 0
 	def vai(self, q, stop=None):
 		if not self.vis_s or self.vis_r > time.time():
 			return ""
