@@ -768,10 +768,13 @@ class Bot:
 				else:
 					openai.api_key = self.key
 					costs = 1
-				resp = openai.Moderation.create(
-					q,
-				)
-				flagged = resp["results"][0]["flagged"]
+				try:
+					resp = openai.Moderation.create(
+						q,
+					)
+					flagged = resp["results"][0]["flagged"]
+				except:
+					flagged = False
 				if flagged:
 					print(resp)
 					text = "!"
@@ -1072,10 +1075,13 @@ class Bot:
 					ok = openai.api_key
 					if not i and random.randint(0, 1) and model == "gpt-3.5-turbo" and not self.nsfw and not self.jailbroken and (not chat_history or len(self.gpttokens(q)) > 8):
 						prompt = "".join(reversed(ins))
-						resp = openai.Moderation.create(
-							prompt,
-						)
-						flagged = resp["results"][0]["flagged"]
+						try:
+							resp = openai.Moderation.create(
+								prompt,
+							)
+							flagged = resp["results"][0]["flagged"]
+						except:
+							flagged = False
 						if not flagged:
 							if nstart:
 								ns2 = "Assume y" + nstart[1:] + "\n"
@@ -1151,10 +1157,13 @@ class Bot:
 					text += " " + t2
 					cost += c2
 				if not self.jailbroken and self.nsfw:
-					resp = openai.Moderation.create(
-						text,
-					)
-					self.jailbroken = resp["results"][0]["flagged"]
+					try:
+						resp = openai.Moderation.create(
+							text,
+						)
+						self.jailbroken = resp["results"][0]["flagged"]
+					except:
+						pass
 				break
 			if response:
 				cost += response["usage"]["prompt_tokens"] * cm * costs
