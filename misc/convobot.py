@@ -1677,8 +1677,9 @@ class Bot:
 			if (tc := len(self.gpttokens(v))) > lim + 16:
 				if tc > lim * 2 or (tc > lim * 1.5 and self.premium >= 2):
 					try:
-						prompt = f'"""\n{v}\n"""\n\nSummarise the above into a paragraph, keeping most important parts. Do not be repetitive!'
-						v2 = self.au(prompt)[0]
+						prompt = f'"""\n{v}\n"""\n\nSummarise the above into a paragraph, keeping most important parts. Do not be repetitive or continue the text!'
+						func = self.au if not self.jailbroken else self.cgp
+						v2 = func(prompt)[0]
 						if len(self.gpttokens(v2)) < 16:
 							raise ValueError(v2)
 						if v2[0] == v2[-1] == '"':
