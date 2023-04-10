@@ -641,7 +641,7 @@ class Bot:
 		if start:
 			ns += " " + start.strip()
 		lines.append(ns)
-		longer = req_long(q)
+		longer = False
 		cm2 = None
 		if self.premium < 0:
 			if not res and not start and q.count(" ") < 2:
@@ -659,6 +659,7 @@ class Bot:
 			temp = 0.8
 			limit = 3000
 			cm = 200
+			longer = True
 		elif self.premium < 4:
 			model = "gpt-3.5-turbo"
 			temp = 0.9
