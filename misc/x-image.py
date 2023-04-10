@@ -2418,6 +2418,7 @@ def CBAI(inputs):
 	personality = inputs["personality"]
 	premium = inputs["premium"]
 	summary = inputs["summary"]
+	jb = inputs["jb"]
 	history = inputs["history"]
 	refs = inputs["refs"]
 	im = inputs["im"]
@@ -2444,6 +2445,8 @@ def CBAI(inputs):
 		cb.vis_s = vis
 		for t in history:
 			cb.append(t)
+		if jb:
+			cb.jailbroken = jb
 	else:
 		cb.premium = premium
 	cb.bl = bl
