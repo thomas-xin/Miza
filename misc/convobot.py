@@ -1333,7 +1333,7 @@ class Bot:
 		if not chatgpt or time.time() - getattr(chatgpt, "rate", 0) < 0:
 			return ""
 		async def run_chatgpt(q, fut=None):
-			if not hasattr(chatgpt, "ask_stream") or time.time() - chatgpt.timestamp >= 3600:
+			if not hasattr(chatgpt, "ask_stream") or time.time() - getattr(chatgpt, "timestamp", 0) >= 3600:
 				try:
 					from chatgpt_wrapper import AsyncChatGPT
 				except ImportError:
