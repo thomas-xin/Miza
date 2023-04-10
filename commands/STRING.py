@@ -1384,6 +1384,10 @@ class Ask(Command):
                     if name == bot.name:
                         name = bot.name + "2"
             summary = bot.data.chat_histories.get(channel.id)
+            if isinstance(summary, list):
+                summary, jb = summary
+            else:
+                jb = False
             if reset:
                 summary = None
             if bot.is_trusted(guild) >= 2:
@@ -1406,6 +1410,7 @@ class Ask(Command):
                 personality=bot.commands.personality[0].retrieve((channel or guild).id),
                 premium=premium,
                 summary=summary,
+                jb=jb,
                 history=history,
                 refs=refs,
                 im=im,
@@ -1492,7 +1497,7 @@ class Ask(Command):
                     emb.description = (
                         f"Uh-oh, it appears your API key credit was blocked! Please make sure your payment methods are functional, or buy a consistent subscription [here]({bot.kofi_url})!"
                     )
-            caic = await process_image("lambda cid: CBOTS[cid].summary", "$", [channel.id], fix=1)
+            caic = await process_image("lambda cid: [(b := CBOTS[cid]).summary, b.jailbroken]", "$", [channel.id], fix=1)
             if caic:
                 bot.data.chat_histories[channel.id] = caic
             else:
