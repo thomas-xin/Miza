@@ -1655,6 +1655,7 @@ class UpdateChatHistories(Database):
             return
         if message.reference.message_id != after.id:
             return
+        caids = list(getattr(message, "caids", []))
         caids.extend(getattr(message.reference.cached_message, "caids", []))
         print("Editing", channel)
         await process_image("lambda cid, caids: CBOTS[cid].deletes(caids)", "$", [channel.id, caids], fix=1)
@@ -1683,6 +1684,7 @@ class UpdateChatHistories(Database):
             return
         if message.reference.message_id != after.id:
             return
+        caids = list(getattr(message, "caids", []))
         caids.extend(getattr(message.reference.cached_message, "caids", []))
         print("Deleting", channel)
         await process_image("lambda cid, caids: CBOTS[cid].deletes(caids)", "$", [channel.id, caids], fix=1)
