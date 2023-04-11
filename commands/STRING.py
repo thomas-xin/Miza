@@ -1558,10 +1558,10 @@ class Ask(Command):
         hist = bot.data.chat_histories.get(channel.id, ())
         if len(hist) > 2 and isinstance(hist, list):
             mi2 = hist[2]
-        with tracebacksuppressor:
-            m2 = await bot.fetch_message(mi2, channel)
-            if m2:
-                await self.remove_reacts(m2)
+            with tracebacksuppressor:
+                m2 = await bot.fetch_message(mi2, channel)
+                if m2:
+                    await self.remove_reacts(m2)
         caic = await process_image("lambda cid: [(b := CBOTS[cid]).summary, b.jailbroken]", "$", [channel.id], fix=1)
         if caic:
             caic.append(m.id)
