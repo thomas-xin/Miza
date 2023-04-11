@@ -1137,7 +1137,7 @@ class Bot:
 					print(response)
 					role = m["role"]
 					text = m["content"].removeprefix(f"{self.name} says: ").removeprefix(f"{self.name}: ").strip()
-					if len(text) >= 2 and text[-1] == " " and text[-2] not in ".!?" or text.endswith(' "') or text.endswith('\n"'):
+					if len(text) >= 2 and text[-1] in " aA" and text[-2] not in ".!?" or text.endswith(' "') or text.endswith('\n"'):
 						redo = True
 					text = text.strip()
 					if not text or len(self.gpttokens(text)) < 8:
@@ -1647,7 +1647,7 @@ class Bot:
 		summ_start = "Summary of prior conversation:\n"
 		if chat_history and chat_history[0][1].startswith(summ_start):
 			chat_history[0] = (chat_history[0][0], chat_history[0][1][len(summ_start):].strip())
-		summ_next = "[SYSTEM]:"
+		summ_next = "[SYSTEM]"
 		if chat_history and chat_history[0][0].startswith(summ_next):
 			chat_history[0] = (chat_history[0][0][len(summ_next):].strip(), chat_history[0][1])
 		lines = []
