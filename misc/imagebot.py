@@ -459,7 +459,7 @@ class Bot:
 
 	def art_stablediffusion_local(self, prompt, kwargs=None):
 		from diffusers import StableDiffusionPipeline
-		pipe = getattr(self.__class__, "_sdp", None)
+		pipe = torch.cuda.is_available() and getattr(self.__class__, "_sdp", None)
 		if pipe == False:
 			return
 		if not pipe:

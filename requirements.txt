@@ -1,3 +1,4 @@
+accelerate>=0.18.0
 akinator>=1.0.3
 antlr4-python3-runtime>=4.12.0
 asyncio>=3.4.3
