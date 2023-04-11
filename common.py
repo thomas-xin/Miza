@@ -267,10 +267,11 @@ class TracebackSuppressor(contextlib.AbstractContextManager, contextlib.Abstract
             for exception in self.exceptions:
                 if issubclass(type(exc_value), exception):
                     return True
-            try:
-                raise exc_value
-            except:
-                print_exc()
+            print_exc()
+            # try:
+            #     raise exc_value
+            # except:
+            #     print_exc()
         return True
 
     def __aexit__(self, *args):

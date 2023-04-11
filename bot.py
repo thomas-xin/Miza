@@ -1121,7 +1121,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
     def create_progress_bar(self, length, ratio=0.5):
         if "emojis" in self.data:
-            return create_future(self.data.emojis.create_progress_bar, length, ratio)
+            with tracebacksuppressor:
+                return create_future(self.data.emojis.create_progress_bar, length, ratio)
         position = min(length, round(length * ratio))
         return as_fut("⬜" * position + "⬛" * (length - position))
 

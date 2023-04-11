@@ -2536,6 +2536,16 @@ def IBAOL(prompt, url, kwargs, key=None):
 		ib.token = key
 	return ib.openjourney_local(url, kwargs)
 
+def IBASL(prompt, url, kwargs, key=None):
+	import imagebot
+	try:
+		ib = CBOTS[None]
+	except KeyError:
+		ib = CBOTS[None] = imagebot.Bot(token=key)
+	if key:
+		ib.token = key
+	return ib.stablediffusion_local(url, kwargs)
+
 
 def write_to(fn, data):
 	with open(fn, "wb") as f:

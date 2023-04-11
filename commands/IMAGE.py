@@ -1585,6 +1585,10 @@ class Art(Command):
             try:
                 dalle2 = name.startswith("dalle")
                 openjourney = "journey" in name
+                if not dalle2 and not openjourney and not specified:
+                    fn = await process_image("IBAOL", "$", [prompt, kwargs], fix=2, timeout=1200)
+                    if fn:
+                        raise StopIteration
                 if dalle2 and premium < 4:
                     raise PermissionError("Premium subscription required to perform DALL·E 2 operations.")
                 if bot.is_trusted(guild) >= 2:
@@ -1627,6 +1631,8 @@ class Art(Command):
                                     "Uh-oh, it appears your tokens have run out! Check ~wallet to view your balance, top up using a donation [here]({bot.kofi_url}), "
                                     + "or purchase a subscription to gain temporary unlimited usage!"
                                 )
+            except StopIteration:
+                pass
             except PermissionError:
                 raise
             except:
@@ -1788,17 +1794,6 @@ class Art(Command):
                                 force_kill(proc)
                             raise
                         fn = "misc/stable_diffusion.openvino/output.png"
-        # if not random.randint(0, 16) and premium < 2:
-        #     emb = discord.Embed(colour=rand_colour())
-        #     emb.set_author(**get_author(bot.user))
-        #     emb.description = (
-        #         "Looking for Dall·E 2 image synthesis?\n"
-        #         + "Unfortunately the service for it had to be cut short, as the API services were too expensive for my creator to keep up given the size of my audience.\n"
-        #         + f"However, if you would still wish to use the service for your user or server, it is available for subscription [here]({bot.kofi_url}), to help fund API usage!\n"
-        #         + "Any support is greatly appreciated!"
-        #     )
-        # else:
-        #     emb = None
         if isinstance(fn, str):
             with open(fn, "rb") as f:
                 fn = f.read()

@@ -441,7 +441,7 @@ class Bot:
 		from diffusers import StableDiffusionPipeline
 		if not any(w in prompt for w in ("style", "stylised", "stylized")):
 			prompt += ", mdjrny-v4 style"
-		pipe = getattr(self.__class__, "ojp", None)
+		pipe = getattr(self.__class__, "_ojp", None)
 		if not pipe:
 			pipe = StableDiffusionPipeline.from_pretrained("prompthero/openjourney", torch_dtype=torch.float32)
 			try:
@@ -449,11 +449,36 @@ class Bot:
 			except:
 				pass
 			pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
-			self.__class__.ojp = pipe
+			self.__class__._ojp = pipe
 		im = pipe(prompt).images[0]
 		b = io.BytesIO()
 		im.save(b, format="png")
 		print("OpenjourneyL:", b)
+		b.seek(0)
+		return b.read()
+
+	def art_stablediffusion_local(self, prompt, kwargs=None):
+		from diffusers import StableDiffusionPipeline
+		pipe = getattr(self.__class__, "_sdp", None)
+		if pipe == False:
+			return
+		if not pipe:
+			try:
+				pipe = StableDiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-2-1", torch_dtype=torch.float16)
+				from diffusers import DPMSolverMultistepScheduler
+				pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+				pipe = pipe.to("cuda")
+			except:
+				self._sdp = False
+				print_exc()
+				print("StablediffusionL: CUDA f16 init failed")
+				return
+			pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
+			self.__class__._sdp = pipe
+		im = pipe(prompt).images[0]
+		b = io.BytesIO()
+		im.save(b, format="png")
+		print("StablediffusionL:", b)
 		b.seek(0)
 		return b.read()
 
