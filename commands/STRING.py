@@ -1384,7 +1384,7 @@ class Ask(Command):
                         name = bot.name + "2"
             summary = bot.data.chat_histories.get(channel.id)
             if isinstance(summary, list):
-                summary, jb = summary
+                summary, jb, *irr = summary
             else:
                 jb = False
             if reset:
@@ -1556,7 +1556,7 @@ class Ask(Command):
         if caids:
             m.caids = caids
         hist = bot.data.chat_histories.get(channel.id, ())
-        if len(hist) > 2:
+        if len(hist) > 2 and isinstance(hist, list):
             mi2 = hist[2]
         with tracebacksuppressor:
             m2 = await bot.fetch_message(mi2, channel)
@@ -1593,6 +1593,8 @@ class Ask(Command):
             bot.data.users.update(user.id)
             return await message.edit(embeds=())
         hist = bot.data.chat_histories.get(channel.id, ())
+        if not isinstance(hist, list):
+            hist = [hist]
         if r == "🔄":
             if len(hist) <= 2 or hist[2] != message.id:
                 await self.remove_reacts(message)
@@ -1640,6 +1642,8 @@ class UpdateChatHistories(Database):
         ask = bot.commands.ask[0]
         channel = after.channel
         hist = bot.data.chat_histories.get(channel.id, ())
+        if not isinstance(hist, list):
+            return
         if len(hist) <= 2:
             return
         try:
@@ -1666,6 +1670,8 @@ class UpdateChatHistories(Database):
         after = message
         channel = after.channel
         hist = bot.data.chat_histories.get(channel.id, ())
+        if not isinstance(hist, list):
+            return
         if len(hist) <= 2:
             return
         try:

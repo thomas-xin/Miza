@@ -5558,7 +5558,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     fut = None
                 await self.seen(after.author, after.channel, after.guild, event="message", raw="Editing a message")
                 if fut:
-                    await fut
+                    with tracebacksuppressor:
+                        await fut
                 await self.handle_message(after)
 
         # Message delete event: uses raw payloads rather than discord.py message cache. calls _delete_ bot database event.
