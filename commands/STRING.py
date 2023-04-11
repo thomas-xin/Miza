@@ -1601,7 +1601,7 @@ class Ask(Command):
                 caids.extend(getattr(m, "caids", []))
             else:
                 m = None
-            print("Resetting", caids)
+            print("Redoing", channel)
             await process_image("lambda cid, caids: CBOTS[cid].deletes(caids)", "$", [channel.id, caids], fix=1)
             colour = await bot.get_colour(bot.user)
             emb = discord.Embed(colour=colour, description=css_md("[This message has been reset.]"))
@@ -1631,6 +1631,57 @@ class Ask(Command):
 
 class UpdateChatHistories(Database):
     name = "chat_histories"
+
+    async def _edit_(self, before, after, **void):
+        bot = self.bot
+        ask = bot.commands.ask[0]
+        channel = after.channel
+        m_id = getattr(ask.last.get(channel.id), "id", None)
+        if not m_id:
+            return
+        try:
+            message = await bot.fetch_message(m_id, channel)
+        except:
+            print_exc()
+            return
+        if not getattr(message, "reference", None):
+            return
+        if message.reference.message_id != after.id:
+            return
+        caids.extend(getattr(message.reference.cached_message, "caids", []))
+        print("Editing", channel)
+        await process_image("lambda cid, caids: CBOTS[cid].deletes(caids)", "$", [channel.id, caids], fix=1)
+        colour = await bot.get_colour(bot.user)
+        emb = discord.Embed(colour=colour, description=css_md("[This message has been reset.]"))
+        emb.set_author(**get_author(bot.user))
+        create_task(message.edit(embed=emb))
+        await message.add_reaction("❎")
+
+    async def _delete_(self, message, **void):
+        bot = self.bot
+        ask = bot.commands.ask[0]
+        after = message
+        channel = after.channel
+        m_id = getattr(ask.last.get(channel.id), "id", None)
+        if not m_id:
+            return
+        try:
+            message = await bot.fetch_message(m_id, channel)
+        except:
+            print_exc()
+            return
+        if not getattr(message, "reference", None):
+            return
+        if message.reference.message_id != after.id:
+            return
+        caids.extend(getattr(message.reference.cached_message, "caids", []))
+        print("Deleting", channel)
+        await process_image("lambda cid, caids: CBOTS[cid].deletes(caids)", "$", [channel.id, caids], fix=1)
+        colour = await bot.get_colour(bot.user)
+        emb = discord.Embed(colour=colour, description=css_md("[This message has been reset.]"))
+        emb.set_author(**get_author(bot.user))
+        create_task(message.edit(embed=emb))
+        await message.add_reaction("❎")
 
 
 class Personality(Command):

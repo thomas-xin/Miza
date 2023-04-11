@@ -5553,8 +5553,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 if "users" in self.data:
                     self.data.users.add_xp(after.author, xrand(1, 4))
                 if getattr(after, "guild", None):
-                    create_task(self.send_event("_edit_", before=before, after=after))
+                    fut = create_task(self.send_event("_edit_", before=before, after=after))
+                else:
+                    fut = None
                 await self.seen(after.author, after.channel, after.guild, event="message", raw="Editing a message")
+                if fut:
+                    await fut
                 await self.handle_message(after)
 
         # Message delete event: uses raw payloads rather than discord.py message cache. calls _delete_ bot database event.
