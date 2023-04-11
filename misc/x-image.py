@@ -2526,7 +2526,7 @@ def caption(im, q=None, cid=None):
 	p2 = m.config.id2label[idx].strip()
 	return (p1, p2)
 
-def IBAOL(prompt, url, kwargs, key=None):
+def IBAOL(prompt, kwargs, key=None):
 	import imagebot
 	try:
 		ib = CBOTS[None]
@@ -2534,9 +2534,9 @@ def IBAOL(prompt, url, kwargs, key=None):
 		ib = CBOTS[None] = imagebot.Bot(token=key)
 	if key:
 		ib.token = key
-	return ib.openjourney_local(url, kwargs)
+	return ib.openjourney_local(prompt, kwargs)
 
-def IBASL(prompt, url, kwargs, key=None):
+def IBASL(prompt, kwargs, key=None):
 	import imagebot
 	try:
 		ib = CBOTS[None]
@@ -2544,7 +2544,7 @@ def IBASL(prompt, url, kwargs, key=None):
 		ib = CBOTS[None] = imagebot.Bot(token=key)
 	if key:
 		ib.token = key
-	return ib.stablediffusion_local(url, kwargs)
+	return ib.stablediffusion_local(prompt, kwargs)
 
 
 def write_to(fn, data):

@@ -1586,7 +1586,7 @@ class Art(Command):
                 dalle2 = name.startswith("dalle")
                 openjourney = "journey" in name
                 if not dalle2 and not openjourney and not specified:
-                    fn = await process_image("IBAOL", "$", [prompt, kwargs], fix=2, timeout=1200)
+                    fn = await process_image("IBASL", "$", [prompt, kwargs], fix=2, timeout=1200)
                     if fn:
                         raise StopIteration
                 if dalle2 and premium < 4:
