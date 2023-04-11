@@ -1185,7 +1185,7 @@ class Match(Command):
 
 class Ask(Command):
     _timeout_ = 24
-    alias = ["GPT2", "GPT3", "GPT4"]
+    alias = ["GPT", "GPT2", "GPT3", "GPT4"]
     description = "Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. For premium tier chatbots, check using ~serverinfo, or apply with ~premium!"
     usage = "<string>"
     example = ("ask what's the date?", "ask what is the square root of 3721?", "ask can I have a hug?")

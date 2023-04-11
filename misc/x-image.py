@@ -2534,7 +2534,7 @@ def IBAOL(prompt, kwargs, key=None):
 		ib = CBOTS[None] = imagebot.Bot(token=key)
 	if key:
 		ib.token = key
-	return ib.openjourney_local(prompt, kwargs)
+	return ib.art_openjourney_local(prompt, kwargs)
 
 def IBASL(prompt, kwargs, key=None):
 	import imagebot
@@ -2544,7 +2544,7 @@ def IBASL(prompt, kwargs, key=None):
 		ib = CBOTS[None] = imagebot.Bot(token=key)
 	if key:
 		ib.token = key
-	return ib.stablediffusion_local(prompt, kwargs)
+	return ib.art_stablediffusion_local(prompt, kwargs)
 
 
 def write_to(fn, data):
