@@ -1194,7 +1194,6 @@ class Ask(Command):
     rate_limit = (12, 16)
     slash = True
 
-    last = {}
     reset = {}
     analysed = {}
 
@@ -1497,11 +1496,6 @@ class Ask(Command):
                     emb.description = (
                         f"Uh-oh, it appears your API key credit was blocked! Please make sure your payment methods are functional, or buy a consistent subscription [here]({bot.kofi_url})!"
                     )
-            caic = await process_image("lambda cid: [(b := CBOTS[cid]).summary, b.jailbroken]", "$", [channel.id], fix=1)
-            if caic:
-                bot.data.chat_histories[channel.id] = caic
-            else:
-                bot.data.chat_histories.pop(channel.id)
         if not bl:
             print("Result:", out)
         code = "\xad"
@@ -1561,10 +1555,19 @@ class Ask(Command):
         m.replaceable = False
         if caids:
             m.caids = caids
-        m2 = self.last.get(channel.id)
-        if m2:
-            await self.remove_reacts(m2)
-        self.last[channel.id] = m
+        hist = bot.data.chat_histories.get(channel.id, ())
+        if len(hist) > 2:
+            mi2 = hist[2]
+        with tracebacksuppressor:
+            m2 = await bot.fetch_message(mi2, channel)
+            if m2:
+                await self.remove_reacts(m2)
+        caic = await process_image("lambda cid: [(b := CBOTS[cid]).summary, b.jailbroken]", "$", [channel.id], fix=1)
+        if caic:
+            caic.append(m.id)
+            bot.data.chat_histories[channel.id] = caic
+        else:
+            bot.data.chat_histories.pop(channel.id)
         m._react_callback_ = self._callback_
         bot.add_message(m, files=False, force=True)
         return m
@@ -1589,8 +1592,9 @@ class Ask(Command):
             bot.data.users.setdefault(user.id, {})["opt_out"] = utc()
             bot.data.users.update(user.id)
             return await message.edit(embeds=())
+        hist = bot.data.chat_histories.get(channel.id, ())
         if r == "🔄":
-            if getattr(self.last.get(channel.id), "id", None) != message.id:
+            if len(hist) <= 2 or hist[2] != message.id:
                 await self.remove_reacts(message)
                 raise IndexError("Only resetting the last message is possible.")
             caids = list(getattr(message, "caids", []))
@@ -1619,7 +1623,6 @@ class Ask(Command):
             print("Resetting", channel)
             bot.data.chat_histories.pop(channel.id, None)
             self.reset[channel.id] = True
-            self.last.pop(channel.id, None)
             colour = await bot.get_colour(bot.user)
             emb = discord.Embed(colour=colour, description=css_md("[The conversation has been reset.]"))
             emb.set_author(**get_author(bot.user))
@@ -1636,11 +1639,11 @@ class UpdateChatHistories(Database):
         bot = self.bot
         ask = bot.commands.ask[0]
         channel = after.channel
-        m_id = getattr(ask.last.get(channel.id), "id", None)
-        if not m_id:
+        hist = bot.data.chat_histories.get(channel.id, ())
+        if len(hist) <= 2:
             return
         try:
-            message = await bot.fetch_message(m_id, channel)
+            message = await bot.fetch_message(hist[2], channel)
         except:
             print_exc()
             return
@@ -1662,11 +1665,11 @@ class UpdateChatHistories(Database):
         ask = bot.commands.ask[0]
         after = message
         channel = after.channel
-        m_id = getattr(ask.last.get(channel.id), "id", None)
-        if not m_id:
+        hist = bot.data.chat_histories.get(channel.id, ())
+        if len(hist) <= 2:
             return
         try:
-            message = await bot.fetch_message(m_id, channel)
+            message = await bot.fetch_message(hist[2], channel)
         except:
             print_exc()
             return
@@ -1713,8 +1716,7 @@ class Personality(Command):
         self.description = f"Customises {bot.name}'s personality for ~ask in the current server. Will attempt to use the highest available GPT-family tier; see {bot.kofi_url} for more info. Experimental long descriptions are now supported."
         if "chat" in name:
             bot.data.chat_histories.pop(channel.id, None)
-            bot.commands.ask[0].reset[channel.id] = True
-            bot.commands.ask[0].last.pop(channel.id, None)
+            bot.commands.ask[0].reset[channel.id] = Truee)
             return css_md(f"Conversations for {sqr_md(channel)} have been reset.")
         if not AUTH.get("openai_key"):
             raise ModuleNotFoundError("No OpenAI key found for customisable personality.")
@@ -1722,7 +1724,6 @@ class Personality(Command):
             bot.data.personalities.pop(channel.id, None)
             bot.data.chat_histories.pop(channel.id, None)
             bot.commands.ask[0].reset[channel.id] = True
-            bot.commands.ask[0].last.pop(channel.id, None)
             return css_md(f"My personality for {sqr_md(channel)} has been reset.")
         if not argv:
             p = self.decode(self.retrieve(channel.id))
@@ -1751,7 +1752,6 @@ class Personality(Command):
         bot.data.personalities[channel.id] = p
         bot.data.chat_histories.pop(channel.id, None)
         bot.commands.ask[0].reset[channel.id] = True
-        bot.commands.ask[0].last.pop(channel.id, None)
         return css_md(f"My personality description for {sqr_md(channel)} has been changed to {sqr_md(p)}.")
 
 
