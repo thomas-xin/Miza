@@ -1073,7 +1073,7 @@ class Bot:
 						openai.api_key = self.key
 						costs = 1
 					ok = openai.api_key
-					if not i and random.randint(0, 1) and model == "gpt-3.5-turbo" and not self.nsfw and not self.jailbroken and (not chat_history or len(self.gpttokens(q)) > 8):
+					if not i and model == "gpt-3.5-turbo" and not self.nsfw and not self.jailbroken and (not chat_history or len(self.gpttokens(q)) > 8):
 						prompt = "".join(reversed(ins))
 						try:
 							resp = openai.Moderation.create(
