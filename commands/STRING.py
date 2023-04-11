@@ -1716,7 +1716,7 @@ class Personality(Command):
         self.description = f"Customises {bot.name}'s personality for ~ask in the current server. Will attempt to use the highest available GPT-family tier; see {bot.kofi_url} for more info. Experimental long descriptions are now supported."
         if "chat" in name:
             bot.data.chat_histories.pop(channel.id, None)
-            bot.commands.ask[0].reset[channel.id] = Truee)
+            bot.commands.ask[0].reset[channel.id] = True
             return css_md(f"Conversations for {sqr_md(channel)} have been reset.")
         if not AUTH.get("openai_key"):
             raise ModuleNotFoundError("No OpenAI key found for customisable personality.")
