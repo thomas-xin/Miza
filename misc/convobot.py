@@ -1491,7 +1491,7 @@ class Bot:
 		resp = list(resp)
 		if stop:
 			for s in stop:
-				resp[0] = resp[0].split(s, None)
+				resp[0] = resp[0].split(s, 1)[0]
 		return resp[0] if force else resp
 
 	def ai(self, u, q, refs=(), im=None):
