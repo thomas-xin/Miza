@@ -776,92 +776,49 @@ class Bot:
 					flagged = False
 				if flagged:
 					print(resp)
-					text = "!"
+					text = "2."
 				resp = None
-				q2 = 'Regarding the above context: Say "@" if you have a definite answer, "!" if inappropriate, "%" followed by query if maths question, else formulate as google search prepended with "$"'
-				# if not text and random.randint(0, 1):
-					# q4 = f'Previous context:\n{messages[-2]["content"]}\n\n' if len(messages) > 2 and messages[-2]["content"] else ""
-					# q3 = "For the below question: " + q2 + ".\n" + q
-					# try:
-					# 	text = self.chatgpt(q3)
-					# except:
-					# 	print_exc()
-					# else:
-					# 	if text and text[0] not in "@!%$" and "(!)" in text:
-					# 		text = "!"
+				q2 = "Classify the above into:\n1. Personal\n2. Inappropriate\n3. Maths\n4. Other"
+				q3 = f'"""\n{q}\n"""\n\n{q2}'
 				if not text:
-					mes = messages[-2:-1]
-					m = dict(role="user", content='"""\n' + messages[-1]["content"] + '\n"""\n\n' + q2)
-					mes.append(m)
-					dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
-					m = dict(role="system", content=f"Current time: {dtn}")
-					mes.insert(0, m)
-					stop = ["@", "AI language model"]
-					try:
-						data = dict(
-							messages=[dict(role=m["role"], content=m["content"]) for m in mes],
-							temperature=0,
-							top_p=0,
-							max_tokens=32,
-							stop=stop,
-							model="gpt-3.5-turbo",
-							user=str(hash(u)),
-						)
-						text = self.ycg(data) or "@"
-					except EOFError:
-						pass
-					except:
-						print_exc()
-				if not text:
-					for i in range(3):
-						try:
-							resp = exc.submit(
-								openai.ChatCompletion.create,
-								messages=mes,
-								temperature=0,
-								top_p=0,
-								max_tokens=32,
-								stop=stop,
-								model="gpt-3.5-turbo",
-								user=str(hash(u)),
-							).result(timeout=8)
-						except concurrent.futures.TimeoutError:
-							print_exc()
-						else:
-							break
-					if resp:
-						cost += resp["usage"]["prompt_tokens"] * cm * costs
-						cost += resp["usage"].get("completion_tokens", 0) * (cm2 or cm) * costs
-						text = resp["choices"][0]["message"]["content"] or "@"
-			sname = "GOOGLE"
+					text = self.au(q3, stop=["1"], force=True)
+			sname = None
 			nohist = False
 			if text:
-				if text.startswith("%"):
+				if text.startswith("3"):
 					stype = "3"
 					sname = "WOLFRAMALPHA"
 					nohist = True
-				else:
+				elif text.startswith("4"):
 					stype = random.randint(0, 2)
 					sname = ("GOOGLE", "BING", "YAHOO")[stype]
-				print(sname.capitalize(), "search:", text)
-			if text and text.startswith("!"):
+				if sname:
+					print(sname.capitalize(), "search:", text)
+			if text and text.startswith("2"):
 				flagged = True
-			elif text and text.startswith("$"):
-				t2 = text.strip("$").strip()
-				if t2:
-					for i in range(3):
-						try:
-							res = exc.submit(
-								getattr(self, sname.lower()),
-								t2,
-								raw=True,
-							).result(timeout=8)
-						except concurrent.futures.TimeoutError:
-							print_exc()
-						else:
-							break
-			elif text and text.startswith("%"):
-				t2 = text.strip("%").strip()
+			elif text and text.startswith("4"):
+				t2 = f'"""\n{q}\n"""\n\nRegarding above context: Formulate a search engine query for knowledge if relevant, else say "!"'
+				for i in range(3):
+					try:
+						t3 = self.au(t2, force=True)
+						if not t3 or t3 in ("!", '"!"'):
+							t3 = lim_tokens(q, 16)
+						elif t3[0] == t3[-1] == '"':
+							try:
+								t3 = orjson.loads(t3)
+							except orjson.JSONDecodeError:
+								pass
+						res = exc.submit(
+							getattr(self, sname.lower()),
+							t3,
+							raw=True,
+						).result(timeout=8)
+					except concurrent.futures.TimeoutError:
+						print_exc()
+					else:
+						break
+			elif text and text.startswith("3"):
+				t2 = lim_tokens(q, 64)
 				if t2:
 					for i in range(3):
 						try:
@@ -1520,7 +1477,7 @@ class Bot:
 				text = resp["choices"][0]["message"]["content"]
 				return text, cost, uoai
 
-	def au(self, prompt, stop=None):
+	def au(self, prompt, stop=None, force=False):
 		funcs = [self.chatgpt, self.vai, self.ycg, self.cgp, self.cgp, self.cgp]
 		random.shuffle(funcs)
 		resp = None
@@ -1535,7 +1492,7 @@ class Bot:
 		if stop:
 			for s in stop:
 				resp[0] = resp[0].split(s, None)
-		return resp
+		return resp[0] if force else resp
 
 	def ai(self, u, q, refs=(), im=None):
 		tup = (u, q)
