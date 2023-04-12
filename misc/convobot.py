@@ -819,6 +819,7 @@ class Bot:
 						break
 			elif text and text.startswith("3"):
 				t2 = lim_tokens(q, 64)
+				print("Test:", t2)
 				if t2:
 					for i in range(3):
 						try:
@@ -834,7 +835,7 @@ class Bot:
 				messages = [messages[0], messages[-2], messages[-1]]
 			if res:
 				if len(self.gpttokens(res)) > 512:
-					summ = self.auto_summarise(q=q + "\n" + res, max_length=500, min_length=384).replace("\n", ". ").replace(": ", " -").strip()
+					res = self.auto_summarise(q=q + "\n" + res, max_length=500, min_length=384).replace("\n", ". ").replace(": ", " -").strip()
 				if res:
 					m = dict(role="system", name=sname, content=res.strip())
 					pc += len(self.gpttokens(m["role"], model))
