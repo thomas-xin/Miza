@@ -1240,49 +1240,37 @@ class Ask(Command):
             premium = 4
         elif premium > 3:
             premium = 3
-        h = await process_image("lambda cid: bool(CBOTS.get(cid))", "$", [channel.id], fix=1)
+        reset = True
+        caid = bot.data.chat_histories.get(channel.id, None)
+        if not isinstance(caid, dict):
+            caid = None
         history = []
-        reset = False
-        if not self.reset.get(channel.id, None):
-            if not h:
-                if not getattr(message, "simulated", False) and not bot.data.chat_histories.get(channel.id):
-                    async for m in bot.history(channel, limit=12):
-                        if m.id == message.id:
-                            continue
-                        if m.content:
-                            if m.author.id == bot.id:
-                                name = bot.name
-                            else:
-                                name = m.author.display_name
-                                if name == bot.name:
-                                    name = m.author.name
-                                    if name == bot.name:
-                                        name = bot.name + "2"
-                            t = (name, unicode_prune(m.content))
-                            history.insert(0, t)
-                if not q:
-                    q = "Hi!"
-            else:
-                t = await process_image("lambda cid: CBOTS.get(cid).timestamp", "$", [channel.id], fix=1)
-                if utc() - t > 28800:
-                    async for m in bot.history(channel, limit=12):
-                        if m.id == message.id:
-                            continue
-                        if m.content:
-                            if m.author.id == bot.id:
-                                break
-                            else:
-                                name = m.author.display_name
-                                if name == bot.name:
-                                    name = m.author.name
-                                    if name == bot.name:
-                                        name = bot.name + "2"
-                            t = (name, unicode_prune(m.content))
-                            history.insert(0, t)
+        if not getattr(message, "simulated", False):
+            async for m in bot.history(channel, limit=12):
+                if m.id == message.id:
+                    continue
+                if reset:
+                    if caid and caid.get("last_message_id") == m.id:
+                        reset = None
                     else:
-                        reset = True
-                        if not q:
-                            q = "Hi!"
+                        reset = False
+                if caid and caid.get("first_message_id") == m.id:
+                    break
+                if m.content:
+                    if m.author.id == bot.id:
+                        name = bot.name
+                    else:
+                        name = m.author.display_name
+                        if name == bot.name:
+                            name = m.author.name
+                            if name == bot.name:
+                                name = bot.name + "2"
+                    t = (name, unicode_prune(m.content))
+                    history.insert(0, t)
+        else:
+            reset = None
+        if not q:
+            q = "Hi!"
         im = None
         fr = fm = None
         emb = None
@@ -1425,20 +1413,14 @@ class Ask(Command):
             tup = await process_image("CBAI", "$", [inputs], fix=1, timeout=420)
             out = tup[0]
             cost = 0
-            caids = ()
             uoai = None
             expapi = None
             if len(tup) > 1:
                 cost = tup[1]
                 if len(tup) > 2:
-                    caids = tup[2]
+                    uoai = tup[2]
                     if len(tup) > 3:
-                        uoai = tup[3]
-                        if len(tup) > 4:
-                            expapi = tup[4]
-            if caids:
-                message.caids = (caids.pop(0),)
-                # out = zwencode("zzz" + "z".join("".join(chr(ord(c) + 49) for c in str(i)) for i in caids) + "zzz")
+                        expapi = tup[3]
             if cost:
                 if "costs" in bot.data:
                     bot.data.costs.put(user.id, cost)
@@ -1500,7 +1482,6 @@ class Ask(Command):
             print("Result:", out)
         code = "\xad"
         reacts = []
-        # if caids:
         reacts.extend(("🔄", "🗑️"))
         if h and not emb and premium < 2 and (not random.randint(0, 32) or "AI language model" in out):
             oo = bot.data.users.get(user.id, {}).get("opt_out") or 0
@@ -1553,19 +1534,19 @@ class Ask(Command):
             await asyncio.sleep(0.25)
         m = await send_with_react(channel, code + s, embed=emb, reacts=reacts, reference=ref)
         m.replaceable = False
-        if caids:
-            m.caids = caids
         hist = bot.data.chat_histories.get(channel.id, ())
-        if len(hist) > 2 and isinstance(hist, list):
-            mi2 = hist[2]
-            with tracebacksuppressor:
-                m2 = await bot.fetch_message(mi2, channel)
-                if m2:
-                    await self.remove_reacts(m2)
+        if isinstance(hist, dict):
+            mi2 = hist.get("last_message_id")
+            if mi2:
+                with tracebacksuppressor:
+                    m2 = await bot.fetch_message(mi2, channel)
+                    if m2:
+                        await self.remove_reacts(m2)
+        # Syntax: Summary, Jailbroken
         caic = await process_image("lambda cid: [(b := CBOTS[cid]).summary, b.jailbroken]", "$", [channel.id], fix=1)
         if caic:
-            caic.append(m.id)
-            bot.data.chat_histories[channel.id] = caic
+            caid = dict(summary=caic[0], jailbroken=caic[1], last_message_id=m.id)
+            bot.data.chat_histories.setdefault(channel.id, {}).update(caid)
         else:
             bot.data.chat_histories.pop(channel.id)
         m._react_callback_ = self._callback_
@@ -1593,22 +1574,21 @@ class Ask(Command):
             bot.data.users.update(user.id)
             return await message.edit(embeds=())
         hist = bot.data.chat_histories.get(channel.id, ())
-        if not isinstance(hist, list):
-            hist = [hist]
+        if not isinstance(hist, dict):
+            return
         if r == "🔄":
-            if len(hist) <= 2 or hist[2] != message.id:
+            if hist.get("last_message_id") != message.id:
                 await self.remove_reacts(message)
                 raise IndexError("Only resetting the last message is possible.")
-            caids = list(getattr(message, "caids", []))
             if getattr(message, "reference", None):
                 m = message.reference.cached_message
                 if m.author.id != user.id and perm < 3:
                     return
-                caids.extend(getattr(m, "caids", []))
             else:
                 m = None
             print("Redoing", channel)
-            await process_image("lambda cid, caids: CBOTS[cid].deletes(caids)", "$", [channel.id, caids], fix=1)
+            # await process_image("lambda cid: CBOTS[cid].deletes()", "$", [channel.id], fix=1)
+            bot.data.chat_histories[channel.id] = None
             colour = await bot.get_colour(bot.user)
             emb = discord.Embed(colour=colour, description=css_md("[This message has been reset.]"))
             emb.set_author(**get_author(bot.user))
@@ -1623,8 +1603,7 @@ class Ask(Command):
                 if m.author.id != user.id and perm < 3:
                     return
             print("Resetting", channel)
-            bot.data.chat_histories.pop(channel.id, None)
-            self.reset[channel.id] = True
+            bot.data.chat_histories[channel.id] = dict(first_message_id=message.id)
             colour = await bot.get_colour(bot.user)
             emb = discord.Embed(colour=colour, description=css_md("[The conversation has been reset.]"))
             emb.set_author(**get_author(bot.user))
@@ -1655,10 +1634,9 @@ class UpdateChatHistories(Database):
             return
         if message.reference.message_id != after.id:
             return
-        caids = list(getattr(message, "caids", []))
-        caids.extend(getattr(message.reference.cached_message, "caids", []))
         print("Editing", channel)
-        await process_image("lambda cid, caids: CBOTS[cid].deletes(caids)", "$", [channel.id, caids], fix=1)
+        # await process_image("lambda cid: CBOTS[cid].deletes()", "$", [channel.id], fix=1)
+        bot.data.chat_histories[channel.id] = None
         colour = await bot.get_colour(bot.user)
         emb = discord.Embed(colour=colour, description=css_md("[This message has been reset.]"))
         emb.set_author(**get_author(bot.user))
@@ -1684,10 +1662,9 @@ class UpdateChatHistories(Database):
             return
         if message.reference.message_id != after.id:
             return
-        caids = list(getattr(message, "caids", []))
-        caids.extend(getattr(message.reference.cached_message, "caids", []))
         print("Deleting", channel)
-        await process_image("lambda cid, caids: CBOTS[cid].deletes(caids)", "$", [channel.id, caids], fix=1)
+        # await process_image("lambda cid: CBOTS[cid].deletes()", "$", [channel.id], fix=1)
+        bot.data.chat_histories[channel.id] = None
         colour = await bot.get_colour(bot.user)
         emb = discord.Embed(colour=colour, description=css_md("[This message has been reset.]"))
         emb.set_author(**get_author(bot.user))
@@ -1723,15 +1700,13 @@ class Personality(Command):
     async def __call__(self, bot, flags, guild, channel, message, name, user, argv, **void):
         self.description = f"Customises {bot.name}'s personality for ~ask in the current server. Will attempt to use the highest available GPT-family tier; see {bot.kofi_url} for more info. Experimental long descriptions are now supported."
         if "chat" in name:
-            bot.data.chat_histories.pop(channel.id, None)
-            bot.commands.ask[0].reset[channel.id] = True
+            bot.data.chat_histories[channel.id] = dict(first_message_id=message.id)
             return css_md(f"Conversations for {sqr_md(channel)} have been reset.")
         if not AUTH.get("openai_key"):
             raise ModuleNotFoundError("No OpenAI key found for customisable personality.")
         if "d" in flags or argv == "default":
             bot.data.personalities.pop(channel.id, None)
-            bot.data.chat_histories.pop(channel.id, None)
-            bot.commands.ask[0].reset[channel.id] = True
+            bot.data.chat_histories[channel.id] = dict(first_message_id=message.id)
             return css_md(f"My personality for {sqr_md(channel)} has been reset.")
         if not argv:
             p = self.decode(self.retrieve(channel.id))
@@ -1758,8 +1733,7 @@ class Personality(Command):
                     + "Please move to a NSFW channel, reword, or consider contacting the support server if you believe this is a mistake!"
                 )
         bot.data.personalities[channel.id] = p
-        bot.data.chat_histories.pop(channel.id, None)
-        bot.commands.ask[0].reset[channel.id] = True
+        bot.data.chat_histories[channel.id] = dict(first_message_id=message.id)
         return css_md(f"My personality description for {sqr_md(channel)} has been changed to {sqr_md(p)}.")
 
 

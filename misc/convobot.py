@@ -281,7 +281,7 @@ unptrans = {
 }
 unpunctuation = "".maketrans(unptrans)
 MIZAAC += full_prune(AC.decode("utf-8")).capitalize()
-MIZAAC += "".join(next(iter(unptrans.items())))
+MIZAAC += "".join(next(iter(unptrans.items()))).rstrip()
 
 def req_long(q):
 	words = q.casefold().translate(unpunctuation).split()
@@ -448,7 +448,7 @@ class Bot:
 		return smp(q, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
 
 	def auto_summarise(self, q="", max_length=128, min_length=64):
-		if q and sum(c.isascii() for c in q) / len(q) > 0.6:
+		if q and sum(c.isascii() for c in q) / len(q) > 0.75:
 			q = lim_tokens(q, max_length + min_length << 1)
 			return self.answer_summarise(q=q, max_length=max_length, min_length=min_length)
 		else:
@@ -1542,24 +1542,23 @@ class Bot:
 		tup = (u, q)
 		if self.chat_history and len(self.chat_history) + len(self.promises) > self.history_length:
 			self.rerender()
-		caids = ()
 		uoai = None
 		expapi = None
 		# if self.premium > 0 or random.randint(0, 1):
 		response, cost, uoai, expapi = self.gptcomplete(u, q, refs=refs)
 		if response:
-			return self.after(tup, (self.name, response)), cost, caids, uoai, expapi
+			return self.after(tup, (self.name, response)), cost, uoai, expapi
 		if refs and refs[-1][0] in ("IMAGE", "ANSWER"):
 			if len(refs) > 1:
 				response = refs[-2][1] + ", " + refs[-1][1]
 			else:
 				response = refs[-1][1]
 			if response:
-				return self.after(tup, (self.name, response)), 0, caids
+				return self.after(tup, (self.name, response)), 0
 		if self.premium > 0 and literal_question(q):
 			response = (self.google, self.bing)[random.randint(0, 1)](q)
 			if response:
-				return self.after(tup, (self.name, response)), 0, caids
+				return self.after(tup, (self.name, response)), 0
 			googled = True
 		else:
 			googled = False
@@ -1574,42 +1573,50 @@ class Bot:
 		if not googled and not response:
 			response = (self.google, self.bing)[random.randint(0, 1)](q)
 			if response:
-				return self.after(tup, (self.name, response)), 0, caids
+				return self.after(tup, (self.name, response)), 0
 		if not response:
 			response = reso
 		response = response.replace("  ", " ")
 		if not response:
 			response, cost, uoai, expapi = self.gptcomplete(u, q, refs=refs)
 			if response:
-				return self.after(tup, (self.name, response)), cost, caids, uoai, expapi
+				return self.after(tup, (self.name, response)), cost, uoai, expapi
 			response = "Sorry, I don't know."
-		return self.after(tup, (self.name, response)), 0, caids
+		return self.after(tup, (self.name, response)), 0
 
-	def deletes(self, caids):
+	def deletes(self):
 		self.chat_history = self.chat_history[:-2]
 
 	ask = ai
 
-	def append(self, tup):
-		if not self.chat_history or tup != self.chat_history[-1]:
+	def append(self, tup, nin=0, to=None):
+		to = to if to is not None else self.chat_history
+		if not to or tup != to[-1]:
 			k, v = tup
 			if k == self.name:
 				v = self.alm_re.sub("", v)
-			if len(self.gpttokens(v)) > 36:
-				v = self.auto_summarise(q=v, max_length=32, min_length=16).replace("\n", ". ").strip()
+			tlim = round(2 ** (-nin / 2) * (256 if self.premium >= 2 else 128))
+			if tlim < 32:
+				return
+			if len(self.gpttokens(v)) > tlim + 4:
+				v = self.auto_summarise(q=v, max_length=tlim, min_length=tlim // 2).replace("\n", ". ").strip()
 				tup = (k, v)
-			self.chat_history.append(tup)
+			to.append(tup)
 		return tup[-1]
 
-	def appendleft(self, tup):
-		if not self.chat_history or tup != self.chat_history[0]:
+	def appendleft(self, tup, nin=0, to=None):
+		to = to if to is not None else self.chat_history
+		if not to or tup != to[0]:
 			k, v = tup
 			if k == self.name:
 				v = self.alm_re.sub("", v)
-			if len(self.gpttokens(v)) > 36:
-				v = self.auto_summarise(q=v, max_length=32, min_length=16).replace("\n", ". ").strip()
+			tlim = round(2 ** (-nin / 2) * (256 if self.premium >= 2 else 128))
+			if tlim < 32:
+				return
+			if len(self.gpttokens(v)) > tlim + 4:
+				v = self.auto_summarise(q=v, max_length=tlim, min_length=tlim // 2).replace("\n", ". ").strip()
 				tup = (k, v)
-			self.chat_history.insert(0, tup)
+			to.insert(0, tup)
 		return tup[0]
 
 	def _after(self, t1, t2):
@@ -1707,7 +1714,7 @@ class Bot:
 		self.promises.clear()
 
 	def after(self, t1, t2):
-		exc.submit(self._after, t1, t2)
+		# exc.submit(self._after, t1, t2)
 		self.timestamp = time.time()
 		return t2[1]
 

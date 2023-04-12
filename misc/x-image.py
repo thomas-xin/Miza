@@ -2442,17 +2442,18 @@ def CBAI(inputs):
 			personality=personality,
 			premium=premium,
 		)
-		cb.vis_s = vis
-		for t in history:
-			cb.append(t)
-		if jb:
-			cb.jailbroken = jb
 	else:
 		cb.premium = premium
 	cb.bl = bl
 	cb.oai = oai
 	cb.bals = bals
 	cb.nsfw = nsfw
+	cb.vis_s = vis
+	to = []
+	for i, t in enumerate(history):
+		cb.append(t, nin=len(history) - i - 1, to=to)
+	cb.chat_history = to
+	cb.jailbroken = jb
 	if im:
 		try:
 			im = cb.image
