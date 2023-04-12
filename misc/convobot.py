@@ -1624,7 +1624,7 @@ class Bot:
 		if not self.chat_history or len(self.chat_history) < r1 and len(self.gpttokens(self.chat_history[0][1])) <= lim * 2:
 			return
 		r2 = r1 // 2 + 1
-		fix = min(len(self.chat_history - 1), max(r2, len(self.chat_history) - r2))
+		fix = min(len(self.chat_history) - 1, max(r2, len(self.chat_history) - r2))
 		if fix < 1:
 			return
 		chat_history = self.chat_history[:fix]
