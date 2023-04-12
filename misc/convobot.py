@@ -1604,9 +1604,9 @@ class Bot:
 		summ_start = "Summary of prior conversation:\n"
 		if chat_history and chat_history[0][1].startswith(summ_start):
 			chat_history[0] = (chat_history[0][0], chat_history[0][1][len(summ_start):].strip())
-		summ_next = "[SYSTEM]"
-		if chat_history and chat_history[0][0].startswith(summ_next):
-			chat_history[0] = (chat_history[0][0][len(summ_next):].strip(), chat_history[0][1])
+		# summ_next = "[SYSTEM]"
+		# if chat_history and chat_history[0][0].startswith(summ_next):
+		# 	chat_history[0] = (chat_history[0][0][len(summ_next):].strip(), chat_history[0][1])
 		lines = []
 		for k, v in self.promises:
 			k = k.replace(":", "")
