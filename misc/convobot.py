@@ -1073,7 +1073,7 @@ class Bot:
 						openai.api_key = self.key
 						costs = 1
 					ok = openai.api_key
-					if not i and model == "gpt-3.5-turbo" and not self.nsfw and not self.jailbroken and (not chat_history or len(self.gpttokens(q)) > 8):
+					if not i and model == "gpt-3.5-turbo" and not self.nsfw and not self.jailbroken and not flagged and (not chat_history or len(self.gpttokens(q)) > 8):
 						prompt = "".join(reversed(ins))
 						try:
 							resp = openai.Moderation.create(
@@ -1340,6 +1340,7 @@ class Bot:
 
 	def chatgpt(self, q, stop=None):
 		if not chatgpt or time.time() - getattr(chatgpt, "rate", 0) < 0:
+			print("ChatGPT:", chatgpt and chatgpt.rate)
 			return ""
 		async def run_chatgpt(q, fut=None):
 			if not hasattr(chatgpt, "ask_stream") or time.time() - getattr(chatgpt, "timestamp", 0) >= 3600:
@@ -1359,7 +1360,7 @@ class Bot:
 				if ok:
 					pass
 				else:
-					chatgpt.log.error("Failed to delete conversations")
+					print("Failed to delete conversations")
 					chatgpt.rate = time.time() + 3600
 				# resp = []
 				# async for w in chatgpt.ask_stream(""):
@@ -1659,11 +1660,14 @@ class Bot:
 			k = k.replace(":", "")
 			s = f"{k}: {v}\n"
 			lines.append(s)
+		summ_next = "[SYSTEM]:"
+		while lines[0].startswith(summ_next):
+			lines[0] = lines[0][len(summ_next):].strip()
 		return lines
 
 	def rerender(self):
 		lim = 480 if self.premium >= 2 else 120
-		r1 = 6 if self.premium >= 2 else 4
+		r1 = 5 if self.premium >= 2 else 3
 		if not self.chat_history or len(self.chat_history) < r1 and len(self.gpttokens(self.chat_history[0][1])) <= lim * 2:
 			return
 		r2 = r1 // 2 + 1
@@ -1688,6 +1692,7 @@ class Bot:
 							except orjson.JSONDecodeError:
 								pass
 						v = v2
+						tc = len(self.gpttokens(v))
 					except:
 						print_exc()
 					else:
