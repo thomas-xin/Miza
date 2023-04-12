@@ -1668,7 +1668,7 @@ class Bot:
 			s = f"{k}: {v}\n"
 			lines.append(s)
 		summ_next = "[SYSTEM]:"
-		while lines[0].startswith(summ_next):
+		while lines and lines[0].startswith(summ_next):
 			lines[0] = lines[0][len(summ_next):].strip()
 		return lines
 
