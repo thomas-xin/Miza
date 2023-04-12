@@ -792,15 +792,16 @@ class Bot:
 				elif text.startswith("4"):
 					stype = random.randint(0, 2)
 					sname = ("GOOGLE", "BING", "YAHOO")[stype]
-				if sname:
-					print(sname.capitalize(), "search:", text)
+				print(sname.capitalize(), "search:", text)
 			if text and text.startswith("2"):
 				flagged = True
 			elif text and text.startswith("4"):
 				t2 = f'"""\n{q}\n"""\n\nRegarding above context: Formulate a search engine query for knowledge if relevant, else say "!"'
 				for i in range(3):
 					try:
-						t3 = self.au(t2, force=True)
+						spl = self.cgp(t2)
+						t3 = None if not spl else spl[0]
+						print(sname.capitalize(), "response:", t3)
 						if not t3 or t3 in ("!", '"!"'):
 							t3 = lim_tokens(q, 16)
 						elif t3[0] == t3[-1] == '"':
@@ -812,13 +813,13 @@ class Bot:
 							getattr(self, sname.lower()),
 							t3,
 							raw=True,
-						).result(timeout=8)
+						).result(timeout=12)
 					except concurrent.futures.TimeoutError:
 						print_exc()
 					else:
 						break
 			elif text and text.startswith("3"):
-				t2 = lim_tokens(q, 64)
+				t2 = lim_tokens(q, 96)
 				print("Test:", t2)
 				if t2:
 					for i in range(3):
@@ -826,7 +827,7 @@ class Bot:
 							res = exc.submit(
 								self.wolframalpha,
 								t2,
-							).result(timeout=16)
+							).result(timeout=18)
 						except concurrent.futures.TimeoutError:
 							print_exc()
 						else:
@@ -1150,9 +1151,9 @@ class Bot:
 					model=model,
 					prompt=prompt,
 					temperature=temp,
-					max_tokens=min(768, limit - pc - 64),
+					max_tokens=min(1024, limit - pc - 64),
 					top_p=1,
-					stop=[f"{self.name}: "],
+					stop=[f"{u}: "],
 					frequency_penalty=0.8,
 					presence_penalty=0.4,
 					user=str(hash(u)),
