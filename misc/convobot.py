@@ -332,8 +332,10 @@ class Bot:
 		self.forbidden = []
 		self.jailbroken = False
 		if summary:
-			self.chat_history.extend(summary)
-			# self.rerender()
+			if isinstance(summary, str):
+				self.chat_history.append(("[SYSTEM]", summary))
+			else:
+				self.chat_history.extend(summary)
 
 	def get_proxy(self, retry=True):
 		if self.proxies and time.time() - self.ctime <= 20:
@@ -801,7 +803,6 @@ class Bot:
 					try:
 						spl = self.cgp(t2)
 						t3 = None if not spl else spl[0]
-						print(sname.capitalize(), "response:", t3)
 						if not t3 or t3 in ("!", '"!"'):
 							t3 = lim_tokens(q, 16)
 						elif t3[0] == t3[-1] == '"':
@@ -814,6 +815,7 @@ class Bot:
 							t3,
 							raw=True,
 						).result(timeout=12)
+						print(sname.capitalize(), "res:", t3, res)
 					except concurrent.futures.TimeoutError:
 						print_exc()
 					else:
@@ -1032,7 +1034,7 @@ class Bot:
 						costs = 1
 					ok = openai.api_key
 					if not i and model == "gpt-3.5-turbo" and not self.nsfw and not self.jailbroken and not flagged and (not chat_history or len(self.gpttokens(q)) > 8):
-						prompt = "".join(reversed(ins))
+						prompt = "\n".join(m["content"] if "name" not in m else f'{m["name"]}: {m["content"]}' for m in messages)
 						try:
 							resp = openai.Moderation.create(
 								prompt,
