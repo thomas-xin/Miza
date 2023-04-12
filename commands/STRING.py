@@ -1257,6 +1257,12 @@ class Ask(Command):
                 if caid and caid.get("first_message_id") == m.id:
                     break
                 if m.content:
+                    content = m.clean_content
+                elif m.embeds:
+                    content = m.embeds[0].description
+                else:
+                    content = None
+                if content:
                     if m.author.id == bot.id:
                         name = bot.name
                     else:
@@ -1265,7 +1271,7 @@ class Ask(Command):
                             name = m.author.name
                             if name == bot.name:
                                 name = bot.name + "2"
-                    t = (name, unicode_prune(m.content))
+                    t = (name, content)
                     history.insert(0, t)
         else:
             reset = None
