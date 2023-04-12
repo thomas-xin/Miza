@@ -326,7 +326,6 @@ class Bot:
 		self.timestamp = time.time()
 		self.premium = premium
 		self.last_cost = 0
-		self.history_length = 2 if premium < 1 else 6 if premium < 2 else 24 if premium < 4 else 48
 		self.fp = FreeProxy()
 		self.session = requests.Session()
 		self.session.cookies["CookieConsent"] = "true"
@@ -1540,8 +1539,7 @@ class Bot:
 
 	def ai(self, u, q, refs=(), im=None):
 		tup = (u, q)
-		if self.chat_history and len(self.chat_history) + len(self.promises) > self.history_length:
-			self.rerender()
+		self.rerender()
 		uoai = None
 		expapi = None
 		# if self.premium > 0 or random.randint(0, 1):
