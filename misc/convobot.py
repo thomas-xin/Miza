@@ -1315,9 +1315,9 @@ class Bot:
 				}
 				ok, json, response = await chatgpt._api_patch_request(url, data)
 				if ok:
-					pass
+					print("ChatGPT: History deleted")
 				else:
-					print("Failed to delete conversations")
+					print("ChatGPT: Failed to delete conversations")
 					chatgpt.rate = time.time() + 3600
 				# resp = []
 				# async for w in chatgpt.ask_stream(""):
