@@ -1632,8 +1632,8 @@ class Bot:
 			# if len(self.gpttokens(v)) > lim + 16:
 			# 	self.auto_summarise(q=v, max_length=lim, min_length=lim * 2 // 3).replace("\n", ". ").strip()
 			# 	t1 = (k, v)
-			self.chat_history.append(t1)
-			self.chat_history.append(t2)
+			self.append(t1)
+			self.append(t2)
 		except:
 			print_exc()
 
