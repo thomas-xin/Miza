@@ -794,7 +794,7 @@ class Bot:
 				elif text.startswith("4"):
 					stype = random.randint(0, 2)
 					sname = ("GOOGLE", "BING", "YAHOO")[stype]
-				print(sname.capitalize(), "search:", text)
+				print(sname, "search:", text)
 			if text and text.startswith("2"):
 				flagged = True
 			elif text and text.startswith("4"):
@@ -815,7 +815,7 @@ class Bot:
 							t3,
 							raw=True,
 						).result(timeout=12)
-						print(sname.capitalize(), "res:", t3, res)
+						print(sname, "res:", t3, res)
 					except concurrent.futures.TimeoutError:
 						print_exc()
 					else:
@@ -1034,7 +1034,7 @@ class Bot:
 						costs = 1
 					ok = openai.api_key
 					if not i and model == "gpt-3.5-turbo" and not self.nsfw and not self.jailbroken and not flagged and (not chat_history or len(self.gpttokens(q)) > 8):
-						prompt = "\n".join(m["content"] if "name" not in m else f'{m["name"]}: {m["content"]}' for m in messages)
+						prompt = "\n\n".join(m["content"] if "name" not in m else f'{m["name"]}: {m["content"]}' for m in messages)
 						try:
 							resp = openai.Moderation.create(
 								prompt,
