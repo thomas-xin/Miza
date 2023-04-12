@@ -1249,6 +1249,8 @@ class Ask(Command):
             async for m in bot.history(channel, limit=12):
                 if m.id == message.id:
                     continue
+                if any(str(e) == "❎" for e in m.reactions):
+                    continue
                 if caid and caid.get("first_message_id") == m.id:
                     break
                 if m.content:
