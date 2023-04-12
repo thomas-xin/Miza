@@ -1379,8 +1379,7 @@ class Ask(Command):
                     name = m.author.name
                     if name == bot.name:
                         name = bot.name + "2"
-            summary = caid.get("summary")
-            jb = caid.get("jailbroken")
+            summary = caid and caid.get("summary")
             if reset is not None:
                 summary = None
             if bot.is_trusted(guild) >= 2:
@@ -1403,7 +1402,7 @@ class Ask(Command):
                 personality=bot.commands.personality[0].retrieve((channel or guild).id),
                 premium=premium,
                 summary=summary,
-                jb=jb,
+                jb=caid and caid.get("jailbroken"),
                 history=history,
                 refs=refs,
                 im=im,
