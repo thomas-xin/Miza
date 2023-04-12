@@ -332,8 +332,8 @@ class Bot:
 		self.forbidden = []
 		self.jailbroken = False
 		if summary:
-			self.chat_history.insert(0, ("[SYSTEM]", summary))
-			self.rerender()
+			self.chat_history.extend(summary)
+			# self.rerender()
 
 	def get_proxy(self, retry=True):
 		if self.proxies and time.time() - self.ctime <= 20:
@@ -1624,7 +1624,9 @@ class Bot:
 		if not self.chat_history or len(self.chat_history) < r1 and len(self.gpttokens(self.chat_history[0][1])) <= lim * 2:
 			return
 		r2 = r1 // 2 + 1
-		fix = max(r2, len(self.chat_history) - r2)
+		fix = min(len(self.chat_history - 1), max(r2, len(self.chat_history) - r2))
+		if fix < 1:
+			return
 		chat_history = self.chat_history[:fix]
 		self.chat_history = self.chat_history[fix:]
 		lines = self.condense(chat_history)

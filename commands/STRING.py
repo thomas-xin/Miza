@@ -1550,7 +1550,7 @@ class Ask(Command):
                     if m2:
                         await self.remove_reacts(m2)
         # Syntax: Summary, Jailbroken
-        caic = await process_image("lambda cid: [(b := CBOTS[cid]).summary, b.jailbroken]", "$", [channel.id], fix=1)
+        caic = await process_image("lambda cid: [(b := CBOTS[cid]).chat_history, b.jailbroken]", "$", [channel.id], fix=1)
         if caic:
             caid = bot.data.chat_histories.get(channel.id, None)
             if not isinstance(caid, dict):
