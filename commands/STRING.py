@@ -1252,6 +1252,7 @@ class Ask(Command):
                 if reset:
                     if caid and caid.get("last_message_id") == m.id:
                         reset = None
+                        print(channel, "mismatch", m.id, caid)
                     else:
                         reset = False
                 if caid and caid.get("first_message_id") == m.id:
@@ -1262,7 +1263,7 @@ class Ask(Command):
                     content = m.embeds[0].description
                 else:
                     content = None
-                if content:
+                if content and not content.startswith("#"):
                     if m.author.id == bot.id:
                         name = bot.name
                     else:
@@ -1381,7 +1382,7 @@ class Ask(Command):
                 summary, jb, *irr = summary
             else:
                 jb = False
-            if reset:
+            if reset is not None:
                 summary = None
             if bot.is_trusted(guild) >= 2:
                 for uid in bot.data.trusted[guild.id]:
@@ -1408,7 +1409,7 @@ class Ask(Command):
                 refs=refs,
                 im=im,
                 prompt=(name, q),
-                reset=self.reset.pop(channel.id, None),
+                reset=reset is not None,
                 bals={k: v for k, v in bot.data.token_balances.items() if v < 0},
                 oai=oai,
                 bl=bl,

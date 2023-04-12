@@ -2430,7 +2430,7 @@ def CBAI(inputs):
 	# locals().update(inputs)
 	try:
 		cb = CBOTS[channel_id]
-		if cb.personality != personality or inputs.get("reset"):
+		if cb.personality != personality:
 			summary = None
 			raise KeyError
 	except KeyError:
@@ -2449,10 +2449,11 @@ def CBAI(inputs):
 	cb.bals = bals
 	cb.nsfw = nsfw
 	cb.vis_s = vis
-	to = []
-	for i, t in enumerate(history):
-		cb.append(t, nin=len(history) - i - 1, to=to)
-	cb.chat_history = to
+	if inputs.get("reset"):
+		to = []
+		for i, t in enumerate(history):
+			cb.append(t, nin=len(history) - i - 1, to=to)
+		cb.chat_history = to
 	cb.jailbroken = jb
 	if im:
 		try:
