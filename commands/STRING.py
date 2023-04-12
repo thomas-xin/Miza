@@ -1545,10 +1545,13 @@ class Ask(Command):
         # Syntax: Summary, Jailbroken
         caic = await process_image("lambda cid: [(b := CBOTS[cid]).summary, b.jailbroken]", "$", [channel.id], fix=1)
         if caic:
-            caid = dict(summary=caic[0], jailbroken=caic[1], last_message_id=m.id)
-            bot.data.chat_histories.setdefault(channel.id, {}).update(caid)
+            caid = bot.data.chat_histories.get(channel.id, None)
+            if not isinstance(caid, dict):
+                caid = {}
+            caid.update(dict(summary=caic[0], jailbroken=caic[1], last_message_id=m.id))
+            bot.data.chat_histories[channel.id] = caid
         else:
-            bot.data.chat_histories.pop(channel.id)
+            bot.data.chat_histories.pop(channel.id, None)
         m._react_callback_ = self._callback_
         bot.add_message(m, files=False, force=True)
         return m
