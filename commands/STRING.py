@@ -1249,12 +1249,6 @@ class Ask(Command):
             async for m in bot.history(channel, limit=12):
                 if m.id == message.id:
                     continue
-                if reset:
-                    if caid and caid.get("last_message_id") == m.id:
-                        reset = None
-                        print(channel, "mismatch", m.id, caid)
-                    else:
-                        reset = False
                 if caid and caid.get("first_message_id") == m.id:
                     break
                 if m.content:
@@ -1263,17 +1257,25 @@ class Ask(Command):
                     content = m.embeds[0].description
                 else:
                     content = None
-                if content and not content.startswith("#"):
-                    if m.author.id == bot.id:
-                        name = bot.name
+                if not content or content.startswith("#"):
+                    continue
+                if reset:
+                    if caid and caid.get("last_message_id") == m.id:
+                        reset = None
+                        break
                     else:
-                        name = m.author.display_name
+                        reset = False
+                        print(channel, "mismatch", m.id, caid)
+                if m.author.id == bot.id:
+                    name = bot.name
+                else:
+                    name = m.author.display_name
+                    if name == bot.name:
+                        name = m.author.name
                         if name == bot.name:
-                            name = m.author.name
-                            if name == bot.name:
-                                name = bot.name + "2"
-                    t = (name, content)
-                    history.insert(0, t)
+                            name = bot.name + "2"
+                t = (name, content)
+                history.insert(0, t)
         else:
             reset = None
         if not q:
@@ -1377,11 +1379,8 @@ class Ask(Command):
                     name = m.author.name
                     if name == bot.name:
                         name = bot.name + "2"
-            summary = bot.data.chat_histories.get(channel.id)
-            if isinstance(summary, list):
-                summary, jb, *irr = summary
-            else:
-                jb = False
+            summary = caid.get("summary")
+            jb = caid.get("jailbroken")
             if reset is not None:
                 summary = None
             if bot.is_trusted(guild) >= 2:
