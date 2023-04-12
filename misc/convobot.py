@@ -1621,29 +1621,19 @@ class Bot:
 
 	def _after(self, t1, t2):
 		try:
-			k, v = t2
-			# if self.premium > 1:
-			# 	labels = ("promise", "information", "example")
-			# 	resp = self.answer_classify(q=v, labels=labels)
-			lim = 256 if self.premium >= 2 else 128
-			v = self.alm_re.sub("", v)
-			if len(self.gpttokens(v)) > lim + 16:
-				self.auto_summarise(q=v, max_length=lim, min_length=lim * 2 // 3).replace("\n", ". ").strip()
-				t2 = (k, v)
-			lim -= 32
-			k, v = t1
-			if len(self.gpttokens(v)) > lim + 16:
-				self.auto_summarise(q=v, max_length=lim, min_length=lim * 2 // 3).replace("\n", ". ").strip()
-				t1 = (k, v)
-			if 0: pass#self.premium > 1 and resp["promise"] >= 0.5:
-				# if len(self.promises) >= 6:
-				# 	self.promises = self.promises[2:]
-				# self.promises.append(t1)
-				# self.promises.append(t2)
-				# print("Promises:", self.promises)
-			else:
-				self.chat_history.append(t1)
-				self.chat_history.append(t2)
+			# k, v = t2
+			# lim = 256 if self.premium >= 2 else 128
+			# v = self.alm_re.sub("", v)
+			# if len(self.gpttokens(v)) > lim + 16:
+			# 	self.auto_summarise(q=v, max_length=lim, min_length=lim * 2 // 3).replace("\n", ". ").strip()
+			# 	t2 = (k, v)
+			# lim -= 32
+			# k, v = t1
+			# if len(self.gpttokens(v)) > lim + 16:
+			# 	self.auto_summarise(q=v, max_length=lim, min_length=lim * 2 // 3).replace("\n", ". ").strip()
+			# 	t1 = (k, v)
+			self.chat_history.append(t1)
+			self.chat_history.append(t2)
 		except:
 			print_exc()
 
@@ -1714,7 +1704,7 @@ class Bot:
 		self.promises.clear()
 
 	def after(self, t1, t2):
-		# exc.submit(self._after, t1, t2)
+		self._after(t1, t2)
 		self.timestamp = time.time()
 		return t2[1]
 
