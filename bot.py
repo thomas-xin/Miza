@@ -24,13 +24,13 @@ heartbeat_proc = psutil.Popen([python, "misc/heartbeat.py"])
 # Main class containing all global bot data.
 class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Callable):
 
-    github = "https://github.com/thomas-xin/Miza"
-    rcc_invite = "https://discord.gg/cbKQKAr"
+    github = AUTH.get("github") or "https://github.com/thomas-xin/Miza"
+    rcc_invite = AUTH.get("rcc_invite") or "https://discord.gg/cbKQKAr"
     discord_icon = "https://cdn.discordapp.com/embed/avatars/0.png"
     twitch_url = "https://www.twitch.tv/-"
-    webserver = "https://mizabot.xyz"
-    kofi_url = "https://ko-fi.com/mizabot"
-    rapidapi_url = "https://rapidapi.com/thomas-xin/api/miza"
+    webserver = AUTH.get("webserver") or "https://mizabot.xyz"
+    kofi_url = AUTH.get("kofi_url") or "https://ko-fi.com/mizabot"
+    rapidapi_url = AUTH.get("rapidapi_url") or "https://rapidapi.com/thomas-xin/api/miza"
     raw_webserver = webserver
     heartbeat = "heartbeat.tmp"
     heartbeat_ack = "heartbeat_ack.tmp"
