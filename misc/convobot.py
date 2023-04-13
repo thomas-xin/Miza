@@ -1308,6 +1308,7 @@ class Bot:
 					from chatgpt_wrapper import AsyncChatGPT
 				except ImportError:
 					globals()["chatgpt"] = None
+					return ""
 				else:
 					if not hasattr(chatgpt, "ask_stream"):
 						globals()["chatgpt"] = await AsyncChatGPT().create(timeout=220)
