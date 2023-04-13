@@ -3552,7 +3552,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             funcs = [self._connection.chunk_guild, self.load_guild_http]
             futs = alist()
             for n, guild in enumerate(self.client.guilds):
-                i = n % 3 != 0
+                i = n % 5 != 0
                 if not i and getattr(guild, "_member_count", len(guild._members)) > 250:
                     i = 1
                 fut = create_task(asyncio.wait_for(funcs[i](guild), timeout=None if i else 30))
