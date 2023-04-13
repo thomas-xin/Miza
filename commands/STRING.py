@@ -1272,7 +1272,7 @@ class Ask(Command):
                 history.insert(0, t)
         else:
             reset = None
-        if not q:
+        if not q and not message.attachments:
             q = "Hi!"
             if xrand(2):
                 emb = discord.Embed(colour=rand_colour())
