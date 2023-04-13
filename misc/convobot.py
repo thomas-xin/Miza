@@ -1,6 +1,6 @@
 import os, sys, time, datetime, urllib, orjson, io, random, re, traceback
 import concurrent.futures, asyncio
-import selenium, requests, torch, openai, httpx
+import selenium, requests, torch, openai, httpx, markdownify
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 for i in range(3):
@@ -1404,7 +1404,11 @@ class Bot:
 			print_exc()
 			self.vis_r = time.time() + 86400
 			return ""
-		return "\n".join(html_decode(line.strip().removeprefix("<p>").removesuffix("</p>")).strip() for line in data["response"].replace("<br>", "\n").splitlines()).replace("<em>", "*").replace("</em>", "*").replace("<ul>", "").replace("</ul>", "").replace("<ol>", "").replace("</ol>", "").replace("<li>", "•").replace("</li>", "")
+		try:
+			return html_decode(markdownify.markdownify(data["response"].strip()).strip()).strip()
+		except:
+			print_exc()
+			return data["response"].strip()
 
 	you_r = 0
 	def ycg(self, data, stop=None):
