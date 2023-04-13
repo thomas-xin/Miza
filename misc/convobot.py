@@ -1654,7 +1654,7 @@ class Bot:
 		summ_start = "Summary of prior conversation:\n"
 		for i in (0,):
 			if (tc := len(self.gpttokens(v))) > lim + 16:
-				if tc > lim * 2 or (tc > lim * 1.5 and self.premium >= 2):
+				if tc > lim * 3 or (tc > lim * 1.5 and self.premium >= 2):
 					try:
 						prompt = f'"""\n{v.strip()}\n"""\n\nSummarise the above into a paragraph, keeping most important parts. Do not be repetitive or continue the text!'
 						func = self.au if not self.jailbroken else self.cgp
