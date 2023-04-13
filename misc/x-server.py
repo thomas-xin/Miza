@@ -1359,7 +1359,7 @@ transform: translate(-50%, -50%);
 						client_secret=AUTH["discord_secret"],
 						grant_type="authorization_code",
 						code=code,
-						redirect_uri="https://mizabot.xyz/user",
+						redirect_uri=f"{HOST}/user",
 					),
 				)
 				resp.raise_for_status()

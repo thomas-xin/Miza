@@ -1246,7 +1246,7 @@ class Ask(Command):
             caid = None
         history = []
         if not getattr(message, "simulated", False):
-            async for m in bot.history(channel, limit=12):
+            async for m in bot.history(channel, limit=32):
                 if m.id == message.id:
                     continue
                 if caid and caid.get("first_message_id") == m.id:

@@ -1555,7 +1555,7 @@ class Bot:
 			k, v = tup
 			if k == self.name:
 				v = self.alm_re.sub("", v)
-			tlim = round(2 ** (-nin / 3) * (384 if self.premium >= 2 else 192))
+			tlim = round(2 ** (-nin / 8) * (384 if self.premium >= 2 else 192))
 			if tlim < 32:
 				return
 			if len(self.gpttokens(v)) > tlim + 4:
@@ -1570,7 +1570,7 @@ class Bot:
 			k, v = tup
 			if k == self.name:
 				v = self.alm_re.sub("", v)
-			tlim = round(2 ** (-nin / 3) * (384 if self.premium >= 2 else 192))
+			tlim = round(2 ** (-nin / 8) * (384 if self.premium >= 2 else 192))
 			if tlim < 32:
 				return
 			if len(self.gpttokens(v)) > tlim + 4:
