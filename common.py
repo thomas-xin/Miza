@@ -2214,7 +2214,7 @@ async def proc_communicate(proc):
             if not b:
                 return
             s = as_str(b.rstrip())
-            if s[0] == "~":
+            if s and s[0] == "~":
                 c = as_str(evalEX(s[1:]))
                 exec_tb(c, globals())
             else:

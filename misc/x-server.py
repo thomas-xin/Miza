@@ -269,7 +269,7 @@ config = {
 	},
 	"/": {
 		"request.dispatch": EndpointRedirects(),
-		# "request.error_response": error_handler,
+		"request.error_response": error_handler,
 	}
 }
 if os.path.exists("domain.cert.pem") and os.path.exists("private.key.pem"):
