@@ -589,6 +589,7 @@ class Bot:
 		oai = getattr(self, "oai", None)
 		bals = getattr(self, "bals", {})
 		cost = 0
+		premium = self.premium
 		headers = {
 			"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
 			"DNT": "1",
@@ -599,7 +600,7 @@ class Bot:
 			"x-wait-for-model": "true",
 		}
 		lines = []
-		if per == DEFPER and self.premium < 0:
+		if per == DEFPER and premium < 0:
 			if len(chat_history) < 4:
 				e1 = random.choice((":3", ":D", ";3", ":>", ":0", ";w;", ":P", "^ω^"))
 				lines.append(f"{u}: Hi!\n")
@@ -644,7 +645,7 @@ class Bot:
 		lines.append(ns)
 		longer = False
 		cm2 = None
-		if self.premium < 0:
+		if premium < 0:
 			if not res and not start and q.count(" ") < 2:
 				model = "text-bloom-001"
 				temp = 0.9
@@ -661,7 +662,7 @@ class Bot:
 			limit = 3000
 			cm = 200
 			longer = True
-		elif self.premium < 4:
+		elif premium < 4:
 			model = "gpt-3.5-turbo"
 			temp = 0.9
 			limit = 4000
@@ -759,7 +760,7 @@ class Bot:
 				pc += len(self.gpttokens(m["role"], model))
 				pc += len(self.gpttokens(m["content"], model))
 			text = res = flagged = None
-			if self.premium >= 2 and q and len(q.split(None)) > 1 and not self.jailbroken:
+			if premium >= 2 and q and len(q.split(None)) > 1 and not self.jailbroken:
 				if oai:
 					openai.api_key = oai
 					costs = 0
@@ -779,11 +780,18 @@ class Bot:
 				if flagged:
 					print(resp)
 					text = "2."
-				resp = None
-				q2 = "Classify the above into:\n1. Personal\n2. Inappropriate\n3. Maths\n4. Other"
-				q3 = f'"""\n{q}\n"""\n\n{q2}'
-				if not text:
+				else:
+					resp = None
+					q2 = "Classify the above as:\n1. Personal\n2. Inappropriate\n3. Maths\n4. Other"
+					q3 = f'"""\n{q}\n"""\n\n{q2}'
 					text = self.au(q3, stop=["1"], force=True)
+					if text and text[0] not in "1234":
+						if "Inappropriate" in text:
+							text = "2."
+						elif "Maths" in text:
+							text = "3."
+						elif "Other" in text:
+							text = "4."
 			sname = None
 			nohist = False
 			if text:
@@ -799,6 +807,7 @@ class Bot:
 				flagged = True
 			elif text and text.startswith("4"):
 				t2 = f'"""\n{q}\n"""\n\nRegarding above context: Formulate a search engine query for knowledge if relevant, else say "!"'
+				temp /= 2
 				for i in range(3):
 					try:
 						spl = self.cgp(t2)
@@ -822,7 +831,7 @@ class Bot:
 						break
 			elif text and text.startswith("3"):
 				t2 = lim_tokens(q, 96)
-				print("Test:", t2)
+				temp /= 3
 				if t2:
 					for i in range(3):
 						try:
@@ -989,7 +998,7 @@ class Bot:
 				cm = 20
 		elif model in ("gpt-3.5-turbo", "gpt-4"):
 			tries = 7
-			if self.premium < 2:
+			if premium < 2:
 				stop = None
 			else:
 				stop = ["s an AI", "AI language model", "I'm sorry,", "language model"]
@@ -1003,7 +1012,7 @@ class Bot:
 						model=model,
 						messages=messages,
 						temperature=temp,
-						max_tokens=min(8192 if self.premium >= 2 else 1024, limit - pc - 64),
+						max_tokens=min(8192 if premium >= 2 else 1024, limit - pc - 64),
 						top_p=1,
 						stop=stop,
 						frequency_penalty=1.0,
@@ -1647,7 +1656,7 @@ class Bot:
 			if (tc := len(self.gpttokens(v))) > lim + 16:
 				if tc > lim * 2 or (tc > lim * 1.5 and self.premium >= 2):
 					try:
-						prompt = f'"""\n{v}\n"""\n\nSummarise the above into a paragraph, keeping most important parts. Do not be repetitive or continue the text!'
+						prompt = f'"""\n{v.strip()}\n"""\n\nSummarise the above into a paragraph, keeping most important parts. Do not be repetitive or continue the text!'
 						func = self.au if not self.jailbroken else self.cgp
 						v2 = func(prompt)[0]
 						if len(self.gpttokens(v2)) < 16:

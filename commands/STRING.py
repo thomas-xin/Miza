@@ -1206,6 +1206,7 @@ class Ask(Command):
         bot.data.users.update(user.id)
         await bot.seen(user, event="misc", raw="Talking to me")
         bl = bot.data.blacklist.get(user.id) or 0
+        emb = None
 
         if "dailies" in bot.data:
             bot.data.dailies.progress_quests(user, "talk")
@@ -1215,16 +1216,7 @@ class Ask(Command):
             else:
                 q = (name + " " + argv).lstrip()
         else:
-            if not AUTH.get("openai_key"):
-                if len(argv) > 1:
-                    q = unicode_prune(argv)
-                else:
-                    q = argv
-                q = q.replace("？", "?")
-                if not q.replace("?", ""):
-                    q = "Hi!"
-            else:
-                q = argv
+            q = argv
         if not bl:
             print(f"{message.author}:", q)
         premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
@@ -1282,9 +1274,12 @@ class Ask(Command):
             reset = None
         if not q:
             q = "Hi!"
+            if xrand(2):
+                emb = discord.Embed(colour=rand_colour())
+                emb.set_author(**get_author(bot.user))
+                emb.description = f"Did you instead intend to ask about my main bot? use {bot.get_prefix(guild)}help for help!"
         im = None
         fr = fm = None
-        emb = None
         caids = None
         urls = []
         refs = []
