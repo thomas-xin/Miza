@@ -1624,6 +1624,8 @@ class Bot:
 		summ_next = "[SYSTEM]:"
 		while lines and lines[0].startswith(summ_next):
 			lines[0] = lines[0][len(summ_next):].strip()
+		if lines[0]and lines[0][-1] != "\n":
+			lines[0] += "\n"
 		return lines
 
 	def rerender(self):
