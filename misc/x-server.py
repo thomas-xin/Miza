@@ -288,14 +288,13 @@ if os.path.exists("domain.cert.pem") and os.path.exists("private.key.pem"):
 	def e404(status, message, traceback, version):
 		url = cp.url(qs=cp.request.query_string)
 		if not url.startswith("https://mizabot.") and not url.startswith("https://i.mizabot."):
+			print("Not Found:", url)
 			time.sleep(3600)
 		return message
 	cp.config["error_page.404"] = e404
 else:
 	def hostmap(func):
-		def decorator(*args, **kwargs):
-			return func(*args, **kwargs)
-		return decorator
+		return func
 
 HEADERS = {
 	"X-Content-Type-Options": "nosniff",

@@ -1482,8 +1482,9 @@ class Bot:
 				return text, cost, uoai
 
 	def au(self, prompt, stop=None, force=False):
-		funcs = [self.chatgpt, self.chatgpt, self.vai, self.ycg, self.cgp, self.cgp, self.cgp]
+		funcs = [self.chatgpt, self.chatgpt, self.vai, self.ycg, self.cgp, self.cgp]
 		random.shuffle(funcs)
+		funcs.extend((self.cgp, self.cgp))
 		resp = None
 		while not resp:
 			try:
