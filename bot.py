@@ -3335,7 +3335,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         )
                         # Add a callback to typing in the channel if the command takes too long
                         if fut is None and not hasattr(command, "typing") and not getattr(message, "simulated", False):
-                            create_task(delayed_callback(future, sqrt(3), discord.abc.Messageable.trigger_typing(channel), repeat=True))
+                            create_task(delayed_callback(future, sqrt(3), discord.abc.Messageable.trigger_typing, channel, repeat=True))
                         if getattr(message, "slash", None):
                             create_task(delayed_callback(future, 1, self.defer_interaction, message))
                         with self.command_semaphore:
