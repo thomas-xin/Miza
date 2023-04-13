@@ -1215,7 +1215,7 @@ class Ask(Command):
             else:
                 q = (name + " " + argv).lstrip()
         else:
-            if "openai_key" not in AUTH:
+            if not AUTH.get("openai_key"):
                 if len(argv) > 1:
                     q = unicode_prune(argv)
                 else:
@@ -1228,7 +1228,7 @@ class Ask(Command):
         if not bl:
             print(f"{message.author}:", q)
         premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
-        if name == "gpt2":
+        if name == "gpt2" or not AUTH.get("openai_key"):
             premium = -1
         elif name == "gpt3":
             if premium < 2:
