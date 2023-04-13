@@ -1303,7 +1303,7 @@ class Bot:
 			print("ChatGPT:", chatgpt and chatgpt.rate)
 			return ""
 		async def run_chatgpt(q, fut=None):
-			if not hasattr(chatgpt, "ask_stream") or time.time() - getattr(chatgpt, "timestamp", 0) >= 3600:
+			if not hasattr(chatgpt, "ask_stream") or time.time() - getattr(chatgpt, "timestamp", 0) >= 1800:
 				try:
 					from chatgpt_wrapper import AsyncChatGPT
 				except ImportError:
@@ -1482,7 +1482,7 @@ class Bot:
 				return text, cost, uoai
 
 	def au(self, prompt, stop=None, force=False):
-		funcs = [self.chatgpt, self.vai, self.ycg, self.cgp, self.cgp, self.cgp]
+		funcs = [self.chatgpt, self.chatgpt, self.vai, self.ycg, self.cgp, self.cgp, self.cgp]
 		random.shuffle(funcs)
 		resp = None
 		while not resp:
