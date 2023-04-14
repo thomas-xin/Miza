@@ -2214,7 +2214,7 @@ async def proc_communicate(proc):
                 print(s)
                 s, r = s.split(b"~", 1)
                 d = {"_x": base64.b64decode(r)}
-                c = evalex(memoryview(s)[1:], d)
+                c = evalex(memoryview(s)[1:], globals(), d)
                 if isinstance(c, (str, bytes, memoryview)):
                     exec_tb(c, globals(), d)
             elif s and s[:1] == b"~":
@@ -2348,9 +2348,9 @@ def process_image(image, operation, args=[], fix=None, timeout=36):
     return sub_submit("image", (image, operation, command), fix=fix, _timeout=timeout)
 
 
-def evalex(exc, v=None):
+def evalex(exc, g=None, l=None):
     try:
-        ex = eval(exc, v)
+        ex = eval(exc, g, l)
     except (SyntaxError, NameError):
         exc = as_str(exc)
         s = exc[exc.index("(") + 1:exc.rindex(")")]
@@ -2358,7 +2358,7 @@ def evalex(exc, v=None):
             s = ast.literal_eval(s)
         ex = RuntimeError(s)
         if exc.startswith("PROC_RESP["):
-            ex = eval(exc.split("(", 1)[0] + f"({repr(ex)})", v)
+            ex = eval(exc.split("(", 1)[0] + f"({repr(ex)})", g, l)
     return ex
 
 # Evaluates an an expression, raising it if it is an exception.
