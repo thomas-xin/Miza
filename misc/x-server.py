@@ -2575,6 +2575,7 @@ alert("File successfully deleted. Returning to home.");
 	@hostmap
 	def command(self, content="", input="", timeout=420, redirect=""):
 		ip = cp.request.remote.ip
+		content = content.removeprefix("command/").removeprefix("commands/")
 		if "\x7f" in content and ip in ("127.0.0.1", ADDRESS, getattr(self, "ip", None)):
 			t, after = content.split("\x7f", 1)
 			t = int(t)
