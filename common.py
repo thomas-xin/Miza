@@ -2212,11 +2212,14 @@ async def proc_communicate(proc):
             s = b.rstrip()
             if s and s[:1] == b"!":
                 s, r = s.split(b"~", 1)
-                c = evalex(memoryview(s)[1:])
-                exec_tb(c, globals(), {"_x": base64.b64decode(r)})
+                d = {"_x": base64.b64decode(r)}
+                c = evalex(memoryview(s)[1:], d)
+                if isinstance(c, (str, bytes, memoryview)):
+                    exec_tb(c, globals(), d)
             if s and s[:1] == b"~":
                 c = evalex(memoryview(s)[1:])
-                exec_tb(c, globals())
+                if isinstance(c, (str, bytes, memoryview)):
+                    exec_tb(c, globals())
             else:
                 print(s)
 
@@ -2344,9 +2347,9 @@ def process_image(image, operation, args=[], fix=None, timeout=36):
     return sub_submit("image", (image, operation, command), fix=fix, _timeout=timeout)
 
 
-def evalex(exc):
+def evalex(exc, v=None):
     try:
-        ex = eval(exc)
+        ex = eval(exc, v)
     except (SyntaxError, NameError):
         exc = as_str(exc)
         s = exc[exc.index("(") + 1:exc.rindex(")")]
