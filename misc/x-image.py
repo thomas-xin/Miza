@@ -2994,13 +2994,14 @@ def evalImg(url, operation, args):
 def evaluate(ts, args):
 	try:
 		out = evalImg(*args)
-		if isinstance(out, (bytes, memoryview)):
-			b = base64.b64encode(out)
-			sys.stdout.buffer.write(f"!PROC_RESP[{ts}].set_result(_x)~".encode("utf-8"))
-			sys.stdout.buffer.write(b)
-			sys.stdout.buffer.write(b"\n")
-		else:
-			sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_result({repr(out)})\n".encode("utf-8"))
+		sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_result({repr(out)})\n".encode("utf-8"))
+		# if isinstance(out, (bytes, memoryview)):
+		# 	b = base64.b64encode(out)
+		# 	sys.stdout.buffer.write(f"!PROC_RESP[{ts}].set_result(_x)~".encode("utf-8"))
+		# 	sys.stdout.buffer.write(b)
+		# 	sys.stdout.buffer.write(b"\n")
+		# else:
+		# 	sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_result({repr(out)})\n".encode("utf-8"))
 	except Exception as ex:
 		sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_exception({repr(ex)})\n".encode("utf-8"))
 		sys.stdout.buffer.write(f"~print({args},{repr(traceback.format_exc())},sep='\\n',end='')\n".encode("utf-8"))

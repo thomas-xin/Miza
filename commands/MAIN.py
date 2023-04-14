@@ -2392,7 +2392,7 @@ class UpdateUsers(Database):
         if not getattr(message, "simulated", None):
             self.data.setdefault(user.id, {})["last_channel"] = channel.id
             stored = self.data[user.id].setdefault("stored", {})
-            if channel.id in stored:
+            if channel.id in stored and len(stored) < 5:
                 m_id = stored[channel.id]
                 try:
                     await bot.fetch_message(m_id, channel)
