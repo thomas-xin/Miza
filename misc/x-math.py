@@ -1105,8 +1105,6 @@ def evaluate(ts, args):
 	try:
 		resp = evalSym(*literal_eval(base64.b64decode(args)))
 		out = procResp(resp)
-		if len(out) > 8388608:
-			raise OverflowError("Output data too large.")
 		sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_result({repr(out)})\n".encode("utf-8"))
 	except Exception as ex:
 		sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_exception(pickle.loads({repr(pickle.dumps(ex))}))\n".encode("utf-8"))

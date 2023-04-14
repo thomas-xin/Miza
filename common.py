@@ -2217,10 +2217,12 @@ async def proc_communicate(proc):
                 c = evalex(memoryview(s)[1:], globals(), d)
                 if isinstance(c, (str, bytes, memoryview)):
                     exec_tb(c, globals(), d)
+                print(c)
             elif s and s[:1] == b"~":
                 c = evalex(memoryview(s)[1:])
                 if isinstance(c, (str, bytes, memoryview)):
                     exec_tb(c, globals())
+                print(c)
             else:
                 print(lim_str(as_str(s), 1024))
 
@@ -2235,6 +2237,7 @@ async def start_proc(k, i):
         limit=8388608,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
+        stderr=None,
     )
     proc.is_running = lambda: not proc.returncode
     proc.sem = Semaphore(1, inf)

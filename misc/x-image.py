@@ -3026,7 +3026,7 @@ if __name__ == "__main__":
 	asyncio.set_event_loop(loop)
 	asyncio.main_new_loop = loop
 	loop.create_task(ensure_parent())
-	exc = concurrent.futures.ThreadPoolExecutor(max_workers=10)
+	exc = concurrent.futures.ThreadPoolExecutor(max_workers=12)
 	async def update_loop():
 		while True:
 			argv = await wrap_future(exc.submit(sys.stdin.readline))
@@ -3055,4 +3055,7 @@ if __name__ == "__main__":
 						CACHE.pop(next(iter(CACHE)))
 					except RuntimeError:
 						pass
+			else:
+				sys.stdout.buffer.write(f"~print({repr(argv)}, end='')\n".encode("utf-8"))
+				sys.stdout.flush()
 	loop.run_until_complete(update_loop())
