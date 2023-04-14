@@ -1245,6 +1245,9 @@ class Ask(Command):
                     continue
                 if caid and caid.get("first_message_id") == m.id:
                     break
+                if reset and caid and caid.get("last_message_id") == m.id:
+                    reset = None
+                    continue
                 if caid and str(m.id) in caid.get("ids", ()) or any(str(e) == "❎" for e in m.reactions):
                     continue
                 if m.content:
@@ -1256,12 +1259,8 @@ class Ask(Command):
                 if not content or content.startswith("#"):
                     continue
                 if reset:
-                    if caid and caid.get("last_message_id") == m.id:
-                        reset = None
-                        break
-                    else:
-                        reset = False
-                        print(channel, "mismatch", m.id, caid)
+                    reset = False
+                    print(channel, "mismatch", m.id, caid)
                 if m.author.id == bot.id:
                     name = bot.name
                 else:
