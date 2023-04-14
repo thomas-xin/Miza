@@ -2211,6 +2211,7 @@ async def proc_communicate(proc):
                 return
             s = b.rstrip()
             if s and s[:1] == b"!":
+                print(s)
                 s, r = s.split(b"~", 1)
                 d = {"_x": base64.b64decode(r)}
                 c = evalex(memoryview(s)[1:], d)
@@ -2357,7 +2358,7 @@ def evalex(exc, v=None):
             s = ast.literal_eval(s)
         ex = RuntimeError(s)
         if exc.startswith("PROC_RESP["):
-            ex = eval(exc.split("(", 1)[0] + f"({repr(ex)})")
+            ex = eval(exc.split("(", 1)[0] + f"({repr(ex)})", v)
     return ex
 
 # Evaluates an an expression, raising it if it is an exception.

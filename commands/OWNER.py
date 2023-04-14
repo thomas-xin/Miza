@@ -1263,7 +1263,10 @@ class UpdateGuilds(Database):
             m.nick = cm.nick
             m.guild_permissions = discord.Permissions(cm.gp)
             m.guild = guild
-            m.roles = list(filter(bool, map(guild._roles.get, cm.get("rids", ())))) or ([guild._roles.get(guild.id)] if guild._roles else [])
+            m.roles = list(filter(bool, map(guild._roles.get, cm.get("rids", ()))))
+            if guild.id not in cm.get("rids", ()):
+                r = guild._roles.get(guild.id) or discord.Role(guild=guild, state=self.bot._state, data=dict(id=guild.id, name="@everyone"))
+                m.roles.append(r)
             m.bot = cm.bot
             guild._members[m.id] = m
         return guild._members
