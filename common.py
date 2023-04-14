@@ -2222,7 +2222,7 @@ async def proc_communicate(proc):
                 if isinstance(c, (str, bytes, memoryview)):
                     exec_tb(c, globals())
             else:
-                print(as_str(s))
+                print(lim_str(as_str(s), 1024))
 
 proc_args = cdict(
     math=[python, "misc/x-math.py"],

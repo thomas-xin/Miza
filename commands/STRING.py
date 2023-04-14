@@ -1260,6 +1260,8 @@ class Ask(Command):
                     continue
                 if reset:
                     reset = False
+                    if caid:
+                        caid.pop("ids", None)
                     print(channel, "mismatch", m.id, caid)
                 if m.author.id == bot.id:
                     name = bot.name
