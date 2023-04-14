@@ -2216,7 +2216,7 @@ async def proc_communicate(proc):
                 c = evalex(memoryview(s)[1:], d)
                 if isinstance(c, (str, bytes, memoryview)):
                     exec_tb(c, globals(), d)
-            if s and s[:1] == b"~":
+            elif s and s[:1] == b"~":
                 c = evalex(memoryview(s)[1:])
                 if isinstance(c, (str, bytes, memoryview)):
                     exec_tb(c, globals())

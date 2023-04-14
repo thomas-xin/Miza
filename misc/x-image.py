@@ -2490,7 +2490,9 @@ def embedding(s):
 	if not Embedder:
 		print("Initialising embedder...")
 		from sentence_transformers import SentenceTransformer
+		print("Loading embedder...")
 		globals()["Embedder"] = SentenceTransformer("LLukas22/all-mpnet-base-v2-embedding-all")
+		print("Embedder loaded.")
 	a = Embedder.encode(s)
 	return a.data
 
