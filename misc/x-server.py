@@ -24,7 +24,7 @@ except KeyError:
 	KOFI_SECRET = None
 
 
-HOST = "https://mizabot.xyz"
+HOST = AUTH.get("webserver") or "https://mizabot.xyz"
 ADDRESS = AUTH.get("webserver_address") or "0.0.0.0"
 PORT = AUTH.get("webserver_port") or 80
 IND = "\x7f"
