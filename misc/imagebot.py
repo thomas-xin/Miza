@@ -553,11 +553,16 @@ class Bot:
 		if not specified and not url:
 			if not openjourney:
 				funcs.append(self.art_openjourney)
-			funcs.append(self.art_deepai)
+			if random.randint(0, 3):
+				funcs.append(self.art_deepai)
+			else:
+				funcs.insert(0, self.art_deepai)
 			if openjourney:
 				funcs.insert(0, self.art_openjourney)
 			if dalle2:
 				funcs.insert(0, self.art_dalle)
+		if not url:
+			funcs.append(self.art_textsynth)
 		for func in funcs:
 			try:
 				im = exc.submit(func, prompt, kwargs).result(timeout=240)

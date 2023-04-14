@@ -40,6 +40,7 @@ requests>=2.28.2
 rule34>=1.8.1
 selenium>=4.8.3
 sentencepiece>=0.1.97
+sentence-transformers>=2.2.2
 sympy>=1.11.1
 tiktoken>=0.3.3
 torch>=2.0.0

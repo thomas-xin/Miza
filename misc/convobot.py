@@ -782,7 +782,7 @@ class Bot:
 					text = "2."
 				else:
 					resp = None
-					q2 = "Classify the above as:\n1. Personal\n2. Inappropriate\n3. Maths\n4. Other"
+					q2 = "Classify the above as:\n1. Personal/casual\n2. Inappropriate\n3. Maths\n4. Other"
 					q3 = f'"""\n{q}\n"""\n\n{q2}'
 					text = self.au(q3, stop=["1"], force=True)
 					if text and text[0] not in "1234":
@@ -1019,8 +1019,9 @@ class Bot:
 						presence_penalty=0.6,
 						user=str(hash(u)),
 					)
-					if not i and not random.randint(0, 2) and model == "gpt-3.5-turbo" and not self.nsfw and not self.jailbroken:
+					if not i and not random.randint(0, 2) and model.startswith("gpt-3.5-") and not self.nsfw and not self.jailbroken:
 						try:
+							model = "gpt-3.5-clone"
 							text = self.ycg(data).removeprefix(f"{self.name}: ").strip()
 							if stop and any(s in text for s in stop):
 								text = ""
@@ -1042,7 +1043,7 @@ class Bot:
 						openai.api_key = self.key
 						costs = 1
 					ok = openai.api_key
-					if not i and model == "gpt-3.5-turbo" and not self.nsfw and not self.jailbroken and not flagged and (not chat_history or len(self.gpttokens(q)) > 8):
+					if not i and model.startswith("gpt-3.5-") and not self.nsfw and not self.jailbroken and not flagged and (not chat_history or len(self.gpttokens(q)) > 8):
 						prompt = "\n\n".join(m["content"] if "name" not in m else f'{m["name"]}: {m["content"]}' for m in messages)
 						try:
 							resp = openai.Moderation.create(
@@ -1058,8 +1059,10 @@ class Bot:
 								ns2 = ""
 							prompt = ns2 + nend + "\n\n" + prompt
 							if random.randint(0, 1):
+								model = "gpt-3.5-visus"
 								text = self.vai(prompt)
 							if not text:
+								model = "gpt-3.5-chat"
 								text = self.chatgpt(prompt)
 							if stop and any(s in text for s in stop):
 								text = ""
@@ -1070,6 +1073,7 @@ class Bot:
 									break
 						else:
 							try:
+								model = "gpt-3.5-clone"
 								text = self.ycg(data).removeprefix(f"{self.name}: ").strip()
 								if stop and any(s in text for s in stop):
 									text = ""
@@ -1313,13 +1317,13 @@ class Bot:
 			return ""
 		async def run_chatgpt(q, fut=None):
 			if not hasattr(chatgpt, "ask_stream") or time.time() - getattr(chatgpt, "timestamp", 0) >= 1800:
-				try:
-					from chatgpt_wrapper import AsyncChatGPT
-				except ImportError:
-					globals()["chatgpt"] = None
-					return ""
-				else:
-					if not hasattr(chatgpt, "ask_stream"):
+				if not hasattr(chatgpt, "ask_stream"):
+					try:
+						from chatgpt_wrapper import AsyncChatGPT
+					except ImportError:
+						globals()["chatgpt"] = None
+						return ""
+					else:
 						globals()["chatgpt"] = await AsyncChatGPT().create(timeout=220)
 				await chatgpt.refresh_session()
 				url = "https://chat.openai.com/backend-api/conversations"
@@ -1367,6 +1371,7 @@ class Bot:
 			if not err:
 				return res
 			else:
+				print(res)
 				res = ""
 				chatgpt.timestamp = 0
 		elif chatgpt:
@@ -1496,7 +1501,9 @@ class Bot:
 				return text, cost, uoai
 
 	def au(self, prompt, stop=None, force=False):
-		funcs = [self.chatgpt, self.chatgpt, self.vai, self.ycg, self.cgp, self.cgp]
+		funcs = [self.chatgpt, self.chatgpt, self.ycg, self.cgp, self.cgp]
+		if len(self.gpttokens(prompt)) > 24:
+			funcs.append(self.vai)
 		random.shuffle(funcs)
 		funcs.extend((self.cgp, self.cgp))
 		resp = None

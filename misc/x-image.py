@@ -2485,6 +2485,14 @@ def CBAU(inputs):
 	cb.nsfw = nsfw
 	return cb.au(prompt)
 
+Embedder = None
+def embedding(s):
+	if not Embedder:
+		from sentence_transformers import SentenceTransformer
+		globals()["Embedder"] = SentenceTransformer("LLukas22/all-mpnet-base-v2-embedding-all")
+	a = Embedder.encode(s)
+	return a.data
+
 VGPT = VVQA = None
 def caption(im, q=None, cid=None):
 	for i in range(3):
@@ -2821,7 +2829,7 @@ def evalImg(url, operation, args):
 	if isinstance(new, Image.Image):
 		if getattr(new, "audio", None):
 			new = dict(count=1, duration=1, frames=[new])
-	if type(new) is dict:
+	if type(new) is dict and "frames" in new:
 		frames = new["frames"]
 		if not frames:
 			raise EOFError("No image output detected.")
@@ -2983,7 +2991,13 @@ def evalImg(url, operation, args):
 def evaluate(ts, args):
 	try:
 		out = evalImg(*args)
-		sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_result({repr(out)})\n".encode("utf-8"))
+		if isinstance(out, (bytes, memoryview)):
+			b = base64.b64encode(out)
+			sys.stdout.buffer.write(f"!PROC_RESP[{ts}].set_result(_x)~".encode("utf-8"))
+			sys.stdout.buffer.write(b)
+			sys.stdout.buffer.write(b"\n")
+		else:
+			sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_result({repr(out)})\n".encode("utf-8"))
 	except Exception as ex:
 		sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_exception({repr(ex)})\n".encode("utf-8"))
 		sys.stdout.buffer.write(f"~print({args},{repr(traceback.format_exc())},sep='\\n',end='')\n".encode("utf-8"))

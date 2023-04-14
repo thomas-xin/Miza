@@ -2209,9 +2209,13 @@ async def proc_communicate(proc):
             b = await proc.stdout.readline()
             if not b:
                 return
-            s = as_str(b.rstrip())
-            if s and s[0] == "~":
-                c = as_str(evalEX(s[1:]))
+            s = b.rstrip()
+            if s and s[0] == b"!":
+                s, r = s.split(b"~", 1)
+                c = evalex(memoryview(s)[1:])
+                exec_tb(c, globals(), {"_x": base64.b64decode(r)})
+            if s and s[0] == b"~":
+                c = evalex(memoryview(s)[1:])
                 exec_tb(c, globals())
             else:
                 print(s)
