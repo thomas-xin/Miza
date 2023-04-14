@@ -187,8 +187,8 @@ class EndpointRedirects(Dispatcher):
 			path = "/files"
 		elif path == "/api/mpinsights":
 			path = "/api_mpinsights"
-		elif path == "/api/status":
-			path = "/api_status"
+		elif path.startswith("/api/"):
+			path = path.removeprefix("/api")
 		else:
 			p = path.lstrip("/")
 			if p in actually_static:
@@ -2431,7 +2431,7 @@ alert("File successfully deleted. Returning to home.");
 
 	@cp.expose
 	@hostmap
-	def api_status(self):
+	def status(self):
 		status = self.bot_exec(f"bot.status()")
 		return orjson.dumps(status)
 

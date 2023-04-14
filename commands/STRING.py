@@ -1232,14 +1232,12 @@ class Ask(Command):
             premium = 4
         elif premium > 3:
             premium = 3
-        try:
-            message.in_chat = True
-        except AttributeError:
-            pass
         reset = True
         caid = bot.data.chat_histories.get(channel.id, None)
         if not isinstance(caid, dict):
             caid = None
+        else:
+            caid.setdefault("ids", {})[str(message.id)] = None
         history = []
         if not getattr(message, "simulated", False):
             async for m in bot.history(channel, limit=32):
@@ -1247,7 +1245,7 @@ class Ask(Command):
                     continue
                 if caid and caid.get("first_message_id") == m.id:
                     break
-                if getattr(m, "in_chat", False) or any(str(e) == "❎" for e in m.reactions):
+                if caid and str(m.id) in caid.get("ids", ()) or any(str(e) == "❎" for e in m.reactions):
                     continue
                 if m.content:
                     content = m.clean_content
@@ -1284,7 +1282,6 @@ class Ask(Command):
                 emb.description = f"Did you instead intend to ask about my main bot? use {bot.get_prefix(guild)}help for help!"
         im = None
         fr = fm = None
-        caids = None
         urls = []
         refs = []
         with discord.context_managers.Typing(channel):
@@ -1539,7 +1536,7 @@ class Ask(Command):
             ref = None
             await asyncio.sleep(0.25)
         m = await send_with_react(channel, code + s, embed=emb, reacts=reacts, reference=ref)
-        m.in_chat = True
+        caid.setdefault("ids", {})[str(m.id)] = None
         m.replaceable = False
         hist = bot.data.chat_histories.get(channel.id, ())
         if isinstance(hist, dict):
@@ -1583,11 +1580,11 @@ class Ask(Command):
             bot.data.users.setdefault(user.id, {})["opt_out"] = utc()
             bot.data.users.update(user.id)
             return await message.edit(embeds=())
-        hist = bot.data.chat_histories.get(channel.id, ())
-        if not isinstance(hist, dict):
+        caid = bot.data.chat_histories.get(channel.id, ())
+        if not isinstance(caid, dict):
             return
         if r == "🔄":
-            if hist.get("last_message_id") != message.id:
+            if caid.get("last_message_id") != message.id:
                 await self.remove_reacts(message)
                 raise IndexError("Only resetting the last message is possible.")
             if getattr(message, "reference", None):
@@ -1630,13 +1627,11 @@ class UpdateChatHistories(Database):
         bot = self.bot
         ask = bot.commands.ask[0]
         channel = after.channel
-        hist = bot.data.chat_histories.get(channel.id, ())
-        if not isinstance(hist, list):
-            return
-        if len(hist) <= 2:
+        caid = bot.data.chat_histories.get(channel.id, ())
+        if not isinstance(caid, dict) or "last_message_id" not in caid:
             return
         try:
-            message = await bot.fetch_message(hist[2], channel)
+            message = await bot.fetch_message(caid["last_message_id"], channel)
         except:
             print_exc()
             return
@@ -1658,13 +1653,11 @@ class UpdateChatHistories(Database):
         ask = bot.commands.ask[0]
         after = message
         channel = after.channel
-        hist = bot.data.chat_histories.get(channel.id, ())
-        if not isinstance(hist, list):
-            return
-        if len(hist) <= 2:
+        caid = bot.data.chat_histories.get(channel.id, ())
+        if not isinstance(caid, dict) or "last_message_id" not in caid:
             return
         try:
-            message = await bot.fetch_message(hist[2], channel)
+            message = await bot.fetch_message(caid["last_message_id"], channel)
         except:
             print_exc()
             return
