@@ -1485,7 +1485,7 @@ class Ask(Command):
         code = "\xad"
         reacts = []
         reacts.extend(("🔄", "🗑️"))
-        if h and not emb and premium < 2 and (not random.randint(0, 32) or "AI language model" in out):
+        if h and not emb and premium < 2 and (not xrand(32) or "AI language model" in out and not xrand(3)):
             oo = bot.data.users.get(user.id, {}).get("opt_out") or 0
             if utc() - oo > 86400 * 14:
                 code = f"*```callback-string-ask-{user.id}-\nReact with 🚫 to dismiss.```*\n"
