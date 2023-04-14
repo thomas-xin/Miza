@@ -2488,6 +2488,7 @@ def CBAU(inputs):
 Embedder = None
 def embedding(s):
 	if not Embedder:
+		print("Initialising embedder...")
 		from sentence_transformers import SentenceTransformer
 		globals()["Embedder"] = SentenceTransformer("LLukas22/all-mpnet-base-v2-embedding-all")
 	a = Embedder.encode(s)

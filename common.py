@@ -2221,7 +2221,7 @@ async def proc_communicate(proc):
                 if isinstance(c, (str, bytes, memoryview)):
                     exec_tb(c, globals())
             else:
-                print(s)
+                print(as_str(s))
 
 proc_args = cdict(
     math=[python, "misc/x-math.py"],
