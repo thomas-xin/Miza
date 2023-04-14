@@ -340,7 +340,7 @@ class Math(Command):
         if not argv:
             raise ArgumentError(f"Input string is empty. Use {bot.get_prefix(guild)}math help for help.")
         r = "r" in flags
-        p = flags.get("v", 0) * 2 + 1 << 7
+        p = 1 << (8 + flags.get("v", 0))
         var = None
         if "plot" in name and not argv.lower().startswith("plot") or "factor" in name:
             argv = f"{name}({argv})"
