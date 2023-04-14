@@ -1370,7 +1370,7 @@ class Bot:
 				res = ""
 				chatgpt.timestamp = 0
 		elif chatgpt:
-			chatgpt.rate = time.time() + 3600
+			# chatgpt.rate = time.time() + 3600
 			chatgpt.timestamp = 0
 		return res
 
