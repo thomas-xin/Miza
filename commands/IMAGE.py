@@ -1399,7 +1399,7 @@ class Waifu2x(Command):
     async def __call__(self, bot, user, message, channel, args, argv, flags, **void):
         name, value, url, fmt = await get_image(bot, user, message, args, argv, raw=True, default="")
         if "a" not in flags:
-            return self.bot.webserver + "/waifu2x?source=" + url
+            return self.bot.raw_webserver + "/waifu2x?source=" + url
         with discord.context_managers.Typing(channel):
             mime = await create_future(bot.detect_mime, url)
             image = None

@@ -51,7 +51,7 @@ def get_best_icon(entry):
             entry["thumbnail"] = f"https://i.ytimg.com/vi/{vid}/maxresdefault.jpg"
             return entry["thumbnail"]
         if ytdl.bot.is_webserver_url(url):
-            return ytdl.bot.webserver + "/static/mizaleaf.png"
+            return ytdl.bot.raw_webserver + "/static/mizaleaf.png"
         return url
     return sorted(thumbnails, key=lambda x: float(x.get("width", x.get("preference", 0) * 4096)), reverse=True)[0]["url"]
 
@@ -5087,8 +5087,8 @@ class Download(Command):
                     start, end = spl[4:6]
                 if not simulated:
                     if tuple(map(str, (start, end))) == ("None", "None") and not silenceremove and not auds and fmt in ("mp3", "opus", "ogg", "wav", "weba"):
-                        view = bot.webserver + "/ytdl?fmt=" + fmt + "&view=" + url
-                        download = bot.webserver + "/ytdl?fmt=" + fmt + "&download=" + url
+                        view = bot.raw_webserver + "/ytdl?fmt=" + fmt + "&view=" + url
+                        download = bot.raw_webserver + "/ytdl?fmt=" + fmt + "&download=" + url
                         # content = view + "\n" + download
                         # if message.guild and message.guild.get_member(bot.client.user.id).permissions_in(message.channel).manage_messages:
                         #     create_task(message.clear_reactions())

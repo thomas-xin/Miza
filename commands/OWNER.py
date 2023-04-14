@@ -805,7 +805,7 @@ class Immortalise(Command):
                         fid += 1
                 out = f"cache/!{fid}~{fn}"
                 os.rename(p, out)
-                return f"{self.bot.webserver}/view/!{fid}\n{self.bot.webserver}/files/!{fid}"
+                return f"{self.bot.raw_webserver}/view/!{fid}\n{self.bot.raw_webserver}/files/!{fid}"
         raise TypeError("Not a valid webserver URL.")
         
         

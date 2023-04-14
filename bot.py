@@ -2496,8 +2496,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         if regexp("^([0-9]{1,3}\\.){3}[0-9]{1,3}$").search(ip):
             self.ip = ip
             new_ip = f"http://{self.ip}:{PORT}"
-            if self.raw_webserver != self.webserver and self.raw_webserver != new_ip:
-                create_task(self.create_main_website())
+            # if self.raw_webserver != self.webserver and self.raw_webserver != new_ip:
+            #     create_task(self.create_main_website())
             self.raw_webserver = new_ip
 
     def is_webserver_url(self, url):
@@ -3388,7 +3388,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                                     if type(response) not in (str, bytes, bytearray):
                                         response = str(response)
                                     # Process everything else as a string
-                                    if type(response) is str and len(response) <= 2000:
+                                    if type(response) is str and (len(response) <= 2000 or getattr(message, "simulated", False)):
                                         sent = await send_with_react(channel, response, reference=not loop and message)
                                         # sent = await channel.send(response)
                                     else:
@@ -6030,8 +6030,8 @@ def as_file(file, filename=None, ext=None, rename=True):
     else:
         b = fn.bit_length() + 7 >> 3
         fn = as_str(base64.urlsafe_b64encode(fn.to_bytes(b, "big"))).rstrip("=")
-    url1 = f"{bot.webserver}/p/{fn}"
-    url2 = f"{bot.webserver}/d/{fn}"
+    url1 = f"{bot.raw_webserver}/p/{fn}"
+    url2 = f"{bot.raw_webserver}/d/{fn}"
     # if filename:
     #     fn = "/" + (str(file) if filename is None else lim_str(filename, 64).translate(filetrans))
     #     url1 += fn
@@ -6040,7 +6040,7 @@ def as_file(file, filename=None, ext=None, rename=True):
     return url1, url2
 
 def is_file(url):
-    for start in (f"{bot.webserver}/", f"http://{bot.ip}:{PORT}/"):
+    for start in (f"{bot.raw_webserver}/", f"http://{bot.ip}:{PORT}/"):
         if url.startswith(start):
             u = url[len(start):]
             endpoint = u.split("/", 1)[0]
@@ -6062,6 +6062,9 @@ def webserver_communicate(bot):
         except:
             print_exc()
             bot.start_webserver()
+        with tracebacksuppressor:
+            with reqs.next().head(self.webserver) as resp:
+                self.raw_webserver = resp.url
         with tracebacksuppressor:
             while bot.server and is_strict_running(bot.server):
                 b = bot.server.stderr.readline()

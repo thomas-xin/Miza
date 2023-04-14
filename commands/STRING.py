@@ -920,7 +920,7 @@ class Timezone(Command):
             fields = deque()
             for k, v in COUNTRIES.items():
                 fields.append((k, ", ".join(v), False))
-            self.bot.send_as_embeds(channel, description=f"[Click here to find your timezone]({self.bot.webserver}/time)", title="Timezone list", fields=fields, author=get_author(self.bot.user), reference=message)
+            self.bot.send_as_embeds(channel, description=f"[Click here to find your timezone]({self.bot.raw_webserver}/time)", title="Timezone list", fields=fields, author=get_author(self.bot.user), reference=message)
             return
         secs = as_timezone(argv)
         t = utc_dt() + datetime.timedelta(seconds=secs)

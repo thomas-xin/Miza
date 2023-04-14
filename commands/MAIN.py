@@ -116,7 +116,7 @@ class Help(Command):
         else:
             content = (
                 f"Yo! Use the menu below to select from my command list!\n"
-                + f"Alternatively, visit [`mizatlas`]({bot.webserver}/mizatlas) for a full command list and tester.\n\n"
+                + f"Alternatively, visit [`mizatlas`]({bot.raw_webserver}/mizatlas) for a full command list and tester.\n\n"
                 + f"If you're an admin and wish to disable me in a particular channel, check out `{prefix}ec`!\n"
                 + f"Want to try the premium features, unsure about anything, or have a bug to report? check out the [`support server`]({bot.rcc_invite})!\n"
                 + f"Finally, donate to me or purchase a subscription [`here`]({bot.kofi_url})! Any support is greatly appreciated!"
@@ -1148,7 +1148,7 @@ class Upload(Command):
             argv += " " * bool(argv) + " ".join(best_url(a) for a in message.attachments)
         args = await self.bot.follow_url(argv)
         if not args:
-            return self.bot.webserver + "/files"
+            return self.bot.raw_webserver + "/files"
         futs = deque()
         for url in args:
             futs.append(Request(self.bot.raw_webserver + "/upload_url?url=" + url, decode=True, aio=True, timeout=1200))
