@@ -3470,7 +3470,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     await asyncio.sleep(0.1)
                 await self.react_callback(message, None, message.author)
                 out = orjson.dumps(list(message.response))
-            url = f"{self.webserver}/commands/{t}\x7f{after}"
+            url = f"https://127.0.0.1:{PORT}/commands/{t}\x7f{after}"
         await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, bypass=False, decode=True, aio=True, ssl=False)
 
     async def process_http_eval(self, t, proc):
