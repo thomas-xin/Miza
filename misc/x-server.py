@@ -2575,7 +2575,6 @@ alert("File successfully deleted. Returning to home.");
 	@hostmap
 	def command(self, content="", input="", timeout=420, redirect=""):
 		ip = cp.request.remote.ip
-		content = content.removeprefix("command/").removeprefix("commands/")
 		if "\x7f" in content and ip in ("127.0.0.1", ADDRESS, getattr(self, "ip", None)):
 			t, after = content.split("\x7f", 1)
 			t = int(t)
@@ -2585,7 +2584,7 @@ alert("File successfully deleted. Returning to home.");
 			if t in RESPONSES:
 				RESPONSES[t].set_result((j, after))
 				return b"\xf0\x9f\x92\x9c"
-		content = input or urllib.parse.unquote(cp.url(base="", qs=cp.request.query_string).rstrip("?").split("/", 2)[-1])
+		content = input or urllib.parse.unquote(cp.url(base="", qs=cp.request.query_string).rstrip("?").split("/", 1)[-1].removeprefix("api/").split("/", 1)[-1])
 		send("/command", ip, content)
 		# if "DNT" in (k.upper() for k in cp.request.headers):
 		#	 random.seed(ip)
