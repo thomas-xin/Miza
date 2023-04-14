@@ -1232,6 +1232,10 @@ class Ask(Command):
             premium = 4
         elif premium > 3:
             premium = 3
+        try:
+            message.in_chat = True
+        except AttributeError:
+            pass
         reset = True
         caid = bot.data.chat_histories.get(channel.id, None)
         if not isinstance(caid, dict):
@@ -1243,7 +1247,7 @@ class Ask(Command):
                     continue
                 if caid and caid.get("first_message_id") == m.id:
                     break
-                if any(str(e) == "❎" for e in m.reactions):
+                if getattr(m, "in_chat", False) or any(str(e) == "❎" for e in m.reactions):
                     continue
                 if m.content:
                     content = m.clean_content
@@ -1535,6 +1539,7 @@ class Ask(Command):
             ref = None
             await asyncio.sleep(0.25)
         m = await send_with_react(channel, code + s, embed=emb, reacts=reacts, reference=ref)
+        m.in_chat = True
         m.replaceable = False
         hist = bot.data.chat_histories.get(channel.id, ())
         if isinstance(hist, dict):
