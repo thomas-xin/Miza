@@ -1537,7 +1537,8 @@ class Ask(Command):
             ref = None
             await asyncio.sleep(0.25)
         m = await send_with_react(channel, code + s, embed=emb, reacts=reacts, reference=ref)
-        caid.setdefault("ids", {})[str(m.id)] = None
+        if isinstance(caid, dict):
+            caid.setdefault("ids", {})[str(m.id)] = None
         m.replaceable = False
         hist = bot.data.chat_histories.get(channel.id, ())
         if isinstance(hist, dict):

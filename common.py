@@ -2209,24 +2209,24 @@ async def proc_communicate(proc):
             b = await proc.stdout.readline()
             if not b:
                 return
-            s = as_str(b.rstrip())
-            if s and s[0] == "~":
-                c = as_str(evalEX(s[1:]))
-                exec_tb(c, globals())
-            # s = b.rstrip()
-            # if s and s[:1] == b"!":
-            #     print(s)
-            #     s, r = s.split(b"~", 1)
-            #     d = {"_x": base64.b64decode(r)}
-            #     c = evalex(memoryview(s)[1:], globals(), d)
-            #     if isinstance(c, (str, bytes, memoryview)):
-            #         exec_tb(c, globals(), d)
-            #     print(c)
-            # elif s and s[:1] == b"~":
-            #     c = evalex(memoryview(s)[1:], globals())
-            #     if isinstance(c, (str, bytes, memoryview)):
-            #         exec_tb(c, globals())
-            #     print(c)
+            # s = as_str(b.rstrip())
+            # if s and s[0] == "~":
+            #     c = as_str(evalEX(s[1:]))
+            #     exec_tb(c, globals())
+            s = b.rstrip()
+            if s and s[:1] == b"!":
+                print(s)
+                s, r = s.split(b"~", 1)
+                d = {"_x": base64.b64decode(r)}
+                c = evalex(memoryview(s)[1:], globals(), d)
+                if isinstance(c, (str, bytes, memoryview)):
+                    exec_tb(c, globals(), d)
+                print(c)
+            elif s and s[:1] == b"~":
+                c = evalex(memoryview(s)[1:], globals())
+                if isinstance(c, (str, bytes, memoryview)):
+                    exec_tb(c, globals())
+                print(c)
             else:
                 print(lim_str(as_str(s), 1024))
 
