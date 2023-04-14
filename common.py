@@ -2210,11 +2210,11 @@ async def proc_communicate(proc):
             if not b:
                 return
             s = b.rstrip()
-            if s and s[0] == b"!":
+            if s and s[:1] == b"!":
                 s, r = s.split(b"~", 1)
                 c = evalex(memoryview(s)[1:])
                 exec_tb(c, globals(), {"_x": base64.b64decode(r)})
-            if s and s[0] == b"~":
+            if s and s[:1] == b"~":
                 c = evalex(memoryview(s)[1:])
                 exec_tb(c, globals())
             else:
