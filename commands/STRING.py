@@ -321,7 +321,7 @@ class Math(Command):
     alias = name + ["Plot3D", "Factor", "Factorise", "Factorize"]
     description = "Evaluates a math formula."
     usage = "<string> <verbose{?v}>? <rationalize{?r}>? <show_variables{?l}>? <clear_variables{?c}>?"
-    example = ("m factorial 32", "plot 3x^2-2x+1", "math integral tan(x)", "calc std([6.26,6.23,6.34,6.28])", "🔢 predict_next([2, 10, 30, 68, 130])")
+    example = ("m factorial 32", "plot 3x^2-2x+1", "math integral tan(x)", "m solve(x^3-1)", "calc std([6.26,6.23,6.34,6.28])", "🔢 predict_next([2, 10, 30, 68, 130])")
     flags = "rvlcd"
     rate_limit = (4.5, 6)
     slash = True
