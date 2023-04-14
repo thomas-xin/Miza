@@ -29,6 +29,14 @@ if sys.version_info.major == 3 and sys.version_info.minor >= 10:
 installing = []
 install = lambda m: installing.append(subprocess.Popen([python, "-m", "pip", "install", m, "--upgrade", "--user"]))
 
+def try_int(i):
+    if type(i) is str and not i.isnumeric():
+        return i
+    try:
+        return int(i)
+    except:
+        return i
+
 # Parse requirements.txt
 for mod in modlist:
     if mod:
@@ -42,7 +50,7 @@ for mod in modlist:
                     break
             v = pkg_resources.get_distribution(name).version
             if version is not None:
-                s = repr(v.split(".")) + op + repr(version.split("."))
+                s = repr([try_int(i) for i in v.split(".")]) + op + repr([try_int(i) for i in version.split(".")])
                 assert eval(s, {}, {})
         except:
             # Modules may require an older version, replace current version if necessary
