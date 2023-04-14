@@ -784,6 +784,7 @@ class Bot:
 					resp = None
 					q2 = "Classify the above as:\n1. Personal/casual\n2. Inappropriate\n3. Maths\n4. Other"
 					q3 = f'"""\n{q}\n"""\n\n{q2}'
+					print("AU prompt:", q3)
 					text = self.au(q3, stop=["1"], force=True)
 					if text and text[0] not in "1234":
 						if "Inappropriate" in text:

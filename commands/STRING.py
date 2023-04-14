@@ -170,6 +170,7 @@ class Translate(Command):
             oai=oai,
             nsfw=bot.is_nsfw(channel),
         )
+        await process_image("CBIP", "&", [], fix=1, timeout=360)
         tup = await process_image("CBAU", "$", [inputs], fix=1, timeout=192)
         out = tup[0]
         if out and out[0] == out[-1] == '"' and not text[0] == text[-1] == '"':
@@ -1223,9 +1224,10 @@ class Ask(Command):
         if name == "gpt2" or not AUTH.get("openai_key"):
             premium = -1
         elif name == "gpt3":
-            if premium < 2:
-                raise PermissionError(f"Distributed premium level 1 or higher required; please see {bot.kofi_url} for more info!")
-            premium = 2
+            premium = max(0, min(2, premium))
+            # if premium < 2:
+            #     raise PermissionError(f"Distributed premium level 1 or higher required; please see {bot.kofi_url} for more info!")
+            # premium = 2
         elif name == "gpt4":
             if premium < 4:
                 raise PermissionError(f"Distributed premium level 2 or higher required; please see {bot.kofi_url} for more info!")
