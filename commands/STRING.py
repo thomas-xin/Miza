@@ -170,7 +170,7 @@ class Translate(Command):
             oai=oai,
             nsfw=bot.is_nsfw(channel),
         )
-        await process_image("CBIP", "&", [], fix=1, timeout=360)
+        # await process_image("CBIP", "&", [], fix=1, timeout=360)
         tup = await process_image("CBAU", "$", [inputs], fix=1, timeout=192)
         out = tup[0]
         if out and out[0] == out[-1] == '"' and not text[0] == text[-1] == '"':
@@ -1288,7 +1288,7 @@ class Ask(Command):
         urls = []
         refs = []
         with discord.context_managers.Typing(channel):
-            fut = self.cbip = create_task(process_image("CBIP", "&", [], fix=1, timeout=360))
+            # fut = self.cbip = create_task(process_image("CBIP", "&", [], fix=1, timeout=360))
             if getattr(message, "reference", None):
                 reference = message.reference.resolved
             else:
@@ -1414,8 +1414,8 @@ class Ask(Command):
                 bl=bl,
                 nsfw=bot.is_nsfw(channel),
             )
-            if fut:
-                await fut
+            # if fut:
+            #     await fut
             tup = await process_image("CBAI", "$", [inputs], fix=1, timeout=420)
             out = tup[0]
             cost = 0

@@ -1354,7 +1354,7 @@ class Bot:
 			return res
 		if hasattr(asyncio, "main_new_loop"):
 			fut = concurrent.futures.Future()
-			asyncio.main_new_loop.create_task(run_chatgpt(q, fut))
+			asyncio.main_new_loop.create_task(asyncio.wait_for(run_chatgpt(q, fut), timeout=241))
 			res = fut.result(timeout=240)
 		else:
 			res = asyncio.run(run_chatgpt(q))

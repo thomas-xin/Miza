@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import os, sys, io, time, concurrent.futures, asyncio, subprocess, psutil, collections, traceback, re, requests, blend_modes, pdf2image, zipfile, contextlib, filetype, pyqrcode, ast, colorspace, pickle, orjson, base64
+import os, sys, io, time, concurrent.futures, threading, asyncio, subprocess, psutil, collections, traceback, re, requests, blend_modes, pdf2image, zipfile, contextlib, filetype, pyqrcode, ast, colorspace, pickle, orjson, base64
 import numpy as np
 import PIL
 from PIL import Image, ImageCms, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhance, ImageMath, ImageStat, ImageFile
@@ -47,6 +47,22 @@ def wrap_future(fut, loop=None):
 
     fut.add_done_callback(on_done)
     return wrapper
+
+def await_fut(fut, timeout=None):
+    return convert_fut(fut).result(timeout=timeout)
+
+def convert_fut(fut):
+    loop = get_event_loop()
+    if is_main_thread():
+        if not isinstance(fut, asyncio.Task):
+            fut = create_task(fut, loop=loop)
+        raise RuntimeError("This function must not be called from the main thread's asyncio loop.")
+    try:
+        ret = asyncio.run_coroutine_threadsafe(fut, loop=loop)
+    except:
+        ret = concurrent.futures.Future()
+        loop.create_task(_await_fut(fut, ret))
+    return ret
 
 hwaccel = "d3d11va" if os.name == "nt" else "auto"
 
@@ -2401,15 +2417,27 @@ is_discord_emoji = lambda url: discord_emoji.search(url)
 
 sys.path.append("misc")
 
+def CBIP():
+	import convobot
+	globals()["convobot"] = convobot
+async def ACBIP():
+	return CBIP()
+
+def IBIP():
+	import imagebot
+	globals()["imagebot"] = imagebot
+async def AIBIP():
+	return IBIP()
+
 CBOTS = {}
 def cb_exists(cid):
 	return cid in CBOTS
 
-def CBIP():
-	import convobot
-	globals()["convobot"] = convobot
-
 def CBAI(inputs):
+	if threading.current_thread() is threading.main_thread():
+		CBIP()
+	else:
+		await_fut(asyncio.main_new_loop.create_task(ACBIP()))
 	channel_id = inputs["channel_id"]
 	key = inputs["key"]
 	ht = inputs["huggingface_token"]
@@ -2463,7 +2491,10 @@ def CBAI(inputs):
 	return cb.ai(*prompt, refs=refs, im=im)
 
 def CBAU(inputs):
-	CBIP()
+	if threading.current_thread() is threading.main_thread():
+		CBIP()
+	else:
+		await_fut(asyncio.main_new_loop.create_task(ACBIP()))
 	prompt = inputs["prompt"]
 	key = inputs["key"]
 	ht = inputs["huggingface_token"]
@@ -2485,19 +2516,25 @@ def CBAU(inputs):
 	cb.nsfw = nsfw
 	return cb.au(prompt)
 
+def EBAP():
+	from sentence_transformers import SentenceTransformer
+	globals()["Embedder"] = SentenceTransformer("LLukas22/all-mpnet-base-v2-embedding-all")
+async def AEBAP():
+	return EBAP()
+
 Embedder = None
 def embedding(s):
 	if not Embedder:
 		print("Initialising embedder...")
-		from sentence_transformers import SentenceTransformer
-		print("Loading embedder...")
-		globals()["Embedder"] = SentenceTransformer("LLukas22/all-mpnet-base-v2-embedding-all")
+		if threading.current_thread() is threading.main_thread():
+			EBAP()
+		else:
+			await_fut(asyncio.main_new_loop.create_task(AEBAP()))
 		print("Embedder loaded.")
 	a = Embedder.encode(s)
 	return a.data
 
-VGPT = VVQA = None
-def caption(im, q=None, cid=None):
+def ICAP():
 	for i in range(3):
 		try:
 			from transformers import TrOCRProcessor, VisionEncoderDecoderModel, ViltProcessor, ViltForQuestionAnswering
@@ -2505,6 +2542,16 @@ def caption(im, q=None, cid=None):
 			time.sleep(i + 1)
 		else:
 			break
+	return TrOCRProcessor, VisionEncoderDecoderModel, ViltProcessor, ViltForQuestionAnswering
+async def AICAP():
+	return ICAP()
+	
+VGPT = VVQA = None
+def caption(im, q=None, cid=None):
+	if threading.current_thread() is threading.main_thread():
+		TrOCRProcessor, VisionEncoderDecoderModel, ViltProcessor, ViltForQuestionAnswering = ICAP()
+	else:
+		TrOCRProcessor, VisionEncoderDecoderModel, ViltProcessor, ViltForQuestionAnswering = await_fut(asyncio.main_new_loop.create_task(AICAP()))
 	im = resize_max(im, 512, "auto")
 	if im.mode != "RGB":
 		image = im.convert("RGB")
@@ -2540,7 +2587,10 @@ def caption(im, q=None, cid=None):
 	return (p1, p2)
 
 def IBAOL(prompt, kwargs, key=None):
-	import imagebot
+	if threading.current_thread() is threading.main_thread():
+		IBIP()
+	else:
+		await_fut(asyncio.main_new_loop.create_task(AIBIP()))
 	try:
 		ib = CBOTS[None]
 	except KeyError:
@@ -2550,7 +2600,10 @@ def IBAOL(prompt, kwargs, key=None):
 	return ib.art_openjourney_local(prompt, kwargs)
 
 def IBASL(prompt, kwargs, key=None):
-	import imagebot
+	if threading.current_thread() is threading.main_thread():
+		IBIP()
+	else:
+		await_fut(asyncio.main_new_loop.create_task(AIBIP()))
 	try:
 		ib = CBOTS[None]
 	except KeyError:
@@ -3007,7 +3060,10 @@ def evaluate(ts, args):
 	sys.stdout.flush()
 
 
+exc = concurrent.futures.ThreadPoolExecutor(max_workers=12)
+loop = asyncio.new_event_loop()
 if __name__ == "__main__":
+
 	async def ensure_parent():
 		parent = psutil.Process(os.getppid())
 		while True:
@@ -3022,40 +3078,43 @@ if __name__ == "__main__":
 				p.terminate()
 				break
 			await asyncio.sleep(12)
-	loop = asyncio.new_event_loop()
-	asyncio.set_event_loop(loop)
-	asyncio.main_new_loop = loop
-	loop.create_task(ensure_parent())
-	exc = concurrent.futures.ThreadPoolExecutor(max_workers=12)
+
+	async def process_cmd(argv):
+		argv = argv.rstrip()
+		if argv[0] == "~":
+			ts, s = argv[1:].split("~", 1)
+			try:
+				d = base64.b64decode(s.encode("ascii"))
+				args = eval(d)
+				if args[1] == "&":
+					args[1] = "$"
+					evaluate(ts, args)
+				elif "plt_special" in args or "plt_mp" in args:
+					evaluate(ts, args)
+				else:
+					exc.submit(evaluate, ts, args)
+			except Exception as ex:
+				sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_exception({repr(ex)})\n".encode("utf-8"))
+				sys.stdout.buffer.write(f"~print({s}, end='')\n".encode("utf-8"))
+				sys.stdout.buffer.write(f"~print({repr(traceback.format_exc())}, end='')\n".encode("utf-8"))
+				sys.stdout.flush()
+			while len(CACHE) > 32:
+				try:
+					CACHE.pop(next(iter(CACHE)))
+				except RuntimeError:
+					pass
+		else:
+			sys.stdout.buffer.write(f"~print({repr(argv)}, end='')\n".encode("utf-8"))
+			sys.stdout.flush()
+
 	async def update_loop():
 		while True:
 			argv = await wrap_future(exc.submit(sys.stdin.readline))
 			if not argv:
 				raise SystemExit
-			argv = argv.rstrip()
-			if argv[0] == "~":
-				ts, s = argv[1:].split("~", 1)
-				try:
-					d = base64.b64decode(s.encode("ascii"))
-					args = eval(d)
-					if args[1] == "&":
-						args[1] = "$"
-						evaluate(ts, args)
-					elif "plt_special" in args or "plt_mp" in args:
-						evaluate(ts, args)
-					else:
-						exc.submit(evaluate, ts, args)
-				except Exception as ex:
-					sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_exception({repr(ex)})\n".encode("utf-8"))
-					sys.stdout.buffer.write(f"~print({s}, end='')\n".encode("utf-8"))
-					sys.stdout.buffer.write(f"~print({repr(traceback.format_exc())}, end='')\n".encode("utf-8"))
-					sys.stdout.flush()
-				while len(CACHE) > 32:
-					try:
-						CACHE.pop(next(iter(CACHE)))
-					except RuntimeError:
-						pass
-			else:
-				sys.stdout.buffer.write(f"~print({repr(argv)}, end='')\n".encode("utf-8"))
-				sys.stdout.flush()
+			await process_cmd(argv)
+
+	asyncio.set_event_loop(loop)
+	asyncio.main_new_loop = loop
+	loop.create_task(ensure_parent())
 	loop.run_until_complete(update_loop())
