@@ -6064,7 +6064,7 @@ def webserver_communicate(bot):
             bot.start_webserver()
         with tracebacksuppressor:
             with reqs.next().options(self.webserver, stream=True) as resp:
-                self.raw_webserver = resp.url
+                self.raw_webserver = resp.url.rstrip("/")
         with tracebacksuppressor:
             while bot.server and is_strict_running(bot.server):
                 b = bot.server.stderr.readline()
