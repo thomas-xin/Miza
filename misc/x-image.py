@@ -53,10 +53,10 @@ def await_fut(fut, timeout=None):
 
 def convert_fut(fut):
     loop = asyncio.main_new_loop
-    if is_main_thread():
-        if not isinstance(fut, asyncio.Task):
-            fut = create_task(fut, loop=loop)
-        raise RuntimeError("This function must not be called from the main thread's asyncio loop.")
+    # if is_main_thread():
+    #     if not isinstance(fut, asyncio.Task):
+    #         fut = create_task(fut, loop=loop)
+    #     raise RuntimeError("This function must not be called from the main thread's asyncio loop.")
     try:
         ret = asyncio.run_coroutine_threadsafe(fut, loop=loop)
     except:
