@@ -1380,7 +1380,7 @@ class Ask(Command):
                 objs = list(embd.items())
                 keys = [t[0] for t in objs]
                 ems = [t[1] for t in objs]
-                print("EM:", len(em))
+                print("EM:", len(ems))
                 argsort = await process_image("rank_embeddings", "$", [ems, em], timeout=32)
                 argi = argsort[:5]
                 print("ARGI:", argi)
@@ -1617,7 +1617,7 @@ class Ask(Command):
             bot.data.chat_histories[channel.id] = caid
         else:
             bot.data.chat_histories.pop(channel.id, None)
-        tup += (bot.name, self.alm_re.sub("", s))
+        tup = orig_tup + (bot.name, self.alm_re.sub("", s))
         await register_embedding(m.id, tup)
         lm = ceil(caid.get("long_mem", 0))
         if len(embd) > lm:
