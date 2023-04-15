@@ -3001,13 +3001,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     status_changes = range(len(self.statuses))
                 self.status_iter = choice(status_changes)
                 with suppress(discord.NotFound):
-                    text = f"{self.webserver}, to {uni_str(guild_count)} server{'s' if guild_count != 1 else ''}"
-                    if self.owners:
-                        u = await self.fetch_user(next(iter(self.owners)))
-                        n = u.name
-                        text += f", from {belongs(uni_str(n))} place!"
+                    if "blacklist" in self.data and self.data.blacklist.get(0):
+                        text = "Currently under maintenance, please stay tuned!"
                     else:
-                        text += "!"
+                        text = f"{self.webserver}, to {uni_str(guild_count)} server{'s' if guild_count != 1 else ''}"
+                        if self.owners:
+                            u = await self.fetch_user(next(iter(self.owners)))
+                            n = u.name
+                            text += f", from {belongs(uni_str(n))} place!"
+                        else:
+                            text += "!"
                     # Status iterates through 5 possible choices
                     status = self.statuses[self.status_iter]
                     if status is discord.Streaming:
@@ -3105,7 +3108,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if gid and gid != g_id:
                 create_task(send_with_react(
                     channel,
-                    "I am currently under maintenance, please hold tight!",
+                    "I am currently under maintenance, please stay tuned!",
                     reacts="❎",
                     reference=message,
                 ))
