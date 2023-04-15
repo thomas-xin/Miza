@@ -1242,7 +1242,7 @@ class Ask(Command):
             caid.setdefault("ids", {})[str(message.id)] = None
         mapd = bot.data.chat_mappings.get(channel.id, {})
         embd = bot.data.chat_embeddings.get(channel.id, {})
-        emb_futs = []
+        # emb_futs = []
 
         async def register_embedding(i, name, content, em=None):
             s = str(i)
@@ -1328,7 +1328,7 @@ class Ask(Command):
                     refs.insert(0, ("[REPLIED TO]: " + name, c))
                     ignores.add(m.id)
                     if str(m.id) not in mapd:
-                        emb_futs.append(register_embedding(m.id, name, c))
+                        await register_embedding(m.id, name, c)
             urls = find_urls(q)
             if fm:
                 if urls:
@@ -1376,9 +1376,9 @@ class Ask(Command):
                     refs.insert(0, ("[REFERENCE]: " + name, content))
                     ignores.add(int(i))
                 print("REFS:", refs)
-                register_embedding(message.id, name, q, em=em)
+                await register_embedding(message.id, name, q, em=em)
             else:
-                emb_futs.append(create_task(register_embedding(message.id, name, q)))
+                await register_embedding(message.id, name, q)
             history = []
             if not getattr(message, "simulated", False):
                 async for m in bot.history(channel, limit=16):
@@ -1415,7 +1415,7 @@ class Ask(Command):
                     t = (name, content)
                     history.insert(0, t)
                     if str(m.id) not in mapd:
-                        emb_futs.append(create_task(register_embedding(m.id, name, content)))
+                        await register_embedding(m.id, name, content)
             else:
                 reset = None
             summary = caid and caid.get("summary")
@@ -1588,8 +1588,8 @@ class Ask(Command):
                     m2 = await bot.fetch_message(mi2, channel)
                     if m2:
                         await self.remove_reacts(m2)
-        while emb_futs:
-            await emb_futs.pop(0)
+        # while emb_futs:
+        #     await emb_futs.pop(0)
         # Syntax: Summary, Jailbroken
         caic = await process_image("lambda cid: [(b := CBOTS[cid]).chat_history, b.jailbroken]", "$", [channel.id], fix=1)
         if caic:
@@ -1600,7 +1600,7 @@ class Ask(Command):
             bot.data.chat_histories[channel.id] = caid
         else:
             bot.data.chat_histories.pop(channel.id, None)
-        fut = create_task(register_embedding(m.id, bot.name, s))
+        await register_embedding(m.id, bot.name, s)
         if len(embd) > 1024:
             keys = sorted(embd.keys())
             keys = keys[:-1024]
@@ -1621,7 +1621,6 @@ class Ask(Command):
             bot.data.chat_embeddings.update(channel.id)
         m._react_callback_ = self._callback_
         bot.add_message(m, files=False, force=True)
-        await fut
         return m
 
     async def remove_reacts(self, message):

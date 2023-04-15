@@ -2218,19 +2218,16 @@ async def proc_communicate(proc):
             #     exec_tb(c, globals())
             s = b.rstrip()
             if s and s[:1] == b"!":
-                # print(s)
                 s, r = s.split(b"~", 1)
-                print("PROC_RESP:", s, PROC_RESP.keys())
+                # print("PROC_RESP:", s, PROC_RESP.keys())
                 d = {"_x": base64.b64decode(r)}
                 c = evalex(memoryview(s)[1:], globals(), d)
                 if isinstance(c, (str, bytes, memoryview)):
                     exec_tb(c, globals(), d)
-                # print(c)
             elif s and s[:1] == b"~":
                 c = evalex(memoryview(s)[1:], globals())
                 if isinstance(c, (str, bytes, memoryview)):
                     exec_tb(c, globals())
-                # print(c)
             else:
                 print(lim_str(as_str(s), 1024))
 
@@ -2315,7 +2312,9 @@ async def sub_submit(ptype, command, fix=None, _timeout=12):
                         raise
                 else:
                     break
-        except (BrokenPipeError, OSError, asyncio.TimeoutError) as ex:
+            else:
+                raise TimeoutError("Max waits exceeded.")
+        except (BrokenPipeError, OSError, T0, T1, T2) as ex:
             try:
                 i = PROCS[ptype].index(proc)
             except (LookupError, ValueError):
