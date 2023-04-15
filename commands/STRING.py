@@ -1252,7 +1252,7 @@ class Ask(Command):
             orig = list(tup)
             if tup in chdd:
                 mapd[s] = None
-                return embed[str(chdd[tup])]
+                return embd[str(chdd[tup])]
             chdd[tup] = i
             inp = []
             while tup:
