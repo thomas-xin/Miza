@@ -52,7 +52,7 @@ def await_fut(fut, timeout=None):
     return convert_fut(fut).result(timeout=timeout)
 
 def convert_fut(fut):
-    loop = get_event_loop()
+    loop = asyncio.main_new_loop
     if is_main_thread():
         if not isinstance(fut, asyncio.Task):
             fut = create_task(fut, loop=loop)
