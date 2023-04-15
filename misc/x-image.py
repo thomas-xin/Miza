@@ -2506,9 +2506,9 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 	try:
 		from chatgpt_wrapper import AsyncChatGPT
 	except ImportError:
-		convobot.chatgpt = None
+		convobot.AsyncChatGPT = None
 	else:
-		convobot.chatgpt = await AsyncChatGPT().create(timeout=220)
+		convobot.AsyncChatGPT = AsyncChatGPT
 
 from sentence_transformers import SentenceTransformer
 Embedder = None
