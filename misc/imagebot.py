@@ -56,8 +56,8 @@ def create_driver():
 			options=options,
 		)
 	except selenium.common.SessionNotCreatedException as ex:
-		if ex.args and "Current browser version is " in ex.args[0]:
-			v = ex.args[0].split("Current browser version is ", 1)[-1].split(None, 1)[0]
+		if "Current browser version is " in (s := str(ex)):
+			v = s.split("Current browser version is ", 1)[-1].split(None, 1)[0]
 			url = f"https://msedgedriver.azureedge.net/{v}/edgedriver_win64.zip"
 			import requests, io, zipfile
 			with requests.get(url, headers={"User-Agent": "Mozilla/6.0"}) as resp:
