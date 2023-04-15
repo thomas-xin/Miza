@@ -1247,7 +1247,7 @@ class Ask(Command):
         async def register_embedding(i, name, content, em=None):
             s = str(i)
             if not em:
-                data = await process_image("embedding", "$", [f"{name}: {content}"], timeout=12)
+                data = await process_image("embedding", "$", [f"{name}: {content}"], timeout=13)
                 em = base64.b64encode(data).decode("ascii")
             mapd[s] = (name, content)
             embd[s] = em
