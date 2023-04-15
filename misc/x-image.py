@@ -2519,7 +2519,7 @@ def rank_embeddings(embs, emb, temp=0):
 	blist = [base64.b64decode(line) for line in embs]
 	bt2 = b"".join(blist)
 	x = np.frombuffer(bt2, dtype=np.float16)
-	x = x.reshape((len(x) // len(y), y))
+	x = x.reshape((len(x) // len(y), len(y)))
 	norms = np.linalg.norm(x, axis=1) * np.linalg.norm(y, axis=1)
 	x *= y
 	z = x.sum(axis=1)

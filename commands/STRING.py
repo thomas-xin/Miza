@@ -1366,7 +1366,7 @@ class Ask(Command):
                 objs = list(embd.items())
                 keys = [t[0] for t in objs]
                 ems = [t[1] for t in objs]
-                print("EM:", em)
+                print("EM:", len(em))
                 argsort = await process_image("rank_embeddings", "$", [ems, em], timeout=32)
                 argi = argsort[:5]
                 print("ARGI:", argi)
