@@ -1240,43 +1240,18 @@ class Ask(Command):
             caid = None
         else:
             caid.setdefault("ids", {})[str(message.id)] = None
-        history = []
-        if not getattr(message, "simulated", False):
-            async for m in bot.history(channel, limit=32):
-                if m.id == message.id:
-                    continue
-                if caid and caid.get("first_message_id") == m.id:
-                    break
-                if reset and caid and caid.get("last_message_id") == m.id:
-                    reset = None
-                    continue
-                if caid and str(m.id) in caid.get("ids", ()) or any(str(e) == "❎" for e in m.reactions):
-                    continue
-                if m.content:
-                    content = m.clean_content
-                elif m.embeds:
-                    content = m.embeds[0].description
-                else:
-                    content = None
-                if not content or content.startswith("#"):
-                    continue
-                if reset:
-                    reset = False
-                    if caid:
-                        caid.pop("ids", None)
-                    print(channel, "mismatch", m.id, caid)
-                if m.author.id == bot.id:
-                    name = bot.name
-                else:
-                    name = m.author.display_name
-                    if name == bot.name:
-                        name = m.author.name
-                        if name == bot.name:
-                            name = bot.name + "2"
-                t = (name, content)
-                history.insert(0, t)
-        else:
-            reset = None
+        mapd = bot.data.chat_mappings.get(channel.id, {})
+        embd = bot.data.chat_embeddings.get(channel.id, {})
+        emb_futs = []
+
+        async def register_embedding(i, name, content, em=None):
+            s = str(i)
+            if not em:
+                em = (await process_image("embedding", "$", [f"{name}: {content}"], fix=3, timeout=12)).decode("ascii")
+            mapd[s] = (name, content)
+            embd[s] = em
+            return em
+
         if not q and not message.attachments:
             q = "Hi!"
             if xrand(2):
@@ -1287,6 +1262,7 @@ class Ask(Command):
         fr = fm = None
         urls = []
         refs = []
+        ignores = set()
         with discord.context_managers.Typing(channel):
             # fut = self.cbip = create_task(process_image("CBIP", "&", [], fix=1, timeout=360))
             if getattr(message, "reference", None):
@@ -1349,6 +1325,9 @@ class Ask(Command):
                             capt = url.rsplit("/", 1)[-1]
                             c = c.replace(url, f"[Image {capt}]")
                     refs.insert(0, ("[REPLIED TO]: " + name, c))
+                    ignores.add(m.id)
+                    if str(m.id) not in mapd:
+                        emb_futs.append(register_embedding(m.id, name, c))
             urls = find_urls(q)
             if fm:
                 if urls:
@@ -1380,6 +1359,63 @@ class Ask(Command):
                     name = m.author.name
                     if name == bot.name:
                         name = bot.name + "2"
+            if embd:
+                em = (await process_image("embedding", "$", [f"{name}: {q}"], fix=3, timeout=12)).decode("ascii")
+                objs = list(embd.items())
+                keys = [t[0] for t in objs]
+                ems = [t[1] for t in objs]
+                print("EM:", em)
+                argsort = await process_image("rank_embeddings", "$", [ems, em], timeout=32)
+                argi = argsort[:5]
+                print("ARGI:", argi)
+                for i in reversed(argi):
+                    k = keys[i]
+                    name, content = mapd[k]
+                    refs.insert(0, ("[REFERENCE]: " + name, content))
+                    ignores.add(int(i))
+                print("REFS:", refs)
+                register_embedding(message.id, name, q, em=em)
+            else:
+                emb_futs.append(create_task(register_embedding(message.id, name, q)))
+            history = []
+            if not getattr(message, "simulated", False):
+                async for m in bot.history(channel, limit=16):
+                    if m.id == message.id:
+                        continue
+                    if caid and caid.get("first_message_id") == m.id:
+                        break
+                    if reset and caid and caid.get("last_message_id") == m.id:
+                        reset = None
+                        continue
+                    if m.id in ignores or caid and str(m.id) in caid.get("ids", ()) or any(str(e) == "❎" for e in m.reactions):
+                        continue
+                    if m.content:
+                        content = m.clean_content
+                    elif m.embeds:
+                        content = m.embeds[0].description
+                    else:
+                        content = None
+                    if not content or content.startswith("#"):
+                        continue
+                    if reset:
+                        reset = False
+                        if caid:
+                            caid.pop("ids", None)
+                        print(channel, "mismatch", m.id, caid)
+                    if m.author.id == bot.id:
+                        name = bot.name
+                    else:
+                        name = m.author.display_name
+                        if name == bot.name:
+                            name = m.author.name
+                            if name == bot.name:
+                                name = bot.name + "2"
+                    t = (name, content)
+                    history.insert(0, t)
+                    if str(m.id) not in mapd:
+                        emb_futs.append(create_task(register_embedding(m.id, name, content)))
+            else:
+                reset = None
             summary = caid and caid.get("summary")
             if reset is not None:
                 summary = None
@@ -1550,6 +1586,8 @@ class Ask(Command):
                     m2 = await bot.fetch_message(mi2, channel)
                     if m2:
                         await self.remove_reacts(m2)
+        while emb_futs:
+            await emb_futs.pop(0)
         # Syntax: Summary, Jailbroken
         caic = await process_image("lambda cid: [(b := CBOTS[cid]).chat_history, b.jailbroken]", "$", [channel.id], fix=1)
         if caic:
@@ -1560,6 +1598,25 @@ class Ask(Command):
             bot.data.chat_histories[channel.id] = caid
         else:
             bot.data.chat_histories.pop(channel.id, None)
+        emb_futs.append(create_task(register_embedding(m.id, bot.name, s)))
+        if len(embd) > 1024:
+            keys = sorted(embd.keys())
+            keys = keys[:-1024]
+            for k in keys:
+                mapd.pop(k, None)
+                embd.pop(k, None)
+        try:
+            bot.data.chat_mappings[channel.id].update(mapd)
+        except KeyError:
+            bot.data.chat_mappings[channel.id] = mapd
+        else:
+            bot.data.chat_mappings.update(channel.id)
+        try:
+            bot.data.chat_embeddings[channel.id].update(embd)
+        except KeyError:
+            bot.data.chat_embeddings[channel.id] = embd
+        else:
+            bot.data.chat_embeddings.update(channel.id)
         m._react_callback_ = self._callback_
         bot.add_message(m, files=False, force=True)
         return m
@@ -1615,6 +1672,8 @@ class Ask(Command):
                     return
             print("Resetting", channel)
             bot.data.chat_histories[channel.id] = dict(first_message_id=message.id)
+            bot.data.chat_mappings.pop(channel.id, None)
+            bot.data.chat_embeddings.pop(channel.id, None)
             colour = await bot.get_colour(bot.user)
             emb = discord.Embed(colour=colour, description=css_md("[The conversation has been reset.]"))
             emb.set_author(**get_author(bot.user))
@@ -1626,6 +1685,7 @@ class Ask(Command):
 
 class UpdateChatHistories(Database):
     name = "chat_histories"
+    channel = True
 
     async def _edit_(self, before, after, **void):
         bot = self.bot
@@ -1677,6 +1737,14 @@ class UpdateChatHistories(Database):
         emb.set_author(**get_author(bot.user))
         create_task(message.edit(embed=emb))
         await message.add_reaction("❎")
+
+class UpdateChatMappings(Database):
+    name = "chat_mappings"
+    channel = True
+
+class UpdateChatEmbeddings(Database):
+    name = "chat_embeddings"
+    channel = True
 
 
 class Personality(Command):
@@ -1746,6 +1814,7 @@ class Personality(Command):
 
 class UpdatePersonalities(Database):
     name = "personalities"
+    channel = True
 
 #     def __call__(self, **void):
 #         if convobot:

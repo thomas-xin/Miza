@@ -622,16 +622,16 @@ class Bot:
 		for k, v in refs:
 			if not k.startswith("[REPLIED TO]: "):
 				continue
-			if len(self.gpttokens(v)) > 52:
-				v = self.auto_summarise(q=v, max_length=48, min_length=18).replace("\n", ". ").strip()
+			if len(self.gpttokens(v)) > 300:
+				v = self.auto_summarise(q=v, max_length=288, min_length=192).replace("\n", ". ").strip()
 			s = f"{k}: {v}\n"
 			lines.append(s)
 		for k, v in refs:
 			if k.startswith("[REPLIED TO]: "):
 				continue
 			k = k.replace(":", "")
-			if len(self.gpttokens(v)) > 36:
-				v = self.auto_summarise(q=v, max_length=32, min_length=12).replace("\n", ". ").strip()
+			if len(self.gpttokens(v)) > 200:
+				v = self.auto_summarise(q=v, max_length=192, min_length=128).replace("\n", ". ").strip()
 			s = f"{k}: {v}\n"
 			lines.append(s)
 		tq = q
@@ -750,7 +750,7 @@ class Bot:
 				if not k.isascii() or not k.isalnum():
 					k = unicode_prune(k)
 					if not k.isascii() or not k.isalnum():
-						k = "".join((c if c.isascii() and c.isalnum() else "-") for c in k).strip("-")
+						k = "".join((c if (c.isascii() and c.isalnum() or c == "_") else "-") for c in k).strip("-")
 						while "--" in k:
 							k = k.replace("--", "-")
 				if k:
@@ -1359,8 +1359,8 @@ class Bot:
 		else:
 			res = asyncio.run(run_chatgpt(q))
 		if res:
-			if not self.bl:
-				print("ChatGPT response:", res)
+			# if not self.bl:
+			# 	print("ChatGPT response:", res)
 			# if len(self.gpttokens(res)) > 512:
 			# 	res = self.answer_summarise(q=res, max_length=500, min_length=256).strip()
 			errs = (
@@ -1393,7 +1393,7 @@ class Bot:
 				cookies={"__session": vis_s},
 			)
 			print(resp)
-		print("Visus prompt:", q)
+		# print("Visus prompt:", q)
 		rid = "-".join("".join(hex(random.randint(0, 15))[2:] for i in range(n)) for n in (8, 4, 4, 4, 12))
 		resp = requests.post(
 			"https://app.visus.ai/api/query",
@@ -1440,7 +1440,7 @@ class Bot:
 				model="gpt-3.5-turbo",
 				user=str(random.randint(0, 4294967295)),
 			)
-		print("YourChat prompt:", data)
+		# print("YourChat prompt:", data)
 		headers = {
 			"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
 			"DNT": "1",

@@ -2221,24 +2221,25 @@ async def proc_communicate(proc):
                 c = evalex(memoryview(s)[1:], globals(), d)
                 if isinstance(c, (str, bytes, memoryview)):
                     exec_tb(c, globals(), d)
-                print(c)
+                # print(c)
             elif s and s[:1] == b"~":
                 c = evalex(memoryview(s)[1:], globals())
                 if isinstance(c, (str, bytes, memoryview)):
                     exec_tb(c, globals())
-                print(c)
+                # print(c)
             else:
                 print(lim_str(as_str(s), 1024))
 
 proc_args = cdict(
-    math=[python, "misc/x-math.py"],
-    image=[python, "misc/x-image.py"],
+    math=(python, "misc/x-math.py"),
+    image=(python, "misc/x-image.py"),
 )
 
 async def start_proc(k, i):
+    args = list(proc_args[k])
+    args.append(str(i))
     proc = await asyncio.create_subprocess_exec(
-        *proc_args[k],
-        str(i),
+        *args,
         limit=8388608,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,

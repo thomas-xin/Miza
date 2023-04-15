@@ -2510,8 +2510,23 @@ def embedding(s):
 		print("Initialising embedder...")
 		globals()["Embedder"] = SentenceTransformer("LLukas22/all-mpnet-base-v2-embedding-all")
 		print("Embedder loaded.")
-	a = Embedder.encode(s)
+	a = Embedder.encode(s).astype(np.float16)
 	return a.data
+
+def rank_embeddings(embs, emb, temp=0):
+	btest = base64.b64decode(emb)
+	y = np.frombuffer(emb, dtype=np.float16)
+	blist = [base64.b64decode(line) for line in embs]
+	b2 = b"".join(blist)
+	x = np.frombuffer(b2, dtype=np.float16)
+	x = x.reshape((len(x) // len(y), y))
+	norms = np.linalg.norm(x, axis=1) * np.linalg.norm(y, axis=1)
+	x *= y
+	z = x.sum(axis=1)
+	z /= norms
+	if temp:
+		pass
+	return list(np.argsort(z)[::-1])
 
 if len(sys.argv) > 1 and sys.argv[1] == "2":
 	for i in range(3):

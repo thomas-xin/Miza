@@ -4487,7 +4487,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 return object.__getattribute__(m, k)
 
         class LoadedMessage(discord.Message):
-            pass
+
+            @property
+            def mentions(self):
+                try:
+                    return super().mentions
+                except AttributeError:
+                    return []
 
         class CachedMessage(discord.abc.Snowflake):
 
