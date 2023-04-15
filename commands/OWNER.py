@@ -1091,7 +1091,7 @@ class Maintenance(Command):
             bot.data.blacklist[0] = guild.id
             return css_md(f"Maintenance mode activated. No longer serving commands outside of {sqr_md(guild)}.")
         maintenance = bot.data.blacklist.get(0)
-        return css_md(f"Maintenance mode: {sqr_md(bot.maintenance)}")
+        return css_md(f"Maintenance mode: {sqr_md(maintenance)}")
 
 
 class Suspend(Command):
