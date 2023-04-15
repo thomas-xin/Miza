@@ -626,14 +626,17 @@ class Bot:
 				v = self.auto_summarise(q=v, max_length=288, min_length=192).replace("\n", ". ").strip()
 			s = f"{k}: {v}\n"
 			lines.append(s)
+		refst = []
 		for k, v in refs:
 			if k.startswith("[REPLIED TO]: "):
 				continue
-			k = k.replace(":", "")
-			if len(self.gpttokens(v)) > 200:
-				v = self.auto_summarise(q=v, max_length=192, min_length=128).replace("\n", ". ").strip()
+			k = k.replace(":", "") or "Human"
 			s = f"{k}: {v}\n"
-			lines.append(s)
+			refst.append(s)
+		r = "".join(refst).strip()
+		if len(self.gpttokens(r)) > 400:
+			r = self.auto_summarise(q=r, max_length=384, min_length=256).strip()
+		lines.append("[SYSTEM]: \n" + r + "\n")
 		tq = q
 		if len(self.gpttokens(tq)) > 400:
 			tq = self.auto_summarise(q=tq, max_length=384, min_length=256).replace("\n", ". ").strip()

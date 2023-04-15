@@ -1384,7 +1384,7 @@ class Ask(Command):
                 argsort = await process_image("rank_embeddings", "$", [ems, em], timeout=32)
                 argi = argsort[:5]
                 print("ARGI:", argi)
-                for i in reversed(argi):
+                for i in shuffle(argi):
                     k = keys[i]
                     ki = int(k)
                     if ki in ignores:
@@ -1393,7 +1393,7 @@ class Ask(Command):
                     while len(temp):
                         name, content = temp[:2]
                         temp = temp[2:]
-                        refs.insert(0, ("[REFERENCE]: " + name, content))
+                        refs.insert(0, (name, content))
                     ignores.add(ki)
                 # print("REFS:", refs)
             history = []
