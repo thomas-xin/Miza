@@ -2287,7 +2287,7 @@ async def sub_submit(ptype, command, fix=None, _timeout=12):
     while ts in PROC_RESP:
         ts += 1
     PROC_RESP[ts] = fut = concurrent.futures.Future()
-    print("PROC_RESP:", PROC_RESP.keys())
+    # print("PROC_RESP:", PROC_RESP.keys())
     command = "[" + ",".join(map(repr, command[:2])) + "," + ",".join(map(str, command[2:])) + "]"
     s = f"~{ts}~".encode("ascii") + base64.b64encode(command.encode("utf-8")) + b"\n"
     # s = f"~{ts}~{repr(command.encode('utf-8'))}\n".encode("utf-8")

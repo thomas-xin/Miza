@@ -1077,6 +1077,23 @@ class UpdateChannelHistories(Database):
             pass
 
 
+class Maintenance(Command):
+    min_level = nan
+    description = "Toggles Maintenance mode, which will block all use of commands for all servers except the current one while active."
+    usage = "<disable(?d)>"
+    flags = "aed"
+
+    async def __call__(self, bot, guild, **void):
+        if "d" in flags:
+            bot.data.blacklist.pop(0)
+            return css_md(f"Maintenance mode deactivated.")
+        if "a" in flags or "e" in flags:
+            bot.data.blacklist[0] = guild.id
+            return css_md(f"Maintenance mode activated. No longer serving commands outside of {sqr_md(guild)}.")
+        maintenance = bot.data.blacklist.get(0)
+        return css_md(f"Maintenance mode: {sqr_md(bot.maintenance)}")
+
+
 class Suspend(Command):
     name = ["Block", "Blacklist"]
     min_level = nan

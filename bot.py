@@ -3063,6 +3063,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             g_id = guild.id
         else:
             g_id = 0
+        if "blacklist" in self.data:
+            gid = self.data.blacklist.get(0)
+            if gid and gid != g_id:
+                create_task(send_with_react(
+                    channel,
+                    "I am currently under maintenance, please hold tight!",
+                    reacts="❎",
+                    reference=message,
+                ))
+                return 0
         if not slash:
             if u_id != self.id:
                 # Strip quote from message.
