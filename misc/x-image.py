@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import os, sys, io, time, concurrent.futures, asyncio, subprocess, psutil, collections, traceback, re, requests, blend_modes, pdf2image, zipfile, contextlib, filetype, pyqrcode, ast, colorspace, pickle, orjson, base64
+import os, sys, io, time, concurrent.futures, asyncio, subprocess, psutil, collections, traceback, re, requests, blend_modes, pdf2image, zipfile, contextlib, filetype, pyqrcode, ast, colorspace, orjson, base64, random
 import numpy as np
 import PIL
 from PIL import Image, ImageCms, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhance, ImageMath, ImageStat, ImageFile
@@ -2513,7 +2513,7 @@ def embedding(s):
 	a = Embedder.encode(s).astype(np.float16)
 	return a.data
 
-def rank_embeddings(embs, emb, temp=0):
+def rank_embeddings(embs, emb, temp=0.375):
 	btest = base64.b64decode(emb)
 	y = np.frombuffer(btest, dtype=np.float16)
 	blist = [base64.b64decode(line) for line in embs]
@@ -2524,9 +2524,8 @@ def rank_embeddings(embs, emb, temp=0):
 	norms = np.linalg.norm(x, axis=1) * np.linalg.norm(y, axis=1)
 	z = (x * y).sum(axis=1)
 	z /= norms
-	if temp:
-		pass
-	return list(np.argsort(z)[::-1])
+	top = np.max(z)
+	return [i for i in np.argsort(z)[::-1] if z[i] >= (top - (2 + random.random()) * temp / 3)]
 
 if len(sys.argv) > 1 and sys.argv[1] == "2":
 	for i in range(3):

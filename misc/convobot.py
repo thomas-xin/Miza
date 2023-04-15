@@ -633,10 +633,11 @@ class Bot:
 			k = k.replace(":", "") or "Human"
 			s = f"{k}: {v}\n"
 			refst.append(s)
-		r = "".join(refst).strip()
-		if len(self.gpttokens(r)) > 400:
-			r = self.auto_summarise(q=r, max_length=384, min_length=256).strip()
-		lines.append("[SYSTEM]: \n" + r + "\n")
+		if refst:
+			r = "".join(refst).strip()
+			if len(self.gpttokens(r)) > 400:
+				r = self.auto_summarise(q=r, max_length=384, min_length=256).strip()
+			lines.append("[SYSTEM]: \n" + r + "\n")
 		tq = q
 		if len(self.gpttokens(tq)) > 400:
 			tq = self.auto_summarise(q=tq, max_length=384, min_length=256).replace("\n", ". ").strip()
@@ -1651,7 +1652,7 @@ class Bot:
 
 	def rerender(self):
 		lim = 360 if self.premium >= 2 else 120
-		r1 = 5 if self.premium >= 2 else 3
+		r1 = 3 if self.premium >= 2 else 2
 		if not self.chat_history or len(self.chat_history) < r1 and len(self.gpttokens(self.chat_history[0][1])) <= lim * 2:
 			return
 		r2 = r1 // 2 + 1
