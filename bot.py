@@ -2498,7 +2498,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             new_ip = f"http://{self.ip}:{PORT}"
             # if self.raw_webserver != self.webserver and self.raw_webserver != new_ip:
             #     create_task(self.create_main_website())
-            self.raw_webserver = new_ip
+            # self.raw_webserver = new_ip
 
     def is_webserver_url(self, url):
         if url.startswith(self.raw_webserver) or url.startswith("https://" + self.raw_webserver.split("//", 1)[-1]):
@@ -6063,7 +6063,7 @@ def webserver_communicate(bot):
             print_exc()
             bot.start_webserver()
         with tracebacksuppressor:
-            with reqs.next().head(self.webserver) as resp:
+            with reqs.next().options(self.webserver, stream=True) as resp:
                 self.raw_webserver = resp.url
         with tracebacksuppressor:
             while bot.server and is_strict_running(bot.server):
