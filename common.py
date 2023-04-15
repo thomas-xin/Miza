@@ -2220,6 +2220,7 @@ async def proc_communicate(proc):
             if s and s[:1] == b"!":
                 # print(s)
                 s, r = s.split(b"~", 1)
+                print("PROC_RESP:", s, PROC_RESP.keys())
                 d = {"_x": base64.b64decode(r)}
                 c = evalex(memoryview(s)[1:], globals(), d)
                 if isinstance(c, (str, bytes, memoryview)):
