@@ -1600,7 +1600,7 @@ class Ask(Command):
             bot.data.chat_histories[channel.id] = caid
         else:
             bot.data.chat_histories.pop(channel.id, None)
-        emb_futs.append(create_task(register_embedding(m.id, bot.name, s)))
+        fut = create_task(register_embedding(m.id, bot.name, s))
         if len(embd) > 1024:
             keys = sorted(embd.keys())
             keys = keys[:-1024]
@@ -1621,6 +1621,7 @@ class Ask(Command):
             bot.data.chat_embeddings.update(channel.id)
         m._react_callback_ = self._callback_
         bot.add_message(m, files=False, force=True)
+        await fut
         return m
 
     async def remove_reacts(self, message):

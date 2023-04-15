@@ -3103,7 +3103,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if comm and (comm[0] == "/" or comm[0] == self.prefix):
                 comm = comm[1:]
             op = True
-        if op and "blacklist" in self.data and not isnan(u_perm):
+        mentioning = (op or self.id in (member.id for member in message.mentions))
+        if (op or mentioning) and "blacklist" in self.data and not isnan(u_perm):
             gid = self.data.blacklist.get(0)
             if gid and gid != g_id:
                 create_task(send_with_react(
@@ -3114,7 +3115,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 ))
                 return 0
         # Respond to blacklisted users attempting to use a command, or when mentioned without a command.
-        if (u_perm <= -inf and (op or self.id in (member.id for member in message.mentions))) and not cpy.startswith("~~"):
+        if (u_perm <= -inf and mentioning) and not cpy.startswith("~~"):
             # print(f"Ignoring command from blacklisted user {user} ({u_id}): {lim_str(message.content, 256)}")
             if not self.ready:
                 create_task(send_with_react(
