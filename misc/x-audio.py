@@ -455,7 +455,7 @@ class AudioFile:
 			cdc = "libopus"
 			cdc2 = "opus"
 		# Collects data from source, converts to 48khz 224kbps opus format, outputting to target file
-		cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", fmt, "-c:a", cdc, "-ar", str(SAMPLE_RATE), "-ac", "2", "-b:a", "229376", "cache/" + self.file]
+		cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", fmt, "-c:a", cdc, "-ar", str(SAMPLE_RATE), "-ac", "2", "-b:a", "196608", "cache/" + self.file]
 		# if not stream.startswith("https://cf-hls-media.sndcdn.com/"):
 		with suppress():
 			if stream.startswith("https://www.yt-download.org/download/"):
@@ -635,7 +635,7 @@ class AudioFile:
 		if options is None:
 			options = auds.construct_options(full=self.live)
 		speed = 1
-		if options or auds.reverse or pos or auds.stats.bitrate != 2293.76 or self.live:
+		if options or auds.reverse or pos or auds.stats.bitrate != 1966.08 or self.live:
 			args = ["./ffmpeg", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets"]
 			if (pos or auds.reverse) and self.seekable:
 				arg = "-to" if auds.reverse else "-ss"
@@ -654,7 +654,7 @@ class AudioFile:
 				buff = True
 				args.append("-")
 			auds.stats.bitrate = min(auds.stats.bitrate, auds.stats.max_bitrate)
-			if options or auds.stats.bitrate != 2293.76:
+			if options or auds.stats.bitrate != 1966.08:
 				br = 100 * auds.stats.bitrate
 				sr = SAMPLE_RATE
 				while br < 4096:

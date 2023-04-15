@@ -1244,11 +1244,16 @@ class Ask(Command):
             caid.setdefault("ids", {})[str(message.id)] = None
         mapd = bot.data.chat_mappings.get(channel.id, {})
         embd = bot.data.chat_embeddings.get(channel.id, {})
+        chdd = bot.data.chat_dedups.get(channel.id, {})
         # emb_futs = []
 
         async def register_embedding(i, *tup, em=None):
             s = str(i)
             orig = list(tup)
+            if tup in chdd:
+                mapd[s] = None
+                return embed[str(chdd[tup])]
+            chdd[tup] = i
             inp = []
             while tup:
                 name, content = tup[:2]
@@ -1627,8 +1632,9 @@ class Ask(Command):
             keys = sorted(embd.keys())
             keys = keys[:-lm]
             for k in keys:
-                mapd.pop(k, None)
+                tup = mapd.pop(k, None)
                 embd.pop(k, None)
+                chdd.pop(tup, None)
         try:
             bot.data.chat_mappings[channel.id].update(mapd)
         except KeyError:
@@ -1641,6 +1647,12 @@ class Ask(Command):
             bot.data.chat_embeddings[channel.id] = embd
         else:
             bot.data.chat_embeddings.update(channel.id)
+        try:
+            bot.data.chat_dedups[channel.id].update(chdd)
+        except KeyError:
+            bot.data.chat_dedups[channel.id] = chdd
+        else:
+            bot.data.chat_dedups.update(channel.id)
         m._react_callback_ = self._callback_
         bot.add_message(m, files=False, force=True)
         return m
@@ -1698,6 +1710,7 @@ class Ask(Command):
             bot.data.chat_histories[channel.id] = dict(first_message_id=message.id)
             bot.data.chat_mappings.pop(channel.id, None)
             bot.data.chat_embeddings.pop(channel.id, None)
+            bot.data.chat_dedups.pop(channel.id, None)
             colour = await bot.get_colour(bot.user)
             emb = discord.Embed(colour=colour, description=css_md("[The conversation has been reset.]"))
             emb.set_author(**get_author(bot.user))
@@ -1768,6 +1781,10 @@ class UpdateChatMappings(Database):
 
 class UpdateChatEmbeddings(Database):
     name = "chat_embeddings"
+    channel = True
+
+class UpdateChatDedups(Database):
+    name = "chat_dedups"
     channel = True
 
 

@@ -2532,7 +2532,7 @@ def rank_embeddings(embs, emb, temp=0.375):
 	z = (x * y).sum(axis=1)
 	z /= norms
 	top = np.max(z)
-	return [i for i in np.argsort(z)[::-1] if z[i] >= (top - (2 + random.random()) * temp / 3)]
+	return [i for i in np.argsort(z)[::-1] if z[i] - random.random() / 3 >= (top - temp * 2 / 3)]
 
 if len(sys.argv) > 1 and sys.argv[1] == "2":
 	for i in range(3):

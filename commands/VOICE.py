@@ -236,7 +236,7 @@ lyric_trans = re.compile(
 class CustomAudio(collections.abc.Hashable):
 
     # Default player settings
-    max_bitrate = 229376
+    max_bitrate = 196608
     defaults = {
         "volume": 1,
         "reverb": 0,
