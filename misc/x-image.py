@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import os, sys, io, time, concurrent.futures, threading, asyncio, subprocess, psutil, collections, traceback, re, requests, blend_modes, pdf2image, zipfile, contextlib, filetype, pyqrcode, ast, colorspace, pickle, orjson, base64
+import os, sys, io, time, concurrent.futures, asyncio, subprocess, psutil, collections, traceback, re, requests, blend_modes, pdf2image, zipfile, contextlib, filetype, pyqrcode, ast, colorspace, pickle, orjson, base64
 import numpy as np
 import PIL
 from PIL import Image, ImageCms, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhance, ImageMath, ImageStat, ImageFile
@@ -2422,124 +2422,98 @@ is_discord_emoji = lambda url: discord_emoji.search(url)
 
 sys.path.append("misc")
 
-def CBIP():
-	import convobot
-	globals()["convobot"] = convobot
-async def ACBIP():
-	return CBIP()
-
-def IBIP():
-	import imagebot
-	globals()["imagebot"] = imagebot
-async def AIBIP():
-	return IBIP()
-
 CBOTS = {}
 def cb_exists(cid):
 	return cid in CBOTS
 
-def CBAI(inputs):
-	if threading.current_thread() is threading.main_thread():
-		CBIP()
-	else:
-		await_fut(asyncio.main_new_loop.create_task(ACBIP()))
-	channel_id = inputs["channel_id"]
-	key = inputs["key"]
-	ht = inputs["huggingface_token"]
-	vis = inputs.get("vis_session")
-	name = inputs["name"]
-	personality = inputs["personality"]
-	premium = inputs["premium"]
-	summary = inputs["summary"]
-	jb = inputs["jb"]
-	history = inputs["history"]
-	refs = inputs["refs"]
-	im = inputs["im"]
-	prompt = inputs["prompt"]
-	bl = inputs.get("bl")
-	oai = inputs.get("oai")
-	bals = inputs.get("bals")
-	nsfw = inputs.get("nsfw")
-	# locals().update(inputs)
-	try:
-		cb = CBOTS[channel_id]
-		if cb.personality != personality:
-			summary = None
-			raise KeyError
-	except KeyError:
-		cb = CBOTS[channel_id] = convobot.Bot( 
-			key=key,
-			huggingface_token=ht,
-			summary=summary,
-			name=name,
-			personality=personality,
-			premium=premium,
-		)
-	else:
-		cb.premium = premium
-	cb.bl = bl
-	cb.oai = oai
-	cb.bals = bals
-	cb.nsfw = nsfw
-	cb.vis_s = vis
-	if inputs.get("reset"):
-		to = []
-		for i, t in enumerate(history):
-			cb.append(t, nin=len(history) - i - 1, to=to)
-		cb.chat_history = to
-	cb.jailbroken = jb
-	if im:
+if len(sys.argv) > 1 and sys.argv[1] == "1":
+	import convobot
+
+	def CBAI(inputs):
+		channel_id = inputs["channel_id"]
+		key = inputs["key"]
+		ht = inputs["huggingface_token"]
+		vis = inputs.get("vis_session")
+		name = inputs["name"]
+		personality = inputs["personality"]
+		premium = inputs["premium"]
+		summary = inputs["summary"]
+		jb = inputs["jb"]
+		history = inputs["history"]
+		refs = inputs["refs"]
+		im = inputs["im"]
+		prompt = inputs["prompt"]
+		bl = inputs.get("bl")
+		oai = inputs.get("oai")
+		bals = inputs.get("bals")
+		nsfw = inputs.get("nsfw")
 		try:
-			im = cb.image
-		except AttributeError:
-			im = get_image(im)
-	return cb.ai(*prompt, refs=refs, im=im)
-
-def CBAU(inputs):
-	if threading.current_thread() is threading.main_thread():
-		CBIP()
-	else:
-		await_fut(asyncio.main_new_loop.create_task(ACBIP()))
-	prompt = inputs["prompt"]
-	key = inputs["key"]
-	ht = inputs["huggingface_token"]
-	vis = inputs.get("vis_session")
-	oai = inputs.get("oai")
-	bals = inputs.get("bals")
-	nsfw = inputs.get("nsfw")
-	try:
-		cb = CBOTS["TR"]
-	except KeyError:
-		cb = CBOTS["TR"] = convobot.Bot( 
-			key=key,
-			huggingface_token=ht,
-			premium=0,
-		)
+			cb = CBOTS[channel_id]
+			if cb.personality != personality:
+				summary = None
+				raise KeyError
+		except KeyError:
+			cb = CBOTS[channel_id] = convobot.Bot( 
+				key=key,
+				huggingface_token=ht,
+				summary=summary,
+				name=name,
+				personality=personality,
+				premium=premium,
+			)
+		else:
+			cb.premium = premium
+		cb.bl = bl
+		cb.oai = oai
+		cb.bals = bals
+		cb.nsfw = nsfw
 		cb.vis_s = vis
-	cb.oai = oai
-	cb.bals = bals
-	cb.nsfw = nsfw
-	return cb.au(prompt)
+		if inputs.get("reset"):
+			to = []
+			for i, t in enumerate(history):
+				cb.append(t, nin=len(history) - i - 1, to=to)
+			cb.chat_history = to
+		cb.jailbroken = jb
+		if im:
+			try:
+				im = cb.image
+			except AttributeError:
+				im = get_image(im)
+		return cb.ai(*prompt, refs=refs, im=im)
 
-def EBAP():
-	from sentence_transformers import SentenceTransformer
-	globals()["Embedder"] = SentenceTransformer("LLukas22/all-mpnet-base-v2-embedding-all")
-async def AEBAP():
-	return EBAP()
+	def CBAU(inputs):
+		prompt = inputs["prompt"]
+		key = inputs["key"]
+		ht = inputs["huggingface_token"]
+		vis = inputs.get("vis_session")
+		oai = inputs.get("oai")
+		bals = inputs.get("bals")
+		nsfw = inputs.get("nsfw")
+		try:
+			cb = CBOTS["TR"]
+		except KeyError:
+			cb = CBOTS["TR"] = convobot.Bot( 
+				key=key,
+				huggingface_token=ht,
+				premium=0,
+			)
+			cb.vis_s = vis
+		cb.oai = oai
+		cb.bals = bals
+		cb.nsfw = nsfw
+		return cb.au(prompt)
 
+from sentence_transformers import SentenceTransformer
 Embedder = None
 def embedding(s):
 	if not Embedder:
 		print("Initialising embedder...")
-		if threading.current_thread() is threading.main_thread():
-			EBAP()
-		else:
-			await_fut(asyncio.main_new_loop.create_task(AEBAP()))
+		globals()["Embedder"] = SentenceTransformer("LLukas22/all-mpnet-base-v2-embedding-all")
 		print("Embedder loaded.")
 	a = Embedder.encode(s)
 	return a.data
 
-def ICAP():
+if len(sys.argv) > 1 and sys.argv[1] == "2":
 	for i in range(3):
 		try:
 			from transformers import TrOCRProcessor, VisionEncoderDecoderModel, ViltProcessor, ViltForQuestionAnswering
@@ -2547,75 +2521,60 @@ def ICAP():
 			time.sleep(i + 1)
 		else:
 			break
-	return TrOCRProcessor, VisionEncoderDecoderModel, ViltProcessor, ViltForQuestionAnswering
-async def AICAP():
-	return ICAP()
-	
-VGPT = VVQA = None
-def caption(im, q=None, cid=None):
-	if threading.current_thread() is threading.main_thread():
-		TrOCRProcessor, VisionEncoderDecoderModel, ViltProcessor, ViltForQuestionAnswering = ICAP()
-	else:
-		TrOCRProcessor, VisionEncoderDecoderModel, ViltProcessor, ViltForQuestionAnswering = await_fut(asyncio.main_new_loop.create_task(AICAP()))
-	im = resize_max(im, 512, "auto")
-	if im.mode != "RGB":
-		image = im.convert("RGB")
-	else:
-		image = im
-	p1 = p2 = None
-	if VGPT:
-		p, m = VGPT
-	else:
-		p = TrOCRProcessor.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
-		m = VisionEncoderDecoderModel.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
-		globals()["VGPT"] = (p, m)
-	impv = p(image, return_tensors="pt")
-	pixel_values = impv.pixel_values
-	generated_ids = m.generate(pixel_values)
-	generated_text = p.batch_decode(generated_ids, skip_special_tokens=True)[0]
-	p1 = generated_text.strip()
-	if not q:
-		return (p1, "")
-	if VVQA:
-		p, m = VVQA
-	else:
-		p = ViltProcessor.from_pretrained("dandelin/vilt-b32-finetuned-vqa")
-		m = ViltForQuestionAnswering.from_pretrained("dandelin/vilt-b32-finetuned-vqa")
-		globals()["VVQA"] = (p, m)
-	spl = q.split()
-	t = " ".join(w for w in spl if not is_url(w))[:32]
-	encoding = p(image, t, return_tensors="pt")
-	outputs = m(**encoding)
-	logits = outputs.logits
-	idx = logits.argmax(-1).item()
-	p2 = m.config.id2label[idx].strip()
-	return (p1, p2)
 
-def IBAOL(prompt, kwargs, key=None):
-	if threading.current_thread() is threading.main_thread():
-		IBIP()
-	else:
-		await_fut(asyncio.main_new_loop.create_task(AIBIP()))
-	try:
-		ib = CBOTS[None]
-	except KeyError:
-		ib = CBOTS[None] = imagebot.Bot(token=key)
-	if key:
-		ib.token = key
-	return ib.art_openjourney_local(prompt, kwargs)
+	VGPT = VVQA = None
+	def caption(im, q=None, cid=None):
+		im = resize_max(im, 512, "auto")
+		if im.mode != "RGB":
+			image = im.convert("RGB")
+		else:
+			image = im
+		p1 = p2 = None
+		if VGPT:
+			p, m = VGPT
+		else:
+			p = TrOCRProcessor.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
+			m = VisionEncoderDecoderModel.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
+			globals()["VGPT"] = (p, m)
+		impv = p(image, return_tensors="pt")
+		pixel_values = impv.pixel_values
+		generated_ids = m.generate(pixel_values)
+		generated_text = p.batch_decode(generated_ids, skip_special_tokens=True)[0]
+		p1 = generated_text.strip()
+		if not q:
+			return (p1, "")
+		if VVQA:
+			p, m = VVQA
+		else:
+			p = ViltProcessor.from_pretrained("dandelin/vilt-b32-finetuned-vqa")
+			m = ViltForQuestionAnswering.from_pretrained("dandelin/vilt-b32-finetuned-vqa")
+			globals()["VVQA"] = (p, m)
+		spl = q.split()
+		t = " ".join(w for w in spl if not is_url(w))[:32]
+		encoding = p(image, t, return_tensors="pt")
+		outputs = m(**encoding)
+		logits = outputs.logits
+		idx = logits.argmax(-1).item()
+		p2 = m.config.id2label[idx].strip()
+		return (p1, p2)
 
-def IBASL(prompt, kwargs, key=None):
-	if threading.current_thread() is threading.main_thread():
-		IBIP()
-	else:
-		await_fut(asyncio.main_new_loop.create_task(AIBIP()))
-	try:
-		ib = CBOTS[None]
-	except KeyError:
-		ib = CBOTS[None] = imagebot.Bot(token=key)
-	if key:
-		ib.token = key
-	return ib.art_stablediffusion_local(prompt, kwargs)
+	def IBAOL(prompt, kwargs, key=None):
+		try:
+			ib = CBOTS[None]
+		except KeyError:
+			ib = CBOTS[None] = imagebot.Bot(token=key)
+		if key:
+			ib.token = key
+		return ib.art_openjourney_local(prompt, kwargs)
+
+	def IBASL(prompt, kwargs, key=None):
+		try:
+			ib = CBOTS[None]
+		except KeyError:
+			ib = CBOTS[None] = imagebot.Bot(token=key)
+		if key:
+			ib.token = key
+		return ib.art_stablediffusion_local(prompt, kwargs)
 
 
 def write_to(fn, data):

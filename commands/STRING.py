@@ -1312,7 +1312,7 @@ class Ask(Command):
                         q += found[0]
             if urls:
                 url = im = urls[-1]
-                p1, p2 = await process_image(url, "caption", ["-nogif", q, channel.id], fix=1, timeout=300)
+                p1, p2 = await process_image(url, "caption", ["-nogif", q, channel.id], fix=2, timeout=300)
                 if p1 or p2:
                     if not bl:
                         print(p1)

@@ -1553,7 +1553,7 @@ class Art(Command):
         if not prompt:
             if not url:
                 raise ArgumentError("Please input a valid prompt.")
-            prompt, _ = await process_image(url, "caption", ["-nogif"], fix=1)
+            prompt, _ = await process_image(url, "caption", ["-nogif"], fix=2)
             if not prompt:
                 prompt = "art"
             print(url, prompt)
