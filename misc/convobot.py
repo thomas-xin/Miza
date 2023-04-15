@@ -1004,22 +1004,22 @@ class Bot:
 			else:
 				stop = ["s an AI", "AI language model", "I'm sorry,", "language model"]
 			response = None
+			data = dict(
+				model=model,
+				messages=messages,
+				temperature=temp,
+				max_tokens=min(8192 if premium >= 2 else 1024, limit - pc - 64),
+				top_p=1,
+				stop=stop,
+				frequency_penalty=1.0,
+				presence_penalty=0.6,
+				user=str(hash(u)),
+			)
 			for i in range(tries):
 				redo = False
 				try:
 					if flagged:
 						raise PermissionError("flagged")
-					data = dict(
-						model=model,
-						messages=messages,
-						temperature=temp,
-						max_tokens=min(8192 if premium >= 2 else 1024, limit - pc - 64),
-						top_p=1,
-						stop=stop,
-						frequency_penalty=1.0,
-						presence_penalty=0.6,
-						user=str(hash(u)),
-					)
 					if not i and not random.randint(0, 2) and model.startswith("gpt-3.5-") and not self.nsfw and not self.jailbroken:
 						try:
 							model = "gpt-3.5-clone"
