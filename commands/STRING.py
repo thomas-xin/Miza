@@ -1386,12 +1386,15 @@ class Ask(Command):
                 print("ARGI:", argi)
                 for i in reversed(argi):
                     k = keys[i]
+                    ki = int(k)
+                    if ki in ignores:
+                        continue
                     temp = mapd[k].copy()
                     while len(temp):
                         name, content = temp[:2]
                         temp = temp[2:]
                         refs.insert(0, ("[REFERENCE]: " + name, content))
-                    ignores.add(int(i))
+                    ignores.add(ki)
                 # print("REFS:", refs)
             history = []
             if not getattr(message, "simulated", False):
