@@ -3063,16 +3063,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             g_id = guild.id
         else:
             g_id = 0
-        if "blacklist" in self.data:
-            gid = self.data.blacklist.get(0)
-            if gid and gid != g_id:
-                create_task(send_with_react(
-                    channel,
-                    "I am currently under maintenance, please hold tight!",
-                    reacts="❎",
-                    reference=message,
-                ))
-                return 0
         if not slash:
             if u_id != self.id:
                 # Strip quote from message.
@@ -3086,6 +3076,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         # Get list of enabled commands for the channel.
         enabled = self.get_enabled(channel)
         u_perm = self.get_perms(u_id, guild)
+        if "blacklist" in self.data and not isnan(u_perm):
+            gid = self.data.blacklist.get(0)
+            if gid and gid != g_id:
+                create_task(send_with_react(
+                    channel,
+                    "I am currently under maintenance, please hold tight!",
+                    reacts="❎",
+                    reference=message,
+                ))
+                return 0
         admin = not inf > u_perm
         # Gets prefix for current guild.
         if u_id == self.id:

@@ -1083,7 +1083,7 @@ class Maintenance(Command):
     usage = "<disable(?d)>"
     flags = "aed"
 
-    async def __call__(self, bot, guild, **void):
+    async def __call__(self, bot, guild, flags, **void):
         if "d" in flags:
             bot.data.blacklist.pop(0)
             return css_md(f"Maintenance mode deactivated.")
