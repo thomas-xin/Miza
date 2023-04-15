@@ -1340,7 +1340,7 @@ class Bot:
 				if ok:
 					print("ChatGPT: History deleted")
 				else:
-					print("ChatGPT: Failed to delete conversations")
+					print("ChatGPT: Failed to delete conversations:", json)
 					chatgpt.rate = time.time() + 3600
 				# resp = []
 				# async for w in chatgpt.ask_stream(""):
