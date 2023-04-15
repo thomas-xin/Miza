@@ -1028,10 +1028,11 @@ class Bot:
 						raise PermissionError("flagged")
 					if not i and not random.randint(0, 2) and model.startswith("gpt-3.5-") and not self.nsfw and not self.jailbroken:
 						try:
-							model = "gpt-3.5-clone"
 							text = self.ycg(data).removeprefix(f"{self.name}: ").strip()
 							if stop and any(s in text for s in stop):
 								text = ""
+							elif text:
+								model = "gpt-3.5-clone"
 						except EOFError:
 							pass
 						except:
@@ -1069,8 +1070,9 @@ class Bot:
 								model = "gpt-3.5-visus"
 								text = self.vai(prompt)
 							if not text:
-								model = "gpt-3.5-chat"
 								text = self.chatgpt(prompt)
+								if text:
+									model = "gpt-3.5-chat"
 							if stop and any(s in text for s in stop):
 								text = ""
 							else:
@@ -1080,10 +1082,11 @@ class Bot:
 									break
 						else:
 							try:
-								model = "gpt-3.5-clone"
 								text = self.ycg(data).removeprefix(f"{self.name}: ").strip()
 								if stop and any(s in text for s in stop):
 									text = ""
+								elif text:
+									model = "gpt-3.5-clone"
 							except EOFError:
 								pass
 							except:
@@ -1095,6 +1098,8 @@ class Bot:
 						openai.ChatCompletion.create,
 						**data,
 					).result(timeout=60)
+					if model != "gpt-4":
+						model = "gpt-3.5-turbo"
 				except Exception as ex:
 					if i >= tries - 1:
 						raise

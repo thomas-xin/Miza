@@ -2507,6 +2507,7 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 		from chatgpt_wrapper import AsyncChatGPT
 	except ImportError:
 		convobot.AsyncChatGPT = None
+		print(traceback.format_exc(), end="")
 	else:
 		convobot.AsyncChatGPT = AsyncChatGPT
 
@@ -2520,7 +2521,7 @@ def embedding(s):
 	a = Embedder.encode(s).astype(np.float16)
 	return a.data
 
-def rank_embeddings(embs, emb, temp=0.375):
+def rank_embeddings(embs, emb, temp=0.5):
 	btest = base64.b64decode(emb)
 	y = np.frombuffer(btest, dtype=np.float16)
 	blist = [base64.b64decode(line) for line in embs]
