@@ -681,9 +681,11 @@ class Bot:
 			soft = limit / 4
 		else:
 			soft = limit / 2
+		print("LINES:", lines)
 		ins = []
 		while lines and sum(map(len, ins)) < soft * 4:
 			ins.append(lines.pop(-1))
+		print("INS:", ins)
 		p = per
 		if self.name.casefold() not in p.casefold():
 			if not p:
@@ -788,8 +790,8 @@ class Bot:
 					resp = None
 					q2 = "Classify the above as:\n1. Personal/casual\n2. Inappropriate\n3. Maths\n4. Other"
 					q3 = f'"""\n{q}\n"""\n\n{q2}'
-					print("AU prompt:", q3)
 					text = self.au(q3, stop=["1"], force=True)
+					print("AU result:", text)
 					if text and text[0] not in "1234":
 						if "Inappropriate" in text:
 							text = "2."
