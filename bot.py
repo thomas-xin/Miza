@@ -4488,10 +4488,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
         class LoadedMessage(discord.Message):
 
-            @property
-            def mentions(self):
+            def __getattr__(self, k):
+                if k != "mentions":
+                    return super().__getattr__(k)
                 try:
-                    return super().mentions
+                    return super().__getattr__(k)
                 except AttributeError:
                     return []
 
