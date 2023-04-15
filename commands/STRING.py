@@ -1361,7 +1361,7 @@ class Ask(Command):
                     if name == bot.name:
                         name = bot.name + "2"
             if embd:
-                data = await process_image("embedding", "$", [f"{name}: {content}"], timeout=12)
+                data = await process_image("embedding", "$", [f"{name}: {q}"], timeout=12)
                 em = base64.b64encode(data).decode("ascii")
                 objs = list(embd.items())
                 keys = [t[0] for t in objs]
