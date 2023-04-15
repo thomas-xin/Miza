@@ -1577,7 +1577,7 @@ class Bot:
 			k, v = tup
 			if k == self.name:
 				v = self.alm_re.sub("", v)
-			tlim = round(2 ** (-nin / 8) * (384 if self.premium >= 2 else 192))
+			tlim = round(2 ** (-nin / 3) * (384 if self.premium >= 2 else 192))
 			if tlim < 32:
 				return
 			if len(self.gpttokens(v)) > tlim + 4:
@@ -1592,7 +1592,7 @@ class Bot:
 			k, v = tup
 			if k == self.name:
 				v = self.alm_re.sub("", v)
-			tlim = round(2 ** (-nin / 8) * (384 if self.premium >= 2 else 192))
+			tlim = round(2 ** (-nin / 3) * (384 if self.premium >= 2 else 192))
 			if tlim < 32:
 				return
 			if len(self.gpttokens(v)) > tlim + 4:
@@ -1647,7 +1647,7 @@ class Bot:
 		return lines
 
 	def rerender(self):
-		lim = 480 if self.premium >= 2 else 120
+		lim = 360 if self.premium >= 2 else 120
 		r1 = 5 if self.premium >= 2 else 3
 		if not self.chat_history or len(self.chat_history) < r1 and len(self.gpttokens(self.chat_history[0][1])) <= lim * 2:
 			return

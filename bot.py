@@ -2782,17 +2782,18 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             return i
 
     def backup(self):
+        backup = AUTH.get("backup_path") or "backup"
         self.clear_cache()
         with tracebacksuppressor:
             date = datetime.datetime.utcnow().date()
-            fn = f"backup/saves.{date}.wb"
+            fn = f"{backup}/saves.{date}.wb"
             if os.path.exists(fn):
                 if utc() - os.path.getmtime(fn) < 60:
                     return fn
                 os.remove(fn)
             for i in range(30):
                 d2 = date - datetime.timedelta(days=i + 3)
-                f2 = f"backup/saves.{d2}.wb"
+                f2 = f"{backup}/saves.{d2}.wb"
                 if os.path.exists(f2):
                     os.remove(f2)
                     continue
@@ -2835,9 +2836,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     os.rename(saves[:-5] + "\x7f.json", saves)
                 with open(saves, "w") as f:
                     f.write(s)
-        if not os.path.exists("backup"):
-            os.mkdir("backup")
-        fn = f"backup/saves.{datetime.datetime.utcnow().date()}.wb"
+        backup = AUTH.get("backup_path") or "backup"
+        if not os.path.exists(backup):
+            os.mkdir(backup)
+        fn = f"{backup}/saves.{datetime.datetime.utcnow().date()}.wb"
         day = not os.path.exists(fn)
         if day:
             await_fut(self.send_event("_day_"))

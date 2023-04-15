@@ -664,12 +664,15 @@ class FileHashDict(collections.abc.MutableMapping):
             data = select_and_loads(self.decode(s), mode="unsafe")
         if data is BaseException:
             fn = fn.rstrip("\x7f")
-            for file in sorted(os.listdir("backup"), reverse=True):
+            backup = AUTH.get("backup_path") or "backup"
+            for file in sorted(os.listdir(backup), reverse=True):
                 with tracebacksuppressor:
                     if file.endswith(".wb"):
-                        s = subprocess.check_output([sys.executable, "neutrino.py", "../backup/" + file, "-f", fn.split("/", 1)[-1]], cwd="misc")
+                        if ":" not in backup:
+                            backup = "../" + backup
+                        s = subprocess.check_output([sys.executable, "neutrino.py", backup + "/" + file, "-f", fn.split("/", 1)[-1]], cwd="misc")
                     else:
-                        with zipfile.ZipFile("backup/" + file, allowZip64=True, strict_timestamps=False) as z:
+                        with zipfile.ZipFile(backup + "/" + file, allowZip64=True, strict_timestamps=False) as z:
                             s = z.read(fn)
                     data = select_and_loads(self.decode(s), mode="unsafe")
                     self.modified.add(k)
@@ -2284,6 +2287,7 @@ async def sub_submit(ptype, command, fix=None, _timeout=12):
     while ts in PROC_RESP:
         ts += 1
     PROC_RESP[ts] = fut = concurrent.futures.Future()
+    print("PROC_RESP:", PROC_RESP)
     command = "[" + ",".join(map(repr, command[:2])) + "," + ",".join(map(str, command[2:])) + "]"
     s = f"~{ts}~".encode("ascii") + base64.b64encode(command.encode("utf-8")) + b"\n"
     # s = f"~{ts}~{repr(command.encode('utf-8'))}\n".encode("utf-8")
@@ -2305,7 +2309,7 @@ async def sub_submit(ptype, command, fix=None, _timeout=12):
                     raise ConnectionResetError("Response disconnected.")
                 try:
                     resp = await asyncio.wait_for(wrap_future(fut), timeout=3)
-                except T1:
+                except (T1, T2, T3):
                     if i >= tries - 1:
                         raise
                 else:

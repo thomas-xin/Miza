@@ -2295,7 +2295,7 @@ alert("File successfully deleted. Returning to home.");
 				raise InterruptedError
 		backup = self.bot_exec(f"bot.backup()")
 		cp.response.headers.update(CHEADERS)
-		return cp.lib.static.serve_file(os.getcwd() + "/" + backup, content_type="application/octet-stream", disposition="attachment")
+		return cp.lib.static.serve_file(backup, content_type="application/octet-stream", disposition="attachment")
 	backup._cp_config = {"response.stream": True}
 
 	@cp.expose(("eval", "exec"))
