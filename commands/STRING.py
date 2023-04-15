@@ -1195,6 +1195,7 @@ class Ask(Command):
     rate_limit = (12, 16)
     slash = True
 
+    alm_re = re.compile(r"(?:as |i am )?an ai(?: language model)?[, ]{,2}", flags=re.I)
     reset = {}
     analysed = {}
 
@@ -1221,6 +1222,7 @@ class Ask(Command):
         if not bl:
             print(f"{message.author}:", q)
         premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
+        long_mem = 4096 if premium >= 2 else 1024
         if name == "gpt2" or not AUTH.get("openai_key"):
             premium = -1
         elif name == "gpt3":
@@ -1244,14 +1246,24 @@ class Ask(Command):
         embd = bot.data.chat_embeddings.get(channel.id, {})
         # emb_futs = []
 
-        async def register_embedding(i, name, content, em=None):
+        async def register_embedding(i, *tup, em=None):
             s = str(i)
+            orig = list(tup)
+            inp = []
+            while tup:
+                name, content = tup[:2]
+                tup = tup[2:]
+                inp.append(f"{name}: {content}")
             if not em:
-                data = await process_image("embedding", "$", [f"{name}: {content}"], timeout=13)
+                data = await process_image("embedding", "$", ["\n".join(inp)], timeout=13)
                 em = base64.b64encode(data).decode("ascii")
-            mapd[s] = (name, content)
+            mapd[s] = orig
             embd[s] = em
             return em
+
+        async def ignore_embedding(i):
+            s = str(i)
+            mapd[s] = None
 
         if not q and not message.attachments:
             q = "Hi!"
@@ -1360,6 +1372,8 @@ class Ask(Command):
                     name = m.author.name
                     if name == bot.name:
                         name = bot.name + "2"
+            await ignore_embedding(message.id)
+            orig_tup = (name, q)
             if embd:
                 data = await process_image("embedding", "$", [f"{name}: {q}"], timeout=12)
                 em = base64.b64encode(data).decode("ascii")
@@ -1372,13 +1386,13 @@ class Ask(Command):
                 print("ARGI:", argi)
                 for i in reversed(argi):
                     k = keys[i]
-                    name, content = mapd[k]
-                    refs.insert(0, ("[REFERENCE]: " + name, content))
+                    temp = mapd[k].copy()
+                    while len(temp):
+                        name, content = temp[:2]
+                        temp = temp[2:]
+                        refs.insert(0, ("[REFERENCE]: " + name, content))
                     ignores.add(int(i))
-                print("REFS:", refs)
-                await register_embedding(message.id, name, q, em=em)
-            else:
-                await register_embedding(message.id, name, q)
+                # print("REFS:", refs)
             history = []
             if not getattr(message, "simulated", False):
                 async for m in bot.history(channel, limit=16):
@@ -1432,6 +1446,8 @@ class Ask(Command):
                 u = user
             data = bot.data.users.get(u.id, {})
             oai = data.get("trial") and data.get("openai_key")
+            print("HISTORY:", history)
+            print("REFS:", refs)
             inputs = dict(
                 channel_id=channel.id,
                 key=AUTH.get("openai_key"),
@@ -1445,7 +1461,7 @@ class Ask(Command):
                 history=history,
                 refs=refs,
                 im=im,
-                prompt=(name, q),
+                prompt=orig_tup,
                 reset=reset is not None,
                 bals={k: v for k, v in bot.data.token_balances.items() if v < 0},
                 oai=oai,
@@ -1597,13 +1613,16 @@ class Ask(Command):
             if not isinstance(caid, dict):
                 caid = {}
             caid.update(dict(summary=caic[0], jailbroken=caic[1], last_message_id=m.id))
+            caid["long_mem"] = max(long_mem, caid.get("long_mem", 0) * 63 / 64)
             bot.data.chat_histories[channel.id] = caid
         else:
             bot.data.chat_histories.pop(channel.id, None)
-        await register_embedding(m.id, bot.name, s)
-        if len(embd) > 1024:
+        tup += (bot.name, self.alm_re.sub("", s))
+        await register_embedding(m.id, tup)
+        lm = ceil(caid.get("long_mem", 0))
+        if len(embd) > lm:
             keys = sorted(embd.keys())
-            keys = keys[:-1024]
+            keys = keys[:-lm]
             for k in keys:
                 mapd.pop(k, None)
                 embd.pop(k, None)
