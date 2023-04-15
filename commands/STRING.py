@@ -1618,7 +1618,7 @@ class Ask(Command):
         else:
             bot.data.chat_histories.pop(channel.id, None)
         tup = orig_tup + (bot.name, self.alm_re.sub("", s))
-        await register_embedding(m.id, tup)
+        await register_embedding(m.id, *tup)
         lm = ceil(caid.get("long_mem", 0))
         if len(embd) > lm:
             keys = sorted(embd.keys())
