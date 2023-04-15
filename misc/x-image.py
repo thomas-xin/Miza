@@ -2536,6 +2536,7 @@ def rank_embeddings(embs, emb, temp=0.5):
 	return [i for i in np.argsort(z)[::-1] if z[i] - random.random() / 3 >= (top - temp * 2 / 3)]
 
 if len(sys.argv) > 1 and sys.argv[1] == "2":
+	import imagebot
 	for i in range(3):
 		try:
 			from transformers import TrOCRProcessor, VisionEncoderDecoderModel, ViltProcessor, ViltForQuestionAnswering

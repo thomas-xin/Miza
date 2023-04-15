@@ -662,18 +662,18 @@ class Bot:
 				cm = 0
 		elif start:
 			model = "text-davinci-003"
-			temp = 0.8
+			temp = 0.7
 			limit = 3000
 			cm = 200
 			longer = True
 		elif premium < 4:
 			model = "gpt-3.5-turbo"
-			temp = 0.9
+			temp = 0.8
 			limit = 4000
 			cm = 20
 		else:
 			model = "gpt-4"
-			temp = 0.9
+			temp = 0.8
 			limit = 8000
 			cm = 300
 			cm2 = 600
