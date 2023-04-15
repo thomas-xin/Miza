@@ -2215,7 +2215,7 @@ async def proc_communicate(proc):
             #     exec_tb(c, globals())
             s = b.rstrip()
             if s and s[:1] == b"!":
-                print(s)
+                # print(s)
                 s, r = s.split(b"~", 1)
                 d = {"_x": base64.b64decode(r)}
                 c = evalex(memoryview(s)[1:], globals(), d)

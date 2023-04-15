@@ -4339,6 +4339,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             @property
             def _user(self):
                 return bot.cache.users.get(self.id) or self
+            @_user.setter
+            def set_user(self, user):
+                bot.cache.users[user.id] = user
 
             def _to_minimal_user_json(self):
                 return cdict(

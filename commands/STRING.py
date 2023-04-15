@@ -1247,7 +1247,8 @@ class Ask(Command):
         async def register_embedding(i, name, content, em=None):
             s = str(i)
             if not em:
-                em = base64.b64encode(await process_image("embedding", "$", [f"{name}: {content}"], timeout=12)).decode("ascii")
+                data = await process_image("embedding", "$", [f"{name}: {content}"], timeout=12)
+                em = base64.b64encode(data).decode("ascii")
             mapd[s] = (name, content)
             embd[s] = em
             return em
@@ -1360,7 +1361,8 @@ class Ask(Command):
                     if name == bot.name:
                         name = bot.name + "2"
             if embd:
-                em = base64.b64encode(await process_image("embedding", "$", [f"{name}: {q}"], timeout=12)).decode("ascii")
+                data = await process_image("embedding", "$", [f"{name}: {content}"], timeout=12)
+                em = base64.b64encode(data).decode("ascii")
                 objs = list(embd.items())
                 keys = [t[0] for t in objs]
                 ems = [t[1] for t in objs]
