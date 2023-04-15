@@ -48,6 +48,11 @@ def wrap_future(fut, loop=None):
     fut.add_done_callback(on_done)
     return wrapper
 
+async def _await_fut(fut, ret):
+    out = await fut
+    ret.set_result(out)
+    return ret
+
 def await_fut(fut, timeout=None):
     return convert_fut(fut).result(timeout=timeout)
 
