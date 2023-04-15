@@ -5128,7 +5128,7 @@ class Download(Command):
                         )
                     if download:
                         f = await bot.get_request(download, timeout=3600)
-                        out = name
+                        out = name + "." + (fmt if fmt != "weba" else "webm")
                 if not f:
                     f, out = await create_future(
                         ytdl.download_file,
