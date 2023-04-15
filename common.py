@@ -2309,7 +2309,7 @@ async def sub_submit(ptype, command, fix=None, _timeout=12):
                     raise ConnectionResetError("Response disconnected.")
                 try:
                     resp = await asyncio.wait_for(wrap_future(fut), timeout=3)
-                except (T1, T2, T3):
+                except (T0, T1, T2):
                     if i >= tries - 1:
                         raise
                 else:
