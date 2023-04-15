@@ -2522,8 +2522,7 @@ def rank_embeddings(embs, emb, temp=0):
 	x = x.reshape((len(x) // len(y), len(y)))
 	y = y.reshape((1, len(y)))
 	norms = np.linalg.norm(x, axis=1) * np.linalg.norm(y, axis=1)
-	x *= y
-	z = x.sum(axis=1)
+	z = (x * y).sum(axis=1)
 	z /= norms
 	if temp:
 		pass
