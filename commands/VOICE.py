@@ -5068,6 +5068,7 @@ class Download(Command):
             url = data[num]
             # Perform all these tasks asynchronously to save time
             with discord.context_managers.Typing(channel):
+                f = out = None
                 fmt = spl[2]
                 try:
                     if int(spl[3]):
@@ -5086,38 +5087,36 @@ class Download(Command):
                 if len(spl) >= 6:
                     start, end = spl[4:6]
                 if not simulated:
+                    download = None
                     if tuple(map(str, (start, end))) == ("None", "None") and not silenceremove and not auds and fmt in ("mp3", "opus", "ogg", "wav", "weba"):
-                        view = bot.raw_webserver + "/ytdl?fmt=" + fmt + "&view=" + url
+                        # view = bot.raw_webserver + "/ytdl?fmt=" + fmt + "&view=" + url
                         download = bot.raw_webserver + "/ytdl?fmt=" + fmt + "&download=" + url
-                        # content = view + "\n" + download
-                        # if message.guild and message.guild.get_member(bot.client.user.id).permissions_in(message.channel).manage_messages:
-                        #     create_task(message.clear_reactions())
                         entries = await create_future(ytdl.search, url)
                         if entries:
                             name = entries[0].get("name")
                         else:
                             name = None
                         name = name or url.rsplit("/", 1)[-1].rsplit(".", 1)[0]
-                        name = f"【{num}】{name}"
-                        sem = getattr(message, "sem", None)
-                        if not sem:
-                            try:
-                                sem = EDIT_SEM[message.channel.id]
-                            except KeyError:
-                                sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
-                        async with sem:
-                            return await Request(
-                                f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
-                                data=dict(
-                                    components=restructure_buttons([[
-                                        cdict(emoji="🔊", name=name, url=view),
-                                        cdict(emoji="📥", name=name, url=download),
-                                    ]]),
-                                ),
-                                method="PATCH",
-                                authorise=True,
-                                aio=True,
-                            )
+                        # name = f"【{num}】{name}"
+                        # sem = getattr(message, "sem", None)
+                        # if not sem:
+                        #     try:
+                        #         sem = EDIT_SEM[message.channel.id]
+                        #     except KeyError:
+                        #         sem = EDIT_SEM[message.channel.id] = Semaphore(5.15, 256, rate_limit=5)
+                        # async with sem:
+                        #     return await Request(
+                        #         f"https://discord.com/api/{api}/channels/{message.channel.id}/messages/{message.id}",
+                        #         data=dict(
+                        #             components=restructure_buttons([[
+                        #                 cdict(emoji="🔊", name=name, url=view),
+                        #                 cdict(emoji="📥", name=name, url=download),
+                        #             ]]),
+                        #         ),
+                        #         method="PATCH",
+                        #         authorise=True,
+                        #         aio=True,
+                        #     )
                     if len(data) <= 1:
                         create_task(message.edit(
                             content=ini_md(f"Downloading and converting {sqr_md(ensure_url(url))}..."),
@@ -5127,15 +5126,19 @@ class Download(Command):
                         message = await message.channel.send(
                             ini_md(f"Downloading and converting {sqr_md(ensure_url(url))}..."),
                         )
-                f, out = await create_future(
-                    ytdl.download_file,
-                    url,
-                    fmt=fmt,
-                    start=start,
-                    end=end,
-                    auds=auds,
-                    silenceremove=silenceremove,
-                )
+                    if download:
+                        f = await bot.get_request(download, timeout=3600)
+                        out = name
+                if not f:
+                    f, out = await create_future(
+                        ytdl.download_file,
+                        url,
+                        fmt=fmt,
+                        start=start,
+                        end=end,
+                        auds=auds,
+                        silenceremove=silenceremove,
+                    )
                 if not simulated:
                     create_task(message.edit(
                         content=css_md(f"Uploading {sqr_md(out)}..."),
