@@ -30,7 +30,7 @@ except AttributeError:
 drivers = selenium.__dict__.setdefault("-drivers", [])
 
 AC = bytes(i ^ 158 for i in b'n\x03\x0e3n\x03\r/n\x03\x0f\x0c\xben\x03\n>n\x03\x08\nq#\x10n\x01\x1b\x1bn\x01\x1b*|\r?n\x01\x1b<n\x03\x06<n\x03\x077n\x03\x04\x0c\x7f+\x0c\x7f\x06\x17\xben\x03\x0e<n\x03\r"\xben\x03\x0b\x0cn\x03\n7n\x03\x08\x0fq#\x11n\x01\x1b\x18n\x01\x1b*|\r\r\xben\x03\x06+n\x03\x07:\xbe\x7f+\x19\x7f\x06!\xben\x03\x0e8n\x03\r4n\x03\r\x17n\x03\x0b8n\x03\n1n\x03\x08\x14\xben\x01\x1a n\x01\x18\x1f\xben\x01\x1b<n\x03\x068n\x03\x073n\x03\x04\x00\x7f+\x1d\x7f\x0c4\xben\x03\x0e\x04n\x03\r2n\x03\x0c&n\x03\x0b>n\x03\n1n\x03\x08\x17q#\x17n\x01\x1a#n\x01\x1b(\xben\x01\x1b=n\x03\x06.\xben\x03\x04\x03T.\x7f\x06!\xben\x03\x0e9n\x03\r0n\x03\x0f\x0cn\x03\x0b\x0bn\x03\n.\xbeq#\x11n\x01\x1a+\xbe|\r=n\x01\x1b\tn\x03\x068\xben\x03\x04\x00U<\x7f\x06!W\'\xben\x03\r4n\x03\r\x1dn\x03\x0b\x0b\xben\x03\x08\rq#\x11n\x01\x1b\x1d\xbe|\r\x0e\xben\x03\x06/n\x03\x07:n\x03\x04\x0b|\x1f/\x7f\x0f<T\x10')
-chatgpt = True
+chatgpt = None
 
 from math import *
 def lim_str(s, maxlen=10, mode="centre"):
@@ -1323,15 +1323,7 @@ class Bot:
 			print("ChatGPT:", chatgpt and chatgpt.rate)
 			return ""
 		async def run_chatgpt(q, fut=None):
-			if not hasattr(chatgpt, "ask_stream") or time.time() - getattr(chatgpt, "timestamp", 0) >= 1800:
-				if not hasattr(chatgpt, "ask_stream"):
-					try:
-						from chatgpt_wrapper import AsyncChatGPT
-					except ImportError:
-						globals()["chatgpt"] = None
-						return ""
-					else:
-						globals()["chatgpt"] = await AsyncChatGPT().create(timeout=220)
+			if time.time() - getattr(chatgpt, "timestamp", 0) >= 1800:
 				await chatgpt.refresh_session()
 				url = "https://chat.openai.com/backend-api/conversations"
 				data = {
@@ -1360,8 +1352,8 @@ class Bot:
 			return res
 		if hasattr(asyncio, "main_new_loop"):
 			fut = concurrent.futures.Future()
-			asyncio.main_new_loop.create_task(asyncio.wait_for(run_chatgpt(q, fut), timeout=241))
-			res = fut.result(timeout=240)
+			asyncio.main_new_loop.create_task(asyncio.wait_for(run_chatgpt(q, fut), timeout=121))
+			res = fut.result(timeout=120)
 		else:
 			res = asyncio.run(run_chatgpt(q))
 		if res:

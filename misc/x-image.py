@@ -2503,6 +2503,13 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 		cb.nsfw = nsfw
 		return cb.au(prompt)
 
+	try:
+		from chatgpt_wrapper import AsyncChatGPT
+	except ImportError:
+		convobot.chatgpt = None
+	else:
+		convobot.chatgpt = await AsyncChatGPT().create(timeout=220)
+
 from sentence_transformers import SentenceTransformer
 Embedder = None
 def embedding(s):

@@ -2307,14 +2307,14 @@ async def sub_submit(ptype, command, fix=None, _timeout=12):
                     raise ConnectionResetError("Response disconnected.")
                 try:
                     resp = await asyncio.wait_for(wrap_future(fut), timeout=3)
-                except (T0, T1, T2):
+                except T1:
                     if i >= tries - 1:
                         raise
                 else:
                     break
             else:
-                raise TimeoutError("Max waits exceeded.")
-        except (BrokenPipeError, OSError, T0, T1, T2) as ex:
+                raise OSError("Max waits exceeded.")
+        except (BrokenPipeError, OSError) as ex:
             try:
                 i = PROCS[ptype].index(proc)
             except (LookupError, ValueError):
