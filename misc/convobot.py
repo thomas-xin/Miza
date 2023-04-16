@@ -1739,7 +1739,9 @@ class Bot:
 				if tc > lim * 1.5 and len(self.gpttokens(lines[0])) > lim * 3 / 4:
 					lines[0] = lim_tokens(lines[0], lim // 2)
 					v = "".join(lines)
-				v = self.auto_summarise(q=v, max_length=lim, min_length=lim * 2 // 3).strip()
+					tc = lim // 2
+				if tc > lim + 16:
+					v = self.auto_summarise(q=v, max_length=lim, min_length=lim * 2 // 3).strip()
 		v = summ_start + v
 		print("Chat summary:", v)
 		self.chat_history.insert(0, ("[SYSTEM]", v))
