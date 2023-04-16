@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import os, sys, io, time, concurrent.futures, asyncio, subprocess, psutil, collections, traceback, re, requests, blend_modes, pdf2image, zipfile, contextlib, filetype, pyqrcode, ast, colorspace, orjson, base64, random
+import os, sys, io, time, concurrent.futures, asyncio, subprocess, psutil, collections, traceback, re, requests, blend_modes, zipfile, contextlib, filetype, pyqrcode, ast, colorspace, orjson, base64, random
 import numpy as np
 import PIL
 from PIL import Image, ImageCms, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhance, ImageMath, ImageStat, ImageFile
@@ -2626,6 +2626,7 @@ def from_bytes(b, save=None, nogif=False):
 		if save and data and not os.path.exists(save):
 			exc.submit(write_to, save, data)
 	elif b[:4] == b"%PDF":
+		import pdf2image
 		if os.name == "nt":
 			pages = pdf2image.convert_from_bytes(b, poppler_path="misc/poppler", use_pdftocairo=True)
 		else:
