@@ -1252,7 +1252,10 @@ class Ask(Command):
             orig = list(tup)
             if tup in chdd:
                 mapd[s] = None
-                return embd[str(chdd[tup])]
+                try:
+                    embd[str(chdd[tup])]
+                except KeyError:
+                    pass
             chdd[tup] = i
             inp = []
             while tup:
