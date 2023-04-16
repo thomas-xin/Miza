@@ -2300,7 +2300,6 @@ async def sub_submit(ptype, command, fix=None, _timeout=12):
         await sem()
     if not is_strict_running(proc):
         proc = await get_idle_proc(ptype, fix=fix)
-    sem.clear()
     async with sem:
         try:
             proc.stdin.write(s)
