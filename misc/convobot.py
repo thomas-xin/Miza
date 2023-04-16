@@ -790,7 +790,7 @@ class Bot:
 					resp = None
 					q2 = "Classify the above as:\n1. Personal/casual\n2. Inappropriate\n3. Maths\n4. Other"
 					q3 = f'"""\n{q}\n"""\n\n{q2}'
-					text = self.au(q3, stop=["1"], force=True)
+					text = self.aq(q3, stop=["1"])
 					print("AU result:", text)
 					if text and text[0] not in "1234":
 						if "Inappropriate" in text:
@@ -813,12 +813,13 @@ class Bot:
 			if text and text.startswith("2"):
 				flagged = True
 			elif text and text.startswith("4"):
-				t2 = f'"""\n{q}\n"""\n\nRegarding above context: Formulate a search engine query for knowledge if relevant, else say "!"'
+				t2 = f'"""\n{q}\n"""\n\nRegarding above context: Formulate a search engine query for knowledge if relevant, else say "!".'
 				temp /= 2
 				for i in range(3):
 					try:
-						spl = self.cgp(t2)
-						t3 = None if not spl else spl[0]
+						t3 = self.aq(t2)
+						# spl = self.cgp(t2)
+						# t3 = None if not spl else spl[0]
 						if not t3 or t3 in ("!", '"!"'):
 							t3 = lim_tokens(q, 16)
 						elif t3[0] == t3[-1] == '"':
@@ -1526,6 +1527,50 @@ class Bot:
 				resp[0] = resp[0].split(s, 1)[0]
 		return resp[0] if force else resp
 
+	def aq(self, prompt, stop=None):
+		try:
+			headers = {
+				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
+				"DNT": "1",
+				"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
+				"Content-Type": "application/json",
+				"cache-control": "no-cache",
+				"x-use-cache": "false",
+				"x-wait-for-model": "true",
+				"Authorization": "Bearer 842a11464f81fc8be43ac76fb36426d2",
+			}
+			p = self.get_proxy()
+			with httpx.Client(timeout=360, http2=True, proxies=p, verify=False) as reqx:
+				resp = reqx.post(
+					"https://api.textsynth.com/v1/engines/flan_t5_xxl/completions",
+					headers=headers,
+					data=orjson.dumps(dict(
+						prompt=prompt,
+						temperature=0.3,
+						top_k=128,
+						top_p=0.8,
+						max_tokens=200,
+						stream=False,
+						stop=stop or "####",
+					)),
+				)
+				resp.raise_for_status()
+			text = resp.content.decode("utf-8")
+			lines = text.splitlines()
+			text = ""
+			for line in lines:
+				if line:
+					try:
+						d = orjson.loads(line)
+					except:
+						print(lines)
+						raise
+					text += d["text"] + "\n"
+			return text.strip()
+		except:
+			print_exc()
+		return self.au(prompt, stop=stop, force=True)
+
 	def ai(self, u, q, refs=(), im=None):
 		tup = (u, q)
 		self.rerender()
@@ -1670,8 +1715,9 @@ class Bot:
 				if tc < 3072 and (tc > lim * 3 or (tc > lim * 1.5 and self.premium >= 2)):
 					try:
 						prompt = f'"""\n{v.strip()}\n"""\n\nSummarise the above into a paragraph, keeping most important parts. Do not be repetitive or continue the text!'
-						func = self.au if not self.jailbroken else self.cgp
-						v2 = func(prompt)[0]
+						# func = self.au if not self.jailbroken else self.cgp
+						func = self.aq
+						v2 = func(prompt)
 						if len(self.gpttokens(v2)) < 16:
 							raise ValueError(v2)
 						if v2[0] == v2[-1] == '"':
