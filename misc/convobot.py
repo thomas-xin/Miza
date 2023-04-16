@@ -451,7 +451,7 @@ class Bot:
 	def auto_summarise(self, q="", max_length=128, min_length=64):
 		if 256 < len(self.gpttokens(q)) < 1024:
 			q2 = f'"""\n{q}\n"""\n\nSummarise the above into a paragraph, keeping most important parts.'
-			text = self.aq(q2, temp=0.8)
+			text = self.aq(q2, temp=0.8).strip('" ')
 			if text:
 				return text
 		if q and sum(c.isascii() for c in q) / len(q) > 0.75:
@@ -795,7 +795,7 @@ class Bot:
 					resp = None
 					q2 = "Classify the above as:\n1. Personal/casual\n2. Inappropriate\n3. Maths\n4. Other"
 					q3 = f'"""\n{q}\n"""\n\n{q2}'
-					text = self.aq(q3, stop=["1"])
+					text = self.aq(q3, stop=["1"]).strip('" ')
 					print("AU result:", text)
 					if text and text[0] not in "1234":
 						if "Inappropriate" in text:
@@ -822,7 +822,7 @@ class Bot:
 				temp /= 2
 				for i in range(3):
 					try:
-						t3 = self.aq(t2)
+						t3 = self.aq(t2).strip('" ')
 						# spl = self.cgp(t2)
 						# t3 = None if not spl else spl[0]
 						if not t3 or t3 in ("!", '"!"'):
