@@ -248,7 +248,7 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
     def is_busy(self):
         return self.active >= self.limit or self.rate_limit and len(self._update_bin()) >= self.limit
 
-    def clear(self)
+    def clear(self):
         self.rate_bin.clear()
         self._update_bin()
 
