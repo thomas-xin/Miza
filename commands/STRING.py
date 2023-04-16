@@ -1263,7 +1263,7 @@ class Ask(Command):
                 tup = tup[2:]
                 inp.append(f"{name}: {content}")
             if not em:
-                data = await process_image("embedding", "&", ["\n".join(inp)], timeout=13)
+                data = await process_image("embedding", "&", ["\n".join(inp)], fix=3, timeout=13)
                 em = base64.b64encode(data).decode("ascii")
             mapd[s] = orig
             embd[s] = em
@@ -1383,7 +1383,7 @@ class Ask(Command):
             await ignore_embedding(message.id)
             orig_tup = (name, q)
             if embd:
-                data = await process_image("embedding", "&", [f"{name}: {q}"], timeout=12)
+                data = await process_image("embedding", "&", [f"{name}: {q}"], fix=3, timeout=13)
                 em = base64.b64encode(data).decode("ascii")
                 objs = list(embd.items())
                 keys = [t[0] for t in objs]
