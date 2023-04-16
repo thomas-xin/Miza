@@ -12,7 +12,6 @@ Transpose = getattr(Image, "Transpose", Image)
 Transform = getattr(Image, "Transform", Image)
 Image.MAX_IMAGE_PIXELS = 4294967296
 from zipfile import ZipFile
-import matplotlib.pyplot as plt
 colorlib = colorspace.colorlib()
 from math import *
 
@@ -3077,6 +3076,8 @@ if __name__ == "__main__":
 					args[1] = "$"
 					evaluate(ts, args)
 				elif "plt_special" in args or "plt_mp" in args:
+					import matplotlib.pyplot
+					globals()["plt"] = matplotlib.pyplot
 					evaluate(ts, args)
 				else:
 					exc.submit(evaluate, ts, args)
