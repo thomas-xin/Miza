@@ -449,6 +449,11 @@ class Bot:
 		return smp(q, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
 
 	def auto_summarise(self, q="", max_length=128, min_length=64):
+		if 256 < len(self.gpttokens(q)) < 1024:
+			q2 = f'"""\n{q}\n"""\n\nSummarise the above into a paragraph, keeping most important parts.'
+			text = self.aq(q2, temp=0.8)
+			if text:
+				return text
 		if q and sum(c.isascii() for c in q) / len(q) > 0.75:
 			q = lim_tokens(q, max_length + min_length << 1)
 			return self.answer_summarise(q=q, max_length=max_length, min_length=min_length)
@@ -1527,7 +1532,7 @@ class Bot:
 				resp[0] = resp[0].split(s, 1)[0]
 		return resp[0] if force else resp
 
-	def aq(self, prompt, stop=None):
+	def aq(self, prompt, stop=None, temp=0.3):
 		try:
 			headers = {
 				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
@@ -1546,7 +1551,7 @@ class Bot:
 					headers=headers,
 					data=orjson.dumps(dict(
 						prompt=prompt,
-						temperature=0.3,
+						temperature=temp,
 						top_k=128,
 						top_p=0.8,
 						max_tokens=200,
@@ -1715,9 +1720,8 @@ class Bot:
 				if tc < 3072 and (tc > lim * 3 or (tc > lim * 1.5 and self.premium >= 2)):
 					try:
 						prompt = f'"""\n{v.strip()}\n"""\n\nSummarise the above into a paragraph, keeping most important parts. Do not be repetitive or continue the text!'
-						# func = self.au if not self.jailbroken else self.cgp
-						func = self.aq
-						v2 = func(prompt)
+						func = self.au if not self.jailbroken else self.cgp
+						v2 = func(prompt)[0]
 						if len(self.gpttokens(v2)) < 16:
 							raise ValueError(v2)
 						if v2[0] == v2[-1] == '"':

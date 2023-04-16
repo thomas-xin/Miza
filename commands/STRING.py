@@ -1454,8 +1454,8 @@ class Ask(Command):
                 u = user
             data = bot.data.users.get(u.id, {})
             oai = data.get("trial") and data.get("openai_key")
-            print("HISTORY:", history)
-            print("REFS:", refs)
+            # print("HISTORY:", history)
+            # print("REFS:", refs)
             inputs = dict(
                 channel_id=channel.id,
                 key=AUTH.get("openai_key"),
