@@ -1619,7 +1619,7 @@ class Ask(Command):
         # while emb_futs:
         #     await emb_futs.pop(0)
         # Syntax: Summary, Jailbroken
-        caic = await process_image("lambda cid: [(b := CBOTS[cid]).chat_history, b.jailbroken]", "$", [channel.id], fix=1)
+        caic = await process_image("lambda cid: [(b := CBOTS[cid]).chat_history, b.jailbroken]", "$", [channel.id], fix=1, timeout=120)
         if caic:
             caid = bot.data.chat_histories.get(channel.id, None)
             if not isinstance(caid, dict):
@@ -1695,7 +1695,7 @@ class Ask(Command):
             else:
                 m = None
             print("Redoing", channel)
-            # await process_image("lambda cid: CBOTS[cid].deletes()", "$", [channel.id], fix=1)
+            # await process_image("lambda cid: CBOTS[cid].deletes()", "$", [channel.id], fix=1, timeout=120)
             bot.data.chat_histories[channel.id] = None
             colour = await bot.get_colour(bot.user)
             emb = discord.Embed(colour=colour, description=css_md("[This message has been reset.]"))
@@ -1745,7 +1745,7 @@ class UpdateChatHistories(Database):
         if message.reference.message_id != after.id:
             return
         print("Editing", channel)
-        # await process_image("lambda cid: CBOTS[cid].deletes()", "$", [channel.id], fix=1)
+        # await process_image("lambda cid: CBOTS[cid].deletes()", "$", [channel.id], fix=1, timeout=120)
         bot.data.chat_histories[channel.id] = None
         colour = await bot.get_colour(bot.user)
         emb = discord.Embed(colour=colour, description=css_md("[This message has been reset.]"))
@@ -1771,7 +1771,7 @@ class UpdateChatHistories(Database):
         if message.reference.message_id != after.id:
             return
         print("Deleting", channel)
-        # await process_image("lambda cid: CBOTS[cid].deletes()", "$", [channel.id], fix=1)
+        # await process_image("lambda cid: CBOTS[cid].deletes()", "$", [channel.id], fix=1, timeout=120)
         bot.data.chat_histories[channel.id] = None
         colour = await bot.get_colour(bot.user)
         emb = discord.Embed(colour=colour, description=css_md("[This message has been reset.]"))
