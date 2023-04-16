@@ -16,10 +16,6 @@ colorlib = colorspace.colorlib()
 from math import *
 
 write, sys.stdout.write = sys.stdout.write, lambda *args, **kwargs: None
-try:
-	import pygame
-except ImportError:
-	pygame = None
 sys.stdout.write = write
 
 def wrap_future(fut, loop=None):
@@ -1424,6 +1420,10 @@ def laplacian(image):
 	if str(image.mode) == "P":
 		image = image.convert("RGBA")
 	b = image.tobytes()
+	try:
+		import pygame
+	except ImportError:
+		pygame = None
 	surf = pygame.image.frombuffer(b, image.size, image.mode)
 	surf = pygame.transform.laplacian(surf)
 	b = pygame.image.tostring(surf, image.mode)
@@ -1559,6 +1559,10 @@ def resize_to(image, w, h, operation="auto"):
 			image = image.convert("RGBA")
 	if filt == "scale2x":
 		if w > image.width or h > image.height:
+			try:
+				import pygame
+			except ImportError:
+				pygame = None
 			if image.mode == "P":
 				image = image.convert("RGBA")
 			b = image.tobytes()
