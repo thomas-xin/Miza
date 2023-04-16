@@ -15,9 +15,6 @@ from zipfile import ZipFile
 colorlib = colorspace.colorlib()
 from math import *
 
-write, sys.stdout.write = sys.stdout.write, lambda *args, **kwargs: None
-sys.stdout.write = write
-
 def wrap_future(fut, loop=None):
     if loop is None:
         loop = asyncio.main_new_loop
