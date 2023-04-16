@@ -2512,11 +2512,11 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 	else:
 		convobot.AsyncChatGPT = AsyncChatGPT
 
-from sentence_transformers import SentenceTransformer
 Embedder = None
 def embedding(s):
 	if not Embedder:
 		print("Initialising embedder...")
+		from sentence_transformers import SentenceTransformer
 		globals()["Embedder"] = SentenceTransformer("LLukas22/all-mpnet-base-v2-embedding-all")
 		print("Embedder loaded.")
 	a = Embedder.encode(s).astype(np.float16)
