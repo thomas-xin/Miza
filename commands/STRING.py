@@ -1390,7 +1390,8 @@ class Ask(Command):
                 ems = [t[1] for t in objs]
                 print("EM:", len(ems))
                 argsort = await process_image("rank_embeddings", "$", [ems, em], timeout=32)
-                argi = argsort[:4]
+                n = 4 if premium < 2 else 6
+                argi = argsort[:n]
                 print("ARGI:", argi)
                 for i in shuffle(argi):
                     k = keys[i]
