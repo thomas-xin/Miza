@@ -553,7 +553,7 @@ class Bot:
 		if not specified and not url:
 			if not openjourney:
 				funcs.append(self.art_openjourney)
-			if random.randint(0, 3):
+			if random.randint(0, 4):
 				funcs.append(self.art_deepai)
 			else:
 				funcs.insert(0, self.art_deepai)

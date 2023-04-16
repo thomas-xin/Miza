@@ -771,13 +771,13 @@ class AudioQueue(alist):
                     with self.sem2:
                         e = self[1]
                         source = ytdl.get_stream(e, asap=True)
-                        if source:
+                        if source and not auds.next and auds.source:
                             auds.enqueue(source)
-            if len(self) > 2 and not self.sem2.is_busy() and not auds.stats.get("shuffle"):
-                e = self[2]
-                sufficient = auds.epos[1] - auds.epos[0] + (self[1].get("duration") or 0) >= (self[2].get("duration") or inf) / 2
-                if sufficient:
-                    create_future_ex(self.preemptive_download, e)
+            # if len(self) > 2 and not self.sem2.is_busy() and not auds.stats.get("shuffle"):
+            #     e = self[2]
+            #     sufficient = auds.epos[1] - auds.epos[0] + (self[1].get("duration") or 0) >= (self[2].get("duration") or inf) / 2
+            #     if sufficient:
+            #         create_future_ex(self.preemptive_download, e)
 
     def preemptive_download(self, e):
         with self.sem2:
