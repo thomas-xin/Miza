@@ -449,7 +449,7 @@ class Bot:
 		return smp(q, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
 
 	def auto_summarise(self, q="", max_length=128, min_length=64):
-		if 256 < len(self.gpttokens(q)) < 1024:
+		if 256 < len(self.gpttokens(q)) < 768:
 			q2 = f'"""\n{q}\n"""\n\nSummarise the above into a paragraph, keeping most important parts.'
 			text = self.aq(q2, temp=0.8).strip('" ')
 			if text:
@@ -640,8 +640,9 @@ class Bot:
 			refst.append(s)
 		if refst:
 			r = "".join(refst).strip()
-			if len(self.gpttokens(r)) > 400:
-				r = self.auto_summarise(q=r, max_length=384, min_length=256).strip()
+			lim = 600 if premium >= 2 else 400
+			if len(self.gpttokens(r)) > lim + 16:
+				r = self.auto_summarise(q=r, max_length=lim, min_length=lim * 2 // 3).strip()
 			lines.append("[SYSTEM]: Summary of history:\n" + r + "\n")
 		tq = q
 		if len(self.gpttokens(tq)) > 400:
