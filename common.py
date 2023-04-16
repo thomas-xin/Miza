@@ -248,6 +248,10 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
     def is_busy(self):
         return self.active >= self.limit or self.rate_limit and len(self._update_bin()) >= self.limit
 
+    def clear(self)
+        self.rate_bin.clear()
+        self._update_bin()
+
     @property
     def busy(self):
         return self.is_busy()
@@ -2296,6 +2300,7 @@ async def sub_submit(ptype, command, fix=None, _timeout=12):
         await sem()
     if not is_strict_running(proc):
         proc = await get_idle_proc(ptype, fix=fix)
+    sem.clear()
     async with sem:
         try:
             proc.stdin.write(s)
