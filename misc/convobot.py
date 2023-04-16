@@ -772,38 +772,14 @@ class Bot:
 				pc += len(self.gpttokens(m["content"], model))
 			text = res = flagged = None
 			if premium >= 2 and q and len(q.split(None)) > 1 and not self.jailbroken:
-				if oai:
-					openai.api_key = oai
-					costs = 0
-				elif bals:
-					openai.api_key = uoai = sorted(bals, key=bals.get)[0]
-					costs = -1
-				else:
-					openai.api_key = self.key
-					costs = 1
-				try:
-					resp = openai.Moderation.create(
-						q,
-					)
-					flagged = resp["results"][0]["flagged"]
-				except:
-					flagged = False
-				if flagged:
-					print(resp)
+				resp = self.answer_classify(q=q, labels=("personal", "casual", "illegal", "maths", "knowledge", "other"))
+				order = sorted(resp, key=resp.get)
+				if order[-1] == "illegal":
 					text = "2."
-				else:
-					resp = None
-					q2 = "Classify the above as:\n1. Personal/casual\n2. Inappropriate\n3. Maths\n4. Other"
-					q3 = f'"""\n{q}\n"""\n\n{q2}'
-					text = self.aq(q3, stop=["1"]).strip('" ')
-					print("AU result:", text)
-					if text and text[0] not in "1234":
-						if "Inappropriate" in text:
-							text = "2."
-						elif "Maths" in text:
-							text = "3."
-						elif "Other" in text:
-							text = "4."
+				elif order[-1] == "maths":
+					text = "3."
+				elif order[-1] in ("knowledge", "other"):
+					text = "4."
 			sname = None
 			nohist = False
 			if text:
