@@ -1545,6 +1545,7 @@ class Bot:
 				"Authorization": "Bearer 842a11464f81fc8be43ac76fb36426d2",
 			}
 			p = self.get_proxy()
+			print("AQ prompt:", prompt)
 			with httpx.Client(timeout=360, http2=True, proxies=p, verify=False) as reqx:
 				resp = reqx.post(
 					"https://api.textsynth.com/v1/engines/flan_t5_xxl/completions",
