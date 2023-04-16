@@ -637,7 +637,7 @@ class Bot:
 			r = "".join(refst).strip()
 			if len(self.gpttokens(r)) > 400:
 				r = self.auto_summarise(q=r, max_length=384, min_length=256).strip()
-			lines.append("[SYSTEM]: \n" + r + "\n")
+			lines.append("[SYSTEM]: Summary of history:\n" + r + "\n")
 		tq = q
 		if len(self.gpttokens(tq)) > 400:
 			tq = self.auto_summarise(q=tq, max_length=384, min_length=256).replace("\n", ". ").strip()
