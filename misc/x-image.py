@@ -3071,6 +3071,9 @@ if __name__ == "__main__":
 			ts, s = argv[1:].split("~", 1)
 			try:
 				d = base64.b64decode(s.encode("ascii"))
+				if b"pickle." in d:
+					import pickle
+					globals()["pickle"] = pickle
 				args = eval(d)
 				if args[1] == "&":
 					args[1] = "$"
