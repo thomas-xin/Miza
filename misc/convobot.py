@@ -1679,8 +1679,8 @@ class Bot:
 		return lines
 
 	def rerender(self):
-		lim = 360 if self.premium >= 2 else 120
-		r1 = 3 if self.premium >= 2 else 2
+		lim = 480 if self.premium >= 2 else 120
+		r1 = 4 if self.premium >= 2 else 2
 		if not self.chat_history or len(self.chat_history) < r1 and len(self.gpttokens(self.chat_history[0][1])) <= lim * 2:
 			return
 		r2 = r1 // 2 + 1
