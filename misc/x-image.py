@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import os, sys, io, time, concurrent.futures, asyncio, subprocess, psutil, collections, traceback, re, requests, blend_modes, zipfile, contextlib, filetype, pyqrcode, ast, colorspace, orjson, base64, random
+import os, sys, io, time, concurrent.futures, asyncio, subprocess, psutil, collections, traceback, re, requests, blend_modes, zipfile, contextlib, filetype, ast, colorspace, orjson, base64, random
 import numpy as np
 import PIL
 from PIL import Image, ImageCms, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhance, ImageMath, ImageStat, ImageFile
@@ -176,6 +176,7 @@ def to_qr(s, rainbow=False):
 	#				 err = "L"
 	#	 if ver is None:
 	#		 raise OverflowError("Input string too large for QR code encoding.")
+	import pyqrcode
 	img = pyqrcode.create(s, error=err, version=ver, mode=None, encoding="utf-8" if max(s) >= 80 else "ascii")
 	fn = f"cache/{time.time_ns() // 1000}.png"
 	if not os.path.exists(fn):
