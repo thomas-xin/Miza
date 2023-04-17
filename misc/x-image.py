@@ -2968,9 +2968,9 @@ def evalImg(url, operation, args):
 							command.extend(("-c:a", "copy"))
 					else:
 						command.extend(("-c:a", "copy"))
-					if first[0].width & 1 or first[0].height & 1:
-						w = round(first[0].width / 2) * 2
-						h = round(first[0].height / 2) * 2
+					if first.width & 1 or first.height & 1:
+						w = round(first.width / 2) * 2
+						h = round(first.height / 2) * 2
 						command.extend(("-vf", f"scale={w}:{h}"))
 					if new.get("count", inf) <= 16:
 						crf = 18
