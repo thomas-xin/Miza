@@ -1070,7 +1070,7 @@ class Bot:
 							flagged = resp["results"][0]["flagged"]
 						except:
 							flagged = False
-						if not flagged:
+						if not flagged and not searched:
 							if nstart:
 								ns2 = "Assume y" + nstart[1:] + "\n"
 							else:
