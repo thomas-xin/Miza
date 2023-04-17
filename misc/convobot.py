@@ -1576,7 +1576,9 @@ class Bot:
 						print(lines)
 						raise
 					text += d["text"] + "\n"
-			return text.strip()
+			text = text.strip().replace("ERAERA", "")
+			if text:
+				return text
 		except:
 			print_exc()
 		return self.au(prompt, stop=stop, force=True)
