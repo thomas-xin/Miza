@@ -1131,7 +1131,7 @@ class Bot:
 					m = response["choices"][0]["message"]
 					print(response)
 					role = m["role"]
-					text = m["content"].removeprefix(f"{self.name} says: ").removeprefix(f"{self.name}: ")
+					text = m["content"].removeprefix(f"{self.name} says: ").removeprefix(f"{self.name}:")
 					if len(text) >= 2 and text[-1] in " aA" and text[-2] not in ".!?" or text.endswith(' "') or text.endswith('\n"'):
 						redo = True
 					text = text.strip()
