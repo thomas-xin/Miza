@@ -1265,7 +1265,7 @@ class UpdateGuilds(Database):
         self[guild.id] = mdata
         return mdata
 
-    def _bot_ready_(self, **void):
+    def _ready_(self, **void):
         bot = self.bot
         for guild in bot.cache.guilds.values():
             with tracebacksuppressor:
