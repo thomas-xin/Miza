@@ -877,7 +877,10 @@ class Bot:
 				v += "\n".join(iman) + "\n"
 			v += nend
 			m = dict(role="system", content=v)
-			messages.insert(-1, m)
+			if len(messages) < 3 or searched:
+				messages.insert(-1, m)
+			else:
+				messages.insert(-2, m)
 			pc += len(self.gpttokens(m["role"], model))
 			pc += len(self.gpttokens(m["content"], model))
 			print("ChatGPT prompt:", messages)

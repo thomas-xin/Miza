@@ -416,7 +416,7 @@ if not enc_key:
         enc_key += "A"
     AUTH["encryption_key"] = enc_key 
     with open("auth.json", "w", encoding="utf-8") as f:
-        json.dump(AUTH, f, indent=4)
+        json.dump(AUTH, f, indent="\t")
 
 if AUTH.get("openai_key"):
     import openai

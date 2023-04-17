@@ -25,7 +25,7 @@ if not os.path.exists("auth.json") or not os.path.getsize("auth.json"):
     }
     import json
     with open("auth.json", "w", encoding="utf-8") as f:
-        json.dump(d, f, indent=4)
+        json.dump(d, f, indent="\t")
     input("auth.json generated. Please fill in discord_token and restart bot when done.")
     raise SystemExit
 
