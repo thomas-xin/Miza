@@ -4509,7 +4509,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         class LoadedMessage(discord.Message):
 
             def __getattr__(self, k):
-                if k != "mentions":
+                if k not in ("mentions", "role_mentions"):
                     return super().__getattribute__(k)
                 try:
                     return super().__getattribute__(k)
@@ -4581,8 +4581,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 if k in ("simulated", "slash"):
                     raise AttributeError(k)
                 d = self.__getattribute__("_data")
-                if k == "content":
-                    return d.get("content", "")
+                if k in ("content", "system_content", "clean_content"):
+                    return d.get(k) or d.get("content", "")
                 if k == "channel":
                     try:
                         channel, _ = bot._get_guild_channel(d)
