@@ -638,23 +638,8 @@ class Bot:
 					e2 = random.choice(("😊", "🥰", "😉", "😛", "😌"))
 					lines.append(f"{u}: Can I have a hug?\n")
 					lines.append(f"{self.name}: Of course! *hugs* {e2}\n")
-		for k, v in self.promises:
-			k = k.replace(":", "")
-			s = f"{k}: {v}\n"
-			lines.append(s)
-		for k, v in chat_history:
-			k = k.replace(":", "")
-			s = f"{k}: {v}\n"
-			lines.append(s)
 		searched = False
 		res = ""
-		for k, v in refs:
-			if not k.startswith("[REPLIED TO]: "):
-				continue
-			if len(self.gpttokens(v)) > 300:
-				v = self.auto_summarise(q=v, max_length=288, min_length=192).replace("\n", ". ").strip()
-			s = f"{k}: {v}\n"
-			lines.append(s)
 		refst = []
 		for k, v in refs:
 			if k.startswith("[REPLIED TO]: "):
@@ -668,6 +653,21 @@ class Bot:
 			if len(self.gpttokens(r)) > lim + 16:
 				r = self.auto_summarise(q=r, max_length=lim, min_length=lim * 2 // 3).strip()
 			lines.append("[SYSTEM]: Summary of history:\n" + r + "\n")
+		for k, v in self.promises:
+			k = k.replace(":", "")
+			s = f"{k}: {v}\n"
+			lines.append(s)
+		for k, v in chat_history:
+			k = k.replace(":", "")
+			s = f"{k}: {v}\n"
+			lines.append(s)
+		for k, v in refs:
+			if not k.startswith("[REPLIED TO]: "):
+				continue
+			if len(self.gpttokens(v)) > 300:
+				v = self.auto_summarise(q=v, max_length=288, min_length=192).replace("\n", ". ").strip()
+			s = f"{k}: {v}\n"
+			lines.append(s)
 		tq = q
 		if len(self.gpttokens(tq)) > 400:
 			tq = self.auto_summarise(q=tq, max_length=384, min_length=256).replace("\n", ". ").strip()
