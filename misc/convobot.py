@@ -830,11 +830,6 @@ class Bot:
 						if not t3 or t3 in ("!", '"!"'):
 							t3 = q
 						t3 = lim_tokens(t3, 32)
-						elif t3[0] == t3[-1] == '"':
-							try:
-								t3 = orjson.loads(t3)
-							except orjson.JSONDecodeError:
-								pass
 						res = exc.submit(
 							getattr(self, sname.lower()),
 							t3,
