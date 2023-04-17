@@ -1699,16 +1699,17 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         url = worst_url(user)
         return self.data.colours.get(url)
 
-    async def get_proxy_url(self, user):
+    async def get_proxy_url(self, user, force=False):
         if hasattr(user, "webhook"):
             url = user.webhook.avatar_url_as(format="webp", size=4096)
         else:
-            url = best_url(user)
+            with tracebacksuppressor:
+                url = best_url(user)
         if not url:
             return self.discord_icon
         if "proxies" in self.data:
             with tracebacksuppressor:
-                url = (await self.data.exec.uproxy(url)) or url
+                url = (await self.data.exec.uproxy(url, force=force)) or url
         return url
 
     async def as_embed(self, message, link=False, colour=False):

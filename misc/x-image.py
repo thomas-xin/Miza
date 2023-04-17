@@ -2968,6 +2968,10 @@ def evalImg(url, operation, args):
 							command.extend(("-c:a", "copy"))
 					else:
 						command.extend(("-c:a", "copy"))
+					if first[0].width & 1 or first[0].height & 1:
+						w = round(first[0].width / 2) * 2
+						h = round(first[0].height / 2) * 2
+						command.extend(("-vf", f"scale={w}:{h}"))
 					if new.get("count", inf) <= 16:
 						crf = 18
 					else:
@@ -2975,9 +2979,12 @@ def evalImg(url, operation, args):
 					command.extend(("-crf", str(crf), "-pix_fmt"))
 					if mode == "RGBA":
 						command.extend(("yuva420p", "-c:v", "libsvtav1"))
+						fmt = "webm"
 					else:
 						command.extend(("yuv420p", "-c:v", "h264"))
+						fmt = "mp4"
 					# command.append("-shortest")
+					out = "cache/" + str(ts) + "." + fmt
 				command.append(out)
 				print(command)
 				proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, bufsize=1048576)

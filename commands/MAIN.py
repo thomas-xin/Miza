@@ -597,7 +597,7 @@ class Avatar(Command):
                     else:
                         u = user
                     name = str(u)
-                    url = await self.bot.get_proxy_url(u)
+                    url = await self.bot.get_proxy_url(u, force=True)
                     colour = await self.bot.get_colour(u)
                     emb = discord.Embed(colour=colour)
                     emb.set_thumbnail(url=url)
@@ -621,7 +621,7 @@ class Info(Command):
 
     async def getGuildData(self, g, flags={}):
         bot = self.bot
-        url = await bot.get_proxy_url(g)
+        url = await bot.get_proxy_url(g, force=True)
         name = g.name
         try:
             u = g.owner
@@ -789,7 +789,7 @@ class Info(Command):
                     u = await bot.fetch_user_member(u.id, guild)
                     member = guild.get_member(u.id)
                     name = str(u)
-                    url = await bot.get_proxy_url(u)
+                    url = await bot.get_proxy_url(u, force=True)
                     st = deque()
                     if u.id == bot.id:
                         st.append("Myself 🙃")

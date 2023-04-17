@@ -653,7 +653,7 @@ class UpdateExec(Database):
         print("Deleted", deleted)
         return deleted
 
-    async def uproxy(self, *urls, collapse=True):
+    async def uproxy(self, *urls, collapse=True, force=False):
         out = [None] * len(urls)
         files = [None] * len(urls)
         sendable = [c_id for c_id, flag in self.data.items() if flag & 16]
@@ -668,14 +668,17 @@ class UpdateExec(Database):
                 out[i] = self.bot.data.proxies[uhu]
                 if not out[i]:
                     raise KeyError
-                if not xrand(16):
+                if force or not xrand(16):
 
                     def verify(url, uhu):
                         with reqs.next().head(url, stream=True) as resp:
                             if resp.status_code not in range(200, 400):
                                 self.bot.data.proxies.pop(uhu, None)
 
-                    create_future_ex(verify, out[i], uhu)
+                    if force:
+                        await create_future(verify, out[i], uhu)
+                    else:
+                        create_future_ex(verify, out[i], uhu)
             except KeyError:
                 if not sendable:
                     out[i] = url
