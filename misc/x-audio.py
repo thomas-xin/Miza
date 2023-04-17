@@ -446,8 +446,10 @@ class AudioFile:
 			cdc = "libopus"
 			cdc2 = "opus"
 		if fmt == "ogg":
-			cdc = "libvorbis"
-			cdc2 = "vorbis"
+			cdc = "libopus"
+			cdc2 = "opus"
+			# cdc = "libvorbis"
+			# cdc2 = "vorbis"
 		elif fmt == "wav":
 			cdc = "pcm_s16le"
 			cdc2 = "wav"
