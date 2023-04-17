@@ -62,7 +62,7 @@ def convert_fut(fut):
     return ret
 
 import torch.cuda
-hwaccel = "d3d11va" if os.name == "nt" and torch.cuda.is_available() else "auto"
+hwaccel = "d3d11va" if os.name == "nt" and not torch.cuda.is_available() else "auto"
 del torch
 
 if not hasattr(time, "time_ns"):
