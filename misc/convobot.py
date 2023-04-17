@@ -441,8 +441,9 @@ class Bot:
 			fmp = self.models[m] = pipeline("fill-mask", model=m, tokenizer=m)
 		return fmp(q)[0]["sequence"]
 
+	sum_rate = 0
 	def answer_summarise(self, m="Qiliang/bart-large-cnn-samsum-ChatGPT_v3", q="", max_length=128, min_length=64, do_sample=False):
-		if q and m == "Qiliang/bart-large-cnn-samsum-ChatGPT_v3" and max_length in range(40, 513):
+		if (t := time.time()) - self.sum_rate > 0 and q and m == "Qiliang/bart-large-cnn-samsum-ChatGPT_v3" and max_length in range(40, 513):
 			headers = {
 				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
 				"DNT": "1",
@@ -464,6 +465,7 @@ class Bot:
 				return resp.json()[0]["generated_text"]
 			except:
 				print_exc()
+				self.sum_rate = t + 30
 		try:
 			smp = self.models[m]
 		except KeyError:
