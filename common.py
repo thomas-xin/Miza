@@ -35,7 +35,6 @@ import nacl.secret
 
 import torch.cuda
 hwaccel = "d3d11va" if os.name == "nt" and torch.cuda.is_available() else "auto"
-sys.modules.pop("torch")
 del torch
 
 utils = discord.utils
