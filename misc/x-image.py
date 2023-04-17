@@ -2474,7 +2474,7 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 		if inputs.get("reset"):
 			to = []
 			for i, t in enumerate(history):
-				cb.append(t, nin=len(history) - i - 1, to=to)
+				cb.append(t, nin=len(history) - i - 1, to=to, ai=False)
 			cb.chat_history = to
 		cb.jailbroken = jb
 		if im:

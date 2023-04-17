@@ -1482,7 +1482,7 @@ class Ask(Command):
             )
             # if fut:
             #     await fut
-            tup = await process_image("CBAI", "&", [inputs], fix=1, timeout=420)
+            tup = await process_image("CBAI", "$", [inputs], fix=1, timeout=420)
             out = tup[0]
             cost = 0
             uoai = None

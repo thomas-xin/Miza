@@ -1628,7 +1628,7 @@ class Bot:
 
 	ask = ai
 
-	def append(self, tup, nin=0, to=None):
+	def append(self, tup, nin=0, to=None, ai=True):
 		to = to if to is not None else self.chat_history
 		if not to or tup != to[-1]:
 			k, v = tup
@@ -1638,12 +1638,15 @@ class Bot:
 			if tlim < 32:
 				return
 			if len(self.gpttokens(v)) > tlim + 4:
-				v = self.auto_summarise(q=v, max_length=tlim, min_length=tlim // 2).replace("\n", ". ").strip()
+				if ai:
+					v = self.auto_summarise(q=v, max_length=tlim, min_length=tlim // 2).replace("\n", ". ").strip()
+				else:
+					v = lim_tokens(v, tlim).strip()
 				tup = (k, v)
 			to.append(tup)
 		return tup[-1]
 
-	def appendleft(self, tup, nin=0, to=None):
+	def appendleft(self, tup, nin=0, to=None, ai=True):
 		to = to if to is not None else self.chat_history
 		if not to or tup != to[0]:
 			k, v = tup
@@ -1653,7 +1656,10 @@ class Bot:
 			if tlim < 32:
 				return
 			if len(self.gpttokens(v)) > tlim + 4:
-				v = self.auto_summarise(q=v, max_length=tlim, min_length=tlim // 2).replace("\n", ". ").strip()
+				if ai:
+					v = self.auto_summarise(q=v, max_length=tlim, min_length=tlim // 2).replace("\n", ". ").strip()
+				else:
+					v = lim_tokens(v, tlim).strip()
 				tup = (k, v)
 			to.insert(0, tup)
 		return tup[0]
