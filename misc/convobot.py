@@ -458,7 +458,7 @@ class Bot:
 					resp = reqx.post(
 						"https://api-inference.huggingface.co/models/Qiliang/bart-large-cnn-samsum-ChatGPT_v3",
 						headers=headers,
-						data=json.dumps(dict(inputs=q)),
+						data=orjson.dumps(dict(inputs=q)),
 					)
 					resp.raise_for_status()
 				return resp.json()[0]["generated_text"]
