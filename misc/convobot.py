@@ -442,7 +442,7 @@ class Bot:
 		return fmp(q)[0]["sequence"]
 
 	def answer_summarise(self, m="Qiliang/bart-large-cnn-samsum-ChatGPT_v3", q="", max_length=128, min_length=64, do_sample=False):
-		if q and m == "Qiliang/bart-large-cnn-samsum-ChatGPT_v3" and max_length in range(40, 96):
+		if q and m == "Qiliang/bart-large-cnn-samsum-ChatGPT_v3" and max_length in range(40, 513):
 			headers = {
 				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
 				"DNT": "1",
@@ -450,7 +450,7 @@ class Bot:
 				"Content-Type": "application/json",
 				"cache-control": "no-cache",
 				"x-use-cache": "false",
-				"x-wait-for-model": "true",
+				"x-wait-for-model": "false",
 			}
 			try:
 				p = self.get_proxy()
@@ -458,7 +458,7 @@ class Bot:
 					resp = reqx.post(
 						"https://api-inference.huggingface.co/models/Qiliang/bart-large-cnn-samsum-ChatGPT_v3",
 						headers=headers,
-						data=orjson.dumps(dict(inputs=q)),
+						data=orjson.dumps(dict(inputs=q, max_length=max_length, min_length=min_length)),
 					)
 					resp.raise_for_status()
 				return resp.json()[0]["generated_text"]
