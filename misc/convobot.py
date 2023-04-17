@@ -442,6 +442,28 @@ class Bot:
 		return fmp(q)[0]["sequence"]
 
 	def answer_summarise(self, m="Qiliang/bart-large-cnn-samsum-ChatGPT_v3", q="", max_length=128, min_length=64, do_sample=False):
+		if q and m == "Qiliang/bart-large-cnn-samsum-ChatGPT_v3" and max_length in range(40, 96):
+			headers = {
+				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
+				"DNT": "1",
+				"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
+				"Content-Type": "application/json",
+				"cache-control": "no-cache",
+				"x-use-cache": "false",
+				"x-wait-for-model": "true",
+			}
+			try:
+				p = self.get_proxy()
+				with httpx.Client(timeout=360, http2=True, proxies=p, verify=False) as reqx:
+					resp = reqx.post(
+						"https://api-inference.huggingface.co/models/Qiliang/bart-large-cnn-samsum-ChatGPT_v3",
+						headers=headers,
+						data=json.dumps(dict(inputs=q)),
+					)
+					resp.raise_for_status()
+				return resp.json()[0]["generated_text"]
+			except:
+				print_exc()
 		try:
 			smp = self.models[m]
 		except KeyError:
@@ -449,11 +471,11 @@ class Bot:
 		return smp(q, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
 
 	def auto_summarise(self, q="", max_length=128, min_length=64):
-		if 256 < len(self.gpttokens(q)) < 768:
-			q2 = f'"""\n{q}\n"""\n\nSummarise the above into a paragraph, keeping most important parts.'
-			text = self.aq(q2, temp=0.8).strip('" ')
-			if text:
-				return text
+		# if 256 < len(self.gpttokens(q)) < 768:
+		# 	q2 = f'"""\n{q}\n"""\n\nSummarise the above into a paragraph, keeping most important parts.'
+		# 	text = self.aq(q2, temp=0.8).strip('" ')
+		# 	if text:
+		# 		return text
 		if q and sum(c.isascii() for c in q) / len(q) > 0.75:
 			q = lim_tokens(q, max_length + min_length << 1)
 			return self.answer_summarise(q=q, max_length=max_length, min_length=min_length)
