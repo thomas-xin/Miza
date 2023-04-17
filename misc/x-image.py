@@ -61,7 +61,9 @@ def convert_fut(fut):
         loop.create_task(_await_fut(fut, ret))
     return ret
 
-hwaccel = "d3d11va" if os.name == "nt" else "auto"
+import torch.cuda
+hwaccel = "d3d11va" if os.name == "nt" and torch.cuda.is_available() else "auto"
+del torch
 
 if not hasattr(time, "time_ns"):
 	time.time_ns = lambda: int(time.time() * 1e9)

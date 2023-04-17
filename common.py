@@ -33,7 +33,10 @@ from zipfile import ZipFile
 import urllib.request, urllib.parse
 import nacl.secret
 
-hwaccel = "d3d11va" if os.name == "nt" else "auto"
+import torch.cuda
+hwaccel = "d3d11va" if os.name == "nt" and torch.cuda.is_available() else "auto"
+sys.modules.pop("torch")
+del torch
 
 utils = discord.utils
 reqs = alist(requests.Session() for i in range(6))
@@ -2685,7 +2688,7 @@ class CompatFile(discord.File):
                 self.filename = getattr(fp, "name", None)
         else:
             self.filename = filename
-        self.filename = self.filename or "untitled"
+        self.filename = self.filename.strip().replace(" ", "_") or "untitled"
         if spoiler:
             if self.filename is not None:
                 if not self.filename.startswith("SPOILER_"):
