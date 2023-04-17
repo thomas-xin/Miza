@@ -2897,6 +2897,7 @@ def evalImg(url, operation, args):
 			if duration > dur:
 				duration = dur
 		if video:
+			print("VIDEO:", new)
 			if fmt in ("default", "png", "jpg", "jpeg", "bmp"):
 				fmt = "gif"
 			print(duration, new["count"])
