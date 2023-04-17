@@ -1696,7 +1696,8 @@ class Ask(Command):
                 m = None
             print("Redoing", channel)
             # await process_image("lambda cid: CBOTS[cid].deletes()", "$", [channel.id], fix=1, timeout=120)
-            bot.data.chat_histories[channel.id] = None
+            bot.data.chat_histories.get(channel.id, {}).pop("ids", None)
+            bot.data.chat_histories.get(channel.id, {}).pop("last_message_id", None)
             colour = await bot.get_colour(bot.user)
             emb = discord.Embed(colour=colour, description=css_md("[This message has been reset.]"))
             emb.set_author(**get_author(bot.user))
@@ -1746,7 +1747,8 @@ class UpdateChatHistories(Database):
             return
         print("Editing", channel)
         # await process_image("lambda cid: CBOTS[cid].deletes()", "$", [channel.id], fix=1, timeout=120)
-        bot.data.chat_histories[channel.id] = None
+        bot.data.chat_histories.get(channel.id, {}).pop("ids", None)
+        bot.data.chat_histories.get(channel.id, {}).pop("last_message_id", None)
         colour = await bot.get_colour(bot.user)
         emb = discord.Embed(colour=colour, description=css_md("[This message has been reset.]"))
         emb.set_author(**get_author(bot.user))
@@ -1772,7 +1774,8 @@ class UpdateChatHistories(Database):
             return
         print("Deleting", channel)
         # await process_image("lambda cid: CBOTS[cid].deletes()", "$", [channel.id], fix=1, timeout=120)
-        bot.data.chat_histories[channel.id] = None
+        bot.data.chat_histories.get(channel.id, {}).pop("ids", None)
+        bot.data.chat_histories.get(channel.id, {}).pop("last_message_id", None)
         colour = await bot.get_colour(bot.user)
         emb = discord.Embed(colour=colour, description=css_md("[This message has been reset.]"))
         emb.set_author(**get_author(bot.user))
