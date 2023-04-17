@@ -4509,9 +4509,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
             def __getattr__(self, k):
                 if k != "mentions":
-                    return super().__getattr__(k)
+                    return super().__getattribute__(k)
                 try:
-                    return super().__getattr__(k)
+                    return super().__getattribute__(k)
                 except AttributeError:
                     return []
 
