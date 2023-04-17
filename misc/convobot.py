@@ -444,6 +444,7 @@ class Bot:
 	sum_rate = 0
 	def answer_summarise(self, m="Qiliang/bart-large-cnn-samsum-ChatGPT_v3", q="", max_length=128, min_length=64, do_sample=False):
 		if (t := time.time()) - self.sum_rate > 0 and q and m == "Qiliang/bart-large-cnn-samsum-ChatGPT_v3" and max_length in range(40, 513):
+			self.sum_rate = t + 30
 			headers = {
 				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
 				"DNT": "1",
@@ -462,10 +463,10 @@ class Bot:
 						data=orjson.dumps(dict(inputs=q, max_length=max_length, min_length=min_length)),
 					)
 					resp.raise_for_status()
+				self.sum_rate = t
 				return resp.json()[0]["generated_text"]
 			except:
 				print_exc()
-				self.sum_rate = t + 30
 		try:
 			smp = self.models[m]
 		except KeyError:
@@ -827,7 +828,8 @@ class Bot:
 						# spl = self.cgp(t2)
 						# t3 = None if not spl else spl[0]
 						if not t3 or t3 in ("!", '"!"'):
-							t3 = lim_tokens(q, 16)
+							t3 = q
+						t3 = lim_tokens(t3, 32)
 						elif t3[0] == t3[-1] == '"':
 							try:
 								t3 = orjson.loads(t3)
