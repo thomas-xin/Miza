@@ -1561,7 +1561,7 @@ class Bot:
 						top_p=0.8,
 						max_tokens=200,
 						stream=False,
-						stop=stop or "####",
+						stop=stop or ["ERAERA", "####"],
 					)),
 				)
 				resp.raise_for_status()
