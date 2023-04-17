@@ -1483,6 +1483,7 @@ class Art(Command):
         url2 = None
         rems = deque()
         kwargs = {
+            "--device": "GPU",
             "--num-inference-steps": "24",
             "--guidance-scale": "7.5",
             "--eta": "0.8",
