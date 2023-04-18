@@ -2296,11 +2296,10 @@ async def sub_submit(ptype, command, fix=None, _timeout=12):
     command = "[" + ",".join(map(repr, command[:2])) + "," + ",".join(map(str, command[2:])) + "]"
     s = f"~{ts}~".encode("ascii") + base64.b64encode(command.encode("utf-8")) + b"\n"
     # s = f"~{ts}~{repr(command.encode('utf-8'))}\n".encode("utf-8")
+    sem = proc.sem
     if fix:
-        sem = emptyctx
-    else:
-        sem = proc.sem
-        await sem()
+        sem.clear()
+    await sem()
     if not is_strict_running(proc):
         proc = await get_idle_proc(ptype, fix=fix)
     async with sem:
@@ -2333,10 +2332,12 @@ async def sub_submit(ptype, command, fix=None, _timeout=12):
             PROC_RESP.pop(ts, None)
     return resp
 
-def sub_kill(start=True):
+def sub_kill(start=True, force=False):
     for p in itertools.chain(*PROCS.values()):
         if is_strict_running(p):
-            create_future_ex(force_kill, p)
+            sem = emptyctx if force else p.sem
+            with sem:
+                force_kill(p)
     PROCS.clear()
     PROC_RESP.clear()
     if start:

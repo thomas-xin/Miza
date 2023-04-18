@@ -95,7 +95,10 @@ class Restart(Command):
                 # Kill math and image subprocesses
                 print("Killing math and image subprocesses...")
                 with tracebacksuppressor:
-                    await create_future(sub_kill, start=False, timeout=8, priority=True)
+                    try:
+                        await create_future(sub_kill, start=False, timeout=24, priority=True)
+                    except:
+                        await create_future(sub_kill, start=False, force=True, timeout=8, priority=True)
                 # Kill the webserver
                 print("Killing webserver...")
                 with tracebacksuppressor:

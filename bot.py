@@ -6277,6 +6277,6 @@ if __name__ == "__main__":
                 miza.run()
             force_kill(miza.server)
             miza.audio.kill()
-            sub_kill(start=False)
+            sub_kill(start=False, force=True)
     print = _print
     sys.stdout, sys.stderr = sys.__stdout__, sys.__stderr__
