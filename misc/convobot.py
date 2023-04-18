@@ -489,7 +489,7 @@ class Bot:
 		try:
 			zscp = self.models[m]
 		except KeyError:
-			zscp = self.models[m] = pipeline("zero-shot-classification", model=m, use_auth_token=self.huggingface_token)
+			zscp = self.models[m] = pipeline("zero-shot-classification", model=m)
 		resp = zscp(q, labels, truncation=True)
 		return dict(zip(resp["labels"], resp["scores"]))
 
@@ -798,13 +798,13 @@ class Bot:
 				pc += len(self.gpttokens(m["content"], model))
 			text = res = flagged = None
 			if premium >= 2 and q and len(q.split(None)) > 1 and not self.jailbroken:
-				resp = self.answer_classify(q=q, labels=("personal", "casual", "illegal", "maths", "knowledge", "other"))
+				resp = self.answer_classify(q=q, labels=("personal question", "casual conversation", "illegal act", "maths equation", "knowledge info", "other"))
 				order = sorted(resp, key=resp.get)
-				if order[-1] == "illegal":
+				if order[-1] == "illegal act":
 					text = "2."
-				elif order[-1] == "maths":
+				elif order[-1] == "maths equation":
 					text = "3."
-				elif order[-1] in ("knowledge", "other"):
+				elif order[-1] in ("knowledge info", "other"):
 					text = "4."
 			sname = None
 			nohist = False
