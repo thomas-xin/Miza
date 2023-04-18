@@ -1178,7 +1178,8 @@ async def recursive_coro(item):
     return item
 
 
-is_channel = lambda channel: isinstance(channel, discord.abc.GuildChannel) or isinstance(channel, discord.abc.PrivateChannel) or isinstance(channel, discord.Thread)
+is_channel = lambda channel: isinstance(channel, discord.abc.GuildChannel) or isinstance(channel, discord.abc.PrivateChannel) or isinstance(channel, discord.Thread) or getattr(channel, "is_channel", False)
+is_guild = lambda guild: isinstance(guild, discord.Guild) or isinstance(guild, discord.PartialInviteGuild)
 
 def is_nsfw(channel):
     try:
@@ -2356,7 +2357,7 @@ def process_image(image, operation, args=[], fix=None, timeout=36):
             try:
                 args[i] = "orjson.loads(" + as_str(orjson.dumps(as_str(orjson.dumps(a)))) + ")"
             except (TypeError, orjson.JSONDecodeError):
-                args[i] = "pickle.loads(" + as_str(orjson.dumps(as_str(pickle.dumps(a)))) + ")"
+                args[i] = "pickle.loads(" + repr(pickle.dumps(a)) + ")"
 
     def as_arg(arg):
         if isinstance(arg, str) and (arg.startswith("pickle.loads(") or arg.startswith("orjson.loads(")):
