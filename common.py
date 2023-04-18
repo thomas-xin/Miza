@@ -2356,7 +2356,7 @@ def process_image(image, operation, args=[], fix=None, timeout=36):
             try:
                 args[i] = "orjson.loads(" + as_str(orjson.dumps(as_str(orjson.dumps(a)))) + ")"
             except (TypeError, orjson.JSONDecodeError):
-                args[i] = "pickle.loads(" + as_str(orjson.dumps(as_str(pickle.dumps(a)))) + ")"
+                args[i] = "pickle.loads(" + repr(pickle.dumps(a)) + ")"
 
     def as_arg(arg):
         if isinstance(arg, str) and (arg.startswith("pickle.loads(") or arg.startswith("orjson.loads(")):
