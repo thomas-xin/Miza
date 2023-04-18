@@ -5199,7 +5199,7 @@ class Transcribe(Command):
                     arg = spl[0]
                     if (dest := (tr.renamed.get(c := arg.casefold()) or (tr.languages.get(c) and c))):
                         dest = (googletrans.LANGUAGES.get(dest) or dest).capitalize()
-                        curr.languages.append(dest)
+                        # curr.languages.append(dest)
                         argv = " ".join(spl[1:])
             argv = verify_search(argv)
             # Input must be a URL
