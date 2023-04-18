@@ -1038,7 +1038,7 @@ class Bot:
 				try:
 					if flagged:
 						raise PermissionError("flagged")
-					if not i and not random.randint(0, 2) and model.startswith("gpt-3.5-") and not self.nsfw and not self.jailbroken:
+					if not i and not bals and not random.randint(0, 2) and model.startswith("gpt-3.5-") and not self.nsfw and not self.jailbroken:
 						try:
 							text = self.ycg(data).removeprefix(f"{self.name}: ").strip()
 							if stop and any(s in text for s in stop):
@@ -1519,10 +1519,14 @@ class Bot:
 				return text, cost, uoai
 
 	def au(self, prompt, stop=None, force=False):
-		funcs = [self.chatgpt, self.chatgpt, self.ycg, self.cgp, self.cgp]
-		if len(self.gpttokens(prompt)) > 24:
-			funcs.append(self.vai)
-		random.shuffle(funcs)
+		bals = getattr(self, "bals", {})
+		if bals:
+			funcs = [self.cgp]
+		else:
+			funcs = [self.chatgpt, self.chatgpt, self.ycg, self.cgp, self.cgp]
+			if len(self.gpttokens(prompt)) > 24:
+				funcs.append(self.vai)
+			random.shuffle(funcs)
 		funcs.extend((self.cgp, self.cgp))
 		resp = None
 		while not resp:
