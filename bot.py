@@ -4251,6 +4251,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 topic = None
                 is_nsfw = lambda self: bot.is_nsfw(self.channel)
                 is_news = lambda *self: False
+                is_chanbel = True
 
             def __init__(self, user, channel, **void):
                 self.channel = self.system_channel = self.rules_channel = self.UserChannel(channel)
@@ -4289,6 +4290,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             max_members = 2
             unavailable = False
             ghost = True
+            is_channel = True
 
         # Represents a deleted/not found user.
         class GhostUser(discord.abc.Snowflake):
@@ -6134,7 +6136,8 @@ class SimulatedMessage:
         else:
             author = self
         self.author = author
-        self.channel = author
+        self.channel = self
+        self.is_channel = True
         self.guild = author
         self.dm_channel = author
         self.name = name
