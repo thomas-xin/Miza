@@ -2847,6 +2847,7 @@ class FileStreamer(io.BufferedRandom, contextlib.AbstractContextManager):
     def __init__(self, *objs, filename=None):
         self.pos = 0
         self.data = []
+        self.filename = filename
         i = 0
         objs = list(objs)
         while objs:
@@ -2858,6 +2859,7 @@ class FileStreamer(io.BufferedRandom, contextlib.AbstractContextManager):
                 f = open(f, "rb")
             self.data.append((i, f))
             i += f.seek(0, os.SEEK_END)
+            self.filename = filename or getattr(f, "filename", None) or getattr(f, "name", None)
 
     def seek(self, pos=0):
         self.pos = pos
