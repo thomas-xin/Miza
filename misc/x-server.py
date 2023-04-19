@@ -1650,7 +1650,7 @@ transform: translate(-50%, -50%);
 
 	chunk_file = "cache/chunking.json"
 	try:
-		if not os.path.exists(self.chunk_file):
+		if not os.path.exists(chunk_file):
 			chunking = {}
 		else:
 			with open(chunk_file, "rb") as f:

@@ -569,7 +569,7 @@ class UpdateExec(Database):
         print("Stash", fns, start, end)
         urls = []
         mids = []
-        with FileStreamer(*fns)
+        with FileStreamer(*fns) as f:
             if start:
                 f.seek(start)
             i = start
