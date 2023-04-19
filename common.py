@@ -2256,7 +2256,7 @@ async def start_proc(k, i):
     args.append(str(i))
     proc = await asyncio.create_subprocess_exec(
         *args,
-        limit=8388608,
+        limit=1073741824,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=None,

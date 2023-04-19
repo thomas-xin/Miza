@@ -27,6 +27,7 @@ literal_eval = lambda s: ast.literal_eval(as_str(s).lstrip())
 
 
 BF_PREC = 256
+sys.set_int_max_str_digits(BF_PREC)
 BF_ALPHA = "0123456789abcdefghijklmnopqrstuvwxyz"
 
 mp = mpmath.mp
@@ -975,6 +976,8 @@ def evalSym(f, prec=64, r=False, variables=None):
 	global BF_PREC
 	random.seed(time.time_ns())
 	BF_PREC = sympy.ceiling(int(prec) * 1.25)
+	mp.dps = BF_PREC
+	sys.set_int_max_str_digits(BF_PREC)
 	r = int(r)
 	prec = int(prec)
 	y = f
