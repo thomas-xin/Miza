@@ -447,7 +447,7 @@ class CustomAudio(collections.abc.Hashable):
             f = CompatFile(resp, filename=fn)
         else:
             f = None
-        if aio:
+        if aio or is_main_thread():
             return create_task(send_with_react(self.text, *args, file=f, reacts="❎", **kwargs))
         with self.announcer:
             return await_fut(send_with_react(self.text, *args, file=f, reacts="❎", **kwargs))
