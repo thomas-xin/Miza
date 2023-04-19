@@ -855,6 +855,7 @@ transform: translate(-50%, -50%);
 			else:
 				cp.response.status = 200
 				ranges.append((0, size))
+				length = size
 			if not size:
 				size = "*"
 			cr = "bytes " + ", ".join(f"{start}-{end - 1}/{size}" for start, end in ranges)
