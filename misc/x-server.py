@@ -1546,7 +1546,7 @@ transform: translate(-50%, -50%);
 	def upload_chunk(self, **kwargs):
 		name = cp.request.headers.get("x-file-name", "untitled")
 		s = cp.request.remote.ip + "%" + name
-		h = hash(s) % 2 ** 48
+		h = ihash(s) % 2 ** 48
 		single = "/upload_single" in cp.url()
 		xi = int(cp.request.headers.get("x-index", 0))
 		mfs = int(cp.request.headers.get("x-total", 0))
@@ -1691,7 +1691,7 @@ transform: translate(-50%, -50%);
 		s = cp.request.remote.ip + "%" + x_name
 		print(s)
 		mfs = int(kwargs.get("x-total") or cp.request.headers.get("x-total", 0))
-		h = hash(s) % 2 ** 48
+		h = ihash(s) % 2 ** 48
 		nh = n = f"cache/{h}%"
 		if self.merged.get(nh):
 			return
