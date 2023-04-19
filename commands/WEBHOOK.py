@@ -415,7 +415,7 @@ class EmojiList(Command):
                 except LookupError:
                     following[user.id].pop(k)
                     following.update(user.id)
-                    continue
+                    return
                 curr[f":{k}:"] = f"({v})` {me}"
 
             futs.append(create_task(check_emoji(k, v)))
