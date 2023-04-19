@@ -570,7 +570,7 @@ class UpdateExec(Database):
         urls = []
         mids = []
         with FileStreamer(*fns) as f:
-            fn = f.filename
+            fn = f.filename or "untitled"
             if start:
                 f.seek(start)
             i = start

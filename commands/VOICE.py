@@ -3850,7 +3850,7 @@ class AudioSettings(Command):
     aliasExt = {
         "AudioSettings": None,
         "Audio": None,
-        "A": None,
+        # "A": None,
         "Vol": "volume",
         "V": "volume",
         "🔉": "volume",
