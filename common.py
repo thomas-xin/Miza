@@ -2629,7 +2629,7 @@ def p2n(b):
 
 def n2p(n):
     c = n.bit_length() + 7 >> 3
-    return base64.urlsafe_b64encode(n.to_bytes(c, "little")).rstrip(b"=").decode("ascii")
+    return base64.urlsafe_b64encode(n.to_bytes(c, "big")).rstrip(b"=").decode("ascii")
 
 def find_file(path, cwd="saves/filehost", ind="\x7f"):
     # if no file name is inputted, return no content
