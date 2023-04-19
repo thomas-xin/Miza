@@ -835,7 +835,7 @@ class Bot:
 							t3,
 							raw=True,
 						).result(timeout=12)
-						print(sname, "res:", t3, res)
+						print(sname, "res:", t3 + ";", res)
 					except concurrent.futures.TimeoutError:
 						print_exc()
 					else:

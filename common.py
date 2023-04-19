@@ -2834,6 +2834,55 @@ class ForwardedRequest(io.IOBase):
             self.fp.close()
         self.fp = None
 
+class FileStreamer(io.BufferedRandom, collections.abc.MutableSequence, contextlib.AbstractContextManager):
+
+    def __init__(self, *objs, filename=None):
+        self.pos = 0
+        self.data = []
+        i = 0
+        objs = list(objs)
+        while objs:
+            f = objs.pop(0)
+            if isinstance(f, str):
+                f = open(f, "rb")
+            if isinstance(f, (list, tuple)):
+                objs.extend(f)
+                continue
+            self.data.append((i, f))
+            i += f.seek(0, os.SEEK_END)
+
+    def seek(self, pos=0):
+        self.pos = pos
+
+    def read(self, size=None):
+        out = []
+        size = size if size is not None else inf
+        while size:
+            t = None
+            for i, f in self.data:
+                if i > self.pos:
+                    break
+                t = (i, f)
+            p = self.pos - t[0]
+            t[1].seek(p)
+            b = t[1].read(min(size, 4294967296))
+            if not b:
+                break
+            out.append(b)
+            size -= len(b)
+            self.pos += len(b)
+        return b"".join(out)
+
+    def close(self):
+        for i, f in self.data:
+            f.close()
+        self.data.clear()
+
+    seekable = lambda self: True
+    readable = lambda self: True
+    tell = lambda self: self.pos
+    __exit__ = lambda self, *args: self.close()
+
 class seq(io.BufferedRandom, collections.abc.MutableSequence, contextlib.AbstractContextManager):
 
     BUF = 262144

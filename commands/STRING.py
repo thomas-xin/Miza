@@ -1558,7 +1558,7 @@ class Ask(Command):
         if h and not emb and premium < 2 and (not xrand(32) or "AI language model" in out and not xrand(3)):
             oo = bot.data.users.get(user.id, {}).get("opt_out") or 0
             if utc() - oo > 86400 * 14:
-                code = f"*```callback-string-ask-{user.id}-\nReact with 🚫 to dismiss.```*\n"
+                code = f"*```callback-string-ask-{user.id}-\nReact with 🚫 to dismiss.```* "
                 emb = discord.Embed(colour=rand_colour())
                 emb.set_author(**get_author(bot.user))
                 emb.description = (
@@ -1702,7 +1702,7 @@ class Ask(Command):
             emb = discord.Embed(colour=colour, description=css_md("[This message has been reset.]"))
             emb.set_author(**get_author(bot.user))
             create_task(message.edit(embed=emb))
-            create_task(message.add_reaction("❎"))
+            await message.add_reaction("❎")
             if m:
                 await bot.process_message(m)
             return
@@ -1719,9 +1719,8 @@ class Ask(Command):
             colour = await bot.get_colour(bot.user)
             emb = discord.Embed(colour=colour, description=css_md("[The conversation has been reset.]"))
             emb.set_author(**get_author(bot.user))
-            await message.edit(embed=emb)
-            # create_task(message.edit(content=css_md("[The conversation has been reset.]")))
-            create_task(message.add_reaction("❎"))
+            create_task(message.edit(embed=emb))
+            await message.add_reaction("❎")
             return
 
 

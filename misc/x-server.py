@@ -1648,7 +1648,35 @@ transform: translate(-50%, -50%);
 				return
 			shutil.copyfileobj(cp.request.body.fp, f)
 
-	merged = {}
+	chunk_file = "cache/chunking.json"
+	try:
+		if not os.path.exists(self.chunk_file):
+			chunking = {}
+		else:
+			with open(chunk_file, "rb") as f:
+				b = f.read()
+			chunking = orjson.loads(b)
+	except:
+		print_exc()
+		chunking = {}
+	merge_sem = Semaphore(1, inf)
+	def update_merge(self):
+		with tracebacksuppressor:
+			d = self.chunking.copy()
+			for k, v in tuple(d.items()):
+				if isinstance(v, concurrent.futures.Future):
+					d.pop(k)
+			with self.merge_sem:
+				b = orjson.dumps(d)
+				if not os.path.exists(self.chunk_file):
+					with open(self.chunk_file, "wb") as f:
+						f.write(b)
+				else:
+					with open(self.chunk_file, "rb+") as f:
+						f.truncate(len(b))
+						f.seek(0)
+						f.write(b)
+
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
 	@hostmap
@@ -1692,10 +1720,10 @@ transform: translate(-50%, -50%);
 				q = f"?key={key}"
 				url = HOST + "/f/" + n2p(ts)
 				lim_str(name, 96).replace("$", "-")
+				size = mfs
 				tn = f"saves/filehost/{IND}{ts}~.forward${size}$ ${na2}.$"
 				urls = []
 				mids = []
-				size = mfs
 				mime = info.mime
 				for i in range(high):
 					gn = nh + str(i)
@@ -1738,6 +1766,7 @@ transform: translate(-50%, -50%);
 				self.register_replacer(ts, key)
 		finally:
 			self.merged.pop(nh, None)
+		self.update_merge()
 		return "/p/" + n2p(ts)
 
 	@cp.expose

@@ -565,19 +565,11 @@ class UpdateExec(Database):
     hmac_sem = Semaphore(5, 1, rate_limit=5)
     async def stash(self, fn, start=0, end=inf):
         bot = self.bot
-        print("Stash", fn, start, end)
-        if isinstance(fn, (tuple, list)):
-            fl = list(fn)
-            fn = fl.pop(0)
-            if len(fl) > 1:
-                with open(fn, "ab") as f1:
-                    for fc in fl:
-                        with open(fc, "rb") as f2:
-                            await create_future(shutil.copyfileobj, f2, f1)
+        fns = [fn] if isinstance(fn, str) else fn
+        print("Stash", fns, start, end)
         urls = []
         mids = []
-        end = min(end, os.path.getsize(fn))
-        with open(fn, "rb") as f:
+        with FileStreamer(*fns)
             if start:
                 f.seek(start)
             i = start
