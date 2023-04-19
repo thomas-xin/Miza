@@ -182,7 +182,7 @@ class EndpointRedirects(Dispatcher):
 			if p == "ip":
 				p = "get_ip"
 			elif p[:2] == "f/":
-				p = "raw/" + p[3:]
+				p = "raw/" + p[2:]
 			elif p == "upload":
 				p = "files"
 			elif p == "api/mpinsights":
@@ -196,8 +196,8 @@ class EndpointRedirects(Dispatcher):
 			else:
 				break
 		p = "/" + p
-		if p != path:
-			print("REDIR:", path, p)
+		# if p != path:
+		# 	print("REDIR:", path, p)
 		return super().__call__(p)
 
 error_map = {
