@@ -177,25 +177,25 @@ class EndpointRedirects(Dispatcher):
 
 	def __call__(self, path):
 		send("@@@", escape=False)
-		if path[1:] == AUTH.get("discord_token"):
-			path = "/backup"
-		elif path == "/ip":
-			path = "/get_ip"
-		elif path[:3] == "/f/":
-			path = "/raw/" + path[3:]
-		elif path == "/upload":
-			path = "/files"
-		elif path == "/api/mpinsights":
-			path = "/api_mpinsights"
-		elif path.startswith("/api/"):
-			path = path.removeprefix("/api")
-		else:
-			p = path.lstrip("/")
-			if p in actually_static:
-				path = "/static/" + p
-			elif p in mapped_static:
-				path = "/static/" + mapped_static[p]
-		return Dispatcher.__call__(self, path)
+		p = path.lstrip("/")
+		if p == "ip":
+			p = "get_ip"
+		elif p[:3] == "/f/":
+			p = "/raw/" + p[3:]
+		elif p == "/upload":
+			p = "/files"
+		elif p == "/api/mpinsights":
+			p = "/api_mpinsights"
+		elif p.startswith("api/"):
+			p = p.removeprefix("api/")
+		elif p in actually_static:
+			p = "static/" + p
+		elif p in mapped_static:
+			p = "static/" + mapped_static[p]
+		p = "/" + p
+		if p != path:
+			print("REDIR:", path, p)
+		return super().__call__(p)
 
 error_map = {
 	SyntaxError: 400,
