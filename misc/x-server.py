@@ -1595,7 +1595,7 @@ transform: translate(-50%, -50%);
 			if mfs > 512 * 1048576:
 				fut = create_future_ex(shutil.copyfileobj, cp.request.body.fp, f)
 				try:
-					info = self.chunking[n]
+					info = cdict(self.chunking[n])
 				except KeyError:
 					info = self.chunking[n] = cdict(
 						mime="application/octet-stream",
@@ -1645,6 +1645,7 @@ transform: translate(-50%, -50%);
 						fut.add_done_callback(self.chunking[fn].set_result)
 					self.chunking[fn] = fut
 					fut.result()
+				self.update_merge()
 				return
 			shutil.copyfileobj(cp.request.body.fp, f)
 
@@ -1677,6 +1678,7 @@ transform: translate(-50%, -50%);
 						f.seek(0)
 						f.write(b)
 
+	merged = {}
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
 	@hostmap
@@ -1719,7 +1721,7 @@ transform: translate(-50%, -50%);
 					key = n2p(n)
 				q = f"?key={key}"
 				url = HOST + "/f/" + n2p(ts)
-				lim_str(name, 96).replace("$", "-")
+				na2 = lim_str(name, 96).replace("$", "-")
 				size = mfs
 				tn = f"saves/filehost/{IND}{ts}~.forward${size}$ ${na2}.$"
 				urls = []
@@ -1734,7 +1736,7 @@ transform: translate(-50%, -50%);
 						url1, mid1 = self.bot_exec(f"bot.data.exec.stash({repr(gn)})")
 						urls.extend(url1)
 						mids.extend(mid1)
-					elif isinstance(fut, tuple):
+					elif isinstance(fut, (tuple, list)):
 						urls.extend(fut[0])
 						mids.extend(fut[1])
 				urls = [map_url(url) for url in urls]
