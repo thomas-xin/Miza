@@ -122,6 +122,7 @@ class UpdateAutoEmojis(Database):
                 orig = self.bot.data.emojilists.setdefault(message.author.id, {})
                 orig[name] = e_id
                 self.bot.data.emojilists.update(message.author.id)
+                self.bot.data.emojinames[e_id] = name
         if not message.guild or message.guild.id not in self.data:
             return
         m_id = None
@@ -189,6 +190,10 @@ class UpdateAutoEmojis(Database):
                             e_id = await self.bot.id_from_message(emoji)
                             emoji = self.bot.cache.emojis.get(e_id)
                         futs.append(create_task(m2.add_reaction(emoji)))
+                        orig = self.bot.data.emojilists.setdefault(message.author.id, {})
+                        orig[name] = emoji.id
+                        self.bot.data.emojilists.update(message.author.id)
+                        self.bot.data.emojinames[emoji.id] = name
                 if futs:
                     futs.append(create_task(self.bot.silent_delete(message)))
                     for fut in futs:
@@ -240,7 +245,7 @@ class UpdateAutoEmojis(Database):
                 if not emoji:
                     animated = await create_future(self.bot.is_animated, e_id, verify=True)
                     if animated is not None:
-                        emoji = cdict(id=e_id, animated=animated)
+                        emoji = cdict(id=e_id, animated=animated, name=self.bot.data.emojinames.get(e_id))
                 if not emoji and not message.webhook_id:
                     self.bot.data.emojilists.get(message.author.id, {}).pop(name, None)
                     self.bot.data.emojilists.update(message.author.id)
@@ -260,6 +265,7 @@ class UpdateAutoEmojis(Database):
                         orig = self.bot.data.emojilists.setdefault(message.author.id, {})
                         orig.setdefault(name, emoji.id)
                         self.bot.data.emojilists.update(message.author.id)
+                        self.bot.data.emojinames[emoji.id] = name
             if substitutes:
                 msg = msg[:substitutes[0]] + substitutes[1] + msg[substitutes[2]:]
         if not msg or msg == message.content:
@@ -440,6 +446,11 @@ class EmojiList(Command):
 
 class UpdateEmojiLists(Database):
     name = "emojilists"
+    user = True
+
+
+class UpdateEmojiNames(Database):
+    name = "emojinames"
 
 
 class MimicConfig(Command):

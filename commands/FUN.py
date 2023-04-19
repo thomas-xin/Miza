@@ -1801,7 +1801,7 @@ class React(Command):
     min_level = 2
     description = "Causes ⟨MIZA⟩ to automatically assign a reaction to messages containing the substring."
     usage = "<0:react_to>? <1:react_data>? <disable{?d}>?"
-    example = ("react cat 🐱", "react ?d dog")
+    example = ("react cat 🐱", "react ?d dog", "react remove 1")
     flags = "aedzf"
     no_parse = True
     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
@@ -1835,18 +1835,24 @@ class React(Command):
             )
             return
         if "d" in flags:
-            a = full_prune(args[0])
+            a = full_prune(argv)
+            if a not in curr and a.isnumeric() and int(a) < len(curr):
+                a = tuple(curr)[int(a)]
+                curr.pop(a)
+                update(guild.id)
+                return italics(css_md(f"Removed {sqr_md(a)} from the auto react list for {sqr_md(guild)}."))
             if a in curr:
                 curr.pop(a)
                 update(guild.id)
                 return italics(css_md(f"Removed {sqr_md(a)} from the auto react list for {sqr_md(guild)}."))
-            else:
-                raise LookupError(f"{a} is not in the auto react list.")
+            raise LookupError(f"{a} is not in the auto react list.")
         lim = 64 << bot.is_trusted(guild.id) * 2 + 1
         if curr.count() >= lim:
             raise OverflowError(f"React list for {guild} has reached the maximum of {lim} items. Please remove an item to add another.")
         # Limit substring length to 64
-        a = unicode_prune(" ".join(args[:-1])).casefold()[:64]
+        a = unicode_prune(" ".join(args[:-1])).casefold()
+        if len(a) > 64:
+            raise OverflowError("Maximum allowed string length is 64 characters.")
         e_id = await bot.id_from_message(args[-1])
         if isinstance(e_id, int):
             emoji = await bot.fetch_emoji(e_id)
@@ -1897,8 +1903,8 @@ class React(Command):
             msg = ""
         else:
             content += f"{len(curr)} auto reactions currently assigned for {str(guild).replace('`', '')}:```*"
-            key = lambda x: "\n" + ", ".join(x)
-            msg = ini_md(iter2str({k: curr[k] for k in tuple(curr)[pos:pos + page]}, key=key))
+            key = lambda x: ", ".join(x)
+            msg = ini_md(iter2str({f"{i}][{k}": curr[k] for i, k in enumerate(tuple(curr)[pos:pos + page], pos)}, key=key))
         colour = await self.bot.data.colours.get(worst_url(guild))
         emb = discord.Embed(
             description=content + msg,
