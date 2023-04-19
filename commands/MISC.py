@@ -780,5 +780,6 @@ while True:
         )
     except:
         print_exc()
+        time.sleep(30)
         continue
     break
