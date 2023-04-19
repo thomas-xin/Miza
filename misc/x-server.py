@@ -1715,7 +1715,7 @@ transform: translate(-50%, -50%);
 				if os.path.exists(n + "0"):
 					os.rename(n + "0", f"cache/{IND}{ts}" + "~.temp$@" + name)
 			elif nh in self.chunking:
-				info = self.chunking.pop(n)
+				info = cdict(self.chunking.pop(n))
 				if not key:
 					n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
 					key = n2p(n)
