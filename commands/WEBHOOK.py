@@ -399,21 +399,28 @@ class EmojiList(Command):
                 new = pos
             pos = new
         curr = {}
+        futs = []
         for k, v in sorted(items, key=lambda n: full_prune(n[0]))[pos:pos + page]:
-            try:
+
+            async def check_emoji(k, v):
                 try:
-                    e = bot.cache.emojis[v]
-                    if not e.is_usable():
-                        raise LookupError
-                    me = " " + str(e)
-                except KeyError:
-                    await bot.min_emoji(v)
-                    me = ""
-            except LookupError:
-                following[user.id].pop(k)
-                following.update(user.id)
-                continue
-            curr[f":{k}:"] = f"({v})` {me}"
+                    try:
+                        e = bot.cache.emojis[v]
+                        if not e.is_usable():
+                            raise LookupError
+                        me = " " + str(e)
+                    except KeyError:
+                        await bot.min_emoji(v)
+                        me = ""
+                except LookupError:
+                    following[user.id].pop(k)
+                    following.update(user.id)
+                    continue
+                curr[f":{k}:"] = f"({v})` {me}"
+
+            futs.append(create_task(check_emoji(k, v)))
+        for fut in futs:
+            await fut
         content = message.content
         if not content:
             content = message.embeds[0].description
