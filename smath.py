@@ -48,39 +48,59 @@ import_exc = concurrent.futures.ThreadPoolExecutor(max_workers=12)
 
 class MultiAutoImporter:
 
-    class ImportedModule:
+	class ImportedModule:
 
-        def __init__(self, module, pool, _globals):
-            object.__setattr__(self, "__module", module)
-            object.__setattr__(self, "__fut", pool.submit(__import__, module))
-            object.__setattr__(self, "__globals", _globals)
+		def __init__(self, module, pool, _globals, start=True):
+			object.__setattr__(self, "__module", module)
+			if start:
+				fut = pool.submit(__import__, module)
+				object.__setattr__(self, "__fut", fut)
+			object.__setattr__(self, "__globals", _globals)
 
-        def __getattr__(self, k):
-            m = self.force()
-            return getattr(m, k)
+		def __getattr__(self, k):
+			m = self.force()
+			return getattr(m, k)
 
-        def __setattr__(self, k, v):
-            m = self.force()
-            return setattr(m, k, v)
+		def __setattr__(self, k, v):
+			m = self.force()
+			return setattr(m, k, v)
 
-        def force(self):
-            module = object.__getattribute__(self, "__module")
-            _globals = object.__getattribute__(self, "__globals")
-            _globals[module] = m = object.__getattribute__(self, "__fut").result()
-            return m
+		def force(self):
+			module = object.__getattribute__(self, "__module")
+			_globals = object.__getattribute__(self, "__globals")
+			try:
+				_globals[module] = m = object.__getattribute__(self, "__fut").result()
+			except AttributeError:
+				_globals[module] = m = __import__(module)
+			return m
 
-    def __init__(self, *args, pool=None, _globals=None):
-        self.pool = pool
-        if not _globals:
-            _globals = globals()
-        args = " ".join(args).replace(",", " ").split()
-        if not pool:
-            _globals.update((k, __import__(k)) for k in args)
-        else:
-            futs = []
-            for arg in args:
-                futs.append(self.ImportedModule(arg, pool, _globals))
-            _globals.update(zip(args, futs))
+	def __init__(self, *args, pool=None, _globals=None):
+		self.pool = pool
+		if not _globals:
+			_globals = globals()
+		args = " ".join(args).replace(",", " ").split()
+		if not pool:
+			_globals.update((k, __import__(k)) for k in args)
+		else:
+			futs = []
+			for arg in args:
+				futs.append(self.ImportedModule(arg, pool, _globals, start=len(futs) < 3))
+			self.futs = futs
+			_globals.update(zip(args, futs))
+			submit(self.scan)
+
+	def scan(self):
+		for i, sub in enumerate(self.futs):
+			object.__getattribute__(sub, "__fut").result()
+			for j in range(i + 1, len(self.futs)):
+				try:
+					object.__getattribute__(self.futs[j], "__fut")
+				except AttributeError:
+					module = object.__getattribute__(self.futs[j], "__module")
+					fut = self.pool.submit(__import__, module)
+					# sys.stderr.write(str(fut) + "\n")
+					object.__setattr__(self.futs[j], "__fut", fut)
+					break
 
 MultiAutoImporter(
     "sys",

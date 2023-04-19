@@ -182,11 +182,11 @@ class EndpointRedirects(Dispatcher):
 			if p == "ip":
 				p = "get_ip"
 			elif p[:2] == "f/":
-				p = "/raw/" + p[3:]
-			elif p == "/upload":
-				p = "/files"
-			elif p == "/api/mpinsights":
-				p = "/api_mpinsights"
+				p = "raw/" + p[3:]
+			elif p == "upload":
+				p = "files"
+			elif p == "api/mpinsights":
+				p = "api_mpinsights"
 			elif p.startswith("api/"):
 				p = p.removeprefix("api/")
 			elif p in actually_static:
