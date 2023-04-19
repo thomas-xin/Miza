@@ -45,7 +45,7 @@ def _adjust_thread_count(self):
 concurrent.futures.ThreadPoolExecutor._adjust_thread_count = lambda self: _adjust_thread_count(self)
 
 import_exc = concurrent.futures.ThreadPoolExecutor(max_workers=48)
-submit = exc.submit
+submit = import_exc.submit
 
 class MultiAutoImporter:
 
