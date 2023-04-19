@@ -268,6 +268,7 @@ class TracebackSuppressor(contextlib.AbstractContextManager, contextlib.Abstract
     def __init__(self, *args, **kwargs):
         self.exceptions = args + tuple(kwargs.values())
 
+    __enter__ = lambda self: self
     def __exit__(self, exc_type, exc_value, exc_tb):
         if exc_type and exc_value:
             for exception in self.exceptions:
@@ -276,6 +277,7 @@ class TracebackSuppressor(contextlib.AbstractContextManager, contextlib.Abstract
             print_exc()
         return True
 
+    __aenter__ = lambda self: emptyfut
     def __aexit__(self, *args):
         return as_fut(self.__exit__(*args))
 
@@ -294,6 +296,7 @@ class Delay(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextMa
     def __call__(self):
         return self.exit()
 
+    __enter__ = lambda self: self
     def __exit__(self, *args):
         remaining = self.duration - utc() + self.start
         if remaining > 0:
@@ -321,6 +324,7 @@ class MemoryTimer(contextlib.AbstractContextManager, contextlib.AbstractAsyncCon
     def __call__(self):
         return self.exit()
 
+    __enter__ = lambda self: self
     def __exit__(self, *args):
         taken = utc() - self.start
         try:
@@ -329,6 +333,7 @@ class MemoryTimer(contextlib.AbstractContextManager, contextlib.AbstractAsyncCon
             self.timers[self.name] = t = deque(maxlen=8)
             t.append(taken)
 
+    __aenter__ = lambda self: emptyfut
     def __aexit__(self, *args):
         self.__exit__()
         return emptyfut
@@ -1617,7 +1622,10 @@ def apply_stickers(message, data):
     return message
 
 
-EmptyEmbed = discord.embeds._EmptyEmbed
+try:
+    EmptyEmbed = discord.embeds._EmptyEmbed
+except AttributeError:
+    EmptyEmbed = None
 
 def as_embed(message, link=False):
     emb = discord.Embed(description="").set_author(**get_author(message.author))
@@ -2834,7 +2842,7 @@ class ForwardedRequest(io.IOBase):
             self.fp.close()
         self.fp = None
 
-class FileStreamer(io.BufferedRandom, collections.abc.MutableSequence, contextlib.AbstractContextManager):
+class FileStreamer(io.BufferedRandom, contextlib.AbstractContextManager):
 
     def __init__(self, *objs, filename=None):
         self.pos = 0
@@ -2843,11 +2851,11 @@ class FileStreamer(io.BufferedRandom, collections.abc.MutableSequence, contextli
         objs = list(objs)
         while objs:
             f = objs.pop(0)
-            if isinstance(f, str):
-                f = open(f, "rb")
             if isinstance(f, (list, tuple)):
                 objs.extend(f)
                 continue
+            if isinstance(f, str):
+                f = open(f, "rb")
             self.data.append((i, f))
             i += f.seek(0, os.SEEK_END)
 
@@ -2874,13 +2882,19 @@ class FileStreamer(io.BufferedRandom, collections.abc.MutableSequence, contextli
         return b"".join(out)
 
     def close(self):
-        for i, f in self.data:
-            f.close()
+        data = [f for i, f in self.data]
         self.data.clear()
+        for f in data:
+            with tracebacksuppressor:
+                f.close()
 
+    isatty = lambda self: False
+    flush = lambda self: None
+    writable = lambda self: False
     seekable = lambda self: True
     readable = lambda self: True
     tell = lambda self: self.pos
+    __enter__ = lambda self: self
     __exit__ = lambda self, *args: self.close()
 
 class seq(io.BufferedRandom, collections.abc.MutableSequence, contextlib.AbstractContextManager):
@@ -3016,6 +3030,7 @@ class seq(io.BufferedRandom, collections.abc.MutableSequence, contextlib.Abstrac
         return object.__getattribute__(self.data, k)
 
     close = lambda self: self.closer() if self.closer else None
+    __enter__ = lambda self: self
     __exit__ = lambda self, *args: self.close()
 
     def load(self, k):
@@ -3359,6 +3374,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
                 return as_str(data)
             return data
 
+    __enter__ = lambda self: self
     def __exit__(self, *args):
         self.session.close()
 

@@ -1592,7 +1592,7 @@ transform: translate(-50%, -50%);
 				with open(fn, "w", encoding="utf-8") as f:
 					f.write(s)
 				return self.merge(name=name, index=1)
-			if mfs > 4 * 1073741824:
+			if mfs > 512 * 1048576:
 				fut = create_future_ex(shutil.copyfileobj, cp.request.body.fp, f)
 				try:
 					info = self.chunking[n]

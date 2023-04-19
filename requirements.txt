@@ -9,12 +9,12 @@ CherryPy>=18.8.0
 colormath>=3.0.0
 cython>=0.29.34
 diffusers>=0.14.0
-discord.py==2.0.0a3575+g45d498c1
+discord.py>=2.0.0a3575+g45d498c1
 filetype>=1.2.0
 free-proxy>=1.1.1
 googletrans==4.0.0rc1
 gmpy2>=2.1.5
-httpx>=0.23.3
+httpx>=0.13.3
 inspiro>=0.0.3
 knackpy>=1.1.1
 markdownify>=0.11.6
