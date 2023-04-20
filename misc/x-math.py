@@ -391,8 +391,10 @@ def get_maxima():
 		import psutil
 		proc = globals()["MAXIMA"] = psutil.Popen("maxima", shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 		o = None
-		while o != b"%":
+		while o != b"%" and proc.is_running():
 			o = proc.stdout.read(1)
+		if not proc.is_running():
+			raise FileNotFoundError("Process closed.")
 	except FileNotFoundError:
 		globals()["has_maxima"] = False
 		raise
