@@ -1058,15 +1058,16 @@ class Bot:
 						openai.api_key = self.key
 						costs = 1
 					ok = openai.api_key
+					flagged = False
 					if not i and (searched or not stop) and model.startswith("gpt-3.5-") and not self.nsfw and not self.jailbroken and not flagged and (not chat_history or len(self.gpttokens(q)) > 8):
-						prompt = "\n\n".join(m["content"] if "name" not in m else f'{m["name"]}: {m["content"]}' for m in messages)
-						try:
-							resp = openai.Moderation.create(
-								prompt,
-							)
-							flagged = resp["results"][0]["flagged"]
-						except:
-							flagged = False
+						prompt = "\n\n".join(m["content"] if "name" not in m else f'{m["name"]}: {m["content"]}' for m in messages[1:])
+						# try:
+						# 	resp = openai.Moderation.create(
+						# 		prompt,
+						# 	)
+						# 	flagged = resp["results"][0]["flagged"]
+						# except:
+						# 	flagged = False
 						if not flagged and not stop:
 							if nstart:
 								ns2 = "Assume y" + nstart[1:] + "\n"
