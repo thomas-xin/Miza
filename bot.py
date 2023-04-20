@@ -3454,18 +3454,19 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 return -1
         # If message was not processed as a command, send a _nocommand_ event with the parsed message data.
         if not run:
-            await self.send_event("_nocommand2_", message=message)
-            not_self = True
-            if u_id == bot.id:
-                not_self = False
-            elif getattr(message, "webhook_id", None) and message.author.name == guild.me.display_name:
-                cola = await create_future(self.get_colour, self)
-                colb = await create_future(self.get_colour, message.author)
-                not_self = cola != colb
-            if not_self:
-                temp = to_alphanumeric(cpy).casefold()
-                temp2 = to_alphanumeric(message.clean_content or message.content).casefold()
-                await self.send_event("_nocommand_", text=temp, text2=temp2, edit=edit, orig=orig, msg=msg, message=message, perm=u_perm, truemention=truemention)
+            with self.command_semaphore:
+                await self.send_event("_nocommand2_", message=message)
+                not_self = True
+                if u_id == bot.id:
+                    not_self = False
+                elif getattr(message, "webhook_id", None) and message.author.name == guild.me.display_name:
+                    cola = await create_future(self.get_colour, self)
+                    colb = await create_future(self.get_colour, message.author)
+                    not_self = cola != colb
+                if not_self:
+                    temp = to_alphanumeric(cpy).casefold()
+                    temp2 = to_alphanumeric(message.clean_content or message.content).casefold()
+                    await self.send_event("_nocommand_", text=temp, text2=temp2, edit=edit, orig=orig, msg=msg, message=message, perm=u_perm, truemention=truemention)
         # Return the delay before the message can be called again. This is calculated by the rate limit of the command.
         return remaining
 
