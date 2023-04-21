@@ -422,12 +422,12 @@ class Bot:
 						device = random.randint(0, torch.cuda.device_count() - 1)
 					else:
 						device = 0
-					smp = pipeline("summarization", model=m, device=device)
+					smp = pipeline("summarization", model=m, device=device, torch_dtype=torch.float16)
 					smp.devid = device
 					break
 				except:
 					print_exc()
-			smp = pipeline("summarization", model=m)
+			smp = pipeline("summarization", model=m, torch_dtype=torch.float16)
 			smp.devid = None
 		self.models[m] = smp
 		enc = tiktoken.get_encoding("cl100k_base")
