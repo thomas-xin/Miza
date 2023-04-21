@@ -433,7 +433,7 @@ class Bot:
 		enc = tiktoken.get_encoding("cl100k_base")
 		tokens = enc.encode(q)
 		if smp.devid is not None:
-			limit = (torch.cuda.get_device_properties(smp.devid).total_memory - 2147483648) // 4194304
+			limit = (torch.cuda.get_device_properties(smp.devid).total_memory - 2147483648) // 2097152
 			print("CUDA limit:", limit)
 		else:
 			limit = 4096
