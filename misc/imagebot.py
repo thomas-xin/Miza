@@ -444,10 +444,11 @@ class Bot:
 		pipe = getattr(self.__class__, "_ojp", None)
 		if not pipe:
 			pipe = StableDiffusionPipeline.from_pretrained("prompthero/openjourney", torch_dtype=torch.float32)
-			try:
-				pipe = pipe.to("cuda")
-			except:
-				pass
+			if torch.cuda.is_available():
+				try:
+					pipe = pipe.to("cuda")
+				except:
+					pass
 			pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
 			self.__class__._ojp = pipe
 		im = pipe(prompt).images[0]

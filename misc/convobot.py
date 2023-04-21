@@ -387,32 +387,6 @@ class Bot:
 			resp = reqx.get(url)
 			return resp.content
 
-	def question_context_analysis(self, m, q, c):
-		if m in ("deepset/roberta-base-squad2", "deepset/tinyroberta-squad2"):
-			try:
-				nlp = self.models[m]
-			except KeyError:
-				nlp = self.models[m] = pipeline("question-answering", model=m, tokenizer=m)
-			QA_input = dict(
-				question=q,
-				context=c,
-			)
-			return nlp(QA_input)["answer"]
-
-		try:
-			tokenizer, model = self.models[m]
-		except KeyError:
-			tokenizer = AutoTokenizer.from_pretrained(m)
-			model = AutoModelForQuestionAnswering.from_pretrained(m)
-			self.models[m] = (tokenizer, model)
-		inputs = tokenizer(q[:384], c[:1024], return_tensors="pt", max_length=4096, truncation=True)
-		with torch.no_grad():
-			outputs = model(**inputs)
-		answer_start_index = outputs.start_logits.argmax()
-		answer_end_index = outputs.end_logits.argmax()
-		predict_answer_tokens = inputs.input_ids[0, answer_start_index : answer_end_index + 1]
-		return tokenizer.decode(predict_answer_tokens).strip()
-
 	def question_answer_analysis(self, m):
 		try:
 			tokenizer, model = self.models[m]
@@ -434,16 +408,10 @@ class Bot:
 		self.chat_history_ids = model.generate(bot_input_ids, max_length=16384, pad_token_id=tokenizer.eos_token_id)
 		return tokenizer.decode(self.chat_history_ids[-4096:, bot_input_ids.shape[-1]:][0], skip_special_tokens=True).strip()
 
-	def answer_fill_mask(self, m="xlm-roberta-large", q=""):
-		try:
-			fmp = self.models[m]
-		except KeyError:
-			fmp = self.models[m] = pipeline("fill-mask", model=m, tokenizer=m)
-		return fmp(q)[0]["sequence"]
-
 	sum_rate = 0
+	sum_cuda = False
 	def answer_summarise(self, m="Qiliang/bart-large-cnn-samsum-ChatGPT_v3", q="", max_length=128, min_length=64, do_sample=False):
-		if (t := time.time()) - self.sum_rate > 0 and q and m == "Qiliang/bart-large-cnn-samsum-ChatGPT_v3" and max_length in range(40, 513):
+		if not self.sum_cuda and (t := time.time()) - self.sum_rate > 0 and q and m == "Qiliang/bart-large-cnn-samsum-ChatGPT_v3" and max_length in range(40, 513):
 			self.sum_rate = t + 30
 			headers = {
 				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
@@ -471,6 +439,8 @@ class Bot:
 			smp = self.models[m]
 		except KeyError:
 			smp = self.models[m] = pipeline("summarization", model=m)
+		if torch.cuda.is_available():
+			smp = smp.to("cuda")
 		return smp(q, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
 
 	def auto_summarise(self, q="", max_length=128, min_length=64):
@@ -493,71 +463,6 @@ class Bot:
 		resp = zscp(q, labels, truncation=True)
 		return dict(zip(resp["labels"], resp["scores"]))
 
-	def clean_response(self, q, res):
-		res = res.strip()
-		if not res.isascii():
-			fut = exc.submit(self.question_context_analysis, "salti/bert-base-multilingual-cased-finetuned-squad", q, res)
-		else:
-			fut = a2 = ""
-		a1 = self.question_context_analysis("deepset/tinyroberta-squad2", q, res)
-		if fut:
-			a2 = fut.result()
-		if len(a2) >= len(a1) * 2 and len(a1) < 32:
-			a1 = a2
-		a1 = a1.strip()
-		if len(a1) < 16:
-			res = self.answer_summarise(q=q + "\n\n" + res)
-			print("Bart response:", res)
-			return res.strip()
-		if "\n" not in a1 and ". " not in a1 and a1 in res:
-			for sentence in res.replace("\n", ". ").split(". "):
-				if a1 in sentence:
-					a1 = sentence.strip()
-					if not a1.endswith("."):
-						a1 += "."
-					break
-		elif (" " not in a1 or len(a1) < 12) and not a1[0].isnumeric():
-			a1 = res.strip()
-		response = "\n".join(line.strip() for line in a1.replace("[CLS]", "").replace("[SEP]", "\n").splitlines()).strip()
-		while "[UNK]" in response:
-			response = self.answer_fill_mask(q=response.replace("[UNK]", "<mask>", 1))
-		search = "https : / / "
-		while search in response:
-			i = response.index(search)
-			temp = response[i + len(search):].split(" ")
-			response = response[:i] + "https://"
-			while temp:
-				word = temp[0]
-				if word.endswith(".") or word.endswith("?") or word.endswith("&") or word.endswith("="):
-					response += temp.pop(0)
-				else:
-					break
-			response += " ".join(temp)
-		if ". " in response:
-			words = response.split(".")
-			modified = False
-			for i in range(len(words) - 1):
-				a, b = words[i:i + 2]
-				if a and a[-1].isnumeric() and len(b) > 1 and b[0] == " " and b[1].isnumeric():
-					words[i + 1] = b.lstrip()
-					modified = True
-			if modified:
-				response = ".".join(words)
-		response = response.replace("( ", "(").replace(" )", ")")
-		if not response:
-			response = res.split("\n", 1)[0]
-			if response == "Dictionary":
-				r = []
-				for line in res.splitlines()[2:]:
-					if line.casefold() == "translations and more definitions" or line.casefold().startswith("web result"):
-						break
-					r.append(line)
-				response = "\n".join(r)
-		res = response.strip().replace("  ", " ")
-		if not self.bl:
-			print("Roberta response:", res)
-		return res
-
 	def check_google(self, q):
 		if q.count(" ") < 2:
 			return False
@@ -567,43 +472,6 @@ class Bot:
 				return False
 		resp = self.answer_classify(q=q, labels=("personal question", "not personal"))
 		return resp["not personal"] >= 0.5
-
-	def emoji_clean(self, text):
-		ems = []
-		out = []
-
-		def clean_ems():
-			end = ""
-			s = []
-			if ems and ems[0] == " ":
-				s.append(ems.pop(0))
-			if len(ems) > 1 and ems[-1] == " ":
-				end = ems.pop(-1)
-			if len(ems) > 3:
-				temp = {}
-				for em in ems:
-					try:
-						temp[em] += 1
-					except KeyError:
-						temp[em] = 1
-				ems.clear()
-				ems.extend(em for em in temp if em in sorted(temp, key=temp.get, reverse=True)[:3])
-			s.extend(ems)
-			if end:
-				s.append(end)
-			ems.clear()
-			return s
-
-		for c in text:
-			# print(c, ord(c), ems)
-			if ord(c) >= 127744 or c in "?! ":
-				ems.append(c)
-				continue
-			if ems:
-				out.extend(clean_ems())
-			out.append(c)
-		out.extend(clean_ems())
-		return "".join(out)
 
 	# tokeniser = None
 	def gpttokens(self, s, model="gpt-3.5-turbo"):
@@ -1248,9 +1116,6 @@ class Bot:
 		else:
 			res = "\n".join(r.strip() for r in res.splitlines() if valid_response(r))
 			# res = lim_str(res, 3072, mode="right")
-			if raw:
-				return res
-			res = self.clean_response(q, res)
 		return res
 
 	def bing(self, q, raw=False):
@@ -1279,9 +1144,6 @@ class Bot:
 		else:
 			res = "\n".join(r.strip() for r in res.splitlines() if valid_response(r))
 			# res = lim_str(res, 3072, mode="right")
-			if raw:
-				return res
-			res = self.clean_response(q, res)
 		return res
 
 	def yahoo(self, q, raw=False):
@@ -1310,9 +1172,6 @@ class Bot:
 		else:
 			res = "\n".join(r.strip() for r in res.splitlines() if valid_response(r))
 			# res = lim_str(res, 3072, mode="right")
-			if raw:
-				return res
-			res = self.clean_response(q, res)
 		return res
 
 	def wolframalpha(self, q):
