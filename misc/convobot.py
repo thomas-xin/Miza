@@ -428,14 +428,25 @@ class Bot:
 					print_exc()
 			smp = pipeline("summarization", model=m)
 		self.models[m] = smp
-		return smp(q, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
+		enc = tiktoken.get_encoding("cl100k_base")
+		tokens = enc.encode(q)
+		out = []
+		while len(tokens) > max_length:
+			if len(tokens) > 1024:
+				e1 = tokens[:1024]
+				s1 = enc.decode(e1).strip()
+				s2 = smp(s1, max_length=512, min_length=480, do_sample=do_sample, truncation=True)[0]["summary_text"]
+				e2 = enc.encode(s2) + " "
+				tokens = e2 + tokens[1024:]
+				continue
+			break
+		e1 = tokens
+		s1 = enc.decode(e1).strip()
+		if len(tokens) > max_length:
+			s2 = smp(s1, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
+		return s2
 
 	def auto_summarise(self, q="", max_length=128, min_length=64):
-		# if 256 < len(self.gpttokens(q)) < 768:
-		# 	q2 = f'"""\n{q}\n"""\n\nSummarise the above into a paragraph, keeping most important parts.'
-		# 	text = self.aq(q2, temp=0.8).strip('" ')
-		# 	if text:
-		# 		return text
 		if q and sum(c.isascii() for c in q) / len(q) > 0.75:
 			q = lim_tokens(q, max_length + min_length << 1)
 			return self.answer_summarise(q=q, max_length=max_length, min_length=min_length)
