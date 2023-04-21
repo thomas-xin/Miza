@@ -423,25 +423,31 @@ class Bot:
 					else:
 						device = 0
 					smp = pipeline("summarization", model=m, device=device)
+					smp.device = device
 					break
 				except:
 					print_exc()
 			smp = pipeline("summarization", model=m)
+			smp.device = None
 		self.models[m] = smp
 		enc = tiktoken.get_encoding("cl100k_base")
 		tokens = enc.encode(q)
-		out = []
+		if smp.device is not None:
+			limit = (torch.cuda.get_device_properties(smp.device).total_memory - 2147483648) // 4194304
+			print("CUDA limit:", limit)
+		else:
+			limit = 4096
 		while len(tokens) > max_length:
-			if len(tokens) > 1024:
-				e1 = tokens[:1024]
+			if len(tokens) > limit:
+				e1 = tokens[:limit]
 				s1 = enc.decode(e1).strip()
-				s2 = smp(s1, max_length=512, min_length=480, do_sample=do_sample, truncation=True)[0]["summary_text"]
+				s2 = smp(s1, max_length=limit // 2, min_length=limit // 2 - 32, do_sample=do_sample, truncation=True)[0]["summary_text"]
 				e2 = enc.encode(s2) + " "
-				tokens = e2 + tokens[1024:]
+				tokens = e2 + tokens[limit:]
 				continue
 			break
 		e1 = tokens
-		s1 = enc.decode(e1).strip()
+		s1 = enc.decode(e1).strip().replace("  ", " ")
 		if len(tokens) > max_length:
 			s2 = smp(s1, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
 		return s2
@@ -1387,10 +1393,14 @@ class Bot:
 		funcs.extend((self.cgp, self.cgp))
 		resp = None
 		while not resp:
+			func = funcs.pop(0)
 			try:
-				resp = funcs.pop(0)(prompt, stop=stop)
+				resp = func(prompt, stop=stop)
 			except EOFError:
 				pass
+			except:
+				print(func)
+				print_exc()
 		if not isinstance(resp, tuple):
 			resp = [resp]
 		resp = list(resp)
