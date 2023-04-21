@@ -449,6 +449,8 @@ class Bot:
 					pipe = pipe.to("cuda")
 				except:
 					self._sdp = False
+					print_exc()
+					print("StablediffusionL: CUDA f16 init failed")
 					pass
 			pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
 			self.__class__._ojp = pipe

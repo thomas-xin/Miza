@@ -408,33 +408,7 @@ class Bot:
 		self.chat_history_ids = model.generate(bot_input_ids, max_length=16384, pad_token_id=tokenizer.eos_token_id)
 		return tokenizer.decode(self.chat_history_ids[-4096:, bot_input_ids.shape[-1]:][0], skip_special_tokens=True).strip()
 
-	sum_rate = 0
-	sum_cuda = None
 	def answer_summarise(self, m="Qiliang/bart-large-cnn-samsum-ChatGPT_v3", q="", max_length=128, min_length=64, do_sample=False):
-		if self.sum_cuda is None and (t := time.time()) - self.sum_rate > 0 and q and m == "Qiliang/bart-large-cnn-samsum-ChatGPT_v3" and max_length in range(40, 513):
-			self.sum_rate = t + 30
-			headers = {
-				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
-				"DNT": "1",
-				"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
-				"Content-Type": "application/json",
-				"cache-control": "no-cache",
-				"x-use-cache": "false",
-				"x-wait-for-model": "false",
-			}
-			try:
-				p = self.get_proxy()
-				with httpx.Client(timeout=360, http2=True, proxies=p, verify=False) as reqx:
-					resp = reqx.post(
-						"https://api-inference.huggingface.co/models/Qiliang/bart-large-cnn-samsum-ChatGPT_v3",
-						headers=headers,
-						data=orjson.dumps(dict(inputs=q, max_length=max_length, min_length=min_length)),
-					)
-					resp.raise_for_status()
-				self.sum_rate = t
-				return resp.json()[0]["generated_text"]
-			except:
-				print_exc()
 		for i in range(1):
 			try:
 				smp = self.models[m]
@@ -445,15 +419,15 @@ class Bot:
 				try:
 					n = torch.cuda.device_count()
 					if n > 1:
-						self.sum_cuda = random.randint(0, torch.cuda.device_count() - 1)
+						device = random.randint(0, torch.cuda.device_count() - 1)
 					else:
-						self.sum_cuda = 0
-					smp = self.models[m] = pipeline("summarization", model=m, device=self.sum_cuda)
+						device = 0
+					smp = pipeline("summarization", model=m, device=device)
 					break
 				except:
-					self.sum_cuda = None
 					print_exc()
-			smp = self.models[m] = pipeline("summarization", model=m)
+			smp = pipeline("summarization", model=m)
+		self.models[m] = smp
 		return smp(q, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
 
 	def auto_summarise(self, q="", max_length=128, min_length=64):
@@ -709,7 +683,7 @@ class Bot:
 				temp /= 2
 				for i in range(3):
 					try:
-						t3 = self.aq(t2).strip('" ')
+						t3 = self.au(t2, force=True).strip('" ')
 						# spl = self.cgp(t2)
 						# t3 = None if not spl else spl[0]
 						if not t3 or t3 in ("!", '"!"'):
