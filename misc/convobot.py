@@ -442,7 +442,7 @@ class Bot:
 				e1 = tokens[:limit]
 				s1 = enc.decode(e1).strip()
 				s2 = smp(s1, max_length=limit // 2, min_length=limit // 2 - 32, do_sample=do_sample, truncation=True)[0]["summary_text"]
-				e2 = enc.encode(s2) + " "
+				e2 = enc.encode(s2 + " ")
 				tokens = e2 + tokens[limit:]
 				continue
 			break
