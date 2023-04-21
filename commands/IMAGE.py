@@ -1647,8 +1647,7 @@ class Art(Command):
                     if os.name == "nt":
                         self.fut = create_future(subprocess.run(
                             [
-                                "py",
-                                "-3.9",
+                                python,
                                 "-m",
                                 "pip",
                                 "install",
@@ -1673,8 +1672,7 @@ class Art(Command):
                     self.fut = None
             if os.name == "nt":
                 args = [
-                    "py",
-                    "-3.9",
+                    python,
                     "demo.py",
                 ]
             else:
