@@ -409,9 +409,9 @@ class Bot:
 		return tokenizer.decode(self.chat_history_ids[-4096:, bot_input_ids.shape[-1]:][0], skip_special_tokens=True).strip()
 
 	sum_rate = 0
-	sum_cuda = False
+	sum_cuda = None
 	def answer_summarise(self, m="Qiliang/bart-large-cnn-samsum-ChatGPT_v3", q="", max_length=128, min_length=64, do_sample=False):
-		if not self.sum_cuda and (t := time.time()) - self.sum_rate > 0 and q and m == "Qiliang/bart-large-cnn-samsum-ChatGPT_v3" and max_length in range(40, 513):
+		if self.sum_cuda is None and (t := time.time()) - self.sum_rate > 0 and q and m == "Qiliang/bart-large-cnn-samsum-ChatGPT_v3" and max_length in range(40, 513):
 			self.sum_rate = t + 30
 			headers = {
 				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
@@ -435,12 +435,21 @@ class Bot:
 				return resp.json()[0]["generated_text"]
 			except:
 				print_exc()
-		try:
-			smp = self.models[m]
-		except KeyError:
+		for i in range(1):
+			try:
+				smp = self.models[m]
+				break
+			except KeyError:
+				pass
+			if torch.cuda.is_available():
+				try:
+					self.sum_cuda = random.randint(0, len(torch.cuda.device_count) - 1)
+					smp = self.models[m] = pipeline("summarization", model=m, device=self.sum_cuda)
+					break
+				except:
+					self.sum_cuda = None
+					print_exc()
 			smp = self.models[m] = pipeline("summarization", model=m)
-		if torch.cuda.is_available():
-			smp = smp.to("cuda")
 		return smp(q, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
 
 	def auto_summarise(self, q="", max_length=128, min_length=64):
