@@ -945,10 +945,10 @@ class Bot:
 						# except:
 						# 	flagged = False
 						if not flagged and not stop:
-							if nstart:
+							if nstart and nstart[0] in "Yy":
 								ns2 = "Assume y" + nstart[1:] + "\n"
 							else:
-								ns2 = ""
+								ns2 = nstart or ""
 							prompt = ns2 + nend + "\n\n" + prompt
 							if random.randint(0, 1):
 								model = "gpt-3.5-visus"
