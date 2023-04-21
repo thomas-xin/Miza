@@ -718,7 +718,7 @@ class Bot:
 			ins.append(lines.pop(-1))
 		print("INS:", ins)
 		p = per
-		if self.name.casefold() not in p.casefold():
+		if self.name.casefold() not in p.casefold() and "you" not in p.casefold():
 			if not p:
 				p = "an"
 			elif p[0] in "aeio":
@@ -783,16 +783,20 @@ class Bot:
 					continue
 				else:
 					m["role"] = "user"
-				m["content"] = v.strip(ZeroEnc)
 				if not k.isascii() or not k.isalnum():
-					k = unicode_prune(k)
-					if not k.isascii() or not k.isalnum():
-						k = "".join((c if (c.isascii() and c.isalnum() or c == "_") else "-") for c in k).strip("-")
-						while "--" in k:
-							k = k.replace("--", "-")
+					if not (k2 := k.translate("".maketrans({"-": "", " ": "", "_": ""}))).isascii or not k2.isalnum() or not any(c.isalnum() for c in k):
+						v = k + ": " + v
+						k = ""
+					else:
+						k = unicode_prune(k)
+						if not k.isascii() or not k.isalnum():
+							k = "".join((c if (c.isascii() and c.isalnum() or c == "_") else "-") for c in k).strip("-")
+							while "--" in k:
+								k = k.replace("--", "-")
 				if k:
 					m["name"] = lim_str(k, 48)
 					pc += len(self.gpttokens(m["name"], model))
+				m["content"] = v.strip(ZeroEnc)
 				messages.append(m)
 				pc += len(self.gpttokens(m["role"], model))
 				pc += len(self.gpttokens(m["content"], model))
