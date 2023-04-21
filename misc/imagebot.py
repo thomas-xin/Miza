@@ -446,6 +446,8 @@ class Bot:
 			pipe = StableDiffusionPipeline.from_pretrained("prompthero/openjourney", torch_dtype=torch.float32)
 			if torch.cuda.is_available() and getattr(self.__class__, "_sdp", True):
 				try:
+					if torch.cuda.get_device_properties(0).total_memory < 8589934592:
+						raise MemoryError("CUDA: Insufficient estimated virtual memory.")
 					pipe = pipe.to("cuda")
 				except:
 					self._sdp = False
@@ -471,6 +473,8 @@ class Bot:
 				pipe = StableDiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-2-1", torch_dtype=torch.float16)
 				from diffusers import DPMSolverMultistepScheduler
 				pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+				if torch.cuda.get_device_properties(0).total_memory < 8589934592:
+					raise MemoryError("CUDA: Insufficient estimated virtual memory.")
 				pipe = pipe.to("cuda")
 			except:
 				self._sdp = False
