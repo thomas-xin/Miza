@@ -1641,35 +1641,35 @@ class Art(Command):
             if openjourney:
                 fn = await process_image("IBAOL", "$", [prompt, kwargs], fix=2, timeout=1200)
         if not fn:
-            if self.fut:
-                with tracebacksuppressor:
+            with tracebacksuppressor:
+                if self.fut:
                     await self.fut
-                    if os.name == "nt":
-                        self.fut = create_future(subprocess.run(
-                            [
-                                python,
-                                "-m",
-                                "pip",
-                                "install",
-                                "-r",
-                                "requirements.txt",
-                            ],
-                            cwd="misc",
-                        ))
-                    else:
-                        self.fut = create_future(subprocess.run(
-                            [
-                                sys.executable,
-                                "-m",
-                                "pip",
-                                "install",
-                                "-r",
-                                "requirements.txt",
-                            ],
-                            cwd="misc",
-                        ))
-                    await self.fut
-                    self.fut = None
+                if os.name == "nt":
+                    self.fut = create_future(subprocess.run(
+                        [
+                            python,
+                            "-m",
+                            "pip",
+                            "install",
+                            "-r",
+                            "requirements.txt",
+                        ],
+                        cwd="misc",
+                    ))
+                else:
+                    self.fut = create_future(subprocess.run(
+                        [
+                            sys.executable,
+                            "-m",
+                            "pip",
+                            "install",
+                            "-r",
+                            "requirements.txt",
+                        ],
+                        cwd="misc",
+                    ))
+                await self.fut
+                self.fut = None
             if os.name == "nt":
                 args = [
                     python,
