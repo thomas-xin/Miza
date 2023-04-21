@@ -443,7 +443,7 @@ class Bot:
 				pass
 			if torch.cuda.is_available():
 				try:
-					self.sum_cuda = random.randint(0, len(torch.cuda.device_count) - 1)
+					self.sum_cuda = random.randint(0, len(torch.cuda.device_count()) - 1)
 					smp = self.models[m] = pipeline("summarization", model=m, device=self.sum_cuda)
 					break
 				except:
