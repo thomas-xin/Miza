@@ -1845,7 +1845,7 @@ class Personality(Command):
                 openai.Moderation.create,
                 input=p,
             )
-            results = resp.results[0].categories
+            results = resp.results[0]
             if results.flagged:
                 inappropriate = True
                 print(results)
