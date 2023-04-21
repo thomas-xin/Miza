@@ -423,17 +423,17 @@ class Bot:
 					else:
 						device = 0
 					smp = pipeline("summarization", model=m, device=device)
-					smp.device = device
+					smp.devid = device
 					break
 				except:
 					print_exc()
 			smp = pipeline("summarization", model=m)
-			smp.device = None
+			smp.devid = None
 		self.models[m] = smp
 		enc = tiktoken.get_encoding("cl100k_base")
 		tokens = enc.encode(q)
-		if smp.device is not None:
-			limit = (torch.cuda.get_device_properties(smp.device).total_memory - 2147483648) // 4194304
+		if smp.devid is not None:
+			limit = (torch.cuda.get_device_properties(smp.devid).total_memory - 2147483648) // 4194304
 			print("CUDA limit:", limit)
 		else:
 			limit = 4096
