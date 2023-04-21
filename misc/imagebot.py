@@ -444,10 +444,11 @@ class Bot:
 		pipe = getattr(self.__class__, "_ojp", None)
 		if not pipe:
 			pipe = StableDiffusionPipeline.from_pretrained("prompthero/openjourney", torch_dtype=torch.float32)
-			if torch.cuda.is_available():
+			if torch.cuda.is_available() and getattr(self.__class__, "_sdp", True):
 				try:
 					pipe = pipe.to("cuda")
 				except:
+					self._sdp = False
 					pass
 			pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
 			self.__class__._ojp = pipe
@@ -460,7 +461,7 @@ class Bot:
 
 	def art_stablediffusion_local(self, prompt, kwargs=None):
 		from diffusers import StableDiffusionPipeline
-		pipe = torch.cuda.is_available() and getattr(self.__class__, "_sdp", None)
+		pipe = torch.cuda.is_available() and getattr(self.__class__, "_sdp", True)
 		if pipe == False:
 			return
 		if not pipe:
