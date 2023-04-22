@@ -384,8 +384,8 @@ class Bot:
 		print(resp.status_code, resp.text)
 
 	def art_openjourney(self, prompt, kwargs=None):
-		if not any(w in prompt for w in ("style", "stylised", "stylized")):
-			prompt += ", mdjrny-v4 style"
+		# if not any(w in prompt for w in ("style", "stylised", "stylized")):
+		# 	prompt += ", mdjrny-v4 style"
 		headers = {
 			"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
 			"DNT": "1",
@@ -437,62 +437,29 @@ class Bot:
 			return False
 		print(resp.status_code, resp.text)
 
-	def art_openjourney_local(self, prompt, kwargs=None):
-		from diffusers import StableDiffusionPipeline
-		if not any(w in prompt for w in ("style", "stylised", "stylized")):
-			prompt += ", mdjrny-v4 style"
-		pipe = getattr(self.__class__, "_ojp", None)
+	def art_stablediffusion_local(self, prompt, kwargs=None, model="stabilityai/stable-diffusion-2-1", fail_unless_gpu=True):
+		pipe = torch.cuda.is_available() and self.models.get(model)
+		if pipe == False and fail_unless_gpu:
+			return
 		if not pipe:
-			pipe = StableDiffusionPipeline.from_pretrained("prompthero/openjourney", torch_dtype=torch.float16)
+			from diffusers import StableDiffusionPipeline, DPMSolverMultistepScheduler
+			pipe = StableDiffusionPipeline.from_pretrained(model, torch_dtype=torch.float16)
 			pipe.enable_attention_slicing()
-			from diffusers import DPMSolverMultistepScheduler
 			pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
-			if torch.cuda.is_available() and getattr(self.__class__, "_sdp", True):
+			if torch.cuda.is_available() and self.models.get(model, True):
 				try:
 					if torch.cuda.get_device_properties(0).total_memory < 8589934592:
 						raise MemoryError("CUDA: Insufficient estimated virtual memory.")
 					pipe = pipe.to("cuda")
 					# pipe.enable_xformers_memory_efficient_attention()
 				except:
-					self._sdp = False
+					self.models[model] = False
 					print_exc()
 					print("StablediffusionL: CUDA f16 init failed")
-					pass
+					if fail_unless_gpu:
+						return
 			pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
-			self.__class__._ojp = pipe
-		im = pipe(
-			prompt,
-			num_inference_steps=int(kwargs.get("--num-inference-steps", 50)),
-			guidance_scale=int(kwargs.get("--guidance-scale", 7.5)),
-		).images[0]
-		b = io.BytesIO()
-		im.save(b, format="png")
-		print("OpenjourneyL:", b)
-		b.seek(0)
-		return b.read()
-
-	def art_stablediffusion_local(self, prompt, kwargs=None):
-		from diffusers import StableDiffusionPipeline
-		pipe = torch.cuda.is_available() and getattr(self.__class__, "_sdp", None)
-		if pipe == False:
-			return
-		if not pipe:
-			try:
-				pipe = StableDiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-2-1", torch_dtype=torch.float16)
-				pipe.enable_attention_slicing()
-				from diffusers import DPMSolverMultistepScheduler
-				pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
-				if torch.cuda.get_device_properties(0).total_memory < 8589934592:
-					raise MemoryError("CUDA: Insufficient estimated virtual memory.")
-				pipe = pipe.to("cuda")
-				# pipe.enable_xformers_memory_efficient_attention()
-			except:
-				self._sdp = False
-				print_exc()
-				print("StablediffusionL: CUDA f16 init failed")
-				return
-			pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
-			self.__class__._sdp = pipe
+			self.models[model] = pipe
 		im = pipe(
 			prompt,
 			num_inference_steps=int(kwargs.get("--num-inference-steps", 50)),

@@ -1585,7 +1585,7 @@ class Art(Command):
             try:
                 dalle2 = name.startswith("dalle")
                 openjourney = "journey" in name
-                if not dalle2 and not openjourney and not specified:
+                if not dalle2 and not openjourney and not url:
                     fn = await process_image("IBASL", "&", [prompt, kwargs], fix=2, timeout=1200)
                     if fn:
                         raise StopIteration
@@ -1637,9 +1637,6 @@ class Art(Command):
                 raise
             except:
                 print_exc()
-        if not fn and not specified and not url:
-            if openjourney:
-                fn = await process_image("IBAOL", "$", [prompt, kwargs], fix=2, timeout=1200)
         if not fn:
             with tracebacksuppressor:
                 if self.fut:

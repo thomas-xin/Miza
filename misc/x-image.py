@@ -2584,15 +2584,6 @@ if len(sys.argv) > 1 and sys.argv[1] == "2":
 		p2 = m.config.id2label[idx].strip()
 		return (p1, p2)
 
-	def IBAOL(prompt, kwargs, key=None):
-		try:
-			ib = CBOTS[None]
-		except KeyError:
-			ib = CBOTS[None] = imagebot.Bot(token=key)
-		if key:
-			ib.token = key
-		return ib.art_openjourney_local(prompt, kwargs)
-
 	def IBASL(prompt, kwargs, key=None):
 		try:
 			ib = CBOTS[None]
