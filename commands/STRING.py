@@ -1396,7 +1396,7 @@ class Ask(Command):
                 for i in shuffle(argi):
                     k = keys[i]
                     ki = int(k)
-                    if ki in ignores:
+                    if ki in ignores or not mapd.get(k):
                         continue
                     temp = mapd[k].copy()
                     while len(temp):
