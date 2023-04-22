@@ -2500,7 +2500,10 @@ alert("File successfully deleted. Returning to home.");
 			values[2] += t - ltime < 60
 			values[3] += active
 			values[4] += listen
-		values[5] = values[4] / values[0]
+		if not values[0]:
+			values[5] = 0
+		else:
+			values[5] = values[4] / values[0]
 		return values
 
 	def mpdata_update(self):
@@ -2725,7 +2728,8 @@ if __name__ == "__main__":
 	proc = psutil.Process(pid)
 	parent = psutil.Process(ppid)
 	create_thread(ensure_parent, proc, parent)
-	self = server = cherrypy.Application(Server(), "/", config)
-	create_thread(server.mp_activity)
-	create_future_ex(server.get_ip_ex)
-	waitress.serve(server, ADDRESS, PORT)
+	app = Server()
+	self = server = cherrypy.Application(app, "/", config)
+	create_thread(app.mp_activity)
+	create_future_ex(app.get_ip_ex)
+	waitress.serve(server, host=ADDRESS, port=PORT)
