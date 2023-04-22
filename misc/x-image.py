@@ -2514,16 +2514,6 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 	else:
 		convobot.AsyncChatGPT = AsyncChatGPT
 
-Embedder = None
-def embedding(s):
-	if not Embedder:
-		print("Initialising embedder...")
-		from sentence_transformers import SentenceTransformer
-		globals()["Embedder"] = SentenceTransformer("LLukas22/all-mpnet-base-v2-embedding-all", device="cpu").half()
-		print("Embedder loaded.")
-	a = Embedder.encode(s).astype(np.float16)
-	return a.data
-
 def rank_embeddings(embs, emb, temp=0.5):
 	btest = base64.b64decode(emb)
 	y = np.frombuffer(btest, dtype=np.float16)
@@ -2592,6 +2582,13 @@ if len(sys.argv) > 1 and sys.argv[1] == "2":
 		if key:
 			ib.token = key
 		return ib.art_stablediffusion_local(prompt, kwargs)
+
+if len(sys.argv) > 1 and sys.argv[1] == "3":
+	from sentence_transformers import SentenceTransformer
+	Embedder = SentenceTransformer("LLukas22/all-mpnet-base-v2-embedding-all", device="cuda").half()
+	def embedding(s):
+		a = Embedder.encode(s).astype(np.float16)
+		return a.data
 
 
 def write_to(fn, data):
