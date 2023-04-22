@@ -2733,4 +2733,4 @@ if __name__ == "__main__":
 	self = server = cherrypy.Application(app, "/", config)
 	create_thread(app.mp_activity)
 	create_future_ex(app.get_ip_ex)
-	waitress.serve(server, host=ADDRESS, port=PORT)
+	waitress.serve(server, host=ADDRESS, port=PORT, url_scheme="https")

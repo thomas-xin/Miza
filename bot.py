@@ -6085,7 +6085,7 @@ def is_file(url):
 def webserver_communicate(bot):
     while not bot.closed:
         while not bot.server:
-            time.sleep(5)
+            time.sleep(12)
         time.sleep(3)
         try:
             assert reqs.next().get(f"https://127.0.0.1:{PORT}/ip", verify=False).content
