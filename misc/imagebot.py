@@ -443,12 +443,16 @@ class Bot:
 			prompt += ", mdjrny-v4 style"
 		pipe = getattr(self.__class__, "_ojp", None)
 		if not pipe:
-			pipe = StableDiffusionPipeline.from_pretrained("prompthero/openjourney", torch_dtype=torch.float32)
+			pipe = StableDiffusionPipeline.from_pretrained("prompthero/openjourney", torch_dtype=torch.float16)
+			pipe.enable_attention_slicing()
+			from diffusers import DPMSolverMultistepScheduler
+			pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 			if torch.cuda.is_available() and getattr(self.__class__, "_sdp", True):
 				try:
 					if torch.cuda.get_device_properties(0).total_memory < 8589934592:
 						raise MemoryError("CUDA: Insufficient estimated virtual memory.")
 					pipe = pipe.to("cuda")
+					# pipe.enable_xformers_memory_efficient_attention()
 				except:
 					self._sdp = False
 					print_exc()
@@ -456,7 +460,11 @@ class Bot:
 					pass
 			pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
 			self.__class__._ojp = pipe
-		im = pipe(prompt).images[0]
+		im = pipe(
+			prompt,
+			num_inference_steps=int(kwargs.get("--num-inference-steps", 50)),
+			guidance_scale=int(kwargs.get("--guidance-scale", 7.5)),
+		).images[0]
 		b = io.BytesIO()
 		im.save(b, format="png")
 		print("OpenjourneyL:", b)
@@ -471,11 +479,13 @@ class Bot:
 		if not pipe:
 			try:
 				pipe = StableDiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-2-1", torch_dtype=torch.float16)
+				pipe.enable_attention_slicing()
 				from diffusers import DPMSolverMultistepScheduler
 				pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 				if torch.cuda.get_device_properties(0).total_memory < 8589934592:
 					raise MemoryError("CUDA: Insufficient estimated virtual memory.")
 				pipe = pipe.to("cuda")
+				# pipe.enable_xformers_memory_efficient_attention()
 			except:
 				self._sdp = False
 				print_exc()
@@ -483,7 +493,11 @@ class Bot:
 				return
 			pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
 			self.__class__._sdp = pipe
-		im = pipe(prompt).images[0]
+		im = pipe(
+			prompt,
+			num_inference_steps=int(kwargs.get("--num-inference-steps", 50)),
+			guidance_scale=int(kwargs.get("--guidance-scale", 7.5)),
+		).images[0]
 		b = io.BytesIO()
 		im.save(b, format="png")
 		print("StablediffusionL:", b)
