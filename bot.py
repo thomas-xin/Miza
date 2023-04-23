@@ -32,6 +32,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     kofi_url = AUTH.get("kofi_url") or "https://ko-fi.com/mizabot"
     rapidapi_url = AUTH.get("rapidapi_url") or "https://rapidapi.com/thomas-xin/api/miza"
     raw_webserver = webserver
+    server_init = False
     heartbeat = "heartbeat.tmp"
     heartbeat_ack = "heartbeat_ack.tmp"
     restart = "restart.tmp"
@@ -3471,7 +3472,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         return remaining
 
     async def process_http_command(self, t, name, nick, command):
-        url = f"https://127.0.0.1:{PORT}/commands/{t}\x7f0"
+        url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f0"
         out = "[]"
         with tracebacksuppressor:
             message = SimulatedMessage(self, command, t, name, nick)
@@ -3488,12 +3489,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     await asyncio.sleep(0.1)
                 await self.react_callback(message, None, message.author)
                 out = orjson.dumps(list(message.response))
-            url = f"https://127.0.0.1:{PORT}/commands/{t}\x7f{after}"
+            url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f{after}"
         await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, bypass=False, decode=True, aio=True, ssl=False)
 
     async def process_http_eval(self, t, proc):
         glob = self._globals
-        url = f"https://127.0.0.1:{PORT}/commands/{t}\x7f0"
+        url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f0"
         out = '{"result":null}'
         with tracebacksuppressor:
             code = None
@@ -4129,13 +4130,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                             sem._update_bin()
                     create_future_ex(self.cache_reduce, priority=True)
                     await asyncio.sleep(1)
-                    with tracebacksuppressor:
-                        await Request(
-                            f"https://127.0.0.1:{PORT}/api_update_replacers",
-                            method="GET",
-                            aio=True,
-                            ssl=False,
-                        )
+                    if self.server_init:
+                        with tracebacksuppressor:
+                            await Request(
+                                f"http://127.0.0.1:{PORT}/api_update_replacers",
+                                method="GET",
+                                aio=True,
+                                ssl=False,
+                            )
                     with MemoryTimer("update"):
                         await create_future(self.update, priority=True)
 
@@ -6046,7 +6048,7 @@ def as_file(file, filename=None, ext=None, rename=True):
         n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
         key = base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
         create_task(Request(
-            f"https://127.0.0.1:{PORT}/api_register_replacer?ts={out}&key={key}",
+            f"http://127.0.0.1:{PORT}/api_register_replacer?ts={out}&key={key}",
             method="PUT",
             aio=True,
             ssl=False,
@@ -6088,10 +6090,12 @@ def webserver_communicate(bot):
             time.sleep(12)
         time.sleep(3)
         try:
-            assert reqs.next().get(f"https://127.0.0.1:{PORT}/ip", verify=False).content
+            assert reqs.next().get(f"http://127.0.0.1:{PORT}/ip", verify=False).content
         except:
             print_exc()
             bot.start_webserver()
+            time.sleep(5)
+        bot.server_init = True
         with tracebacksuppressor:
             with reqs.next().options(self.webserver, stream=True) as resp:
                 self.raw_webserver = resp.url.rstrip("/")
