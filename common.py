@@ -1297,6 +1297,8 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
             data["embeds"] = [embed.to_dict() for embed in embeds]
         if tts is not None:
             data["tts"] = tts
+        if getattr(channel, "simulated", False):
+            return await channel.send(content, **fields)
     body = orjson.dumps(data)
     exc = RuntimeError
     for i in range(xrand(3, 6)):
@@ -1345,10 +1347,7 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
                     fields["embeds"] = embeds
                 if tts:
                     fields["tts"] = tts
-                if getattr(channel, "simulated", False):
-                    message = await channel.send(content, **fields)
-                else:
-                    message = await discord.abc.Messageable.send(channel, content, **fields)
+                message = await discord.abc.Messageable.send(channel, content, **fields)
                 for a in message.attachments:
                     print("<attachment>", a.url)
                 return message
