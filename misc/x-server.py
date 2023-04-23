@@ -2723,7 +2723,7 @@ def ensure_parent(proc, parent):
 		time.sleep(6)
 
 if __name__ == "__main__":
-	logging.basicConfig(level=logging.WARNING, format='%(asctime)s %(message)s')
+	# logging.basicConfig(level=logging.WARNING, format='%(asctime)s %(message)s')
 	pid = os.getpid()
 	ppid = os.getppid()
 	send(f"Webserver starting on port {PORT}, with PID {pid} and parent PID {ppid}...")
