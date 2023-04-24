@@ -400,6 +400,15 @@ def get_geo(ip):
 		send(ip + "\t" + "\t".join(resp.values()))
 	return resp
 
+def true_ip():
+	ip = cp.request.headers["Remote-Addr"]
+	if ip == "127.0.0.1":
+		ip = cp.request.headers["X-Real-Ip"]
+		if ip == "127.0.0.1":
+			ip = cp.request.remote.ip
+	return ip
+
+
 
 class Server:
 
@@ -490,7 +499,7 @@ class Server:
 	@hostmap
 	def files(self, path, filename=None, download=None, **void):
 		if path in ("hacks", "mods", "files", "download", "static"):
-			send(cp.request.headers["Remote-Addr"] + " was rickrolled 🙃")
+			send(true_ip() + " was rickrolled 🙃")
 			raise cp.HTTPRedirect("https://www.youtube.com/watch?v=dQw4w9WgXcQ", status=301)
 		orig_path = path
 		ind = IND
@@ -1537,7 +1546,7 @@ transform: translate(-50%, -50%);
 	@hostmap
 	def get_ip(self, *args, **kwargs):
 		data = orjson.dumps(dict(
-			remote=cp.request.headers["Remote-Addr"],
+			remote=true_ip(),
 			host=getattr(self, "ip", "127.0.0.1"),
 		))
 		cp.response.headers.update(SHEADERS)
@@ -1551,7 +1560,7 @@ transform: translate(-50%, -50%);
 	@hostmap
 	def upload_chunk(self, **kwargs):
 		name = cp.request.headers.get("x-file-name", "untitled")
-		s = cp.request.headers["Remote-Addr"] + "%" + name
+		s = true_ip() + "%" + name
 		h = ihash(s) % 2 ** 48
 		single = "/upload_single" in cp.url()
 		xi = int(cp.request.headers.get("x-index", 0))
@@ -1694,7 +1703,7 @@ transform: translate(-50%, -50%);
 		ts = int(kwargs.get("?ts") or time.time_ns() // 1000)
 		x_name = kwargs.get("x-file-name") or cp.request.headers.get("x-file-name", "untitled")
 		name = kwargs.get("name") or x_name
-		s = cp.request.headers["Remote-Addr"] + "%" + x_name
+		s = true_ip() + "%" + x_name
 		print(s)
 		mfs = int(kwargs.get("x-total") or cp.request.headers.get("x-total", 0))
 		h = ihash(s) % 2 ** 48
@@ -2387,7 +2396,7 @@ alert("File successfully deleted. Returning to home.");
 	@hostmap
 	def mphb(self, playing=None):
 		mpdata = self.mpdata
-		ip = cp.request.headers["Remote-Addr"]
+		ip = true_ip()
 		t = utc()
 		try:
 			if playing is None or cp.request.method.casefold() != "patch" or cp.request.headers["User-Agent"] != "Miza Player":
@@ -2563,7 +2572,7 @@ alert("File successfully deleted. Returning to home.");
 	@cp.expose
 	@hostmap
 	def donation(self, data=None):
-		ip = cp.request.headers["Remote-Addr"]
+		ip = true_ip()
 		data = data or cp.request.json
 		if isinstance(data, str):
 			data = orjson.loads(data)
@@ -2614,7 +2623,7 @@ alert("File successfully deleted. Returning to home.");
 	@cp.expose(("commands",))
 	@hostmap
 	def command(self, content="", input="", timeout=420, redirect=""):
-		ip = cp.request.headers["Remote-Addr"]
+		ip = true_ip()
 		if "\x7f" in content and ip in ("127.0.0.1", ADDRESS, getattr(self, "ip", None)):
 			t, after = content.split("\x7f", 1)
 			t = int(t)
