@@ -1535,7 +1535,7 @@ transform: translate(-50%, -50%);
 	@hostmap
 	def get_ip(self, *args, **kwargs):
 		data = orjson.dumps(dict(
-			remote=cp.request.remote.ip,
+			remote=cp.request.headers["Remote-Addr"],
 			host=getattr(self, "ip", "127.0.0.1"),
 		))
 		cp.response.headers.update(SHEADERS)
@@ -1549,7 +1549,7 @@ transform: translate(-50%, -50%);
 	@hostmap
 	def upload_chunk(self, **kwargs):
 		name = cp.request.headers.get("x-file-name", "untitled")
-		s = cp.request.remote.ip + "%" + name
+		s = cp.request.headers["Remote-Addr"] + "%" + name
 		h = ihash(s) % 2 ** 48
 		single = "/upload_single" in cp.url()
 		xi = int(cp.request.headers.get("x-index", 0))
@@ -2385,7 +2385,7 @@ alert("File successfully deleted. Returning to home.");
 	@hostmap
 	def mphb(self, playing=None):
 		mpdata = self.mpdata
-		ip = cp.request.remote.ip
+		ip = cp.request.headers["Remote-Addr"]
 		t = utc()
 		try:
 			if playing is None or cp.request.method.casefold() != "patch" or cp.request.headers["User-Agent"] != "Miza Player":
@@ -2561,7 +2561,7 @@ alert("File successfully deleted. Returning to home.");
 	@cp.expose
 	@hostmap
 	def donation(self, data=None):
-		ip = cp.request.remote.ip
+		ip = cp.request.headers["Remote-Addr"]
 		data = data or cp.request.json
 		if isinstance(data, str):
 			data = orjson.loads(data)
@@ -2612,7 +2612,7 @@ alert("File successfully deleted. Returning to home.");
 	@cp.expose(("commands",))
 	@hostmap
 	def command(self, content="", input="", timeout=420, redirect=""):
-		ip = cp.request.remote.ip
+		ip = cp.request.headers["Remote-Addr"]
 		if "\x7f" in content and ip in ("127.0.0.1", ADDRESS, getattr(self, "ip", None)):
 			t, after = content.split("\x7f", 1)
 			t = int(t)
