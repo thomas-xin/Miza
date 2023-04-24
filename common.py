@@ -3274,6 +3274,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
             "User-Agent": f"Mozilla/5.{random.randint(1, 9)} (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
             "DNT": "1",
             "X-Forwarded-For": ".".join(str(xrand(1, 255)) for _ in loop(4)),
+            "X-Real-Ip": ".".join(str(xrand(1, 255)) for _ in loop(4)),
         }
     headers = header
 

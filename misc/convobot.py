@@ -496,6 +496,7 @@ class Bot:
 			"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
 			"DNT": "1",
 			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
+			"X-Real-Ip": ".".join(str(random.randint(1, 254)) for _ in range(4)),
 			"Content-Type": "application/json",
 			"cache-control": "no-cache",
 			"x-use-cache": "false",
@@ -1325,6 +1326,7 @@ class Bot:
 			"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
 			"DNT": "1",
 			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
+			"X-Real-Ip": ".".join(str(random.randint(1, 254)) for _ in range(4)),
 			"Content-Type": "text/plain"
 		}
 		resp = self.session.post(
@@ -1415,6 +1417,7 @@ class Bot:
 				"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
 				"DNT": "1",
 				"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
+				"X-Real-Ip": ".".join(str(random.randint(1, 254)) for _ in range(4)),
 				"Content-Type": "application/json",
 				"cache-control": "no-cache",
 				"x-use-cache": "false",

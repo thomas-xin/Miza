@@ -138,11 +138,11 @@ def process_headers(self):
 		if name == 'Cookie':
 			with suppress():
 				self.cookie.load(value)
-				# raise cherrypy.HTTPError(400, str(exc))
+				# raise cp.HTTPError(400, str(exc))
 	if not dict.__contains__(headers, 'Host'):
 		if self.protocol >= (1, 1):
 			msg = "HTTP/1.1 requires a 'Host' request header."
-			raise cherrypy.HTTPError(400, msg)
+			raise cp.HTTPError(400, msg)
 	else:
 		headers['Host'] = httputil.SanitizedHost(dict.get(headers, 'Host'))
 	host = dict.get(headers, 'Host')
@@ -275,29 +275,29 @@ config = {
 		"request.error_response": error_handler,
 	}
 }
-if os.path.exists("domain.cert.pem") and os.path.exists("private.key.pem"):
-	config["global"]["server.ssl_certificate"] = "domain.cert.pem"
-	config["global"]["server.ssl_private_key"] = "private.key.pem"
-	def hostmap(func):
-		def decorator(*args, **kwargs):
-			url = cp.url(qs=cp.request.query_string)
-			if not url.startswith("https://mizabot.") and not url.startswith("https://api.mizabot."):
-				if url.startswith("https://csnftcg.mizabot."):
-					raise cp.HTTPRedirect(f"https://csnftcg.mizabot.xyz:9604/{url.rsplit('/', 1)[-1]}", 307)
-				# time.sleep(10)
-				# raise cp.HTTPRedirect(f"https://mizabot.xyz/{url.rsplit('/', 1)[-1]}", 307)
-			return func(*args, **kwargs)
-		return decorator
-	def e404(status, message, traceback, version):
-		url = cp.url(qs=cp.request.query_string)
-		if not url.startswith("https://mizabot.") and not url.startswith("https://api.mizabot."):
-			print("Not Found:", url)
-			time.sleep(3600)
-		return message
-	cp.config["error_page.404"] = e404
-else:
-	def hostmap(func):
-		return func
+# if os.path.exists("domain.cert.pem") and os.path.exists("private.key.pem"):
+# 	config["global"]["server.ssl_certificate"] = "domain.cert.pem"
+# 	config["global"]["server.ssl_private_key"] = "private.key.pem"
+# 	def hostmap(func):
+# 		def decorator(*args, **kwargs):
+# 			url = cp.url(qs=cp.request.query_string)
+# 			if not url.startswith("https://mizabot.") and not url.startswith("https://api.mizabot."):
+# 				if url.startswith("https://csnftcg.mizabot."):
+# 					raise cp.HTTPRedirect(f"https://csnftcg.mizabot.xyz:9604/{url.rsplit('/', 1)[-1]}", 307)
+# 				# time.sleep(10)
+# 				# raise cp.HTTPRedirect(f"https://mizabot.xyz/{url.rsplit('/', 1)[-1]}", 307)
+# 			return func(*args, **kwargs)
+# 		return decorator
+# 	def e404(status, message, traceback, version):
+# 		url = cp.url(qs=cp.request.query_string)
+# 		if not url.startswith("https://mizabot.") and not url.startswith("https://api.mizabot."):
+# 			print("Not Found:", url)
+# 			time.sleep(3600)
+# 		return message
+# 	cp.config["error_page.404"] = e404
+# else:
+def hostmap(func):
+	return func
 
 HEADERS = {
 	"X-Content-Type-Options": "nosniff",
@@ -756,7 +756,10 @@ transform: translate(-50%, -50%);
 									self.serving.setdefault(p, weakref.WeakSet()).add(f)
 								return resp
 							if info[1] > 64 * 1048576:
-								return self.dyn_serve(urls, size=info[1])
+								uri = f"{HOST}/fileinfo/{orig_path}"
+								url = f"{HOST}/stream?info={urllib.parse.quote_plus(uri)}"
+								raise cp.HTTPRedirect(url, status="307")
+								# return self.dyn_serve(urls, size=info[1])
 							return self.concat(p, urls, name=info[0], mime=info[2], stn=stn)
 			f = open(p, "rb")
 			resp = cp.lib.static.serve_fileobj(f, content_type=mime, disposition="attachment" if download else None, name=a2)
@@ -822,34 +825,33 @@ transform: translate(-50%, -50%);
 				yield b
 
 	def dyn_serve(self, urls, size=0):
-		# print("Serve", urls, size)
 		with tracebacksuppressor:
+			brange = cp.request.headers.get("Range", "").removeprefix("bytes=")
 			headers = fcdict(cp.request.headers)
 			headers.pop("Remote-Addr", None)
 			headers.pop("Host", None)
 			headers.pop("Range", None)
 			headers.update(Request.header())
-			brange = cp.request.headers.get("Range", "")
-			brange = brange.removeprefix("bytes=")
 			ranges = []
 			length = 0
-			try:
-				branges = brange.split(",")
-				for s in branges:
-					start, end = s.split("-", 1)
-					if not start:
-						if not end:
-							continue
-						start = size - int(end)
-						end = size
-					elif not end:
-						end = size
-					start = int(start)
-					end = int(end)
-					length += end - start
-					ranges.append((start, end))
-			except:
-				print_exc()
+			if brange:
+				try:
+					branges = brange.split(",")
+					for s in branges:
+						start, end = s.split("-", 1)
+						if not start:
+							if not end:
+								continue
+							start = size - int(end)
+							end = size
+						elif not end:
+							end = size
+						start = int(start)
+						end = int(end)
+						length += end - start
+						ranges.append((start, end))
+				except:
+					print_exc()
 			if ranges:
 				cp.response.status = 206
 			else:
@@ -861,11 +863,10 @@ transform: translate(-50%, -50%);
 			cr = "bytes " + ", ".join(f"{start}-{end - 1}/{size}" for start, end in ranges)
 			cp.response.headers["Content-Range"] = cr
 			cp.response.headers["Content-Length"] = str(length)
-			cp.response.headers["Accept-Range"] = "bytes"
+			cp.response.headers["Accept-Ranges"] = "bytes"
 			return self._dyn_serve(urls, ranges, headers)
 
 	def _dyn_serve(self, urls, ranges, headers):
-		# print("Dynamic Serve:", urls, ranges, headers)
 		with tracebacksuppressor(GeneratorExit):
 			for start, end in ranges:
 				pos = 0
@@ -881,7 +882,6 @@ transform: translate(-50%, -50%);
 					else:
 						resp = reqs.next().head(u, headers=headers)
 						ns = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
-					# print(len(rems), pos, ns, start, end)
 					if pos + ns <= start:
 						pos += ns
 						continue
@@ -895,7 +895,6 @@ transform: translate(-50%, -50%);
 							e = ""
 						h2 = dict(h.items())
 						h2["range"] = f"bytes={s}-{e}"
-						# print("Range:", h2["range"])
 						ex2 = None
 						for i in range(3):
 							resp = reqs.next().get(u, headers=h2, stream=True)
@@ -913,7 +912,7 @@ transform: translate(-50%, -50%);
 						if resp.status_code != 206:
 							ms = min(ns, end - pos - s)
 							if len(resp.content) > ms:
-								yield resp.content[s:e]
+								yield resp.content[s:(e or len(resp.content))]
 								return
 							yield resp.content
 							return
@@ -922,7 +921,7 @@ transform: translate(-50%, -50%);
 							return
 						yield from resp.iter_content(65536)
 
-					if len(futs) > 2:
+					if len(futs) > 1:
 						yield from futs.pop(0).result()
 					fut = create_future_ex(get_chunk, u, headers, start, end, pos, ns, big)
 					futs.append(fut)
@@ -2723,7 +2722,7 @@ def ensure_parent(proc, parent):
 		time.sleep(6)
 
 if __name__ == "__main__":
-	# logging.basicConfig(level=logging.WARNING, format='%(asctime)s %(message)s')
+	logging.basicConfig(level=logging.WARNING, format='%(asctime)s %(message)s')
 	pid = os.getpid()
 	ppid = os.getppid()
 	send(f"Webserver starting on port {PORT}, with PID {pid} and parent PID {ppid}...")
@@ -2731,7 +2730,7 @@ if __name__ == "__main__":
 	parent = psutil.Process(ppid)
 	create_thread(ensure_parent, proc, parent)
 	app = Server()
-	self = server = cherrypy.Application(app, "/", config)
+	self = server = cp.Application(app, "/", config)
 	create_thread(app.mp_activity)
 	create_future_ex(app.get_ip_ex)
 	waitress.serve(server, host=ADDRESS, port=PORT, url_scheme="https")

@@ -336,6 +336,7 @@ class Bot:
 			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
 			"DNT": "1",
 			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
+			"X-Real-Ip": ".".join(str(random.randint(1, 254)) for _ in range(4)),
 		}
 		print("Mage:", a)
 		resp = self.session.get(a, headers=headers)
@@ -348,6 +349,7 @@ class Bot:
 			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
 			"DNT": "1",
 			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
+			"X-Real-Ip": ".".join(str(random.randint(1, 254)) for _ in range(4)),
 			"api-key": "quickstart-QUdJIGlzIGNvbWluZy4uLi4K",
 		}
 		resp = self.session.post(
@@ -390,6 +392,7 @@ class Bot:
 			"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
 			"DNT": "1",
 			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
+			"X-Real-Ip": ".".join(str(random.randint(1, 254)) for _ in range(4)),
 			"cache-control": "no-cache",
 			"x-use-cache": "false",
 			"x-wait-for-model": "true",
@@ -477,6 +480,7 @@ class Bot:
 			"DNT": "1",
 			"Content-Type": "application/json",
 			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
+			"X-Real-Ip": ".".join(str(random.randint(1, 254)) for _ in range(4)),
 			"cache-control": "no-cache",
 		}
 		kwargs = kwargs or {}
