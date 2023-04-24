@@ -1435,7 +1435,7 @@ transform: translate(-50%, -50%);
 			raise cp.HTTPRedirect(url.replace("/preview/", "/file/"), status=307)
 		if "/upload" in url:
 			raise cp.HTTPRedirect(url.replace("/upload", "/files"), status=307)
-		data, mime = fetch_static("static/index.html")
+		data, mime = fetch_static("index.html")
 		if url.split("//", 1)[-1].count("/") > 1:
 			meta = '<meta property="og:title" content="Miza"><meta property="og:description" content="A multipurpose Discord bot.">'
 			if "/file" in url or "/files" in url:
