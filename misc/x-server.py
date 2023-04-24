@@ -151,7 +151,7 @@ def process_headers(self):
 	self.base = '%s://%s' % (self.scheme, host)
 cp._cprequest.Request.process_headers = process_headers
 
-actually_static = set(os.listdir("misc/static"))
+actually_static = set(os.listdir("misc/web"))
 mapped_static = {k[:-5]: k for k in actually_static if k.endswith(".html")}
 
 def map_url(url):
