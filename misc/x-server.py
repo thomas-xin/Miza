@@ -1489,11 +1489,19 @@ transform: translate(-50%, -50%);
 					sem = SEMAPHORES[p] = Semaphore(256, 256, rate_limit=60)
 				with sem:
 					fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
-					attachment = filename or self._fileinfo(f"@{path}")["filename"]
+					if fn.startswith(".forward$"):
+						info = self._fileinfo(f"@{path}")
+						attachment = info["filename"]
+						mim = info["mimetype"]
+						attachment = info["filename"]
+						size = info["size"]
+					else:
+						mim = get_mime(p)
+						attachment = filename or fn
+						size = os.path.getsize(p)
 					a2 = url_unparse(attachment).removeprefix(".temp$@")
 					f_url = url.replace("/file/", "/f/")
-					mim = get_mime(p)
-					description = mim + f", {byte_scale(os.path.getsize(p))}B"
+					description = mim + f", {byte_scale(size)}B"
 					meta = '<meta http-equiv="Content-Type" content="text/html;charset=UTF-8">'
 					if mim.startswith("video/"):
 						i_url = url.replace("/file/", "/i/") + ".gif"
