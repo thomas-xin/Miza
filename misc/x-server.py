@@ -2759,4 +2759,4 @@ if __name__ == "__main__":
 	self = server = cp.Application(app, "/", config)
 	create_thread(app.mp_activity)
 	create_future_ex(app.get_ip_ex)
-	waitress.serve(server, host=ADDRESS, port=PORT, url_scheme="https")
+	waitress.serve(server, threads=128, host=ADDRESS, port=PORT, url_scheme="https")

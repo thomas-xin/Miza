@@ -190,4 +190,4 @@ if __name__ == "__main__":
 	logging.basicConfig(level=logging.WARNING, format='%(asctime)s %(message)s')
 	app = Server()
 	self = server = cp.Application(app, "/", config)
-	waitress.serve(server, host="0.0.0.0", port=8080, url_scheme="https")
+	waitress.serve(server, threads=128, host="0.0.0.0", port=8080, url_scheme="https")
