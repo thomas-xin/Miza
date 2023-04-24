@@ -324,7 +324,7 @@ def fetch_static(path, ignore=False):
 		try:
 			data = STATIC[path]
 		except KeyError:
-			fn = f"misc/{path}"
+			fn = f"misc/web/{path}"
 			fn2 = fn + ".zip"
 			if os.path.exists(fn2) and zipfile.is_zipfile(fn2):
 				with ZipFile(fn2, compression=zipfile.ZIP_DEFLATED, allowZip64=True, strict_timestamps=False) as z:
