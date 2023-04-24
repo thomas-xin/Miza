@@ -1472,7 +1472,7 @@ transform: translate(-50%, -50%);
 					sem = SEMAPHORES[p] = Semaphore(256, 256, rate_limit=60)
 				with sem:
 					fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
-					attachment = filename or self._fileinfo(path)["filename"]
+					attachment = filename or self._fileinfo(f"@{path}")["filename"]
 					a2 = url_unparse(attachment).removeprefix(".temp$@")
 					f_url = url.replace("/file/", "/f/")
 					mim = get_mime(p)
