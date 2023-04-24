@@ -252,7 +252,7 @@ def error_handler(exc=None):
 </head><body></body></html>""".encode("utf-8")
 	else:
 		resp = errdata.get(status) or errdata.setdefault(status, reqs.next().get(f"https://http.cat/{status}"))
-		head = resp.headers
+		head = resp.headers.copy()
 		body = resp.content
 	head.update(HEADERS)
 	head["Content-Length"] = len(body)
