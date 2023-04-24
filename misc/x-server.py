@@ -258,6 +258,7 @@ def error_handler(exc=None):
 	head["Content-Length"] = len(body)
 	cp.response.status = status
 	cp.response.headers.update(head)
+	cp.response.headers.pop("Connection", None)
 	print(cp.response.headers)
 	cp.response.body = body
 
