@@ -1193,6 +1193,7 @@ transform: translate(-50%, -50%);
 	@cp.expose
 	@hostmap
 	def ytdl(self, **kwargs):
+		cp.response.headers.update(HEADERS)
 		d = kwargs.get("d") or kwargs.get("download")
 		v = d or kwargs.get("v") or kwargs.get("view")
 		q = d or v or kwargs.get("q") or kwargs.get("query") or kwargs.get("s") or kwargs.get("search")
@@ -1255,6 +1256,7 @@ transform: translate(-50%, -50%);
 	@cp.expose
 	@hostmap
 	def ytdlp(self, url, fmt="mp4", start="", end=""):
+		cp.response.headers.update(HEADERS)
 		if not url:
 			cp.response.status = 204
 			return
@@ -1274,6 +1276,7 @@ transform: translate(-50%, -50%);
 	@cp.expose
 	@hostmap
 	def ytdlc(self, *urls, fmt="mp4", multi="true", **kwargs):
+		cp.response.headers.update(HEADERS)
 		m = "" if multi in ("false", "False") else "-m"
 		kwurls = []
 		for k, v in kwargs.items():
@@ -1301,6 +1304,7 @@ transform: translate(-50%, -50%);
 	@cp.expose
 	@hostmap
 	def specexec(self, url, **kwargs):
+		cp.response.headers.update(HEADERS)
 		argv = " ".join(itertools.chain(*kwargs.items()))
 		b = self.command(input=f"spectralpulse {url} {argv}")
 		data = orjson.loads(b)
@@ -1310,6 +1314,7 @@ transform: translate(-50%, -50%);
 	@cp.expose
 	@hostmap
 	def filelist(self, path=None):
+		cp.response.headers.update(HEADERS)
 		cp.response.headers["Content-Type"] = "application/json"
 		try:
 			sessid = int(cp.request.cookie["sessid"].value)
@@ -1348,6 +1353,7 @@ transform: translate(-50%, -50%);
 	@cp.expose
 	@hostmap
 	def teapot(self, *args, **kwargs):
+		cp.response.headers.update(HEADERS)
 		raise IsADirectoryError("I'm a teapot.")
 
 	@cp.expose(("index", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "user", "login", "logout", "mpinsights", "createredirect"))
@@ -1560,6 +1566,7 @@ transform: translate(-50%, -50%);
 	@hostmap
 	def upload_chunk(self, **kwargs):
 		name = cp.request.headers.get("x-file-name", "untitled")
+		cp.response.headers.update(HEADERS)
 		s = true_ip() + "%" + name
 		h = ihash(s) % 2 ** 48
 		single = "/upload_single" in cp.url()
@@ -1698,6 +1705,7 @@ transform: translate(-50%, -50%);
 	@cp.tools.accept(media="multipart/form-data")
 	@hostmap
 	def merge(self, **kwargs):
+		cp.response.headers.update(HEADERS)
 		kwargs = fcdict(kwargs)
 		key = kwargs.get("?key")
 		ts = int(kwargs.get("?ts") or time.time_ns() // 1000)
@@ -1795,6 +1803,7 @@ transform: translate(-50%, -50%);
 		subprocess.run([sys.executable, "downloader.py", url, fn], cwd="misc")
 		b = ts.bit_length() + 7 >> 3
 		ts, key = self.register_replacer(ts)
+		cp.response.headers.update(HEADERS)
 		return HOST + "/p/" + n2p(ts)
 
 	def optimise_video(self, of, size, mime):
@@ -2176,6 +2185,7 @@ transform: translate(-50%, -50%);
 	def edit(self, path, key=None, **kwargs):
 		if not key:
 			raise PermissionError("Key not found.")
+		cp.response.headers.update(HEADERS)
 		ots = p2n(path)
 		path = str(ots)
 		p = find_file(path, cwd=("cache", "saves/filehost"))
@@ -2290,6 +2300,7 @@ transform: translate(-50%, -50%);
 		if not replaceable:
 			mids = orjson.loads(orig.split("<!--MID=", 1)[-1].split("-->", 1)[0])
 			self.bot_exec(f"bot.data.exec.delete({repr(mids)})")
+		cp.response.headers.update(HEADERS)
 		return """<!DOCTYPE html><html>
 <meta http-equiv="refresh" content="0;URL=/">
 <body onload="myFunction()" style="background-color:#000">
@@ -2330,6 +2341,7 @@ alert("File successfully deleted. Returning to home.");
 			)
 		with open(fn, "w", encoding="utf-8") as f:
 			f.write(s)
+		cp.response.headers.update(HEADERS)
 		raise cp.HTTPRedirect(url, status=307)
 
 	@cp.expose
@@ -2432,6 +2444,7 @@ alert("File successfully deleted. Returning to home.");
 		if not self.mpdata_updated:
 			self.mpdata_updated = True
 			create_future_ex(self.mpdata_update)
+		cp.response.headers.update(HEADERS)
 		try:
 			resp = self.mpresponse.pop(ip)
 		except KeyError:
@@ -2456,6 +2469,7 @@ alert("File successfully deleted. Returning to home.");
 			width = np.clip(len(self.ins_data[k]), 3, 96)
 			histories[k] = list(supersample(self.ins_data[k], width))
 			hours[k] = len(self.ins_data[k])
+		cp.response.headers.update(HEADERS)
 		return orjson.dumps(dict(
 			current=dict(
 				live_users=values[2],
@@ -2479,6 +2493,7 @@ alert("File successfully deleted. Returning to home.");
 	@hostmap
 	def status(self):
 		status = self.bot_exec(f"bot.status()")
+		cp.response.headers.update(HEADERS)
 		return orjson.dumps(status)
 
 	def ensure_mpins(self):
