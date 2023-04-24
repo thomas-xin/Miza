@@ -403,9 +403,9 @@ def get_geo(ip):
 def true_ip():
 	ip = cp.request.headers["Remote-Addr"]
 	if ip == "127.0.0.1":
-		ip = cp.request.headers["X-Real-Ip"]
-		if ip == "127.0.0.1":
-			ip = cp.request.remote.ip
+		ip = cp.request.headers.get("X-Real-Ip") or ip
+	if ip == "127.0.0.1":
+		ip = cp.request.remote.ip
 	return ip
 
 
