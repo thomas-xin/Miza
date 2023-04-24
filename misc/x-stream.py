@@ -3,67 +3,21 @@ import cherrypy as cp
 
 
 exc = concurrent.futures.ThreadPoolExecutor(max_workers=128)
-nhash = lambda s: int.from_bytes(hashlib.md5(s if type(s) is bytes else as_str(s).encode("utf-8")).digest(), "little")
-
-def create_etag(data):
-	n = len(data)
-	s = str(nhash(data[:128] + data[n // 2 - 128:(n + 1) // 2 + 128] + data[-128:]) + n & 4294967295)
-	return '"' + "0" * (10 - len(s)) + s + '"'
-
 config = {}
-
-HEADERS = {
-	"X-Content-Type-Options": "nosniff",
-	"Server": "Miza",
-	"Vary": "Accept-Encoding",
-	"Accept-Ranges": "bytes",
-	"Access-Control-Allow-Headers": "*",
-	"Access-Control-Allow-Methods": "*",
-	"Access-Control-Allow-Origin": "*",
-}
-CHEADERS = {"Cache-Control": "public, max-age=3600, stale-while-revalidate=1073741824, stale-if-error=1073741824"}
-
-MIMES = {}
-STATIC = {}
-
-def fetch_static(path, ignore=False):
-	while path.startswith("../"):
-		path = path[3:]
-	try:
-		data = STATIC[path]
-	except KeyError:
-		fn = path
-		fn2 = fn + ".zip"
-		with open(fn, "rb") as f:
-			data = f.read()
-		STATIC[path] = data
-	fmt = path.rsplit(".", 1)[-1].casefold()
-	try:
-		mime = MIMES[fmt]
-	except KeyError:
-		mime = "text/html"
-	return data, mime
 
 
 class Server:
 
-	@cp.expose(("index", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "user", "login", "logout", "mpinsights", "createredirect"))
-	def index(self, *args, **kwargs):
-		url = cp.url(qs=cp.request.query_string).rstrip("/")
-		if "/upload" in url:
-			raise cp.HTTPRedirect(url.replace("/upload", "/files"), status=307)
-		data, mime = fetch_static("index.html")
-		if url.split("//", 1)[-1].count("/") > 1:
-			raise RuntimeError("Unexpected proxy URL.")
-		cp.response.headers.update(CHEADERS)
-		cp.response.headers["Content-Type"] = mime
-		cp.response.headers["Content-Length"] = len(data)
-		cp.response.headers["ETag"] = create_etag(data)
-		return data
+	cache = {}
 
 	@cp.expose
 	def stream(self, info):
-		data = requests.get(info).json()
+		try:
+			data = self.cache[info]
+		except KeyError:
+			if len(self.cache) > 128:
+				self.cache.pop(next(iter(self.cache)))
+			data = self.cache[info] = requests.get(info).json()
 		info = [data["filename"], data["size"], data["mimetype"]]
 		urls = data.get("chunks") or [data["dl"]]
 		size = info[1]
