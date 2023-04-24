@@ -488,7 +488,7 @@ class Server:
 	@hostmap
 	def files(self, path, filename=None, download=None, **void):
 		if path in ("hacks", "mods", "files", "download", "static"):
-			send(cp.request.remote.ip + " was rickrolled 🙃")
+			send(cp.request.headers["Remote-Addr"] + " was rickrolled 🙃")
 			raise cp.HTTPRedirect("https://www.youtube.com/watch?v=dQw4w9WgXcQ", status=301)
 		orig_path = path
 		ind = IND
@@ -1692,7 +1692,7 @@ transform: translate(-50%, -50%);
 		ts = int(kwargs.get("?ts") or time.time_ns() // 1000)
 		x_name = kwargs.get("x-file-name") or cp.request.headers.get("x-file-name", "untitled")
 		name = kwargs.get("name") or x_name
-		s = cp.request.remote.ip + "%" + x_name
+		s = cp.request.headers["Remote-Addr"] + "%" + x_name
 		print(s)
 		mfs = int(kwargs.get("x-total") or cp.request.headers.get("x-total", 0))
 		h = ihash(s) % 2 ** 48
