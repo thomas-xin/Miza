@@ -98,6 +98,8 @@ class Server:
 						e = end - pos
 						if e >= ns:
 							e = ""
+						else:
+							e -= 1
 						h2 = dict(h.items())
 						h2["range"] = f"bytes={s}-{e}"
 						ex2 = None
