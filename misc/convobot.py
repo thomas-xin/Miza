@@ -667,7 +667,7 @@ class Bot:
 								k = k.replace("--", "-")
 					else:
 						k = ""
-					if not k:
+					if not k and orig_k:
 						v = orig_k + ": " + v
 				if k:
 					m["name"] = lim_str(k, 48)

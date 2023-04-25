@@ -47,11 +47,11 @@ class Server:
 						if not end:
 							continue
 						start = size - int(end)
-						end = size
+						end = size - 1
 					elif not end:
-						end = size
+						end = size - 1
 					start = int(start)
-					end = int(end)
+					end = int(end) + 1
 					length += end - start
 					ranges.append((start, end))
 			except:
