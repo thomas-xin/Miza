@@ -22,6 +22,7 @@ class Server:
 			headers["Range"] = cp.request.headers["Range"]
 		resp = requests.get(url, headers=headers, stream=True)
 		cp.response.headers.update(resp.headers)
+		cp.response.headers.pop("Connection", None)
 		return resp.iter_content(65536)
 
 	@cp.expose
