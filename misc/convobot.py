@@ -657,15 +657,18 @@ class Bot:
 				else:
 					m["role"] = "user"
 				if not k.isascii() or not k.isalnum():
-					if not (k2 := k.translate("".maketrans({"-": "", " ": "", "_": ""}))).isascii() or not k2.isalnum() or not any(c.isalnum() for c in k):
-						v = k + ": " + v
-						k = ""
-					else:
+					k2 = k.translate("".maketrans({"-": "", " ": "", "_": ""}))
+					orig_k = k
+					if k2.isascii() and k2.isalnum() and any(c.isalnum() for c in k):
 						k = unicode_prune(k)
 						if not k.isascii() or not k.isalnum():
 							k = "".join((c if (c.isascii() and c.isalnum() or c == "_") else "-") for c in k).strip("-")
 							while "--" in k:
 								k = k.replace("--", "-")
+					else:
+						k = ""
+					if not k:
+						v = orig_k + ": " + v
 				if k:
 					m["name"] = lim_str(k, 48)
 					pc += len(self.gpttokens(m["name"], model))
