@@ -1,4 +1,4 @@
-import os, simplejson, requests, hashlib, logging, waitress, random, base64, concurrent.futures
+import requests, logging, waitress, random, concurrent.futures
 import cherrypy as cp
 
 
@@ -9,6 +9,20 @@ config = {}
 class Server:
 
 	cache = {}
+
+	@cp.expose
+	def proxy(self, url):
+		headers = {
+			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
+			"DNT": "1",
+			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
+			"X-Real-Ip": ".".join(str(random.randint(1, 254)) for _ in range(4)),
+		}
+		if cp.request.headers.get("Range"):
+			headers["Range"] = cp.request.headers["Range"]
+		resp = requests.get(url, headers=headers, stream=True)
+		cp.response.headers.update(resp.headers)
+		return resp.iter_content(65536)
 
 	@cp.expose
 	def stream(self, info):
