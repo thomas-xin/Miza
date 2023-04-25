@@ -657,7 +657,7 @@ class Bot:
 				else:
 					m["role"] = "user"
 				if not k.isascii() or not k.isalnum():
-					if not (k2 := k.translate("".maketrans({"-": "", " ": "", "_": ""}))).isascii or not k2.isalnum() or not any(c.isalnum() for c in k):
+					if not (k2 := k.translate("".maketrans({"-": "", " ": "", "_": ""}))).isascii() or not k2.isalnum() or not any(c.isalnum() for c in k):
 						v = k + ": " + v
 						k = ""
 					else:
