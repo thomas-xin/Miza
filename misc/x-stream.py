@@ -3,6 +3,8 @@ import cherrypy as cp
 
 
 exc = concurrent.futures.ThreadPoolExecutor(max_workers=128)
+ADDRESS = "0.0.0.0"
+PORT = 8080
 config = {
 	"global": {
 		"server.socket_host": ADDRESS,
@@ -173,4 +175,4 @@ if __name__ == "__main__":
 	app = Server()
 	self = server = cp.Application(app, "/", config)
 	cp.quickstart(server, "/", config)
-	# waitress.serve(server, threads=128, host="0.0.0.0", port=8080, url_scheme="https")
+	# waitress.serve(server, threads=128, host=ADDRESS, port=PORT, url_scheme="https")
