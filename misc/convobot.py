@@ -16,7 +16,10 @@ MIZAAC = ""
 
 import tiktoken
 if torch.cuda.is_available():
-	torch.cuda.set_enabled_lms(True)
+	try:
+		torch.cuda.set_enabled_lms(True)
+	except AttributeError:
+		pass
 from fp.fp import FreeProxy
 print_exc = lambda: sys.stdout.write(traceback.format_exc())
 

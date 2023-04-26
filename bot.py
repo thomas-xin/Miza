@@ -371,6 +371,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             j = {}
             for category in ("MAIN", "STRING", "ADMIN", "VOICE", "IMAGE", "FUN", "OWNER", "NSFW", "MISC"):
                 k = j[category] = {}
+                if category not in self.categories:
+                    pass
                 for command in self.categories[category]:
                     c = k[command.parse_name()] = dict(
                         aliases=[n.strip("_") for n in command.alias],

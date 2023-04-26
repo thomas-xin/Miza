@@ -14,7 +14,10 @@ def print(*args, sep=" ", end="\n"):
 	return sys.stdout.buffer.write(b)
 
 if torch.cuda.is_available():
-	torch.cuda.set_enabled_lms(True)
+	try:
+		torch.cuda.set_enabled_lms(True)
+	except AttributeError:
+		pass
 try:
 	exc = concurrent.futures.exc_worker
 except AttributeError:
