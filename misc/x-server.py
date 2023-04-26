@@ -426,7 +426,7 @@ class Server:
 			path = path[1:]
 		p = find_file(path, cwd=("saves/filehost", "cache"), ind=ind)
 		mime = get_mime(p)
-		f_url = cp.url(qs=cp.request.query_string).replace("/fileinfo/", "/f/")
+		f_url = HOST + "/f/" + n2p(int(path))
 		st = os.stat(p)
 		fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
 		if fn.startswith(".temp$@"):
