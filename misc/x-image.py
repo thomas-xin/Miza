@@ -2584,8 +2584,10 @@ if len(sys.argv) > 1 and sys.argv[1] == "2":
 		return ib.art_stablediffusion_local(prompt, kwargs)
 
 if len(sys.argv) > 1 and sys.argv[1] == "3":
+	import torch
+	device = "cuda" if torch.cuda.is_available() else "cpu"
 	from sentence_transformers import SentenceTransformer
-	Embedder = SentenceTransformer("LLukas22/all-mpnet-base-v2-embedding-all", device="cuda").half()
+	Embedder = SentenceTransformer("LLukas22/all-mpnet-base-v2-embedding-all", device=device).half()
 	def embedding(s):
 		a = Embedder.encode(s).astype(np.float16)
 		return a.data

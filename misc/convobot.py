@@ -15,6 +15,8 @@ from collections2 import *
 MIZAAC = ""
 
 import tiktoken
+if torch.cuda.is_available():
+	torch.cuda.set_enabled_lms(True)
 from fp.fp import FreeProxy
 print_exc = lambda: sys.stdout.write(traceback.format_exc())
 
@@ -432,11 +434,7 @@ class Bot:
 		self.models[m] = smp
 		enc = tiktoken.get_encoding("cl100k_base")
 		tokens = enc.encode(q)
-		if smp.devid is not None:
-			limit = (torch.cuda.get_device_properties(smp.devid).total_memory - 2147483648) // 1048576
-			print("CUDA limit:", limit)
-		else:
-			limit = 4096
+		limit = 4096
 		while len(tokens) > max_length:
 			if len(tokens) > limit:
 				e1 = tokens[:limit]
@@ -460,22 +458,19 @@ class Bot:
 			return lim_tokens(q, max_length)
 
 	def answer_classify(self, m="vicgalle/xlm-roberta-large-xnli-anli", q="", labels=[]):
+		device = -1
+		if torch.cuda.is_available():
+			n = torch.cuda.device_count()
+			if n > 1:
+				device = random.randint(0, torch.cuda.device_count() - 1)
+			else:
+				device = 0
 		try:
 			zscp = self.models[m]
 		except KeyError:
-			zscp = self.models[m] = pipeline("zero-shot-classification", model=m)
+			zscp = self.models[m] = pipeline("zero-shot-classification", model=m, device=device, torch_dtype=torch.float16 if device > -1 else torch.float32)
 		resp = zscp(q, labels, truncation=True)
 		return dict(zip(resp["labels"], resp["scores"]))
-
-	def check_google(self, q):
-		if q.count(" ") < 2:
-			return False
-		if not literal_question(q):
-			resp = self.answer_classify(q=q, labels=("question", "information", "action"))
-			if resp["question"] < 0.5:
-				return False
-		resp = self.answer_classify(q=q, labels=("personal question", "not personal"))
-		return resp["not personal"] >= 0.5
 
 	# tokeniser = None
 	def gpttokens(self, s, model="gpt-3.5-turbo"):

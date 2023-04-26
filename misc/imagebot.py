@@ -13,6 +13,8 @@ def print(*args, sep=" ", end="\n"):
 	b = s.encode("utf-8")
 	return sys.stdout.buffer.write(b)
 
+if torch.cuda.is_available():
+	torch.cuda.set_enabled_lms(True)
 try:
 	exc = concurrent.futures.exc_worker
 except AttributeError:
