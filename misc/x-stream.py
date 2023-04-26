@@ -1,9 +1,19 @@
-import requests, logging, waitress, random, concurrent.futures
+import requests, logging, random, concurrent.futures
 import cherrypy as cp
 
 
 exc = concurrent.futures.ThreadPoolExecutor(max_workers=128)
-config = {}
+config = {
+	"global": {
+		"server.socket_host": ADDRESS,
+		"server.socket_port": PORT,
+		"server.thread_pool": 128,
+		"server.max_request_body_size": 0,
+		"server.socket_timeout": 65,
+		"server.ssl_module": "builtin",
+		"engine.autoreload_on": False,
+	},
+}
 
 
 class Server:
@@ -162,4 +172,5 @@ if __name__ == "__main__":
 	logging.basicConfig(level=logging.WARNING, format='%(asctime)s %(message)s')
 	app = Server()
 	self = server = cp.Application(app, "/", config)
-	waitress.serve(server, threads=128, host="0.0.0.0", port=8080, url_scheme="https")
+	cp.quickstart(server, "/", config)
+	# waitress.serve(server, threads=128, host="0.0.0.0", port=8080, url_scheme="https")
