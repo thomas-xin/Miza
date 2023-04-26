@@ -2493,7 +2493,7 @@ class AudioDownloader:
                     if not (info.get("video") and info["video"].startswith("https://www.yt-download.org/download/")):
                         self.get_stream(info, video=True, force=True, download=False)
                     video = info["video"]
-                    if (video == info["stream"] or xrand(2)) and is_youtube_url(info["url"]) and has_ytd:
+                    if video == info["stream"] and is_youtube_url(info["url"]) and has_ytd:
                         data = self.extract_backup(info["url"], video=True)
                         video = info["video"] = get_best_video(data)
                     vidinfo = as_str(subprocess.check_output(["./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "default=nokey=1:noprint_wrappers=1", video])).strip()
