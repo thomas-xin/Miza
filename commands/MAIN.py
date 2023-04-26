@@ -537,7 +537,7 @@ class Avatar(Command):
         emb.description = f"{sqr_md(name)}({url})"
         return emb
 
-    async def __call__(self, argv, argl, channel, guild, bot, user, **void):
+    async def __call__(self, argv, argl, channel, guild, bot, user, message, **void):
         iterator = argl if argl else (argv,)
         embs = set()
         for argv in iterator:
@@ -605,7 +605,7 @@ class Avatar(Command):
                     emb.set_author(name=name, icon_url=url, url=url)
                     emb.description = f"{sqr_md(name)}({url})"
                     embs.add(emb)
-        bot.send_embeds(channel, embeds=embs)
+        bot.send_embeds(channel, embeds=embs, reference=message)
 
 
 class Info(Command):
@@ -706,7 +706,7 @@ class Info(Command):
             emb.add_field(name="Age", value=str(round_min(round(age, 1))), inline=1)
         return emb
 
-    async def __call__(self, argv, argl, name, guild, channel, bot, user, flags, **void):
+    async def __call__(self, argv, argl, name, guild, channel, bot, user, message, flags, **void):
         iterator = argl if argl else (argv,)
         embs = set()
         for argv in iterator:
@@ -910,7 +910,7 @@ class Info(Command):
                     if role:
                         emb.add_field(name=f"Roles ({len(rolelist)})", value=role, inline=0)
                     embs.add(emb)
-        bot.send_embeds(channel, embeds=embs)
+        bot.send_embeds(channel, embeds=embs, reference=message)
 
 
 class Profile(Command):
