@@ -453,7 +453,7 @@ class CustomAudio(collections.abc.Hashable):
             return await_fut(send_with_react(self.text, *args, file=f, reacts="❎", **kwargs))
 
     # Kills this audio player, stopping audio playback. Will cause bot to leave voice upon next update event.
-    def kill(self, reason=None):
+    def kill(self, reason=None, initiator=None):
         if self.acsi:
             with tracebacksuppressor(AttributeError):
                 self.acsi.kill()
@@ -465,7 +465,7 @@ class CustomAudio(collections.abc.Hashable):
             if reason is None:
                 reason = css_md(f"🎵 Successfully disconnected from {sqr_md(self.guild)}. 🎵")
             if reason:
-                self.announce(reason, dump=True)
+                self.announce(reason, dump=True, reference=initiator)
 
     # Update event, ensures audio is playing correctly and moves, leaves, or rejoins voice when necessary.
     def update(self, *void1, **void2):
@@ -3399,7 +3399,7 @@ class Connect(Command):
     rate_limit = (3, 4)
     slash = ("Join", "Leave")
 
-    async def __call__(self, user, channel, name="join", argv="", vc=None, **void):
+    async def __call__(self, user, channel, message, name="join", argv="", vc=None, **void):
         bot = self.bot
         joining = False
         if name in ("dc", "disconnect", "leave", "yeet", "fuckoff", "📴", "📛"):
@@ -3458,7 +3458,7 @@ class Connect(Command):
             auds.text = channel
             if not is_alone(auds, user) and perm < 1:
                 raise self.perm_error(perm, 1, "to disconnect while other users are in voice")
-            return await create_future(auds.kill)
+            return await create_future(auds.kill, initiator=message)
         if not vc_.permissions_for(guild.me).connect:
             raise ConnectionError("Insufficient permissions to connect to voice channel.")
         if vc_.permissions_for(guild.me).manage_channels:
