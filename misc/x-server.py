@@ -768,7 +768,11 @@ transform: translate(-50%, -50%);
 								return resp
 							if info[1] > 64 * 1048576:
 								uri = f"{HOST}/fileinfo/{orig_path}"
-								url = f"{HOST}/stream?info={urllib.parse.quote_plus(uri)}"
+								url = choice(
+									"https://stream.miza-stream.workers.dev/",
+									"https://stream.sub-stream.workers.dev/",
+								) + f"?info={urllib.parse.quote_plus(uri)}"
+								# url = f"{HOST}/stream?info={urllib.parse.quote_plus(uri)}"
 								raise cp.HTTPRedirect(url, status="307")
 								# return self.dyn_serve(urls, size=info[1])
 							return self.concat(p, urls, name=info[0], mime=info[2], stn=stn)
