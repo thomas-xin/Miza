@@ -65,7 +65,7 @@ prev_date = utc_dt().date()
 zfailed = set()
 
 
-import cherrypy, cheroot, logging, ssl, socket, waitress
+import cherrypy, cheroot, logging, ssl, socket #, waitress
 from cherrypy._cpdispatch import Dispatcher
 cp = cherrypy
 httputil = cp.lib.httputil
@@ -266,9 +266,9 @@ config = {
 	"global": {
 		"server.socket_host": ADDRESS,
 		"server.socket_port": PORT,
-		"server.thread_pool": 96,
+		"server.thread_pool": 128,
 		"server.max_request_body_size": 0,
-		"server.socket_timeout": 60,
+		"server.socket_timeout": 65,
 		"server.ssl_module": "builtin",
 		"engine.autoreload_on": False,
 	},
@@ -2775,4 +2775,5 @@ if __name__ == "__main__":
 	self = server = cp.Application(app, "/", config)
 	create_thread(app.mp_activity)
 	create_future_ex(app.get_ip_ex)
-	waitress.serve(server, threads=128, host=ADDRESS, port=PORT, url_scheme="https")
+	cp.quickstart(server, "/", config)
+	# waitress.serve(server, threads=128, host=ADDRESS, port=PORT, url_scheme="https")
