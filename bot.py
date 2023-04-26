@@ -384,7 +384,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     for attr in ("flags", "server_only", "slash"):
                         with suppress(AttributeError):
                             c[attr] = command.attr
-            with open("misc/HELP.json", "w", encoding="utf-8") as f:
+            with open("misc/web/static/HELP.json", "w", encoding="utf-8") as f:
                 json.dump(j, f, indent="\t")
 
     def start_webserver(self):
