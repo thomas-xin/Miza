@@ -65,7 +65,7 @@ prev_date = utc_dt().date()
 zfailed = set()
 
 
-import cherrypy, cheroot, logging, ssl, socket, waitress
+import cherrypy, cheroot, logging, ssl, socket #, waitress
 from cherrypy._cpdispatch import Dispatcher
 cp = cherrypy
 httputil = cp.lib.httputil
@@ -266,9 +266,9 @@ config = {
 	"global": {
 		"server.socket_host": ADDRESS,
 		"server.socket_port": PORT,
-		"server.thread_pool": 96,
+		"server.thread_pool": 128,
 		"server.max_request_body_size": 0,
-		"server.socket_timeout": 60,
+		"server.socket_timeout": 65,
 		"server.ssl_module": "builtin",
 		"engine.autoreload_on": False,
 	},
@@ -426,7 +426,7 @@ class Server:
 			path = path[1:]
 		p = find_file(path, cwd=("saves/filehost", "cache"), ind=ind)
 		mime = get_mime(p)
-		f_url = cp.url(qs=cp.request.query_string).replace("/fileinfo/", "/f/")
+		f_url = HOST + "/f/" + n2p(int(path))
 		st = os.stat(p)
 		fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
 		if fn.startswith(".temp$@"):
@@ -768,13 +768,13 @@ transform: translate(-50%, -50%);
 								return resp
 							if info[1] > 64 * 1048576:
 								uri = f"{HOST}/fileinfo/{orig_path}"
-								# if not cp.request.headers.get("Range") and urls[0].startswith("https://cdn.discord"):
-								# 	url = f"{HOST}/stream?info={urllib.parse.quote_plus(uri)}"
-								# else:
-								url = choice(
-									"https://stream.miza-stream.workers.dev/",
-									"https://stream.sub-stream.workers.dev/",
-								) + f"?info={urllib.parse.quote_plus(uri)}"
+								if not cp.request.headers.get("Range") and len(urls) > 48:
+									url = f"{HOST}/stream?info={urllib.parse.quote_plus(uri)}"
+								else:
+									url = choice(
+										"https://stream.miza-stream.workers.dev/",
+										"https://stream.sub-stream.workers.dev/",
+									) + f"?info={urllib.parse.quote_plus(uri)}"
 								raise cp.HTTPRedirect(url, status="307")
 								# return self.dyn_serve(urls, size=info[1])
 							return self.concat(p, urls, name=info[0], mime=info[2], stn=stn)
@@ -2775,4 +2775,5 @@ if __name__ == "__main__":
 	self = server = cp.Application(app, "/", config)
 	create_thread(app.mp_activity)
 	create_future_ex(app.get_ip_ex)
-	waitress.serve(server, threads=128, host=ADDRESS, port=PORT, url_scheme="https")
+	cp.quickstart(server, "/", config)
+	# waitress.serve(server, threads=128, host=ADDRESS, port=PORT, url_scheme="https")
