@@ -342,6 +342,8 @@ class Bot:
 				self.chat_history.extend(summary)
 
 	def submit_cost(self, key, cost):
+		if not key or key == self.key:
+			return
 		sys.__stdout__.buffer.write(f"~BOT[0]._globals['STRING'].process_cost({self.channel_id},{self.user_id},{repr(key)},{cost})\n".encode("utf-8"))
 		# sys.__stdout__.flush()
 
@@ -930,9 +932,11 @@ class Bot:
 						else:
 							if text:
 								break
+					intended = None
 					if oai:
 						openai.api_key = oai
 						costs = 0
+						intended = oai
 					elif bals:
 						openai.api_key = uoai = sorted(bals, key=bals.get)[0]
 						bals.pop(uoai)
@@ -991,14 +995,14 @@ class Bot:
 					).result(timeout=60)
 					if model != "gpt-4":
 						model = "gpt-3.5-turbo"
-					self.submit_cost(ok, response["usage"]["prompt_tokens"] * cm * costs + response["usage"].get("completion_tokens", 0) * (cm2 or cm) * costs)
+					self.submit_cost(intended, response["usage"]["prompt_tokens"] * cm * costs + response["usage"].get("completion_tokens", 0) * (cm2 or cm) * costs)
 				except Exception as ex:
 					if i >= tries - 1:
 						raise
 					if " does not exist" in str(ex) or i >= tries - 2:
 						openai.api_key = self.key
 						uoai = oai = bals = None
-						costs = 1
+						costs = 1.25
 					elif "Incorrect API key provided: " in str(ex) or "You exceeded your current quota, " in str(ex):
 						print(ok)
 						print_exc()
@@ -1385,7 +1389,8 @@ class Bot:
 
 	def au(self, prompt, stop=None):
 		bals = getattr(self, "bals", {})
-		if bals:
+		oai = getattr(self, "oai", None)
+		if bals or oai:
 			funcs = [self.cgp]
 		else:
 			funcs = [self.chatgpt, self.chatgpt, self.ycg, self.cgp, self.cgp]
