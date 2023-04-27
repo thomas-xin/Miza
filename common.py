@@ -282,10 +282,10 @@ class TracebackSuppressor(contextlib.AbstractContextManager, contextlib.Abstract
         return as_fut(self.__exit__(*args))
 
     def __call__(self, *ins, default=None):
-        if len(ins) == 1 and callable(ins[0]) and not issubclass(ins[0], BaseException):
+        if len(ins) == 1 and callable(ins[0]) and (not isinstance(ins[0], type) or not issubclass(ins[0], BaseException)):
             def decorator(*args, **kwargs):
                 with self:
-                    return func(*args, **kwargs)
+                    return ins[0](*args, **kwargs)
                 return default
             return decorator
         return self.__class__(*ins)

@@ -1387,67 +1387,6 @@ class Steganography(Command):
         await m.reply("Message has been successfully taken down.")
 
 
-class Waifu2x(Command):
-    description = "Resizes the target image using the popular Waifu2x AI algorithm."
-    usage = "<url> <api{?a}>"
-    example = ("waifu2x https://mizabot.xyz/favicon",)
-    no_parse = True
-    rate_limit = (12, 15)
-    flags = "l"
-    _timeout_ = 5
-    typing = True
-
-    async def __call__(self, bot, user, message, channel, args, argv, flags, **void):
-        name, value, url, fmt = await get_image(bot, user, message, args, argv, raw=True, default="")
-        if "a" not in flags:
-            return self.bot.raw_webserver + "/waifu2x?source=" + url
-        with discord.context_managers.Typing(channel):
-            mime = await create_future(bot.detect_mime, url)
-            image = None
-            if "image/png" not in mime:
-                if "image/jpg" not in mime:
-                    if "image/jpeg" not in mime:
-                        resp = await process_image(url, "resize_mult", ["-nogif", 1, 1, "auto"], timeout=60)
-                        with open(resp[0], "rb") as f:
-                            image = await create_future(f.read)
-                        ext = "webp"
-                    else:
-                        ext = "jpeg"
-                else:
-                    ext = "jpg"
-            else:
-                ext = "png"
-            if not image:
-                image = await Request(url, timeout=20, aio=True)
-            data = await create_future(
-                Request,
-                "https://api.alcaamado.es/api/v1/waifu2x/convert",
-                files={
-                    "denoise": (None, "1"),
-                    "scale": (None, "true"),
-                    "file": (f"file.{ext}", image),
-                },
-                _timeout_=22,
-                method="post",
-                json=True,
-            )
-            for i in range(60):
-                async with Delay(0.75):
-                    img = await Request(
-                        f"https://api.alcaamado.es/api/v1/waifu2x/get?hash={data['hash']}",
-                        headers=dict(Accept="application/json, text/plain, */*"),
-                        timeout=60,
-                        json=True,
-                        aio=True,
-                    )
-                    if img.get("image"):
-                        break
-            if not img.get("image"):
-                raise FileNotFoundError("image file not found")
-            image = await create_future(base64.b64decode, img["image"])
-        await bot.send_with_file(channel, "", file=image, filename=name, reference=message, reacts="🔳")
-
-
 class Art(Command):
     _timeout_ = 150
     name = ["AIArt", "Inpaint", "StableDiffusion", "Dalle", "Dalle2", "Imagine", "Openjourney", "Midjourney"]

@@ -1458,7 +1458,7 @@ class Ask(Command):
             # print("HISTORY:", history)
             # print("REFS:", refs)
             inputs = dict(
-                user_id=user.id
+                user_id=user.id,
                 channel_id=channel.id,
                 key=AUTH.get("openai_key"),
                 huggingface_token=AUTH.get("huggingface_key"),
