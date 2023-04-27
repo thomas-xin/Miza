@@ -462,12 +462,12 @@ class Bot:
 
 	def answer_classify(self, m="vicgalle/xlm-roberta-large-xnli-anli", q="", labels=[]):
 		device = -1
-		if torch.cuda.is_available():
-			n = torch.cuda.device_count()
-			if n > 1:
-				device = random.randint(0, torch.cuda.device_count() - 1)
-			else:
-				device = 0
+		# if torch.cuda.is_available():
+		# 	n = torch.cuda.device_count()
+		# 	if n > 1:
+		# 		device = random.randint(0, torch.cuda.device_count() - 1)
+		# 	else:
+		# 		device = 0
 		try:
 			zscp = self.models[m]
 		except KeyError:
@@ -1559,8 +1559,8 @@ class Bot:
 			# if len(self.gpttokens(v)) > lim + 16:
 			# 	self.auto_summarise(q=v, max_length=lim, min_length=lim * 2 // 3).replace("\n", ". ").strip()
 			# 	t1 = (k, v)
-			self.append(t1)
-			self.append(t2)
+			self.append(t1, ai=False)
+			self.append(t2, ai=False)
 		except:
 			print_exc()
 
@@ -1637,8 +1637,9 @@ class Bot:
 		self.promises.clear()
 
 	def after(self, t1, t2):
-		self.append(t1)
-		self.append(t2)
+		# self.append(t1)
+		# self.append(t2)
+		self._after(t1, t2)
 		# exc.submit(self._after, t1, t2)
 		self.timestamp = time.time()
 		return t2[1]
