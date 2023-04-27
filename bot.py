@@ -3825,8 +3825,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     def send_embeds(self, channel, embeds=None, embed=None, reacts=None, reference=None, exc=True):
         if embeds is not None and not issubclass(type(embeds), collections.abc.Collection):
             embeds = (embeds,)
+        elif embeds:
+            embeds = tuple(embeds)
         if embed is not None:
-            if embeds is not None:
+            if embeds:
                 embeds += (embed,)
             else:
                 embeds = (embed,)
