@@ -1637,7 +1637,9 @@ class Bot:
 		self.promises.clear()
 
 	def after(self, t1, t2):
-		exc.submit(self._after, t1, t2)
+		self.append(t1)
+		self.append(t2)
+		# exc.submit(self._after, t1, t2)
 		self.timestamp = time.time()
 		return t2[1]
 
