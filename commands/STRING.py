@@ -25,6 +25,7 @@ except:
 EXPAPI = set()
 @tracebacksuppressor
 def process_cost(cid, uid, key, cost):
+    bot = BOT[0]
     guild = getattr(bot.cache.channels.get(cid), "guild", None)
     if not cost:
         return
@@ -189,8 +190,7 @@ class Translate(Command):
             nsfw=bot.is_nsfw(channel),
         )
         # await process_image("CBIP", "&", [], fix=1, timeout=360)
-        tup = await process_image("CBAU", "$", [inputs], fix=1, timeout=192)
-        out = tup[0]
+        out = await process_image("CBAU", "$", [inputs], fix=1, timeout=192)
         if out and out[0] == out[-1] == '"' and not text[0] == text[-1] == '"':
             try:
                 out = orjson.loads(out)
@@ -1480,8 +1480,7 @@ class Ask(Command):
             )
             # if fut:
             #     await fut
-            tup = await process_image("CBAI", "$", [inputs], fix=1, timeout=420)
-            out = tup[0]
+            out = await process_image("CBAI", "$", [inputs], fix=1, timeout=420)
             if oai in EXPAPI:
                 EXPAPI.discard(oai)
                 if bot.is_trusted(guild) >= 2:
