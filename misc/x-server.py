@@ -348,24 +348,24 @@ def fetch_static(path, ignore=False):
 est_time = utc()
 est_last = -inf
 
+@tracebacksuppressor
 def estimate_life():
 	return inf
 	global est_time, est_last
-	with tracebacksuppressor:
-		hosted = sorted(int(f[1:].split("~", 1)[0]) / 1e6 for f in os.listdir("cache") if f.startswith(IND))
-		if not hosted:
-			est_last = -inf
-			ts = 0
-		else:
-			ts = hosted[0]
-		res = self.bot_exec(f"bot.storage_ratio")
-		try:
-			last = (utc() - ts) / res
-		except ZeroDivisionError:
-			last = inf
-		send(last)
-		est_time = utc() - last
-		est_last = utc()
+	hosted = sorted(int(f[1:].split("~", 1)[0]) / 1e6 for f in os.listdir("cache") if f.startswith(IND))
+	if not hosted:
+		est_last = -inf
+		ts = 0
+	else:
+		ts = hosted[0]
+	res = self.bot_exec(f"bot.storage_ratio")
+	try:
+		last = (utc() - ts) / res
+	except ZeroDivisionError:
+		last = inf
+	send(last)
+	est_time = utc() - last
+	est_last = utc()
 
 # estimate_life_after = lambda t: time.sleep(t) or estimate_life()
 
@@ -841,115 +841,115 @@ transform: translate(-50%, -50%);
 					return
 				yield b
 
+	@tracebacksuppressor
 	def dyn_serve(self, urls, size=0):
-		with tracebacksuppressor:
-			brange = cp.request.headers.get("Range", "").removeprefix("bytes=")
-			headers = fcdict(cp.request.headers)
-			headers.pop("Remote-Addr", None)
-			headers.pop("Host", None)
-			headers.pop("Range", None)
-			headers.update(Request.header())
-			ranges = []
-			length = 0
-			if brange:
-				try:
-					branges = brange.split(",")
-					for s in branges:
-						start, end = s.split("-", 1)
-						if not start:
-							if not end:
-								continue
-							start = size - int(end)
-							end = size - 1
-						elif not end:
-							end = size - 1
-						start = int(start)
-						end = int(end) + 1
-						length += end - start
-						ranges.append((start, end))
-				except:
-					pass
-			if ranges:
-				cp.response.status = 206
-			else:
-				cp.response.status = 200
-				ranges.append((0, size))
-				length = size
-			if not size:
-				size = "*"
-			cr = "bytes " + ", ".join(f"{start}-{end - 1}/{size}" for start, end in ranges)
-			cp.response.headers["Content-Range"] = cr
-			cp.response.headers["Content-Length"] = str(length)
-			cp.response.headers["Accept-Ranges"] = "bytes"
-			return self._dyn_serve(urls, ranges, headers)
+		brange = cp.request.headers.get("Range", "").removeprefix("bytes=")
+		headers = fcdict(cp.request.headers)
+		headers.pop("Remote-Addr", None)
+		headers.pop("Host", None)
+		headers.pop("Range", None)
+		headers.update(Request.header())
+		ranges = []
+		length = 0
+		if brange:
+			try:
+				branges = brange.split(",")
+				for s in branges:
+					start, end = s.split("-", 1)
+					if not start:
+						if not end:
+							continue
+						start = size - int(end)
+						end = size - 1
+					elif not end:
+						end = size - 1
+					start = int(start)
+					end = int(end) + 1
+					length += end - start
+					ranges.append((start, end))
+			except:
+				pass
+		if ranges:
+			cp.response.status = 206
+		else:
+			cp.response.status = 200
+			ranges.append((0, size))
+			length = size
+		if not size:
+			size = "*"
+		cr = "bytes " + ", ".join(f"{start}-{end - 1}/{size}" for start, end in ranges)
+		cp.response.headers["Content-Range"] = cr
+		cp.response.headers["Content-Length"] = str(length)
+		cp.response.headers["Accept-Ranges"] = "bytes"
+		return self._dyn_serve(urls, ranges, headers)
 
+	@tracebacksuppressor(GeneratorExit)
 	def _dyn_serve(self, urls, ranges, headers):
-		with tracebacksuppressor(GeneratorExit):
-			for start, end in ranges:
-				pos = 0
-				rems = urls.copy()
-				futs = []
-				big = False
-				while rems:
-					u = rems.pop(0)
-					if u.startswith("https://s3-us-west-2"):
-						ns = 503316480
-					elif u.startswith("https://cdn.discord"):
-						ns = 8388608
+		for start, end in ranges:
+			pos = 0
+			rems = urls.copy()
+			futs = []
+			big = False
+			while rems:
+				u = rems.pop(0)
+				if u.startswith("https://s3-us-west-2"):
+					ns = 503316480
+				elif u.startswith("https://cdn.discord"):
+					ns = 8388608
+				else:
+					resp = reqs.next().head(u, headers=headers)
+					ns = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
+				if pos + ns <= start:
+					pos += ns
+					continue
+				if pos >= end:
+					break
+
+				def get_chunk(u, h, start, end, pos, ns, big):
+					s = start - pos
+					e = end - pos
+					if e >= ns:
+						e = ""
 					else:
-						resp = reqs.next().head(u, headers=headers)
-						ns = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
-					if pos + ns <= start:
-						pos += ns
-						continue
-					if pos >= end:
-						break
-
-					def get_chunk(u, h, start, end, pos, ns, big):
-						s = start - pos
-						e = end - pos
-						if e >= ns:
-							e = ""
+						e -= 1
+					h2 = dict(h.items())
+					h2["range"] = f"bytes={s}-{e}"
+					ex2 = None
+					for i in range(3):
+						resp = reqs.next().get(u, headers=h2, stream=True)
+						if resp.status_code == 416:
+							yield b""
+							return
+						try:
+							resp.raise_for_status()
+						except Exception as ex:
+							ex2 = ex
 						else:
-							e -= 1
-						h2 = dict(h.items())
-						h2["range"] = f"bytes={s}-{e}"
-						ex2 = None
-						for i in range(3):
-							resp = reqs.next().get(u, headers=h2, stream=True)
-							if resp.status_code == 416:
-								yield b""
-								return
-							try:
-								resp.raise_for_status()
-							except Exception as ex:
-								ex2 = ex
-							else:
-								break
-						if ex2:
-							raise ex2
-						if resp.status_code != 206:
-							ms = min(ns, end - pos - s)
-							if len(resp.content) > ms:
-								yield resp.content[s:(e or len(resp.content))]
-								return
-							yield resp.content
+							break
+					if ex2:
+						raise ex2
+					if resp.status_code != 206:
+						ms = min(ns, end - pos - s)
+						if len(resp.content) > ms:
+							yield resp.content[s:(e or len(resp.content))]
 							return
-						if big:
-							yield from resp.iter_content(262144)
-							return
-						yield from resp.iter_content(65536)
+						yield resp.content
+						return
+					if big:
+						yield from resp.iter_content(262144)
+						return
+					yield from resp.iter_content(65536)
 
-					if len(futs) > 1:
-						yield from futs.pop(0).result()
-					fut = create_future_ex(get_chunk, u, headers, start, end, pos, ns, big)
-					futs.append(fut)
-					pos = 0
-					start = 0
-					end -= start + ns
-					big = True
-				for fut in futs:
-					yield from fut.result()
+				if len(futs) > 1:
+					yield from futs.pop(0).result()
+				fut = create_future_ex(get_chunk, u, headers, start, end, pos, ns, big)
+				futs.append(fut)
+				pos = 0
+				start = 0
+				end -= start + ns
+				big = True
+			for fut in futs:
+				yield from fut.result()
 
 	def _peek(self, urls, on, pn, name, download, mime):
 		headers = fcdict(cp.request.headers)
@@ -972,51 +972,51 @@ transform: translate(-50%, -50%);
 		self.serving[on] = fut
 		yield from self.wconcat(on, pn, name, download, mime, fut, start=len(b))
 
+	@tracebacksuppressor
 	def _concat(self, urls, on, pn):
 		print("Cat", urls)
-		with tracebacksuppressor:
-			headers = fcdict(cp.request.headers)
-			headers.pop("Remote-Addr", None)
-			headers.pop("Host", None)
-			headers.pop("Range", None)
-			headers.update(Request.header())
-			buf = 0
-			pos = 0
-			futs = []
-			with open(on, "wb") as f:
-				for url in urls:
-					if len(futs) >= 16 or futs and futs[0].done():
-						fut = futs.pop(0)
-						fut.result()
-						buf += fut.buf
-						self.serving[on + "~buffer"] = buf
-					for i in range(16):
-						try:
-							resp = reqs.next().get(url, headers=headers, stream=True)
-							if resp.status_code in (403, 404):
-								raise FileNotFoundError
-							resp.raise_for_status()
-							break
-						except FileNotFoundError:
-							break
-						except:
-							print_exc()
-						time.sleep(i ** 2 + 1)
-					bsize = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
-					fs = pos + bsize
-					f.truncate(fs)
-					fut = create_future_ex(self.chunk_into, resp, on, pos)
-					fut.buf = bsize
-					futs.append(fut)
-					pos = fs
-			for fut in futs:
-				fut.result()
-				buf += fut.buf
-				self.serving[on + "~buffer"] = buf
-			try:
-				os.rename(on, pn)
-			except PermissionError:
-				create_future_ex(self.rename_after, on, pn)
+		headers = fcdict(cp.request.headers)
+		headers.pop("Remote-Addr", None)
+		headers.pop("Host", None)
+		headers.pop("Range", None)
+		headers.update(Request.header())
+		buf = 0
+		pos = 0
+		futs = []
+		with open(on, "wb") as f:
+			for url in urls:
+				if len(futs) >= 16 or futs and futs[0].done():
+					fut = futs.pop(0)
+					fut.result()
+					buf += fut.buf
+					self.serving[on + "~buffer"] = buf
+				for i in range(16):
+					try:
+						resp = reqs.next().get(url, headers=headers, stream=True)
+						if resp.status_code in (403, 404):
+							raise FileNotFoundError
+						resp.raise_for_status()
+						break
+					except FileNotFoundError:
+						break
+					except:
+						print_exc()
+					time.sleep(i ** 2 + 1)
+				bsize = int(resp.headers.get("Content-Length") or resp.headers.get("x-goog-stored-content-length", 0))
+				fs = pos + bsize
+				f.truncate(fs)
+				fut = create_future_ex(self.chunk_into, resp, on, pos)
+				fut.buf = bsize
+				futs.append(fut)
+				pos = fs
+		for fut in futs:
+			fut.result()
+			buf += fut.buf
+			self.serving[on + "~buffer"] = buf
+		try:
+			os.rename(on, pn)
+		except PermissionError:
+			create_future_ex(self.rename_after, on, pn)
 
 	def rename_after(self, on, pn):
 		try:
@@ -1699,22 +1699,23 @@ transform: translate(-50%, -50%);
 		print_exc()
 		chunking = {}
 	merge_sem = Semaphore(1, inf)
+
+	@tracebacksuppressor
 	def update_merge(self):
-		with tracebacksuppressor:
-			d = self.chunking.copy()
-			for k, v in tuple(d.items()):
-				if isinstance(v, concurrent.futures.Future):
-					d.pop(k)
-			with self.merge_sem:
-				b = orjson.dumps(d)
-				if not os.path.exists(self.chunk_file):
-					with open(self.chunk_file, "wb") as f:
-						f.write(b)
-				else:
-					with open(self.chunk_file, "rb+") as f:
-						f.truncate(len(b))
-						f.seek(0)
-						f.write(b)
+		d = self.chunking.copy()
+		for k, v in tuple(d.items()):
+			if isinstance(v, concurrent.futures.Future):
+				d.pop(k)
+		with self.merge_sem:
+			b = orjson.dumps(d)
+			if not os.path.exists(self.chunk_file):
+				with open(self.chunk_file, "wb") as f:
+					f.write(b)
+			else:
+				with open(self.chunk_file, "rb+") as f:
+					f.truncate(len(b))
+					f.seek(0)
+					f.write(b)
 
 	merged = {}
 	@cp.expose

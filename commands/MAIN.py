@@ -1815,10 +1815,10 @@ class UpdateMessages(Database):
     closed = False
     hue = 0
 
+    @tracebacksuppressor(SemaphoreOverflowError)
     async def wrap_semaphore(self, func, *args, **kwargs):
-        with tracebacksuppressor(SemaphoreOverflowError):
-            async with self.semaphore:
-                return await func(*args, **kwargs)
+        async with self.semaphore:
+            return await func(*args, **kwargs)
 
     async def __call__(self, **void):
         if self.bot.ready and not self.closed:
@@ -1856,39 +1856,39 @@ class UpdateMessages(Database):
 class UpdateFlavour(Database):
     name = "flavour"
 
+    @tracebacksuppressor
     async def get(self, p=True, q=True):
         out = None
         i = xrand(7)
         facts = self.bot.data.users.facts
         questions = self.bot.data.users.questions
         useless = self.bot.data.useless.setdefault(0, alist())
-        with tracebacksuppressor:
-            if i < 3 - q and facts:
-                text = choice(facts)
-                if not p:
-                    return text
-                fact = choice(("Fun fact:", "Did you know?", "Useless fact:", "Random fact:"))
-                out = f"\n{fact} `{text}`"
-            elif i < 4 and questions and q:
-                text = choice(questions)
-                if not p:
-                    return text
-                out = f"\nRandom question: `{text}`"
-            else:
-                try:
-                    if not useless or not xrand(len(useless) / 8):
-                        raise KeyError
-                except KeyError:
-                    s = str(datetime.datetime.fromtimestamp(xrand(1462456800, utc())).date())
-                    data = await Request("https://www.uselessfacts.net/api/posts?d=" + s, json=True, aio=True)
-                    factlist = [fact["title"].replace("`", "") for fact in data if "title" in fact]
-                    useless.extend(factlist)
-                    useless.uniq()
-                text = choice(useless)
-                if not p:
-                    return text
-                fact = choice(("Fun fact:", "Did you know?", "Useless fact:", "Random fact:"))
-                out = f"\n{fact} `{text}`"
+        if i < 3 - q and facts:
+            text = choice(facts)
+            if not p:
+                return text
+            fact = choice(("Fun fact:", "Did you know?", "Useless fact:", "Random fact:"))
+            out = f"\n{fact} `{text}`"
+        elif i < 4 and questions and q:
+            text = choice(questions)
+            if not p:
+                return text
+            out = f"\nRandom question: `{text}`"
+        else:
+            try:
+                if not useless or not xrand(len(useless) / 8):
+                    raise KeyError
+            except KeyError:
+                s = str(datetime.datetime.fromtimestamp(xrand(1462456800, utc())).date())
+                data = await Request("https://www.uselessfacts.net/api/posts?d=" + s, json=True, aio=True)
+                factlist = [fact["title"].replace("`", "") for fact in data if "title" in fact]
+                useless.extend(factlist)
+                useless.uniq()
+            text = choice(useless)
+            if not p:
+                return text
+            fact = choice(("Fun fact:", "Did you know?", "Useless fact:", "Random fact:"))
+            out = f"\n{fact} `{text}`"
         return out
 
 

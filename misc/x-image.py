@@ -2433,6 +2433,7 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 	import convobot, torch
 
 	def CBAI(inputs):
+		user_id = inputs["user_id"]
 		channel_id = inputs["channel_id"]
 		key = inputs["key"]
 		ht = inputs["huggingface_token"]
@@ -2456,7 +2457,7 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 				summary = None
 				raise KeyError
 		except KeyError:
-			cb = CBOTS[channel_id] = convobot.Bot( 
+			cb = CBOTS[channel_id] = convobot.Bot(
 				key=key,
 				huggingface_token=ht,
 				summary=summary,
@@ -2466,6 +2467,8 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 			)
 		else:
 			cb.premium = premium
+		cb.user_id = user_id
+		cb.channel_id = channel_id
 		cb.bl = bl
 		cb.oai = oai
 		cb.bals = bals
@@ -2485,6 +2488,8 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 		return cb.ai(*prompt, refs=refs, im=im)
 
 	def CBAU(inputs):
+		user_id = inputs["user_id"]
+		channel_id = inputs["channel_id"]
 		prompt = inputs["prompt"]
 		key = inputs["key"]
 		ht = inputs["huggingface_token"]
@@ -2493,14 +2498,16 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 		bals = inputs.get("bals")
 		nsfw = inputs.get("nsfw")
 		try:
-			cb = CBOTS["TR"]
+			cb = CBOTS["AU"]
 		except KeyError:
-			cb = CBOTS["TR"] = convobot.Bot( 
+			cb = CBOTS["AU"] = convobot.Bot( 
 				key=key,
 				huggingface_token=ht,
 				premium=0,
 			)
 			cb.vis_s = vis
+		cb.user_id = user_id
+		cb.channel_id = channel_id
 		cb.oai = oai
 		cb.bals = bals
 		cb.nsfw = nsfw

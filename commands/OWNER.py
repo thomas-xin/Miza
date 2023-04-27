@@ -633,19 +633,19 @@ class UpdateExec(Database):
             channels.append(channel)
         create_task(self._delete(channels, mids))
 
+    @tracebacksuppressor
     async def _delete(self, channels, mids):
         bot = self.bot
         deleted = []
-        with tracebacksuppressor:
-            for mid in mids:
-                for c in channels:
-                    try:
-                        m = await bot.fetch_message(mid, c)
-                    except:
-                        continue
-                    await bot.silent_delete(m)
-                    deleted.append(m.id)
-                    break
+        for mid in mids:
+            for c in channels:
+                try:
+                    m = await bot.fetch_message(mid, c)
+                except:
+                    continue
+                await bot.silent_delete(m)
+                deleted.append(m.id)
+                break
         print("Deleted", deleted)
         return deleted
 
@@ -1173,32 +1173,32 @@ class UpdateImagePools(Database):
             self.update("finished")
         self.finished = finished
 
+    @tracebacksuppressor
     async def load_until(self, key, func, threshold, args=()):
-        with tracebacksuppressor:
-            async with self.sem:
-                data = set_dict(self.data, key, alist())
-                failed = 0
-                for i in range(threshold << 1):
-                    if len(data) > threshold or failed > threshold >> 1:
-                        break
-                    try:
-                        out = await func(*args)
-                        if isinstance(out, str):
-                            out = (out,)
-                        for url in out:
-                            url = url.strip()
-                            if url not in data:
-                                data.add(url)
-                                failed = 0
-                                self.update(key)
-                            else:
-                                failed += 1
-                    except:
-                        failed += 8
-                        print_exc()
-                self.finished.add(key)
-                self.update("finished")
-                data.uniq(sort=None)
+        async with self.sem:
+            data = set_dict(self.data, key, alist())
+            failed = 0
+            for i in range(threshold << 1):
+                if len(data) > threshold or failed > threshold >> 1:
+                    break
+                try:
+                    out = await func(*args)
+                    if isinstance(out, str):
+                        out = (out,)
+                    for url in out:
+                        url = url.strip()
+                        if url not in data:
+                            data.add(url)
+                            failed = 0
+                            self.update(key)
+                        else:
+                            failed += 1
+                except:
+                    failed += 8
+                    print_exc()
+            self.finished.add(key)
+            self.update("finished")
+            data.uniq(sort=None)
 
     async def proc(self, key, func, args=()):
         async with self.sem:

@@ -66,7 +66,7 @@ def lim_tokens(s, maxlen=10, mode="centre"):
 			s = enc.decode(tokens[:ceil(half - over - 1)]) + ".." + enc.decode(tokens[ceil(half + over + 1):])
 		else:
 			s = enc.decode(tokens[:maxlen - 3]) + "..."
-	return s
+	return s.strip()
 
 class_name = webdriver.common.by.By.CLASS_NAME
 css_selector = webdriver.common.by.By.CSS_SELECTOR
@@ -330,7 +330,6 @@ class Bot:
 		self.chat_history_ids = None
 		self.timestamp = time.time()
 		self.premium = premium
-		self.last_cost = 0
 		self.fp = FreeProxy()
 		self.session = requests.Session()
 		self.session.cookies["CookieConsent"] = "true"
@@ -341,6 +340,14 @@ class Bot:
 				self.chat_history.append(("[SYSTEM]", summary))
 			else:
 				self.chat_history.extend(summary)
+
+	def submit_cost(self, key, cost):
+		sys.__stdout__.buffer.write(f"~BOT[0]._globals['STRING'].process_cost({self.channel_id},{self.user_id},{repr(key)},{cost})\n".encode("utf-8"))
+		# sys.__stdout__.flush()
+
+	def expire_key(self, key):
+		sys.__stdout__.buffer.write(f"~BOT[0]._globals['STRING'].EXPAPI.add(key)\n".encode("utf-8"))
+		# sys.__stdout__.flush()
 
 	def get_proxy(self, retry=True):
 		if self.proxies and time.time() - self.ctime <= 20:
@@ -451,7 +458,7 @@ class Bot:
 		s1 = enc.decode(e1).strip().replace("  ", " ")
 		if len(tokens) > max_length:
 			s2 = smp(s1, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
-		return s2
+		return s2.strip()
 
 	def auto_summarise(self, q="", max_length=128, min_length=64):
 		if q and sum(c.isascii() for c in q) / len(q) > 0.75:
@@ -488,7 +495,6 @@ class Bot:
 		chat_history = self.chat_history.copy()
 		oai = getattr(self, "oai", None)
 		bals = getattr(self, "bals", {})
-		cost = 0
 		premium = self.premium
 		headers = {
 			"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
@@ -523,7 +529,7 @@ class Bot:
 			r = "".join(refst).strip()
 			lim = 600 if premium >= 2 else 400
 			if len(self.gpttokens(r)) > lim + 16:
-				r = self.auto_summarise(q=r, max_length=lim, min_length=lim * 2 // 3).strip()
+				r = self.auto_summarise(q=r, max_length=lim, min_length=lim * 2 // 3)
 			lines.append("[SYSTEM]: Summary of history:\n" + r + "\n")
 		for k, v in self.promises:
 			k = k.replace(":", "")
@@ -537,12 +543,12 @@ class Bot:
 			if not k.startswith("[REPLIED TO]: "):
 				continue
 			if len(self.gpttokens(v)) > 300:
-				v = self.auto_summarise(q=v, max_length=288, min_length=192).replace("\n", ". ").strip()
+				v = self.auto_summarise(q=v, max_length=288, min_length=192).replace("\n", ". ")
 			s = f"{k}: {v}\n"
 			lines.append(s)
 		tq = q
 		if len(self.gpttokens(tq)) > 400:
-			tq = self.auto_summarise(q=tq, max_length=384, min_length=256).replace("\n", ". ").strip()
+			tq = self.auto_summarise(q=tq, max_length=384, min_length=256).replace("\n", ". ")
 		s = f"{u}: {q}\n"
 		lines.append(s)
 		ns = f"{self.name}:"
@@ -702,7 +708,7 @@ class Bot:
 				temp /= 2
 				for i in range(3):
 					try:
-						t3 = self.au(t2, force=True).strip('" ')
+						t3 = self.au(t2).strip('" ')
 						# spl = self.cgp(t2)
 						# t3 = None if not spl else spl[0]
 						if not t3 or t3 in ("!", '"!"'):
@@ -771,7 +777,6 @@ class Bot:
 		response = None
 		text = ""
 		uoai = None
-		expapi = None
 		exclusive = {"text-neox-001", "text-bloom-001"}
 		if model in exclusive:
 			p = None
@@ -986,6 +991,7 @@ class Bot:
 					).result(timeout=60)
 					if model != "gpt-4":
 						model = "gpt-3.5-turbo"
+					self.submit_cost(ok, response["usage"]["prompt_tokens"] * cm * costs + response["usage"].get("completion_tokens", 0) * (cm2 or cm) * costs)
 				except Exception as ex:
 					if i >= tries - 1:
 						raise
@@ -994,18 +1000,18 @@ class Bot:
 						uoai = oai = bals = None
 						costs = 1
 					elif "Incorrect API key provided: " in str(ex) or "You exceeded your current quota, " in str(ex):
-						print(openai.api_key)
+						print(ok)
 						print_exc()
-						expapi = openai.api_key
+						self.expire_key(ok)
 						openai.api_key = self.key
 						uoai = oai = bals = None
 						costs = 1
 					else:
 						print_exc()
 				if response:
-					response["key"] = ok
+					# response["key"] = ok
+					# print(response)
 					m = response["choices"][0]["message"]
-					print(response)
 					role = m["role"]
 					text = m["content"].removeprefix(f"{self.name} says: ").removeprefix(f"{self.name}:")
 					if len(text) >= 2 and text[-1] in " aAsS" and text[-2] not in ".!?" or text.endswith(' "') or text.endswith('\n"'):
@@ -1024,9 +1030,8 @@ class Bot:
 						text = ""
 					if searched:
 						refs = list(refs) + [(f"[{sname}]", searched)]
-					t2, c2, *irr = self.gptcomplete(u, q, refs=refs, start=text or " ")
+					t2 = self.gptcomplete(u, q, refs=refs, start=text or " ")
 					text += " " + t2
-					cost += c2
 				if not self.jailbroken and self.nsfw:
 					try:
 						resp = openai.Moderation.create(
@@ -1036,11 +1041,6 @@ class Bot:
 					except:
 						pass
 				break
-			if response:
-				cost += response["usage"]["prompt_tokens"] * cm * costs
-				cost += response["usage"].get("completion_tokens", 0) * (cm2 or cm) * costs
-				# if len(self.gpttokens(text)) > 512:
-				# 	text = self.answer_summarise(q=text, max_length=500, min_length=256).strip()
 		if not text:
 			if not prompt:
 				prompt = "".join(reversed(ins))
@@ -1059,6 +1059,7 @@ class Bot:
 			else:
 				openai.api_key = self.key
 				costs = 1
+			ok = openai.api_key
 			try:
 				response = openai.Completion.create(
 					model=model,
@@ -1088,13 +1089,13 @@ class Bot:
 				print(response)
 				text = response.choices[0].text
 				rc = len(self.gpttokens(text, model="text-davinci-003"))
-				cost += (pc + rc) * cm
+				self.submit_cost(ok, (pc + rc) * cm)
 		text = text.strip()
 		if not self.bl:
 			print(f"GPT {model} response:", text)
 		if start and text.startswith(f"{self.name}: "):
 			text = ""
-		return text, cost, uoai, expapi
+		return text
 
 	def google(self, q, raw=False):
 		words = q.split()
@@ -1346,7 +1347,6 @@ class Bot:
 		return resp.text
 
 	def cgp(self, data, stop=None):
-		cost = 0
 		oai = getattr(self, "oai", None)
 		bals = getattr(self, "bals", {})
 		uoai = None
@@ -1370,6 +1370,7 @@ class Bot:
 				user=str(random.randint(0, 4294967295)),
 			)
 		cm = cm2 = 20
+		ok = openai.api_key
 		try:
 			resp = exc.submit(
 				openai.ChatCompletion.create,
@@ -1379,12 +1380,10 @@ class Bot:
 			print_exc()
 		else:
 			if resp:
-				cost += resp["usage"]["prompt_tokens"] * cm * costs
-				cost += resp["usage"].get("completion_tokens", 0) * (cm2 or cm) * costs
-				text = resp["choices"][0]["message"]["content"]
-				return text, cost, uoai
+				self.submit_cost(ok, resp["usage"]["prompt_tokens"] * cm * costs + resp["usage"].get("completion_tokens", 0) * (cm2 or cm) * costs)
+				return resp["choices"][0]["message"]["content"]
 
-	def au(self, prompt, stop=None, force=False):
+	def au(self, prompt, stop=None):
 		bals = getattr(self, "bals", {})
 		if bals:
 			funcs = [self.cgp]
@@ -1394,23 +1393,16 @@ class Bot:
 				funcs.append(self.vai)
 			random.shuffle(funcs)
 		funcs.extend((self.cgp, self.cgp))
-		resp = None
-		while not resp:
+		while funcs:
 			func = funcs.pop(0)
 			try:
-				resp = func(prompt, stop=stop)
+				return func(prompt, stop=stop)
 			except EOFError:
 				pass
 			except:
 				print(func)
 				print_exc()
-		if not isinstance(resp, tuple):
-			resp = [resp]
-		resp = list(resp)
-		if stop:
-			for s in stop:
-				resp[0] = resp[0].split(s, 1)[0]
-		return resp[0] if force else resp
+		return ""
 
 	def aq(self, prompt, stop=None, temp=0.3):
 		try:
@@ -1458,28 +1450,27 @@ class Bot:
 				return text
 		except:
 			print_exc()
-		return self.au(prompt, stop=stop, force=True)
+		return self.au(prompt, stop=stop)
 
 	def ai(self, u, q, refs=(), im=None):
 		tup = (u, q)
 		self.rerender()
 		uoai = None
-		expapi = None
 		# if self.premium > 0 or random.randint(0, 1):
-		response, cost, uoai, expapi = self.gptcomplete(u, q, refs=refs)
+		response = self.gptcomplete(u, q, refs=refs)
 		if response:
-			return self.after(tup, (self.name, response)), cost, uoai, expapi
+			return self.after(tup, (self.name, response))
 		if refs and refs[-1][0] in ("IMAGE", "ANSWER"):
 			if len(refs) > 1:
 				response = refs[-2][1] + ", " + refs[-1][1]
 			else:
 				response = refs[-1][1]
 			if response:
-				return self.after(tup, (self.name, response)), 0
+				return self.after(tup, (self.name, response))
 		if self.premium > 0 and literal_question(q):
 			response = (self.google, self.bing)[random.randint(0, 1)](q)
 			if response:
-				return self.after(tup, (self.name, response)), 0
+				return self.after(tup, (self.name, response))
 			googled = True
 		else:
 			googled = False
@@ -1494,16 +1485,16 @@ class Bot:
 		if not googled and not response:
 			response = (self.google, self.bing)[random.randint(0, 1)](q)
 			if response:
-				return self.after(tup, (self.name, response)), 0
+				return self.after(tup, (self.name, response))
 		if not response:
 			response = reso
 		response = response.replace("  ", " ")
 		if not response:
-			response, cost, uoai, expapi = self.gptcomplete(u, q, refs=refs)
+			response = self.gptcomplete(u, q, refs=refs)
 			if response:
-				return self.after(tup, (self.name, response)), cost, uoai, expapi
+				return self.after(tup, (self.name, response))
 			response = "Sorry, I don't know."
-		return self.after(tup, (self.name, response)), 0
+		return self.after(tup, (self.name, response))
 
 	def deletes(self):
 		self.chat_history = self.chat_history[:-2]
@@ -1630,7 +1621,7 @@ class Bot:
 					v = "".join(lines)
 					tc = lim // 2
 				if tc > lim + 16:
-					v = self.auto_summarise(q=v, max_length=lim, min_length=lim * 2 // 3).strip()
+					v = self.auto_summarise(q=v, max_length=lim, min_length=lim * 2 // 3)
 		v = summ_start + v
 		print("Chat summary:", v)
 		self.chat_history.insert(0, ("[SYSTEM]", v))

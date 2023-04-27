@@ -22,6 +22,22 @@ except:
     rapidapi_key = None
     print("WARNING: rapidapi_key not found. Unable to search Urban Dictionary.")
 
+EXPAPI = set()
+@tracebacksuppressor
+def process_cost(cid, uid, key, cost):
+    guild = getattr(bot.cache.channels.get(cid), "guild", None)
+    if not cost:
+        return
+    if "costs" in bot.data:
+        bot.data.costs.put(uid, cost)
+        if guild:
+            bot.data.costs.put(guild.id, cost)
+    if key:
+        try:
+            bot.data.token_balances[key] -= cost
+        except KeyError:
+            bot.data.token_balances[key] = -cost
+
 
 class Translate(Command):
     time_consuming = True
@@ -162,6 +178,8 @@ class Translate(Command):
         data = bot.data.users.get(u.id, {})
         oai = data.get("trial") and data.get("openai_key")
         inputs = dict(
+            user_id=user.id,
+            channel_id=channel.id,
             prompt=prompt,
             key=AUTH.get("openai_key"),
             huggingface_token=AUTH.get("huggingface_key"),
@@ -178,27 +196,6 @@ class Translate(Command):
                 out = orjson.loads(out)
             except orjson.JSONDecodeError:
                 pass
-        cost = 0
-        uoai = None
-        if len(tup) > 1:
-            cost = tup[1]
-            if len(tup) > 2:
-                uoai = tup[2]
-        if cost:
-            if "costs" in bot.data:
-                bot.data.costs.put(user.id, cost)
-                if guild:
-                    bot.data.costs.put(guild.id, cost)
-            if uoai:
-                try:
-                    bot.data.token_balances[uoai] -= cost
-                except KeyError:
-                    bot.data.token_balances[uoai] = -cost
-            elif oai and oai != AUTH.get("openai_key"):
-                try:
-                    bot.data.token_balances[oai] -= cost * 6 // 5
-                except KeyError:
-                    bot.data.token_balances[oai] = -cost * 6 // 5
         lines = [line2 for line in out.split("•") if (line2 := line.strip())]
         print("ChatGPT Translate:", user, text, src, dests, lines)
 
@@ -1461,6 +1458,7 @@ class Ask(Command):
             # print("HISTORY:", history)
             # print("REFS:", refs)
             inputs = dict(
+                user_id=user.id
                 channel_id=channel.id,
                 key=AUTH.get("openai_key"),
                 huggingface_token=AUTH.get("huggingface_key"),
@@ -1484,72 +1482,25 @@ class Ask(Command):
             #     await fut
             tup = await process_image("CBAI", "$", [inputs], fix=1, timeout=420)
             out = tup[0]
-            cost = 0
-            uoai = None
-            expapi = None
-            if len(tup) > 1:
-                cost = tup[1]
-                if len(tup) > 2:
-                    uoai = tup[2]
-                    if len(tup) > 3:
-                        expapi = tup[3]
-            if cost:
-                if "costs" in bot.data:
-                    bot.data.costs.put(user.id, cost)
-                    if guild:
-                        bot.data.costs.put(guild.id, cost)
-                if uoai:
-                    try:
-                        bot.data.token_balances[uoai] -= cost
-                    except KeyError:
-                        bot.data.token_balances[uoai] = -cost
-                elif oai and oai != AUTH.get("openai_key"):
-                    try:
-                        bot.data.token_balances[oai] -= cost * 6 // 5
-                    except KeyError:
-                        bot.data.token_balances[oai] = -cost * 6 // 5
+            if oai in EXPAPI:
+                EXPAPI.discard(oai)
+                if bot.is_trusted(guild) >= 2:
+                    for uid in bot.data.trusted[guild.id]:
+                        if uid and bot.premium_level(uid, absolute=True) >= 2:
+                            break
+                    else:
+                        uid = next(iter(bot.data.trusted[guild.id]))
+                    u = await bot.fetch_user(uid)
                 else:
-                    if bot.is_trusted(guild) >= 2:
-                        for uid in bot.data.trusted[guild.id]:
-                            if uid and bot.premium_level(uid, absolute=True) >= 2:
-                                break
-                        else:
-                            uid = next(iter(bot.data.trusted[guild.id]))
-                        u = await bot.fetch_user(uid)
-                    else:
-                        u = user
-                    data = bot.data.users.get(u.id)
-                    if data and data.get("trial"):
-                        bot.data.users.add_diamonds(user, cost / -25000)
-                        if data.get("diamonds", 0) < 1:
-                            data.pop("trial", None)
-                            bot.premium_level(u)
-                            emb = discord.Embed(colour=rand_colour())
-                            emb.set_author(**get_author(bot.user))
-                            emb.description = (
-                                f"Uh-oh, it appears your tokens have run out! Check ~wallet to view your balance, top up using a donation [here]({bot.kofi_url}), "
-                                + "or purchase a subscription to gain unlimited usage!"
-                            )
-            if expapi:
-                bot.data.token_balances.pop(expapi, None)
-                if oai == expapi:
-                    if bot.is_trusted(guild) >= 2:
-                        for uid in bot.data.trusted[guild.id]:
-                            if uid and bot.premium_level(uid, absolute=True) >= 2:
-                                break
-                        else:
-                            uid = next(iter(bot.data.trusted[guild.id]))
-                        u = await bot.fetch_user(uid)
-                    else:
-                        u = user
-                    data = bot.data.users.get(u.id)
-                    data.pop("trial", None)
-                    bot.premium_level(u)
-                    emb = discord.Embed(colour=rand_colour())
-                    emb.set_author(**get_author(bot.user))
-                    emb.description = (
-                        f"Uh-oh, it appears your API key credit was blocked! Please make sure your payment methods are functional, or buy a consistent subscription [here]({bot.kofi_url})!"
-                    )
+                    u = user
+                data = bot.data.users.get(u.id)
+                data.pop("trial", None)
+                bot.premium_level(u)
+                emb = discord.Embed(colour=rand_colour())
+                emb.set_author(**get_author(bot.user))
+                emb.description = (
+                    f"Uh-oh, it appears your API key credit was blocked! Please make sure your payment methods are functional, or buy a consistent subscription [here]({bot.kofi_url})!"
+                )
         if not bl:
             print("Result:", out)
         code = "\xad"
@@ -1664,15 +1615,15 @@ class Ask(Command):
         bot.add_message(m, files=False, force=True)
         return m
 
+    @tracebacksuppressor
     async def remove_reacts(self, message):
         guild = message.guild
-        with tracebacksuppressor:
-            if guild and guild.me and guild.me.permissions_in(message.channel).manage_messages:
-                create_task(message.clear_reaction("🔄"))
-                await message.clear_reaction("🗑️")
-            else:
-                create_task(message.remove_reaction("🔄", self.bot.user))
-                await message.remove_reaction("🗑️", self.bot.user)
+        if guild and guild.me and guild.me.permissions_in(message.channel).manage_messages:
+            create_task(message.clear_reaction("🔄"))
+            await message.clear_reaction("🗑️")
+        else:
+            create_task(message.remove_reaction("🔄", self.bot.user))
+            await message.remove_reaction("🗑️", self.bot.user)
 
     async def _callback_(self, bot, message, reaction=3, user=None, perm=0, vals="", **void):
         u_id = int(vals) if vals else user.id

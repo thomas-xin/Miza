@@ -1922,6 +1922,7 @@ class React(Command):
 class UpdateReacts(Database):
     name = "reacts"
 
+    @tracebacksuppressor(ZeroDivisionError)
     async def _nocommand_(self, text, text2, edit, orig, message, **void):
         if message.guild is None or not orig:
             return
@@ -1929,48 +1930,47 @@ class UpdateReacts(Database):
         data = self.data
         if g_id not in data:
             return
-        with tracebacksuppressor(ZeroDivisionError):
-            following = self.data[g_id]
-            if type(following) != mdict:
-                following = self.data[g_id] = mdict(following)
-            reacting = {}
-            words = clean_words = None
-            full = clean_full = None
-            for k in following:
-                if is_alphanumeric(k) and " " not in k:
-                    if words is None:
-                        words = text.split()
-                    x = words
-                    if clean_words is None:
-                        clean_words = text2.split()
-                    y = clean_words
-                else:
-                    if full is None:
-                        full = full_prune(message.content)
-                    x = full
-                    if clean_full is None:
-                        clean_full = full_prune(message.clean_content)
-                    y = clean_full
-                # Store position for each keyword found
-                if k in x:
-                    emojis = following[k]
-                    reacting[x.index(k) / len(x)] = emojis
-                elif k in y:
-                    emojis = following[k]
-                    reacting[y.index(k) / len(y)] = emojis
-            # Reactions sorted by their order of appearance in the message
-            for r in sorted(reacting):
-                for react in reacting[r]:
-                    if isinstance(react, str) and not react.isnumeric():
-                        react = await self.bot.id_from_message(react)
-                    if isinstance(react, int):
-                        react = await self.bot.fetch_emoji(react)
-                    try:
-                        await message.add_reaction(react)
-                    except discord.HTTPException as ex:
-                        if "10014" in repr(ex):
-                            emojis.remove(react)
-                            self.update(g_id)
+        following = self.data[g_id]
+        if type(following) != mdict:
+            following = self.data[g_id] = mdict(following)
+        reacting = {}
+        words = clean_words = None
+        full = clean_full = None
+        for k in following:
+            if is_alphanumeric(k) and " " not in k:
+                if words is None:
+                    words = text.split()
+                x = words
+                if clean_words is None:
+                    clean_words = text2.split()
+                y = clean_words
+            else:
+                if full is None:
+                    full = full_prune(message.content)
+                x = full
+                if clean_full is None:
+                    clean_full = full_prune(message.clean_content)
+                y = clean_full
+            # Store position for each keyword found
+            if k in x:
+                emojis = following[k]
+                reacting[x.index(k) / len(x)] = emojis
+            elif k in y:
+                emojis = following[k]
+                reacting[y.index(k) / len(y)] = emojis
+        # Reactions sorted by their order of appearance in the message
+        for r in sorted(reacting):
+            for react in reacting[r]:
+                if isinstance(react, str) and not react.isnumeric():
+                    react = await self.bot.id_from_message(react)
+                if isinstance(react, int):
+                    react = await self.bot.fetch_emoji(react)
+                try:
+                    await message.add_reaction(react)
+                except discord.HTTPException as ex:
+                    if "10014" in repr(ex):
+                        emojis.remove(react)
+                        self.update(g_id)
 
 
 class Dogpile(Command):

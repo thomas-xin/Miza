@@ -248,22 +248,22 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 out.append(arg)
         return sorted(out, key=lambda arg: bool(arg.get("required")), reverse=True)
 
+    @tracebacksuppressor
     def create_command(self, data):
-        with tracebacksuppressor:
-            for i in range(16):
-                resp = reqs.next().post(
-                    f"https://discord.com/api/{api}/applications/{self.id}/commands",
-                    headers={"Content-Type": "application/json", "Authorization": "Bot " + self.token},
-                    data=orjson.dumps(data),
-                )
-                self.activity += 1
-                if resp.status_code == 429:
-                    time.sleep(20)
-                    continue
-                if resp.status_code not in range(200, 400):
-                    print("\n", data, " ", ConnectionError(f"Error {resp.status_code}", resp.text), "\n", sep="")
-                print(resp.text)
-                return
+        for i in range(16):
+            resp = reqs.next().post(
+                f"https://discord.com/api/{api}/applications/{self.id}/commands",
+                headers={"Content-Type": "application/json", "Authorization": "Bot " + self.token},
+                data=orjson.dumps(data),
+            )
+            self.activity += 1
+            if resp.status_code == 429:
+                time.sleep(20)
+                continue
+            if resp.status_code not in range(200, 400):
+                print("\n", data, " ", ConnectionError(f"Error {resp.status_code}", resp.text), "\n", sep="")
+            print(resp.text)
+            return
 
     def update_slash_commands(self):
         if not AUTH.get("slash_commands"):
@@ -414,9 +414,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         print(f"Logging in...")
         self.audio_client_start = create_future(self.start_audio_client, priority=True)
         with closing(get_event_loop()):
-            with tracebacksuppressor():
+            with tracebacksuppressor:
                 get_event_loop().run_until_complete(self.start(self.token))
-            with tracebacksuppressor():
+            with tracebacksuppressor:
                 get_event_loop().run_until_complete(self.close())
         self.setshutdown()
 
@@ -428,78 +428,78 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     close = lambda self: setattr(self, "closed", True) or create_task(super().close())
 
     # A garbage collector for empty and unassigned objects in the database.
+    @tracebacksuppressor(SemaphoreOverflowError)
     async def garbage_collect(self, obj):
         if not self.ready or hasattr(obj, "no_delete") or not any(hasattr(obj, i) for i in ("guild", "user", "channel", "garbage")) and not getattr(obj, "garbage_collect", None):
             return
         with MemoryTimer("gc_" + obj.name):
-            with tracebacksuppressor(SemaphoreOverflowError):
-                async with obj._garbage_semaphore:
-                    data = obj.data
-                    if getattr(obj, "garbage_collect", None):
-                        return await obj.garbage_collect()
-                    if len(data) <= 1024:
-                        keys = data.keys()
-                    else:
-                        low = xrand(ceil(len(data) / 1024)) << 10
-                        keys = astype(data, alist).view[low:low + 1024]
-                    for key in keys:
-                        if getattr(data, "unloaded", False):
-                            return
-                        if not key or type(key) is str:
-                            continue
-                        try:
-                            # Database keys may be user, guild, or channel IDs
-                            if getattr(obj, "channel", None):
-                                d = self.get_channel(key)
-                            elif getattr(obj, "user", None):
-                                d = await self.fetch_user(key)
-                            else:
-                                if not data[key]:
-                                    raise LookupError
-                                with suppress(KeyError):
-                                    d = self.cache.guilds[key]
-                                    continue
-                                d = await self.fetch_messageable(key)
-                            if d is not None:
+            async with obj._garbage_semaphore:
+                data = obj.data
+                if getattr(obj, "garbage_collect", None):
+                    return await obj.garbage_collect()
+                if len(data) <= 1024:
+                    keys = data.keys()
+                else:
+                    low = xrand(ceil(len(data) / 1024)) << 10
+                    keys = astype(data, alist).view[low:low + 1024]
+                for key in keys:
+                    if getattr(data, "unloaded", False):
+                        return
+                    if not key or type(key) is str:
+                        continue
+                    try:
+                        # Database keys may be user, guild, or channel IDs
+                        if getattr(obj, "channel", None):
+                            d = self.get_channel(key)
+                        elif getattr(obj, "user", None):
+                            d = await self.fetch_user(key)
+                        else:
+                            if not data[key]:
+                                raise LookupError
+                            with suppress(KeyError):
+                                d = self.cache.guilds[key]
                                 continue
-                        except:
-                            print_exc()
-                        print(f"Deleting {key} from {obj}...")
-                        data.pop(key, None)
+                            d = await self.fetch_messageable(key)
+                        if d is not None:
+                            continue
+                    except:
+                        print_exc()
+                    print(f"Deleting {key} from {obj}...")
+                    data.pop(key, None)
 
     # Calls a bot event, triggered by client events or others, across all bot databases. Calls may be sync or async.
+    @tracebacksuppressor
     async def send_event(self, ev, *args, exc=False, **kwargs):
         if self.closed:
             return
         with MemoryTimer(ev):
-            with tracebacksuppressor:
-                ctx = emptyctx if exc else tracebacksuppressor
-                events = self.events.get(ev, ())
-                if len(events) == 1:
-                    with ctx:
-                        return await create_future(events[0](*args, **kwargs))
-                    return
-                futs = [create_future(func(*args, **kwargs)) for func in events]
-                out = deque()
-                for fut in futs:
-                    with ctx:
-                        res = await fut
-                        out.append(res)
-                return out
+            ctx = emptyctx if exc else tracebacksuppressor
+            events = self.events.get(ev, ())
+            if len(events) == 1:
+                with ctx:
+                    return await create_future(events[0](*args, **kwargs))
+                return
+            futs = [create_future(func(*args, **kwargs)) for func in events]
+            out = deque()
+            for fut in futs:
+                with ctx:
+                    res = await fut
+                    out.append(res)
+            return out
 
     # Gets the full list of invites from a guild, if applicable.
+    @tracebacksuppressor(default=[])
     async def get_full_invites(self, guild):
-        with tracebacksuppressor:
-            member = guild.get_member(self.id)
-            if member.guild_permissions.create_instant_invite:
-                invitedata = await Request(
-                    f"https://discord.com/api/{api}/guilds/{guild.id}/invites",
-                    authorise=True,
-                    aio=True,
-                    json=True,
-                )
-                invites = [cdict(invite) for invite in invitedata]
-                return sorted(invites, key=lambda invite: (invite.max_age == 0, -abs(invite.max_uses - invite.uses), len(invite.url)))
+        member = guild.get_member(self.id)
+        if member.guild_permissions.create_instant_invite:
+            invitedata = await Request(
+                f"https://discord.com/api/{api}/guilds/{guild.id}/invites",
+                authorise=True,
+                aio=True,
+                json=True,
+            )
+            invites = [cdict(invite) for invite in invitedata]
+            return sorted(invites, key=lambda invite: (invite.max_age == 0, -abs(invite.max_uses - invite.uses), len(invite.url)))
         return []
 
     # Gets the first accessable text channel in the target guild.
@@ -1122,10 +1122,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 return f[max(f.keys())]
         raise LookupError("Unable to find suitable guild.")
 
+    @tracebacksuppressor
     def create_progress_bar(self, length, ratio=0.5):
         if "emojis" in self.data:
-            with tracebacksuppressor:
-                return create_future(self.data.emojis.create_progress_bar, length, ratio)
+            return create_future(self.data.emojis.create_progress_bar, length, ratio)
         position = min(length, round(length * ratio))
         return as_fut("⬜" * position + "⬛" * (length - position))
 
@@ -2553,29 +2553,29 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         return size
 
     # Gets the status of the bot.
+    @tracebacksuppressor
     async def get_state(self):
-        with tracebacksuppressor:
-            stats = azero(3)
-            procs = await create_future(self.proc.children, recursive=True, priority=True)
-            procs.append(self.proc)
-            tasks = [self.get_proc_state(p) for p in procs]
-            resp = await recursive_coro(tasks)
-            stats += [sum(st[0] for st in resp), sum(st[1] for st in resp), 0]
-            cpu = psutil.cpu_count(logical=True)
-            mem = psutil.virtual_memory()
-            # CPU is totalled across all cores
-            stats[0] /= cpu
-            # Memory is in %
-            stats[1] *= mem.total / 100
-            stats[2] = self.disk
-            self.size2 = fcdict()
-            files = os.listdir("misc")
-            for f in files:
-                path = "misc/" + f
-                if is_code(path):
-                    self.size2[f] = line_count(path)
-            self.curr_state = stats
-            return stats
+        stats = azero(3)
+        procs = await create_future(self.proc.children, recursive=True, priority=True)
+        procs.append(self.proc)
+        tasks = [self.get_proc_state(p) for p in procs]
+        resp = await recursive_coro(tasks)
+        stats += [sum(st[0] for st in resp), sum(st[1] for st in resp), 0]
+        cpu = psutil.cpu_count(logical=True)
+        mem = psutil.virtual_memory()
+        # CPU is totalled across all cores
+        stats[0] /= cpu
+        # Memory is in %
+        stats[1] *= mem.total / 100
+        stats[2] = self.disk
+        self.size2 = fcdict()
+        files = os.listdir("misc")
+        for f in files:
+            path = "misc/" + f
+            if is_code(path):
+                self.size2[f] = line_count(path)
+        self.curr_state = stats
+        return stats
 
     status_sem = Semaphore(1, inf, rate_limit=1)
 
@@ -2638,100 +2638,100 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         return self.status_data
 
     # Loads a module containing commands and databases by name.
+    @tracebacksuppressor
     def get_module(self, module):
-        with tracebacksuppressor:
-            f = module
-            if "." in f:
-                f = f[:f.rindex(".")]
-            path, module = module, f
-            new = False
-            reloaded = False
-            if module in self._globals:
-                reloaded = True
-                print(f"Reloading module {module}...")
-                if module in self.categories:
-                    self.unload(module)
-                # mod = importlib.reload(self._globals[module])
-            else:
-                print(f"Loading module {module}...")
-                new = True
-                # mod = __import__(module)
-            if not new:
-                mod = self._globals.pop(module, {})
-            # else:
-            #     mod = self._globals
-            else:
-                mod = cdict(common.__dict__)
-            fn = f"commands/{module}.py"
-            with open(fn, "rb") as f:
-                b = f.read()
-            code = compile(b, fn, "exec", optimize=1)
-            exec(code, mod)
-            self._globals[module] = mod
-            commands = deque()
-            dataitems = deque()
-            items = mod
-            for var in tuple(items.values()):
-                if callable(var) and var is not Command and var is not Database:
-                    load_type = 0
-                    with suppress(TypeError):
-                        if issubclass(var, Command):
-                            load_type = 1
-                        elif issubclass(var, Database) and not reloaded:
-                            load_type = 2
-                    if load_type:
-                        obj = var(self, module)
-                        if load_type == 1:
-                            commands.append(obj)
-                        elif load_type == 2:
-                            dataitems.append(obj)
-            commands = alist(commands)
-            dataitems = alist(dataitems)
-            for u in dataitems:
-                for c in commands:
-                    c.data[u.name] = u
-            self.categories[module] = commands
-            self.dbitems[module] = dataitems
-            self.size[module] = line_count("commands/" + path)
-            if commands:
-                print(f"{module}: Successfully loaded {len(commands)} command{'s' if len(commands) != 1 else ''}.")
-            if dataitems:
-                print(f"{module}: Successfully loaded {len(dataitems)} database{'s' if len(dataitems) != 1 else ''}.")
-            if not new and not reloaded:
-                while not self.ready:
-                    time.sleep(0.5)
-                print(f"Resending _ready_ event to module {module}...")
-                for db in dataitems:
-                    for f in dir(db):
-                        if f.startswith("_") and f[-1] == "_" and f[1] != "_":
-                            func = getattr(db, f, None)
-                            if callable(func):
-                                self.events.append(f, func)
-                    for e in ("_bot_ready_", "_ready_"):
-                        func = getattr(db, e, None)
+        f = module
+        if "." in f:
+            f = f[:f.rindex(".")]
+        path, module = module, f
+        new = False
+        reloaded = False
+        if module in self._globals:
+            reloaded = True
+            print(f"Reloading module {module}...")
+            if module in self.categories:
+                self.unload(module)
+            # mod = importlib.reload(self._globals[module])
+        else:
+            print(f"Loading module {module}...")
+            new = True
+            # mod = __import__(module)
+        if not new:
+            mod = self._globals.pop(module, {})
+        # else:
+        #     mod = self._globals
+        else:
+            mod = cdict(common.__dict__)
+        fn = f"commands/{module}.py"
+        with open(fn, "rb") as f:
+            b = f.read()
+        code = compile(b, fn, "exec", optimize=1)
+        exec(code, mod)
+        self._globals[module] = mod
+        commands = deque()
+        dataitems = deque()
+        items = mod
+        for var in tuple(items.values()):
+            if callable(var) and var is not Command and var is not Database:
+                load_type = 0
+                with suppress(TypeError):
+                    if issubclass(var, Command):
+                        load_type = 1
+                    elif issubclass(var, Database) and not reloaded:
+                        load_type = 2
+                if load_type:
+                    obj = var(self, module)
+                    if load_type == 1:
+                        commands.append(obj)
+                    elif load_type == 2:
+                        dataitems.append(obj)
+        commands = alist(commands)
+        dataitems = alist(dataitems)
+        for u in dataitems:
+            for c in commands:
+                c.data[u.name] = u
+        self.categories[module] = commands
+        self.dbitems[module] = dataitems
+        self.size[module] = line_count("commands/" + path)
+        if commands:
+            print(f"{module}: Successfully loaded {len(commands)} command{'s' if len(commands) != 1 else ''}.")
+        if dataitems:
+            print(f"{module}: Successfully loaded {len(dataitems)} database{'s' if len(dataitems) != 1 else ''}.")
+        if not new and not reloaded:
+            while not self.ready:
+                time.sleep(0.5)
+            print(f"Resending _ready_ event to module {module}...")
+            for db in dataitems:
+                for f in dir(db):
+                    if f.startswith("_") and f[-1] == "_" and f[1] != "_":
+                        func = getattr(db, f, None)
                         if callable(func):
-                            await_fut(create_future(func, bot=self))
-            print(f"Successfully loaded module {module}.")
-            return True
+                            self.events.append(f, func)
+                for e in ("_bot_ready_", "_ready_"):
+                    func = getattr(db, e, None)
+                    if callable(func):
+                        await_fut(create_future(func, bot=self))
+        print(f"Successfully loaded module {module}.")
+        return True
 
+    @tracebacksuppressor
     def unload(self, mod=None):
-        with tracebacksuppressor:
-            if mod is None:
-                mods = deque(self.categories)
-            else:
-                mod = mod.casefold()
-                if mod not in self.categories:
-                    raise KeyError
-                mods = [mod]
-            for mod in mods:
-                for command in self.categories[mod]:
-                    command.unload()
-                # for database in self.dbitems[mod]:
-                #     database.unload()
-                self.categories.pop(mod)
-                # self.dbitems.pop(mod)
-                self.size.pop(mod)
-            return True
+        if mod is None:
+            mods = deque(self.categories)
+        else:
+            mod = mod.casefold()
+            if mod not in self.categories:
+                raise KeyError
+            mods = [mod]
+        for mod in mods:
+            for command in self.categories[mod]:
+                command.unload()
+            # for database in self.dbitems[mod]:
+            #     database.unload()
+            self.categories.pop(mod)
+            # self.dbitems.pop(mod)
+            self.size.pop(mod)
+        return True
 
     def reload(self, mod=None):
         sub_kill()
@@ -2785,26 +2785,26 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 print(f"{i} cached files flagged for deletion.")
             return i
 
+    @tracebacksuppressor
     def backup(self):
         backup = AUTH.get("backup_path") or "backup"
         self.clear_cache()
-        with tracebacksuppressor:
-            date = datetime.datetime.utcnow().date()
-            fn = f"{backup}/saves.{date}.wb"
-            if os.path.exists(fn):
-                if utc() - os.path.getmtime(fn) < 60:
-                    return fn
-                os.remove(fn)
-            for i in range(30):
-                d2 = date - datetime.timedelta(days=i + 3)
-                f2 = f"{backup}/saves.{d2}.wb"
-                if os.path.exists(f2):
-                    os.remove(f2)
-                    continue
-                break
-            lines = as_str(subprocess.run([sys.executable, "neutrino.py", "-c0", "../saves", "../" + fn], stderr=subprocess.PIPE, cwd="misc").stdout).splitlines()
-            s = "\n".join(line for line in lines if not line.startswith("\r"))
-            print(s)
+        date = datetime.datetime.utcnow().date()
+        fn = f"{backup}/saves.{date}.wb"
+        if os.path.exists(fn):
+            if utc() - os.path.getmtime(fn) < 60:
+                return fn
+            os.remove(fn)
+        for i in range(30):
+            d2 = date - datetime.timedelta(days=i + 3)
+            f2 = f"{backup}/saves.{d2}.wb"
+            if os.path.exists(f2):
+                os.remove(f2)
+                continue
+            break
+        lines = as_str(subprocess.run([sys.executable, "neutrino.py", "-c0", "../saves", "../" + fn], stderr=subprocess.PIPE, cwd="misc").stdout).splitlines()
+        s = "\n".join(line for line in lines if not line.startswith("\r"))
+        print(s)
         # zf = ZipFile(fn, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
         # for x, y, z in os.walk("saves"):
         #     for f in z:
@@ -2992,52 +2992,52 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         break
             self.react_sem.pop(message.id, None)
 
+    @tracebacksuppressor
     async def update_status(self):
-        with tracebacksuppressor:
-            guild_count = len(self.guilds)
-            changed = guild_count != self.guild_count
-            if changed or utc() > self.stat_timer:
-                self.stat_timer = utc() + 4.5
-                self.guild_count = guild_count
-                status_changes = list(range(self.status_iter))
-                status_changes.extend(range(self.status_iter + 1, len(self.statuses) - (not self.audio)))
-                if not status_changes:
-                    status_changes = range(len(self.statuses))
-                self.status_iter = choice(status_changes)
-                with suppress(discord.NotFound):
-                    if "blacklist" in self.data and self.data.blacklist.get(0):
-                        text = "Currently under maintenance, please stay tuned!"
+        guild_count = len(self.guilds)
+        changed = guild_count != self.guild_count
+        if changed or utc() > self.stat_timer:
+            self.stat_timer = utc() + 4.5
+            self.guild_count = guild_count
+            status_changes = list(range(self.status_iter))
+            status_changes.extend(range(self.status_iter + 1, len(self.statuses) - (not self.audio)))
+            if not status_changes:
+                status_changes = range(len(self.statuses))
+            self.status_iter = choice(status_changes)
+            with suppress(discord.NotFound):
+                if "blacklist" in self.data and self.data.blacklist.get(0):
+                    text = "Currently under maintenance, please stay tuned!"
+                else:
+                    text = f"{self.webserver}, to {uni_str(guild_count)} server{'s' if guild_count != 1 else ''}"
+                    if self.owners:
+                        u = await self.fetch_user(next(iter(self.owners)))
+                        n = u.name
+                        text += f", from {belongs(uni_str(n))} place!"
                     else:
-                        text = f"{self.webserver}, to {uni_str(guild_count)} server{'s' if guild_count != 1 else ''}"
-                        if self.owners:
-                            u = await self.fetch_user(next(iter(self.owners)))
-                            n = u.name
-                            text += f", from {belongs(uni_str(n))} place!"
-                        else:
-                            text += "!"
-                    # Status iterates through 5 possible choices
-                    status = self.statuses[self.status_iter]
-                    if status is discord.Streaming:
-                        activity = discord.Streaming(name=text, url=self.twitch_url)
-                        status = discord.Status.dnd
+                        text += "!"
+                # Status iterates through 5 possible choices
+                status = self.statuses[self.status_iter]
+                if status is discord.Streaming:
+                    activity = discord.Streaming(name=text, url=self.twitch_url)
+                    status = discord.Status.dnd
+                else:
+                    activity = discord.Game(name=text)
+                if changed:
+                    print(repr(activity))
+                if self.audio:
+                    audio_status = f"await client.change_presence(status=discord.Status."
+                    if status == discord.Status.invisible:
+                        status = discord.Status.idle
+                        create_task(self.audio.asubmit(audio_status + "online)"))
+                        await self.seen(self.user, event="misc", raw="Changing their status")
                     else:
-                        activity = discord.Game(name=text)
-                    if changed:
-                        print(repr(activity))
-                    if self.audio:
-                        audio_status = f"await client.change_presence(status=discord.Status."
-                        if status == discord.Status.invisible:
-                            status = discord.Status.idle
-                            create_task(self.audio.asubmit(audio_status + "online)"))
-                            await self.seen(self.user, event="misc", raw="Changing their status")
-                        else:
-                            if status == discord.Status.online:
-                                create_task(self.audio.asubmit(audio_status + "dnd)"))
-                            create_task(self.seen(self.user, event="misc", raw="Changing their status"))
-                    with suppress(ConnectionResetError):
-                        await self.change_presence(activity=activity, status=status)
-                    # Member update events are not sent through for the current user, so manually send a _seen_ event
-                    await self.seen(self.user, event="misc", raw="Changing their status")
+                        if status == discord.Status.online:
+                            create_task(self.audio.asubmit(audio_status + "dnd)"))
+                        create_task(self.seen(self.user, event="misc", raw="Changing their status"))
+                with suppress(ConnectionResetError):
+                    await self.change_presence(activity=activity, status=status)
+                # Member update events are not sent through for the current user, so manually send a _seen_ event
+                await self.seen(self.user, event="misc", raw="Changing their status")
 
     # Handles all updates to the bot. Manages the bot's status and activity on discord, and updates all databases.
     async def handle_update(self, force=False):
@@ -3473,70 +3473,70 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         # Return the delay before the message can be called again. This is calculated by the rate limit of the command.
         return remaining
 
+    @tracebacksuppressor
     async def process_http_command(self, t, name, nick, command):
         url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f0"
         out = "[]"
-        with tracebacksuppressor:
-            message = SimulatedMessage(self, command, t, name, nick)
-            self.cache.users[message.author.id] = message.author
-            after = await self.process_message(message, msg=command, slash=True)
-            if after != -1:
-                if after is not None:
-                    after += utc()
-                else:
-                    after = 0
-                for i in range(3600):
-                    if message.response:
-                        break
-                    await asyncio.sleep(0.1)
-                await self.react_callback(message, None, message.author)
-                out = orjson.dumps(list(message.response))
-            url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f{after}"
+        message = SimulatedMessage(self, command, t, name, nick)
+        self.cache.users[message.author.id] = message.author
+        after = await self.process_message(message, msg=command, slash=True)
+        if after != -1:
+            if after is not None:
+                after += utc()
+            else:
+                after = 0
+            for i in range(3600):
+                if message.response:
+                    break
+                await asyncio.sleep(0.1)
+            await self.react_callback(message, None, message.author)
+            out = orjson.dumps(list(message.response))
+        url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f{after}"
         await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, bypass=False, decode=True, aio=True, ssl=False)
 
+    @tracebacksuppressor
     async def process_http_eval(self, t, proc):
         glob = self._globals
         url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f0"
         out = '{"result":null}'
-        with tracebacksuppressor:
-            code = None
+        code = None
+        with suppress(SyntaxError):
+            code = compile(proc, "<webserver>", "eval", optimize=2)
+        if code is None:
             with suppress(SyntaxError):
-                code = compile(proc, "<webserver>", "eval", optimize=2)
+                code = compile(proc, "<webserver>", "exec", optimize=2)
             if code is None:
-                with suppress(SyntaxError):
-                    code = compile(proc, "<webserver>", "exec", optimize=2)
-                if code is None:
-                    _ = glob.get("_")
-                    defs = False
-                    lines = proc.splitlines()
-                    for line in lines:
-                        if line.startswith("def") or line.startswith("async def"):
-                            defs = True
-                    func = "async def _():\n\tlocals().update(globals())\n"
-                    func += "\n".join(("\tglobals().update(locals())\n" if not defs and line.strip().startswith("return") else "") + "\t" + line for line in lines)
-                    func += "\n\tglobals().update(locals())"
-                    code2 = compile(func, "<webserver>", "exec", optimize=2)
-                    await create_future(eval, code2, glob)
-                    output = await glob["_"]()
-                    glob["_"] = _
-            if code is not None:
-                try:
-                    output = await create_future(eval, code, glob, priority=True)
-                except:
-                    print(proc)
-                    raise
-            if type(output) in (deque, alist):
-                output = list(output)
-            if output is not None:
-                glob["_"] = output
+                _ = glob.get("_")
+                defs = False
+                lines = proc.splitlines()
+                for line in lines:
+                    if line.startswith("def") or line.startswith("async def"):
+                        defs = True
+                func = "async def _():\n\tlocals().update(globals())\n"
+                func += "\n".join(("\tglobals().update(locals())\n" if not defs and line.strip().startswith("return") else "") + "\t" + line for line in lines)
+                func += "\n\tglobals().update(locals())"
+                code2 = compile(func, "<webserver>", "exec", optimize=2)
+                await create_future(eval, code2, glob)
+                output = await glob["_"]()
+                glob["_"] = _
+        if code is not None:
             try:
-                out = orjson.dumps(dict(result=output))
+                output = await create_future(eval, code, glob, priority=True)
+            except:
+                print(proc)
+                raise
+        if type(output) in (deque, alist):
+            output = list(output)
+        if output is not None:
+            glob["_"] = output
+        try:
+            out = orjson.dumps(dict(result=output))
+        except TypeError:
+            try:
+                out = json.dumps(dict(result=output), cls=MultiEncoder)
             except TypeError:
-                try:
-                    out = json.dumps(dict(result=output), cls=MultiEncoder)
-                except TypeError:
-                    out = orjson.dumps(dict(result=repr(output)))
-            # print(url, out)
+                out = orjson.dumps(dict(result=repr(output)))
+        # print(url, out)
         await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, bypass=False, decode=True, aio=True, ssl=False)
 
     async def load_guild_http(self, guild):
@@ -3568,39 +3568,39 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         guild._member_count = len(_members)
         return guild.members
 
+    @tracebacksuppressor
     async def load_guilds(self):
-        with tracebacksuppressor:
-            funcs = [self._connection.chunk_guild, self.load_guild_http]
-            futs = alist()
-            for n, guild in enumerate(self.client.guilds):
-                i = n % 5 != 0
-                if not i and getattr(guild, "_member_count", len(guild._members)) > 250:
-                    i = 1
-                fut = create_task(asyncio.wait_for(funcs[i](guild), timeout=None if i else 30))
-                fut.guild = guild
+        funcs = [self._connection.chunk_guild, self.load_guild_http]
+        futs = alist()
+        for n, guild in enumerate(self.client.guilds):
+            i = n % 5 != 0
+            if not i and getattr(guild, "_member_count", len(guild._members)) > 250:
+                i = 1
+            fut = create_task(asyncio.wait_for(funcs[i](guild), timeout=None if i else 30))
+            fut.guild = guild
+            if len(futs) >= 8:
+                pops = [a for a, fut in enumerate(futs) if fut.done()]
+                futs.pops(pops)
                 if len(futs) >= 8:
-                    pops = [a for a, fut in enumerate(futs) if fut.done()]
-                    futs.pops(pops)
-                    if len(futs) >= 8:
-                        fut = futs.pop(0)
-                        try:
-                            await fut
-                        except (T0, T1, T2):
-                            print_exc()
-                            await self.load_guild_http(fut.guild)
-                        if "guilds" in self.data:
-                            self.data.guilds.register(fut.guild)
-                futs.append(fut)
-            for fut in futs:
-                try:
-                    await fut
-                except (T0, T1, T2):
-                    print_exc()
-                    await self.load_guild_http(fut.guild)
-                if "guilds" in self.data:
-                    self.data.guilds.register(fut.guild)
-            self.users_updated = True
-            print("Guilds loaded.")
+                    fut = futs.pop(0)
+                    try:
+                        await fut
+                    except (T0, T1, T2):
+                        print_exc()
+                        await self.load_guild_http(fut.guild)
+                    if "guilds" in self.data:
+                        self.data.guilds.register(fut.guild)
+            futs.append(fut)
+        for fut in futs:
+            try:
+                await fut
+            except (T0, T1, T2):
+                print_exc()
+                await self.load_guild_http(fut.guild)
+            if "guilds" in self.data:
+                self.data.guilds.register(fut.guild)
+        self.users_updated = True
+        print("Guilds loaded.")
 
     # Adds a webhook to the bot's user and webhook cache.
     def add_webhook(self, w):
@@ -3805,21 +3805,21 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 self.cache.messages[message.id] = message
             return message
 
+    @tracebacksuppressor
     async def ignore_interaction(self, message):
-        with tracebacksuppressor:
-            if hasattr(message, "int_id"):
-                int_id, int_token = message.int_id, message.int_token
-            elif hasattr(message, "slash"):
-                int_id, int_token = message.id, message.slash
-            else:
-                return
-            await Request(
-                f"https://discord.com/api/{api}/interactions/{int_id}/{int_token}/callback",
-                method="POST",
-                authorise=True,
-                data='{"type":6}',
-                aio=True,
-            )
+        if hasattr(message, "int_id"):
+            int_id, int_token = message.int_id, message.int_token
+        elif hasattr(message, "slash"):
+            int_id, int_token = message.id, message.slash
+        else:
+            return
+        await Request(
+            f"https://discord.com/api/{api}/interactions/{int_id}/{int_token}/callback",
+            method="POST",
+            authorise=True,
+            data='{"type":6}',
+            aio=True,
+        )
 
     # Adds embeds to the embed sender, waiting for the next update event.
     def send_embeds(self, channel, embeds=None, embed=None, reacts=None, reference=None, exc=True):
@@ -4146,15 +4146,15 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         await create_future(self.update, priority=True)
 
     # Heartbeat loop: Repeatedly renames a file to inform the watchdog process that the bot's event loop is still running.
+    @tracebacksuppressor
     async def heartbeat_loop(self):
         print("Heartbeat Loop initiated.")
-        with tracebacksuppressor:
-            while not self.closed:
-                async with Delay(0.2):
-                    d = os.path.exists(self.heartbeat)
-                    if d:
-                        with tracebacksuppressor(FileNotFoundError, PermissionError):
-                            os.rename(self.heartbeat, self.heartbeat_ack)
+        while not self.closed:
+            async with Delay(0.2):
+                d = os.path.exists(self.heartbeat)
+                if d:
+                    with tracebacksuppressor(FileNotFoundError, PermissionError):
+                        os.rename(self.heartbeat, self.heartbeat_ack)
 
     # User seen event
     async def seen(self, *args, delay=0, event=None, **kwargs):
@@ -5188,64 +5188,64 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         self.dispatch("reaction_clear", message, old_reactions)
         self.add_message(message, files=False, force=True)
 
+    @tracebacksuppressor
     async def init_ready(self):
-        with tracebacksuppressor:
-            attachments = (file for file in sorted(set(file for file in os.listdir("cache") if file.startswith("attachment_"))))
-            for file in attachments:
-                with tracebacksuppressor:
-                    self.attachment_from_file(file)
-            print("Loading imported modules...")
-            # Wait until all modules have been loaded successfully
-            while self.modload:
-                fut = self.modload.popleft()
-                with tracebacksuppressor:
-                    # print(fut)
-                    mod = await fut
-            print(f"Mapped command count: {len(self.commands)}")
-            commands = set()
-            for command in self.commands.values():
-                commands.update(command)
-            print(f"Unique command count: {len(commands)}")
-            # Assign all bot database events to their corresponding keys.
-            for u in self.data.values():
-                for f in dir(u):
-                    if f.startswith("_") and f[-1] == "_" and f[1] != "_":
-                        func = getattr(u, f, None)
-                        if callable(func):
-                            self.events.append(f, func)
-            print(f"Database event count: {sum(len(v) for v in self.events.values())}")
-            await self.fetch_user(self.deleted_user)
-            create_task(self.global_loop())
-            create_task(self.slow_loop())
-            create_task(self.lazy_loop())
-            print("Update loops initiated.")
-            futs = alist()
-            futs.add(create_future(self.update_slash_commands, priority=True))
-            futs.add(create_task(self.create_main_website(first=True)))
-            futs.add(self.audio_client_start)
-            await self.wait_until_ready()
-            self.bot_ready = True
-            # Send bot_ready event to all databases.
-            await self.send_event("_bot_ready_", bot=self)
-            for fut in futs:
-                with tracebacksuppressor:
-                    await fut
-            print("Bot ready.")
-            await wrap_future(self.connect_ready)
-            print("Connect ready.")
-            self.ready = True
-            await create_future(self.update_usernames)
-            # Send ready event to all databases.
-            await self.send_event("_ready_", bot=self)
-            print("Database ready.")
-            await self.guilds_ready
-            await create_future(self.update_usernames)
-            print("Guilds ready.")
-            create_task(self.heartbeat_loop())
-            force_kill(self.heartbeat_proc)
-            create_task(self.fast_loop())
-            self.initialisation_complete = True
-            print("Initialisation complete.")
+        attachments = (file for file in sorted(set(file for file in os.listdir("cache") if file.startswith("attachment_"))))
+        for file in attachments:
+            with tracebacksuppressor:
+                self.attachment_from_file(file)
+        print("Loading imported modules...")
+        # Wait until all modules have been loaded successfully
+        while self.modload:
+            fut = self.modload.popleft()
+            with tracebacksuppressor:
+                # print(fut)
+                mod = await fut
+        print(f"Mapped command count: {len(self.commands)}")
+        commands = set()
+        for command in self.commands.values():
+            commands.update(command)
+        print(f"Unique command count: {len(commands)}")
+        # Assign all bot database events to their corresponding keys.
+        for u in self.data.values():
+            for f in dir(u):
+                if f.startswith("_") and f[-1] == "_" and f[1] != "_":
+                    func = getattr(u, f, None)
+                    if callable(func):
+                        self.events.append(f, func)
+        print(f"Database event count: {sum(len(v) for v in self.events.values())}")
+        await self.fetch_user(self.deleted_user)
+        create_task(self.global_loop())
+        create_task(self.slow_loop())
+        create_task(self.lazy_loop())
+        print("Update loops initiated.")
+        futs = alist()
+        futs.add(create_future(self.update_slash_commands, priority=True))
+        futs.add(create_task(self.create_main_website(first=True)))
+        futs.add(self.audio_client_start)
+        await self.wait_until_ready()
+        self.bot_ready = True
+        # Send bot_ready event to all databases.
+        await self.send_event("_bot_ready_", bot=self)
+        for fut in futs:
+            with tracebacksuppressor:
+                await fut
+        print("Bot ready.")
+        await wrap_future(self.connect_ready)
+        print("Connect ready.")
+        self.ready = True
+        await create_future(self.update_usernames)
+        # Send ready event to all databases.
+        await self.send_event("_ready_", bot=self)
+        print("Database ready.")
+        await self.guilds_ready
+        await create_future(self.update_usernames)
+        print("Guilds ready.")
+        create_task(self.heartbeat_loop())
+        force_kill(self.heartbeat_proc)
+        create_task(self.fast_loop())
+        self.initialisation_complete = True
+        print("Initialisation complete.")
 
     def set_client_events(self):
 
@@ -5902,6 +5902,7 @@ class AudioClientInterface:
             self.returns.pop(key, None)
         return resp
 
+    @tracebacksuppressor
     def communicate(self):
         proc = self.proc
         i = b"~0~Fa\n"
@@ -5918,36 +5919,35 @@ class AudioClientInterface:
             time.sleep(0.2)
         self.written = True
         self.fut.set_result(self)
-        with tracebacksuppressor:
-            while not bot.closed and is_strict_running(proc):
-                s = proc.stdout.readline()
-                if not s:
-                    raise EOFError
-                s = s.rstrip()
-                if s:
-                    if s[:1] == b"~":
-                        bot.activity += 1
-                        c = memoryview(base64.b85decode(s[1:]))
-                        if c[:18] == b"bot.audio.returns[":
-                            out = Dummy
-                            if c[-18:] == b"].set_result(None)":
-                                out = None
-                            elif c[-18:] == b"].set_result(True)":
-                                out = True
-                            if out is not Dummy:
-                                k = int(c[18:-18])
-                                with tracebacksuppressor:
-                                    self.returns[k].set_result(out)
-                                continue
-                        create_future_ex(exec_tb, c, bot._globals)
-                    else:
-                        print(as_str(s))
+        while not bot.closed and is_strict_running(proc):
+            s = proc.stdout.readline()
+            if not s:
+                raise EOFError
+            s = s.rstrip()
+            if s:
+                if s[:1] == b"~":
+                    bot.activity += 1
+                    c = memoryview(base64.b85decode(s[1:]))
+                    if c[:18] == b"bot.audio.returns[":
+                        out = Dummy
+                        if c[-18:] == b"].set_result(None)":
+                            out = None
+                        elif c[-18:] == b"].set_result(True)":
+                            out = True
+                        if out is not Dummy:
+                            k = int(c[18:-18])
+                            with tracebacksuppressor:
+                                self.returns[k].set_result(out)
+                            continue
+                    create_future_ex(exec_tb, c, bot._globals)
+                else:
+                    print(as_str(s))
 
+    @tracebacksuppressor
     def kill(self):
         if not is_strict_running(self.proc):
             return
-        with tracebacksuppressor:
-            create_future_ex(self.submit, "await kill()", priority=True).result(timeout=2)
+        create_future_ex(self.submit, "await kill()", priority=True).result(timeout=2)
         time.sleep(0.5)
         if is_strict_running(self.proc):
             with tracebacksuppressor(psutil.NoSuchProcess):

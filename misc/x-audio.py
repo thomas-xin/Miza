@@ -31,11 +31,11 @@ def send(*args, escape=True):
 		sys.__stdout__.write(s)
 		sys.__stdout__.flush()
 
+@tracebacksuppressor
 def request(s):
-	with tracebacksuppressor:
-		PORT = AUTH["webserver_port"]
-		token = AUTH["discord_token"]
-		return reqs.next().get(f"http://127.0.0.1:{PORT}/eval/{token}/{url_parse(s)}", verify=False, timeout=16).text
+	PORT = AUTH["webserver_port"]
+	token = AUTH["discord_token"]
+	return reqs.next().get(f"http://127.0.0.1:{PORT}/eval/{token}/{url_parse(s)}", verify=False, timeout=16).text
 
 def submit(s):
 	if type(s) not in (bytes, memoryview):
@@ -748,10 +748,10 @@ class LoadedAudioReader(discord.AudioSource):
 				return out
 		return b""
 
+	@tracebacksuppressor
 	def start(self):
 		self.buffer = None
-		with tracebacksuppressor():
-			self.buffer = self.read()
+		self.buffer = self.read()
 		return self
 
 	def close(self, *void1, **void2):
@@ -823,12 +823,12 @@ class BufferedAudioReader(discord.AudioSource):
 		self.full = True
 		self.proc.stdin.close()
 
+	@tracebacksuppressor
 	def start(self):
 		# Run loading loop in parallel thread obviously
 		create_future_ex(self.run, timeout=86400)
 		self.buffer = None
-		with tracebacksuppressor():
-			self.buffer = self.read()
+		self.buffer = self.read()
 		return self
 
 	def close(self):

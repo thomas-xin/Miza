@@ -262,21 +262,21 @@ class CustomAudio(collections.abc.Hashable):
     ts = None
     player = None
 
+    @tracebacksuppressor
     def __init__(self, text=None):
-        with tracebacksuppressor:
-            # Class instance variables
-            self.bot = bot
-            self.stats = cdict(self.defaults)
-            self.text = text
-            self.fut = concurrent.futures.Future()
-            self.acsi = None
-            self.args = []
-            self.queue = AudioQueue()
-            self.queue._init_()
-            self.queue.auds = self
-            self.semaphore = Semaphore(1, 4, rate_limit=1 / 8)
-            self.announcer = Semaphore(1, 1, rate_limit=1 / 3)
-            self.search_sem = Semaphore(1, 1, rate_limit=1)
+        # Class instance variables
+        self.bot = bot
+        self.stats = cdict(self.defaults)
+        self.text = text
+        self.fut = concurrent.futures.Future()
+        self.acsi = None
+        self.args = []
+        self.queue = AudioQueue()
+        self.queue._init_()
+        self.queue.auds = self
+        self.semaphore = Semaphore(1, 4, rate_limit=1 / 8)
+        self.announcer = Semaphore(1, 1, rate_limit=1 / 3)
+        self.search_sem = Semaphore(1, 1, rate_limit=1)
 
     def join(self, channel=None):
         if channel:
@@ -422,12 +422,12 @@ class CustomAudio(collections.abc.Hashable):
         else:
             self.stop()
 
+    @tracebacksuppressor
     def enqueue(self, source):
         self.next = source
-        with tracebacksuppressor:
-            source.readable.result(timeout=12)
-            src = source.create_reader(0, auds=self)
-            self.acsi.enqueue(src, after=self.queue.advance)
+        source.readable.result(timeout=12)
+        src = source.create_reader(0, auds=self)
+        self.acsi.enqueue(src, after=self.queue.advance)
 
     # Seeks current song position.
     def seek(self, pos):
@@ -468,54 +468,54 @@ class CustomAudio(collections.abc.Hashable):
                 self.announce(reason, dump=True, reference=initiator)
 
     # Update event, ensures audio is playing correctly and moves, leaves, or rejoins voice when necessary.
+    @tracebacksuppressor
     def update(self, *void1, **void2):
-        with tracebacksuppressor:
-            guild = self.guild
-            if self.fut.done() and not guild.me or not guild.me.voice:
-                return self.kill(css_md(f"🎵 Automatically disconnected from {sqr_md(guild)}. 🎵"))
-            try:
-                self.fut.result(timeout=12)
-            except:
-                print_exc()
-                return self.kill()
-            t = utc()
-            if getattr(self, "player", None) is not None and self.stats.speed and not self.paused:
-                if t - self.player.get("time", 0) >= 0:
-                    self.player.time = t + 20
-                    create_task(bot.commands.player[0]._callback_(self.player.get("message"), guild, self.text, 0, self.bot, inf))
-            if self.stats.stay:
-                cnt = inf
-            else:
-                cnt = sum(1 for m in self.acsi.channel.members if not m.bot)
-            if cnt < 2 and not self.queue and self.timeout < utc() - 240:
-                return self.kill(css_md(f"🎵 Automatically disconnected from {sqr_md(guild)}: Queue empty. 🎵"))
-            if not cnt:
-                # Timeout for leaving is 240 seconds
-                if self.timeout < utc() - 240:
-                    return self.kill(css_md(f"🎵 Automatically disconnected from {sqr_md(guild)}: All channels empty. 🎵"))
-                perms = self.acsi.channel.permissions_for(guild.me)
-                if not perms.connect or not perms.speak:
-                    return self.kill(css_md(f"🎵 Automatically disconnected from {sqr_md(guild)}: No permission to connect/speak in {sqr_md(self.acsi.channel)}. 🎵"))
-                # If idle for more than 10 seconds, attempt to find members in other voice channels
-                elif self.timeout < utc() - 10:
-                    if guild.afk_channel and (guild.afk_channel.id != self.acsi.channel.id and guild.afk_channel.permissions_for(guild.me).connect):
-                        await_fut(self.move_unmute(self.acsi, guild.afk_channel))
-                    else:
-                        cnt = 0
-                        ch = None
-                        for channel in voice_channels(guild):
-                            if not guild.afk_channel or channel.id != guild.afk_channel.id:
-                                c = sum(1 for m in channel.members if not m.bot)
-                                if c > cnt:
-                                    cnt = c
-                                    ch = channel
-                        if ch:
-                            with tracebacksuppressor(SemaphoreOverflowError):
-                                await_fut(self.move_unmute(self.acsi, ch))
-                                self.announce(ini_md(f"🎵 Detected {sqr_md(cnt)} user{'s' if cnt != 1 else ''} in {sqr_md(ch)}, automatically joined! 🎵"), aio=False)
-            elif self.queue or cnt >= 2:
-                self.timeout = utc()
-            self.queue.update_load()
+        guild = self.guild
+        if self.fut.done() and not guild.me or not guild.me.voice:
+            return self.kill(css_md(f"🎵 Automatically disconnected from {sqr_md(guild)}. 🎵"))
+        try:
+            self.fut.result(timeout=12)
+        except:
+            print_exc()
+            return self.kill()
+        t = utc()
+        if getattr(self, "player", None) is not None and self.stats.speed and not self.paused:
+            if t - self.player.get("time", 0) >= 0:
+                self.player.time = t + 20
+                create_task(bot.commands.player[0]._callback_(self.player.get("message"), guild, self.text, 0, self.bot, inf))
+        if self.stats.stay:
+            cnt = inf
+        else:
+            cnt = sum(1 for m in self.acsi.channel.members if not m.bot)
+        if cnt < 2 and not self.queue and self.timeout < utc() - 240:
+            return self.kill(css_md(f"🎵 Automatically disconnected from {sqr_md(guild)}: Queue empty. 🎵"))
+        if not cnt:
+            # Timeout for leaving is 240 seconds
+            if self.timeout < utc() - 240:
+                return self.kill(css_md(f"🎵 Automatically disconnected from {sqr_md(guild)}: All channels empty. 🎵"))
+            perms = self.acsi.channel.permissions_for(guild.me)
+            if not perms.connect or not perms.speak:
+                return self.kill(css_md(f"🎵 Automatically disconnected from {sqr_md(guild)}: No permission to connect/speak in {sqr_md(self.acsi.channel)}. 🎵"))
+            # If idle for more than 10 seconds, attempt to find members in other voice channels
+            elif self.timeout < utc() - 10:
+                if guild.afk_channel and (guild.afk_channel.id != self.acsi.channel.id and guild.afk_channel.permissions_for(guild.me).connect):
+                    await_fut(self.move_unmute(self.acsi, guild.afk_channel))
+                else:
+                    cnt = 0
+                    ch = None
+                    for channel in voice_channels(guild):
+                        if not guild.afk_channel or channel.id != guild.afk_channel.id:
+                            c = sum(1 for m in channel.members if not m.bot)
+                            if c > cnt:
+                                cnt = c
+                                ch = channel
+                    if ch:
+                        with tracebacksuppressor(SemaphoreOverflowError):
+                            await_fut(self.move_unmute(self.acsi, ch))
+                            self.announce(ini_md(f"🎵 Detected {sqr_md(cnt)} user{'s' if cnt != 1 else ''} in {sqr_md(ch)}, automatically joined! 🎵"), aio=False)
+        elif self.queue or cnt >= 2:
+            self.timeout = utc()
+        self.queue.update_load()
 
     # Moves to the target channel, unmuting self afterwards.
     async def move_unmute(self, vc, vc_):
@@ -742,42 +742,42 @@ class AudioQueue(alist):
                 self.lastsent = utc()
                 auds.announce(italics(ini_md(f"🎵 Now playing {sqr_md(e.name)}, added by {sqr_md(name)}! 🎵")), aio=True)
 
+    @tracebacksuppressor
     def start_queue(self):
-        with tracebacksuppressor:
-            auds = self.auds
-            try:
-                auds.epos
-            except (TypeError, AttributeError):
-                auds.kill()
-                raise
+        auds = self.auds
+        try:
+            auds.epos
+        except (TypeError, AttributeError):
+            auds.kill()
+            raise
+        if self.sem.is_busy():
+            return
+        if not auds.source and self:
+            e = self[0]
+            source = None
+            with self.sem:
+                with tracebacksuppressor:
+                    source = ytdl.get_stream(e, force=True)
             if self.sem.is_busy():
-                return
-            if not auds.source and self:
-                e = self[0]
-                source = None
-                with self.sem:
-                    with tracebacksuppressor:
-                        source = ytdl.get_stream(e, force=True)
-                if self.sem.is_busy():
-                    self.sem.wait()
-                if not source:
-                    e["url"] = ""
-                    return self.update_load()
-                with self.sem:
-                    self.announce_play(e)
-                    self.auds.play(source, pos=auds.seek_pos)
-            if not auds.next and auds.source and len(self) > 1 and not self.sem2.is_busy():
-                with self.sem:
-                    with self.sem2:
-                        e = self[1]
-                        source = ytdl.get_stream(e, asap=True)
-                        if source and not auds.next and auds.source:
-                            auds.enqueue(source)
-            # if len(self) > 2 and not self.sem2.is_busy() and not auds.stats.get("shuffle"):
-            #     e = self[2]
-            #     sufficient = auds.epos[1] - auds.epos[0] + (self[1].get("duration") or 0) >= (self[2].get("duration") or inf) / 2
-            #     if sufficient:
-            #         create_future_ex(self.preemptive_download, e)
+                self.sem.wait()
+            if not source:
+                e["url"] = ""
+                return self.update_load()
+            with self.sem:
+                self.announce_play(e)
+                self.auds.play(source, pos=auds.seek_pos)
+        if not auds.next and auds.source and len(self) > 1 and not self.sem2.is_busy():
+            with self.sem:
+                with self.sem2:
+                    e = self[1]
+                    source = ytdl.get_stream(e, asap=True)
+                    if source and not auds.next and auds.source:
+                        auds.enqueue(source)
+        # if len(self) > 2 and not self.sem2.is_busy() and not auds.stats.get("shuffle"):
+        #     e = self[2]
+        #     sufficient = auds.epos[1] - auds.epos[0] + (self[1].get("duration") or 0) >= (self[2].get("duration") or inf) / 2
+        #     if sufficient:
+        #         create_future_ex(self.preemptive_download, e)
 
     def preemptive_download(self, e):
         with self.sem2:
@@ -1260,16 +1260,16 @@ class AudioDownloader:
         return headers
 
     # Initializes youtube_dl object as well as spotify tokens, every 720 seconds.
+    @tracebacksuppressor
     def update_dl(self):
         if utc() - self.lastclear > 720:
             self.lastclear = utc()
-            with tracebacksuppressor:
-                self.youtube_dl_x += 1
-                self.downloader = youtube_dl.YoutubeDL(self.ydl_opts)
-                self.spotify_x += 1
-                token = await_fut(aretry(Request, "https://open.spotify.com/get_access_token", aio=True, attempts=8, delay=0.5))
-                self.spotify_header = {"authorization": f"Bearer {orjson.loads(token[:512])['accessToken']}"}
-                self.other_x += 1
+            self.youtube_dl_x += 1
+            self.downloader = youtube_dl.YoutubeDL(self.ydl_opts)
+            self.spotify_x += 1
+            token = await_fut(aretry(Request, "https://open.spotify.com/get_access_token", aio=True, attempts=8, delay=0.5))
+            self.spotify_header = {"authorization": f"Bearer {orjson.loads(token[:512])['accessToken']}"}
+            self.other_x += 1
 
     # Gets data from yt-download.org, and adjusts the format to ensure compatibility with results from youtube-dl. Used as backup.
     def extract_backup(self, url, video=False):
@@ -4264,7 +4264,6 @@ class Radio(Command):
                         return country
 
                     data.get_cities = get_cities
-
         return self.countries
 
     async def __call__(self, bot, channel, message, args, **void):
@@ -5304,28 +5303,28 @@ class UpdateAudio(Database):
         self.players = cdict()
 
     # Searches for and extracts incomplete queue entries
+    @tracebacksuppressor
     async def research(self, auds):
-        with tracebacksuppressor:
-            if not auds.search_sem.is_busy():
-                async with auds.search_sem:
-                    searched = 0
-                    q = auds.queue
-                    async with Delay(2):
-                        for i, e in enumerate(q, 1):
-                            if searched >= 1 or i > 12:
+        if not auds.search_sem.is_busy():
+            async with auds.search_sem:
+                searched = 0
+                q = auds.queue
+                async with Delay(2):
+                    for i, e in enumerate(q, 1):
+                        if searched >= 1 or i > 12:
+                            break
+                        if "research" in e:
+                            try:
+                                await create_future(ytdl.extract_single, e, timeout=18)
+                                e.pop("research", None)
+                                searched += 1
+                            except:
+                                e.pop("research", None)
+                                print_exc()
                                 break
-                            if "research" in e:
-                                try:
-                                    await create_future(ytdl.extract_single, e, timeout=18)
-                                    e.pop("research", None)
-                                    searched += 1
-                                except:
-                                    e.pop("research", None)
-                                    print_exc()
-                                    break
-                                e.pop("id", None)
-                            if "research" not in e and not e.get("duration") and "stream" in e:
-                                e["duration"] = await create_future(get_duration, e["stream"])
+                            e.pop("id", None)
+                        if "research" not in e and not e.get("duration") and "stream" in e:
+                            e["duration"] = await create_future(get_duration, e["stream"])
 
     # Delays audio player display message by 15 seconds when a user types in the target channel
     async def _typing_(self, channel, user, **void):
@@ -5348,9 +5347,9 @@ class UpdateAudio(Database):
                     auds.player.time = t
 
     # Makes 1 attempt to disconnect a single member from voice.
+    @tracebacksuppressor(discord.Forbidden)
     async def _dc(self, member):
-        with tracebacksuppressor(discord.Forbidden):
-            await member.move_to(None)
+        await member.move_to(None)
 
     def update_vc(self, guild):
         m = guild.me
@@ -5374,49 +5373,49 @@ class UpdateAudio(Database):
         return emptyfut
 
     # Updates all voice clients
+    @tracebacksuppressor(SemaphoreOverflowError)
     async def __call__(self, guild=None, **void):
         bot = self.bot
-        with tracebacksuppressor(SemaphoreOverflowError):
-            async with self._semaphore:
-                # Ensure all voice clients are not muted, disconnect ones without matching audio players
-                if guild is not None:
-                    create_task(self.update_vc(guild))
-                else:
-                    [create_task(self.update_vc(g)) for g in bot.cache.guilds.values()]
-            # Update audio players
+        async with self._semaphore:
+            # Ensure all voice clients are not muted, disconnect ones without matching audio players
             if guild is not None:
-                if guild.id in self.players:
-                    auds = self.players[guild.id]
-                    create_future_ex(auds.update)
+                create_task(self.update_vc(guild))
             else:
-                async with Delay(0.5):
-                    a = 1
-                    futs = deque()
-                    for g in tuple(self.players):
-                        with tracebacksuppressor(KeyError):
-                            auds = self.players[g]
-                            futs.append(create_future(auds.update, priority=True))
-                            futs.append(create_task(self.research(auds)))
-                            if auds.queue and not auds.paused and "dailies" in bot.data:
-                                if auds.ts is not None:
-                                    for member in auds.acsi.channel.members:
-                                        if member.id != bot.id:
-                                            vs = member.voice
-                                            if vs is not None and not vs.deaf and not vs.self_deaf:
-                                                bot.data.users.add_gold(member, 0.25)
-                                                bot.data.dailies.progress_quests(member, "music", utc() - auds.ts)
-                                auds.ts = utc()
-                            else:
-                                auds.ts = None
-                        if not a & 15:
-                            await asyncio.sleep(0.2)
-                        a += 1
-                    for fut in futs:
-                        with tracebacksuppressor:
-                            await fut
-                await bot.audio.asubmit("ytdl.update()")
-            create_future_ex(ytd.update)
-            create_future_ex(ytdl.update_dl, priority=True)
+                [create_task(self.update_vc(g)) for g in bot.cache.guilds.values()]
+        # Update audio players
+        if guild is not None:
+            if guild.id in self.players:
+                auds = self.players[guild.id]
+                create_future_ex(auds.update)
+        else:
+            async with Delay(0.5):
+                a = 1
+                futs = deque()
+                for g in tuple(self.players):
+                    with tracebacksuppressor(KeyError):
+                        auds = self.players[g]
+                        futs.append(create_future(auds.update, priority=True))
+                        futs.append(create_task(self.research(auds)))
+                        if auds.queue and not auds.paused and "dailies" in bot.data:
+                            if auds.ts is not None:
+                                for member in auds.acsi.channel.members:
+                                    if member.id != bot.id:
+                                        vs = member.voice
+                                        if vs is not None and not vs.deaf and not vs.self_deaf:
+                                            bot.data.users.add_gold(member, 0.25)
+                                            bot.data.dailies.progress_quests(member, "music", utc() - auds.ts)
+                            auds.ts = utc()
+                        else:
+                            auds.ts = None
+                    if not a & 15:
+                        await asyncio.sleep(0.2)
+                    a += 1
+                for fut in futs:
+                    with tracebacksuppressor:
+                        await fut
+            await bot.audio.asubmit("ytdl.update()")
+        create_future_ex(ytd.update)
+        create_future_ex(ytdl.update_dl, priority=True)
 
     def _announce_(self, *args, **kwargs):
         for auds in self.players.values():
@@ -5455,6 +5454,8 @@ class UpdateAudio(Database):
                 count += 1
         if count:
             print(f"Successfully reinstated {count} audio file{'s' if count != 1 else ''}")
+        if "blacklist" in self.data and self.data.blacklist.get(0):
+            return
         for k, v in self.data.items():
             with tracebacksuppressor:
                 vc = await bot.fetch_channel(k)

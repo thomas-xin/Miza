@@ -2551,8 +2551,8 @@ class UpdateMessageLogs(Database):
         while "channel_cache" not in self.bot.data:
             await asyncio.sleep(0.5)
         print(f"Probing new messages from {len(self.bot.guilds)} guild{'s' if len(self.bot.guilds) != 1 else ''}...")
-        with tracebacksuppressor:
-            for guild in self.bot.guilds:
+        for guild in self.bot.guilds:
+            with tracebacksuppressor:
                 futs = deque()
                 for channel in itertools.chain(guild.text_channels, guild.threads):
                     try:
@@ -2811,28 +2811,29 @@ class UpdateCrossposts(Database):
     stack = {}
     sem = Semaphore(1, 0, rate_limit=1)
 
+    @tracebacksuppressor
     async def _call_(self):
         if self.sem.is_busy():
             return
         if not self.stack:
             return
-        with tracebacksuppressor:
-            async with self.sem:
-                async with Delay(1):
-                    for c, s in self.stack.items():
-                        channel = self.bot.get_channel(c)
-                        for k, v in s.items():
-                            embs = deque()
-                            for emb in v:
-                                if len(embs) > 9 or len(emb) + sum(len(e) for e in embs) > 6000:
-                                    create_task(self.bot.send_as_webhook(channel, embeds=embs, username=k[0], avatar_url=k[1]))
-                                    embs.clear()
-                                embs.append(emb)
-                                reacts = None
-                            if embs:
+        async with self.sem:
+            async with Delay(1):
+                for c, s in self.stack.items():
+                    channel = self.bot.get_channel(c)
+                    for k, v in s.items():
+                        embs = deque()
+                        for emb in v:
+                            if len(embs) > 9 or len(emb) + sum(len(e) for e in embs) > 6000:
                                 create_task(self.bot.send_as_webhook(channel, embeds=embs, username=k[0], avatar_url=k[1]))
-                    self.stack.clear()
+                                embs.clear()
+                            embs.append(emb)
+                            reacts = None
+                        if embs:
+                            create_task(self.bot.send_as_webhook(channel, embeds=embs, username=k[0], avatar_url=k[1]))
+                self.stack.clear()
 
+    @tracebacksuppressor
     async def _send_(self, message, **void):
         if message.channel.id not in self.data:
             return
@@ -2840,55 +2841,54 @@ class UpdateCrossposts(Database):
             return
         if "\u2009\u2009" in message.author.name:
             return
-        with tracebacksuppressor:
-            content = message.content or message.system_content
-            embeds = deque()
-            for emb in message.embeds:
-                embed = discord.Embed(
-                    description=emb.description,
-                    colour=emb.colour,
-                )
-                if emb.title:
-                    embed.title = emb.title
-                if emb.url:
-                    embed.url = emb.url
-                if emb.author:
-                    author = emb.author
-                    embed.set_author(name=author.name, url=author.url, icon_url=author.icon_url)
-                if emb.image:
-                    image = emb.image.url
-                    embed.set_image(url=image)
-                if emb.thumbnail:
-                    thumbnail = emb.thumbnail.url
-                    embed.set_thumbnail(url=thumbnail)
-                if emb.footer:
-                    footer = eval(repr(emb.footer), dict(EmbedProxy=dict))
-                    footer.pop("proxy_icon_url", None)
-                    embed.set_footer(**footer)
-                if emb.timestamp:
-                    embed.timestamp = emb.timestamp
-                for f in emb.fields:
-                    if f:
-                        embed.add_field(name=f.name, value=f.value, inline=getattr(f, "inline", True))
-                embeds.append(embed)
-            files = deque()
-            for a in message.attachments:
-                b = await self.bot.get_attachment(a.url, full=False)
-                files.append(CompatFile(seq(b), filename=getattr(a, "filename", "untitled")))
-            for c_id in tuple(self.data[message.channel.id]):
-                try:
-                    channel = await self.bot.fetch_channel(c_id)
-                except:
-                    print_exc()
-                    s = self.data[message.channel.id]
-                    s.discard(c_id)
-                    if not s:
-                        self.pop(message.channel.id)
-                    self.update(message.channel.id)
-                    continue
-                name = message.guild.name + "\u2009﹟" + str(message.channel)
-                url = best_url(message.guild)
-                create_task(self.bot.send_as_webhook(channel, content, embeds=list(embeds), files=list(files), username=name, avatar_url=url))
+        content = message.content or message.system_content
+        embeds = deque()
+        for emb in message.embeds:
+            embed = discord.Embed(
+                description=emb.description,
+                colour=emb.colour,
+            )
+            if emb.title:
+                embed.title = emb.title
+            if emb.url:
+                embed.url = emb.url
+            if emb.author:
+                author = emb.author
+                embed.set_author(name=author.name, url=author.url, icon_url=author.icon_url)
+            if emb.image:
+                image = emb.image.url
+                embed.set_image(url=image)
+            if emb.thumbnail:
+                thumbnail = emb.thumbnail.url
+                embed.set_thumbnail(url=thumbnail)
+            if emb.footer:
+                footer = eval(repr(emb.footer), dict(EmbedProxy=dict))
+                footer.pop("proxy_icon_url", None)
+                embed.set_footer(**footer)
+            if emb.timestamp:
+                embed.timestamp = emb.timestamp
+            for f in emb.fields:
+                if f:
+                    embed.add_field(name=f.name, value=f.value, inline=getattr(f, "inline", True))
+            embeds.append(embed)
+        files = deque()
+        for a in message.attachments:
+            b = await self.bot.get_attachment(a.url, full=False)
+            files.append(CompatFile(seq(b), filename=getattr(a, "filename", "untitled")))
+        for c_id in tuple(self.data[message.channel.id]):
+            try:
+                channel = await self.bot.fetch_channel(c_id)
+            except:
+                print_exc()
+                s = self.data[message.channel.id]
+                s.discard(c_id)
+                if not s:
+                    self.pop(message.channel.id)
+                self.update(message.channel.id)
+                continue
+            name = message.guild.name + "\u2009﹟" + str(message.channel)
+            url = best_url(message.guild)
+            create_task(self.bot.send_as_webhook(channel, content, embeds=list(embeds), files=list(files), username=name, avatar_url=url))
 
 
 class UpdateStarboards(Database):

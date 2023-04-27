@@ -954,23 +954,23 @@ class UpdateMimics(Database):
                     mimic.url = "https://cdn.discordapp.com/embed/avatars/0.png"
         return mimic
 
+    @tracebacksuppressor(SemaphoreOverflowError)
     async def __call__(self):
-        with tracebacksuppressor(SemaphoreOverflowError):
-            async with self._semaphore:
-                async with Delay(120):
-                    # Garbage collector for unassigned mimics
-                    i = 1
-                    for m_id in tuple(self.data):
-                        if type(m_id) is str:
-                            mimic = self.data[m_id]
-                            try:
-                                if mimic.u_id not in self.data or mimic.id not in self.data[mimic.u_id][mimic.prefix]:
-                                    self.data.pop(m_id)
-                            except:
+        async with self._semaphore:
+            async with Delay(120):
+                # Garbage collector for unassigned mimics
+                i = 1
+                for m_id in tuple(self.data):
+                    if type(m_id) is str:
+                        mimic = self.data[m_id]
+                        try:
+                            if mimic.u_id not in self.data or mimic.id not in self.data[mimic.u_id][mimic.prefix]:
                                 self.data.pop(m_id)
-                        if not i % 8191:
-                            await asyncio.sleep(0.45)
-                        i += 1
+                        except:
+                            self.data.pop(m_id)
+                    if not i % 8191:
+                        await asyncio.sleep(0.45)
+                    i += 1
 
 
 class UpdateWebhooks(Database):

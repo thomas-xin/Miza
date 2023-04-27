@@ -281,7 +281,14 @@ class TracebackSuppressor(contextlib.AbstractContextManager, contextlib.Abstract
     def __aexit__(self, *args):
         return as_fut(self.__exit__(*args))
 
-    __call__ = lambda self, *args, **kwargs: self.__class__(*args, **kwargs)
+    def __call__(self, *ins, default=None):
+        if len(ins) == 1 and callable(ins[0]) and not issubclass(ins[0], BaseException):
+            def decorator(*args, **kwargs):
+                with self:
+                    return func(*args, **kwargs)
+                return default
+            return decorator
+        return self.__class__(*ins)
 
 tracebacksuppressor = TracebackSuppressor()
 
@@ -1862,35 +1869,35 @@ colour_types = (
     tertiary_colours,
 )
 
+@tracebacksuppressor
 def get_colour_list():
     global colour_names
-    with tracebacksuppressor:
-        colour_names = cdict()
-        resp = Request("https://en.wikipedia.org/wiki/List_of_colors_(compact)", decode=True, timeout=None)
-        resp = resp.split('<span class="mw-headline" id="List_of_colors">List of colors</span>', 1)[-1].split("</h3>", 1)[-1].split("<h2>", 1)[0]
-        n = len("background-color:rgb")
-        while resp:
-            try:
-                i = resp.index("background-color:rgb")
-            except ValueError:
-                break
-            colour, resp = resp[i + n:].split(";", 1)
-            colour = literal_eval(colour)
-            resp = resp.split("<a ", 1)[-1].split(">", 1)[-1]
-            name, resp = resp.split("<", 1)
-            name = full_prune(name).strip().replace(" ", "_")
-            if "(" in name and ")" in name:
-                name = (name.split("(", 1)[0] + name.rsplit(")", 1)[-1]).strip("_")
-                if name in colour_names:
-                    continue
-            colour_names[name] = colour
-        for colour_group in colour_types:
-            if colour_group:
-                if not colour_names:
-                    colour_names = cdict(colour_group)
-                else:
-                    colour_names.update(colour_group)
-        print(f"Successfully loaded {len(colour_names)} colour names.")
+    colour_names = cdict()
+    resp = Request("https://en.wikipedia.org/wiki/List_of_colors_(compact)", decode=True, timeout=None)
+    resp = resp.split('<span class="mw-headline" id="List_of_colors">List of colors</span>', 1)[-1].split("</h3>", 1)[-1].split("<h2>", 1)[0]
+    n = len("background-color:rgb")
+    while resp:
+        try:
+            i = resp.index("background-color:rgb")
+        except ValueError:
+            break
+        colour, resp = resp[i + n:].split(";", 1)
+        colour = literal_eval(colour)
+        resp = resp.split("<a ", 1)[-1].split(">", 1)[-1]
+        name, resp = resp.split("<", 1)
+        name = full_prune(name).strip().replace(" ", "_")
+        if "(" in name and ")" in name:
+            name = (name.split("(", 1)[0] + name.rsplit(")", 1)[-1]).strip("_")
+            if name in colour_names:
+                continue
+        colour_names[name] = colour
+    for colour_group in colour_types:
+        if colour_group:
+            if not colour_names:
+                colour_names = cdict(colour_group)
+            else:
+                colour_names.update(colour_group)
+    print(f"Successfully loaded {len(colour_names)} colour names.")
 
 def parse_colour(s, default=None):
     if s.startswith("0x"):
@@ -2195,28 +2202,28 @@ def is_strict_running(proc):
         return
     return True
 
+@tracebacksuppressor(psutil.NoSuchProcess)
 def force_kill(proc):
     if not proc:
         return
-    with tracebacksuppressor(psutil.NoSuchProcess):
-        killed = deque()
-        if not callable(getattr(proc, "children", None)):
-            proc = psutil.Process(proc.pid)
-        for child in proc.children(recursive=True):
-            with suppress():
-                child.terminate()
-                killed.append(child)
-                print(child, "killed.")
-        proc.terminate()
-        print(proc, "killed.")
-        _, alive = psutil.wait_procs(killed, timeout=2)
-        for child in alive:
-            with suppress():
-                child.kill()
-        try:
-            proc.wait(timeout=2)
-        except psutil.TimeoutExpired:
-            proc.kill()
+    killed = deque()
+    if not callable(getattr(proc, "children", None)):
+        proc = psutil.Process(proc.pid)
+    for child in proc.children(recursive=True):
+        with suppress():
+            child.terminate()
+            killed.append(child)
+            print(child, "killed.")
+    proc.terminate()
+    print(proc, "killed.")
+    _, alive = psutil.wait_procs(killed, timeout=2)
+    for child in alive:
+        with suppress():
+            child.kill()
+    try:
+        proc.wait(timeout=2)
+    except psutil.TimeoutExpired:
+        proc.kill()
 
 async def proc_communicate(proc):
     while True:
@@ -2612,9 +2619,9 @@ async def delayed_callback(fut, delay, func, *args, repeat=False, exc=False, **k
             raise
 
 
+@tracebacksuppressor
 def exec_tb(s, *args, **kwargs):
-    with tracebacksuppressor:
-        exec(s, *args, **kwargs)
+    exec(s, *args, **kwargs)
 
 
 def p2n(b):
@@ -3278,12 +3285,12 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
         }
     headers = header
 
+    @tracebacksuppressor
     async def _init_(self):
         if self.sessions:
-            with tracebacksuppressor:
-                for session in self.sessions:
-                    await session.close()
-                await self.nossl.close()
+            for session in self.sessions:
+                await session.close()
+            await self.nossl.close()
         self.sessions = alist(aiohttp.ClientSession() for i in range(6))
         self.nossl = aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False))
         self.ts = utc()
@@ -3388,20 +3395,20 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 Request = RequestManager()
 
 
+@tracebacksuppressor
 def load_emojis():
     global emoji_translate, emoji_replace, em_trans
-    with tracebacksuppressor:
-        data = Request("https://api.github.com/repos/twitter/twemoji/git/trees/master?recursive=1", json=True, timeout=None)
-        ems = [e for e in data["tree"] if e["path"].startswith("assets/svg/")]
-        e_ids = [e["path"].rsplit("/", 1)[-1].split(".", 1)[0] for e in ems]
-        urls = [f"https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/{e_id}.svg" for e_id in e_ids]
-        emojis = ["".join(chr(int(i, 16)) for i in e_id.split("-")) for e_id in e_ids]
-        etrans = dict(zip(emojis, urls))
+    data = Request("https://api.github.com/repos/twitter/twemoji/git/trees/master?recursive=1", json=True, timeout=None)
+    ems = [e for e in data["tree"] if e["path"].startswith("assets/svg/")]
+    e_ids = [e["path"].rsplit("/", 1)[-1].split(".", 1)[0] for e in ems]
+    urls = [f"https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/{e_id}.svg" for e_id in e_ids]
+    emojis = ["".join(chr(int(i, 16)) for i in e_id.split("-")) for e_id in e_ids]
+    etrans = dict(zip(emojis, urls))
 
-        emoji_translate = {k: v for k, v in etrans.items() if len(k) == 1}
-        emoji_replace = {k: v for k, v in etrans.items() if len(k) > 1}
-        em_trans = "".maketrans(emoji_translate)
-        print(f"Successfully loaded {len(etrans)} unicode emojis.")
+    emoji_translate = {k: v for k, v in etrans.items() if len(k) == 1}
+    emoji_replace = {k: v for k, v in etrans.items() if len(k) > 1}
+    em_trans = "".maketrans(emoji_translate)
+    print(f"Successfully loaded {len(etrans)} unicode emojis.")
 
 def translate_emojis(s):
     res = s.translate(em_trans)
@@ -3431,20 +3438,20 @@ HEARTS = ["❤️", "🧡", "💛", "💚", "💙", "💜", "💗", "💞", "�
 # Stores and manages timezones information.
 TIMEZONES = cdict()
 
+@tracebacksuppressor
 def load_timezones():
-    with tracebacksuppressor():
-        with open("misc/timezones.txt", "rb") as f:
-            data = as_str(f.read())
-            for line in data.splitlines():
-                info = line.split("\t")
-                abb = info[0].casefold()
-                if len(abb) >= 3 and (abb not in TIMEZONES or "(unofficial)" not in info[1]):
-                    temp = info[-1].replace("\\", "/")
-                    curr = sorted([round((1 - (i[3] == "−") * 2) * (time_parse(i[4:]) if ":" in i else float(i[4:]) * 60) * 60) for i in temp.split("/") if i.startswith("UTC")])
-                    if len(curr) == 1:
-                        curr = curr[0]
-                    TIMEZONES[abb] = curr
-            print(f"Successfully loaded {len(TIMEZONES)} timezones.")
+    with open("misc/timezones.txt", "rb") as f:
+        data = as_str(f.read())
+        for line in data.splitlines():
+            info = line.split("\t")
+            abb = info[0].casefold()
+            if len(abb) >= 3 and (abb not in TIMEZONES or "(unofficial)" not in info[1]):
+                temp = info[-1].replace("\\", "/")
+                curr = sorted([round((1 - (i[3] == "−") * 2) * (time_parse(i[4:]) if ":" in i else float(i[4:]) * 60) * 60) for i in temp.split("/") if i.startswith("UTC")])
+                if len(curr) == 1:
+                    curr = curr[0]
+                TIMEZONES[abb] = curr
+        print(f"Successfully loaded {len(TIMEZONES)} timezones.")
 
 def is_dst(dt=None, timezone="UTC"):
     if dt is None:
