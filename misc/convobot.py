@@ -1546,7 +1546,7 @@ class Bot:
 			to.insert(0, tup)
 		return tup[0]
 
-	def _after(self, t1, t2):
+	def _after(self, t1, t2, ai=False):
 		try:
 			# k, v = t2
 			# lim = 256 if self.premium >= 2 else 128
@@ -1559,8 +1559,8 @@ class Bot:
 			# if len(self.gpttokens(v)) > lim + 16:
 			# 	self.auto_summarise(q=v, max_length=lim, min_length=lim * 2 // 3).replace("\n", ". ").strip()
 			# 	t1 = (k, v)
-			self.append(t1, ai=False)
-			self.append(t2, ai=False)
+			self.append(t1, ai=ai)
+			self.append(t2, ai=ai)
 		except:
 			print_exc()
 
@@ -1639,7 +1639,7 @@ class Bot:
 	def after(self, t1, t2):
 		# self.append(t1)
 		# self.append(t2)
-		self._after(t1, t2)
+		self._after(t1, t2, ai=self.premium >= 2)
 		# exc.submit(self._after, t1, t2)
 		self.timestamp = time.time()
 		return t2[1]
