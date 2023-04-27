@@ -710,7 +710,7 @@ class Bot:
 				temp /= 2
 				for i in range(3):
 					try:
-						t3 = self.au(t2).strip('" ')
+						t3 = self.cgp(t2, stop=["s an AI", "!", "orry,", "language model"]).strip('" ')
 						# spl = self.cgp(t2)
 						# t3 = None if not spl else spl[0]
 						if not t3 or t3 in ("!", '"!"'):
@@ -900,7 +900,7 @@ class Bot:
 			if premium < 2:
 				stop = None
 			else:
-				stop = ["s an AI", "AI language model", "orry,", "language model"]
+				stop = ["s an AI", "orry,", "language model"]
 			response = None
 			data = dict(
 				model=model,
