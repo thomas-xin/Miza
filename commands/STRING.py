@@ -1619,7 +1619,10 @@ class Ask(Command):
         # while emb_futs:
         #     await emb_futs.pop(0)
         # Syntax: Summary, Jailbroken
-        caic = await process_image("lambda cid: [(b := CBOTS[cid]).chat_history, b.jailbroken]", "$", [channel.id], fix=1, timeout=120)
+        try:
+            caic = await process_image("lambda cid: [(b := CBOTS[cid]).chat_history, b.jailbroken]", "$", [channel.id], fix=1, timeout=120)
+        except KeyError:
+            caic = False
         if caic:
             caid = bot.data.chat_histories.get(channel.id, None)
             if not isinstance(caid, dict):
@@ -1627,7 +1630,7 @@ class Ask(Command):
             caid.update(dict(summary=caic[0], jailbroken=caic[1], last_message_id=m.id))
             caid["long_mem"] = max(long_mem, caid.get("long_mem", 0) * 63 / 64)
             bot.data.chat_histories[channel.id] = caid
-        else:
+        elif caic is None:
             bot.data.chat_histories.pop(channel.id, None)
         tup = orig_tup + (bot.name, self.alm_re.sub("", s))
         await register_embedding(m.id, *tup)
