@@ -1837,9 +1837,10 @@ class Personality(Command):
         if not argv:
             p = self.decode(self.retrieve(channel.id))
             return ini_md(f"My current personality for {sqr_md(channel)} is {sqr_md(p)}. Enter keywords for this command to modify the AI for default GPT-based chat, or enter \"default\" to reset.")
-        if len(argv) > 512:
-            raise OverflowError("Maximum currently supported personality prompt size is 512 characters.")
-        # if max(bot.is_trusted(guild), bot.premium_level(user) * 2) < 2:
+        premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
+        if len(argv) > 4096 or len(argv) > 512 and premium < 2:
+            raise OverflowError("Maximum currently supported personality prompt size is 512 characters, 4096 for premium users.")
+        # if premium < 2:
         #     raise PermissionError(f"Sorry, this feature is currently for premium users only. Please make sure you have a subscription level of minimum 1 from {bot.kofi_url}, or try out ~trial if you would like to manage/fund your own usage!")
         p = self.encode(argv)
         if not bot.is_nsfw(channel):
