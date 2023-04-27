@@ -3399,7 +3399,7 @@ class Connect(Command):
     rate_limit = (3, 4)
     slash = ("Join", "Leave")
 
-    async def __call__(self, user, channel, message, name="join", argv="", vc=None, **void):
+    async def __call__(self, user, channel, name="join", argv="", vc=None, message=None, **void):
         bot = self.bot
         joining = False
         if name in ("dc", "disconnect", "leave", "yeet", "fuckoff", "📴", "📛"):

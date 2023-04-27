@@ -1539,17 +1539,6 @@ class Bot:
 
 	def _after(self, t1, t2, ai=False):
 		try:
-			# k, v = t2
-			# lim = 256 if self.premium >= 2 else 128
-			# v = self.alm_re.sub("", v)
-			# if len(self.gpttokens(v)) > lim + 16:
-			# 	self.auto_summarise(q=v, max_length=lim, min_length=lim * 2 // 3).replace("\n", ". ").strip()
-			# 	t2 = (k, v)
-			# lim -= 32
-			# k, v = t1
-			# if len(self.gpttokens(v)) > lim + 16:
-			# 	self.auto_summarise(q=v, max_length=lim, min_length=lim * 2 // 3).replace("\n", ". ").strip()
-			# 	t1 = (k, v)
 			self.append(t1, ai=ai)
 			self.append(t2, ai=ai)
 		except:
