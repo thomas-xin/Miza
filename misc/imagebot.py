@@ -460,6 +460,8 @@ class Bot:
 			pf = StableDiffusionImg2ImgPipeline
 		else:
 			pf = StableDiffusionImageVariationPipeline
+			if model == "stabilityai/stable-diffusion-2-1":
+				model = "lambdalabs/sd-image-variations-diffusers"
 		pipe = cia and self.models.get((pf, model))
 		if pipe == False and fail_unless_gpu:
 			return
