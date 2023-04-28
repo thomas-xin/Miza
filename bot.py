@@ -5844,7 +5844,7 @@ class AudioClientInterface:
                 raise
             try:
                 self.killed = True
-                for auds in self.players.values():
+                for auds in tuple(self.players.values()):
                     if auds:
                         with tracebacksuppressor:
                             auds.kill()
