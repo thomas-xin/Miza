@@ -301,11 +301,11 @@ class AudioPlayer(discord.AudioSource):
 		out = b""
 		try:
 			out = self.queue[0][0].read()
-		except StopIteration:
+		except (StopIteration, IndexError, discord.oggparse.OggError):
 			pass
 		except:
 			print_exc()
-		if not out:
+		if not out and self.queue:
 			with tracebacksuppressor(StopIteration):
 				entry = self.queue.popleft()
 				create_future_ex(entry[0].close)

@@ -1880,7 +1880,7 @@ class UpdateFlavour(Database):
                     raise KeyError
             except KeyError:
                 s = str(datetime.datetime.fromtimestamp(xrand(1462456800, utc())).date())
-                data = await Request("https://www.uselessfacts.net/api/posts?d=" + s, json=True, aio=True)
+                data = await Request("https://www.uselessfacts.net/api/posts?d=" + s, timeout=24, json=True, aio=True)
                 factlist = [fact["title"].replace("`", "") for fact in data if "title" in fact]
                 useless.extend(factlist)
                 useless.uniq()
@@ -1932,7 +1932,7 @@ class UpdateUsers(Database):
             data.pop(key, None)
 
     def __load__(self):
-        self.semaphore = Semaphore(1, 2, delay=0.5, rate_limit=8)
+        self.semaphore = Semaphore(1, 2, delay=0.5, rate_limit=60)
         self.facts = None
         self.flavour_buffer = deque()
         self.flavour_set = set()
@@ -2078,21 +2078,21 @@ class UpdateUsers(Database):
         # print(estimated, inactive, activity)
         return estimated
 
+    @tracebacksuppressor(SemaphoreOverflowError)
     async def __call__(self):
-        with suppress(SemaphoreOverflowError):
-            async with self.semaphore:
-                changed = False
-                for i in range(64):
-                    out = await self.bot.data.flavour.get()
-                    if out:
-                        self.flavour_buffer.append(out)
-                        self.flavour_set.add(out)
-                        changed = True
-                        if len(self.flavour_buffer) >= 32:
-                            break
-                amount = len(self.flavour_set)
-                if changed and (not amount & amount - 1):
-                    self.flavour = tuple(self.flavour_set)
+        async with self.semaphore:
+            changed = False
+            for i in range(64):
+                out = await self.bot.data.flavour.get()
+                if out:
+                    self.flavour_buffer.append(out)
+                    self.flavour_set.add(out)
+                    changed = True
+                    if len(self.flavour_buffer) >= 32:
+                        break
+            amount = len(self.flavour_set)
+            if changed and (not amount & amount - 1):
+                self.flavour = tuple(self.flavour_set)
 
     def _offline_(self, user, **void):
         set_dict(self.data, user.id, {})["last_offline"] = utc()

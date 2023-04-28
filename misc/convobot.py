@@ -549,8 +549,9 @@ class Bot:
 			s = f"{k}: {v}\n"
 			lines.append(s)
 		tq = q
-		if len(self.gpttokens(tq)) > 400:
-			tq = self.auto_summarise(q=tq, max_length=384, min_length=256).replace("\n", ". ")
+		mq = 600 if premium < 2 else 1200
+		if len(self.gpttokens(tq)) > mq:
+			tq = self.auto_summarise(q=tq, max_length=round(mq * 0.96), min_length=round(mq * 0.64)).replace("\n", ". ")
 		s = f"{u}: {q}\n"
 		lines.append(s)
 		ns = f"{self.name}:"
@@ -700,7 +701,7 @@ class Bot:
 					sname = "WOLFRAMALPHA"
 					nohist = True
 				elif text.startswith("4"):
-					stype = random.randint(0, 2)
+					stype = random.randint(0, 1) # 2
 					sname = ("GOOGLE", "BING", "YAHOO")[stype]
 				print(sname, "search:", text)
 			if text and text.startswith("2"):
@@ -918,7 +919,7 @@ class Bot:
 				try:
 					if flagged:
 						raise PermissionError("flagged")
-					if not i and not bals and not random.randint(0, 2) and model.startswith("gpt-3.5-") and not self.nsfw and not self.jailbroken:
+					if not i and (searched or not stop) and not bals and not random.randint(0, 2) and model.startswith("gpt-3.5-") and not self.nsfw and not self.jailbroken:
 						try:
 							text = self.ycg(data).removeprefix(f"{self.name}: ").strip()
 							if stop and any(s in text for s in stop):
@@ -946,7 +947,7 @@ class Bot:
 						costs = 1
 					ok = openai.api_key
 					flagged = False
-					if not i and (searched or not stop) and model.startswith("gpt-3.5-") and not self.nsfw and not self.jailbroken and not flagged and (not chat_history or len(self.gpttokens(q)) > 8):
+					if not i and (searched or not stop) and not bals and model.startswith("gpt-3.5-") and not self.nsfw and not self.jailbroken and not flagged and (not chat_history or len(self.gpttokens(q)) > 8):
 						prompt = "\n\n".join(m["content"] if "name" not in m else f'{m["name"]}: {m["content"]}' for m in messages[1:])
 						# try:
 						# 	resp = openai.Moderation.create(
@@ -1624,8 +1625,10 @@ class Bot:
 	def after(self, t1, t2):
 		# self.append(t1)
 		# self.append(t2)
-		self._after(t1, t2, ai=self.premium >= 2)
-		# exc.submit(self._after, t1, t2)
+		try:
+			exc.submit(self._after, t1, t2, ai=self.premium >= 2).result(timeout=0.5)
+		except concurrent.futures.TimeoutError:
+			pass
 		self.timestamp = time.time()
 		return t2[1]
 

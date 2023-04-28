@@ -2237,8 +2237,9 @@ async def proc_communicate(proc):
             # if s and s[0] == "~":
             #     c = as_str(evalEX(s[1:]))
             #     exec_tb(c, globals())
-            s = b.rstrip()
-            if s and s[:1] == b"!":
+        s = b.rstrip()
+        try:
+            if s and s[:1] == b"$":
                 s, r = s.split(b"~", 1)
                 # print("PROC_RESP:", s, PROC_RESP.keys())
                 d = {"_x": base64.b64decode(r)}
@@ -2251,6 +2252,9 @@ async def proc_communicate(proc):
                     exec_tb(c, globals())
             else:
                 print(lim_str(as_str(s), 1048576))
+        except:
+            print_exc()
+            print(s)
 
 proc_args = cdict(
     math=(python, "misc/x-math.py"),
@@ -3300,10 +3304,10 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
     def session(self):
         return choice(self.sessions)
 
-    async def aio_call(self, url, headers, files, data, method, decode=False, json=False, session=None, ssl=True):
+    async def aio_call(self, url, headers, files, data, method, decode=False, json=False, session=None, ssl=True, timeout=24):
         async with self.semaphore:
             req = session or (self.sessions.next() if ssl else self.nossl)
-            resp = await req.request(method.upper(), url, headers=headers, data=data, timeout=24)
+            resp = await req.request(method.upper(), url, headers=headers, data=data, timeout=timeout)
             if BOT[0]:
                 BOT[0].activity += 1
             status = getattr(resp, "status_code", None) or getattr(resp, "status", 400)
@@ -3351,7 +3355,7 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
             headers["DNT"] = "1"
         method = method.casefold()
         if aio:
-            return create_task(asyncio.wait_for(self.aio_call(url, headers, files, data, method, decode, json, session, ssl), timeout=timeout))
+            return create_task(asyncio.wait_for(self.aio_call(url, headers, files, data, method, decode, json, session, ssl, timeout=timeout), timeout=timeout))
         with self.semaphore:
             if proxy:
                 data = proxy_download(url)
