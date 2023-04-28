@@ -1737,7 +1737,7 @@ class Art(Command):
                                 raise
                             fn = "misc/stable_diffusion.openvino/output.png"
                         else:
-                            noprompt = not force and not kwargs.get("--mask"):
+                            noprompt = not force and not kwargs.get("--mask")
                             fn = await process_image("IBASL", "&", ["" if noprompt else prompt, kwargs, nsfw, True], fix=2, timeout=1200)
         if isinstance(fn, str):
             with open(fn, "rb") as f:
