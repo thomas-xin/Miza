@@ -2078,21 +2078,21 @@ class UpdateUsers(Database):
         # print(estimated, inactive, activity)
         return estimated
 
-    @tracebacksuppressor(SemaphoreOverflowError)
     async def __call__(self):
-        async with self.semaphore:
-            changed = False
-            for i in range(64):
-                out = await self.bot.data.flavour.get()
-                if out:
-                    self.flavour_buffer.append(out)
-                    self.flavour_set.add(out)
-                    changed = True
-                    if len(self.flavour_buffer) >= 32:
-                        break
-            amount = len(self.flavour_set)
-            if changed and (not amount & amount - 1):
-                self.flavour = tuple(self.flavour_set)
+        with tracebacksuppressor(SemaphoreOverflowError):
+            async with self.semaphore:
+                changed = False
+                for i in range(64):
+                    out = await self.bot.data.flavour.get()
+                    if out:
+                        self.flavour_buffer.append(out)
+                        self.flavour_set.add(out)
+                        changed = True
+                        if len(self.flavour_buffer) >= 32:
+                            break
+        amount = len(self.flavour_set)
+        if changed and (not amount & amount - 1):
+            self.flavour = tuple(self.flavour_set)
 
     def _offline_(self, user, **void):
         set_dict(self.data, user.id, {})["last_offline"] = utc()
