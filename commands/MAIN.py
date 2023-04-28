@@ -2079,9 +2079,9 @@ class UpdateUsers(Database):
         return estimated
 
     async def __call__(self):
+        changed = False
         with tracebacksuppressor(SemaphoreOverflowError):
             async with self.semaphore:
-                changed = False
                 for i in range(64):
                     out = await self.bot.data.flavour.get()
                     if out:
