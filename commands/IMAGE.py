@@ -1524,8 +1524,9 @@ class Art(Command):
             try:
                 dalle2 = name.startswith("dalle")
                 openjourney = "journey" in name
-                if not dalle2 and not openjourney and not url:
-                    fn = await process_image("IBASL", "&", [prompt, kwargs], fix=2, timeout=1200)
+                if not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy():
+                    async with self.sdiff_sem:
+                        fn = await process_image("IBASL", "&", [prompt, kwargs], fix=2, timeout=1200)
                     if fn:
                         raise StopIteration
                 if dalle2 and premium < 4:
