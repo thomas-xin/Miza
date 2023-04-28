@@ -448,6 +448,7 @@ class Bot:
 	safety_checker = lambda images, **kwargs: (images, [False] * len(images))
 	def art_stablediffusion_local(self, prompt, kwargs=None, model="runwayml/stable-diffusion-v1-5", fail_unless_gpu=True, nsfw=False):
 		cia = torch.cuda.is_available()
+		from diffusers import DPMSolverMultistepScheduler, StableDiffusionPipeline, StableDiffusionImg2ImgPipeline, StableDiffusionInpaintPipeline, StableDiffusionImageVariationPipeline
 		if not kwargs.get("--init-image"):
 			pf = StableDiffusionPipeline
 		elif kwargs.get("--mask"):
@@ -460,7 +461,6 @@ class Bot:
 		if pipe == False and fail_unless_gpu:
 			return
 		if not pipe:
-			from diffusers import DPMSolverMultistepScheduler, StableDiffusionPipeline, StableDiffusionImg2ImgPipeline, StableDiffusionInpaintPipeline, StableDiffusionImageVariationPipeline
 			pipe = pf.from_pretrained(model, torch_dtype=torch.float16 if cia else torch.float32)
 			pipe.enable_attention_slicing()
 			pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
