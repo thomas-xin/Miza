@@ -18,6 +18,7 @@ if torch.cuda.is_available():
 		torch.cuda.set_enabled_lms(True)
 	except AttributeError:
 		pass
+image_to = lambda im, mode="RGB": im if im.mode == mode else im.convert(mode)
 try:
 	exc = concurrent.futures.exc_worker
 except AttributeError:
@@ -467,9 +468,9 @@ class Bot:
 			return
 		if not pipe:
 			kw = {}
-			if pf is StableDiffusionImageVariationPipeline:
-				clip = CLIPModel.from_pretrained("openai/clip-vit-base-patch32", torch_dtype=torch.float16 if cia else torch.float32)
-				kw["image_encoder"] = clip
+			# if pf is StableDiffusionImageVariationPipeline:
+			# 	clip = CLIPModel.from_pretrained("openai/clip-vit-base-patch32", torch_dtype=torch.float16 if cia else torch.float32)
+			# 	kw["image_encoder"] = clip
 			pipe = pf.from_pretrained(model, torch_dtype=torch.float16 if cia else torch.float32, **kw)
 			pipe.enable_attention_slicing()
 			pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
@@ -502,21 +503,21 @@ class Bot:
 		if pf is StableDiffusionInpaintPipeline:
 			im = pipe(
 				prompt,
-				image=Image.open(kwargs["--init-image"]),
-				mask_image=Image.open(kwargs["--mask"]),
+				image=image_to(Image.open(kwargs["--init-image"])),
+				mask_image=image_to(Image.open(kwargs["--mask"])),
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
 			).images[0]
 		elif pf is StableDiffusionImg2ImgPipeline:
 			im = pipe(
 				prompt,
-				image=Image.open(kwargs["--init-image"]),
+				image=image_to(Image.open(kwargs["--init-image"])),
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
 			).images[0]
 		elif pf is StableDiffusionImageVariationPipeline:
 			im = pipe(
-				image=Image.open(kwargs["--init-image"]),
+				image=image_to(Image.open(kwargs["--init-image"])),
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
 			).images[0]
