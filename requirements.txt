@@ -48,5 +48,4 @@ torch>=2.0.0
 transformers>=4.27.4
 tsc_utils>=0.2.3
 waitress>=2.1.2
-xformers>=0.0.16
 yt-dlp>=2023.3.4

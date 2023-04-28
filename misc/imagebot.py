@@ -446,11 +446,14 @@ class Bot:
 		print(resp.status_code, resp.text)
 
 	safety_checker = lambda images, **kwargs: (images, [False] * len(images))
-	def art_stablediffusion_local(self, prompt, kwargs=None, model="runwayml/stable-diffusion-v1-5", fail_unless_gpu=True, nsfw=False):
+	def art_stablediffusion_local(self, prompt, kwargs=None, model="stabilityai/stable-diffusion-2-1", fail_unless_gpu=True, nsfw=False):
 		cia = torch.cuda.is_available()
 		from diffusers import DPMSolverMultistepScheduler, StableDiffusionPipeline, StableDiffusionImg2ImgPipeline, StableDiffusionInpaintPipeline, StableDiffusionImageVariationPipeline
+		from transformers import CLIPModel
 		if not kwargs.get("--init-image"):
 			pf = StableDiffusionPipeline
+			if model == "stabilityai/stable-diffusion-2-1":
+				model = "runwayml/stable-diffusion-v1-5"
 		elif kwargs.get("--mask"):
 			pf = StableDiffusionInpaintPipeline
 		elif prompt:
@@ -463,7 +466,8 @@ class Bot:
 		if not pipe:
 			kw = {}
 			if pf is StableDiffusionImageVariationPipeline:
-				kw["image_encoder"] = "openai/clip-vit-base-patch32"
+				clip = CLIPModel.from_pretrained("openai/clip-vit-large-patch32", torch_dtype=torch.float16 if cia else torch.float32)
+				kw["image_encoder"] = clip
 			pipe = pf.from_pretrained(model, torch_dtype=torch.float16 if cia else torch.float32, **kw)
 			pipe.enable_attention_slicing()
 			pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
@@ -473,11 +477,11 @@ class Bot:
 						raise MemoryError("CUDA: Insufficient estimated virtual memory.")
 					pipe = pipe.to("cuda")
 					pipe.enable_model_cpu_offload()
-					if pf is StableDiffusionPipeline:
-						try:
-							pipe.enable_xformers_memory_efficient_attention()
-						except ImportError:
-							pass
+					# if pf is StableDiffusionPipeline:
+					# try:
+					# 	pipe.enable_xformers_memory_efficient_attention()
+					# except ImportError:
+					# 	pass
 				except:
 					self.models[(pf, model)] = False
 					print_exc()
