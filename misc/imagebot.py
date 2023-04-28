@@ -476,7 +476,10 @@ class Bot:
 					if torch.cuda.get_device_properties(0).total_memory < 8589934592:
 						raise MemoryError("CUDA: Insufficient estimated virtual memory.")
 					pipe = pipe.to("cuda")
-					pipe.enable_model_cpu_offload()
+					try:
+						pipe.enable_model_cpu_offload()
+					except AttributeError:
+						pass
 					# if pf is StableDiffusionPipeline:
 					# try:
 					# 	pipe.enable_xformers_memory_efficient_attention()
