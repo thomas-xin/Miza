@@ -471,7 +471,7 @@ class Bot:
 		im = pipe(
 			prompt,
 			num_inference_steps=int(kwargs.get("--num-inference-steps", 50)),
-			guidance_scale=int(kwargs.get("--guidance-scale", 7.5)),
+			guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
 		).images[0]
 		b = io.BytesIO()
 		im.save(b, format="png")
