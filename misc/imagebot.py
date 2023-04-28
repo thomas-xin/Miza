@@ -461,7 +461,10 @@ class Bot:
 		if pipe == False and fail_unless_gpu:
 			return
 		if not pipe:
-			pipe = pf.from_pretrained(model, torch_dtype=torch.float16 if cia else torch.float32)
+			kw = {}
+			if pf is StableDiffusionImageVariationPipeline:
+				kw["image_encoder"] = "openai/clip-vit-base-patch32"
+			pipe = pf.from_pretrained(model, torch_dtype=torch.float16 if cia else torch.float32, **kw)
 			pipe.enable_attention_slicing()
 			pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 			if cia and self.models.get((pf, model), True):
@@ -470,10 +473,11 @@ class Bot:
 						raise MemoryError("CUDA: Insufficient estimated virtual memory.")
 					pipe = pipe.to("cuda")
 					pipe.enable_model_cpu_offload()
-					try:
-						pipe.enable_xformers_memory_efficient_attention()
-					except ImportError:
-						pass
+					if pf is StableDiffusionPipeline:
+						try:
+							pipe.enable_xformers_memory_efficient_attention()
+						except ImportError:
+							pass
 				except:
 					self.models[(pf, model)] = False
 					print_exc()
