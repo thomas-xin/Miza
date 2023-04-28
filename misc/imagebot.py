@@ -445,34 +445,74 @@ class Bot:
 			return False
 		print(resp.status_code, resp.text)
 
-	def art_stablediffusion_local(self, prompt, kwargs=None, model="stabilityai/stable-diffusion-2-1", fail_unless_gpu=True):
-		pipe = torch.cuda.is_available() and self.models.get(model)
+	safety_checker = lambda images, **kwargs: (images, [False] * len(images))
+	def art_stablediffusion_local(self, prompt, kwargs=None, model="runwayml/stable-diffusion-v1-5", fail_unless_gpu=True, nsfw=False):
+		cia = torch.cuda.is_available()
+		if not kwargs.get("--init-image"):
+			pf = StableDiffusionPipeline
+		elif kwargs.get("--mask"):
+			pf = StableDiffusionInpaintPipeline
+		elif prompt:
+			pf = StableDiffusionImg2ImgPipeline
+		else:
+			pf = StableDiffusionImageVariationPipeline
+		pipe = cia and self.models.get((pf, model))
 		if pipe == False and fail_unless_gpu:
 			return
 		if not pipe:
-			from diffusers import StableDiffusionPipeline, DPMSolverMultistepScheduler
-			pipe = StableDiffusionPipeline.from_pretrained(model, torch_dtype=torch.float16)
+			from diffusers import DPMSolverMultistepScheduler, StableDiffusionPipeline, StableDiffusionImg2ImgPipeline, StableDiffusionInpaintPipeline, StableDiffusionImageVariationPipeline
+			pipe = pf.from_pretrained(model, torch_dtype=torch.float16 if cia else torch.float32)
 			pipe.enable_attention_slicing()
 			pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
-			if torch.cuda.is_available() and self.models.get(model, True):
+			if cia and self.models.get((pf, model), True):
 				try:
 					if torch.cuda.get_device_properties(0).total_memory < 8589934592:
 						raise MemoryError("CUDA: Insufficient estimated virtual memory.")
 					pipe = pipe.to("cuda")
-					# pipe.enable_xformers_memory_efficient_attention()
+					pipe.enable_model_cpu_offload()
+					try:
+						pipe.enable_xformers_memory_efficient_attention()
+					except ImportError:
+						pass
 				except:
-					self.models[model] = False
+					self.models[(pf, model)] = False
 					print_exc()
 					print("StablediffusionL: CUDA f16 init failed")
 					if fail_unless_gpu:
 						return
+			self.safety_checker = pipe.safety_checker
+			self.models[(pf, model)] = pipe
+		if nsfw:
 			pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
-			self.models[model] = pipe
-		im = pipe(
-			prompt,
-			num_inference_steps=int(kwargs.get("--num-inference-steps", 50)),
-			guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
-		).images[0]
+		else:
+			pipe.safety_checker = self.safety_checker
+		if pf is StableDiffusionInpaintPipeline:
+			im = pipe(
+				prompt,
+				image=Image.open(kwargs["--init-image"]),
+				mask_image=Image.open(kwargs["--mask"]),
+				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
+				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
+			).images[0]
+		elif pf is StableDiffusionImg2ImgPipeline:
+			im = pipe(
+				prompt,
+				image=Image.open(kwargs["--init-image"]),
+				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
+				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
+			).images[0]
+		elif pf is StableDiffusionImageVariationPipeline:
+			im = pipe(
+				image=Image.open(kwargs["--init-image"]),
+				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
+				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
+			).images[0]
+		else:
+			im = pipe(
+				prompt,
+				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
+				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
+			).images[0]
 		b = io.BytesIO()
 		im.save(b, format="png")
 		print("StablediffusionL:", b)

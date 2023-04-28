@@ -1400,6 +1400,7 @@ class Art(Command):
     sdiff_sem = Semaphore(1, 256, rate_limit=16)
     fut = None
     imagebot = imagebot.Bot(token=AUTH.get("openai_key"))
+    has_py39 = subprocess.run("py -3.9 -m pip").returncode == 0
 
     async def __call__(self, bot, guild, user, channel, message, name, args, flags, **void):
         for a in reversed(message.attachments):
@@ -1424,7 +1425,7 @@ class Art(Command):
         rems = deque()
         kwargs = {
             "--device": "GPU",
-            "--num-inference-steps": "24",
+            "--num-inference-steps": "48",
             "--guidance-scale": "7.5",
             "--eta": "0.8",
         }
@@ -1479,15 +1480,6 @@ class Art(Command):
                 url = urls.pop(0)
             if urls and not url2:
                 url2 = urls.pop(0)
-        if not self.fut and not os.path.exists("misc/stable_diffusion.openvino"):
-            self.fut = create_future(subprocess.run(
-                [
-                    "git",
-                    "clone",
-                    "https://github.com/bes-dev/stable_diffusion.openvino.git",
-                ],
-                cwd="misc",
-            ))
         prompt = " ".join(rems).strip()
         if not prompt:
             if not url:
@@ -1509,15 +1501,15 @@ class Art(Command):
         if specified:
             req += " ".join(f"{k} {v}" for k, v in kwargs.items() if k in specified)
         nsfw = bot.is_nsfw(channel)
-        if not nsfw and prompt and AUTH.get("openai_key"):
-            import openai
-            openai.api_key = AUTH["openai_key"]
-            resp = openai.Moderation.create(
-                input=prompt,
-            )
-            results = resp.results[0].categories
-            if results.hate or results["self-harm"] or results["sexual/minors"] or results["violence/graphic"]:
-                raise PermissionError("NSFW filter detected in non-NSFW channel. If you believe this was a mistake, please try again.")
+        # if not nsfw and prompt and AUTH.get("openai_key"):
+        #     import openai
+        #     openai.api_key = AUTH["openai_key"]
+        #     resp = openai.Moderation.create(
+        #         input=prompt,
+        #     )
+        #     results = resp.results[0].categories
+        #     if results.hate or results["self-harm"] or results["sexual/minors"] or results["violence/graphic"]:
+        #         raise PermissionError("NSFW filter detected in non-NSFW channel. If you believe this was a mistake, please try again.")
         emb = None
         fn = None
         with discord.context_managers.Typing(channel):
@@ -1526,7 +1518,7 @@ class Art(Command):
                 openjourney = "journey" in name
                 if not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy():
                     async with self.sdiff_sem:
-                        fn = await process_image("IBASL", "&", [prompt, kwargs], fix=2, timeout=1200)
+                        fn = await process_image("IBASL", "&", [prompt, kwargs, nsfw], fix=2, timeout=1200)
                     if fn:
                         raise StopIteration
                 if dalle2 and premium < 4:
@@ -1578,38 +1570,48 @@ class Art(Command):
             except:
                 print_exc()
         if not fn:
-            with tracebacksuppressor:
-                if self.fut:
+            if self.has_py39:
+                with tracebacksuppressor:
+                    if not self.fut and not os.path.exists("misc/stable_diffusion.openvino"):
+                        self.fut = create_future(subprocess.run(
+                            [
+                                "git",
+                                "clone",
+                                "https://github.com/bes-dev/stable_diffusion.openvino.git",
+                            ],
+                            cwd="misc",
+                        ))
                     await self.fut
-                if os.name == "nt":
-                    self.fut = create_future(subprocess.run(
-                        [
-                            python,
-                            "-m",
-                            "pip",
-                            "install",
-                            "-r",
-                            "requirements.txt",
-                        ],
-                        cwd="misc",
-                    ))
-                else:
-                    self.fut = create_future(subprocess.run(
-                        [
-                            sys.executable,
-                            "-m",
-                            "pip",
-                            "install",
-                            "-r",
-                            "requirements.txt",
-                        ],
-                        cwd="misc",
-                    ))
-                await self.fut
-                self.fut = None
+                    if os.name == "nt":
+                        self.fut = create_future(subprocess.run(
+                            [
+                                python,
+                                "-m",
+                                "pip",
+                                "install",
+                                "-r",
+                                "requirements.txt",
+                            ],
+                            cwd="misc",
+                        ))
+                    else:
+                        self.fut = create_future(subprocess.run(
+                            [
+                                sys.executable,
+                                "-m",
+                                "pip",
+                                "install",
+                                "-r",
+                                "requirements.txt",
+                            ],
+                            cwd="misc",
+                        ))
+                    await self.fut
+                    self.fut = None
             if os.name == "nt":
                 args = [
-                    python,
+                    "py",
+                    "-3.9",
                     "demo.py",
                 ]
             else:
@@ -1644,6 +1646,7 @@ class Art(Command):
                             "--strength",
                             "0.75",
                         ))
+                        kwargs["--strength"] = 0.75
                     if premium >= 2 and not force and "--strength" not in kwargs and str(kwargs["--guidance-scale"]) == "7.5" and str(kwargs["--eta"]) == "0.8":
                         with open(image_1, "rb") as f:
                             image_1b = f.read()
@@ -1701,6 +1704,7 @@ class Art(Command):
                                 "--init-image",
                                 "input.png",
                             ))
+                            kwargs["--init-image"] = fn
                             if image_2:
                                 fm = "misc/stable_diffusion.openvino/mask.png"
                                 if os.path.exists(fm):
@@ -1710,6 +1714,7 @@ class Art(Command):
                                     "--mask",
                                     "mask.png",
                                 ))
+                                kwargs["--mask"] = fm
                             elif image_2b:
                                 fm = "misc/stable_diffusion.openvino/mask.png"
                                 with open(fm, "wb") as f:
@@ -1718,17 +1723,23 @@ class Art(Command):
                                     "--mask",
                                     "mask.png",
                                 ))
+                                kwargs["--mask"] = fm
                         for k, v in kwargs.items():
                             args.extend((k, v))
                         print(args)
-                        proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc/stable_diffusion.openvino", stdout=subprocess.DEVNULL)
-                        try:
-                            await asyncio.wait_for(proc.wait(), timeout=3200)
-                        except (T0, T1, T2):
-                            with tracebacksuppressor:
-                                force_kill(proc)
-                            raise
-                        fn = "misc/stable_diffusion.openvino/output.png"
+                        if self.has_py39:
+                            proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc/stable_diffusion.openvino", stdout=subprocess.DEVNULL)
+                            try:
+                                await asyncio.wait_for(proc.wait(), timeout=3200)
+                            except (T0, T1, T2):
+                                with tracebacksuppressor:
+                                    force_kill(proc)
+                                raise
+                            fn = "misc/stable_diffusion.openvino/output.png"
+                        else:
+                            if not force and not kwargs.get("--mask"):
+                                prompt = ""
+                            fn = await process_image("IBASL", "&", [prompt, kwargs, nsfw, True], fix=2, timeout=1200)
         if isinstance(fn, str):
             with open(fn, "rb") as f:
                 fn = f.read()
