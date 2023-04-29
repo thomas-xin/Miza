@@ -62,7 +62,7 @@ def convert_fut(fut):
     return ret
 
 import torch.cuda
-hwaccel = "d3d11va" if os.name == "nt" and not torch.cuda.is_available() else "auto"
+hwaccel = "cuvid" if torch.cuda.is_available() else "d3d11va" if os.name == "nt" else "auto"
 del torch
 
 if not hasattr(time, "time_ns"):
@@ -2897,7 +2897,7 @@ def evalImg(url, operation, args):
 			if duration > dur:
 				duration = dur
 		if video:
-			print("VIDEO:", new)
+			# print("VIDEO:", new)
 			if fmt in ("default", "png", "jpg", "jpeg", "bmp"):
 				fmt = "gif"
 			print(duration, new["count"])
