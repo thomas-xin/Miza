@@ -315,6 +315,8 @@ class AudioPlayer(discord.AudioSource):
 				if not self.queue:
 					return self.emptyopus
 				out = self.queue[0][0].read()
+		if self.silent:
+			self.silent = False
 		return out or self.emptyopus
 
 	def play(self, source, after=None):
@@ -933,15 +935,7 @@ async def received_message(self, msg):
 			'd': time.time_ns() // 1000000,
 		}
 		await self.send_as_json(payload)
-		payload = {
-			'op': self.SPEAKING,
-			'd': {
-				'delay': 0,
-				'speaking': 1,
-				'ssrc': self._connection.ssrc,
-			},
-		}
-		await self.send_as_json(payload)
+		await self.speak(state=1)
 	elif op == self.HEARTBEAT_ACK:
 		if self._keep_alive:
 			self._keep_alive.ack()
@@ -951,15 +945,7 @@ async def received_message(self, msg):
 	elif op == self.SESSION_DESCRIPTION:
 		self._connection.mode = data['mode']
 		self.secret_key = self._connection.secret_key = data['secret_key']
-		payload = {
-			'op': self.SPEAKING,
-			'd': {
-				'delay': 0,
-				'speaking': 0,
-				'ssrc': self._connection.ssrc,
-			},
-		}
-		await self.send_as_json(payload)
+		await self.speak(state=0)
 	elif op == self.SPEAKING:
 		uid = int(data["user_id"])
 		ssrc = int(data["ssrc"])

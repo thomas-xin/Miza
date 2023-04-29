@@ -476,7 +476,7 @@ class CustomAudio(collections.abc.Hashable):
         if self.fut.done() and not guild.me or not guild.me.voice:
             return self.kill(css_md(f"🎵 Automatically disconnected from {sqr_md(guild)}. 🎵"))
         try:
-            self.fut.result(timeout=12)
+            self.fut.result(timeout=16)
         except:
             print_exc()
             return self.kill()
