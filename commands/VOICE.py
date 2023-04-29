@@ -5399,7 +5399,7 @@ class UpdateAudio(Database):
                         futs.append(create_future(auds.update, priority=True))
                         futs.append(create_task(self.research(auds)))
                         if auds.queue and not auds.paused and "dailies" in bot.data:
-                            if auds.ts is not None:
+                            if auds.ts is not None and auds.acsi:
                                 for member in auds.acsi.channel.members:
                                     if member.id != bot.id:
                                         vs = member.voice

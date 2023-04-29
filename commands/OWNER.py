@@ -581,6 +581,8 @@ class UpdateExec(Database):
                             b = await create_future(f.read, 503316480)
                             if not b:
                                 break
+                            if len(b) < 83886080:
+                                raise ValueError(f"Skipping small chunk {len(b)}")
                             resp = await create_future(
                                 reqs.next().post,
                                 AUTH.hmac_signed_url,
@@ -593,7 +595,7 @@ class UpdateExec(Database):
                                 ),
                             )
                             resp.raise_for_status()
-                            url = resp.json()["url"].split("?", 1)[0]
+                            url = resp.json()["url"].split("?", 1)[0] + "?size=" + str(len(b))
                     except:
                         print_exc()
                         f.seek(i)
@@ -604,7 +606,7 @@ class UpdateExec(Database):
                 with tracebacksuppressor:
                     fs = []
                     while len(fs) < 10:
-                        b = f.read(8388608)
+                        b = f.read(26214400)
                         if not b:
                             break
                         fi = CompatFile(b, filename="c.b")
@@ -616,7 +618,7 @@ class UpdateExec(Database):
                     m = channel.guild.me
                     message = await bot.send_as_webhook(channel, f"{fn.rsplit('/', 1)[-1]} ({i})", files=fs, username=m.display_name, avatar_url=best_url(m), recurse=False)
                     for a in message.attachments:
-                        urls.append(str(a.url))
+                        urls.append(str(a.url) + "?size=" + str(len(b)))
                     mids.append(message.id)
                     i = f.tell()
         print(urls, mids)

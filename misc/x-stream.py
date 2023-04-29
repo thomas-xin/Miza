@@ -108,7 +108,10 @@ class Server:
 				big = False
 				while rems:
 					u = rems.pop(0)
-					if u.startswith("https://s3-us-west-2"):
+					if "?size=" in u:
+						u, ns = u.split("?size=", 1)
+						ns = int(ns)
+					elif u.startswith("https://s3-us-west-2"):
 						ns = 503316480
 					elif u.startswith("https://cdn.discord"):
 						ns = 8388608

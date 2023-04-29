@@ -2708,7 +2708,7 @@ class CompatFile(discord.File):
                 self.filename = getattr(fp, "name", None)
         else:
             self.filename = filename
-        self.filename = self.filename.strip().replace(" ", "_") or "untitled"
+        self.filename = (self.filename or "untitled").strip().replace(" ", "_")
         if spoiler:
             if self.filename is not None:
                 if not self.filename.startswith("SPOILER_"):
