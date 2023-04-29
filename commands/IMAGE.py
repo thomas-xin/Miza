@@ -1396,7 +1396,7 @@ class Art(Command):
     rate_limit = (45, 60)
     flags = "i"
     typing = True
-    slash = ("Art",)
+    slash = ("Art", "Imagine")
     sdiff_sem = Semaphore(1, 256, rate_limit=16)
     fut = None
     imagebot = imagebot.Bot(token=AUTH.get("openai_key"))
