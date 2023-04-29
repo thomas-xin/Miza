@@ -501,32 +501,35 @@ class Bot:
 		else:
 			pipe.safety_checker = self.safety_checker
 		if pf is StableDiffusionInpaintPipeline:
-			im = pipe(
+			data = pipe(
 				prompt,
 				image=image_to(Image.open(kwargs["--init-image"])),
 				mask_image=image_to(Image.open(kwargs["--mask"])),
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
-			).images[0]
+			)
 		elif pf is StableDiffusionImg2ImgPipeline:
-			im = pipe(
+			data = pipe(
 				prompt,
 				image=image_to(Image.open(kwargs["--init-image"])),
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
-			).images[0]
+			)
 		elif pf is StableDiffusionImageVariationPipeline:
-			im = pipe(
+			data = pipe(
 				image=image_to(Image.open(kwargs["--init-image"])),
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
-			).images[0]
+			)
 		else:
-			im = pipe(
+			data = pipe(
 				prompt,
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
-			).images[0]
+			)
+		if data.nsfw_content_detected and data.nsfw_content_detected[0]:
+			raise PermissionError("NSFW filter detected in non-NSFW channel. If you believe this was a mistake, please try again.")
+		im = data.images[0]
 		b = io.BytesIO()
 		im.save(b, format="png")
 		print("StablediffusionL:", b)
