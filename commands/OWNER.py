@@ -605,20 +605,23 @@ class UpdateExec(Database):
                         continue
                 with tracebacksuppressor:
                     fs = []
+                    sizes = []
                     while len(fs) < 10:
                         b = f.read(26214400)
                         if not b:
                             break
                         fi = CompatFile(b, filename="c.b")
                         fs.append(fi)
+                        sizes.append(len(b))
                     if not fs:
                         break
                     c_id = choice([c_id for c_id, flag in self.data.items() if flag & 16])
                     channel = await bot.fetch_channel(c_id)
                     m = channel.guild.me
-                    message = await bot.send_as_webhook(channel, f"{fn.rsplit('/', 1)[-1]} ({i})", files=fs, username=m.display_name, avatar_url=best_url(m), recurse=False)
-                    for a in message.attachments:
-                        urls.append(str(a.url) + "?size=" + str(len(b)))
+                    message = await channel.send(f"{fn.rsplit('/', 1)[-1]} ({i})", files=fs)
+                    # message = await bot.send_as_webhook(channel, f"{fn.rsplit('/', 1)[-1]} ({i})", files=fs, username=m.display_name, avatar_url=best_url(m), recurse=False)
+                    for a, bs in zip(message.attachments, sizes):
+                        urls.append(str(a.url) + "?size=" + str(bs))
                     mids.append(message.id)
                     i = f.tell()
         print(urls, mids)
