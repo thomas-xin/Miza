@@ -1518,7 +1518,7 @@ class Art(Command):
                 openjourney = "journey" in name
                 if not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy():
                     async with self.sdiff_sem:
-                        fn = await process_image("IBASL", "&", [prompt, kwargs, nsfw], fix=2, timeout=1200)
+                        fn = await process_image("IBASL", "&", [prompt, kwargs, None, nsfw], fix=2, timeout=1200)
                     if fn:
                         raise StopIteration
                 if dalle2 and premium < 4:
@@ -1738,7 +1738,7 @@ class Art(Command):
                             fn = "misc/stable_diffusion.openvino/output.png"
                         else:
                             noprompt = not force and not kwargs.get("--mask")
-                            fn = await process_image("IBASL", "&", ["" if noprompt else prompt, kwargs, nsfw, True], fix=2, timeout=1200)
+                            fn = await process_image("IBASL", "&", ["" if noprompt else prompt, kwargs, None, nsfw, True], fix=2, timeout=1200)
         if isinstance(fn, str):
             with open(fn, "rb") as f:
                 fn = f.read()
