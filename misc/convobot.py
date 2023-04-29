@@ -1278,7 +1278,7 @@ class Bot:
 				"https://app.visus.ai/t/kxzsjtzfxu/query/clfw3bcof01uqfbey053r4o93/clfw3bcoj01urfbey5czzjaji/?index=&_data=routes%2F_dashboard%2B%2Ft%2B%2F%24teamId%2B%2Fquery%2B%2F%24aiId.%24conversationId%2B%2Findex",
 				data={"newName": "", "intent": "clear-convo"},
 				headers={"Content-Type": "application/x-www-form-urlencoded;charset=UTF-8", "User-Agent": "Mozilla/5.1"},
-				cookies={"__session": vis_s},
+				cookies={"_session": vis_s},
 			)
 			print(resp)
 		# print("Visus prompt:", q)
@@ -1295,7 +1295,7 @@ class Bot:
 				"query": q,
 			}),
 			headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.1"},
-			cookies={"__session": self.vis_s},
+			cookies={"_session": self.vis_s},
 		)
 		try:
 			resp.raise_for_status()

@@ -507,6 +507,7 @@ class Bot:
 				mask_image=image_to(Image.open(kwargs["--mask"])),
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
+				strength=float(kwargs.get("--strength", 0.8)),
 			)
 		elif pf is StableDiffusionImg2ImgPipeline:
 			data = pipe(
@@ -514,6 +515,7 @@ class Bot:
 				image=image_to(Image.open(kwargs["--init-image"])),
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
+				strength=float(kwargs.get("--strength", 0.8)),
 			)
 		elif pf is StableDiffusionImageVariationPipeline:
 			data = pipe(
