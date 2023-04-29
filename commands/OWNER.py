@@ -606,8 +606,8 @@ class UpdateExec(Database):
                 with tracebacksuppressor:
                     fs = []
                     sizes = []
-                    while len(fs) < 10:
-                        b = f.read(26214400)
+                    while len(fs) < 8:
+                        b = f.read(25165824)
                         if not b:
                             break
                         fi = CompatFile(b, filename="c.b")
