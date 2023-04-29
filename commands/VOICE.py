@@ -178,7 +178,6 @@ async def auto_join(guild, channel, user, bot, preparing=False, vc=None):
     except KeyError:
         raise LookupError("Unable to find voice channel.")
     auds.text = channel
-    await wrap_future(auds.fut)
     return auds
 
 
@@ -308,10 +307,8 @@ class CustomAudio(collections.abc.Hashable):
             return getattr(self.__getattribute__("queue"), key)
         except AttributeError:
             pass
-        try:
-            self.fut.result(timeout=1)
-        except concurrent.futures.TimeoutError:
-            raise RuntimeError("Subprocess did not respond.")
+        if not self.fut.done():
+            return
         return getattr(self.__getattribute__("acsi"), key)
 
     def __dir__(self):
@@ -353,13 +350,14 @@ class CustomAudio(collections.abc.Hashable):
         return abs(self.stats.speed)
 
     def _epos(self):
-        self.fut.result(timeout=4)
+        if not self.fut.done():
+            return (0, 0)
         pos = self.acsi.pos
         if not pos[1] and self.queue:
             dur = e_dur(self.queue[0].get("duration"))
             return min(dur, pos[0]), dur
         elif pos[1] is None:
-            return 0, 0
+            return (0, 0)
         return pos
 
     def _pos(self):
