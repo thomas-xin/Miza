@@ -1030,13 +1030,14 @@ async def on_ready():
 	client.closed = True
 
 
-def ensure_parent(proc, parent):
-	while True:
-		if not is_strict_running(parent) or getattr(client, "closed", False):
-			await_fut(kill())
-			force_kill(psutil.Process())
+async def ensure_parent(proc, parent):
+	while not getattr(client, "closed", False):
+		if not is_strict_running(parent):
+			with tracebacksuppressor():
+				await asyncio.wait_for(kill(), timeout=2)
+			force_kill(proc)
 			break
-		time.sleep(6)
+		await asyncio.sleep(12)
 
 
 if __name__ == "__main__":
@@ -1045,5 +1046,5 @@ if __name__ == "__main__":
 	send(f"Audio client starting with PID {pid} and parent PID {ppid}...")
 	proc = psutil.Process(pid)
 	parent = psutil.Process(ppid)
-	create_thread(ensure_parent, proc, parent)
+	create_task(ensure_parent(proc, parent))
 	client.run(AUTH["discord_token"])

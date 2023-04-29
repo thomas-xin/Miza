@@ -5107,7 +5107,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             reacts="❎"
         footer = None
         fields = None
-        if isinstance(ex, TooManyRequests) and not random.randint(0, 5):
+        if isinstance(ex, TooManyRequests):# and not random.randint(0, 5):
             fields = (("Running into the rate limit often?", f"Consider donating using one of the subscriptions from my [ko-fi]({self.kofi_url}), which will grant shorter rate limits amongst many feature improvements!"),)
         elif isinstance(op, tuple):
             fields = (op,)
