@@ -471,7 +471,7 @@ class Bot:
 			# if pf is StableDiffusionImageVariationPipeline:
 			# 	clip = CLIPModel.from_pretrained("openai/clip-vit-base-patch32", torch_dtype=torch.float16 if cia else torch.float32)
 			# 	kw["image_encoder"] = clip
-			pipe = pf.from_pretrained(model, torch_dtype=torch.float16 if cia else torch.float32, **kw)
+			pipe = pf.from_pretrained(model, torch_dtype=torch.float16 if cia else torch.float32, requires_safety_checker=False, **kw)
 			pipe.enable_attention_slicing()
 			pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 			if cia and self.models.get((pf, model), True):
@@ -527,7 +527,7 @@ class Bot:
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
 			)
-		if data.nsfw_content_detected and data.nsfw_content_detected[0]:
+		if not nsfw and data.nsfw_content_detected and data.nsfw_content_detected[0]:
 			raise PermissionError("NSFW filter detected in non-NSFW channel. If you believe this was a mistake, please try again.")
 		im = data.images[0]
 		b = io.BytesIO()
