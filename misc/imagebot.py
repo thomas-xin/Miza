@@ -471,7 +471,7 @@ class Bot:
 			# if pf is StableDiffusionImageVariationPipeline:
 			# 	clip = CLIPModel.from_pretrained("openai/clip-vit-base-patch32", torch_dtype=torch.float16 if cia else torch.float32)
 			# 	kw["image_encoder"] = clip
-			pipe = pf.from_pretrained(model, torch_dtype=torch.float16 if cia else torch.float32, requires_safety_checker=False, **kw)
+			pipe = pf.from_pretrained(model, torch_dtype=torch.float16 if cia else torch.float32, requires_safety_checker=True, **kw)
 			pipe.enable_attention_slicing()
 			pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 			if cia and self.models.get((pf, model), True):
