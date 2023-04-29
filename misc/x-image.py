@@ -2581,13 +2581,11 @@ if len(sys.argv) > 1 and sys.argv[1] == "2":
 		p2 = m.config.id2label[idx].strip()
 		return (p1, p2)
 
-	def IBASL(prompt, kwargs, key=None, nsfw=False, force=True):
+	def IBASL(prompt, kwargs, nsfw=False, force=False):
 		try:
 			ib = CBOTS[None]
 		except KeyError:
-			ib = CBOTS[None] = imagebot.Bot(token=key)
-		if key:
-			ib.token = key
+			ib = CBOTS[None] = imagebot.Bot()
 		return ib.art_stablediffusion_local(prompt, kwargs, nsfw=nsfw, fail_unless_gpu=not force)
 
 if len(sys.argv) > 1 and sys.argv[1] == "3":
