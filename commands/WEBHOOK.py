@@ -191,9 +191,10 @@ class UpdateAutoEmojis(Database):
                             emoji = self.bot.cache.emojis.get(e_id)
                         futs.append(create_task(m2.add_reaction(emoji)))
                         orig = self.bot.data.emojilists.setdefault(message.author.id, {})
-                        orig[name] = emoji.id
-                        self.bot.data.emojilists.update(message.author.id)
-                        self.bot.data.emojinames[emoji.id] = name
+                        if getattr(emoji, "id", None):
+                            orig[name] = emoji.id
+                            self.bot.data.emojilists.update(message.author.id)
+                            self.bot.data.emojinames[emoji.id] = name
                 if futs:
                     futs.append(create_task(self.bot.silent_delete(message)))
                     for fut in futs:
