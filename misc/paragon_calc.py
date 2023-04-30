@@ -29,7 +29,10 @@ def get_tower_data():
 		middle = lines.pop(0).split("{", 1)[-1].split("}", 1)[0].split(",")
 		bottom = lines.pop(0).split("{", 1)[-1].split("}", 1)[0].split(",")
 		data["base"] = int(lines.pop(0).split("{", 1)[-1].split("}", 1)[0])
-		data["paragon"] = int(lines.pop(0).split("{", 1)[-1].split("}", 1)[0].strip() or 0)
+		if not lines or lines[0].strip().startswith("MK = "):
+			data["paragon"] = 0
+		else:
+			data["paragon"] = int(lines.pop(0).split("{", 1)[-1].split("}", 1)[0].strip() or 0)
 		data["upgrades"] = [list(map(int, top)), list(map(int, middle)), list(map(int, bottom))]
 	return COSTS
 get_tower_data()
