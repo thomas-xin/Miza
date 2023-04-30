@@ -2515,7 +2515,7 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 
 	try:
 		from chatgpt_wrapper import AsyncChatGPT
-	except ModuleNotFoundError:
+	except ImportError:
 		convobot.AsyncChatGPT = None
 	except:
 		convobot.AsyncChatGPT = None
