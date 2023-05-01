@@ -458,7 +458,7 @@ def zip2bytes(data):
     if data[:1] == b"~":
         import lzma
         return lzma.decompress(memoryview(data)[1:])
-    if data[:1] == b"$":
+    if data[:1] == b"!":
         import zlib
         return zlib.decompress(memoryview(data)[1:])
     if not hasattr(data, "read"):
@@ -469,9 +469,9 @@ def zip2bytes(data):
 def bytes2zip(data, lzma=False):
     if lzma:
         import lzma
-        return b"$" + lzma.compress(data)
+        return b"~" + lzma.compress(data)
     import zlib
-    return b"$" + zlib.compress(data)
+    return b"!" + zlib.compress(data)
     # b = io.BytesIO()
     # ctype = zipfile.ZIP_LZMA if lzma else zipfile.ZIP_DEFLATED
     # with ZipFile(b, "w", compression=ctype, allowZip64=True) as z:
@@ -509,18 +509,20 @@ def select_and_loads(s, mode="safe", size=None):
             raise
         else:
             time.sleep(0.1)
-    b = io.BytesIO(s)
-    if zipfile.is_zipfile(b):
-        if len(s) > 1048576:
-            print(f"Loading zip file of size {len(s)}...")
-        b.seek(0)
-        with ZipFile(b, allowZip64=True, strict_timestamps=False) as z:
-            n = z.namelist()[0]
-            if size:
-                x = z.getinfo(n).file_size
-                if size < x:
-                    raise OverflowError(f"Data input size too large ({x} > {size}).")
-            s = z.read(n)
+    if s[:1] in (b"~", b"!") or zipfile.is_zipfile(io.BytesIO(s)):
+        s = zip2bytes(s)
+    # b = io.BytesIO(s)
+    # if zipfile.is_zipfile(b):
+    #     if len(s) > 1048576:
+    #         print(f"Loading zip file of size {len(s)}...")
+    #     b.seek(0)
+    #     with ZipFile(b, allowZip64=True, strict_timestamps=False) as z:
+    #         n = z.namelist()[0]
+    #         if size:
+    #             x = z.getinfo(n).file_size
+    #             if size < x:
+    #                 raise OverflowError(f"Data input size too large ({x} > {size}).")
+    #         s = z.read(n)
     data = None
     if not s:
         return data
