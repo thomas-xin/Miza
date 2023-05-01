@@ -3082,10 +3082,10 @@ class RPS(Command):
             if looped:
                 await bot.send_as_embeds(channel, response)
             else:
-                await channel.send(response, reference=message)
+                await send_with_reply(channel, message, response)
         except KeyError:
             emoji = choice("😛", "😶‍🌫️", "😇", "😶")
-            await channel.send(f"\u200b{''.join(y for x in zip(argv[::2].upper(), argv[1::2].lower() + (' ' if len(argv) & 1 else '')) for y in x if y).strip()} doesn't count! {emoji}", reference=message)
+            await send_with_reply(channel, message, f"\u200b{''.join(y for x in zip(argv[::2].upper(), argv[1::2].lower() + (' ' if len(argv) & 1 else '')) for y in x if y).strip()} doesn't count! {emoji}")
 
     async def _callback_(self, bot, message, reaction, argv, user, perm, vals, **void):
         u_id = int(vals)
