@@ -2106,7 +2106,7 @@ class UpdateDogpiles(Database):
             print(message.channel, content, mcount)
             if content[0].isascii() and content[:2] != "<:" and not is_url(content):
                 content = lim_str("\u200b" + content, 2000)
-            create_task(message.channel.send(content, tts=message.tts))
+            create_task(discord.abc.Messageable.send(message.channel, content, tts=message.tts))
             self.bot.data.users.add_xp(message.author, len(content) / 2 + 16)
             self.bot.data.users.add_gold(message.author, len(content) / 4 + 32)
 
