@@ -507,8 +507,6 @@ def select_and_loads(s, mode="safe", size=None):
             pass
         except:
             raise
-        else:
-            time.sleep(0.1)
     if s[:1] in (b"~", b"!") or zipfile.is_zipfile(io.BytesIO(s)):
         s = zip2bytes(s)
     # b = io.BytesIO(s)
@@ -667,9 +665,10 @@ class FileHashDict(collections.abc.MutableMapping):
                         with self.db_sem:
                             s = next(self.cur.execute(f"SELECT value FROM '{self.path}' WHERE key=?", (k,)))[0]
                         if s:
-                            data = select_and_loads(self.decode(s), mode="unsafe")
-                            self.data[k] = data
-                            return data
+                            with tracebacksuppressor:
+                                data = select_and_loads(self.decode(s), mode="unsafe")
+                                self.data[k] = data
+                                return data
                     elif isinstance(k, str) and k.startswith("~"):
                         raise TypeError("Attempted to load SQL database inappropriately")
                 raise KeyError(k)

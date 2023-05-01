@@ -44,6 +44,7 @@ sentencepiece>=0.1.98
 sentence-transformers>=2.2.2
 sympy>=1.11.1
 tiktoken>=0.3.3
+tokenizers>=0.13.3
 torch>=2.0.0
 transformers>=4.27.4
 tsc_utils>=0.2.3
