@@ -2529,7 +2529,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if not c:
                 await asyncio.sleep(1)
                 c = await create_future(proc.cpu_percent)
-            m = proc.memory_percent()
+            # m = proc.memory_percent()
+            m = proc.memory_info().vms
             return float(c), float(m)
         return 0, 0
 
@@ -2562,11 +2563,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         resp = await recursive_coro(tasks)
         stats += [sum(st[0] for st in resp), sum(st[1] for st in resp), 0]
         cpu = psutil.cpu_count(logical=True)
-        mem = psutil.virtual_memory()
+        # mem = psutil.virtual_memory()
         # CPU is totalled across all cores
         stats[0] /= cpu
         # Memory is in %
-        stats[1] *= mem.total / 100
+        # stats[1] *= mem.total / 100
         stats[2] = self.disk
         self.size2 = fcdict()
         files = os.listdir("misc")

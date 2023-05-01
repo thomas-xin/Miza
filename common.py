@@ -455,17 +455,28 @@ def decrypt(s):
 
 
 def zip2bytes(data):
+    if data[:1] == b"~":
+        import lzma
+        return lzma.decompress(memoryview(data)[1:])
+    if data[:1] == b"$":
+        import zlib
+        return zlib.decompress(memoryview(data)[1:])
     if not hasattr(data, "read"):
         data = io.BytesIO(data)
     with zipfile.ZipFile(data, allowZip64=True, strict_timestamps=False) as z:
         return z.read(z.namelist()[0])
 
 def bytes2zip(data, lzma=False):
-    b = io.BytesIO()
-    ctype = zipfile.ZIP_LZMA if lzma else zipfile.ZIP_DEFLATED
-    with ZipFile(b, "w", compression=ctype, allowZip64=True) as z:
-        z.writestr("D", data=data)
-    return b.getbuffer()
+    if lzma:
+        import lzma
+        return b"$" + lzma.compress(data)
+    import zlib
+    return b"$" + zlib.compress(data)
+    # b = io.BytesIO()
+    # ctype = zipfile.ZIP_LZMA if lzma else zipfile.ZIP_DEFLATED
+    # with ZipFile(b, "w", compression=ctype, allowZip64=True) as z:
+    #     z.writestr("D", data=data)
+    # return b.getbuffer()
 
 
 # Safer than raw eval, more powerful than json.loads
@@ -546,7 +557,7 @@ def select_and_dumps(data, mode="safe", compress=True):
             s = pickle.dumps(data)
         if len(s) > 32768 and compress:
             t = bytes2zip(s, lzma=len(s) > 16777216)
-            if len(t) < len(s):
+            if len(t) < len(s) * 0.9:
                 s = t
         return s
     try:
@@ -555,7 +566,7 @@ def select_and_dumps(data, mode="safe", compress=True):
         s = None
     if len(s) > 262144:
         t = bytes2zip(s, lzma=False)
-        if len(t) < len(s):
+        if len(t) < len(s) * 0.9:
             s = t
     return s
 
@@ -582,12 +593,8 @@ class FileHashDict(collections.abc.MutableMapping):
         self.db = sqlite3.connect(f"{self.path}/~~", check_same_thread=False)
         self.cur = self.db.cursor()
         self.cur.execute(f"CREATE TABLE IF NOT EXISTS '{self.path}' (key VARCHAR(256) PRIMARY KEY, value BLOB)")
-        self.comp = set(self.c.keys())
         self.codb = set(try_int(r[0]) for r in self.cur.execute(f"SELECT key FROM '{self.path}'") if r)
         self.db_sem = Semaphore(1, 64)
-        if self.comp:
-            self.data.pop("~", None)
-            print(f"{self.path}: Successfully loaded {len(self.comp)} compressed entries.")
         self.c_updated = False
 
     __hash__ = lambda self: lambda self: hash(self.path)
@@ -601,11 +608,6 @@ class FileHashDict(collections.abc.MutableMapping):
 
     def key_path(self, k):
         return f"{self.path}/{k}"
-
-    @property
-    def c(self):
-        self.data["~"] = c = self.get("~", {})
-        return c
 
     @property
     def full(self):
@@ -628,8 +630,6 @@ class FileHashDict(collections.abc.MutableMapping):
                 gen.update(self.modified)
             if self.deleted:
                 gen.difference_update(self.deleted)
-            if self.comp:
-                gen.update(self.comp)
             if self.codb:
                 gen.update(self.codb)
             self.iter = alist(i for i in gen if not isinstance(i, str) or not i.startswith("~"))
@@ -661,9 +661,6 @@ class FileHashDict(collections.abc.MutableMapping):
             fn += "\x7f\x7f"
             if not os.path.exists(fn):
                 if k != "~":
-                    if k in self.comp:
-                        with suppress(KeyError):
-                            return self.c[k]
                     if k in self.codb:
                         with self.db_sem:
                             s = next(self.cur.execute(f"SELECT value FROM '{self.path}' WHERE key=?", (k,)))[0]
@@ -705,9 +702,6 @@ class FileHashDict(collections.abc.MutableMapping):
         with suppress(ValueError):
             k = int(k)
         self.deleted.discard(k)
-        # if k in self.comp:
-        #     self.c.pop(k, None)
-        #     self.c_updated = True
         self.data[k] = v
         self.modified.add(k)
 
@@ -724,10 +718,6 @@ class FileHashDict(collections.abc.MutableMapping):
                     with self.db_sem:
                         self.cur.execute(f"DELETE FROM '{self.path}' WHERE key=?", (k,))
                     self.codb.discard(k)
-                    self.c_updated = True
-                elif k in self.comp:
-                    self.c.pop(k, None)
-                    self.comp.discard(k)
                     self.c_updated = True
                 self.deleted.add(k)
             if force:
@@ -775,9 +765,6 @@ class FileHashDict(collections.abc.MutableMapping):
             self.iter.clear()
         self.modified.clear()
         self.deleted.clear()
-        self.c_updated = len(self.c)
-        self.data["~"] = {}
-        self.comp.clear()
         self.data.clear()
         with self.db_sem:
             self.cur.execute(f"DELETE FROM '{self.path}'")
@@ -804,18 +791,9 @@ class FileHashDict(collections.abc.MutableMapping):
                         self.cur.execute(f"DELETE FROM '{self.path}' WHERE key=?", (k,))
                     self.codb.discard(k)
                     self.c_updated = True
-                elif k in self.comp:
-                    self.c.pop(k, None)
-                    self.comp.discard(k)
-                    self.c_updated = True
-        cinter = self.comp.intersection(self.codb)
-        for k in cinter:
-            self.c.pop(k, None)
-            self.comp.discard(k)
         if not self.c_updated:
             t = utc()
             old = {try_int(f.name) for f in os.scandir(self.path) if not f.name.endswith("\x7f") and not f.name.startswith("~") and t - f.stat().st_mtime > 3600}
-            old.update(self.comp)
             if old:
                 if self.deleted:
                     old.difference_update(self.deleted)
@@ -834,15 +812,10 @@ class FileHashDict(collections.abc.MutableMapping):
                                     + "ON CONFLICT(key) DO UPDATE SET 'value' = ?",
                                 [d, d],
                             )
-                        if k in self.comp:
-                            self.c.pop(k, None)
-                            self.comp.discard(k)
-                        # self.c[k] = self.pop(k, force=True, remove=False)
                 self.c_updated = True
         if self.c_updated:
             modified.add("~")
             self.c_updated = False
-            self.comp = set(self.c.keys())
             self.db.commit()
             with self.db_sem:
                 self.codb = set(try_int(r[0]) for r in self.cur.execute(f"SELECT key FROM '{self.path}'") if r)
