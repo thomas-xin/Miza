@@ -671,6 +671,7 @@ class FileHashDict(collections.abc.MutableMapping):
                                 return data
                     elif isinstance(k, str) and k.startswith("~"):
                         raise TypeError("Attempted to load SQL database inappropriately")
+                self.deleted.add(k)
                 raise KeyError(k)
         with self.sem:
             with open(fn, "rb") as f:
