@@ -48,14 +48,24 @@ def create_driver():
 	except selenium.common.SessionNotCreatedException as ex:
 		if "Current browser version is " in (s := repr(ex)):
 			v = s.split("Current browser version is ", 1)[-1].split(None, 1)[0]
-			url = f"https://msedgedriver.azureedge.net/{v}/edgedriver_win64.zip"
-			import requests, io, zipfile
-			with requests.get(url, headers={"User-Agent": "Mozilla/6.0"}) as resp:
-				with zipfile.ZipFile(io.BytesIO(resp.content)) as z:
-					with z.open("msedgedriver.exe") as fi:
-						with open("misc/msedgedriver.exe", "wb") as fo:
-							b = fi.read()
-							fo.write(b)
+			if os.name == "nt":
+				url = f"https://msedgedriver.azureedge.net/{v}/edgedriver_win64.zip"
+				import requests, io, zipfile
+				with requests.get(url, headers={"User-Agent": "Mozilla/6.0"}) as resp:
+					with zipfile.ZipFile(io.BytesIO(resp.content)) as z:
+						with z.open("msedgedriver.exe") as fi:
+							with open("misc/msedgedriver.exe", "wb") as fo:
+								b = fi.read()
+								fo.write(b)
+			else:
+				url = f"https://msedgedriver.azureedge.net/{v}/edgedriver_linux64.zip"
+				import requests, io, zipfile
+				with requests.get(url, headers={"User-Agent": "Mozilla/6.0"}) as resp:
+					with zipfile.ZipFile(io.BytesIO(resp.content)) as z:
+						with z.open("msedgedriver") as fi:
+							with open("misc/msedgedriver", "wb") as fo:
+								b = fi.read()
+								fo.write(b)
 			driver = browser["driver"](
 				service=service,
 				options=options,
@@ -67,14 +77,24 @@ def create_driver():
 		search = "unrecognized Microsoft Edge version"
 		if search in argv and "Chrome" in argv:
 			v = argv.split("Stacktrace", 1)[0].rsplit("/", 1)[-1].strip()
-			url = f"https://chromedriver.storage.googleapis.com/{v}/chromedriver_win32.zip"
-			import requests, io, zipfile
-			with requests.get(url, headers={"User-Agent": "Mozilla/6.0"}) as resp:
-				with zipfile.ZipFile(io.BytesIO(resp.content)) as z:
-					with z.open("chromedriver.exe") as fi:
-						with open("misc/msedgedriver.exe", "wb") as fo:
-							b = fi.read()
-							fo.write(b)
+			if os.name == "nt":
+				url = f"https://chromedriver.storage.googleapis.com/{v}/chromedriver_win32.zip"
+				import requests, io, zipfile
+				with requests.get(url, headers={"User-Agent": "Mozilla/6.0"}) as resp:
+					with zipfile.ZipFile(io.BytesIO(resp.content)) as z:
+						with z.open("msedgedriver.exe") as fi:
+							with open("misc/msedgedriver.exe", "wb") as fo:
+								b = fi.read()
+								fo.write(b)
+			else:
+				url = f"https://chromedriver.storage.googleapis.com/{v}/chromedriver_linux64.zip"
+				import requests, io, zipfile
+				with requests.get(url, headers={"User-Agent": "Mozilla/6.0"}) as resp:
+					with zipfile.ZipFile(io.BytesIO(resp.content)) as z:
+						with z.open("msedgedriver") as fi:
+							with open("misc/msedgedriver", "wb") as fo:
+								b = fi.read()
+								fo.write(b)
 			driver = browser["driver"](
 				service=service,
 				options=options,
@@ -82,6 +102,7 @@ def create_driver():
 		else:
 			raise
 	driver.folder = folder
+	driver.get("file://")
 	return driver
 
 LAST_DRIVER = 0

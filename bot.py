@@ -5801,10 +5801,13 @@ class AudioClientInterface:
     returns = {}
     written = False
     killed = False
+    communicating = None
 
     def __init__(self):
         self.proc = psutil.Popen([python, "x-audio.py"], cwd=os.getcwd() + "/misc", stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=65536)
-        create_thread(self.communicate)
+        if self.communicating:
+            self.communicating.join()
+        self.communicating = create_thread(self.communicate)
         with suppress():
             if os.name == "nt":
                 self.proc.ionice(psutil.IOPRIO_HIGH)
@@ -5841,6 +5844,7 @@ class AudioClientInterface:
             self.proc.stdin.flush()
             resp = await asyncio.wait_for(wrap_future(self.returns[key]), timeout=48)
         except (T0, T1, T2, OSError):
+            print("AExpired:", s)
             if self.killed:
                 raise
             try:
