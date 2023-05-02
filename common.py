@@ -696,6 +696,7 @@ class FileHashDict(collections.abc.MutableMapping):
                     print(f"Successfully recovered backup of {fn} from {file}.")
                     break
         if data is BaseException:
+            self.deleted.add(k)
             raise KeyError(k)
         self.data[k] = data
         return data
