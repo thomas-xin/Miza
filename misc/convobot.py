@@ -1526,7 +1526,7 @@ class Bot:
 			if tlim < 32:
 				return
 			if len(self.gpttokens(v)) > tlim + 4:
-				if ai:
+				if ai and torch.cuda.is_available():
 					v = self.auto_summarise(q=v, max_length=tlim, min_length=tlim // 2).replace("\n", ". ").strip()
 				else:
 					v = lim_tokens(v, tlim).strip()
@@ -1544,7 +1544,7 @@ class Bot:
 			if tlim < 32:
 				return
 			if len(self.gpttokens(v)) > tlim + 4:
-				if ai:
+				if ai and torch.cuda.is_available():
 					v = self.auto_summarise(q=v, max_length=tlim, min_length=tlim // 2).replace("\n", ". ").strip()
 				else:
 					v = lim_tokens(v, tlim).strip()
