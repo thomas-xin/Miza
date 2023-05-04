@@ -61,9 +61,8 @@ def convert_fut(fut):
         loop.create_task(_await_fut(fut, ret))
     return ret
 
-import torch.cuda
+import torch
 hwaccel = "cuvid" if torch.cuda.is_available() else "d3d11va" if os.name == "nt" else "auto"
-del torch
 
 if not hasattr(time, "time_ns"):
 	time.time_ns = lambda: int(time.time() * 1e9)
@@ -2537,7 +2536,7 @@ def rank_embeddings(embs, emb, temp=0.5):
 	top = np.max(z)
 	return [i for i in np.argsort(z)[::-1] if z[i] - random.random() / 3 >= (top - temp * 2 / 3)]
 
-if len(sys.argv) > 1 and sys.argv[1] == "2":
+elif len(sys.argv) > 1 and sys.argv[1] == "2":
 	import imagebot
 	for i in range(3):
 		try:
@@ -2590,7 +2589,7 @@ if len(sys.argv) > 1 and sys.argv[1] == "2":
 			ib = CBOTS[None] = imagebot.Bot()
 		return ib.art_stablediffusion_local(prompt, kwargs, nsfw=nsfw, fail_unless_gpu=not force)
 
-if len(sys.argv) > 1 and sys.argv[1] == "3":
+elif len(sys.argv) > 1 and sys.argv[1] == "3":
 
 	def determine_cuda(mem=1, priority=False):
 		if not torch.cuda.is_available():
@@ -2615,6 +2614,9 @@ if len(sys.argv) > 1 and sys.argv[1] == "3":
 	def embedding(s):
 		a = Embedder.encode(s).astype(np.float16)
 		return a.data
+
+else:
+	del torch
 
 
 def write_to(fn, data):
