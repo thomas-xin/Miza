@@ -2585,7 +2585,7 @@ elif len(sys.argv) > 1 and sys.argv[1] == "3":
 			return -1, torch.float32
 		dps = [torch.cuda.get_device_properties(i) for i in range(n)]
 		sign = 1 if priority else -1
-		pcs = sorted(range(n), key=lambda i: (p := dps[i]) or (p.total_memory >= mem, p.multi_processor_count * sign), reverse=True)
+		pcs = sorted(range(n), key=lambda i: (p := dps[i]) and (p.total_memory >= mem, p.multi_processor_count * sign), reverse=True)
 		return pcs[0], torch.float16
 
 	device, dtype = determine_cuda(1073741824)
