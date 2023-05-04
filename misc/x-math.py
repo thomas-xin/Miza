@@ -501,16 +501,16 @@ def gcd(*nums):
 	return nums[0]
 
 if os.name == "nt":
-	if not os.path.exists("misc/ecm.exe"):
+	if not os.path.exists("misc/ecm.exe") or os.path.getsize("misc/ecm.exe") < 4096:
 		import requests
-		with requests.get("https://cdn.discordapp.com/attachments/731709481863479436/899561574145081364/ecm.exe") as resp:
+		with requests.get("https://cdn.discordapp.com/attachments/703579929840844891/1103723891815362600/ecm.exe") as resp:
 			b = resp.content
 		with open("misc/ecm.exe", "wb") as f:
 			f.write(b)
 else:
-	if not os.path.exists("misc/ecm"):
+	if not os.path.exists("misc/ecm") or os.path.getsize("misc/ecm") < 4096:
 		import requests
-		with requests.get("https://cdn.discordapp.com/attachments/731709481863479436/899561549881032734/ecm") as resp:
+		with requests.get("https://cdn.discordapp.com/attachments/703579929840844891/1103729122909376562/ecm") as resp:
 			b = resp.content
 		with open("misc/ecm", "wb") as f:
 			f.write(b)
@@ -529,7 +529,7 @@ def _factorint(n, **kwargs):
 		return _fcache[s]
 	except KeyError:
 		pass
-	args = ["misc/ecm", s]
+	args = ["misc/ecm", s, "2"]
 	try:
 		proc = subprocess.run(args, stdout=subprocess.PIPE)
 	except PermissionError:

@@ -453,6 +453,9 @@ def decrypt(s):
         return enc_box.decrypt(s[8:])
     raise ValueError("Data header not found.")
 
+PORT = AUTH.get("webserver_port", 80)
+IND = "\x7f"
+
 
 def zip2bytes(data):
     if data[:1] == b"~":

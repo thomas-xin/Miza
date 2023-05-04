@@ -6018,9 +6018,6 @@ def userIter4(x):
         yield to_alphanumeric(x.nick).replace(" ", "").casefold()
 
 
-PORT = AUTH.get("webserver_port", 80)
-IND = "\x7f"
-
 def update_file_cache():
     attachments = {t for t in bot.cache.attachments.items() if type(t[-1]) is bytes}
     while len(attachments) > 512:
