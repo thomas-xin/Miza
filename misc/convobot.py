@@ -207,6 +207,17 @@ def update():
 			drivers.clear()
 			return_driver(d)
 
+def determine_cuda(mem=1, priority=False):
+	if not torch.cuda.is_available():
+		return -1, torch.float32
+	n = torch.cuda.device_count()
+	if not n:
+		return -1, torch.float32
+	dps = [torch.cuda.get_device_properties(i) for i in range(n)]
+	sign = 1 if priority else -1
+	pcs = sorted(i, key=lambda i: (p := dps[i]) or (p.total_memory >= mem, p.multi_processor_count * sign), reverse=True)
+	return pcs[0], torch.float16
+
 def safecomp(gen):
 	while True:
 		try:
@@ -438,20 +449,14 @@ class Bot:
 				break
 			except KeyError:
 				pass
-			if torch.cuda.is_available():
-				try:
-					n = torch.cuda.device_count()
-					if n > 1:
-						device = random.randint(0, torch.cuda.device_count() - 1)
-					else:
-						device = 0
-					smp = pipeline("summarization", model=m, device=device, torch_dtype=torch.float16)
-					smp.devid = device
-					break
-				except:
-					print_exc()
-			smp = pipeline("summarization", model=m, torch_dtype=torch.float16)
-			smp.devid = None
+			device, dtype = determine_cuda(2147483648, priority=True)
+			try:
+				smp = pipeline("summarization", model=m, device=device, torch_dtype=dtype)
+				smp.devid = device
+			except:
+				print_exc()
+				smp = pipeline("summarization", model=m)
+				smp.devid = None
 		self.models[m] = smp
 		enc = tiktoken.get_encoding("cl100k_base")
 		tokens = enc.encode(q)
@@ -479,17 +484,15 @@ class Bot:
 			return lim_tokens(q, max_length)
 
 	def answer_classify(self, m="vicgalle/xlm-roberta-large-xnli-anli", q="", labels=[]):
-		device = -1
-		# if torch.cuda.is_available():
-		# 	n = torch.cuda.device_count()
-		# 	if n > 1:
-		# 		device = random.randint(0, torch.cuda.device_count() - 1)
-		# 	else:
-		# 		device = 0
 		try:
 			zscp = self.models[m]
 		except KeyError:
-			zscp = self.models[m] = pipeline("zero-shot-classification", model=m, device=device, torch_dtype=torch.float16 if device > -1 else torch.float32)
+			device, dtype = determine_cuda(2147483648, priority=False)
+			try:
+				zscp = pipeline("zero-shot-classification", model=m, device=device, torch_dtype=dtype)
+			except:
+				print_exc()
+				zscp = pipeline("zero-shot-classification", model=m)
 		resp = zscp(q, labels, truncation=True)
 		return dict(zip(resp["labels"], resp["scores"]))
 

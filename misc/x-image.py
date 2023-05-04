@@ -2591,11 +2591,23 @@ if len(sys.argv) > 1 and sys.argv[1] == "2":
 		return ib.art_stablediffusion_local(prompt, kwargs, nsfw=nsfw, fail_unless_gpu=not force)
 
 if len(sys.argv) > 1 and sys.argv[1] == "3":
-	import torch
-	device = "cuda" if torch.cuda.is_available() else "cpu"
+
+	def determine_cuda(mem=1, priority=False):
+		if not torch.cuda.is_available():
+			return -1, torch.float32
+		n = torch.cuda.device_count()
+		if not n:
+			return -1, torch.float32
+		dps = [torch.cuda.get_device_properties(i) for i in range(n)]
+		sign = 1 if priority else -1
+		pcs = sorted(i, key=lambda i: (p := dps[i]) or (p.total_memory >= mem, p.multi_processor_count * sign), reverse=True)
+		return pcs[0], torch.float16
+
+	device, dtype = determine_cuda(1073741824)
+	device = f"cuda:{device}" if device >= 0 else "cpu"
 	from sentence_transformers import SentenceTransformer
 	Embedder = SentenceTransformer("LLukas22/all-mpnet-base-v2-embedding-all", device=device)
-	if device != "cpu":
+	if dtype == torch.float16:
 		try:
 			Embedder = Embedder.half()
 		except (RuntimeError, NotImplementedError):

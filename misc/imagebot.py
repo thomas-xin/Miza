@@ -164,6 +164,17 @@ def update():
 			drivers.clear()
 			return_driver(d)
 
+def determine_cuda(mem=1, priority=False):
+	if not torch.cuda.is_available():
+		return -1, torch.float32
+	n = torch.cuda.device_count()
+	if not n:
+		return -1, torch.float32
+	dps = [torch.cuda.get_device_properties(i) for i in range(n)]
+	sign = 1 if priority else -1
+	pcs = sorted(i, key=lambda i: (p := dps[i]) or (p.total_memory >= mem, p.multi_processor_count * sign), reverse=True)
+	return pcs[0], torch.float16
+
 def safecomp(gen):
 	while True:
 		try:
@@ -488,32 +499,25 @@ class Bot:
 			return
 		if not pipe:
 			kw = {}
-			# if pf is StableDiffusionImageVariationPipeline:
-			# 	clip = CLIPModel.from_pretrained("openai/clip-vit-base-patch32", torch_dtype=torch.float16 if cia else torch.float32)
-			# 	kw["image_encoder"] = clip
-			pipe = pf.from_pretrained(model, torch_dtype=torch.float16 if cia else torch.float32, requires_safety_checker=True, **kw)
-			pipe.enable_attention_slicing()
-			pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
-			if cia and self.models.get((pf, model), True):
-				try:
-					if torch.cuda.get_device_properties(0).total_memory < 8589934592:
-						raise MemoryError("CUDA: Insufficient estimated virtual memory.")
-					pipe = pipe.to("cuda")
+			device, dtype = determine_cuda(8589934592, priority=True)
+			try:
+				if fail_unless_gpu and (device < 0 or not self.models.get((pf, model), True)):
+					return
+				pipe = pf.from_pretrained(model, requires_safety_checker=True, device=device, torch_dtype=dtype, **kw)
+				if device >= 0:
+					pipe.enable_attention_slicing()
+					pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 					try:
 						pipe.enable_model_cpu_offload()
 					except AttributeError:
 						pass
-					# if pf is StableDiffusionPipeline:
-					# try:
-					# 	pipe.enable_xformers_memory_efficient_attention()
-					# except ImportError:
-					# 	pass
-				except:
+			except:
+				print_exc()
+				if fail_unless_gpu:
 					self.models[(pf, model)] = False
-					print_exc()
 					print("StablediffusionL: CUDA f16 init failed")
-					if fail_unless_gpu:
-						return
+					return
+				pipe = pf.from_pretrained(model, requires_safety_checker=True, **kw)
 			self.safety_checker = pipe.safety_checker
 			self.models[(pf, model)] = pipe
 		if nsfw:
