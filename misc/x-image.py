@@ -2522,20 +2522,6 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 	else:
 		convobot.AsyncChatGPT = AsyncChatGPT
 
-def rank_embeddings(embs, emb, temp=0.5):
-	btest = base64.b64decode(emb)
-	y = np.frombuffer(btest, dtype=np.float16)
-	blist = [base64.b64decode(line) for line in embs]
-	bt2 = b"".join(blist)
-	x = np.frombuffer(bt2, dtype=np.float16)
-	x = x.reshape((len(x) // len(y), len(y)))
-	y = y.reshape((1, len(y)))
-	norms = np.linalg.norm(x, axis=1) * np.linalg.norm(y, axis=1)
-	z = (x * y).sum(axis=1)
-	z /= norms
-	top = np.max(z)
-	return [i for i in np.argsort(z)[::-1] if z[i] - random.random() / 3 >= (top - temp * 2 / 3)]
-
 elif len(sys.argv) > 1 and sys.argv[1] == "2":
 	import imagebot
 	for i in range(3):
@@ -2617,6 +2603,20 @@ elif len(sys.argv) > 1 and sys.argv[1] == "3":
 
 else:
 	del torch
+
+def rank_embeddings(embs, emb, temp=0.5):
+	btest = base64.b64decode(emb)
+	y = np.frombuffer(btest, dtype=np.float16)
+	blist = [base64.b64decode(line) for line in embs]
+	bt2 = b"".join(blist)
+	x = np.frombuffer(bt2, dtype=np.float16)
+	x = x.reshape((len(x) // len(y), len(y)))
+	y = y.reshape((1, len(y)))
+	norms = np.linalg.norm(x, axis=1) * np.linalg.norm(y, axis=1)
+	z = (x * y).sum(axis=1)
+	z /= norms
+	top = np.max(z)
+	return [i for i in np.argsort(z)[::-1] if z[i] - random.random() / 3 >= (top - temp * 2 / 3)]
 
 
 def write_to(fn, data):
