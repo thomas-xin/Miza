@@ -2281,7 +2281,7 @@ class AudioDownloader:
         if not entry.get("url"):
             raise FileNotFoundError
         try:
-            entry.update(self.searched[entry["url"]])
+            entry.update(self.searched[entry["url"]]["data"])
         except KeyError:
             pass
         if video:

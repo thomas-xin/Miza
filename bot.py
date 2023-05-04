@@ -3538,7 +3538,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             try:
                 out = json.dumps(dict(result=output), cls=MultiEncoder)
             except TypeError:
-                out = orjson.dumps(dict(result=repr(output)))
+                try:
+                    out = orjson.dumps(dict(result=repr(output)))
+                except typeError:
+                    out = repr(dict(result=output))
         # print(url, out)
         await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, bypass=False, decode=True, aio=True, ssl=False)
 
