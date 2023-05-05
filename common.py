@@ -430,7 +430,9 @@ if not enc_key:
     with open("auth.json", "w", encoding="utf-8") as f:
         json.dump(AUTH, f, indent="\t")
 
-if AUTH.get("openai_key"):
+def verify_openai():
+    if not AUTH.get("openai_key"):
+        return
     import openai
     try:
         openai.api_key = AUTH["openai_key"]

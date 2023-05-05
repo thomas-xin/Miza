@@ -503,8 +503,9 @@ class Bot:
 			try:
 				if fail_unless_gpu and (device < 0 or not self.models.get((pf, model), True)):
 					return
-				pipe = pf.from_pretrained(model, requires_safety_checker=True, device=device, torch_dtype=dtype, **kw)
+				pipe = pf.from_pretrained(model, requires_safety_checker=True, torch_dtype=dtype, **kw)
 				if device >= 0:
+					pipe = pipe.to(f"cuda:{device}")
 					pipe.enable_attention_slicing()
 					pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 					try:

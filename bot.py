@@ -13,6 +13,7 @@ if ADDRESS == "0.0.0.0":
 create_future_ex(get_colour_list)
 create_future_ex(load_emojis)
 create_future_ex(load_timezones)
+create_future_ex(verify_openai)
 
 # Allows importing from commands and misc directories.
 sys.path.insert(1, "commands")
@@ -412,13 +413,15 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     # Starts up client.
     def run(self):
         print(f"Logging in...")
-        self.audio_client_start = create_future(self.start_audio_client, priority=True)
-        with closing(get_event_loop()):
-            with tracebacksuppressor:
-                get_event_loop().run_until_complete(self.start(self.token))
-            with tracebacksuppressor:
-                get_event_loop().run_until_complete(self.close())
-        self.setshutdown()
+        try:
+            self.audio_client_start = create_future(self.start_audio_client, priority=True)
+            with closing(get_event_loop()):
+                with tracebacksuppressor:
+                    get_event_loop().run_until_complete(self.start(self.token))
+                with tracebacksuppressor:
+                    get_event_loop().run_until_complete(self.close())
+        finally:
+            self.setshutdown()
 
     # A reimplementation of the print builtin function.
     def print(self, *args, sep=" ", end="\n"):
