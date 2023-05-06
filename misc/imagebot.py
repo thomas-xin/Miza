@@ -644,14 +644,14 @@ class Bot:
 		funcs = []
 		if not url and not dalle2 and nsfw:
 			funcs.append((self.art_textsynth, 4))
-		if not specified and not url and os.name == "nt":
-			funcs.append((self.art_mage, 1))
 		if not specified and not url:
-			funcs.insert(0, (self.art_deepai, 4))
+			funcs.append((self.art_deepai, 4))
 			if openjourney:
 				funcs.insert(0, (self.art_openjourney, 1))
 			if dalle2:
 				funcs.insert(0, (self.art_dalle, 4))
+		if not specified and not url and os.name == "nt":
+			funcs.append((self.art_mage, 1))
 		if not funcs:
 			return ()
 		eff = 0
