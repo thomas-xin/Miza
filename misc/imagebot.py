@@ -202,7 +202,7 @@ class Bot:
 		self.fp = FreeProxy()
 
 	def get_proxy(self, retry=True):
-		if self.proxies and time.time() - self.ctime <= 20:
+		if self.proxies and time.time() - self.ctime <= 120:
 			return random.choice(tuple(self.proxies))
 		while not self.proxies or time.time() - self.ptime > 240:
 			i = random.randint(1, 3)
