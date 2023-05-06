@@ -1543,7 +1543,8 @@ class Art(Command):
                 # print(ims)
                 if fut:
                     ims2 = await fut
-                    ims.extend(ims2)
+                    ims2.extend(ims)
+                    ims = ims2
                 futs.extend(ims)
                 amount2 = len(futs)
         if amount2 < amount:
