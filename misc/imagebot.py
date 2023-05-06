@@ -197,7 +197,6 @@ class Bot:
 
 	def __init__(self, token=""):
 		self.token = token
-		self.cache = {}
 		self.session = requests.Session()
 		self.timestamp = time.time()
 		self.fp = FreeProxy()
@@ -252,19 +251,23 @@ class Bot:
 			resp = reqx.get(url)
 			return resp.content
 
-	def art_dalle(self, prompt, kwargs=None):
+	def art_dalle(self, prompt, kwargs=None, count=1):
 		openai.api_key = self.token
 		resp = openai.Image.create(
 			prompt=prompt,
-			n=1,
+			n=count,
 			size="512x512",
 			user=str(id(self)),
 		)
 		print(resp)
-		with self.session.get(resp.data[0].url) as resp:
-			return resp.content
+		futs = []
+		for im in resp.data:
+			fut = exc.submit(self.session.get, im.url)
+			futs.append(fut)
+		for fut in futs:
+			yield fut.result().content
 
-	def dalle_i2i(self, prompt, image_1b, image_2b=None, force=False):
+	def dalle_i2i(self, prompt, image_1b, image_2b=None, force=False, count=1):
 		openai.api_key = self.token
 		if image_2b:
 			im = Image.open(io.BytesIO(image_2b))
@@ -278,7 +281,7 @@ class Bot:
 				prompt=prompt,
 				image=image_1b,
 				mask=image_2b,
-				n=1,
+				n=count,
 				size="512x512",
 				user=str(id(self)),
 			)
@@ -286,7 +289,7 @@ class Bot:
 			if not prompt or not force:
 				resp = openai.Image.create_variation(
 					image=image_1b,
-					n=1,
+					n=count,
 					size="512x512",
 					user=str(id(self)),
 				)
@@ -300,15 +303,19 @@ class Bot:
 					prompt=prompt,
 					image=image_1b,
 					mask=image_2b,
-					n=1,
+					n=count,
 					size="512x512",
 					user=str(id(self)),
 				)
 		print(resp)
-		with self.session.get(resp.data[0].url) as resp:
-			return resp.content, 180000
+		futs = []
+		for im in resp.data:
+			fut = exc.submit(self.session.get, im.url)
+			futs.append(fut)
+		for fut in futs:
+			yield fut.result().content, 180000
 
-	def art_mage(self, prompt, kwargs=None):
+	def art_mage(self, prompt, kwargs=None, **void):
 		driver = get_driver()
 
 		folder = driver.folder
@@ -367,7 +374,7 @@ class Bot:
 		return_driver(driver)
 		if elems:
 			print("Mage: censored")
-			return False
+			raise PermissionError
 
 		headers = {
 			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
@@ -378,10 +385,10 @@ class Bot:
 		print("Mage:", a)
 		resp = self.session.get(a, headers=headers)
 		if resp.status_code in range(200, 400):
-			return resp.content
+			return [resp.content]
 		print(resp.status_code, resp.text)
 
-	def art_deepai(self, prompt, kwargs=None):
+	def art_deepai(self, prompt, kwargs=None, **void):
 		headers = {
 			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
 			"DNT": "1",
@@ -405,7 +412,7 @@ class Bot:
 				image.crop((512, 512, 1024, 1024)),
 				image.crop((0, 512, 512, 1024)),
 			]
-			ims2 = self.cache.setdefault(prompt, [])
+			ims2 = []
 			for im in ims:
 				p = np.sum(im.resize((32, 32)).convert("L"))
 				if p > 1024:
@@ -414,15 +421,12 @@ class Bot:
 					b.seek(0)
 					ims2.append(b.read())
 			if ims2:
-				random.shuffle(ims2)
-				return ims2.pop(0)
-			else:
-				self.cache.pop(prompt, None)
+				return ims2
 			print("DeepAI: censored")
-			return False
+			raise PermissionError
 		print(resp.status_code, resp.text)
 
-	def art_openjourney(self, prompt, kwargs=None):
+	def art_openjourney(self, prompt, kwargs=None, **void):
 		# if not any(w in prompt for w in ("style", "stylised", "stylized")):
 		# 	prompt += ", mdjrny-v4 style"
 		headers = {
@@ -472,9 +476,9 @@ class Bot:
 			im = Image.open(io.BytesIO(b))
 			p = np.sum(im.resize((32, 32)).convert("L"))
 			if p > 1024:
-				return b
+				return [b]
 			print("Openjourney: censored")
-			return False
+			raise PermissionError
 		print(resp.status_code, resp.text)
 
 	safety_checker = lambda images, **kwargs: (images, [False] * len(images))
@@ -560,18 +564,15 @@ class Bot:
 			)
 		if not nsfw and data.nsfw_content_detected and all(data.nsfw_content_detected):
 			raise PermissionError("NSFW filter detected in non-NSFW channel. If you believe this was a mistake, please try again.")
-		out = []
 		for im, n in zip(data.images, data.nsfw_content_detected):
 			im = data.images[0]
 			b = io.BytesIO()
 			im.save(b, format="png")
 			print("StablediffusionL:", b)
 			b.seek(0)
-			out.append(b)
-			out.append(b.read())
-		return out
+			yield b.read()
 
-	def art_textsynth(self, prompt, kwargs=None):
+	def art_textsynth(self, prompt, kwargs=None, count=1):
 		headers = {
 			"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
 			"DNT": "1",
@@ -598,7 +599,7 @@ class Bot:
 						headers=headers,
 						data=orjson.dumps(dict(
 							prompt=prompt,
-							image_count=4,
+							image_count=count,
 							timesteps=int(kwargs.get("--num-inference-steps", 50)),
 							guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
 							width=512,
@@ -627,45 +628,50 @@ class Bot:
 			d = resp.json()
 			ds = d["images"]
 			ims = [base64.b64decode(b["data"].encode("ascii")) for b in ds]
-			b = ims.pop(0)
-			self.cache.setdefault(prompt, []).extend(ims)
-			return b
+			return ims
 		print(resp.status_code, resp.text)
 
-	def art(self, prompt, url="", url2="", kwargs={}, specified=False, dalle2=False, openjourney=False, nsfw=False):
+	def art(self, prompt, url="", url2="", kwargs={}, specified=False, dalle2=False, openjourney=False, nsfw=False, count=1):
 		funcs = []
 		if not url and not dalle2 and nsfw:
-			funcs.append(self.art_textsynth)
+			funcs.append((self.art_textsynth, 4))
 		if not specified and not url and os.name == "nt":
-			if random.randint(0, 2) and self.cache.get(prompt):
-				return self.cache[prompt].pop(0), 0
-			funcs.append(self.art_mage)
+			funcs.append((self.art_mage, 1))
 		if not specified and not url:
 			if not openjourney:
-				funcs.append(self.art_openjourney)
+				funcs.append((self.art_openjourney, 1))
 			if random.randint(0, 4):
-				funcs.append(self.art_deepai)
+				funcs.append((self.art_deepai, 4))
 			else:
-				funcs.insert(0, self.art_deepai)
+				funcs.insert(0, (self.art_deepai, 4))
 			if openjourney:
-				funcs.insert(0, self.art_openjourney)
+				funcs.insert(0, (self.art_openjourney, 1))
 			if dalle2:
-				funcs.insert(0, self.art_dalle)
+				funcs.insert(0, (self.art_dalle, 4))
 		if not url:
-			funcs.append(self.art_textsynth)
-		for func in funcs:
+			funcs.append((self.art_textsynth, 4))
+		if not funcs:
+			return ()
+		eff = 0
+		funceff = [random.choice(funcs) for i in range(count - 1)]
+		funceff.insert(0, funcs[0])
+		futs = []
+		for func, it in funceff:
+			if eff >= count:
+				break
+			c = min(it, count - eff)
+			fut = exc.submit(func, prompt, kwargs, count=c)
+			futs.append(fut)
+		out = []
+		for fut in futs:
 			try:
-				im = exc.submit(func, prompt, kwargs).result(timeout=240)
+				ims = fut.result(timeout=240)
+				out.extend(ims)
 			except:
 				print_exc()
-				im = dalle2 = None
-			if im:
-				if dalle2:
-					return im, 180000
-				else:
-					return im, 0
-			elif im is False and not nsfw:
-				raise PermissionError("NSFW filter detected in non-NSFW channel. If you believe this was a mistake, please try again.")
+		if not out and not nsfw:
+			raise PermissionError("NSFW filter detected in non-NSFW channel. If you believe this was a mistake, please try again.")
+		return out
 
 if __name__ == "__main__":
 	import sys

@@ -1397,7 +1397,7 @@ class Art(Command):
     flags = "i"
     typing = True
     slash = ("Art", "Imagine")
-    sdiff_sem = Semaphore(1, 256, rate_limit=12)
+    sdiff_sem = Semaphore(1, 256, rate_limit=7)
     fut = None
     imagebot = imagebot.Bot(token=AUTH.get("openai_key"))
     has_py39 = subprocess.run("py -3.9 -m pip").returncode == 0
@@ -1514,6 +1514,7 @@ class Art(Command):
         fn = None
         futs = []
         amount = 9 if premium >= 4 else 4 if premium > 2 else 1
+        amount2 = 0
         if bot.is_trusted(guild) >= 2:
             for uid in bot.data.trusted[guild.id]:
                 if uid and bot.premium_level(uid, absolute=True) >= 2:
@@ -1525,22 +1526,25 @@ class Art(Command):
             u = user
         data = bot.data.users.get(u.id, {})
         oai = data.get("trial") and data.get("openai_key")
-        while len(futs) < amount:
-            async def ibasl():
-                dalle2 = name.startswith("dalle")
-                openjourney = "journey" in name
-                if not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy() and torch.cuda.is_available():
-                    async with self.sdiff_sem:
-                        fn = await process_image("IBASL", "&", [prompt, kwargs, nsfw, 1], fix=2, timeout=1200)
-                        if fn:
-                            return fn
-                if dalle2 and premium < 4:
-                    raise PermissionError("Premium subscription required to perform DALL·E 2 operations.")
-                self.imagebot.token = oai or AUTH.get("openai_key")
-                return await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2, openjourney, nsfw, timeout=480)
-            fut = create_task(ibasl())
-            futs.append(fut)
-        if len(futs) < amount:
+        if amount2 < amount:
+            dalle2 = name.startswith("dalle")
+            if dalle2 and premium < 4:
+                raise PermissionError("Premium subscription required to perform DALL·E 2 operations.")
+            openjourney = "journey" in name
+            fut = None
+            c = 0
+            if not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy() and torch.cuda.is_available():
+                async with self.sdiff_sem:
+                    c = max(amount, 4)
+                    fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, c], fix=2, timeout=1200))
+            self.imagebot.token = oai or AUTH.get("openai_key")
+            ims = await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2, openjourney, nsfw, amount - c, timeout=480)
+            if fut:
+                ims2 = await fut
+                ims.extend(ims2)
+            futs.extend(ims)
+            amount2 = len(futs)
+        if amount2 < amount:
             if self.has_py39:
                 with tracebacksuppressor:
                     if not self.fut and not os.path.exists("misc/stable_diffusion.openvino"):
@@ -1636,10 +1640,10 @@ class Art(Command):
                             data = bot.data.users.get(u.id, {})
                             oai = data.get("trial") and data.get("openai_key")
                             self.imagebot.token = oai or AUTH.get("openai_key")
-                            while len(fut) < amount:
-                                fut = create_future(self.imagebot.dalle_i2i, prompt, image_1b, image_2b, timeout=60)
-                                futs.append(fut)
-                while len(futs) < amount:
+                            ims = create_future(self.imagebot.dalle_i2i, prompt, image_1b, image_2b, False, count, timeout=60)
+                            futs.extend(ims)
+                            amount2 = len(futs)
+                while amount2 < amount:
                     if self.sdiff_sem.is_busy() and not getattr(message, "simulated", False):
                         await send_with_react(channel, italics(ini_md(f"StableDiffusion: {sqr_md(req)} enqueued in position {sqr_md(self.sdiff_sem.passive + 1)}.")), reacts="❎", reference=message)
                     async with self.sdiff_sem:
@@ -1675,38 +1679,26 @@ class Art(Command):
                         for k, v in kwargs.items():
                             args.extend((k, v))
                         print(args)
-                        async def sdl_force():
-                            if self.has_py39:
-                                proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc/stable_diffusion.openvino", stdout=subprocess.DEVNULL)
-                                try:
-                                    await asyncio.wait_for(proc.wait(), timeout=3200)
-                                except (T0, T1, T2):
-                                    with tracebacksuppressor:
-                                        force_kill(proc)
-                                    raise
-                                fn = "misc/stable_diffusion.openvino/output.png"
-                            else:
-                                noprompt = not force and not kwargs.get("--mask")
-                                fn = await process_image("IBASL", "&", ["" if noprompt else prompt, kwargs, nsfw, True], fix=2, timeout=1200)
-                            return fn
-                        fut = create_task(sdl_force())
-                        futs.append(fut)
+                        if self.has_py39:
+                            proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc/stable_diffusion.openvino", stdout=subprocess.DEVNULL)
+                            try:
+                                await asyncio.wait_for(proc.wait(), timeout=3200)
+                            except (T0, T1, T2):
+                                with tracebacksuppressor:
+                                    force_kill(proc)
+                                raise
+                            with open("misc/stable_diffusion.openvino/output.png", "rb") as f:
+                                futs.append(f.read())
+                            amount2 = len(futs)
+                        else:
+                            noprompt = not force and not kwargs.get("--mask")
+                            ims = await process_image("IBASL", "&", ["" if noprompt else prompt, kwargs, nsfw, True, count], fix=2, timeout=1200)
+                            futs.extend(ims)
+                            amount2 = len(futs)
         files = []
         exc = RuntimeError("Unknown error occured.")
         with discord.context_managers.Typing(channel):
-            for fut in futs:
-                try:
-                    tup = await fut
-                except StopIteration:
-                    continue
-                except PermissionError as ex:
-                    if amount <= 1:
-                        raise
-                    exc = ex
-                    continue
-                except:
-                    print_exc()
-                    continue
+            for tup in futs:
                 if not tup:
                     continue
                 if not isinstance(tup, tuple):
