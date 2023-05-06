@@ -666,6 +666,7 @@ class Bot:
 			c = min(it, count - eff)
 			fut = exc.submit(func, prompt, kwargs, count=c)
 			futs.append(fut)
+			eff += c
 		out = []
 		for fut in futs:
 			try:
@@ -673,7 +674,7 @@ class Bot:
 				out.extend(ims)
 			except:
 				print_exc()
-		print(out, futs, funceff)
+		print(out, futs, funceff, count)
 		if not out and not nsfw:
 			raise PermissionError("NSFW filter detected in non-NSFW channel. If you believe this was a mistake, please try again.")
 		return out

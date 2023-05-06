@@ -1534,9 +1534,9 @@ class Art(Command):
             fut = None
             c = 0
             if not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy() and torch.cuda.is_available():
+                c = max(amount, 4)
                 async with self.sdiff_sem:
-                    c = max(amount, 4)
-                    fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, c], fix=2, timeout=1200))
+                    fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, c], fix=2, timeout=1200))
             self.imagebot.token = oai or AUTH.get("openai_key")
             ims = await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2, openjourney, nsfw, amount - c, timeout=480)
             print(ims)
