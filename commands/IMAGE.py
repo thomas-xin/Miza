@@ -1701,6 +1701,8 @@ class Art(Command):
         exc = RuntimeError("Unknown error occured.")
         with discord.context_managers.Typing(channel):
             for tup in futs:
+                if len(files) >= amount:
+                    break
                 if not tup:
                     continue
                 if not isinstance(tup, tuple):
