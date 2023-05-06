@@ -544,7 +544,7 @@ class Bot:
 		elif pf is StableDiffusionImg2ImgPipeline:
 			data = pipe(
 				[prompt] * count,
-				image=image_to(Image.open(kwargs["--init-image"])),
+				image=[image_to(Image.open(kwargs["--init-image"]))] * count,
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
 				strength=float(kwargs.get("--strength", 0.8)),
@@ -568,7 +568,8 @@ class Bot:
 			raise PermissionError("NSFW filter detected in non-NSFW channel. If you believe this was a mistake, please try again.")
 		out = []
 		for im, n in zip(data.images, data.nsfw_content_detected):
-			im = data.images[0]
+			if n:
+				continue
 			b = io.BytesIO()
 			im.save(b, format="png")
 			print("StablediffusionL:", b)
