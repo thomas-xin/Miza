@@ -483,7 +483,7 @@ class Bot:
 
 	safety_checker = lambda images, **kwargs: (images, [False] * len(images))
 	device, dtype = determine_cuda(0, priority=False)
-	gen = torch.Generator(f"cuda:{device}" if dtype >= 0 else "cpu")
+	gen = torch.Generator(f"cuda:{device}" if device >= 0 else "cpu")
 	def art_stablediffusion_local(self, prompt, kwargs=None, model="stabilityai/stable-diffusion-2-1", fail_unless_gpu=True, nsfw=False, count=1):
 		cia = torch.cuda.is_available()
 		from diffusers import DPMSolverMultistepScheduler, StableDiffusionPipeline, StableDiffusionImg2ImgPipeline, StableDiffusionInpaintPipeline, StableDiffusionImageVariationPipeline
