@@ -647,18 +647,11 @@ class Bot:
 		if not specified and not url and os.name == "nt":
 			funcs.append((self.art_mage, 1))
 		if not specified and not url:
-			if not openjourney:
-				funcs.append((self.art_openjourney, 1))
-			if random.randint(0, 4):
-				funcs.append((self.art_deepai, 4))
-			else:
-				funcs.insert(0, (self.art_deepai, 4))
+			funcs.append((self.art_deepai, 4))
 			if openjourney:
 				funcs.insert(0, (self.art_openjourney, 1))
 			if dalle2:
 				funcs.insert(0, (self.art_dalle, 4))
-		if not url:
-			funcs.append((self.art_textsynth, 4))
 		if not funcs:
 			return ()
 		eff = 0
@@ -679,6 +672,7 @@ class Bot:
 			fut = exc.submit(func, prompt, kwargs, count=c)
 			futs.append(fut)
 			eff += c
+		random.shuffle(futs)
 		out = []
 		for fut in futs:
 			try:

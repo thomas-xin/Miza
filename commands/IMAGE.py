@@ -1535,7 +1535,7 @@ class Art(Command):
                 fut = None
                 c = 0
                 if not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy() and torch.cuda.is_available():
-                    c = min(amount, 4)
+                    c = min(amount, 5)
                     async with self.sdiff_sem:
                         fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, c], fix=2, timeout=1200))
                 self.imagebot.token = oai or AUTH.get("openai_key")
