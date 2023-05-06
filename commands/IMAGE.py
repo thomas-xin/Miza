@@ -1531,20 +1531,21 @@ class Art(Command):
             if dalle2 and premium < 4:
                 raise PermissionError("Premium subscription required to perform DALL·E 2 operations.")
             openjourney = "journey" in name
-            fut = None
-            c = 0
-            if not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy() and torch.cuda.is_available():
-                c = min(amount, 4)
-                async with self.sdiff_sem:
-                    fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, c], fix=2, timeout=1200))
-            self.imagebot.token = oai or AUTH.get("openai_key")
-            ims = await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2, openjourney, nsfw, amount - c, timeout=480)
-            # print(ims)
-            if fut:
-                ims2 = await fut
-                ims.extend(ims2)
-            futs.extend(ims)
-            amount2 = len(futs)
+            with discord.context_managers.Typing(channel):
+                fut = None
+                c = 0
+                if not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy() and torch.cuda.is_available():
+                    c = min(amount, 4)
+                    async with self.sdiff_sem:
+                        fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, c], fix=2, timeout=1200))
+                self.imagebot.token = oai or AUTH.get("openai_key")
+                ims = await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2, openjourney, nsfw, amount - c, timeout=480)
+                # print(ims)
+                if fut:
+                    ims2 = await fut
+                    ims.extend(ims2)
+                futs.extend(ims)
+                amount2 = len(futs)
         if amount2 < amount:
             if self.has_py39:
                 with tracebacksuppressor:
