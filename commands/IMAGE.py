@@ -1514,6 +1514,17 @@ class Art(Command):
         fn = None
         futs = []
         amount = 9 if premium >= 4 else 4 if premium > 2 else 1
+        if bot.is_trusted(guild) >= 2:
+            for uid in bot.data.trusted[guild.id]:
+                if uid and bot.premium_level(uid, absolute=True) >= 2:
+                    break
+            else:
+                uid = next(iter(bot.data.trusted[guild.id]))
+            u = await bot.fetch_user(uid)
+        else:
+            u = user
+        data = bot.data.users.get(u.id, {})
+        oai = data.get("trial") and data.get("openai_key")
         while len(futs) < amount:
             async def ibasl():
                 dalle2 = name.startswith("dalle")
@@ -1525,17 +1536,6 @@ class Art(Command):
                             return fn
                 if dalle2 and premium < 4:
                     raise PermissionError("Premium subscription required to perform DALL·E 2 operations.")
-                if bot.is_trusted(guild) >= 2:
-                    for uid in bot.data.trusted[guild.id]:
-                        if uid and bot.premium_level(uid, absolute=True) >= 2:
-                            break
-                    else:
-                        uid = next(iter(bot.data.trusted[guild.id]))
-                    u = await bot.fetch_user(uid)
-                else:
-                    u = user
-                data = bot.data.users.get(u.id, {})
-                oai = data.get("trial") and data.get("openai_key")
                 self.imagebot.token = oai or AUTH.get("openai_key")
                 return await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2, openjourney, nsfw, timeout=480)
             fut = create_task(ibasl())
