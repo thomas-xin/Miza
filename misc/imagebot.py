@@ -687,7 +687,7 @@ class Bot:
 			except:
 				print_exc()
 		print(len(out), futs, funceff, count)
-		if not out and not nsfw:
+		if not out and not nsfw and count:
 			raise PermissionError("NSFW filter detected in non-NSFW channel. If you believe this was a mistake, please try again.")
 		return out
 
