@@ -647,7 +647,7 @@ class Bot:
 		if not specified and not url and os.name == "nt":
 			funcs.append((self.art_mage, 1))
 		if not specified and not url:
-			funcs.append((self.art_deepai, 4))
+			funcs.insert(0, (self.art_deepai, 4))
 			if openjourney:
 				funcs.insert(0, (self.art_openjourney, 1))
 			if dalle2:
@@ -661,6 +661,8 @@ class Bot:
 			counts = [t[1] for t in funceff]
 			imc = sum(counts)
 			i = np.argmin(counts)
+			if not i and len(funceff) > 1:
+				i = 1
 			if imc - counts[i] < count:
 				break
 			funceff.pop(i)
