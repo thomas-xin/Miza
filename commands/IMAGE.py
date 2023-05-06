@@ -1397,7 +1397,7 @@ class Art(Command):
     flags = "i"
     typing = True
     slash = ("Art", "Imagine")
-    sdiff_sem = Semaphore(1, 256, rate_limit=4)
+    sdiff_sem = Semaphore(1, 256, rate_limit=5)
     fut = None
     imagebot = imagebot.Bot(token=AUTH.get("openai_key"))
     has_py39 = subprocess.run("py -3.9 -m pip").returncode == 0
@@ -1526,7 +1526,7 @@ class Art(Command):
                     fut = create_task(ibasl())
                     futs.append(fut)
                     if len(futs) >= amount:
-                        raise StopIteration
+                        break
                 if dalle2 and premium < 4:
                     raise PermissionError("Premium subscription required to perform DALL·E 2 operations.")
                 if bot.is_trusted(guild) >= 2:
