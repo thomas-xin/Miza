@@ -1514,19 +1514,14 @@ class Art(Command):
         fn = None
         futs = []
         amount = 9 if premium >= 4 else 4 if premium > 2 else 1
-        with discord.context_managers.Typing(channel):
-            while len(futs) < amount:
+        while len(futs) < amount:
+            async def ibasl():
                 dalle2 = name.startswith("dalle")
                 openjourney = "journey" in name
                 if not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy() and torch.cuda.is_available():
-                    async def ibasl():
-                        async with self.sdiff_sem:
-                            fn = await process_image("IBASL", "&", [prompt, kwargs, nsfw], fix=2, timeout=1200)
+                    fn = await process_image("IBASL", "&", [prompt, kwargs, nsfw], fix=2, timeout=1200)
+                    if fn:
                         return fn
-                    fut = create_task(ibasl())
-                    futs.append(fut)
-                    if len(futs) >= amount:
-                        break
                 if dalle2 and premium < 4:
                     raise PermissionError("Premium subscription required to perform DALL·E 2 operations.")
                 if bot.is_trusted(guild) >= 2:
@@ -1541,8 +1536,9 @@ class Art(Command):
                 data = bot.data.users.get(u.id, {})
                 oai = data.get("trial") and data.get("openai_key")
                 self.imagebot.token = oai or AUTH.get("openai_key")
-                fut = create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2, openjourney, nsfw, timeout=480)
-                futs.append(fut)
+                return await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2, openjourney, nsfw, timeout=480)
+            fut = create_task(ibasl())
+            futs.append(fut)
         if len(futs) < amount:
             if self.has_py39:
                 with tracebacksuppressor:
@@ -1696,56 +1692,57 @@ class Art(Command):
                         futs.append(fut)
         files = []
         exc = RuntimeError("Unknown error occured.")
-        for fut in futs:
-            try:
-                tup = await fut
-            except StopIteration:
-                continue
-            except PermissionError as ex:
-                if amount <= 1:
-                    raise
-                exc = ex
-                continue
-            except:
-                print_exc()
-                continue
-            if not tup:
-                continue
-            fn = tup[0]
-            if not fn:
-                continue
-            if fn and not oai and len(tup) > 1:
-                cost = tup[1]
-                if "costs" in bot.data:
-                    bot.data.costs.put(user.id, cost)
-                    if guild:
-                        bot.data.costs.put(guild.id, cost)
-                if bot.is_trusted(guild) >= 2:
-                    for uid in bot.data.trusted[guild.id]:
-                        if uid and bot.premium_level(uid, absolute=True) >= 2:
-                            break
+        with discord.context_managers.Typing(channel):
+            for fut in futs:
+                try:
+                    tup = await fut
+                except StopIteration:
+                    continue
+                except PermissionError as ex:
+                    if amount <= 1:
+                        raise
+                    exc = ex
+                    continue
+                except:
+                    print_exc()
+                    continue
+                if not tup:
+                    continue
+                fn = tup[0]
+                if not fn:
+                    continue
+                if fn and not oai and len(tup) > 1:
+                    cost = tup[1]
+                    if "costs" in bot.data:
+                        bot.data.costs.put(user.id, cost)
+                        if guild:
+                            bot.data.costs.put(guild.id, cost)
+                    if bot.is_trusted(guild) >= 2:
+                        for uid in bot.data.trusted[guild.id]:
+                            if uid and bot.premium_level(uid, absolute=True) >= 2:
+                                break
+                        else:
+                            uid = next(iter(bot.data.trusted[guild.id]))
+                        u = await bot.fetch_user(uid)
                     else:
-                        uid = next(iter(bot.data.trusted[guild.id]))
-                    u = await bot.fetch_user(uid)
-                else:
-                    u = user
-                data = bot.data.users.get(u.id)
-                if data and data.get("trial"):
-                    bot.data.users.add_diamonds(user, cost / -25000)
-                    if data.get("diamonds", 0) < 1:
-                        bot.premium_level(u)
-                        emb = discord.Embed(colour=rand_colour())
-                        emb.set_author(**get_author(bot.user))
-                        emb.description = (
-                            "Uh-oh, it appears your tokens have run out! Check ~wallet to view your balance, top up using a donation [here]({bot.kofi_url}), "
-                            + "or purchase a subscription to gain temporary unlimited usage!"
-                        )
-            if isinstance(fn, str):
-                with open(fn, "rb") as f:
-                    fn = f.read()
-            with tracebacksuppressor:
-                fn = await bot.commands.steganography[0].call(fn, str(bot.id))
-            files.append(CompatFile(fn, filename=lim_str(prompt, 96) + ".png"))
+                        u = user
+                    data = bot.data.users.get(u.id)
+                    if data and data.get("trial"):
+                        bot.data.users.add_diamonds(user, cost / -25000)
+                        if data.get("diamonds", 0) < 1:
+                            bot.premium_level(u)
+                            emb = discord.Embed(colour=rand_colour())
+                            emb.set_author(**get_author(bot.user))
+                            emb.description = (
+                                "Uh-oh, it appears your tokens have run out! Check ~wallet to view your balance, top up using a donation [here]({bot.kofi_url}), "
+                                + "or purchase a subscription to gain temporary unlimited usage!"
+                            )
+                if isinstance(fn, str):
+                    with open(fn, "rb") as f:
+                        fn = f.read()
+                with tracebacksuppressor:
+                    fn = await bot.commands.steganography[0].call(fn, str(bot.id))
+                files.append(CompatFile(fn, filename=lim_str(prompt, 96) + ".png"))
         if not files:
             raise exc
         await send_with_react(channel, "", files=files, reference=message, reacts="🔳", embed=emb)
