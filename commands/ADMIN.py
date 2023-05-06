@@ -2266,7 +2266,7 @@ class UpdateUserLogs(Database):
                         stored.pop(c_id, None)
                         continue
                     if m.author.id == bot.deleted_user:
-                        print(user, "deleted!!")
+                        print(user, user.id, "deleted!!")
                         bot.data.users[user.id]["deleted"] = True
                     break
         # Colour: Black
