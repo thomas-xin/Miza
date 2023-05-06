@@ -4,7 +4,7 @@ try:
     import yt_dlp as youtube_dl
 except ModuleNotFoundError:
     import youtube_dl
-import aiohttp
+import aiohttp, torch
 import imagebot
 
 getattr(youtube_dl, "__builtins__", {})["print"] = print
@@ -1397,7 +1397,7 @@ class Art(Command):
     flags = "i"
     typing = True
     slash = ("Art", "Imagine")
-    sdiff_sem = Semaphore(1, 256, rate_limit=16)
+    sdiff_sem = Semaphore(1, 256, rate_limit=4)
     fut = None
     imagebot = imagebot.Bot(token=AUTH.get("openai_key"))
     has_py39 = subprocess.run("py -3.9 -m pip").returncode == 0
@@ -1512,14 +1512,20 @@ class Art(Command):
         #         raise PermissionError("NSFW filter detected in non-NSFW channel. If you believe this was a mistake, please try again.")
         emb = None
         fn = None
+        futs = []
+        amount = 9 if premium >= 4 else 4 if premium > 2 else 1
         with discord.context_managers.Typing(channel):
-            try:
+            while len(futs) < amount:
                 dalle2 = name.startswith("dalle")
                 openjourney = "journey" in name
-                if not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy():
-                    async with self.sdiff_sem:
-                        fn = await process_image("IBASL", "&", [prompt, kwargs, nsfw], fix=2, timeout=1200)
-                    if fn:
+                if not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy() and torch.cuda.is_available():
+                    async def ibasl():
+                        async with self.sdiff_sem:
+                            fn = await process_image("IBASL", "&", [prompt, kwargs, nsfw], fix=2, timeout=1200)
+                        return fn
+                    fut = create_task(ibasl())
+                    futs.append(fut)
+                    if len(futs) >= amount:
                         raise StopIteration
                 if dalle2 and premium < 4:
                     raise PermissionError("Premium subscription required to perform DALL·E 2 operations.")
@@ -1535,41 +1541,9 @@ class Art(Command):
                 data = bot.data.users.get(u.id, {})
                 oai = data.get("trial") and data.get("openai_key")
                 self.imagebot.token = oai or AUTH.get("openai_key")
-                tup = await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2, openjourney, nsfw, timeout=480)
-                if tup:
-                    fn, cost = tup
-                    if fn and cost and not oai:
-                        if "costs" in bot.data:
-                            bot.data.costs.put(user.id, cost)
-                            if guild:
-                                bot.data.costs.put(guild.id, cost)
-                        if bot.is_trusted(guild) >= 2:
-                            for uid in bot.data.trusted[guild.id]:
-                                if uid and bot.premium_level(uid, absolute=True) >= 2:
-                                    break
-                            else:
-                                uid = next(iter(bot.data.trusted[guild.id]))
-                            u = await bot.fetch_user(uid)
-                        else:
-                            u = user
-                        data = bot.data.users.get(u.id)
-                        if data and data.get("trial"):
-                            bot.data.users.add_diamonds(user, cost / -25000)
-                            if data.get("diamonds", 0) < 1:
-                                bot.premium_level(u)
-                                emb = discord.Embed(colour=rand_colour())
-                                emb.set_author(**get_author(bot.user))
-                                emb.description = (
-                                    "Uh-oh, it appears your tokens have run out! Check ~wallet to view your balance, top up using a donation [here]({bot.kofi_url}), "
-                                    + "or purchase a subscription to gain temporary unlimited usage!"
-                                )
-            except StopIteration:
-                pass
-            except PermissionError:
-                raise
-            except:
-                print_exc()
-        if not fn:
+                fut = create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2, openjourney, nsfw, timeout=480)
+                futs.append(fut)
+        if len(futs) < amount:
             if self.has_py39:
                 with tracebacksuppressor:
                     if not self.fut and not os.path.exists("misc/stable_diffusion.openvino"):
@@ -1627,7 +1601,6 @@ class Art(Command):
             with discord.context_managers.Typing(channel):
                 image_1 = image_2 = None
                 image_1b = image_2b = None
-                done = False
                 if url:
                     resp = await process_image(url, "resize_to", ["-nogif", 512, 512, "auto", "-f", "png"], timeout=60)
                     image_1 = resp[0]
@@ -1666,32 +1639,10 @@ class Art(Command):
                             data = bot.data.users.get(u.id, {})
                             oai = data.get("trial") and data.get("openai_key")
                             self.imagebot.token = oai or AUTH.get("openai_key")
-                            fn, cost = await create_future(self.imagebot.dalle_i2i, prompt, image_1b, image_2b, timeout=60)
-                            done = True
-                            if fn and cost and not oai:
-                                if "costs" in bot.data:
-                                    bot.data.costs.put(user.id, cost)
-                                    if guild:
-                                        bot.data.costs.put(guild.id, cost)
-                                if bot.is_trusted(guild) >= 2:
-                                    for uid in reversed(bot.data.trusted[guild.id]):
-                                        if uid and bot.premium_level(uid, absolute=True) >= 2:
-                                            break
-                                    u = await bot.fetch_user(uid)
-                                else:
-                                    u = user
-                                data = bot.data.users.get(u.id)
-                                if data and data.get("trial"):
-                                    bot.data.users.add_diamonds(user, cost / -25000)
-                                    if data.get("diamonds", 0) < 1:
-                                        bot.premium_level(u)
-                                        emb = discord.Embed(colour=rand_colour())
-                                        emb.set_author(**get_author(bot.user))
-                                        emb.description = (
-                                            "Uh-oh, it appears your tokens have run out! Check ~wallet to view your balance, top up using a donation [here]({bot.kofi_url}), "
-                                            + "or purchase a subscription to gain temporary unlimited usage!"
-                                        )
-                if not done:
+                            while len(fut) < amount:
+                                fut = create_future(self.imagebot.dalle_i2i, prompt, image_1b, image_2b, timeout=60)
+                                futs.append(fut)
+                while len(futs) < amount:
                     if self.sdiff_sem.is_busy() and not getattr(message, "simulated", False):
                         await send_with_react(channel, italics(ini_md(f"StableDiffusion: {sqr_md(req)} enqueued in position {sqr_md(self.sdiff_sem.passive + 1)}.")), reacts="❎", reference=message)
                     async with self.sdiff_sem:
@@ -1727,24 +1678,78 @@ class Art(Command):
                         for k, v in kwargs.items():
                             args.extend((k, v))
                         print(args)
-                        if self.has_py39:
-                            proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc/stable_diffusion.openvino", stdout=subprocess.DEVNULL)
-                            try:
-                                await asyncio.wait_for(proc.wait(), timeout=3200)
-                            except (T0, T1, T2):
-                                with tracebacksuppressor:
-                                    force_kill(proc)
-                                raise
-                            fn = "misc/stable_diffusion.openvino/output.png"
-                        else:
-                            noprompt = not force and not kwargs.get("--mask")
-                            fn = await process_image("IBASL", "&", ["" if noprompt else prompt, kwargs, nsfw, True], fix=2, timeout=1200)
-        if isinstance(fn, str):
-            with open(fn, "rb") as f:
-                fn = f.read()
-        with tracebacksuppressor:
-            fn = await bot.commands.steganography[0].call(fn, str(bot.id))
-        await bot.send_with_file(channel, "", fn, filename=lim_str(prompt, 96) + ".png", reference=message, reacts="🔳", embed=emb)
+                        async def sdl_force():
+                            if self.has_py39:
+                                proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc/stable_diffusion.openvino", stdout=subprocess.DEVNULL)
+                                try:
+                                    await asyncio.wait_for(proc.wait(), timeout=3200)
+                                except (T0, T1, T2):
+                                    with tracebacksuppressor:
+                                        force_kill(proc)
+                                    raise
+                                fn = "misc/stable_diffusion.openvino/output.png"
+                            else:
+                                noprompt = not force and not kwargs.get("--mask")
+                                fn = await process_image("IBASL", "&", ["" if noprompt else prompt, kwargs, nsfw, True], fix=2, timeout=1200)
+                            return fn
+                        fut = create_task(sdl_force())
+                        futs.append(fut)
+        files = []
+        exc = RuntimeError("Unknown error occured.")
+        for fut in futs:
+            try:
+                tup = await fut
+            except StopIteration:
+                continue
+            except PermissionError as ex:
+                if amount <= 1:
+                    raise
+                exc = ex
+                continue
+            except:
+                print_exc()
+                continue
+            if not tup:
+                continue
+            fn = tup[0]
+            if not fn:
+                continue
+            if fn and not oai and len(tup) > 1:
+                cost = tup[1]
+                if "costs" in bot.data:
+                    bot.data.costs.put(user.id, cost)
+                    if guild:
+                        bot.data.costs.put(guild.id, cost)
+                if bot.is_trusted(guild) >= 2:
+                    for uid in bot.data.trusted[guild.id]:
+                        if uid and bot.premium_level(uid, absolute=True) >= 2:
+                            break
+                    else:
+                        uid = next(iter(bot.data.trusted[guild.id]))
+                    u = await bot.fetch_user(uid)
+                else:
+                    u = user
+                data = bot.data.users.get(u.id)
+                if data and data.get("trial"):
+                    bot.data.users.add_diamonds(user, cost / -25000)
+                    if data.get("diamonds", 0) < 1:
+                        bot.premium_level(u)
+                        emb = discord.Embed(colour=rand_colour())
+                        emb.set_author(**get_author(bot.user))
+                        emb.description = (
+                            "Uh-oh, it appears your tokens have run out! Check ~wallet to view your balance, top up using a donation [here]({bot.kofi_url}), "
+                            + "or purchase a subscription to gain temporary unlimited usage!"
+                        )
+            if isinstance(fn, str):
+                with open(fn, "rb") as f:
+                    fn = f.read()
+            with tracebacksuppressor:
+                fn = await bot.commands.steganography[0].call(fn, str(bot.id))
+            files.append(CompatFile(fn, filename=lim_str(prompt, 96) + ".png"))
+        if not files:
+            raise exc
+        await send_with_react(channel, "", files=files, reference=message, reacts="🔳", embed=emb)
+        # await bot.send_with_file(channel, "", fn, filename=lim_str(prompt, 96) + ".png", reference=message, reacts="🔳", embed=emb)
 
 
 class UpdateImages(Database):
