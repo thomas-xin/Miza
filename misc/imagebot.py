@@ -483,7 +483,7 @@ class Bot:
 
 	safety_checker = lambda images, **kwargs: (images, [False] * len(images))
 	device, dtype = determine_cuda(0, priority=False)
-	gen = torch.Generator(f"cuda:{device}" if device >= 0 else "cpu")
+	gen = torch.Generator(f"cuda:{device}" if device >= 0 else "cpu").manual_seed(time.time_ns() - 1)
 	def art_stablediffusion_local(self, prompt, kwargs=None, model="stabilityai/stable-diffusion-2-1", fail_unless_gpu=True, nsfw=False, count=1):
 		cia = torch.cuda.is_available()
 		from diffusers import DPMSolverMultistepScheduler, StableDiffusionPipeline, StableDiffusionImg2ImgPipeline, StableDiffusionInpaintPipeline, StableDiffusionImageVariationPipeline
@@ -539,7 +539,7 @@ class Bot:
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
 				strength=float(kwargs.get("--strength", 0.8)),
-				generator=gen,
+				generator=self.gen,
 			)
 		elif pf is StableDiffusionImg2ImgPipeline:
 			data = pipe(
@@ -548,21 +548,21 @@ class Bot:
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
 				strength=float(kwargs.get("--strength", 0.8)),
-				generator=gen,
+				generator=self.gen,
 			)
 		elif pf is StableDiffusionImageVariationPipeline:
 			data = pipe(
 				image=[image_to(Image.open(kwargs["--init-image"]))] * count,
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
-				generator=gen,
+				generator=self.gen,
 			)
 		else:
 			data = pipe(
 				[prompt] * count,
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
-				generator=gen,
+				generator=self.gen,
 			)
 		if not nsfw and data.nsfw_content_detected and all(data.nsfw_content_detected):
 			raise PermissionError("NSFW filter detected in non-NSFW channel. If you believe this was a mistake, please try again.")
