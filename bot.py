@@ -5852,6 +5852,8 @@ class AudioClientInterface:
             self.proc.stdin.flush()
             resp = await asyncio.wait_for(wrap_future(self.returns[key]), timeout=48)
         except (T0, T1, T2, OSError):
+            if self.returns[key].done():
+                raise
             print("AExpired:", s)
             if self.killed:
                 raise
