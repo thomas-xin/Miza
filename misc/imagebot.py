@@ -564,13 +564,15 @@ class Bot:
 			)
 		if not nsfw and data.nsfw_content_detected and all(data.nsfw_content_detected):
 			raise PermissionError("NSFW filter detected in non-NSFW channel. If you believe this was a mistake, please try again.")
+		out = []
 		for im, n in zip(data.images, data.nsfw_content_detected):
 			im = data.images[0]
 			b = io.BytesIO()
 			im.save(b, format="png")
 			print("StablediffusionL:", b)
 			b.seek(0)
-			yield b.read()
+			out.append(b.read())
+		return out
 
 	def art_textsynth(self, prompt, kwargs=None, count=1):
 		headers = {
