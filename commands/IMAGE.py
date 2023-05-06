@@ -1519,9 +1519,10 @@ class Art(Command):
                 dalle2 = name.startswith("dalle")
                 openjourney = "journey" in name
                 if not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy() and torch.cuda.is_available():
-                    fn = await process_image("IBASL", "&", [prompt, kwargs, nsfw], fix=2, timeout=1200)
-                    if fn:
-                        return fn
+                    async with self.sdiff_sem:
+                        fn = await process_image("IBASL", "&", [prompt, kwargs, nsfw], fix=2, timeout=1200)
+                        if fn:
+                            return fn
                 if dalle2 and premium < 4:
                     raise PermissionError("Premium subscription required to perform DALL·E 2 operations.")
                 if bot.is_trusted(guild) >= 2:
