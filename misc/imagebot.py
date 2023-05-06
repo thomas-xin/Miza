@@ -321,7 +321,7 @@ class Bot:
 		folder = driver.folder
 		search = "https://www.mage.space/"
 		fut = exc.submit(driver.get, search)
-		fut.result(timeout=16)
+		fut.result(timeout=24)
 
 		# elems = driver.find_elements(by=class_name, value="mantine-1qsvvs3")
 		# if elems:
@@ -679,7 +679,7 @@ class Bot:
 				out.extend(ims)
 			except:
 				print_exc()
-		print(out, futs, funceff, count)
+		print(len(out), futs, funceff, count)
 		if not out and not nsfw:
 			raise PermissionError("NSFW filter detected in non-NSFW channel. If you believe this was a mistake, please try again.")
 		return out
