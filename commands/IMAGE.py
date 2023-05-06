@@ -1539,6 +1539,7 @@ class Art(Command):
                     fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, c], fix=2, timeout=1200))
             self.imagebot.token = oai or AUTH.get("openai_key")
             ims = await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2, openjourney, nsfw, amount - c, timeout=480)
+            print(ims)
             if fut:
                 ims2 = await fut
                 ims.extend(ims2)
@@ -1692,7 +1693,7 @@ class Art(Command):
                             amount2 = len(futs)
                         else:
                             noprompt = not force and not kwargs.get("--mask")
-                            ims = await process_image("IBASL", "&", ["" if noprompt else prompt, kwargs, nsfw, True, count], fix=2, timeout=1200)
+                            ims = await process_image("IBASL", "&", ["" if noprompt else prompt, kwargs, nsfw, True, amount - amount2], fix=2, timeout=1200)
                             futs.extend(ims)
                             amount2 = len(futs)
         files = []
