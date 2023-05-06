@@ -3031,14 +3031,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 if changed:
                     print(repr(activity))
                 if self.audio:
-                    audio_status = f"await client.change_presence(status=discord.Status."
+                    audio_status = f"await asyncio.wait_for(client.change_presence(status=discord.Status."
                     if status == discord.Status.invisible:
                         status = discord.Status.idle
-                        create_task(self.audio.asubmit(audio_status + "online)"))
+                        create_task(self.audio.asubmit(audio_status + "online),timeout=8)"))
                         await self.seen(self.user, event="misc", raw="Changing their status")
                     else:
                         if status == discord.Status.online:
-                            create_task(self.audio.asubmit(audio_status + "dnd)"))
+                            create_task(self.audio.asubmit(audio_status + "dnd),timeout=8)"))
                         create_task(self.seen(self.user, event="misc", raw="Changing their status"))
                 with suppress(ConnectionResetError):
                     await self.change_presence(activity=activity, status=status)
@@ -5852,6 +5852,8 @@ class AudioClientInterface:
             self.proc.stdin.flush()
             resp = await asyncio.wait_for(wrap_future(self.returns[key]), timeout=48)
         except (T0, T1, T2, OSError):
+            if self.returns[key].done():
+                raise
             print("AExpired:", s)
             if self.killed:
                 raise
