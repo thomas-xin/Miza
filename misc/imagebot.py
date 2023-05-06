@@ -679,6 +679,8 @@ class Bot:
 		for fut in futs:
 			try:
 				ims = fut.result(timeout=240)
+				if not ims:
+					continue
 				out.extend(ims)
 			except:
 				print_exc()
