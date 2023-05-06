@@ -1397,7 +1397,7 @@ class Art(Command):
     flags = "i"
     typing = True
     slash = ("Art", "Imagine")
-    sdiff_sem = Semaphore(1, 256, rate_limit=5)
+    sdiff_sem = Semaphore(1, 256, rate_limit=12)
     fut = None
     imagebot = imagebot.Bot(token=AUTH.get("openai_key"))
     has_py39 = subprocess.run("py -3.9 -m pip").returncode == 0
@@ -1531,7 +1531,7 @@ class Art(Command):
                 openjourney = "journey" in name
                 if not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy() and torch.cuda.is_available():
                     async with self.sdiff_sem:
-                        fn = await process_image("IBASL", "&", [prompt, kwargs, nsfw], fix=2, timeout=1200)
+                        fn = await process_image("IBASL", "&", [prompt, kwargs, nsfw, 1], fix=2, timeout=1200)
                         if fn:
                             return fn
                 if dalle2 and premium < 4:
@@ -1709,6 +1709,8 @@ class Art(Command):
                     continue
                 if not tup:
                     continue
+                if not isinstance(tup, tuple):
+                    tup = (tup,)
                 fn = tup[0]
                 if not fn:
                     continue
