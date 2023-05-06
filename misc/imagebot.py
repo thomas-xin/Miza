@@ -533,9 +533,10 @@ class Bot:
 			pipe.safety_checker = self.safety_checker
 		if pf is StableDiffusionInpaintPipeline:
 			data = pipe(
-				[prompt] * count,
+				prompt,
 				image=image_to(Image.open(kwargs["--init-image"])),
 				mask_image=image_to(Image.open(kwargs["--mask"])),
+				num_images_per_prompt=count,
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
 				strength=float(kwargs.get("--strength", 0.8)),
@@ -543,8 +544,9 @@ class Bot:
 			)
 		elif pf is StableDiffusionImg2ImgPipeline:
 			data = pipe(
-				[prompt] * count,
-				image=[image_to(Image.open(kwargs["--init-image"]))] * count,
+				prompt,
+				image=image_to(Image.open(kwargs["--init-image"])),
+				num_images_per_prompt=count,
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
 				strength=float(kwargs.get("--strength", 0.8)),
@@ -552,14 +554,16 @@ class Bot:
 			)
 		elif pf is StableDiffusionImageVariationPipeline:
 			data = pipe(
-				image=[image_to(Image.open(kwargs["--init-image"]))] * count,
+				image=image_to(Image.open(kwargs["--init-image"])),
+				num_images_per_prompt=count,
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
 				generator=self.gen,
 			)
 		else:
 			data = pipe(
-				[prompt] * count,
+				prompt,
+				num_images_per_prompt=count,
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
 				generator=self.gen,
