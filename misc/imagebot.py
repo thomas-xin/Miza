@@ -664,6 +664,13 @@ class Bot:
 		eff = 0
 		funceff = [random.choice(funcs) for i in range(count - 1)]
 		funceff.insert(0, funcs[0])
+		while funceff:
+			counts = [t[1] for t in funceff]
+			imc = sum(counts)
+			i = np.argmin(counts)
+			if imc - counts[i] < count:
+				break
+			funceff.pop(i)
 		futs = []
 		for func, it in funceff:
 			if eff >= count:
