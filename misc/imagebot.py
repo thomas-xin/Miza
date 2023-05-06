@@ -531,34 +531,30 @@ class Bot:
 			pipe.safety_checker = self.safety_checker
 		if pf is StableDiffusionInpaintPipeline:
 			data = pipe(
-				prompt,
+				[prompt] * count,
 				image=image_to(Image.open(kwargs["--init-image"])),
 				mask_image=image_to(Image.open(kwargs["--mask"])),
-				num_images_per_prompt=count,
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
 				strength=float(kwargs.get("--strength", 0.8)),
 			)
 		elif pf is StableDiffusionImg2ImgPipeline:
 			data = pipe(
-				prompt,
+				[prompt] * count,
 				image=image_to(Image.open(kwargs["--init-image"])),
-				num_images_per_prompt=count,
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
 				strength=float(kwargs.get("--strength", 0.8)),
 			)
 		elif pf is StableDiffusionImageVariationPipeline:
 			data = pipe(
-				image=image_to(Image.open(kwargs["--init-image"])),
-				num_images_per_prompt=count,
+				image=[image_to(Image.open(kwargs["--init-image"]))] * count,
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
 			)
 		else:
 			data = pipe(
-				prompt,
-				num_images_per_prompt=count,
+				[prompt] * count,
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
 			)
@@ -671,6 +667,7 @@ class Bot:
 				out.extend(ims)
 			except:
 				print_exc()
+		print(out, futs, funceff)
 		if not out and not nsfw:
 			raise PermissionError("NSFW filter detected in non-NSFW channel. If you believe this was a mistake, please try again.")
 		return out
