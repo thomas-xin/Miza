@@ -2539,6 +2539,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         )
 
     async def get_current_stats(self):
+        import psutil, cpuinfo, gpustat
         cinfo = self._cpuinfo
         if not cinfo:
             cinfo = self._cpuinfo = await create_future(cpuinfo.get_cpu_info)
