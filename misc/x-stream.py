@@ -64,10 +64,10 @@ class Server:
 				) for gi in ginfo},
 			},
 			disk={f"{ip}-{k}": dict(name=k, count=1, usage=v.used, max=v.total, time=t) for k, v in dinfo.items()},
-			network={
-				ip: dict(name="Upstream", count=1, usage=self.up_bps, max=-1, time=t),
-				ip: dict(name="Downstream", count=1, usage=self.down_bps, max=-1, time=t),
-			},
+			# network={
+			# 	ip: dict(name="Upstream", count=1, usage=self.up_bps, max=-1, time=t),
+			# 	ip: dict(name="Downstream", count=1, usage=self.down_bps, max=-1, time=t),
+			# },
 		))
 
 	@cp.expose
