@@ -2539,12 +2539,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         )
 
     async def get_current_stats(self):
-        import psutil, torch, cpuinfo, gpustat
+        import psutil, cpuinfo
         cinfo = self._cpuinfo
         if not cinfo:
             cinfo = self._cpuinfo = await create_future(cpuinfo.get_cpu_info)
         cpercent = psutil.cpu_percent()
         try:
+            import torch, gpustat
             ginfo = await create_future(gpustat.new_query)
         except:
             ginfo = []

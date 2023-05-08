@@ -24,13 +24,14 @@ class Server:
 
 	@cp.expose
 	def stat(self):
-		import psutil, torch, cpuinfo, gpustat, requests
+		import psutil, cpuinfo
 		fut = exc.submit(requests.get, "https://api.ipify.org")
 		cinfo = self._cpuinfo
 		if not cinfo:
 			cinfo = self._cpuinfo = cpuinfo.get_cpu_info()
 		cpercent = psutil.cpu_percent()
 		try:
+			import torch, gpustat
 			ginfo = gpustat.new_query()
 		except:
 			ginfo = []
