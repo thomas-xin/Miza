@@ -55,7 +55,7 @@ class Server:
 			memory={
 				f"{ip}-v": dict(name="RAM", count=1, usage=minfo.used, max=minfo.total, time=t),
 				f"{ip}-s": dict(name="Swap", count=1, usage=sinfo.used, max=sinfo.total, time=t),
-				**{ip + "-" + gi["uuid"]: dict(
+				**{f"{ip}-{gi['index']}": dict(
 					name=gi["name"],
 					count=1,
 					usage=gi["memory.used"] * 1048576,
