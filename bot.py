@@ -2597,6 +2597,15 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             audio_players = active_audio_players = "N/A"
         else:
             active_audio_players = sum(bool(auds.queue and not auds.paused) for auds in self.audio.players.values())
+        files = os.listdir("misc")
+        for f in files:
+            path = "misc/" + f
+            if is_code(path):
+                self.size2[f] = line_count(path)
+        size = (
+            np.sum(deque(self.size.values()), dtype=np.uint32, axis=0)
+            + np.sum(deque(self.size2.values()), dtype=np.uint32, axis=0)
+        )
         for fut in futs:
             with tracebacksuppressor:
                 system = await fut
@@ -2652,13 +2661,18 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         status = self.status_data
         if simplified:
             system = status.system
+            cpu_usage = sum(e["usage"] * e["count"] for e in system.cpu) / sum(e["max"] * e["count"] for e in system.cpu) if system.cpu else 0
+            gpu_usage = sum(e["usage"] * e["count"] for e in system.gpu) / sum(e["max"] * e["count"] for e in system.gpu) if system.gpu else 0
+            memory_usage = sum(e["usage"] * e["count"] for e in system.memory) if system.memory else 0
+            disk_usage = sum(e["usage"] * e["count"] for e in system.disk) if system.disk else 0
+            network_usage = sum(e["usage"] * e["count"] for e in system.network) if system.network else 0
             return {
                 "System info": {
-                    "CPU usage": sum(e["usage"] * e["count"] for e in system.cpu) / sum(e["max"] * e["count"] for e in system.cpu),
-                    "GPU usage": sum(e["usage"] * e["count"] for e in system.gpu) / sum(e["max"] * e["count"] for e in system.gpu),
-                    "Memory usage": sum(e["usage"] * e["count"] for e in system.memory) / sum(e["max"] * e["count"] for e in system.memory),
-                    "Disk usage": sum(e["usage"] * e["count"] for e in system.disk) / sum(e["max"] * e["count"] for e in system.disk),
-                    "Network usage": sum(e["usage"] * e["count"] for e in system.network) / sum(e["max"] * e["count"] for e in system.network),
+                    "CPU usage": f"{round(cpu_usage * 100, 3)}%",
+                    "GPU usage": f"{round(gpu_usage * 100, 3)}%",
+                    "Memory usage": byte_scale(memory_usage),
+                    "Disk usage": byte_scale(disk_usage),
+                    "Network usage": byte_scale(network_usage) + "bps",
                 },
                 "Discord info": status.discord,
                 "Misc info": status.misc,
@@ -2775,6 +2789,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         return self.get_module(mod + ".py")
 
     # Loads all modules in the commands folder and initializes bot commands and databases.
+    size = fcdict()
+    size2 = fcdict()
     def get_modules(self):
         files = [i for i in os.listdir("commands") if is_code(i) and i.rsplit(".", 1)[0] in self.active_categories]
         self.categories = fcdict()
@@ -2782,7 +2798,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         self.commands = fcdict()
         self.data = fcdict()
         self.database = fcdict()
-        self.size = fcdict()
         for f in os.listdir():
             if is_code(f):
                 self.size[f] = line_count(f)
