@@ -2531,13 +2531,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         return size
 
     async def get_remote_stat(self, addr):
-        await Request(
+        b = await Request(
             f"http://{addr}/stat/",
             aio=True,
             ssl=False,
-            json=True,
             timeout=4,
         )
+        return orjson.loads(b)
 
     async def get_current_stats(self):
         import psutil, cpuinfo
