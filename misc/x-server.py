@@ -1041,7 +1041,7 @@ transform: translate(-50%, -50%);
 	@hostmap
 	def static(self, *filepath):
 		if not filepath:
-			if cp.request.remote_ip == "127.0.0.1":
+			if cp.request.remote.ip == "127.0.0.1":
 				STATIC.clear()
 				send("Webserver cache cleared.")
 				return b"\xf0\x9f\x92\x9c"
@@ -1426,6 +1426,7 @@ transform: translate(-50%, -50%);
 	@cp.expose
 	@hostmap
 	def get_ip(self, *args, **kwargs):
+		create_future_ex(app.get_ip_ex)
 		data = orjson.dumps(dict(
 			remote=true_ip(),
 			host=getattr(self, "ip", "127.0.0.1"),

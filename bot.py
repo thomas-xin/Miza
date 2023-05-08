@@ -2544,14 +2544,17 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         if not cinfo:
             cinfo = self._cpuinfo = await create_future(cpuinfo.get_cpu_info)
         cpercent = psutil.cpu_percent()
-        ginfo = await create_future(gpustat.new_query)
+        try:
+            ginfo = await create_future(gpustat.new_query)
+        except:
+            ginfo = []
         minfo = psutil.virtual_memory()
         sinfo = psutil.swap_memory()
         dinfo = {p.mountpoint: psutil.disk_usage(p.mountpoint) for p in psutil.disk_partitions(all=True)}
         t = utc()
         return dict(
             cpu={"0": dict(name=cinfo["brand_raw"], count=cinfo["count"], usage=cpercent / 100, max=1, time=t)},
-            gpu={gi["uuid"]: dict(
+            gpu={"0-" + gi["uuid"]: dict(
                 name=gi["name"],
                 count=torch.cuda.get_device_properties(gi["index"]).multi_processor_count,
                 usage=gi["utilization.gpu"] / 100,
@@ -2561,7 +2564,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             memory={
                 "0-v": dict(name="RAM", count=1, usage=minfo.used, max=minfo.total, time=t),
                 "0-s": dict(name="Swap", count=1, usage=sinfo.used, max=sinfo.total, time=t),
-                **{gi["uuid"]: dict(
+                **{"0-" + gi["uuid"]: dict(
                     name=gi["name"],
                     count=1,
                     usage=gi["memory.used"] * 1048576,
@@ -2571,8 +2574,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             },
             disk={f"0-{k}": dict(name=k, count=1, usage=v.used, max=v.total, time=t) for k, v in dinfo.items()},
             network={
-                f"0": dict(name="Upstream", count=1, usage=self.up_bps, max=-1, time=t),
-                f"1": dict(name="Downstream", count=1, usage=self.down_bps, max=-1, time=t),
+                "0": dict(name="Upstream", count=1, usage=self.up_bps, max=-1, time=t),
+                "1": dict(name="Downstream", count=1, usage=self.down_bps, max=-1, time=t),
             },
         )
 

@@ -23,6 +23,51 @@ class Server:
 	cache = {}
 
 	@cp.expose
+	def stat(self):
+		import psutil, torch, cpuinfo, gpustat, requests
+		fut = exc.submit(requests.get, "https://api.ipify.org")
+		cinfo = self._cpuinfo
+		if not cinfo:
+			cinfo = self._cpuinfo = cpuinfo.get_cpu_info()
+		cpercent = psutil.cpu_percent()
+		try:
+			ginfo = gpustat.new_query()
+		except:
+			ginfo = []
+		minfo = psutil.virtual_memory()
+		sinfo = psutil.swap_memory()
+		dinfo = {p.mountpoint: psutil.disk_usage(p.mountpoint) for p in psutil.disk_partitions(all=True)}
+		resp = fut.result()
+		ip = resp.text
+		t = utc()
+		return json.dumps(dict(
+			cpu={ip: dict(name=cinfo["brand_raw"], count=cinfo["count"], usage=cpercent / 100, max=1, time=t)},
+			gpu={ip + "-" + gi["uuid"]: dict(
+				name=gi["name"],
+				count=torch.cuda.get_device_properties(gi["index"]).multi_processor_count,
+				usage=gi["utilization.gpu"] / 100,
+				max=1,
+				time=t,
+			) for gi in ginfo},
+			memory={
+				f"{ip}-v": dict(name="RAM", count=1, usage=minfo.used, max=minfo.total, time=t),
+				f"{ip}-s": dict(name="Swap", count=1, usage=sinfo.used, max=sinfo.total, time=t),
+				**{ip + "-" + gi["uuid"]: dict(
+					name=gi["name"],
+					count=1,
+					usage=gi["memory.used"] * 1048576,
+					max=gi["memory.total"] * 1048576,
+					time=t,
+				) for gi in ginfo},
+			},
+			disk={f"{ip}-{k}": dict(name=k, count=1, usage=v.used, max=v.total, time=t) for k, v in dinfo.items()},
+			network={
+				ip: dict(name="Upstream", count=1, usage=self.up_bps, max=-1, time=t),
+				ip: dict(name="Downstream", count=1, usage=self.down_bps, max=-1, time=t),
+			},
+		))
+
+	@cp.expose
 	def proxy(self, url):
 		headers = {
 			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
