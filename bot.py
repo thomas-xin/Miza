@@ -2541,6 +2541,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
     async def get_current_stats(self):
         import psutil, cpuinfo
+        fut = create_task(self.get_ip)
         cinfo = self._cpuinfo
         if not cinfo:
             cinfo = self._cpuinfo = await create_future(cpuinfo.get_cpu_info)
@@ -2553,33 +2554,34 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         minfo = psutil.virtual_memory()
         sinfo = psutil.swap_memory()
         dinfo = {p.mountpoint: psutil.disk_usage(p.mountpoint) for p in psutil.disk_partitions(all=False)}
+        ip = await fut
         t = utc()
         return dict(
-            cpu={"0": dict(name=cinfo["brand_raw"], count=cinfo["count"], usage=cpercent / 100, max=1, time=t)},
-            gpu={"0-" + gi["uuid"]: dict(
-                name=gi["name"],
-                count=torch.cuda.get_device_properties(gi["index"]).multi_processor_count,
-                usage=gi["utilization.gpu"] / 100,
-                max=1,
-                time=t,
-            ) for gi in ginfo},
-            memory={
-                "0-v": dict(name="RAM", count=1, usage=minfo.used, max=minfo.total, time=t),
-                "0-s": dict(name="Swap", count=1, usage=sinfo.used, max=sinfo.total, time=t),
-                **{"0-" + gi["uuid"]: dict(
-                    name=gi["name"],
-                    count=1,
-                    usage=gi["memory.used"] * 1048576,
-                    max=gi["memory.total"] * 1048576,
-                    time=t,
-                ) for gi in ginfo},
-            },
-            disk={f"0-{k}": dict(name=k, count=1, usage=v.used, max=v.total, time=t) for k, v in dinfo.items()},
-            network={
-                "0": dict(name="Upstream", count=1, usage=self.up_bps, max=-1, time=t),
-                "1": dict(name="Downstream", count=1, usage=self.down_bps, max=-1, time=t),
-            },
-        )
+			cpu={ip: dict(name=cinfo["brand_raw"], count=cinfo["count"], usage=cpercent / 100, max=1, time=t)},
+			gpu={f"{ip}-{gi['index']}": dict(
+				name=gi["name"],
+				count=torch.cuda.get_device_properties(gi["index"]).multi_processor_count,
+				usage=gi["utilization.gpu"] / 100,
+				max=1,
+				time=t,
+			) for gi in ginfo},
+			memory={
+				f"{ip}-v": dict(name="RAM", count=1, usage=minfo.used, max=minfo.total, time=t),
+				f"{ip}-s": dict(name="Swap", count=1, usage=sinfo.used, max=sinfo.total, time=t),
+				**{ip + "-" + gi["uuid"]: dict(
+					name=gi["name"],
+					count=1,
+					usage=gi["memory.used"] * 1048576,
+					max=gi["memory.total"] * 1048576,
+					time=t,
+				) for gi in ginfo},
+			},
+			disk={f"{ip}-{k}": dict(name=k, count=1, usage=v.used, max=v.total, time=t) for k, v in dinfo.items()},
+			network={
+				ip: dict(name="Upstream", count=1, usage=self.up_bps, max=-1, time=t),
+				ip: dict(name="Downstream", count=1, usage=self.down_bps, max=-1, time=t),
+			},
+		)
 
     _cpuinfo = None
     api_latency = inf

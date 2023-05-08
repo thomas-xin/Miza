@@ -45,7 +45,7 @@ class Server:
 		import json
 		return json.dumps(dict(
 			cpu={ip: dict(name=cinfo["brand_raw"], count=cinfo["count"], usage=cpercent / 100, max=1, time=t)},
-			gpu={ip + "-" + gi["uuid"]: dict(
+			gpu={f"{ip}-{gi['index']}": dict(
 				name=gi["name"],
 				count=torch.cuda.get_device_properties(gi["index"]).multi_processor_count,
 				usage=gi["utilization.gpu"] / 100,
