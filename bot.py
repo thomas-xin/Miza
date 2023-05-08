@@ -2539,7 +2539,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         )
 
     async def get_current_stats(self):
-        import psutil, cpuinfo, gpustat
+        import psutil, torch, cpuinfo, gpustat
         cinfo = self._cpuinfo
         if not cinfo:
             cinfo = self._cpuinfo = await create_future(cpuinfo.get_cpu_info)
@@ -2667,6 +2667,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             memory_usage = sum(e["usage"] * e["count"] for e in system.memory) if system.memory else 0
             disk_usage = sum(e["usage"] * e["count"] for e in system.disk) if system.disk else 0
             network_usage = sum(e["usage"] * e["count"] for e in system.network) if system.network else 0
+            discord_stats = dict(status.discord)
+            discord_stats["API latency"] = sec2time(discord_stats["API latency"])
+            misc_stats = dict(status.misc)
+            misc_stats["Total data transmitted"] = byte_scale(misc_stats["Total data transmitted"])
+            misc_stats["Hosted storage"] = byte_scale(misc_stats["Hosted storage"])
+            misc_stats["Uptime (last week)"] = f'{round(misc_stats["Uptime (last week)"] * 100, 3)}%'
             return {
                 "System info": {
                     "CPU usage": f"{round(cpu_usage * 100, 3)}%",
@@ -2675,8 +2681,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     "Disk usage": byte_scale(disk_usage),
                     "Network usage": byte_scale(network_usage) + "bps",
                 },
-                "Discord info": status.discord,
-                "Misc info": status.misc,
+                "Discord info": discord_stats,
+                "Misc info": misc_stats,
             }
         return status
 
