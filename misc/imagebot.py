@@ -481,7 +481,7 @@ class Bot:
 			raise PermissionError
 		print(resp.status_code, resp.text)
 
-	safety_checker = lambda images, **kwargs: (images, [False] * len(images))
+	safety_checkers = {}
 	device, dtype = determine_cuda(0, priority=False)
 	gen = torch.Generator(f"cuda:{device}" if device >= 0 else "cpu").manual_seed(time.time_ns() - 1)
 	def art_stablediffusion_local(self, prompt, kwargs=None, model="stabilityai/stable-diffusion-2-1", fail_unless_gpu=True, nsfw=False, count=1):
@@ -525,12 +525,12 @@ class Bot:
 					print("StablediffusionL: CUDA f16 init failed")
 					return
 				pipe = pf.from_pretrained(model, requires_safety_checker=True, **kw)
-			self.safety_checker = pipe.safety_checker
+			self.safety_checkers[model] = pipe.safety_checker
 			self.models[(pf, model)] = pipe
 		if nsfw:
 			pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
 		else:
-			pipe.safety_checker = self.safety_checker
+			pipe.safety_checker = self.safety_checkers[model]
 		if pf is StableDiffusionInpaintPipeline:
 			data = pipe(
 				prompt,
