@@ -1083,7 +1083,7 @@ class Status(Command):
                 if n == "Website URL":
                     return f"{n}\n[`{x}`]({x})"
                 return f"{n}\n`{x}`"
-            s = await create_future(bot.status)
+            s = await bot.status(simplified=True)
             for k, v in s.items():
                 emb.add_field(
                     name=k,

@@ -1243,6 +1243,10 @@ class UpdateImagePools(Database):
         return choice(data)
 
 
+class UpdateInsights(Database):
+    name = "insights"
+
+
 class UpdateGuildSettings(Database):
     name = "guildsettings"
 

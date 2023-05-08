@@ -116,12 +116,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         self.guild_semaphore = Semaphore(5, inf, rate_limit=5)
         self.load_semaphore = Semaphore(5, inf, rate_limit=1)
         self.user_semaphore = Semaphore(64, inf, rate_limit=8)
-        self.disk_semaphore = Semaphore(1, 1, rate_limit=1)
+        # self.disk_semaphore = Semaphore(1, 1, rate_limit=1)
         self.cache_semaphore = Semaphore(1, 1, rate_limit=30)
         self.command_semaphore = Semaphore(262144, 16384)
-        self.disk = 0
-        self.storage_ratio = 0
-        self.file_count = 0
         print("Time:", datetime.datetime.now())
         print("Initializing...")
         # O(1) time complexity for searching directory
@@ -257,7 +254,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 headers={"Content-Type": "application/json", "Authorization": "Bot " + self.token},
                 data=orjson.dumps(data),
             )
-            self.activity += 1
             if resp.status_code == 429:
                 time.sleep(20)
                 continue
@@ -275,7 +271,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 f"https://discord.com/api/{api}/applications/{self.id}/commands",
                 headers=dict(Authorization="Bot " + self.token),
             )
-            self.activity += 1
             if resp.status_code not in range(200, 400):
                 raise ConnectionError(f"Error {resp.status_code}", resp.text)
             commands = dict((int(c["id"]), c) for c in resp.json() if str(c.get("application_id")) == str(self.id))
@@ -335,7 +330,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                                                     f"https://discord.com/api/{api}/applications/{self.id}/commands/{curr['id']}",
                                                     headers=dict(Authorization="Bot " + self.token),
                                                 )
-                                                self.activity += 1
                                                 if resp.status_code == 429:
                                                     time.sleep(1)
                                                     continue
@@ -360,7 +354,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     f"https://discord.com/api/{api}/applications/{self.id}/commands/{curr['id']}",
                     headers=dict(Authorization="Bot " + self.token),
                 )
-                self.activity += 1
                 if resp.status_code not in range(200, 400):
                     raise ConnectionError(f"Error {resp.status_code}", resp.text)
 
@@ -1327,7 +1320,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         skip = "text/html" not in self.mimes[url]
                     if not skip:
                         resp = await create_future(reqs.next().get, url, headers=Request.header(), stream=True)
-                        self.activity += 1
                         url = as_str(resp.url)
                         head = fcdict(resp.headers)
                         ctype = [t.strip() for t in head.get("Content-Type", "").split(";")]
@@ -1375,7 +1367,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         except KeyError:
             pass
         resp = reqs.next().get(url, stream=True)
-        self.activity += 1
         head = fcdict(resp.headers)
         try:
             mime = [t.strip() for t in head.get("Content-Type", "").split(";")]
@@ -1405,7 +1396,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     fut = create_future_ex(Request, base + "png")
                 url = base + "gif"
                 with reqs.next().head(url, stream=True) as resp:
-                    self.activity += 1
                     if resp.status_code in range(400, 500):
                         if not verify:
                             return False
@@ -1426,7 +1416,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         if type(e) in (int, str):
             url = f"https://cdn.discordapp.com/emojis/{e}.png"
             with reqs.next().head(url, stream=True) as resp:
-                self.activity += 1
                 if resp.status_code in range(400, 500):
                     self.emoji_stuff.pop(int(e), None)
                     return
@@ -1762,7 +1751,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 with tracebacksuppressor:
                     url = urls[0]
                     resp = await create_future(reqs.next().get, url, headers=Request.header(), _timeout_=12)
-                    self.activity += 1
                     headers = fcdict(resp.headers)
                     if headers.get("Content-Type", "").split("/", 1)[0] == "image":
                         if float(headers.get("Content-Length", inf)) < 8388608:
@@ -2516,14 +2504,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     async def get_ip(self):
         self.ip = await Request("https://api.ipify.org", bypass=False, decode=True, aio=True)
         return self.ip
-        # self.update_ip(resp)
-
-    # Gets the amount of active processes, threads, coroutines.
-    def get_active(self):
-        procs = 2 + sum(1 for c in self.proc.children(True))
-        thrds = self.proc.num_threads()
-        coros = sum(1 for i in asyncio.all_tasks(self.loop))
-        return alist((procs, thrds, coros))
 
     # Gets the CPU and memory usage of a process over a period of 1 second.
     async def get_proc_state(self, proc):
@@ -2537,14 +2517,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             return float(c), float(m)
         return 0, 0
 
-    async def get_disk(self):
-        with tracebacksuppressor(SemaphoreOverflowError, FileNotFoundError):
-            async with self.disk_semaphore:
-                self.file_count, self.disk = await create_future(get_folder_size, ".", priority=True)
-        return self.disk
-
+    total_hosted = 0
     async def get_hosted(self):
-        self.__dict__.setdefault("total_hosted", 0)
         size = 0
         for fn in os.listdir("saves/filehost"):
             with tracebacksuppressor(ValueError):
@@ -2556,90 +2530,135 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         self.total_hosted = size
         return size
 
-    # Gets the status of the bot.
-    @tracebacksuppressor
-    async def get_state(self):
-        stats = azero(3)
-        procs = await create_future(self.proc.children, recursive=True, priority=True)
-        procs.append(self.proc)
-        tasks = [self.get_proc_state(p) for p in procs]
-        resp = await recursive_coro(tasks)
-        stats += [sum(st[0] for st in resp), sum(st[1] for st in resp), 0]
-        cpu = psutil.cpu_count(logical=True)
-        # mem = psutil.virtual_memory()
-        # CPU is totalled across all cores
-        stats[0] /= cpu
-        # Memory is in %
-        # stats[1] *= mem.total / 100
-        stats[2] = self.disk
-        self.size2 = fcdict()
-        files = os.listdir("misc")
-        for f in files:
-            path = "misc/" + f
-            if is_code(path):
-                self.size2[f] = line_count(path)
-        self.curr_state = stats
-        return stats
+    async def get_remote_stat(self, addr):
+        await Request(
+            f"http://{addr}/stat",
+            aio=True,
+            json=True,
+            timeout=4,
+        )
+
+    async def get_current_stats(self):
+        cinfo = self._cpuinfo
+        if not cinfo:
+            cinfo = self._cpuinfo = await create_future(cpuinfo.get_cpu_info)
+        cpercent = psutil.cpu_percent()
+        ginfo = await create_future(gpustat.new_query)
+        minfo = psutil.virtual_memory()
+        sinfo = psutil.swap_memory()
+        dinfo = {p.mountpoint: psutil.disk_usage(p.mountpoint) for p in psutil.disk_partitions(all=True)}
+        t = utc()
+        return dict(
+            cpu={"0": dict(name=cinfo["brand_raw"], count=cinfo["count"], usage=cpercent, max=1, time=t)},
+            gpu={gi["uuid"]: dict(
+                name=gi["name"],
+                count=torch.cuda.get_device_properties(gi["index"]).multi_processor_count,
+                usage=gi["utilization.gpu"] / 100,
+                max=1,
+                time=t,
+            ) for gi in ginfo},
+            memory={
+                "0-v": dict(name="RAM", count=1, usage=minfo.used, max=minfo.total, time=t),
+                "0-s": dict(name="Swap", count=1, usage=sinfo.used, max=sinfo.total, time=t),
+                **{gi["uuid"]: dict(
+                    name=gi["name"],
+                    count=1,
+                    usage=gi["memory.used"] * 1048576,
+                    max=gi["memory.total"] * 1048576,
+                    time=t,
+                ) for gi in ginfo},
+            },
+            disk={f"0-{k}": dict(name=k, count=1, usage=v.used, max=v.total, time=t) for k, v in dinfo.items()},
+            network={
+                f"0": dict(name="Upstream", count=1, usage=self.up_bps, max=-1, time=t),
+                f"1": dict(name="Downstream", count=1, usage=self.down_bps, max=-1, time=t),
+            },
+        )
+
+    _cpuinfo = None
+    api_latency = inf
+    async def get_system_stats(self):
+        futs = []
+        fut = create_task(self.get_current_stats())
+        futs.append(fut)
+        for addr in AUTH.get("remote-servers", ()):
+            fut = create_task(self.get_remote_stat(addr))
+            futs.append(fut)
+        try:
+            t = utc()
+            resp = await Request.sessions.next().head(f"https://discord.com/api/{api}", timeout=4)
+            self.api_latency = utc() - t
+        except Exception as ex:
+            self.api_exc = ex
+            self.api_latency *= 2
+        for fut in futs:
+            with tracebacksuppressor:
+                system = await fut
+                for k, v in system.items():
+                    self.status_data.system[k].update(v)
+        t = utc()
+        for k, v in self.status_data.system.items():
+            for i, e in tuple(v.items()):
+                if t - e.get("time", 0) > 30:
+                    v.pop(i)
+        self.status_data.update({
+            "discord": {
+                "Shard count": len(AUTH.get("remote-servers", ())) + 1,
+                "Server count": len(self._guilds),
+                "User count": len(self.cache.users),
+                "Channel count": len(self.cache.channels),
+                "Role count": len(self.cache.roles),
+                "Emoji count": len(self.cache.emojis),
+                "Cached messages": len(self.cache.messages),
+                "API latency": self.api_latency,
+                **({"Website URL": self.webserver} if self.webserver else {}),
+            },
+            "misc": {
+                "Active commands": self.command_semaphore.active,
+                "Connected voice channels": audio_players,
+                "Active audio players": active_audio_players,
+                "Total data transmitted": bot.total_bytes,
+                "Hosted storage": bot.total_hosted,
+                "System time": datetime.datetime.now(),
+                "Uptime (last week)": bot.uptime,
+                "Code size": [x.item() for x in size],
+                "Command count": len(set(itertools.chain(*self.commands.values()))),
+            },
+        })
+        return self.status_data
 
     status_sem = Semaphore(1, inf, rate_limit=1)
-
-    def status(self):
-        if self.status_sem.busy:
-            self.status_sem.wait()
-            return self.status_data
-        with self.status_sem:
-            self.status_data = {}
-            active = self.get_active()
-            size = (
-                np.sum(deque(self.size.values()), dtype=np.uint32, axis=0)
-                + np.sum(deque(self.size2.values()), dtype=np.uint32, axis=0)
-            )
-            stats = self.curr_state
-            commands = set(itertools.chain(*self.commands.values()))
-            try:
-                audio_players = len(self.audio.players)
-            except:
-                audio_players = active_audio_players = "N/A"
-            else:
-                active_audio_players = sum(bool(auds.queue and not auds.paused) for auds in self.audio.players.values())
-            self.status_data = {
+    status_data = cdict(
+        system=cdict(
+            time=0,
+            cpu=[],
+            gpu=[],
+            memory=[],
+            disk=[],
+            network=[],
+        ),
+        discord=cdict(),
+        misc=cdict(),
+    )
+    async def status(self, simplified=False):
+        if not self.status_sem.busy:
+            async with self.status_sem:
+                self.status_data = await self.get_system_stats()
+        status = self.status_data
+        if simplified:
+            system = status.system
+            return {
                 "System info": {
-                    "Process count": active[0],
-                    "Thread count": active[1],
-                    "Coroutine count": active[2],
-                    "CPU usage": f"{round(stats[0], 3)}%",
-                    "RAM usage": byte_scale(stats[1]) + "B",
-                    "Disk usage": byte_scale(stats[2]) + "B",
-                    "Network usage": byte_scale(bot.bitrate) + "bps",
-                    "Stored files": self.file_count,
+                    "CPU usage": sum(e["usage"] * e["count"] for e in system.cpu) / sum(e["max"] * e["count"] for e in system.cpu),
+                    "GPU usage": sum(e["usage"] * e["count"] for e in system.gpu) / sum(e["max"] * e["count"] for e in system.gpu),
+                    "Memory usage": sum(e["usage"] * e["count"] for e in system.memory) / sum(e["max"] * e["count"] for e in system.memory),
+                    "Disk usage": sum(e["usage"] * e["count"] for e in system.disk) / sum(e["max"] * e["count"] for e in system.disk),
+                    "Network usage": sum(e["usage"] * e["count"] for e in system.network) / sum(e["max"] * e["count"] for e in system.network),
                 },
-                "Discord info": {
-                    "Shard count": self.shards,
-                    "Server count": len(self._guilds),
-                    "User count": len(self.cache.users),
-                    "Channel count": len(self.cache.channels),
-                    "Role count": len(self.cache.roles),
-                    "Emoji count": len(self.cache.emojis),
-                    "Cached messages": len(self.cache.messages),
-                    "API latency": sec2time(self.api_latency),
-                },
-                "Misc info": {
-                    "Active commands": self.command_semaphore.active,
-                    "Connected voice channels": audio_players,
-                    "Active audio players": active_audio_players,
-                    "Activity count": self.activity,
-                    "Total data transmitted": byte_scale(bot.total_bytes) + "B",
-                    "Hosted storage": byte_scale(bot.total_hosted) + "B",
-                    "System time": datetime.datetime.now(),
-                    "Current uptime": dyn_time_diff(utc(), bot.start_time),
-                },
-                "Code info": {
-                    "Code size": [x.item() for x in size],
-                    "Command count": len(commands),
-                    "Website URL": self.webserver,
-                },
+                "Discord info": status.discord,
+                "Misc info": status.misc,
             }
-        return self.status_data
+        return status
 
     # Loads a module containing commands and databases by name.
     @tracebacksuppressor
@@ -2832,20 +2851,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         if u.update(force=True):
                             saved.append(i)
                             time.sleep(0.05)
-        if not self.closed and hasattr(self, "total_bytes"):
-            with tracebacksuppressor:
-                s = "{'net_bytes': " + str(self.total_bytes) + "}"
-                saves = "saves/status.json"
-                if os.path.exists("saves"):
-                    with open(saves[:-5] + "\x7f.json", "w") as f:
-                        f.write(s)
-                    with suppress(FileNotFoundError):
-                        os.remove(saves[:-5] + "\x7f\x7f.json")
-                    with suppress(FileNotFoundError):
-                        os.rename(saves, saves[:-5] + "\x7f\x7f.json")
-                    os.rename(saves[:-5] + "\x7f.json", saves)
-                with open(saves, "w") as f:
-                    f.write(s)
         backup = AUTH.get("backup_path") or "backup"
         if not os.path.exists(backup):
             os.mkdir(backup)
@@ -4061,8 +4066,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         await self.send_event("_call_")
                 self.update_users()
 
-    api_latency = inf
-    # The slow update loop that runs once every 3 second2.
+    # The slow update loop that runs once every 3 seconds.
+    up_bps = down_bps = 0
+    total_bytes = 0
     async def slow_loop(self):
         await asyncio.sleep(2)
         errored = 0
@@ -4071,44 +4077,43 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 async with tracebacksuppressor:
                     create_task(self.update_status())
                     with MemoryTimer("update_bytes"):
-                        net = await create_future(psutil.net_io_counters)
-                        net_bytes = net.bytes_sent + net.bytes_recv
-                        if not hasattr(self, "net_bytes"):
-                            self.net_bytes = deque(maxlen=3)
-                            self.start_bytes = 0
-                            if os.path.exists("saves/status.json"):
-                                with tracebacksuppressor:
-                                    with open("saves/status.json", "rb") as f:
-                                        data = await create_future(f.read)
-                                    status = eval(data)
-                                    self.start_bytes = max(0, status["net_bytes"] - net_bytes)
-                            if not self.start_bytes and os.path.exists("saves/status.json\x7f\x7f"):
-                                with tracebacksuppressor:
-                                    with open("saves/status.json\x7f\x7f", "rb") as f:
-                                        data = await create_future(f.read)
-                                    status = eval(data)
-                                    self.start_bytes = max(0, status["net_bytes"] - net_bytes)
-                        self.net_bytes.append(net_bytes)
-                        self.bitrate = (self.net_bytes[-1] - self.net_bytes[0]) * 8 / len(self.net_bytes)
-                        self.total_bytes = self.net_bytes[-1] + self.start_bytes
-                    if xrand(2):
-                        continue
-                    try:
-                        t = utc()
-                        resp = await Request.sessions.next().head(f"https://discord.com/api/{api}")
-                        self.activity += 1
-                        self.api_latency = utc() - t
-                    except:
-                        if hasattr(self, "api_latency"):
-                            self.api_latency *= 2
+                        if "insights" in self.data:
+                            uptime = self.data.insights.setdefault("uptimes", set())
+                            it = int(t // 720)
+                            interval = 86400 * 7 // 720
+                            if it not in uptime:
+                                uptime.add(it)
+                                sl = sorted(uptime)
+                                while sl[0] < it - interval:
+                                    uptime.pop(sl.pop(0))
+                            ut = 0
+                            for i in range(interval):
+                                ut += it - interval + i + 1 in uptime
+                            self.uptime = ut / interval
+
+                            net = await create_future(psutil.net_io_counters)
+                            if not hasattr(self, "up_bytes"):
+                                self.up_bytes = deque(maxlen=3)
+                                self.down_bytes = deque(maxlen=3)
+                                self.start_up = max(0, self.data.insights.get("up_bytes", 0) - net.bytes_sent)
+                                self.start_down = max(0, self.data.insights.get("down_bytes", 0) - net.bytes_recv)
+                            self.up_bytes.append(net.bytes_sent)
+                            self.down_bytes.append(net.bytes_recv)
+                            self.up_bps = (self.up_bytes[-1] - self.up_bytes[0]) * 8 / len(self.up_bytes)
+                            self.down_bps = (self.down_bytes[-1] - self.down_bytes[0]) * 8 / len(self.down_bytes)
+                            self.bitrate = self.up_bps + self.down_bps
+                            self.data.insights["up_bytes"] = up_bytes = self.up_bytes[-1] + self.start_up
+                            self.data.insights["down_bytes"] = down_bytes = self.down_bytes[-1] + self.start_down
+                            self.total_bytes = up_bytes + down_bytes
+
+                            self.data.insights.update()
                         else:
-                            self.api_latency = inf
-                        if not errored:
-                            print_exc()
-                        errored = 2
-                    else:
-                        if errored > 0:
-                            errored -= 1
+                            self.uptime = 0
+                            self.up_bps = 0
+                            self.down_bps = 0
+                            self.bitrate = 0
+                            self.total_bytes = 0
+                        await self.status()
 
     # The lazy update loop that runs once every 4-8 seconds.
     async def lazy_loop(self):
@@ -4129,8 +4134,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     with MemoryTimer("update_file_cache"):
                         await create_future(update_file_cache)
                     await asyncio.sleep(1)
-                    with MemoryTimer("get_disk"):
-                        await self.get_disk()
+                    # with MemoryTimer("get_disk"):
+                    #     await self.get_disk()
                     with MemoryTimer("get_hosted"):
                         await self.get_hosted()
                     await asyncio.sleep(1)
@@ -4942,7 +4947,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     kwargs['data'] = form_data
 
                 try:
-                    bot.activity += 1
                     r = await Request.sessions.next().request(method.upper(), url, **kwargs)
                     data = await discord.http.json_or_text(r)
                     status = r.status
@@ -5428,7 +5432,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         # Socket response event: if the event was an interaction, create a virtual message with the arguments as the content, then process as if it were a regular command.
         @self.event
         async def on_socket_response(data):
-            self.activity += 1
             if not data.get("op") and data.get("t") == "INTERACTION_CREATE" and "d" in data:
                 try:
                     dt = utc_dt()
@@ -5832,7 +5835,6 @@ class AudioClientInterface:
     async def asubmit(self, s, aio=False, ignore=False):
         if self.killed:
             return
-        bot.activity += 1
         key = ts_us()
         while key in self.returns:
             key += 1
@@ -5892,7 +5894,6 @@ class AudioClientInterface:
         return resp
 
     def submit(self, s, aio=False, ignore=False, timeout=48):
-        bot.activity += 1
         key = ts_us()
         while key in self.returns:
             key += 1
@@ -5941,7 +5942,6 @@ class AudioClientInterface:
             s = s.rstrip()
             if s:
                 if s[:1] == b"~":
-                    bot.activity += 1
                     c = memoryview(base64.b85decode(s[1:]))
                     if c[:18] == b"bot.audio.returns[":
                         out = Dummy
@@ -6128,12 +6128,10 @@ def webserver_communicate(bot):
                     s = as_str(b)
                     if s[0] == "~":
                         create_task(bot.process_http_command(*s[1:].split("\x7f", 3)))
-                        bot.activity += 1
                     elif s[0] == "!":
                         create_task(bot.process_http_eval(*s[1:].split("\x7f", 1)))
-                        bot.activity += 1
                     elif s == "@@@":
-                        bot.activity += 2
+                        pass
                     else:
                         print(s)
             time.sleep(1)

@@ -2284,8 +2284,6 @@ async def get_idle_proc(ptype, fix=None):
     return proc
 
 async def sub_submit(ptype, command, fix=None, _timeout=12):
-    if BOT[0]:
-        BOT[0].activity += 1
     ts = ts_us()
     proc = await get_idle_proc(ptype, fix=fix)
     while ts in PROC_RESP:
@@ -3086,8 +3084,6 @@ class Stream(io.IOBase):
             with suppress():
                 self.resp.close()
         self.resp = reqs.next().get(url, stream=True)
-        if BOT[0]:
-            BOT[0].activity += 1
         self.iter = self.resp.iter_content(self.BUF)
 
     def refill(self):
@@ -3289,8 +3285,6 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
         async with self.semaphore:
             req = session or (self.sessions.next() if ssl else self.nossl)
             resp = await req.request(method.upper(), url, headers=headers, data=data, timeout=timeout)
-            if BOT[0]:
-                BOT[0].activity += 1
             status = getattr(resp, "status_code", None) or getattr(resp, "status", 400)
             if status >= 400:
                 try:
@@ -3354,8 +3348,6 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
             else:
                 req = requests
                 resp = getattr(req, method)(url, headers=headers, files=files, data=data, timeout=timeout, verify=ssl)
-            if BOT[0]:
-                BOT[0].activity += 1
             if resp.status_code >= 400:
                 if not resp.content or magic.from_buffer(resp.content).startswith("text/"):
                     raise ConnectionError(resp.status_code, url, resp.text)
