@@ -2591,6 +2591,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         except Exception as ex:
             self.api_exc = ex
             self.api_latency *= 2
+        try:
+            audio_players = len(self.audio.players)
+        except:
+            audio_players = active_audio_players = "N/A"
+        else:
+            active_audio_players = sum(bool(auds.queue and not auds.paused) for auds in self.audio.players.values())
         for fut in futs:
             with tracebacksuppressor:
                 system = await fut
