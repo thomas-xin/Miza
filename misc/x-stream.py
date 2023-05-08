@@ -1,4 +1,4 @@
-import requests, logging, random, concurrent.futures
+import requests, logging, random, time, concurrent.futures
 import cherrypy as cp
 
 
@@ -41,7 +41,7 @@ class Server:
 		dinfo = {p.mountpoint: psutil.disk_usage(p.mountpoint) for p in psutil.disk_partitions(all=True)}
 		resp = fut.result()
 		ip = resp.text
-		t = utc()
+		t = time.time()
 		return json.dumps(dict(
 			cpu={ip: dict(name=cinfo["brand_raw"], count=cinfo["count"], usage=cpercent / 100, max=1, time=t)},
 			gpu={ip + "-" + gi["uuid"]: dict(
