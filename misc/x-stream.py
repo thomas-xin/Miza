@@ -22,6 +22,7 @@ class Server:
 
 	cache = {}
 
+	_cpuinfo = None
 	@cp.expose
 	def stat(self):
 		import psutil, cpuinfo
