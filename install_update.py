@@ -50,8 +50,12 @@ for mod in modlist:
                     break
             v = pkg_resources.get_distribution(name).version
             if version is not None:
-                s = repr([try_int(i) for i in v.split(".")]) + op + repr([try_int(i) for i in version.split(".")])
-                assert eval(s, {}, {})
+                try:
+                    s = repr([try_int(i) for i in v.split(".")]) + op + repr([try_int(i) for i in version.split(".")])
+                    assert eval(s, {}, {})
+                except TypeError:
+                    s = repr(v.split(".")) + op + repr(version.split("."))
+                    assert eval(s, {}, {})
         except:
             # Modules may require an older version, replace current version if necessary
             if s:

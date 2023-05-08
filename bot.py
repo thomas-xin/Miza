@@ -2630,12 +2630,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     status_sem = Semaphore(1, inf, rate_limit=1)
     status_data = cdict(
         system=cdict(
-            time=0,
-            cpu=[],
-            gpu=[],
-            memory=[],
-            disk=[],
-            network=[],
+            cpu={},
+            gpu={},
+            memory={},
+            disk={},
+            network={},
         ),
         discord=cdict(),
         misc=cdict(),
@@ -3057,8 +3056,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             with suppress(SemaphoreOverflowError):
                 with semaphore:
                     self.last_check = utc()
-                    if not force:
-                        create_task(self.get_state())
                     if self.bot_ready:
                         # Update databases
                         for u in self.data.values():
@@ -5285,7 +5282,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             await create_future(self.update_subs, priority=True)
             self.update_cache_feed()
             with tracebacksuppressor:
-                create_task(self.get_state())
                 for guild in self.guilds:
                     if guild.unavailable:
                         print(f"Warning: Guild {guild.id} is not available.")
