@@ -4079,7 +4079,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     with MemoryTimer("update_bytes"):
                         if "insights" in self.data:
                             uptime = self.data.insights.setdefault("uptimes", set())
-                            it = int(t // 720)
+                            it = int(utc() // 720)
                             interval = 86400 * 7 // 720
                             if it not in uptime:
                                 uptime.add(it)
