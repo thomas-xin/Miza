@@ -2662,8 +2662,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         status = self.status_data
         if simplified:
             system = status.system
-            cpu_usage = sum(e["usage"] * e["count"] for e in system.cpu.values()) / sum(e["max"] * e["count"] for e in system.cpu) if system.cpu else 0
-            gpu_usage = sum(e["usage"] * e["count"] for e in system.gpu.values()) / sum(e["max"] * e["count"] for e in system.gpu) if system.gpu else 0
+            cpu_usage = sum(e["usage"] * e["count"] for e in system.cpu.values()) / sum(e["max"] * e["count"] for e in system.cpu.values()) if system.cpu else 0
+            gpu_usage = sum(e["usage"] * e["count"] for e in system.gpu.values()) / sum(e["max"] * e["count"] for e in system.gpu.values()) if system.gpu else 0
             memory_usage = sum(e["usage"] * e["count"] for e in system.memory.values()) if system.memory else 0
             disk_usage = sum(e["usage"] * e["count"] for e in system.disk.values()) if system.disk else 0
             network_usage = sum(e["usage"] * e["count"] for e in system.network.values()) if system.network else 0
