@@ -2552,7 +2552,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             ginfo = []
         minfo = psutil.virtual_memory()
         sinfo = psutil.swap_memory()
-        dinfo = {p.mountpoint: psutil.disk_usage(p.mountpoint) for p in psutil.disk_partitions(all=True)}
+        dinfo = {p.mountpoint: psutil.disk_usage(p.mountpoint) for p in psutil.disk_partitions(all=False)}
         t = utc()
         return dict(
             cpu={"0": dict(name=cinfo["brand_raw"], count=cinfo["count"], usage=cpercent / 100, max=1, time=t)},
@@ -2642,8 +2642,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 "Hosted storage": bot.total_hosted,
                 "System time": datetime.datetime.now(),
                 "Uptime (last week)": bot.uptime,
-                "Code size": [x.item() for x in size],
                 "Command count": len(set(itertools.chain(*self.commands.values()))),
+                "Code size": [x.item() for x in size],
             },
         })
         return self.status_data
@@ -2670,7 +2670,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             cpu_usage = sum(e["usage"] * e["count"] for e in system.cpu.values()) / sum(e["max"] * e["count"] for e in system.cpu.values()) if system.cpu else 0
             gpu_usage = sum(e["usage"] * e["count"] for e in system.gpu.values()) / sum(e["max"] * e["count"] for e in system.gpu.values()) if system.gpu else 0
             memory_usage = sum(e["usage"] * e["count"] for e in system.memory.values()) if system.memory else 0
+            memory_max = sum(e["max"] * e["count"] for e in system.memory.values()) if system.memory else 0
             disk_usage = sum(e["usage"] * e["count"] for e in system.disk.values()) if system.disk else 0
+            disk_max = sum(e["max"] * e["count"] for e in system.disk.values()) if system.disk else 0
             network_usage = sum(e["usage"] * e["count"] for e in system.network.values()) if system.network else 0
             discord_stats = dict(status.discord)
             discord_stats["API latency"] = sec2time(discord_stats["API latency"])
@@ -2682,8 +2684,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 "System info": {
                     "CPU usage": f"{round(cpu_usage * 100, 3)}%",
                     "GPU usage": f"{round(gpu_usage * 100, 3)}%",
-                    "Memory usage": byte_scale(memory_usage) + "B",
-                    "Disk usage": byte_scale(disk_usage) + "B",
+                    "Memory usage": byte_scale(memory_usage) + "B/" + byte_scale(memory_max) + "B",
+                    "Disk usage": byte_scale(disk_usage) + "B/" + byte_scale(disk_max) + "B",
                     "Network usage": byte_scale(network_usage) + "bps",
                 },
                 "Discord info": discord_stats,

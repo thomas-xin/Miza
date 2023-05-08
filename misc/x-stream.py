@@ -38,7 +38,7 @@ class Server:
 			ginfo = []
 		minfo = psutil.virtual_memory()
 		sinfo = psutil.swap_memory()
-		dinfo = {p.mountpoint: psutil.disk_usage(p.mountpoint) for p in psutil.disk_partitions(all=True)}
+		dinfo = {p.mountpoint: psutil.disk_usage(p.mountpoint) for p in psutil.disk_partitions(all=False)}
 		resp = fut.result()
 		ip = resp.text
 		t = time.time()
