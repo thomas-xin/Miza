@@ -2550,7 +2550,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         dinfo = {p.mountpoint: psutil.disk_usage(p.mountpoint) for p in psutil.disk_partitions(all=True)}
         t = utc()
         return dict(
-            cpu={"0": dict(name=cinfo["brand_raw"], count=cinfo["count"], usage=cpercent, max=1, time=t)},
+            cpu={"0": dict(name=cinfo["brand_raw"], count=cinfo["count"], usage=cpercent / 100, max=1, time=t)},
             gpu={gi["uuid"]: dict(
                 name=gi["name"],
                 count=torch.cuda.get_device_properties(gi["index"]).multi_processor_count,
@@ -2677,8 +2677,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 "System info": {
                     "CPU usage": f"{round(cpu_usage * 100, 3)}%",
                     "GPU usage": f"{round(gpu_usage * 100, 3)}%",
-                    "Memory usage": byte_scale(memory_usage),
-                    "Disk usage": byte_scale(disk_usage),
+                    "Memory usage": byte_scale(memory_usage) + "B",
+                    "Disk usage": byte_scale(disk_usage) + "B",
                     "Network usage": byte_scale(network_usage) + "bps",
                 },
                 "Discord info": discord_stats,
