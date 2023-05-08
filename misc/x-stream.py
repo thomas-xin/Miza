@@ -42,6 +42,7 @@ class Server:
 		resp = fut.result()
 		ip = resp.text
 		t = time.time()
+		import json
 		return json.dumps(dict(
 			cpu={ip: dict(name=cinfo["brand_raw"], count=cinfo["count"], usage=cpercent / 100, max=1, time=t)},
 			gpu={ip + "-" + gi["uuid"]: dict(
