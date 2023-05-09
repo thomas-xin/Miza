@@ -487,7 +487,6 @@ class Bot:
 	def art_stablediffusion_local(self, prompt, kwargs=None, model="stabilityai/stable-diffusion-2-1", fail_unless_gpu=True, nsfw=False, count=1):
 		cia = torch.cuda.is_available()
 		from diffusers import DPMSolverMultistepScheduler, StableDiffusionPipeline, StableDiffusionImg2ImgPipeline, StableDiffusionInpaintPipeline, StableDiffusionImageVariationPipeline
-		from transformers import CLIPModel
 		if not kwargs.get("--init-image"):
 			pf = StableDiffusionPipeline
 			if model == "stabilityai/stable-diffusion-2-1":

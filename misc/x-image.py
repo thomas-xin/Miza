@@ -2527,7 +2527,9 @@ elif len(sys.argv) > 1 and sys.argv[1] == "2":
 	for i in range(3):
 		try:
 			from transformers import TrOCRProcessor, VisionEncoderDecoderModel, ViltProcessor, ViltForQuestionAnswering
+			from diffusers import DPMSolverMultistepScheduler, StableDiffusionPipeline, StableDiffusionImg2ImgPipeline, StableDiffusionInpaintPipeline, StableDiffusionImageVariationPipeline
 		except ImportError:
+			print(traceback.format_exc(), end="")
 			time.sleep(i + 1)
 		else:
 			break
