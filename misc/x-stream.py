@@ -1,6 +1,5 @@
 import requests, logging, random, time, sys, concurrent.futures
 import cherrypy as cp
-sys.path.append("spectralpulse")
 
 
 exc = concurrent.futures.ThreadPoolExecutor(max_workers=128)
@@ -30,6 +29,8 @@ class Server:
 	def stat(self, api=None, **kwargs):
 		if api == "ytdl" and "q" in kwargs:
 			if not getattr(self, "downloader", None):
+				spectralpulse = __file__.replace("\\", "/").rsplit("/", 1)[0] + "/spectralpulse"
+				sys.path.append(spectralpulse)
 				import audio_downloader
 				self.downloader = audio_downloader.AudioDownloader()
 			entries = self.downloader.search(kwargs["q"])
