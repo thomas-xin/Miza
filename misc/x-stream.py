@@ -1,4 +1,4 @@
-import requests, logging, random, time, sys, concurrent.futures
+import requests, logging, random, time, sys, json, concurrent.futures
 import cherrypy as cp
 
 
@@ -59,7 +59,6 @@ class Server:
 			self.ip = resp.text
 		ip = self.ip
 		t = time.time()
-		import json
 		return json.dumps(dict(
 			cpu={ip: dict(name=cinfo["brand_raw"], count=cinfo["count"], usage=cpercent / 100, max=1, time=t)},
 			gpu={f"{ip}-{gi['index']}": dict(
