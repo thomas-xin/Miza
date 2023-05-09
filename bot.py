@@ -2536,7 +2536,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     async def get_remote_stat(self, addr):
         try:
             b = await Request(
-                f"http://{addr}/stat/",
+                f"https://{addr}/stat/",
                 aio=True,
                 ssl=False,
                 timeout=4,

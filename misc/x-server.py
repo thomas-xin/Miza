@@ -1073,12 +1073,14 @@ transform: translate(-50%, -50%);
 		if v:
 			fmt = kwargs.get("fmt")
 			if not fmt:
-				fmt = "opus" if d else "mp3"
+				fmt = "opus" if d else "weba"
 			if fmt not in ("mp3", "opus", "webm", "weba", "ogg", "wav"):
 				raise TypeError(fmt)
 			fmt = "." + fmt
 			self.bot_exec(f"bot.audio.returns[{t}]=VOICE.ytdl.search({repr(q)})[0]")
-			self.bot_exec(f"VOICE.ytdl.get_stream(bot.audio.returns[{t}],force=True,download=False)")
+			stream = self.bot_exec(f"VOICE.ytdl.get_stream(bot.audio.returns[{t}],force=True,download=False)")
+			if fmt in ("webm", "weba"):
+				raise cp.HTTPRedirect(stream, status="307")
 			name, url = self.bot_exec(f"(bot.audio.returns[{t}].get('name'),bot.audio.returns[{t}].get('url'))")
 			if not name or not url:
 				raise FileNotFoundError(500, v)

@@ -2268,7 +2268,15 @@ class AudioDownloader:
         with self.semaphore:
             try:
                 obj = cdict(t=utc())
-                obj.data = output = self.extract(item, force, mode=mode, count=count)
+                remote = AUTH.get("remote-servers", ())
+                if remote:
+                    with tracebacksuppressor:
+                        addr = choice(remote)
+                        resp = requests.get(f"https://{addr}/stat/?api=ytdl&q={urllib.parse.quote_plus(item)}")
+                        output = [cdict(e) for e in entries]
+                if not output:
+                    output = self.extract(item, force, mode=mode, count=count)
+                obj.data = output
                 if obj.data:
                     self.searched[item] = obj
                 return output
