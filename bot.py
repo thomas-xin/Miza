@@ -2592,6 +2592,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     _cpuinfo = None
     api_latency = inf
     async def get_system_stats(self):
+        t = utc()
         futs = []
         fut = create_task(self.get_current_stats())
         futs.append(fut)
@@ -2599,7 +2600,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             fut = create_task(self.get_remote_stat(addr))
             futs.append(fut)
         try:
-            t = utc()
             resp = await Request.sessions.next().head(f"https://discord.com/api/{api}", timeout=4)
             self.api_latency = utc() - t
         except Exception as ex:
@@ -2625,7 +2625,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 system = await fut
                 for k, v in system.items():
                     self.status_data.system[k].update(v)
-        t = utc()
         for k, v in self.status_data.system.items():
             for i, e in tuple(v.items()):
                 if t - e.get("time", 0) > 30:
@@ -2677,6 +2676,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             system = status.system
             cpu_usage = sum(e["usage"] * e["count"] for e in system.cpu.values()) / sum(e["max"] * e["count"] for e in system.cpu.values()) if system.cpu else 0
             gpu_usage = sum(e["usage"] * e["count"] for e in system.gpu.values()) / sum(e["max"] * e["count"] for e in system.gpu.values()) if system.gpu else 0
+            cpu_cores = sum(e["count"] for e in system.cpu.values()) if system.cpu else 0
+            gpu_cores = sum(e["count"] for e in system.gpu.values()) if system.gpu else 0
             memory_usage = sum(e["usage"] * e["count"] for e in system.memory.values()) if system.memory else 0
             memory_max = sum(e["max"] * e["count"] for e in system.memory.values()) if system.memory else 0
             disk_usage = sum(e["usage"] * e["count"] for e in system.disk.values()) if system.disk else 0
@@ -2690,8 +2691,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             misc_stats["Uptime (past week)"] = f'{round(misc_stats["Uptime (past week)"] * 100, 3)}%'
             return {
                 "System info": {
-                    "CPU usage": f"{round(cpu_usage * 100, 3)}%",
-                    "GPU usage": f"{round(gpu_usage * 100, 3)}%",
+                    "CPU usage": f"{round(cpu_usage * 100, 3)}%*{cpu_cores}",
+                    "GPU usage": f"{round(gpu_usage * 100, 3)}%*{gpu_cores}",
                     "Memory usage": byte_scale(memory_usage) + "B/" + byte_scale(memory_max) + "B",
                     "Disk usage": byte_scale(disk_usage) + "B/" + byte_scale(disk_max) + "B",
                     "Network usage": byte_scale(network_usage) + "bps",
