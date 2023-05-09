@@ -76,13 +76,12 @@ class MultiAutoImporter:
 			_globals.update(zip(args, futs))
 
 importer = MultiAutoImporter(
-	"numpy, contextlib, urllib, collections, math, traceback, requests, orjson",
+	"contextlib, urllib, collections, math, traceback, requests, orjson",
 	"os, yt_dlp, random, time, base64, hashlib, re, psutil, subprocess, itertools, zipfile",
 	pool=exc,
 	_globals=globals(),
 )
 
-np = numpy.force()
 suppress = contextlib.suppress
 urllib.force()
 import urllib.parse
@@ -339,7 +338,7 @@ extra_zalgos = (
 	(42607,), range(42612, 42622), (42654, 42655),
 	range(65056, 65060),
 )
-zalgo_array = np.concatenate(extra_zalgos)
+zalgo_array = list(itertools.chain(*extra_zalgos))
 zalgo_map = {n: "" for n in zalgo_array}
 __trans.update(zalgo_map)
 __unitrans = ["".maketrans({UNIFMTS[-1][x]: UNIFMTS[i][x] for x in range(len(UNIFMTS[-1]))}) for i in range(len(UNIFMTS) - 1)]
