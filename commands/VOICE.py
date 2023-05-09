@@ -2268,6 +2268,7 @@ class AudioDownloader:
         with self.semaphore:
             try:
                 obj = cdict(t=utc())
+                output = None
                 remote = AUTH.get("remote-servers", ())
                 if remote:
                     with tracebacksuppressor:
