@@ -2273,7 +2273,7 @@ class AudioDownloader:
                 if remote:
                     with tracebacksuppressor:
                         addr = choice(remote)
-                        resp = requests.get(f"https://{addr}/stat/?api=ytdl&q={urllib.parse.quote_plus(item)}")
+                        resp = requests.get(f"https://{addr}/stat/?api=ytdl&q={urllib.parse.quote_plus(item)}", verify=False)
                         resp.raise_for_status()
                         output = [cdict(e) for e in resp.json()]
                 if not output:
