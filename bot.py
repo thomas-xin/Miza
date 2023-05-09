@@ -2691,8 +2691,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             misc_stats["Uptime (past week)"] = f'{round(misc_stats["Uptime (past week)"] * 100, 3)}%'
             return {
                 "System info": {
-                    "CPU usage": f"{round(cpu_usage * 100, 3)}%*{cpu_cores}",
-                    "GPU usage": f"{round(gpu_usage * 100, 3)}%*{gpu_cores}",
+                    "CPU usage": f"{round(cpu_usage * 100, 3)}% *{cpu_cores}",
+                    "GPU usage": f"{round(gpu_usage * 100, 3)}% *{gpu_cores}",
                     "Memory usage": byte_scale(memory_usage) + "B/" + byte_scale(memory_max) + "B",
                     "Disk usage": byte_scale(disk_usage) + "B/" + byte_scale(disk_max) + "B",
                     "Network usage": byte_scale(network_usage) + "bps",
