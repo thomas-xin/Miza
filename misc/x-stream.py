@@ -25,6 +25,7 @@ class Server:
 	_cpuinfo = None
 	up_bps = down_bps = 0
 	ip_time = 0
+	ip = "127.0.0.1"
 	@cp.expose
 	def stat(self, api=None, **kwargs):
 		if api == "ytdl" and "q" in kwargs:

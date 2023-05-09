@@ -2273,6 +2273,7 @@ class AudioDownloader:
                     with tracebacksuppressor:
                         addr = choice(remote)
                         resp = requests.get(f"https://{addr}/stat/?api=ytdl&q={urllib.parse.quote_plus(item)}")
+                        resp.raise_for_status()
                         output = [cdict(e) for e in resp.json()]
                 if not output:
                     output = self.extract(item, force, mode=mode, count=count)
