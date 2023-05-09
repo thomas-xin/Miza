@@ -2685,8 +2685,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             discord_stats = dict(status.discord)
             discord_stats["API latency"] = sec2time(discord_stats["API latency"])
             misc_stats = dict(status.misc)
-            misc_stats["Total data transmitted"] = byte_scale(misc_stats["Total data transmitted"])
-            misc_stats["Hosted storage"] = byte_scale(misc_stats["Hosted storage"])
+            misc_stats["Total data transmitted"] = byte_scale(misc_stats["Total data transmitted"]) + "B"
+            misc_stats["Hosted storage"] = byte_scale(misc_stats["Hosted storage"]) + "B"
             misc_stats["Uptime (last week)"] = f'{round(misc_stats["Uptime (last week)"] * 100, 3)}%'
             return {
                 "System info": {
