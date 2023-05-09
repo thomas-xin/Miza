@@ -29,7 +29,7 @@ class Server:
 	@cp.expose
 	def stat(self, api=None, **kwargs):
 		if api == "ytdl" and "q" in kwargs:
-			if not getattr(self, downloader):
+			if not getattr(self, "downloader", None):
 				import audio_downloader
 				self.downloader = audio_downloader.AudioDownloader()
 			entries = self.downloader.search(kwargs["q"])
