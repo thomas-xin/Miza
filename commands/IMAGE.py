@@ -1493,11 +1493,14 @@ class Art(Command):
             force = True
         req = prompt
         if url:
-            if req:
-                req += " "
-            req += url
-            if url2:
-                req += " " + url2
+            if force:
+                if req:
+                    req += " "
+                req += url
+                if url2:
+                    req += " " + url2
+            else:
+                req = url
         if specified:
             req += " ".join(f"{k} {v}" for k, v in kwargs.items() if k in specified)
         nsfw = bot.is_nsfw(channel)
