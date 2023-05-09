@@ -582,6 +582,7 @@ def round_min(x):
 			return round_min(x.real)
 		else:
 			return round_min(complex(x).real) + round_min(complex(x).imag) * (1j)
+math.round = round
 
 
 eval_json = lambda s: eval(s, dict(true=True, false=False, null=None, none=None), {})
