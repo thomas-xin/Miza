@@ -1,5 +1,6 @@
-import requests, logging, random, time, concurrent.futures
+import requests, logging, random, time, sys, concurrent.futures
 import cherrypy as cp
+sys.path.append("spectralpulse")
 
 
 exc = concurrent.futures.ThreadPoolExecutor(max_workers=128)
@@ -23,10 +24,23 @@ class Server:
 	cache = {}
 
 	_cpuinfo = None
+	up_bps = down_bps = 0
+	ip_time = 0
 	@cp.expose
-	def stat(self):
+	def stat(self, api=None, **kwargs):
+		if api == "ytdl" and "q" in kwargs:
+			if not getattr(self, downloader):
+				import audio_downloader
+				self.downloader = audio_downloader.AudioDownloader()
+			entries = self.downloader.search(kwargs["q"])
+			self.downloader.get_stream(entries[0], force=True, download=False)
+			return json.dumps(entries)
 		import psutil, cpuinfo
-		fut = exc.submit(requests.get, "https://api.ipify.org")
+		if time.time() - self.ip_time > 60:
+			fut = exc.submit(requests.get, "https://api.ipify.org")
+			self.ip_time = time.time()
+		else:
+			fut = None
 		cinfo = self._cpuinfo
 		if not cinfo:
 			cinfo = self._cpuinfo = cpuinfo.get_cpu_info()
@@ -39,8 +53,10 @@ class Server:
 		minfo = psutil.virtual_memory()
 		sinfo = psutil.swap_memory()
 		dinfo = {p.mountpoint: psutil.disk_usage(p.mountpoint) for p in psutil.disk_partitions(all=False)}
-		resp = fut.result()
-		ip = resp.text
+		if fut:
+			resp = fut.result()
+			self.ip = resp.text
+		ip = self.ip
 		t = time.time()
 		import json
 		return json.dumps(dict(
@@ -64,14 +80,32 @@ class Server:
 				) for gi in ginfo},
 			},
 			disk={f"{ip}-{k}": dict(name=k, count=1, usage=v.used, max=v.total, time=t) for k, v in dinfo.items()},
-			# network={
-			# 	ip: dict(name="Upstream", count=1, usage=self.up_bps, max=-1, time=t),
-			# 	ip: dict(name="Downstream", count=1, usage=self.down_bps, max=-1, time=t),
-			# },
+			network={
+				ip: dict(name="Upstream", count=1, usage=self.up_bps, max=-1, time=t),
+				ip: dict(name="Downstream", count=1, usage=self.down_bps, max=-1, time=t),
+			},
 		))
 
+	def update_net(self):
+		ninter = 3
+		while True:
+			t = time.time()
+			net = psutil.net_io_counters()
+			if not hasattr(self, "up_bytes"):
+				self.up_bytes = deque(maxlen=3)
+				self.down_bytes = deque(maxlen=3)
+				self.start_up = -net.bytes_sent
+				self.start_down = -net.bytes_recv
+			self.up_bytes.append(net.bytes_sent)
+			self.down_bytes.append(net.bytes_recv)
+			self.up_bps = (self.up_bytes[-1] - self.up_bytes[0]) * 8 / len(self.up_bytes) / ninter
+			self.down_bps = (self.down_bytes[-1] - self.down_bytes[0]) * 8 / len(self.down_bytes) / ninter
+			time.sleep(max(0, t - time.time() + ninter))
+
 	@cp.expose
-	def proxy(self, url):
+	def proxy(self, url=None):
+		if not url:
+			return "Expected proxy URL."
 		headers = {
 			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
 			"DNT": "1",
@@ -87,7 +121,9 @@ class Server:
 		return resp.iter_content(65536)
 
 	@cp.expose
-	def stream(self, info):
+	def stream(self, info=None):
+		if not info:
+			return "Expected info URL."
 		try:
 			data = self.cache[info]
 		except KeyError:
@@ -225,5 +261,6 @@ if __name__ == "__main__":
 	logging.basicConfig(level=logging.WARNING, format='%(asctime)s %(message)s')
 	app = Server()
 	self = server = cp.Application(app, "/", config)
+	exc.submit(server.update_net)
 	cp.quickstart(server, "/", config)
 	# waitress.serve(server, threads=128, host=ADDRESS, port=PORT, url_scheme="https")

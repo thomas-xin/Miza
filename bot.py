@@ -2501,8 +2501,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         return regexp("^https?:\\/\\/(?:[A-Za-z]+\\.)?mizabot\\.xyz").findall(url)
 
     # Gets the external IP address from api.ipify.org
+    ip_sem = Semaphore(1, 1, rate_limit=60)
     async def get_ip(self):
-        self.ip = await Request("https://api.ipify.org", bypass=False, decode=True, aio=True)
+        with suppress(SemaphoreOverflowError):
+            async with self.ip_sem:
+                self.ip = await Request("https://api.ipify.org", bypass=False, decode=True, aio=True)
         return self.ip
 
     # Gets the CPU and memory usage of a process over a period of 1 second.
@@ -2531,13 +2534,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         return size
 
     async def get_remote_stat(self, addr):
-        b = await Request(
-            f"http://{addr}/stat/",
-            aio=True,
-            ssl=False,
-            timeout=4,
-        )
-        return orjson.loads(b)
+        try:
+            b = await Request(
+                f"http://{addr}/stat/",
+                aio=True,
+                ssl=False,
+                timeout=4,
+            )
+            return orjson.loads(b)
+        except (T0, T1, T2):
+            return {}
 
     async def get_current_stats(self):
         import psutil, cpuinfo
@@ -4107,7 +4113,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         await asyncio.sleep(2)
         errored = 0
         while not self.closed:
-            async with Delay(3):
+            ninter = 3
+            async with Delay(ninter):
                 async with tracebacksuppressor:
                     create_task(self.update_status())
                     with MemoryTimer("update_bytes"):
@@ -4133,8 +4140,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                                 self.start_down = max(0, self.data.insights.get("down_bytes", 0) - net.bytes_recv)
                             self.up_bytes.append(net.bytes_sent)
                             self.down_bytes.append(net.bytes_recv)
-                            self.up_bps = (self.up_bytes[-1] - self.up_bytes[0]) * 8 / len(self.up_bytes)
-                            self.down_bps = (self.down_bytes[-1] - self.down_bytes[0]) * 8 / len(self.down_bytes)
+                            self.up_bps = (self.up_bytes[-1] - self.up_bytes[0]) * 8 / len(self.up_bytes) / ninter
+                            self.down_bps = (self.down_bytes[-1] - self.down_bytes[0]) * 8 / len(self.down_bytes) / ninter
                             self.bitrate = self.up_bps + self.down_bps
                             self.data.insights["up_bytes"] = up_bytes = self.up_bytes[-1] + self.start_up
                             self.data.insights["down_bytes"] = down_bytes = self.down_bytes[-1] + self.start_down
