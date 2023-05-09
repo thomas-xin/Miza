@@ -583,10 +583,11 @@ class Bot:
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
 				generator=self.gen,
 			)
-		if not nsfw and data.nsfw_content_detected and all(data.nsfw_content_detected):
+		nsfw_content_detected = [data.nsfw_content_detected] * len(data.images) if isinstance(data.nsfw_content_detected, bool) else nsfw_content_detected
+		if not nsfw and data.nsfw_content_detected and all(nsfw_content_detected):
 			raise PermissionError("NSFW filter detected in non-NSFW channel. If you believe this was a mistake, please try again.")
 		out = []
-		for im, n in zip(data.images, data.nsfw_content_detected):
+		for im, n in zip(data.images, nsfw_content_detected):
 			if n:
 				continue
 			b = io.BytesIO()
