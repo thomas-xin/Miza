@@ -2431,14 +2431,17 @@ def cb_exists(cid):
 def backup_model(cls, model, **kwargs):
 	fut = exc.submit(cls, model, **kwargs)
 	try:
-		return fut.result(timeout=60)
+		return fut.result(timeout=8)
 	except Exception as ex:
 		try:
 			return cls(model, local_files_only=True, **kwargs)
 		except:
 			pass
 		if isinstance(ex, concurrent.futures.TimeoutError):
-			raise RuntimeError("Model is loading, please wait...")
+			try:
+				return fut.result(timeout=60)
+			except concurrent.futures.TimeoutError:
+				raise RuntimeError("Model is loading, please wait...")
 		raise
 
 if len(sys.argv) > 1 and sys.argv[1] == "1":
