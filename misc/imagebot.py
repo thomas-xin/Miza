@@ -175,6 +175,19 @@ def determine_cuda(mem=1, priority=False):
 	pcs = sorted(range(n), key=lambda i: (p := dps[i]) and (p.total_memory >= mem, p.multi_processor_count * sign), reverse=True)
 	return pcs[0], torch.float16
 
+def backup_model(cls, model, **kwargs):
+	fut = exc.submit(cls, model, **kwargs)
+	try:
+		return fut.result(timeout=60)
+	except Exception as ex:
+		try:
+			return cls(model, local_files_only=True, **kwargs)
+		except:
+			pass
+		if isinstance(ex, concurrent.futures.TimeoutError):
+			raise RuntimeError("Model is loading, please wait...")
+		raise
+
 def safecomp(gen):
 	while True:
 		try:
@@ -508,7 +521,7 @@ class Bot:
 			try:
 				if fail_unless_gpu and (device < 0 or not self.models.get((pf, model), True)):
 					return
-				pipe = pf.from_pretrained(model, requires_safety_checker=True, torch_dtype=dtype, **kw)
+				pipe = backup_model(pf.from_pretrained, model, requires_safety_checker=True, torch_dtype=dtype, **kw)
 				if device >= 0:
 					pipe = pipe.to(f"cuda:{device}")
 					pipe.enable_attention_slicing()
@@ -523,7 +536,7 @@ class Bot:
 					self.models[(pf, model)] = False
 					print("StablediffusionL: CUDA f16 init failed")
 					return
-				pipe = pf.from_pretrained(model, requires_safety_checker=True, **kw)
+				pipe = backup_model(pf.from_pretrained, model, requires_safety_checker=True, **kw)
 			self.safety_checkers[model] = pipe.safety_checker
 			self.models[(pf, model)] = pipe
 		if nsfw:

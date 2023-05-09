@@ -100,7 +100,7 @@ mpf = float
 deque = collections.deque
 suppress = contextlib.suppress
 
-exc = concurrent.futures.ThreadPoolExecutor(max_workers=3)
+exc = concurrent.futures.ThreadPoolExecutor(max_workers=8)
 
 def load_mimes():
 	with open("misc/mimes.txt") as f:
@@ -2428,6 +2428,19 @@ CBOTS = {}
 def cb_exists(cid):
 	return cid in CBOTS
 
+def backup_model(cls, model, **kwargs):
+	fut = exc.submit(cls, model, **kwargs)
+	try:
+		return fut.result(timeout=60)
+	except Exception as ex:
+		try:
+			return cls(model, local_files_only=True, **kwargs)
+		except:
+			pass
+		if isinstance(ex, concurrent.futures.TimeoutError):
+			raise RuntimeError("Model is loading, please wait...")
+		raise
+
 if len(sys.argv) > 1 and sys.argv[1] == "1":
 	import convobot, torch
 
@@ -2545,8 +2558,8 @@ elif len(sys.argv) > 1 and sys.argv[1] == "2":
 		if VGPT:
 			p, m = VGPT
 		else:
-			p = TrOCRProcessor.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
-			m = VisionEncoderDecoderModel.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
+			p = backup_model(TrOCRProcessor.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
+			m = backup_model(VisionEncoderDecoderModel.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
 			globals()["VGPT"] = (p, m)
 		impv = p(image, return_tensors="pt")
 		pixel_values = impv.pixel_values
@@ -2558,8 +2571,8 @@ elif len(sys.argv) > 1 and sys.argv[1] == "2":
 		if VVQA:
 			p, m = VVQA
 		else:
-			p = ViltProcessor.from_pretrained("dandelin/vilt-b32-finetuned-vqa")
-			m = ViltForQuestionAnswering.from_pretrained("dandelin/vilt-b32-finetuned-vqa")
+			p = backup_model(ViltProcessor.from_pretrained, "dandelin/vilt-b32-finetuned-vqa")
+			m = backup_model(ViltForQuestionAnswering.from_pretrained, "dandelin/vilt-b32-finetuned-vqa")
 			globals()["VVQA"] = (p, m)
 		spl = q.split()
 		t = " ".join(w for w in spl if not is_url(w))[:32]

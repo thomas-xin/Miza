@@ -218,6 +218,19 @@ def determine_cuda(mem=1, priority=False):
 	pcs = sorted(range(n), key=lambda i: (p := dps[i]) and (p.total_memory >= mem, p.multi_processor_count * sign), reverse=True)
 	return pcs[0], torch.float16
 
+def backup_model(cls, model, **kwargs):
+	fut = exc.submit(cls, model, **kwargs)
+	try:
+		return fut.result(timeout=60)
+	except Exception as ex:
+		try:
+			return cls(model, local_files_only=True, **kwargs)
+		except:
+			pass
+		if isinstance(ex, concurrent.futures.TimeoutError):
+			raise RuntimeError("Model is loading, please wait...")
+		raise
+
 def safecomp(gen):
 	while True:
 		try:
@@ -425,8 +438,8 @@ class Bot:
 		try:
 			tokenizer, model = self.models[m]
 		except KeyError:
-			tokenizer = AutoTokenizer.from_pretrained(m, padding_side="left", padding=True)
-			model = AutoModelForCausalLM.from_pretrained(m)
+			tokenizer = backup_model(AutoTokenizer.from_pretrained, m, padding_side="left", padding=True)
+			model = backup_model(AutoModelForCausalLM.from_pretrained, m)
 			self.models[m] = (tokenizer, model)
 		end = tokenizer.eos_token
 		history = []
