@@ -2649,7 +2649,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 "Total data transmitted": bot.total_bytes,
                 "Hosted storage": bot.total_hosted,
                 "System time": datetime.datetime.now(),
-                "Uptime (last week)": bot.uptime,
+                "Uptime (past week)": bot.uptime,
                 "Command count": len(set(itertools.chain(*self.commands.values()))),
                 "Code size": [x.item() for x in size],
             },
@@ -2687,7 +2687,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             misc_stats = dict(status.misc)
             misc_stats["Total data transmitted"] = byte_scale(misc_stats["Total data transmitted"]) + "B"
             misc_stats["Hosted storage"] = byte_scale(misc_stats["Hosted storage"]) + "B"
-            misc_stats["Uptime (last week)"] = f'{round(misc_stats["Uptime (last week)"] * 100, 3)}%'
+            misc_stats["Uptime (past week)"] = f'{round(misc_stats["Uptime (past week)"] * 100, 3)}%'
             return {
                 "System info": {
                     "CPU usage": f"{round(cpu_usage * 100, 3)}%",
