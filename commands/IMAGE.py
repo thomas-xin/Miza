@@ -1493,7 +1493,7 @@ class Art(Command):
             force = True
         req = prompt
         if url:
-            if force:
+            if force: # keep both if both provided by user
                 if req:
                     req += " "
                 req += url
