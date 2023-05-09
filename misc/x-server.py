@@ -1073,8 +1073,10 @@ transform: translate(-50%, -50%);
 		if v:
 			fmt = kwargs.get("fmt")
 			if not fmt:
-				fmt = "opus" if d else "weba"
-			if fmt not in ("mp3", "opus", "webm", "weba", "ogg", "wav"):
+				fmt = "opus" if d else "webm"
+			if fmt == "weba":
+				fmt = "webm"
+			if fmt not in ("mp3", "opus", "webm", "ogg", "wav"):
 				raise TypeError(fmt)
 			fmt = "." + fmt
 			self.bot_exec(f"bot.audio.returns[{t}]=VOICE.ytdl.search({repr(q)})[0]")
