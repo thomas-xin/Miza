@@ -1500,7 +1500,7 @@ class Art(Command):
                 if url2:
                     req += " " + url2
             else:
-                req = url
+                req = url # omit caption
         if specified:
             req += " ".join(f"{k} {v}" for k, v in kwargs.items() if k in specified)
         nsfw = bot.is_nsfw(channel)
