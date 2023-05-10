@@ -2505,7 +2505,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     async def get_ip(self):
         with suppress(SemaphoreOverflowError):
             async with self.ip_sem:
-                self.ip = await Request("https://api.ipify.org", bypass=False, decode=True, aio=True)
+                self.ip = await Request("https://api.ipify.org", bypass=False, decode=True, timeout=3, aio=True)
         return self.ip
 
     # Gets the CPU and memory usage of a process over a period of 1 second.
@@ -2560,7 +2560,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         minfo = psutil.virtual_memory()
         sinfo = psutil.swap_memory()
         dinfo = {p.mountpoint: psutil.disk_usage(p.mountpoint) for p in psutil.disk_partitions(all=False)}
-        ip = await fut
+        ip = self.ip
+        with tracebacksuppressor:
+            ip = await fut
         t = utc()
         return dict(
 			cpu={ip: dict(name=cinfo["brand_raw"], count=cinfo["count"], usage=cpercent / 100, max=1, time=t)},
@@ -3085,8 +3087,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         create_task(self.audio.asubmit(audio_status + "online),timeout=8)"))
                         await self.seen(self.user, event="misc", raw="Changing their status")
                     else:
-                        if status == discord.Status.online:
-                            create_task(self.audio.asubmit(audio_status + "dnd),timeout=8)"))
+                        # if status == discord.Status.online:
+                        create_task(self.audio.asubmit(audio_status + "dnd),timeout=8)"))
                         create_task(self.seen(self.user, event="misc", raw="Changing their status"))
                 with suppress(ConnectionResetError):
                     await self.change_presence(activity=activity, status=status)
@@ -4155,7 +4157,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                             self.down_bps = 0
                             self.bitrate = 0
                             self.total_bytes = 0
-                        await self.status()
+                        fut = create_task(self.status())
+                        with suppress(T0, T1, T2):
+                            await asyncio.wait_for(fut, timeout=1)
 
     # The lazy update loop that runs once every 4-8 seconds.
     async def lazy_loop(self):
