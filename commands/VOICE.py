@@ -2270,7 +2270,7 @@ class AudioDownloader:
                 obj = cdict(t=utc())
                 output = None
                 remote = AUTH.get("remote-servers", ())
-                if remote:
+                if 0 and remote:
                     with tracebacksuppressor:
                         addr = choice(remote)
                         resp = requests.get(f"https://{addr}/stat/?api=ytdl&q={urllib.parse.quote_plus(item)}", verify=False)
