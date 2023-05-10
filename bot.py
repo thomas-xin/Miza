@@ -2561,7 +2561,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         sinfo = psutil.swap_memory()
         dinfo = {p.mountpoint: psutil.disk_usage(p.mountpoint) for p in psutil.disk_partitions(all=False)}
         ip = self.ip
-        with tracebacksuppressor:
+        with tracebacksuppressor(T0, T1, T2):
             ip = await fut
         t = utc()
         return dict(
