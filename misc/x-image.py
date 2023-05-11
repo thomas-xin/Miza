@@ -2561,8 +2561,8 @@ elif len(sys.argv) > 1 and sys.argv[1] == "2":
 		if VGPT:
 			p, m = VGPT
 		else:
-			p = backup_model(TrOCRProcessor.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
-			m = backup_model(VisionEncoderDecoderModel.from_pretrained, "nlpconnect/vit-gpt2-image-captioning", device=-1)
+			p = backup_model(TrOCRProcessor.from_pretrained, "nlpconnect/vit-gpt2-image-captioning").to("cpu")
+			m = backup_model(VisionEncoderDecoderModel.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
 			globals()["VGPT"] = (p, m)
 		impv = p(image, return_tensors="pt")
 		pixel_values = impv.pixel_values
@@ -2574,8 +2574,8 @@ elif len(sys.argv) > 1 and sys.argv[1] == "2":
 		if VVQA:
 			p, m = VVQA
 		else:
-			p = backup_model(ViltProcessor.from_pretrained, "dandelin/vilt-b32-finetuned-vqa")
-			m = backup_model(ViltForQuestionAnswering.from_pretrained, "dandelin/vilt-b32-finetuned-vqa", device=-1)
+			p = backup_model(ViltProcessor.from_pretrained, "dandelin/vilt-b32-finetuned-vqa").to("cpu")
+			m = backup_model(ViltForQuestionAnswering.from_pretrained, "dandelin/vilt-b32-finetuned-vqa")
 			globals()["VVQA"] = (p, m)
 		spl = q.split()
 		t = " ".join(w for w in spl if not is_url(w))[:32]
