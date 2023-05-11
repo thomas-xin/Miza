@@ -2539,10 +2539,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 f"https://{addr}/stat/",
                 aio=True,
                 ssl=False,
-                timeout=4,
+                timeout=5,
             )
             return orjson.loads(b)
-        except (T0, T1, T2):
+        except (asyncio.TimeoutError, asyncio.CancelledError):
             return {}
 
     async def get_current_stats(self):

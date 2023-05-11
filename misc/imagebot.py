@@ -520,7 +520,7 @@ class Bot:
 			return
 		if not pipe:
 			kw = {}
-			device, dtype = determine_cuda(8589934592, priority=True)
+			device, dtype = determine_cuda(8589934592, priority=False)
 			try:
 				if fail_unless_gpu and (device < 0 or not self.models.get((pf, model), True)):
 					return

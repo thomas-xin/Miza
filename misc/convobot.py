@@ -465,7 +465,7 @@ class Bot:
 				break
 			except KeyError:
 				pass
-			device, dtype = determine_cuda(2147483648, priority=True)
+			device, dtype = determine_cuda(2147483648, priority=False)
 			try:
 				smp = pipeline("summarization", model=m, device=device, torch_dtype=dtype)
 				smp.devid = device
