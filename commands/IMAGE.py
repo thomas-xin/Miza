@@ -1539,13 +1539,23 @@ class Art(Command):
                 c = 0
                 if not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy() and torch.cuda.is_available():
                     c = min(amount, 5)
-                    async with self.sdiff_sem:
-                        fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, c], fix=2, timeout=1200))
+                    fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, c], fix=2, timeout=1200))
                 self.imagebot.token = oai or AUTH.get("openai_key")
-                ims = await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2, openjourney, nsfw, amount - c, timeout=480)
+                try:
+                    if c > amount:
+                        raise PermissionError
+                    ims = await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2, openjourney, nsfw, amount - c, timeout=480)
+                except PermissionError:
+                    async with self.sdiff_sem:
+                        ims2 = await fut
                 # print(ims)
                 if fut:
-                    ims2 = await fut
+                    try:
+                        async with self.sdiff_sem:
+                            ims2 = await fut
+                    except PermissionError:
+                        if not ims:
+                            raise
                     ims2.extend(ims)
                     ims = ims2
                 futs.extend(ims)
@@ -1654,32 +1664,35 @@ class Art(Command):
                         await send_with_react(channel, italics(ini_md(f"StableDiffusion: {sqr_md(req)} enqueued in position {sqr_md(self.sdiff_sem.passive + 1)}.")), reacts="❎", reference=message)
                     async with self.sdiff_sem:
                         if url:
-                            fn = "misc/stable_diffusion.openvino/input.png"
-                            if os.path.exists(fn):
-                                os.remove(fn)
-                            os.rename(image_1, fn)
+                            fn = os.path.abspath(image_1)
+                            # fn = "misc/stable_diffusion.openvino/input.png"
+                            # if os.path.exists(fn):
+                            #     os.remove(fn)
+                            # os.rename(image_1, fn)
                             args.extend((
                                 "--init-image",
-                                "input.png",
+                                fn,
                             ))
                             kwargs["--init-image"] = fn
                             if image_2:
-                                fm = "misc/stable_diffusion.openvino/mask.png"
-                                if os.path.exists(fm):
-                                    os.remove(fm)
-                                os.rename(image_2, fm)
+                                fm = os.path.abspath(image_2)
+                                # fm = "misc/stable_diffusion.openvino/mask.png"
+                                # if os.path.exists(fm):
+                                #     os.remove(fm)
+                                # os.rename(image_2, fm)
                                 args.extend((
                                     "--mask",
-                                    "mask.png",
+                                    fm,
                                 ))
                                 kwargs["--mask"] = fm
                             elif image_2b:
-                                fm = "misc/stable_diffusion.openvino/mask.png"
+                                fm = os.path.abspath(f"cache/{ts_us()}.png")
+                                # fm = "misc/stable_diffusion.openvino/mask.png"
                                 with open(fm, "wb") as f:
                                     f.write(image_2b)
                                 args.extend((
                                     "--mask",
-                                    "mask.png",
+                                    fm,
                                 ))
                                 kwargs["--mask"] = fm
                         for k, v in kwargs.items():
