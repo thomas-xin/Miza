@@ -1420,7 +1420,7 @@ class Bot:
 		bals = getattr(self, "bals", {})
 		oai = getattr(self, "oai", None)
 		if bals or oai:
-			funcs = [self.cgp]
+			funcs = [self.cgp, self.cgp]
 		else:
 			funcs = [self.chatgpt, self.chatgpt, self.ycg, self.cgp, self.cgp]
 			if len(self.gpttokens(prompt)) > 24:
@@ -1430,7 +1430,9 @@ class Bot:
 		while funcs:
 			func = funcs.pop(0)
 			try:
-				return func(prompt, stop=stop)
+				resp = func(prompt, stop=stop)
+				if resp:
+					return resp
 			except EOFError:
 				pass
 			except:

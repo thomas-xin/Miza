@@ -115,6 +115,7 @@ class Translate(Command):
             footer = dict(text=f"Detected language: {(googletrans.LANGUAGES.get(src) or src).capitalize()}")
             if getattr(resp, "extra_data", None) and resp.extra_data.get("origin_pronunciation"):
                 footer["text"] += "\nOriginal pronunciation: " + resp.extra_data["origin_pronunciation"]
+            footer["text"] = lim_str(footer["text"], 2048)
         else:
             footer = None
         print(footer, odest, translated, comments)
