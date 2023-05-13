@@ -65,7 +65,7 @@ class Server:
 			gpu={f"{ip}-{gi['index']}": dict(
 				name=gi["name"],
 				count=torch.cuda.get_device_properties(gi["index"]).multi_processor_count,
-				usage=gi["utilization.gpu"] / 100,
+				usage=float(gi["utilization.gpu"]) / 100,
 				max=1,
 				time=t,
 			) for gi in ginfo},

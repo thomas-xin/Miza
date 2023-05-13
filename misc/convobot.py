@@ -207,15 +207,22 @@ def update():
 			drivers.clear()
 			return_driver(d)
 
-def determine_cuda(mem=1, priority=False):
+def determine_cuda(mem=1, priority=None):
 	if not torch.cuda.is_available():
 		return -1, torch.float32
 	n = torch.cuda.device_count()
 	if not n:
 		return -1, torch.float32
 	dps = [torch.cuda.get_device_properties(i) for i in range(n)]
-	sign = 1 if priority else -1
-	pcs = sorted(range(n), key=lambda i: (p := dps[i]) and (p.total_memory >= mem, p.multi_processor_count * sign), reverse=True)
+	if priority == "full":
+		key = lambda i: (p := dps[i]) and (p.total_memory >= mem, p.major, p.minor, p.multi_processor_count, p.total_memory)
+	elif priority:
+		key = lambda i: (p := dps[i]) and (p.total_memory >= mem, p.multi_processor_count, p.total_memory)
+	elif priority is False:
+		key = lambda i: (p := dps[i]) and (p.total_memory >= mem, -p.total_memory, p.multi_processor_count)
+	else:
+		key = lambda i: (p := dps[i]) and (p.total_memory >= mem, -p.multi_processor_count, -p.total_memory)
+	pcs = sorted(range(n), key=key, reverse=True)
 	return pcs[0], torch.float16
 
 def backup_model(cls, model, **kwargs):
@@ -465,7 +472,7 @@ class Bot:
 				break
 			except KeyError:
 				pass
-			device, dtype = determine_cuda(2147483648, priority=False)
+			device, dtype = determine_cuda(2147483648, priority=True)
 			try:
 				smp = pipeline("summarization", model=m, device=device, torch_dtype=dtype)
 				smp.devid = device
