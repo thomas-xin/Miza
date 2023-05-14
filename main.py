@@ -86,7 +86,10 @@ if os.name == "nt":
         os.remove(f)
     if not os.path.exists("misc/poppler/pdftocairo.exe"):
         print("Downloading Poppler version 21.10.0...")
-        os.mkdir("misc/poppler")
+        try:
+            os.mkdir("misc/poppler")
+        except FileExistsError:
+            pass
         subprocess.run([sys.executable, "downloader.py", "https://cdn.discordapp.com/attachments/1091275350740320258/1107280656347705404/poppler.zip", "poppler.zip"], cwd="misc")
         import zipfile, io
         f = "misc/poppler.zip"
