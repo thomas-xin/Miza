@@ -1225,9 +1225,9 @@ class Ask(Command):
         path = None
         if name == "gpt2" or not AUTH.get("openai_key"):
             model = "neox"
-        elif name == "bloom"
+        elif name == "bloom":
             model = "bloom"
-        elif name == "neox"
+        elif name == "neox":
             model = "neox"
         elif name == "pyg" or name == "pygmalion":
             # if not bot.is_nsfw(channel):
