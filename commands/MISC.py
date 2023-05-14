@@ -98,6 +98,7 @@ class SheetPull:
 
     @tracebacksuppressor
     def pull(self):
+        return # This is temporarily unusable
         # print("Pulling Spreadsheet...")
         url = self.url
         text = Request(url, timeout=32, decode=True)

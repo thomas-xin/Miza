@@ -84,10 +84,10 @@ if os.name == "nt":
                             y.write(b)
         print("FFmpeg extraction complete.")
         os.remove(f)
-    if not os.path.exists("misc/poppler"):
+    if not os.path.exists("misc/poppler/pdftocairo.exe"):
         print("Downloading Poppler version 21.10.0...")
         os.mkdir("misc/poppler")
-        subprocess.run([sys.executable, "downloader.py", "https://cdn.discordapp.com/attachments/731709481863479436/899556463016554496/Poppler.zip", "poppler.zip"], cwd="misc")
+        subprocess.run([sys.executable, "downloader.py", "https://cdn.discordapp.com/attachments/1091275350740320258/1107280656347705404/poppler.zip", "poppler.zip"], cwd="misc")
         import zipfile, io
         f = "misc/poppler.zip"
         print("Download complete; extracting new Poppler installation...")
