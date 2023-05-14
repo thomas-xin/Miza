@@ -941,7 +941,7 @@ class Bot:
 				cm = 20
 		elif model in ("gpt-3.5-turbo", "gpt-4"):
 			tries = 7
-			if not extensions:
+			if premium < 2:
 				stop = None
 			else:
 				stop = ["s an AI", "orry,", "language model"]
