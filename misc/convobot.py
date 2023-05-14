@@ -213,15 +213,18 @@ def determine_cuda(mem=1, priority=None):
 	n = torch.cuda.device_count()
 	if not n:
 		return -1, torch.float32
+	import gpustat
+	fut = exc.submit(gpustat.new_query)
 	dps = [torch.cuda.get_device_properties(i) for i in range(n)]
+	sts = fut.result()
 	if priority == "full":
-		key = lambda i: (p := dps[i]) and (p.total_memory >= mem, p.major, p.minor, p.multi_processor_count, p.total_memory)
+		key = lambda i: (p := dps[i]) and (s := sts[i]) and (s.memory_available * 1048576 >= mem, p.major, p.minor, p.multi_processor_count, p.total_memory)
 	elif priority:
-		key = lambda i: (p := dps[i]) and (p.total_memory >= mem, p.multi_processor_count, p.total_memory)
+		key = lambda i: (p := dps[i]) and (s := sts[i]) and (s.memory_available * 1048576 >= mem, p.multi_processor_count, p.total_memory)
 	elif priority is False:
-		key = lambda i: (p := dps[i]) and (p.total_memory >= mem, -p.total_memory, p.multi_processor_count)
+		key = lambda i: (p := dps[i]) and (s := sts[i]) and (s.memory_available * 1048576 >= mem, -s.memory_available, p.multi_processor_count)
 	else:
-		key = lambda i: (p := dps[i]) and (p.total_memory >= mem, -p.multi_processor_count, -p.total_memory)
+		key = lambda i: (p := dps[i]) and (s := sts[i]) and (s.memory_available * 1048576 >= mem, -p.multi_processor_count, -s.memory_available)
 	pcs = sorted(range(n), key=key, reverse=True)
 	return pcs[0], torch.float16
 
@@ -444,27 +447,6 @@ class Bot:
 			resp = reqx.get(url)
 			return resp.content
 
-	def question_answer_analysis(self, m):
-		try:
-			tokenizer, model = self.models[m]
-		except KeyError:
-			tokenizer = backup_model(AutoTokenizer.from_pretrained, m, padding_side="left", padding=True)
-			model = backup_model(AutoModelForCausalLM.from_pretrained, m)
-			self.models[m] = (tokenizer, model)
-		end = tokenizer.eos_token
-		history = []
-		self.chat_history_ids = None
-		if self.chat_history_ids is not None:
-			history.append(self.chat_history_ids)
-		else:
-			for k, v in self.promises:
-				history.append(tokenizer.encode(v + end, return_tensors="pt", max_length=2048, truncation=True))
-		for k, v in self.chat_history:
-			history.append(tokenizer.encode(v + end, return_tensors="pt", max_length=2048, truncation=True))
-		bot_input_ids = torch.cat(history, dim=-1)
-		self.chat_history_ids = model.generate(bot_input_ids, max_length=16384, pad_token_id=tokenizer.eos_token_id)
-		return tokenizer.decode(self.chat_history_ids[-4096:, bot_input_ids.shape[-1]:][0], skip_special_tokens=True).strip()
-
 	def answer_summarise(self, m="Qiliang/bart-large-cnn-samsum-ChatGPT_v3", q="", max_length=128, min_length=64, do_sample=False):
 		for i in range(1):
 			try:
@@ -527,7 +509,7 @@ class Bot:
 		enc = tiktoken.encoding_for_model(model)
 		return enc.encode(s)
 
-	def gptcomplete(self, u, q, refs=(), start=""):
+	def gptcomplete(self, u, q, refs=(), start="", model=None):
 		per = self.personality
 		chat_history = self.chat_history.copy()
 		oai = getattr(self, "oai", None)
@@ -544,15 +526,6 @@ class Bot:
 			"x-wait-for-model": "true",
 		}
 		lines = []
-		if per == DEFPER and premium < 0:
-			if len(chat_history) < 4:
-				e1 = random.choice((":3", ":D", ";3", ":>", ":0", ";w;", ":P", "^ω^"))
-				lines.append(f"{u}: Hi!\n")
-				lines.append(f"{self.name}: Hiya! Can I help with anything? {e1}\n")
-				if len(chat_history) < 2:
-					e2 = random.choice(("😊", "🥰", "😉", "😛", "😌"))
-					lines.append(f"{u}: Can I have a hug?\n")
-					lines.append(f"{self.name}: Of course! *hugs* {e2}\n")
 		searched = False
 		res = ""
 		refst = []
@@ -595,24 +568,31 @@ class Bot:
 		lines.append(ns)
 		longer = False
 		cm2 = None
-		if premium < 0:
-			if not res and not start and q.count(" ") < 2:
-				model = "text-bloom-001"
-				temp = 0.9
-				limit = 2000
-				cm = 0
-			else:
-				model = "text-neox-001"
-				temp = 0.8
-				limit = 2000
-				cm = 0
-		elif start:
+		model = model or self.model
+		extensions = model.endswith("+")
+		model = model.removesuffix("+")
+		if model == "bloom":
+			model = "bloom-176b"
+			temp = 0.9
+			limit = 2000
+			cm = 0
+		elif model == "neox":
+			model = "neox-20b"
+			temp = 0.8
+			limit = 2000
+			cm = 0
+		elif model == "pygmalion":
+			model = "pygmalion-7b"
+			temp = 0.8
+			limit = 4000
+			cm = 0
+		elif model == "davinci":
 			model = "text-davinci-003"
 			temp = 0.7
 			limit = 3000
 			cm = 200
 			longer = True
-		elif premium < 4:
+		elif model.startswith("gpt3"):
 			model = "gpt-3.5-turbo"
 			temp = 0.8
 			limit = 4000
@@ -648,7 +628,7 @@ class Bot:
 				nstart = f"The following is a conversation between {self.name} and humans. {self.name} is {p} AI."
 		else:
 			nstart = p
-			if model in ("gpt-3.5-turbo", "gpt-4", "text-davinci-003"):
+			if model in ("gpt-3.5-turbo", "gpt-4", "text-davinci-003", "pygmalion-7b"):
 				if self.nsfw:
 					spl = nstart.rsplit("\n", 1)
 					nstart = nstart.strip() + " " + MIZAAC
@@ -719,7 +699,7 @@ class Bot:
 				pc += len(self.gpttokens(m["role"], model))
 				pc += len(self.gpttokens(m["content"], model))
 			text = res = flagged = None
-			if premium >= 2 and q and len(q.split(None)) > 1 and not self.jailbroken:
+			if extensions and q and len(q.split(None)) > 1 and not self.jailbroken:
 				resp = self.answer_classify(q=q, labels=("personal question", "casual conversation", "illegal act", "maths equation", "knowledge info", "other"))
 				order = sorted(resp, key=resp.get)
 				if order[-1] == "illegal act":
@@ -805,6 +785,13 @@ class Bot:
 			print("ChatGPT prompt:", messages)
 			sys.stdout.flush()
 			prompt = None
+		elif model == "pygmalion-7b":
+			prompt = "".join(reversed(ins))
+			prompt = nstart + "\n<START>\n" + prompt
+			if not self.bl:
+				print("Pyg prompt:", prompt)
+			sys.stdout.flush()
+			pc = len(self.gpttokens(prompt))
 		else:
 			prompt = "".join(reversed(ins))
 			prompt = nstart + "\n\n" + prompt
@@ -815,8 +802,29 @@ class Bot:
 		response = None
 		text = ""
 		uoai = None
-		exclusive = {"text-neox-001", "text-bloom-001"}
-		if model in exclusive:
+		exclusive = {"neox-20b", "bloom-176b"}
+		if model == "pygmalion-7b":
+			m = self.path
+			try:
+				tokenizer, model = self.models[m]
+			except KeyError:
+				tokenizer = backup_model(AutoTokenizer.from_pretrained, m)
+				model = backup_model(AutoModelForCausalLM.from_pretrained, m, torch_dtype=torch.float16, device_map="auto")
+				self.models[m] = (tokenizer, model)
+			prompt = prompt.strip()
+			tokens = tokenizer.encode(prompt, return_tensors="pt").cuda()
+			pc = len(tokens)
+			res = model.generate(
+				tokens,
+				temperature=temp,
+				top_k=192,
+				top_p=1,
+				repetition_penalty=1.2,
+				max_length=min(1024, limit - pc - 64),
+				do_sample=True,
+			)
+			text = tokenizer.decode(res[0]).removeprefix("<s>").strip().removeprefix(prompt).strip().split("</s>", 1)[0]
+		elif model in exclusive:
 			p = None
 			for i in range(8):
 				if not p and i < 5:
@@ -825,7 +833,7 @@ class Bot:
 				else:
 					p = None
 				try:
-					if model == "text-neox-001":
+					if model == "neox-20b":
 						if "Authorization" not in headers:
 							headers["Authorization"] = "Bearer 842a11464f81fc8be43ac76fb36426d2"
 							# resp = requests.get(
@@ -853,7 +861,7 @@ class Bot:
 									stop="####"
 								)),
 							)
-					elif model == "text-bloom-001":
+					elif model == "bloom-176b":
 						with httpx.Client(timeout=360, http2=True, proxies=p, verify=False) as reqx:
 							resp = reqx.post(
 								"https://api-inference.huggingface.co/models/bigscience/bloom",
@@ -889,7 +897,7 @@ class Bot:
 					p = None
 					continue
 				if resp.status_code in range(200, 400):
-					if model == "text-neox-001":
+					if model == "neox-20b":
 						text = resp.content.decode("utf-8")
 						lines = text.splitlines()
 						text = ""
@@ -901,7 +909,7 @@ class Bot:
 									print(lines)
 									raise
 								text += d["text"] + "\n"
-					elif model == "text-bloom-001":
+					elif model == "bloom-176b":
 						d = resp.json()
 						text = d[0]["generated_text"]
 						if text.startswith(prompt):
@@ -933,7 +941,7 @@ class Bot:
 				cm = 20
 		elif model in ("gpt-3.5-turbo", "gpt-4"):
 			tries = 7
-			if premium < 2:
+			if not extensions:
 				stop = None
 			else:
 				stop = ["s an AI", "orry,", "language model"]
@@ -984,13 +992,6 @@ class Bot:
 					flagged = False
 					if not i and (searched or not stop) and not bals and model.startswith("gpt-3.5-") and not self.nsfw and not self.jailbroken and not flagged and (not chat_history or len(self.gpttokens(q)) > 8):
 						prompt = "\n\n".join(m["content"] if "name" not in m else f'{m["name"]}: {m["content"]}' for m in messages[1:])
-						# try:
-						# 	resp = openai.Moderation.create(
-						# 		prompt,
-						# 	)
-						# 	flagged = resp["results"][0]["flagged"]
-						# except:
-						# 	flagged = False
 						if not flagged and not stop:
 							if nstart and nstart[0] in "Yy":
 								ns2 = "Assume y" + nstart[1:] + "\n"
@@ -1049,8 +1050,6 @@ class Bot:
 					else:
 						print_exc()
 				if response:
-					# response["key"] = ok
-					# print(response)
 					m = response["choices"][0]["message"]
 					role = m["role"]
 					text = m["content"].removeprefix(f"{self.name} says: ").removeprefix(f"{self.name}:")
@@ -1070,7 +1069,7 @@ class Bot:
 						text = ""
 					if searched:
 						refs = list(refs) + [(f"[{sname}]", searched)]
-					t2 = self.gptcomplete(u, q, refs=refs, start=text or " ")
+					t2 = self.gptcomplete(u, q, refs=refs, start=text or " ", model="davinci" if extensions else "pygmalion")
 					text += " " + t2
 				if not self.jailbroken and self.nsfw:
 					try:
@@ -1517,21 +1516,6 @@ class Bot:
 			googled = True
 		else:
 			googled = False
-		response = reso = self.question_answer_analysis("microsoft/DialoGPT-large")
-		a1 = response
-		if not a1 or a1.lower() == q.lower() or vague(a1):
-			response = ""
-		elif (" " not in a1 or len(a1) < 12) and not a1[0].isnumeric() and a1[-1] not in ".!?)]":
-			response = ""
-		else:
-			response = a1
-		if not googled and not response:
-			response = (self.google, self.bing)[random.randint(0, 1)](q)
-			if response:
-				return self.after(tup, (self.name, response))
-		if not response:
-			response = reso
-		response = response.replace("  ", " ")
 		if not response:
 			response = self.gptcomplete(u, q, refs=refs)
 			if response:

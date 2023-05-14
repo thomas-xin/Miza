@@ -1184,10 +1184,10 @@ class Match(Command):
 
 class Ask(Command):
     _timeout_ = 24
-    alias = ["GPT", "GPT2", "GPT3", "GPT4"]
+    name = ["Bloom", "NeoX", "Pyg", "Pygmalion", "GPT2", "Davinci", "GPT3", "GPT3a", "GPT4", "GPT4a"]
     description = "Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. For premium tier chatbots, check using ~serverinfo, or apply with ~premium!"
     usage = "<string>"
-    example = ("ask what's the date?", "ask what is the square root of 3721?", "ask can I have a hug?")
+    example = ("ask what's the date?", "gpt3 what is the square root of 3721?", "pyg can I have a hug?")
     # flags = "h"
     no_parse = True
     rate_limit = (12, 16)
@@ -1220,20 +1220,40 @@ class Ask(Command):
         if not bl:
             print(f"{message.author}:", q)
         premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
+        model = "gpt3"
         long_mem = 4096 if premium >= 2 else 1024
+        path = None
         if name == "gpt2" or not AUTH.get("openai_key"):
-            premium = -1
+            model = "neox"
+        elif name == "bloom"
+            model = "bloom"
+        elif name == "neox"
+            model = "neox"
+        elif name == "pyg" or name == "pygmalion":
+            # if not bot.is_nsfw(channel):
+            #     if hasattr(channel, "recipient"):
+            #         raise PermissionError(f"This model is only available in {uni_str('NSFW')} channels. Please verify your age using ~verify within a NSFW channel to enable NSFW in DMs.")
+            #     raise PermissionError(f"This model is only available in {uni_str('NSFW')} channels.")
+            model = "pygmalion"
+            path = AUTH.get("pygmalion-path", "")
         elif name == "gpt3":
-            premium = max(0, min(2, premium))
-            # if premium < 2:
-            #     raise PermissionError(f"Distributed premium level 1 or higher required; please see {bot.kofi_url} for more info!")
-            # premium = 2
+            model = "gpt3"
+        elif name == "gpt3a":
+            if premium < 2:
+                raise PermissionError(f"Distributed premium level 1 or higher required; please see {bot.kofi_url} for more info!")
+            model = "gpt3+"
+        elif name == "davinci":
+            if premium < 4:
+                raise PermissionError(f"Distributed premium level 2 or higher required; please see {bot.kofi_url} for more info!")
+            model = "davinci"
         elif name == "gpt4":
             if premium < 4:
                 raise PermissionError(f"Distributed premium level 2 or higher required; please see {bot.kofi_url} for more info!")
-            premium = 4
-        elif premium > 3:
-            premium = 3
+            model = "gpt4+"
+        elif name == "gpt4a":
+            if premium < 4:
+                raise PermissionError(f"Distributed premium level 2 or higher required; please see {bot.kofi_url} for more info!")
+            model = "gpt4+"
         reset = True
         caid = bot.data.chat_histories.get(channel.id, None)
         if not isinstance(caid, dict):
@@ -1465,7 +1485,9 @@ class Ask(Command):
                 huggingface_token=AUTH.get("huggingface_key"),
                 vis_session=AUTH.get("vis_session"),
                 name=bot.name,
+                model=model,
                 personality=bot.commands.personality[0].retrieve((channel or guild).id),
+                path=path,
                 premium=premium,
                 summary=summary,
                 jb=caid and caid.get("jailbroken"),

@@ -170,15 +170,18 @@ def determine_cuda(mem=1, priority=None):
 	n = torch.cuda.device_count()
 	if not n:
 		return -1, torch.float32
+	import gpustat
+	fut = exc.submit(gpustat.new_query)
 	dps = [torch.cuda.get_device_properties(i) for i in range(n)]
+	sts = fut.result()
 	if priority == "full":
-		key = lambda i: (p := dps[i]) and (p.total_memory >= mem, p.major, p.minor, p.multi_processor_count, p.total_memory)
+		key = lambda i: (p := dps[i]) and (s := sts[i]) and (s.memory_available * 1048576 >= mem, p.major, p.minor, p.multi_processor_count, p.total_memory)
 	elif priority:
-		key = lambda i: (p := dps[i]) and (p.total_memory >= mem, p.multi_processor_count, p.total_memory)
+		key = lambda i: (p := dps[i]) and (s := sts[i]) and (s.memory_available * 1048576 >= mem, p.multi_processor_count, p.total_memory)
 	elif priority is False:
-		key = lambda i: (p := dps[i]) and (p.total_memory >= mem, -p.total_memory, p.multi_processor_count)
+		key = lambda i: (p := dps[i]) and (s := sts[i]) and (s.memory_available * 1048576 >= mem, -s.memory_available, p.multi_processor_count)
 	else:
-		key = lambda i: (p := dps[i]) and (p.total_memory >= mem, -p.multi_processor_count, -p.total_memory)
+		key = lambda i: (p := dps[i]) and (s := sts[i]) and (s.memory_available * 1048576 >= mem, -p.multi_processor_count, -s.memory_available)
 	pcs = sorted(range(n), key=key, reverse=True)
 	return pcs[0], torch.float16
 
