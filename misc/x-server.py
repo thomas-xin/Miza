@@ -2375,6 +2375,7 @@ alert("File successfully deleted. Returning to home.");
 	def status(self):
 		status = self.bot_exec(f"bot.status()")
 		cp.response.headers.update(HEADERS)
+		cp.response.headers["Content-Type"] = "application/json"
 		return orjson.dumps(status)
 
 	def ensure_mpins(self):
