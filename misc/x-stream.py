@@ -66,7 +66,7 @@ class Server:
             except ValueError:
                 pass
             try:
-                return = gi.power_draw / gi.power_limit
+                return gi.power_draw / gi.power_limit
             except:
                 return 0
 		return json.dumps(dict(
