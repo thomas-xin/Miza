@@ -2564,12 +2564,21 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         with tracebacksuppressor(asyncio.TimeoutError, asyncio.CancelledError):
             ip = await fut
         t = utc()
+        def get_usage(gi):
+            try:
+                return float(gi["utilization.gpu"]) / 100
+            except ValueError:
+                pass
+            try:
+                return = gi.power_draw / gi.power_limit
+            except:
+                return 0
         return dict(
 			cpu={ip: dict(name=cinfo["brand_raw"], count=cinfo["count"], usage=cpercent / 100, max=1, time=t)},
 			gpu={f"{ip}-{gi['index']}": dict(
 				name=gi["name"],
 				count=torch.cuda.get_device_properties(gi["index"]).multi_processor_count,
-				usage=float(gi["utilization.gpu"]) / 100,
+				usage=get_usage(gi),
 				max=1,
 				time=t,
 			) for gi in ginfo},
