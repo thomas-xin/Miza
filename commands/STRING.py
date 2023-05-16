@@ -202,7 +202,11 @@ class Translate(Command):
 
         async def translate_into(arg, src, dest, i):
             translated[i] = arg
-            resp = await create_future(self.trans.translate, arg, src=src, dest=dest)
+            try:
+                resp = await create_future(self.trans.translate, arg, src=src, dest=dest)
+            except:
+                print_exc()
+                resp = None
             if getattr(resp, "extra_data", None) and resp.extra_data.get("origin_pronunciation"):
                 comments[i] = resp.extra_data["origin_pronunciation"]
 
