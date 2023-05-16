@@ -804,7 +804,7 @@ class Bot:
 		uoai = None
 		exclusive = {"neox-20b", "bloom-176b"}
 		if model == "pygmalion-7b":
-			m = self.path
+			m = self.ppath
 			try:
 				tokenizer, model = self.models[m]
 			except KeyError:

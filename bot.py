@@ -4129,7 +4129,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                                 uptime.add(it)
                                 sl = sorted(uptime)
                                 while sl[0] < it - interval:
-                                    uptime.pop(sl.pop(0))
+                                    uptime.discard(sl.pop(0))
                             ut = 0
                             for i in range(interval):
                                 ut += it - interval + i + 1 in uptime

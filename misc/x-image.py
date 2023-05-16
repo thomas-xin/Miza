@@ -2456,7 +2456,7 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 		name = inputs["name"]
 		model = inputs["model"]
 		personality = inputs["personality"]
-		path = inputs["path"]
+		ppath = inputs["ppath"]
 		premium = inputs["premium"]
 		summary = inputs["summary"]
 		jb = inputs["jb"]
@@ -2485,7 +2485,7 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 		else:
 			cb.premium = premium
 		cb.model = model
-		cb.path = path
+		cb.ppath = ppath
 		cb.user_id = user_id
 		cb.channel_id = channel_id
 		cb.bl = bl

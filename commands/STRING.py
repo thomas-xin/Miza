@@ -1222,7 +1222,7 @@ class Ask(Command):
         premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
         model = "gpt3"
         long_mem = 4096 if premium >= 2 else 1024
-        path = None
+        ppath = AUTH.get("pygmalion-path", "")
         if name == "gpt2" or not AUTH.get("openai_key"):
             model = "neox"
         elif name == "bloom":
@@ -1235,7 +1235,6 @@ class Ask(Command):
             #         raise PermissionError(f"This model is only available in {uni_str('NSFW')} channels. Please verify your age using ~verify within a NSFW channel to enable NSFW in DMs.")
             #     raise PermissionError(f"This model is only available in {uni_str('NSFW')} channels.")
             model = "pygmalion"
-            path = AUTH.get("pygmalion-path", "")
         elif name == "gpt3":
             model = "gpt3"
         elif name == "gpt3a":
@@ -1487,7 +1486,7 @@ class Ask(Command):
                 name=bot.name,
                 model=model,
                 personality=bot.commands.personality[0].retrieve((channel or guild).id),
-                path=path,
+                ppath=ppath,
                 premium=premium,
                 summary=summary,
                 jb=caid and caid.get("jailbroken"),
