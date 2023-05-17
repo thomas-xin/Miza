@@ -2577,7 +2577,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 pass
             try:
                 return gi.power_draw / gi.power_limit
-            except (TypeError, ZeroDivisionError):
+            except (ValueError, TypeError, ZeroDivisionError):
                 return 0
         def try_float(f):
             try:
