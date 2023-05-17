@@ -959,7 +959,7 @@ class Bot:
 				cm = 20
 		elif model in ("gpt-3.5-turbo", "gpt-4"):
 			tries = 7
-			if premium < 2:
+			if 0 and premium < 2:
 				stop = None
 			else:
 				stop = ["s an AI", "orry,", "language model"]
@@ -1087,7 +1087,7 @@ class Bot:
 						text = ""
 					if searched:
 						refs = list(refs) + [(f"[{sname}]", searched)]
-					t2 = self.gptcomplete(u, q, refs=refs, start=text or " ", model="davinci" if extensions else "pygmalion")
+					t2 = self.gptcomplete(u, q, refs=refs, start=text or " ", model="davinci" if premium >= 2 else "pygmalion")
 					text += " " + t2
 				if not self.jailbroken and self.nsfw:
 					try:
