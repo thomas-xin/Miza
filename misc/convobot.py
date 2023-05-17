@@ -826,18 +826,20 @@ class Bot:
 			text = tokenizer.decode(res[0]).removeprefix("<s>").strip().removeprefix(prompt).strip().split("</s>", 1)[0]
 			text = text.strip().replace(":\n", ": ").replace(f"You:", f"{u}:")
 			spl = text.split(": ")
-			text = ""
-			while spl:
-				s = spl.pop(0)
-				if "\n" in s:
-					text += s.rsplit("\n", 1)[0]
-					break
-				text += s + ": "
-			text = text.strip()
-			if text.endswith(":"):
-				text = text.rsplit("\n", 1)[0]
-			if text.startswith(start):
-				text = text[len(start):].strip()
+			if len(spl) > 1:
+				text = ""
+				while spl:
+					s = spl.pop(0)
+					if "\n" in s:
+						text += s.rsplit("\n", 1)[0]
+						break
+					text += s + ": "
+				text = text.strip()
+				if text.endswith(":"):
+					text = text.rsplit("\n", 1)[0]
+				start = ns
+				if text.startswith(start):
+					text = text[len(start):].strip()
 			model = "pygmalion-7b"
 		elif model in exclusive:
 			p = None
@@ -941,6 +943,7 @@ class Bot:
 					text = text.strip()
 					if text.endswith(":"):
 						text = text.rsplit("\n", 1)[0]
+					start = ns
 					if text.startswith(start):
 						text = text[len(start):].strip()
 				else:
