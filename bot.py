@@ -2084,8 +2084,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             return True
         if guild is None:
             return True
-        if "exec" in self.data and self.data.exec.get(message.channel.id, 0) & 64 and (not message.content or no_md(message.content[0]) not in "\\#"):
-            return True
+        if "exec" in self.data and self.data.exec.get(message.channel.id, 0) & 64:
+            if not message.content and (message.attachments or message.embeds):
+                return True
+            c = no_md(message.content)
+            if c.startswith(self.get_prefix(guild)):
+                return True
+            if c[0] not in "\\#!%" and c[:2] not in ("//", "/*"):
+                return True
         member = guild.get_member(u_id)
         if member is None:
             return False
@@ -2571,7 +2577,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 pass
             try:
                 return gi.power_draw / gi.power_limit
-            except:
+            except (TypeError, ZeroDivisionError):
+                return 0
+        def try_float(f):
+            try:
+                return float(f)
+            except ValueError:
                 return 0
         return dict(
 			cpu={ip: dict(name=cinfo["brand_raw"], count=cinfo["count"], usage=cpercent / 100, max=1, time=t)},
@@ -2588,8 +2599,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				**{f"{ip}-{gi['index']}": dict(
 					name=gi["name"],
 					count=1,
-					usage=gi["memory.used"] * 1048576,
-					max=gi["memory.total"] * 1048576,
+					usage=try_float(gi["memory.used"]) * 1048576,
+					max=try_float(gi["memory.total"]) * 1048576,
 					time=t,
 				) for gi in ginfo},
 			},

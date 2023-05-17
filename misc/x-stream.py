@@ -67,7 +67,12 @@ class Server:
                 pass
             try:
                 return gi.power_draw / gi.power_limit
-            except:
+            except (TypeError, ZeroDivisionError):
+                return 0
+        def try_float(f):
+            try:
+                return float(f)
+            except ValueError:
                 return 0
 		return json.dumps(dict(
 			cpu={ip: dict(name=cinfo["brand_raw"], count=cinfo["count"], usage=cpercent / 100, max=1, time=t)},
@@ -84,8 +89,8 @@ class Server:
 				**{f"{ip}-{gi['index']}": dict(
 					name=gi["name"],
 					count=1,
-					usage=gi["memory.used"] * 1048576,
-					max=gi["memory.total"] * 1048576,
+					usage=try_float(gi["memory.used"]) * 1048576,
+					max=try_float(gi["memory.total"]) * 1048576,
 					time=t,
 				) for gi in ginfo},
 			},

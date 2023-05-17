@@ -2249,7 +2249,7 @@ class UpdateUsers(Database):
         user = message.author
         channel = message.channel
         guild = message.guild
-        if force or msg and bot.is_mentioned(message, bot, guild):
+        if force or bot.is_mentioned(message, bot, guild):
             if user.bot:
                 with suppress(AttributeError):
                     async for m in self.bot.data.channel_cache.get(channel):
@@ -2264,7 +2264,7 @@ class UpdateUsers(Database):
             # Simulates a randomized conversation
             if count < 5:
                 create_task(message.add_reaction("👀"))
-            if msg and "ask" in bot.commands:# and random.random() > math.atan(count / 16) / 4:
+            if "ask" in bot.commands:# and random.random() > math.atan(count / 16) / 4:
                 argv = message.clean_content.strip()
                 me = guild.me if guild else bot
                 argv = argv.removeprefix(f"@{me.display_name}")
