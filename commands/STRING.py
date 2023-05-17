@@ -1224,7 +1224,7 @@ class Ask(Command):
         if not bl:
             print(f"{message.author}:", q)
         premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
-        model = "gpt3"
+        model = "gpt3" if premium < 4 else "gpt4"
         long_mem = 4096 if premium >= 2 else 1024
         ppath = AUTH.get("pygmalion-path", "")
         if name == "gpt2" or not AUTH.get("openai_key"):
