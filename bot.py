@@ -5769,7 +5769,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             if b != a:
                 self.usernames.pop(b, None)
                 self.usernames[a] = after
-            await self.send_event("_user_update_", before=before, after=after)
+            if not isinstance(before, self.GhostUser):
+                await self.send_event("_user_update_", before=before, after=after)
             if before.id == self.deleted_user or after.id == self.deleted_user:
                 print("Deleted user USER_UPDATE", before, after, before.id, after.id)
             await self.seen(after, event="misc", raw="Editing their profile")
@@ -5777,7 +5778,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         # Member update event: calls _member_update_ and _seen_ bot database events.
         @self.event
         async def on_member_update(before, after):
-            await self.send_event("_member_update_", before=before, after=after)
+            if not isinstance(before, self.GhostUser):
+                await self.send_event("_member_update_", before=before, after=after)
             if self.status_changed(before, after):
                 # A little bit of a trick to make sure this part is only called once per user event.
                 # This is necessary because on_member_update is called once for every member object.
