@@ -54,7 +54,12 @@ class Server:
 			ginfo = []
 		minfo = psutil.virtual_memory()
 		sinfo = psutil.swap_memory()
-		dinfo = {p.mountpoint: psutil.disk_usage(p.mountpoint) for p in psutil.disk_partitions(all=False)}
+		dinfo = {}
+        for p in psutil.disk_partitions(all=False):
+            try:
+                dinfo[p.mountpoint] = psutil.disk_usage(p.mountpoint)
+            except OSError:
+                pass
 		if fut:
 			resp = fut.result()
 			self.ip = resp.text

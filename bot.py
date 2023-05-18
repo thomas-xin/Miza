@@ -2565,7 +2565,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             ginfo = []
         minfo = psutil.virtual_memory()
         sinfo = psutil.swap_memory()
-        dinfo = {p.mountpoint: psutil.disk_usage(p.mountpoint) for p in psutil.disk_partitions(all=False)}
+        dinfo = {}
+        for p in psutil.disk_partitions(all=False):
+            try:
+                dinfo[p.mountpoint] = psutil.disk_usage(p.mountpoint)
+            except OSError:
+                pass
         ip = self.ip
         with tracebacksuppressor(asyncio.TimeoutError, asyncio.CancelledError):
             ip = await fut
