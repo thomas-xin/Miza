@@ -582,12 +582,24 @@ class Bot:
 			limit = 2000
 			cm = 0
 		elif model == "pygmalion":
-			model = "pygmalion-7b"
-			temp = 0.8
-			limit = 4000
-			cm = 0
+			if os.path.exists(self.ppath):
+				model = "pygmalion-7b"
+				temp = 0.8
+				limit = 4000
+				cm = 0
+			else:
+				model = "neox-20b"
+				temp = 0.8
+				limit = 2000
+				cm = 0
 		elif model == "davinci":
 			model = "text-davinci-003"
+			temp = 0.7
+			limit = 3000
+			cm = 200
+			longer = True
+		elif model == "curie":
+			model = "text-curie-001"
 			temp = 0.7
 			limit = 3000
 			cm = 200
@@ -1087,7 +1099,7 @@ class Bot:
 						text = ""
 					if searched:
 						refs = list(refs) + [(f"[{sname}]", searched)]
-					t2 = self.gptcomplete(u, q, refs=refs, start=text or " ", model="davinci" if premium >= 2 else "pygmalion")
+					t2 = self.gptcomplete(u, q, refs=refs, start=text or " ", model="davinci" if premium >= 2 else "curie")
 					text += " " + t2
 				if not self.jailbroken and self.nsfw:
 					try:
