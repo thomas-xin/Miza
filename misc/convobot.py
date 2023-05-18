@@ -571,6 +571,8 @@ class Bot:
 		model = model or self.model
 		extensions = model.endswith("+")
 		model = model.removesuffix("+")
+		if not os.path.exists(self.ppath):
+			self.ppath = "Neko-Institute-of-Science/pygmalion-7b"
 		if model == "bloom":
 			model = "bloom-176b"
 			temp = 0.9
@@ -582,16 +584,10 @@ class Bot:
 			limit = 2000
 			cm = 0
 		elif model == "pygmalion":
-			if os.path.exists(self.ppath):
-				model = "pygmalion-7b"
-				temp = 0.8
-				limit = 4000
-				cm = 0
-			else:
-				model = "neox-20b"
-				temp = 0.8
-				limit = 2000
-				cm = 0
+			model = "pygmalion-7b"
+			temp = 0.8
+			limit = 4000
+			cm = 0
 		elif model == "davinci":
 			model = "text-davinci-003"
 			temp = 0.7
