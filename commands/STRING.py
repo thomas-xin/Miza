@@ -1444,7 +1444,10 @@ class Ask(Command):
                         content = m.embeds[0].description
                     else:
                         content = None
-                    if not content or content.startswith("#"):
+                    if not content:
+                        continue
+                    c = content
+                    if c[0] in "\\#!%" or c[:2] in ("//", "/*"):
                         continue
                     if reset:
                         reset = False
