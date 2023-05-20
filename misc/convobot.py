@@ -572,7 +572,7 @@ class Bot:
 		extensions = model.endswith("+")
 		model = model.removesuffix("+")
 		if not os.path.exists(self.ppath):
-			self.ppath = "Neko-Institute-of-Science/pygmalion-7b"
+			self.ppath = "TehVenom/Pygmalion-13b-Merged"
 		if model == "bloom":
 			model = "bloom-176b"
 			temp = 0.9
