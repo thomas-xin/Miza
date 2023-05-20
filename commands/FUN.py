@@ -2805,14 +2805,7 @@ class Inspiro(ImagePool, Command):
     async def fetch_one(self):
         return await Request("https://inspirobot.me/api?generate=true", decode=True, aio=True)
 
-    async def __call__(self, bot, channel, flags, **void):
-        url = await bot.data.imagepools.get(self.database, self.fetch_one, self.threshold)
-        if "v" in flags:
-            return escape_roles(url)
-        embed = discord.Embed(colour=await bot.get_colour(url))
-        embed.set_image(url=url)
-        await send_with_react(channel, embed=embed, reacts="🔳")
-
+   
 
 class ImageSearch(ImagePool, Command):
     name = ["🖼", "🧁", "ImgSearch", "Muffin", "Muffins"]
