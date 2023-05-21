@@ -534,7 +534,8 @@ class Bot:
 		devices, dtype = determine_cuda(8589934592, priority="full", multi=True)
 		if self.models:
 			devices = self.models
-		device = devices[0]
+		print(tuple(devices))
+		device = next(iter(devices))
 		# futs = []
 		# c = count // len(devices)
 		# clist = [c] * len(devices)
