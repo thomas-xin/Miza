@@ -534,27 +534,27 @@ class Bot:
 		devices, dtype = determine_cuda(8589934592, priority="full", multi=True)
 		if self.models:
 			devices = self.models
-		c = count // len(devices)
-		clist = [c] * len(devices)
-		clist[0] += count - c * len(devices)
-		futs = []
-		for device, count in zip(devices, clist):
-			fut = exc.submit(self.art_stablediffusion_sub, pf, model, prompt, kwargs, count, device, dtype, nsfw, fail_unless_gpu)
-			futs.append(fut)
-		for fut, device in zip(futs, devices):
-			data = fut.result()
-			if not data:
+		# futs = []
+		# c = count // len(devices)
+		# clist = [c] * len(devices)
+		# clist[0] += count - c * len(devices)
+		# for device, count in zip(devices, clist):
+		# 	fut = exc.submit(self.art_stablediffusion_sub, pf, model, prompt, kwargs, count, device, dtype, nsfw, fail_unless_gpu)
+		# 	futs.append(fut)
+		# for fut in futs:
+		# 	data = fut.result()
+			# if not data:
+			# 	continue
+		data = self.art_stablediffusion_sub(pf, model, prompt, kwargs, count, device, dtype, nsfw, fail_unless_gpu)
+		nsfw_content_detected = [data.nsfw_content_detected] if isinstance(data.nsfw_content_detected, bool) else data.nsfw_content_detected
+		for im, n in zip(data.images, nsfw_content_detected):
+			if n:
 				continue
-			self.models[device][(pf, model)] = self.models[device][(pf, model)].to("cpu")
-			nsfw_content_detected = [data.nsfw_content_detected] if isinstance(data.nsfw_content_detected, bool) else data.nsfw_content_detected
-			for im, n in zip(data.images, nsfw_content_detected):
-				if n:
-					continue
-				b = io.BytesIO()
-				im.save(b, format="png")
-				print("StablediffusionL:", b)
-				b.seek(0)
-				out.append(b.read())
+			b = io.BytesIO()
+			im.save(b, format="png")
+			print("StablediffusionL:", b)
+			b.seek(0)
+			out.append(b.read())
 		if not out and all(nsfw_content_detected):
 			raise PermissionError("NSFW filter detected in non-NSFW channel. If you believe this was a mistake, please try again.")
 		return out
@@ -594,6 +594,8 @@ class Bot:
 			pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
 		else:
 			pipe.safety_checker = checkers[model]
+		torch.cuda.set_device(device)
+		pipe = pipe.to(f"cuda:{device}")
 		with torch.cuda.device(device):
 			if pf is StableDiffusionInpaintPipeline:
 				data = pipe(
@@ -632,6 +634,7 @@ class Bot:
 					guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
 					# generator=self.gen,
 				)
+		models[(pf, model)] = pipe.to("cpu")
 		return data
 
 	def art_textsynth(self, prompt, kwargs=None, count=1):

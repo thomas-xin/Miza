@@ -61,6 +61,10 @@ def convert_fut(fut):
         loop.create_task(_await_fut(fut, ret))
     return ret
 
+if len(sys.argv) > 1 and sys.argv[1].isnumeric() and int(sys.argv[1]) >= 3:
+	fix = int(sys.argv[1]) - 3
+	os.environ["CUDA_VISIBLE_DEVICES"] = str(fix)
+
 import torch
 hwaccel = "cuvid" if torch.cuda.is_available() else "d3d11va" if os.name == "nt" else "auto"
 
@@ -2545,6 +2549,48 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 		convobot.AsyncChatGPT = AsyncChatGPT
 
 elif len(sys.argv) > 1 and sys.argv[1] == "2":
+
+	def determine_cuda(mem=1, priority=None, multi=False):
+		if not torch.cuda.is_available():
+			if multi:
+				return [-1], torch.float32
+			return -1, torch.float32
+		n = torch.cuda.device_count()
+		if not n:
+			if multi:
+				return [-1], torch.float32
+			return -1, torch.float32
+		import gpustat
+		fut = exc.submit(gpustat.new_query)
+		dps = [torch.cuda.get_device_properties(i) for i in range(n)]
+		sts = fut.result()
+		if priority == "full":
+			key = lambda i: (p := dps[i]) and (s := sts[i]) and (s.memory_available * 1048576 >= mem, p.major, p.minor, p.multi_processor_count, p.total_memory)
+		elif priority:
+			key = lambda i: (p := dps[i]) and (s := sts[i]) and (s.memory_available * 1048576 >= mem, p.multi_processor_count, p.total_memory)
+		elif priority is False:
+			key = lambda i: (p := dps[i]) and (s := sts[i]) and (s.memory_available * 1048576 >= mem, -s.memory_available, p.multi_processor_count)
+		else:
+			key = lambda i: (p := dps[i]) and (s := sts[i]) and (s.memory_available * 1048576 >= mem, -p.multi_processor_count, -s.memory_available)
+		pcs = sorted(range(n), key=key, reverse=True)
+		if multi:
+			return [i for i in pcs if sts[i].memory_available * 1048576 >= mem], torch.float16
+		return pcs[0], torch.float16
+
+	device, dtype = determine_cuda(1073741824, priority=False)
+	device = f"cuda:{device}" if device >= 0 else "cpu"
+	from sentence_transformers import SentenceTransformer
+	Embedder = SentenceTransformer("LLukas22/all-mpnet-base-v2-embedding-all", device=device)
+	if dtype == torch.float16:
+		try:
+			Embedder = Embedder.half()
+		except (RuntimeError, NotImplementedError):
+			pass
+	def embedding(s):
+		a = Embedder.encode(s).astype(np.float16)
+		return a.data
+
+elif len(sys.argv) > 1:
 	import imagebot
 	for i in range(3):
 		try:
@@ -2598,48 +2644,6 @@ elif len(sys.argv) > 1 and sys.argv[1] == "2":
 		except KeyError:
 			ib = CBOTS[None] = imagebot.Bot()
 		return ib.art_stablediffusion_local(prompt, kwargs, nsfw=nsfw, fail_unless_gpu=not force, count=count)
-
-elif len(sys.argv) > 1 and sys.argv[1] == "3":
-
-	def determine_cuda(mem=1, priority=None, multi=False):
-		if not torch.cuda.is_available():
-			if multi:
-				return [-1], torch.float32
-			return -1, torch.float32
-		n = torch.cuda.device_count()
-		if not n:
-			if multi:
-				return [-1], torch.float32
-			return -1, torch.float32
-		import gpustat
-		fut = exc.submit(gpustat.new_query)
-		dps = [torch.cuda.get_device_properties(i) for i in range(n)]
-		sts = fut.result()
-		if priority == "full":
-			key = lambda i: (p := dps[i]) and (s := sts[i]) and (s.memory_available * 1048576 >= mem, p.major, p.minor, p.multi_processor_count, p.total_memory)
-		elif priority:
-			key = lambda i: (p := dps[i]) and (s := sts[i]) and (s.memory_available * 1048576 >= mem, p.multi_processor_count, p.total_memory)
-		elif priority is False:
-			key = lambda i: (p := dps[i]) and (s := sts[i]) and (s.memory_available * 1048576 >= mem, -s.memory_available, p.multi_processor_count)
-		else:
-			key = lambda i: (p := dps[i]) and (s := sts[i]) and (s.memory_available * 1048576 >= mem, -p.multi_processor_count, -s.memory_available)
-		pcs = sorted(range(n), key=key, reverse=True)
-		if multi:
-			return [i for i in pcs if sts[i].memory_available * 1048576 >= mem], torch.float16
-		return pcs[0], torch.float16
-
-	device, dtype = determine_cuda(1073741824, priority=False)
-	device = f"cuda:{device}" if device >= 0 else "cpu"
-	from sentence_transformers import SentenceTransformer
-	Embedder = SentenceTransformer("LLukas22/all-mpnet-base-v2-embedding-all", device=device)
-	if dtype == torch.float16:
-		try:
-			Embedder = Embedder.half()
-		except (RuntimeError, NotImplementedError):
-			pass
-	def embedding(s):
-		a = Embedder.encode(s).astype(np.float16)
-		return a.data
 
 else:
 	del torch

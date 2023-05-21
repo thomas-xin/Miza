@@ -1484,7 +1484,7 @@ class Art(Command):
         if not prompt:
             if not url:
                 raise ArgumentError("Please input a valid prompt.")
-            prompt, _ = await process_image(url, "caption", ["-nogif"], fix=2, timeout=300)
+            prompt, _ = await process_image(url, "caption", ["-nogif"], fix=3, timeout=300)
             if not prompt:
                 prompt = "art"
             print(url, prompt)
@@ -1535,11 +1535,16 @@ class Art(Command):
                 raise PermissionError("Premium subscription required to perform DALL·E 2 operations.")
             openjourney = "journey" in name
             with discord.context_managers.Typing(channel):
-                fut = None
+                futs = []
                 c = 0
                 if not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy() and torch.cuda.is_available():
                     c = min(amount, 5)
-                    fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, c], fix=2, timeout=1200))
+                    c2 = count // len(devices)
+                    clist = [c2] * len(devices)
+                    clist[0] += count - c2 * len(devices)
+                    for i, c3 in enumerate(clist):
+                        fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, c3], fix=3 + i, timeout=1200))
+                        futs.append(fut)
                 self.imagebot.token = oai or AUTH.get("openai_key")
                 try:
                     if c > amount:
@@ -1547,9 +1552,10 @@ class Art(Command):
                     ims = await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2, openjourney, nsfw, amount - c, timeout=480)
                 except PermissionError:
                     async with self.sdiff_sem:
-                        ims2 = await fut
+                        for fut in futs:
+                            await fut
                 # print(ims)
-                if fut:
+                for fut in futs:
                     try:
                         async with self.sdiff_sem:
                             ims2 = await fut
@@ -1711,7 +1717,7 @@ class Art(Command):
                             amount2 = len(futs)
                         else:
                             noprompt = not force and not kwargs.get("--mask")
-                            ims = await process_image("IBASL", "&", ["" if noprompt else prompt, kwargs, nsfw, True, amount - amount2], fix=2, timeout=1200)
+                            ims = await process_image("IBASL", "&", ["" if noprompt else prompt, kwargs, nsfw, True, amount - amount2], fix=3, timeout=1200)
                             futs.extend(ims)
                             amount2 = len(futs)
         files = []
