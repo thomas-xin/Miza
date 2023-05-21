@@ -1539,9 +1539,9 @@ class Art(Command):
                 c = 0
                 if not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy() and torch.cuda.is_available():
                     c = min(amount, 5)
-                    c2 = count // len(devices)
+                    c2 = c // len(devices)
                     clist = [c2] * len(devices)
-                    clist[0] += count - c2 * len(devices)
+                    clist[0] += c - c2 * len(devices)
                     for i, c3 in enumerate(clist):
                         fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, c3], fix=3 + i, timeout=1200))
                         futs.append(fut)
