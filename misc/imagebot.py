@@ -560,7 +560,7 @@ class Bot:
 		return out
 
 	def art_stablediffusion_sub(self, pf, prompt, kwargs, model, device=-1, dtype=torch.float32, nsfw=False, fail_unless_gpu=False):
-		from diffusers import DPMSolverMultistepScheduler
+		from diffusers import DPMSolverMultistepScheduler, StableDiffusionPipeline, StableDiffusionImg2ImgPipeline, StableDiffusionInpaintPipeline, StableDiffusionImageVariationPipeline
 		cia = torch.cuda.is_available()
 		models = self.models.setdefault(device, {})
 		checkers = self.safety_checkers.setdefault(device, {})
