@@ -536,6 +536,7 @@ class Bot:
 		clist = [c] * len(devices)
 		clist[0] += count - c * len(devices)
 		out = []
+		futs = []
 		for device, count in zip(devices, clist):
 			models = self.models.setdefault(device, {})
 			checkers = self.safety_checkers.setdefault(device, {})
@@ -570,7 +571,8 @@ class Bot:
 			else:
 				pipe.safety_checker = checkers[model]
 			if pf is StableDiffusionInpaintPipeline:
-				data = pipe(
+				fut = exc.submit(
+					pipe,
 					prompt,
 					image=image_to(Image.open(kwargs["--init-image"])),
 					mask_image=image_to(Image.open(kwargs["--mask"])),
@@ -581,7 +583,8 @@ class Bot:
 					generator=self.gen,
 				)
 			elif pf is StableDiffusionImg2ImgPipeline:
-				data = pipe(
+				fut = exc.submit(
+					pipe,
 					prompt,
 					image=image_to(Image.open(kwargs["--init-image"])),
 					num_images_per_prompt=count,
@@ -591,7 +594,8 @@ class Bot:
 					generator=self.gen,
 				)
 			elif pf is StableDiffusionImageVariationPipeline:
-				data = pipe(
+				fut = exc.submit(
+					pipe,
 					image=image_to(Image.open(kwargs["--init-image"])),
 					num_images_per_prompt=count,
 					num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
@@ -599,13 +603,18 @@ class Bot:
 					generator=self.gen,
 				)
 			else:
-				data = pipe(
+				fut = exc.submit(
+					pipe,
 					prompt,
 					num_images_per_prompt=count,
 					num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 					guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
 					generator=self.gen,
 				)
+			futs.append(fut)
+		for fut in futs:
+			data = fut.result()
+			nsfw_content_detected = [data.nsfw_content_detected] if isinstance(data.nsfw_content_detected, bool) else data.nsfw_content_detected
 			for im, n in zip(data.images, nsfw_content_detected):
 				if n:
 					continue
@@ -614,7 +623,7 @@ class Bot:
 				print("StablediffusionL:", b)
 				b.seek(0)
 				out.append(b.read())
-		if not out and data.nsfw_content_detected and (isinstance(data.nsfw_content_detected, bool) or all(data.nsfw_content_detected)):
+		if not out and all(nsfw_content_detected):
 			raise PermissionError("NSFW filter detected in non-NSFW channel. If you believe this was a mistake, please try again.")
 		return out
 
