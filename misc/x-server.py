@@ -2095,7 +2095,6 @@ transform: translate(-50%, -50%);
 					time.sleep(0.2)
 				with tracebacksuppressor:
 					os.remove(p)
-				p = find_file(path)
 			else:
 				os.remove(p)
 		if self.edited.get(ots):
