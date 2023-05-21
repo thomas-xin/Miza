@@ -1544,6 +1544,8 @@ class Art(Command):
                     clist = [c2] * len(devices)
                     clist[0] += c - c2 * len(devices)
                     for i, c3 in enumerate(clist):
+                        if not c3:
+                            continue
                         fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, c3], fix=3 + i, timeout=1200))
                         futt.append(fut)
                 self.imagebot.token = oai or AUTH.get("openai_key")
@@ -1718,8 +1720,23 @@ class Art(Command):
                             amount2 = len(futs)
                         else:
                             noprompt = not force and not kwargs.get("--mask")
-                            ims = await process_image("IBASL", "&", ["" if noprompt else prompt, kwargs, nsfw, True, amount - amount2], fix=3, timeout=1200)
-                            futs.extend(ims)
+                            p = "" if noprompt else prompt
+                            futt = []
+                            c = amount - amount2
+                            devices = range(torch.cuda.device_count())
+                            c2 = c // len(devices)
+                            clist = [c2] * len(devices)
+                            clist[0] += c - c2 * len(devices)
+                            for i, c3 in enumerate(clist):
+                                if not c3:
+                                    continue
+                                fut = create_task(process_image("IBASL", "&", [p, kwargs, nsfw, True, c3], fix=3 + i, timeout=1200))
+                                futt.append(fut)
+                            for fut in futt:
+                                ims = fut.result()
+                                futs.extend(ims)
+                            # ims = await process_image("IBASL", "&", ["" if noprompt else prompt, kwargs, nsfw, True, c3], fix=3, timeout=1200)
+                            # futs.extend(ims)
                             amount2 = len(futs)
         files = []
         exc = RuntimeError("Unknown error occured.")
