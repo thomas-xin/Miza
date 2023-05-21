@@ -517,7 +517,7 @@ class Bot:
 	# device, dtype = determine_cuda(0)
 	# gen = torch.Generator(f"cuda:{device}" if device >= 0 else "cpu").manual_seed(time.time_ns() - 1)
 	def art_stablediffusion_local(self, prompt, kwargs=None, model="stabilityai/stable-diffusion-2-1", fail_unless_gpu=True, nsfw=False, count=1):
-		from diffusers import DPMSolverMultistepScheduler, StableDiffusionPipeline, StableDiffusionImg2ImgPipeline, StableDiffusionInpaintPipeline, StableDiffusionImageVariationPipeline
+		from diffusers import StableDiffusionPipeline, StableDiffusionImg2ImgPipeline, StableDiffusionInpaintPipeline, StableDiffusionImageVariationPipeline
 		if not kwargs.get("--init-image"):
 			pf = StableDiffusionPipeline
 			if model == "stabilityai/stable-diffusion-2-1":
@@ -543,6 +543,8 @@ class Bot:
 			futs.append(fut)
 		for fut, device in zip(futs, devices):
 			data = fut.result()
+			if not data:
+				continue
 			self.models[device][(pf, model)] = self.models[device][(pf, model)].to("cpu")
 			nsfw_content_detected = [data.nsfw_content_detected] if isinstance(data.nsfw_content_detected, bool) else data.nsfw_content_detected
 			for im, n in zip(data.images, nsfw_content_detected):
@@ -558,6 +560,7 @@ class Bot:
 		return out
 
 	def art_stablediffusion_sub(self, pf, prompt, kwargs, model, device=-1, dtype=torch.float32, fail_unless_gpu=False):
+		from diffusers import DPMSolverMultistepScheduler
 		cia = torch.cuda.is_available()
 		models = self.models.setdefault(device, {})
 		checkers = self.safety_checkers.setdefault(device, {})
