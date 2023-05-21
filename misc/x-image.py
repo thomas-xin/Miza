@@ -3087,7 +3087,7 @@ def evalImg(url, operation, args):
 				proc.wait()
 			return [out]
 	if isinstance(new, Image.Image):
-		if new.entropy() > 4 and fmt in ("default", "webp"):
+		if new.entropy() > 8 and fmt in ("default", "webp"):
 			out = "cache/" + str(ts) + ".webp"
 			new.save(out, format="webp", lossless=False, quality=67)
 			return [out]
