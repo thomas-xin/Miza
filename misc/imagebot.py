@@ -539,7 +539,7 @@ class Bot:
 		clist[0] += count - c * len(devices)
 		futs = []
 		for device, count in zip(devices, clist):
-			fut = exc.submit(self.art_stablediffusion_sub, pf, prompt, kwargs, model, device)
+			fut = exc.submit(self.art_stablediffusion_sub, pf, prompt, kwargs, model, device, fail_unless_gpu)
 			futs.append(fut)
 		for fut, device in zip(futs, devices):
 			data = fut.result()
@@ -557,7 +557,7 @@ class Bot:
 			raise PermissionError("NSFW filter detected in non-NSFW channel. If you believe this was a mistake, please try again.")
 		return out
 
-	def art_stablediffusion_sub(self, pf, prompt, kwargs, model, device):
+	def art_stablediffusion_sub(self, pf, prompt, kwargs, model, device=-1, fail_unless_gpu=False):
 		cia = torch.cuda.is_available()
 		models = self.models.setdefault(device, {})
 		checkers = self.safety_checkers.setdefault(device, {})
