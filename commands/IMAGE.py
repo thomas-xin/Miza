@@ -1733,7 +1733,7 @@ class Art(Command):
                                 fut = create_task(process_image("IBASL", "&", [p, kwargs, nsfw, True, c3], fix=3 + i, timeout=1200))
                                 futt.append(fut)
                             for fut in futt:
-                                ims = fut.result()
+                                ims = await fut
                                 futs.extend(ims)
                             # ims = await process_image("IBASL", "&", ["" if noprompt else prompt, kwargs, nsfw, True, c3], fix=3, timeout=1200)
                             # futs.extend(ims)
