@@ -1535,7 +1535,7 @@ class Art(Command):
                 raise PermissionError("Premium subscription required to perform DALL·E 2 operations.")
             openjourney = "journey" in name
             with discord.context_managers.Typing(channel):
-                futs = []
+                futt = []
                 c = 0
                 if not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy() and torch.cuda.is_available():
                     c = min(amount, 5)
@@ -1545,7 +1545,7 @@ class Art(Command):
                     clist[0] += c - c2 * len(devices)
                     for i, c3 in enumerate(clist):
                         fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, c3], fix=3 + i, timeout=1200))
-                        futs.append(fut)
+                        futt.append(fut)
                 self.imagebot.token = oai or AUTH.get("openai_key")
                 try:
                     if c > amount:
@@ -1553,10 +1553,10 @@ class Art(Command):
                     ims = await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2, openjourney, nsfw, amount - c, timeout=480)
                 except PermissionError:
                     async with self.sdiff_sem:
-                        for fut in futs:
+                        for fut in futt:
                             await fut
                 # print(ims)
-                for fut in futs:
+                for fut in futt:
                     try:
                         async with self.sdiff_sem:
                             ims2 = await fut
