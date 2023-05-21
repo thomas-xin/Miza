@@ -1539,6 +1539,7 @@ class Art(Command):
                 c = 0
                 if not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy() and torch.cuda.is_available():
                     c = min(amount, 5)
+                    devices = range(torch.cuda.device_count())
                     c2 = c // len(devices)
                     clist = [c2] * len(devices)
                     clist[0] += c - c2 * len(devices)
