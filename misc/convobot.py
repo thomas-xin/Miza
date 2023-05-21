@@ -1457,8 +1457,8 @@ class Bot:
 	def au(self, prompt, stop=None):
 		bals = getattr(self, "bals", {})
 		oai = getattr(self, "oai", None)
-		if bals or oai:
-			funcs = [self.cgp, self.cgp]
+		if bals or oai or self.premium >= 2:
+			funcs = [self.cgp, self.ycg]
 		else:
 			funcs = [self.chatgpt, self.chatgpt, self.ycg, self.cgp, self.cgp]
 			if len(self.gpttokens(prompt)) > 24:

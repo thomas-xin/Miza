@@ -179,6 +179,7 @@ class Translate(Command):
             u = user
         data = bot.data.users.get(u.id, {})
         oai = data.get("trial") and data.get("openai_key")
+        premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
         inputs = dict(
             user_id=user.id,
             channel_id=channel.id,
@@ -189,6 +190,7 @@ class Translate(Command):
             bals={k: v for k, v in bot.data.token_balances.items() if v < 0},
             oai=oai,
             nsfw=bot.is_nsfw(channel),
+            premium=premium,
         )
         # await process_image("CBIP", "&", [], fix=1, timeout=360)
         out = await process_image("CBAU", "$", [inputs], fix=1, timeout=192)
@@ -267,7 +269,10 @@ class UpdateTranslators(Database):
         curr = self.get(message.channel.id)
         if not curr:
             return
-        if not msg or msg.startswith("#"):
+        if not msg:
+            return
+        c = msg
+        if c[0] in "\\#!%" or c[:2] in ("//", "/*"):
             return
         bot = self.bot
         user = message.author

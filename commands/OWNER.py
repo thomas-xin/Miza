@@ -412,11 +412,11 @@ class UpdateExec(Database):
             for f in (flag & 1, flag & 4, flag & 32):
                 if not f:
                     continue
-                proc = message.content.strip()
+                c = proc = message.content.strip()
                 if not proc:
                     return
                 # Ignore commented messages
-                if proc[:2] in ("//", "||", "~~") or proc[0] in "\\#<>:;+.^*" or not proc[0].isascii():
+                if c[0] in "\\#!%" or c[:2] in ("//", "/*"):
                     return
                 if proc == "-" or proc.startswith("http://") or proc.startswith("https://"):
                     return

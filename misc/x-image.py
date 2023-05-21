@@ -2516,13 +2516,14 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 		oai = inputs.get("oai")
 		bals = inputs.get("bals")
 		nsfw = inputs.get("nsfw")
+		premium = inputs.get("premium")
 		try:
 			cb = CBOTS["AU"]
 		except KeyError:
 			cb = CBOTS["AU"] = convobot.Bot( 
 				key=key,
 				huggingface_token=ht,
-				premium=0,
+				premium=premium,
 			)
 			cb.vis_s = vis
 		cb.user_id = user_id
@@ -2530,6 +2531,7 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 		cb.oai = oai
 		cb.bals = bals
 		cb.nsfw = nsfw
+		cb.premium = premium
 		return cb.au(prompt)
 
 	try:
