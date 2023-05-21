@@ -1617,7 +1617,10 @@ transform: translate(-50%, -50%);
 				key = key or s.split("<!--KEY=", 1)[-1].split("-->", 1)[0]
 				q = f"?key={key}"
 				if os.path.exists(n + "0"):
-					os.rename(n + "0", f"cache/{IND}{ts}" + "~.temp$@" + name)
+					fn = f"cache/{IND}{ts}" + "~.temp$@" + name
+					if os.path.exists(fn):
+						os.remove(fn)
+					os.rename(n + "0", fn)
 			elif nh in self.chunking:
 				info = cdict(self.chunking.pop(n))
 				if not key:
@@ -1658,6 +1661,8 @@ transform: translate(-50%, -50%);
 			else:
 				of = nh + "0"
 				fn = f"cache/{IND}{ts}~.temp$@{name}"
+				if os.path.exists(fn):
+					os.remove(fn)
 				os.rename(of, fn)
 				if high > 1:
 					with open(fn, "ab") as f:
