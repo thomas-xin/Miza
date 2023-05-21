@@ -3058,19 +3058,28 @@ def evalImg(url, operation, args):
 					if frame.mode != mode:
 						frame = frame.convert(mode)
 					if fmt == "zip":
-						frame.save(b, format="webp", lossless=False, quality=67)
+						if frame.entropy() > 8:
+							frame.save(b, format="webp", lossless=False, quality=67)
+						else:
+							frame.save(b, format="webp", lossless=True, quality=80)
 					else:
 						b = frame.tobytes()
 				elif type(frame) is io.BytesIO:
 					if fmt == "zip":
 						with Image.open(frame) as im:
-							im.save(b, format="webp", lossless=False, quality=67)
+							if im.entropy() > 8:
+								im.save(b, format="webp", lossless=False, quality=67)
+							else:
+								im.save(b, format="webp", lossless=True, quality=80)
 					else:
 						b = frame.read()
 				else:
 					if fmt == "zip":
 						with Image.open(io.BytesIO(frame)) as im:
-							im.save(b, format="webp", lossless=False, quality=67)
+							if im.entropy() > 8:
+								im.save(b, format="webp", lossless=False, quality=67)
+							else:
+								im.save(b, format="webp", lossless=True, quality=80)
 					else:
 						b = frame
 				if fmt == "zip":
