@@ -517,7 +517,6 @@ class Bot:
 	# device, dtype = determine_cuda(0)
 	# gen = torch.Generator(f"cuda:{device}" if device >= 0 else "cpu").manual_seed(time.time_ns() - 1)
 	def art_stablediffusion_local(self, prompt, kwargs=None, model="stabilityai/stable-diffusion-2-1", fail_unless_gpu=True, nsfw=False, count=1):
-		cia = torch.cuda.is_available()
 		from diffusers import DPMSolverMultistepScheduler, StableDiffusionPipeline, StableDiffusionImg2ImgPipeline, StableDiffusionInpaintPipeline, StableDiffusionImageVariationPipeline
 		if not kwargs.get("--init-image"):
 			pf = StableDiffusionPipeline
@@ -559,6 +558,7 @@ class Bot:
 		return out
 
 	def art_stablediffusion_sub(self, prompt, kwargs, model, device):
+		cia = torch.cuda.is_available()
 		models = self.models.setdefault(device, {})
 		checkers = self.safety_checkers.setdefault(device, {})
 		pipe = cia and models.get((pf, model))
