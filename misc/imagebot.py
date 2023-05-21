@@ -532,8 +532,11 @@ class Bot:
 			if model == "stabilityai/stable-diffusion-2-1":
 				model = "lambdalabs/sd-image-variations-diffusers"
 		devices, dtype = determine_cuda(8589934592, priority="full", multi=True)
+		c = count // len(devices)
+		clist = [c] * len(devices)
+		clist[0] += count - c * len(devices)
 		out = []
-		for device in devices:
+		for device, count in zip(devices, clist):
 			models = self.models.setdefault(device, {})
 			checkers = self.safety_checkers.setdefault(device, {})
 			pipe = cia and models.get((pf, model))
