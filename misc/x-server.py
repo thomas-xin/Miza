@@ -1600,10 +1600,10 @@ transform: translate(-50%, -50%);
 		if self.merged.get(nh):
 			return
 		self.merged[nh] = True
+		q = ""
 		try:
 			fn = f"saves/filehost/{IND}{ts}~" + name
 			r = n + "!"
-			q = ""
 			print("Merge", fn)
 			high = int(kwargs.get("index") or cp.request.headers.get("x-index", 0))
 			if high == 0 and os.path.exists(r):
@@ -1673,7 +1673,7 @@ transform: translate(-50%, -50%);
 		finally:
 			self.merged.pop(nh, None)
 		self.update_merge()
-		return "/p/" + n2p(ts)
+		return "/p/" + n2p(ts) + q
 
 	@cp.expose
 	@hostmap
@@ -2088,7 +2088,16 @@ transform: translate(-50%, -50%);
 				raise PermissionError("Incorrect key.")
 			self.delete_link(p, orig)
 		else:
-			os.remove(p)
+			if p.split("~", 1)[-1].startswith(".temp$@"):
+				if p in self.serving:
+					for f in self.serving.pop(p):
+						f.close()
+					time.sleep(0.2)
+				with tracebacksuppressor:
+					os.remove(p)
+				p = find_file(path)
+			else:
+				os.remove(p)
 		if self.edited.get(ots):
 			return
 		self.edited[ots] = True

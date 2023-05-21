@@ -2805,7 +2805,6 @@ class Inspiro(ImagePool, Command):
     async def fetch_one(self):
         return await Request("https://inspirobot.me/api?generate=true", decode=True, aio=True)
 
-   
 
 class ImageSearch(ImagePool, Command):
     name = ["🖼", "🧁", "ImgSearch", "Muffin", "Muffins"]
