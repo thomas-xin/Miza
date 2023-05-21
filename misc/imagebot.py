@@ -550,7 +550,7 @@ class Bot:
 					return
 				pipe = backup_model(pf.from_pretrained, model, requires_safety_checker=True, torch_dtype=dtype, device_map="auto", **kw)
 				if device >= 0:
-					pipe = pipe.to(f"cuda:{device}")
+					# pipe = pipe.to(f"cuda:{device}")
 					pipe.enable_attention_slicing()
 					pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 					try:
