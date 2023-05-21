@@ -2625,7 +2625,7 @@ elif len(sys.argv) > 1 and sys.argv[1] == "3":
 			key = lambda i: (p := dps[i]) and (s := sts[i]) and (s.memory_available * 1048576 >= mem, -p.multi_processor_count, -s.memory_available)
 		pcs = sorted(range(n), key=key, reverse=True)
 		if multi:
-			return [i for i in pcs if sts[i].memory_available >= mem], torch.float16
+			return [i for i in pcs if sts[i].memory_available * 1048576 >= mem], torch.float16
 		return pcs[0], torch.float16
 
 	device, dtype = determine_cuda(1073741824, priority=False)
