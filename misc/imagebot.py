@@ -531,89 +531,16 @@ class Bot:
 			pf = StableDiffusionImageVariationPipeline
 			if model == "stabilityai/stable-diffusion-2-1":
 				model = "lambdalabs/sd-image-variations-diffusers"
+		out = []
 		devices, dtype = determine_cuda(8589934592, priority="full", multi=True)
 		if self.models:
 			devices = self.models
 		c = count // len(devices)
 		clist = [c] * len(devices)
 		clist[0] += count - c * len(devices)
-		out = []
 		futs = []
 		for device, count in zip(devices, clist):
-			models = self.models.setdefault(device, {})
-			checkers = self.safety_checkers.setdefault(device, {})
-			pipe = cia and models.get((pf, model))
-			if pipe == False and fail_unless_gpu:
-				return
-			if not pipe:
-				kw = {}
-				try:
-					if fail_unless_gpu and (device < 0 or not models.get((pf, model), True)):
-						return
-					pipe = backup_model(pf.from_pretrained, model, requires_safety_checker=True, torch_dtype=dtype, **kw)
-					if device >= 0:
-						pipe = pipe.to(f"cuda:{device}")
-						pipe.enable_attention_slicing()
-						pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
-						try:
-							pipe.enable_model_cpu_offload()
-						except AttributeError:
-							pass
-				except:
-					print_exc()
-					if fail_unless_gpu:
-						models[(pf, model)] = False
-						print("StablediffusionL: CUDA f16 init failed")
-						return
-					pipe = backup_model(pf.from_pretrained, model, requires_safety_checker=True, **kw)
-				checkers[model] = pipe.safety_checker
-				models[(pf, model)] = pipe
-			if nsfw:
-				pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
-			else:
-				pipe.safety_checker = checkers[model]
-			pipe = pipe.to(f"cuda:{device}")
-			if pf is StableDiffusionInpaintPipeline:
-				fut = exc.submit(
-					pipe,
-					prompt,
-					image=image_to(Image.open(kwargs["--init-image"])),
-					mask_image=image_to(Image.open(kwargs["--mask"])),
-					num_images_per_prompt=count,
-					num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
-					guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
-					strength=float(kwargs.get("--strength", 0.8)),
-					# generator=self.gen,
-				)
-			elif pf is StableDiffusionImg2ImgPipeline:
-				fut = exc.submit(
-					pipe,
-					prompt,
-					image=image_to(Image.open(kwargs["--init-image"])),
-					num_images_per_prompt=count,
-					num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
-					guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
-					strength=float(kwargs.get("--strength", 0.8)),
-					# generator=self.gen,
-				)
-			elif pf is StableDiffusionImageVariationPipeline:
-				fut = exc.submit(
-					pipe,
-					image=image_to(Image.open(kwargs["--init-image"])),
-					num_images_per_prompt=count,
-					num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
-					guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
-					# generator=self.gen,
-				)
-			else:
-				fut = exc.submit(
-					pipe,
-					prompt,
-					num_images_per_prompt=count,
-					num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
-					guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
-					# generator=self.gen,
-				)
+			fut = exc.submit(self.art_stablediffusion_sub, prompt, kwargs, model, device)
 			futs.append(fut)
 		for fut, device in zip(futs, devices):
 			data = fut.result()
@@ -630,6 +557,79 @@ class Bot:
 		if not out and all(nsfw_content_detected):
 			raise PermissionError("NSFW filter detected in non-NSFW channel. If you believe this was a mistake, please try again.")
 		return out
+
+	def art_stablediffusion_sub(self, prompt, kwargs, model, device):
+		models = self.models.setdefault(device, {})
+		checkers = self.safety_checkers.setdefault(device, {})
+		pipe = cia and models.get((pf, model))
+		if pipe == False and fail_unless_gpu:
+			return
+		if not pipe:
+			kw = {}
+			try:
+				if fail_unless_gpu and (device < 0 or not models.get((pf, model), True)):
+					return
+				pipe = backup_model(pf.from_pretrained, model, requires_safety_checker=True, torch_dtype=dtype, **kw)
+				if device >= 0:
+					pipe = pipe.to(f"cuda:{device}")
+					pipe.enable_attention_slicing()
+					pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+					try:
+						pipe.enable_model_cpu_offload()
+					except AttributeError:
+						pass
+			except:
+				print_exc()
+				if fail_unless_gpu:
+					models[(pf, model)] = False
+					print("StablediffusionL: CUDA f16 init failed")
+					return
+				pipe = backup_model(pf.from_pretrained, model, requires_safety_checker=True, **kw)
+			checkers[model] = pipe.safety_checker
+			models[(pf, model)] = pipe
+		if nsfw:
+			pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
+		else:
+			pipe.safety_checker = checkers[model]
+		with torch.cuda.device(device):
+			if pf is StableDiffusionInpaintPipeline:
+				data = pipe(
+					prompt,
+					image=image_to(Image.open(kwargs["--init-image"])),
+					mask_image=image_to(Image.open(kwargs["--mask"])),
+					num_images_per_prompt=count,
+					num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
+					guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
+					strength=float(kwargs.get("--strength", 0.8)),
+					# generator=self.gen,
+				)
+			elif pf is StableDiffusionImg2ImgPipeline:
+				data = pipe(
+					prompt,
+					image=image_to(Image.open(kwargs["--init-image"])),
+					num_images_per_prompt=count,
+					num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
+					guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
+					strength=float(kwargs.get("--strength", 0.8)),
+					# generator=self.gen,
+				)
+			elif pf is StableDiffusionImageVariationPipeline:
+				data = pipe(
+					image=image_to(Image.open(kwargs["--init-image"])),
+					num_images_per_prompt=count,
+					num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
+					guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
+					# generator=self.gen,
+				)
+			else:
+				data = pipe(
+					prompt,
+					num_images_per_prompt=count,
+					num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
+					guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
+					# generator=self.gen,
+				)
+		return data
 
 	def art_textsynth(self, prompt, kwargs=None, count=1):
 		headers = {
