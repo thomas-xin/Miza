@@ -435,12 +435,20 @@ def verify_openai():
         return
     import openai
     try:
-        openai.api_key = AUTH["openai_key"]
-        resp = openai.Moderation.create(
-            input=str(utc()),
-        )
-    except:
-        print_exc()
+        for i in range(3):
+            try:
+                openai.api_key = AUTH["openai_key"]
+                resp = openai.Moderation.create(
+                    input=str(utc()),
+                )
+            except:
+                print_exc()
+            else:
+                if resp:
+                    raise StopIteration
+    except StopIteration:
+        pass
+    else:
         AUTH["openai_key"] = ""
         print("OpenAI key has no usable credit. Please verify and fix the key to proceed with relevant commands.")
 
