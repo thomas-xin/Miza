@@ -829,8 +829,8 @@ class Bot:
 			try:
 				tokenizer, model = self.models[m]
 			except KeyError:
-				tokenizer = backup_model(AutoTokenizer.from_pretrained, m, force=True)
-				model = backup_model(AutoModelForCausalLM.from_pretrained, m, torch_dtype=torch.float16, force=True)
+				tokenizer = backup_model(AutoTokenizer.from_pretrained, m)
+				model = backup_model(AutoModelForCausalLM.from_pretrained, m, torch_dtype=torch.float16)
 				n = torch.cuda.device_count()
 				if n:
 					import gpustat
