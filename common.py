@@ -2305,7 +2305,8 @@ async def sub_submit(ptype, command, fix=None, _timeout=12):
     if fix:
         # sem.clear()
         sem = emptyctx
-    await sem()
+    else:
+        await sem()
     if not is_strict_running(proc):
         proc = await get_idle_proc(ptype, fix=fix)
     async with sem:
