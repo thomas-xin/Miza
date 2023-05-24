@@ -825,42 +825,50 @@ class Bot:
 		uoai = None
 		exclusive = {"neox-20b", "bloom-176b"}
 		if model == "pygmalion-7b":
-			m = self.ppath
-			try:
-				tokenizer, model = self.models[m]
-			except KeyError:
-				tokenizer = backup_model(AutoTokenizer.from_pretrained, m, force=True)
-				model = backup_model(AutoModelForCausalLM.from_pretrained, m, torch_dtype=torch.float16, device_map="auto", force=True)
-				self.models[m] = (tokenizer, model)
-			prompt = prompt.strip().replace(f"{u}:", f"You:")
-			tokens = tokenizer.encode(prompt, return_tensors="pt").cuda()
-			pc = len(tokens)
-			res = model.generate(
-				tokens,
-				temperature=temp,
-				top_k=192,
-				top_p=0.9,
-				repetition_penalty=1.2,
-				max_length=min(1024, limit - pc - 64),
-				do_sample=True,
-			)
-			text = tokenizer.decode(res[0]).removeprefix("<s>").strip().removeprefix(prompt).strip().split("</s>", 1)[0]
-			text = text.strip().replace(":\n", ": ").replace(f"You:", f"{u}:")
-			spl = text.split(": ")
-			if len(spl) > 1:
-				text = ""
-				while spl:
-					s = spl.pop(0)
-					if "\n" in s:
-						text += s.rsplit("\n", 1)[0]
-						break
-					text += s + ": "
-				text = text.strip()
-				if text.endswith(":"):
-					text = text.rsplit("\n", 1)[0]
-				start = ns
-				if text.startswith(start):
-					text = text[len(start):].strip()
+			async def run_pygmalion(q, fut=None):
+				m = self.ppath
+				try:
+					tokenizer, model = self.models[m]
+				except KeyError:
+					tokenizer = backup_model(AutoTokenizer.from_pretrained, m, force=True)
+					model = backup_model(AutoModelForCausalLM.from_pretrained, m, torch_dtype=torch.float16, device_map="auto", force=True)
+					self.models[m] = (tokenizer, model)
+				prompt = q.strip().replace(f"{u}:", f"You:")
+				tokens = tokenizer.encode(prompt, return_tensors="pt").cuda()
+				pc = len(tokens)
+				res = model.generate(
+					tokens,
+					temperature=temp,
+					top_k=192,
+					top_p=0.9,
+					repetition_penalty=1.2,
+					max_length=min(1024, limit - pc - 64),
+					do_sample=True,
+				)
+				text = tokenizer.decode(res[0]).removeprefix("<s>").strip().removeprefix(prompt).strip().split("</s>", 1)[0]
+				text = text.strip().replace(":\n", ": ").replace(f"You:", f"{u}:")
+				spl = text.split(": ")
+				if len(spl) > 1:
+					text = ""
+					while spl:
+						s = spl.pop(0)
+						if "\n" in s:
+							text += s.rsplit("\n", 1)[0]
+							break
+						text += s + ": "
+					text = text.strip()
+					if text.endswith(":"):
+						text = text.rsplit("\n", 1)[0]
+					start = ns
+					if text.startswith(start):
+						text = text[len(start):].strip()
+				return text
+			if hasattr(asyncio, "main_new_loop"):
+				fut = concurrent.futures.Future()
+				asyncio.main_new_loop.create_task(asyncio.wait_for(run_pygmalion(prompt, fut), timeout=121))
+				res = fut.result(timeout=120)
+			else:
+				res = asyncio.run(run_pygmalion(prompt))
 			model = "pygmalion-7b"
 		elif model in exclusive:
 			p = None

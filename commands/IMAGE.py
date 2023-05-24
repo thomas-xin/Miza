@@ -1389,7 +1389,7 @@ class Steganography(Command):
 
 class Art(Command):
     _timeout_ = 150
-    name = ["AIArt", "Inpaint", "StableDiffusion", "Dalle", "Dalle2", "Imagine", "Openjourney", "Midjourney"]
+    name = ["AIArt", "Inpaint", "StableDiffusion", "Dalle", "Dalle2", "Imagine", "Inspire", "Openjourney", "Midjourney"]
     description = "Runs a Stable Diffusion AI art generator on the input prompt or image. Operates on a global queue system for image prompts. Accepts appropriate keyword arguments."
     usage = "<0:prompt> <inpaint{?i}>"
     example = ("art cute kitten", "art https://mizabot.xyz/favicon")
