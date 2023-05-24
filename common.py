@@ -103,7 +103,7 @@ def as_fut(obj):
     return fut
 
 
-class EmptyContext(contextlib.AbstractContextManager):
+class EmptyContext(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
     __enter__ = lambda self, *args: self
     __exit__ = lambda *args: None
     __aenter__ = lambda self, *args: as_fut(self)
