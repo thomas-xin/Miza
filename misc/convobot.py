@@ -831,7 +831,7 @@ class Bot:
 					tokenizer, model = self.models[m]
 				except KeyError:
 					tokenizer = backup_model(AutoTokenizer.from_pretrained, m, force=True)
-					model = backup_model(AutoModelForCausalLM.from_pretrained, m, torch_dtype=torch.float16, device_map="balanced_low_0", force=True)
+					model = backup_model(AutoModelForCausalLM.from_pretrained, m, torch_dtype=torch.float16, device_map="sequential", force=True)
 					self.models[m] = (tokenizer, model)
 				prompt = q.strip().replace(f"{u}:", f"You:")
 				tokens = tokenizer.encode(prompt, return_tensors="pt").cuda()
