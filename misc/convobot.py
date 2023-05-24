@@ -830,16 +830,17 @@ class Bot:
 				tokenizer, model = self.models[m]
 			except KeyError:
 				tokenizer = backup_model(AutoTokenizer.from_pretrained, m)
-				# model = backup_model(AutoModelForCausalLM.from_pretrained, m, torch_dtype=torch.float16)
+				# model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map="auto", torch_dtype=torch.float16, force=True)
 				n = torch.cuda.device_count()
 				if not n:
 					raise RuntimeError("Required GPU not found.")
 				config = AutoConfig.from_pretrained(m)
 				with accelerate.init_empty_weights():
 					model = AutoModelForCausalLM.from_config(config)
-				import gpustat
-				sts = gpustat.new_query()
-				max_mem = {i: f"{s.memory_available // 1024 - 3}GiB" for i, s in enumerate(sts)}
+				# import gpustat
+				# sts = gpustat.new_query()
+				dps = [torch.cuda.get_device_properties(i) for i in range(n)]
+				max_mem = {i: f"{p.total_memory // 1073741824 - 3}GiB" for i, p in enumerate(dps)}
 				max_mem["cpu"] = "64GiB"
 				print(max_mem)
 				dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, dtype=torch.float16)
