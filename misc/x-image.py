@@ -2453,7 +2453,7 @@ def backup_model(cls, model, force=False, **kwargs):
 			return fut.result(timeout=60)
 		except concurrent.futures.TimeoutError:
 			raise RuntimeError("Model is loading, please wait...")
-	raise exc
+	raise ex2
 
 if len(sys.argv) > 1 and sys.argv[1] == "1":
 	import convobot, torch

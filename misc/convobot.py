@@ -255,7 +255,7 @@ def backup_model(cls, model, force=False, **kwargs):
 			return fut.result(timeout=60)
 		except concurrent.futures.TimeoutError:
 			raise RuntimeError("Model is loading, please wait...")
-	raise exc
+	raise ex2
 
 def safecomp(gen):
 	while True:
@@ -839,7 +839,7 @@ class Bot:
 					model = AutoModelForCausalLM.from_config(config)
 				import gpustat
 				sts = gpustat.new_query()
-				max_mem = {i: f"{s.memory_available // 1024 - (1 if i else 2)}GiB" for i, s in enumerate(sts)}
+				max_mem = {i: f"{s.memory_available // 1024 - (2 if i else 4)}GiB" for i, s in enumerate(sts)}
 				max_mem["cpu"] = "64GiB"
 				print(max_mem)
 				dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, dtype=torch.float16)
