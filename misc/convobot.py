@@ -14,7 +14,7 @@ for i in range(3):
 from collections2 import *
 MIZAAC = ""
 
-import tiktoken
+import tiktoken, accelerate
 if torch.cuda.is_available():
 	try:
 		torch.cuda.set_enabled_lms(True)
@@ -830,7 +830,15 @@ class Bot:
 				tokenizer, model = self.models[m]
 			except KeyError:
 				tokenizer = backup_model(AutoTokenizer.from_pretrained, m, force=True)
-				model = backup_model(AutoModelForCausalLM.from_pretrained, m, torch_dtype=torch.float16, device_map="auto", force=True)
+				model = backup_model(AutoModelForCausalLM.from_pretrained, m, torch_dtype=torch.float16, force=True)
+				n = torch.cuda.device_count()
+				if n:
+					import gpustat
+					sts = gpustat.new_query()
+					max_mem = {i: f"{s.memory_available // 1024 - 2}GiB" for i, s in enumerate(sts)}
+					max_mem["cpu"] = "1024GiB"
+					dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem)
+					model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, torch_dtype=torch.float16, force=True)
 				self.models[m] = (tokenizer, model)
 			prompt = prompt.strip().replace(f"{u}:", f"You:")
 			tokens = tokenizer.encode(prompt, return_tensors="pt").cuda()
