@@ -229,6 +229,8 @@ def error_handler(exc=None):
 			exc = RuntimeError("An unknown error occured.")
 	if (dt := datetime.datetime.utcnow()) and (dt.month, dt.day) in ((3, 31), (4, 1), (4, 2)):
 		status = 418
+	elif isinstance(exc, ConnectionError) or isinstance(exc, type) and issubclass(exc, ConnectionError) and exc.args and isinstance(exc.args[0], int):
+		status = exc.args[0]
 	else:
 		status = error_map.get(exc) or error_map.get(exc.__class__) or 500
 	if status == 418:
@@ -755,8 +757,8 @@ transform: translate(-50%, -50%);
 								if not is_url(urls[0]):
 									p = find_file(urls[0], cwd=("cache", "saves/filehost"))
 									urls = self._fileinfo(f"@{urls[0]}").get("chunks", ())
-							if download and len(urls) == 1 and not referrer:
-								raise cp.HTTPRedirect(url, status="307")
+								if download and not referrer:
+									raise cp.HTTPRedirect(url, status="307")
 							cp.response.headers.pop("Accept-Ranges", None)
 							stn = p.rsplit("~.forward$", 1)[0].replace("saves/filehost/", "cache/")
 							pn = stn + "~.temp$@" + info[0]
@@ -766,7 +768,7 @@ transform: translate(-50%, -50%);
 								if a3:
 									self.serving.setdefault(p, weakref.WeakSet()).add(f)
 								return resp
-							if info[1] > 64 * 1048576:
+							if info[1] > 256 * 1048576:
 								uri = f"{HOST}/fileinfo/{orig_path}"
 								if not cp.request.headers.get("Range") and len(urls) > 48:
 									url = f"{HOST}/stream?info={urllib.parse.quote_plus(uri)}"
@@ -1441,6 +1443,11 @@ transform: translate(-50%, -50%);
 		cp.response.headers["ETag"] = create_etag(data)
 		return data
 
+	@cp.expose
+	@hostmap
+	def error(self, code=400):
+		raise ConnectionError(int(code))
+
 	chunking = {}
 	@cp.expose(("upload_single",))
 	@hostmap
@@ -1911,7 +1918,7 @@ transform: translate(-50%, -50%);
 		size = os.path.getsize(of)
 		mime = get_mime(of)
 		if not urls:
-			if size > 8388608:
+			if size > 25165824:
 				with tracebacksuppressor(StopIteration):
 					if mime.split("/", 1)[0] == "video" or mime in ("image/gif", "image/apng"):
 						of = self.optimise_video(of, size, mime)
@@ -2081,9 +2088,13 @@ transform: translate(-50%, -50%);
 				if p in self.serving:
 					for f in self.serving.pop(p):
 						f.close()
-					time.sleep(0.2)
-				with tracebacksuppressor:
-					os.remove(p)
+					time.sleep(0.5)
+				if os.path.exists(p):
+					try:
+						os.remove(p)
+					except:
+						print_exc()
+						return f"{HOST}/error/500"
 				p = find_file(path)
 			if not p.split("~", 1)[-1].startswith(".forward$"):
 				raise TypeError("File is not editable.")

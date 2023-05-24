@@ -489,7 +489,7 @@ class UpdateExec(Database):
                         invalid.add(c_id)
                     elif len(msg) > 6000:
                         b = msg.encode("utf-8")
-                        if len(b) > 8388608:
+                        if len(b) > 25165824:
                             b = b[:4194304] + b[-4194304:]
                         create_task(channel.send(file=CompatFile(b, filename="message.txt")))
                     else:
@@ -705,7 +705,7 @@ class UpdateExec(Database):
             try:
                 data = await fut.fut
                 try:
-                    if len(data) > 8388608:
+                    if len(data) > 25165824:
                         raise ConnectionError
                 except TypeError:
                     pass

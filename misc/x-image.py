@@ -827,7 +827,7 @@ def create_gif(in_type, args, delay):
 					temp = img.crop()
 				imgs.append(temp)
 	# size = list(imgs[0].size)
-	# while size[0] * size[1] * len(imgs) > 8388608:
+	# while size[0] * size[1] * len(imgs) > 25165824:
 	#	 size[0] /= 2 ** 0.5
 	#	 size[1] /= 2 ** 0.5
 	# size = [round(size[0]), round(size[1])]

@@ -1470,7 +1470,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             msg = ""
         f = None
         fsize = 0
-        size = 8388608
+        size = 25165824
         with suppress(AttributeError):
             size = channel.guild.filesize_limit
         if getattr(channel, "simulated", None) or getattr(channel, "guild", None) and not channel.permissions_for(channel.guild.me).attach_files:
@@ -1753,7 +1753,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     resp = await create_future(reqs.next().get, url, headers=Request.header(), _timeout_=12)
                     headers = fcdict(resp.headers)
                     if headers.get("Content-Type", "").split("/", 1)[0] == "image":
-                        if float(headers.get("Content-Length", inf)) < 8388608:
+                        if float(headers.get("Content-Length", inf)) < 25165824:
                             url = await self.data.exec.uproxy(url)
                         else:
                             url = await self.data.exec.aproxy(url)
@@ -4374,7 +4374,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             
             get_role = lambda *args: None
 
-            filesize_limit = 8388608
+            filesize_limit = 25165824
             bitrate_limit = 98304
             emoji_limit = 0
             large = False
