@@ -835,7 +835,7 @@ class Bot:
 				if n:
 					import gpustat
 					sts = gpustat.new_query()
-					max_mem = {i: f"{s.memory_available // 1024 - 2}GiB" for i, s in enumerate(sts)}
+					max_mem = {i: f"{s.memory_available // 1024 - (2 if i else 4)}GiB" for i, s in enumerate(sts)}
 					max_mem["cpu"] = "1024GiB"
 					dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem)
 					model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, torch_dtype=torch.float16, force=True)
