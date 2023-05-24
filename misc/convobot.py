@@ -239,18 +239,18 @@ def backup_model(cls, model, force=False, **kwargs):
 		try:
 			return cls(model, **kwargs)
 		except Exception as ex:
-			exc = ex
+			ex2 = ex
 	else:
 		fut = exc.submit(cls, model, **kwargs)
 		try:
 			return fut.result(timeout=8)
 		except Exception as ex:
-			exc = ex
+			ex2 = ex
 	try:
 		return cls(model, local_files_only=True, **kwargs)
 	except:
 		pass
-	if isinstance(exc, concurrent.futures.TimeoutError):
+	if isinstance(ex2, concurrent.futures.TimeoutError):
 		try:
 			return fut.result(timeout=60)
 		except concurrent.futures.TimeoutError:

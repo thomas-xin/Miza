@@ -191,21 +191,28 @@ def determine_cuda(mem=1, priority=None, multi=False):
 		return [i for i in pcs if sts[i].memory_available * 1048576 >= mem], torch.float16
 	return pcs[0], torch.float16
 
-def backup_model(cls, model, **kwargs):
-	fut = exc.submit(cls, model, **kwargs)
-	try:
-		return fut.result(timeout=8)
-	except Exception as ex:
+def backup_model(cls, model, force=False, **kwargs):
+	if force:
 		try:
-			return cls(model, local_files_only=True, **kwargs)
-		except:
-			pass
-		if isinstance(ex, concurrent.futures.TimeoutError):
-			try:
-				return fut.result(timeout=60)
-			except concurrent.futures.TimeoutError:
-				raise RuntimeError("Model is loading, please wait...")
-		raise
+			return cls(model, **kwargs)
+		except Exception as ex:
+			ex2 = ex
+	else:
+		fut = exc.submit(cls, model, **kwargs)
+		try:
+			return fut.result(timeout=8)
+		except Exception as ex:
+			ex2 = ex
+	try:
+		return cls(model, local_files_only=True, **kwargs)
+	except:
+		pass
+	if isinstance(ex2, concurrent.futures.TimeoutError):
+		try:
+			return fut.result(timeout=60)
+		except concurrent.futures.TimeoutError:
+			raise RuntimeError("Model is loading, please wait...")
+	raise exc
 
 def safecomp(gen):
 	while True:
