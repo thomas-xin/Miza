@@ -234,21 +234,28 @@ def determine_cuda(mem=1, priority=None, multi=False):
 		return [i for i in pcs if sts[i].memory_available * 1048576 >= mem], torch.float16
 	return pcs[0], torch.float16
 
-def backup_model(cls, model, **kwargs):
-	fut = exc.submit(cls, model, **kwargs)
-	try:
-		return fut.result(timeout=8)
-	except Exception as ex:
+def backup_model(cls, model, force=False, **kwargs):
+	if force:
 		try:
-			return cls(model, local_files_only=True, **kwargs)
-		except:
-			pass
-		if isinstance(ex, concurrent.futures.TimeoutError):
-			try:
-				return fut.result(timeout=60)
-			except concurrent.futures.TimeoutError:
-				raise RuntimeError("Model is loading, please wait...")
-		raise
+			return cls(model, **kwargs)
+		except Exception as ex:
+			exc = ex
+	else:
+		fut = exc.submit(cls, model, **kwargs)
+		try:
+			return fut.result(timeout=8)
+		except Exception as ex:
+			exc = ex
+	try:
+		return cls(model, local_files_only=True, **kwargs)
+	except:
+		pass
+	if isinstance(exc, concurrent.futures.TimeoutError):
+		try:
+			return fut.result(timeout=60)
+		except concurrent.futures.TimeoutError:
+			raise RuntimeError("Model is loading, please wait...")
+	raise exc
 
 def safecomp(gen):
 	while True:
@@ -822,8 +829,8 @@ class Bot:
 			try:
 				tokenizer, model = self.models[m]
 			except KeyError:
-				tokenizer = backup_model(AutoTokenizer.from_pretrained, m)
-				model = backup_model(AutoModelForCausalLM.from_pretrained, m, torch_dtype=torch.float16, device_map="auto")
+				tokenizer = backup_model(AutoTokenizer.from_pretrained, m, force=True)
+				model = backup_model(AutoModelForCausalLM.from_pretrained, m, torch_dtype=torch.float16, device_map="auto", force=True)
 				self.models[m] = (tokenizer, model)
 			prompt = prompt.strip().replace(f"{u}:", f"You:")
 			tokens = tokenizer.encode(prompt, return_tensors="pt").cuda()
