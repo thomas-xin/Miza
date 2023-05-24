@@ -839,7 +839,7 @@ class Bot:
 					model = AutoModelForCausalLM.from_config(config)
 				import gpustat
 				sts = gpustat.new_query()
-				max_mem = {i: f"{s.memory_available // 1024 - (2 if i else 4)}GiB" for i, s in enumerate(sts)}
+				max_mem = {i: f"{s.memory_available // 1024 - 3}GiB" for i, s in enumerate(sts)}
 				max_mem["cpu"] = "64GiB"
 				print(max_mem)
 				dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, dtype=torch.float16)
