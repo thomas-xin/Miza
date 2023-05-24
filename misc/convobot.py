@@ -842,7 +842,7 @@ class Bot:
 				max_mem = {i: f"{s.memory_available // 1024 - (1 if i else 2)}GiB" for i, s in enumerate(sts)}
 				max_mem["cpu"] = "64GiB"
 				print(max_mem)
-				dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem)
+				dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, dtype=torch.float16)
 				print(dev_map)
 				model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, torch_dtype=torch.float16, force=True)
 				self.models[m] = (tokenizer, model)
