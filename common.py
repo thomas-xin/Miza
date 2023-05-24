@@ -2303,7 +2303,8 @@ async def sub_submit(ptype, command, fix=None, _timeout=12):
     # s = f"~{ts}~{repr(command.encode('utf-8'))}\n".encode("utf-8")
     sem = proc.sem
     if fix:
-        sem.clear()
+        # sem.clear()
+        sem = emptyctx
     await sem()
     if not is_strict_running(proc):
         proc = await get_idle_proc(ptype, fix=fix)

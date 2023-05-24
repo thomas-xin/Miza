@@ -5,7 +5,7 @@ from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 for i in range(3):
 	try:
-		from transformers import AutoTokenizer, AutoModelForQuestionAnswering, AutoModelForCausalLM, pipeline, set_seed
+		from transformers import AutoConfig, AutoTokenizer, AutoModelForQuestionAnswering, AutoModelForCausalLM, pipeline, set_seed
 	except ImportError:
 		time.sleep(i + 1)
 	else:
@@ -597,9 +597,9 @@ class Bot:
 			limit = 2000
 			cm = 0
 		elif model == "pygmalion":
-			model = "pygmalion-7b"
+			model = "pygmalion-13b"
 			temp = 0.8
-			limit = 4000
+			limit = 2048
 			cm = 0
 		elif model == "davinci":
 			model = "text-davinci-003"
@@ -649,7 +649,7 @@ class Bot:
 				nstart = f"The following is a conversation between {self.name} and humans. {self.name} is {p} AI."
 		else:
 			nstart = p
-			if model in ("gpt-3.5-turbo", "gpt-4", "text-davinci-003", "pygmalion-7b"):
+			if model in ("gpt-3.5-turbo", "gpt-4", "text-davinci-003", "pygmalion-13b"):
 				if self.nsfw:
 					spl = nstart.rsplit("\n", 1)
 					nstart = nstart.strip() + " " + MIZAAC
@@ -806,7 +806,7 @@ class Bot:
 			print("ChatGPT prompt:", messages)
 			sys.stdout.flush()
 			prompt = None
-		elif model == "pygmalion-7b":
+		elif model == "pygmalion-13b":
 			prompt = "".join(reversed(ins))
 			prompt = nstart + "\n<START>\n" + prompt
 			if not self.bl:
@@ -824,21 +824,26 @@ class Bot:
 		text = ""
 		uoai = None
 		exclusive = {"neox-20b", "bloom-176b"}
-		if model == "pygmalion-7b":
+		if model == "pygmalion-13b":
 			m = self.ppath
 			try:
 				tokenizer, model = self.models[m]
 			except KeyError:
 				tokenizer = backup_model(AutoTokenizer.from_pretrained, m)
-				model = backup_model(AutoModelForCausalLM.from_pretrained, m, torch_dtype=torch.float16)
+				# model = backup_model(AutoModelForCausalLM.from_pretrained, m, torch_dtype=torch.float16)
 				n = torch.cuda.device_count()
-				if n:
-					import gpustat
-					sts = gpustat.new_query()
-					max_mem = {i: f"{s.memory_available // 1024 - (2 if i else 4)}GiB" for i, s in enumerate(sts)}
-					max_mem["cpu"] = "1024GiB"
-					dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem)
-					model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, torch_dtype=torch.float16, force=True)
+				if not n:
+					raise RuntimeError("Required GPU not found.")
+				config = AutoConfig.from_pretrained(m)
+				with accelerate.init_empty_weights():
+					model = AutoModelForCausalLM.from_config(config)
+				import gpustat
+				sts = gpustat.new_query()
+				max_mem = {i: f"{s.memory_available // 1024 - (2 if i else 4)}GiB" for i, s in enumerate(sts)}
+				max_mem["cpu"] = "1024GiB"
+				dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem)
+				print(dev_map)
+				model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, torch_dtype=torch.float16, force=True)
 				self.models[m] = (tokenizer, model)
 			prompt = prompt.strip().replace(f"{u}:", f"You:")
 			tokens = tokenizer.encode(prompt, return_tensors="pt").cuda()
@@ -869,7 +874,7 @@ class Bot:
 				start = ns
 				if text.startswith(start):
 					text = text[len(start):].strip()
-			model = "pygmalion-7b"
+			model = "pygmalion-13b"
 		elif model in exclusive:
 			p = None
 			for i in range(8):

@@ -1514,7 +1514,7 @@ class Ask(Command):
             )
             # if fut:
             #     await fut
-            out = await process_image("CBAI", "$", [inputs], fix=1, timeout=420)
+            out = await process_image("CBAI", "$", [inputs], fix=1, timeout=600)
             if oai in EXPAPI:
                 EXPAPI.discard(oai)
                 if bot.is_trusted(guild) >= 2:
