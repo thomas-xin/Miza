@@ -848,9 +848,17 @@ class Bot:
 				layers = {}
 				real_map = {}
 				for k, v in dev_map.items():
-					c = k.rsplit(".", 1)[0] if k.rsplit(".", 1)[-1].isnumeric() else k
+					if not k.startswith("model.layers."):
+						real_map[k] = v
+						continue
+					c = k.rsplit(".", 3)[2]
 					if c in layers:
-						v = layers[c]
+						v = layers[c] = v + 1
+						if v > n:
+							v = "cpu"
+						for k in real_map:
+							if k.startswith(c):
+								real_map[k] = v
 					else:
 						layers[c] = v
 					real_map[k] = v
