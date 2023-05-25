@@ -849,7 +849,6 @@ class Bot:
 				real_map = {}
 				for k, v in dev_map.items():
 					if not k.startswith("model.layers."):
-						real_map[k] = v
 						continue
 					c = k.rsplit(".", 3)[2]
 					if c in layers:
@@ -857,13 +856,14 @@ class Bot:
 						if v > n:
 							v = "cpu"
 						for k2 in real_map:
-							if k2.startswith(c):
+							if k2.rsplit(".", 3)[2] == c:
 								real_map[k2] = v
 					else:
 						layers[c] = v
 					real_map[k] = v
-				print(real_map)
-				model = AutoModelForCausalLM.from_pretrained(m, device_map=real_map, torch_dtype=torch.float16)
+				dev_map.update(real_map)
+				print(dev_map)
+				model = AutoModelForCausalLM.from_pretrained(m, device_map=dev_map, torch_dtype=torch.float16)
 				self.models[m] = (tokenizer, model)
 			prompt = prompt.strip().replace(f"{u}:", f"You:")
 			tokens = tokenizer.encode(prompt, return_tensors="pt").cuda()
