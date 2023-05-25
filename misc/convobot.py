@@ -845,7 +845,17 @@ class Bot:
 				print(max_mem)
 				dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, dtype=torch.float16)
 				print(dev_map)
-				model = AutoModelForCausalLM.from_pretrained(m, device_map=dev_map, torch_dtype=torch.float16)
+				layers = {}
+				real_map = {}
+				for k, v in dev_map.items():
+					c = k.rsplit(".", 1)[0]
+					if c in layers:
+						v = layers[c]
+					else:
+						layers[c] = v
+					real_map[k] = v
+				print(real_map)
+				model = AutoModelForCausalLM.from_pretrained(m, device_map=real_map, torch_dtype=torch.float16)
 				self.models[m] = (tokenizer, model)
 			prompt = prompt.strip().replace(f"{u}:", f"You:")
 			tokens = tokenizer.encode(prompt, return_tensors="pt").cuda()
