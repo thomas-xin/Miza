@@ -856,9 +856,9 @@ class Bot:
 						v = layers[c] = v + 1
 						if v > n:
 							v = "cpu"
-						for k in real_map:
-							if k.startswith(c):
-								real_map[k] = v
+						for k2 in real_map:
+							if k2.startswith(c):
+								real_map[k2] = v
 					else:
 						layers[c] = v
 					real_map[k] = v
