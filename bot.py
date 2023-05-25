@@ -2079,19 +2079,20 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         return utc() - self.cache.banned.get((verify_id(guild), verify_id(user)), 0) < duration
 
     def is_mentioned(self, message, user, guild=None):
+        if not message.content and not (message.attachments or message.embeds):
+            return
+        if message.content:
+            c = no_md(message.content)
+            if not c.startswith(self.get_prefix(guild)):
+                if c[0] in "\\#!%" or c[:2] in ("//", "/*"):
+                    return False
         u_id = verify_id(user)
         if u_id in (member.id for member in message.mentions):
             return True
         if guild is None:
             return True
         if "exec" in self.data and self.data.exec.get(message.channel.id, 0) & 64:
-            if not message.content and (message.attachments or message.embeds):
-                return True
-            c = no_md(message.content)
-            if c.startswith(self.get_prefix(guild)):
-                return True
-            if c[0] not in "\\#!%" and c[:2] not in ("//", "/*"):
-                return True
+            return True
         member = guild.get_member(u_id)
         if member is None:
             return False
