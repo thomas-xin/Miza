@@ -848,7 +848,7 @@ class Bot:
 				layers = {}
 				real_map = {}
 				for k, v in dev_map.items():
-					c = k.rsplit(".", 1)[0]
+					c = k.rsplit(".", 1)[0] if k.rsplit(".", 1)[-1].isnumeric() else k
 					if c in layers:
 						v = layers[c]
 					else:
