@@ -843,26 +843,26 @@ class Bot:
 				max_mem = {i: f"{p.total_memory // 1073741824 - 3}GiB" for i, p in enumerate(dps)}
 				max_mem["cpu"] = "64GiB"
 				print(max_mem)
-				dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, dtype=torch.float16)
+				dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, no_split_module_classes=["LlamaDecoderLayer"], dtype=torch.float16)
 				print(dev_map)
-				layers = {}
-				real_map = {}
-				for k, v in dev_map.items():
-					if not k.startswith("model.layers."):
-						continue
-					c = k.rsplit(".", 3)[2]
-					if c in layers:
-						v = layers[c] = v + 1
-						if v > n:
-							v = "cpu"
-						for k2 in real_map:
-							if k2.rsplit(".", 3)[2] == c:
-								real_map[k2] = v
-					else:
-						layers[c] = v
-					real_map[k] = v
-				dev_map.update(real_map)
-				print(dev_map)
+				# layers = {}
+				# real_map = {}
+				# for k, v in dev_map.items():
+				# 	if not k.startswith("model.layers."):
+				# 		continue
+				# 	c = k.rsplit(".", 3)[2]
+				# 	if c in layers:
+				# 		v = layers[c] = v + 1
+				# 		if v > n:
+				# 			v = "cpu"
+				# 		for k2 in real_map:
+				# 			if k2.rsplit(".", 3)[2] == c:
+				# 				real_map[k2] = v
+				# 	else:
+				# 		layers[c] = v
+				# 	real_map[k] = v
+				# dev_map.update(real_map)
+				# print(dev_map)
 				model = AutoModelForCausalLM.from_pretrained(m, device_map=dev_map, torch_dtype=torch.float16)
 				self.models[m] = (tokenizer, model)
 			prompt = prompt.strip().replace(f"{u}:", f"You:")
