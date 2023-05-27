@@ -2496,7 +2496,7 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 		else:
 			cb.premium = premium
 		if model == "auto":
-			if not cb.model:
+			if not getattr(cb, "model", None):
 				if premium < 4:
 					cb.model = "gpt3"
 				else:
