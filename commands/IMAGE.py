@@ -1541,7 +1541,7 @@ class Art(Command):
                     c = min(amount, 5 + 4 * xrand(2))
                     c2 = c
                     for i in range(len(COMPUTE_LOAD)):
-                        if len(devices) == 1:
+                        if i >= len(COMPUTE_LOAD) - 1:
                             perc = c2
                         else:
                             perc = min(c2, round_random(COMPUTE_LOAD[i] * c))
@@ -1727,7 +1727,7 @@ class Art(Command):
                             c = amount - amount2
                             c2 = c
                             for i in range(len(COMPUTE_LOAD)):
-                                if len(devices) == 1:
+                                if i >= len(COMPUTE_LOAD) - 1:
                                     perc = c2
                                 else:
                                     perc = min(c2, round_random(COMPUTE_LOAD[i] * c))
