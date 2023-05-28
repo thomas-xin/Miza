@@ -2612,7 +2612,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				usage=get_usage(gi),
 				max=1,
 				time=t,
-			) for gi in ginfo},
+			) for i, gi in enumerate(ginfo)},
 			memory={
 				f"{ip}-v": dict(name="RAM", count=1, usage=minfo.used, max=minfo.total, time=t),
 				f"{ip}-s": dict(name="Swap", count=1, usage=sinfo.used, max=sinfo.total, time=t),
