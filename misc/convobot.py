@@ -1141,7 +1141,7 @@ class Bot:
 						text = ""
 					if searched:
 						refs = list(refs) + [(f"[{sname}]", searched)]
-					t2 = self.gptcomplete(u, q, refs=refs, start=text or " ", model="davinci" if premium >= 2 else "curie")
+					t2 = self.gptcomplete(u, q, refs=refs, start=text or " ", model="davinci" if premium >= 2 else "pygmalion")
 					text += " " + t2
 				if not self.jailbroken and self.nsfw:
 					try:
