@@ -1725,20 +1725,20 @@ class Art(Command):
                             p = "" if noprompt else prompt
                             futt = []
                             c = amount - amount2
-                            devices = range(torch.cuda.device_count())
-                            c2 = c // len(devices)
-                            clist = [c2] * len(devices)
-                            clist[0] += c - c2 * len(devices)
-                            for i, c3 in enumerate(clist):
-                                if not c3:
-                                    continue
-                                fut = create_task(process_image("IBASL", "&", [p, kwargs, nsfw, True, c3], fix=3 + i, timeout=1200))
+                            c2 = c
+                            for i in range(len(COMPUTE_LOAD)):
+                                if len(devices) == 1:
+                                    perc = c2
+                                else:
+                                    perc = min(c2, round_random(COMPUTE_LOAD[i] * c))
+                                fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, perc], fix=3 + i, timeout=1200))
                                 futt.append(fut)
+                                c2 -= perc
+                                if c2 <= 0:
+                                    break
                             for fut in futt:
                                 ims = await fut
                                 futs.extend(ims)
-                            # ims = await process_image("IBASL", "&", ["" if noprompt else prompt, kwargs, nsfw, True, c3], fix=3, timeout=1200)
-                            # futs.extend(ims)
                             amount2 = len(futs)
         files = []
         exc = RuntimeError("Unknown error occured.")
