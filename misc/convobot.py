@@ -217,6 +217,7 @@ def determine_cuda(mem=1, priority=None, multi=False):
 		if multi:
 			return [-1], torch.float32
 		return -1, torch.float32
+	import gpustat
 	fut = exc.submit(gpustat.new_query)
 	tinfo = [torch.cuda.get_device_properties(i) for i in range(n)]
 	ginfo = fut.result()
@@ -847,8 +848,6 @@ class Bot:
 				config = AutoConfig.from_pretrained(m)
 				with accelerate.init_empty_weights():
 					model = AutoModelForCausalLM.from_config(config)
-				# import gpustat
-				# sts = gpustat.new_query()
 				dps = [torch.cuda.get_device_properties(i) for i in range(n)]
 				max_mem = {i: f"{p.total_memory // 1073741824 - 3}GiB" for i, p in enumerate(dps)}
 				max_mem["cpu"] = "64GiB"

@@ -174,6 +174,7 @@ def determine_cuda(mem=1, priority=None, multi=False):
 		if multi:
 			return [-1], torch.float32
 		return -1, torch.float32
+	import gpustat
 	fut = exc.submit(gpustat.new_query)
 	tinfo = [torch.cuda.get_device_properties(i) for i in range(n)]
 	ginfo = fut.result()
