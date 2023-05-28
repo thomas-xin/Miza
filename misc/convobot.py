@@ -484,7 +484,7 @@ class Bot:
 				smp.devid = device
 			except:
 				print_exc()
-				smp = pipeline("summarization", model=m)
+				smp = pipeline("summarization", model=m, device=-1, torch_dtype=torch.float32)
 				smp.devid = None
 		self.models[m] = smp
 		enc = tiktoken.get_encoding("cl100k_base")
