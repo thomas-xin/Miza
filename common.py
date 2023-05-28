@@ -2253,6 +2253,9 @@ COMPUTE_LOAD = AUTH.get("compute_load", [])
 if len(COMPUTE_LOAD) != torch.cuda.device_count():
     COMPUTE_LOAD = AUTH["compute_load"] = [torch.cuda.get_device_properties(i).multi_processor_count for i in range(torch.cuda.device_count())]
 if COMPUTE_LOAD:
+    total = sum(COMPUTE_LOAD)
+    if total != 1:
+        compute_load = [i / total for i in COMPUTE_LOAD]
     print("Compute load distribution:", COMPUTE_LOAD)
 
 async def start_proc(k, i):
