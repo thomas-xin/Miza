@@ -1537,17 +1537,19 @@ class Art(Command):
             with discord.context_managers.Typing(channel):
                 futt = []
                 c = 0
-                if not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy() and torch.cuda.is_available():
-                    c = min(amount, 5)
-                    devices = range(torch.cuda.device_count())
-                    c2 = c // len(devices)
-                    clist = [c2] * len(devices)
-                    clist[0] += c - c2 * len(devices)
-                    for i, c3 in enumerate(clist):
-                        if not c3:
-                            continue
-                        fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, c3], fix=3 + i, timeout=1200))
+                if not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy() and COMPUTE_LOAD:
+                    c = min(amount, 5 + 4 * xrand(2))
+                    c2 = c
+                    for i in range(len(COMPUTE_LOAD)):
+                        if len(devices) == 1:
+                            perc = c2
+                        else:
+                            perc = min(c2, round_random(COMPUTE_LOAD[i] * c))
+                        fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, perc], fix=3 + i, timeout=1200))
                         futt.append(fut)
+                        c2 -= perc
+                        if c2 <= 0:
+                            break
                 self.imagebot.token = oai or AUTH.get("openai_key")
                 try:
                     if c > amount:

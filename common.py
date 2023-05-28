@@ -33,9 +33,8 @@ from zipfile import ZipFile
 import urllib.request, urllib.parse
 import nacl.secret
 
-import torch.cuda
+import torch
 hwaccel = "cuvid" if torch.cuda.is_available() else "d3d11va" if os.name == "nt" else "auto"
-del torch
 
 utils = discord.utils
 reqs = alist(requests.Session() for i in range(6))
@@ -2250,9 +2249,16 @@ proc_args = cdict(
     image=(python, "misc/x-image.py"),
 )
 
+COMPUTE_LOAD = AUTH.get("compute_load", [])
+if len(COMPUTE_LOAD) != torch.cuda.device_count():
+    COMPUTE_LOAD = AUTH["compute_load"] = [torch.cuda.get_device_properties(i).multi_processor_count for i in range(torch.cuda.device_count())]
+if COMPUTE_LOAD:
+    print("Compute load distribution:", COMPUTE_LOAD)
+
 async def start_proc(k, i):
     args = list(proc_args[k])
     args.append(str(i))
+    args.append(orjson.dumps(COMPUTE_LOAD).decode("ascii"))
     proc = await asyncio.create_subprocess_exec(
         *args,
         limit=1073741824,
@@ -2267,8 +2273,9 @@ async def start_proc(k, i):
     return proc
 
 def proc_start():
+    dc = torch.cuda.device_count()
     PROC_COUNT.math = 3
-    PROC_COUNT.image = 7
+    PROC_COUNT.image = 3 + dc
     for k, v in PROC_COUNT.items():
         PROCS[k] = [None] * v
         create_task(start_proc(k, 0))

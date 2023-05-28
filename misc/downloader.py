@@ -132,7 +132,7 @@ COLOURS = ["\x1b[38;5;16m█"]
 COLOURS.extend(f"\x1b[38;5;{i}m█" for i in range(232, 256))
 COLOURS.append("\x1b[38;5;15m█")
 
-def download(url, fn, resp=None, index=0, start=None, end=None):
+def download(url, fn, resp=None, index=0, start=None, end=None, tn=None):
 	size = 0
 	packet = 131072
 	try:
@@ -140,7 +140,7 @@ def download(url, fn, resp=None, index=0, start=None, end=None):
 	except:
 		f = open(fn, "rb+")
 	with f:
-		while True:
+		while tn is None or threaders[tn]:
 			try:
 				if not resp:
 					rheader = header()
@@ -161,7 +161,7 @@ def download(url, fn, resp=None, index=0, start=None, end=None):
 							globals()["attempts"] += 1
 						err = prio.submit(resp.read)
 						raise ConnectionError(resp.code, err.result(timeout=4).decode("utf-8").rstrip())
-					while True:
+					while tn is None or threaders[tn]:
 						try:
 							fut = submit(resp.read, packet)
 						except RuntimeError:
@@ -201,13 +201,13 @@ def download(url, fn, resp=None, index=0, start=None, end=None):
 			resp = None
 	return fn
 
-def upload(url, fn, resp=None, index=0, start=None, end=None):
+def upload(url, fn, resp=None, index=0, start=None, end=None, tn=None):
 	start = start or 0
 	end = end or os.path.getsize(fn)
 	with open(fn, "rb") as f:
 		f.seek(start)
 		data = f.read(end - start)
-		while True:
+		while tn is None or threaders[tn]:
 			try:
 				rheader = header()
 				rheader["x-file-name"] = fn.rsplit("/", 1)[-1]
@@ -439,6 +439,7 @@ if not fn:
 exc = concurrent.futures.ThreadPoolExecutor(max_workers=threads + 1 << 1)
 prio = concurrent.futures.ThreadPoolExecutor(max_workers=8)
 submit = exc.submit
+threaders = {}
 if threads > 1:
 	print(f"Splitting into {threads} threads...")
 	workers = [None] * threads
@@ -451,24 +452,34 @@ if threads > 1:
 	for i in range(threads):
 		if chunked:
 			url = urls[i]
-			workers[i] = submit(download, url, f"cache/${PID}-{i}", resp, index=i, start=0, end=None)
+			tn = len(threaders)
+			threaders[tn] = True
+			workers[i] = submit(download, url, f"cache/${PID}-{i}", resp, index=i, start=0, end=None, tn=tn)
+			workers[i].tn = tn
 		else:
 			start = i * load
 			if i == threads - 1:
 				end = None
 			else:
 				end = min(start + load, fsize)
-			workers[i] = submit(download, url, f"cache/${PID}-{i}", resp, index=i, start=start, end=end)
+			tn = len(threaders)
+			threaders[tn] = True
+			workers[i] = submit(download, url, f"cache/${PID}-{i}", resp, index=i, start=start, end=end, tn=tn)
+			workers[i].tn = tn
 		resp = None
 		try:
 			j = max(0, i - 2)
 			workers[j].result(timeout=delay)
 		except concurrent.futures.TimeoutError:
 			pass
-		if workers[i].done() or i >= 1 and workers[i - 1].done() or i >= 2 and workers[i - 2].done():
-			delay /= 2
+		for j in range(math.ceil(threads / 4) + 8):
+			if j > i:
+				continue
+			if workers[i - j].done():
+				delay = max(0.0625, delay / 2)
+				break
 		else:
-			delay *= math.sqrt(2)
+			delay += min(delay / 4, 2)
 		time.sleep(0.5)
 		fut = workers[0]
 		if tt is None and fut.done():
@@ -501,16 +512,23 @@ if threads > 1:
 				except concurrent.futures.TimeoutError:
 					if i + 2 >= len(workers) or workers[i + 2].done() or x > 2:
 						print(f"Thread {i + 1} timed out, restarting...")
+						threaders[workers[i + 1].tn] = False
 						tt += 5
 						if chunked:
-							fut = workers[i + 1] = prio.submit(download, urls[i + 1], f"cache/${PID}-{i + 1}", None, index=i + 1, start=0, end=None)
+							tn = len(threaders)
+							threaders[tn] = True
+							fut = workers[i + 1] = prio.submit(download, urls[i + 1], f"cache/${PID}-{i + 1}", None, index=i + 1, start=0, end=None, tn=tn)
+							fut.tn = tn
 						else:
 							start = (i + 1) * load
 							if i + 1 == threads - 1:
 								end = None
 							else:
 								end = min(start + load, fsize)
-							fut = workers[i + 1] = prio.submit(download, url, f"cache/${PID}-{i + 1}", None, index=i + 1, start=start, end=end)
+							tn = len(threaders)
+							threaders[tn] = True
+							fut = workers[i + 1] = prio.submit(download, url, f"cache/${PID}-{i + 1}", None, index=i + 1, start=start, end=end, tn=tn)
+							fut.tn = tn
 					continue
 				else:
 					if x:

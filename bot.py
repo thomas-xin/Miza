@@ -1472,7 +1472,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         fsize = 0
         size = 25165824
         with suppress(AttributeError):
-            size = channel.guild.filesize_limit
+            size = max(size, channel.guild.filesize_limit)
         if getattr(channel, "simulated", None) or getattr(channel, "guild", None) and not channel.permissions_for(channel.guild.me).attach_files:
             size = -1
         data = file
@@ -2561,9 +2561,23 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         cpercent = psutil.cpu_percent()
         try:
             import torch, gpustat
-            ginfo = await create_future(gpustat.new_query)
+            fut2 = create_future(gpustat.new_query)
+            tinfo = [torch.cuda.get_device_properties(i) for i in range(torch.cuda.device_count())]
+            ginfo = await fut2
         except:
-            ginfo = []
+            tinfo = ginfo = []
+        else:
+            ginfo3 = []
+            ginfo2 = list(ginfo)
+            tinfo2 = list(tinfo)
+            while tinfo2:
+                name = tinfo2.pop(0).name
+                for gi in ginfo2:
+                    if gi.name == name:
+                        ginfo2.remove(gi)
+                        ginfo3.append(gi)
+                        break
+            ginfo = ginfo3
         minfo = psutil.virtual_memory()
         sinfo = psutil.swap_memory()
         dinfo = {}
@@ -2594,7 +2608,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			cpu={ip: dict(name=cinfo["brand_raw"], count=cinfo["count"], usage=cpercent / 100, max=1, time=t)},
 			gpu={f"{ip}-{gi['index']}": dict(
 				name=gi["name"],
-				count=torch.cuda.get_device_properties(gi["index"]).multi_processor_count,
+				count=tinfo[i].multi_processor_count,
 				usage=get_usage(gi),
 				max=1,
 				time=t,
