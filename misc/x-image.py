@@ -64,8 +64,8 @@ def convert_fut(fut):
 if len(sys.argv) > 1 and sys.argv[1].isnumeric() and int(sys.argv[1]) >= 3:
 	fix = int(sys.argv[1]) - 3
 	os.environ["CUDA_VISIBLE_DEVICES"] = str(fix)
-	if len(sys.argv) > 2:
-		COMPUTE_LOAD = orjson.loads(sys.argv[2])
+if len(sys.argv) > 2:
+	COMPUTE_LOAD = orjson.loads(sys.argv[2])
 
 import torch
 hwaccel = "cuvid" if torch.cuda.is_available() else "d3d11va" if os.name == "nt" else "auto"
