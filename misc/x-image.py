@@ -2708,12 +2708,16 @@ def write_video(proc, data):
 
 def from_bytes(b, save=None, nogif=False):
 	if b[:4] == b"<svg" or b[:5] == b"<?xml":
-		resp = requests.post("https://www.svgtopng.me/api/svgtopng/upload-file", headers=header(), files={"files": ("temp.svg", b, "image/svg+xml"), "format": (None, "PNG"), "forceTransparentWhite": (None, "true"), "jpegQuality": (None, "256")})
-		with ZipFile(io.BytesIO(resp.content), compression=zipfile.ZIP_DEFLATED, strict_timestamps=False) as z:
-			data = z.read("temp.png")
-		out = io.BytesIO(data)
-		if save and data and not os.path.exists(save):
-			exc.submit(write_to, save, data)
+		import wand
+		with wand.image.Image() as im:
+			with wand.color.Color("transparent") as background_color:
+				wand.api.library.MagickSetBackgroundColor(
+					im.wand,
+					background_color.resource,
+				) 
+			im.read(blob=b, resolution=1024)
+			ib = io.BytesIO(im.make_blob("png32"))
+		return Image.open(ib)
 	elif b[:4] == b"%PDF":
 		import pdf2image
 		if os.name == "nt":
