@@ -549,22 +549,12 @@ class Bot:
 			if model == "stabilityai/stable-diffusion-2-1":
 				model = "lambdalabs/sd-image-variations-diffusers"
 		out = []
-		devices, dtype = determine_cuda(4294967296, priority="full", multi=True)
-		if self.models:
-			devices = self.models
-		print(tuple(devices))
-		device = next(iter(devices))
-		# futs = []
-		# c = count // len(devices)
-		# clist = [c] * len(devices)
-		# clist[0] += count - c * len(devices)
-		# for device, count in zip(devices, clist):
-		# 	fut = exc.submit(self.art_stablediffusion_sub, pf, model, prompt, kwargs, count, device, dtype, nsfw, fail_unless_gpu)
-		# 	futs.append(fut)
-		# for fut in futs:
-		# 	data = fut.result()
-			# if not data:
-			# 	continue
+		if torch.cuda.is_available():
+			device = 0
+			dtype = torch.float16
+		else:
+			device = -1
+			dtype = torch.float32
 		data = self.art_stablediffusion_sub(pf, model, prompt, kwargs, count, device, dtype, nsfw, fail_unless_gpu)
 		nsfw_content_detected = [data.nsfw_content_detected] if isinstance(data.nsfw_content_detected, bool) else data.nsfw_content_detected
 		for im, n in zip(data.images, nsfw_content_detected):
