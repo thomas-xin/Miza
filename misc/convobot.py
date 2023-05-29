@@ -495,7 +495,11 @@ class Bot:
 			if len(tokens) > limit:
 				e1 = tokens[:limit]
 				s1 = enc.decode(e1).strip()
-				s2 = smp(s1, max_length=limit // 2, min_length=limit // 2 - 32, do_sample=do_sample, truncation=True)[0]["summary_text"]
+				if smp.devid:
+					with torch.autocast("cuda"):
+						s2 = smp(s1, max_length=limit // 2, min_length=limit // 2 - 32, do_sample=do_sample, truncation=True)[0]["summary_text"]
+				else:
+					s2 = smp(s1, max_length=limit // 2, min_length=limit // 2 - 32, do_sample=do_sample, truncation=True)[0]["summary_text"]
 				e2 = enc.encode(s2 + " ")
 				tokens = e2 + tokens[limit:]
 				continue
@@ -503,7 +507,11 @@ class Bot:
 		e1 = tokens
 		s1 = enc.decode(e1).strip().replace("  ", " ")
 		if len(tokens) > max_length:
-			s2 = smp(s1, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
+			if smp.devid:
+				with torch.autocast("cuda"):
+					s2 = smp(s1, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
+			else:
+				s2 = smp(s1, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
 		return s2.strip()
 
 	def auto_summarise(self, q="", max_length=128, min_length=64):
