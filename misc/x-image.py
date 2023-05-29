@@ -2788,12 +2788,12 @@ def from_bytes(b, save=None, nogif=False):
 				proc.wait(timeout=2)
 				return ImageSequence(*images)
 			print(proc.stderr.read())
-	except:
-		pass
-	# except Exception as ex:
-	# 	exc = ex
-	# else:
-	# 	exc = TypeError(f'Filetype "{mime}" is not supported.')
+	# except:
+	# 	pass
+	except Exception as ex:
+		exc = ex
+	else:
+		exc = TypeError(f'Filetype "{mime}" is not supported.')
 	import wand, wand.image
 	with wand.image.Image() as im:
 		with wand.color.Color("transparent") as background_color:
@@ -2801,7 +2801,11 @@ def from_bytes(b, save=None, nogif=False):
 				im.wand,
 				background_color.resource,
 			)
-		im.read(blob=b, resolution=1024)
+		try:
+			im.read(blob=b, resolution=1024)
+		except Exception as ex:
+			exc.args = exc.args + (ex.__class__,) + ex.args
+			raise exc
 		ib = io.BytesIO(im.make_blob("png32"))
 	return Image.open(ib)
 
