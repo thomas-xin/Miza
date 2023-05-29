@@ -2709,6 +2709,7 @@ def write_video(proc, data):
 def from_bytes(b, save=None, nogif=False):
 	if b[:4] == b"<svg" or b[:5] == b"<?xml":
 		import wand
+		import wand.image
 		with wand.image.Image() as im:
 			with wand.color.Color("transparent") as background_color:
 				wand.api.library.MagickSetBackgroundColor(
