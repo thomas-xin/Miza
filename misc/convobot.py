@@ -1151,7 +1151,10 @@ class Bot:
 					if searched:
 						refs = list(refs) + [(f"[{sname}]", searched)]
 					t2 = self.gptcomplete(u, q, refs=refs, start=text or " ", model="davinci" if premium >= 2 else "pygmalion")
-					text += " " + t2
+					if len(text) >= 2 and text[-1] in " aAsS" and text[-2] not in ".!?":
+						text += t2
+					else:
+						text += " " + t2
 				if not self.jailbroken and self.nsfw:
 					try:
 						resp = openai.Moderation.create(
