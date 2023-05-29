@@ -2708,14 +2708,13 @@ def write_video(proc, data):
 
 def from_bytes(b, save=None, nogif=False):
 	if b[:4] == b"<svg" or b[:5] == b"<?xml":
-		import wand
-		import wand.image
+		import wand, wand.image
 		with wand.image.Image() as im:
 			with wand.color.Color("transparent") as background_color:
 				wand.api.library.MagickSetBackgroundColor(
 					im.wand,
 					background_color.resource,
-				) 
+				)
 			im.read(blob=b, resolution=1024)
 			ib = io.BytesIO(im.make_blob("png32"))
 		return Image.open(ib)
@@ -2733,62 +2732,78 @@ def from_bytes(b, save=None, nogif=False):
 	if mime == "application/zip":
 		z = zipfile.ZipFile(io.BytesIO(data), compression=zipfile.ZIP_DEFLATED, strict_timestamps=False)
 		return ImageSequence(*(Image.open(z.open(f.filename)) for f in z.filelist if not f.is_dir()))
-	if mime.split("/", 1)[0] == "image" and mime.split("/", 1)[-1] in "blp bmp cur dcx dds dib emf eps fits flc fli fpx ftex gbr gd heif heic icns ico im imt iptc jpeg jpg mcidas mic mpo msp naa pcd pcx pixar png ppm psd sgi sun spider tga tiff wal wmf xbm".split():
-		try:
-			return Image.open(out)
-		except PIL.UnidentifiedImageError:
-			if not b:
-				raise FileNotFoundError("image file not found")
-			out.seek(0)   
-	if mime.split("/", 1)[0] in ("image", "video"):
-		fmt = "rgba" if mime.split("/", 1)[0] == "image" else "rgb24"
-		ts = time.time_ns() // 1000
-		fn = "cache/" + str(ts)
-		with open(fn, "wb") as f:
-			f.write(data)
-		cmd = ("./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,avg_frame_rate", "-of", "csv=s=x:p=0", fn)
-		print(cmd)
-		p = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		cmd2 = ["./ffmpeg", "-hide_banner", "-v", "error", "-y", "-i", fn, "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0"]
-		if nogif:
-			cmd2.extend(("-vframes", "1"))
-		cmd2.append("-")
-		print(cmd2)
-		proc = psutil.Popen(cmd2, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1048576)
-		bcount = 4 if fmt == "rgba" else 3
-		mode = "RGBA" if fmt == "rgba" else "RGB"
-		try:
-			res = as_str(p.stdout.read()).strip()
-			if not res:
-				raise TypeError(f'Filetype "{mime}" is not supported.')
-			info = res.split("x", 2)
-		except:
-			print(as_str(p.stderr.read()), end="")
-			raise
-		print(info)
-		size = tuple(map(int, info[:2]))
-		try:
-			duration = 1000 / eval(info[-1], {}, {})
-		except (ValueError, TypeError, SyntaxError, ZeroDivisionError):
-			duration = 33.333333333333333
-		bcount *= int(np.prod(size))
-		images = deque()
-		while True:
-			b = proc.stdout.read(bcount)
-			while len(b) < bcount:
-				if not b or not is_strict_running(proc):
+	try:
+		if mime.split("/", 1)[0] == "image" and mime.split("/", 1)[-1] in "blp bmp cur dcx dds dib emf eps fits flc fli fpx ftex gbr gd heif heic icns ico im imt iptc jpeg jpg mcidas mic mpo msp naa pcd pcx pixar png ppm psd sgi sun spider tga tiff wal wmf xbm".split():
+			try:
+				return Image.open(out)
+			except PIL.UnidentifiedImageError:
+				if not b:
+					raise FileNotFoundError("image file not found")
+				out.seek(0)   
+		if mime.split("/", 1)[0] in ("image", "video"):
+			fmt = "rgba" if mime.split("/", 1)[0] == "image" else "rgb24"
+			ts = time.time_ns() // 1000
+			fn = "cache/" + str(ts)
+			with open(fn, "wb") as f:
+				f.write(data)
+			cmd = ("./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,avg_frame_rate", "-of", "csv=s=x:p=0", fn)
+			print(cmd)
+			p = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+			cmd2 = ["./ffmpeg", "-hide_banner", "-v", "error", "-y", "-i", fn, "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0"]
+			if nogif:
+				cmd2.extend(("-vframes", "1"))
+			cmd2.append("-")
+			print(cmd2)
+			proc = psutil.Popen(cmd2, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1048576)
+			bcount = 4 if fmt == "rgba" else 3
+			mode = "RGBA" if fmt == "rgba" else "RGB"
+			try:
+				res = as_str(p.stdout.read()).strip()
+				if not res:
+					raise TypeError(f'Filetype "{mime}" is not supported.')
+				info = res.split("x", 2)
+			except:
+				print(as_str(p.stderr.read()), end="")
+				raise
+			print(info)
+			size = tuple(map(int, info[:2]))
+			try:
+				duration = 1000 / eval(info[-1], {}, {})
+			except (ValueError, TypeError, SyntaxError, ZeroDivisionError):
+				duration = 33.333333333333333
+			bcount *= int(np.prod(size))
+			images = deque()
+			while True:
+				b = proc.stdout.read(bcount)
+				while len(b) < bcount:
+					if not b or not is_strict_running(proc):
+						break
+					b += proc.stdout.read(bcount - len(b))
+				if len(b) < bcount:
 					break
-				b += proc.stdout.read(bcount - len(b))
-			if len(b) < bcount:
-				break
-			img = Image.frombuffer(mode, size, b)
-			img.info["duration"] = duration
-			images.append(img)
-		if not images:
+				img = Image.frombuffer(mode, size, b)
+				img.info["duration"] = duration
+				images.append(img)
+			if images:
+				proc.wait(timeout=2)
+				return ImageSequence(*images)
 			print(proc.stderr.read())
-		proc.wait(timeout=2)
-		return ImageSequence(*images)
-	raise TypeError(f'Filetype "{mime}" is not supported.')
+	except:
+		pass
+	# except Exception as ex:
+	# 	exc = ex
+	# else:
+	# 	exc = TypeError(f'Filetype "{mime}" is not supported.')
+	import wand, wand.image
+	with wand.image.Image() as im:
+		with wand.color.Color("transparent") as background_color:
+			wand.api.library.MagickSetBackgroundColor(
+				im.wand,
+				background_color.resource,
+			)
+		im.read(blob=b, resolution=1024)
+		ib = io.BytesIO(im.make_blob("png32"))
+	return Image.open(ib)
 
 def ImageOpIterator(image, step, operation, ts, args):
 	# Attempt to perform operation on all individual frames of .gif images
