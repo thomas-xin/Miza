@@ -887,7 +887,7 @@ class Bot:
 				do_sample=True,
 			)
 			text = tokenizer.decode(res[0]).removeprefix("<s>").strip().removeprefix(prompt).strip().split("</s>", 1)[0]
-			text = text.strip().replace(":\n", ": ").replace(f"You:", f"{u}:")
+			text = text.strip().replace(":\n", ": ").replace(f"You:", f"{u}:").replace("<USER>", u)
 			spl = text.split(": ")
 			if len(spl) > 1:
 				text = ""
