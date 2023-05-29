@@ -549,7 +549,7 @@ class Bot:
 			if model == "stabilityai/stable-diffusion-2-1":
 				model = "lambdalabs/sd-image-variations-diffusers"
 		out = []
-		devices, dtype = determine_cuda(8589934592, priority="full", multi=True)
+		devices, dtype = determine_cuda(4294967296, priority="full", multi=True)
 		if self.models:
 			devices = self.models
 		print(tuple(devices))
