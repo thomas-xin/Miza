@@ -1137,7 +1137,7 @@ class Bot:
 					if len(text) >= 2 and text[-1] in " aAsS" and text[-2] not in ".!?" or text.endswith(' "') or text.endswith('\n"'):
 						redo = True
 					text = text.strip()
-					if not text or len(self.gpttokens(text)) < 8:
+					if not text or len(self.gpttokens(text)) < 24:
 						text = ""
 						redo = True
 				elif not flagged:
