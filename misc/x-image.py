@@ -2805,6 +2805,9 @@ def from_bytes(b, save=None, nogif=False):
 			im.read(blob=b, resolution=1024)
 		except Exception as ex:
 			exc.args = exc.args + (ex.__class__,) + ex.args
+		else:
+			exc = None
+		if exc:
 			raise exc
 		ib = io.BytesIO(im.make_blob("png32"))
 	return Image.open(ib)
