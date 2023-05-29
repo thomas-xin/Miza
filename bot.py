@@ -2137,6 +2137,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
     # Checks a user's premium subscription level.
     def premium_level(self, user, absolute=False):
+        if self.is_owner(user):
+            return 5
         try:
             premiums = self.data.premiums
         except (AttributeError, KeyError):

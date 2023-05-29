@@ -479,6 +479,7 @@ class Bot:
 			except KeyError:
 				pass
 			device, dtype = determine_cuda(2147483648, priority=True)
+			print(device, dtype)
 			try:
 				smp = pipeline("summarization", model=m, device=device, torch_dtype=dtype)
 				smp.devid = device
@@ -521,7 +522,7 @@ class Bot:
 				zscp = pipeline("zero-shot-classification", model=m, device=device, torch_dtype=dtype)
 			except:
 				print_exc()
-				zscp = pipeline("zero-shot-classification", model=m)
+				zscp = pipeline("zero-shot-classification", model=m, device=-1, torch_dtype=torch.float32)
 		resp = zscp(q, labels, truncation=True)
 		return dict(zip(resp["labels"], resp["scores"]))
 
