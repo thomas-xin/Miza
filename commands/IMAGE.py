@@ -1545,6 +1545,8 @@ class Art(Command):
                             perc = c2
                         else:
                             perc = min(c2, round_random(COMPUTE_LOAD[i] * c))
+                        if not perc:
+                            continue
                         fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, perc], fix=3 + i, timeout=1200))
                         futt.append(fut)
                         c2 -= perc
@@ -1731,6 +1733,8 @@ class Art(Command):
                                     perc = c2
                                 else:
                                     perc = min(c2, round_random(COMPUTE_LOAD[i] * c))
+                                if not perc:
+                                    continue
                                 fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, perc], fix=3 + i, timeout=1200))
                                 futt.append(fut)
                                 c2 -= perc
