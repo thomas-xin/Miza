@@ -1052,20 +1052,20 @@ class Bot:
 				try:
 					if flagged:
 						raise PermissionError("flagged")
-					if not i and (searched or not stop) and not bals and not random.randint(0, 2) and model.startswith("gpt-3.5-") and not self.nsfw and not self.jailbroken:
-						try:
-							text = self.ycg(data).removeprefix(f"{self.name}: ").strip()
-							if stop and any(s in text for s in stop):
-								text = ""
-							elif text:
-								model = "gpt-3.5-clone"
-						except EOFError:
-							pass
-						except:
-							print_exc()
-						else:
-							if text:
-								break
+					# if not i and (searched or not stop) and not bals and not random.randint(0, 2) and model.startswith("gpt-3.5-") and not self.nsfw and not self.jailbroken:
+					# 	try:
+					# 		text = self.ycg(data).removeprefix(f"{self.name}: ").strip()
+					# 		if stop and any(s in text for s in stop):
+					# 			text = ""
+					# 		elif text:
+					# 			model = "gpt-3.5-clone"
+					# 	except EOFError:
+					# 		pass
+					# 	except:
+					# 		print_exc()
+					# 	else:
+					# 		if text:
+					# 			break
 					intended = None
 					if oai:
 						openai.api_key = oai
@@ -1088,9 +1088,9 @@ class Bot:
 							else:
 								ns2 = nstart or ""
 							prompt = ns2 + nend + "\n\n" + prompt
-							if random.randint(0, 1):
-								model = "gpt-3.5-visus"
-								text = self.vai(prompt)
+							# if random.randint(0, 1):
+							# 	model = "gpt-3.5-visus"
+							# 	text = self.vai(prompt)
 							if not text:
 								text = self.chatgpt(prompt)
 								if text:
@@ -1102,20 +1102,20 @@ class Bot:
 								if text:
 									response = None
 									break
-						else:
-							try:
-								text = self.ycg(data).removeprefix(f"{self.name}: ").strip()
-								if stop and any(s in text for s in stop):
-									text = ""
-								elif text:
-									model = "gpt-3.5-clone"
-							except EOFError:
-								pass
-							except:
-								print_exc()
-							else:
-								if text:
-									break
+						# else:
+						# 	try:
+						# 		text = self.ycg(data).removeprefix(f"{self.name}: ").strip()
+						# 		if stop and any(s in text for s in stop):
+						# 			text = ""
+						# 		elif text:
+						# 			model = "gpt-3.5-clone"
+						# 	except EOFError:
+						# 		pass
+						# 	except:
+						# 		print_exc()
+						# 	else:
+						# 		if text:
+						# 			break
 					response = exc.submit(
 						openai.ChatCompletion.create,
 						**data,
@@ -1519,9 +1519,9 @@ class Bot:
 		bals = getattr(self, "bals", {})
 		oai = getattr(self, "oai", None)
 		if bals or oai or self.premium >= 2:
-			funcs = [self.cgp, self.ycg]
+			funcs = [self.cgp]
 		else:
-			funcs = [self.chatgpt, self.chatgpt, self.ycg, self.cgp, self.cgp]
+			funcs = [self.chatgpt, self.chatgpt, self.cgp, self.cgp]
 			if len(self.gpttokens(prompt)) > 24:
 				funcs.append(self.vai)
 			random.shuffle(funcs)
