@@ -604,8 +604,7 @@ class Bot:
 			pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
 		else:
 			pipe.safety_checker = checkers[model]
-		torch.cuda.set_device(device)
-		pipe = pipe.to(f"cuda:{device}")
+		# pipe = pipe.to(f"cuda:{device}")
 		with torch.cuda.device(device):
 			if pf is StableDiffusionInpaintPipeline:
 				data = pipe(
@@ -644,7 +643,7 @@ class Bot:
 					guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
 					# generator=self.gen,
 				)
-		models[(pf, model)] = pipe.to("cpu")
+		# models[(pf, model)] = pipe.to("cpu")
 		return data
 
 	def art_textsynth(self, prompt, kwargs=None, count=1):
