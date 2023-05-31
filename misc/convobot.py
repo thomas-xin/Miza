@@ -881,7 +881,12 @@ class Bot:
 				# 	real_map[k] = v
 				# dev_map.update(real_map)
 				# print(dev_map)
-				model = AutoModelForCausalLM.from_pretrained(m, device_map=dev_map, torch_dtype=torch.float16)
+				try:
+					import bitsandbytes
+				except ImportError:
+					model = AutoModelForCausalLM.from_pretrained(m, device_map=dev_map, torch_dtype=torch.float16)
+				else:
+					model = AutoModelForCausalLM.from_pretrained(m, device_map=dev_map, load_in_8bit=True)
 				self.models[m] = (tokenizer, model)
 			prompt = prompt.strip().replace(f"{u}:", f"You:")
 			tokens = tokenizer.encode(prompt, return_tensors="pt").cuda()
