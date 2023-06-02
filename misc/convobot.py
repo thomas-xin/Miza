@@ -868,9 +868,9 @@ class Bot:
 					model = AutoModelForCausalLM.from_pretrained(m, device_map=dev_map, torch_dtype=torch.float16)
 				else:
 					from transformers import BitsAndBytesConfig
-					quantization_config = BitsAndBytesConfig(llm_int8_threshold=20 / 3, llm_int8_enable_fp32_cpu_offload=True)
+					quantization_config = BitsAndBytesConfig(llm_int8_enable_fp32_cpu_offload=True)
 					dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, no_split_module_classes=["LlamaDecoderLayer"], dtype=torch.int8)
-					model = AutoModelForCausalLM.from_pretrained(m, device_map="auto", torch_dtype=torch.bfloat16, quantization_config=quantization_config, load_in_8bit=True)
+					model = AutoModelForCausalLM.from_pretrained(m, device_map=dev_map, quantization_config=quantization_config, load_in_8bit=True)
 				print(dev_map)
 				# layers = {}
 				# real_map = {}
