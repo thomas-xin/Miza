@@ -861,7 +861,16 @@ class Bot:
 				max_mem = {i: f"{p.total_memory // 1073741824 - 3}GiB" for i, p in enumerate(dps)}
 				max_mem["cpu"] = "64GiB"
 				print(max_mem)
-				dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, no_split_module_classes=["LlamaDecoderLayer"], dtype=torch.float16)
+				try:
+					import bitsandbytes
+				except ImportError:
+					dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, no_split_module_classes=["LlamaDecoderLayer"], dtype=torch.float16)
+					model = AutoModelForCausalLM.from_pretrained(m, device_map=dev_map, torch_dtype=torch.float16)
+				else:
+					from transformers import BitsAndBytesConfig
+					quantization_config = BitsAndBytesConfig(llm_int8_threshold=7, llm_int8_enable_fp32_cpu_offload=True)
+					dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, no_split_module_classes=["LlamaDecoderLayer"], dtype=torch.int8)
+					model = AutoModelForCausalLM.from_pretrained(m, device_map=dev_map, torch_dtype=torch.bfloat16, quantization_config=quantization_config, load_in_8bit=True)
 				print(dev_map)
 				# layers = {}
 				# real_map = {}
@@ -881,12 +890,6 @@ class Bot:
 				# 	real_map[k] = v
 				# dev_map.update(real_map)
 				# print(dev_map)
-				try:
-					import bitsandbytes
-				except ImportError:
-					model = AutoModelForCausalLM.from_pretrained(m, device_map=dev_map, torch_dtype=torch.float16)
-				else:
-					model = AutoModelForCausalLM.from_pretrained(m, device_map=dev_map, load_in_8bit=True)
 				self.models[m] = (tokenizer, model)
 			prompt = prompt.strip().replace(f"{u}:", f"You:")
 			tokens = tokenizer.encode(prompt, return_tensors="pt").cuda()

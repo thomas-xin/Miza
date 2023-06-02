@@ -6167,7 +6167,7 @@ def as_file(file, filename=None, ext=None, rename=True):
     else:
         b = fn.bit_length() + 7 >> 3
         fn = as_str(base64.urlsafe_b64encode(fn.to_bytes(b, "big"))).rstrip("=")
-    url1 = f"{bot.raw_webserver}/p/{fn}"
+    url1 = f"{bot.raw_webserver}/file/{fn}"
     url2 = f"{bot.raw_webserver}/d/{fn}"
     # if filename:
     #     fn = "/" + (str(file) if filename is None else lim_str(filename, 64).translate(filetrans))
