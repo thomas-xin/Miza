@@ -257,6 +257,7 @@ fn = None
 if len(sys.argv) < 2:
 	url = input("Please enter a URL to download from: ")
 	threads = 1
+	chunked = False
 else:
 	args = list(sys.argv)
 	if "-v" in args:
@@ -276,7 +277,7 @@ else:
 		threads = int(args[i + 1])
 		args = args[:i] + args[i + 2:]
 	else:
-		threads = 1
+		threads = 0
 	if "-attempts" in args:
 		i = args.index("-attempts")
 		max_attempts = int(args[i + 1])
@@ -390,7 +391,7 @@ if chunked:
 	threads = len(urls)
 elif "bytes" in head.get("accept-ranges", ""):
 	print("Accept-Ranges header found.")
-	if threads == 1:
+	if threads < 1:
 		try:
 			with open("training.txt", "r", encoding="utf-8") as f:
 				s = f.read()
@@ -430,7 +431,7 @@ elif "bytes" in head.get("accept-ranges", ""):
 			n = round(fsize / 4194304)
 			print(f"Decision tree empty: {n}")
 			threads = n
-		threads = max(1, min(64, threads))
+		threads = max(3, min(64, threads))
 else:
 	threads = 1
 if not fn:
