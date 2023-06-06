@@ -34,7 +34,7 @@ import urllib.request, urllib.parse
 import nacl.secret
 
 import torch
-hwaccel = "cuvid" if torch.cuda.is_available() else "d3d11va" if os.name == "nt" else "auto"
+hwaccel = "cuda" if torch.cuda.is_available() else "d3d11va" if os.name == "nt" else "auto"
 
 utils = discord.utils
 reqs = alist(requests.Session() for i in range(6))

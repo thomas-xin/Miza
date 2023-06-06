@@ -68,7 +68,7 @@ if len(sys.argv) > 2:
 	COMPUTE_LOAD = orjson.loads(sys.argv[2])
 
 import torch
-hwaccel = "cuvid" if torch.cuda.is_available() else "d3d11va" if os.name == "nt" else "auto"
+hwaccel = "cuda" if torch.cuda.is_available() else "d3d11va" if os.name == "nt" else "auto"
 
 if not hasattr(time, "time_ns"):
 	time.time_ns = lambda: int(time.time() * 1e9)

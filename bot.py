@@ -4405,7 +4405,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         class GhostUser(discord.abc.Snowflake):
 
             __repr__ = lambda self: f"<Ghost User id={self.id} name='{self.name}' discriminator='{self.discriminator}' bot=False>"
-            __str__ = discord.user.BaseUser
+            __str__ = discord.user.BaseUser.__str__
             system = False
             history = lambda *void1, **void2: fut_nop
             dm_channel = None
