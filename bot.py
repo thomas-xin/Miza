@@ -4405,7 +4405,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         class GhostUser(discord.abc.Snowflake):
 
             __repr__ = lambda self: f"<Ghost User id={self.id} name='{self.name}' discriminator='{self.discriminator}' bot=False>"
-            __str__ = lambda self: f"{self.name}#{self.discriminator}"
+            __str__ = discord.user.BaseUser
             system = False
             history = lambda *void1, **void2: fut_nop
             dm_channel = None
@@ -4417,7 +4417,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             avatar = _avatar = ""
             name = "[USER DATA NOT FOUND]"
             nick = None
-            discriminator = "0000"
+            discriminator = "0"
             id = 0
             guild = None
             status = None
@@ -4818,6 +4818,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         discord.http.Route.BASE = f"https://discord.com/api/{api}"
         discord.Member.permissions_in = lambda self, channel: discord.Permissions.none() if not getattr(channel, "permissions_for", None) else channel.permissions_for(self)
         discord.VoiceChannel._get_channel = lambda self: as_fut(self)
+        discord.user.BaseUser.__str__ = lambda self: self.name if self.discriminator in (None, 0, "", "0") else f"{self.name}#{self.discriminator}"
 
         async def received_message(self, msg, /):
             if type(msg) is bytes:
