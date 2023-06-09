@@ -2470,7 +2470,6 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 		name = inputs["name"]
 		model = inputs["model"]
 		personality = inputs["personality"]
-		ppath = inputs["ppath"]
 		premium = inputs["premium"]
 		summary = inputs["summary"]
 		jb = inputs["jb"]
@@ -2509,7 +2508,6 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 				cb.model = "gpt3"
 			else:
 				cb.model = model
-		cb.ppath = ppath
 		cb.user_id = user_id
 		cb.channel_id = channel_id
 		cb.bl = bl
@@ -2528,7 +2526,10 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 				im = cb.image
 			except AttributeError:
 				im = get_image(im)
-		return cb.ai(*prompt, refs=refs, im=im)
+		res = cb.ai(*prompt, refs=refs, im=im)
+		if cb.model in ("gpt3", "gpt4", "gpt3a", "gpt4a"):
+			cb.model = None
+		return res
 
 	def CBAU(inputs):
 		user_id = inputs["user_id"]

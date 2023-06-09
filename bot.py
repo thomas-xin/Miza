@@ -4162,16 +4162,17 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             async with Delay(ninter):
                 async with tracebacksuppressor:
                     create_task(self.update_status())
+                    data = await self.status()
                     with MemoryTimer("update_bytes"):
                         if "insights" in self.data:
-                            uptime = self.data.insights.setdefault("uptimes", set())
-                            it = int(utc() // 720)
-                            interval = 86400 * 7 // 720
+                            uptime = astype(self.data.insights.setdefault("uptimes", {}), dict)
+                            it = int(utc() // 3)
+                            interval = 86400 * 7 // 3
                             if it not in uptime:
-                                uptime.add(it)
+                                uptime[it] = data
                                 sl = sorted(uptime)
                                 while sl[0] < it - interval:
-                                    uptime.discard(sl.pop(0))
+                                    uptime.pop(sl.pop(0), None)
                             ut = 0
                             for i in range(interval):
                                 ut += it - interval + i + 1 in uptime
@@ -4192,17 +4193,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                             self.data.insights["down_bytes"] = down_bytes = self.down_bytes[-1] + self.start_down
                             self.total_bytes = up_bytes + down_bytes
 
-                            self.data.insights.update()
+                            self.data.insights["uptimes"] = uptime
                         else:
                             self.uptime = 0
                             self.up_bps = 0
                             self.down_bps = 0
                             self.bitrate = 0
                             self.total_bytes = 0
-                        fut = create_task(self.status())
-                        with suppress(T0, T1, T2):
-                            await asyncio.wait_for(fut, timeout=1)
-
     # The lazy update loop that runs once every 4-8 seconds.
     async def lazy_loop(self):
         await asyncio.sleep(5)

@@ -1231,7 +1231,6 @@ class Ask(Command):
         premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
         model = "auto"
         long_mem = 4096 if premium >= 2 else 1024
-        ppath = AUTH.get("pygmalion-path", "")
         if name == "gpt2" or not AUTH.get("openai_key"):
             model = "neox"
         elif name == "bloom":
@@ -1498,7 +1497,6 @@ class Ask(Command):
                 name=bot.name,
                 model=model,
                 personality=bot.commands.personality[0].retrieve((channel or guild).id),
-                ppath=ppath,
                 premium=premium,
                 summary=summary,
                 jb=caid and caid.get("jailbroken"),
