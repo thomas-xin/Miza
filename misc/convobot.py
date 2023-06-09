@@ -1,6 +1,6 @@
 import os, sys, time, datetime, urllib, orjson, io, random, re, traceback
 import concurrent.futures, asyncio
-import selenium, requests, torch, openai, httpx, markdownify
+import selenium, requests, torch, openai, httpx, psutil, markdownify
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 for i in range(3):
@@ -857,7 +857,7 @@ class Bot:
 					model = AutoModelForCausalLM.from_config(config)
 				dps = [torch.cuda.get_device_properties(i) for i in range(n)]
 				max_mem = {i: f"{p.total_memory // 1073741824 - 3}GiB" for i, p in enumerate(dps)}
-				max_mem["cpu"] = "64GiB"
+				max_mem["cpu"] = f"{psutil.virtual_memory().total // 1073741824}GiB"
 				print(max_mem)
 				try:
 					import bitsandbytes
