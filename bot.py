@@ -4166,7 +4166,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     data = await self.status()
                     with MemoryTimer("update_bytes"):
                         if "insights" in self.data:
-                            uptime = astype(self.data.insights.setdefault("uptimes", {}), dict)
+                            uptime = self.data.insights.setdefault("uptimes", {})
+                            if not isinstance(uptime, dict):
+                                uptime = {k: () for k in uptime}
                             it = int(utc() // 3)
                             interval = 86400 * 7 // 3
                             if it not in uptime:
