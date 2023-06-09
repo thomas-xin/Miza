@@ -4152,6 +4152,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 self.update_users()
 
     # The slow update loop that runs once every 3 seconds.
+    uptime = 0
     up_bps = down_bps = 0
     total_bytes = 0
     async def slow_loop(self):
