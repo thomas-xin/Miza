@@ -619,6 +619,11 @@ class Bot:
 			temp = 0.8
 			limit = 2048
 			cm = 0
+		elif model == "manticore":
+			model = "manticore-30b"
+			temp = 0.8
+			limit = 2048
+			cm = 0
 		elif model == "davinci":
 			model = "text-davinci-003"
 			temp = 0.7
@@ -652,6 +657,7 @@ class Bot:
 			ins.append(lines.pop(-1))
 		print("INS:", ins)
 		p = per
+		local_models = ("pygmalion-13b", "manticore-30b")
 		if self.name.casefold() not in p.casefold() and "you" not in p.casefold():
 			if not p:
 				p = "an"
@@ -824,7 +830,7 @@ class Bot:
 			print("ChatGPT prompt:", messages)
 			sys.stdout.flush()
 			prompt = None
-		elif model == "pygmalion-13b":
+		elif model in local_models:
 			prompt = "".join(reversed(ins))
 			prompt = nstart + "\n<START>\n" + prompt
 			if not self.bl:
@@ -842,8 +848,11 @@ class Bot:
 		text = ""
 		uoai = None
 		exclusive = {"neox-20b", "bloom-176b"}
-		if model == "pygmalion-13b":
-			m = "TehVenom/Pygmalion-13b-Merged"
+		if model in local_models:
+			if model == "pygmalion-13b":
+				m = "TehVenom/Pygmalion-13b-Merged"
+			else:
+				m = "openaccess-ai-collective/manticore-30b-chat-pyg-alpha"
 			try:
 				tokenizer, model = self.models[m]
 			except KeyError:
