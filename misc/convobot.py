@@ -890,7 +890,7 @@ class Bot:
 							ginfo3.append(gi)
 							break
 				ginfo = ginfo3
-				max_mem = {i: f"{round((gi["memory.total"] - gi["memory.used"]) / 1024 - 1)}GiB" for i, gi in enumerate(ginfo)}
+				max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) / 1024 - 1)}GiB" for i, gi in enumerate(ginfo)}
 				max_mem["cpu"] = f"{round(psutil.virtual_memory().free / 1073741824 - 1)}GiB"
 				print(max_mem)
 				if not bitsandbytes:
