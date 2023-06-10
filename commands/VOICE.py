@@ -5431,24 +5431,37 @@ class UpdateAudio(Database):
             await bot.audio.asubmit("ytdl.update()")
         create_future_ex(ytd.update)
         create_future_ex(ytdl.update_dl, priority=True)
+        async with self.backup_sem:
+            await self.backup()
 
     def _announce_(self, *args, **kwargs):
         for auds in self.players.values():
             if auds.queue and not auds.paused:
                 create_future_ex(auds.announce, *args, aio=True, **kwargs)
 
-    # Stores all currently playing audio data to temporary database when bot shuts down
-    async def _destroy_(self, **void):
+    backup_sem = Semaphore(1, 0, rate_limit=30)
+    async def backup(self):
+        self.data.clear()
         for auds in tuple(self.players.values()):
             d, _ = await create_future(auds.get_dump, True, True)
             self.data[auds.acsi.channel.id] = dict(dump=d, channel=auds.text.id)
-            await create_future(auds.kill, reason="")
             self.update(auds.acsi.channel.id)
+        await create_future(self.update, force=True, priority=True)
+
+    # Stores all currently playing audio data to temporary database when bot shuts down
+    async def _destroy_(self, **void):
+        await self.backup()
         for file in tuple(ytdl.cache.values()):
             if not file.loaded:
                 await create_future(file.destroy)
-        await create_future(self.update, force=True, priority=True)
-        print("Saved Queues:", dict(self.data))
+        for auds in tuple(self.players.values()):
+            reason = "🎵 Temporarily disconnecting for maintenance"
+            if auds.queue:
+                reason += " (Queue saved)."
+            else:
+                reason += "."
+            reason += " Apologies for any inconvenience! 🎵"
+            await create_future(auds.kill, reason=reason)
 
     # Restores all audio players from temporary database when applicable
     async def _bot_ready_(self, bot, **void):
