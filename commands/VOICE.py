@@ -4087,7 +4087,7 @@ class Shuffle(Command):
     server_only = True
     name = ["🔀", "Scramble"]
     min_display = "0~1"
-    description = "Shuffles the audio queue."
+    description = "Shuffles the audio queue. Leaves the current song untouched unless ?f is specified."
     usage = "<force_full_shuffle{?f}|hide{?h}>*"
     flags = "fsh"
     rate_limit = (4, 9)
@@ -4097,21 +4097,58 @@ class Shuffle(Command):
         if guild.id not in bot.data.audio.players:
             raise LookupError("Currently not playing in a voice channel.")
         auds = bot.data.audio.players[guild.id]
+        if not auds.queue:
+            raise IndexError("Queue is currently empty.")
         auds.text = channel
-        if len(auds.queue) > 1:
-            if not is_alone(auds, user) and perm < 1:
-                raise self.perm_error(perm, 1, "to shuffle queue while other users are in voice")
-            async with auds.semaphore:
-                if "f" in flags or "s" in flags:
-                    # Clear "played" tag of current item
-                    shuffle(auds.queue)
-                    await create_future(auds.reset)
-                else:
-                    temp = auds.queue.popleft()
-                    shuffle(auds.queue)
-                    auds.queue.appendleft(temp)
+        if not is_alone(auds, user) and perm < 1:
+            raise self.perm_error(perm, 1, "to shuffle queue while other users are in voice")
+        async with auds.semaphore:
+            if "f" in flags or "s" in flags:
+                # Clear "played" tag of current item
+                shuffle(auds.queue)
+                await create_future(auds.reset)
+            else:
+                temp = auds.queue.popleft()
+                shuffle(auds.queue)
+                auds.queue.appendleft(temp)
         if "h" not in flags:
             return italics(css_md(f"Successfully shuffled queue for {sqr_md(guild)}.")), 1
+
+
+class Dedup(Command):
+    server_only = True
+    name = ["Unique", "Deduplicate", "RemoveDuplicates"]
+    min_display = "0~1"
+    description = "Removes all duplicate items from the audio queue."
+    usage = "<hide{?h}>*"
+    flags = "h"
+    rate_limit = (4, 9)
+
+    async def __call__(self, perm, flags, guild, channel, user, bot, **void):
+        if guild.id not in bot.data.audio.players:
+            raise LookupError("Currently not playing in a voice channel.")
+        auds = bot.data.audio.players[guild.id]
+        if not auds.queue:
+            raise IndexError("Queue is currently empty.")
+        auds.text = channel
+        if not is_alone(auds, user) and perm < 1:
+            raise self.perm_error(perm, 1, "to removed duplicate items from queue while other users are in voice")
+        async with auds.semaphore:
+            if auds.queue:
+                queue = auds.queue
+                orig = queue[0]
+                pops = deque()
+                found = set()
+                for i, e in enumerate(queue):
+                    if e["url"] in found:
+                        pops.append(i)
+                    else:
+                        found.add(e["url"])
+                queue.pops(pops)
+                if orig != queue[0]:
+                    await create_future(auds.reset)
+        if "h" not in flags:
+            return italics(css_md(f"Successfully removed duplicate items from queue for {sqr_md(guild)}.")), 1
 
 
 class Reverse(Command):
@@ -4126,13 +4163,14 @@ class Reverse(Command):
         if guild.id not in bot.data.audio.players:
             raise LookupError("Currently not playing in a voice channel.")
         auds = bot.data.audio.players[guild.id]
+        if not auds.queue:
+            raise IndexError("Queue is currently empty.")
         auds.text = channel
-        if len(auds.queue) > 1:
-            if not is_alone(auds, user) and perm < 1:
-                raise self.perm_error(perm, 1, "to reverse queue while other users are in voice")
-            async with auds.semaphore:
-                reverse(auds.queue)
-                auds.queue.rotate(-1)
+        if not is_alone(auds, user) and perm < 1:
+            raise self.perm_error(perm, 1, "to reverse queue while other users are in voice")
+        async with auds.semaphore:
+            reverse(auds.queue)
+            auds.queue.rotate(-1)
         if "h" not in flags:
             return italics(css_md(f"Successfully reversed queue for {sqr_md(guild)}.")), 1
 
