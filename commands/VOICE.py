@@ -5458,13 +5458,13 @@ class UpdateAudio(Database):
             if not file.loaded:
                 await create_future(file.destroy)
         for auds in tuple(self.players.values()):
-            reason = css_md("🎵 Temporarily disconnecting for maintenance")
+            reason = "🎵 Temporarily disconnecting for maintenance"
             if auds.queue:
                 reason += " (Queue saved)."
             else:
                 reason += "."
             reason += " Apologies for any inconvenience! 🎵"
-            await create_future(auds.kill, reason=reason)
+            await create_future(auds.kill, reason=css_md(reason))
 
     # Restores all audio players from temporary database when applicable
     async def _bot_ready_(self, bot, **void):
