@@ -492,7 +492,7 @@ class CustomAudio(collections.abc.Hashable):
             cnt = inf
         else:
             cnt = sum(1 for m in self.acsi.channel.members if not m.bot)
-        if cnt < 2 and not self.queue and self.timeout < utc() - 240:
+        if not self.queue and self.timeout < utc() - 3600:
             return self.kill(css_md(f"🎵 Automatically disconnected from {sqr_md(guild)}: Queue empty. 🎵"))
         if not cnt:
             # Timeout for leaving is 240 seconds
@@ -501,8 +501,8 @@ class CustomAudio(collections.abc.Hashable):
             perms = self.acsi.channel.permissions_for(guild.me)
             if not perms.connect or not perms.speak:
                 return self.kill(css_md(f"🎵 Automatically disconnected from {sqr_md(guild)}: No permission to connect/speak in {sqr_md(self.acsi.channel)}. 🎵"))
-            # If idle for more than 10 seconds, attempt to find members in other voice channels
-            elif self.timeout < utc() - 10:
+            # If idle for more than 20 seconds, attempt to find members in other voice channels
+            elif self.timeout < utc() - 20:
                 if guild.afk_channel and (guild.afk_channel.id != self.acsi.channel.id and guild.afk_channel.permissions_for(guild.me).connect):
                     await_fut(self.move_unmute(self.acsi, guild.afk_channel))
                 else:
