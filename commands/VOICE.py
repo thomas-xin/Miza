@@ -5431,8 +5431,9 @@ class UpdateAudio(Database):
             await bot.audio.asubmit("ytdl.update()")
         create_future_ex(ytd.update)
         create_future_ex(ytdl.update_dl, priority=True)
-        async with self.backup_sem:
-            await self.backup()
+        if not self.backup_sem.busy:
+            async with self.backup_sem:
+                await self.backup()
 
     def _announce_(self, *args, **kwargs):
         for auds in self.players.values():
