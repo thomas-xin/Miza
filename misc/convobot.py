@@ -620,7 +620,12 @@ class Bot:
 			limit = 2048
 			cm = 0
 		elif model == "manticore":
-			model = "manticore-30b"
+			model = "manticore-13b"
+			temp = 0.8
+			limit = 2048
+			cm = 0
+		elif model == "hippogriff":
+			model = "hippogriff-30b"
 			temp = 0.8
 			limit = 2048
 			cm = 0
@@ -657,7 +662,7 @@ class Bot:
 			ins.append(lines.pop(-1))
 		print("INS:", ins)
 		p = per
-		local_models = ("pygmalion-13b", "manticore-30b")
+		local_models = ("pygmalion-13b", "manticore-13b", "hippogriff-30b")
 		if self.name.casefold() not in p.casefold() and "you" not in p.casefold():
 			if not p:
 				p = "an"
@@ -834,7 +839,7 @@ class Bot:
 			prompt = "".join(reversed(ins))
 			prompt = nstart + "\n<START>\n" + prompt
 			if not self.bl:
-				print("Pyg prompt:", prompt)
+				print(f"{model.capitalize()} prompt:", prompt)
 			sys.stdout.flush()
 			pc = len(self.gpttokens(prompt))
 		else:
@@ -851,8 +856,10 @@ class Bot:
 		if model in local_models:
 			if model == "pygmalion-13b":
 				m = "TehVenom/Pygmalion-13b-Merged"
+			elif model == "manticore-13b":
+				m = "openaccess-ai-collective/manticore-13b-chat-pyg"
 			else:
-				m = "openaccess-ai-collective/manticore-30b-chat-pyg-alpha"
+				m = "openaccess-ai-collective/hippogriff-30b-chat"
 			try:
 				tokenizer, model = self.models[m]
 			except KeyError:
@@ -865,8 +872,8 @@ class Bot:
 				with accelerate.init_empty_weights():
 					model = AutoModelForCausalLM.from_config(config)
 				dps = [torch.cuda.get_device_properties(i) for i in range(n)]
-				max_mem = {i: f"{p.total_memory // 1073741824 - 3}GiB" for i, p in enumerate(dps)}
-				max_mem["cpu"] = f"{psutil.virtual_memory().total // 1073741824}GiB"
+				max_mem = {i: f"{round(p.total_memory / 1073741824 - 4)}GiB" for i, p in enumerate(dps)}
+				max_mem["cpu"] = f"{round(psutil.virtual_memory().total / 1073741824 - 4)}GiB"
 				print(max_mem)
 				try:
 					import bitsandbytes

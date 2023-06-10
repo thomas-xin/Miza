@@ -1193,7 +1193,7 @@ class Match(Command):
 
 class Ask(Command):
     _timeout_ = 24
-    name = ["Bloom", "NeoX", "Pyg", "Pygmalion", "GPT2", "Llama", "Manticore", "Davinci", "GPT3", "GPT3a", "GPT4", "GPT4a"]
+    name = ["Bloom", "NeoX", "Pyg", "Pygmalion", "GPT2", "Llama", "Manticore", "Hippogriff", "Davinci", "GPT3", "GPT3a", "GPT4", "GPT4a"]
     description = "Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. For premium tier chatbots, check using ~serverinfo, or apply with ~premium!"
     usage = "<string>"
     example = ("ask what's the date?", "gpt3 what is the square root of 3721?", "pyg can I have a hug?")
@@ -1243,8 +1243,10 @@ class Ask(Command):
             #         raise PermissionError(f"This model is only available in {uni_str('NSFW')} channels. Please verify your age using ~verify within a NSFW channel to enable NSFW in DMs.")
             #     raise PermissionError(f"This model is only available in {uni_str('NSFW')} channels.")
             model = "pygmalion"
-        elif name == "manticore" or name == "llama":
+        elif name == "manticore":
             model = "manticore"
+        elif name == "hippogriff" or name == "llama":
+            model = "hippogriff"
         elif name == "gpt3":
             model = "gpt3"
         elif name == "gpt3a":
