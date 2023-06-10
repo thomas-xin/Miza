@@ -5444,6 +5444,8 @@ class UpdateAudio(Database):
     async def backup(self):
         self.data.clear()
         for auds in tuple(self.players.values()):
+            if not auds.acsi:
+                continue
             d, _ = await create_future(auds.get_dump, True, True)
             self.data[auds.acsi.channel.id] = dict(dump=d, channel=auds.text.id)
             self.update(auds.acsi.channel.id)
@@ -5456,7 +5458,7 @@ class UpdateAudio(Database):
             if not file.loaded:
                 await create_future(file.destroy)
         for auds in tuple(self.players.values()):
-            reason = "🎵 Temporarily disconnecting for maintenance"
+            reason = css_md("🎵 Temporarily disconnecting for maintenance")
             if auds.queue:
                 reason += " (Queue saved)."
             else:
