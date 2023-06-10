@@ -82,12 +82,13 @@ class Restart(Command):
                 # Call _destroy_ bot event to indicate to all databases the imminent shutdown
                 print("Destroying database memory...")
                 await bot.send_event("_destroy_", shutdown=True)
+                # Save any database that has not already been autosaved
+                print("Saving all databases...")
+                await create_future(bot.update, force=False, priority=True)
+                await create_future(bot.update, force=True, priority=True)
                 # Kill the audio player client
                 print("Shutting down audio client...")
                 kill = create_future(bot.audio.kill, timeout=16, priority=True)
-                # Save any database that has not already been autosaved
-                print("Saving all databases...")
-                await create_future(bot.update, force=True, priority=True)
                 # Send the bot "offline"
                 print("Going offline...")
                 with tracebacksuppressor:
