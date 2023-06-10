@@ -890,8 +890,9 @@ class Bot:
 							ginfo3.append(gi)
 							break
 				ginfo = ginfo3
-				max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) / 1024 - 3)}GiB" for i, gi in enumerate(ginfo)}
+				max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) / 1024 - 4)}GiB" for i, gi in enumerate(ginfo)}
 				max_mem["cpu"] = f"{round(psutil.virtual_memory().free / 1073741824 - 4)}GiB"
+				max_mem["disk"] = "1024GiB"
 				print(max_mem)
 				if not bitsandbytes:
 					dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, no_split_module_classes=["LlamaDecoderLayer"], dtype=torch.float16)
