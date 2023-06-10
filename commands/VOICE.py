@@ -455,7 +455,7 @@ class CustomAudio(collections.abc.Hashable):
             return await_fut(send_with_react(self.text, *args, file=f, reacts="❎", **kwargs))
 
     # Kills this audio player, stopping audio playback. Will cause bot to leave voice upon next update event.
-    def kill(self, reason=None, initiator=None):
+    def kill(self, reason=None, initiator=None, wait=False):
         if self.acsi:
             with tracebacksuppressor(AttributeError):
                 self.acsi.kill()
@@ -468,6 +468,9 @@ class CustomAudio(collections.abc.Hashable):
                 reason = css_md(f"🎵 Successfully disconnected from {sqr_md(self.guild)}. 🎵")
             if reason:
                 self.announce(reason, dump=True, reference=initiator)
+        if wait:
+            while self.guild.me.voice:
+                await_fut(self.guild.change_voice_state(channel=None))
 
     # Update event, ensures audio is playing correctly and moves, leaves, or rejoins voice when necessary.
     @tracebacksuppressor
@@ -5445,6 +5448,7 @@ class UpdateAudio(Database):
             if not file.loaded:
                 await create_future(file.destroy)
         await create_future(self.update, force=True, priority=True)
+        await asyncio.sleep(1)
 
     # Restores all audio players from temporary database when applicable
     async def _bot_ready_(self, bot, **void):

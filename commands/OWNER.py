@@ -84,7 +84,6 @@ class Restart(Command):
                 await bot.send_event("_destroy_", shutdown=True)
                 # Save any database that has not already been autosaved
                 print("Saving all databases...")
-                await create_future(bot.update, force=False, priority=True)
                 await create_future(bot.update, force=True, priority=True)
                 # Kill the audio player client
                 print("Shutting down audio client...")
