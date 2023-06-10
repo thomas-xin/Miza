@@ -76,7 +76,6 @@ class Restart(Command):
         if save is None:
             print("Saving message cache...")
             save = create_task(bot.send_event("_save_"))
-        bot.closed = True
         async with Delay(1):
             with discord.context_managers.Typing(channel):
                 # Call _destroy_ bot event to indicate to all databases the imminent shutdown
@@ -89,6 +88,7 @@ class Restart(Command):
                 print("Shutting down audio client...")
                 kill = create_future(bot.audio.kill, timeout=16, priority=True)
                 # Send the bot "offline"
+                bot.closed = True
                 print("Going offline...")
                 with tracebacksuppressor:
                     await asyncio.wait_for(bot.change_presence(status=discord.Status.invisible), timeout=3)

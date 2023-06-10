@@ -5449,7 +5449,6 @@ class UpdateAudio(Database):
                 await create_future(file.destroy)
         await create_future(self.update, force=True, priority=True)
         print("Saved Queues:", dict(self.data))
-        await asyncio.sleep(1)
 
     # Restores all audio players from temporary database when applicable
     async def _bot_ready_(self, bot, **void):
