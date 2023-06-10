@@ -3118,7 +3118,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                     text = f"{self.webserver}, to {uni_str(guild_count)} server{'s' if guild_count != 1 else ''}"
                     if self.owners:
                         u = await self.fetch_user(next(iter(self.owners)))
-                        n = u.name
+                        n = u.display_name
                         text += f", from {belongs(uni_str(n))} place!"
                     else:
                         text += "!"
