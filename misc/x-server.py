@@ -2396,8 +2396,8 @@ alert("File successfully deleted. Returning to home.");
 
 	@cp.expose
 	@hostmap
-	def status(self):
-		status = self.bot_exec(f"bot.status()")
+	def status(self, interval=None):
+		status = self.bot_exec(f"bot.status(interval={interval})")
 		cp.response.headers.update(HEADERS)
 		cp.response.headers["Content-Type"] = "application/json"
 		return orjson.dumps(status)

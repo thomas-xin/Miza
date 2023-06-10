@@ -2711,40 +2711,48 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         discord=cdict(),
         misc=cdict(),
     )
-    async def status(self, simplified=False):
+    async def status(self, interval=None, simplified=False):
         if not self.status_sem.busy:
             async with self.status_sem:
                 self.status_data = await self.get_system_stats()
+        if interval:
+            it = int(utc() // 3) * 3
+            out = []
+            for i in range(1, interval + 3, 3):
+                out.append(self.data.insights["uptimes"].get(i - interval + it, {}))
+            return out
         status = self.status_data
         if simplified:
-            system = status.system
-            cpu_usage = sum(e["usage"] * e["count"] for e in system.cpu.values()) / sum(e["max"] * e["count"] for e in system.cpu.values()) if system.cpu else 0
-            gpu_usage = sum(e["usage"] * e["count"] for e in system.gpu.values()) / sum(e["max"] * e["count"] for e in system.gpu.values()) if system.gpu else 0
-            cpu_cores = sum(e["count"] for e in system.cpu.values()) if system.cpu else 0
-            gpu_cores = sum(e["count"] for e in system.gpu.values()) if system.gpu else 0
-            memory_usage = sum(e["usage"] * e["count"] for e in system.memory.values()) if system.memory else 0
-            memory_max = sum(e["max"] * e["count"] for e in system.memory.values()) if system.memory else 0
-            disk_usage = sum(e["usage"] * e["count"] for e in system.disk.values()) if system.disk else 0
-            disk_max = sum(e["max"] * e["count"] for e in system.disk.values()) if system.disk else 0
-            network_usage = sum(e["usage"] * e["count"] for e in system.network.values()) if system.network else 0
-            discord_stats = dict(status.discord)
-            discord_stats["API latency"] = sec2time(discord_stats["API latency"])
-            misc_stats = dict(status.misc)
-            misc_stats["Total data transmitted"] = byte_scale(misc_stats["Total data transmitted"]) + "B"
-            misc_stats["Hosted storage"] = byte_scale(misc_stats["Hosted storage"]) + "B"
-            misc_stats["Uptime (past week)"] = f'{round(misc_stats["Uptime (past week)"] * 100, 3)}%'
-            return {
-                "System info": {
-                    "CPU usage": f"{round(cpu_usage * 100, 3)}% *{cpu_cores}",
-                    "GPU usage": f"{round(gpu_usage * 100, 3)}% *{gpu_cores}",
-                    "Memory usage": byte_scale(memory_usage) + "B/" + byte_scale(memory_max) + "B",
-                    "Disk usage": byte_scale(disk_usage) + "B/" + byte_scale(disk_max) + "B",
-                    "Network usage": byte_scale(network_usage) + "bps",
-                },
-                "Discord info": discord_stats,
-                "Misc info": misc_stats,
-            }
+            return self.simplify_status(status.system)
         return status
+
+    def simplify_status(system):
+        cpu_usage = sum(e["usage"] * e["count"] for e in system.cpu.values()) / sum(e["max"] * e["count"] for e in system.cpu.values()) if system.cpu else 0
+        gpu_usage = sum(e["usage"] * e["count"] for e in system.gpu.values()) / sum(e["max"] * e["count"] for e in system.gpu.values()) if system.gpu else 0
+        cpu_cores = sum(e["count"] for e in system.cpu.values()) if system.cpu else 0
+        gpu_cores = sum(e["count"] for e in system.gpu.values()) if system.gpu else 0
+        memory_usage = sum(e["usage"] * e["count"] for e in system.memory.values()) if system.memory else 0
+        memory_max = sum(e["max"] * e["count"] for e in system.memory.values()) if system.memory else 0
+        disk_usage = sum(e["usage"] * e["count"] for e in system.disk.values()) if system.disk else 0
+        disk_max = sum(e["max"] * e["count"] for e in system.disk.values()) if system.disk else 0
+        network_usage = sum(e["usage"] * e["count"] for e in system.network.values()) if system.network else 0
+        discord_stats = dict(status.discord)
+        discord_stats["API latency"] = sec2time(discord_stats["API latency"])
+        misc_stats = dict(status.misc)
+        misc_stats["Total data transmitted"] = byte_scale(misc_stats["Total data transmitted"]) + "B"
+        misc_stats["Hosted storage"] = byte_scale(misc_stats["Hosted storage"]) + "B"
+        misc_stats["Uptime (past week)"] = f'{round(misc_stats["Uptime (past week)"] * 100, 3)}%'
+        return {
+            "System info": {
+                "CPU usage": f"{round(cpu_usage * 100, 3)}% *{cpu_cores}",
+                "GPU usage": f"{round(gpu_usage * 100, 3)}% *{gpu_cores}",
+                "Memory usage": byte_scale(memory_usage) + "B/" + byte_scale(memory_max) + "B",
+                "Disk usage": byte_scale(disk_usage) + "B/" + byte_scale(disk_max) + "B",
+                "Network usage": byte_scale(network_usage) + "bps",
+            },
+            "Discord info": discord_stats,
+            "Misc info": misc_stats,
+        }
 
     # Loads a module containing commands and databases by name.
     @tracebacksuppressor
@@ -4168,17 +4176,19 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                         if "insights" in self.data:
                             uptime = self.data.insights.setdefault("uptimes", {})
                             if not isinstance(uptime, dict):
-                                uptime = {k: () for k in uptime}
-                            it = int(utc() // 3)
-                            interval = 86400 * 7 // 3
+                                uptime = {k: {} for k in uptime}
+                            it = int(utc() // 3) * 3
+                            interval = 86400 * 7
                             if it not in uptime:
                                 uptime[it] = data
                                 sl = sorted(uptime)
-                                while sl[0] < it - interval:
+                                while sl[0] <= it - interval:
                                     uptime.pop(sl.pop(0), None)
+                                while sl[-1] > it:
+                                    uptime.pop(sl.pop(-1), None)
                             ut = 0
-                            for i in range(interval):
-                                ut += it - interval + i + 1 in uptime
+                            for i in range(1, interval + 3, 3):
+                                ut += it - interval + i in uptime
                             self.uptime = ut / interval
 
                             net = await create_future(psutil.net_io_counters)
