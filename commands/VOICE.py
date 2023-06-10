@@ -862,7 +862,7 @@ class AudioQueue(alist):
     def enqueue(self, items, position=-1):
         with self.auds.semaphore:
             if len(items) > self.maxitems:
-                items = items[:self.maxitems]
+                items = astype(items, (list, alist))[:self.maxitems]
             if not self:
                 self.auds.clear_source()
             if position == -1 or not self:
@@ -2282,7 +2282,7 @@ class AudioDownloader:
                 if not output:
                     output = self.extract(item, force, mode=mode, count=count)
                 obj.data = output
-                if obj.data:
+                if obj.data and len(obj.data) < 16384:
                     self.searched[item] = obj
                 return output
             except Exception as ex:
