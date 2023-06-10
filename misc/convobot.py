@@ -871,13 +871,29 @@ class Bot:
 				config = AutoConfig.from_pretrained(m)
 				with accelerate.init_empty_weights():
 					model = AutoModelForCausalLM.from_config(config)
-				dps = [torch.cuda.get_device_properties(i) for i in range(n)]
-				max_mem = {i: f"{round(p.total_memory / 1073741824 - 4)}GiB" for i, p in enumerate(dps)}
-				max_mem["cpu"] = f"{round(psutil.virtual_memory().total / 1073741824 - 4)}GiB"
-				print(max_mem)
 				try:
 					import bitsandbytes
 				except ImportError:
+					bitsandbytes = None
+				import gpustat
+				fut = exc.submit(gpustat.new_query)
+				tinfo = [torch.cuda.get_device_properties(i) for i in range(n)]
+				ginfo = fut.result()
+				ginfo3 = []
+				ginfo2 = list(ginfo)
+				tinfo2 = [ti for ti in tinfo if ti.major >= 8 or not bitsandbytes]
+				while tinfo2:
+					name = tinfo2.pop(0).name
+					for gi in ginfo2:
+						if gi.name == name:
+							ginfo2.remove(gi)
+							ginfo3.append(gi)
+							break
+				ginfo = ginfo3
+				max_mem = {i: f"{round((gi["memory.total"] - gi["memory.used"]) / 1024 - 1)}GiB" for i, gi in enumerate(ginfo)}
+				max_mem["cpu"] = f"{round(psutil.virtual_memory().free / 1073741824 - 1)}GiB"
+				print(max_mem)
+				if not bitsandbytes:
 					dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, no_split_module_classes=["LlamaDecoderLayer"], dtype=torch.float16)
 					model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, torch_dtype=torch.float16)
 				else:

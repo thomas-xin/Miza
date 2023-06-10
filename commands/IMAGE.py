@@ -1538,7 +1538,7 @@ class Art(Command):
                 futt = []
                 c = 0
                 if not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy() and COMPUTE_LOAD:
-                    c = min(amount, 5 + 4 * xrand(2))
+                    c = min(amount, 9 if nsfw else 5)
                     c2 = c
                     for i in range(len(COMPUTE_LOAD)):
                         if i >= len(COMPUTE_LOAD) - 1:
