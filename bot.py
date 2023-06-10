@@ -2726,7 +2726,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             return self.simplify_status(status.system)
         return status
 
-    def simplify_status(system):
+    def simplify_status(self, system):
         cpu_usage = sum(e["usage"] * e["count"] for e in system.cpu.values()) / sum(e["max"] * e["count"] for e in system.cpu.values()) if system.cpu else 0
         gpu_usage = sum(e["usage"] * e["count"] for e in system.gpu.values()) / sum(e["max"] * e["count"] for e in system.gpu.values()) if system.gpu else 0
         cpu_cores = sum(e["count"] for e in system.cpu.values()) if system.cpu else 0
