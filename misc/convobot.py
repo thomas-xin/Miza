@@ -247,7 +247,7 @@ def determine_cuda(mem=1, priority=None, multi=False):
 
 mcache = {}
 def cached_model(cls, model, **kwargs):
-	t = (cls, model, tuple(kwargs.items()))
+	t = (cls, model, tuple(kwargs.keys()))
 	try:
 		return mcache[t]
 	except KeyError:
