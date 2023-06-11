@@ -1322,7 +1322,7 @@ class Steganography(Command):
             await bot.send_with_file(channel, f'Successfully created image with encoded message "{msg}".', fn, filename=f"{fon}.webp", reference=message, reacts="🔳")
 
     async def call(self, b, msg=""):
-        ts = ts_us()
+        ts = hash(b)
         args = (
             sys.executable,
             "misc/steganography.py",
