@@ -2718,7 +2718,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         if interval:
             it = int(utc() // 3) * 3
             out = []
-            for i in range(1, interval + 3, 3):
+            for i in range(3, interval + 3, 3):
                 out.append(self.data.insights["uptimes"].get(i - interval + it, {}))
             return out
         status = self.status_data
