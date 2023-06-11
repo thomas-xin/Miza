@@ -2245,8 +2245,9 @@ async def proc_communicate(proc):
             print(s)
 
 proc_args = cdict(
-    math=(python, "misc/x-math.py"),
-    image=(python, "misc/x-image.py"),
+    # math=(python, "misc/x-math.py"),
+    #image=(python, "misc/x-image.py"),
+    compute=(python, "misc/x-compute.py"),
 )
 
 COMPUTE_LOAD = AUTH.get("compute_load", [])
@@ -2277,8 +2278,9 @@ async def start_proc(k, i):
 
 def proc_start():
     dc = torch.cuda.device_count()
-    PROC_COUNT.math = 3
-    PROC_COUNT.image = 3 + dc
+    # PROC_COUNT.math = 3
+    # PROC_COUNT.image = 3 + dc
+    PROC_COUNT.compute = 3 + dc
     for k, v in PROC_COUNT.items():
         PROCS[k] = [None] * v
         create_task(start_proc(k, 0))
@@ -2363,7 +2365,7 @@ def sub_kill(start=True, force=False):
 
 # Sends an operation to the math subprocess pool.
 def process_math(expr, prec=64, rat=False, timeout=12, variables=None):
-    return sub_submit("math", (expr, prec, rat, variables), _timeout=timeout)
+    return sub_submit("compute", (expr, "%", prec, rat, variables), fix=xrand(4), _timeout=timeout)
 
 # Sends an operation to the image subprocess pool.
 def process_image(image, operation, args=[], fix=None, timeout=36):
@@ -2383,7 +2385,7 @@ def process_image(image, operation, args=[], fix=None, timeout=36):
         return repr(arg)
 
     command = "[" + ",".join(map(as_arg, args)) + "]"
-    return sub_submit("image", (image, operation, command), fix=fix, _timeout=timeout)
+    return sub_submit("compute", (image, operation, command), fix=fix, _timeout=timeout)
 
 
 def evalex(exc, g=None, l=None):
