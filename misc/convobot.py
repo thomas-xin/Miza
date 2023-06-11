@@ -873,11 +873,11 @@ class Bot:
 			elif model == "manticore-13b":
 				m = "openaccess-ai-collective/manticore-13b-chat-pyg"
 				req = 13
-				bitsandbytes = None
+				# bitsandbytes = None
 			else:
 				m = "openaccess-ai-collective/hippogriff-30b-chat"
 				req = 30
-				bitsandbytes = None
+				# bitsandbytes = None
 			try:
 				tokenizer, model = self.models[m]
 			except KeyError:
@@ -907,6 +907,7 @@ class Bot:
 				max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) / 1024 - 2.5)}GiB" for i, gi in enumerate(ginfo)}
 				max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("GiB")) > 0}
 				if sum(int(v.removesuffix("GiB")) for v in max_mem.values()) < req:
+					self.models.clear()
 					bitsandbytes = None
 					ginfo3 = []
 					ginfo2 = list(ginfo)
