@@ -905,8 +905,8 @@ class Bot:
 							break
 				ginfo = ginfo3
 				max_mem = {i: f"{round(((gi['memory.total'] - gi['memory.used']) / 1024 - 1.5) * 2) / 2}GiB" for i, gi in enumerate(ginfo)}
-				max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("GiB")) > 0}
-				if sum(int(v.removesuffix("GiB")) for v in max_mem.values()) < req:
+				max_mem = {k: v for k, v in max_mem.items() if float(v.removesuffix("GiB")) > 0}
+				if sum(float(v.removesuffix("GiB")) for v in max_mem.values()) < req:
 					self.models.clear()
 					bitsandbytes = None
 					ginfo3 = []
@@ -921,7 +921,7 @@ class Bot:
 								break
 					ginfo = ginfo3
 					max_mem = {i: f"{round(((gi['memory.total'] - gi['memory.used']) / 1024 - 1.5) * 2) / 2}GiB" for i, gi in enumerate(ginfo)}
-					max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("GiB")) > 0}
+					max_mem = {k: v for k, v in max_mem.items() if float(v.removesuffix("GiB")) > 0}
 				max_mem["cpu"] = f"{round(psutil.virtual_memory().free / 1073741824 - 8)}GiB"
 				max_mem["disk"] = "1024GiB"
 				print(max_mem)
