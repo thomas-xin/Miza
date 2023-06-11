@@ -855,15 +855,21 @@ class Bot:
 		exclusive = {"neox-20b", "bloom-176b"}
 		if model in local_models:
 			omodel = model
+			try:
+				import bitsandbytes
+			except ImportError:
+				bitsandbytes = None
 			if model == "pygmalion-13b":
 				m = "TehVenom/Pygmalion-13b-Merged"
 				req = 13
 			elif model == "manticore-13b":
 				m = "openaccess-ai-collective/manticore-13b-chat-pyg"
 				req = 13
+				bitsandbytes = None
 			else:
 				m = "openaccess-ai-collective/hippogriff-30b-chat"
 				req = 30
+				bitsandbytes = None
 			try:
 				tokenizer, model = self.models[m]
 			except KeyError:
@@ -875,10 +881,6 @@ class Bot:
 				config = AutoConfig.from_pretrained(m)
 				with accelerate.init_empty_weights():
 					model = AutoModelForCausalLM.from_config(config)
-				try:
-					import bitsandbytes
-				except ImportError:
-					bitsandbytes = None
 				import gpustat
 				fut = exc.submit(gpustat.new_query)
 				tinfo = [torch.cuda.get_device_properties(i) for i in range(n)]
@@ -894,7 +896,7 @@ class Bot:
 							ginfo3.append(gi)
 							break
 				ginfo = ginfo3
-				max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) / 1024 - 4)}GiB" for i, gi in enumerate(ginfo)}
+				max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) / 1024 - 2.5)}GiB" for i, gi in enumerate(ginfo)}
 				max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("GiB")) > 0}
 				if sum(int(v.removesuffix("GiB")) for v in max_mem.values()) < req:
 					bitsandbytes = None
@@ -909,7 +911,7 @@ class Bot:
 								ginfo3.append(gi)
 								break
 					ginfo = ginfo3
-					max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) / 1024 - 4)}GiB" for i, gi in enumerate(ginfo)}
+					max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) / 1024 - 2.5)}GiB" for i, gi in enumerate(ginfo)}
 					max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("GiB")) > 0}
 				max_mem["cpu"] = f"{round(psutil.virtual_memory().free / 1073741824 - 8)}GiB"
 				max_mem["disk"] = "1024GiB"
