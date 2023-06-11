@@ -4188,7 +4188,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                                 while sl[-1] > it:
                                     uptime.pop(sl.pop(-1), None)
                             ut = 0
-                            for i in range(1, interval + 3, 3):
+                            for i in range(3, interval + 3, 3):
                                 ut += it - interval + i in uptime
                             self.uptime = ut / interval
 
