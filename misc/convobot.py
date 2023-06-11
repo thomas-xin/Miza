@@ -678,7 +678,7 @@ class Bot:
 				nstart = f"The following is a conversation between {self.name} and humans. {self.name} is {p} AI."
 		else:
 			nstart = p
-			if model in ("gpt-3.5-turbo", "gpt-4", "text-davinci-003", "pygmalion-13b"):
+			if model in ("gpt-3.5-turbo", "gpt-4", "text-davinci-003") or model in local_models:
 				if self.nsfw:
 					spl = nstart.rsplit("\n", 1)
 					nstart = nstart.strip() + " " + MIZAAC
@@ -854,12 +854,16 @@ class Bot:
 		uoai = None
 		exclusive = {"neox-20b", "bloom-176b"}
 		if model in local_models:
+			omodel = model
 			if model == "pygmalion-13b":
 				m = "TehVenom/Pygmalion-13b-Merged"
+				req = 13
 			elif model == "manticore-13b":
 				m = "openaccess-ai-collective/manticore-13b-chat-pyg"
+				req = 13
 			else:
 				m = "openaccess-ai-collective/hippogriff-30b-chat"
+				req = 30
 			try:
 				tokenizer, model = self.models[m]
 			except KeyError:
@@ -891,6 +895,20 @@ class Bot:
 							break
 				ginfo = ginfo3
 				max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) / 1024 - 2)}GiB" for i, gi in enumerate(ginfo)}
+				if sum(int(v.removesuffix("GiB")) for v in max_mem.values()) < req:
+					bitsandbytes = None
+					ginfo3 = []
+					ginfo2 = list(ginfo)
+					tinfo2 = [ti for ti in tinfo]
+					while tinfo2:
+						name = tinfo2.pop(0).name
+						for gi in ginfo2:
+							if gi.name == name:
+								ginfo2.remove(gi)
+								ginfo3.append(gi)
+								break
+					ginfo = ginfo3
+					max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) / 1024 - 2)}GiB" for i, gi in enumerate(ginfo)}
 				max_mem["cpu"] = f"{round(psutil.virtual_memory().free / 1073741824 - 4)}GiB"
 				max_mem["disk"] = "1024GiB"
 				print(max_mem)
@@ -898,10 +916,10 @@ class Bot:
 					dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, no_split_module_classes=["LlamaDecoderLayer"], dtype=torch.float16)
 					model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, torch_dtype=torch.float16)
 				else:
-					from transformers import BitsAndBytesConfig
-					quantization_config = BitsAndBytesConfig(llm_int8_enable_fp32_cpu_offload=True)
+					# from transformers import BitsAndBytesConfig
+					# quantization_config = BitsAndBytesConfig(llm_int8_enable_fp32_cpu_offload=True)
 					dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, no_split_module_classes=["LlamaDecoderLayer"], dtype=torch.int8)
-					model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, torch_dtype=torch.int8, load_in_8bit=True, quantization_config=quantization_config)
+					model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, load_in_8bit=True)#, quantization_config=quantization_config)
 				print(dev_map)
 				# layers = {}
 				# real_map = {}
@@ -951,7 +969,7 @@ class Bot:
 				start = ns
 				if text.startswith(start):
 					text = text[len(start):].strip()
-			model = "pygmalion-13b"
+			model = omodel
 		elif model in exclusive:
 			p = None
 			for i in range(8):
@@ -1198,7 +1216,7 @@ class Bot:
 						text = ""
 					if searched:
 						refs = list(refs) + [(f"[{sname}]", searched)]
-					t2 = self.gptcomplete(u, q, refs=refs, start=text or " ", model="davinci" if premium >= 2 else "pygmalion")
+					t2 = self.gptcomplete(u, q, refs=refs, start=text or " ", model="davinci" if premium >= 2 else "manticore")
 					if len(text) >= 2 and text[-1] in " aAsS" and text[-2] not in ".!?":
 						text += t2
 					else:
