@@ -894,7 +894,8 @@ class Bot:
 							ginfo3.append(gi)
 							break
 				ginfo = ginfo3
-				max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) / 1024 - 3)}GiB" for i, gi in enumerate(ginfo)}
+				max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) / 1024 - 4)}GiB" for i, gi in enumerate(ginfo)}
+				max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("GiB")) > 0}
 				if sum(int(v.removesuffix("GiB")) for v in max_mem.values()) < req:
 					bitsandbytes = None
 					ginfo3 = []
@@ -908,8 +909,9 @@ class Bot:
 								ginfo3.append(gi)
 								break
 					ginfo = ginfo3
-					max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) / 1024 - 2)}GiB" for i, gi in enumerate(ginfo)}
-				max_mem["cpu"] = f"{round(psutil.virtual_memory().free / 1073741824 - 4)}GiB"
+					max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) / 1024 - 4)}GiB" for i, gi in enumerate(ginfo)}
+					max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("GiB")) > 0}
+				max_mem["cpu"] = f"{round(psutil.virtual_memory().free / 1073741824 - 8)}GiB"
 				max_mem["disk"] = "1024GiB"
 				print(max_mem)
 				if not bitsandbytes:
