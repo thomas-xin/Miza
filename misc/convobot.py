@@ -894,7 +894,7 @@ class Bot:
 							ginfo3.append(gi)
 							break
 				ginfo = ginfo3
-				max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) / 1024 - 2)}GiB" for i, gi in enumerate(ginfo)}
+				max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) / 1024 - 3)}GiB" for i, gi in enumerate(ginfo)}
 				if sum(int(v.removesuffix("GiB")) for v in max_mem.values()) < req:
 					bitsandbytes = None
 					ginfo3 = []
