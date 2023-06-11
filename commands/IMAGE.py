@@ -1744,7 +1744,7 @@ class Art(Command):
                                 ims = await fut
                                 futs.extend(ims)
                             amount2 = len(futs)
-        files = []
+        ffuts = []
         exc = RuntimeError("Unknown error occured.")
         with discord.context_managers.Typing(channel):
             for tup in futs:
@@ -1786,11 +1786,19 @@ class Art(Command):
                 if isinstance(fn, str):
                     with open(fn, "rb") as f:
                         fn = f.read()
-                with tracebacksuppressor:
-                    fn = await bot.commands.steganography[0].call(fn, str(bot.id))
-                files.append(CompatFile(fn, filename=lim_str(prompt, 96) + ".png"))
-        if not files:
+                ffut = create_task(bot.commands.steganography[0].call(fn, str(bot.id)))
+                ffut.name = lim_str(prompt, 96) + ".png"
+                ffut.back = fn
+                ffuts.append(ffut)
+        if not ffuts:
             raise exc
+        files = []
+        for ffut in ffuts:
+            name = ffut.name
+            fn = ffut.back
+            with tracebacksuppressor:
+                fn = await ffut
+            files.append(CompatFile(fn, filename=name)
         await send_with_react(channel, "", files=files, reference=message, reacts="🔳", embed=emb)
         # await bot.send_with_file(channel, "", fn, filename=lim_str(prompt, 96) + ".png", reference=message, reacts="🔳", embed=emb)
 

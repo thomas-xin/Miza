@@ -602,11 +602,17 @@ class Server:
 						lambda: not is_strict_running(image_loaders[preview]),
 					)
 				if not f:
-					if os.path.getsize(preview):
+					s = os.path.getsize(preview)
+					if s:
 						f = open(preview, "rb")
 					else:
 						cp.response.headers["Content-Type"] = get_mime(p)
 						f = open(p, "rb")
+						s = os.path.getsize(p)
+				if s < 1048576:
+					return f.read()
+				if s < 67108864:
+					return io.BytesIO(f.read())
 				return cp.lib.file_generator(f, 262144)
 			elif endpoint.startswith("i") and (mime in ("image/webp", "image/apng") or mime.split("/", 1)[0] == "video"):
 				preview = "cache/%" + p.rsplit("/", 1)[-1].split(".", 1)[0] + ".png"
@@ -647,11 +653,17 @@ class Server:
 						lambda: not is_strict_running(image_loaders[preview]),
 					)
 				if not f:
-					if os.path.getsize(preview):
+					s = os.path.getsize(preview)
+					if s:
 						f = open(preview, "rb")
 					else:
 						cp.response.headers["Content-Type"] = get_mime(p)
 						f = open(p, "rb")
+						s = os.path.getsize(p)
+				if s < 1048576:
+					return f.read()
+				if s < 67108864:
+					return io.BytesIO(f.read())
 				return cp.lib.file_generator(f, 262144)
 			elif endpoint.startswith("a") and mime.split("/", 1)[0] in "video":
 				f_url = cp.url(qs=cp.request.query_string).replace(f"/{endpoint}/", "/f/")
@@ -781,6 +793,13 @@ transform: translate(-50%, -50%);
 								# return self.dyn_serve(urls, size=info[1])
 							return self.concat(p, urls, name=info[0], mime=info[2], stn=stn)
 			f = open(p, "rb")
+			s = os.path.getsize(p)
+			if s < 67108864:
+				cp.response.headers["Content-Type"] = mime
+				cp.response.headers["Content-Disposition"] = "attachment; " * bool(download) + "filename=" + json.dumps(a2)
+				if s < 1048576:
+					return f.read()
+				return io.BytesIO(f.read())
 			resp = cp.lib.static.serve_fileobj(f, content_type=mime, disposition="attachment" if download else None, name=a2)
 			if a3:
 				self.serving.setdefault(p, weakref.WeakSet()).add(f)
