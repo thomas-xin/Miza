@@ -2434,7 +2434,7 @@ CBOTS = {}
 def cb_exists(cid):
 	return cid in CBOTS
 
-mcache = []
+mcache = {}
 def cached_model(cls, model, **kwargs):
 	t = (cls, model, tuple(kwargs.items()))
 	try:
@@ -2455,7 +2455,7 @@ def backup_model(cls, model, force=False, **kwargs):
 		except:
 			fut = exc.submit(cached_model, cls, model, **kwargs)
 			try:
-				return fut.result(timeout=8)
+				return fut.result(timeout=24)
 			except Exception as ex:
 				ex2 = ex
 	if isinstance(ex2, concurrent.futures.TimeoutError):
