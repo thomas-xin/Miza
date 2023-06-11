@@ -1108,7 +1108,9 @@ def procResp(resp):
 
 def evaluate(ts, args):
 	try:
-		resp = evalSym(*literal_eval(base64.b64decode(args)))
+		if isinstance(args, (str, bytes, memoryview)):
+			args = literal_eval(base64.b64decode(args))
+		resp = evalSym(*args)
 		out = procResp(resp)
 		sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_result({repr(out)})\n".encode("utf-8"))
 	except Exception as ex:

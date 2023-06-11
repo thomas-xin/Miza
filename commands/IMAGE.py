@@ -1553,6 +1553,7 @@ class Art(Command):
                         if c2 <= 0:
                             break
                 self.imagebot.token = oai or AUTH.get("openai_key")
+                ims = []
                 try:
                     if c > amount:
                         raise PermissionError

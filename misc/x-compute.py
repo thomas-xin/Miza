@@ -3233,7 +3233,7 @@ if __name__ == "__main__":
 					evaluate(ts, args)
 				elif args[1] == "%":
 					args.pop(1)
-					x_math.evaluate(ts, s.encode("ascii"))
+					x_math.evaluate(ts, args)
 				elif "plt_special" in args or "plt_mp" in args:
 					import matplotlib.pyplot
 					globals()["plt"] = matplotlib.pyplot
