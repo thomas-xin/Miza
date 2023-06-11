@@ -2465,8 +2465,8 @@ def backup_model(cls, model, force=False, **kwargs):
 			raise RuntimeError("Model is loading, please wait...")
 	raise ex2
 
-if len(sys.argv) <= 1 or int(sys.argv[1]) < 4:
-	x_math = __import__("misc/x-math")
+if len(sys.argv) <= 1 or int(sys.argv[1]) < 3:
+	x_math = __import__("x-math")
 
 if len(sys.argv) > 1 and sys.argv[1] == "1":
 	import convobot, torch

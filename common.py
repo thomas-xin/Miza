@@ -2365,7 +2365,7 @@ def sub_kill(start=True, force=False):
 
 # Sends an operation to the math subprocess pool.
 def process_math(expr, prec=64, rat=False, timeout=12, variables=None):
-    return sub_submit("compute", (expr, "%", prec, rat, variables), fix=xrand(4), _timeout=timeout)
+    return sub_submit("compute", (expr, "%", prec, rat, variables), fix=xrand(3), _timeout=timeout)
 
 # Sends an operation to the image subprocess pool.
 def process_image(image, operation, args=[], fix=None, timeout=36):
