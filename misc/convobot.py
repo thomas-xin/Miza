@@ -245,6 +245,15 @@ def determine_cuda(mem=1, priority=None, multi=False):
 		return [i for i in pcs if ginfo[i].memory_available * 1048576 >= mem], torch.float16
 	return pcs[0], torch.float16
 
+mcache = []
+def cached_model(cls, model, **kwargs):
+	t = (cls, model, tuple(kwargs.items()))
+	try:
+		return mcache[t]
+	except KeyError:
+		mcache[t] = cls(model, **kwargs)
+	return mcache[t]
+
 def backup_model(cls, model, force=False, **kwargs):
 	if force:
 		try:
@@ -252,15 +261,14 @@ def backup_model(cls, model, force=False, **kwargs):
 		except Exception as ex:
 			ex2 = ex
 	else:
-		fut = exc.submit(cls, model, **kwargs)
 		try:
-			return fut.result(timeout=8)
-		except Exception as ex:
-			ex2 = ex
-	try:
-		return cls(model, local_files_only=True, **kwargs)
-	except:
-		pass
+			return cls(model, local_files_only=True, **kwargs)
+		except:
+			fut = exc.submit(cached_model, cls, model, **kwargs)
+			try:
+				return fut.result(timeout=8)
+			except Exception as ex:
+				ex2 = ex
 	if isinstance(ex2, concurrent.futures.TimeoutError):
 		try:
 			return fut.result(timeout=60)
