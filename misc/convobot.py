@@ -910,7 +910,7 @@ class Bot:
 							ginfo3.append(gi)
 							break
 				ginfo = ginfo3
-				max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) - 1.5 * 1024)}MiB" for i, gi in enumerate(ginfo)}
+				max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) - 1.75 * 1024)}MiB" for i, gi in enumerate(ginfo)}
 				max_mem = {k: v for k, v in max_mem.items() if float(v.removesuffix("MiB")) > 0}
 				if sum(float(v.removesuffix("MiB")) for v in max_mem.values()) < req * 1024:
 					self.models.clear()
