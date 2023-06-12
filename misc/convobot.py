@@ -252,9 +252,15 @@ def cached_model(cls, model, **kwargs):
 		return mcache[t]
 	except KeyError:
 		mcache[t] = cls(model, **kwargs)
+	print("CACHED_MODEL:", t)
 	return mcache[t]
 
 def backup_model(cls, model, force=False, **kwargs):
+	t = (cls, model, tuple(kwargs.keys()))
+	try:
+		return mcache[t]
+	except KeyError:
+		pass
 	if force:
 		try:
 			return cls(model, **kwargs)
