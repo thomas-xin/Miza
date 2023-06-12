@@ -796,8 +796,8 @@ transform: translate(-50%, -50%);
 			s = os.path.getsize(p)
 			if s < 67108864:
 				if s < 1048576:
-                    cp.response.headers["Content-Type"] = mime
-                    cp.response.headers["Content-Disposition"] = "attachment; " * bool(download) + "filename=" + json.dumps(a2)
+					cp.response.headers["Content-Type"] = mime
+					cp.response.headers["Content-Disposition"] = "attachment; " * bool(download) + "filename=" + json.dumps(a2)
 					return f.read()
 				f = io.BytesIO(f.read())
 			resp = cp.lib.static.serve_fileobj(f, content_type=mime, disposition="attachment" if download else None, name=a2)
