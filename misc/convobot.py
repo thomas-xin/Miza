@@ -615,7 +615,7 @@ class Bot:
 		lines.append(ns)
 		longer = False
 		cm2 = None
-		model = model or self.model
+		model = model or self.model or "gpt3"
 		extensions = model.endswith("+")
 		model = model.removesuffix("+")
 		if model == "bloom":
@@ -932,6 +932,7 @@ class Bot:
 				max_mem["cpu"] = f"{round(psutil.virtual_memory().free / 1073741824 - 8)}GiB"
 				max_mem["disk"] = "1024GiB"
 				print(max_mem)
+				print(req, rem)
 				if not bitsandbytes:
 					dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, no_split_module_classes=["LlamaDecoderLayer"], dtype=torch.float16)
 					model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, torch_dtype=torch.float16)

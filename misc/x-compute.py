@@ -2524,7 +2524,7 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 			if model.startswith("gpt4") and premium < 4:
 				cb.model = "gpt3"
 			else:
-				cb.model = model
+				cb.model = model or "gpt3"
 		cb.user_id = user_id
 		cb.channel_id = channel_id
 		cb.bl = bl
