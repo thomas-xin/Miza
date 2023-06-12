@@ -912,7 +912,8 @@ class Bot:
 				ginfo = ginfo3
 				max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) - 1.75 * 1024)}MiB" for i, gi in enumerate(ginfo)}
 				max_mem = {k: v for k, v in max_mem.items() if float(v.removesuffix("MiB")) > 0}
-				if sum(float(v.removesuffix("MiB")) for v in max_mem.values()) < req * 1024:
+				rem = sum(float(v.removesuffix("MiB")) for v in max_mem.values()) - req * 1024
+				if rem < 1024:
 					self.models.clear()
 					bitsandbytes = None
 					ginfo3 = []
@@ -926,7 +927,7 @@ class Bot:
 								ginfo3.append(gi)
 								break
 					ginfo = ginfo3
-					max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) - 1.5 * 1024)}MiB" for i, gi in enumerate(ginfo)}
+					max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) - 1.75 * 1024)}MiB" for i, gi in enumerate(ginfo)}
 					max_mem = {k: v for k, v in max_mem.items() if float(v.removesuffix("MiB")) > 0}
 				max_mem["cpu"] = f"{round(psutil.virtual_memory().free / 1073741824 - 8)}GiB"
 				max_mem["disk"] = "1024GiB"
@@ -935,10 +936,13 @@ class Bot:
 					dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, no_split_module_classes=["LlamaDecoderLayer"], dtype=torch.float16)
 					model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, torch_dtype=torch.float16)
 				else:
-					# from transformers import BitsAndBytesConfig
-					# quantization_config = BitsAndBytesConfig(llm_int8_enable_fp32_cpu_offload=True)
 					dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, no_split_module_classes=["LlamaDecoderLayer"], dtype=torch.int8)
-					model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, load_in_8bit=True)#, quantization_config=quantization_config)
+					if rem > 8 * 1024:
+						from transformers import BitsAndBytesConfig
+						quantization_config = BitsAndBytesConfig(llm_int8_enable_fp32_cpu_offload=True)
+						model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, load_in_8bit=True, quantization_config=quantization_config)
+					else:
+						model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, load_in_8bit=True)
 				print(dev_map)
 				# layers = {}
 				# real_map = {}
