@@ -2252,7 +2252,7 @@ async def proc_distribute(proc):
             if not is_strict_running(proc):
                 return
             if not tasks:
-                proc.fut.result()
+                await wrap_future(proc.fut)
                 proc.fut = concurrent.futures.Future()
                 tasks = bot.distribute([proc.cap], {}, {})
                 if not tasks:
