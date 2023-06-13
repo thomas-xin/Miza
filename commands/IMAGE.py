@@ -1539,19 +1539,22 @@ class Art(Command):
                 c = 0
                 if not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy() and COMPUTE_LOAD:
                     c = min(amount, 9 if nsfw else 5)
-                    c2 = c
-                    for i in range(len(COMPUTE_LOAD)):
-                        if i >= len(COMPUTE_LOAD) - 1:
-                            perc = c2
-                        else:
-                            perc = min(c2, round_random(COMPUTE_LOAD[i] * c))
-                        if not perc:
-                            continue
-                        fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, perc], fix=3 + i, timeout=1200))
+                    for i in range(c):
+                        fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, perc], fix=3, timeout=1200))
                         futt.append(fut)
-                        c2 -= perc
-                        if c2 <= 0:
-                            break
+                    # c2 = c
+                    # for i in range(len(COMPUTE_LOAD)):
+                    #     if i >= len(COMPUTE_LOAD) - 1:
+                    #         perc = c2
+                    #     else:
+                    #         perc = min(c2, round_random(COMPUTE_LOAD[i] * c))
+                    #     if not perc:
+                    #         continue
+                    #     fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, perc], fix=3 + i, timeout=1200))
+                    #     futt.append(fut)
+                    #     c2 -= perc
+                    #     if c2 <= 0:
+                    #         break
                 self.imagebot.token = oai or AUTH.get("openai_key")
                 ims = []
                 try:
@@ -1728,19 +1731,22 @@ class Art(Command):
                             p = "" if noprompt else prompt
                             futt = []
                             c = amount - amount2
-                            c2 = c
-                            for i in range(len(COMPUTE_LOAD)):
-                                if i >= len(COMPUTE_LOAD) - 1:
-                                    perc = c2
-                                else:
-                                    perc = min(c2, round_random(COMPUTE_LOAD[i] * c))
-                                if not perc:
-                                    continue
-                                fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, perc], fix=3 + i, timeout=1200))
+                            for i in range(c):
+                                fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, perc], fix=3, timeout=1200))
                                 futt.append(fut)
-                                c2 -= perc
-                                if c2 <= 0:
-                                    break
+                            # c2 = c
+                            # for i in range(len(COMPUTE_LOAD)):
+                            #     if i >= len(COMPUTE_LOAD) - 1:
+                            #         perc = c2
+                            #     else:
+                            #         perc = min(c2, round_random(COMPUTE_LOAD[i] * c))
+                            #     if not perc:
+                            #         continue
+                            #     fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, perc], fix=3 + i, timeout=1200))
+                            #     futt.append(fut)
+                            #     c2 -= perc
+                            #     if c2 <= 0:
+                            #         break
                             for fut in futt:
                                 ims = await fut
                                 futs.extend(ims)
