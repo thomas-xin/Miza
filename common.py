@@ -2312,7 +2312,8 @@ def proc_start():
     for k, v in PROC_COUNT.items():
         PROCS[k] = [None] * v
         for i in range(v):
-            create_task(start_proc(k, i))
+            if i >= 3 and torch.cuda.get_device_properties(i - 3).total_memory > 3 * 1073741824:
+                create_task(start_proc(k, i))
 
 async def get_idle_proc(ptype, fix=None):
     if fix is not None:
@@ -2342,6 +2343,8 @@ async def sub_submit(ptype, command, fix=None, _timeout=12):
         task.timeout = _timeout
         queue = bot.compute_queue.setdefault(fix, set())
         queue.add(task)
+        if fix and fix >= 3 and PROC_COUNT.compute > 3:
+            fix = random.randint(3, PROC_COUNT.compute - 1)
         proc = await get_idle_proc(ptype, fix=fix)
         if not proc.fut.done():
             proc.fut.set_result(None)
