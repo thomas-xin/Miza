@@ -2512,7 +2512,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     # Gets the external IP address from api.ipify.org
     ip_sem = Semaphore(1, 1, rate_limit=60)
     async def get_ip(self):
-        with suppress(SemaphoreOverflowError):
+        if not self.ip_sem.busy:
             async with self.ip_sem:
                 self.ip = await Request("https://api.ipify.org", bypass=False, decode=True, timeout=3, aio=True)
         return self.ip
