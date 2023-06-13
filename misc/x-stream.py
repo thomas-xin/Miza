@@ -39,7 +39,7 @@ class Server:
 			return json.dumps(entries)
 		import psutil, cpuinfo
 		if time.time() - self.ip_time > 60:
-			fut = exc.submit(requests.get, "https://api.ipify.org")
+			fut = exc.submit(requests.get, "https://api.ipify.org", verify=False)
 			self.ip_time = time.time()
 		else:
 			fut = None

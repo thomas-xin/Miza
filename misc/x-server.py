@@ -382,7 +382,7 @@ def get_geo(ip):
 	if ip.startswith("192.168."):
 		ip = IP
 		if not ip:
-			ip = IP = reqs.next().get("https://api.ipify.org").text
+			ip = IP = reqs.next().get("https://api.ipify.org", verify=False).text
 	try:
 		resp = TZCACHE[ip]
 	except KeyError:
@@ -2424,7 +2424,16 @@ alert("File successfully deleted. Returning to home.");
 
 	@cp.expose
 	@hostmap
-	def distribute(self, caps=[], stat={}, resp={}):
+	def distribute(self, caps="[]", stat="{}", resp="{}"):
+		if not caps.startswith("["):
+			caps = base64.urlsafe_b64decode(caps + "==")
+		caps = orjson.loads(caps)
+		if not stat.startswith("{"):
+			stat = base64.urlsafe_b64decode(stat + "==")
+		stat = orjson.loads(stat)
+		if not resp.startswith("{"):
+			resp = base64.urlsafe_b64decode(resp + "==")
+		resp = orjson.loads(resp)
 		tasks = self.bot_exec(f"bot.distribute({caps},{stat},{resp})")
 		cp.response.headers.update(HEADERS)
 		cp.response.headers["Content-Type"] = "application/json"
