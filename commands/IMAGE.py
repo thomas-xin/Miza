@@ -1540,7 +1540,7 @@ class Art(Command):
                 if not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy() and COMPUTE_LOAD:
                     c = min(amount, 9 if nsfw else 5)
                     for i in range(c):
-                        fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, perc], fix=3, timeout=1200))
+                        fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, 1], fix=3, timeout=1200))
                         futt.append(fut)
                     # c2 = c
                     # for i in range(len(COMPUTE_LOAD)):
@@ -1732,7 +1732,7 @@ class Art(Command):
                             futt = []
                             c = amount - amount2
                             for i in range(c):
-                                fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, perc], fix=3, timeout=1200))
+                                fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, 1], fix=3, timeout=1200))
                                 futt.append(fut)
                             # c2 = c
                             # for i in range(len(COMPUTE_LOAD)):
