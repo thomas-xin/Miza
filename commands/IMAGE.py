@@ -1397,7 +1397,7 @@ class Art(Command):
     flags = "i"
     typing = True
     slash = ("Art", "Imagine")
-    sdiff_sem = Semaphore(1, 256, rate_limit=7)
+    sdiff_sem = Semaphore(3, 256, rate_limit=7)
     fut = None
     imagebot = imagebot.Bot(token=AUTH.get("openai_key"))
     has_py39 = subprocess.run("py -3.9 -m pip").returncode == 0
@@ -1537,7 +1537,7 @@ class Art(Command):
             with discord.context_managers.Typing(channel):
                 futt = []
                 c = 0
-                if not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy() and COMPUTE_LOAD:
+                if not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy():
                     c = min(amount, 9 if nsfw else 5)
                     for i in range(c):
                         fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, 1], fix=3, timeout=1200))
