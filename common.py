@@ -2256,13 +2256,17 @@ async def proc_distribute(proc):
                 proc.fut = concurrent.futures.Future()
                 tasks = bot.distribute([proc.cap], {}, {})
                 if not tasks:
-                    await asyncio.sleep(0.125)
+                    await asyncio.sleep(1 / 24)
                     continue
             newtasks = []
             for task in tasks:
                 i, cap, command, timeout = task
-                resp = await _sub_submit("compute", command, fix=cap or None, _timeout=timeout)
-                newtasks.extend(bot.distribute([proc.cap], {}, {i: resp}))
+                try:
+                    resp = await _sub_submit("compute", command, fix=cap or None, _timeout=timeout)
+                except Exception as ex:
+                    newtasks.extend(bot.distribute([proc.cap], {}, {i: ex}))
+                else:
+                    newtasks.extend(bot.distribute([proc.cap], {}, {i: resp}))
             tasks = newtasks
 
 proc_args = cdict(

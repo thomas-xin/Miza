@@ -2562,7 +2562,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         if completed:
             for k, v in completed.items():
                 task = self.compute_wait.pop(k)
-                task.set_result(v)
+                if isinstance(v, Exception):
+                    task.set_exception(v)
+                else:
+                    task.set_result(v)
         tasks = []
         for i in caps:
             i = i or 0
