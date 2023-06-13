@@ -2561,7 +2561,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             self.status_data.system[k].update(v)
         if completed:
             for k, v in completed.items():
-                task = self.compute_wait.pop(task)
+                task = self.compute_wait.pop(k)
                 task.set_result(v)
         tasks = []
         for i in caps:
