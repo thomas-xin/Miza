@@ -2347,7 +2347,7 @@ async def sub_submit(ptype, command, fix=None, _timeout=12):
         queue.add(task)
         proc = await get_idle_proc(ptype, fix=fix)
         if not proc.fut.done():
-            proc.fut.set_result(None)
+            eloop.call_soon_threadsafe(proc.fut.set_result, None)
         try:
             return await asyncio.wait_for(wrap_future(task), timeout=_timeout + 2)
         except T1 as ex:

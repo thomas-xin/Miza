@@ -2563,9 +2563,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             for k, v in completed.items():
                 task = self.compute_wait.pop(k)
                 if isinstance(v, Exception):
-                    task.set_exception(v)
+                    eloop.call_soon_threadsafe(task.set_exception, v)
                 else:
-                    task.set_result(v)
+                    eloop.call_soon_threadsafe(task.set_result, v)
         tasks = []
         for i in caps:
             i = i or 0
