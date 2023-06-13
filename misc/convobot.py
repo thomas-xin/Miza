@@ -911,14 +911,14 @@ class Bot:
 							break
 				ginfo = ginfo3
 				max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) - 1.75 * 1024)}MiB" for i, gi in enumerate(ginfo)}
-				max_mem = {k: v for k, v in max_mem.items() if float(v.removesuffix("MiB")) > 0}
-				rem = sum(float(v.removesuffix("MiB")) for v in max_mem.values()) / 1024 - req
+				max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("MiB")) > 0}
+				rem = sum(int(v.removesuffix("MiB")) for v in max_mem.values()) / 1024 - req
 				if rem < 1:
 					self.models.clear()
 					bitsandbytes = None
 					ginfo3 = []
 					ginfo2 = list(ginfo)
-					tinfo2 = [ti for ti in tinfo]
+					tinfo2 = list(tinfo)
 					while tinfo2:
 						name = tinfo2.pop(0).name
 						for gi in ginfo2:
@@ -928,22 +928,25 @@ class Bot:
 								break
 					ginfo = ginfo3
 					max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) - 1.75 * 1024)}MiB" for i, gi in enumerate(ginfo)}
-					max_mem = {k: v for k, v in max_mem.items() if float(v.removesuffix("MiB")) > 0}
+					max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("MiB")) > 0}
+				cap = sum(int(v.removesuffix("MiB")) for v in max_mem.values()) / 1024
+				if cap > req * 1.25:
+					max_mem = {k: f"{round(int(v.removesuffix('MiB')) * req / cap * 1.25)}MiB" for k, v in max_mem.items()}
 				max_mem["cpu"] = f"{round(psutil.virtual_memory().free / 1073741824 - 8)}GiB"
 				max_mem["disk"] = "1024GiB"
 				print(max_mem)
-				print(req, rem)
+				print(cap, req)
 				if not bitsandbytes:
 					dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, no_split_module_classes=["LlamaDecoderLayer"], dtype=torch.float16)
 					model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, torch_dtype=torch.float16)
 				else:
 					dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, no_split_module_classes=["LlamaDecoderLayer"], dtype=torch.int8)
-					if rem > req * 3:
-						from transformers import BitsAndBytesConfig
-						quantization_config = BitsAndBytesConfig(llm_int8_enable_fp32_cpu_offload=True)
-						model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, torch_dtype=torch.float16, load_in_8bit=True, quantization_config=quantization_config)
-					else:
-						model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, load_in_8bit=True)
+					# if rem > req * 3:
+					# 	from transformers import BitsAndBytesConfig
+					# 	quantization_config = BitsAndBytesConfig(llm_int8_enable_fp32_cpu_offload=True)
+					# 	model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, torch_dtype=torch.float16, load_in_8bit=True, quantization_config=quantization_config)
+					# else:
+					model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, load_in_8bit=True)
 				print(dev_map)
 				# layers = {}
 				# real_map = {}

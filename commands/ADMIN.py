@@ -148,7 +148,7 @@ class Mute(Command):
                 try:
                     mute = mutes[user.id]
                 except LookupError:
-                    create_task(channel.send(ini_md(f"{sqr_md(user)} is currently not muted in {sqr_md(guild)}.")))
+                    create_task(channel.send(ini_md(f"{sqr_md(user)} is currently not muted in {sqr_md(guild)}. Specify a duration for temporary mutes, or `inf` for permanent mutes.")))
                     continue
                 if name == "unmute":
                     # await self.unmute(guild, user)
@@ -379,7 +379,7 @@ class Ban(Command):
                 try:
                     ban = bans[user.id]
                 except LookupError:
-                    create_task(channel.send(ini_md(f"{sqr_md(user)} is currently not banned from {sqr_md(guild)}.")))
+                    create_task(channel.send(ini_md(f"{sqr_md(user)} is currently not banned from {sqr_md(guild)}. Specify a duration for temporary bans, or `inf` for permanent bans.")))
                     continue
                 if name == "unban":
                     await guild.unban(user)
