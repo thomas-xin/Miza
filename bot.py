@@ -2554,6 +2554,54 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         except (asyncio.TimeoutError, asyncio.CancelledError):
             return {}
 
+    compute_queue = {}
+    compute_wait = {}
+    def distribute(self, caps, stat, completed):
+        for k, v in stat.items():
+            self.status_data.system[k].update(v)
+        if completed:
+            for k, v in completed.keys():
+                task = self.compute_wait.pop(task)
+                task.set_result(v)
+        tasks = []
+        for i in caps:
+            i = i or 0
+            if i == 1:
+                convo = self.compute_queue.get(1)
+                if not convo:
+                    continue
+                task = convo.pop()
+                tasks.append(task)
+                continue
+            if i == 2:
+                text = self.compute_queue.get(2)
+                if not text:
+                    continue
+                task = text.pop()
+                tasks.append(task)
+                continue
+            if i == 3:
+                image = self.compute_queue.get(3)
+                if not image:
+                    continue
+                task = image.pop()
+                tasks.append(task)
+                continue
+            misc = self.compute_queue.get(0)
+            if not misc:
+                continue
+            task = misc.pop()
+            tasks.append(task)
+        prompts = []
+        for task in tasks:
+            i = ts_us() + id(task)
+            while i in self.compute_wait:
+                i += 1
+            self.compute_wait[i] = task
+            prompt = [i, task.cap, task.command, task._timeout]
+            prompts.append(prompt)
+        return prompts
+
     async def get_current_stats(self):
         import psutil, cpuinfo
         fut = create_task(self.get_ip())
@@ -2640,9 +2688,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         futs = []
         fut = create_task(self.get_current_stats())
         futs.append(fut)
-        for addr in AUTH.get("remote-servers", ()):
-            fut = create_task(self.get_remote_stat(addr))
-            futs.append(fut)
+        # for addr in AUTH.get("remote-servers", ()):
+        #     fut = create_task(self.get_remote_stat(addr))
+        #     futs.append(fut)
         try:
             resp = await Request.sessions.next().head(f"https://discord.com/api/{api}", timeout=4)
             self.api_latency = utc() - t

@@ -2422,6 +2422,14 @@ alert("File successfully deleted. Returning to home.");
 		cp.response.headers["Content-Type"] = "application/json"
 		return orjson.dumps(status)
 
+	@cp.expose
+	@hostmap
+	def distribute(self, caps=[], stat={}, resp={}):
+		tasks = self.bot_exec(f"bot.distribute({caps},{stat},{resp})")
+		cp.response.headers.update(HEADERS)
+		cp.response.headers["Content-Type"] = "application/json"
+		return orjson.dumps(tasks)
+
 	def ensure_mpins(self):
 		try:
 			ins_time = getattr(self, "ins_time", 0)

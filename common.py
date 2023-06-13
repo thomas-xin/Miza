@@ -2244,6 +2244,27 @@ async def proc_communicate(proc):
             print_exc()
             print(s)
 
+async def proc_distribute(proc):
+    bot = BOT[0]
+    tasks = []
+    while True:
+        with tracebacksuppressor:
+            if not is_strict_running(proc):
+                return
+            if not tasks:
+                proc.fut.result()
+                proc.fut = concurrent.futures.Future()
+                tasks = bot.distribute([proc.cap], {}, {})
+                if not tasks:
+                    await asyncio.sleep(0.125)
+                    continue
+            newtasks = []
+            for task in tasks:
+                i, cap, command, timeout = task
+                resp = await _sub_submit("compute", command, fix=cap or None, _timeout=timeout)
+                newtasks.extend(bot.distribute([proc.cap], {}, {i: resp}))
+            tasks = newtasks
+
 proc_args = cdict(
     # math=(python, "misc/x-math.py"),
     #image=(python, "misc/x-image.py"),
@@ -2273,6 +2294,8 @@ async def start_proc(k, i):
     proc.is_running = lambda: not proc.returncode
     proc.sem = Semaphore(1, inf)
     proc.comm = create_task(proc_communicate(proc))
+    proc.cap = min(i, 3)
+    proc.fut = concurrent.futures.Future()
     PROCS[k][i] = proc
     return proc
 
@@ -2304,6 +2327,26 @@ async def get_idle_proc(ptype, fix=None):
     return proc
 
 async def sub_submit(ptype, command, fix=None, _timeout=12):
+    bot = BOT[0]
+    ex2 = RuntimeError("Maximum compute attempts exceeded.")
+    for i in range(3):
+        task = concurrent.futures.Future()
+        task.cap = fix
+        task.command = command
+        task.timeout = _timeout
+        queue = bot.compute_queue.setdefault(fix, set())
+        queue.add(task)
+        proc = await get_idle_proc(ptype, fix=fix)
+        if not proc.fut.done():
+            proc.fut.set_result(None)
+        try:
+            return await asyncio.wait_for(wrap_future(task), timeout=_timeout + 2)
+        except T1 as ex:
+            ex2 = ex
+            continue
+    raise ex2
+
+async def _sub_submit(ptype, command, fix=None, _timeout=12):
     ts = ts_us()
     proc = await get_idle_proc(ptype, fix=fix)
     while ts in PROC_RESP:
