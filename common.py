@@ -2294,6 +2294,7 @@ async def start_proc(k, i):
     proc.is_running = lambda: not proc.returncode
     proc.sem = Semaphore(1, inf)
     proc.comm = create_task(proc_communicate(proc))
+    proc.dist = create_task(proc_distribute(proc))
     proc.cap = min(i, 3)
     proc.fut = concurrent.futures.Future()
     PROCS[k][i] = proc
