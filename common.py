@@ -2339,8 +2339,10 @@ async def sub_submit(ptype, command, fix=None, _timeout=12):
     for i in range(3):
         if fix and fix >= 3 and PROC_COUNT.compute > 3:
             fix = random.randint(3, PROC_COUNT.compute - 1)
+        else:
+            fix = fix or 0
         task = concurrent.futures.Future()
-        task.cap = fix or 0
+        task.cap = fix
         task.command = command
         task.timeout = _timeout
         queue = bot.compute_queue.setdefault(min(3, fix), set())
