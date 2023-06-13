@@ -2300,7 +2300,7 @@ async def start_proc(k, i):
     proc.comm = create_task(proc_communicate(proc))
     proc.dist = create_task(proc_distribute(proc))
     proc.cap = min(i, 3)
-    proc.fut = concurrent.futures.Future()
+    proc.fut = newfut
     PROCS[k][i] = proc
     return proc
 
@@ -2348,6 +2348,8 @@ async def sub_submit(ptype, command, fix=None, _timeout=12):
         queue = bot.compute_queue.setdefault(fix, set())
         queue.add(task)
         for proc in PROCS.compute:
+            if not proc:
+                continue
             if not proc.fut.done():
                 proc.fut.set_result(None)
         try:
