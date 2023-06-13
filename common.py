@@ -2361,6 +2361,15 @@ async def sub_submit(ptype, command, fix=None, _timeout=12):
             continue
     raise ex2
 
+last_sub = 0
+async def wait_sub():
+    globals()["last_sub"] = utc()
+    await asyncio.sleep(1800)
+    if utc() - last_sub < 1800:
+        return
+    globals()["last_sub"] = utc()
+    return await create_future(sub_kill)
+
 async def _sub_submit(ptype, command, fix=None, _timeout=12):
     ts = ts_us()
     proc = await get_idle_proc(ptype, fix=fix)
@@ -2407,6 +2416,7 @@ async def _sub_submit(ptype, command, fix=None, _timeout=12):
             raise
         finally:
             PROC_RESP.pop(ts, None)
+    create_task(wait_sub())
     return resp
 
 def sub_kill(start=True, force=False):
