@@ -2338,10 +2338,7 @@ async def sub_submit(ptype, command, fix=None, _timeout=12):
     bot = BOT[0]
     ex2 = RuntimeError("Maximum compute attempts exceeded.")
     for i in range(3):
-        # if fix and fix >= 3 and PROC_COUNT.compute > 3:
-        #     fix = random.randint(3, PROC_COUNT.compute - 1)
-        # elif not fix:
-        #     fix = random.randint(0, PROC_COUNT.compute - 1)
+        fix = fix or 0
         task = concurrent.futures.Future()
         task.cap = fix
         task.command = command
