@@ -55,30 +55,30 @@ class Server:
 		minfo = psutil.virtual_memory()
 		sinfo = psutil.swap_memory()
 		dinfo = {}
-        for p in psutil.disk_partitions(all=False):
-            try:
-                dinfo[p.mountpoint] = psutil.disk_usage(p.mountpoint)
-            except OSError:
-                pass
+		for p in psutil.disk_partitions(all=False):
+			try:
+				dinfo[p.mountpoint] = psutil.disk_usage(p.mountpoint)
+			except OSError:
+				pass
 		if fut:
 			resp = fut.result()
 			self.ip = resp.text
 		ip = self.ip
 		t = time.time()
 		def get_usage(gi):
-            try:
-                return float(gi["utilization.gpu"]) / 100
-            except ValueError:
-                pass
-            try:
-                return gi.power_draw / gi.power_limit
-            except (ValueError, TypeError, ZeroDivisionError):
-                return 0
-        def try_float(f):
-            try:
-                return float(f)
-            except ValueError:
-                return 0
+			try:
+				return float(gi["utilization.gpu"]) / 100
+			except ValueError:
+				pass
+			try:
+				return gi.power_draw / gi.power_limit
+			except (ValueError, TypeError, ZeroDivisionError):
+				return 0
+		def try_float(f):
+			try:
+				return float(f)
+			except ValueError:
+				return 0
 		return json.dumps(dict(
 			cpu={ip: dict(name=cinfo["brand_raw"], count=cinfo["count"], usage=cpercent / 100, max=1, time=t)},
 			gpu={f"{ip}-{gi['index']}": dict(
