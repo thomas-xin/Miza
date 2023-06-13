@@ -2311,7 +2311,8 @@ def proc_start():
     PROC_COUNT.compute = 3 + dc
     for k, v in PROC_COUNT.items():
         PROCS[k] = [None] * v
-        create_task(start_proc(k, 0))
+        for i in range(v):
+            create_task(start_proc(k, i))
 
 async def get_idle_proc(ptype, fix=None):
     if fix is not None:
