@@ -1732,7 +1732,7 @@ class Art(Command):
                             futt = []
                             c = amount - amount2
                             for i in range(c):
-                                fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, 1], fix=3, timeout=1200))
+                                fut = create_task(process_image("IBASL", "&", [p, kwargs, nsfw, False, 1], fix=3, timeout=1200))
                                 futt.append(fut)
                             # c2 = c
                             # for i in range(len(COMPUTE_LOAD)):
