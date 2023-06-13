@@ -1538,7 +1538,7 @@ class Art(Command):
                 futt = []
                 c = 0
                 if not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy():
-                    c = min(amount, 9 if nsfw else 5)
+                    c = min(amount, 9 if nsfw and not self.sdiff_sem.active else 5)
                     for i in range(c):
                         fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, 1], fix=3, timeout=1200))
                         futt.append(fut)

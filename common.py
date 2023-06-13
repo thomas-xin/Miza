@@ -2179,7 +2179,11 @@ def is_strict_running(proc):
             return
         return True
     except AttributeError:
-        proc = psutil.Process(proc.pid)
+        try:
+            proc = psutil.Process(proc.pid)
+        except:
+            print_exc()
+            return
     if not proc.is_running():
         return False
     try:
