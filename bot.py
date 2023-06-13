@@ -2598,7 +2598,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             while i in self.compute_wait:
                 i += 1
             self.compute_wait[i] = task
-            prompt = [i, task.cap, task.command, task._timeout]
+            prompt = [i, task.cap, task.command, task.timeout]
             prompts.append(prompt)
         return prompts
 
