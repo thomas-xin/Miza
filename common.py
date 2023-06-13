@@ -2262,7 +2262,7 @@ async def proc_distribute(proc):
             for task in tasks:
                 i, cap, command, timeout = task
                 try:
-                    resp = await _sub_submit("compute", command, fix=cap or None, _timeout=timeout)
+                    resp = await _sub_submit("compute", command, fix=proc.i, _timeout=timeout)
                 except Exception as ex:
                     newtasks.extend(bot.distribute([proc.cap], {}, {i: ex}))
                 else:
@@ -2295,6 +2295,7 @@ async def start_proc(k, i):
         stdout=subprocess.PIPE,
         stderr=None,
     )
+    proc.i = i
     proc.is_running = lambda: not proc.returncode
     proc.sem = Semaphore(1, inf)
     proc.comm = create_task(proc_communicate(proc))
