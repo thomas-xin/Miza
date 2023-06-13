@@ -2514,7 +2514,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
     async def get_ip(self):
         if not self.ip_sem.busy:
             async with self.ip_sem:
-                self.ip = await Request("https://api.ipify.org", bypass=False, verify=False, decode=True, timeout=3, aio=True)
+                self.ip = await Request("https://api.ipify.org", bypass=False, ssl=False, decode=True, timeout=3, aio=True)
         return self.ip
 
     # Gets the CPU and memory usage of a process over a period of 1 second.
