@@ -1472,7 +1472,7 @@ class OCR(Command):
     async def __call__(self, bot, user, message, args, argv, **void):
         fut = create_future(__import__, "pytesseract")
         name, value, url, fmt, extra = await get_image(bot, user, message, args, argv)
-        resp = await process_image(url, "resize_max", ["-nogif", [1024, 1024], "auto", "-f", "png"], timeout=60)
+        resp = await process_image(url, "resize_max", ["-nogif", 1024, "auto", "-f", "png"], timeout=60)
         if isinstance(resp, str):
             f = open(resp, "rb")
         else:
