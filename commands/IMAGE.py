@@ -1481,7 +1481,7 @@ class OCR(Command):
         im = await create_future(Image.open, f)
         pytesseract = await fut
         text = await create_future(pytesseract.image_to_string, im, config="--psm 1", timeout=8)
-        return css_md(f"[Detected text]{no_md(text)}.")
+        return css_md(f"[Detected text]\n{no_md(text)}.")
 
 
 class Art(Command):
