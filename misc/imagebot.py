@@ -562,11 +562,6 @@ class Bot:
 			pf = StableDiffusionImageVariationPipeline
 			if model == "stabilityai/stable-diffusion-2-1":
 				model = "lambdalabs/sd-image-variations-diffusers"
-		if kwargs.get("--init-image"):
-			b = kwargs["--init-image"]
-			if not isinstance(b, str):
-				b = io.BytesIO(b)
-			im = Image.open(b)
 		out = []
 		if torch.cuda.is_available():
 			device = 0
@@ -624,6 +619,11 @@ class Bot:
 		else:
 			pipe.safety_checker = checkers[model]
 		# pipe = pipe.to(f"cuda:{device}")
+		if kwargs.get("--init-image"):
+			b = kwargs["--init-image"]
+			if not isinstance(b, str):
+				b = io.BytesIO(b)
+			im = Image.open(b)
 		with torch.cuda.device(device):
 			if pf is StableDiffusionInpaintPipeline:
 				data = pipe(
