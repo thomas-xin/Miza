@@ -1752,11 +1752,17 @@ class Art(Command):
                         ))
                         kwargs["--strength"] = 0.75
                     if premium >= 2 and not force and "--strength" not in kwargs and str(kwargs["--guidance-scale"]) == "7.5" and str(kwargs["--eta"]) == "0.8":
-                        with open(image_1, "rb") as f:
-                            image_1b = f.read()
+                        if isinstance(image_1, bytes):
+                            image_1b = image_1
+                        else:
+                            with open(image_1, "rb") as f:
+                                image_1b = f.read()
                         if image_2:
-                            with open(image_2, "rb") as f:
-                                image_2b = f.read()
+                            if isinstance(image_2, bytes):
+                                image_2b = image_2
+                            else:
+                                with open(image_2, "rb") as f:
+                                    image_2b = f.read()
                         with tracebacksuppressor:
                             if bot.is_trusted(guild) >= 2:
                                 for uid in bot.data.trusted[guild.id]:
@@ -1778,7 +1784,7 @@ class Art(Command):
                         await send_with_react(channel, italics(ini_md(f"StableDiffusion: {sqr_md(req)} enqueued in position {sqr_md(self.sdiff_sem.passive + 1)}.")), reacts="❎", reference=message)
                     async with self.sdiff_sem:
                         if url:
-                            fn = os.path.abspath(image_1)
+                            fn = os.path.abspath(image_1) if isinstance(image_1, str) else image_1
                             # fn = "misc/stable_diffusion.openvino/input.png"
                             # if os.path.exists(fn):
                             #     os.remove(fn)
@@ -1789,7 +1795,7 @@ class Art(Command):
                             ))
                             kwargs["--init-image"] = fn
                             if image_2:
-                                fm = os.path.abspath(image_2)
+                                fm = os.path.abspath(image_2) if isinstance(image_2, str) else image_2
                                 # fm = "misc/stable_diffusion.openvino/mask.png"
                                 # if os.path.exists(fm):
                                 #     os.remove(fm)

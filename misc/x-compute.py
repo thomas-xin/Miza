@@ -251,6 +251,11 @@ def header():
 	}
 
 def get_request(url):
+	if isinstance(url, (bytes, memoryview)):
+		return url
+	if isinstance(url, io.BytesIO):
+		url.seek(0)
+		return url.read()
 	if is_discord_url(url) and "attachments/" in url[:64]:
 		try:
 			a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])

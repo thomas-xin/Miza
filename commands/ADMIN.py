@@ -1824,16 +1824,16 @@ class CreateEmoji(Command):
                 name = "emoji_" + str(len(guild.emojis))
             # print(name, url)
             image = resp = await bot.get_request(url, timeout=20)
-            if len(image) > 67108864:
-                raise OverflowError("Max file size to load is 64MB.")
-            if len(image) > 2097152 or not is_image(url):
+            if len(image) > 1073741824:
+                raise OverflowError("Max file size to load is 1GB.")
+            if len(image) > 262144 or not is_image(url):
                 ts = ts_us()
                 path = "cache/" + str(ts)
                 with open(path, "wb") as f:
                     await create_future(f.write, image, timeout=18)
                 verified = False
                 width = 128
-                while len(image) > 2097152 or not verified:
+                while len(image) > 262144 or not verified:
                     try:
                         resp = await process_image(path, "resize_max", [width], timeout=_timeout)
                     except:
@@ -1843,7 +1843,7 @@ class CreateEmoji(Command):
                         if not os.path.exists(fn) or not os.path.getsize(fn):
                             break
                         if isinstance(fn, str):
-                            r = os.path.getsize(fn) / 2097152
+                            r = os.path.getsize(fn) / 262144
                             if r > 1:
                                 width = floor(width / sqrt(r))
                                 continue
