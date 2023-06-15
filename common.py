@@ -2424,6 +2424,7 @@ async def _sub_submit(ptype, command, fix=None, _timeout=12):
                 raise ex
             force_kill(proc)
             PROCS[ptype][i] = None
+            create_task(start_proc(ptype, i))
             raise
         finally:
             PROC_RESP.pop(ts, None)

@@ -1480,7 +1480,7 @@ class OCR(Command):
             f = io.BytesIO(resp[0])
         im = await create_future(Image.open, f)
         pytesseract = await fut
-        text = await create_future(pytesseract.image_to_string, im, config="--psm 1", _timeout=8)
+        text = await create_future(pytesseract.image_to_string, im, config="--psm 1", timeout=8)
         return css_md(f"[Detected text]{no_md(text)}.")
 
 
