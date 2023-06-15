@@ -1473,10 +1473,10 @@ class OCR(Command):
         fut = create_future(__import__, "pytesseract")
         name, value, url, fmt, extra = await get_image(bot, user, message, args, argv)
         resp = await process_image(url, "resize_max", ["-nogif", 1024, "auto", "-f", "png"], timeout=60)
-        if isinstance(resp, str):
-            f = open(resp, "rb")
+        if isinstance(resp[0], str):
+            f = open(resp[0], "rb")
         else:
-            f = io.BytesIO(resp)
+            f = io.BytesIO(resp[0])
         pytesseract = await fut
         text = pytesseract.image_to_string(f, config="--psm 1")
         return css_md(f"[Detected text]{no_md(text)}.")
