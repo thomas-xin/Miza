@@ -596,9 +596,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 with tracebacksuppressor:
                     if "s" in data:
                         s = data.pop("s")
-                        data["username"], data["discriminator"] = s.rsplit("#", 1)
+                        if "#" in s:
+                            data["username"], data["discriminator"] = s.rsplit("#", 1)
+                        else:
+                            data["username"] = s
+                            data["discriminator"] = 0
                     else:
-                        s = data["username"] + "#" + data["discriminator"]
+                        if data.get("discriminator") not in (None, 0, "0"):
+                            s = data["username"] + "#" + data["discriminator"]
+                        else:
+                            s = data["username"]
                     self.usernames[s] = users[u_id] = self._state.store_user(data)
                     return
             self.user_loader.add(u_id)
@@ -666,14 +673,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         return (u,)
 
     def user_from_identifier(self, u_id):
-        if "#" in u_id:
-            spl = u_id.split()
-            for i in range(len(spl)):
-                uid = " ".join(spl[i:])
-                try:
-                    return self.usernames[uid]
-                except:
-                    pass
+        spl = u_id.split()
+        for i in range(len(spl)):
+            uid = " ".join(spl[i:])
+            try:
+                return self.usernames[uid]
+            except:
+                pass
 
     async def fetch_user_member(self, u_id, guild=None):
         u_id = verify_id(u_id)
