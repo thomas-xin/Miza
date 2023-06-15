@@ -1826,14 +1826,14 @@ class CreateEmoji(Command):
             image = resp = await bot.get_request(url, timeout=20)
             if len(image) > 67108864:
                 raise OverflowError("Max file size to load is 64MB.")
-            if len(image) > 262144 or not is_image(url):
+            if len(image) > 2097152 or not is_image(url):
                 ts = ts_us()
                 path = "cache/" + str(ts)
                 with open(path, "wb") as f:
                     await create_future(f.write, image, timeout=18)
                 verified = False
                 width = 128
-                while len(image) > 262144 or not verified:
+                while len(image) > 2097152 or not verified:
                     try:
                         resp = await process_image(path, "resize_max", [width], timeout=_timeout)
                     except:
@@ -1842,12 +1842,15 @@ class CreateEmoji(Command):
                         fn = resp[0]
                         if not os.path.exists(fn) or not os.path.getsize(fn):
                             break
-                        r = os.path.getsize(fn) / 262144
-                        if r > 1:
-                            width = floor(width / sqrt(r))
-                            continue
-                        with open(fn, "rb") as f:
-                            image = await create_future(f.read, timeout=18)
+                        if isinstance(fn, str):
+                            r = os.path.getsize(fn) / 2097152
+                            if r > 1:
+                                width = floor(width / sqrt(r))
+                                continue
+                            with open(fn, "rb") as f:
+                                image = await create_future(f.read, timeout=18)
+                        else:
+                            image = fn
                         verified = True
                     finally:
                         with suppress():
