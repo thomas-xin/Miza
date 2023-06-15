@@ -6,6 +6,7 @@ except ModuleNotFoundError:
     import youtube_dl
 import aiohttp, torch
 import imagebot
+from PIL import Image
 
 getattr(youtube_dl, "__builtins__", {})["print"] = print
 
@@ -1477,8 +1478,9 @@ class OCR(Command):
             f = open(resp[0], "rb")
         else:
             f = io.BytesIO(resp[0])
+        im = await create_future(Image.open, f)
         pytesseract = await fut
-        text = pytesseract.image_to_string(f, config="--psm 1")
+        text = await create_future(pytesseract.image_to_string, im, config="--psm 1", _timeout=8)
         return css_md(f"[Detected text]{no_md(text)}.")
 
 

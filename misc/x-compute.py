@@ -3203,7 +3203,7 @@ def evalImg(url, operation, args):
 def evaluate(ts, args):
 	try:
 		out = evalImg(*args)
-		if isinstance(out, (tuple, list)) or isinstance(out[0], io.BytesIO):
+		if isinstance(out, (tuple, list)) and isinstance(out[0], io.BytesIO):
 			out[0].seek(0)
 			out[0] = out[0].read()
 		if isinstance(out, (bytes, memoryview)):
