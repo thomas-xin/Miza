@@ -3203,9 +3203,9 @@ def evalImg(url, operation, args):
 def evaluate(ts, args):
 	try:
 		out = evalImg(*args)
-		if isinstance(out, io.BytesIO):
-			out.seek(0)
-			out = out.read()
+		if isinstance(out, (tuple, list)) or isinstance(out[0], io.BytesIO):
+			out[0].seek(0)
+			out[0] = out[0].read()
 		if isinstance(out, (bytes, memoryview)):
 			b = base64.b64encode(out)
 			sys.stdout.buffer.write(f"$PROC_RESP[{ts}].set_result(_x)~".encode("utf-8"))
