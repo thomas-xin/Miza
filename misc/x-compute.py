@@ -5,14 +5,10 @@ import numpy as np
 import PIL
 from PIL import Image, ImageCms, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhance, ImageMath, ImageStat, ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
-import pillow_heif
-pillow_heif.register_heif_opener()
 Resampling = getattr(Image, "Resampling", Image)
 Transpose = getattr(Image, "Transpose", Image)
 Transform = getattr(Image, "Transform", Image)
 Image.MAX_IMAGE_PIXELS = 4294967296
-from zipfile import ZipFile
-colorlib = colorspace.colorlib()
 from math import *
 
 def wrap_future(fut, loop=None):
@@ -188,6 +184,8 @@ def to_qr(s, rainbow=False):
 	fn = f"cache/{time.time_ns() // 1000}.png"
 	if not os.path.exists(fn):
 		img.png(fn, scale=1, module_color=(255,) * 3, background=(0,) * 4)
+	import pillow_heif
+	pillow_heif.register_heif_opener()
 	imo = Image.open(fn)
 	im = imo.convert("1")
 	imo.close()
@@ -328,6 +326,7 @@ def rgb_split(image, dtype=np.uint8):
 	return channels
 
 def xyz_split(image, convert=True, dtype=np.uint8):
+	colorlib = colorspace.colorlib()
 	out = rgb_split(image, dtype=np.float32)
 	out *= 1 / 255
 	for r, g, b in zip(*out):
@@ -420,6 +419,7 @@ def hsi_split(image, convert=True, dtype=np.uint8):
 	return out
 
 def hcl_split(image, convert=True, dtype=np.uint8):
+	colorlib = colorspace.colorlib()
 	out = rgb_split(image, dtype=np.float32)
 	out *= 1 / 255
 	for r, g, b in zip(*out):
@@ -442,6 +442,7 @@ def hcl_split(image, convert=True, dtype=np.uint8):
 	return out
 
 def luv_split(image, convert=True, dtype=np.uint8):
+	colorlib = colorspace.colorlib()
 	out = rgb_split(image, dtype=np.float32)
 	out *= 1 / 255
 	for r, g, b in zip(*out):
@@ -510,6 +511,7 @@ def rgb_merge(R, G, B, convert=True):
 	return out
 
 def xyz_merge(X, Y, Z, convert=True):
+	colorlib = colorspace.colorlib()
 	X = np.asanyarray(X, np.float32)
 	Y = np.asanyarray(Y, np.float32)
 	Z = np.asanyarray(Z, np.float32)
@@ -598,6 +600,7 @@ def hsi_merge(H, S, V, convert=True):
 	return hsl_merge(H, S, V, convert, intensity=True)
 
 def hcl_merge(H, C, L, convert=True):
+	colorlib = colorspace.colorlib()
 	H = np.asanyarray(H, np.float32)
 	C = np.asanyarray(C, np.float32)
 	L = np.asanyarray(L, np.float32)
@@ -618,6 +621,7 @@ def hcl_merge(H, C, L, convert=True):
 	return rgb_merge(*out, convert=convert)
 
 def luv_merge(L, U, V, convert=True):
+	colorlib = colorspace.colorlib()
 	L = np.asanyarray(L, np.float32)
 	U = np.asanyarray(U, np.float32)
 	V = np.asanyarray(V, np.float32)
@@ -1282,7 +1286,7 @@ def magik_gif2(image, cell_count, grid_distance, iterations):
 	return dict(duration=total * scale, count=length * scale, frames=magik_gif_iterator(image))
 
 
-def magik_gif(image, cell_count=7, iterations=1):
+def magik_gif(image, cell_count=7, iterations=1, anim=32, duration=2):
 	grid_distance = int(max(1, round(sqrt(np.prod(image.size)) / cell_count / 3 / iterations)))
 	try:
 		image.seek(1)
@@ -1294,7 +1298,7 @@ def magik_gif(image, cell_count=7, iterations=1):
 
 	def magik_gif_iterator(image):
 		yield image
-		for _ in range(31):
+		for _ in range(anim - 1):
 			for _ in range(iterations):
 				dst_grid = griddify(shape_to_rect(image.size), cell_count, cell_count)
 				src_grid = distort_grid(dst_grid, grid_distance)
@@ -1302,7 +1306,7 @@ def magik_gif(image, cell_count=7, iterations=1):
 				image = image.transform(image.size, Transform.MESH, mesh, resample=Resampling.NEAREST)
 			yield image
 
-	return dict(duration=2000, count=32, frames=magik_gif_iterator(image))
+	return dict(duration=duration * 1000, count=anim, frames=magik_gif_iterator(image))
 
 
 def quad_as_rect(quad):
@@ -2749,6 +2753,8 @@ def from_bytes(b, save=None, nogif=False):
 	else:
 		data = b
 		out = io.BytesIO(b) if type(b) is bytes else b
+	import pillow_heif
+	pillow_heif.register_heif_opener()
 	mime = magic.from_buffer(data)
 	if mime == "application/zip":
 		z = zipfile.ZipFile(io.BytesIO(data), compression=zipfile.ZIP_DEFLATED, strict_timestamps=False)
@@ -3171,17 +3177,22 @@ def evalImg(url, operation, args):
 			else:
 				proc.stdin.close()
 				proc.wait()
-			return [out]
+			with open(out, "rb") as f:
+				return f.read()
+			# return [out]
 	if isinstance(new, Image.Image):
 		if new.entropy() > 8 and fmt in ("default", "webp"):
-			out = "cache/" + str(ts) + ".webp"
+			# out = "cache/" + str(ts) + ".webp"
+			out = io.BytesIO()
 			new.save(out, format="webp", lossless=False, quality=67)
 			return [out]
 		elif fmt in ("default", "webp"):
-			out = "cache/" + str(ts) + ".webp"
+			# out = "cache/" + str(ts) + ".webp"
+			out = io.BytesIO()
 			new.save(out, format="webp", lossless=True, quality=80)
 			return [out]
 		else:
+			out = io.BytesIO()
 			new.save(out, format="png", optimize=True)
 			return [out]
 	elif type(new) is str and new.startswith("$"):
@@ -3192,6 +3203,9 @@ def evalImg(url, operation, args):
 def evaluate(ts, args):
 	try:
 		out = evalImg(*args)
+		if isinstance(out, io.BytesIO):
+			out.seek(0)
+			b = out.read()
 		if isinstance(out, (bytes, memoryview)):
 			b = base64.b64encode(out)
 			sys.stdout.buffer.write(f"$PROC_RESP[{ts}].set_result(_x)~".encode("utf-8"))

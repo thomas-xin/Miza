@@ -201,7 +201,7 @@ class IMG(Command):
             await bot.ignore_interaction(message)
 
 
-async def get_image(bot, user, message, args, argv, default=2, raw=False, ext="webp"):
+async def get_image(bot, user, message, args, argv, default=2, raw=False, ext="webp", count=0):
     try:
         # Take input from any attachments, or otherwise the message contents
         if message.attachments:
@@ -229,6 +229,9 @@ async def get_image(bot, user, message, args, argv, default=2, raw=False, ext="w
             raise ArgumentError("Please input an image by URL or attachment.")
     if args and args[-1] in VIDEOS:
         ext = args.pop(-1)
+    extra = []
+    while count > 0 and len(args) > 1:
+        extra.append(args.pop(-1))
     value = " ".join(args).strip()
     if not value:
         value = default
@@ -247,7 +250,7 @@ async def get_image(bot, user, message, args, argv, default=2, raw=False, ext="w
         name = "unknown"
     if not name.endswith("." + ext):
         name += "." + ext
-    return name, value, url, ext
+    return name, value, url, ext, extra
 
 
 class ImageAdjust(Command):
@@ -275,7 +278,7 @@ class ImageAdjust(Command):
             default = 8
         else:
             default = 2
-        name2, value, url, fmt = await get_image(bot, user, message, args, argv, default=default)
+        name2, value, url, fmt, extra = await get_image(bot, user, message, args, argv, default=default)
         with discord.context_managers.Typing(channel):
             if name.startswith("sat"):
                 argi = ("Enhance", ["Color", value, "-f", fmt])
@@ -295,7 +298,7 @@ class ImageAdjust(Command):
                 raise RuntimeError(name)
             resp = await process_image(url, *argi, timeout=_timeout)
             fn = resp[0]
-            if "." in fn:
+            if isinstance(fn, str) and "." in fn:
                 fmt = "." + fn.rsplit(".", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
@@ -369,7 +372,7 @@ class ColourDeficiency(Command):
         with discord.context_managers.Typing(channel):
             resp = await process_image(url, "colour_deficiency", [operation, value], timeout=_timeout)
             fn = resp[0]
-            if "." in fn:
+            if isinstance(fn, str) and "." in fn:
                 fmt = "." + fn.rsplit(".", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
@@ -448,11 +451,11 @@ class Invert(Command):
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url, fmt = await get_image(bot, user, message, args, argv)
+        name, value, url, fmt, extra = await get_image(bot, user, message, args, argv)
         with discord.context_managers.Typing(channel):
             resp = await process_image(url, "invert", ["-f", fmt], timeout=_timeout)
             fn = resp[0]
-            if "." in fn:
+            if isinstance(fn, str) and "." in fn:
                 fmt = "." + fn.rsplit(".", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
@@ -472,11 +475,11 @@ class GreyScale(Command):
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url, fmt = await get_image(bot, user, message, args, argv)
+        name, value, url, fmt, extra = await get_image(bot, user, message, args, argv)
         with discord.context_managers.Typing(channel):
             resp = await process_image(url, "greyscale", ["-f", fmt], timeout=_timeout)
             fn = resp[0]
-            if "." in fn:
+            if isinstance(fn, str) and "." in fn:
                 fmt = "." + fn.rsplit(".", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
@@ -496,11 +499,11 @@ class Laplacian(Command):
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url, fmt = await get_image(bot, user, message, args, argv)
+        name, value, url, fmt, extra = await get_image(bot, user, message, args, argv)
         with discord.context_managers.Typing(channel):
             resp = await process_image(url, "laplacian", ["-f", fmt], timeout=_timeout)
             fn = resp[0]
-            if "." in fn:
+            if isinstance(fn, str) and "." in fn:
                 fmt = "." + fn.rsplit(".", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
@@ -520,7 +523,7 @@ class ColourSpace(Command):
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url, fmt = await get_image(bot, user, message, args, argv, raw=True, default="")
+        name, value, url, fmt, extra = await get_image(bot, user, message, args, argv, raw=True, default="")
         spl = value.rsplit(None, 1)
         if not spl:
             source = "rgb"
@@ -538,7 +541,7 @@ class ColourSpace(Command):
         with discord.context_managers.Typing(channel):
             resp = await process_image(url, "colourspace", [source, dest, "-f", fmt], timeout=_timeout)
             fn = resp[0]
-            if "." in fn:
+            if isinstance(fn, str) and "." in fn:
                 fmt = "." + fn.rsplit(".", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
@@ -558,11 +561,11 @@ class Magik(Command):
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url, fmt = await get_image(bot, user, message, args, argv, default=7)
+        name, value, url, fmt, extra = await get_image(bot, user, message, args, argv, default=7)
         with discord.context_managers.Typing(channel):
             resp = await process_image(url, "magik", [value, "-f", fmt], timeout=_timeout)
             fn = resp[0]
-            if "." in fn:
+            if isinstance(fn, str) and "." in fn:
                 fmt = "." + fn.rsplit(".", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
@@ -737,7 +740,7 @@ class Rainbow(Command):
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url, fmt = await get_image(bot, user, message, args, argv, ext="gif")
+        name, value, url, fmt, extra = await get_image(bot, user, message, args, argv, ext="gif")
         with discord.context_managers.Typing(channel):
             # -gif signals to image subprocess that the output is always a .gif image
             resp = await process_image(url, "rainbow_gif", [value, "-gif", "-f", fmt], timeout=_timeout)
@@ -825,7 +828,7 @@ class Spin(Command):
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url, fmt = await get_image(bot, user, message, args, argv, ext="gif")
+        name, value, url, fmt, extra = await get_image(bot, user, message, args, argv, ext="gif")
         with discord.context_managers.Typing(channel):
             # -gif signals to image subprocess that the output is always a .gif image
             resp = await process_image(url, "spin_gif", [value, "-gif", "-f", fmt], timeout=_timeout)
@@ -844,7 +847,7 @@ class Orbit(Command):
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url, fmt = await get_image(bot, user, message, args, argv, ext="gif", raw=True, default="")
+        name, value, url, fmt, extra = await get_image(bot, user, message, args, argv, ext="gif", raw=True, default="")
         extras = deque()
         while value:
             spl = value.split(None, 1)
@@ -883,7 +886,7 @@ class Orbit(Command):
 class GMagik(Command):
     name = ["Liquefy", "MagikGIF"]
     description = "Repeatedly applies the Magik image filter to supplied image."
-    usage = "<0:url> <cell_size(7)>?"
+    usage = "<0:url> <cell_size(7)>? <iterations(64)>? <duration(2)>?"
     example = ("gmagik https://mizabot.xyz/favicon", "liquefy https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png 36")
     no_parse = True
     rate_limit = (11, 14)
@@ -895,11 +898,16 @@ class GMagik(Command):
             default = 32
         else:
             default = 7
-        name, value, url, fmt = await get_image(bot, user, message, args, argv, default=default, ext="gif")
+        name, value, url, fmt, extra = await get_image(bot, user, message, args, argv, default=default, count=1, ext="gif")
         if name == "liquefy":
-            arr = [abs(value), 2, "-gif", "-f", fmt]
+            arr = [abs(value), 2]
         else:
-            arr = [abs(value), "-gif", "-f", fmt]
+            arr = [abs(value), 1]
+        if extra:
+            arr.append(int(extra.pop(0)))
+        if extra:
+            arr.append(int(extra.pop(0)))
+        arr.extend(("-gif", "-f", fmt))
         with discord.context_managers.Typing(channel):
             resp = await process_image(url, "magik_gif", arr, timeout=_timeout)
             fn = resp[0]
@@ -1073,7 +1081,7 @@ class Resize(Command):
                 name += "." + fmt
             resp = await process_image(url, func, [x, y, op, "-f", fmt], timeout=_timeout)
             fn = resp[0]
-            if "." in fn:
+            if isinstance(fn, str) and "." in fn:
                 fmt = "." + fn.rsplit(".", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
@@ -1093,12 +1101,12 @@ class Rotate(Command):
     typing = True
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
-        name, value, url, fmt = await get_image(bot, user, message, args, argv, default=90, raw=True)
+        name, value, url, fmt, extra = await get_image(bot, user, message, args, argv, default=90, raw=True)
         value = await bot.eval_math(value)
         with discord.context_managers.Typing(channel):
             resp = await process_image(url, "rotate_to", [value, "-f", fmt], timeout=_timeout)
             fn = resp[0]
-            if "." in fn:
+            if isinstance(fn, str) and "." in fn:
                 fmt = "." + fn.rsplit(".", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
@@ -1169,7 +1177,7 @@ class Fill(Command):
                 name += ".png"
             resp = await process_image(url, "fill_channels", [value, *args], timeout=_timeout)
             fn = resp[0]
-            if "." in fn:
+            if isinstance(fn, str) and "." in fn:
                 fmt = "." + fn.rsplit(".", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
@@ -1266,7 +1274,7 @@ class Blend(Command):
             resp = await process_image(url1, "blend_op", [url2, operation, opacity], timeout=_timeout)
             print(resp)
             fn = resp[0]
-            if "." in fn:
+            if isinstance(fn, str) and "." in fn:
                 fmt = "." + fn.rsplit(".", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
@@ -1385,6 +1393,27 @@ class Steganography(Command):
             emb.timestamp = message.created_at
             self.bot.send_embeds(c, emb)
         await m.reply("Message has been successfully taken down.")
+
+
+class OCR(Command):
+    name = ["Tesseract", "Read", "Image2Text"]
+    description = "Attempts to read text in an image using Optical Character Recognition AI."
+    usage = "<url>"
+    example = ("ocr https://opengraph.githubassets.com/c3922b6d44ff4a498c1607bec89b70a1c755e2d44d115bec93b5bb981aa1ad36/tesseract-ocr/tesseract",)
+    rate_limit = (10, 15)
+    slash = ("Read")
+
+    async def __call__(self, bot, user, message, args, argv, channel):
+        fut = create_future(__import__, "pytesseract")
+        name, value, url, fmt, extra = await get_image(bot, user, message, args, argv)
+        resp = await process_image(url, "resize_max", ["-nogif", [1024, 1024], "auto", "-f", "png"], timeout=60)
+        if isinstance(resp, str):
+            f = open(resp, "rb")
+        else:
+            f = io.BytesIO(resp)
+        pytesseract = await fut
+        text = pytesseract.image_to_string(f, config="--psm 1")
+        return css_md(f"[Detected text]{no_md(text)}.")
 
 
 class Art(Command):
@@ -1540,7 +1569,7 @@ class Art(Command):
                 if not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy():
                     c = min(amount, 9 if nsfw and not self.sdiff_sem.active else 5)
                     for i in range(c):
-                        fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, 1], fix=3, timeout=1200))
+                        fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, 1], fix=3, timeout=120))
                         futt.append(fut)
                     # c2 = c
                     # for i in range(len(COMPUTE_LOAD)):
@@ -1673,7 +1702,7 @@ class Art(Command):
                             data = bot.data.users.get(u.id, {})
                             oai = data.get("trial") and data.get("openai_key")
                             self.imagebot.token = oai or AUTH.get("openai_key")
-                            ims = create_future(self.imagebot.dalle_i2i, prompt, image_1b, image_2b, False, count, timeout=60)
+                            ims = await create_future(self.imagebot.dalle_i2i, prompt, image_1b, image_2b, False, amount, timeout=60)
                             futs.extend(ims)
                             amount2 = len(futs)
                 while amount2 < amount:
@@ -1732,7 +1761,7 @@ class Art(Command):
                             futt = []
                             c = amount - amount2
                             for i in range(c):
-                                fut = create_task(process_image("IBASL", "&", [p, kwargs, nsfw, False, 1], fix=3, timeout=1200))
+                                fut = create_task(process_image("IBASL", "&", [p, kwargs, nsfw, False, 1], fix=3, timeout=120))
                                 futt.append(fut)
                             # c2 = c
                             # for i in range(len(COMPUTE_LOAD)):

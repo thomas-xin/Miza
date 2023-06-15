@@ -2430,10 +2430,16 @@ alert("File successfully deleted. Returning to home.");
 		caps = orjson.loads(caps)
 		if not stat.startswith("{"):
 			stat = base64.urlsafe_b64decode(stat + "==")
-		stat = orjson.loads(stat)
+		stat = orjson.loads(stat.replace("<IP>", true_ip()))
 		if not resp.startswith("{"):
 			resp = base64.urlsafe_b64decode(resp + "==")
 		resp = orjson.loads(resp)
+		for k, v in resp:
+			if isinstance(v, str):
+				if v.startswith("ERR:"):
+					resp[k] = evalex(v[4:])
+				elif v.startswith("RES:"):
+					resp[k] = v[4:]
 		tasks = self.bot_exec(f"bot.distribute({caps},{stat},{resp})")
 		cp.response.headers.update(HEADERS)
 		cp.response.headers["Content-Type"] = "application/json"

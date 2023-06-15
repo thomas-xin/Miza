@@ -389,7 +389,8 @@ class CustomAudio(collections.abc.Hashable):
             self.queue.update_load()
         elif not self.paused:
             self.paused = True
-            self.acsi.pause()
+            if self.acsi:
+                self.acsi.pause()
 
     def resume(self):
         if self.paused:

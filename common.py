@@ -2250,7 +2250,7 @@ async def proc_communicate(proc):
 
 async def proc_distribute(proc):
     bot = BOT[0]
-    tasks = []
+    tasks = ()
     while True:
         with tracebacksuppressor:
             if not is_strict_running(proc):
@@ -2355,7 +2355,7 @@ async def sub_submit(ptype, command, fix=None, _timeout=12):
             if not proc.fut.done():
                 proc.fut.set_result(None)
         try:
-            return await asyncio.wait_for(wrap_future(task), timeout=_timeout + 2)
+            return await asyncio.wait_for(wrap_future(task), timeout=(_timeout or 0) + 2)
         except T1 as ex:
             ex2 = ex
             continue
@@ -2369,6 +2369,17 @@ async def wait_sub():
         return
     globals()["last_sub"] = utc()
     return await create_future(sub_kill)
+
+def sub_kill(start=True, force=False):
+    for p in itertools.chain(*PROCS.values()):
+        if is_strict_running(p):
+            sem = emptyctx if force else p.sem
+            with sem:
+                force_kill(p)
+    PROCS.clear()
+    PROC_RESP.clear()
+    if start:
+        return proc_start()
 
 async def _sub_submit(ptype, command, fix=None, _timeout=12):
     ts = ts_us()
@@ -2418,17 +2429,6 @@ async def _sub_submit(ptype, command, fix=None, _timeout=12):
             PROC_RESP.pop(ts, None)
     create_task(wait_sub())
     return resp
-
-def sub_kill(start=True, force=False):
-    for p in itertools.chain(*PROCS.values()):
-        if is_strict_running(p):
-            sem = emptyctx if force else p.sem
-            with sem:
-                force_kill(p)
-    PROCS.clear()
-    PROC_RESP.clear()
-    if start:
-        return proc_start()
 
 
 # Sends an operation to the math subprocess pool.
