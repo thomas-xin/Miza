@@ -566,7 +566,7 @@ class Bot:
 			b = kwargs["--init-image"]
 			if not isinstance(b, str):
 				b = io.BytesIO(b)
-			im = Image.open(i)
+			im = Image.open(b)
 		out = []
 		if torch.cuda.is_available():
 			device = 0
