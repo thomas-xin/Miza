@@ -305,7 +305,7 @@ class ImageAdjust(Command):
                         name = name[:name.rindex(".")]
                     name += fmt
             elif isinstance(fn, (bytes, memoryview)):
-                fmt = get_mime(fn).rsplit("/", 1)[-1]
+                fmt = magic.from_buffer(fn).rsplit("/", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
@@ -385,7 +385,7 @@ class ColourDeficiency(Command):
                         name = name[:name.rindex(".")]
                     name += fmt
             elif isinstance(fn, (bytes, memoryview)):
-                fmt = get_mime(fn).rsplit("/", 1)[-1]
+                fmt = magic.from_buffer(fn).rsplit("/", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
@@ -474,7 +474,7 @@ class Invert(Command):
                         name = name[:name.rindex(".")]
                     name += fmt
             elif isinstance(fn, (bytes, memoryview)):
-                fmt = get_mime(fn).rsplit("/", 1)[-1]
+                fmt = magic.from_buffer(fn).rsplit("/", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
@@ -504,7 +504,7 @@ class GreyScale(Command):
                         name = name[:name.rindex(".")]
                     name += fmt
             elif isinstance(fn, (bytes, memoryview)):
-                fmt = get_mime(fn).rsplit("/", 1)[-1]
+                fmt = magic.from_buffer(fn).rsplit("/", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
@@ -534,7 +534,7 @@ class Laplacian(Command):
                         name = name[:name.rindex(".")]
                     name += fmt
             elif isinstance(fn, (bytes, memoryview)):
-                fmt = get_mime(fn).rsplit("/", 1)[-1]
+                fmt = magic.from_buffer(fn).rsplit("/", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
@@ -578,7 +578,7 @@ class ColourSpace(Command):
                         name = name[:name.rindex(".")]
                     name += fmt
             elif isinstance(fn, (bytes, memoryview)):
-                fmt = get_mime(fn).rsplit("/", 1)[-1]
+                fmt = magic.from_buffer(fn).rsplit("/", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
@@ -608,7 +608,7 @@ class Magik(Command):
                         name = name[:name.rindex(".")]
                     name += fmt
             elif isinstance(fn, (bytes, memoryview)):
-                fmt = get_mime(fn).rsplit("/", 1)[-1]
+                fmt = magic.from_buffer(fn).rsplit("/", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
@@ -1130,7 +1130,7 @@ class Resize(Command):
                         name = name[:name.rindex(".")]
                     name += fmt
             elif isinstance(fn, (bytes, memoryview)):
-                fmt = get_mime(fn).rsplit("/", 1)[-1]
+                fmt = magic.from_buffer(fn).rsplit("/", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
@@ -1161,7 +1161,7 @@ class Rotate(Command):
                         name = name[:name.rindex(".")]
                     name += fmt
             elif isinstance(fn, (bytes, memoryview)):
-                fmt = get_mime(fn).rsplit("/", 1)[-1]
+                fmt = magic.from_buffer(fn).rsplit("/", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
@@ -1238,7 +1238,7 @@ class Fill(Command):
                         name = name[:name.rindex(".")]
                     name += fmt
             elif isinstance(fn, (bytes, memoryview)):
-                fmt = get_mime(fn).rsplit("/", 1)[-1]
+                fmt = magic.from_buffer(fn).rsplit("/", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
@@ -1341,7 +1341,7 @@ class Blend(Command):
                         name = name[:name.rindex(".")]
                     name += fmt
             elif isinstance(fn, (bytes, memoryview)):
-                fmt = get_mime(fn).rsplit("/", 1)[-1]
+                fmt = magic.from_buffer(fn).rsplit("/", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
