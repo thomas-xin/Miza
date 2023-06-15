@@ -564,7 +564,8 @@ class Bot:
 				model = "lambdalabs/sd-image-variations-diffusers"
 		if kwargs.get("--init-image"):
 			b = kwargs["--init-image"]
-			i = io.BytesIO(b)
+			if not isinstance(b, str):
+				b = io.BytesIO(b)
 			im = Image.open(i)
 		out = []
 		if torch.cuda.is_available():
