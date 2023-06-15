@@ -562,6 +562,10 @@ class Bot:
 			pf = StableDiffusionImageVariationPipeline
 			if model == "stabilityai/stable-diffusion-2-1":
 				model = "lambdalabs/sd-image-variations-diffusers"
+		if kwargs.get("--init-image"):
+			b = kwargs["--init-image"]
+			i = io.BytesIO(b)
+			im = Image.open(i)
 		out = []
 		if torch.cuda.is_available():
 			device = 0
@@ -623,7 +627,7 @@ class Bot:
 			if pf is StableDiffusionInpaintPipeline:
 				data = pipe(
 					prompt,
-					image=image_to(Image.open(kwargs["--init-image"])),
+					image=image_to(im),
 					mask_image=image_to(Image.open(kwargs["--mask"])),
 					num_images_per_prompt=count,
 					num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
@@ -634,7 +638,7 @@ class Bot:
 			elif pf is StableDiffusionImg2ImgPipeline:
 				data = pipe(
 					prompt,
-					image=image_to(Image.open(kwargs["--init-image"])),
+					image=image_to(im),
 					num_images_per_prompt=count,
 					num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 					guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
@@ -643,7 +647,7 @@ class Bot:
 				)
 			elif pf is StableDiffusionImageVariationPipeline:
 				data = pipe(
-					image=image_to(Image.open(kwargs["--init-image"])),
+					image=image_to(im),
 					num_images_per_prompt=count,
 					num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 					guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
