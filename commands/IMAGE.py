@@ -303,13 +303,13 @@ class ImageAdjust(Command):
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
-                    name += fmt
+                    name += "." + fmt
             elif isinstance(fn, (bytes, memoryview)):
                 fmt = magic.from_buffer(fn).rsplit("/", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
-                    name += fmt
+                    name += "." + fmt
         await bot.send_with_file(channel, "", fn, filename=name2, reference=message, reacts="🔳")
 
 
@@ -383,13 +383,13 @@ class ColourDeficiency(Command):
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
-                    name += fmt
+                    name += "." + fmt
             elif isinstance(fn, (bytes, memoryview)):
                 fmt = magic.from_buffer(fn).rsplit("/", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
-                    name += fmt
+                    name += "." + fmt
         await bot.send_with_file(channel, "", fn, filename=name, reference=message, reacts="🔳")
 
 
@@ -472,13 +472,13 @@ class Invert(Command):
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
-                    name += fmt
+                    name += "." + fmt
             elif isinstance(fn, (bytes, memoryview)):
                 fmt = magic.from_buffer(fn).rsplit("/", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
-                    name += fmt
+                    name += "." + fmt
         await bot.send_with_file(channel, "", fn, filename=name, reference=message, reacts="🔳")
 
 
@@ -502,13 +502,13 @@ class GreyScale(Command):
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
-                    name += fmt
+                    name += "." + fmt
             elif isinstance(fn, (bytes, memoryview)):
                 fmt = magic.from_buffer(fn).rsplit("/", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
-                    name += fmt
+                    name += "." + fmt
         await bot.send_with_file(channel, "", fn, filename=name, reference=message, reacts="🔳")
 
 
@@ -532,13 +532,13 @@ class Laplacian(Command):
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
-                    name += fmt
+                    name += "." + fmt
             elif isinstance(fn, (bytes, memoryview)):
                 fmt = magic.from_buffer(fn).rsplit("/", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
-                    name += fmt
+                    name += "." + fmt
         await bot.send_with_file(channel, "", fn, filename=name, reference=message, reacts="🔳")
 
 
@@ -576,13 +576,13 @@ class ColourSpace(Command):
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
-                    name += fmt
+                    name += "." + fmt
             elif isinstance(fn, (bytes, memoryview)):
                 fmt = magic.from_buffer(fn).rsplit("/", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
-                    name += fmt
+                    name += "." + fmt
         await bot.send_with_file(channel, "", fn, filename=name, reference=message, reacts="🔳")
 
 
@@ -606,13 +606,13 @@ class Magik(Command):
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
-                    name += fmt
+                    name += "." + fmt
             elif isinstance(fn, (bytes, memoryview)):
                 fmt = magic.from_buffer(fn).rsplit("/", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
-                    name += fmt
+                    name += "." + fmt
         await bot.send_with_file(channel, "", fn, filename=name, reference=message, reacts="🔳")
 
 
@@ -1128,13 +1128,13 @@ class Resize(Command):
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
-                    name += fmt
+                    name += "." + fmt
             elif isinstance(fn, (bytes, memoryview)):
                 fmt = magic.from_buffer(fn).rsplit("/", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
-                    name += fmt
+                    name += "." + fmt
         await bot.send_with_file(channel, "", fn, filename=name, reference=message, reacts="🔳")
 
 
@@ -1159,13 +1159,13 @@ class Rotate(Command):
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
-                    name += fmt
+                    name += "." + fmt
             elif isinstance(fn, (bytes, memoryview)):
                 fmt = magic.from_buffer(fn).rsplit("/", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
-                    name += fmt
+                    name += "." + fmt
         await bot.send_with_file(channel, "", fn, filename=name, reference=message, reacts="🔳")
 
 
@@ -1236,13 +1236,13 @@ class Fill(Command):
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
-                    name += fmt
+                    name += "." + fmt
             elif isinstance(fn, (bytes, memoryview)):
                 fmt = magic.from_buffer(fn).rsplit("/", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
-                    name += fmt
+                    name += "." + fmt
         await bot.send_with_file(channel, "", fn, filename=name, reference=message, reacts="🔳")
 
 
@@ -1339,13 +1339,13 @@ class Blend(Command):
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
-                    name += fmt
+                    name += "." + fmt
             elif isinstance(fn, (bytes, memoryview)):
                 fmt = magic.from_buffer(fn).rsplit("/", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
-                    name += fmt
+                    name += "." + fmt
         await bot.send_with_file(channel, "", fn, filename=name, reference=message, reacts="🔳")
 
 
