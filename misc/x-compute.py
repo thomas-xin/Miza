@@ -3205,7 +3205,7 @@ def evaluate(ts, args):
 		out = evalImg(*args)
 		if isinstance(out, io.BytesIO):
 			out.seek(0)
-			b = out.read()
+			out = out.read()
 		if isinstance(out, (bytes, memoryview)):
 			b = base64.b64encode(out)
 			sys.stdout.buffer.write(f"$PROC_RESP[{ts}].set_result(_x)~".encode("utf-8"))
