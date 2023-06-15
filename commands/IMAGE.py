@@ -304,6 +304,12 @@ class ImageAdjust(Command):
                     if "." in name:
                         name = name[:name.rindex(".")]
                     name += fmt
+            elif isinstance(fn, (bytes, memoryview)):
+                fmt = get_mime(fn).rsplit("/", 1)[-1]
+                if not name.endswith(fmt):
+                    if "." in name:
+                        name = name[:name.rindex(".")]
+                    name += fmt
         await bot.send_with_file(channel, "", fn, filename=name2, reference=message, reacts="🔳")
 
 
@@ -374,6 +380,12 @@ class ColourDeficiency(Command):
             fn = resp[0]
             if isinstance(fn, str) and "." in fn:
                 fmt = "." + fn.rsplit(".", 1)[-1]
+                if not name.endswith(fmt):
+                    if "." in name:
+                        name = name[:name.rindex(".")]
+                    name += fmt
+            elif isinstance(fn, (bytes, memoryview)):
+                fmt = get_mime(fn).rsplit("/", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
@@ -461,6 +473,12 @@ class Invert(Command):
                     if "." in name:
                         name = name[:name.rindex(".")]
                     name += fmt
+            elif isinstance(fn, (bytes, memoryview)):
+                fmt = get_mime(fn).rsplit("/", 1)[-1]
+                if not name.endswith(fmt):
+                    if "." in name:
+                        name = name[:name.rindex(".")]
+                    name += fmt
         await bot.send_with_file(channel, "", fn, filename=name, reference=message, reacts="🔳")
 
 
@@ -485,6 +503,12 @@ class GreyScale(Command):
                     if "." in name:
                         name = name[:name.rindex(".")]
                     name += fmt
+            elif isinstance(fn, (bytes, memoryview)):
+                fmt = get_mime(fn).rsplit("/", 1)[-1]
+                if not name.endswith(fmt):
+                    if "." in name:
+                        name = name[:name.rindex(".")]
+                    name += fmt
         await bot.send_with_file(channel, "", fn, filename=name, reference=message, reacts="🔳")
 
 
@@ -505,6 +529,12 @@ class Laplacian(Command):
             fn = resp[0]
             if isinstance(fn, str) and "." in fn:
                 fmt = "." + fn.rsplit(".", 1)[-1]
+                if not name.endswith(fmt):
+                    if "." in name:
+                        name = name[:name.rindex(".")]
+                    name += fmt
+            elif isinstance(fn, (bytes, memoryview)):
+                fmt = get_mime(fn).rsplit("/", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
@@ -547,6 +577,12 @@ class ColourSpace(Command):
                     if "." in name:
                         name = name[:name.rindex(".")]
                     name += fmt
+            elif isinstance(fn, (bytes, memoryview)):
+                fmt = get_mime(fn).rsplit("/", 1)[-1]
+                if not name.endswith(fmt):
+                    if "." in name:
+                        name = name[:name.rindex(".")]
+                    name += fmt
         await bot.send_with_file(channel, "", fn, filename=name, reference=message, reacts="🔳")
 
 
@@ -567,6 +603,12 @@ class Magik(Command):
             fn = resp[0]
             if isinstance(fn, str) and "." in fn:
                 fmt = "." + fn.rsplit(".", 1)[-1]
+                if not name.endswith(fmt):
+                    if "." in name:
+                        name = name[:name.rindex(".")]
+                    name += fmt
+            elif isinstance(fn, (bytes, memoryview)):
+                fmt = get_mime(fn).rsplit("/", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
@@ -1087,6 +1129,12 @@ class Resize(Command):
                     if "." in name:
                         name = name[:name.rindex(".")]
                     name += fmt
+            elif isinstance(fn, (bytes, memoryview)):
+                fmt = get_mime(fn).rsplit("/", 1)[-1]
+                if not name.endswith(fmt):
+                    if "." in name:
+                        name = name[:name.rindex(".")]
+                    name += fmt
         await bot.send_with_file(channel, "", fn, filename=name, reference=message, reacts="🔳")
 
 
@@ -1108,6 +1156,12 @@ class Rotate(Command):
             fn = resp[0]
             if isinstance(fn, str) and "." in fn:
                 fmt = "." + fn.rsplit(".", 1)[-1]
+                if not name.endswith(fmt):
+                    if "." in name:
+                        name = name[:name.rindex(".")]
+                    name += fmt
+            elif isinstance(fn, (bytes, memoryview)):
+                fmt = get_mime(fn).rsplit("/", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
@@ -1179,6 +1233,12 @@ class Fill(Command):
             fn = resp[0]
             if isinstance(fn, str) and "." in fn:
                 fmt = "." + fn.rsplit(".", 1)[-1]
+                if not name.endswith(fmt):
+                    if "." in name:
+                        name = name[:name.rindex(".")]
+                    name += fmt
+            elif isinstance(fn, (bytes, memoryview)):
+                fmt = get_mime(fn).rsplit("/", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
@@ -1276,6 +1336,12 @@ class Blend(Command):
             fn = resp[0]
             if isinstance(fn, str) and "." in fn:
                 fmt = "." + fn.rsplit(".", 1)[-1]
+                if not name.endswith(fmt):
+                    if "." in name:
+                        name = name[:name.rindex(".")]
+                    name += fmt
+            elif isinstance(fn, (bytes, memoryview)):
+                fmt = get_mime(fn).rsplit("/", 1)[-1]
                 if not name.endswith(fmt):
                     if "." in name:
                         name = name[:name.rindex(".")]
@@ -1403,7 +1469,7 @@ class OCR(Command):
     rate_limit = (10, 15)
     slash = ("Read")
 
-    async def __call__(self, bot, user, message, args, argv, channel):
+    async def __call__(self, bot, user, message, args, argv, **void):
         fut = create_future(__import__, "pytesseract")
         name, value, url, fmt, extra = await get_image(bot, user, message, args, argv)
         resp = await process_image(url, "resize_max", ["-nogif", [1024, 1024], "auto", "-f", "png"], timeout=60)
