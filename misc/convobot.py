@@ -910,7 +910,7 @@ class Bot:
 							ginfo3.append(gi)
 							break
 				ginfo = ginfo3
-				max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) - 1.75 * 1024)}MiB" for i, gi in enumerate(ginfo)}
+				max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) - 2 * 1024)}MiB" for i, gi in enumerate(ginfo)}
 				max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("MiB")) > 0}
 				rem = sum(int(v.removesuffix("MiB")) for v in max_mem.values()) / 1024 - req
 				if rem < 1:
@@ -927,7 +927,7 @@ class Bot:
 								ginfo3.append(gi)
 								break
 					ginfo = ginfo3
-					max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) - 1.75 * 1024)}MiB" for i, gi in enumerate(ginfo)}
+					max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) - 2 * 1024)}MiB" for i, gi in enumerate(ginfo)}
 					max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("MiB")) > 0}
 				cap = sum(int(v.removesuffix("MiB")) for v in max_mem.values()) / 1024
 				if cap > req * 1.2:

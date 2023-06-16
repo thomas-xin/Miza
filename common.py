@@ -2198,6 +2198,9 @@ def is_strict_running(proc):
 def force_kill(proc):
     if not proc:
         return
+    if getattr(proc, "fut", None) and not proc.fut.done():
+        with tracebacksuppressor:
+            proc.fut.set_exception(ConnectionResetError("Response disconnected."))
     killed = deque()
     if not callable(getattr(proc, "children", None)):
         proc = psutil.Process(proc.pid)
