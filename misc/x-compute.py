@@ -3211,6 +3211,9 @@ def evaluate(ts, args):
 		if isinstance(out, (tuple, list)) and isinstance(out[0], io.BytesIO):
 			out[0].seek(0)
 			out[0] = out[0].read()
+		elif isinstance(out, io.BytesIO):
+			out.seek(0)
+			out = out.read()
 		if isinstance(out, (bytes, memoryview)):
 			b = base64.b64encode(out)
 			sys.stdout.buffer.write(f"$PROC_RESP[{ts}].set_result(_x)~".encode("utf-8"))
