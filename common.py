@@ -2355,7 +2355,7 @@ async def sub_submit(ptype, command, fix=None, _timeout=12):
             if not proc.fut.done():
                 proc.fut.set_result(None)
         try:
-            return await asyncio.wait_for(wrap_future(task), timeout=(_timeout or 0) + 2)
+            return await asyncio.wait_for(wrap_future(task), timeout=(_timeout or inf) + 2)
         except T1 as ex:
             ex2 = ex
             continue
