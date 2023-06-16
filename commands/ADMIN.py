@@ -1839,10 +1839,10 @@ class CreateEmoji(Command):
                     except:
                         raise
                     else:
-                        fn = resp[0]
-                        if not os.path.exists(fn) or not os.path.getsize(fn):
-                            break
+                        fn = resp
                         if isinstance(fn, str):
+                            if not os.path.exists(fn) or not os.path.getsize(fn):
+                                break
                             r = os.path.getsize(fn) / 262144
                             if r > 1:
                                 width = floor(width / sqrt(r))
@@ -1926,15 +1926,18 @@ class CreateSticker(Command):
                 except:
                     raise
                 else:
-                    fn = resp[0]
-                    if not os.path.exists(fn) or not os.path.getsize(fn):
-                        break
-                    r = os.path.getsize(fn) / 512000
-                    if r > 1:
-                        width = floor(width / sqrt(r))
-                        continue
-                    with open(fn, "rb") as f:
-                        image = await create_future(f.read, timeout=18)
+                    fn = resp
+                    if isinstance(fn, str):
+                        if not os.path.exists(fn) or not os.path.getsize(fn):
+                            break
+                        r = os.path.getsize(fn) / 512000
+                        if r > 1:
+                            width = floor(width / sqrt(r))
+                            continue
+                        with open(fn, "rb") as f:
+                            image = await create_future(f.read, timeout=18)
+                    else:
+                        image = fn
                     verified = True
                 finally:
                     with suppress():

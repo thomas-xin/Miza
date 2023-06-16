@@ -3190,18 +3190,18 @@ def evalImg(url, operation, args):
 			# out = "cache/" + str(ts) + ".webp"
 			out = io.BytesIO()
 			new.save(out, format="webp", lossless=False, quality=67)
-			return [out]
+			return out
 		elif fmt in ("default", "webp"):
 			# out = "cache/" + str(ts) + ".webp"
 			out = io.BytesIO()
 			new.save(out, format="webp", lossless=True, quality=80)
-			return [out]
+			return out
 		else:
 			out = io.BytesIO()
 			new.save(out, format="png", optimize=True)
-			return [out]
+			return out
 	elif type(new) is str and new.startswith("$"):
-		return [new[1:]]
+		return new[1:]
 	return new
 
 

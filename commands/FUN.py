@@ -2953,7 +2953,7 @@ class Rickroll(Command):
                     if "image/jpg" not in mime:
                         if "image/jpeg" not in mime:
                             resp = await process_image(url, "resize_mult", ["-nogif", 1, 1, "auto"], timeout=60)
-                            with open(resp[0], "rb") as f:
+                            with open(resp, "rb") as f:
                                 data = await create_future(f.read)
                             url = await bot.data.exec.uproxy(data)
                             ext = "png"

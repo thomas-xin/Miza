@@ -298,7 +298,7 @@ class ImageAdjust(Command):
             else:
                 raise RuntimeError(name)
             resp = await process_image(url, *argi, timeout=_timeout)
-            fn = resp[0]
+            fn = resp
             if isinstance(fn, str) and "." in fn:
                 fmt = "." + fn.rsplit(".", 1)[-1]
                 if not name.endswith(fmt):
@@ -378,7 +378,7 @@ class ColourDeficiency(Command):
             name += "." + ext
         with discord.context_managers.Typing(channel):
             resp = await process_image(url, "colour_deficiency", [operation, value], timeout=_timeout)
-            fn = resp[0]
+            fn = resp
             if isinstance(fn, str) and "." in fn:
                 fmt = "." + fn.rsplit(".", 1)[-1]
                 if not name.endswith(fmt):
@@ -444,7 +444,7 @@ class ColourDeficiency(Command):
 #             name += "." + ext
 #         with discord.context_managers.Typing(channel):
 #             resp = await process_image(url, "remove_matte", [colour], timeout=_timeout)
-#             fn = resp[0]
+#             fn = resp
 #             if fn.endswith(".gif"):
 #                 if not name.endswith(".gif"):
 #                     if "." in name:
@@ -467,7 +467,7 @@ class Invert(Command):
         name, value, url, fmt, extra = await get_image(bot, user, message, args, argv)
         with discord.context_managers.Typing(channel):
             resp = await process_image(url, "invert", ["-f", fmt], timeout=_timeout)
-            fn = resp[0]
+            fn = resp
             if isinstance(fn, str) and "." in fn:
                 fmt = "." + fn.rsplit(".", 1)[-1]
                 if not name.endswith(fmt):
@@ -497,7 +497,7 @@ class GreyScale(Command):
         name, value, url, fmt, extra = await get_image(bot, user, message, args, argv)
         with discord.context_managers.Typing(channel):
             resp = await process_image(url, "greyscale", ["-f", fmt], timeout=_timeout)
-            fn = resp[0]
+            fn = resp
             if isinstance(fn, str) and "." in fn:
                 fmt = "." + fn.rsplit(".", 1)[-1]
                 if not name.endswith(fmt):
@@ -527,7 +527,7 @@ class Laplacian(Command):
         name, value, url, fmt, extra = await get_image(bot, user, message, args, argv)
         with discord.context_managers.Typing(channel):
             resp = await process_image(url, "laplacian", ["-f", fmt], timeout=_timeout)
-            fn = resp[0]
+            fn = resp
             if isinstance(fn, str) and "." in fn:
                 fmt = "." + fn.rsplit(".", 1)[-1]
                 if not name.endswith(fmt):
@@ -571,7 +571,7 @@ class ColourSpace(Command):
                 raise TypeError(f"Invalid colour space {i}.")
         with discord.context_managers.Typing(channel):
             resp = await process_image(url, "colourspace", [source, dest, "-f", fmt], timeout=_timeout)
-            fn = resp[0]
+            fn = resp
             if isinstance(fn, str) and "." in fn:
                 fmt = "." + fn.rsplit(".", 1)[-1]
                 if not name.endswith(fmt):
@@ -601,7 +601,7 @@ class Magik(Command):
         name, value, url, fmt, extra = await get_image(bot, user, message, args, argv, default=7)
         with discord.context_managers.Typing(channel):
             resp = await process_image(url, "magik", [value, "-f", fmt], timeout=_timeout)
-            fn = resp[0]
+            fn = resp
             if isinstance(fn, str) and "." in fn:
                 fmt = "." + fn.rsplit(".", 1)[-1]
                 if not name.endswith(fmt):
@@ -659,7 +659,7 @@ class Colour(Command):
         )
         with discord.context_managers.Typing(channel):
             resp = await process_image("from_colour", "$", [channels])
-            fn = resp[0]
+            fn = resp
             f = CompatFile(fn, filename="colour.png")
         await bot.send_with_file(channel, msg, f, filename=fn, best=True, reference=message)
 
@@ -690,7 +690,7 @@ class Gradient(Command):
             count = 1
         with discord.context_managers.Typing(channel):
             resp = await process_image("from_gradient", "$", [shape, count, colour])
-            fn = resp[0]
+            fn = resp
             f = CompatFile(fn, filename="gradient.png")
         await bot.send_with_file(channel, "", f, filename=fn, best=True, reference=message)
 
@@ -747,7 +747,7 @@ class Average(Command):
                 + "\nXYZ values: " + sqr_md(", ".join(str(round(x * 255)) for x in rgb_to_xyz(adj)))
             )
             resp = await process_image("from_colour", "$", [channels])
-            fn = resp[0]
+            fn = resp
             f = CompatFile(fn, filename="average.png")
         await bot.send_with_file(channel, msg, f, filename=fn, best=True, reference=message)
         # return css_md("#" + bytes2hex(bytes(raw2colour(colour)), space=False))
@@ -768,7 +768,7 @@ class QR(Command):
             raise ArgumentError("Input string is empty.")
         with discord.context_managers.Typing(channel):
             resp = await process_image("to_qr", "$", [argv, "rainbow" in name], timeout=_timeout)
-            fn = resp[0]
+            fn = resp
         await bot.send_with_file(channel, "", fn, filename="QR." + ("gif" if "rainbow" in name else "png"), reference=message)
 
 
@@ -787,7 +787,7 @@ class Rainbow(Command):
         with discord.context_managers.Typing(channel):
             # -gif signals to image subprocess that the output is always a .gif image
             resp = await process_image(url, "rainbow_gif", [value, "-gif", "-f", fmt], timeout=_timeout)
-            fn = resp[0]
+            fn = resp
         await bot.send_with_file(channel, "", fn, filename=name, reference=message, reacts="🔳")
 
 
@@ -856,7 +856,7 @@ class Scroll(Command):
         with discord.context_managers.Typing(channel):
             # -gif signals to image subprocess that the output is always a .gif image
             resp = await process_image(url, "scroll_gif", [direction, duration, fps, "-gif"], timeout=_timeout)
-            fn = resp[0]
+            fn = resp
         await bot.send_with_file(channel, "", fn, filename=name, reference=message, reacts="🔳")
 
 
@@ -875,7 +875,7 @@ class Spin(Command):
         with discord.context_managers.Typing(channel):
             # -gif signals to image subprocess that the output is always a .gif image
             resp = await process_image(url, "spin_gif", [value, "-gif", "-f", fmt], timeout=_timeout)
-            fn = resp[0]
+            fn = resp
         await bot.send_with_file(channel, "", fn, filename=name, reference=message, reacts="🔳")
 
 
@@ -922,7 +922,7 @@ class Orbit(Command):
             raise OverflowError()
         with discord.context_managers.Typing(channel):
             resp = await process_image(url, "orbit_gif", [count, duration, list(extras), "-gif", "-f", fmt], timeout=_timeout)
-            fn = resp[0]
+            fn = resp
         await bot.send_with_file(channel, "", fn, filename=name, reference=message, reacts="🔳")
 
 
@@ -953,7 +953,7 @@ class GMagik(Command):
         arr.extend(("-gif", "-f", fmt))
         with discord.context_managers.Typing(channel):
             resp = await process_image(url, "magik_gif", arr, timeout=_timeout)
-            fn = resp[0]
+            fn = resp
         await bot.send_with_file(channel, "", fn, filename=name, reference=message, reacts="🔳")
 
 
@@ -1022,7 +1022,7 @@ class CreateGIF(Command):
             if video is None:
                 video = args
             resp = await process_image("create_gif", "$", ["image", args, delay, "-f", fmt], timeout=_timeout)
-            fn = resp[0]
+            fn = resp
         await bot.send_with_file(channel, "", fn, filename=filename, reference=message, reacts="🔳")
 
 
@@ -1123,7 +1123,7 @@ class Resize(Command):
             if not name.endswith("." + fmt):
                 name += "." + fmt
             resp = await process_image(url, func, [x, y, op, "-f", fmt], timeout=_timeout)
-            fn = resp[0]
+            fn = resp
             if isinstance(fn, str) and "." in fn:
                 fmt = "." + fn.rsplit(".", 1)[-1]
                 if not name.endswith(fmt):
@@ -1154,7 +1154,7 @@ class Rotate(Command):
         value = await bot.eval_math(value)
         with discord.context_managers.Typing(channel):
             resp = await process_image(url, "rotate_to", [value, "-f", fmt], timeout=_timeout)
-            fn = resp[0]
+            fn = resp
             if isinstance(fn, str) and "." in fn:
                 fmt = "." + fn.rsplit(".", 1)[-1]
                 if not name.endswith(fmt):
@@ -1231,7 +1231,7 @@ class Fill(Command):
             if not name.endswith(".png"):
                 name += ".png"
             resp = await process_image(url, "fill_channels", [value, *args], timeout=_timeout)
-            fn = resp[0]
+            fn = resp
             if isinstance(fn, str) and "." in fn:
                 fmt = "." + fn.rsplit(".", 1)[-1]
                 if not name.endswith(fmt):
@@ -1334,7 +1334,7 @@ class Blend(Command):
                 name += ".png"
             resp = await process_image(url1, "blend_op", [url2, operation, opacity], timeout=_timeout)
             print(resp)
-            fn = resp[0]
+            fn = resp
             if isinstance(fn, str) and "." in fn:
                 fmt = "." + fn.rsplit(".", 1)[-1]
                 if not name.endswith(fmt):
@@ -1474,10 +1474,10 @@ class OCR(Command):
         fut = create_future(__import__, "pytesseract")
         name, value, url, fmt, extra = await get_image(bot, user, message, args, argv)
         resp = await process_image(url, "resize_max", ["-nogif", 1024, "auto", "-f", "png"], timeout=60)
-        if isinstance(resp[0], str):
-            f = open(resp[0], "rb")
+        if isinstance(resp, str):
+            f = open(resp, "rb")
         else:
-            f = io.BytesIO(resp[0])
+            f = io.BytesIO(resp)
         im = await create_future(Image.open, f)
         pytesseract = await fut
         text = await create_future(pytesseract.image_to_string, im, config="--psm 1", timeout=8)
@@ -1734,16 +1734,16 @@ class Art(Command):
                 image_1b = image_2b = None
                 if url:
                     resp = await process_image(url, "resize_to", ["-nogif", 512, 512, "auto", "-f", "png"], timeout=60)
-                    image_1 = resp[0]
+                    image_1 = resp
                     if inpaint and url2:
                         image_2b = await bot.get_request(url2)
                     if inpaint and not url2:
                         resp = await process_image(image_1, "get_mask", ["-nogif", "-nodel", "-f", "png"], timeout=60)
-                        image_2 = resp[0]
+                        image_2 = resp
                         resp = await process_image(image_1, "inpaint", [image_2, "-nodel", "-f", "png"], timeout=60)
-                        image_1 = resp[0]
+                        image_1 = resp
                         resp = await process_image(image_2, "expand_mask", ["-nogif", 12, "-f", "png"], timeout=60)
-                        image_2 = resp[0]
+                        image_2 = resp
                         print(image_1, image_2)
                     if "--strength" not in kwargs:
                         args.extend((

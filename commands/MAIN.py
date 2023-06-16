@@ -1037,7 +1037,7 @@ class Activity(Command):
         ctx = discord.context_managers.Typing(channel) if channel else emptyctx
         with ctx:
             resp = await process_image("plt_special", "$", (data, str(user)))
-            fn = resp[0]
+            fn = resp
             f = CompatFile(fn, filename=f"{user.id}.png")
         return dict(file=f, filename=fn, best=True)
 
