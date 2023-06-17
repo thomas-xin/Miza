@@ -616,7 +616,7 @@ class Bot:
 		longer = False
 		cm2 = None
 		model = model or self.model or "gpt3"
-		print("Model:", model)
+		# print("Model:", model)
 		extensions = model.endswith("+")
 		model = model.removesuffix("+")
 		if model == "bloom":

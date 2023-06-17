@@ -1266,7 +1266,7 @@ class Ask(Command):
         elif name == "gpt4":
             if premium < 4:
                 raise PermissionError(f"Distributed premium level 2 or higher required; please see {bot.kofi_url} for more info!")
-            model = "gpt4+"
+            model = "gpt4"
         elif name == "gpt4a":
             if premium < 4:
                 raise PermissionError(f"Distributed premium level 2 or higher required; please see {bot.kofi_url} for more info!")
