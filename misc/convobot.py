@@ -941,7 +941,7 @@ class Bot:
 				ok = openai.api_key
 				text = None
 				tries = 5
-				response = None
+				response = m = None
 				for i in range(tries):
 					try:
 						response = exc.submit(
@@ -967,9 +967,9 @@ class Bot:
 							print_exc()
 					if response:
 						print(response)
-						if response.get("function_call"):
-							break
 						m = response["choices"][0]["message"]
+						if m.get("function_call"):
+							break
 						role = m["role"]
 						text = m["content"].removeprefix(f"{self.name} says: ").removeprefix(f"{self.name}:") if m["content"] else ""
 						if len(text) >= 2 and text[-1] in " aAsS" and text[-2] not in ".!?" or text.endswith(' "') or text.endswith('\n"'):
@@ -981,7 +981,7 @@ class Bot:
 						if not redo:
 							break
 				if response:
-					fc = response.get("function_call")
+					fc = m.get("function_call")
 					if not fc or fc.get("name") not in self.function_list:
 						if text:
 							return text
