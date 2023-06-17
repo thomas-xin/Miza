@@ -2554,7 +2554,7 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 			except AttributeError:
 				im = get_image(im)
 		res = cb.ai(*prompt, refs=refs, im=im)
-		if cb.model in ("gpt3", "gpt4", "gpt3a", "gpt4a"):
+		if cb.model in ("gpt3", "gpt4", "gpt3+", "gpt4+"):
 			cb.model = None
 		return res
 
