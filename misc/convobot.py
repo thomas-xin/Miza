@@ -888,7 +888,7 @@ class Bot:
 			prompt = None
 			if extensions:
 				data = dict(
-					model=model,
+					model="gpt-3.5-turbo-0613" if model.startswith("gpt-3.5") else "gpt-4-0613",
 					messages=messages,
 					temperature=temp,
 					max_tokens=min(8192 if premium >= 2 else 1024, limit - pc - 512),
@@ -912,6 +912,7 @@ class Bot:
 				ok = openai.api_key
 				text = None
 				tries = 5
+				response = None
 				for i in range(tries):
 					try:
 						response = exc.submit(
