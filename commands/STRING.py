@@ -1231,7 +1231,7 @@ class Ask(Command):
         premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
         pers = bot.commands.personality[0].retrieve((channel or guild).id)
         if pers and ";" in pers:
-            model, pers = pers.split(";")
+            model, pers = pers.split(";", 1)
             model = model.casefold().split("-", 1)[0]
             pers = pers.lstrip()
         else:
@@ -1838,14 +1838,17 @@ class Personality(Command):
                     "Apologies, my AI has detected that your input may be inappropriate.\n"
                     + "Please move to a NSFW channel, reword, or consider contacting the support server if you believe this is a mistake!"
                 )
+        models = ("auto", "gpt", "neox", "bloom", "pyg", "pygmalion", "manticore", "llama", "hippogriff", "davinci", "gpt3", "gpt4")
         if ";" in p:
             m, p = p.split(";", 1)
             p = p.lstrip()
+        elif p in models:
+            m, p = self.defper.split(";", 1)
         else:
             m = "Auto"
         m = m.split("-", 1)[0]
         m2 = m.casefold()
-        if m2 not in ("auto", "gpt", "neox", "bloom", "pyg", "pygmalion", "manticore", "llama", "hippogriff", "davinci", "gpt3", "gpt4"):
+        if m2 not in models:
             raise NotImplementedError(f'No such model "{m}" currently supported. Sorry!')
         if m2.startswith("gpt4") and premium < 3:
             raise PermissionError(f"Sorry, this model is currently for premium users only. Please make sure you have a subscription level of minimum 2 from {bot.kofi_url}, or try out ~trial if you would like to manage/fund your own usage!")
