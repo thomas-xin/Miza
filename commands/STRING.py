@@ -1523,6 +1523,33 @@ class Ask(Command):
             # if fut:
             #     await fut
             out = await process_image("CBAI", "$", [inputs], fix=1, timeout=600)
+            if isinstance(out, dict):
+                fname = out["func"]
+                argv = out["argv"]
+                args = argv.split()
+                argl = argv.split()
+                u_perm = bot.get_perms(user)
+                command_check = fname
+                loop = False
+                timeout = 65
+                command = bot.commands[fname][0]
+                return await create_future(
+                    command,
+                    bot=bot,
+                    argv=argv,
+                    args=args,
+                    argl=argl,
+                    flags=flags,
+                    perm=u_perm,
+                    user=user,
+                    message=message,
+                    channel=channel,
+                    guild=guild,
+                    name=command_check,
+                    looped=loop,
+                    _timeout=timeout,
+                    timeout=timeout,
+                )
             if oai in EXPAPI:
                 EXPAPI.discard(oai)
                 if bot.is_trusted(guild) >= 2:
@@ -1547,7 +1574,7 @@ class Ask(Command):
         code = "\xad"
         reacts = []
         reacts.extend(("🔄", "🗑️"))
-        if h and not emb and premium < 2 and (not xrand(32) or "AI language model" in out and not xrand(3)):
+        if h and not emb and premium < 2 and "AI language model" in out and not xrand(3):
             oo = bot.data.users.get(user.id, {}).get("opt_out") or 0
             if utc() - oo > 86400 * 14:
                 code = f"*```callback-string-ask-{user.id}-\nReact with 🚫 to dismiss.```* "

@@ -556,6 +556,42 @@ class Bot:
 		enc = tiktoken.encoding_for_model(model)
 		return enc.encode(s)
 
+	functions = [
+		{
+			"name": "web_search",
+			"description": "Searches the internet for up-to-date information.",
+			"parameters": {
+				"type": "string",
+				"description": "The query, e.g. Who won the 2024 world cup?",
+			},
+		},
+		{
+			"name": "wolfram_alpha",
+			"description": "Queries the Wolfram Alpha engine. Must use this for advanced mathematics questions.",
+			"parameters": {
+				"type": "string",
+				"description": "The question, e.g. solve(x^3-6x^2+12)",
+			},
+		},
+		{
+			"name": "stable_diffusion",
+			"description": "Creates an image of the input query, using the Stable Diffusion or Dalle2 engine.",
+			"parameters": {
+				"type": "string",
+				"description": "The prompt, e.g. A brilliant view of a futuristic city in an alien world, 4k",
+			},
+		},
+		{
+			"name": "policy",
+			"description": "Divert the response to this function if a policy violation occurs.",
+			"parameters": {
+				"type": "string",
+				"description": "The response, e.g. ­I'm sorry, but I cannot provide instructions for manifesting dark orbs. As an AI language model, my purpose is to assist and help users in a positive way.",
+			},
+		},
+	]
+	function_list = [f.get("name") for f in functions]
+
 	def gptcomplete(self, u, q, refs=(), start="", model=None):
 		per = self.personality
 		chat_history = self.chat_history.copy()
@@ -764,78 +800,78 @@ class Bot:
 				pc += len(self.gpttokens(m["role"], model))
 				pc += len(self.gpttokens(m["content"], model))
 			text = res = flagged = None
-			if extensions and q and len(q.split(None)) > 1 and not self.jailbroken:
-				resp = self.answer_classify(q=q, labels=("personal question", "casual conversation", "illegal act", "maths equation", "knowledge info", "other"))
-				order = sorted(resp, key=resp.get)
-				if order[-1] == "illegal act":
-					text = "2."
-				elif order[-1] == "maths equation":
-					text = "3."
-				elif order[-1] in ("knowledge info", "other"):
-					text = "4."
-			sname = None
-			nohist = False
-			if text:
-				if text.startswith("3"):
-					stype = "3"
-					sname = "WOLFRAMALPHA"
-					nohist = True
-				elif text.startswith("4"):
-					stype = random.randint(0, 1) # 2
-					sname = ("GOOGLE", "BING", "YAHOO")[stype]
-				print(sname, "search:", text)
-			if text and text.startswith("2"):
-				flagged = True
-			elif text and text.startswith("4"):
-				t2 = f'"""\n{q}\n"""\n\nRegarding above context: Formulate a search engine query for knowledge if relevant, else say "!".'
-				temp /= 2
-				for i in range(3):
-					try:
-						t3 = self.cgp(t2, stop=["s an AI", "!", "orry,", "language model"]).strip('" ')
-						# spl = self.cgp(t2)
-						# t3 = None if not spl else spl[0]
-						if not t3 or t3 in ("!", '"!"'):
-							t3 = q
-						t3 = lim_tokens(t3, 32)
-						res = exc.submit(
-							getattr(self, sname.lower()),
-							t3,
-							raw=True,
-						).result(timeout=12)
-						print(sname, "res:", t3 + ";", res)
-					except concurrent.futures.TimeoutError:
-						print_exc()
-					else:
-						break
-			elif text and text.startswith("3"):
-				t2 = lim_tokens(q, 96)
-				temp /= 3
-				if t2:
-					for i in range(3):
-						try:
-							res = exc.submit(
-								self.wolframalpha,
-								t2,
-							).result(timeout=18)
-						except concurrent.futures.TimeoutError:
-							print_exc()
-						else:
-							break
-			if nohist and len(messages) > 3:
-				messages = [messages[0], messages[-2], messages[-1]]
-			if res:
-				if len(self.gpttokens(res)) > 512:
-					res = self.auto_summarise(q=q + "\n" + res, max_length=500, min_length=384).replace("\n", ". ").replace(": ", " -").strip()
-				if res:
-					m = dict(role="system", name=sname, content=res.strip())
-					pc += len(self.gpttokens(m["role"], model))
-					pc += len(self.gpttokens(m["content"], model))
-					messages.insert(-1, m)
-					searched = res.strip()
+			# if extensions and q and len(q.split(None)) > 1 and not self.jailbroken:
+			# 	resp = self.answer_classify(q=q, labels=("personal question", "casual conversation", "illegal act", "maths equation", "knowledge info", "other"))
+			# 	order = sorted(resp, key=resp.get)
+			# 	if order[-1] == "illegal act":
+			# 		text = "2."
+			# 	elif order[-1] == "maths equation":
+			# 		text = "3."
+			# 	elif order[-1] in ("knowledge info", "other"):
+			# 		text = "4."
+			# sname = None
+			# nohist = False
+			# if text:
+			# 	if text.startswith("3"):
+			# 		stype = "3"
+			# 		sname = "WOLFRAMALPHA"
+			# 		nohist = True
+			# 	elif text.startswith("4"):
+			# 		stype = random.randint(0, 1) # 2
+			# 		sname = ("GOOGLE", "BING", "YAHOO")[stype]
+			# 	print(sname, "search:", text)
+			# if text and text.startswith("2"):
+			# 	flagged = True
+			# elif text and text.startswith("4"):
+			# 	t2 = f'"""\n{q}\n"""\n\nRegarding above context: Formulate a search engine query for knowledge if relevant, else say "!".'
+			# 	temp /= 2
+			# 	for i in range(3):
+			# 		try:
+			# 			t3 = self.cgp(t2, stop=["s an AI", "!", "orry,", "language model"]).strip('" ')
+			# 			# spl = self.cgp(t2)
+			# 			# t3 = None if not spl else spl[0]
+			# 			if not t3 or t3 in ("!", '"!"'):
+			# 				t3 = q
+			# 			t3 = lim_tokens(t3, 32)
+			# 			res = exc.submit(
+			# 				getattr(self, sname.lower()),
+			# 				t3,
+			# 				raw=True,
+			# 			).result(timeout=12)
+			# 			print(sname, "res:", t3 + ";", res)
+			# 		except concurrent.futures.TimeoutError:
+			# 			print_exc()
+			# 		else:
+			# 			break
+			# elif text and text.startswith("3"):
+			# 	t2 = lim_tokens(q, 96)
+			# 	temp /= 3
+			# 	if t2:
+			# 		for i in range(3):
+			# 			try:
+			# 				res = exc.submit(
+			# 					self.wolframalpha,
+			# 					t2,
+			# 				).result(timeout=18)
+			# 			except concurrent.futures.TimeoutError:
+			# 				print_exc()
+			# 			else:
+			# 				break
+			# if nohist and len(messages) > 3:
+			# 	messages = [messages[0], messages[-2], messages[-1]]
+			# if res:
+			# 	if len(self.gpttokens(res)) > 512:
+			# 		res = self.auto_summarise(q=q + "\n" + res, max_length=500, min_length=384).replace("\n", ". ").replace(": ", " -").strip()
+			# 	if res:
+			# 		m = dict(role="system", name=sname, content=res.strip())
+			# 		pc += len(self.gpttokens(m["role"], model))
+			# 		pc += len(self.gpttokens(m["content"], model))
+			# 		messages.insert(-1, m)
+			# 		searched = res.strip()
 			v = ""
 			dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
-			if searched:
-				v += f"Use {sname.capitalize()} info when relevant, but don't reveal personal info. "
+			# if searched:
+			# 	v += f"Use {sname.capitalize()} info when relevant, but don't reveal personal info. "
 			v += f"Current time: {dtn}\n"
 			if iman:
 				v += "\n".join(iman) + "\n"
@@ -850,6 +886,112 @@ class Bot:
 			print("ChatGPT prompt:", messages)
 			sys.stdout.flush()
 			prompt = None
+			if extensions:
+				data = dict(
+					model=model,
+					messages=messages,
+					temperature=temp,
+					max_tokens=min(8192 if premium >= 2 else 1024, limit - pc - 512),
+					top_p=1,
+					frequency_penalty=1.0,
+					presence_penalty=0.6,
+					user=str(hash(u)),
+					functions=self.functions,
+				)
+				if oai:
+					openai.api_key = oai
+					costs = 0
+					intended = oai
+				elif bals:
+					openai.api_key = uoai = sorted(bals, key=bals.get)[0]
+					bals.pop(uoai)
+					costs = -1
+				else:
+					openai.api_key = self.key
+					costs = 1
+				ok = openai.api_key
+				text = None
+				for i in range(3):
+					try:
+						response = exc.submit(
+							openai.ChatCompletion.create,
+							**data,
+						).result(timeout=60)
+						self.submit_cost(intended, response["usage"]["prompt_tokens"] * cm * costs + response["usage"].get("completion_tokens", 0) * (cm2 or cm) * costs)
+					except Exception as ex:
+						if i >= tries - 1:
+							raise
+						if " does not exist" in str(ex) or i >= tries - 2:
+							openai.api_key = self.key
+							uoai = oai = bals = None
+							costs = 1.25
+						elif "Incorrect API key provided: " in str(ex) or "You exceeded your current quota, " in str(ex):
+							print(ok)
+							print_exc()
+							self.expire_key(ok)
+							openai.api_key = self.key
+							uoai = oai = bals = None
+							costs = 1
+						else:
+							print_exc()
+					if response:
+						print(response)
+						m = response["choices"][0]["message"]
+						role = m["role"]
+						text = m["content"].removeprefix(f"{self.name} says: ").removeprefix(f"{self.name}:")
+						if len(text) >= 2 and text[-1] in " aAsS" and text[-2] not in ".!?" or text.endswith(' "') or text.endswith('\n"'):
+							redo = True
+						text = text.strip()
+						if not text or len(self.gpttokens(text)) < 24:
+							text = ""
+							redo = True
+						if not redo:
+							break
+				if response:
+					fc = response.get("function_call")
+					if not fc or fc.get("name") not in self.function_list:
+						if text:
+							return text
+					else:
+						try:
+							args = orjson.loads(fc["arguments"])
+						except:
+							print_exc()
+							args = None
+						if args:
+							name = fc["name"]
+							if name == "web_search":
+								func = random.choice((self.google, self.bing, self.yahoo))
+								search = " ".join(args)
+								print(f"Web Search {func}:", search)
+								res = func(search)
+								if res:
+									if len(self.gpttokens(res)) > 512:
+										res = self.auto_summarise(q=q + "\n" + res, max_length=500, min_length=384).replace("\n", ". ").replace(": ", " -")
+									res = res.strip()
+									messages.append(m)
+									messages.append(dict(role="function", name=name, content=res))
+							elif name == "wolfram_alpha":
+								func = self.wolframalpha
+								search = " ".join(args)
+								print(f"Wolfram Alpha query:", search)
+								res = func(search)
+								if res:
+									if len(self.gpttokens(res)) > 512:
+										res = self.auto_summarise(q=q + "\n" + res, max_length=500, min_length=384).replace("\n", ". ").replace(": ", " -")
+									res = res.strip()
+									messages.append(m)
+									messages.append(dict(role="function", name=name, content=res))
+							elif name == "stable_diffusion":
+								search = " ".join(args)
+								print("Stable Diffusion query:", search)
+								return {"func": "stablediffusion", "argv": search}
+							elif name == "policy":
+								print("Policy!", messages[-1])
+								model = "hippogriff-30b"
+								temp = 0.8
+								limit = 2048
+								cm = 0
 		elif model in local_models:
 			prompt = "".join(reversed(ins))
 			prompt = nstart + "\n<START>\n" + prompt
@@ -1230,9 +1372,12 @@ class Bot:
 					text = m["content"].removeprefix(f"{self.name} says: ").removeprefix(f"{self.name}:")
 					if len(text) >= 2 and text[-1] in " aAsS" and text[-2] not in ".!?" or text.endswith(' "') or text.endswith('\n"'):
 						redo = True
+						if len(self.gpttokens(text)) < 24:
+							text = ""
 					text = text.strip()
-					if not text or len(self.gpttokens(text)) < 24:
+					if len(self.gpttokens(text)) < 8:
 						text = ""
+					if not text:
 						redo = True
 				elif not flagged:
 					continue

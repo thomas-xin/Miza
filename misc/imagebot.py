@@ -563,12 +563,21 @@ class Bot:
 			if model == "stabilityai/stable-diffusion-2-1":
 				model = "lambdalabs/sd-image-variations-diffusers"
 		out = []
-		if torch.cuda.is_available():
-			device = 0
-			dtype = torch.float16
+		if self.models:
+			device = next(iter(self.models))
+			dtype = torch.float32 if device == "cpu" else torch.float16
 		else:
-			device = -1
-			dtype = torch.float32
+			try:
+				device, dtype = determine_cuda(priority=False)
+				if not device:
+					raise FileNotFoundError
+			except:
+				if torch.cuda.is_available():
+					device = 0
+					dtype = torch.float16
+				else:
+					device = -1
+					dtype = torch.float32
 		data = self.art_stablediffusion_sub(pf, model, prompt, kwargs, count, device, dtype, nsfw, fail_unless_gpu)
 		nsfw_content_detected = [data.nsfw_content_detected] if isinstance(data.nsfw_content_detected, bool) else data.nsfw_content_detected
 		for im, n in zip(data.images, nsfw_content_detected):

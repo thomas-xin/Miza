@@ -2526,13 +2526,15 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 			cb.premium = premium
 		if model == "auto":
 			if not getattr(cb, "model", None):
-				if premium < 4:
+				if premium < 2:
 					cb.model = "gpt3"
+				elif premium < 4:
+					cb.model = "gpt3+"
 				else:
-					cb.model = "gpt4"
+					cb.model = "gpt4+"
 		else:
 			if model.startswith("gpt4") and premium < 4:
-				cb.model = "gpt3"
+				cb.model = "gpt3" + model[4:]
 			else:
 				cb.model = model or "gpt3"
 		cb.user_id = user_id
