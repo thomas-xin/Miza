@@ -911,7 +911,8 @@ class Bot:
 					costs = 1
 				ok = openai.api_key
 				text = None
-				for i in range(3):
+				tries = 5
+				for i in range(tries):
 					try:
 						response = exc.submit(
 							openai.ChatCompletion.create,
