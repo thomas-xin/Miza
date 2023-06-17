@@ -1698,7 +1698,13 @@ class UpdateReminders(Database):
     def __load__(self):
         d = self.data
         # This exists so that checking next scheduled item is O(1)
-        self.listed = alist(sorted(((d[i][0]["t"], i) for i in d if type(i) is not str and d[i]), key=lambda x: x[0]))
+        for i in tuple(d):
+            try:
+                assert d[i][0]["t"]
+            except:
+                print_exc()
+                d.pop(i, None)
+        self.listed = alist(sorted(((d[i][0]["t"], i) for i in d), key=lambda x: x[0]))
         self.t = utc()
 
     async def recurrent_message(self, channel, embed, wait=60):
