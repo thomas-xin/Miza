@@ -2624,7 +2624,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             tinfo = [torch.cuda.get_device_properties(i) for i in range(torch.cuda.device_count())]
             ginfo = await fut2
         except:
-            tinfo = ginfo = []
+            tinfo = []
+            ginfo = {}
         else:
             ginfo3 = {}
             ginfo2 = list(ginfo)

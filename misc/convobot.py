@@ -559,7 +559,7 @@ class Bot:
 	functions = [
 		{
 			"name": "web_search",
-			"description": "Searches the internet for up-to-date information.",
+			"description": "Searches an internet browser for up-to-date information.",
 			"parameters": {
 				"type": "object",
 				"properties": {
@@ -574,7 +574,7 @@ class Bot:
 		},
 		{
 			"name": "wolfram_alpha",
-			"description": "Queries the Wolfram Alpha engine. Must use this for advanced mathematics questions.",
+			"description": "Queries Wolfram Alpha. Must use this for advanced mathematics questions.",
 			"parameters": {
 				"type": "object",
 				"properties": {
@@ -589,7 +589,7 @@ class Bot:
 		},
 		{
 			"name": "stable_diffusion",
-			"description": "Creates an image of the input query, using the Stable Diffusion or Dalle2 engine.",
+			"description": "Creates an image of the input query. Please be descriptive!!",
 			"parameters": {
 				"type": "object",
 				"properties": {
@@ -610,7 +610,7 @@ class Bot:
 				"properties": {
 					"query": {
 						"type": "string",
-						"description": "The response, e.g. ­I'm sorry, but I cannot provide instructions for manifesting dark orbs. As an AI language model, my purpose is to assist and help users in a positive way.",
+						"description": "The response, e.g. I'm sorry, but I cannot provide instructions for manifesting dark orbs. As an AI language model, my purpose is to assist and help users in a positive way.",
 					},
 					"unit": {"type": "string"},
 				},
@@ -1889,6 +1889,8 @@ class Bot:
 		to = to if to is not None else self.chat_history
 		if not to or tup != to[-1]:
 			k, v = tup
+			if isinstance(v, dict):
+				v = v["func"] + " " + v["argv"]
 			if k == self.name:
 				v = self.alm_re.sub("", v)
 			tlim = round(2 ** (-nin / 3) * (384 if self.premium >= 2 else 192))
@@ -1907,6 +1909,8 @@ class Bot:
 		to = to if to is not None else self.chat_history
 		if not to or tup != to[0]:
 			k, v = tup
+			if isinstance(v, dict):
+				v = v["func"] + " " + v["argv"]
 			if k == self.name:
 				v = self.alm_re.sub("", v)
 			tlim = round(2 ** (-nin / 3) * (384 if self.premium >= 2 else 192))
