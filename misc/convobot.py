@@ -1002,6 +1002,7 @@ class Bot:
 									if len(self.gpttokens(res)) > 512:
 										res = self.auto_summarise(q=q + "\n" + res, max_length=500, min_length=384).replace("\n", ". ").replace(": ", " -")
 									res = res.strip()
+									messages = [messages[-1]]
 									messages.append(m)
 									messages.append(dict(role="function", name=name, content=res))
 							elif name == "wolfram_alpha":
@@ -1012,6 +1013,7 @@ class Bot:
 									if len(self.gpttokens(res)) > 512:
 										res = self.auto_summarise(q=q + "\n" + res, max_length=500, min_length=384).replace("\n", ". ").replace(": ", " -")
 									res = res.strip()
+									messages = [messages[-1]]
 									messages.append(m)
 									messages.append(dict(role="function", name=name, content=res))
 							elif name == "stable_diffusion":
@@ -1023,6 +1025,7 @@ class Bot:
 								temp = 0.8
 								limit = 2048
 								cm = 0
+							model = "gpt-3.5-turbo-0613" if model.startswith("gpt-3.5") else "gpt-4-0613",
 		elif model in local_models:
 			prompt = "".join(reversed(ins))
 			prompt = nstart + "\n<START>\n" + prompt

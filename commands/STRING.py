@@ -1531,7 +1531,7 @@ class Ask(Command):
                 u_perm = bot.get_perms(user)
                 command_check = fname
                 loop = False
-                timeout = 65
+                timeout = 240
                 command = bot.commands[fname][0]
                 return await create_future(
                     command,
