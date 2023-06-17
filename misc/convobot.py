@@ -915,6 +915,7 @@ class Bot:
 			sys.stdout.flush()
 			prompt = None
 			if extensions:
+				intended = None
 				data = dict(
 					model="gpt-3.5-turbo-0613" if model.startswith("gpt-3.5") else "gpt-4-0613",
 					messages=messages,
@@ -970,7 +971,7 @@ class Bot:
 							break
 						m = response["choices"][0]["message"]
 						role = m["role"]
-						text = m["content"].removeprefix(f"{self.name} says: ").removeprefix(f"{self.name}:")
+						text = m["content"].removeprefix(f"{self.name} says: ").removeprefix(f"{self.name}:") if m["content"] else ""
 						if len(text) >= 2 and text[-1] in " aAsS" and text[-2] not in ".!?" or text.endswith(' "') or text.endswith('\n"'):
 							redo = True
 						text = text.strip()
@@ -1399,7 +1400,7 @@ class Bot:
 				if response:
 					m = response["choices"][0]["message"]
 					role = m["role"]
-					text = m["content"].removeprefix(f"{self.name} says: ").removeprefix(f"{self.name}:")
+					text = m["content"].removeprefix(f"{self.name} says: ").removeprefix(f"{self.name}:") if m["content"] else ""
 					if len(text) >= 2 and text[-1] in " aAsS" and text[-2] not in ".!?" or text.endswith(' "') or text.endswith('\n"'):
 						redo = True
 						if len(self.gpttokens(text)) < 24:
