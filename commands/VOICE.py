@@ -3135,7 +3135,11 @@ class Queue(Command):
         else:
             names = f"{len(names)} items"
         if "h" not in flags:
-            return css_md(f"🎶 Added {sqr_md(names)} to the queue! Estimated time until playing: {sqr_md(time_until(utc() + total_duration))}. 🎶"), 1
+            if auds.paused:
+                p = f"\nNote: Player is currently paused. Use {bot.get_prefix(guild)}resume to resume!"
+            else:
+                p = ""
+            return css_md(f"🎶 Added {sqr_md(names)} to the queue! Estimated time until playing: {sqr_md(time_until(utc() + total_duration))}. 🎶{p}"), 1
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
         u_id, pos, v = list(map(int, vals.split("_", 2)))
@@ -3173,9 +3177,13 @@ class Queue(Command):
         elapsed, length = auds.epos
         startTime = 0
         if not q:
-            totalTime = 0
-        elif auds.stats.loop or auds.stats.repeat:
-            totalTime = inf
+            stime = "0"
+        elif auds.stats.loop:
+            stime = "inf (loop)"
+        elif auds.stats.repeat:
+            stime = "inf (repeat)"
+        elif auds.paused:
+            stime = "inf (paused)"
         else:
             if auds.reverse and q:
                 totalTime = elapsed - length
@@ -3189,10 +3197,11 @@ class Queue(Command):
                 if not 1 + i & 32767:
                     await asyncio.sleep(0.1)
                 i += 1
+            stime = time_until(utc() + totalTime / auds.speed)
         cnt = len(q)
         info = (
             str(cnt) + " item" + "s" * (cnt != 1) + "\nEstimated total duration: "
-            + time_until(utc() + totalTime / auds.speed) + "```*"
+            + stime + "```*"
         )
         if not q:
             duration = 0
