@@ -63,6 +63,7 @@ if len(sys.argv) > 1 and sys.argv[1].isnumeric() and int(sys.argv[1]) >= 3:
 if len(sys.argv) > 2:
 	COMPUTE_LOAD = orjson.loads(sys.argv[2])
 
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 import torch
 hwaccel = "cuda" if torch.cuda.is_available() else "d3d11va" if os.name == "nt" else "auto"
 

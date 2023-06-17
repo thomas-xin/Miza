@@ -33,6 +33,7 @@ from zipfile import ZipFile
 import urllib.request, urllib.parse
 import nacl.secret
 
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 import torch
 hwaccel = "cuda" if torch.cuda.is_available() else "d3d11va" if os.name == "nt" else "auto"
 
