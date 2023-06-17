@@ -2626,7 +2626,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         except:
             tinfo = ginfo = []
         else:
-            ginfo3 = []
+            ginfo3 = {}
             ginfo2 = list(ginfo)
             tinfo2 = list(tinfo)
             while tinfo2:
@@ -2634,7 +2634,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 for gi in ginfo2:
                     if gi.name == name:
                         ginfo2.remove(gi)
-                        ginfo3.append(gi)
+                        ginfo3[gi.index] = gi
                         break
             ginfo = ginfo3
         minfo = psutil.virtual_memory()

@@ -899,7 +899,7 @@ class Bot:
 				fut = exc.submit(gpustat.new_query)
 				tinfo = [torch.cuda.get_device_properties(i) for i in range(n)]
 				ginfo = fut.result()
-				ginfo3 = []
+				ginfo3 = {}
 				ginfo2 = list(ginfo)
 				tinfo2 = [ti for ti in tinfo if ti.major >= 8 or not bitsandbytes]
 				while tinfo2:
@@ -907,7 +907,7 @@ class Bot:
 					for gi in ginfo2:
 						if gi.name == name:
 							ginfo2.remove(gi)
-							ginfo3.append(gi)
+							ginfo3[gi.index] = gi
 							break
 				ginfo = ginfo3
 				max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) - 2 * 1024)}MiB" for i, gi in enumerate(ginfo)}
@@ -916,7 +916,7 @@ class Bot:
 				if rem < 1:
 					self.models.clear()
 					bitsandbytes = None
-					ginfo3 = []
+					ginfo3 = {}
 					ginfo2 = list(ginfo)
 					tinfo2 = list(tinfo)
 					while tinfo2:
@@ -924,7 +924,7 @@ class Bot:
 						for gi in ginfo2:
 							if gi.name == name:
 								ginfo2.remove(gi)
-								ginfo3.append(gi)
+								ginfo3[gi.index] = gi
 								break
 					ginfo = ginfo3
 					max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) - 2 * 1024)}MiB" for i, gi in enumerate(ginfo)}
