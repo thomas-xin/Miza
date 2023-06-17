@@ -966,6 +966,8 @@ class Bot:
 							print_exc()
 					if response:
 						print(response)
+						if response.get("function_call"):
+							break
 						m = response["choices"][0]["message"]
 						role = m["role"]
 						text = m["content"].removeprefix(f"{self.name} says: ").removeprefix(f"{self.name}:")
