@@ -561,32 +561,60 @@ class Bot:
 			"name": "web_search",
 			"description": "Searches the internet for up-to-date information.",
 			"parameters": {
-				"type": "string",
-				"description": "The query, e.g. Who won the 2024 world cup?",
+				"type": "object",
+				"properties": {
+					"query": {
+						"type": "string",
+						"description": "The query, e.g. Who won the 2024 world cup?",
+					},
+					"unit": {"type": "string"},
+				},
+				"required": ["query"],
 			},
 		},
 		{
 			"name": "wolfram_alpha",
 			"description": "Queries the Wolfram Alpha engine. Must use this for advanced mathematics questions.",
 			"parameters": {
-				"type": "string",
-				"description": "The question, e.g. solve(x^3-6x^2+12)",
+				"type": "object",
+				"properties": {
+					"query": {
+						"type": "string",
+						"description": "The question, e.g. solve(x^3-6x^2+12)",
+					},
+					"unit": {"type": "string"},
+				},
+				"required": ["query"],
 			},
 		},
 		{
 			"name": "stable_diffusion",
 			"description": "Creates an image of the input query, using the Stable Diffusion or Dalle2 engine.",
 			"parameters": {
-				"type": "string",
-				"description": "The prompt, e.g. A brilliant view of a futuristic city in an alien world, 4k",
+				"type": "object",
+				"properties": {
+					"query": {
+						"type": "string",
+						"description": "The prompt, e.g. A brilliant view of a futuristic city in an alien world, 4k",
+					},
+					"unit": {"type": "string"},
+				},
+				"required": ["query"],
 			},
 		},
 		{
 			"name": "policy",
 			"description": "Divert the response to this function if a policy violation occurs.",
 			"parameters": {
-				"type": "string",
-				"description": "The response, e.g. ­I'm sorry, but I cannot provide instructions for manifesting dark orbs. As an AI language model, my purpose is to assist and help users in a positive way.",
+				"type": "object",
+				"properties": {
+					"query": {
+						"type": "string",
+						"description": "The response, e.g. ­I'm sorry, but I cannot provide instructions for manifesting dark orbs. As an AI language model, my purpose is to assist and help users in a positive way.",
+					},
+					"unit": {"type": "string"},
+				},
+				"required": ["query"],
 			},
 		},
 	]
@@ -961,12 +989,12 @@ class Bot:
 							print_exc()
 							args = None
 						if args:
+							argv = " ".join(args.values())
 							name = fc["name"]
 							if name == "web_search":
 								func = random.choice((self.google, self.bing, self.yahoo))
-								search = " ".join(args)
-								print(f"Web Search {func}:", search)
-								res = func(search)
+								print(f"Web Search {func}:", argv)
+								res = func(argv)
 								if res:
 									if len(self.gpttokens(res)) > 512:
 										res = self.auto_summarise(q=q + "\n" + res, max_length=500, min_length=384).replace("\n", ". ").replace(": ", " -")
@@ -975,9 +1003,8 @@ class Bot:
 									messages.append(dict(role="function", name=name, content=res))
 							elif name == "wolfram_alpha":
 								func = self.wolframalpha
-								search = " ".join(args)
-								print(f"Wolfram Alpha query:", search)
-								res = func(search)
+								print(f"Wolfram Alpha query:", argv)
+								res = func(argv)
 								if res:
 									if len(self.gpttokens(res)) > 512:
 										res = self.auto_summarise(q=q + "\n" + res, max_length=500, min_length=384).replace("\n", ". ").replace(": ", " -")
@@ -985,9 +1012,8 @@ class Bot:
 									messages.append(m)
 									messages.append(dict(role="function", name=name, content=res))
 							elif name == "stable_diffusion":
-								search = " ".join(args)
-								print("Stable Diffusion query:", search)
-								return {"func": "stablediffusion", "argv": search}
+								print("Stable Diffusion query:", argv)
+								return {"func": "stablediffusion", "argv": argv}
 							elif name == "policy":
 								print("Policy!", messages[-1])
 								model = "hippogriff-30b"
