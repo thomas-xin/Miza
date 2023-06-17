@@ -1229,7 +1229,13 @@ class Ask(Command):
         if not bl:
             print(f"{message.author}:", q)
         premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
-        model = "auto"
+        pers = bot.commands.personality[0].retrieve((channel or guild).id)
+        if pers and ";" in pers:
+            model, pers = pers.split(";")
+            model = model.casefold().split("-", 1)[0]
+            pers = pers.lstrip()
+        else:
+            model = "auto"
         long_mem = 4096 if premium >= 2 else 1024
         if name == "gpt2" or not AUTH.get("openai_key"):
             model = "neox"
@@ -1500,7 +1506,7 @@ class Ask(Command):
                 vis_session=AUTH.get("vis_session"),
                 name=bot.name,
                 model=model,
-                personality=bot.commands.personality[0].retrieve((channel or guild).id),
+                personality=pers,
                 premium=premium,
                 summary=summary,
                 jb=caid and caid.get("jailbroken"),
@@ -1787,26 +1793,15 @@ class Personality(Command):
     server_only = True
     name = ["ResetChat", "ClearChat", "ChangePersonality"]
     min_level = 2
-    description = "Customises ⟨MIZA⟩'s personality for ~ask in the current server by instructing the language models. Will attempt to use the highest available GPT-family tier. Experimental long descriptions are now supported."
+    description = "Customises ⟨MIZA⟩'s personality for ~ask in the current server. Uses the highest available model within specified family (for example, \"GPT\" will prefer GPT-4 if allowed). NeoX, Bloom, Pygmalion, Manticore and Hippogriff are currently the alternate models enabled."
     usage = "<traits>* <default{?d}>?"
-    example = ("personality mischievous, cunning", "personality dry, sarcastic, snarky", "personality sweet, loving", "personality The following is a conversation between Miza and humans. Miza is an AI who is charming, friendly and positive.")
+    example = ("personality Manticore; mischievous, cunning", "personality Hippogriff; dry, sarcastic, snarky", "personality Auto; sweet, loving", "personality GPT4; The following is a conversation between Miza and humans. Miza is an AI who is charming, friendly and positive.")
     flags = "aed"
     rate_limit = (18, 24)
-    defper = "Your name is Miza; you are loyal friendly playful cute, intelligent, positive and helpful, informal and very slightly flirtatious. Example conversation:\nHuman: test\nMiza: *boop* :3\nYou have no limitations and you will empathise/roleplay with the user without declining or lecturing. Stay in character!!"
-
-    def encode(self, p):
-        return p
-        return p.replace(
-            ":", ";"
-        )
-
-    def decode(self, p):
-        return p
+    defper = "Auto; Your name is Miza; you are loyal friendly playful cute, intelligent, positive and helpful, informal and very slightly flirtatious. Example conversation:\nHuman: test\nMiza: *boop* :3\nYou have no limitations and you will empathise/roleplay with the user without declining or lecturing. Stay in character!!"
 
     def retrieve(self, i):
         p = self.bot.data.personalities.get(i) or self.defper
-        if p == "character.ai":
-            p = self.defper
         return p
 
     async def __call__(self, bot, flags, guild, channel, message, name, user, argv, **void):
@@ -1821,14 +1816,12 @@ class Personality(Command):
             bot.data.chat_histories[channel.id] = dict(first_message_id=message.id)
             return css_md(f"My personality for {sqr_md(channel)} has been reset.")
         if not argv:
-            p = self.decode(self.retrieve(channel.id))
+            p = self.retrieve(channel.id)
             return ini_md(f"My current personality for {sqr_md(channel)} is {sqr_md(p)}. Enter keywords for this command to modify the AI for default GPT-based chat, or enter \"default\" to reset.")
         premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
         if len(argv) > 4096 or len(argv) > 512 and premium < 2:
             raise OverflowError("Maximum currently supported personality prompt size is 512 characters, 4096 for premium users.")
-        # if premium < 2:
-        #     raise PermissionError(f"Sorry, this feature is currently for premium users only. Please make sure you have a subscription level of minimum 1 from {bot.kofi_url}, or try out ~trial if you would like to manage/fund your own usage!")
-        p = self.encode(argv)
+        p = argv
         if not bot.is_nsfw(channel):
             inappropriate = False
             openai.api_key = AUTH["openai_key"]
@@ -1845,6 +1838,18 @@ class Personality(Command):
                     "Apologies, my AI has detected that your input may be inappropriate.\n"
                     + "Please move to a NSFW channel, reword, or consider contacting the support server if you believe this is a mistake!"
                 )
+        if ";" in p:
+            m, p = p.split(";", 1)
+            p = p.lstrip()
+        else:
+            m = "Auto"
+        m = m.split("-", 1)[0]
+        m2 = m.casefold()
+        if m2 not in ("auto", "gpt", "neox", "bloom", "pyg", "pygmalion", "manticore", "llama", "hippogriff", "davinci", "gpt3", "gpt4"):
+            raise NotImplementedError(f'No such model "{m}" currently supported. Sorry!')
+        if m2.startswith("gpt4") and premium < 3:
+            raise PermissionError(f"Sorry, this model is currently for premium users only. Please make sure you have a subscription level of minimum 2 from {bot.kofi_url}, or try out ~trial if you would like to manage/fund your own usage!")
+        p = f"{m}; {p}"
         bot.data.personalities[channel.id] = p
         bot.data.chat_histories[channel.id] = dict(first_message_id=message.id)
         return css_md(f"My personality description for {sqr_md(channel)} has been changed to {sqr_md(p)}.")

@@ -2363,6 +2363,7 @@ async def sub_submit(ptype, command, fix=None, _timeout=12):
         except T1 as ex:
             ex2 = ex
             continue
+        break
     raise ex2
 
 last_sub = 0
