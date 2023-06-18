@@ -1005,6 +1005,7 @@ class Bot:
 									messages = [messages[-1]]
 									messages.append(m)
 									messages.append(dict(role="function", name=name, content=res))
+									model = "gpt-3.5-turbo-0613" if model.startswith("gpt-3.5") else "gpt-4-0613",
 							elif name == "wolfram_alpha":
 								func = self.wolframalpha
 								print(f"Wolfram Alpha query:", argv)
@@ -1016,6 +1017,7 @@ class Bot:
 									messages = [messages[-1]]
 									messages.append(m)
 									messages.append(dict(role="function", name=name, content=res))
+									model = "gpt-3.5-turbo-0613" if model.startswith("gpt-3.5") else "gpt-4-0613",
 							elif name == "stable_diffusion":
 								print("Stable Diffusion query:", argv)
 								return {"func": "stablediffusion", "argv": argv}
@@ -1025,7 +1027,6 @@ class Bot:
 								temp = 0.8
 								limit = 2048
 								cm = 0
-							model = "gpt-3.5-turbo-0613" if model.startswith("gpt-3.5") else "gpt-4-0613",
 		elif model in local_models:
 			prompt = "".join(reversed(ins))
 			prompt = nstart + "\n<START>\n" + prompt
@@ -1290,7 +1291,7 @@ class Bot:
 				print(resp.status_code, resp.text)
 				model = "text-curie-001"
 				cm = 20
-		elif model in ("gpt-3.5-turbo", "gpt-4"):
+		elif model.startswith("gpt-3.5-turbo") or model.startswith("gpt-4"):
 			tries = 7
 			if premium < 2:
 				stop = None
