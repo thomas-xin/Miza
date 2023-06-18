@@ -943,6 +943,7 @@ class Bot:
 				tries = 5
 				response = m = None
 				for i in range(tries):
+					redo = False
 					try:
 						response = exc.submit(
 							openai.ChatCompletion.create,
