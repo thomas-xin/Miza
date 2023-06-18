@@ -2276,6 +2276,7 @@ async def proc_distribute(proc):
                 else:
                     newtasks.extend(bot.distribute([proc.cap], {}, {i: resp}))
             tasks = newtasks
+        await asyncio.sleep(0.01)
 
 proc_args = cdict(
     # math=(python, "misc/x-math.py"),

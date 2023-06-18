@@ -970,7 +970,6 @@ class Bot:
 						m = response["choices"][0]["message"]
 						if m.get("function_call"):
 							break
-						role = m["role"]
 						text = m["content"].removeprefix(f"{self.name} says: ").removeprefix(f"{self.name}:") if m["content"] else ""
 						if len(text) >= 2 and text[-1] in " aAsS" and text[-2] not in ".!?" or text.endswith(' "') or text.endswith('\n"'):
 							redo = True
@@ -1094,6 +1093,7 @@ class Bot:
 				if rem < 1:
 					self.models.clear()
 					bitsandbytes = None
+					ginfo = fut.result()
 					ginfo3 = {}
 					ginfo2 = list(ginfo)
 					tinfo2 = list(tinfo)
@@ -1120,11 +1120,16 @@ class Bot:
 				else:
 					dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, no_split_module_classes=["LlamaDecoderLayer"], dtype=torch.int8)
 					# if rem > req * 3:
-					# 	from transformers import BitsAndBytesConfig
-					# 	quantization_config = BitsAndBytesConfig(llm_int8_enable_fp32_cpu_offload=True)
-					# 	model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, torch_dtype=torch.float16, load_in_8bit=True, quantization_config=quantization_config)
+					from transformers import BitsAndBytesConfig
+					quantization_config = BitsAndBytesConfig(
+						load_in_8bit=True,
+						llm_int8_threshold=8.0,
+						llm_int8_enable_fp32_cpu_offload=True,
+						llm_int8_has_fp16_weight=True
+					)
+					model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map="auto", load_in_8bit=True, quantization_config=quantization_config)
 					# else:
-					model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, load_in_8bit=True)
+					# model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, load_in_8bit=True)
 				print(dev_map)
 				# layers = {}
 				# real_map = {}
