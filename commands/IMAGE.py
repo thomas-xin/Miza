@@ -1499,7 +1499,7 @@ class Art(Command):
     imagebot = imagebot.Bot(token=AUTH.get("openai_key"))
     has_py39 = subprocess.run("py -3.9 -m pip").returncode == 0
 
-    async def __call__(self, bot, guild, user, channel, message, name, args, flags, **void):
+    async def __call__(self, bot, guild, user, channel, message, name, args, flags, comment="", **void):
         for a in reversed(message.attachments):
             args.insert(0, a.url)
         if not args:
@@ -1909,7 +1909,7 @@ class Art(Command):
             with tracebacksuppressor:
                 fn = await ffut
             files.append(CompatFile(fn, filename=name))
-        await send_with_react(channel, "", files=files, reference=message, reacts="🔳", embed=emb)
+        await send_with_react(channel, comment, files=files, reference=message, reacts="🔳", embed=emb)
         # await bot.send_with_file(channel, "", fn, filename=lim_str(prompt, 96) + ".png", reference=message, reacts="🔳", embed=emb)
 
 

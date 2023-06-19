@@ -1549,6 +1549,7 @@ class Ask(Command):
                     looped=loop,
                     _timeout=timeout,
                     timeout=timeout,
+                    comment=f"> Used {bot.get_prefix(guild)}{fname} {argv}"
                 )
             if oai in EXPAPI:
                 EXPAPI.discard(oai)
