@@ -151,7 +151,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         self.last_check = 0
         self.status_iter = xrand(4)
         self.curr_state = azero(4)
-        self.ip = None
+        self.ip = "127.0.0.1"
         self.server = None
         self.audio = None
         self.embed_senders = cdict()
