@@ -2664,7 +2664,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					usage=gmems[i].used,
 					max=gmems[i].total,
 					time=t,
-				) for ti in tinfo},
+				) for i, ti in enumerate(tinfo)},
 			},
 			disk={f"{ip}-{k}": dict(name=k, count=1, usage=v.used, max=v.total, time=t) for k, v in dinfo.items()},
 			network={
