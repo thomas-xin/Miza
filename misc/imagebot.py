@@ -174,32 +174,22 @@ def determine_cuda(mem=1, priority=None, multi=False):
 		if multi:
 			return [-1], torch.float32
 		return -1, torch.float32
-	import gpustat
-	fut = exc.submit(gpustat.new_query)
+	import pynvml
+	dc = pynvml.nvmlDeviceGetCount()
+	handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(dc)]
+	gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
 	tinfo = [torch.cuda.get_device_properties(i) for i in range(n)]
-	ginfo = fut.result()
-	ginfo3 = []
-	ginfo2 = list(ginfo)
-	tinfo2 = list(tinfo)
-	while tinfo2:
-		name = tinfo2.pop(0).name
-		for gi in ginfo2:
-			if gi.name == name:
-				ginfo2.remove(gi)
-				ginfo3.append(gi)
-				break
-	ginfo = ginfo3
 	if priority == "full":
-		key = lambda i: (p := tinfo[i]) and (s := ginfo[i]) and (s.memory_available * 1048576 >= mem, COMPUTE_LOAD[i], p.major, p.minor, p.multi_processor_count, p.total_memory)
+		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i], p.major, p.minor, p.multi_processor_count, p.total_memory)
 	elif priority:
-		key = lambda i: (p := tinfo[i]) and (s := ginfo[i]) and (s.memory_available * 1048576 >= mem, COMPUTE_LOAD[i], p.multi_processor_count, p.total_memory)
+		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i], p.multi_processor_count, p.total_memory)
 	elif priority is False:
-		key = lambda i: (p := tinfo[i]) and (s := ginfo[i]) and (s.memory_available * 1048576 >= mem, -COMPUTE_LOAD[i], -s.memory_available, p.multi_processor_count)
+		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, -COMPUTE_LOAD[i], -gmems[i].free, p.multi_processor_count)
 	else:
-		key = lambda i: (p := tinfo[i]) and (s := ginfo[i]) and (s.memory_available * 1048576 >= mem, -COMPUTE_LOAD[i], -p.multi_processor_count, -s.memory_available)
+		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, -COMPUTE_LOAD[i], -p.multi_processor_count, -gmems[i].free)
 	pcs = sorted(range(n), key=key, reverse=True)
 	if multi:
-		return [i for i in pcs if ginfo[i].memory_available * 1048576 >= mem], torch.float16
+		return [i for i in pcs if gmems[i].free >= mem], torch.float16
 	return pcs[0], torch.float16
 
 mcache = {}

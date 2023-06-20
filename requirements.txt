@@ -14,7 +14,6 @@ filetype>=1.2.0
 free-proxy>=1.1.1
 gmpy2>=2.1.5
 googletrans==4.0.0rc1
-gpustat>=1.1
 httpx>=0.13.3
 inspiro>=0.0.3
 knackpy>=1.1.1
@@ -35,6 +34,7 @@ py-cpuinfo>=9.0.0
 Pybooru>=4.2.2
 pygame>=2.3.0
 PyNaCl>=1.5.0
+pynvml>=11.5.0
 pypng>=0.20220715.0
 pyqrcode>=1.2.1
 pytesseract>=0.3.10

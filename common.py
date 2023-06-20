@@ -33,9 +33,16 @@ from zipfile import ZipFile
 import urllib.request, urllib.parse
 import nacl.secret
 
-os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-import torch
-hwaccel = "cuda" if torch.cuda.is_available() else "d3d11va" if os.name == "nt" else "auto"
+# os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+# import torch
+import pynvml
+try:
+    dc = pynvml.nvmlDeviceGetCount()
+except:
+    dc = 0
+else:
+    import torch
+hwaccel = "cuda" if dc else "d3d11va" if os.name == "nt" else "auto"
 
 utils = discord.utils
 reqs = alist(requests.Session() for i in range(6))

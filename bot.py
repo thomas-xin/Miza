@@ -2619,25 +2619,21 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             cinfo = self._cpuinfo = await create_future(cpuinfo.get_cpu_info)
         cpercent = psutil.cpu_percent()
         try:
-            import torch, gpustat
-            fut2 = create_future(gpustat.new_query)
-            tinfo = [torch.cuda.get_device_properties(i) for i in range(torch.cuda.device_count())]
-            ginfo = await fut2
+            import pynvml
+            dc = pynvml.nvmlDeviceGetCount()
+
+            def cuda_info():
+                import torch
+                return [torch.cuda.get_device_properties(i) for i in range(torch.cuda.device_count())]
+
+            fut2 = create_future(cuda_info)
+            handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(dc)]
+            gcore = [pynvml.nvmlDeviceGetNumGpuCores(d) for d in handles]
+            gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
+            gutil = [pynvml.nvmlDeviceGetUtilizationRates(d) for d in handles]
+            tinfo = await fut2
         except:
             tinfo = []
-            ginfo = {}
-        else:
-            ginfo3 = {}
-            ginfo2 = list(ginfo)
-            tinfo2 = list(tinfo)
-            while tinfo2:
-                name = tinfo2.pop(0).name
-                for gi in ginfo2:
-                    if gi.name == name:
-                        ginfo2.remove(gi)
-                        ginfo3[gi.index] = gi
-                        break
-            ginfo = ginfo3
         minfo = psutil.virtual_memory()
         sinfo = psutil.swap_memory()
         dinfo = {}
@@ -2650,39 +2646,25 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         with tracebacksuppressor(asyncio.TimeoutError, asyncio.CancelledError):
             ip = await fut
         t = utc()
-        def get_usage(gi):
-            try:
-                return float(gi["utilization.gpu"]) / 100
-            except ValueError:
-                pass
-            try:
-                return gi.power_draw / gi.power_limit
-            except (ValueError, TypeError, ZeroDivisionError):
-                return 0
-        def try_float(f):
-            try:
-                return float(f)
-            except ValueError:
-                return 0
         return dict(
 			cpu={ip: dict(name=cinfo["brand_raw"], count=cinfo["count"], usage=cpercent / 100, max=1, time=t)},
-			gpu={f"{ip}-{gi['index']}": dict(
-				name=gi["name"],
-				count=tinfo[i].multi_processor_count,
-				usage=get_usage(gi),
+			gpu={f"{ip}-{i}": dict(
+				name=ti.name,
+				count=gcore[i],
+				usage=gutil[i] / 100,
 				max=1,
 				time=t,
-			) for i, gi in ginfo.items()},
+			) for i, ti in tinfo.items()},
 			memory={
 				f"{ip}-v": dict(name="RAM", count=1, usage=minfo.used, max=minfo.total, time=t),
 				f"{ip}-s": dict(name="Swap", count=1, usage=sinfo.used, max=sinfo.total, time=t),
-				**{f"{ip}-{gi['index']}": dict(
-					name=gi["name"],
+				**{f"{ip}-{i}": dict(
+					name=ti.name,
 					count=1,
-					usage=try_float(gi["memory.used"]) * 1048576,
-					max=try_float(gi["memory.total"]) * 1048576,
+					usage=gmems[i].used,
+					max=gmems[i].total,
 					time=t,
-				) for gi in ginfo.values()},
+				) for ti in tinfo.values()},
 			},
 			disk={f"{ip}-{k}": dict(name=k, count=1, usage=v.used, max=v.total, time=t) for k, v in dinfo.items()},
 			network={
