@@ -2651,7 +2651,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			gpu={f"{ip}-{i}": dict(
 				name=ti.name,
 				count=gcore[i],
-				usage=gutil[i] / 100,
+				usage=gutil[i].gpu / 100,
 				max=1,
 				time=t,
 			) for i, ti in enumerate(tinfo)},
