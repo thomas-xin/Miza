@@ -1704,7 +1704,7 @@ class UpdateReminders(Database):
             except:
                 print_exc()
                 d.pop(i, None)
-        self.listed = alist(sorted(((d[i][0]["t"], i) for i in d), key=lambda x: x[0]))
+        self.listed = alist(sorted(((block[0]["t"], i) for i, block in d.items()), key=lambda x: x[0]))
         self.t = utc()
 
     async def recurrent_message(self, channel, embed, wait=60):

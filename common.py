@@ -2322,8 +2322,12 @@ def proc_start():
     for k, v in PROC_COUNT.items():
         PROCS[k] = [None] * v
         for i in range(v):
-            if i < 3 or torch.cuda.get_device_properties(i - 3).total_memory > 3 * 1073741824:
-                create_task(start_proc(k, i))
+            if i >= 3:
+                if torch.cuda.get_device_properties(i - 3).total_memory <= 3 * 1073741824:
+                    continue
+                if COMPUTE_LOAD[i - 3] < 1 / len(COMPUTE_LOAD) / 4:
+                    continue
+            create_task(start_proc(k, i))
 
 async def get_idle_proc(ptype, fix=None):
     if fix is not None:
