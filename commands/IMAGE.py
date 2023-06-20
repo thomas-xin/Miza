@@ -1652,15 +1652,15 @@ class Art(Command):
                         for fut in futt:
                             await fut
                 # print(ims)
-                for fut in futt:
-                    try:
-                        async with self.sdiff_sem:
+                async with self.sdiff_sem:
+                    for fut in futt:
+                        try:
                             ims2 = await fut
-                    except PermissionError:
-                        if not ims:
-                            raise
-                    ims2.extend(ims)
-                    ims = ims2
+                        except PermissionError:
+                            if not ims:
+                                raise
+                        ims2.extend(ims)
+                        ims = ims2
                 futs.extend(ims)
                 amount2 = len(futs)
         if amount2 < amount:
