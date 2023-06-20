@@ -2611,6 +2611,7 @@ elif len(sys.argv) > 1 and sys.argv[1] == "2":
 				return [-1], torch.float32
 			return -1, torch.float32
 		import pynvml
+		pynvml.nvmlInit()
 		dc = pynvml.nvmlDeviceGetCount()
 		handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(dc)]
 		gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]

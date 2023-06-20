@@ -37,12 +37,13 @@ import nacl.secret
 # import torch
 import pynvml
 try:
-    dc = pynvml.nvmlDeviceGetCount()
+    pynvml.nvmlInit()
+    DC = pynvml.nvmlDeviceGetCount()
 except:
-    dc = 0
+    DC = 0
 else:
     import torch
-hwaccel = "cuda" if dc else "d3d11va" if os.name == "nt" else "auto"
+hwaccel = "cuda" if DC else "d3d11va" if os.name == "nt" else "auto"
 
 utils = discord.utils
 reqs = alist(requests.Session() for i in range(6))
@@ -2292,7 +2293,8 @@ proc_args = cdict(
 )
 
 COMPUTE_LOAD = AUTH.get("compute_load", [])
-if len(COMPUTE_LOAD) != torch.cuda.device_count():
+if len(COMPUTE_LOAD) != DC:
+    import torch
     COMPUTE_LOAD = AUTH["compute_load"] = [torch.cuda.get_device_properties(i).multi_processor_count for i in range(torch.cuda.device_count())]
 if COMPUTE_LOAD:
     total = sum(COMPUTE_LOAD)
@@ -2322,10 +2324,9 @@ async def start_proc(k, i):
     return proc
 
 def proc_start():
-    dc = torch.cuda.device_count()
     # PROC_COUNT.math = 3
     # PROC_COUNT.image = 3 + dc
-    PROC_COUNT.compute = 3 + dc
+    PROC_COUNT.compute = 3 + DC
     for k, v in PROC_COUNT.items():
         PROCS[k] = [None] * v
         for i in range(v):
