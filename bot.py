@@ -2654,7 +2654,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				usage=gutil[i] / 100,
 				max=1,
 				time=t,
-			) for i, ti in tinfo.items()},
+			) for i, ti in enumerate(tinfo)},
 			memory={
 				f"{ip}-v": dict(name="RAM", count=1, usage=minfo.used, max=minfo.total, time=t),
 				f"{ip}-s": dict(name="Swap", count=1, usage=sinfo.used, max=sinfo.total, time=t),
@@ -2664,7 +2664,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					usage=gmems[i].used,
 					max=gmems[i].total,
 					time=t,
-				) for ti in tinfo.values()},
+				) for ti in tinfo},
 			},
 			disk={f"{ip}-{k}": dict(name=k, count=1, usage=v.used, max=v.total, time=t) for k, v in dinfo.items()},
 			network={
