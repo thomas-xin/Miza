@@ -1636,8 +1636,8 @@ class Art(Command):
                 c = 0
                 if not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy():
                     c = min(amount, 9 if nsfw and not self.sdiff_sem.active else 5)
-                    while c:
-                        n = xrand(floor(sqrt(c) + 1)) + 1
+                    while c > 0:
+                        n = min(c, xrand(floor(sqrt(c) + 1)) + 1)
                         fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, n], fix=3, timeout=120))
                         futt.append(fut)
                         c -= n
@@ -1823,8 +1823,8 @@ class Art(Command):
                             p = "" if noprompt else prompt
                             futt = []
                             c = amount - amount2
-                            while c:
-                                n = xrand(floor(sqrt(c) + 1)) + 1
+                            while c > 0:
+                                n = min(c, xrand(floor(sqrt(c) + 1)) + 1)
                                 fut = create_task(process_image("IBASL", "&", [p, kwargs, nsfw, False, n], fix=3, timeout=120))
                                 futt.append(fut)
                                 c -= n
