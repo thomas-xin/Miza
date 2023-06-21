@@ -2333,7 +2333,7 @@ def proc_start():
             if i >= 3:
                 if torch.cuda.get_device_properties(i - 3).total_memory <= 3 * 1073741824:
                     continue
-                if COMPUTE_LOAD[i - 3] < 1 / len(COMPUTE_LOAD) / 4:
+                if COMPUTE_LOAD[i - 3] < 0.25 / len(COMPUTE_LOAD):
                     continue
             create_task(start_proc(k, i))
 

@@ -2619,9 +2619,9 @@ elif len(sys.argv) > 1 and sys.argv[1] == "2":
 		elif priority:
 			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i], p.multi_processor_count, p.total_memory)
 		elif priority is False:
-			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, -COMPUTE_LOAD[i], -gmems[i].free, p.multi_processor_count)
+			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < 0.25 / len(COMPUTE_LOAD), COMPUTE_LOAD[i], -gmems[i].free, p.multi_processor_count)
 		else:
-			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, -COMPUTE_LOAD[i], -p.multi_processor_count, -gmems[i].free)
+			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < 0.25 / len(COMPUTE_LOAD), COMPUTE_LOAD[i], -p.multi_processor_count, -gmems[i].free)
 		pcs = sorted(range(n), key=key, reverse=True)
 		if multi:
 			return [i for i in pcs if gmems[i].free >= mem], torch.float16
