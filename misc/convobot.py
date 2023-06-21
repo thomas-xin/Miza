@@ -1018,7 +1018,7 @@ class Bot:
 									res = res.strip()
 									messages = [messages[-1]]
 									messages.append(m)
-									messages.append(dict(role="function", name=name, content=res))
+									messages.append(dict(role="function", name=name, content=res or ""))
 									model = "gpt-3.5-turbo-0613" if model.startswith("gpt-3.5") else "gpt-4-0613"
 									print("ChatGPT prompt:", messages)
 							elif name == "wolfram_alpha":
@@ -1031,16 +1031,16 @@ class Bot:
 									res = res.strip()
 									messages = [messages[-1]]
 									messages.append(m)
-									messages.append(dict(role="function", name=name, content=res))
+									messages.append(dict(role="function", name=name, content=res or ""))
 									model = "gpt-3.5-turbo-0613" if model.startswith("gpt-3.5") else "gpt-4-0613"
 									print("ChatGPT prompt:", messages)
 							elif name == "stable_diffusion":
 								print("Stable Diffusion query:", argv)
-								return {"func": "stablediffusion", "argv": argv}
+								return {"func": "stablediffusion", "argv": argv, "comment": res}
 							elif name == "reminder":
 								argv = args["message"] + " in " + args["delay"]
 								print("Reminder query:", argv)
-								return {"func": "remind", "argv": argv}
+								return {"func": "remind", "argv": argv, "comment": res}
 							elif name == "policy":
 								print("Policy!", messages[-1])
 								if model.startswith("gpt-3.5"):
