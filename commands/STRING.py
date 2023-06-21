@@ -1535,7 +1535,7 @@ class Ask(Command):
                 fake_message = copy.copy(message)
                 fake_message.content = f"{bot.get_prefix(guild)}{fname} {argv}"
                 comment = (out.get("comment") or "") + f"\n> Used `{fake_message.content}`"
-                return await create_future(
+                response = await create_future(
                     command,
                     bot=bot,
                     argv=argv,
@@ -1553,6 +1553,16 @@ class Ask(Command):
                     timeout=timeout,
                     comment=comment,
                 )
+                if type(response) is tuple and len(response) == 2:
+                    response, react = response
+                    if react == 1:
+                        react = "❎"
+                else:
+                    react = False
+                if isinstance(response, str):
+                    await send_with_react(channel, response, reference=not loop and message, reacts=react)
+                    return
+                return response
             if oai in EXPAPI:
                 EXPAPI.discard(oai)
                 if bot.is_trusted(guild) >= 2:
