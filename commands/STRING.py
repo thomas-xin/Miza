@@ -1532,7 +1532,7 @@ class Ask(Command):
                 timeout = 240
                 command = bot.commands[fname][0]
                 fake_message = copy.copy(message)
-                fake_message.content = argv
+                fake_message.content = f"{bot.get_prefix(guild)}{fname} {argv}"
                 return await create_future(
                     command,
                     bot=bot,
@@ -1549,7 +1549,7 @@ class Ask(Command):
                     looped=loop,
                     _timeout=timeout,
                     timeout=timeout,
-                    comment=f"> Used `{bot.get_prefix(guild)}{fname} {argv}`"
+                    comment=f"> Used `{fake_message.content}`"
                 )
             if oai in EXPAPI:
                 EXPAPI.discard(oai)
