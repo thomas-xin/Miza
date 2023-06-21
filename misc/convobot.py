@@ -594,6 +594,26 @@ class Bot:
 			},
 		},
 		{
+			"name": "reminder",
+			"description": "Sets a reminder for the user.",
+			"parameters": {
+				"type": "object",
+				"properties": {
+					"message": {
+						"type": "string",
+						"description": "The message, e.g. Remember to take your meds!",
+					},
+					"unit": {"type": "string"},
+					"delay": {
+						"type": "string",
+						"description": "The delay, e.g. 3 days 16 hours 3.9 seconds",
+					},
+					"unit": {"type": "string"},
+				},
+				"required": ["message", "delay"],
+			},
+		},
+		{
 			"name": "policy",
 			"description": "Divert the response to this function if a policy violation occurs.",
 			"parameters": {
@@ -701,7 +721,7 @@ class Bot:
 			cm = 0
 		elif model == "davinci":
 			model = "text-davinci-003"
-			temp = 0.7
+			temp = 0.8
 			limit = 3000
 			cm = 200
 			longer = True
@@ -907,6 +927,9 @@ class Bot:
 			prompt = None
 			if extensions:
 				intended = None
+				functions = self.functions.copy()
+				if self.jailbroken:
+					functions.pop(-1)
 				data = dict(
 					model="gpt-3.5-turbo-0613" if model.startswith("gpt-3.5") else "gpt-4-0613",
 					messages=messages,
@@ -916,7 +939,7 @@ class Bot:
 					frequency_penalty=1.0,
 					presence_penalty=0.6,
 					user=str(hash(u)),
-					functions=self.functions,
+					functions=functions,
 				)
 				if oai:
 					openai.api_key = oai
@@ -996,7 +1019,7 @@ class Bot:
 									messages = [messages[-1]]
 									messages.append(m)
 									messages.append(dict(role="function", name=name, content=res))
-									model = "gpt-3.5-turbo-0613" if model.startswith("gpt-3.5") else "gpt-4-0613",
+									model = "gpt-3.5-turbo-0613" if model.startswith("gpt-3.5") else "gpt-4-0613"
 							elif name == "wolfram_alpha":
 								func = self.wolframalpha
 								print(f"Wolfram Alpha query:", argv)
@@ -1008,17 +1031,27 @@ class Bot:
 									messages = [messages[-1]]
 									messages.append(m)
 									messages.append(dict(role="function", name=name, content=res))
-									model = "gpt-3.5-turbo-0613" if model.startswith("gpt-3.5") else "gpt-4-0613",
+									model = "gpt-3.5-turbo-0613" if model.startswith("gpt-3.5") else "gpt-4-0613"
 							elif name == "stable_diffusion":
 								print("Stable Diffusion query:", argv)
 								return {"func": "stablediffusion", "argv": argv}
+							elif name == "reminder":
+								argv = args["message"] + " in " + args["delay"]
+								print("Reminder query:", argv)
+								return {"func": "remind", "argv": argv}
 							elif name == "policy":
 								print("Policy!", messages[-1])
-								model = "hippogriff-30b"
-								temp = 0.8
-								limit = 2048
-								cm = 0
-		elif model in local_models:
+								if model.startswith("gpt-3.5"):
+									model = "hippogriff-30b"
+									temp = 0.8
+									limit = 2048
+									cm = 0
+								else:
+									model = "text-davinci-003"
+									temp = 0.8
+									limit = 3000
+									cm = 200
+		if model in local_models:
 			prompt = "".join(reversed(ins))
 			prompt = nstart + "\n<START>\n" + prompt
 			if not self.bl:
