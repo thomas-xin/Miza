@@ -1531,6 +1531,8 @@ class Ask(Command):
                 loop = False
                 timeout = 240
                 command = bot.commands[fname][0]
+                fake_message = copy.copy(message)
+                fake_message.content = argv
                 return await create_future(
                     command,
                     bot=bot,
@@ -1540,7 +1542,7 @@ class Ask(Command):
                     flags=flags,
                     perm=u_perm,
                     user=user,
-                    message=message,
+                    message=fake_message,
                     channel=channel,
                     guild=guild,
                     name=command_check,
