@@ -3139,7 +3139,7 @@ class Queue(Command):
                 p = f"\nNote: Player is currently paused. Use {bot.get_prefix(guild)}resume to resume!"
             else:
                 p = ""
-            return (comment or "") + css_md(f"🎶 Added {sqr_md(names)} to the queue! Estimated time until playing: {sqr_md(time_until(utc() + total_duration))}. 🎶{p}"), 1
+            return comment + "\n" + css_md(f"🎶 Added {sqr_md(names)} to the queue! Estimated time until playing: {sqr_md(time_until(utc() + total_duration))}. 🎶{p}"), 1
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
         u_id, pos, v = list(map(int, vals.split("_", 2)))
@@ -5506,12 +5506,15 @@ class UpdateAudio(Database):
             if not file.loaded:
                 await create_future(file.destroy)
         for auds in tuple(self.players.values()):
-            reason = "🎵 Temporarily disconnecting for maintenance"
             if auds.queue:
-                reason += " (Queue saved)."
+                reason = "🎵 Temporarily disconnecting for maintenance"
+                if auds.queue:
+                    reason += " (Queue saved)."
+                else:
+                    reason += "."
+                reason += " Apologies for any inconvenience! 🎵"
             else:
-                reason += "."
-            reason += " Apologies for any inconvenience! 🎵"
+                reason = ""
             await create_future(auds.kill, reason=css_md(reason))
 
     # Restores all audio players from temporary database when applicable

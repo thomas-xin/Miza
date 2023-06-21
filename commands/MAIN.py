@@ -1449,7 +1449,7 @@ class Reminder(Command):
         emb = discord.Embed(description=msg)
         emb.colour = await bot.get_colour(remind_as)
         emb.set_author(name=username, url=url, icon_url=url)
-        out = (comment or "") + "```css\nSuccessfully set "
+        out = comment + "\n```css\nSuccessfully set "
         if urgent:
             out += "urgent "
         if "announce" in name:
