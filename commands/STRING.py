@@ -1517,6 +1517,7 @@ class Ask(Command):
                 oai=oai,
                 bl=bl,
                 nsfw=bot.is_nsfw(channel),
+                vc=bool(user.voice),
             )
             # if fut:
             #     await fut
@@ -1533,7 +1534,7 @@ class Ask(Command):
                 command = bot.commands[fname][0]
                 fake_message = copy.copy(message)
                 fake_message.content = f"{bot.get_prefix(guild)}{fname} {argv}"
-                comment = out.get("comment") or f"> Used `{fake_message.content}`"
+                comment = (out.get("comment") or "") + f"\n> Used `{fake_message.content}`"
                 return await create_future(
                     command,
                     bot=bot,

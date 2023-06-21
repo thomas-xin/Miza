@@ -1178,7 +1178,7 @@ class Reminder(Command):
     def __load__(self):
         self.timefind = re.compile("(?:(?:(?:[0-9]+:)+[0-9.]+\\s*(?:am|pm)?|" + self.bot.num_words + "|[\\s\-+*\\/^%.,0-9]+\\s*(?:am|pm|s|m|h|d|w|y|century|centuries|millenium|millenia|(?:second|sec|minute|min|hour|hr|day|week|wk|month|mo|year|yr|decade|galactic[\\s\\-_]year)s?))\\s*)+$", re.I)
 
-    async def __call__(self, name, message, flags, bot, user, guild, perm, argv, **void):
+    async def __call__(self, name, message, flags, bot, user, guild, perm, argv, comment=None, **void):
         msg = message.content
         try:
             msg = msg[msg.casefold().index(name) + len(name):]
@@ -1449,7 +1449,7 @@ class Reminder(Command):
         emb = discord.Embed(description=msg)
         emb.colour = await bot.get_colour(remind_as)
         emb.set_author(name=username, url=url, icon_url=url)
-        out = "```css\nSuccessfully set "
+        out = (comment or "") + "```css\nSuccessfully set "
         if urgent:
             out += "urgent "
         if "announce" in name:

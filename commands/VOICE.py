@@ -3006,7 +3006,7 @@ class Queue(Command):
     slash = ("Play", "Queue")
     msgcmd = ("Search & Play",)
 
-    async def __call__(self, bot, user, perm, message, channel, guild, flags, name, argv, **void):
+    async def __call__(self, bot, user, perm, message, channel, guild, flags, name, argv, comment="", **void):
         # This command is a bit of a mess
         ytdl.bot = bot
         argv += " ".join(best_url(a) for a in message.attachments)
@@ -3139,7 +3139,7 @@ class Queue(Command):
                 p = f"\nNote: Player is currently paused. Use {bot.get_prefix(guild)}resume to resume!"
             else:
                 p = ""
-            return css_md(f"🎶 Added {sqr_md(names)} to the queue! Estimated time until playing: {sqr_md(time_until(utc() + total_duration))}. 🎶{p}"), 1
+            return (comment or "") + css_md(f"🎶 Added {sqr_md(names)} to the queue! Estimated time until playing: {sqr_md(time_until(utc() + total_duration))}. 🎶{p}"), 1
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
         u_id, pos, v = list(map(int, vals.split("_", 2)))

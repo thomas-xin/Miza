@@ -614,6 +614,21 @@ class Bot:
 			},
 		},
 		{
+			"name": "play",
+			"description": "Searches and plays a song in the nearest voice channel.",
+			"parameters": {
+				"type": "object",
+				"properties": {
+					"query": {
+						"type": "string",
+						"description": "The name or URL, e.g. Rick Astley - Never gonna give you up",
+					},
+					"unit": {"type": "string"},
+				},
+				"required": ["query"],
+			},
+		},
+		{
 			"name": "policy",
 			"description": "Divert the response to this function if a policy violation occurs.",
 			"parameters": {
@@ -621,7 +636,7 @@ class Bot:
 				"properties": {
 					"query": {
 						"type": "string",
-						"description": "The response, e.g. I'm sorry, but I cannot provide instructions for manifesting dark orbs. As an AI language model, my purpose is to assist and help users in a positive way.",
+						"description": "The response, e.g. Sorry, as an AI language model, my purpose is to assist and help users in a positive way.",
 					},
 					"unit": {"type": "string"},
 				},
@@ -839,74 +854,6 @@ class Bot:
 				pc += len(self.gpttokens(m["role"], model))
 				pc += len(self.gpttokens(m["content"], model))
 			text = res = flagged = None
-			# if extensions and q and len(q.split(None)) > 1 and not self.jailbroken:
-			# 	resp = self.answer_classify(q=q, labels=("personal question", "casual conversation", "illegal act", "maths equation", "knowledge info", "other"))
-			# 	order = sorted(resp, key=resp.get)
-			# 	if order[-1] == "illegal act":
-			# 		text = "2."
-			# 	elif order[-1] == "maths equation":
-			# 		text = "3."
-			# 	elif order[-1] in ("knowledge info", "other"):
-			# 		text = "4."
-			# sname = None
-			# nohist = False
-			# if text:
-			# 	if text.startswith("3"):
-			# 		stype = "3"
-			# 		sname = "WOLFRAMALPHA"
-			# 		nohist = True
-			# 	elif text.startswith("4"):
-			# 		stype = random.randint(0, 1) # 2
-			# 		sname = ("GOOGLE", "BING", "YAHOO")[stype]
-			# 	print(sname, "search:", text)
-			# if text and text.startswith("2"):
-			# 	flagged = True
-			# elif text and text.startswith("4"):
-			# 	t2 = f'"""\n{q}\n"""\n\nRegarding above context: Formulate a search engine query for knowledge if relevant, else say "!".'
-			# 	temp /= 2
-			# 	for i in range(3):
-			# 		try:
-			# 			t3 = self.cgp(t2, stop=["s an AI", "!", "orry,", "language model"]).strip('" ')
-			# 			# spl = self.cgp(t2)
-			# 			# t3 = None if not spl else spl[0]
-			# 			if not t3 or t3 in ("!", '"!"'):
-			# 				t3 = q
-			# 			t3 = lim_tokens(t3, 32)
-			# 			res = exc.submit(
-			# 				getattr(self, sname.lower()),
-			# 				t3,
-			# 				raw=True,
-			# 			).result(timeout=12)
-			# 			print(sname, "res:", t3 + ";", res)
-			# 		except concurrent.futures.TimeoutError:
-			# 			print_exc()
-			# 		else:
-			# 			break
-			# elif text and text.startswith("3"):
-			# 	t2 = lim_tokens(q, 96)
-			# 	temp /= 3
-			# 	if t2:
-			# 		for i in range(3):
-			# 			try:
-			# 				res = exc.submit(
-			# 					self.wolframalpha,
-			# 					t2,
-			# 				).result(timeout=18)
-			# 			except concurrent.futures.TimeoutError:
-			# 				print_exc()
-			# 			else:
-			# 				break
-			# if nohist and len(messages) > 3:
-			# 	messages = [messages[0], messages[-2], messages[-1]]
-			# if res:
-			# 	if len(self.gpttokens(res)) > 512:
-			# 		res = self.auto_summarise(q=q + "\n" + res, max_length=500, min_length=384).replace("\n", ". ").replace(": ", " -").strip()
-			# 	if res:
-			# 		m = dict(role="system", name=sname, content=res.strip())
-			# 		pc += len(self.gpttokens(m["role"], model))
-			# 		pc += len(self.gpttokens(m["content"], model))
-			# 		messages.insert(-1, m)
-			# 		searched = res.strip()
 			v = ""
 			dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
 			# if searched:
@@ -927,9 +874,11 @@ class Bot:
 			prompt = None
 			if extensions:
 				intended = None
-				functions = self.functions.copy()
-				if self.jailbroken:
-					functions.pop(-1)
+				functions = self.functions
+				if self.jailbroken or not self.nsfw:
+					functions = [f for f in functions if f["name"] != "policy"]
+				if not self.vc:
+					functions = [f for f in functions if f["name"] != "play"]
 				data = dict(
 					model="gpt-3.5-turbo-0613" if model.startswith("gpt-3.5") else "gpt-4-0613",
 					messages=messages,
@@ -1041,6 +990,9 @@ class Bot:
 								argv = args["message"] + " in " + args["delay"]
 								print("Reminder query:", argv)
 								return {"func": "remind", "argv": argv, "comment": res}
+							elif name == "play":
+								print("Play query:", argv)
+								return {"func": "play", "argv": argv, "comment": res}
 							elif name == "policy":
 								print("Policy!", messages[-1])
 								if model.startswith("gpt-3.5"):

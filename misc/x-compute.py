@@ -2493,7 +2493,7 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 		channel_id = inputs["channel_id"]
 		key = inputs["key"]
 		ht = inputs["huggingface_token"]
-		vis = inputs.get("vis_session")
+		# vis = inputs.get("vis_session")
 		name = inputs["name"]
 		model = inputs["model"]
 		personality = inputs["personality"]
@@ -2508,6 +2508,7 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 		oai = inputs.get("oai")
 		bals = inputs.get("bals")
 		nsfw = inputs.get("nsfw")
+		vc = inputs.get("vc")
 		try:
 			cb = CBOTS[channel_id]
 			if cb.personality != personality:
@@ -2541,7 +2542,8 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 		cb.oai = oai
 		cb.bals = bals
 		cb.nsfw = nsfw
-		cb.vis_s = vis
+		# cb.vis_s = vis
+		cb.vc = vc
 		if inputs.get("reset"):
 			to = []
 			for i, t in enumerate(history):
