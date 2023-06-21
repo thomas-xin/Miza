@@ -1020,6 +1020,7 @@ class Bot:
 									messages.append(m)
 									messages.append(dict(role="function", name=name, content=res))
 									model = "gpt-3.5-turbo-0613" if model.startswith("gpt-3.5") else "gpt-4-0613"
+									print("ChatGPT prompt:", messages)
 							elif name == "wolfram_alpha":
 								func = self.wolframalpha
 								print(f"Wolfram Alpha query:", argv)
@@ -1032,6 +1033,7 @@ class Bot:
 									messages.append(m)
 									messages.append(dict(role="function", name=name, content=res))
 									model = "gpt-3.5-turbo-0613" if model.startswith("gpt-3.5") else "gpt-4-0613"
+									print("ChatGPT prompt:", messages)
 							elif name == "stable_diffusion":
 								print("Stable Diffusion query:", argv)
 								return {"func": "stablediffusion", "argv": argv}
