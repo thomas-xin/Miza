@@ -2644,51 +2644,31 @@ elif len(sys.argv) > 1 and sys.argv[1] == "2":
 
 elif len(sys.argv) > 1:
 	import imagebot
-	imagebot.COMPUTE_LOAD = COMPUTE_LOAD
-	for i in range(3):
-		try:
-			from transformers import TrOCRProcessor, VisionEncoderDecoderModel, ViltProcessor, ViltForQuestionAnswering
-			from diffusers import DPMSolverMultistepScheduler, StableDiffusionPipeline, StableDiffusionImg2ImgPipeline, StableDiffusionInpaintPipeline, StableDiffusionImageVariationPipeline
-		except ImportError:
-			print(traceback.format_exc(), end="")
-			time.sleep(i + 1)
-		else:
-			break
+	from clip_interrogator import Config, Interrogator
+	try:
+		import pytesseract
+	except ImportError:
+		pytesseract = None
 
-	VGPT = VVQA = None
+	VIT = None
 	def caption(im, q=None, cid=None):
-		im = resize_max(im, 512, "auto")
+		im = resize_max(im, 1536, "auto")
 		if im.mode != "RGB":
 			image = im.convert("RGB")
 		else:
 			image = im
-		p1 = p2 = None
-		if VGPT:
-			p, m = VGPT
+		if pytesseract:
+			fut = exc.submit(pytesseract.image_to_string, image, config="--psm 1", timeout=8)
 		else:
-			p = backup_model(TrOCRProcessor.from_pretrained, "nlpconnect/vit-gpt2-image-captioning")
-			m = backup_model(VisionEncoderDecoderModel.from_pretrained, "nlpconnect/vit-gpt2-image-captioning").to("cpu")
-			globals()["VGPT"] = (p, m)
-		impv = p(image, return_tensors="pt")
-		pixel_values = impv.pixel_values
-		generated_ids = m.generate(pixel_values)
-		generated_text = p.batch_decode(generated_ids, skip_special_tokens=True)[0]
-		p1 = generated_text.strip()
-		if not q:
-			return (p1, "")
-		if VVQA:
-			p, m = VVQA
+			fut = None
+		config = Config(clip_model_name="ViT-H-14/laion2b_s32b_b79k")
+		config.apply_low_vram_defaults()
+		ci = Interrogator(config)
+		p1 = ci.interrogate(image)
+		if fut:
+			p2 = fut.result()
 		else:
-			p = backup_model(ViltProcessor.from_pretrained, "dandelin/vilt-b32-finetuned-vqa")
-			m = backup_model(ViltForQuestionAnswering.from_pretrained, "dandelin/vilt-b32-finetuned-vqa").to("cpu")
-			globals()["VVQA"] = (p, m)
-		spl = q.split()
-		t = " ".join(w for w in spl if not is_url(w))[:32]
-		encoding = p(image, t, return_tensors="pt")
-		outputs = m(**encoding)
-		logits = outputs.logits
-		idx = logits.argmax(-1).item()
-		p2 = m.config.id2label[idx].strip()
+			p2 = None
 		return (p1, p2)
 
 	def IBASL(prompt, kwargs, nsfw=False, force=False, count=1):

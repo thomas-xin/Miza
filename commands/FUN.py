@@ -2126,8 +2126,10 @@ class DadJoke(Command):
         following = bot.data.dadjokes
         curr = following.get(guild.id, {})
         mode = args[0][:4] if args else "all"
+        if mode == "mess":
+            mode = "resp"
         if mode not in ("nick", "resp", "all"):
-            raise NotImplementedError(f"Unsupported mode {mode}.")
+            raise NotImplementedError(f"Unsupported mode {args[0]}.")
         chance = args[1] if len(args) > 1 else 100
         if isinstance(chance, str):
             chance = await self.bot.eval_math(chance.rstrip("%"), default=100)
