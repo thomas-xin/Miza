@@ -30,16 +30,21 @@ if len(sys.argv) > 1:
         data = pipe(" ".join(["water"] * 64), num_inference_steps=count, callback=mark)
         delays = [temp[i] - temp[i - 1] for i in range(2, len(temp))]
         taken = sum(delays)
-        if taken < 45:
-            count = max(count * 2, round(60 / taken * count))
+        if taken < 45 and count < 999:
+            count = min(999, max(count * 2, round(45 / taken * count)))
             continue
         break
     tavg = taken
     avg = count / tavg * 100000
-    print(f"Benchmarked {name} ({core}-core). Average time taken for {count} iteration(s): {tavg}")
+    print(f"Benchmarked {name} ({core}-core). Average time taken for {count} iteration(s): {tavg}s")
     print(f"Score: {round(avg, 2)}")
     print(avg)
     raise SystemExit
+
+try:
+    import pynvml
+except ImportError:
+    subprocess.run([sys.executable, "-m", "pip", "install", "pynvml", "--upgrade", "--user"])
 
 print("Loading...")
 import pynvml
@@ -50,6 +55,16 @@ except:
     DC = 0
 if not DC:
     print("WARNING: No NVIDIA GPUs detected. Please install one for AI compute acceleration.")
+
+try:
+    import torch, diffusers, cpuinfo
+except ImportError:
+    subprocess.run([sys.executable, "-m", "pip", "install", "py-cpuinfo", "--upgrade", "--user"])
+    subprocess.run([sys.executable, "-m", "pip", "install", "diffusers", "--upgrade", "--user"])
+    if DC:
+        subprocess.run([sys.executable, "-m", "pip", "install", "pynvml", "--upgrade", "--user"])
+    else:
+        subprocess.run([sys.executable, "-m", "pip", "install", "torch", "--index-url", "https://download.pytorch.org/whl/cu118", "--upgrade", "--user"])
 
 import cpuinfo, subprocess
 

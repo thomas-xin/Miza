@@ -85,37 +85,6 @@ for k, v in memories.items():
 import threading
 new_tasks = {}
 
-def proc_communicate(proc):
-    while True:
-        with tracebacksuppressor:
-            if not is_strict_running(proc):
-                return
-            b = await proc.stdout.readline()
-            if not b:
-                return
-            # s = as_str(b.rstrip())
-            # if s and s[0] == "~":
-            #     c = as_str(evalEX(s[1:]))
-            #     exec_tb(c, globals())
-        s = b.rstrip()
-        try:
-            if s and s[:1] == b"$":
-                s, r = s.split(b"~", 1)
-                # print("PROC_RESP:", s, PROC_RESP.keys())
-                d = {"_x": base64.b64decode(r)}
-                c = evalex(memoryview(s)[1:], globals(), d)
-                if isinstance(c, (str, bytes, memoryview)):
-                    exec_tb(c, globals(), d)
-            elif s and s[:1] == b"~":
-                c = evalex(memoryview(s)[1:], globals())
-                if isinstance(c, (str, bytes, memoryview)):
-                    exec_tb(c, globals())
-            else:
-                print(lim_str(as_str(s), 1048576))
-        except:
-            print_exc()
-            print(s)
-
 def task_submit(ptype, command, fix=None, _timeout=12):
     ts = ts_us()
     proc = random.choice([proc for proc in procs if not proc.busy or proc.busy.done()])
@@ -166,6 +135,39 @@ def task_submit(ptype, command, fix=None, _timeout=12):
     create_task(wait_sub())
     return resp
 
+def update_resps(proc):
+    def func():
+        while True:
+            with tracebacksuppressor:
+                if not is_strict_running(proc):
+                    return
+                b = await proc.stdout.readline()
+                if not b:
+                    return
+                # s = as_str(b.rstrip())
+                # if s and s[0] == "~":
+                #     c = as_str(evalEX(s[1:]))
+                #     exec_tb(c, globals())
+            s = b.rstrip()
+            try:
+                if s and s[:1] == b"$":
+                    s, r = s.split(b"~", 1)
+                    # print("PROC_RESP:", s, PROC_RESP.keys())
+                    d = {"_x": base64.b64decode(r)}
+                    c = evalex(memoryview(s)[1:], globals(), d)
+                    if isinstance(c, (str, bytes, memoryview)):
+                        exec_tb(c, globals(), d)
+                elif s and s[:1] == b"~":
+                    c = evalex(memoryview(s)[1:], globals())
+                    if isinstance(c, (str, bytes, memoryview)):
+                        exec_tb(c, globals())
+                else:
+                    print(lim_str(as_str(s), 1048576))
+            except:
+                print_exc()
+                print(s)
+    return func
+
 def update_tasks(proc):
     def func():
         resps = {}
@@ -193,8 +195,7 @@ def update_tasks(proc):
                     resps[i] = "ERR:" + repr(ex)
                 else:
                     resps[i] = "RES:" + resp if isinstance(resp, str) else resp
-                    newtasks.extend(bot.distribute([proc.cap], {}, {i: resp}))
-            tasks = newtasks
+    return func
 
 procs = []
 for k, v in memories.items():
