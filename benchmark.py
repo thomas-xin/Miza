@@ -26,6 +26,7 @@ def bench(device, name, core):
     #         pipe.enable_model_cpu_offload()
     #     except AttributeError:
     #         pass
+    pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
     count = 1
     taken = 0
     while True:
