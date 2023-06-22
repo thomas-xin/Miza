@@ -1388,6 +1388,7 @@ class Ask(Command):
                     urls[-1] = fm
                 else:
                     urls = [fm]
+            seen = False
             for url in urls:
                 if p1 or is_image(url) is not None or is_video(url) is not None:
                     capt = url.rsplit("/", 1)[-1]
@@ -1407,6 +1408,18 @@ class Ask(Command):
                         q = q.replace(url, capti)
                     else:
                         q += " " + capti
+                    seen = True
+            if refs and not seen:
+                if p1:
+                    if p2:
+                        capti = f"[Image {capt}:{p1}:{p2}]"
+                        refs = refs[:-2]
+                    else:
+                        capti = f"[Image {capt}:{p1}]"
+                        refs = refs[:-1]
+                elif p2:
+                    capti = f"[Image {capt}:{p2}]"
+                    refs.pop(-1)
             m = message
             if m.author.id == bot.id:
                 name = bot.name
