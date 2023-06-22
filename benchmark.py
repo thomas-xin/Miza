@@ -19,31 +19,31 @@ def bench(device, name, core):
     pipe = StableDiffusionPipeline.from_pretrained(model, torch_dtype=torch.float16 if is_cuda else torch.float32)
     if is_cuda:
         pipe = pipe.to(device)
-    pipe.enable_attention_slicing()
-    pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
-    if is_cuda:
-        try:
-            pipe.enable_model_cpu_offload()
-        except AttributeError:
-            pass
+    # pipe.enable_attention_slicing()
+    # pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+    # if is_cuda:
+    #     try:
+    #         pipe.enable_model_cpu_offload()
+    #     except AttributeError:
+    #         pass
     count = 1
     taken = 0
     while True:
         t = time.time()
         data = pipe(" ".join(["water"] * 64), num_inference_steps=count)
         taken = time.time() - t
-        if taken < 20:
+        if taken < 15:
             count <<= 1
             continue
         break
     taken = 0
-    for i in range(4):
+    for i in range(3):
         t = time.time()
         data = pipe(" ".join(["water"] * 64), num_inference_steps=count)
         taken += time.time() - t
     tavg = taken / 4
     avg = count / tavg * 100000
-    print(f"Benchmarked {name} ({core}-core). Average time taken for {count} iterations: {tavg}")
+    print(f"Benchmarked {name} ({core}-core). Average time taken for {count} iteration(s): {tavg}")
     print(f"Score: {round(avg, 2)}")
     return avg
 
