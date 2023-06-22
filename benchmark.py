@@ -31,7 +31,7 @@ if len(sys.argv) > 1:
         delays = [temp[i] - temp[i - 1] for i in range(2, len(temp))]
         taken = sum(delays)
         if taken < 45:
-            count <<= 1
+            count = max(count * 2, round(60 / taken * count))
             continue
         break
     tavg = taken
