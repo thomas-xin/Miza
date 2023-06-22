@@ -21,19 +21,20 @@ if len(sys.argv) > 1:
         except AttributeError:
             pass
     pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
-    count = 4
+    count = 3
     taken = 0
     temp = []
     mark = lambda *args: temp.append(time.time())
     while True:
         temp.clear()
-        data = pipe(" ".join(["water"] * 64), num_inference_steps=count, callback=mark)
-        delays = [temp[i] - temp[i - 1] for i in range(2, len(temp))]
-        taken = sum(delays)
+        data = pipe(" ".join(["water"] * 64), num_inference_steps=count + 1, callback=mark)
+        taken = temp[-1] - temp[1]
         if taken < 45 and count < 999:
             count = min(999, max(count * 2, round(45 / taken * count)))
             continue
         break
+    im = data.images[0]
+    im.save(f"{name} ({core}-core).png")
     tavg = taken
     avg = count / tavg * 100000
     print(f"Benchmarked {name} ({core}-core). Average time taken for {count} iteration(s): {tavg}s")
@@ -58,6 +59,8 @@ if not DC:
 
 try:
     import torch, diffusers, cpuinfo
+    if DC and not torch.cuda.is_available():
+        raise ImportError
 except ImportError:
     subprocess.run([sys.executable, "-m", "pip", "install", "py-cpuinfo", "--upgrade", "--user"])
     subprocess.run([sys.executable, "-m", "pip", "install", "diffusers", "--upgrade", "--user"])
