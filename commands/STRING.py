@@ -1412,13 +1412,13 @@ class Ask(Command):
             if refs and not seen:
                 if p1:
                     if p2:
-                        capti = f"[Image {capt}:{p1}:{p2}]"
+                        capti = f"[Image:{p1}:{p2}]"
                         refs = refs[:-2]
                     else:
-                        capti = f"[Image {capt}:{p1}]"
+                        capti = f"[Image:{p1}]"
                         refs = refs[:-1]
                 elif p2:
-                    capti = f"[Image {capt}:{p2}]"
+                    capti = f"[Image:{p2}]"
                     refs.pop(-1)
             m = message
             if m.author.id == bot.id:
