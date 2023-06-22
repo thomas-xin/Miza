@@ -2661,11 +2661,11 @@ elif len(sys.argv) > 1:
 			fut = exc.submit(pytesseract.image_to_string, image, config="--psm 1", timeout=8)
 		else:
 			fut = None
-		if not self.VIT:
+		if not VIT:
 			config = Config(clip_model_name="ViT-H-14/laion2b_s32b_b79k")
 			config.apply_low_vram_defaults()
-			self.VIT = Interrogator(config)
-		p1 = self.VIT.interrogate(image)
+			globals()["VIT"] = Interrogator(config)
+		p1 = VIT.interrogate(image)
 		if fut:
 			p2 = fut.result()
 		else:
