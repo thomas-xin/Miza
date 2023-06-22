@@ -36,7 +36,6 @@ def bench(device, name, core):
             count <<= 1
             continue
         break
-    taken = 0
     for i in range(3):
         t = time.time()
         data = pipe(" ".join(["water"] * 64), num_inference_steps=count)
