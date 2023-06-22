@@ -42,6 +42,7 @@ if len(sys.argv) > 1:
     print(avg)
     raise SystemExit
 
+import subprocess
 try:
     import pynvml
 except ImportError:
@@ -69,7 +70,7 @@ except ImportError:
     else:
         subprocess.run([sys.executable, "-m", "pip", "install", "torch", "--index-url", "https://download.pytorch.org/whl/cu118", "--upgrade", "--user"])
 
-import cpuinfo, subprocess
+import cpuinfo
 
 
 total = 0
