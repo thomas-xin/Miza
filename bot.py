@@ -2758,6 +2758,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             memory={},
             disk={},
             network={},
+			power={},
         ),
         discord=cdict(),
         misc=cdict(),
