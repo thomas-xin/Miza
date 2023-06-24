@@ -285,32 +285,32 @@ def safecomp(gen):
 
 # Decodes HTML encoded characters in a string.
 def html_decode(s):
-    while len(s) > 7:
-        try:
-            i = s.index("&#")
-        except ValueError:
-            break
-        try:
-            if s[i + 2] == "x":
-                base = 16
-                p = i + 3
-            else:
-                base = 10
-                p = i + 2
-            for a in range(p, p + 16):
-                c = s[a]
-                if c == ";":
-                    v = int(s[p:a], base)
-                    break
-                elif not c.isnumeric() and c not in "abcdefABCDEF":
-                    break
-            c = chr(v)
-            s = s[:i] + c + s[a + 1:]
-        except (ValueError, NameError, IndexError):
-            s = s[:i + 1] + "\u200b" + s[i + 1:]
-            continue
-    s = s.replace("\u200b", "").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
-    return s.replace("&quot;", '"').replace("&apos;", "'")
+	while len(s) > 7:
+		try:
+			i = s.index("&#")
+		except ValueError:
+			break
+		try:
+			if s[i + 2] == "x":
+				base = 16
+				p = i + 3
+			else:
+				base = 10
+				p = i + 2
+			for a in range(p, p + 16):
+				c = s[a]
+				if c == ";":
+					v = int(s[p:a], base)
+					break
+				elif not c.isnumeric() and c not in "abcdefABCDEF":
+					break
+			c = chr(v)
+			s = s[:i] + c + s[a + 1:]
+		except (ValueError, NameError, IndexError):
+			s = s[:i + 1] + "\u200b" + s[i + 1:]
+			continue
+	s = s.replace("\u200b", "").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+	return s.replace("&quot;", '"').replace("&apos;", "'")
 
 def vague(t):
 	t = t.casefold().replace("'", "")
