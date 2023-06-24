@@ -2631,6 +2631,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
             gcore = [pynvml.nvmlDeviceGetNumGpuCores(d) for d in handles]
             gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
             gutil = [pynvml.nvmlDeviceGetUtilizationRates(d) for d in handles]
+			gpowa = [pynvml.nvmlDeviceGetPowerUsage(d) for d in handles]
+			gpowb = [pynvml.nvmlDeviceGetEnforcedPowerLimit(d) for d in handles]
             tinfo = await fut2
         except:
             tinfo = []
@@ -2670,6 +2672,15 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			network={
 				ip: dict(name="Upstream", count=1, usage=self.up_bps, max=-1, time=t),
 				ip: dict(name="Downstream", count=1, usage=self.down_bps, max=-1, time=t),
+			},
+			power={
+				**{f"{ip}-{i}": dict(
+					name=ti.name,
+					count=1,
+					usage=gpowa[i] / 1000,
+					max=gpowb[i] / 1000,
+					time=t,
+				) for i, ti in enumerate(tinfo)},
 			},
 		)
 
@@ -2777,6 +2788,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
         disk_usage = sum(e["usage"] * e["count"] for e in system.disk.values()) if system.disk else 0
         disk_max = sum(e["max"] * e["count"] for e in system.disk.values()) if system.disk else 0
         network_usage = sum(e["usage"] * e["count"] for e in system.network.values()) if system.network else 0
+		power_usage = sum(e["usage"] * e["count"] for e in system.power.values()) if system.power else 0
+        power_max = sum(e["max"] * e["count"] for e in system.power.values()) if system.power else 0
         discord_stats = dict(status.discord)
         discord_stats["API latency"] = sec2time(discord_stats["API latency"])
         misc_stats = dict(status.misc)
@@ -2790,6 +2803,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
                 "Memory usage": byte_scale(memory_usage) + "B/" + byte_scale(memory_max) + "B",
                 "Disk usage": byte_scale(disk_usage) + "B/" + byte_scale(disk_max) + "B",
                 "Network usage": byte_scale(network_usage) + "bps",
+				"Power usage": f"{round(power_usage, 3)} W/ {round(power_max, 3)} W",
             },
             "Discord info": discord_stats,
             "Misc info": misc_stats,
