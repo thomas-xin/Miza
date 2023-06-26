@@ -2665,9 +2665,9 @@ elif len(sys.argv) > 1:
 			config = Config(clip_model_name="ViT-H-14/laion2b_s32b_b79k")
 			config.apply_low_vram_defaults()
 			globals()["VIT"] = Interrogator(config)
-		p1 = VIT.interrogate_fast(image)
+		p1 = VIT.interrogate_fast(image).strip()
 		if fut:
-			p2 = fut.result()
+			p2 = fut.result().strip()
 		else:
 			p2 = None
 		return (p1, p2)
