@@ -1533,7 +1533,7 @@ class Ask(Command):
 				oai=oai,
 				bl=bl,
 				nsfw=bot.is_nsfw(channel),
-				vc=bool(user.voice),
+				vc=bool(getattr(user, "voice", False)),
 			)
 			# if fut:
 			#     await fut
