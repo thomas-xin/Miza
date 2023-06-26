@@ -941,7 +941,7 @@ class Bot:
 						if not text or len(self.gpttokens(text)) < 24:
 							text = ""
 							redo = True
-						if not redo:
+						if not redo or i:
 							break
 				if response:
 					fc = m.get("function_call")
@@ -1398,7 +1398,7 @@ class Bot:
 						text = ""
 					if not text:
 						redo = True
-				elif not flagged:
+				elif not flagged and (not i or not response):
 					continue
 				else:
 					redo = True
@@ -1406,8 +1406,8 @@ class Bot:
 					self.jailbroken = False
 					if not flagged and not i and len(self.gpttokens(text)) < 16:
 						text = ""
-					if searched:
-						refs = list(refs) + [(f"[{sname}]", searched)]
+					# if searched:
+					# 	refs = list(refs) + [(f"[{sname}]", searched)]
 					t2 = self.gptcomplete(u, q, refs=refs, start=text or " ", model="davinci" if premium >= 2 else "hippogriff")
 					if len(text) >= 2 and text[-1] in " aAsS" and text[-2] not in ".!?":
 						text += t2
