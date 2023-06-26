@@ -6336,6 +6336,7 @@ class SimulatedMessage:
 	attachments = []
 	embeds = []
 	position = 0
+	voice = None
 	bot = False
 	ghost = True
 	simulated = True
