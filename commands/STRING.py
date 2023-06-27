@@ -1219,6 +1219,32 @@ class Ask(Command):
 		if "dailies" in bot.data:
 			bot.data.dailies.progress_quests(user, "talk")
 
+		async def register_embedding(i, *tup, em=None):
+			s = str(i)
+			orig = list(tup)
+			if tup in chdd:
+				mapd[s] = None
+				try:
+					embd[str(chdd[tup])]
+				except KeyError:
+					pass
+			chdd[tup] = i
+			inp = []
+			while tup:
+				name, content = tup[:2]
+				tup = tup[2:]
+				inp.append(f"{name}: {content}")
+			if not em:
+				data = await process_image("embedding", "$", ["\n".join(inp)], fix=2, timeout=90)
+				em = base64.b64encode(data).decode("ascii")
+			mapd[s] = orig
+			embd[s] = em
+			return em
+
+		async def ignore_embedding(i):
+			s = str(i)
+			mapd[s] = None
+
 		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
 		if getattr(message, "reference", None):
 			reference = message.reference.resolved
@@ -1233,6 +1259,7 @@ class Ask(Command):
 				name = m.author.name
 				if name == bot.name:
 					name = bot.name + "2"
+		q = argv or ""
 		caid = bot.data.chat_histories.get(channel.id, None)
 		if not isinstance(caid, dict):
 			caid = None
@@ -1356,32 +1383,6 @@ class Ask(Command):
 				raise PermissionError(f"Distributed premium level 2 or higher required; please see {bot.kofi_url} for more info!")
 			model = "gpt4+"
 		# emb_futs = []
-
-		async def register_embedding(i, *tup, em=None):
-			s = str(i)
-			orig = list(tup)
-			if tup in chdd:
-				mapd[s] = None
-				try:
-					embd[str(chdd[tup])]
-				except KeyError:
-					pass
-			chdd[tup] = i
-			inp = []
-			while tup:
-				name, content = tup[:2]
-				tup = tup[2:]
-				inp.append(f"{name}: {content}")
-			if not em:
-				data = await process_image("embedding", "$", ["\n".join(inp)], fix=2, timeout=90)
-				em = base64.b64encode(data).decode("ascii")
-			mapd[s] = orig
-			embd[s] = em
-			return em
-
-		async def ignore_embedding(i):
-			s = str(i)
-			mapd[s] = None
 
 		if not q and not message.attachments:
 			q = "Hi!"
