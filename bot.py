@@ -1247,7 +1247,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					else:
 						found.extend(a.url for a in m.attachments)
 					found.extend(find_urls(m.content))
-					temp = await self.follow_to_image(m.content)
+					temp = await self.follow_to_image(m.content, follow=reactions)
 					found.extend(filter(is_url, temp))
 					# Attempt to find URLs in embed contents
 					for e in m.embeds:
@@ -1450,10 +1450,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return min_emoji(e)
 
 	# Follows a message link, replacing emojis and user mentions with their icon URLs.
-	async def follow_to_image(self, url):
+	async def follow_to_image(self, url, follow=True):
 		temp = find_urls(url)
 		if temp:
 			return temp
+		if not follow:
+			return ()
 		users = find_users(url)
 		emojis = find_emojis(url)
 		out = deque()
