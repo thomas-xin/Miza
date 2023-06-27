@@ -1059,6 +1059,7 @@ class Bot:
 					model = AutoModelForCausalLM.from_config(config)
 				try:
 					import pynvml
+					pynvml.nvmlInit()
 					dc = pynvml.nvmlDeviceGetCount()
 
 					def cuda_info():
