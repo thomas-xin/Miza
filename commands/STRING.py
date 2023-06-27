@@ -1267,6 +1267,7 @@ class Ask(Command):
 		visible.append(message)
 		ignores = set()
 		reset = True
+		refs = []
 		history = []
 		for i, m in enumerate(visible):
 			if not m:
@@ -1279,7 +1280,9 @@ class Ask(Command):
 			if m.id in ignores or caid and str(m.id) in caid.get("ids", ()) or any(str(e) == "❎" for e in m.reactions):
 				continue
 			found = None
-			if m.content:
+			if i == len(visible) - 1:
+				content = q
+			elif m.content:
 				content = m.clean_content
 			elif m.embeds:
 				content = m.embeds[0].description
@@ -1315,10 +1318,10 @@ class Ask(Command):
 							decode=True,
 							aio=True,
 						)
-						content += f"<Link {p0}:{text}>"
+						content += f" <Link {p0}:{text}>"
 				else:
-					content += f"<Image {p0}:{p1}:{p2}>"
-				print(content)
+					content += f" <Image {p0}:{p1}:{p2}>"
+				content = content.strip()
 			if reset:
 				reset = False
 				if caid:
@@ -1338,6 +1341,7 @@ class Ask(Command):
 				continue
 			if i == len(visible) - 1:
 				q = content
+				print(q)
 				continue
 			t = (name, content)
 			if str(m.id) not in mapd and m.id != message.id:
@@ -1406,7 +1410,6 @@ class Ask(Command):
 		im = None
 		fr = fm = None
 		urls = []
-		refs = []
 		with discord.context_managers.Typing(channel):
 			# fut = self.cbip = create_task(process_image("CBIP", "&", [], fix=1, timeout=360))
 			await ignore_embedding(message.id)
