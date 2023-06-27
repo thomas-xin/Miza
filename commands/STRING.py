@@ -1313,7 +1313,14 @@ class Ask(Command):
 				visconts.append((m, content, found, cfut))
 			else:
 				visconts.append((m, content, found, None))
+			if reset:
+				reset = False
+				if caid:
+					caid.pop("ids", None)
+				print(channel, "mismatch", m.id)#, caid)
+			ignores.add(m.id)
 		for i, (m, content, found, cfut) in enumerate(visconts):
+			print(m.id, cfut)
 			if cfut:
 				try:
 					p1, p2 = await cfut
@@ -1329,11 +1336,6 @@ class Ask(Command):
 				else:
 					content += f" <Image {p0}:{p1}:{p2}>"
 				content = content.strip()
-			if reset:
-				reset = False
-				if caid:
-					caid.pop("ids", None)
-				print(channel, "mismatch", m.id)#, caid)
 			if m.author.id == bot.id:
 				name = bot.name
 			else:
@@ -1342,7 +1344,6 @@ class Ask(Command):
 					name = m.author.name
 					if name == bot.name:
 						name = bot.name + "2"
-			ignores.add(m.id)
 			if i == len(visible) - 2:
 				refs = [f"[REPLIED TO]: {name}", content]
 				continue
