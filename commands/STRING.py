@@ -1313,8 +1313,19 @@ class Ask(Command):
 					found = None
 			if found:
 				p0 = found.split("?", 1)[0].rsplit("/", 1)[-1]
-				p1, p2 = await process_image(url, "caption", ["-nogif", q, channel.id, premium >= 4], fix=3, timeout=300)
-				content += f"<Image {p0}:{p1}:{p2}>"
+				try:
+					p1, p2 = await process_image(url, "caption", ["-nogif", q, channel.id, premium >= 4], fix=3, timeout=300)
+				except:
+					print_exc()
+					with tracebacksuppressor:
+						text = await Request(
+							found,
+							decode=True,
+							aio=True,
+						)
+						content += f"<Link {p0}:{text}"
+				else:
+					content += f"<Image {p0}:{p1}:{p2}>"
 			if reset:
 				reset = False
 				if caid:

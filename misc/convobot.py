@@ -1486,8 +1486,13 @@ class Bot:
 
 	def browse(self, q):
 		driver = get_driver()
-		fut = exc.submit(driver.get, q)
-		fut.result(timeout=16)
+		try:
+			fut = exc.submit(driver.get, q)
+			fut.result(timeout=16)
+		except:
+			print("Browse: Timed out.")
+			return_driver(driver)
+			return ""
 		time.sleep(1)
 
 		try:

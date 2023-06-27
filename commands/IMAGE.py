@@ -1504,17 +1504,18 @@ class Art(Command):
             args.insert(0, a.url)
         if not args:
             # raise ArgumentError("Input string is empty.")
-            s = await Request(
-                "https://magatsu.net/generators/art/index.php",
-                data=dict(selGenCount="1", selStyle="2", subGenerate="Generate Prompts"),
-                method="POST",
-                decode=True,
-                aio=True,
-            )
-            s = s.split("<strong>Prompt:</strong>", 1)[-1].removeprefix("<BR>")
-            s = s.split("<BR>", 1)[0].replace("<br />", " ").replace("<br>", " ").replace("<i>", "*").replace("<b>", "**").replace("<u>", "__")
-            args = [s]
-            print(s)
+            # s = await Request(
+            #     "https://magatsu.net/generators/art/index.php",
+            #     data=dict(selGenCount="1", selStyle="2", subGenerate="Generate Prompts"),
+            #     method="POST",
+            #     decode=True,
+            #     aio=True,
+            # )
+            # s = s.split("<strong>Prompt:</strong>", 1)[-1].removeprefix("<BR>")
+            # s = s.split("<BR>", 1)[0].replace("<br />", " ").replace("<br>", " ").replace("<i>", "*").replace("<b>", "**").replace("<u>", "__")
+            # args = [s]
+            # print(s)
+            args = [("art " * xrand(1, 64)).rstrip()]
         premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
         req = " ".join(args)
         url = None
@@ -1581,7 +1582,8 @@ class Art(Command):
         if not prompt:
             if not url:
                 raise ArgumentError("Please input a valid prompt.")
-            prompt, _ = await process_image(url, "caption", ["-nogif", None, None, premium >= 4], fix=3, timeout=300)
+            p1, p2 = await process_image(url, "caption", ["-nogif", None, None, premium >= 4], fix=3, timeout=300)
+            prompt = "\n".join((p1, p2))
             if not prompt:
                 prompt = "art"
             print(url, prompt)
