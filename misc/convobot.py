@@ -1070,7 +1070,7 @@ class Bot:
 					gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
 					tinfo = fut2.result()
 				except:
-					tinfo = []
+					tinfo = gmems = []
 				bit8 = [i for i, ti in enumerate(tinfo) if ti.major >= 8 or not bitsandbytes]
 				tinfo = [tinfo[i] for i in bit8]
 				max_mem = {i: f"{round((mi.total - mi.used) / 1048576 - 2.5 * 1024)}MiB" for i, mi in enumerate(gmems)}
