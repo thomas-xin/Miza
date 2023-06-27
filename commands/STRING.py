@@ -1254,8 +1254,6 @@ class Ask(Command):
 		caid = bot.data.chat_histories.get(channel.id, None)
 		if not isinstance(caid, dict):
 			caid = None
-		else:
-			caid.setdefault("ids", {})[str(message.id)] = None
 		mapd = bot.data.chat_mappings.get(channel.id, {})
 		embd = bot.data.chat_embeddings.get(channel.id, {})
 		chdd = bot.data.chat_dedups.get(channel.id, {})
@@ -1348,6 +1346,8 @@ class Ask(Command):
 				await register_embedding(m.id, name, content)
 		else:
 			reset = None
+		if isinstance(caid, dict):
+			caid.setdefault("ids", {})[str(message.id)] = None
 		m = message
 		if m.author.id == bot.id:
 			name = bot.name
