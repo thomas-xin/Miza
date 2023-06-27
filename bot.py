@@ -1234,44 +1234,36 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				url = u
 			if is_discord_message_link(url):
 				found = deque()
-				spl = url[url.index("channels/") + 9:].replace("?", "/").split("/", 2)
-				c = await self.fetch_channel(spl[1])
-				m = await self.fetch_message(spl[2], c)
-				# All attachments should be valid URLs
-				if best:
-					found.extend(best_url(a) for a in m.attachments)
+				try:
+					spl = url[url.index("channels/") + 9:].replace("?", "/").split("/", 2)
+					c = await self.fetch_channel(spl[1])
+					m = await self.fetch_message(spl[2], c)
+				except:
+					print_exc()
 				else:
-					found.extend(a.url for a in m.attachments)
-				found.extend(find_urls(m.content))
-				temp = await self.follow_to_image(m.content)
-				found.extend(filter(is_url, temp))
-				# Attempt to find URLs in embed contents
-				for e in m.embeds:
-					for a in medias:
-						obj = getattr(e, a, None)
-						if obj:
-							if best:
-								url = best_url(obj)
-							else:
-								url = obj.url
-							if url:
-								found.append(url)
-								break
-				# Attempt to find URLs in embed descriptions
-				[found.extend(find_urls(e.description)) for e in m.embeds if e.description]
-				if images:
-					if reactions:
-						for r in m.reactions:
-							e = r.emoji
-							if hasattr(e, "url"):
-								found.append(as_str(e.url))
-							else:
-								u = translate_emojis(e)
-								if is_url(u):
-									found.append(u)
-					if not found:
-						m = await c.fetch_message(int(spl[2]))
-						self.bot.add_message(m, files=False, force=True)
+					# All attachments should be valid URLs
+					if best:
+						found.extend(best_url(a) for a in m.attachments)
+					else:
+						found.extend(a.url for a in m.attachments)
+					found.extend(find_urls(m.content))
+					temp = await self.follow_to_image(m.content)
+					found.extend(filter(is_url, temp))
+					# Attempt to find URLs in embed contents
+					for e in m.embeds:
+						for a in medias:
+							obj = getattr(e, a, None)
+							if obj:
+								if best:
+									url = best_url(obj)
+								else:
+									url = obj.url
+								if url:
+									found.append(url)
+									break
+					# Attempt to find URLs in embed descriptions
+					[found.extend(find_urls(e.description)) for e in m.embeds if e.description]
+					if images:
 						if reactions:
 							for r in m.reactions:
 								e = r.emoji
@@ -1281,19 +1273,31 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 									u = translate_emojis(e)
 									if is_url(u):
 										found.append(u)
-				for u in found:
-					# Do not attempt to find the same URL twice
-					if u not in it:
-						it[u] = True
-						if not len(it) & 255:
-							await asyncio.sleep(0.2)
-						found2 = await self.follow_url(u, it, best=best, preserve=preserve, images=images, allow=allow, limit=limit)
-						if len(found2):
-							out.extend(found2)
-						elif allow and m.content:
-							lost.append(m.content)
-						elif preserve:
-							lost.append(u)
+						if not found:
+							m = await c.fetch_message(int(spl[2]))
+							self.bot.add_message(m, files=False, force=True)
+							if reactions:
+								for r in m.reactions:
+									e = r.emoji
+									if hasattr(e, "url"):
+										found.append(as_str(e.url))
+									else:
+										u = translate_emojis(e)
+										if is_url(u):
+											found.append(u)
+					for u in found:
+						# Do not attempt to find the same URL twice
+						if u not in it:
+							it[u] = True
+							if not len(it) & 255:
+								await asyncio.sleep(0.2)
+							found2 = await self.follow_url(u, it, best=best, preserve=preserve, images=images, allow=allow, limit=limit)
+							if len(found2):
+								out.extend(found2)
+							elif allow and m.content:
+								lost.append(m.content)
+							elif preserve:
+								lost.append(u)
 			elif images and is_imgur_url(url):
 				first = url.split("?", 1)[0]
 				if not first.endswith(".jpg"):
