@@ -883,7 +883,7 @@ class Bot:
 				if not self.vc:
 					functions = [f for f in functions if f["name"] != "play"]
 				data = dict(
-					model="gpt-3.5-turbo-0613" if model.startswith("gpt-3.5") else "gpt-4-0613",
+					model="gpt-4-0613" if model.startswith("gpt-4") else "gpt-3.5-turbo-0613",
 					messages=messages,
 					temperature=temp,
 					max_tokens=min(8192 if premium >= 2 else 1024, limit - pc - 512),
@@ -949,7 +949,7 @@ class Bot:
 				if response:
 					fc = m.get("function_call")
 					if not fc or fc.get("name") not in self.function_list:
-						if text:
+						if text and model.startswith("gpt-"):
 							return text
 					else:
 						try:
