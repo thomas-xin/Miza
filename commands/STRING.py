@@ -1283,9 +1283,9 @@ class Ask(Command):
 			elif m.embeds:
 				content = m.embeds[0].description
 			else:
-				content = None
+				content = ""
 			found = None
-			if not content:
+			if not content.strip():
 				url = f"https://discord.com/channels/0/{channel.id}/{m.id}"
 				found = await bot.follow_url(url, reactions=False)
 				if found and (is_image(found[0]) is not None or is_video(found[0]) is not None):
