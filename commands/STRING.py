@@ -1277,7 +1277,6 @@ class Ask(Command):
 				continue
 			if m.id in ignores or caid and str(m.id) in caid.get("ids", ()) or any(str(e) == "❎" for e in m.reactions):
 				continue
-			found = None
 			if i == len(visible) - 1:
 				content = q
 			elif m.content:
@@ -1285,6 +1284,9 @@ class Ask(Command):
 			elif m.embeds:
 				content = m.embeds[0].description
 			else:
+				content = None
+			found = None
+			if not content:
 				url = f"https://discord.com/channels/0/{channel.id}/{m.id}"
 				found = await bot.follow_url(url)
 				if found and (is_image(found[0]) is not None or is_video(found[0]) is not None):
