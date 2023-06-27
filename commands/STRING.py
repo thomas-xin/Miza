@@ -1216,10 +1216,23 @@ class Ask(Command):
 		await bot.seen(user, event="misc", raw="Talking to me")
 		bl = bot.data.blacklist.get(user.id) or 0
 		emb = None
-
 		if "dailies" in bot.data:
 			bot.data.dailies.progress_quests(user, "talk")
+
 		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
+		if getattr(message, "reference", None):
+			reference = message.reference.resolved
+		else:
+			reference = None
+		m = message
+		if m.author.id == bot.id:
+			name = bot.name
+		else:
+			name = m.author.display_name
+			if name == bot.name:
+				name = m.author.name
+				if name == bot.name:
+					name = bot.name + "2"
 		visible = []
 		if not getattr(message, "simulated", False):
 			async for m in bot.history(channel, limit=16):
@@ -1381,19 +1394,6 @@ class Ask(Command):
 		ignores = set()
 		with discord.context_managers.Typing(channel):
 			# fut = self.cbip = create_task(process_image("CBIP", "&", [], fix=1, timeout=360))
-			if getattr(message, "reference", None):
-				reference = message.reference.resolved
-			else:
-				reference = None
-			m = message
-			if m.author.id == bot.id:
-				name = bot.name
-			else:
-				name = m.author.display_name
-				if name == bot.name:
-					name = m.author.name
-					if name == bot.name:
-						name = bot.name + "2"
 			await ignore_embedding(message.id)
 			orig_tup = (name, q)
 			if embd:
