@@ -1266,7 +1266,7 @@ class Ask(Command):
 			elif m.embeds:
 				content = m.embeds[0].description
 			else:
-				url = f"https://discord.com/channels/0/{channel.id}/{reference.id}"
+				url = f"https://discord.com/channels/0/{channel.id}/{m.id}"
 				found = await bot.follow_url(url)
 				if found and (is_image(found[0]) is not None or is_video(found[0]) is not None):
 					content = found = found[0]
@@ -1278,7 +1278,7 @@ class Ask(Command):
 			if c[0] in "\\#!%" or c[:2] in ("//", "/*"):
 				continue
 			if not found:
-				url = f"https://discord.com/channels/0/{channel.id}/{reference.id}"
+				url = f"https://discord.com/channels/0/{channel.id}/{m.id}"
 				found = await bot.follow_url(url)
 				if found and (is_image(found[0]) is not None or is_video(found[0]) is not None):
 					found = found[0]
