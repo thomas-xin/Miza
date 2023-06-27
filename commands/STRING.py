@@ -1306,9 +1306,12 @@ class Ask(Command):
 					found = found[0]
 				else:
 					found = None
-			if found:
+			if found in self.analysed:
+				cfut = self.analysed[found]
+				visconts.append((i, m, content, found, cfut))
+			elif found:
 				p0 = found.split("?", 1)[0].rsplit("/", 1)[-1]
-				best = premium >= 4 and i == len(visible) - 1
+				best = False#premium >= 4 and i == len(visible) - 1
 				cfut = create_task(process_image(found, "caption", ["-nogif", content, channel.id, best], fix=3, timeout=300))
 				visconts.append((i, m, content, found, cfut))
 			else:
@@ -1322,7 +1325,13 @@ class Ask(Command):
 		for i, m, content, found, cfut in visconts:
 			if cfut:
 				try:
-					p1, p2 = await cfut
+					if isinstance(cfut, tuple):
+						p1, p2 = cfut
+					else:
+						p1, p2 = await cfut
+						while len(self.analysed) > 4096:
+							self.analysed.pop(next(iter(self.analysed)))
+						self.analysed[found] = (p1, p2)
 				except:
 					print_exc()
 					with tracebacksuppressor:
