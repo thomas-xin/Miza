@@ -1289,13 +1289,13 @@ class Ask(Command):
 				url = f"https://discord.com/channels/0/{channel.id}/{m.id}"
 				found = await bot.follow_url(url, reactions=False)
 				if m.id == message.id:
-					print(m.id, repr(content.encode("utf-8")), found)
+					print(m.id, repr(content.encode("utf-8")), found, i, len(visible) - 1)
 				if found and (is_image(found[0]) is not None or is_video(found[0]) is not None):
 					content = found = found[0]
 				else:
 					content = found = None
 			if m.id == message.id:
-				print(m.id, repr(content.encode("utf-8")), found)
+				print(m.id, repr(content.encode("utf-8")), found, i, len(visible) - 1)
 			if not content:
 				continue
 			c = content
@@ -1304,6 +1304,8 @@ class Ask(Command):
 			if not found:
 				url = f"https://discord.com/channels/0/{channel.id}/{m.id}"
 				found = await bot.follow_url(url, reactions=False)
+				if m.id == message.id:
+					print(m.id, repr(content.encode("utf-8")), found, i, len(visible) - 1)
 				if found and (is_image(found[0]) is not None or is_video(found[0]) is not None):
 					found = found[0]
 				else:
@@ -1325,6 +1327,8 @@ class Ask(Command):
 				else:
 					content += f" <Image {p0}:{p1}:{p2}>"
 				content = content.strip()
+			if m.id == message.id:
+				print(m.id, repr(content.encode("utf-8")), found, i, len(visible) - 1)
 			if reset:
 				reset = False
 				if caid:
