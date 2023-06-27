@@ -1107,7 +1107,7 @@ class Bot:
 				print(cap, req)
 				if not bitsandbytes:
 					dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, no_split_module_classes=["LlamaDecoderLayer"], dtype=torch.float16)
-					model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, torch_dtype=torch.float16)
+					model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, offload_folder="cache", torch_dtype=torch.float16)
 				else:
 					dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, no_split_module_classes=["LlamaDecoderLayer"], dtype=dti)
 					# if rem > req * 3:
@@ -1118,7 +1118,7 @@ class Bot:
 						llm_int8_enable_fp32_cpu_offload=True,
 						llm_int8_has_fp16_weight=True
 					)
-					model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, load_in_8bit=True, quantization_config=quantization_config)
+					model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, offload_folder="cache", load_in_8bit=True, quantization_config=quantization_config)
 					# else:
 					# model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, load_in_8bit=True)
 				print(dev_map)

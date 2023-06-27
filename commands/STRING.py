@@ -1266,6 +1266,7 @@ class Ask(Command):
 		visible.append(message)
 		ignores = set()
 		reset = True
+		visconts = []
 		refs = []
 		history = []
 		for i, m in enumerate(visible):
@@ -1308,8 +1309,14 @@ class Ask(Command):
 			if found:
 				p0 = found.split("?", 1)[0].rsplit("/", 1)[-1]
 				best = premium >= 4 and i == len(visible) - 1
+				cfut = create_task(process_image(found, "caption", ["-nogif", content, channel.id, best], fix=3, timeout=300))
+				visconts.append((m, content, found, cfut))
+			else:
+				visconts.append((m, content, found, None))
+		for i, (m, content, found, cfut) in enumerate(visconts):
+			if cfut:
 				try:
-					p1, p2 = await process_image(found, "caption", ["-nogif", content, channel.id, best], fix=3, timeout=300)
+					p1, p2 = await cfut
 				except:
 					print_exc()
 					with tracebacksuppressor:
