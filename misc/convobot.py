@@ -1057,44 +1057,48 @@ class Bot:
 				config = AutoConfig.from_pretrained(m)
 				with accelerate.init_empty_weights():
 					model = AutoModelForCausalLM.from_config(config)
-				import gpustat
-				fut = exc.submit(gpustat.new_query)
-				tinfo = [torch.cuda.get_device_properties(i) for i in range(n)]
-				ginfo = fut.result()
-				ginfo3 = {}
-				ginfo2 = list(ginfo)
-				tinfo2 = [ti for ti in tinfo if ti.major >= 8 or not bitsandbytes]
-				while tinfo2:
-					name = tinfo2.pop(0).name
-					for gi in ginfo2:
-						if gi.name == name:
-							ginfo2.remove(gi)
-							ginfo3[gi.index] = gi
-							break
-				ginfo = ginfo3
-				max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) - 2.5 * 1024)}MiB" for i, gi in ginfo.items()}
+				try:
+					import pynvml
+					dc = pynvml.nvmlDeviceGetCount()
+
+					def cuda_info():
+						import torch
+						return [torch.cuda.get_device_properties(i) for i in range(torch.cuda.device_count())]
+
+					fut2 = exc.submit(cuda_info)
+					handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(dc)]
+					gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
+					tinfo = fut2.result()
+				except:
+					tinfo = []
+				bit8 = [i for i, ti in enumerate(tinfo) if ti.major >= 8 or not bitsandbytes]
+				tinfo = [tinfo[i] for i in bit8]
+				max_mem = {i: f"{round((mi.total - mi.used) / 1048576 - 2.5 * 1024)}MiB" for i, mi in gmems.items()}
 				max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("MiB")) > 0}
 				rem = sum(int(v.removesuffix("MiB")) for v in max_mem.values()) / 1024 - req
-				if rem < 1:
-					self.models.clear()
-					bitsandbytes = None
-					ginfo = fut.result()
-					ginfo3 = {}
-					ginfo2 = list(ginfo)
-					tinfo2 = list(tinfo)
-					while tinfo2:
-						name = tinfo2.pop(0).name
-						for gi in ginfo2:
-							if gi.name == name:
-								ginfo2.remove(gi)
-								ginfo3[gi.index] = gi
-								break
-					ginfo = ginfo3
-					max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) - 3 * 1024)}MiB" for i, gi in ginfo.items()}
-					max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("MiB")) > 0}
+				# if rem < 1:
+				# 	self.models.clear()
+				# 	bitsandbytes = None
+				# 	ginfo = fut.result()
+				# 	ginfo3 = {}
+				# 	ginfo2 = list(ginfo)
+				# 	tinfo2 = list(tinfo)
+				# 	while tinfo2:
+				# 		name = tinfo2.pop(0).name
+				# 		for gi in ginfo2:
+				# 			if gi.name == name:
+				# 				ginfo2.remove(gi)
+				# 				ginfo3[gi.index] = gi
+				# 				break
+				# 	ginfo = ginfo3
+				# 	max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) - 3 * 1024)}MiB" for i, gi in ginfo.items()}
+				# 	max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("MiB")) > 0}
 				cap = sum(int(v.removesuffix("MiB")) for v in max_mem.values()) / 1024
 				if cap > req * 1.2:
 					max_mem = {k: f"{round(int(v.removesuffix('MiB')) * req / cap * 1.2)}MiB" for k, v in max_mem.items()}
+					dti = torch.int8
+				else:
+					dti = torch.float16
 				max_mem["cpu"] = f"{round(psutil.virtual_memory().free / 1073741824 - 8)}GiB"
 				max_mem["disk"] = "1024GiB"
 				print(max_mem)
@@ -1103,7 +1107,7 @@ class Bot:
 					dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, no_split_module_classes=["LlamaDecoderLayer"], dtype=torch.float16)
 					model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, torch_dtype=torch.float16)
 				else:
-					dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, no_split_module_classes=["LlamaDecoderLayer"], dtype=torch.float16)
+					dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, no_split_module_classes=["LlamaDecoderLayer"], dtype=dti)
 					# if rem > req * 3:
 					from transformers import BitsAndBytesConfig
 					quantization_config = BitsAndBytesConfig(
