@@ -1269,7 +1269,7 @@ class Ask(Command):
 		reset = True
 		history = []
 		for i, m in enumerate(visible):
-			if not m or m.id == message.id:
+			if not m:
 				continue
 			if caid and caid.get("first_message_id") == m.id:
 				break

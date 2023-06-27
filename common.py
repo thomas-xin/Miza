@@ -2190,6 +2190,8 @@ def is_strict_running(proc):
 	except AttributeError:
 		try:
 			proc = psutil.Process(proc.pid)
+		except ProcessLookupError:
+			return
 		except:
 			print_exc()
 			return

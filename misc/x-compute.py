@@ -2651,7 +2651,7 @@ elif len(sys.argv) > 1:
 		pytesseract = None
 
 	VIT = None
-	def caption(im, q=None, cid=None, best=True):
+	def caption(im, q=None, cid=None, best=False):
 		im = resize_max(im, 1536, "auto")
 		if im.mode != "RGB":
 			image = im.convert("RGB")
@@ -2682,6 +2682,40 @@ elif len(sys.argv) > 1:
 		except KeyError:
 			ib = CBOTS[None] = imagebot.Bot()
 		return ib.art_stablediffusion_local(prompt, kwargs, nsfw=nsfw, fail_unless_gpu=not force, count=count)
+
+	def whisper(url, best=False):
+		ts = time.time()
+		fn = f"{ts}.mp3"
+		if best:
+			m = "large-v2"
+		else:
+			m = "medium"
+		args = [sys.executable, "-m", "whisper", "--model", m, "--device", str(fix), "--fp16", "True", fn]
+		proc = psutil.Popen(args, stdout=subprocess.PIPE)
+		lines = proc.stdout.read().decode("utf-8").splitlines()
+	import torch
+	from transformers import pipeline
+	from datasets import load_dataset
+
+	device = "cuda:0" if torch.cuda.is_available() else "cpu"
+
+	pipe = pipeline(
+		"automatic-speech-recognition",
+		model="openai/whisper-large-v2",
+		chunk_length_s=30,
+		device=device,
+	)
+
+	ds = load_dataset("hf-internal-testing/librispeech_asr_dummy", "clean", split="validation")
+	sample = ds[0]["audio"]
+
+	prediction = pipe(sample.copy(), batch_size=8)["text"]
+	" Mr. Quilter is the apostle of the middle classes, and we are glad to welcome his gospel."
+
+	# we can also return timestamps for the predictions
+	prediction = pipe(sample.copy(), batch_size=8, return_timestamps=True)["chunks"]
+	[{'text': ' Mr. Quilter is the apostle of the middle classes and we are glad to welcome his gospel.',
+	'timestamp': (0.0, 5.44)}]
 
 else:
 	del torch
