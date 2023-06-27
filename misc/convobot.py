@@ -1148,7 +1148,7 @@ class Bot:
 				top_k=192,
 				top_p=0.9,
 				repetition_penalty=1.2,
-				max_length=min(1024, limit - pc - 64),
+				max_length=min(4096, len(tokens) + 1024),
 				do_sample=True,
 			)
 			text = tokenizer.decode(res[0]).removeprefix("<s>").strip().removeprefix(prompt).strip().split("</s>", 1)[0]
