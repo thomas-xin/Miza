@@ -1209,7 +1209,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return verify_id(m_id)
 
 	# Finds URLs in a string, following any discord message links found.
-	async def follow_url(self, url, it=None, best=False, preserve=True, images=True, allow=False, limit=None):
+	async def follow_url(self, url, it=None, best=False, preserve=True, images=True, reactions=True, allow=False, limit=None):
 		if limit is not None and limit <= 0:
 			return []
 		if it is None:
@@ -1260,17 +1260,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				# Attempt to find URLs in embed descriptions
 				[found.extend(find_urls(e.description)) for e in m.embeds if e.description]
 				if images:
-					for r in m.reactions:
-						e = r.emoji
-						if hasattr(e, "url"):
-							found.append(as_str(e.url))
-						else:
-							u = translate_emojis(e)
-							if is_url(u):
-								found.append(u)
-					if not found:
-						m = await c.fetch_message(int(spl[2]))
-						self.bot.add_message(m, files=False, force=True)
+					if reactions:
 						for r in m.reactions:
 							e = r.emoji
 							if hasattr(e, "url"):
@@ -1279,6 +1269,18 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 								u = translate_emojis(e)
 								if is_url(u):
 									found.append(u)
+					if not found:
+						m = await c.fetch_message(int(spl[2]))
+						self.bot.add_message(m, files=False, force=True)
+						if reactions:
+							for r in m.reactions:
+								e = r.emoji
+								if hasattr(e, "url"):
+									found.append(as_str(e.url))
+								else:
+									u = translate_emojis(e)
+									if is_url(u):
+										found.append(u)
 				for u in found:
 					# Do not attempt to find the same URL twice
 					if u not in it:

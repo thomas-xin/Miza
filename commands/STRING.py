@@ -1274,7 +1274,6 @@ class Ask(Command):
 				break
 			if reset and caid and caid.get("last_message_id") == m.id:
 				reset = None
-				continue
 			if m.id in ignores or caid and str(m.id) in caid.get("ids", ()) or any(str(e) == "❎" for e in m.reactions):
 				continue
 			if i == len(visible) - 1:
@@ -1288,11 +1287,12 @@ class Ask(Command):
 			found = None
 			if not content:
 				url = f"https://discord.com/channels/0/{channel.id}/{m.id}"
-				found = await bot.follow_url(url)
+				found = await bot.follow_url(url, reactions=False)
 				if found and (is_image(found[0]) is not None or is_video(found[0]) is not None):
 					content = found = found[0]
 				else:
 					content = found = None
+			print(m.id, content)
 			if not content:
 				continue
 			c = content
@@ -1300,7 +1300,7 @@ class Ask(Command):
 				continue
 			if not found:
 				url = f"https://discord.com/channels/0/{channel.id}/{m.id}"
-				found = await bot.follow_url(url)
+				found = await bot.follow_url(url, reactions=False)
 				if found and (is_image(found[0]) is not None or is_video(found[0]) is not None):
 					found = found[0]
 				else:
