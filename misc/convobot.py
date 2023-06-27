@@ -1070,6 +1070,7 @@ class Bot:
 					gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
 					tinfo = fut2.result()
 				except:
+					print_exc()
 					tinfo = gmems = []
 				bit8 = [i for i, ti in enumerate(tinfo) if ti.major >= 8 or not bitsandbytes]
 				tinfo = [tinfo[i] for i in bit8]
