@@ -1233,12 +1233,21 @@ class Ask(Command):
 				name = m.author.name
 				if name == bot.name:
 					name = bot.name + "2"
+		caid = bot.data.chat_histories.get(channel.id, None)
+		if not isinstance(caid, dict):
+			caid = None
+		else:
+			caid.setdefault("ids", {})[str(message.id)] = None
+		mapd = bot.data.chat_mappings.get(channel.id, {})
+		embd = bot.data.chat_embeddings.get(channel.id, {})
+		chdd = bot.data.chat_dedups.get(channel.id, {})
 		visible = []
 		if not getattr(message, "simulated", False):
 			async for m in bot.history(channel, limit=16):
 				visible.insert(0, m)
 		visible.append(reference)
 		visible.append(message)
+		reset = True
 		history = []
 		for i, m in enumerate(visible):
 			if not m or m.id == message.id:
@@ -1344,15 +1353,6 @@ class Ask(Command):
 			if premium < 4:
 				raise PermissionError(f"Distributed premium level 2 or higher required; please see {bot.kofi_url} for more info!")
 			model = "gpt4+"
-		reset = True
-		caid = bot.data.chat_histories.get(channel.id, None)
-		if not isinstance(caid, dict):
-			caid = None
-		else:
-			caid.setdefault("ids", {})[str(message.id)] = None
-		mapd = bot.data.chat_mappings.get(channel.id, {})
-		embd = bot.data.chat_embeddings.get(channel.id, {})
-		chdd = bot.data.chat_dedups.get(channel.id, {})
 		# emb_futs = []
 
 		async def register_embedding(i, *tup, em=None):
