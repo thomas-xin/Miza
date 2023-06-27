@@ -2651,7 +2651,7 @@ elif len(sys.argv) > 1:
 		pytesseract = None
 
 	VIT = None
-	def caption(im, q=None, cid=None):
+	def caption(im, q=None, cid=None, best=True):
 		im = resize_max(im, 1536, "auto")
 		if im.mode != "RGB":
 			image = im.convert("RGB")
@@ -2665,7 +2665,11 @@ elif len(sys.argv) > 1:
 			config = Config(clip_model_name="ViT-H-14/laion2b_s32b_b79k")
 			config.apply_low_vram_defaults()
 			globals()["VIT"] = Interrogator(config)
-		p1 = VIT.interrogate_fast(image).strip()
+		if best:
+			p1 = VIT.interrogate(image)
+		else:
+			p1 = VIT.interrogate_fast(image)
+		p1 = p1.strip()
 		if fut:
 			p2 = fut.result().strip()
 		else:

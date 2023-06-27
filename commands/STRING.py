@@ -1219,16 +1219,78 @@ class Ask(Command):
 
 		if "dailies" in bot.data:
 			bot.data.dailies.progress_quests(user, "talk")
-		if name == "how":
-			if not argv.replace("?", ""):
-				q = name
+		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
+		visible = []
+		if not getattr(message, "simulated", False):
+			async for m in bot.history(channel, limit=16):
+				visible.insert(0, m)
+		visible.append(reference)
+		visible.append(message)
+		history = []
+		for i, m in enumerate(visible):
+			if not m or m.id == message.id:
+				continue
+			if caid and caid.get("first_message_id") == m.id:
+				break
+			if reset and caid and caid.get("last_message_id") == m.id:
+				reset = None
+				continue
+			if m.id in ignores or caid and str(m.id) in caid.get("ids", ()) or any(str(e) == "❎" for e in m.reactions):
+				continue
+			found = None
+			if m.content:
+				content = m.clean_content
+			elif m.embeds:
+				content = m.embeds[0].description
 			else:
-				q = (name + " " + argv).lstrip()
+				url = f"https://discord.com/channels/0/{channel.id}/{reference.id}"
+				found = await bot.follow_url(url)
+				if found and (is_image(found[0]) is not None or is_video(found[0]) is not None):
+					content = found = found[0]
+				else:
+					content = found = None
+			if not content:
+				continue
+			c = content
+			if c[0] in "\\#!%" or c[:2] in ("//", "/*"):
+				continue
+			if not found:
+				url = f"https://discord.com/channels/0/{channel.id}/{reference.id}"
+				found = await bot.follow_url(url)
+				if found and (is_image(found[0]) is not None or is_video(found[0]) is not None):
+					found = found[0]
+				else:
+					found = None
+			if found:
+				p0 = found.split("?", 1)[0].rsplit("/", 1)[-1]
+				p1, p2 = await process_image(url, "caption", ["-nogif", q, channel.id, premium >= 4], fix=3, timeout=300)
+				content += f"<Image {p0}:{p1}:{p2}>"
+			if reset:
+				reset = False
+				if caid:
+					caid.pop("ids", None)
+				print(channel, "mismatch", m.id, caid)
+			if m.author.id == bot.id:
+				name = bot.name
+			else:
+				name = m.author.display_name
+				if name == bot.name:
+					name = m.author.name
+					if name == bot.name:
+						name = bot.name + "2"
+			if i == len(visible) - 2:
+				refs = [f"[REPLIED TO]: {name}", content]
+				continue
+			if i == len(visible) - 1:
+				q = content
+				continue
+			t = (name, content)
+			if str(m.id) not in mapd:
+				await register_embedding(m.id, name, content)
 		else:
-			q = argv
+			reset = None
 		if not bl:
 			print(f"{message.author}:", q)
-		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
 		pers = bot.commands.personality[0].retrieve((channel or guild).id)
 		if pers and ";" in pers:
 			model, pers = pers.split(";", 1)
@@ -1323,103 +1385,6 @@ class Ask(Command):
 				reference = message.reference.resolved
 			else:
 				reference = None
-			p1 = p2 = None
-			if reference and (find_urls(reference.content) or reference.attachments or reference.embeds):
-				url = f"https://discord.com/channels/0/{channel.id}/{reference.id}"
-				found = await bot.follow_url(url)
-				if found and found[0] != url and (is_image(found[0]) is not None or is_video(found[0]) is not None):
-					urls.append(found[0])
-					fr = found[0]
-			if find_urls(message.content) or message.attachments or message.embeds:
-				url = f"https://discord.com/channels/0/{channel.id}/{message.id}"
-				found = await bot.follow_url(url)
-				if found and found[0] != url and (is_image(found[0]) is not None or is_video(found[0]) is not None):
-					urls.append(found[0])
-					fm = found[0]
-					if not find_urls(q):
-						if q:
-							q += " "
-						q += found[0]
-			if urls:
-				url = im = urls[-1]
-				p1, p2 = await process_image(url, "caption", ["-nogif", q, channel.id], fix=3, timeout=300)
-				if p1 or p2:
-					if not bl:
-						print(p1)
-						print(p2)
-					if p1:
-						refs.append(("[IMAGE]", p1))
-					if p2:
-						refs.append(("[SHORT ANSWER]", p2))
-			if reference and reference.content:
-				ref = False
-				async for m in bot.history(channel, limit=2, before=message.id, after=reference.id):
-					if m and m.content:
-						ref = True
-						break
-				if ref:
-					m = reference
-					if m.author.id == bot.id:
-						name = bot.name
-					else:
-						name = m.author.display_name
-						if name == bot.name:
-							name = m.author.name
-							if name == bot.name:
-								name = bot.name + "2"
-					c = reference.content
-					urls = find_urls(c)
-					if fr:
-						if urls:
-							urls[-1] = fr
-						else:
-							urls = [fr]
-					for url in urls:
-						if p2 or is_image(url) is not None or is_video(url) is not None:
-							capt = url.rsplit("/", 1)[-1]
-							c = c.replace(url, f"[Image {capt}]")
-					refs.insert(0, ("[REPLIED TO]: " + name, c))
-					ignores.add(m.id)
-					if str(m.id) not in mapd:
-						await register_embedding(m.id, name, c)
-			urls = find_urls(q)
-			if fm:
-				if urls:
-					urls[-1] = fm
-				else:
-					urls = [fm]
-			seen = False
-			for url in urls:
-				if p1 or is_image(url) is not None or is_video(url) is not None:
-					capt = url.rsplit("/", 1)[-1]
-					if p1:
-						if p2:
-							capti = f"[Image {capt}:{p1}:{p2}]"
-							refs = refs[:-2]
-						else:
-							capti = f"[Image {capt}:{p1}]"
-							refs = refs[:-1]
-					elif p2:
-						capti = f"[Image {capt}:{p2}]"
-						refs.pop(-1)
-					else:
-						capti = f"[Image {capt}]"
-					if url in q:
-						q = q.replace(url, capti)
-					else:
-						q += " " + capti
-					seen = True
-			if refs and not seen:
-				if p1:
-					if p2:
-						capti = f"[Image:{p1}:{p2}]"
-						refs = refs[:-2]
-					else:
-						capti = f"[Image:{p1}]"
-						refs = refs[:-1]
-				elif p2:
-					capti = f"[Image:{p2}]"
-					refs.pop(-1)
 			m = message
 			if m.author.id == bot.id:
 				name = bot.name
@@ -1453,49 +1418,6 @@ class Ask(Command):
 						temp = temp[2:]
 						refs.insert(0, (name, content))
 					ignores.add(ki)
-				# print("REFS:", refs)
-			history = []
-			if not getattr(message, "simulated", False):
-				async for m in bot.history(channel, limit=16):
-					if m.id == message.id:
-						continue
-					if caid and caid.get("first_message_id") == m.id:
-						break
-					if reset and caid and caid.get("last_message_id") == m.id:
-						reset = None
-						continue
-					if m.id in ignores or caid and str(m.id) in caid.get("ids", ()) or any(str(e) == "❎" for e in m.reactions):
-						continue
-					if m.content:
-						content = m.clean_content
-					elif m.embeds:
-						content = m.embeds[0].description
-					else:
-						content = None
-					if not content:
-						continue
-					c = content
-					if c[0] in "\\#!%" or c[:2] in ("//", "/*"):
-						continue
-					if reset:
-						reset = False
-						if caid:
-							caid.pop("ids", None)
-						print(channel, "mismatch", m.id, caid)
-					if m.author.id == bot.id:
-						name = bot.name
-					else:
-						name = m.author.display_name
-						if name == bot.name:
-							name = m.author.name
-							if name == bot.name:
-								name = bot.name + "2"
-					t = (name, content)
-					history.insert(0, t)
-					if str(m.id) not in mapd:
-						await register_embedding(m.id, name, content)
-			else:
-				reset = None
 			summary = caid and caid.get("summary")
 			if reset is not None:
 				summary = None

@@ -68,6 +68,9 @@ def lim_tokens(s, maxlen=10, mode="centre"):
 			s = enc.decode(tokens[:maxlen - 3]) + "..."
 	return s.strip()
 
+url_match = re.compile("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s<>`|\"']+$")
+is_url = lambda url: url_match.search(url)
+
 class_name = webdriver.common.by.By.CLASS_NAME
 css_selector = webdriver.common.by.By.CSS_SELECTOR
 xpath = webdriver.common.by.By.XPATH
@@ -550,7 +553,7 @@ class Bot:
 	functions = [
 		{
 			"name": "web_search",
-			"description": "Searches an internet browser for up-to-date information.",
+			"description": "Searches an internet browser for up-to-date information, or visits a given URL.",
 			"parameters": {
 				"type": "object",
 				"properties": {
@@ -958,7 +961,10 @@ class Bot:
 							argv = " ".join(args.values())
 							name = fc["name"]
 							if name == "web_search":
-								func = random.choice((self.google, self.bing, self.yahoo))
+								if is_url(argv):
+									func = self.browse
+								else:
+									func = random.choice((self.google, self.bing, self.yahoo))
 								print(f"Web Search {func}:", argv)
 								res = func(argv)
 								if res:
@@ -1012,7 +1018,7 @@ class Bot:
 				print(f"{model.capitalize()} prompt:", prompt)
 			sys.stdout.flush()
 			pc = len(self.gpttokens(prompt))
-		else:
+		elif model not in ("gpt-3.5-turbo", "gpt-4"):
 			prompt = "".join(reversed(ins))
 			prompt = nstart + "\n\n" + prompt
 			if not self.bl:
@@ -1477,6 +1483,20 @@ class Bot:
 		if start and text.startswith(f"{self.name}: "):
 			text = ""
 		return text
+
+	def browse(self, q):
+		driver = get_driver()
+		fut = exc.submit(driver.get, q)
+		fut.result(timeout=16)
+		time.sleep(1)
+
+		try:
+			elem = driver.find_element(by=tag_name, value="body")
+		except:
+			print("Browse: Timed out.")
+			return_driver(driver)
+			return ""
+		return elem.text
 
 	def google(self, q, raw=False):
 		words = q.split()
