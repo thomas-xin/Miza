@@ -1310,17 +1310,16 @@ class Ask(Command):
 				p0 = found.split("?", 1)[0].rsplit("/", 1)[-1]
 				best = premium >= 4 and i == len(visible) - 1
 				cfut = create_task(process_image(found, "caption", ["-nogif", content, channel.id, best], fix=3, timeout=300))
-				visconts.append((m, content, found, cfut))
+				visconts.append((i, m, content, found, cfut))
 			else:
-				visconts.append((m, content, found, None))
+				visconts.append((i, m, content, found, None))
 			if reset:
 				reset = False
 				if caid:
 					caid.pop("ids", None)
 				print(channel, "mismatch", m.id)#, caid)
 			ignores.add(m.id)
-		for i, (m, content, found, cfut) in enumerate(visconts):
-			print(m.id, cfut)
+		for i, m, content, found, cfut in visconts:
 			if cfut:
 				try:
 					p1, p2 = await cfut
