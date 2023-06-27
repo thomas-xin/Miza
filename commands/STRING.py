@@ -1208,6 +1208,7 @@ class Ask(Command):
 
 	async def __call__(self, message, guild, channel, user, argv, name, flags=(), **void):
 		bot = self.bot
+		cname = name
 		self.description = f"Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. See {bot.kofi_url} for premium tier chatbot specifications; check using ~serverinfo, or apply it with ~premium!"
 		count = bot.data.users.get(user.id, {}).get("last_talk", 0)
 		add_dict(bot.data.users, {user.id: {"last_talk": 1, "last_mention": 1}})
@@ -1288,14 +1289,10 @@ class Ask(Command):
 			if not content.strip():
 				url = f"https://discord.com/channels/0/{channel.id}/{m.id}"
 				found = await bot.follow_url(url, reactions=False)
-				if m.id == message.id:
-					print(m.id, repr(content.encode("utf-8")), found, i, len(visible) - 1)
 				if found and (is_image(found[0]) is not None or is_video(found[0]) is not None):
 					content = found = found[0]
 				else:
 					content = found = None
-			if m.id == message.id:
-				print(m.id, repr(content.encode("utf-8")), found, i, len(visible) - 1)
 			if not content:
 				continue
 			c = content
@@ -1304,8 +1301,6 @@ class Ask(Command):
 			if not found:
 				url = f"https://discord.com/channels/0/{channel.id}/{m.id}"
 				found = await bot.follow_url(url, reactions=False)
-				if m.id == message.id:
-					print(m.id, repr(content.encode("utf-8")), found, i, len(visible) - 1)
 				if found and (is_image(found[0]) is not None or is_video(found[0]) is not None):
 					found = found[0]
 				else:
@@ -1327,8 +1322,6 @@ class Ask(Command):
 				else:
 					content += f" <Image {p0}:{p1}:{p2}>"
 				content = content.strip()
-			if m.id == message.id:
-				print(m.id, repr(content.encode("utf-8")), found, i, len(visible) - 1)
 			if reset:
 				reset = False
 				if caid:
@@ -1376,35 +1369,35 @@ class Ask(Command):
 		else:
 			model = "auto"
 		long_mem = 4096 if premium >= 2 else 1024
-		if name == "gpt2" or not AUTH.get("openai_key"):
+		if cname == "gpt2" or not AUTH.get("openai_key"):
 			model = "neox"
-		elif name == "bloom":
+		elif cname == "bloom":
 			model = "bloom"
-		elif name == "neox":
+		elif cname == "neox":
 			model = "neox"
-		elif name == "pyg" or name == "pygmalion":
+		elif cname == "pyg" or cname == "pygmalion":
 			# if not bot.is_nsfw(channel):
 			#     if hasattr(channel, "recipient"):
 			#         raise PermissionError(f"This model is only available in {uni_str('NSFW')} channels. Please verify your age using ~verify within a NSFW channel to enable NSFW in DMs.")
 			#     raise PermissionError(f"This model is only available in {uni_str('NSFW')} channels.")
 			model = "pygmalion"
-		elif name == "manticore":
+		elif cname == "manticore":
 			model = "manticore"
-		elif name == "hippogriff" or name == "llama":
+		elif cname == "hippogriff" or cname == "llama":
 			model = "hippogriff"
-		elif name == "gpt3":
+		elif cname == "gpt3":
 			model = "gpt3"
-		elif name == "gpt3a":
+		elif cname == "gpt3a":
 			model = "gpt3+"
-		elif name == "davinci":
+		elif cname == "davinci":
 			if premium < 4:
 				raise PermissionError(f"Distributed premium level 2 or higher required; please see {bot.kofi_url} for more info!")
 			model = "davinci"
-		elif name == "gpt4":
+		elif cname == "gpt4":
 			if premium < 4:
 				raise PermissionError(f"Distributed premium level 2 or higher required; please see {bot.kofi_url} for more info!")
 			model = "gpt4"
-		elif name == "gpt4a":
+		elif cname == "gpt4a":
 			if premium < 4:
 				raise PermissionError(f"Distributed premium level 2 or higher required; please see {bot.kofi_url} for more info!")
 			model = "gpt4+"
