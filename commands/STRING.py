@@ -1247,6 +1247,7 @@ class Ask(Command):
 				visible.insert(0, m)
 		visible.append(reference)
 		visible.append(message)
+		ignores = set()
 		reset = True
 		history = []
 		for i, m in enumerate(visible):
@@ -1300,6 +1301,7 @@ class Ask(Command):
 					name = m.author.name
 					if name == bot.name:
 						name = bot.name + "2"
+			ignores.add(m.id)
 			if i == len(visible) - 2:
 				refs = [f"[REPLIED TO]: {name}", content]
 				continue
@@ -1391,7 +1393,6 @@ class Ask(Command):
 		fr = fm = None
 		urls = []
 		refs = []
-		ignores = set()
 		with discord.context_managers.Typing(channel):
 			# fut = self.cbip = create_task(process_image("CBIP", "&", [], fix=1, timeout=360))
 			await ignore_embedding(message.id)
