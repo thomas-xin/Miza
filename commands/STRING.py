@@ -1313,8 +1313,9 @@ class Ask(Command):
 					found = None
 			if found:
 				p0 = found.split("?", 1)[0].rsplit("/", 1)[-1]
+				best = premium >= 4 and i == len(visible) - 1
 				try:
-					p1, p2 = await process_image(url, "caption", ["-nogif", q, channel.id, premium >= 4], fix=3, timeout=300)
+					p1, p2 = await process_image(url, "caption", ["-nogif", q, channel.id, best], fix=3, timeout=300)
 				except:
 					print_exc()
 					with tracebacksuppressor:
