@@ -1315,9 +1315,10 @@ class Ask(Command):
 							decode=True,
 							aio=True,
 						)
-						content += f"<Link {p0}:{text}"
+						content += f"<Link {p0}:{text}>"
 				else:
 					content += f"<Image {p0}:{p1}:{p2}>"
+				print(content)
 			if reset:
 				reset = False
 				if caid:
