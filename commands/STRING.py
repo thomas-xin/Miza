@@ -1288,11 +1288,14 @@ class Ask(Command):
 			if not content.strip():
 				url = f"https://discord.com/channels/0/{channel.id}/{m.id}"
 				found = await bot.follow_url(url, reactions=False)
+				if m.id == message.id:
+					print(m.id, repr(content.encode("utf-8")), found)
 				if found and (is_image(found[0]) is not None or is_video(found[0]) is not None):
 					content = found = found[0]
 				else:
 					content = found = None
-			print(m.id, repr(content.encode("utf-8")), found)
+			if m.id == message.id:
+				print(m.id, repr(content.encode("utf-8")), found)
 			if not content:
 				continue
 			c = content
