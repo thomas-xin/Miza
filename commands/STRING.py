@@ -1250,15 +1250,6 @@ class Ask(Command):
 			reference = message.reference.resolved
 		else:
 			reference = None
-		m = message
-		if m.author.id == bot.id:
-			name = bot.name
-		else:
-			name = m.author.display_name
-			if name == bot.name:
-				name = m.author.name
-				if name == bot.name:
-					name = bot.name + "2"
 		q = argv or ""
 		caid = bot.data.chat_histories.get(channel.id, None)
 		if not isinstance(caid, dict):
@@ -1352,8 +1343,17 @@ class Ask(Command):
 				await register_embedding(m.id, name, content)
 		else:
 			reset = None
+		m = message
+		if m.author.id == bot.id:
+			name = bot.name
+		else:
+			name = m.author.display_name
+			if name == bot.name:
+				name = m.author.name
+				if name == bot.name:
+					name = bot.name + "2"
 		if not bl:
-			print(f"{message.author}:", q)
+			print(f"{name}:", q)
 		pers = bot.commands.personality[0].retrieve((channel or guild).id)
 		if pers and ";" in pers:
 			model, pers = pers.split(";", 1)
