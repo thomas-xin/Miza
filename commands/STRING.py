@@ -1339,7 +1339,7 @@ class Ask(Command):
 				q = content
 				continue
 			t = (name, content)
-			if str(m.id) not in mapd:
+			if str(m.id) not in mapd and m.id != message.id:
 				await register_embedding(m.id, name, content)
 		else:
 			reset = None
