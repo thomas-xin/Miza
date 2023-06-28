@@ -861,10 +861,9 @@ class Bot:
 			dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
 			# if searched:
 			# 	v += f"Use {sname.capitalize()} info when relevant, but don't reveal personal info. "
-			v += f"Current time: {dtn}\n"
+			v += f"Current time: {dtn}\n{nend}"
 			if iman:
-				v += "\n".join(iman) + "\n"
-			v += nend
+				v += "\n" + "\n".join(iman)
 			m = dict(role="system", content=v)
 			if len(messages) < 3 or searched:
 				messages.insert(-1, m)

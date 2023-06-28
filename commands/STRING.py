@@ -1421,7 +1421,7 @@ class Ask(Command):
 			model = "gpt4+"
 		# emb_futs = []
 
-		if not q and not message.attachments:
+		if not q and not message.attachments and not reference:
 			q = "Hi!"
 			if xrand(2):
 				emb = discord.Embed(colour=rand_colour())
