@@ -2817,7 +2817,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				"Memory usage": byte_scale(memory_usage) + "B/" + byte_scale(memory_max) + "B",
 				"Disk usage": byte_scale(disk_usage) + "B/" + byte_scale(disk_max) + "B",
 				"Network usage": byte_scale(network_usage) + "bps",
-				"Power usage": f"{round(power_usage, 3)} W/ {round(power_max, 3)} W",
+				"Power usage": f"{round(power_usage, 3)} W/{round(power_max, 3)} W",
 			},
 			"Discord info": discord_stats,
 			"Misc info": misc_stats,
