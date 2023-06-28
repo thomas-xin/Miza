@@ -1339,7 +1339,7 @@ class Bot:
 					ok = openai.api_key
 					flagged = False
 					if not i and (searched or not stop) and not bals and model.startswith("gpt-3.5-") and not self.nsfw and not self.jailbroken and not flagged and (not chat_history or len(self.gpttokens(q)) > 8):
-						prompt = "\n\n".join(m["content"] if "name" not in m else f'{m["name"]}: {m["content"]}' for m in messages[1:])
+						prompt = "\n\n".join(m["content"] if "name" not in m else f'{m["name"]}: {m["content"]}' for m in messages[1:] if m)
 						if not flagged and not stop:
 							if nstart and nstart[0] in "Yy":
 								ns2 = "Assume y" + nstart[1:] + "\n"

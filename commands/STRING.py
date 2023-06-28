@@ -1284,6 +1284,8 @@ class Ask(Command):
 				content = m.clean_content
 			elif m.embeds:
 				content = m.embeds[0].description
+				if not isinstance(content, str):
+					content = ""
 			else:
 				content = ""
 			found = None
@@ -1310,7 +1312,6 @@ class Ask(Command):
 				cfut = self.analysed[found]
 				visconts.append((i, m, content, found, cfut))
 			elif found:
-				p0 = found.split("?", 1)[0].rsplit("/", 1)[-1]
 				best = False#premium >= 4 and i == len(visible) - 1
 				cfut = create_task(process_image(found, "caption", ["-nogif", content, channel.id, best], fix=3, timeout=300))
 				visconts.append((i, m, content, found, cfut))
@@ -1342,6 +1343,7 @@ class Ask(Command):
 						)
 						content += f" <Link {p0}:{text}>"
 				else:
+					p0 = found.split("?", 1)[0].rsplit("/", 1)[-1]
 					content += f" <Image {p0}:{p1}:{p2}>"
 				content = content.strip()
 			if m.author.id == bot.id:
