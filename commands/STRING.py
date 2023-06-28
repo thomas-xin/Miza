@@ -1335,6 +1335,7 @@ class Ask(Command):
 						self.analysed[found] = (p1, p2)
 				except:
 					print_exc()
+					text = None
 					with tracebacksuppressor:
 						text = await Request(
 							found,
@@ -1342,6 +1343,8 @@ class Ask(Command):
 							aio=True,
 						)
 						content += f" <Link {p0}:{text}>"
+					if not text:
+						self.analysed[found] = None
 				else:
 					p0 = found.split("?", 1)[0].rsplit("/", 1)[-1]
 					content += f" <Image {p0}:{p1}:{p2}>"
