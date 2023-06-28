@@ -865,7 +865,7 @@ class Bot:
 			if iman:
 				v += "\n" + "\n".join(iman)
 			m = dict(role="system", content=v)
-			if len(messages) < 3 or searched:
+			if len(messages) < 3 or searched or iman:
 				messages.insert(-1, m)
 			else:
 				messages.insert(-2, m)
