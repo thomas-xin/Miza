@@ -1355,7 +1355,7 @@ class Ask(Command):
 					if name == bot.name:
 						name = bot.name + "2"
 			if i == len(visible) - 2:
-				refs = [f"[REPLIED TO]: {name}", content]
+				refs.append((f"[REPLIED TO]: {name}", content))
 				continue
 			if i == len(visible) - 1:
 				q = content
