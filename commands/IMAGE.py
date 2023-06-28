@@ -1879,7 +1879,7 @@ class Art(Command):
                     with open(fn, "rb") as f:
                         fn = f.read()
                 ffut = create_task(bot.commands.steganography[0].call(fn, str(bot.id)))
-                ffut.name = lim_str(prompt, 96) + ".png"
+                ffut.name = (lim_str(prompt, 96).rstrip(".") or "untitled") + ".png"
                 ffut.back = fn
                 ffuts.append(ffut)
         if not ffuts:
