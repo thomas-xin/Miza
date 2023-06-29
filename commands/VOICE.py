@@ -2726,10 +2726,10 @@ class AudioDownloader:
                 asf = "-"
             else:
                 stream = ast[0]["stream"]
-                if child and not stream.startswith("https://cf-hls-media.sndcdn.com/"):
-                    fii = f"cache/{ts}~proxy"
-                    with tracebacksuppressor:
-                        stream = proxy_download(stream, fii, timeout=86400)
+                # if child and not stream.startswith("https://cf-hls-media.sndcdn.com/"):
+                #     fii = f"cache/{ts}~proxy"
+                #     with tracebacksuppressor:
+                #         stream = proxy_download(stream, fii, timeout=86400)
                 asf = asc = stream
             if not vst and not size:
                 args.append("-vn")
