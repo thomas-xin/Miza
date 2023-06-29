@@ -1204,7 +1204,6 @@ class Ask(Command):
 
 	alm_re = re.compile(r"(?:as |i am )?an ai(?: language model)?[, ]{,2}", flags=re.I)
 	reset = {}
-	analysed = {}
 
 	async def __call__(self, message, guild, channel, user, argv, name, flags=(), **void):
 		bot = self.bot
@@ -1308,12 +1307,9 @@ class Ask(Command):
 					found = found[0]
 				else:
 					found = None
-			if found in self.analysed:
-				cfut = self.analysed[found]
-				visconts.append((i, m, content, found, cfut))
-			elif found:
+			if found:
 				best = False#premium >= 4 and i == len(visible) - 1
-				cfut = create_task(process_image(found, "caption", ["-nogif", content, channel.id, best], fix=3, timeout=300))
+				cfut = create_task(bot.caption(found, best=best))
 				visconts.append((i, m, content, found, cfut))
 			else:
 				visconts.append((i, m, content, found, None))
@@ -1325,29 +1321,9 @@ class Ask(Command):
 			ignores.add(m.id)
 		for i, m, content, found, cfut in visconts:
 			if cfut:
-				try:
-					if isinstance(cfut, tuple):
-						p1, p2 = cfut
-					else:
-						p1, p2 = await cfut
-						while len(self.analysed) > 4096:
-							self.analysed.pop(next(iter(self.analysed)))
-						self.analysed[found] = (p1, p2)
-				except:
-					print_exc()
-					text = None
-					with tracebacksuppressor:
-						text = await Request(
-							found,
-							decode=True,
-							aio=True,
-						)
-						content += f" <Link {p0}:{text}>"
-					if not text:
-						self.analysed[found] = None
-				else:
-					p0 = found.split("?", 1)[0].rsplit("/", 1)[-1]
-					content += f" <Image {p0}:{p1}:{p2}>"
+				pt, p1, p2 = await cfut
+				p0 = found.split("?", 1)[0].rsplit("/", 1)[-1]
+				content += f" <{pt} {p0}:{p1}:{p2}>"
 				content = content.strip()
 			if m.author.id == bot.id:
 				name = bot.name

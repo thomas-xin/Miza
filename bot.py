@@ -1449,6 +1449,32 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			e = cdict(id=e, animated=animated)
 		return min_emoji(e)
 
+	analysed = {}
+	async def caption(self, url, best=False):
+		try:
+			if self.analysed[url][-1] >= best:
+				return self.analysed[url][:-1]
+		except LookupError:
+			pass
+		try:
+			p1, p2 = process_image(url, "caption", ["-nogif", best], fix=3, timeout=300)
+		except:
+			print_exc()
+			tup = None
+			with tracebacksuppressor:
+				text = await Request(
+					url,
+					decode=True,
+					aio=True,
+				)
+				tup = ("Text", "", text, True)
+			self.analysed[url] = tup
+		else:
+			self.analysed[url] = ("Image", p1, p2, best)
+		while len(self.analysed) > 4096:
+			self.analysed.pop(next(iter(self.analysed)))
+		return self.analysed[url][:-1]
+
 	# Follows a message link, replacing emojis and user mentions with their icon URLs.
 	async def follow_to_image(self, url, follow=True):
 		temp = find_urls(url)

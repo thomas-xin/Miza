@@ -1582,7 +1582,7 @@ class Art(Command):
         if not prompt:
             if not url:
                 raise ArgumentError("Please input a valid prompt.")
-            p1, p2 = await process_image(url, "caption", ["-nogif", None, None, premium >= 4], fix=3, timeout=300)
+            pt, p1, p2 = await bot.caption(url, best=premium >= 4)
             prompt = "\n".join((p1, p2))
             if not prompt:
                 prompt = "art"

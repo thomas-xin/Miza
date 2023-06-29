@@ -2651,7 +2651,7 @@ elif len(sys.argv) > 1:
 		pytesseract = None
 
 	VIT = None
-	def caption(im, q=None, cid=None, best=False):
+	def caption(im, best=False):
 		im = resize_max(im, 1536, "auto")
 		if im.mode != "RGB":
 			image = im.convert("RGB")
