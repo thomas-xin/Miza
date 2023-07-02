@@ -1,6 +1,13 @@
-import sys
+import os, sys
+
+os.system("color")
+srgb = lambda r, g, b, s: f"\033[38;2;{r};{g};{b}m{s}\033[0m"
+
+print(srgb(0, 0, 255, "Scanning hardware..."))
+
 if len(sys.argv) > 1:
-	device, name, core = sys.argv[1:]
+	device, name, core, mem = sys.argv[1:]
+	core, mem = int(core), int(mem)
 	print(f"Benchmarking device {device}...")
 	is_cuda = device.startswith("cuda:")
 	if is_cuda:
@@ -9,7 +16,7 @@ if len(sys.argv) > 1:
 		device = "cuda:0"
 	prompt = " ".join(["water"] * 64)
 	import torch, time
-	if 1:
+	if 0:
 		from transformers import AutoTokenizer, AutoModelForCausalLM, AutoConfig
 		import accelerate
 		m = "Neko-Institute-of-Science/pygmalion-7b"
@@ -24,7 +31,7 @@ if len(sys.argv) > 1:
 			# llm_int8_enable_fp32_cpu_offload=True,
 			# llm_int8_has_fp16_weight=True
 		# )
-		model = AutoModelForCausalLM.from_pretrained(m, device_map="auto", load_in_8bit=True)
+		model = AutoModelForCausalLM.from_pretrained(m, device_map="auto", load_in_8bit=is_cuda)
 		tokens = tokenizer.encode(prompt, return_tensors="pt").cuda()
 		res = model.generate(
 			tokens,
@@ -62,12 +69,19 @@ if len(sys.argv) > 1:
 			count = min(999, max(count * 2, round(30 / taken * count)))
 			continue
 		break
+	memc = round(mem / 1073741824, 2)
 	im = data.images[0]
-	im.save(f"{name} ({core}-core).png")
+	im.save(f"{name} ({core}-core, {memc} GB).png")
 	tavg = taken
 	avg = count / tavg * 100000
-	print(f"Benchmarked {name} ({core}-core). Average time taken for {count} iteration(s): {tavg}s")
-	print(f"Score: {round(avg, 2)}")
+	cc = f"{core}-core"
+	cc = srgb(0, 255, 0, cc) if core >= 4096 else srgb(255, 255, 0, cc) if core >= 16 else srgb(255, 127, 0, cc) if core >= 8 else srgb(255, 0, 0, cc)
+	gb = f"{memc} GB"
+	gb = srgb(0, 255, 0, gb) if memc > 11 else srgb(255, 255, 0, gb) if memc >= 7 else srgb(255, 127, 0, gb) if memc > 3 else srgb(255, 0, 0, gb)
+	print(f"Benchmarked {srgb(0, 255, 255, name)} ({cc}, {gb}). Average time taken for {count} iteration(s): {tavg}s")
+	sc = f"Score: {round(avg, 2)}"
+	sc = srgb(0, 255, 0, sc) if avg >= 1000000 else srgb(255, 255, 0, sc) if avg >= 300000 else srgb(255, 127, 0, sc) if avg >= 90000 else srgb(255, 0, 0, sc)
+	print(sc)
 	print(avg)
 	raise SystemExit
 
@@ -77,7 +91,7 @@ try:
 except ImportError:
 	subprocess.run([sys.executable, "-m", "pip", "install", "pynvml", "--upgrade", "--user"])
 
-print("Loading...")
+print(srgb(0, 255, 255, "Loading..."))
 import pynvml
 try:
 	pynvml.nvmlInit()
@@ -85,38 +99,85 @@ try:
 except:
 	DC = 0
 if not DC:
-	print("WARNING: No NVIDIA GPUs detected. Please install one for AI compute acceleration.")
+	print(srgb(255, 0, 0, "WARNING: No NVIDIA GPUs detected. Please install one for AI compute acceleration."))
+
+if __name__ != "__main__" and os.path.exists("auth.json"):
+	import json
+	with open("auth.json", "rb") as f:
+		data = json.load(f)
+	compute_load = data.get("compute_load")
+	if compute_load is not None and len(compute_load) == DC:
+		print(srgb(0, 255, 0, "No benchmark required, skipping..."))
+		raise SystemExit
 
 try:
-	import torch, diffusers, cpuinfo
+	import torch, cpuinfo, psutil
 	if DC and not torch.cuda.is_available():
 		raise ImportError
 except ImportError:
 	subprocess.run([sys.executable, "-m", "pip", "install", "py-cpuinfo", "--upgrade", "--user"])
-	subprocess.run([sys.executable, "-m", "pip", "install", "diffusers", "--upgrade", "--user"])
+	subprocess.run([sys.executable, "-m", "pip", "install", "psutil", "--upgrade", "--user"])
 	if DC:
-		subprocess.run([sys.executable, "-m", "pip", "install", "pynvml", "--upgrade", "--user"])
+		subprocess.run([sys.executable, "-m", "pip", "install", "torch", "--upgrade", "--user"])
 	else:
 		subprocess.run([sys.executable, "-m", "pip", "install", "torch", "--index-url", "https://download.pytorch.org/whl/cu118", "--upgrade", "--user"])
+	import torch, cpuinfo, psutil
 
-import cpuinfo
-
+try:
+    import pkg_resources
+except:
+    import traceback
+    print(srgb(255, 0, 0, traceback.format_exc()), end="")
+    subprocess.run(["pip", "install", "setuptools", "--upgrade", "--user"])
+    import pkg_resources
+req = ["diffusers", "accelerate"]
+if os.name == "nt":
+	req.append("bitsandbytes-windows")
+else:
+	req.append("bitsandbytes")
+for mn in req:
+	try:
+		pkg_resources.get_distribution(mn)
+	except:
+		subprocess.run([sys.executable, "-m", "pip", "install", mn, "--upgrade", "--user"])
 
 total = 0
 procs = []
+# avgs = []
+# mems = []
 
 info = cpuinfo.get_cpu_info()
-args = [sys.executable, sys.argv[0], "cpu", info["brand_raw"], str(info["count"])]
+mem = psutil.virtual_memory().total
+# mems.append(mem)
+args = [sys.executable, sys.argv[0], "cpu", info["brand_raw"], str(info["count"]), str(mem)]
 proc = subprocess.Popen(args, stdout=subprocess.PIPE)
 procs.append(proc)
 for i in range(DC):
 	info = pynvml.nvmlDeviceGetHandleByIndex(i)
-	args = [sys.executable, sys.argv[0], f"cuda:{i}", pynvml.nvmlDeviceGetName(info), str(pynvml.nvmlDeviceGetNumGpuCores(info))]
+	mem = torch.cuda.get_device_properties(i).total_memory
+	# mems.append(mem)
+	args = [sys.executable, sys.argv[0], f"cuda:{i}", pynvml.nvmlDeviceGetName(info), str(pynvml.nvmlDeviceGetNumGpuCores(info)), str(mem)]
 	proc = subprocess.Popen(args, stdout=subprocess.PIPE)
 	procs.append(proc)
 
-for proc in procs:
+print()
+compute_load = []
+for n, proc in enumerate(procs):
 	s = proc.stdout.readlines()
-	total += float(s.pop(-1))
-	print(b"\n".join(s).decode("utf-8"))
-print(f"Benchmark complete. Total score: {round(total, 2)}")
+	avg = float(s.pop(-1))
+	# avgs.append(avg)
+	total += avg
+	if n:
+		compute_load.append(avg)
+	print(b"".join(s).decode("utf-8"))
+print(srgb(0, 255, 0, f"Benchmark complete. Total score: {round(total, 2)}"))
+
+if not os.path.exists("auth.json"):
+	raise SystemExit
+import json
+with open("auth.json", "r+", encoding="utf-8") as f:
+	data = json.load(f)
+	data["compute_load"] = compute_load
+	f.seek(0)
+	json.dump(data, f, indent="\t")
+	print(srgb(0, 255, 0, "Results written to `auth.json`."))

@@ -959,6 +959,7 @@ class Bot:
 						if args:
 							argv = " ".join(args.values())
 							name = fc["name"]
+							res = text or ""
 							if name == "web_search":
 								if is_url(argv):
 									func = self.browse
@@ -973,7 +974,7 @@ class Bot:
 									messages = [messages[-1]]
 									messages.append(m)
 									messages.append(dict(role="function", name=name, content=res or ""))
-									model = "gpt-3.5-turbo-0613" if model.startswith("gpt-3.5") else "gpt-4-0613"
+									model = "gpt-4-0613" if model.startswith("gpt-4") else "gpt-3.5-turbo-0613"
 									print("ChatGPT prompt:", messages)
 							elif name == "wolfram_alpha":
 								func = self.wolframalpha
@@ -986,7 +987,7 @@ class Bot:
 									messages = [messages[-1]]
 									messages.append(m)
 									messages.append(dict(role="function", name=name, content=res or ""))
-									model = "gpt-3.5-turbo-0613" if model.startswith("gpt-3.5") else "gpt-4-0613"
+									model = "gpt-4-0613" if model.startswith("gpt-4") else "gpt-3.5-turbo-0613"
 									print("ChatGPT prompt:", messages)
 							elif name == "stable_diffusion":
 								print("Stable Diffusion query:", argv)

@@ -1290,7 +1290,11 @@ class Ask(Command):
 			found = None
 			if not content.strip():
 				url = f"https://discord.com/channels/0/{channel.id}/{m.id}"
-				found = await bot.follow_url(url, reactions=False)
+				try:
+					found = await bot.follow_url(url, reactions=False)
+				except:
+					print_exc()
+					found = None
 				if found and (is_image(found[0]) is not None or is_video(found[0]) is not None):
 					content = found = found[0]
 				else:
@@ -1302,7 +1306,11 @@ class Ask(Command):
 				continue
 			if not found:
 				url = f"https://discord.com/channels/0/{channel.id}/{m.id}"
-				found = await bot.follow_url(url, reactions=False)
+				try:
+					found = await bot.follow_url(url, reactions=False)
+				except:
+					print_exc()
+					found = None
 				if found and (is_image(found[0]) is not None or is_video(found[0]) is not None):
 					found = found[0]
 				else:
@@ -1515,8 +1523,7 @@ class Ask(Command):
 				else:
 					react = False
 				if isinstance(response, str):
-					await send_with_react(channel, response, reference=not loop and message, reacts=react)
-					return
+					return await send_with_react(channel, response, reference=not loop and message, reacts=react)
 				return response
 			if oai in EXPAPI:
 				EXPAPI.discard(oai)

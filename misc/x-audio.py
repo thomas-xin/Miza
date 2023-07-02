@@ -435,10 +435,10 @@ class AudioFile:
 		if webpage_url is not None:
 			self.webpage_url = webpage_url
 		self.loading = True
-		if not asap and not live and is_youtube_stream(stream):
-			fi = "cache/" + str(time.time_ns() + random.randint(1, 1000)) + "~proxy"
-			with suppress():
-				stream = proxy_download(stream, fi, timeout=86400)
+		# if not asap and not live and is_youtube_stream(stream):
+			# fi = "cache/" + str(time.time_ns() + random.randint(1, 1000)) + "~proxy"
+			# with suppress():
+			# 	stream = proxy_download(stream, fi, timeout=86400)
 		ffmpeg = "./ffmpeg"
 		if not os.path.exists(ffmpeg):
 			ffmpeg = "./ffmpeg"

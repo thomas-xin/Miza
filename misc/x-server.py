@@ -2440,6 +2440,9 @@ alert("File successfully deleted. Returning to home.");
 					resp[k] = evalex(v[4:])
 				elif v.startswith("RES:"):
 					resp[k] = v[4:]
+		caps = orjson.dumps(caps).decode("ascii")
+		stat = orjson.dumps(stat).decode("ascii")
+		resp = orjson.dumps()
 		tasks = self.bot_exec(f"bot.distribute({caps},{stat},{resp})")
 		cp.response.headers.update(HEADERS)
 		cp.response.headers["Content-Type"] = "application/json"
@@ -2576,7 +2579,11 @@ alert("File successfully deleted. Returning to home.");
 		while t in RESPONSES:
 			t += 1
 		RESPONSES[t] = fut = concurrent.futures.Future()
-		send(f"!{t}\x7f{s}", escape=False)
+		if not isinstance(s, (bytes, memoryview)):
+			s = s.encode("utf-8")
+		sys.__stderr__.buffer.write(f"!{t}\x7f".encode("ascii") + s + b"\n")
+		sys.__stderr__.flush()
+		# send(f"!{t}\x7f".encode("ascii") + s, escape=False)
 		try:
 			j, after = fut.result()
 		finally:

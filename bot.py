@@ -1247,7 +1247,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					else:
 						found.extend(a.url for a in m.attachments)
 					found.extend(find_urls(m.content))
-					temp = await self.follow_to_image(m.content, follow=reactions)
+					temp = await self.follow_to_image(m.content, follow=True)
 					found.extend(filter(is_url, temp))
 					# Attempt to find URLs in embed contents
 					for e in m.embeds:
@@ -2614,28 +2614,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		tasks = []
 		for i in caps:
 			i = i or 0
-			if i == 1:
-				convo = self.compute_queue.get(1)
-				if not convo:
-					continue
-				task = convo.pop()
-				tasks.append(task)
-				continue
-			if i == 2:
-				text = self.compute_queue.get(2)
-				if not text:
-					continue
-				task = text.pop()
-				tasks.append(task)
-				continue
-			if i == 3:
-				image = self.compute_queue.get(3)
-				if not image:
-					continue
-				task = image.pop()
-				tasks.append(task)
-				continue
-			misc = self.compute_queue.get(0)
+			misc = self.compute_queue.get(i)
 			if not misc:
 				continue
 			task = misc.pop()
@@ -2660,21 +2639,15 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		try:
 			import pynvml
 			dc = pynvml.nvmlDeviceGetCount()
-
-			def cuda_info():
-				import torch
-				return [torch.cuda.get_device_properties(i) for i in range(torch.cuda.device_count())]
-
-			fut2 = create_future(cuda_info)
 			handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(dc)]
+			gname = [pynvml.nvmlDeviceGetName(d) for d in handles]
 			gcore = [pynvml.nvmlDeviceGetNumGpuCores(d) for d in handles]
 			gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
 			gutil = [pynvml.nvmlDeviceGetUtilizationRates(d) for d in handles]
 			gpowa = [pynvml.nvmlDeviceGetPowerUsage(d) for d in handles]
 			gpowb = [pynvml.nvmlDeviceGetEnforcedPowerLimit(d) for d in handles]
-			tinfo = await fut2
 		except:
-			tinfo = []
+			gname = []
 		minfo = psutil.virtual_memory()
 		sinfo = psutil.swap_memory()
 		dinfo = {}
@@ -2690,36 +2663,36 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return dict(
 			cpu={ip: dict(name=cinfo["brand_raw"], count=cinfo["count"], usage=cpercent / 100, max=1, time=t)},
 			gpu={f"{ip}-{i}": dict(
-				name=ti.name,
+				name=name,
 				count=gcore[i],
 				usage=gutil[i].gpu / 100,
 				max=1,
 				time=t,
-			) for i, ti in enumerate(tinfo)},
+			) for i, name in enumerate(gname)},
 			memory={
 				f"{ip}-v": dict(name="RAM", count=1, usage=minfo.used, max=minfo.total, time=t),
 				f"{ip}-s": dict(name="Swap", count=1, usage=sinfo.used, max=sinfo.total, time=t),
 				**{f"{ip}-{i}": dict(
-					name=ti.name,
+					name=name,
 					count=1,
 					usage=gmems[i].used,
 					max=gmems[i].total,
 					time=t,
-				) for i, ti in enumerate(tinfo)},
+				) for i, name in enumerate(gname)},
 			},
 			disk={f"{ip}-{k}": dict(name=k, count=1, usage=v.used, max=v.total, time=t) for k, v in dinfo.items()},
 			network={
-				ip: dict(name="Upstream", count=1, usage=self.up_bps, max=-1, time=t),
-				ip: dict(name="Downstream", count=1, usage=self.down_bps, max=-1, time=t),
+				f"{ip}-u": dict(name="Upstream", count=1, usage=self.up_bps, max=-1, time=t),
+				f"{ip}-d": dict(name="Downstream", count=1, usage=self.down_bps, max=-1, time=t),
 			},
 			power={
 				**{f"{ip}-{i}": dict(
-					name=ti.name,
+					name=name,
 					count=1,
 					usage=gpowa[i] / 1000,
 					max=gpowb[i] / 1000,
 					time=t,
-				) for i, ti in enumerate(tinfo)},
+				) for i, name in enumerate(gname)},
 			},
 		)
 
@@ -3623,7 +3596,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 								if react and sent:
 									await sent.add_reaction(react)
 					# Represents any timeout error that occurs
-					except (T0, T1, T2):
+					except (T0, T1, T2, CE):
 						if fut is not None:
 							try:
 								await fut
@@ -3787,7 +3760,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					fut = futs.pop(0)
 					try:
 						await fut
-					except (T0, T1, T2):
+					except (T0, T1, T2, CE):
 						print_exc()
 						await self.load_guild_http(fut.guild)
 					if "guilds" in self.data:
@@ -3796,7 +3769,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		for fut in futs:
 			try:
 				await fut
-			except (T0, T1, T2):
+			except (T0, T1, T2, CE):
 				print_exc()
 				await self.load_guild_http(fut.guild)
 			if "guilds" in self.data:
@@ -6048,7 +6021,7 @@ class AudioClientInterface:
 			self.proc.stdin.write(b)
 			self.proc.stdin.flush()
 			resp = await asyncio.wait_for(wrap_future(self.returns[key]), timeout=48)
-		except (T0, T1, T2, OSError):
+		except (T0, T1, T2, CE, OSError):
 			if self.returns[key].done():
 				raise
 			print("AExpired:", s)

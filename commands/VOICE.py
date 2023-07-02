@@ -3673,11 +3673,13 @@ class Skip(Command):
                 auds.queue.pops(pops)
                 if 1 in pops:
                     auds.clear_next()
+                if 0 in pops:
+                    auds.clear_source()
             if auds.queue:
                 # If first item is skipped, advance queue and update audio player
                 song = auds.queue[0]
                 if song.skips is None or len(song.skips) >= required:
-                    await create_future(auds.skip)
+                    await create_future(auds.reset)
                     if count < 4:
                         response += f"{sqr_md(song.name)} has been removed from the queue.\n"
                     count += 1

@@ -402,6 +402,10 @@ try:
 	ISE = asyncio.exceptions.InvalidStateError
 except AttributeError:
 	ISE = asyncio.InvalidStateError
+try:
+	CE = asyncio.exceptions.CancelledError
+except AttributeError:
+	CE = asyncio.CancelledError
 
 
 class ArgumentError(LookupError):
@@ -2296,8 +2300,9 @@ proc_args = cdict(
 
 COMPUTE_LOAD = AUTH.get("compute_load", [])
 if len(COMPUTE_LOAD) < DC:
-	import torch
-	COMPUTE_LOAD = AUTH["compute_load"] = [torch.cuda.get_device_properties(i).multi_processor_count for i in range(torch.cuda.device_count())]
+	handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(DC)]
+	gcore = [pynvml.nvmlDeviceGetNumGpuCores(d) for d in handles]
+	COMPUTE_LOAD = AUTH["compute_load"] = gcore
 elif len(COMPUTE_LOAD) > DC:
 	COMPUTE_LOAD = COMPUTE_LOAD[:DC]
 if COMPUTE_LOAD:
@@ -2389,10 +2394,9 @@ async def sub_submit(ptype, command, fix=None, _timeout=12):
 				proc.fut.set_result(None)
 		try:
 			return await asyncio.wait_for(wrap_future(task), timeout=(_timeout or inf) + 2)
-		except T1 as ex:
+		except (T1, CE) as ex:
 			ex2 = ex
 			continue
-		break
 	raise ex2
 
 last_sub = 0
