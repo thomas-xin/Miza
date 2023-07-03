@@ -2380,7 +2380,7 @@ async def sub_submit(ptype, command, fix=None, _timeout=12):
 	bot = BOT[0]
 	ex2 = RuntimeError("Maximum compute attempts exceeded.")
 	for i in range(3):
-		fix = fix or 0
+		fix = fix or -1
 		task = concurrent.futures.Future()
 		task.cap = fix
 		task.command = command
@@ -2472,7 +2472,7 @@ async def _sub_submit(ptype, command, fix=None, _timeout=12):
 
 # Sends an operation to the math subprocess pool.
 def process_math(expr, prec=64, rat=False, timeout=12, variables=None):
-	return sub_submit("compute", (expr, "%", prec, rat, variables), fix=xrand(3), _timeout=timeout)
+	return sub_submit("compute", (expr, "%", prec, rat, variables), fix=choice((0, 2)), _timeout=timeout)
 
 # Sends an operation to the image subprocess pool.
 def process_image(image, operation, args=[], fix=None, timeout=36):
