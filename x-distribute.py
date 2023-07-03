@@ -131,11 +131,11 @@ def update_tasks(proc):
     def func():
         resps = {}
         while proc.is_running():
-            resp = base64.urlsafe_b64encode(orjson.dumps(resps)).decode("utf-8", "replace")
+            resp = base64.urlsafe_b64encode(orjson.dumps(resps))
             resp = session.post(
                 "https://mizabot.xyz/api/distribute",
                 data=dict(
-                    caps=[proc.cap],
+                    caps=orjson.dumps([proc.cap]),
                     resp=resp,
                 )
             )
@@ -260,11 +260,11 @@ try:
             },
         ))
         caps = [proc.cap for proc in procs if not proc.busy or proc.busy.done()]
-        stat = base64.urlsafe_b64encode(stats).rstrip(b"=").decode("ascii")
+        stat = base64.urlsafe_b64encode(stats).rstrip(b"=")
         resp = session.post(
             "https://mizabot.xyz/api/distribute",
             data=dict(
-                caps=caps,
+                caps=orjson.dumps(caps),
                 stat=stat,
             )
         )
