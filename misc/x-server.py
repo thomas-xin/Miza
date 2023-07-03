@@ -2434,7 +2434,7 @@ alert("File successfully deleted. Returning to home.");
 		if not resp.startswith("{"):
 			resp = base64.urlsafe_b64decode(resp + "==")
 		resp = orjson.loads(resp)
-		for k, v in resp:
+		for k, v in resp.items():
 			if isinstance(v, str):
 				if v.startswith("ERR:"):
 					resp[k] = evalex(v[4:])
