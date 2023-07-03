@@ -2610,7 +2610,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					eloop.call_soon_threadsafe(task.set_exception, v)
 				else:
 					eloop.call_soon_threadsafe(task.set_result, v)
-				print("TASK:", k, task, v)
+				# print("TASK:", k, task, v)
 		tasks = []
 		for i in caps:
 			i = i or 0
