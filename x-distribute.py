@@ -22,7 +22,7 @@ with open("auth.json", "rb") as f:
 compute_load = data.get("compute_load", [])
 
 if benchmark.DC:
-    caps = [0, 2] if benchmark.DC > 1 else [2]
+    caps = [0, 2] if benchmark.DC > 1 else [0]
     import pynvml
     handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(benchmark.DC)]
     gmems = [pynvml.nvmlDeviceGetMemoryInfo(d).total for d in handles]
@@ -35,7 +35,7 @@ if benchmark.DC:
             continue
         caps.append(i + 3)
 else:
-    caps = [0]
+    caps = [2]
 
 req = [
     "orjson",
@@ -57,7 +57,7 @@ import time, base64, orjson, psutil, subprocess, threading, requests, concurrent
 from math import *
 session = requests.Session()
 
-exc = concurrent.futures.ThreadPoolExecutor(max_workers=4 + benchmark.DC)
+# exc = concurrent.futures.ThreadPoolExecutor(max_workers=4 + benchmark.DC)
 
 new_tasks = {}
 procs = []
@@ -131,7 +131,7 @@ def update_tasks(proc):
     def func():
         resps = {}
         while proc.is_running():
-            resp = base64.urlsafe_b64encode(orjson.dumps(resps))
+            resp = base64.urlsafe_b64encode(orjson.dumps(resps)) if resps else "{}"
             resp = session.post(
                 "https://mizabot.xyz/api/distribute",
                 data=dict(
@@ -142,11 +142,13 @@ def update_tasks(proc):
             # resp = session.get(f"https://mizabot.xyz/api/distribute?caps=[{proc.cap}]&resp={resp}")
             resp.raise_for_status()
             data = resp.json()
-            print(data)
+            if data:
+                print(data)
             for task in data:
                 cap = task[1]
                 new_tasks.setdefault(cap, []).append(task)
             tasks = new_tasks.get(proc.cap, [])
+            tasks.extend(new_tasks.get(-1, []))
             if not tasks:
                 if proc.waiting:
                     proc.waiting.result()
@@ -271,7 +273,8 @@ try:
         # resp = session.get(f"https://mizabot.xyz/api/distribute?caps={caps}&stat={stat}")
         resp.raise_for_status()
         data = resp.json()
-        print(data)
+        if data:
+            print(data)
         for task in data:
             cap = task[1]
             new_tasks.setdefault(cap, []).append(task)
@@ -288,5 +291,5 @@ finally:
         except:
             pass
     procs.clear()
-    exc.shutdown()
+    # exc.shutdown()
     psutil.Process().kill()

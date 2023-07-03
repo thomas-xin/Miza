@@ -2827,7 +2827,7 @@ def from_bytes(b, save=None, nogif=False):
 		try:
 			im.read(blob=b, resolution=1024)
 		except Exception as ex:
-			exc.args = exc.args + (ex.__class__,) + ex.args
+			exc.args = exc.args + (str(ex.__class__),) + ex.args
 		else:
 			exc = None
 		if exc:
