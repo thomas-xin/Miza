@@ -2380,7 +2380,7 @@ async def sub_submit(ptype, command, fix=None, _timeout=12):
 	bot = BOT[0]
 	ex2 = RuntimeError("Maximum compute attempts exceeded.")
 	for i in range(3):
-		fix = fix or -1
+		fix = fix if fix is not None else -1
 		task = concurrent.futures.Future()
 		task.cap = fix
 		task.command = command
