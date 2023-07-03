@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 import sympy, mpmath, math, time, os, sys, subprocess, psutil, traceback, random
-import collections, itertools, pickle, orjson, base64, ast, re
+import collections, itertools, pickle, base64, ast, re
 import sympy.stats
 import numpy as np
 import sympy.parsing.sympy_parser as parser

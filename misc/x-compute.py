@@ -2481,7 +2481,7 @@ def backup_model(cls, model, force=False, **kwargs):
 			raise RuntimeError("Model is loading, please wait...")
 	raise ex2
 
-if len(sys.argv) <= 1 or int(sys.argv[1]) < 3:
+if len(sys.argv) <= 1 or int(sys.argv[1]) in (0, 2):
 	x_math = __import__("x-math")
 
 if len(sys.argv) > 1 and sys.argv[1] == "1":
@@ -2642,7 +2642,7 @@ elif len(sys.argv) > 1 and sys.argv[1] == "2":
 		a = Embedder.encode(s).astype(np.float16)
 		return a.data
 
-elif len(sys.argv) > 1:
+elif len(sys.argv) > 1 and int(sys.argv[1]) >= 3:
 	import imagebot
 	from clip_interrogator import Config, Interrogator
 	try:

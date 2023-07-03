@@ -2616,7 +2616,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			i = i or 0
 			misc = self.compute_queue.get(i)
 			if not misc:
-				continue
+				if i == 0:
+					continue
+				misc = self.compute_queue.get(0)
+				if not misc:
+					continue
 			task = misc.pop()
 			tasks.append(task)
 		prompts = []
