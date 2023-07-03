@@ -1247,7 +1247,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					else:
 						found.extend(a.url for a in m.attachments)
 					found.extend(find_urls(m.content))
-					temp = await self.follow_to_image(m.content, follow=True)
+					temp = await self.follow_to_image(m.content, follow=reactions)
 					found.extend(filter(is_url, temp))
 					# Attempt to find URLs in embed contents
 					for e in m.embeds:
@@ -1480,12 +1480,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		temp = find_urls(url)
 		if temp:
 			return temp
-		if not follow:
-			return ()
 		users = find_users(url)
 		emojis = find_emojis(url)
 		out = deque()
-		if users:
+		if users and follow:
 			futs = [create_task(self.fetch_user(verify_id(u))) for u in users]
 			for fut in futs:
 				with suppress(LookupError):
