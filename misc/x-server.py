@@ -2442,7 +2442,7 @@ alert("File successfully deleted. Returning to home.");
 					resp[k] = v[4:]
 		caps = orjson.dumps(caps).decode("ascii")
 		stat = orjson.dumps(stat).decode("utf-8", "replace")
-		resp = orjson.dumps(resp).decode("utf-8", "replace")
+		resp = repr(resp)
 		tasks = self.bot_exec(f"bot.distribute({caps},{stat},{resp})")
 		cp.response.headers.update(HEADERS)
 		cp.response.headers["Content-Type"] = "application/json"
