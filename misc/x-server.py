@@ -2425,6 +2425,7 @@ alert("File successfully deleted. Returning to home.");
 	@cp.expose
 	@hostmap
 	def distribute(self, caps="[]", stat="{}", resp="{}"):
+		print(caps, stat, resp)
 		if not caps.startswith("["):
 			caps = base64.urlsafe_b64decode(caps + "==")
 		caps = orjson.loads(caps)
