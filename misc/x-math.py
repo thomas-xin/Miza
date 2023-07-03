@@ -349,9 +349,9 @@ def _predict_next(seq):
 	if b is not None:
 		return round_min(seq[-1] * b)
 
-def predict_next(seq, limit=8):
+def predict_next(seq, limit=12):
 	seq = np.array(deque(astype(x, mpf) for x in seq), dtype=object)
-	for i in range(min(5, limit), 1 + max(5, min(len(seq), limit))):
+	for i in range(min(8, limit), 1 + max(8, min(len(seq), limit))):
 		temp = _predict_next(seq[-i:])
 		if temp is not None:
 			return temp
@@ -657,6 +657,7 @@ plots = (
 for i in plots:
 	_globals[i] = globals()[i]
 _globals.update({
+	"sleep": time.sleep,
 	"roman_numerals": roman_numerals,
 	"bf": _bf,
 	"brainfuck": _bf,
