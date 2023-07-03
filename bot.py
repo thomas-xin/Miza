@@ -2657,7 +2657,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				dinfo[p.mountpoint] = psutil.disk_usage(p.mountpoint)
 			except OSError:
 				pass
-		ip = self.ip
+		ip = "127.0.0.1"
 		with tracebacksuppressor(asyncio.TimeoutError, asyncio.CancelledError):
 			ip = await fut
 		t = utc()
