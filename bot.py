@@ -2632,7 +2632,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 	async def get_current_stats(self):
 		import psutil, cpuinfo
-		fut = create_task(self.get_ip())
+		# fut = create_task(self.get_ip())
 		cinfo = self._cpuinfo
 		if not cinfo:
 			cinfo = self._cpuinfo = await create_future(cpuinfo.get_cpu_info)
@@ -2658,8 +2658,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			except OSError:
 				pass
 		ip = "127.0.0.1"
-		with tracebacksuppressor(asyncio.TimeoutError, asyncio.CancelledError):
-			ip = await fut
+		# with tracebacksuppressor(asyncio.TimeoutError, asyncio.CancelledError):
+		# 	ip = await fut
 		t = utc()
 		return dict(
 			cpu={ip: dict(name=cinfo["brand_raw"], count=cinfo["count"], usage=cpercent / 100, max=1, time=t)},
