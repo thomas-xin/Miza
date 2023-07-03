@@ -4257,7 +4257,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							ut = 0
 							for i in range(3, interval + 3, 3):
 								ut += it - interval + i in uptime
-							self.uptime = ut / interval
+							self.uptime = ut / interval * 3
 
 							net = await create_future(psutil.net_io_counters)
 							if not hasattr(self, "up_bytes"):

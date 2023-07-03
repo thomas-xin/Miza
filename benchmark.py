@@ -101,6 +101,7 @@ except:
 if not DC:
 	print(srgb(255, 0, 0, "WARNING: No NVIDIA GPUs detected. Please install one for AI compute acceleration."))
 
+keep = True
 if __name__ != "__main__" and os.path.exists("auth.json"):
 	import json
 	with open("auth.json", "rb") as f:
@@ -108,76 +109,79 @@ if __name__ != "__main__" and os.path.exists("auth.json"):
 	compute_load = data.get("compute_load")
 	if compute_load is not None and len(compute_load) == DC:
 		print(srgb(0, 255, 0, "No benchmark required, skipping..."))
-		raise SystemExit
+		keep = False
 
-try:
-	import torch, cpuinfo, psutil
-	if DC and not torch.cuda.is_available():
-		raise ImportError
-except ImportError:
-	subprocess.run([sys.executable, "-m", "pip", "install", "py-cpuinfo", "--upgrade", "--user"])
-	subprocess.run([sys.executable, "-m", "pip", "install", "psutil", "--upgrade", "--user"])
-	if DC:
-		subprocess.run([sys.executable, "-m", "pip", "install", "torch", "--upgrade", "--user"])
-	else:
-		subprocess.run([sys.executable, "-m", "pip", "install", "torch", "--index-url", "https://download.pytorch.org/whl/cu118", "--upgrade", "--user"])
-	import torch, cpuinfo, psutil
-
-try:
-    import pkg_resources
-except:
-    import traceback
-    print(srgb(255, 0, 0, traceback.format_exc()), end="")
-    subprocess.run(["pip", "install", "setuptools", "--upgrade", "--user"])
-    import pkg_resources
-req = ["diffusers", "accelerate"]
-if os.name == "nt":
-	req.append("bitsandbytes-windows")
-else:
-	req.append("bitsandbytes")
-for mn in req:
+if keep:
 	try:
-		pkg_resources.get_distribution(mn)
+		import torch, cpuinfo, psutil
+		if DC and not torch.cuda.is_available():
+			raise ImportError
+	except ImportError:
+		subprocess.run([sys.executable, "-m", "pip", "install", "py-cpuinfo", "--upgrade", "--user"])
+		subprocess.run([sys.executable, "-m", "pip", "install", "psutil", "--upgrade", "--user"])
+		if DC:
+			subprocess.run([sys.executable, "-m", "pip", "install", "torch", "--upgrade", "--user"])
+		else:
+			subprocess.run([sys.executable, "-m", "pip", "install", "torch", "--index-url", "https://download.pytorch.org/whl/cu118", "--upgrade", "--user"])
+		import torch, cpuinfo, psutil
+
+	try:
+		import pkg_resources
 	except:
-		subprocess.run([sys.executable, "-m", "pip", "install", mn, "--upgrade", "--user"])
+		import traceback
+		print(srgb(255, 0, 0, traceback.format_exc()), end="")
+		subprocess.run(["pip", "install", "setuptools", "--upgrade", "--user"])
+		import pkg_resources
+	req = ["diffusers", "accelerate"]
+	if os.name == "nt":
+		req.append("bitsandbytes-windows")
+	else:
+		req.append("bitsandbytes")
+	for mn in req:
+		try:
+			pkg_resources.get_distribution(mn)
+		except:
+			subprocess.run([sys.executable, "-m", "pip", "install", mn, "--upgrade", "--user"])
 
-total = 0
-procs = []
-# avgs = []
-# mems = []
+	total = 0
+	procs = []
+	# avgs = []
+	# mems = []
 
-info = cpuinfo.get_cpu_info()
-mem = psutil.virtual_memory().total
-# mems.append(mem)
-args = [sys.executable, sys.argv[0], "cpu", info["brand_raw"], str(info["count"]), str(mem)]
-proc = subprocess.Popen(args, stdout=subprocess.PIPE)
-procs.append(proc)
-for i in range(DC):
-	info = pynvml.nvmlDeviceGetHandleByIndex(i)
-	mem = torch.cuda.get_device_properties(i).total_memory
+	info = cpuinfo.get_cpu_info()
+	mem = psutil.virtual_memory().total
 	# mems.append(mem)
-	args = [sys.executable, sys.argv[0], f"cuda:{i}", pynvml.nvmlDeviceGetName(info), str(pynvml.nvmlDeviceGetNumGpuCores(info)), str(mem)]
+	args = [sys.executable, sys.argv[0], "cpu", info["brand_raw"], str(info["count"]), str(mem)]
 	proc = subprocess.Popen(args, stdout=subprocess.PIPE)
 	procs.append(proc)
+	for i in range(DC):
+		info = pynvml.nvmlDeviceGetHandleByIndex(i)
+		mem = torch.cuda.get_device_properties(i).total_memory
+		# mems.append(mem)
+		args = [sys.executable, sys.argv[0], f"cuda:{i}", pynvml.nvmlDeviceGetName(info), str(pynvml.nvmlDeviceGetNumGpuCores(info)), str(mem)]
+		proc = subprocess.Popen(args, stdout=subprocess.PIPE)
+		procs.append(proc)
 
-print()
-compute_load = []
-for n, proc in enumerate(procs):
-	s = proc.stdout.readlines()
-	avg = float(s.pop(-1))
-	# avgs.append(avg)
-	total += avg
-	if n:
-		compute_load.append(avg)
-	print(b"".join(s).decode("utf-8"))
-print(srgb(0, 255, 0, f"Benchmark complete. Total score: {round(total, 2)}"))
+	print()
+	compute_load = []
+	for n, proc in enumerate(procs):
+		s = proc.stdout.readlines()
+		avg = float(s.pop(-1))
+		# avgs.append(avg)
+		total += avg
+		if n:
+			compute_load.append(avg)
+		print(b"".join(s).decode("utf-8"))
+	print(srgb(0, 255, 0, f"Benchmark complete. Total score: {round(total, 2)}"))
 
-if not os.path.exists("auth.json"):
-	raise SystemExit
-import json
-with open("auth.json", "r+", encoding="utf-8") as f:
-	data = json.load(f)
-	data["compute_load"] = compute_load
-	f.seek(0)
-	json.dump(data, f, indent="\t")
-	print(srgb(0, 255, 0, "Results written to `auth.json`."))
+	if not os.path.exists("auth.json"):
+		keep = False
+
+if keep:
+	import json
+	with open("auth.json", "r+", encoding="utf-8") as f:
+		data = json.load(f)
+		data["compute_load"] = compute_load
+		f.seek(0)
+		json.dump(data, f, indent="\t")
+		print(srgb(0, 255, 0, "Results written to `auth.json`."))
