@@ -132,16 +132,20 @@ def update_tasks(proc):
         resps = {}
         while proc.is_running():
             resp = base64.urlsafe_b64encode(orjson.dumps(resps)) if resps else "{}"
-            resp = session.post(
-                "https://mizabot.xyz/api/distribute",
-                data=dict(
-                    caps=orjson.dumps([proc.cap]),
-                    resp=resp,
+            try:
+                resp = session.post(
+                    "https://mizabot.xyz/api/distribute",
+                    data=dict(
+                        caps=orjson.dumps([proc.cap]),
+                        resp=resp,
+                    )
                 )
-            )
-            # resp = session.get(f"https://mizabot.xyz/api/distribute?caps=[{proc.cap}]&resp={resp}")
-            resp.raise_for_status()
-            data = resp.json()
+                # resp = session.get(f"https://mizabot.xyz/api/distribute?caps=[{proc.cap}]&resp={resp}")
+                resp.raise_for_status()
+                data = resp.json()
+            except:
+                print_exc()
+                time.sleep(10)
             if data:
                 print(data)
             for task in data:
@@ -247,10 +251,10 @@ try:
                 ) for i, name in enumerate(gname)},
             },
             disk={f"{ip}-{k}": dict(name=k, count=1, usage=v.used, max=v.total, time=t) for k, v in dinfo.items()},
-            network={
-                f"{ip}-u": dict(name="Upstream", count=1, usage=self.up_bps, max=-1, time=t),
-                f"{ip}-d": dict(name="Downstream", count=1, usage=self.down_bps, max=-1, time=t),
-            },
+            # network={
+            #     f"{ip}-u": dict(name="Upstream", count=1, usage=self.up_bps, max=-1, time=t),
+            #     f"{ip}-d": dict(name="Downstream", count=1, usage=self.down_bps, max=-1, time=t),
+            # },
             power={
                 **{f"{ip}-{i}": dict(
                     name=name,
@@ -263,16 +267,20 @@ try:
         ))
         caps = [proc.cap for proc in procs if not proc.busy or proc.busy.done()]
         stat = base64.urlsafe_b64encode(stats).rstrip(b"=")
-        resp = session.post(
-            "https://mizabot.xyz/api/distribute",
-            data=dict(
-                caps=orjson.dumps(caps),
-                stat=stat,
+        try:
+            resp = session.post(
+                "https://mizabot.xyz/api/distribute",
+                data=dict(
+                    caps=orjson.dumps(caps),
+                    stat=stat,
+                )
             )
-        )
-        # resp = session.get(f"https://mizabot.xyz/api/distribute?caps={caps}&stat={stat}")
-        resp.raise_for_status()
-        data = resp.json()
+            # resp = session.get(f"https://mizabot.xyz/api/distribute?caps={caps}&stat={stat}")
+            resp.raise_for_status()
+            data = resp.json()
+        except:
+            print_exc()
+            time.sleep(10)
         if data:
             print(data)
         for task in data:
@@ -284,6 +292,8 @@ try:
                     proc.waiting.set_result(None)
                     proc.waiting = None
         time.sleep(1)
+except:
+    print_exc()
 finally:
     for proc in procs:
         try:
