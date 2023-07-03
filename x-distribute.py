@@ -36,6 +36,8 @@ if benchmark.DC:
         caps.append(i + 3)
 else:
     caps = [2]
+# if len(caps) < os.cpu_count() // 2:
+#     caps = [0] * (os.cpu_count() // 2 - len(caps)) + caps
 
 req = [
     "orjson",
@@ -95,6 +97,7 @@ def task_submit(proc, command, _timeout=12):
 def update_resps(proc):
     def func():
         while True:
+            print(proc, "waiting...")
             try:
                 if not proc.is_running():
                     return
@@ -108,6 +111,7 @@ def update_resps(proc):
             except:
                 print_exc()
             s = b.rstrip()
+            print(proc, s)
             try:
                 if s and s[:1] == b"$":
                     s, r = s.split(b"~", 1)
@@ -131,7 +135,7 @@ def update_tasks(proc):
     def func():
         resps = {}
         while proc.is_running():
-            resp = base64.urlsafe_b64encode(orjson.dumps(resps)) if resps else "{}"
+            resp = base64.urlsafe_b64encode(orjson.dumps(resps)).rstrip(b"=") if resps else "{}"
             try:
                 resp = session.post(
                     "https://mizabot.xyz/api/distribute",
@@ -146,6 +150,8 @@ def update_tasks(proc):
             except:
                 print_exc()
                 time.sleep(10)
+            else:
+                resps.clear()
             if data:
                 print(data)
             for task in data:
@@ -172,6 +178,7 @@ def update_tasks(proc):
 
 def start_proc(cap):
     args = [python, "misc/x-compute.py", str(cap)]
+    print(args)
     proc = psutil.Popen(
         args,
         stdin=subprocess.PIPE,
