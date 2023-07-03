@@ -135,7 +135,7 @@ def update_tasks(proc):
     def func():
         resps = {}
         while proc.is_running():
-            resp = base64.urlsafe_b64encode(orjson.dumps(resps)).rstrip(b"=") if resps else "{}"
+            resp = base64.urlsafe_b64encode(repr(resps).encode("utf-8")).rstrip(b"=") if resps else "{}"
             try:
                 resp = session.post(
                     "https://mizabot.xyz/api/distribute",

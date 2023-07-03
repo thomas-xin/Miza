@@ -2133,7 +2133,7 @@ def get_mime(path):
 		mime = "cannot open `"
 	if mime.startswith("cannot open `"):
 		with open(path, "rb") as f:
-			b = f.read(65536)
+			b = f.read(1048576)
 		mime = magic.from_buffer(b, mime=True)
 		if mime == "application/octet-stream":
 			if path.endswith(".txt"):

@@ -783,7 +783,7 @@ transform: translate(-50%, -50%);
 							if info[1] > 256 * 1048576:
 								uri = f"{HOST}/fileinfo/{orig_path}"
 								if not cp.request.headers.get("Range") and len(urls) > 48:
-									url = f"{HOST}/stream?info={urllib.parse.quote_plus(uri)}"
+									url = f"{HOST}/stream/?info={urllib.parse.quote_plus(uri)}"
 								else:
 									url = choice(
 										"https://stream.miza-stream.workers.dev/",
