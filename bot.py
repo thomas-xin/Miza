@@ -2601,11 +2601,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 	compute_queue = {}
 	compute_wait = {}
-	def distribute(self, caps, stat, completed):
+	def distribute(self, caps, stat, resp):
 		for k, v in stat.items():
 			self.status_data.system[k].update(v)
-		if completed:
-			for k, v in completed.items():
+		if resp:
+			for k, v in resp.items():
+				k = int(k)
 				task = self.compute_wait.pop(k)
 				if isinstance(v, Exception):
 					eloop.call_soon_threadsafe(task.set_exception, v)
