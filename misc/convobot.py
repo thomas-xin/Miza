@@ -1074,8 +1074,7 @@ class Bot:
 					print_exc()
 					tinfo = gmems = []
 				bit8 = [i for i, ti in enumerate(tinfo) if ti.major >= 8 or not bitsandbytes]
-				tinfo = [tinfo[i] for i in bit8]
-				max_mem = {i: f"{round((mi.total - mi.used) / 1048576 - 2.5 * 1024)}MiB" for i, mi in enumerate(gmems)}
+				max_mem = {i: f"{round((gmems[i].total - gmems[i].used) / 1048576 - 2.5 * 1024)}MiB" for i in bit8}
 				max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("MiB")) > 0}
 				rem = sum(int(v.removesuffix("MiB")) for v in max_mem.values()) / 1024 - req
 				# if rem < 1:
