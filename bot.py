@@ -1454,7 +1454,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		try:
 			if self.analysed[url][-1] >= best:
 				return self.analysed[url][:-1]
-		except LookupError:
+		except (LookupError, TypeError):
 			pass
 		try:
 			p1, p2 = await process_image(url, "caption", ["-nogif", best], fix=3, timeout=300)
