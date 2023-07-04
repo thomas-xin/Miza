@@ -1473,7 +1473,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			self.analysed[url] = ("Image", p1, p2, best)
 		while len(self.analysed) > 4096:
 			self.analysed.pop(next(iter(self.analysed)))
-		return self.analysed[url][:-1]
+		return self.analysed[url][:-1] if self.analysed.get(url) else None
 
 	# Follows a message link, replacing emojis and user mentions with their icon URLs.
 	async def follow_to_image(self, url, follow=True):
