@@ -1977,7 +1977,7 @@ class Bot:
 	def rerender(self):
 		lim = 480 if self.premium >= 2 else 120
 		r1 = 4 if self.premium >= 2 else 2
-		if self.model == "pygmalion":
+		if not self.model.startswith("gpt"):
 			lim += 240
 			r1 += 2
 		if not self.chat_history or len(self.chat_history) < r1 and len(self.gpttokens(self.chat_history[0][1])) <= lim * 2:

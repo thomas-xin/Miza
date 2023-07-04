@@ -1204,6 +1204,7 @@ class Ask(Command):
 
 	alm_re = re.compile(r"(?:as |i am )?an ai(?: language model)?[, ]{,2}", flags=re.I)
 	reset = {}
+	visited = {}
 
 	async def __call__(self, message, guild, channel, user, argv, name, flags=(), **void):
 		bot = self.bot
@@ -1290,11 +1291,13 @@ class Ask(Command):
 			found = None
 			if not content.strip():
 				url = f"https://discord.com/channels/0/{channel.id}/{m.id}"
-				try:
-					found = await bot.follow_url(url, reactions=False)
-				except:
-					print_exc()
-					found = None
+				found = self.visited.get(url)
+				if found is None:
+					try:
+						found = self.visited[url] = await bot.follow_url(url, reactions=False)
+					except:
+						print_exc()
+						found = self.visited[url] = ""
 				if found and (is_image(found[0]) is not None or is_video(found[0]) is not None):
 					content = found = found[0]
 				else:
@@ -1306,11 +1309,13 @@ class Ask(Command):
 				continue
 			if not found:
 				url = f"https://discord.com/channels/0/{channel.id}/{m.id}"
-				try:
-					found = await bot.follow_url(url, reactions=False)
-				except:
-					print_exc()
-					found = None
+				found = self.visited.get(url)
+				if found is None:
+					try:
+						found = self.visited[url] = await bot.follow_url(url, reactions=False)
+					except:
+						print_exc()
+						found = self.visited[url] = ""
 				if found and (is_image(found[0]) is not None or is_video(found[0]) is not None):
 					found = found[0]
 				else:
@@ -1327,6 +1332,8 @@ class Ask(Command):
 					caid.pop("ids", None)
 				print(channel, "mismatch", m.id)#, caid)
 			ignores.add(m.id)
+		if len(self.visited) > 256:
+			self.visited.pop(next(iter(self.visited)))
 		for i, m, content, found, cfut in visconts:
 			if cfut:
 				pt, p1, p2 = await cfut
