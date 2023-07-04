@@ -556,6 +556,13 @@ class Server:
 			if a2.startswith(".temp$@"):
 				a2 = a2[7:]
 				a3 = True
+				if not st.st_size:
+					with tracebacksuppressor:
+						os.remove(p)
+					p = find_file(path, cwd=("saves/filehost"), ind=ind)
+					mime = get_mime(p)
+					st = os.stat(p)
+					a3 = False
 			else:
 				a3 = False
 			cp.response.headers["Attachment-Filename"] = a2
