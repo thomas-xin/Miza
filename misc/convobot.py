@@ -1096,7 +1096,7 @@ class Bot:
 				# 	max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("MiB")) > 0}
 				cap = sum(int(v.removesuffix("MiB")) for v in max_mem.values()) / 1024
 				if cap > req * 1.2:
-					max_mem = {k: f"{round(int(v.removesuffix('MiB')) * req / cap * 1.2)}MiB" for k, v in max_mem.items()}
+					max_mem = {k: f"{round(int(v.removesuffix('MiB')) / 1.2)}MiB" for k, v in max_mem.items()}
 					dti = torch.int8
 				else:
 					dti = torch.float16
