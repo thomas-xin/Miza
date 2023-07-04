@@ -2664,6 +2664,8 @@ elif len(sys.argv) > 1 and int(sys.argv[1]) >= 3:
 		if not VIT:
 			config = Config(clip_model_name="ViT-H-14/laion2b_s32b_b79k")
 			config.apply_low_vram_defaults()
+			if torch.cuda.device_count() > 1:
+				config.device = "cuda:1"
 			globals()["VIT"] = Interrogator(config)
 		if best:
 			p1 = VIT.interrogate(image)
