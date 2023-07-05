@@ -772,17 +772,17 @@ class Bot:
 		p = per
 		local_models = ("pygmalion-13b", "manticore-13b", "hippogriff-30b")
 		if self.name.casefold() not in p.casefold() and "you" not in p.casefold():
-			if not p:
-				p = "an"
-			elif p[0] in "aeio":
-				p = "an " + p
-			else:
-				p = "a " + p
 			if model in ("gpt-3.5-turbo", "gpt-4", "text-davinci-003"):
 				nstart = f"Your name is {self.name}; you are {p}. Express emotion when appropriate!"
 				if self.nsfw:
 					nstart = nstart.strip() + " " + MIZAAC
 			else:
+				if not p:
+					p = "an"
+				elif p[0] in "aeio":
+					p = "an " + p
+				else:
+					p = "a " + p
 				nstart = f"The following is a conversation between {self.name} and humans. {self.name} is {p} AI."
 		else:
 			nstart = p
