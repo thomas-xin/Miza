@@ -1421,6 +1421,7 @@ class Ask(Command):
 				emb = discord.Embed(colour=rand_colour())
 				emb.set_author(**get_author(bot.user))
 				emb.description = f"Did you instead intend to ask about my main bot? use {bot.get_prefix(guild)}help for help!"
+		m = None
 		im = None
 		fr = fm = None
 		urls = []
@@ -1530,8 +1531,8 @@ class Ask(Command):
 				else:
 					react = False
 				if isinstance(response, str):
-					return await send_with_react(channel, response, reference=not loop and message, reacts=react)
-				return response
+					m = await send_with_react(channel, response, reference=not loop and message, reacts=react)
+				m = response
 			if oai in EXPAPI:
 				EXPAPI.discard(oai)
 				if bot.is_trusted(guild) >= 2:
@@ -1556,7 +1557,7 @@ class Ask(Command):
 		code = "\xad"
 		reacts = []
 		reacts.extend(("🔄", "🗑️"))
-		if h and not emb and premium < 2 and "AI language model" in out and not xrand(3):
+		if visible and not emb and premium < 2 and "AI language model" in out and not xrand(3):
 			oo = bot.data.users.get(user.id, {}).get("opt_out") or 0
 			if utc() - oo > 86400 * 14:
 				code = f"*```callback-string-ask-{user.id}-\nReact with 🚫 to dismiss.```* "
@@ -1573,39 +1574,40 @@ class Ask(Command):
 				reacts.append("🚫")
 		# s = lim_str(code + escape_roles(out), 2000)
 		ref = message
-		s = escape_roles(out)
-		while len(code) + len(s) > 2000:
-			t = []
-			while s:
-				cl = sum(map(len, t))
-				spl = s.split("\n\n", 1)
-				if len(spl) > 1 and cl + len(spl[0]) < 1997:
-					t.append(spl[0])
-					t.append("\n\n")
-					s = spl[1]
-					continue
-				spl = s.split("\n", 1)
-				if len(spl) > 1 and cl + len(spl[0]) < 1998:
-					t.append(spl[0])
-					t.append("\n")
-					s = spl[1]
-					continue
-				spl = s.split(None, 1)
-				if len(spl) > 1 and cl + len(spl[0]) < 1998:
-					t.append(spl[0])
-					t.append(" ")
-					s = spl[1]
-					continue
-				if t:
-					break
-				t.append(s[:1999 - cl])
-				s = s[1999 - cl:]
-			t.insert(0, "\xad")
-			t = "".join(t).strip()
-			create_task(send_with_react(channel, t, reference=ref))
-			ref = None
-			await asyncio.sleep(0.25)
-		m = await send_with_react(channel, code + s, embed=emb, reacts=reacts, reference=ref)
+		if not m:
+			s = escape_roles(out)
+			while len(code) + len(s) > 2000:
+				t = []
+				while s:
+					cl = sum(map(len, t))
+					spl = s.split("\n\n", 1)
+					if len(spl) > 1 and cl + len(spl[0]) < 1997:
+						t.append(spl[0])
+						t.append("\n\n")
+						s = spl[1]
+						continue
+					spl = s.split("\n", 1)
+					if len(spl) > 1 and cl + len(spl[0]) < 1998:
+						t.append(spl[0])
+						t.append("\n")
+						s = spl[1]
+						continue
+					spl = s.split(None, 1)
+					if len(spl) > 1 and cl + len(spl[0]) < 1998:
+						t.append(spl[0])
+						t.append(" ")
+						s = spl[1]
+						continue
+					if t:
+						break
+					t.append(s[:1999 - cl])
+					s = s[1999 - cl:]
+				t.insert(0, "\xad")
+				t = "".join(t).strip()
+				create_task(send_with_react(channel, t, reference=ref))
+				ref = None
+				await asyncio.sleep(0.25)
+			m = await send_with_react(channel, code + s, embed=emb, reacts=reacts, reference=ref)
 		if isinstance(caid, dict):
 			caid.setdefault("ids", {})[str(m.id)] = None
 		m.replaceable = False

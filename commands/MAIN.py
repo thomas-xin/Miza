@@ -1463,7 +1463,8 @@ class Reminder(Command):
         else:
             out += f" in {sqr_md(time_until(t + utc()))}"
         out += ":```"
-        return dict(content=out, embed=emb)
+        return await send_with_reply(message.channel, message, content=out, embed=emb)
+        # return dict(content=out, embed=emb)
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
         u_id, pos, s_id = list(map(int, vals.split("_", 2)))
@@ -2312,7 +2313,7 @@ class UpdateUsers(Database):
                                 else:
                                     raise TooManyRequests(f"Command has a rate limit of {sec2time(x)}; please wait {sec2time(-wait)}.")
                         m = await ask(message, guild, channel, user, argv, name="ask", flags=flags)
-                        if "exec" in bot.data and not message.guild and ("blacklist" not in bot.data or (bot.data.blacklist.get(user.id) or 0) < 1):
+                        if m and "exec" in bot.data and not message.guild and ("blacklist" not in bot.data or (bot.data.blacklist.get(user.id) or 0) < 1):
                             await bot.data.exec._nocommand_(message=m)
                 return
             if count:

@@ -3139,7 +3139,8 @@ class Queue(Command):
                 p = f"\nNote: Player is currently paused. Use {bot.get_prefix(guild)}resume to resume!"
             else:
                 p = ""
-            return comment + "\n" + css_md(f"🎶 Added {sqr_md(names)} to the queue! Estimated time until playing: {sqr_md(time_until(utc() + total_duration))}. 🎶{p}"), 1
+            s = comment + "\n" + css_md(f"🎶 Added {sqr_md(names)} to the queue! Estimated time until playing: {sqr_md(time_until(utc() + total_duration))}. 🎶{p}")
+            return await send_with_react(s, reference=message, reacts="❎")
 
     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
         u_id, pos, v = list(map(int, vals.split("_", 2)))

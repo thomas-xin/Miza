@@ -1891,7 +1891,7 @@ class Art(Command):
             with tracebacksuppressor:
                 fn = await ffut
             files.append(CompatFile(fn, filename=name))
-        await send_with_react(channel, comment, files=files, reference=message, reacts="🔳", embed=emb)
+        return await send_with_react(channel, comment, files=files, reference=message, reacts="🔳", embed=emb)
         # await bot.send_with_file(channel, "", fn, filename=lim_str(prompt, 96) + ".png", reference=message, reacts="🔳", embed=emb)
 
 
