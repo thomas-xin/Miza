@@ -6,11 +6,11 @@ with open("auth.json", "rb") as f:
 cachedir = AUTH.get("cache_path") or None
 if cachedir:
 	print(f"Setting model cache {cachedir}...")
-	os.environ["HF_HOME"] = cachedir
-	os.environ["TORCH_HOME"] = cachedir
-	os.environ["HUGGINGFACE_HUB_CACHE"] = cachedir
-	os.environ["TRANSFORMERS_CACHE"] = cachedir
-	os.environ["HF_DATASETS_CACHE"] = cachedir
+	os.environ["HF_HOME"] = f"{cachedir}/huggingface"
+	os.environ["TORCH_HOME"] = f"{cachedir}/torch"
+	os.environ["HUGGINGFACE_HUB_CACHE"] = f"{cachedir}/huggingface/hub"
+	os.environ["TRANSFORMERS_CACHE"] = f"{cachedir}/huggingface/transformers"
+	os.environ["HF_DATASETS_CACHE"] = f"{cachedir}/huggingface/datasets"
 
 MultiAutoImporter(
 	"psutil",

@@ -7,11 +7,11 @@ if os.path.exists("auth.json"):
 		AUTH = orjson.loads(f.read())
 	cachedir = AUTH.get("cache_path") or None
 	if cachedir:
-		os.environ["HF_HOME"] = cachedir
-		os.environ["TORCH_HOME"] = cachedir
-		os.environ["HUGGINGFACE_HUB_CACHE"] = cachedir
-		os.environ["TRANSFORMERS_CACHE"] = cachedir
-		os.environ["HF_DATASETS_CACHE"] = cachedir
+		os.environ["HF_HOME"] = f"{cachedir}/huggingface"
+		os.environ["TORCH_HOME"] = f"{cachedir}/torch"
+		os.environ["HUGGINGFACE_HUB_CACHE"] = f"{cachedir}/huggingface/hub"
+		os.environ["TRANSFORMERS_CACHE"] = f"{cachedir}/huggingface/transformers"
+		os.environ["HF_DATASETS_CACHE"] = f"{cachedir}/huggingface/datasets"
 
 import io, time, concurrent.futures, asyncio, subprocess, psutil, collections, traceback, re, requests, blend_modes, zipfile, contextlib, filetype, ast, colorspace, base64, random
 import numpy as np
