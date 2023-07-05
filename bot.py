@@ -2977,7 +2977,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 	@tracebacksuppressor
 	def backup(self):
-		backup = AUTH.get("backup_path") or "backup"
+		backup = AUTH.get("backup_path") or os.getcwd() + "/backup"
 		self.clear_cache()
 		date = datetime.datetime.utcnow().date()
 		if not os.path.exists(backup):
