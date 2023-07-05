@@ -1,6 +1,18 @@
 #!/usr/bin/python3
 
-import os, sys, io, time, concurrent.futures, asyncio, subprocess, psutil, collections, traceback, re, requests, blend_modes, zipfile, contextlib, filetype, ast, colorspace, orjson, base64, random
+import os, sys
+
+if os.path.exists("auth.json"):
+	with open("auth.json", "rb") as f:
+		AUTH = eval(f.read())
+	cachedir = AUTH.get("cache_path") or None
+	if cachedir:
+		os.environ["HF_HOME"] = cachedir
+		os.environ["HUGGINGFACE_HUB_CACHE"] = cachedir
+		os.environ["TRANSFORMERS_CACHE"] = cachedir
+		os.environ["HF_DATASETS_CACHE"] = cachedir
+
+import io, time, concurrent.futures, asyncio, subprocess, psutil, collections, traceback, re, requests, blend_modes, zipfile, contextlib, filetype, ast, colorspace, orjson, base64, random
 import numpy as np
 import PIL
 from PIL import Image, ImageCms, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhance, ImageMath, ImageStat, ImageFile

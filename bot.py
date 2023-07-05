@@ -2980,6 +2980,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		backup = AUTH.get("backup_path") or "backup"
 		self.clear_cache()
 		date = datetime.datetime.utcnow().date()
+		if not os.path.exists(backup):
+			os.mkdir(backup)
 		fn = f"{backup}/saves.{date}.wb"
 		if os.path.exists(fn):
 			if utc() - os.path.getmtime(fn) < 60:

@@ -1,6 +1,15 @@
 import smath
 from smath import *
 
+with open("auth.json", "rb") as f:
+	AUTH = cdict(eval(f.read()))
+cachedir = AUTH.get("cache_path") or None
+if cachedir:
+	os.environ["HF_HOME"] = cachedir
+	os.environ["HUGGINGFACE_HUB_CACHE"] = cachedir
+	os.environ["TRANSFORMERS_CACHE"] = cachedir
+	os.environ["HF_DATASETS_CACHE"] = cachedir
+
 MultiAutoImporter(
 	"psutil",
 	"subprocess",
@@ -19,6 +28,7 @@ MultiAutoImporter(
 	"filetype",
 	"inspect",
 	"sqlite3",
+	"torch",
 	pool=import_exc,
 	_globals=globals(),
 )
@@ -41,8 +51,6 @@ try:
 	DC = pynvml.nvmlDeviceGetCount()
 except:
 	DC = 0
-else:
-	import torch
 hwaccel = "cuda" if DC else "d3d11va" if os.name == "nt" else "auto"
 
 utils = discord.utils
@@ -426,9 +434,6 @@ class MultiEncoder(json.JSONEncoder):
 			return list(obj)
 		return json.JSONEncoder.default(self, obj)
 
-
-with open("auth.json", "rb") as f:
-	AUTH = cdict(eval(f.read()))
 
 enc_key = None
 with tracebacksuppressor:
@@ -2333,7 +2338,6 @@ async def start_proc(k, i):
 	return proc
 
 def proc_start():
-	import torch
 	globals()["DC"] = torch.cuda.device_count()
 	COMPUTE_LOAD = AUTH.get("compute_load", [])
 	if len(COMPUTE_LOAD) < DC:

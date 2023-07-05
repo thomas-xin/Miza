@@ -21,7 +21,8 @@ if not os.path.exists("auth.json") or not os.path.getsize("auth.json"):
         "giphy_key": "",
         "huggingface_key": "",
         "openai_key": "",
-        "backup_path": "backup"
+        "backup_path": "backup",
+        "cache_path": "",
     }
     import json
     with open("auth.json", "w", encoding="utf-8") as f:
