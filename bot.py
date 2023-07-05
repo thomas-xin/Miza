@@ -2994,8 +2994,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				os.remove(f2)
 				continue
 			break
-		lines = as_str(subprocess.run([sys.executable, "neutrino.py", "-c0", "../saves", "../" + fn], stderr=subprocess.PIPE, cwd="misc").stdout).splitlines()
-		s = "\n".join(line for line in lines if not line.startswith("\r"))
+		lines = as_str(subprocess.run([python, "neutrino.py", "-c0", "../saves", fn], stdout=subprocess.PIPE, cwd="misc").stdout).split("\n")
+		s = "\n".join(line.strip() for line in lines if not line.startswith("\r"))
 		print(s)
 		# zf = ZipFile(fn, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True)
 		# for x, y, z in os.walk("saves"):
@@ -3003,7 +3003,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		#         fp = os.path.join(x, f)
 		#         zf.write(fp, fp)
 		# zf.close()
-		print("Backup database created in", fn)
+		if os.path.exists(fn):
+			print("Backup database created in", fn)
+		else:
+			print("Backup database failed!", fn)
 		return fn
 
 	# Autosaves modified bot databases. Called once every minute and whenever the bot is about to shut down.
