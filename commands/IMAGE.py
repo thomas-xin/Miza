@@ -1662,8 +1662,9 @@ class Art(Command):
                         except PermissionError:
                             if not ims:
                                 raise
-                        ims2.extend(ims)
-                        ims = ims2
+                        if ims2:
+                            ims2.extend(ims)
+                            ims = ims2
                 futs.extend(ims)
                 amount2 = len(futs)
         if amount2 < amount:
