@@ -8,6 +8,7 @@ if os.path.exists("auth.json"):
 	cachedir = AUTH.get("cache_path") or None
 	if cachedir:
 		os.environ["HF_HOME"] = cachedir
+		os.environ["TORCH_HOME"] = cachedir
 		os.environ["HUGGINGFACE_HUB_CACHE"] = cachedir
 		os.environ["TRANSFORMERS_CACHE"] = cachedir
 		os.environ["HF_DATASETS_CACHE"] = cachedir
