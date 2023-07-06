@@ -14,6 +14,17 @@ if len(sys.argv) > 1:
 		import os
 		os.environ["CUDA_VISIBLE_DEVICES"] = device.split(":", 1)[-1]
 		device = "cuda:0"
+	if os.path.exists("auth.json"):
+		import json
+		with open("auth.json", "rb") as f:
+			AUTH = json.loads(f.read())
+		cachedir = AUTH.get("cache_path") or None
+		if cachedir:
+			os.environ["HF_HOME"] = f"{cachedir}/huggingface"
+			os.environ["TORCH_HOME"] = f"{cachedir}/torch"
+			os.environ["HUGGINGFACE_HUB_CACHE"] = f"{cachedir}/huggingface/hub"
+			os.environ["TRANSFORMERS_CACHE"] = f"{cachedir}/huggingface/transformers"
+			os.environ["HF_DATASETS_CACHE"] = f"{cachedir}/huggingface/datasets"
 	prompt = " ".join(["water"] * 64)
 	import torch, time
 	if 0:
