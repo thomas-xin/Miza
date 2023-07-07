@@ -3987,7 +3987,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				self.cache.messages[message.id] = message
 			return message
 
-	@tracebacksuppressor
+	@tracebacksuppressor(ConnectionError)
 	async def ignore_interaction(self, message):
 		if hasattr(message, "int_id"):
 			int_id, int_token = message.int_id, message.int_token
