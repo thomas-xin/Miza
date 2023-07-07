@@ -975,6 +975,7 @@ class Bot:
 									messages.append(m)
 									messages.append(dict(role="function", name=name, content=res or ""))
 									model = "gpt-4-0613" if model.startswith("gpt-4") else "gpt-3.5-turbo-0613"
+									searched = True
 									print("ChatGPT prompt:", messages)
 							elif name == "wolfram_alpha":
 								func = self.wolframalpha
@@ -988,6 +989,7 @@ class Bot:
 									messages.append(m)
 									messages.append(dict(role="function", name=name, content=res or ""))
 									model = "gpt-4-0613" if model.startswith("gpt-4") else "gpt-3.5-turbo-0613"
+									searched = True
 									print("ChatGPT prompt:", messages)
 							elif name == "stable_diffusion":
 								print("Stable Diffusion query:", argv)
@@ -1337,7 +1339,7 @@ class Bot:
 						costs = 1
 					ok = openai.api_key
 					flagged = False
-					if not i and (searched or not stop) and not bals and model.startswith("gpt-3.5-") and not self.nsfw and not self.jailbroken and not flagged and (not chat_history or len(self.gpttokens(q)) > 8):
+					if not i and not searched and not stop and not bals and model.startswith("gpt-3.5-") and not self.nsfw and not self.jailbroken and not flagged and (not chat_history or len(self.gpttokens(q)) > 8):
 						prompt = "\n\n".join(m["content"] if "name" not in m else f'{m["name"]}: {m["content"]}' for m in messages[1:] if m)
 						if not flagged and not stop:
 							if nstart and nstart[0] in "Yy":

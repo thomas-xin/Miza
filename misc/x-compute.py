@@ -2691,7 +2691,7 @@ elif len(sys.argv) > 1 and int(sys.argv[1]) >= 3:
 			p2 = None
 		return (p1, p2)
 
-	def IBASL(prompt, kwargs, nsfw=False, force=False, count=1):
+	def IBASL(prompt, kwargs, nsfw=False, force=True, count=1):
 		try:
 			ib = CBOTS[None]
 		except KeyError:
