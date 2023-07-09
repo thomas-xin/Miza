@@ -42,7 +42,7 @@ if os.path.exists("auth.json"):
 	webserver_port = AUTH.get("webserver_port") or "9801"
 else:
 	discord_secret = ""
-	webserver_port = AUTH.get("webserver_port") or "9801"
+	webserver_port = "9801"
 
 HEADERS = {
 	"X-Content-Type-Options": "nosniff",
