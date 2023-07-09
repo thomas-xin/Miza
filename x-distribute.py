@@ -143,7 +143,7 @@ def update_tasks(proc):
                     data=dict(
                         caps=orjson.dumps([proc.cap]),
                         resp=resp,
-                    )
+                    ),
                 )
                 data = resp.content
                 # resp = session.get(f"https://mizabot.xyz/api/distribute?caps=[{proc.cap}]&resp={resp}")
@@ -286,7 +286,7 @@ try:
                 data=dict(
                     caps=orjson.dumps(caps),
                     stat=stat,
-                )
+                ),
             )
             data = resp.content
             # resp = session.get(f"https://mizabot.xyz/api/distribute?caps={caps}&stat={stat}")

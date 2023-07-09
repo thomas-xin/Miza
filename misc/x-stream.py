@@ -136,7 +136,7 @@ class Server:
 		resp = self.session.get(
 			url,
 			headers=headers,
-			# data=cp.request.body.fp,
+			data=cp.request.body.fp.read(),
 			stream=True,
 			verify=False,
 		)
@@ -160,7 +160,7 @@ class Server:
 		resp = requests.get(
 			url,
 			headers=headers,
-			# data=cp.request.body.fp,
+			data=cp.request.body.fp.read(),
 			stream=True,
 			verify=False,
 		)
