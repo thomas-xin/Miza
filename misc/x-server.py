@@ -277,21 +277,21 @@ config = {
 	"/": {
 		"request.dispatch": EndpointRedirects(),
 		"request.error_response": error_handler,
-	}
+	},
 }
-# if os.path.exists("domain.cert.pem") and os.path.exists("private.key.pem"):
-# 	config["global"]["server.ssl_certificate"] = "domain.cert.pem"
-# 	config["global"]["server.ssl_private_key"] = "private.key.pem"
-# 	def hostmap(func):
-# 		def decorator(*args, **kwargs):
-# 			url = cp.url(qs=cp.request.query_string)
-# 			if not url.startswith("https://mizabot.") and not url.startswith("https://api.mizabot."):
-# 				if url.startswith("https://csnftcg.mizabot."):
-# 					raise cp.HTTPRedirect(f"https://csnftcg.mizabot.xyz:9604/{url.rsplit('/', 1)[-1]}", 307)
-# 				# time.sleep(10)
-# 				# raise cp.HTTPRedirect(f"https://mizabot.xyz/{url.rsplit('/', 1)[-1]}", 307)
-# 			return func(*args, **kwargs)
-# 		return decorator
+if os.path.exists("domain.cert.pem") and os.path.exists("private.key.pem"):
+	config["global"]["server.ssl_certificate"] = "domain.cert.pem"
+	config["global"]["server.ssl_private_key"] = "private.key.pem"
+	# def hostmap(func):
+	# 	def decorator(*args, **kwargs):
+	# 		url = cp.url(qs=cp.request.query_string)
+	# 		if not url.startswith("https://mizabot.") and not url.startswith("https://api.mizabot."):
+	# 			if url.startswith("https://csnftcg.mizabot."):
+	# 				raise cp.HTTPRedirect(f"https://csnftcg.mizabot.xyz:9604/{url.rsplit('/', 1)[-1]}", 307)
+	# 			# time.sleep(10)
+	# 			# raise cp.HTTPRedirect(f"https://mizabot.xyz/{url.rsplit('/', 1)[-1]}", 307)
+	# 		return func(*args, **kwargs)
+	# 	return decorator
 # 	def e404(status, message, traceback, version):
 # 		url = cp.url(qs=cp.request.query_string)
 # 		if not url.startswith("https://mizabot.") and not url.startswith("https://api.mizabot."):
@@ -2442,7 +2442,7 @@ alert("File successfully deleted. Returning to home.");
 		stat = orjson.loads(stat.replace("<IP>", true_ip()))
 		if not resp.startswith("{"):
 			resp = base64.urlsafe_b64decode(resp + "==")
-		resp = orjson.loads(resp)
+		resp = literal_eval(resp)
 		for k, v in resp.items():
 			if isinstance(v, str):
 				if v.startswith("ERR:"):

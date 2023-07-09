@@ -1336,7 +1336,9 @@ class Ask(Command):
 			self.visited.pop(next(iter(self.visited)))
 		for i, m, content, found, cfut in visconts:
 			if cfut:
-				pt, p1, p2 = await cfut
+				cfut = await cfut
+			if cfut:
+				pt, p1, p2 = cfut
 				p0 = found.split("?", 1)[0].rsplit("/", 1)[-1]
 				content += f" <{pt} {p0}:{p1}:{p2}>"
 				content = content.strip()

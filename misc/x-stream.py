@@ -5,6 +5,19 @@ import cherrypy as cp
 exc = concurrent.futures.ThreadPoolExecutor(max_workers=128)
 ADDRESS = "0.0.0.0"
 PORT = 8080
+from cherrypy._cpdispatch import Dispatcher
+
+class EndpointRedirects(Dispatcher):
+
+	def __call__(self, path):
+		p = path.strip("/")
+		if os.path.exists(f"misc/web/{p}"):
+			p = "static/" + p
+		elif p not in ("proxy", "stream"):
+			p = "backend/" + p
+		p = "/" + p
+		return super().__call__(p)
+
 config = {
 	"global": {
 		"server.socket_host": ADDRESS,
@@ -15,112 +28,81 @@ config = {
 		"server.ssl_module": "builtin",
 		"engine.autoreload_on": False,
 	},
+	"/": {
+		"request.dispatch": EndpointRedirects(),
+	},
 }
+if os.path.exists("domain.cert.pem") and os.path.exists("private.key.pem"):
+	config["global"]["server.ssl_certificate"] = "domain.cert.pem"
+	config["global"]["server.ssl_private_key"] = "private.key.pem"
+if os.path.exists("auth.json"):
+	with open("auth.json", "rb") as f:
+		AUTH = json.load(f)
+	discord_secret = AUTH.get("discord_secret") or ""
+else:
+	discord_secret = ""
+
+HEADERS = {
+	"X-Content-Type-Options": "nosniff",
+	"Server": "Miza",
+	"Vary": "Accept-Encoding",
+	"Accept-Ranges": "bytes",
+	"Access-Control-Allow-Headers": "*",
+	"Access-Control-Allow-Methods": "*",
+	"Access-Control-Allow-Origin": "*",
+}
+
+CHEADERS = {"Cache-Control": "public, max-age=3600, stale-while-revalidate=1073741824, stale-if-error=1073741824"}
+SHEADERS = {"Cache-Control": "public, max-age=5, stale-while-revalidate=1073741824, stale-if-error=1073741824"}
+CHEADERS.update(HEADERS)
+SHEADERS.update(HEADERS)
 
 
 class Server:
 
 	cache = {}
+	backend = "api.mizabot.xyz"
+	session = requests.Session()
 
-	_cpuinfo = None
-	up_bps = down_bps = 0
-	ip_time = 0
-	ip = "127.0.0.1"
 	@cp.expose
-	def stat(self, api=None, **kwargs):
-		if api == "ytdl" and "q" in kwargs:
-			if not getattr(self, "downloader", None):
-				spectralpulse = __file__.replace("\\", "/").rsplit("/", 1)[0] + "/spectralpulse"
-				sys.path.append(spectralpulse)
-				import audio_downloader
-				self.downloader = audio_downloader.AudioDownloader()
-			entries = self.downloader.search(kwargs["q"])
-			self.downloader.get_stream(entries[0], force=True, download=False)
-			return json.dumps(entries)
-		import psutil, cpuinfo
-		if time.time() - self.ip_time > 60:
-			fut = exc.submit(requests.get, "https://api.ipify.org", verify=False)
-			self.ip_time = time.time()
-		else:
-			fut = None
-		cinfo = self._cpuinfo
-		if not cinfo:
-			cinfo = self._cpuinfo = cpuinfo.get_cpu_info()
-		cpercent = psutil.cpu_percent()
-		try:
-			import torch, gpustat
-			ginfo = gpustat.new_query()
-		except:
-			ginfo = []
-		minfo = psutil.virtual_memory()
-		sinfo = psutil.swap_memory()
-		dinfo = {}
-		for p in psutil.disk_partitions(all=False):
-			try:
-				dinfo[p.mountpoint] = psutil.disk_usage(p.mountpoint)
-			except OSError:
-				pass
-		if fut:
-			resp = fut.result()
-			self.ip = resp.text
-		ip = self.ip
-		t = time.time()
-		def get_usage(gi):
-			try:
-				return float(gi["utilization.gpu"]) / 100
-			except ValueError:
-				pass
-			try:
-				return gi.power_draw / gi.power_limit
-			except (ValueError, TypeError, ZeroDivisionError):
-				return 0
-		def try_float(f):
-			try:
-				return float(f)
-			except ValueError:
-				return 0
-		return json.dumps(dict(
-			cpu={ip: dict(name=cinfo["brand_raw"], count=cinfo["count"], usage=cpercent / 100, max=1, time=t)},
-			gpu={f"{ip}-{gi['index']}": dict(
-				name=gi["name"],
-				count=torch.cuda.get_device_properties(gi["index"]).multi_processor_count,
-				usage=get_usage(gi),
-				max=1,
-				time=t,
-			) for gi in ginfo},
-			memory={
-				f"{ip}-v": dict(name="RAM", count=1, usage=minfo.used, max=minfo.total, time=t),
-				f"{ip}-s": dict(name="Swap", count=1, usage=sinfo.used, max=sinfo.total, time=t),
-				**{f"{ip}-{gi['index']}": dict(
-					name=gi["name"],
-					count=1,
-					usage=try_float(gi["memory.used"]) * 1048576,
-					max=try_float(gi["memory.total"]) * 1048576,
-					time=t,
-				) for gi in ginfo},
-			},
-			disk={f"{ip}-{k}": dict(name=k, count=1, usage=v.used, max=v.total, time=t) for k, v in dinfo.items()},
-			network={
-				ip: dict(name="Upstream", count=1, usage=self.up_bps, max=-1, time=t),
-				ip: dict(name="Downstream", count=1, usage=self.down_bps, max=-1, time=t),
-			},
-		))
+	def heartbeat(self, key):
+		assert key == discord_secret
+		self.backend = cp.request.remote.ip
+		return "💜"
 
-	def update_net(self):
-		ninter = 3
-		while True:
-			t = time.time()
-			net = psutil.net_io_counters()
-			if not hasattr(self, "up_bytes"):
-				self.up_bytes = deque(maxlen=3)
-				self.down_bytes = deque(maxlen=3)
-				self.start_up = -net.bytes_sent
-				self.start_down = -net.bytes_recv
-			self.up_bytes.append(net.bytes_sent)
-			self.down_bytes.append(net.bytes_recv)
-			self.up_bps = (self.up_bytes[-1] - self.up_bytes[0]) * 8 / len(self.up_bytes) / ninter
-			self.down_bps = (self.down_bytes[-1] - self.down_bytes[0]) * 8 / len(self.down_bytes) / ninter
-			time.sleep(max(0, t - time.time() + ninter))
+	@cp.expose
+	def static(self, *path):
+		rpath = "/".join(path)
+		rpath = "misc/web/" + path
+		cp.response.headers.update(CHEADERS)
+		if rpath in self.cache:
+			return self.cache[rpath]
+		with open(rpath, "rb") as f:
+			self.cache[rpath] = b = f.read()
+		return b
+
+	@cp.expose
+	@cp.tools.accept(media="multipart/form-data")
+	def backend(self, *path, **query):
+		rpath = "/".join(path)
+		if rpath:
+			rpath = "/" + rpath
+		rquery = "".join(f"&{k}={v}" for k, v in query.items())
+		if rquery:
+			rquery = "?" + rquery[1:]
+		url = f"http://{self.backend}{rpath}{rquery}"
+		headers = dict(cp.request.headers)
+		headers["X-Real-Ip"] = cp.request.remote.ip
+		resp = self.session.get(
+			url,
+			headers=headers,
+			data=cp.request.body.fp,
+			stream=True,
+		)
+		cp.response.headers.update(resp.headers)
+		cp.response.headers.pop("Connection", None)
+		cp.response.headers.pop("Transfer-Encoding", None)
+		return resp.iter_content(65536)
 
 	@cp.expose
 	def proxy(self, url=None):
@@ -134,7 +116,12 @@ class Server:
 		}
 		if cp.request.headers.get("Range"):
 			headers["Range"] = cp.request.headers["Range"]
-		resp = requests.get(url, headers=headers, stream=True)
+		resp = requests.get(
+			url,
+			headers=headers,
+			data=cp.request.body.fp,
+			stream=True,
+		)
 		cp.response.headers.update(resp.headers)
 		cp.response.headers.pop("Connection", None)
 		cp.response.headers.pop("Transfer-Encoding", None)
@@ -281,6 +268,9 @@ if __name__ == "__main__":
 	logging.basicConfig(level=logging.WARNING, format='%(asctime)s %(message)s')
 	app = Server()
 	self = server = cp.Application(app, "/", config)
-	exc.submit(app.update_net)
+	# exc.submit(app.update_net)
+	if os.path.exists("x-distribute.py"):
+		import subprocess
+		subprocess.Popen([sys.executable, "x-distribute.py"])
 	cp.quickstart(server, "/", config)
 	# waitress.serve(server, threads=128, host=ADDRESS, port=PORT, url_scheme="https")

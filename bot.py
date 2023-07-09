@@ -2585,18 +2585,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		self.total_hosted = size
 		return size
 
-	async def get_remote_stat(self, addr):
-		try:
-			b = await Request(
-				f"https://{addr}/stat/",
-				aio=True,
-				ssl=False,
-				timeout=5,
-			)
-			return orjson.loads(b)
-		except (asyncio.TimeoutError, asyncio.CancelledError):
-			return {}
-
 	compute_queue = {}
 	compute_wait = {}
 	def distribute(self, caps, stat, resp):
@@ -2702,12 +2690,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 	api_latency = inf
 	async def get_system_stats(self):
 		t = utc()
-		futs = []
+		# futs = []
 		fut = create_task(self.get_current_stats())
-		futs.append(fut)
-		# for addr in AUTH.get("remote-servers", ()):
-		#     fut = create_task(self.get_remote_stat(addr))
-		#     futs.append(fut)
+		# futs.append(fut)
 		try:
 			resp = await Request.sessions.next().head(f"https://discord.com/api/{api}", timeout=4)
 			self.api_latency = utc() - t
@@ -2729,18 +2714,20 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			np.sum(deque(self.size.values()), dtype=np.uint32, axis=0)
 			+ np.sum(deque(self.size2.values()), dtype=np.uint32, axis=0)
 		)
+		# for fut in futs:
+		with tracebacksuppressor:
+			system = await fut
+			for k, v in system.items():
+				self.status_data.system[k].update(v)
 		for fut in futs:
-			with tracebacksuppressor:
-				system = await fut
-				for k, v in system.items():
-					self.status_data.system[k].update(v)
+			await fut
 		for k, v in self.status_data.system.items():
 			for i, e in tuple(v.items()):
 				if t - e.get("time", 0) > 30:
 					v.pop(i)
 		self.status_data.update({
 			"discord": {
-				"Shard count": len(AUTH.get("remote-servers", ())) + 1,
+				"Shard count": len(self.status_data.system["cpu"]),
 				"Server count": len(self._guilds),
 				"User count": len(self.cache.users),
 				"Channel count": len(self.cache.channels),
@@ -4303,6 +4290,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		while not self.closed:
 			async with Delay(300):
 				async with tracebacksuppressor:
+					futs = []
+					for addr in AUTH.get("remote-servers", ()):
+						fut = create_task(Request(f"https://{addr}/heartbeat?key={AUTH.get('discord_secret') or ''}"))
+						futs.append(fut)
 					await asyncio.sleep(1)
 					with MemoryTimer("update_file_cache"):
 						await create_future(update_file_cache)
@@ -4331,6 +4322,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							)
 					with MemoryTimer("update"):
 						await create_future(self.update, priority=True)
+					for fut in futs:
+						with tracebacksuppressor:
+							await fut
 
 	# Heartbeat loop: Repeatedly renames a file to inform the watchdog process that the bot's event loop is still running.
 	@tracebacksuppressor
