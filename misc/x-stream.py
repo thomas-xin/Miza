@@ -86,21 +86,22 @@ MIMES = dict(
 
 class Server:
 
-	if os.path.exists("temp.tmp"):
-		with open("temp.tmp", "rb") as f:
-			cache = json.load(f)
+	cache = {}
+	if os.path.exists("temp.json"):
+		with open("temp.json", "rb") as f:
+			state = json.load(f)
 	else:
-		cache = {"/": f"api.mizabot.xyz:{webserver_port}"}
+		state = {"/": f"api.mizabot.xyz:{webserver_port}"}
 	session = requests.Session()
 
 	@cp.expose
 	def heartbeat(self, key):
 		assert key == discord_secret
 		uri = f"{cp.request.remote.ip}:{webserver_port}"
-		if self.cache["/"] != uri:
-			self.cache["/"] = uri
-			with open("temp.tmp", "w") as f:
-				json.dump(self.cache, f)
+		if self.state["/"] != uri:
+			self.state["/"] = uri
+			with open("temp.json", "w") as f:
+				json.dump(self.state, f)
 		return "💜"
 
 	@cp.expose
@@ -124,7 +125,7 @@ class Server:
 		rquery = "".join(f"&{k}={v}" for k, v in query.items())
 		if rquery:
 			rquery = "?" + rquery[1:]
-		url = f"http://{self.cache['/']}{rpath}{rquery}"
+		url = f"http://{self.state['/']}{rpath}{rquery}"
 		headers = dict(cp.request.headers)
 		headers["X-Real-Ip"] = cp.request.remote.ip
 		resp = self.session.get(
