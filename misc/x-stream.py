@@ -65,13 +65,13 @@ SHEADERS.update(HEADERS)
 class Server:
 
 	cache = {}
-	backend = f"api.mizabot.xyz:{webserver_port}"
+	api = f"api.mizabot.xyz:{webserver_port}"
 	session = requests.Session()
 
 	@cp.expose
 	def heartbeat(self, key):
 		assert key == discord_secret
-		self.backend = f"{cp.request.remote.ip}:{webserver_port}"
+		self.api = f"{cp.request.remote.ip}:{webserver_port}"
 		return "💜"
 
 	@cp.expose
@@ -94,7 +94,7 @@ class Server:
 		rquery = "".join(f"&{k}={v}" for k, v in query.items())
 		if rquery:
 			rquery = "?" + rquery[1:]
-		url = f"http://{self.backend}{rpath}{rquery}"
+		url = f"http://{self.api}{rpath}{rquery}"
 		headers = dict(cp.request.headers)
 		headers["X-Real-Ip"] = cp.request.remote.ip
 		resp = self.session.get(
