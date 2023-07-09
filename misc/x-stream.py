@@ -14,7 +14,7 @@ class EndpointRedirects(Dispatcher):
 		if not p:
 			p = "index.html"
 		if os.path.exists(f"misc/web/{p}"):
-			p = "static/" + p
+			p = "raw/" + p
 		elif p not in ("proxy", "stream"):
 			p = "backend/" + p
 		p = "/" + p
@@ -75,7 +75,7 @@ class Server:
 		return "💜"
 
 	@cp.expose
-	def static(self, *path):
+	def raw(self, *path):
 		rpath = "/".join(path)
 		rpath = "misc/web/" + rpath
 		cp.response.headers.update(CHEADERS)
