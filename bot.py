@@ -2719,8 +2719,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			system = await fut
 			for k, v in system.items():
 				self.status_data.system[k].update(v)
-		for fut in futs:
-			await fut
 		for k, v in self.status_data.system.items():
 			for i, e in tuple(v.items()):
 				if t - e.get("time", 0) > 30:
