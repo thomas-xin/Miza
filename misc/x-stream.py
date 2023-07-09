@@ -15,7 +15,7 @@ class EndpointRedirects(Dispatcher):
 			p = "index.html"
 		if os.path.exists(f"misc/web/{p}"):
 			p = "raw/" + p
-		elif p not in ("proxy", "stream"):
+		elif p not in ("proxy", "stream", "heartbeat"):
 			p = "backend/" + p
 		p = "/" + p
 		return super().__call__(p)
@@ -61,17 +61,46 @@ SHEADERS = {"Cache-Control": "public, max-age=5, stale-while-revalidate=10737418
 CHEADERS.update(HEADERS)
 SHEADERS.update(HEADERS)
 
+MIMES = cdict(
+	bin="application/octet-stream",
+	css="text/css",
+	json="application/json",
+	js="application/javascript",
+	txt="text/plain",
+	html="text/html",
+	svg="image/svg+xml",
+	ico="image/x-icon",
+	png="image/png",
+	jpg="image/jpeg",
+	gif="image/gif",
+	webp="image/webp",
+	webm="video/webm",
+	mp3="audio/mpeg",
+	ogg="audio/ogg",
+	opus="audio/opus",
+	flac="audio/flac",
+	wav="audio/x-wav",
+	mp4="video/mp4",
+)
+
 
 class Server:
 
-	cache = {}
-	api = f"api.mizabot.xyz:{webserver_port}"
+	if os.path.exists("temp.tmp"):
+		with open("temp.tmp", "rb") as f:
+			cache = json.load(f)
+	else:
+		cache = {"/": f"api.mizabot.xyz:{webserver_port}"}
 	session = requests.Session()
 
 	@cp.expose
 	def heartbeat(self, key):
 		assert key == discord_secret
-		self.api = f"{cp.request.remote.ip}:{webserver_port}"
+		uri = f"{cp.request.remote.ip}:{webserver_port}"
+		if self.cache["/"] != uri:
+			self.cache["/"] = uri
+			with open("temp.tmp", "w") as f:
+				json.dump(self.cache, f)
 		return "💜"
 
 	@cp.expose
@@ -79,6 +108,7 @@ class Server:
 		rpath = "/".join(path)
 		rpath = "misc/web/" + rpath
 		cp.response.headers.update(CHEADERS)
+		cp.response.headers["Content-Type"] = MIMES.get(rpath.rsplit(".", 1)[-1])) or "text/html"
 		if rpath in self.cache:
 			return self.cache[rpath]
 		with open(rpath, "rb") as f:
