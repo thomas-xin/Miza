@@ -132,6 +132,7 @@ class Server:
 		url = f"https://{self.state['/']}{rpath}{rquery}"
 		headers = dict(cp.request.headers)
 		headers["X-Real-Ip"] = cp.request.remote.ip
+		print(url)
 		resp = self.session.get(
 			url,
 			headers=headers,
@@ -161,6 +162,7 @@ class Server:
 			headers=headers,
 			data=cp.request.body.fp,
 			stream=True,
+			verify=False,
 		)
 		cp.response.headers.update(resp.headers)
 		cp.response.headers.pop("Connection", None)
