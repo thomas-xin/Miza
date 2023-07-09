@@ -61,7 +61,7 @@ SHEADERS = {"Cache-Control": "public, max-age=5, stale-while-revalidate=10737418
 CHEADERS.update(HEADERS)
 SHEADERS.update(HEADERS)
 
-MIMES = cdict(
+MIMES = dict(
 	bin="application/octet-stream",
 	css="text/css",
 	json="application/json",
