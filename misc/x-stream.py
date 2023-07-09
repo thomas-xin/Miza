@@ -11,6 +11,8 @@ class EndpointRedirects(Dispatcher):
 
 	def __call__(self, path):
 		p = path.strip("/")
+		if not p:
+			p = "index.html"
 		if os.path.exists(f"misc/web/{p}"):
 			p = "static/" + p
 		elif p not in ("proxy", "stream"):
@@ -75,7 +77,7 @@ class Server:
 	@cp.expose
 	def static(self, *path):
 		rpath = "/".join(path)
-		rpath = "misc/web/" + path
+		rpath = "misc/web/" + rpath
 		cp.response.headers.update(CHEADERS)
 		if rpath in self.cache:
 			return self.cache[rpath]
