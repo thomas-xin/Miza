@@ -1046,7 +1046,7 @@ class Bot:
 				# bitsandbytes = None
 			else:
 				m = "openaccess-ai-collective/hippogriff-30b-chat"
-				req = 30
+				req = 33
 				# bitsandbytes = None
 			try:
 				tokenizer, model = self.models[m]
@@ -1076,7 +1076,7 @@ class Bot:
 					print_exc()
 					tinfo = gmems = []
 				bit8 = [i for i, ti in enumerate(tinfo) if ti.major >= 8 or not bitsandbytes]
-				max_mem = {i: f"{round((gmems[i].total - gmems[i].used) / 1048576 - 2.5 * 1024)}MiB" for i in bit8}
+				max_mem = {i: f"{round((gmems[i].total - gmems[i].used) / 1048576 - 2 * 1024)}MiB" for i in bit8}
 				max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("MiB")) > 0}
 				rem = sum(int(v.removesuffix("MiB")) for v in max_mem.values()) / 1024 - req
 				# if rem < 1:
@@ -1097,15 +1097,15 @@ class Bot:
 				# 	max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) - 3 * 1024)}MiB" for i, gi in ginfo.items()}
 				# 	max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("MiB")) > 0}
 				cap = sum(int(v.removesuffix("MiB")) for v in max_mem.values()) / 1024
-				if cap > req * 1.2:
-					max_mem = {k: f"{round(int(v.removesuffix('MiB')) / 1.2)}MiB" for k, v in max_mem.items()}
+				if cap > req * 1.1:
+					max_mem = {k: f"{round(int(v.removesuffix('MiB')) / 1.1)}MiB" for k, v in max_mem.items()}
 					dti = torch.int8
 				else:
 					dti = torch.float16
 				max_mem["cpu"] = f"{round(psutil.virtual_memory().free / 1073741824 - 8)}GiB"
 				max_mem["disk"] = "1024GiB"
 				print(max_mem)
-				print(cap, req)
+				print(cap, req, dti)
 				if not bitsandbytes:
 					dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, no_split_module_classes=["LlamaDecoderLayer"], dtype=torch.float16)
 					model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, offload_folder="cache", torch_dtype=torch.float16)
