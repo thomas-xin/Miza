@@ -1102,15 +1102,15 @@ class Bot:
 					dti = torch.int8
 				else:
 					dti = torch.float16
-				for k in ("lm_head", "model.norm"):
-					if k in max_mem:
-						max_mem[k] = 0
 				max_mem["cpu"] = f"{round(psutil.virtual_memory().free / 1073741824 - 8)}GiB"
 				max_mem["disk"] = "1024GiB"
 				print(max_mem)
 				print(cap, req, dti)
 				if not bitsandbytes:
 					dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, no_split_module_classes=["LlamaDecoderLayer"], dtype=torch.float16)
+					for k in ("lm_head", "model.norm"):
+						if k in dev_map:
+							dev_map[k] = 0
 					model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, offload_folder="cache", torch_dtype=torch.float16)
 				else:
 					dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, no_split_module_classes=["LlamaDecoderLayer"], dtype=dti)
@@ -1122,6 +1122,9 @@ class Bot:
 						llm_int8_enable_fp32_cpu_offload=True,
 						llm_int8_has_fp16_weight=True
 					)
+					for k in ("lm_head", "model.norm"):
+						if k in dev_map:
+							dev_map[k] = 0
 					model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, offload_folder="cache", load_in_8bit=True, quantization_config=quantization_config)
 					# else:
 					# model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, load_in_8bit=True)
