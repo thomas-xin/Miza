@@ -1,6 +1,6 @@
 import os
-if os.name != "nt":
-    raise SystemExit("Compute distribution currently only supported on Windows due to drivers, sorry!")
+# if os.name != "nt":
+#     raise SystemExit("Compute distribution currently only supported on Windows due to drivers, sorry!")
 
 import sys
 from traceback import print_exc
@@ -135,6 +135,7 @@ def update_tasks(proc):
     def func():
         resps = {}
         while proc.is_running():
+            data = ()
             resp = base64.urlsafe_b64encode(repr(resps).encode("utf-8")).rstrip(b"=") if resps else "{}"
             try:
                 resp = session.post(
@@ -142,12 +143,16 @@ def update_tasks(proc):
                     data=dict(
                         caps=orjson.dumps([proc.cap]),
                         resp=resp,
-                    )
+                    ),
                 )
+                data = resp.content
                 # resp = session.get(f"https://mizabot.xyz/api/distribute?caps=[{proc.cap}]&resp={resp}")
                 resp.raise_for_status()
                 data = resp.json()
             except:
+                if data:
+                    print(resp.text)
+                data = ()
                 print_exc()
                 time.sleep(10)
             else:
@@ -274,18 +279,23 @@ try:
         ))
         caps = [proc.cap for proc in procs if not proc.busy or proc.busy.done()]
         stat = base64.urlsafe_b64encode(stats).rstrip(b"=")
+        data = ()
         try:
             resp = session.post(
                 "https://mizabot.xyz/api/distribute",
                 data=dict(
                     caps=orjson.dumps(caps),
                     stat=stat,
-                )
+                ),
             )
+            data = resp.content
             # resp = session.get(f"https://mizabot.xyz/api/distribute?caps={caps}&stat={stat}")
             resp.raise_for_status()
             data = resp.json()
         except:
+            if data:
+                print(resp.text)
+            data = ()
             print_exc()
             time.sleep(10)
         if data:

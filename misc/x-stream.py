@@ -11,11 +11,15 @@ class EndpointRedirects(Dispatcher):
 
 	def __call__(self, path):
 		p = path.strip("/")
-		if not p:
+		if p in (
+			"", "index", "home", "p", "preview", "files", "file",
+			"chat", "tester", "atlas", "mizatlas", "user", "login",
+			"logout", "mpinsights", "createredirect",
+		):
 			p = "index.html"
 		if os.path.exists(f"misc/web/{p}"):
 			p = "raw/" + p
-		elif p not in ("proxy", "stream", "heartbeat"):
+		elif p.split("/", 1)[0] not in ("proxy", "stream", "heartbeat", "backend"):
 			p = "backend/" + p
 		p = "/" + p
 		return super().__call__(p)
@@ -105,7 +109,7 @@ class Server:
 		return "💜"
 
 	@cp.expose
-	def raw(self, *path):
+	def raw(self, *path, **query):
 		rpath = "/".join(path)
 		rpath = "misc/web/" + rpath
 		cp.response.headers.update(CHEADERS)
@@ -117,7 +121,7 @@ class Server:
 		return b
 
 	@cp.expose
-	@cp.tools.accept(media="multipart/form-data")
+	# @cp.tools.accept(media="multipart/form-data")
 	def backend(self, *path, **query):
 		rpath = "/".join(path)
 		if rpath:
@@ -128,10 +132,11 @@ class Server:
 		url = f"https://{self.state['/']}{rpath}{rquery}"
 		headers = dict(cp.request.headers)
 		headers["X-Real-Ip"] = cp.request.remote.ip
+		print("BACKEND:", url)
 		resp = self.session.get(
 			url,
 			headers=headers,
-			data=cp.request.body.fp,
+			data=cp.request.body.fp.read(),
 			stream=True,
 			verify=False,
 		)
@@ -155,8 +160,9 @@ class Server:
 		resp = requests.get(
 			url,
 			headers=headers,
-			data=cp.request.body.fp,
+			data=cp.request.body.fp.read(),
 			stream=True,
+			verify=False,
 		)
 		cp.response.headers.update(resp.headers)
 		cp.response.headers.pop("Connection", None)
