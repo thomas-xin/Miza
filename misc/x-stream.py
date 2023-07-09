@@ -4,7 +4,7 @@ import cherrypy as cp
 
 exc = concurrent.futures.ThreadPoolExecutor(max_workers=128)
 ADDRESS = "0.0.0.0"
-PORT = 8080
+PORT = 443
 from cherrypy._cpdispatch import Dispatcher
 
 class EndpointRedirects(Dispatcher):
@@ -39,8 +39,10 @@ if os.path.exists("auth.json"):
 	with open("auth.json", "rb") as f:
 		AUTH = json.load(f)
 	discord_secret = AUTH.get("discord_secret") or ""
+	webserver_port = AUTH.get("webserver_port") or "9801"
 else:
 	discord_secret = ""
+	webserver_port = AUTH.get("webserver_port") or "9801"
 
 HEADERS = {
 	"X-Content-Type-Options": "nosniff",
@@ -61,13 +63,13 @@ SHEADERS.update(HEADERS)
 class Server:
 
 	cache = {}
-	backend = "api.mizabot.xyz"
+	backend = f"api.mizabot.xyz:{webserver_port}"
 	session = requests.Session()
 
 	@cp.expose
 	def heartbeat(self, key):
 		assert key == discord_secret
-		self.backend = cp.request.remote.ip
+		self.backend = f"{cp.request.remote.ip}:{webserver_port}"
 		return "💜"
 
 	@cp.expose
