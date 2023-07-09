@@ -5155,7 +5155,7 @@ class Download(Command):
                     download = None
                     if tuple(map(str, (start, end))) == ("None", "None") and not silenceremove and not auds and fmt in ("mp3", "opus", "ogg", "wav", "weba"):
                         # view = bot.raw_webserver + "/ytdl?fmt=" + fmt + "&view=" + url
-                        download =  f"http://127.0.0.1:{PORT}/ytdl?fmt={fmt}&download={url}"
+                        download =  f"https://127.0.0.1:{PORT}/ytdl?fmt={fmt}&download={url}"
                         entries = await create_future(ytdl.search, url)
                         if entries:
                             name = entries[0].get("name")

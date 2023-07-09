@@ -2542,7 +2542,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 	def update_ip(self, ip):
 		if regexp("^([0-9]{1,3}\\.){3}[0-9]{1,3}$").search(ip):
 			self.ip = ip
-			new_ip = f"http://{self.ip}:{PORT}"
+			new_ip = f"https://{self.ip}:{PORT}"
 			# if self.raw_webserver != self.webserver and self.raw_webserver != new_ip:
 			#     create_task(self.create_main_website())
 			# self.raw_webserver = new_ip
@@ -3639,7 +3639,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 	@tracebacksuppressor
 	async def process_http_command(self, t, name, nick, command):
-		url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f0"
+		url = f"https://127.0.0.1:{PORT}/commands/{t}\x7f0"
 		out = "[]"
 		message = SimulatedMessage(self, command, t, name, nick)
 		self.cache.users[message.author.id] = message.author
@@ -3655,13 +3655,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				await asyncio.sleep(0.1)
 			await self.react_callback(message, None, message.author)
 			out = orjson.dumps(list(message.response))
-		url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f{after}"
+		url = f"https://127.0.0.1:{PORT}/commands/{t}\x7f{after}"
 		await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, bypass=False, decode=True, aio=True, ssl=False)
 
 	@tracebacksuppressor
 	async def process_http_eval(self, t, proc):
 		glob = self._globals
-		url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f0"
+		url = f"https://127.0.0.1:{PORT}/commands/{t}\x7f0"
 		out = '{"result":null}'
 		code = None
 		with suppress(SyntaxError):
@@ -4313,7 +4313,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					if self.server_init:
 						with tracebacksuppressor:
 							await Request(
-								f"http://127.0.0.1:{PORT}/api_update_replacers",
+								f"https://127.0.0.1:{PORT}/api_update_replacers",
 								method="GET",
 								aio=True,
 								ssl=False,
@@ -6231,7 +6231,7 @@ def as_file(file, filename=None, ext=None, rename=True):
 		n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
 		key = base64.urlsafe_b64encode(n.to_bytes(8, "little")).rstrip(b"=").decode("ascii")
 		create_task(Request(
-			f"http://127.0.0.1:{PORT}/api_register_replacer?ts={out}&key={key}",
+			f"https://127.0.0.1:{PORT}/api_register_replacer?ts={out}&key={key}",
 			method="PUT",
 			aio=True,
 			ssl=False,
@@ -6255,7 +6255,7 @@ def as_file(file, filename=None, ext=None, rename=True):
 	return url1, url2
 
 def is_file(url):
-	for start in (f"{bot.raw_webserver}/", f"http://{bot.ip}:{PORT}/"):
+	for start in (f"{bot.raw_webserver}/", f"https://{bot.ip}:{PORT}/"):
 		if url.startswith(start):
 			u = url[len(start):]
 			endpoint = u.split("/", 1)[0]
@@ -6273,7 +6273,7 @@ def webserver_communicate(bot):
 			time.sleep(12)
 		time.sleep(3)
 		try:
-			assert reqs.next().get(f"http://127.0.0.1:{PORT}/ip", verify=False).content
+			assert reqs.next().get(f"https://127.0.0.1:{PORT}/ip", verify=False).content
 		except:
 			print_exc()
 			bot.start_webserver()
