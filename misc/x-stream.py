@@ -108,7 +108,7 @@ class Server:
 		rpath = "/".join(path)
 		rpath = "misc/web/" + rpath
 		cp.response.headers.update(CHEADERS)
-		cp.response.headers["Content-Type"] = MIMES.get(rpath.rsplit(".", 1)[-1])) or "text/html"
+		cp.response.headers["Content-Type"] = MIMES.get(rpath.rsplit(".", 1)[-1]) or "text/html"
 		if rpath in self.cache:
 			return self.cache[rpath]
 		with open(rpath, "rb") as f:
