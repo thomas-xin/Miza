@@ -121,13 +121,8 @@ class Server:
 		return b
 
 	@cp.expose
-	@cp.tools.accept(media="multipart/form-data")
+	# @cp.tools.accept(media="multipart/form-data")
 	def backend(self, *path, **query):
-		try:
-			body = cp.request.body.fp.read()
-		except:
-			print_exc()
-			body = None
 		rpath = "/".join(path)
 		if rpath:
 			rpath = "/" + rpath
@@ -135,16 +130,16 @@ class Server:
 		if rquery:
 			rquery = "?" + rquery
 		url = f"https://{self.state['/']}{rpath}{rquery}"
+		if cp.request.method.upper() != "GET":
+			raise cp.HTTPRedirect(url, 307)
 		headers = dict(cp.request.headers)
 		headers.pop("Connection", None)
 		headers.pop("Transfer-Encoding", None)
 		headers["X-Real-Ip"] = cp.request.remote.ip
 		print("BACKEND:", url)
-		resp = self.session.request(
-			cp.request.method.upper(),
+		resp = self.session.get(
 			url,
 			headers=headers,
-			data=body,
 			stream=True,
 			verify=False,
 		)
