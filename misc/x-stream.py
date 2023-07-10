@@ -32,7 +32,7 @@ config = {
 		"server.max_request_body_size": 0,
 		"server.socket_timeout": 65,
 		"server.ssl_module": "builtin",
-		"engine.autoreload_on": False,
+		"engine.autoreload_on": True,
 	},
 	"/": {
 		"request.dispatch": EndpointRedirects(),
@@ -131,9 +131,9 @@ class Server:
 		rpath = "/".join(path)
 		if rpath:
 			rpath = "/" + rpath
-		rquery = "".join(f"&{k}={v}" for k, v in query.items())
+		rquery = cp.request.query_string
 		if rquery:
-			rquery = "?" + rquery[1:]
+			rquery = "?" + rquery
 		url = f"https://{self.state['/']}{rpath}{rquery}"
 		headers = dict(cp.request.headers)
 		headers.pop("Connection", None)
