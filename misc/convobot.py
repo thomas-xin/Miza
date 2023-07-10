@@ -1114,7 +1114,7 @@ class Bot:
 				max_mem["cpu"] = f"{round(psutil.virtual_memory().free / 1073741824 - 8)}GiB"
 				max_mem["disk"] = "1024GiB"
 				print(max_mem)
-				print(cap, req, dti)
+				print(cap, req, dti, bitsandbytes)
 				if not bitsandbytes:
 					dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, no_split_module_classes=["LlamaDecoderLayer"], dtype=torch.float16)
 					for k in ("lm_head", "model.norm"):
@@ -1127,9 +1127,9 @@ class Bot:
 					from transformers import BitsAndBytesConfig
 					quantization_config = BitsAndBytesConfig(
 						load_in_8bit=True,
-						llm_int8_threshold=8.0,
+						llm_int8_threshold=6.0,
 						llm_int8_enable_fp32_cpu_offload=True,
-						llm_int8_has_fp16_weight=True
+						llm_int8_has_fp16_weight=False,
 					)
 					for k in ("lm_head", "model.norm"):
 						if k in dev_map:
