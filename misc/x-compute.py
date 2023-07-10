@@ -3215,7 +3215,7 @@ def evalImg(url, operation, args):
 def evaluate(ts, args):
 	try:
 		out = evalImg(*args)
-		if isinstance(out, (tuple, list)) and isinstance(out[0], io.BytesIO):
+		if out and isinstance(out, (tuple, list)) and isinstance(out[0], io.BytesIO):
 			out[0].seek(0)
 			out[0] = out[0].read()
 		elif isinstance(out, io.BytesIO):
