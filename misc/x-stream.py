@@ -131,6 +131,8 @@ class Server:
 			rquery = "?" + rquery[1:]
 		url = f"https://{self.state['/']}{rpath}{rquery}"
 		headers = dict(cp.request.headers)
+		headers.pop("Connection", None)
+		headers.pop("Transfer-Encoding", None)
 		headers["X-Real-Ip"] = cp.request.remote.ip
 		print("BACKEND:", url)
 		resp = self.session.get(
@@ -155,6 +157,8 @@ class Server:
 			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
 			"X-Real-Ip": ".".join(str(random.randint(1, 254)) for _ in range(4)),
 		}
+		headers.pop("Connection", None)
+		headers.pop("Transfer-Encoding", None)
 		if cp.request.headers.get("Range"):
 			headers["Range"] = cp.request.headers["Range"]
 		resp = requests.get(
@@ -311,8 +315,8 @@ if __name__ == "__main__":
 	app = Server()
 	self = server = cp.Application(app, "/", config)
 	# exc.submit(app.update_net)
-	if os.path.exists("x-distribute.py"):
-		import subprocess
-		subprocess.Popen([sys.executable, "x-distribute.py"])
+	# if os.path.exists("x-distribute.py"):
+	# 	import subprocess
+	# 	subprocess.Popen([sys.executable, "x-distribute.py"])
 	cp.quickstart(server, "/", config)
 	# waitress.serve(server, threads=128, host=ADDRESS, port=PORT, url_scheme="https")
