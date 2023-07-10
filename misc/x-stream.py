@@ -135,7 +135,8 @@ class Server:
 		headers.pop("Transfer-Encoding", None)
 		headers["X-Real-Ip"] = cp.request.remote.ip
 		print("BACKEND:", url)
-		resp = self.session.get(
+		resp = self.session.request(
+			cp.request.method.upper(),
 			url,
 			headers=headers,
 			data=cp.request.body.fp.read(),
@@ -161,7 +162,8 @@ class Server:
 		headers.pop("Transfer-Encoding", None)
 		if cp.request.headers.get("Range"):
 			headers["Range"] = cp.request.headers["Range"]
-		resp = requests.get(
+		resp = self.session.request(
+			cp.request.method.upper(),
 			url,
 			headers=headers,
 			data=cp.request.body.fp.read(),
