@@ -123,6 +123,11 @@ class Server:
 	@cp.expose
 	# @cp.tools.accept(media="multipart/form-data")
 	def backend(self, *path, **query):
+		try:
+			body = cp.request.body.fp.read()
+		except:
+			print_exc()
+			body = None
 		rpath = "/".join(path)
 		if rpath:
 			rpath = "/" + rpath
@@ -139,7 +144,7 @@ class Server:
 			cp.request.method.upper(),
 			url,
 			headers=headers,
-			data=cp.request.body.fp.read(),
+			data=body,
 			stream=True,
 			verify=False,
 		)
@@ -152,6 +157,11 @@ class Server:
 	def proxy(self, url=None):
 		if not url:
 			return "Expected proxy URL."
+		try:
+			body = cp.request.body.fp.read()
+		except:
+			print_exc()
+			body = None
 		headers = {
 			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
 			"DNT": "1",
@@ -166,7 +176,7 @@ class Server:
 			cp.request.method.upper(),
 			url,
 			headers=headers,
-			data=cp.request.body.fp.read(),
+			data=body,
 			stream=True,
 			verify=False,
 		)
