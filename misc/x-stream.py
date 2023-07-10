@@ -121,7 +121,7 @@ class Server:
 		return b
 
 	@cp.expose
-	# @cp.tools.accept(media="multipart/form-data")
+	@cp.tools.accept(media="multipart/form-data")
 	def backend(self, *path, **query):
 		try:
 			body = cp.request.body.fp.read()
@@ -154,6 +154,7 @@ class Server:
 		return resp.iter_content(65536)
 
 	@cp.expose
+	@cp.tools.accept(media="multipart/form-data")
 	def proxy(self, url=None):
 		if not url:
 			return "Expected proxy URL."
