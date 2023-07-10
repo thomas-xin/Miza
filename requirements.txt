@@ -53,4 +53,4 @@ torch>=2.0.0
 transformers>=4.27.4
 tsc_utils>=0.2.3
 wand>=0.6.11
-yt-dlp>=2023.6.22
+yt-dlp>=2023.7.6

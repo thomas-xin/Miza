@@ -738,23 +738,31 @@ class Bot:
 			temp = 0.8
 			limit = 2048
 			cm = 0
+		elif model == "instruct":
+			model = "gpt-3.5-turbo-instruct"
+			temp = 0.8
+			limit = 8000
+			cm = 15
+			longer = True
 		elif model == "davinci":
-			model = "text-davinci-003"
+			# model = "text-davinci-003"
+			model = "gpt-3.5-turbo-instruct"
 			temp = 0.8
 			limit = 3000
-			cm = 200
+			cm = 15
 			longer = True
 		elif model == "curie":
-			model = "text-curie-001"
+			# model = "text-curie-001"
+			model = "gpt-3.5-turbo-instruct"
 			temp = 0.7
 			limit = 3000
-			cm = 200
+			cm = 15
 			longer = True
 		elif model.startswith("gpt3"):
 			model = "gpt-3.5-turbo"
 			temp = 0.8
 			limit = 4000
-			cm = 20
+			cm = 15
 		else:
 			model = "gpt-4"
 			temp = 0.8
@@ -773,7 +781,7 @@ class Bot:
 		p = per
 		local_models = ("pygmalion-13b", "manticore-13b", "hippogriff-30b")
 		if self.name.casefold() not in p.casefold() and "you" not in p.casefold():
-			if model in ("gpt-3.5-turbo", "gpt-4", "text-davinci-003"):
+			if model in ("gpt-3.5-turbo", "gpt-4", "gpt-3.5-turbo-instruct"):
 				nstart = f"Your name is {self.name}; you are {p}. Express emotion when appropriate!"
 				if self.nsfw:
 					nstart = nstart.strip() + " " + MIZAAC
@@ -787,7 +795,7 @@ class Bot:
 				nstart = f"The following is a conversation between {self.name} and humans. {self.name} is {p} AI."
 		else:
 			nstart = p
-			if model in ("gpt-3.5-turbo", "gpt-4", "text-davinci-003") or model in local_models:
+			if model in ("gpt-3.5-turbo", "gpt-4", "gpt-3.5-turbo-instruct") or model in local_models:
 				if self.nsfw:
 					spl = nstart.rsplit("\n", 1)
 					nstart = nstart.strip() + " " + MIZAAC
@@ -1010,10 +1018,10 @@ class Bot:
 									limit = 2048
 									cm = 0
 								else:
-									model = "text-davinci-003"
+									model = "gpt-3.5-turbo-instruct"
 									temp = 0.8
 									limit = 3000
-									cm = 200
+									cm = 15
 		if model in local_models:
 			prompt = "".join(reversed(ins))
 			prompt = nstart + "\n<START>\n" + prompt
@@ -1293,8 +1301,8 @@ class Bot:
 					break
 			if not text:
 				print(resp.status_code, resp.text)
-				model = "text-curie-001"
-				cm = 20
+				model = "gpt-3.5-turbo-instruct"
+				cm = 15
 		elif model.startswith("gpt-3.5-turbo") or model.startswith("gpt-4"):
 			tries = 7
 			if premium < 2:
@@ -1449,7 +1457,7 @@ class Bot:
 				if not self.bl:
 					print("GPT prompt:", prompt)
 				sys.stdout.flush()
-				pc = len(self.gpttokens(prompt, "text-davinci-003"))
+				pc = len(self.gpttokens(prompt))
 			if oai:
 				openai.api_key = oai
 				costs = 0
@@ -1489,7 +1497,7 @@ class Bot:
 			if response:
 				print(response)
 				text = response.choices[0].text
-				rc = len(self.gpttokens(text, model="text-davinci-003"))
+				rc = len(self.gpttokens(text))
 				self.submit_cost(ok, (pc + rc) * cm)
 		text = text.strip()
 		if not self.bl:

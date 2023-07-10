@@ -55,15 +55,17 @@ for mn in req:
     except:
         subprocess.run([sys.executable, "-m", "pip", "install", mn, "--upgrade", "--user"])
 
-import time, base64, orjson, psutil, subprocess, threading, requests, concurrent.futures
+import time, base64, orjson, psutil, subprocess, threading, requests, urllib3, concurrent.futures
 from math import *
 session = requests.Session()
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # exc = concurrent.futures.ThreadPoolExecutor(max_workers=4 + benchmark.DC)
 
 new_tasks = {}
 procs = []
 PROC_RESP = {}
+FORWARD = "https://mizabot.xyz/api/distribute"
 
 def task_submit(proc, command, _timeout=12):
     ts = time.time_ns() // 1000
@@ -139,11 +141,12 @@ def update_tasks(proc):
             resp = base64.urlsafe_b64encode(repr(resps).encode("utf-8")).rstrip(b"=") if resps else "{}"
             try:
                 resp = session.post(
-                    "https://mizabot.xyz/api/distribute",
+                    FORWARD,
                     data=dict(
                         caps=orjson.dumps([proc.cap]),
                         resp=resp,
                     ),
+                    verify=False
                 )
                 data = resp.content
                 # resp = session.get(f"https://mizabot.xyz/api/distribute?caps=[{proc.cap}]&resp={resp}")
@@ -287,7 +290,9 @@ try:
                     caps=orjson.dumps(caps),
                     stat=stat,
                 ),
+                verify=False,
             )
+            FORWARD = resp.url
             data = resp.content
             # resp = session.get(f"https://mizabot.xyz/api/distribute?caps={caps}&stat={stat}")
             resp.raise_for_status()
