@@ -741,7 +741,7 @@ class Bot:
 		elif model == "instruct":
 			model = "gpt-3.5-turbo-instruct"
 			temp = 0.8
-			limit = 8000
+			limit = 4096
 			cm = 15
 			longer = True
 		elif model == "davinci":

@@ -302,7 +302,7 @@ try:
                 print(resp.text)
             data = ()
             print_exc()
-            time.sleep(10)
+            time.sleep(20)
         if data:
             print(data)
         for task in data:
@@ -313,7 +313,7 @@ try:
                 if proc.waiting:
                     proc.waiting.set_result(None)
                     proc.waiting = None
-        time.sleep(1)
+        time.sleep(5)
 except:
     print_exc()
 finally:
