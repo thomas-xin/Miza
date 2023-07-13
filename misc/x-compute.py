@@ -771,7 +771,10 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
 					size = (960, 540)
 		fn2 = fn + ".gif"
 		f_in = fn if direct else url
-		command = ["./ffmpeg", "-threads", "2", "-hide_banner", "-nostdin", "-v", "error", "-y", "-hwaccel", hwaccel, "-i", f_in, "-vf"]
+		command = ["./ffmpeg", "-threads", "2", "-hide_banner", "-nostdin", "-v", "error", "-y", "-hwaccel", hwaccel]
+		if hwaccel == "cuda":
+			command.extend(("-hwaccel_device", str(random.randint(0, ceil(torch.cuda.device_count() / 2)))))
+		command.extend(("-i", f_in, "-vf"))
 		w, h = max_size(*size, maxsize)
 		fps = fps or orig_fps or 30
 		step = 1
@@ -3093,11 +3096,13 @@ def evalImg(url, operation, args):
 			if fmt == "zip":
 				resp = zipfile.ZipFile(out, "w", compression=zipfile.ZIP_STORED, allowZip64=True)
 			else:
-				command = [
-					"./ffmpeg", "-threads", "2", "-hide_banner", "-v", "error", "-y", "-hwaccel", hwaccel,
+				command = ["./ffmpeg", "-threads", "2", "-hide_banner", "-v", "error", "-y", "-hwaccel", hwaccel]
+				if hwaccel == "cuda":
+					command.extend(("-hwaccel_device", str(random.randint(0, ceil(torch.cuda.device_count() / 2)))))
+				command.extend([
 					"-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", ("rgb24" if mode == "RGB" else "rgba"),
 					"-video_size", "x".join(map(str, size)), "-i", "-",
-				]
+				])
 				if fmt in ("gif", "apng"):
 					command.extend(("-gifflags", "-offsetting"))
 					if new["count"] > 4096:

@@ -2481,11 +2481,11 @@ class AudioDownloader:
                 args.extend(("-to", str(end)))
         args.extend(("-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", "rgb24", "-video_size", "x".join(map(str, size)), "-i", "-", "-an", "-pix_fmt", "yuv420p", "-crf", "28"))
         afile = f"cache/-{ts}-.pcm"
-		if hwaccel == "cuda":
-			if fmt == "mp4":
-				args.extend(("-c:v", "h264_nvenc"))
-			elif fmt == "webm":
-				args.extend(("-c:v", "av1_nvenc"))
+        if hwaccel == "cuda":
+            if fmt == "mp4":
+                args.extend(("-c:v", "h264_nvenc"))
+            elif fmt == "webm":
+                args.extend(("-c:v", "av1_nvenc"))
         if len(urls) > 1:
             outf = f"{info['name']} +{len(urls) - 1}.{fmt}"
         else:
@@ -2694,6 +2694,8 @@ class AudioDownloader:
             else:
                 copy = False
             args = alist((ffmpeg, "-nostdin", "-hide_banner", "-v", "error", "-hwaccel", hwaccel, "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y", "-protocol_whitelist", "file,http,https,tcp,tls"))
+            if hwaccel == "cuda":
+                command.extend(("-hwaccel_device", str(random.randint(0, ceil(torch.cuda.device_count() / 2)))))
             if vst:
                 if len(vst) > 1:
                     codec_map = {}
@@ -2819,18 +2821,18 @@ class AudioDownloader:
                 c = "-c:v" if size else "-c"
                 if container == "mkv":
                     container = "matroska"
-				if hwaccel == "cuda":
-					if fmt == "mp4":
-						fmt = "h264_nvenc"
-					elif fmt == "webm":
-						fmt = av1_nvenc"
+                if hwaccel == "cuda":
+                    if fmt == "mp4":
+                        fmt = "h264_nvenc"
+                    elif fmt == "webm":
+                        fmt = "av1_nvenc"
                 args.extend(("-f", container, c, fmt, "-strict", "-2", fn))
             else:
-				if hwaccel == "cuda":
-					if fmt == "mp4":
-						args.extend(("-c:v", "h264_nvenc"))
-					elif fmt == "webm":
-						args.extend(("-c:v", "av1_nvenc"))
+                if hwaccel == "cuda":
+                    if fmt == "mp4":
+                        args.extend(("-c:v", "h264_nvenc"))
+                    elif fmt == "webm":
+                        args.extend(("-c:v", "av1_nvenc"))
                 args.extend(("-f", fmt, fn))
             print(args)
             try:
