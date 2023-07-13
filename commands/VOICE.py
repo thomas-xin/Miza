@@ -2481,6 +2481,11 @@ class AudioDownloader:
                 args.extend(("-to", str(end)))
         args.extend(("-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", "rgb24", "-video_size", "x".join(map(str, size)), "-i", "-", "-an", "-pix_fmt", "yuv420p", "-crf", "28"))
         afile = f"cache/-{ts}-.pcm"
+		if hwaccel == "cuda":
+			if fmt == "mp4":
+				args.extend(("-c:v", "h264_nvenc"))
+			elif fmt == "webm":
+				args.extend(("-c:v", "av1_nvenc"))
         if len(urls) > 1:
             outf = f"{info['name']} +{len(urls) - 1}.{fmt}"
         else:
@@ -2814,8 +2819,18 @@ class AudioDownloader:
                 c = "-c:v" if size else "-c"
                 if container == "mkv":
                     container = "matroska"
+				if hwaccel == "cuda":
+					if fmt == "mp4":
+						fmt = "h264_nvenc"
+					elif fmt == "webm":
+						fmt = av1_nvenc"
                 args.extend(("-f", container, c, fmt, "-strict", "-2", fn))
             else:
+				if hwaccel == "cuda":
+					if fmt == "mp4":
+						args.extend(("-c:v", "h264_nvenc"))
+					elif fmt == "webm":
+						args.extend(("-c:v", "av1_nvenc"))
                 args.extend(("-f", fmt, fn))
             print(args)
             try:

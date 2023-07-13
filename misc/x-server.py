@@ -1812,9 +1812,11 @@ transform: translate(-50%, -50%);
 			if dur <= 60:
 				fmt = "webm"
 				fo = f"{of}.{fmt}"
+				if hwaccel == "cuda":
+					args.extend(("-c:v", "av1_nvenc"))
+				else:
+					args.extend(("-c:v", "libsvtav1"))
 				args.extend((
-					"-c:v",
-					"libsvtav1",
 					"-crf",
 					"42",
 					fo,
@@ -1822,9 +1824,11 @@ transform: translate(-50%, -50%);
 			else:
 				fmt = "mp4"
 				fo = f"{of}.{fmt}"
+				if hwaccel == "cuda":
+					args.extend(("-c:v", "h264_nvenc"))
+				else:
+					args.extend(("-c:v", "h264"))
 				args.extend((
-					"-c:v",
-					"h264",
 					"-crf",
 					"30",
 					fo,

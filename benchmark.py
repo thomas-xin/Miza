@@ -84,16 +84,20 @@ if len(sys.argv) > 1:
 	im = data.images[0]
 	im.save(f"{name} ({core}-core, {memc} GB).png")
 	tavg = taken
-	avg = count / tavg * 100000
+	diffs = [temp[i] - temp[i - 1] for i in range(1, len(temp))]
+	iavg = sum(diffs) / len(diffs)
+	wavg = [n for n in diffs if n <= iavg]
+	avg = sum(wavg) / len(wavg)
+	score = 100000 / avg
 	cc = f"{core}-core"
 	cc = srgb(0, 255, 0, cc) if core >= 4096 else srgb(255, 255, 0, cc) if core >= 16 else srgb(255, 127, 0, cc) if core >= 8 else srgb(255, 0, 0, cc)
 	gb = f"{memc} GB"
 	gb = srgb(0, 255, 0, gb) if memc > 11 else srgb(255, 255, 0, gb) if memc >= 7 else srgb(255, 127, 0, gb) if memc > 3 else srgb(255, 0, 0, gb)
-	print(f"Benchmarked {srgb(0, 255, 255, name)} ({cc}, {gb}). Average time taken for {count} iteration(s): {tavg}s")
-	sc = f"Score: {round(avg, 2)}"
-	sc = srgb(0, 255, 0, sc) if avg >= 1000000 else srgb(255, 255, 0, sc) if avg >= 300000 else srgb(255, 127, 0, sc) if avg >= 90000 else srgb(255, 0, 0, sc)
+	print(f"Benchmarked {srgb(0, 255, 255, name)} ({cc}, {gb}). Weighted average time taken across {count} iteration(s): {avg}s")
+	sc = f"Score: {round(score, 2)}"
+	sc = srgb(0, 255, 0, sc) if score >= 1000000 else srgb(255, 255, 0, sc) if score >= 300000 else srgb(255, 127, 0, sc) if score >= 90000 else srgb(255, 0, 0, sc)
 	print(sc)
-	print(avg)
+	print(score)
 	raise SystemExit
 
 import subprocess
@@ -165,17 +169,23 @@ if keep:
 	args = [sys.executable, sys.argv[0], "cpu", info["brand_raw"], str(info["count"]), str(mem)]
 	proc = subprocess.Popen(args, stdout=subprocess.PIPE)
 	procs.append(proc)
-	for i in range(DC):
+	outs = []
+	for i in list(range(DC)[::2]) + list(range(DC)[1::2]):
+		# if len(procs) > 2:
+			# proc = procs.pop(0)
+			# proc.wait()
+			# outs.append(proc)
 		info = pynvml.nvmlDeviceGetHandleByIndex(i)
 		mem = torch.cuda.get_device_properties(i).total_memory
 		# mems.append(mem)
 		args = [sys.executable, sys.argv[0], f"cuda:{i}", pynvml.nvmlDeviceGetName(info), str(pynvml.nvmlDeviceGetNumGpuCores(info)), str(mem)]
 		proc = subprocess.Popen(args, stdout=subprocess.PIPE)
 		procs.append(proc)
+	outs.extend(procs)
 
 	print()
 	compute_load = []
-	for n, proc in enumerate(procs):
+	for n, proc in enumerate(outs):
 		s = proc.stdout.readlines()
 		avg = float(s.pop(-1))
 		# avgs.append(avg)
@@ -190,9 +200,11 @@ if keep:
 
 if keep:
 	import json
-	with open("auth.json", "r+", encoding="utf-8") as f:
+	with open("auth.json", "rb+") as f:
 		data = json.load(f)
 		data["compute_load"] = compute_load
+		b = json.dumps(data, indent="\t").encode("utf-8")
+		f.truncate(len(b))
 		f.seek(0)
-		json.dump(data, f, indent="\t")
+		f.write(b)
 		print(srgb(0, 255, 0, "Results written to `auth.json`."))

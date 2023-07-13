@@ -785,7 +785,13 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
 		if w != size[0]:
 			vf += "scale=" + str(round(w)) + ":-1:flags=lanczos,"
 		vf += "split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle"
-		command.extend([vf, "-loop", "0", "-framerate", str(fps), out])
+		command.extend([vf, "-loop", "0", "-framerate", str(fps)])
+		if hwaccel == "cuda":
+			if out.endswith(".mp4"):
+				args.extend(("-c:v", "h264_nvenc"))
+			elif out.endswith(".webm"):
+				args.extend(("-c:v", "av1_nvenc"))
+		command.append(out)
 		print(command)
 		subprocess.check_output(command)
 		if direct:
@@ -3134,10 +3140,16 @@ def evalImg(url, operation, args):
 						crf = max(24, min(51, round(log(np.prod(size), 2) * 6 - 92)))
 					command.extend(("-crf", str(crf), "-pix_fmt"))
 					if mode == "RGBA":
-						command.extend(("yuva420p", "-c:v", "libsvtav1"))
+						if hwaccel == "cuda":
+							command.extend(("yuv420p", "-c:v", "av1_nvenc"))
+						else:
+							command.extend(("yuv420p", "-c:v", "libsvtav1"))
 						fmt = "webm"
 					else:
-						command.extend(("yuv420p", "-c:v", "h264"))
+						if hwaccel == "cuda":
+							command.extend(("yuv420p", "-c:v", "h264_nvenc"))
+						else:
+							command.extend(("yuv420p", "-c:v", "h264"))
 						fmt = "mp4"
 					# command.append("-shortest")
 					out = "cache/" + str(ts) + "." + fmt
