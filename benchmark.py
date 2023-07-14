@@ -180,18 +180,19 @@ if keep:
 		# mems.append(mem)
 		args = [sys.executable, sys.argv[0], f"cuda:{i}", pynvml.nvmlDeviceGetName(info), str(pynvml.nvmlDeviceGetNumGpuCores(info)), str(mem)]
 		proc = subprocess.Popen(args, stdout=subprocess.PIPE)
+		proc.i = i
 		procs.append(proc)
 	outs.extend(procs)
 
 	print()
-	compute_load = []
+	compute_load = [0] * len(outs)
 	for n, proc in enumerate(outs):
 		s = proc.stdout.readlines()
 		avg = float(s.pop(-1))
 		# avgs.append(avg)
 		total += avg
 		if n:
-			compute_load.append(avg)
+			compute_load[proc.i] = avg
 		print(b"".join(s).decode("utf-8"))
 	print(srgb(0, 255, 0, f"Benchmark complete. Total score: {round(total, 2)}"))
 
