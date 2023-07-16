@@ -571,9 +571,9 @@ class Bot:
 					device = -1
 					dtype = torch.float32
 		data = self.art_stablediffusion_sub(pf, model, prompt, kwargs, count, device, dtype, nsfw, fail_unless_gpu)
-		if not data:
+		if not data or not data.images:
 			return ()
-		nsfw_content_detected = [data.nsfw_content_detected] if isinstance(data.nsfw_content_detected, bool) else data.nsfw_content_detected
+		nsfw_content_detected = [data.nsfw_content_detected] if not isinstance(data.nsfw_content_detected, (list, tuple)) else data.nsfw_content_detected
 		for im, n in zip(data.images, nsfw_content_detected):
 			if n:
 				continue

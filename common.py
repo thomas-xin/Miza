@@ -2415,6 +2415,8 @@ async def wait_sub():
 	if utc() - last_sub < 1800:
 		return
 	globals()["last_sub"] = utc()
+	if any(proc.sem.busy for proc in PROCS.compute if proc):
+		return
 	return await create_future(sub_kill)
 
 def sub_kill(start=True, force=False):

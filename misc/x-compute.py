@@ -2720,9 +2720,6 @@ elif len(sys.argv) > 1 and int(sys.argv[1]) >= 3:
 	# 	lines = [line for line in proc.stdout.read().decode("utf-8").splitlines() if line.startswith("[")]
 	# 	lineobjs = []
 
-else:
-	del torch
-
 def rank_embeddings(embs, emb, temp=0.5):
 	btest = base64.b64decode(emb)
 	y = np.frombuffer(btest, dtype=np.float16)
