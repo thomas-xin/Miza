@@ -1366,7 +1366,10 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
 				for a in message.attachments:
 					print("<attachment>", a.url)
 				return message
-			print_exc()
+			if isinstance(ex, SemaphoreOverflowError):
+				print("send_with_reply:", repr(ex))
+			else:
+				print_exc()
 		else:
 			if not resp:
 				if url.endswith("/callback") and hasattr(reference, "slash"):

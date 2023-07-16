@@ -1006,22 +1006,30 @@ class CreateGIF(Command):
         elif delay and delay >= 16777216:
             raise OverflowError("GIF image framerate too low.")
         with discord.context_managers.Typing(channel):
-            video = None
-            for i, url in enumerate(args):
+            found = []
+            links = args.copy()
+            while links:
+                url = links.pop(0)
+                if is_discord_url(url):
+                    urls = await bot.follow_url(url, best=True, allow=True, reactions=False, limit=None)
+                    found.extend(urls)
+                    continue
                 urls = await bot.follow_url(url, best=True, allow=True, limit=1)
                 url = urls[0]
-                if "discord" not in url and "channels" not in url:
+                if "channels" not in url:
                     with tracebacksuppressor:
                         url, size, dur, fps = await create_future(get_video, url, None, timeout=60)
                         if size and dur and fps:
-                            video = (url, size, dur, fps)
+                            # video = (url, size, dur, fps)
+                            delay = delay or 1000 / fps
                 if not url:
-                    raise ArgumentError(f'Invalid URL detected: "{url}".')
-                args[i] = url
+                    continue
+                    # raise ArgumentError(f'Invalid URL detected: "{urls[0]}".')
+                found.append(url)
             filename = "unknown." + fmt
-            if video is None:
-                video = args
-            resp = await process_image("create_gif", "$", ["image", args, delay, "-f", fmt], timeout=_timeout)
+            # if video is None:
+            #     video = args
+            resp = await process_image("create_gif", "$", ["image", found, delay, "-f", fmt], timeout=_timeout)
             fn = resp
         await bot.send_with_file(channel, "", fn, filename=filename, reference=message, reacts="🔳")
 
@@ -1486,7 +1494,7 @@ class OCR(Command):
 
 class Art(Command):
     _timeout_ = 150
-    name = ["AIArt", "Inpaint", "StableDiffusion", "Dalle", "Dalle2", "Imagine", "Inspire", "Openjourney", "Midjourney"]
+    name = ["AIArt", "Inpaint", "StableDiffusion", "Dalle", "Dalle2", "Dream", "Imagine", "Inspire", "Openjourney", "Midjourney"]
     description = "Runs a Stable Diffusion AI art generator on the input prompt or image. Operates on a global queue system for image prompts. Accepts appropriate keyword arguments."
     usage = "<0:prompt> <inpaint{?i}>"
     example = ("art cute kitten", "art https://mizabot.xyz/favicon")

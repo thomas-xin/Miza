@@ -833,8 +833,8 @@ def create_gif(in_type, args, delay):
 			for f in range(2147483648):
 				try:
 					img.seek(f)
-					length = f
 				except EOFError:
+					length = f
 					break
 			if length and not delay:
 				delay = img.info.get("duration") or delay or 50
