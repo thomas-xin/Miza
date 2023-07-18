@@ -2284,8 +2284,12 @@ async def proc_distribute(proc):
 			if not is_strict_running(proc):
 				return
 			if not tasks:
-				await wrap_future(proc.fut)
-				proc.fut = concurrent.futures.Future()
+				try:
+					await asyncio.wait_for(wrap_future(proc.fut), timeout=5)
+				except (T0, T1, T2):
+					pass
+				else:
+					proc.fut = concurrent.futures.Future()
 				tasks = bot.distribute([proc.cap], [proc.pwr], {}, {})
 				if not tasks:
 					await asyncio.sleep(1 / 24)
