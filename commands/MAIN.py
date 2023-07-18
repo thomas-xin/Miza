@@ -1935,6 +1935,7 @@ class UpdateUsers(Database):
                 pass
             except:
                 print_exc()
+				continue
             print(f"Deleting {key} from {self}...")
             data.pop(key, None)
 

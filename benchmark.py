@@ -3,8 +3,6 @@ import os, sys
 os.system("color")
 srgb = lambda r, g, b, s: f"\033[38;2;{r};{g};{b}m{s}\033[0m"
 
-print(srgb(0, 0, 255, "Scanning hardware..."))
-
 if len(sys.argv) > 1:
 	device, name, core, mem = sys.argv[1:]
 	core, mem = int(core), int(mem)
@@ -27,34 +25,6 @@ if len(sys.argv) > 1:
 			os.environ["HF_DATASETS_CACHE"] = f"{cachedir}/huggingface/datasets"
 	prompt = " ".join(["water"] * 64)
 	import torch, time
-	if 0:
-		from transformers import AutoTokenizer, AutoModelForCausalLM, AutoConfig
-		import accelerate
-		m = "Neko-Institute-of-Science/pygmalion-7b"
-		tokenizer = AutoTokenizer.from_pretrained(m)
-		import bitsandbytes
-		config = AutoConfig.from_pretrained(m)
-		# dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, dtype=torch.float16)
-		# from transformers import BitsAndBytesConfig
-		# quantization_config = BitsAndBytesConfig(
-			# load_in_8bit=True,
-			# llm_int8_threshold=8.0,
-			# llm_int8_enable_fp32_cpu_offload=True,
-			# llm_int8_has_fp16_weight=True
-		# )
-		model = AutoModelForCausalLM.from_pretrained(m, device_map="auto", load_in_8bit=is_cuda)
-		tokens = tokenizer.encode(prompt, return_tensors="pt").cuda()
-		res = model.generate(
-			tokens,
-			temperature=1,
-			top_k=192,
-			top_p=1,
-			max_length=1024,
-		)
-		text = tokenizer.decode(res[0])
-		print(text)
-		print(0)
-		raise SystemExit
 	from diffusers import StableDiffusionPipeline, DPMSolverMultistepScheduler
 	model = "runwayml/stable-diffusion-v1-5"
 	pipe = StableDiffusionPipeline.from_pretrained(model, torch_dtype=torch.float16 if is_cuda else torch.float32)
@@ -99,6 +69,8 @@ if len(sys.argv) > 1:
 	print(sc)
 	print(score)
 	raise SystemExit
+
+print(srgb(0, 0, 255, "Scanning hardware..."))
 
 import subprocess
 try:
@@ -186,6 +158,7 @@ if keep:
 
 	print()
 	compute_load = [0] * len(outs)
+	olines = []
 	for n, proc in enumerate(outs):
 		s = proc.stdout.readlines()
 		avg = float(s.pop(-1))
@@ -193,7 +166,8 @@ if keep:
 		total += avg
 		if n:
 			compute_load[proc.i] = avg
-		print(b"".join(s).decode("utf-8"))
+		olines.append(b"".join(s).decode("utf-8"))
+	print("\n".join(olines))
 	print(srgb(0, 255, 0, f"Benchmark complete. Total score: {round(total, 2)}"))
 
 	if not os.path.exists("auth.json"):
