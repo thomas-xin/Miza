@@ -2609,7 +2609,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					continue
 			rem = []
 			task = misc.pop()
-			while task.pwr > p and random.random() * task.pwr > p:
+			while task.pwr > p and round_random(p / task.pwr) >= 1:
 				if not misc:
 					misc.update(rem)
 					task = None

@@ -124,7 +124,7 @@ def get_driver():
 		driver = create_driver()
 	else:
 		try:
-			exc.submit(getattr, driver, "title").result(timeout=0.25)
+			exc.submit(getattr, driver, "title").result(timeout=0.5)
 		except:
 			print_exc()
 			driver = create_driver()
