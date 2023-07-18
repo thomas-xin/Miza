@@ -1457,7 +1457,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		except (LookupError, TypeError):
 			pass
 		try:
-			p1, p2 = await process_image(url, "caption", ["-nogif", best], fix=3, timeout=300)
+			p1, p2 = await process_image(url, "caption", ["-nogif", best], fix=3, pwr=1000000 if best else 1, timeout=300)
 		except:
 			print_exc()
 			tup = None

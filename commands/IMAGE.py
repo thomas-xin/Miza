@@ -1590,9 +1590,7 @@ class Art(Command):
         if not prompt:
             if not url:
                 raise ArgumentError("Please input a valid prompt.")
-            best = premium >= 4
-            pwr = 1000000 if best else 1
-            pt, p1, p2 = await bot.caption(url, best=best, pwr=pwr)
+            pt, p1, p2 = await bot.caption(url, best=premium >= 4)
             prompt = "\n".join((p1, p2))
             if not prompt:
                 prompt = "art"
