@@ -1727,7 +1727,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			return data
 		if not full:
 			return await create_future(reqs.next().get, url, stream=True)
-		return await Request(url, timeout=timeout, aio=True)
+		return await Request(url, timeout=timeout, aio=True, ssl=False)
 
 	def get_colour(self, user):
 		if user is None:
