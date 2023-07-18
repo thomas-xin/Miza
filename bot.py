@@ -2610,10 +2610,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			rem = []
 			task = misc.pop()
 			while task.pwr > p and round_random(p / task.pwr) < 1:
+				rem.append(task)
 				if not misc:
 					task = None
 					break
-				rem.append(task)
 				task = misc.pop()
 				continue
 			misc.update(rem)
