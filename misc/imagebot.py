@@ -755,7 +755,7 @@ class Bot:
 		ims = []
 		i = 0
 		while not elems:
-			if i >= 60 and ims:
+			if i >= 90 and ims:
 				break
 			if i >= 180:
 				print("ClipDrop: unavailable")
@@ -763,7 +763,7 @@ class Bot:
 			elems = driver.find_elements(by=tag_name, value="img")
 			for e in reversed(elems):
 				a = e.get_attribute("src")
-				if a.startswith("blob:https://clipdrop.co/"):
+				if e not in ims and a.startswith("blob:https://clipdrop.co/"):
 					ims.append(e)
 					if len(ims) >= 4:
 						break
@@ -818,7 +818,7 @@ class Bot:
 		funceff = [random.choice(funcs) for i in range(count - 1)]
 		funceff.insert(0, funcs[0])
 		if count > 1 and not specified and not url and os.name == "nt":
-			funceff = [(self.art_clipdrop, 4)] * 4 + [(a, min(b, 3)) for a, b in funceff]
+			funceff = [(self.art_clipdrop, (3 if count == 9 else 4))] * 4 + [(a, min(b, 3)) for a, b in funceff]
 		while funceff:
 			counts = [t[1] for t in funceff]
 			imc = sum(counts)
