@@ -2587,7 +2587,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 	compute_queue = {}
 	compute_wait = {}
-	def distribute(self, caps, stat, resp):
+	def distribute(self, caps, pwrs, stat, resp):
 		for k, v in stat.items():
 			self.status_data.system[k].update(v)
 		if resp:
@@ -2600,14 +2600,25 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					eloop.call_soon_threadsafe(task.set_result, v)
 				# print("TASK:", k, task, v)
 		tasks = []
-		for i in caps:
+		for i, p in zip(caps, pwrs):
 			i = i or 0
 			misc = self.compute_queue.get(i)
 			if not misc:
 				misc = self.compute_queue.get(-1)
 				if not misc:
 					continue
+			rem = []
 			task = misc.pop()
+			while task.pwr > p and random.random() * task.pwr > p:
+				if not misc:
+					misc.update(rem)
+					task = None
+					break
+				rem.append(task)
+				task = misc.pop()
+				continue
+			if not task:
+				continue
 			tasks.append(task)
 		prompts = []
 		for task in tasks:
@@ -3989,7 +4000,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		)
 
 	# Adds embeds to the embed sender, waiting for the next update event.
-	def send_embeds(self, channel, embeds=None, embed=None, reacts=None, reference=None, exc=True):
+	def send_embeds(self, channel, embeds=None, embed=None, reacts=None, reference=None, exc=True, bottleneck=False):
 		if embeds is not None and not issubclass(type(embeds), collections.abc.Collection):
 			embeds = (embeds,)
 		elif embeds:
@@ -4019,11 +4030,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			for e in embeds:
 				e["reacts"] = reacts
 		embs = set_dict(self.embed_senders, c_id, [])
+		lim = 16 if bottleneck else 2048
+		if len(embs) >= lim:
+			return
 		embs.extend(embeds)
 		if len(embs) > 2048:
 			self.embed_senders[c_id] = embs[-2048:]
 
-	def send_as_embeds(self, channel, description=None, title=None, fields=None, md=nofunc, author=None, footer=None, thumbnail=None, image=None, images=None, colour=None, reacts=None, reference=None, exc=True):
+	def send_as_embeds(self, channel, description=None, title=None, fields=None, md=nofunc, author=None, footer=None, thumbnail=None, image=None, images=None, colour=None, reacts=None, reference=None, exc=True, bottleneck=False):
 		if type(description) is discord.Embed:
 			emb = description
 			description = emb.description or None
@@ -4041,9 +4055,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			description = None
 		if not description and not fields and not thumbnail and not image and not images:
 			return fut_nop
-		return create_task(self._send_as_embeds(channel, description, title, fields, md, author, footer, thumbnail, image, images, colour, reacts, reference, exc=exc))
+		return create_task(self._send_as_embeds(channel, description, title, fields, md, author, footer, thumbnail, image, images, colour, reacts, reference, exc=exc, bottleneck=bottleneck))
 
-	async def _send_as_embeds(self, channel, description=None, title=None, fields=None, md=nofunc, author=None, footer=None, thumbnail=None, image=None, images=None, colour=None, reacts=None, reference=None, exc=True):
+	async def _send_as_embeds(self, channel, description=None, title=None, fields=None, md=nofunc, author=None, footer=None, thumbnail=None, image=None, images=None, colour=None, reacts=None, reference=None, exc=True, bottleneck=False):
 		fin_col = col = None
 		if colour is None:
 			if author:
@@ -4174,7 +4188,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						embs.append(emb)
 					embs[i].set_image(url=img)
 					embs[i].url = img
-		return self.send_embeds(channel, embeds=embs, reacts=reacts, reference=reference, exc=exc)
+		return self.send_embeds(channel, embeds=embs, reacts=reacts, reference=reference, exc=exc, bottleneck=bottleneck)
 
 	# Updates all embed senders.
 	def update_embeds(self, force=False):

@@ -2286,7 +2286,7 @@ async def proc_distribute(proc):
 			if not tasks:
 				await wrap_future(proc.fut)
 				proc.fut = concurrent.futures.Future()
-				tasks = bot.distribute([proc.cap], {}, {})
+				tasks = bot.distribute([proc.cap], [proc.pwr], {}, {})
 				if not tasks:
 					await asyncio.sleep(1 / 24)
 					continue
@@ -2296,9 +2296,9 @@ async def proc_distribute(proc):
 				try:
 					resp = await _sub_submit("compute", command, fix=proc.i, _timeout=timeout)
 				except Exception as ex:
-					newtasks.extend(bot.distribute([proc.cap], {}, {i: ex}))
+					newtasks.extend(bot.distribute([proc.cap], [proc.pwr], {}, {i: ex}))
 				else:
-					newtasks.extend(bot.distribute([proc.cap], {}, {i: resp}))
+					newtasks.extend(bot.distribute([proc.cap], [proc.pwr], {}, {i: resp}))
 			tasks = newtasks
 		await asyncio.sleep(0.01)
 
@@ -2309,12 +2309,15 @@ proc_args = cdict(
 )
 
 COMPUTE_LOAD = AUTH.get("compute_load", [])
+COMPUTE_POT = COMPUTE_LOAD.copy()
 if len(COMPUTE_LOAD) < DC:
 	handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(DC)]
 	gcore = [pynvml.nvmlDeviceGetNumGpuCores(d) for d in handles]
 	COMPUTE_LOAD = AUTH["compute_load"] = gcore
+	COMPUTE_POT = [i * 100 for i in gcore]
 elif len(COMPUTE_LOAD) > DC:
 	COMPUTE_LOAD = COMPUTE_LOAD[:DC]
+	COMPUTE_POT = COMPUTE_POT[:DC]
 if COMPUTE_LOAD:
 	total = sum(COMPUTE_LOAD)
 	if total != 1:
@@ -2338,6 +2341,7 @@ async def start_proc(k, i):
 	proc.comm = create_task(proc_communicate(proc))
 	proc.dist = create_task(proc_distribute(proc))
 	proc.cap = min(i, 3)
+	proc.pwr = COMPUTE_POT[i - 3] if i >= 3 else 0 if not i else 1 if i == 2 else sum(COMPUTE_POT)
 	proc.fut = newfut
 	PROCS[k][i] = proc
 	return proc
@@ -2385,13 +2389,14 @@ async def get_idle_proc(ptype, fix=None):
 		proc = p[0]
 	return proc
 
-async def sub_submit(ptype, command, fix=None, _timeout=12):
+async def sub_submit(ptype, command, fix=None, pwr=None, _timeout=12):
 	bot = BOT[0]
 	ex2 = RuntimeError("Maximum compute attempts exceeded.")
 	for i in range(3):
 		fix = fix if fix is not None else -1
 		task = concurrent.futures.Future()
 		task.cap = fix
+		task.pwr = pwr or 0
 		task.command = command
 		task.timeout = _timeout
 		queue = bot.compute_queue.setdefault(fix, set())
@@ -2486,7 +2491,7 @@ def process_math(expr, prec=64, rat=False, timeout=12, variables=None):
 	return sub_submit("compute", (expr, "%", prec, rat, variables), fix=choice((0, 2)), _timeout=timeout)
 
 # Sends an operation to the image subprocess pool.
-def process_image(image, operation, args=[], fix=None, timeout=36):
+def process_image(image, operation, args=[], fix=None, pwr=None, timeout=36):
 	args = astype(args, list)
 	for i, a in enumerate(args):
 		if type(a) is mpf:
@@ -2503,7 +2508,7 @@ def process_image(image, operation, args=[], fix=None, timeout=36):
 		return repr(arg)
 
 	command = "[" + ",".join(map(as_arg, args)) + "]"
-	return sub_submit("compute", (image, operation, command), fix=fix, _timeout=timeout)
+	return sub_submit("compute", (image, operation, command), fix=fix, pwr=pwr, _timeout=timeout)
 
 
 def evalex(exc, g=None, l=None):
