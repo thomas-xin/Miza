@@ -1644,14 +1644,14 @@ class Art(Command):
             with discord.context_managers.Typing(channel):
                 futt = []
                 c = 0
-                # if not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy():
-                #     c = min(amount, 9 if nsfw and not self.sdiff_sem.active else 5)
-                #     c2 = c
-                #     while c2 > 0:
-                #         n = min(c2, xrand(floor(sqrt(c2) + 1)) + 1)
-                #         fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, n], fix=3, pwr=500000 * n, timeout=120))
-                #         futt.append(fut)
-                #         c2 -= n
+                if n == 1 and not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy():
+                    c = min(amount, 9 if nsfw and not self.sdiff_sem.active else 5)
+                    c2 = c
+                    while c2 > 0:
+                        n = min(c2, xrand(floor(sqrt(c2) + 1)) + 1)
+                        fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, n], fix=3, pwr=500000 * n, timeout=120))
+                        futt.append(fut)
+                        c2 -= n
                 self.imagebot.token = oai or AUTH.get("openai_key")
                 ims = []
                 try:
