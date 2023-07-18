@@ -807,7 +807,7 @@ class Bot:
 		if not specified and not url and os.name == "nt":
 			funcs.append((self.art_mage, 1))
 		if not specified and not url and os.name == "nt":
-			funcs.insert((self.art_clipdrop, 4))
+			funcs.insert(0, (self.art_clipdrop, 4))
 		if not funcs:
 			return ()
 		eff = 0
