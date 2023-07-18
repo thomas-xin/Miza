@@ -1590,7 +1590,9 @@ class Art(Command):
         if not prompt:
             if not url:
                 raise ArgumentError("Please input a valid prompt.")
-            pt, p1, p2 = await bot.caption(url, best=premium >= 4)
+            best = premium >= 4
+            pwr = 1000000 if best else 1
+            pt, p1, p2 = await bot.caption(url, best=best, pwr=pwr)
             prompt = "\n".join((p1, p2))
             if not prompt:
                 prompt = "art"
@@ -1649,7 +1651,7 @@ class Art(Command):
                 #     c2 = c
                 #     while c2 > 0:
                 #         n = min(c2, xrand(floor(sqrt(c2) + 1)) + 1)
-                #         fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, n], fix=3, pwr=250000 * n, timeout=120))
+                #         fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, n], fix=3, pwr=500000 * n, timeout=120))
                 #         futt.append(fut)
                 #         c2 -= n
                 self.imagebot.token = oai or AUTH.get("openai_key")
@@ -1838,7 +1840,7 @@ class Art(Command):
                             c2 = c
                             while c2 > 0:
                                 n = min(c2, xrand(floor(sqrt(c2) + 1)) + 1)
-                                fut = create_task(process_image("IBASL", "&", [p, kwargs, nsfw, False, n], fix=3, pwr=250000 * n, timeout=120))
+                                fut = create_task(process_image("IBASL", "&", [p, kwargs, nsfw, False, n], fix=3, pwr=500000 * n, timeout=120))
                                 futt.append(fut)
                                 c2 -= n
                             for fut in futt:

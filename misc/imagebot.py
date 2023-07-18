@@ -722,6 +722,7 @@ class Bot:
 		if resp.status_code in range(200, 400):
 			print("TextSynth:", resp)
 			d = resp.json()
+			print(d)
 			ds = d["images"]
 			ims = [base64.b64decode(b["data"].encode("ascii")) for b in ds]
 			return ims
@@ -796,8 +797,8 @@ class Bot:
 
 	def art(self, prompt, url="", url2="", kwargs={}, specified=False, dalle2=False, openjourney=False, nsfw=False, count=1):
 		funcs = []
-		if not url and not dalle2 and nsfw:
-			funcs.append((self.art_textsynth, 4))
+		# if not url and not dalle2 and nsfw:
+		# 	funcs.append((self.art_textsynth, 4))
 		if not specified and not url:
 			funcs.append((self.art_deepai, 4))
 			if openjourney:
