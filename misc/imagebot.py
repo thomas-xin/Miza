@@ -792,11 +792,13 @@ class Bot:
 				raise Exception("Request failed with status %s" % result)
 			return base64.b64decode(result)
 
+		out = []
 		for i, im in enumerate(ims):
 			url = im.get_attribute('src')
 			print("ClipDrop:", url)
 			b = get_file_content_chrome(driver, url)
-			yield b
+			out.append(b)
+		return out
 
 	def art(self, prompt, url="", url2="", kwargs={}, specified=False, dalle2=False, openjourney=False, nsfw=False, count=1):
 		funcs = []

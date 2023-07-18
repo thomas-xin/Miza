@@ -2583,7 +2583,7 @@ class MultiThreadPool(collections.abc.Sized, concurrent.futures.Executor):
 	shutdown = lambda self, wait=True: [exc.shutdown(wait) for exc in self.pools].append(self.pools.clear())
 
 pthreads = ThreadPoolExecutor(32, initializer=__setloop__)
-athreads = MultiThreadPool(pool_count=1, thread_count=64, initializer=__setloop__)
+athreads = concurrent.futures.exc_worker = MultiThreadPool(pool_count=2, thread_count=64, initializer=__setloop__)
 athreads.pools.append(import_exc)
 
 def get_event_loop():
