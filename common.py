@@ -2285,7 +2285,7 @@ async def proc_distribute(proc):
 				return
 			if not tasks:
 				try:
-					await asyncio.wait_for(wrap_future(proc.fut), timeout=5)
+					await asyncio.wait_for(wrap_future(proc.fut), timeout=2)
 				except (T0, T1, T2):
 					pass
 				else:
