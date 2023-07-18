@@ -818,7 +818,7 @@ class Bot:
 		funceff = [random.choice(funcs) for i in range(count - 1)]
 		funceff.insert(0, funcs[0])
 		if count > 1 and not specified and not url and os.name == "nt":
-			funceff = [(self.art_clipdrop, (3 if count == 9 else 4))] * 4 + [(a, min(b, 3)) for a, b in funceff]
+			funceff = [(self.art_clipdrop, (3 if count == 9 else 4))] * count + [(a, min(b, 2)) for a, b in funceff]
 		while funceff:
 			counts = [t[1] for t in funceff]
 			imc = sum(counts)
