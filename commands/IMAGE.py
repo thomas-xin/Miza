@@ -1029,7 +1029,7 @@ class CreateGIF(Command):
             filename = "unknown." + fmt
             # if video is None:
             #     video = args
-            resp = await process_image("create_gif", "$", ["image", found, delay, "-f", fmt], timeout=_timeout)
+            resp = await process_image("create_gif", "$", ["image", found, delay, "-f", fmt], pwr=1, timeout=_timeout)
             fn = resp
         await bot.send_with_file(channel, "", fn, filename=filename, reference=message, reacts="🔳")
 
@@ -1531,7 +1531,7 @@ class Art(Command):
         rems = deque()
         kwargs = {
             "--device": "GPU",
-            "--num-inference-steps": "48",
+            "--num-inference-steps": "48" if premium < 4 else "64",
             "--guidance-scale": "7.5",
             "--eta": "0.8",
         }
@@ -1644,14 +1644,14 @@ class Art(Command):
             with discord.context_managers.Typing(channel):
                 futt = []
                 c = 0
-                if not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy():
-                    c = min(amount, 9 if nsfw and not self.sdiff_sem.active else 5)
-                    c2 = c
-                    while c2 > 0:
-                        n = min(c2, xrand(floor(sqrt(c2) + 1)) + 1)
-                        fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, n], fix=3, timeout=120))
-                        futt.append(fut)
-                        c2 -= n
+                # if not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy():
+                #     c = min(amount, 9 if nsfw and not self.sdiff_sem.active else 5)
+                #     c2 = c
+                #     while c2 > 0:
+                #         n = min(c2, xrand(floor(sqrt(c2) + 1)) + 1)
+                #         fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, n], fix=3, pwr=250000 * n, timeout=120))
+                #         futt.append(fut)
+                #         c2 -= n
                 self.imagebot.token = oai or AUTH.get("openai_key")
                 ims = []
                 try:
@@ -1838,7 +1838,7 @@ class Art(Command):
                             c2 = c
                             while c2 > 0:
                                 n = min(c2, xrand(floor(sqrt(c2) + 1)) + 1)
-                                fut = create_task(process_image("IBASL", "&", [p, kwargs, nsfw, False, n], fix=3, timeout=120))
+                                fut = create_task(process_image("IBASL", "&", [p, kwargs, nsfw, False, n], fix=3, pwr=250000 * n, timeout=120))
                                 futt.append(fut)
                                 c2 -= n
                             for fut in futt:

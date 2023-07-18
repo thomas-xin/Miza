@@ -727,6 +727,73 @@ class Bot:
 			return ims
 		print(resp.status_code, resp.text)
 
+	def art_clipdrop(self, prompt, kwargs=None, **void):
+		driver = get_driver()
+
+		folder = driver.folder
+		search = "https://clipdrop.co/stable-diffusion"
+		fut = exc.submit(driver.get, search)
+		fut.result(timeout=24)
+
+		time.sleep(2)
+
+		bar = driver.find_element(by=webdriver.common.by.By.NAME, value="prompt")
+		bar.clear()
+		try:
+			bar.send_keys(prompt)
+		except selenium.common.exceptions.WebDriverException:
+			driver.execute_script("document.getElementsByName('prompt')[0].focus()")
+			driver.execute_script(f"document.execCommand('insertText', false, {repr(prompt)});")
+
+		driver.execute_script('for (var i=0; i<document.getElementsByClassName("transition-all").length; i++) {var e = document.getElementsByClassName("transition-all")[i]; if (e.textContent == "Generate") {e.click()}};')
+
+		elems = None
+		ims = []
+		i = 0
+		while not elems:
+			if i >= 60 and ims:
+				break
+			if i >= 180:
+				print("ClipDrop: unavailable")
+				return
+			elems = driver.find_elements(by=tag_name, value="img")
+			for e in reversed(elems):
+				a = e.get_attribute("src")
+				if a.startswith("blob:https://clipdrop.co/"):
+					ims.append(e)
+					if len(ims) >= 4:
+						break
+					continue
+			else:
+				elems.clear()
+			time.sleep(1)
+			i += 1
+
+		# Credit to https://github.com/fredi-python/ClipDropSDXL/tree/main and of course StabilityAI for the feature! This is only temporary until v1.0 releases!
+		def get_file_content_chrome(driver, uri):
+			result = driver.execute_async_script("""
+				var uri = arguments[0];
+				var callback = arguments[1];
+				var toBase64 = function(buffer){for(var r,n=new Uint8Array(buffer),t=n.length,a=new Uint8Array(4*Math.ceil(t/3)),i=new Uint8Array(64),o=0,c=0;64>c;++c)i[c]="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".charCodeAt(c);for(c=0;t-t%3>c;c+=3,o+=4)r=n[c]<<16|n[c+1]<<8|n[c+2],a[o]=i[r>>18],a[o+1]=i[r>>12&63],a[o+2]=i[r>>6&63],a[o+3]=i[63&r];return t%3===1?(r=n[t-1],a[o]=i[r>>2],a[o+1]=i[r<<4&63],a[o+2]=61,a[o+3]=61):t%3===2&&(r=(n[t-2]<<8)+n[t-1],a[o]=i[r>>10],a[o+1]=i[r>>4&63],a[o+2]=i[r<<2&63],a[o+3]=61),new TextDecoder("ascii").decode(a)};
+				var xhr = new XMLHttpRequest();
+				xhr.setRequestHeader("X-Forwarded-For", '""" + ".".join(str(random.randint(1, 254)) for _ in range(4)), + """');
+				xhr.setRequestHeader("X-Real-Ip", '""" + ".".join(str(random.randint(1, 254)) for _ in range(4)), + """');
+				xhr.responseType = 'arraybuffer';
+				xhr.onload = function(){ callback(toBase64(xhr.response)) };
+				xhr.onerror = function(){ callback(xhr.status) };
+				xhr.open('GET', uri);
+				xhr.send();
+			""", uri)
+			if type(result) == int:
+				raise Exception("Request failed with status %s" % result)
+			return base64.b64decode(result)
+
+		for i, im in enumerate(ims):
+			url = im.get_attribute('src')
+			print("ClipDrop:", url)
+			b = get_file_content_chrome(driver, url)
+			yield b
+
 	def art(self, prompt, url="", url2="", kwargs={}, specified=False, dalle2=False, openjourney=False, nsfw=False, count=1):
 		funcs = []
 		if not url and not dalle2 and nsfw:
@@ -739,6 +806,8 @@ class Bot:
 				funcs.insert(0, (self.art_dalle, 4))
 		if not specified and not url and os.name == "nt":
 			funcs.append((self.art_mage, 1))
+		if not specified and not url and os.name == "nt":
+			funcs.insert((self.art_clipdrop, 4))
 		if not funcs:
 			return ()
 		eff = 0

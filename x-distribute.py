@@ -22,7 +22,7 @@ with open("auth.json", "rb") as f:
 compute_load = data.get("compute_load", [])
 
 if benchmark.DC:
-    caps = [0, 2] if benchmark.DC > 1 else [0]
+    caps = [1, 2] if benchmark.DC > 1 else [0, 1]
     import pynvml
     handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(benchmark.DC)]
     gmems = [pynvml.nvmlDeviceGetMemoryInfo(d).total for d in handles]
@@ -35,7 +35,7 @@ if benchmark.DC:
             continue
         caps.append(i + 3)
 else:
-    caps = [2]
+    caps = [1, 2]
 # if len(caps) < os.cpu_count() // 2:
 #     caps = [0] * (os.cpu_count() // 2 - len(caps)) + caps
 
@@ -144,6 +144,7 @@ def update_tasks(proc):
                     FORWARD,
                     data=dict(
                         caps=orjson.dumps([proc.cap]),
+                        pwrs=orjson.dumps([proc.pwr]),
                         resp=resp,
                     ),
                     verify=False
@@ -197,6 +198,7 @@ def start_proc(cap):
     proc.busy = None
     proc.waiting = concurrent.futures.Future()
     proc.cap = min(3, int(cap))
+    proc.pwr = compute_load[i - 3] if i >= 3 else 0 if not i else 1 if i == 2 else sum(compute_load)
     procs.append(proc)
     threading.Thread(target=update_tasks(proc)).start()
     threading.Thread(target=update_resps(proc)).start()
@@ -280,7 +282,9 @@ try:
                 ) for i, name in enumerate(gname)},
             },
         ))
-        caps = [proc.cap for proc in procs if not proc.busy or proc.busy.done()]
+        prcs = [proc for proc in procs if not proc.busy or proc.busy.done()]
+        caps = [proc.cap for proc in prcs]
+        pwrs = [proc.pwr for proc in prcs]
         stat = base64.urlsafe_b64encode(stats).rstrip(b"=")
         data = ()
         try:
@@ -288,6 +292,7 @@ try:
                 "https://mizabot.xyz/api/distribute",
                 data=dict(
                     caps=orjson.dumps(caps),
+                    pwrs=orjson.dumps(pwrs),
                     stat=stat,
                 ),
                 verify=False,
