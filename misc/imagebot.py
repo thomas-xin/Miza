@@ -614,7 +614,7 @@ class Bot:
 					models[(pf, model)] = False
 					print("StablediffusionL: CUDA f16 init failed")
 					return
-				pipe = backup_model(pf.from_pretrained, model, requires_safety_checker=True, **kw)
+				pipe = backup_model(pf.from_pretrained, model, requires_safety_checker=pf is not StableDiffusionImageVariationPipeline, **kw)
 			checkers[model] = pipe.safety_checker
 			models[(pf, model)] = pipe
 		if nsfw:
