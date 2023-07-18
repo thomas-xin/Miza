@@ -577,6 +577,9 @@ class Bot:
 		for im, n in zip(data.images, nsfw_content_detected):
 			if n:
 				continue
+			p = np.sum(im.resize((32, 32)).convert("L"))
+			if p <= 1024:
+				continue
 			b = io.BytesIO()
 			im.save(b, format="png")
 			print("StablediffusionL:", b)
