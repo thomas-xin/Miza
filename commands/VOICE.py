@@ -2292,6 +2292,8 @@ class AudioDownloader:
 
     # Gets the stream URL of a queue entry, starting download when applicable.
     def get_stream(self, entry, video=False, force=False, download=True, callback=None, asap=True):
+        if isinstance(entry, str):
+            entry = dict(url=entry)
         if not entry.get("url"):
             raise FileNotFoundError
         try:

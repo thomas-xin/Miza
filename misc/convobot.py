@@ -1303,7 +1303,7 @@ class Bot:
 				print(resp.status_code, resp.text)
 				model = "gpt-3.5-turbo-instruct"
 				cm = 15
-		elif model.startswith("gpt-3.5-turbo") or model.startswith("gpt-4"):
+		elif not model.endswith("-instruct") and (model.startswith("gpt-3.5-turbo") or model.startswith("gpt-4")):
 			tries = 7
 			if premium < 2:
 				stop = None
