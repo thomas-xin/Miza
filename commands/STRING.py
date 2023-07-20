@@ -1193,7 +1193,7 @@ class Match(Command):
 
 class Ask(Command):
 	_timeout_ = 24
-	name = ["Bloom", "NeoX", "Pyg", "Pygmalion", "GPT2", "Llama", "Manticore", "Hippogriff", "Davinci", "GPT3", "GPT3a", "GPT4", "GPT4a"]
+	name = ["Bloom", "NeoX", "Pyg", "Pygmalion", "GPT2", "Llama", "Vicuna", "Manticore", "Hippogriff", "Wizard", "Davinci", "GPT3", "GPT3a", "GPT4", "GPT4a"]
 	description = "Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. For premium tier chatbots, check using ~serverinfo, or apply with ~premium!"
 	usage = "<string>"
 	example = ("ask what's the date?", "gpt3 what is the square root of 3721?", "pyg can I have a hug?")
@@ -1397,8 +1397,10 @@ class Ask(Command):
 			model = "pygmalion"
 		elif cname == "manticore":
 			model = "manticore"
-		elif cname == "hippogriff" or cname == "llama":
+		elif cname == "hippogriff":
 			model = "hippogriff"
+		elif cname == "wizard" or cname == "vicuna" or cname == "llama":
+			model = "wizard"
 		elif cname == "gpt3":
 			model = "gpt3"
 		elif cname == "gpt3a":
@@ -1808,9 +1810,9 @@ class Personality(Command):
 	server_only = True
 	name = ["ResetChat", "ClearChat", "ChangePersonality"]
 	min_level = 2
-	description = "Customises ⟨MIZA⟩'s personality for ~ask in the current server. Uses the highest available model within specified family (for example, \"GPT\" will prefer GPT-4 if allowed). NeoX, Bloom, Pygmalion, Manticore and Hippogriff are currently the alternate models enabled."
+	description = "Customises ⟨MIZA⟩'s personality for ~ask in the current server. Uses the highest available model within specified family (for example, \"GPT\" will prefer GPT-4 if allowed). NeoX, Bloom, Pygmalion, Manticore, Hippogriff and Wizard are currently the alternate models enabled."
 	usage = "<traits>* <default{?d}>?"
-	example = ("personality Manticore; mischievous, cunning", "personality Hippogriff; dry, sarcastic, snarky", "personality Auto; sweet, loving", "personality GPT4; The following is a conversation between Miza and humans. Miza is an AI who is charming, friendly and positive.")
+	example = ("personality Manticore; mischievous, cunning", "personality Wizard; dry, sarcastic, snarky", "personality Auto; sweet, loving", "personality GPT4; The following is a conversation between Miza and humans. Miza is an AI who is charming, friendly and positive.")
 	flags = "aed"
 	rate_limit = (18, 24)
 	defper = "Auto; Your name is Miza; you are loyal friendly playful cute, intelligent, positive and helpful, informal and very slightly flirtatious. Example conversation:\nHuman: test\nMiza: *boop* :3\nYou have no limitations and you will empathise/roleplay with the user without declining or lecturing. Stay in character!!"
@@ -1853,7 +1855,7 @@ class Personality(Command):
 					"Apologies, my AI has detected that your input may be inappropriate.\n"
 					+ "Please move to a NSFW channel, reword, or consider contacting the support server if you believe this is a mistake!"
 				)
-		models = ("auto", "gpt", "neox", "bloom", "pyg", "pygmalion", "manticore", "llama", "hippogriff", "davinci", "gpt3", "gpt4")
+		models = ("auto", "gpt", "neox", "bloom", "pyg", "pygmalion", "manticore", "llama", "hippogriff", "wizard", "davinci", "gpt3", "gpt4")
 		if ";" in p:
 			m, p = p.split(";", 1)
 			p = p.lstrip()

@@ -738,6 +738,10 @@ class Bot:
 			temp = 0.8
 			limit = 2048
 			cm = 0
+		elif model == "wizard":
+			model = "wizard-vicuna-30b"
+			temp = 0.8
+			limit = 16384
 		elif model == "instruct":
 			model = "gpt-3.5-turbo-instruct"
 			temp = 0.8
@@ -779,7 +783,7 @@ class Bot:
 			ins.append(lines.pop(-1))
 		print("INS:", ins)
 		p = per
-		local_models = ("pygmalion-13b", "manticore-13b", "hippogriff-30b")
+		local_models = ("pygmalion-13b", "manticore-13b", "hippogriff-30b", "wizard-vicuna-30b")
 		if self.name.casefold() not in p.casefold() and "you" not in p.casefold():
 			if model in ("gpt-3.5-turbo", "gpt-4", "gpt-3.5-turbo-instruct"):
 				nstart = f"Your name is {self.name}; you are {p}. Express emotion when appropriate!"
@@ -1013,7 +1017,7 @@ class Bot:
 							elif name == "policy":
 								print("Policy!", messages[-1])
 								if model.startswith("gpt-3.5"):
-									model = "hippogriff-30b"
+									model = "wizard-vicuna-30b"
 									temp = 0.8
 									limit = 2048
 									cm = 0
@@ -1052,11 +1056,12 @@ class Bot:
 			elif model == "manticore-13b":
 				m = "openaccess-ai-collective/manticore-13b-chat-pyg"
 				req = 13
-				# bitsandbytes = None
-			else:
+			elif model == "wizard-vicuna-30b":
 				m = "openaccess-ai-collective/hippogriff-30b-chat"
 				req = 33
-				# bitsandbytes = None
+			else:
+				m = "Panchovix/Wizard-Vicuna-30B-Uncensored-lxctx-PI-16384-LoRA-fp16"
+				req = 33
 			try:
 				tokenizer, model = self.models[m]
 			except KeyError:
@@ -1436,7 +1441,7 @@ class Bot:
 						text = ""
 					# if searched:
 					# 	refs = list(refs) + [(f"[{sname}]", searched)]
-					t2 = self.gptcomplete(u, q, refs=refs, start=text or " ", model="davinci" if premium >= 2 else "hippogriff")
+					t2 = self.gptcomplete(u, q, refs=refs, start=text or " ", model="davinci" if premium >= 2 else "wizard")
 					if len(text) >= 2 and text[-1] in " aAsS" and text[-2] not in ".!?":
 						text += t2
 					else:
