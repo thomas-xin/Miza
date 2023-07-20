@@ -1085,6 +1085,7 @@ class AudioClientSubInterface:
     bot = channel = None
 
     @classmethod
+    @tracebacksuppressor
     def from_guild(cls, guild):
         cls.ensure_bot(cls)
         bot = cls.bot
