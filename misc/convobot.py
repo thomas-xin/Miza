@@ -521,7 +521,21 @@ class Bot:
 					s2 = smp(s1, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
 			else:
 				s2 = smp(s1, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
-		return s2.strip()
+		out = []
+		otok = list(enc.encode(s2))
+		last = None
+		count = 0
+		while otok:
+			c = otok.pop(0)
+			if c == last:
+				if count > 3:
+					continue
+				count += 1
+			else:
+				last = c
+				count = 0
+			out.append(c)
+		return enc.decode(out).strip()
 
 	def auto_summarise(self, q="", max_length=128, min_length=64):
 		if q and sum(c.isascii() for c in q) / len(q) > 0.75:
@@ -1019,7 +1033,7 @@ class Bot:
 								if model.startswith("gpt-3.5"):
 									model = "wizard-vicuna-30b"
 									temp = 0.8
-									limit = 2048
+									limit = 16384
 									cm = 0
 								else:
 									model = "gpt-3.5-turbo-instruct"
@@ -1171,7 +1185,7 @@ class Bot:
 				top_k=192,
 				top_p=0.9,
 				repetition_penalty=1.2,
-				max_length=min(4096, len(tokens) + 1024),
+				max_length=max(limit, len(tokens) + 1024),
 				do_sample=True,
 			)
 			text = tokenizer.decode(res[0]).removeprefix("<s>").strip().removeprefix(prompt).strip().split("</s>", 1)[0]
@@ -1890,7 +1904,7 @@ class Bot:
 
 	def ai(self, u, q, refs=(), im=None):
 		tup = (u, q)
-		self.rerender()
+		self.rerender(self.model)
 		uoai = None
 		# if self.premium > 0 or random.randint(0, 1):
 		response = self.gptcomplete(u, q, refs=refs)
@@ -1996,12 +2010,16 @@ class Bot:
 			lines[0] += "\n"
 		return lines
 
-	def rerender(self):
-		lim = 480 if self.premium >= 2 else 120
-		r1 = 4 if self.premium >= 2 else 2
-		if not self.model.startswith("gpt"):
-			lim += 240
-			r1 += 2
+	model_limits = dict(
+		gpt3=(120, 2),
+		gpt4=(480, 4),
+		gpt3a=(120, 2),
+		gpt4a=(480, 4),
+		wizard=(1920, 8),
+	)
+
+	def rerender(self, model=""):
+		lim, r1 = self.model_limits.get(model) or ((720, 6) if self.premium >= 2 else (360, 4))
 		if not self.chat_history or len(self.chat_history) < r1 and len(self.gpttokens(self.chat_history[0][1])) <= lim * 2:
 			return
 		r2 = r1 // 2 + 1

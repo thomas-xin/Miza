@@ -1838,7 +1838,7 @@ class Personality(Command):
 		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
 		if len(argv) > 4096 or len(argv) > 512 and premium < 2:
 			raise OverflowError("Maximum currently supported personality prompt size is 512 characters, 4096 for premium users.")
-		p = argv
+		p = argv.replace(";", ";")
 		if not bot.is_nsfw(channel):
 			inappropriate = False
 			openai.api_key = AUTH["openai_key"]
