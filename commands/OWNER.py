@@ -253,7 +253,7 @@ class Exec(Command):
         else:
             out = self.terminal_types[num]
         if "e" in flags or "a" in flags:
-            if num == 0:
+            if num in (0, "null"):
                 num = 4
             try:
                 bot.data.exec[channel.id] |= num
@@ -265,7 +265,7 @@ class Exec(Command):
             return css_md(f"{sqr_md(out)} terminal now enabled in {sqr_md(channel)}.")
         elif "d" in flags:
             with suppress(KeyError):
-                if num == 0:
+                if num in (0, "null"):
                     # Test bitwise flags for enabled terminals
                     out = ", ".join(self.terminal_types.get(1 << i) for i in bits(bot.data.exec.pop(channel.id, 0, force=True)))
                 else:

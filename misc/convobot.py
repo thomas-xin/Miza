@@ -1064,6 +1064,7 @@ class Bot:
 				import bitsandbytes
 			except ImportError:
 				bitsandbytes = None
+			buffer = 1.1
 			if model == "pygmalion-13b":
 				m = "TehVenom/Pygmalion-13b-Merged"
 				req = 13
@@ -1076,6 +1077,7 @@ class Bot:
 			else:
 				m = "Panchovix/Wizard-Vicuna-30B-Uncensored-lxctx-PI-16384-LoRA-fp16"
 				req = 33
+				buffer = 1.3
 			try:
 				tokenizer, model = self.models[m]
 			except KeyError:
@@ -1125,7 +1127,7 @@ class Bot:
 				# 	max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) - 3 * 1024)}MiB" for i, gi in ginfo.items()}
 				# 	max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("MiB")) > 0}
 				cap = sum(int(v.removesuffix("MiB")) for v in max_mem.values()) / 1024
-				if cap > req * 1.1:
+				if cap > req * buffer:
 					max_mem = {k: f"{round(int(v.removesuffix('MiB')) / 1.1)}MiB" for k, v in max_mem.items()}
 					dti = torch.int8
 				else:

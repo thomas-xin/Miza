@@ -2475,7 +2475,12 @@ async def _sub_submit(ptype, command, fix=None, _timeout=12):
 					break
 			else:
 				raise OSError("Max waits exceeded.")
-		except (BrokenPipeError, OSError) as ex:
+		except (BrokenPipeError, OSError, RuntimeError) as ex:
+			if isinstance(ex, RuntimeError):
+				if "OutOfMemoryError" in repr(ex):
+					pass
+				else:
+					raise
 			try:
 				i = PROCS[ptype].index(proc)
 			except (LookupError, ValueError):

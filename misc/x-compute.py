@@ -759,6 +759,11 @@ def optimise(im, keep_rgb=True):
 		if keep_rgb:
 			return im.convert("RGB")
 		return im
+	if im.mode == "P":
+		if keep_rgb:
+			im = im.convert("RGBA")
+		else:
+			return im
 	if im.mode == "RGBA":
 		if keep_rgb:
 			A = im.getchannel("A")
