@@ -630,12 +630,17 @@ class Bot:
 			if not isinstance(b, str):
 				b = io.BytesIO(b)
 			im = Image.open(b)
+		if kwargs.get("--mask"):
+			b = kwargs["--mask"]
+			if not isinstance(b, str):
+				b = io.BytesIO(b)
+			mask = Image.open(b)
 		with torch.cuda.device(device):
 			if pf is StableDiffusionInpaintPipeline:
 				data = pipe(
 					prompt,
 					image=image_to(im),
-					mask_image=image_to(Image.open(kwargs["--mask"])),
+					mask_image=image_to(mask, mode="L"),
 					num_images_per_prompt=count,
 					num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 					guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),

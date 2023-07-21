@@ -1554,7 +1554,7 @@ class Ask(Command):
 				emb = discord.Embed(colour=rand_colour())
 				emb.set_author(**get_author(bot.user))
 				emb.description = (
-					f"Uh-oh, it appears your API key credit was blocked! Please make sure your payment methods are functional, or buy a consistent subscription [here]({bot.kofi_url})!"
+					f"Uh-oh, it appears your API key or credit was blocked! Please make sure your payment methods are functional, or purchase a consistent subscription [here]({bot.kofi_url})!"
 				)
 		if not bl:
 			print("Result:", out)
