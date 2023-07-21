@@ -3141,15 +3141,12 @@ def evalImg(url, operation, args):
 				first = frames[0]
 			else:
 				it = iter(frames)
-				first = next(it)
-
-				def frameit(first, it):
-					yield first
-					with suppress(StopIteration):
-						while True:
-							yield next(it)
-
-				frames = frameit(first, it)
+				try:
+					first = next(it)
+				except StopIteration:
+					frames = []
+				else:
+					frames = resume(first, it)
 			if getattr(first, "audio", None) and fmt in ("default", "webp", "gif", "apng"):
 				fmt = "mp4"
 			elif fmt == "default":
