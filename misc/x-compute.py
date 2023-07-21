@@ -725,6 +725,75 @@ def fromarray(arr, mode="L"):
 		except TypeError:
 			return Image.frombytes(mode, s, b)
 
+def resume(im, *its):
+	yield im
+	for it in its:
+		yield from it
+
+def optimise(im, keep_rgb=True):
+	try:
+		it = iter(im)
+	except TypeError:
+		pass
+	else:
+		if not im:
+			return im
+		try:
+			i0 = next(it)
+		except StopIteration:
+			return []
+		out = [optimise(i0, keep_rgb=keep_rgb)]
+		orig = []
+		mode = i0.mode
+		if mode == out[0].mode:
+			return resume(i0, it)
+		for i2 in it:
+			orig.append(i2)
+			if i2.mode != mode:
+				i2 = optimise(i2, keep_rgb=keep_rgb)
+				if i2.mode != mode:
+					return resume(i0, orig, it)
+			out.append(i2)
+		return out
+	if im.mode == "L":
+		if keep_rgb:
+			return im.convert("RGB")
+		return im
+	if im.mode == "RGBA":
+		if keep_rgb:
+			A = im.getchannel("A")
+			if np.min(A) >= 254:
+				return im.convert("RGB")
+			return im
+		R, G, B, A = im.split()
+		r, g, b = np.asarray(R, dtype=np.uint8), np.asarray(G, dtype=np.uint8), np.asarray(B, dtype=np.uint8)
+		distRG = (r.ravel() - g.ravel()) ** 2
+		if np.max(distRG) <= 4:
+			distGB = (g.ravel() - b.ravel()) ** 2
+			if np.max(distGB) <= 4:
+				distBR = (b.ravel() - r.ravel()) ** 2
+				if np.max(distBR) <= 4:
+					if np.min(A) >= 254:
+						return im.convert("L")
+					return im.convert("LA")
+		if np.min(A) >= 254:
+			return im.convert("RGB")
+		return im
+	if keep_rgb:
+		if im.mode != "RGB":
+			return im.convert("RGB")
+		return im
+	R, G, B = im.split()
+	r, g, b = np.asarray(R, dtype=np.uint8), np.asarray(G, dtype=np.uint8), np.asarray(B, dtype=np.uint8)
+	distRG = (r.ravel() - g.ravel()) ** 2
+	if np.max(distRG) <= 4:
+		distGB = (g.ravel() - b.ravel()) ** 2
+		if np.max(distGB) <= 4:
+			distBR = (b.ravel() - r.ravel()) ** 2
+			if np.max(distBR) <= 4:
+				return im.convert("L")
+	return im
+
 
 sizecheck = re.compile("[1-9][0-9]*x[0-9]+")
 fpscheck = re.compile("[0-9]+ fps")
@@ -791,9 +860,9 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
 		command.extend([vf, "-loop", "0", "-framerate", str(fps)])
 		if hwaccel == "cuda":
 			if out.endswith(".mp4"):
-				args.extend(("-c:v", "h264_nvenc"))
+				command.extend(("-c:v", "h264_nvenc"))
 			elif out.endswith(".webm"):
-				args.extend(("-c:v", "av1_nvenc"))
+				command.extend(("-c:v", "av1_nvenc"))
 		command.append(out)
 		print(command)
 		subprocess.check_output(command)
@@ -3038,7 +3107,7 @@ def evalImg(url, operation, args):
 		if getattr(new, "audio", None):
 			new = dict(count=1, duration=1, frames=[new])
 	if type(new) is dict and "frames" in new:
-		frames = new["frames"]
+		frames = optimise(new["frames"])
 		if not frames:
 			raise EOFError("No image output detected.")
 		if new["count"] == 1:
@@ -3207,6 +3276,7 @@ def evalImg(url, operation, args):
 				return f.read()
 			# return [out]
 	if isinstance(new, Image.Image):
+		new = optimise(new, keep_rgb=False)
 		if new.entropy() > 8 and fmt in ("default", "webp"):
 			# out = "cache/" + str(ts) + ".webp"
 			out = io.BytesIO()

@@ -604,7 +604,7 @@ class Bot:
 				"properties": {
 					"query": {
 						"type": "string",
-						"description": "The prompt, e.g. A brilliant view of a futuristic city in an alien world, 4k",
+						"description": "The prompt, e.g. Brilliant view of a futuristic city in an alien world, skyline, spaceships, 4k raytraced",
 					},
 					"unit": {"type": "string"},
 				},
@@ -648,7 +648,7 @@ class Bot:
 		},
 		{
 			"name": "policy",
-			"description": "Divert the response to this function if a policy violation occurs.",
+			"description": "Highlight inappropriate queries here.",
 			"parameters": {
 				"type": "object",
 				"properties": {
@@ -1030,7 +1030,7 @@ class Bot:
 								return {"func": "play", "argv": argv, "comment": res}
 							elif name == "policy":
 								print("Policy!", messages[-1])
-								if model.startswith("gpt-3.5"):
+								if 1: #model.startswith("gpt-3.5"):
 									model = "wizard-vicuna-30b"
 									temp = 0.8
 									limit = 16384
