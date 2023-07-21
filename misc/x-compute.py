@@ -2928,8 +2928,8 @@ def get_image(url, out=None, nodel=False, nogif=False):
 	if type(url) not in (bytes, bytearray, io.BytesIO):
 		save = None
 		if is_url(url):
-			if url in CACHE:
-				return CACHE[url]
+			# if url in CACHE:
+			# 	return CACHE[url]
 			data = None
 			if is_discord_emoji(url):
 				save = f"cache/emoji_{url.rsplit('/', 1)[-1].split('.', 1)[0]}"
@@ -2942,7 +2942,7 @@ def get_image(url, out=None, nodel=False, nogif=False):
 			if len(data) > 8589934592:
 				raise OverflowError("Max file size to load is 8GB.")
 			image = from_bytes(data, save, nogif=nogif)
-			CACHE[url] = image
+			# CACHE[url] = image
 		else:
 			if os.path.getsize(url) > 8589934592:
 				raise OverflowError("Max file size to load is 8GB.")
