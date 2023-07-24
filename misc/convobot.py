@@ -750,16 +750,16 @@ class Bot:
 		elif model == "hippogriff":
 			model = "hippogriff-30b"
 			temp = 0.8
-			limit = 2048
+			limit = 4096
 			cm = 0
 		elif model == "wizard":
 			model = "wizard-vicuna-30b"
 			temp = 0.8
-			limit = 16384
+			limit = 4096
 		elif model == "platypus":
 			model = "gplatty-30b"
 			temp = 0.8
-			limit = 16384
+			limit = 4096
 		elif model == "instruct":
 			model = "gpt-3.5-turbo-instruct"
 			temp = 0.8
@@ -1037,7 +1037,7 @@ class Bot:
 								if 1: #model.startswith("gpt-3.5"):
 									model = "wizard-vicuna-30b"
 									temp = 0.8
-									limit = 16384
+									limit = 4096
 									cm = 0
 								else:
 									model = "gpt-3.5-turbo-instruct"
@@ -1094,7 +1094,12 @@ class Bot:
 				n = torch.cuda.device_count()
 				if not n:
 					raise RuntimeError("Required GPU not found.")
-				config = AutoConfig.from_pretrained(m, max_position_embeddings=limit)
+				config = AutoConfig.from_pretrained(
+					m,
+					tie_word_embeddings=True,
+					# max_position_embeddings=limit,
+					rope_scaling=dict(type="dynamic", scaling_factor=round(limit / 2048))
+				)
 				with accelerate.init_empty_weights():
 					model = AutoModelForCausalLM.from_config(config)
 				try:
@@ -2025,7 +2030,8 @@ class Bot:
 		gpt4=(480, 4),
 		gpt3a=(120, 2),
 		gpt4a=(480, 4),
-		wizard=(1920, 8),
+		wizard=(960, 6),
+		platypus=(960, 6),
 	)
 
 	def rerender(self, model=""):
