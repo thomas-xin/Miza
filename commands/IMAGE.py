@@ -1511,7 +1511,7 @@ class Art(Command):
 
     async def __call__(self, bot, guild, user, channel, message, name, args, flags, comment="", **void):
         if not torch:
-			raise NotImplementedError("AI features are currently disabled, sorry!")
+            raise NotImplementedError("AI features are currently disabled, sorry!")
         for a in reversed(message.attachments):
             args.insert(0, a.url)
         if not args:
