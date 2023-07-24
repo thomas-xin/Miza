@@ -1504,9 +1504,11 @@ class Art(Command):
     slash = ("Art", "Imagine")
     sdiff_sem = Semaphore(3, 256, rate_limit=7)
     fut = None
-    imagebot = None
-    with tracebacksuppressor:
+    try:
         imagebot = imagebot.Bot(token=AUTH.get("openai_key"))
+    except:
+        print_exc()
+        imagebot = None
     has_py39 = subprocess.run("py -3.9 -m pip").returncode == 0
 
     async def __call__(self, bot, guild, user, channel, message, name, args, flags, comment="", **void):
