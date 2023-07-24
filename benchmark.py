@@ -129,6 +129,14 @@ if keep:
 			pkg_resources.get_distribution(mn)
 		except:
 			subprocess.run([sys.executable, "-m", "pip", "install", mn, "--upgrade", "--user"])
+	if os.name == "nt":
+		try:
+			pkg_resources.get_distribution("bitsandbytes")
+		except:
+			dist = pkg_resources.get_distribution("bitsandbytes-windows")
+			fold = dist.module_path + "/bitsandbytes_windows-" + dist.version + ".dist-info"
+			if os.path.exists(fold):
+				os.rename(fold, fold.replace("_windows", ""))
 
 	total = 0
 	procs = []

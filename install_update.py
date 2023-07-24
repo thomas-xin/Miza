@@ -37,7 +37,23 @@ def try_int(i):
     except:
         return i
 
-# Parse requirements.txt
+if os.environ.get("AI_FEATURES", True):
+    modlist.extend((
+        "accelerate>=0.20.3",
+        "clip-interrogator>=0.6.0",
+        "diffusers>=0.18.1",
+        "openai>=0.27.8",
+        "protobuf==3.20.3",
+        "pytesseract>=0.3.10",
+        "sentencepiece>=0.1.99",
+        "sentence-transformers>=2.2.2",
+        "tiktoken>=0.4.0",
+        "tokenizers>=0.13.3",
+        "torch>=2.0.1",
+        "transformers>=4.31.0",
+    ))
+
+# Parsed requirements.txt
 for mod in modlist:
     if mod:
         s = None
@@ -97,5 +113,14 @@ try:
 except:
     print_exc()
     subprocess.run([python, "-m", "pip", "install", "httpx[http2]>=0.24.0", "--upgrade", "--user"])
+
+if os.name == "nt" and os.environ.get("AI_FEATURES", True):
+    try:
+        pkg_resources.get_distribution("bitsandbytes")
+    except:
+        dist = pkg_resources.get_distribution("bitsandbytes-windows")
+        fold = dist.module_path + "/bitsandbytes_windows-" + dist.version + ".dist-info"
+        if os.path.exists(fold):
+            os.rename(fold, fold.replace("_windows", ""))
 
 print("Installer terminated.")

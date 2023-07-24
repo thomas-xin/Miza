@@ -1157,7 +1157,7 @@ class Bot:
 					quantization_config = BitsAndBytesConfig(
 						load_in_8bit=True,
 						llm_int8_threshold=6.0,
-						llm_int8_enable_fp32_cpu_offload=True,
+						# llm_int8_enable_fp32_cpu_offload=True,
 						llm_int8_has_fp16_weight=False,
 					)
 					for k in ("lm_head", "model.norm"):

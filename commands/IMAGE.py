@@ -1504,10 +1504,14 @@ class Art(Command):
     slash = ("Art", "Imagine")
     sdiff_sem = Semaphore(3, 256, rate_limit=7)
     fut = None
-    imagebot = imagebot.Bot(token=AUTH.get("openai_key"))
+    imagebot = None
+    with tracebacksuppressor:
+        imagebot = imagebot.Bot(token=AUTH.get("openai_key"))
     has_py39 = subprocess.run("py -3.9 -m pip").returncode == 0
 
     async def __call__(self, bot, guild, user, channel, message, name, args, flags, comment="", **void):
+        if not torch:
+			raise NotImplementedError("AI features are currently disabled, sorry!")
         for a in reversed(message.attachments):
             args.insert(0, a.url)
         if not args:

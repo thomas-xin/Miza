@@ -1456,6 +1456,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				return self.analysed[url][:-1]
 		except (LookupError, TypeError):
 			pass
+		if not torch:
+			return ("File", url.rsplit("/", 1)[-1], "", None)
 		try:
 			p1, p2 = await process_image(url, "caption", ["-nogif", best], fix=3, pwr=1000000 if best else 1, timeout=300)
 		except:

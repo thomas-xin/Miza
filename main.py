@@ -1,34 +1,63 @@
-# Loads the install_update module, which makes sure all required libraries are installed to their required versions.
-import install_update
-from install_update import *
+import subprocess, sys
+try:
+	import pynvml
+except ImportError:
+	subprocess.run([sys.executable, "-m", "pip", "install", "pynvml", "--upgrade", "--user"])
+import pynvml
+try:
+	pynvml.nvmlInit()
+	DC = pynvml.nvmlDeviceGetCount()
+except:
+	DC = 0
 
+
+AUTH = {
+    "active_categories": ["MAIN", "STRING", "ADMIN", "VOICE", "IMAGE", "WEBHOOK", "FUN", "OWNER"],
+    "prefix": "~",
+    "slash_commands": False,
+    "webserver_address": "0.0.0.0",
+    "webserver_port": "",
+    "discord_id": "",
+    "discord_token": "",
+    "discord_secret": "",
+    "owner_id": [],
+    "rapidapi_key": "",
+    "rapidapi_secret": "",
+    "alexflipnote_key": "",
+    "giphy_key": "",
+    "huggingface_key": "",
+    "openai_key": "",
+    "backup_path": "backup",
+    "cache_path": "",
+    "ai_features": bool(DC),
+}
+import json
+modified = False
 # Makes sure an authentication file exists.
 if not os.path.exists("auth.json") or not os.path.getsize("auth.json"):
     print("Authentication file not found. Generating empty template...")
-    d = {
-        "active_categories": ["MAIN", "STRING", "ADMIN", "VOICE", "IMAGE", "WEBHOOK", "FUN", "OWNER"],
-        "prefix": "~",
-        "slash_commands": False,
-        "webserver_address": "0.0.0.0",
-        "webserver_port": "",
-        "discord_id": "",
-        "discord_token": "",
-        "discord_secret": "",
-        "owner_id": [],
-        "rapidapi_key": "",
-        "rapidapi_secret": "",
-        "alexflipnote_key": "",
-        "giphy_key": "",
-        "huggingface_key": "",
-        "openai_key": "",
-        "backup_path": "backup",
-        "cache_path": "",
-    }
-    import json
+    orig = ()
+else:
+    with open("auth.json", "rb") as f:
+        orig = json.load(f)
+    AUTH.update(orig)
+if set(AUTH).difference(orig):
     with open("auth.json", "w", encoding="utf-8") as f:
-        json.dump(d, f, indent="\t")
-    input("auth.json generated. Please fill in discord_token and restart bot when done.")
-    raise SystemExit
+        json.dump(AUTH, f, indent="\t")
+    if "discord_token" not in orig:
+        token = input("auth.json generated. Please fill in discord_token and restart bot when done. ")
+        if not token:
+            raise SystemExit
+        AUTH["discord_token"] = token
+    print("auth.json updated. Make sure to check empty fields!")
+
+
+if not AUTH.get("ai_features"):
+    os.environ["AI_FEATURES"] = False
+
+# Loads the install_update module, which makes sure all required libraries are installed to their required versions.
+import install_update
+from install_update import *
 
 
 import time, datetime, psutil, subprocess

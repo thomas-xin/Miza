@@ -1207,6 +1207,8 @@ class Ask(Command):
 	visited = {}
 
 	async def __call__(self, message, guild, channel, user, argv, name, flags=(), **void):
+		if not torch:
+			raise NotImplementedError("AI features are currently disabled, sorry!")
 		bot = self.bot
 		cname = name
 		self.description = f"Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. See {bot.kofi_url} for premium tier chatbot specifications; check using ~serverinfo, or apply it with ~premium!"

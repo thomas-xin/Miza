@@ -77,8 +77,13 @@ if len(sys.argv) > 2:
 	COMPUTE_LOAD = orjson.loads(sys.argv[2])
 
 # os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-import torch
-hwaccel = "cuda" if torch.cuda.is_available() else "d3d11va" if os.name == "nt" else "auto"
+try:
+	import torch
+except:
+	torch = None
+	hwaccel = "d3d11va" if os.name == "nt" else "auto"
+else:
+	hwaccel = "cuda" if torch.cuda.is_available() else "d3d11va" if os.name == "nt" else "auto"
 
 if not hasattr(time, "time_ns"):
 	time.time_ns = lambda: int(time.time() * 1e9)

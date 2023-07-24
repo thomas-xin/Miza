@@ -30,7 +30,6 @@ MultiAutoImporter(
 	"filetype",
 	"inspect",
 	"sqlite3",
-	"torch",
 	pool=import_exc,
 	_globals=globals(),
 )
@@ -51,8 +50,10 @@ import pynvml
 try:
 	pynvml.nvmlInit()
 	DC = pynvml.nvmlDeviceGetCount()
+	import torch
 except:
 	DC = 0
+	torch = None
 hwaccel = "cuda" if DC else "d3d11va" if os.name == "nt" else "auto"
 
 utils = discord.utils
@@ -2351,17 +2352,21 @@ async def start_proc(k, i):
 	return proc
 
 def proc_start():
-	globals()["DC"] = torch.cuda.device_count()
-	COMPUTE_LOAD = AUTH.get("compute_load", [])
-	if len(COMPUTE_LOAD) < DC:
-		COMPUTE_LOAD = AUTH["compute_load"] = [torch.cuda.get_device_properties(i).multi_processor_count for i in range(torch.cuda.device_count())]
-	elif len(COMPUTE_LOAD) > DC:
-		COMPUTE_LOAD = COMPUTE_LOAD[:DC]
-	if COMPUTE_LOAD:
-		total = sum(COMPUTE_LOAD)
-		if total != 1:
-			COMPUTE_LOAD = AUTH["compute_load"] = [i / total for i in COMPUTE_LOAD]
-		print("Compute load distribution:", COMPUTE_LOAD)
+	if torch:
+		globals()["DC"] = torch.cuda.device_count()
+		COMPUTE_LOAD = AUTH.get("compute_load", [])
+		if len(COMPUTE_LOAD) < DC:
+			COMPUTE_LOAD = AUTH["compute_load"] = [torch.cuda.get_device_properties(i).multi_processor_count for i in range(torch.cuda.device_count())]
+		elif len(COMPUTE_LOAD) > DC:
+			COMPUTE_LOAD = COMPUTE_LOAD[:DC]
+		if COMPUTE_LOAD:
+			total = sum(COMPUTE_LOAD)
+			if total != 1:
+				COMPUTE_LOAD = AUTH["compute_load"] = [i / total for i in COMPUTE_LOAD]
+			print("Compute load distribution:", COMPUTE_LOAD)
+	else:
+		COMPUTE_LOAD = ()
+		globals()["DC"] = 0
 	# PROC_COUNT.math = 3
 	# PROC_COUNT.image = 3 + dc
 	PROC_COUNT.compute = 3 + DC
