@@ -1098,7 +1098,7 @@ class Bot:
 					m,
 					tie_word_embeddings=True,
 					# max_position_embeddings=limit,
-					rope_scaling=dict(type="dynamic", scaling_factor=round(limit / 2048))
+					rope_scaling=dict(type="dynamic", factor=round(limit / 2048))
 				)
 				with accelerate.init_empty_weights():
 					model = AutoModelForCausalLM.from_config(config)
