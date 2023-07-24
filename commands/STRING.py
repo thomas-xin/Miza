@@ -1193,7 +1193,7 @@ class Match(Command):
 
 class Ask(Command):
 	_timeout_ = 24
-	name = ["Bloom", "NeoX", "Pyg", "Pygmalion", "GPT2", "Llama", "Vicuna", "Manticore", "Hippogriff", "Wizard", "Davinci", "GPT3", "GPT3a", "GPT4", "GPT4a"]
+	name = ["Bloom", "NeoX", "Pyg", "Pygmalion", "GPT2", "Llama", "Vicuna", "Manticore", "Hippogriff", "Wizard", "Platypus", "GPlatty", "Davinci", "GPT3", "GPT3a", "GPT4", "GPT4a"]
 	description = "Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. For premium tier chatbots, check using ~serverinfo, or apply with ~premium!"
 	usage = "<string>"
 	example = ("ask what's the date?", "gpt3 what is the square root of 3721?", "pyg can I have a hug?")
@@ -1399,8 +1399,10 @@ class Ask(Command):
 			model = "manticore"
 		elif cname == "hippogriff":
 			model = "hippogriff"
-		elif cname == "wizard" or cname == "vicuna" or cname == "llama":
+		elif cname == "wizard" or cname == "vicuna":
 			model = "wizard"
+		elif cname == "platypus" or cname == "gplatty" or cname == "llama":
+			model = "platypus"
 		elif cname == "gpt3":
 			model = "gpt3"
 		elif cname == "gpt3a":

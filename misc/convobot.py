@@ -648,13 +648,13 @@ class Bot:
 		},
 		{
 			"name": "policy",
-			"description": "Highlight inappropriate queries here.",
+			"description": "Highlight responses here if a request was not fulfilled.",
 			"parameters": {
 				"type": "object",
 				"properties": {
 					"query": {
 						"type": "string",
-						"description": "The response, e.g. Sorry, as an AI language model, my purpose is to assist and help users in a positive way.",
+						"description": "The response, e.g. Sorry, I cannot fulfill that request. My purpose is to assist and help users in a positive way.",
 					},
 					"unit": {"type": "string"},
 				},
@@ -756,6 +756,10 @@ class Bot:
 			model = "wizard-vicuna-30b"
 			temp = 0.8
 			limit = 16384
+		elif model == "platypus":
+			model = "gplatty-30b"
+			temp = 0.8
+			limit = 16384
 		elif model == "instruct":
 			model = "gpt-3.5-turbo-instruct"
 			temp = 0.8
@@ -797,7 +801,7 @@ class Bot:
 			ins.append(lines.pop(-1))
 		print("INS:", ins)
 		p = per
-		local_models = ("pygmalion-13b", "manticore-13b", "hippogriff-30b", "wizard-vicuna-30b")
+		local_models = ("pygmalion-13b", "manticore-13b", "hippogriff-30b", "wizard-vicuna-30b", "gplatty-30b")
 		if self.name.casefold() not in p.casefold() and "you" not in p.casefold():
 			if model in ("gpt-3.5-turbo", "gpt-4", "gpt-3.5-turbo-instruct"):
 				nstart = f"Your name is {self.name}; you are {p}. Express emotion when appropriate!"
@@ -1064,20 +1068,24 @@ class Bot:
 				import bitsandbytes
 			except ImportError:
 				bitsandbytes = None
-			buffer = 1.1
+			buffer = 1.2
 			if model == "pygmalion-13b":
 				m = "TehVenom/Pygmalion-13b-Merged"
 				req = 13
 			elif model == "manticore-13b":
 				m = "openaccess-ai-collective/manticore-13b-chat-pyg"
 				req = 13
-			elif model == "wizard-vicuna-30b":
+			elif model == "hippogriff-30b":
 				m = "openaccess-ai-collective/hippogriff-30b-chat"
 				req = 33
-			else:
+			elif model == "wizard-vicuna-30b":
 				m = "Panchovix/Wizard-Vicuna-30B-Uncensored-lxctx-PI-16384-LoRA-fp16"
 				req = 33
-				buffer = 1.3
+				buffer = 1.5
+			else:
+				m = "Panchovix/GPlatty-30B-lxctx-PI-16384-LoRA-fp16"
+				req = 33
+				buffer = 1.5
 			try:
 				tokenizer, model = self.models[m]
 			except KeyError:
@@ -1329,7 +1337,7 @@ class Bot:
 			if premium < 2:
 				stop = None
 			else:
-				stop = ["s an AI", "orry,", "language model"]
+				stop = ["s an AI", "orry,", "cannot fulfill", "refrain"]
 			response = None
 			data = dict(
 				model=model,
