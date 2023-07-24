@@ -31,7 +31,7 @@ AUTH = {
     "cache_path": "",
     "ai_features": bool(DC),
 }
-import json
+import json, os
 modified = False
 # Makes sure an authentication file exists.
 if not os.path.exists("auth.json") or not os.path.getsize("auth.json"):
