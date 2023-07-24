@@ -2037,7 +2037,7 @@ class Bot:
 
 	def rerender(self, model=""):
 		lim, r1 = self.model_limits.get(model) or ((720, 6) if self.premium >= 2 else (360, 4))
-		if not self.chat_history or len(self.chat_history) < r1 and len(self.gpttokens(self.chat_history[0][1])) <= lim * 2:
+		if not self.chat_history or len(self.chat_history) < r1 and len(self.gpttokens(self.chat_history[0][1])) <= lim * 1.5:
 			return
 		r2 = r1 // 2 + 1
 		fix = min(len(self.chat_history) - 1, max(r2, len(self.chat_history) - r2))
