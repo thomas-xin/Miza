@@ -1094,7 +1094,7 @@ class Bot:
 				n = torch.cuda.device_count()
 				if not n:
 					raise RuntimeError("Required GPU not found.")
-				config = AutoConfig.from_pretrained(m)
+				config = AutoConfig.from_pretrained(m, max_position_embeddings=limit)
 				with accelerate.init_empty_weights():
 					model = AutoModelForCausalLM.from_config(config)
 				try:
