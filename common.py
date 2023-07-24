@@ -2420,8 +2420,8 @@ async def sub_submit(ptype, command, fix=None, pwr=None, _timeout=12):
 last_sub = 0
 async def wait_sub():
 	globals()["last_sub"] = utc()
-	await asyncio.sleep(1800)
-	if utc() - last_sub < 1800:
+	await asyncio.sleep(3600 * 8)
+	if utc() - last_sub < 3600 * 8:
 		return
 	globals()["last_sub"] = utc()
 	if any(proc.sem.busy for proc in PROCS.compute if proc):
@@ -2491,8 +2491,12 @@ async def _sub_submit(ptype, command, fix=None, _timeout=12):
 			raise
 		finally:
 			PROC_RESP.pop(ts, None)
-	create_task(wait_sub())
+	if SUB_WAITING:
+		SUB_WAITING.cancel()
+	globals()["SUB_WAITING"] = create_task(wait_sub())
 	return resp
+
+SUB_WAITING = None
 
 
 # Sends an operation to the math subprocess pool.

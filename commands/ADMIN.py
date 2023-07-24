@@ -2295,9 +2295,11 @@ class UpdateUserLogs(Database):
             with tracebacksuppressor(StopIteration):
                 ts = utc()
                 futs = [create_task(guild.audit_logs(limit=4, action=getattr(discord.AuditLogAction, action)).flatten()) for action in ("ban", "kick", "member_prune")]
-                bans = await futs[0]
-                kicks = await futs[1]
-                prunes = await futs[2]
+                bans = kicks = prunes = ()
+                with tracebacksuppressor:
+                    bans = await futs[0]
+                    kicks = await futs[1]
+                    prunes = await futs[2]
                 for log in bans:
                     if ts - utc_ts(log.created_at) < 3:
                         if log.target.id == user.id:
