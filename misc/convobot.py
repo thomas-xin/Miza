@@ -517,7 +517,7 @@ class Bot:
 				e1 = tokens[:limit]
 				s1 = enc.decode(e1).strip()
 				if smp.devid:
-					with torch.autocast(f"cuda:{smp.devid}"):
+					with torch.autocast("cuda"):
 						s2 = smp(s1, max_length=limit // 2, min_length=limit // 2 - 32, do_sample=do_sample, truncation=True)[0]["summary_text"]
 				else:
 					s2 = smp(s1, max_length=limit // 2, min_length=limit // 2 - 32, do_sample=do_sample, truncation=True)[0]["summary_text"]
@@ -529,7 +529,7 @@ class Bot:
 		s1 = enc.decode(e1).strip().replace("  ", " ")
 		if len(tokens) > max_length:
 			if smp.devid:
-				with torch.autocast(f"cuda:{smp.devid}"):
+				with torch.autocast("cuda"):
 					s2 = smp(s1, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
 			else:
 				s2 = smp(s1, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
