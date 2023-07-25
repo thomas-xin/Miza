@@ -1796,6 +1796,8 @@ transform: translate(-50%, -50%);
 				fo = f"{of}.{fmt}"
 				if hwaccel == "cuda":
 					args.extend(("-c:v", "av1_nvenc"))
+					devid = random.choice([i for i in range(ceil(torch.cuda.device_count() / 2)) if (torch.cuda.get_device_properties(i).major, torch.cuda.get_device_properties(i).major) >= (8, 9)])
+					args = args[:1] + ["-hwaccel_device", str(devid)] + args[1:]
 				else:
 					args.extend(("-c:v", "libsvtav1"))
 				args.extend((
