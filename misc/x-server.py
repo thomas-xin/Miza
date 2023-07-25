@@ -279,27 +279,9 @@ config = {
 		"request.error_response": error_handler,
 	},
 }
-if os.path.exists("domain.cert.pem") and os.path.exists("private.key.pem"):
-	config["global"]["server.ssl_certificate"] = "domain.cert.pem"
-	config["global"]["server.ssl_private_key"] = "private.key.pem"
-	# def hostmap(func):
-	# 	def decorator(*args, **kwargs):
-	# 		url = cp.url(qs=cp.request.query_string)
-	# 		if not url.startswith("https://mizabot.") and not url.startswith("https://api.mizabot."):
-	# 			if url.startswith("https://csnftcg.mizabot."):
-	# 				raise cp.HTTPRedirect(f"https://csnftcg.mizabot.xyz:9604/{url.rsplit('/', 1)[-1]}", 307)
-	# 			# time.sleep(10)
-	# 			# raise cp.HTTPRedirect(f"https://mizabot.xyz/{url.rsplit('/', 1)[-1]}", 307)
-	# 		return func(*args, **kwargs)
-	# 	return decorator
-# 	def e404(status, message, traceback, version):
-# 		url = cp.url(qs=cp.request.query_string)
-# 		if not url.startswith("https://mizabot.") and not url.startswith("https://api.mizabot."):
-# 			print("Not Found:", url)
-# 			time.sleep(3600)
-# 		return message
-# 	cp.config["error_page.404"] = e404
-# else:
+# if os.path.exists("domain.cert.pem") and os.path.exists("private.key.pem"):
+# 	config["global"]["server.ssl_certificate"] = "domain.cert.pem"
+# 	config["global"]["server.ssl_private_key"] = "private.key.pem"
 def hostmap(func):
 	return func
 

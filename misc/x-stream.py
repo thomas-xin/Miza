@@ -91,17 +91,18 @@ MIMES = dict(
 class Server:
 
 	cache = {}
-	if os.path.exists("temp.json"):
+	if os.path.exists("temp.json") and os.path.getsize("temp.json"):
 		with open("temp.json", "rb") as f:
 			state = json.load(f)
 	else:
-		state = {"/": f"api.mizabot.xyz:{webserver_port}"}
+		state = {"/": f"https://api.mizabot.xyz:{webserver_port}"}
 	session = requests.Session()
 
 	@cp.expose
-	def heartbeat(self, key):
+	def heartbeat(self, key, uri=""):
 		assert key == discord_secret
-		uri = f"{cp.request.remote.ip}:{webserver_port}"
+		uri = uri or f"https://IP:{webserver_port}"
+		uri = uri.replace("IP", cp.request.remote.ip)
 		if self.state["/"] != uri:
 			self.state["/"] = uri
 			with open("temp.json", "w") as f:
@@ -129,7 +130,7 @@ class Server:
 		rquery = cp.request.query_string
 		if rquery:
 			rquery = "?" + rquery
-		url = f"https://{self.state['/']}{rpath}{rquery}"
+		url = f"{self.state['/']}{rpath}{rquery}"
 		if cp.request.method.upper() != "GET":
 			raise cp.HTTPRedirect(url, 307)
 		headers = dict(cp.request.headers)

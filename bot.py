@@ -4306,7 +4306,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				async with tracebacksuppressor:
 					futs = []
 					for addr in AUTH.get("remote_servers", ()):
-						fut = create_task(Request(f"https://{addr}/heartbeat?key={AUTH.get('discord_secret') or ''}", aio=True, ssl=False))
+						fut = create_task(Request(
+							f"https://{addr}/heartbeat?key={AUTH.get('discord_secret') or ''}&uri=http://IP:{PORT}",
+							aio=True,
+							ssl=False,
+						))
 						futs.append(fut)
 					await asyncio.sleep(1)
 					with MemoryTimer("update_file_cache"):
