@@ -2698,7 +2698,11 @@ class AudioDownloader:
                 copy = False
             args = alist((ffmpeg, "-nostdin", "-hide_banner", "-v", "error", "-hwaccel", hwaccel, "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y", "-protocol_whitelist", "file,http,https,tcp,tls"))
             if hwaccel == "cuda":
-                args.extend(("-hwaccel_device", str(random.randint(0, ceil(torch.cuda.device_count() / 2)))))
+                if "av1_nvenc" in args:
+                    devid = random.choice([i for i in range(ceil(torch.cuda.device_count() / 2)) if (torch.cuda.get_device_properties(i).major, torch.cuda.get_device_properties(i).major) >= (8, 9)])
+                else:
+                    devid = random.randint(0, ceil(torch.cuda.device_count() / 2))
+                args.extend(("-hwaccel_device", str(devid)))
             if vst:
                 if len(vst) > 1:
                     codec_map = {}

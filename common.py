@@ -2272,10 +2272,10 @@ async def proc_communicate(proc):
 				if isinstance(c, (str, bytes, memoryview)):
 					exec_tb(c, globals())
 			else:
-				print(lim_str(as_str(s), 1048576))
+				print(lim_str(as_str(s), 262144))
 		except:
 			print_exc()
-			print(lim_str(as_str(s), 1048576))
+			print(lim_str(as_str(s), 262144))
 
 async def proc_distribute(proc):
 	bot = BOT[0]

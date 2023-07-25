@@ -3171,7 +3171,11 @@ def evalImg(url, operation, args):
 			else:
 				command = ["./ffmpeg", "-threads", "2", "-hide_banner", "-v", "error", "-y", "-hwaccel", hwaccel]
 				if hwaccel == "cuda":
-					command.extend(("-hwaccel_device", str(random.randint(0, ceil(torch.cuda.device_count() / 2)))))
+					if mode == "RGBA":
+						devid = random.choice([i for i in range(ceil(torch.cuda.device_count() / 2)) if (torch.cuda.get_device_properties(i).major, torch.cuda.get_device_properties(i).major) >= (8, 9)])
+					else:
+						devid = random.randint(0, ceil(torch.cuda.device_count() / 2))
+					command.extend(("-hwaccel_device", str(devid)))
 				command.extend([
 					"-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", ("rgb24" if mode == "RGB" else "rgba"),
 					"-video_size", "x".join(map(str, size)), "-i", "-",
