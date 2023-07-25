@@ -489,25 +489,13 @@ class Bot:
 				pass
 			device, dtype = determine_cuda(2147483648, priority=True)
 			print(device, dtype)
-			smp = None
 			try:
-				import bitsandbytes
-			except ImportError:
-				bitsandbytes = None
-			else:
-				try:
-					smp = pipeline("summarization", model=m, device=device, torch_dtype=dtype, load_in_8bit=True)
-					smp.devid = device
-				except:
-					print_exc()
-			if not smp:
-				try:
-					smp = pipeline("summarization", model=m, device=device, torch_dtype=dtype)
-					smp.devid = device
-				except:
-					print_exc()
-					smp = pipeline("summarization", model=m, device=-1, torch_dtype=torch.float32)
-					smp.devid = None
+				smp = pipeline("summarization", model=m, device=device, torch_dtype=dtype)
+				smp.devid = device
+			except:
+				print_exc()
+				smp = pipeline("summarization", model=m, device=-1, torch_dtype=torch.float32)
+				smp.devid = None
 		self.models[m] = smp
 		enc = tiktoken.get_encoding("cl100k_base")
 		tokens = enc.encode(q)
