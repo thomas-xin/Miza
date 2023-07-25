@@ -2226,7 +2226,7 @@ def force_kill(proc):
 		return
 	if getattr(proc, "fut", None) and not proc.fut.done():
 		with tracebacksuppressor:
-			proc.fut.set_exception(ConnectionResetError("Response disconnected."))
+			proc.fut.set_exception(ConnectionResetError("Response disconnected. If this error occurs during a command, it is likely due to maintenance!"))
 	killed = deque()
 	if not callable(getattr(proc, "children", None)):
 		proc = psutil.Process(proc.pid)
@@ -2470,7 +2470,7 @@ async def _sub_submit(ptype, command, fix=None, _timeout=12):
 			tries = ceil(_timeout / 3) if _timeout and is_finite(_timeout) else 3600
 			for i in range(tries):
 				if ts not in PROC_RESP:
-					raise ConnectionResetError("Response disconnected.")
+					raise ConnectionResetError("Response disconnected. If this error occurs during a command, it is likely due to maintenance!")
 				try:
 					resp = await asyncio.wait_for(wrap_future(fut), timeout=3)
 				except T1:

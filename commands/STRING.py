@@ -1263,7 +1263,7 @@ class Ask(Command):
 		visible = []
 		if not getattr(message, "simulated", False):
 			async for m in bot.history(channel, limit=16):
-				visible.insert(0, m)
+				visible.append(m)
 		visible.append(reference)
 		visible.append(message)
 		ignores = set()
@@ -1291,7 +1291,7 @@ class Ask(Command):
 			else:
 				content = ""
 			found = None
-			if not content.strip():
+			if i < 8 and not content.strip():
 				url = f"https://discord.com/channels/0/{channel.id}/{m.id}"
 				found = self.visited.get(url)
 				if found is None:
@@ -1309,7 +1309,7 @@ class Ask(Command):
 			c = content
 			if c[0] in "\\#!%" or c[:2] in ("//", "/*"):
 				continue
-			if not found:
+			if i < 8 and not found:
 				url = f"https://discord.com/channels/0/{channel.id}/{m.id}"
 				found = self.visited.get(url)
 				if found is None:
@@ -1336,7 +1336,7 @@ class Ask(Command):
 			ignores.add(m.id)
 		if len(self.visited) > 256:
 			self.visited.pop(next(iter(self.visited)))
-		for i, m, content, found, cfut in visconts:
+		for i, m, content, found, cfut in reversed(visconts):
 			if cfut:
 				cfut = await cfut
 			if cfut:
