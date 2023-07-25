@@ -762,7 +762,7 @@ class Bot:
 		while not elems:
 			if i >= 90 and ims:
 				break
-			if i >= 180:
+			if i >= 360:
 				print("ClipDrop: unavailable")
 				return
 			elems = driver.find_elements(by=tag_name, value="img")
