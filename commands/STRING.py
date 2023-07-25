@@ -1362,8 +1362,8 @@ class Ask(Command):
 			t = (name, content)
 			if str(m.id) not in mapd and m.id != message.id:
 				await register_embedding(m.id, name, content)
-		else:
-			reset = None
+		# else:
+		# 	reset = None
 		if isinstance(caid, dict):
 			caid.setdefault("ids", {})[str(message.id)] = None
 		m = message
