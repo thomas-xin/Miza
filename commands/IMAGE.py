@@ -1341,7 +1341,6 @@ class Blend(Command):
             if not name.endswith(".png"):
                 name += ".png"
             resp = await process_image(url1, "blend_op", [url2, operation, opacity], timeout=_timeout)
-            print(resp)
             fn = resp
             if isinstance(fn, str) and "." in fn:
                 fmt = "." + fn.rsplit(".", 1)[-1]
