@@ -2275,7 +2275,7 @@ async def proc_communicate(proc):
 				print(lim_str(as_str(s), 1048576))
 		except:
 			print_exc()
-			print(s)
+			print(lim_str(as_str(s), 1048576))
 
 async def proc_distribute(proc):
 	bot = BOT[0]
@@ -2468,18 +2468,22 @@ async def _sub_submit(ptype, command, fix=None, _timeout=12):
 			await proc.stdin.drain()
 			fut = PROC_RESP[ts]
 			tries = ceil(_timeout / 3) if _timeout and is_finite(_timeout) else 3600
+			ex2 = None
 			for i in range(tries):
 				if ts not in PROC_RESP:
 					raise ConnectionResetError("Response disconnected. If this error occurs during a command, it is likely due to maintenance!")
 				try:
 					resp = await asyncio.wait_for(wrap_future(fut), timeout=3)
-				except T1:
+				except T1 as ex:
 					if i >= tries - 1:
-						raise
+						ex2 = ex
+						break
 				else:
 					break
 			else:
 				raise OSError("Max waits exceeded.")
+			if ex2:
+				raise ex2
 		except (BrokenPipeError, OSError, RuntimeError) as ex:
 			if isinstance(ex, RuntimeError):
 				if "OutOfMemoryError" in repr(ex):
