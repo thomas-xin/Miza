@@ -4308,11 +4308,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					for addr in AUTH.get("remote_servers", ()):
 						fut = create_task(Request(
 							f"https://{addr}/heartbeat",
-							data=orjson.dumps(dict(
+							data=dict(
 								key=AUTH.get("discord_secret") or "",
 								uri=f"http://IP:{PORT}",
-							)),
-							headers={"Content-Type": "application/json"},
+							),
 							aio=True,
 							ssl=False,
 						))
