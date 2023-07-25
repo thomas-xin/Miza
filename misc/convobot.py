@@ -489,13 +489,25 @@ class Bot:
 				pass
 			device, dtype = determine_cuda(2147483648, priority=True)
 			print(device, dtype)
+			smp = None
 			try:
-				smp = pipeline("summarization", model=m, device=device, torch_dtype=dtype)
-				smp.devid = device
-			except:
-				print_exc()
-				smp = pipeline("summarization", model=m, device=-1, torch_dtype=torch.float32)
-				smp.devid = None
+				import bitsandbytes
+			except ImportError:
+				bitsandbytes = None
+			else:
+				try:
+					smp = pipeline("summarization", model=m, device=device, torch_dtype=dtype, load_in_8bit=True)
+					smp.devid = device
+				except:
+					print_exc()
+			if not smp:
+				try:
+					smp = pipeline("summarization", model=m, device=device, torch_dtype=dtype)
+					smp.devid = device
+				except:
+					print_exc()
+					smp = pipeline("summarization", model=m, device=-1, torch_dtype=torch.float32)
+					smp.devid = None
 		self.models[m] = smp
 		enc = tiktoken.get_encoding("cl100k_base")
 		tokens = enc.encode(q)
@@ -505,7 +517,7 @@ class Bot:
 				e1 = tokens[:limit]
 				s1 = enc.decode(e1).strip()
 				if smp.devid:
-					with torch.autocast("cuda"):
+					with torch.autocast(f"cuda:{smp.devid}"):
 						s2 = smp(s1, max_length=limit // 2, min_length=limit // 2 - 32, do_sample=do_sample, truncation=True)[0]["summary_text"]
 				else:
 					s2 = smp(s1, max_length=limit // 2, min_length=limit // 2 - 32, do_sample=do_sample, truncation=True)[0]["summary_text"]
@@ -517,12 +529,12 @@ class Bot:
 		s1 = enc.decode(e1).strip().replace("  ", " ")
 		if len(tokens) > max_length:
 			if smp.devid:
-				with torch.autocast("cuda"):
+				with torch.autocast(f"cuda:{smp.devid}"):
 					s2 = smp(s1, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
 			else:
 				s2 = smp(s1, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
 		out = []
-		otok = list(enc.encode(s2))
+		otok = list(enc.encode(s2.strip()))
 		last = None
 		count = 0
 		while otok:
@@ -535,7 +547,9 @@ class Bot:
 				last = c
 				count = 0
 			out.append(c)
-		return enc.decode(out).strip()
+		if len(out) < min_length / 2:
+			return lim_tokens(q, max_length + min_length >> 1)
+		return enc.decode(out)
 
 	def auto_summarise(self, q="", max_length=128, min_length=64):
 		if q and sum(c.isascii() for c in q) / len(q) > 0.75:
