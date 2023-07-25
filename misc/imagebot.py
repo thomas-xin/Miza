@@ -845,7 +845,7 @@ class Bot:
 		out = []
 		for fut in futs:
 			try:
-				ims = fut.result(timeout=240)
+				ims = fut.result(timeout=420)
 				if not ims:
 					continue
 				out.extend(ims)
