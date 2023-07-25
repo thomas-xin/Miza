@@ -2121,15 +2121,14 @@ def blend_op(image, url, operation, amount, recursive=True):
 			if str(out.mode) != "RGBA":
 				out = out.convert("RGBA")
 		if filt == "blend":
-			A = out.getchannel("A")
-			A.point(lambda x: round(x * amount))
-			out.putalpha(A)
+			# A = out.getchannel("A")
+			# A.point(lambda x: round(x * amount))
+			# out.putalpha(A)
 			out = Image.alpha_composite(image, out)
-		else:
-			if amount == 0:
-				out = image
-			elif amount != 1:
-				out = Image.blend(image, out, amount)
+		if amount == 0:
+			out = image
+		elif amount != 1:
+			out = Image.blend(image, out, amount)
 	return out
 
 
