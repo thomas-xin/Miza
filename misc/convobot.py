@@ -1080,7 +1080,7 @@ class Bot:
 				req = 33
 			elif model == "wizard-vicuna-30b":
 				# m = "Panchovix/Wizard-Vicuna-30B-Uncensored-lxctx-PI-16384-LoRA-fp16"
-				# m = "ehartford/Wizard-Vicuna-30B-Uncensored"
+				m = "ehartford/Wizard-Vicuna-30B-Uncensored"
 				req = 33
 				buffer = 1.4
 			else:
