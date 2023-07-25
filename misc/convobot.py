@@ -405,8 +405,6 @@ class Bot:
 		self.name = name
 		self.personality = personality
 		self.promises = []
-		self.chat_history = []
-		self.chat_history_ids = None
 		self.timestamp = time.time()
 		self.premium = premium
 		self.fp = FreeProxy()
@@ -416,9 +414,11 @@ class Bot:
 		self.jailbroken = False
 		if summary:
 			if isinstance(summary, str):
-				self.chat_history.append(("[SYSTEM]", summary))
+				self.chat_history = [("[SYSTEM]", summary)]
 			else:
-				self.chat_history.extend(summary)
+				self.chat_history = summary
+		else:
+			self.chat_history = []
 
 	def submit_cost(self, key, cost):
 		if not key or key == self.key:
