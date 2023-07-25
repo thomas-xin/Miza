@@ -44,7 +44,7 @@ class Translate(Command):
 	time_consuming = True
 	name = ["TR"]
 	description = "Translates a string into another language."
-	usage = "<0:engine{google|chatgpt}>? <2:src_language(en)>? <1:dest_languages(en)>* <-1:string>"
+	usage = "<0:engine{chatgpt|google}>? <2:src_language(en)>? <1:dest_languages(en)>* <-1:string>"
 	example = ("translate english 你好", "tr google chinese bonjour", "translate chatgpt auto spanish french italian thank you!")
 	flags = "v"
 	no_parse = True
@@ -66,7 +66,7 @@ class Translate(Command):
 		if len(spl) > 1 and spl[0].casefold() in ("google", "chatgpt"):
 			engine = spl.pop(0).casefold()
 		else:
-			engine = "google"
+			engine = "chatgpt"
 		if len(spl) > 2 and (src := (self.renamed.get(c := spl[0].casefold()) or (self.languages.get(c) and c))):
 			spl.pop(0)
 			src = lim_str(src, 32)
@@ -1332,7 +1332,6 @@ class Ask(Command):
 				reset = False
 				if caid:
 					caid.pop("ids", None)
-				print(channel, "mismatch", m.id)#, caid)
 			ignores.add(m.id)
 		if len(self.visited) > 256:
 			self.visited.pop(next(iter(self.visited)))
@@ -1342,7 +1341,7 @@ class Ask(Command):
 			if cfut:
 				pt, p1, p2 = cfut
 				p0 = found.split("?", 1)[0].rsplit("/", 1)[-1]
-				content += f" <{pt} {p0}:{p1}:{p2}>"
+				content += f" <|im_sep {pt} {p0}:{p1}:{p2}|>"
 				content = content.strip()
 			if m.author.id == bot.id:
 				name = bot.name
@@ -1463,6 +1462,7 @@ class Ask(Command):
 			summary = caid and caid.get("summary")
 			if reset is not None:
 				summary = None
+				print(channel, "mismatch", m.id)
 			if bot.is_trusted(guild) >= 2:
 				for uid in bot.data.trusted[guild.id]:
 					if uid and bot.premium_level(uid, absolute=True) >= 2:

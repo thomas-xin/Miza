@@ -417,8 +417,6 @@ class Bot:
 				self.chat_history = [("[SYSTEM]", summary)]
 			else:
 				self.chat_history = summary
-		else:
-			self.chat_history = []
 
 	def submit_cost(self, key, cost):
 		if not key or key == self.key:
@@ -969,7 +967,7 @@ class Bot:
 						m = response["choices"][0]["message"]
 						if m.get("function_call"):
 							break
-						text = m["content"].removeprefix(f"{self.name} says: ").removeprefix(f"{self.name}:") if m["content"] else ""
+						text = m["content"].removeprefix(f"{self.name} says: ").replace("<|im_sep|>", ":").removeprefix(f"{self.name}:") if m["content"] else ""
 						if len(text) >= 2 and text[-1] in " aAsS" and text[-2] not in ".!?" or text.endswith(' "') or text.endswith('\n"'):
 							redo = True
 						text = text.strip()
@@ -1453,7 +1451,7 @@ class Bot:
 				if response:
 					m = response["choices"][0]["message"]
 					role = m["role"]
-					text = m["content"].removeprefix(f"{self.name} says: ").removeprefix(f"{self.name}:") if m["content"] else ""
+					text = m["content"].removeprefix(f"{self.name} says: ").replace("<|im_sep|>", ":").removeprefix(f"{self.name}:") if m["content"] else ""
 					if len(text) >= 2 and text[-1] in " aAsS" and text[-2] not in ".!?" or text.endswith(' "') or text.endswith('\n"'):
 						redo = True
 						if len(self.gpttokens(text)) < 24:
