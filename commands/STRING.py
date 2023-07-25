@@ -1332,6 +1332,7 @@ class Ask(Command):
 				reset = False
 				if caid:
 					caid.pop("ids", None)
+				print(channel, "mismatch", m.id)#, caid)
 			ignores.add(m.id)
 		if len(self.visited) > 256:
 			self.visited.pop(next(iter(self.visited)))
@@ -1462,7 +1463,6 @@ class Ask(Command):
 			summary = caid and caid.get("summary")
 			if reset is not None:
 				summary = None
-				print(channel, "mismatch", m.id)
 			if bot.is_trusted(guild) >= 2:
 				for uid in bot.data.trusted[guild.id]:
 					if uid and bot.premium_level(uid, absolute=True) >= 2:
