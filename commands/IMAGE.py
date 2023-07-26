@@ -1649,7 +1649,7 @@ class Art(Command):
             with discord.context_managers.Typing(channel):
                 futt = []
                 c = 0
-                if amount == 1 and not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy():
+                if amount >= 1 and not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy():
                     c = min(amount, 9 if nsfw and not self.sdiff_sem.active else 5)
                     c2 = c
                     while c2 > 0:

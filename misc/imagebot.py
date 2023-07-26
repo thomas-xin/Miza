@@ -540,20 +540,18 @@ class Bot:
 	safety_checkers = {}
 	# device, dtype = determine_cuda(0)
 	# gen = torch.Generator(f"cuda:{device}" if device >= 0 else "cpu").manual_seed(time.time_ns() - 1)
-	def art_stablediffusion_local(self, prompt, kwargs=None, model="stabilityai/stable-diffusion-2-1", fail_unless_gpu=True, nsfw=False, count=1):
+	def art_stablediffusion_local(self, prompt, kwargs=None, model="stabilityai/stable-diffusion-xl-base-0.9", fail_unless_gpu=True, nsfw=False, count=1):
 		from diffusers import StableDiffusionPipeline, StableDiffusionImg2ImgPipeline, StableDiffusionInpaintPipeline, StableDiffusionImageVariationPipeline
 		if not kwargs.get("--init-image"):
 			pf = StableDiffusionPipeline
-			if model == "stabilityai/stable-diffusion-2-1":
-				model = "runwayml/stable-diffusion-v1-5"
+			# if model == "stabilityai/stable-diffusion-xl-refiner-0.9":
+			# 	model = "stabilityai/stable-diffusion-xl-base-0.9"
 		elif kwargs.get("--mask"):
 			pf = StableDiffusionInpaintPipeline
 		elif prompt:
 			pf = StableDiffusionImg2ImgPipeline
 		else:
 			pf = StableDiffusionImageVariationPipeline
-			if model == "stabilityai/stable-diffusion-2-1":
-				model = "lambdalabs/sd-image-variations-diffusers"
 		out = []
 		if self.models:
 			device = next(iter(self.models))
@@ -570,23 +568,14 @@ class Bot:
 				else:
 					device = -1
 					dtype = torch.float32
-		data = self.art_stablediffusion_sub(pf, model, prompt, kwargs, count, device, dtype, nsfw, fail_unless_gpu)
-		if not data or not data.images:
-			return ()
-		nsfw_content_detected = [data.nsfw_content_detected] if not isinstance(data.nsfw_content_detected, (list, tuple)) else data.nsfw_content_detected
-		for im, n in zip(data.images, nsfw_content_detected):
-			if n:
-				continue
-			p = np.sum(im.resize((32, 32)).convert("L"))
-			if p <= 1024:
-				continue
+		images = self.art_stablediffusion_sub(pf, model, prompt, kwargs, count, device, dtype, nsfw, fail_unless_gpu)
+		out = []
+		for im in images:
 			b = io.BytesIO()
 			im.save(b, format="png")
 			print("StablediffusionL:", b)
 			b.seek(0)
 			out.append(b.read())
-		if not out and all(nsfw_content_detected):
-			raise PermissionError("NSFW filter detected in non-NSFW channel. If you believe this was a mistake, please try again.")
 		return out
 
 	def art_stablediffusion_sub(self, pf, model, prompt, kwargs, count, device=-1, dtype=torch.float32, nsfw=False, fail_unless_gpu=False):
@@ -604,6 +593,7 @@ class Bot:
 					return
 				pipe = backup_model(pf.from_pretrained, model, requires_safety_checker=True, torch_dtype=dtype, **kw)
 				if device >= 0:
+					pipe.unet = torch.compile(pipe.unet, mode="reduce-overhead", fullgraph=True)
 					pipe = pipe.to(f"cuda:{device}")
 					pipe.enable_attention_slicing()
 					pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
@@ -645,7 +635,7 @@ class Bot:
 					num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 					guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
 					strength=float(kwargs.get("--strength", 0.8)),
-					# generator=self.gen,
+					output_type="latent",
 				)
 			elif pf is StableDiffusionImg2ImgPipeline:
 				data = pipe(
@@ -655,7 +645,7 @@ class Bot:
 					num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 					guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
 					strength=float(kwargs.get("--strength", 0.8)),
-					# generator=self.gen,
+					output_type="latent",
 				)
 			elif pf is StableDiffusionImageVariationPipeline:
 				data = pipe(
@@ -663,7 +653,7 @@ class Bot:
 					num_images_per_prompt=count,
 					num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 					guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
-					# generator=self.gen,
+					output_type="latent",
 				)
 			else:
 				data = pipe(
@@ -671,10 +661,62 @@ class Bot:
 					num_images_per_prompt=count,
 					num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 					guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
-					# generator=self.gen,
+					output_type="latent",
 				)
-		# models[(pf, model)] = pipe.to("cpu")
-		return data
+		if not data or not data.images:
+			return ()
+		nsfw_content_detected = [data.nsfw_content_detected] if not isinstance(data.nsfw_content_detected, (list, tuple)) else data.nsfw_content_detected
+		images = []
+		for im, n in zip(data.images, nsfw_content_detected):
+			if n:
+				continue
+			p = np.sum(im.resize((32, 32)).convert("L"))
+			if p <= 1024:
+				continue
+			images.append(im)
+		if not images and all(nsfw_content_detected):
+			raise PermissionError("NSFW filter detected in non-NSFW channel. If you believe this was a mistake, please try again.")
+		if model == "stabilityai/stable-diffusion-xl-base-0.9":
+			model = "stabilityai/stable-diffusion-xl-refiner-0.9"
+			cia = torch.cuda.is_available()
+			models = self.models.setdefault(device, {})
+			checkers = self.safety_checkers.setdefault(device, {})
+			pipe = cia and models.get((pf, model))
+			if pipe == False and fail_unless_gpu:
+				return
+			if not pipe:
+				kw = {}
+				try:
+					if fail_unless_gpu and (device < 0 or not models.get((pf, model), True)):
+						return
+					pipe = backup_model(pf.from_pretrained, model, requires_safety_checker=True, torch_dtype=dtype, **kw)
+					if device >= 0:
+						pipe.unet = torch.compile(pipe.unet, mode="reduce-overhead", fullgraph=True)
+						pipe = pipe.to(f"cuda:{device}")
+						pipe.enable_attention_slicing()
+						pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+						try:
+							pipe.enable_model_cpu_offload()
+						except AttributeError:
+							pass
+				except:
+					print_exc()
+					if fail_unless_gpu:
+						models[(pf, model)] = False
+						print("StablediffusionL: CUDA f16 init failed")
+						return
+					pipe = backup_model(pf.from_pretrained, model, requires_safety_checker=pf is not StableDiffusionImageVariationPipeline, **kw)
+				models[(pf, model)] = pipe
+			pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
+			data = pipe(
+				[prompt] * len(images),
+				image=images,
+				num_images_per_prompt=1,
+				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
+				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
+			)
+			images = data.images
+		return images
 
 	def art_textsynth(self, prompt, kwargs=None, count=1):
 		headers = {
