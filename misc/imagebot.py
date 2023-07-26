@@ -540,7 +540,7 @@ class Bot:
 	safety_checkers = {}
 	# device, dtype = determine_cuda(0)
 	# gen = torch.Generator(f"cuda:{device}" if device >= 0 else "cpu").manual_seed(time.time_ns() - 1)
-	def art_stablediffusion_local(self, prompt, kwargs=None, model="stabilityai/stable-diffusion-xl-base-0.9", fail_unless_gpu=True, nsfw=False, count=1):
+	def art_stablediffusion_local(self, prompt, kwargs=None, model="stabilityai/stable-diffusion-xl-base-1.0", fail_unless_gpu=True, nsfw=False, count=1):
 		from diffusers import StableDiffusionPipeline, StableDiffusionImg2ImgPipeline, StableDiffusionInpaintPipeline, StableDiffusionImageVariationPipeline
 		if not kwargs.get("--init-image"):
 			pf = StableDiffusionPipeline
@@ -674,8 +674,8 @@ class Bot:
 			images.append(im)
 		if not images and all(nsfw_content_detected):
 			raise PermissionError("NSFW filter detected in non-NSFW channel. If you believe this was a mistake, please try again.")
-		if model == "stabilityai/stable-diffusion-xl-base-0.9":
-			model = "stabilityai/stable-diffusion-xl-refiner-0.9"
+		if model == "stabilityai/stable-diffusion-xl-base-1.0":
+			model = "stabilityai/stable-diffusion-xl-refiner-1.0"
 			cia = torch.cuda.is_available()
 			models = self.models.setdefault(device, {})
 			checkers = self.safety_checkers.setdefault(device, {})

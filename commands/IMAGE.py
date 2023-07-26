@@ -1785,7 +1785,9 @@ class Art(Command):
                             ims = await create_future(self.imagebot.dalle_i2i, prompt, image_1b, image_2b, False, amount, timeout=60)
                             futs.extend(ims)
                             amount2 = len(futs)
+                oargs = args
                 while amount2 < amount:
+                    args = list(oargs)
                     if self.sdiff_sem.is_busy() and not getattr(message, "simulated", False):
                         await send_with_react(channel, italics(ini_md(f"StableDiffusion: {sqr_md(req)} enqueued in position {sqr_md(self.sdiff_sem.passive + 1)}.")), reacts="❎", reference=message)
                     async with self.sdiff_sem:
