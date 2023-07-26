@@ -768,17 +768,22 @@ class UpdateDeviantArt(Database):
         self.time = utc()
 
 
-while True:
-    try:
-        douclub = DouClub(AUTH["knack_id"], AUTH["knack_secret"])
-    except KeyError:
-        douclub = cdict(
-            search=lambda *void1, **void2: exec('raise FileNotFoundError("Unable to search Doukutsu Club.")'),
-            update=lambda: None,
-            pull=lambda: None,
-        )
-    except:
-        print_exc()
-        time.sleep(30)
-        continue
-    break
+def load_douclub():
+    global douclub
+    while True:
+        try:
+            douclub = DouClub(AUTH["knack_id"], AUTH["knack_secret"])
+        except KeyError:
+            break
+        except:
+            print_exc()
+            time.sleep(30)
+            continue
+        break
+
+douclub = cdict(
+    search=lambda *void1, **void2: exec('raise FileNotFoundError("Unable to search Doukutsu Club.")'),
+    update=lambda: None,
+    pull=lambda: None,
+)
+create_future_ex(load_douclub, priority=True)
