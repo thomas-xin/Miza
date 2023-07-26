@@ -1066,14 +1066,14 @@ class Bot:
 								return {"func": "play", "argv": argv, "comment": res}
 							elif name == "audio":
 								print("Audio query:", args)
-								return args["mode"] + " " + str(args["value"])
+								return {"func": args["mode"], "argv": args["value"]}
 							elif name == "audiostate":
 								print("AudioState query:", args)
 								if args["mode"] == "pause":
 									return "pause" if args["value"] else "resume"
 								if args["mode"] == "loop":
 									args["mode"] = "lq"
-								return args["mode"] + " " + str(int(args["value"]))
+								return {"func": args["mode"], "argv": int(args["value"])}
 							elif name == "policy":
 								print("Policy!", messages[-1])
 								if 1: #model.startswith("gpt-3.5"):
