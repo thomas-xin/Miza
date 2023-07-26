@@ -147,7 +147,7 @@ class Server:
 		cp.response.headers.update(resp.headers)
 		cp.response.headers.pop("Connection", None)
 		cp.response.headers.pop("Transfer-Encoding", None)
-		return resp.iter_content(65536)
+		yield from resp.iter_content(65536)
 
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
