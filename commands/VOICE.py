@@ -3677,7 +3677,7 @@ class Skip(Command):
             # Get list of items to remove from the queue, based on whether they have sufficient amount of skips
             pops = set()
             count = 0
-            i = 1
+            i = 0
             while i < len(auds.queue):
                 q = auds.queue
                 song = q[i]
