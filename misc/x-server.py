@@ -25,6 +25,7 @@ except KeyError:
 
 
 HOST = AUTH.get("webserver") or "https://mizabot.xyz"
+API = AUTH.get("api") or "https://api.mizabot.xyz"
 ADDRESS = AUTH.get("webserver_address") or "0.0.0.0"
 PORT = AUTH.get("webserver_port") or 80
 IND = "\x7f"
@@ -410,7 +411,7 @@ class Server:
 			path = path[1:]
 		p = find_file(path, cwd=("saves/filehost", "cache"), ind=ind)
 		mime = get_mime(p)
-		f_url = HOST + "/f/" + n2p(int(path))
+		f_url = API + "/f/" + n2p(int(path))
 		st = os.stat(p)
 		fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
 		if fn.startswith(".temp$@"):
@@ -770,7 +771,7 @@ transform: translate(-50%, -50%);
 									self.serving.setdefault(p, weakref.WeakSet()).add(f)
 								return resp
 							if info[1] > 256 * 1048576:
-								uri = f"{HOST}/fileinfo/{orig_path}"
+								uri = f"{API}/fileinfo/{orig_path}"
 								if not cp.request.headers.get("Range") and len(urls) > 48:
 									url = f"{HOST}/stream/?info={urllib.parse.quote_plus(uri)}"
 								else:
@@ -1261,7 +1262,7 @@ transform: translate(-50%, -50%);
 						client_secret=AUTH["discord_secret"],
 						grant_type="authorization_code",
 						code=code,
-						redirect_uri=f"{HOST}/user",
+						redirect_uri=f"{API}/user",
 					),
 				)
 				resp.raise_for_status()
