@@ -1693,7 +1693,12 @@ class Bot:
 			sys.stdout.flush()
 			resp = []
 			async for w in chatgpt.ask_stream(q):
-				if w.startswith("Failed to read response from ChatGPT"):
+				errs = (
+					"Your ChatGPT session is not usable.",
+					"Failed to read response from ChatGPT.",
+					"Generation stopped",
+				)
+				if any(w.startswith(s) for s in errs):
 					continue
 				resp.append(w)
 			res = "".join(resp).strip()
