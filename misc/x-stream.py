@@ -147,6 +147,7 @@ class Server:
 		cp.response.headers.update(resp.headers)
 		cp.response.headers.pop("Connection", None)
 		cp.response.headers.pop("Transfer-Encoding", None)
+		print("HEADERS:", cp.response.headers)
 		yield from resp.iter_content(65536)
 
 	@cp.expose
