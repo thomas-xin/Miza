@@ -147,8 +147,11 @@ class Server:
 		cp.response.headers.update(resp.headers)
 		cp.response.headers.pop("Connection", None)
 		cp.response.headers.pop("Transfer-Encoding", None)
+		if resp.headers.get("Content-Length") < 262144:
+			print("HEADERS:", cp.response.headers)
+			return resp.content
 		print("HEADERS:", cp.response.headers)
-		yield from resp.iter_content(65536)
+		return resp.iter_content(65536)
 
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
