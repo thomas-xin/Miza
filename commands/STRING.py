@@ -1504,7 +1504,7 @@ class Ask(Command):
 			out = await process_image("CBAI", "$", [inputs], fix=1, pwr=1 if model.startswith("gpt") else 1000000, timeout=600)
 			if isinstance(out, dict):
 				fname = out["func"]
-				argv = as_str(out["argv"])
+				argv = as_str(out.get("argv", ""))
 				args = argv.split()
 				argl = argv.split()
 				u_perm = bot.get_perms(user)

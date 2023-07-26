@@ -1070,7 +1070,7 @@ class Bot:
 							elif name == "audiostate":
 								print("AudioState query:", args)
 								if args["mode"] == "pause":
-									return "pause" if args["value"] else "resume"
+									return {"func": ("pause" if args["value"] else "resume")}
 								if args["mode"] == "loop":
 									args["mode"] = "lq"
 								return {"func": args["mode"], "argv": int(args["value"])}
