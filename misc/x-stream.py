@@ -147,7 +147,7 @@ class Server:
 		cp.response.headers.update(resp.headers)
 		cp.response.headers.pop("Connection", None)
 		cp.response.headers.pop("Transfer-Encoding", None)
-		if resp.headers.get("Content-Length") < 262144:
+		if int(resp.headers.get("Content-Length") or 262145) <= 262144:
 			print("HEADERS:", cp.response.headers)
 			return resp.content
 		print("HEADERS:", cp.response.headers)
