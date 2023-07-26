@@ -574,9 +574,8 @@ class Bot:
 				"properties": {
 					"query": {
 						"type": "string",
-						"description": "The query, e.g. Who won the 2024 world cup?",
+						"description": "Query, e.g. Who won the 2024 world cup?",
 					},
-					"unit": {"type": "string"},
 				},
 				"required": ["query"],
 			},
@@ -589,9 +588,8 @@ class Bot:
 				"properties": {
 					"query": {
 						"type": "string",
-						"description": "The question, e.g. solve(x^3-6x^2+12)",
+						"description": "Question, e.g. solve(x^3-6x^2+12)",
 					},
-					"unit": {"type": "string"},
 				},
 				"required": ["query"],
 			},
@@ -604,9 +602,8 @@ class Bot:
 				"properties": {
 					"query": {
 						"type": "string",
-						"description": "The prompt, e.g. Brilliant view of a futuristic city in an alien world, skyline, spaceships, 4k raytraced",
+						"description": "Prompt, e.g. Brilliant view of a futuristic city in an alien world, skyline, spaceships, 4k raytraced",
 					},
-					"unit": {"type": "string"},
 				},
 				"required": ["query"],
 			},
@@ -619,14 +616,12 @@ class Bot:
 				"properties": {
 					"message": {
 						"type": "string",
-						"description": "The message, e.g. Remember to take your meds!",
+						"description": "Message, e.g. Remember to take your meds!",
 					},
-					"unit": {"type": "string"},
 					"delay": {
 						"type": "string",
-						"description": "The delay, e.g. 3 days 16 hours 3.9 seconds",
+						"description": "Delay, e.g. 3 days 16 hours 3.9 seconds",
 					},
-					"unit": {"type": "string"},
 				},
 				"required": ["message", "delay"],
 			},
@@ -639,11 +634,45 @@ class Bot:
 				"properties": {
 					"query": {
 						"type": "string",
-						"description": "The name or URL, e.g. Rick Astley - Never gonna give you up",
+						"description": "Name or URL, e.g. Rick Astley - Never gonna give you up",
 					},
-					"unit": {"type": "string"},
 				},
 				"required": ["query"],
+			},
+		},
+		{
+			"name": "audio",
+			"description": "Adjusts audio settings for current music player.",
+			"parameters": {
+				"type": "object",
+				"properties": {
+					"mode": {
+						"type": "string",
+						"enum": ["volume", "reverb", "pitch", "speed", "pan", "bassboost", "compressor", "chorus", "nightcore", "bitrate"],
+					},
+					"value": {
+						"type": ["number", "string"],
+						"description": "New value percentage, e.g. 300",
+					},
+				},
+				"required": ["mode", "value"],
+			},
+		},
+		{
+			"name": "audiostate",
+			"description": "Adjusts audio state for current music player.",
+			"parameters": {
+				"type": "object",
+				"properties": {
+					"mode": {
+						"type": "string",
+						"enum": ["pause", "loop", "repeat", "shuffle"],
+					},
+					"value": {
+						"type": "boolean",
+					},
+				},
+				"required": ["mode", "value"],
 			},
 		},
 		{
@@ -656,7 +685,6 @@ class Bot:
 						"type": "string",
 						"description": "The response, e.g. Sorry, I cannot fulfill that request. My purpose is to assist and help users in a positive way.",
 					},
-					"unit": {"type": "string"},
 				},
 				"required": ["query"],
 			},
@@ -910,8 +938,12 @@ class Bot:
 				functions = self.functions
 				if self.jailbroken or not self.nsfw:
 					functions = [f for f in functions if f["name"] != "policy"]
-				if not self.vc:
-					functions = [f for f in functions if f["name"] != "play"]
+				if self.vc & 2:
+					pass
+				elif self.vc & 1:
+					functions = [f for f in functions if f["name"] not in ("audio", "audiostate")]
+				else:
+					functions = [f for f in functions if f["name"] not in ("audio", "audiostate", "play")]
 				data = dict(
 					model="gpt-4-0613" if model.startswith("gpt-4") else "gpt-3.5-turbo-0613",
 					messages=messages,

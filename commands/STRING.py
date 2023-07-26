@@ -1497,7 +1497,7 @@ class Ask(Command):
 				oai=oai,
 				bl=bl,
 				nsfw=bot.is_nsfw(channel),
-				vc=bool(getattr(user, "voice", False)),
+				vc=bool(getattr(user, "voice", False)) | bool(bot.audio.players.get(guild.id)) * 2,
 			)
 			# if fut:
 			#     await fut

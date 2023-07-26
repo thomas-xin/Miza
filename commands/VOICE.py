@@ -3952,7 +3952,7 @@ class AudioSettings(Command):
         add_dict(self.map, {k.casefold(): self.aliasExt[k] for k in self.aliasExt})
         super().__init__(*args)
 
-    async def __call__(self, bot, channel, user, guild, flags, name, argv, perm, **void):
+    async def __call__(self, bot, channel, user, guild, flags, name, argv, perm, comment="", **void):
         auds = await auto_join(guild, channel, user, bot)
         ops = alist()
         op1 = self.map[name]
@@ -4048,6 +4048,8 @@ class AudioSettings(Command):
             # Values should be scaled by 100 to indicate percentage
             origStats = auds.stats
             orig = round_min(origStats[op] * 100)
+            if argv.endswith("%"):
+                argv = argv[:-1]
             num = await bot.eval_math(argv, orig)
             new = round_min(num)
             val = round_min(num / 100)
@@ -4086,6 +4088,8 @@ class AudioSettings(Command):
                         raise RuntimeError("Unable to adjust audio setting.")
             changed = "Permanently changed" if "f" in flags else "Changed"
             s += f"\n{changed} audio {op} setting from {sqr_md(orig)} to {sqr_md(new)}."
+        if comment:
+            s = comment + "\n" + s
         if "h" not in flags:
             return css_md(s), 1
 
