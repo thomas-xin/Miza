@@ -544,8 +544,6 @@ class Bot:
 		from diffusers import StableDiffusionPipeline, StableDiffusionImg2ImgPipeline, StableDiffusionInpaintPipeline, StableDiffusionImageVariationPipeline
 		if not kwargs.get("--init-image"):
 			pf = StableDiffusionPipeline
-			# if model == "stabilityai/stable-diffusion-xl-refiner-0.9":
-			# 	model = "stabilityai/stable-diffusion-xl-base-0.9"
 		elif kwargs.get("--mask"):
 			pf = StableDiffusionInpaintPipeline
 		elif prompt:
@@ -585,7 +583,7 @@ class Bot:
 		checkers = self.safety_checkers.setdefault(device, {})
 		pipe = cia and models.get((pf, model))
 		if pipe == False and fail_unless_gpu:
-			return
+			return ()
 		if not pipe:
 			kw = {}
 			try:
@@ -683,7 +681,7 @@ class Bot:
 			checkers = self.safety_checkers.setdefault(device, {})
 			pipe = cia and models.get((pf, model))
 			if pipe == False and fail_unless_gpu:
-				return
+				return ()
 			if not pipe:
 				kw = {}
 				try:
