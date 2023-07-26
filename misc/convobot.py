@@ -1072,7 +1072,7 @@ class Bot:
 								if args["mode"] == "pause":
 									return {"func": ("pause" if args["value"] else "resume")}
 								if args["mode"] == "loop":
-									args["mode"] = "lq"
+									args["mode"] = "loopqueue"
 								return {"func": args["mode"], "argv": int(args["value"])}
 							elif name == "policy":
 								print("Policy!", messages[-1])
@@ -2006,7 +2006,7 @@ class Bot:
 		if not to or tup != to[-1]:
 			k, v = tup
 			if isinstance(v, dict):
-				v = v["func"] + " " + v["argv"]
+				v = (v["func"] + " " + v.get("argv", "")).strip()
 			if k == self.name:
 				v = self.alm_re.sub("", v)
 			tlim = round(2 ** (-nin / 3) * (384 if self.premium >= 2 else 192))
