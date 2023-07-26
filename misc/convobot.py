@@ -1020,7 +1020,7 @@ class Bot:
 							print_exc()
 							args = None
 						if args:
-							argv = " ".join(args.values())
+							argv = " ".join(map(str, args.values()))
 							name = fc["name"]
 							res = text or ""
 							if name == "web_search":
