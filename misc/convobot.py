@@ -1693,6 +1693,8 @@ class Bot:
 			sys.stdout.flush()
 			resp = []
 			async for w in chatgpt.ask_stream(q):
+				if w.startswith("Failed to read response from ChatGPT"):
+					continue
 				resp.append(w)
 			res = "".join(resp).strip()
 			if fut:
