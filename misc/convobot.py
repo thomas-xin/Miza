@@ -2028,11 +2028,11 @@ class Bot:
 
 	model_limits = dict(
 		gpt3=(120, 2),
-		gpt4=(480, 4),
+		gpt4=(480, 3),
 		gpt3a=(120, 2),
-		gpt4a=(480, 4),
-		wizard=(960, 6),
-		platypus=(960, 6),
+		gpt4a=(480, 3),
+		wizard=(960, 4),
+		platypus=(960, 4),
 	)
 
 	def rerender(self, model=""):
