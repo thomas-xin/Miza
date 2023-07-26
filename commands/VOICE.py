@@ -3725,7 +3725,7 @@ class Pause(Command):
     rate_limit = (3, 4)
     slash = True
 
-    async def __call__(self, bot, name, guild, user, perm, channel, flags, **void):
+    async def __call__(self, bot, name, guild, user, perm, channel, message, flags, comment="", **void):
         if guild.id not in bot.data.audio.players:
             raise LookupError("Currently not playing in a voice channel.")
         auds = bot.data.audio.players[guild.id]
@@ -3746,7 +3746,10 @@ class Pause(Command):
             await create_future(auds.pause, unpause=True)
             word = "paused" if auds.paused else "resumed"
         if "h" not in flags:
-            return italics(css_md(f"Successfully {word} audio playback in {sqr_md(guild)}.")), 1
+            s = css_md(f"Successfully {word} audio playback in {sqr_md(guild)}.")
+            if comment:
+                s = comment + "\n" + s
+            return await send_with_react(channel, s, reference=message, reacts="❎")
 
 
 class Seek(Command):
@@ -3952,7 +3955,7 @@ class AudioSettings(Command):
         add_dict(self.map, {k.casefold(): self.aliasExt[k] for k in self.aliasExt})
         super().__init__(*args)
 
-    async def __call__(self, bot, channel, user, guild, flags, name, argv, perm, comment="", **void):
+    async def __call__(self, bot, channel, user, guild, flags, name, argv, perm, message, comment="", **void):
         auds = await auto_join(guild, channel, user, bot)
         ops = alist()
         op1 = self.map[name]
@@ -4088,10 +4091,11 @@ class AudioSettings(Command):
                         raise RuntimeError("Unable to adjust audio setting.")
             changed = "Permanently changed" if "f" in flags else "Changed"
             s += f"\n{changed} audio {op} setting from {sqr_md(orig)} to {sqr_md(new)}."
-        if comment:
-            s = comment + "\n" + s
         if "h" not in flags:
-            return css_md(s), 1
+            s = css_md(s)
+            if comment:
+                s = comment + "\n" + s
+            return await send_with_react(channel, s, reference=message, reacts="❎")
 
 
 class Jump(Command):
