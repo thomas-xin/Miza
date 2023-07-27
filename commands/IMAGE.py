@@ -1770,34 +1770,34 @@ class Art(Command):
                             "0.75",
                         ))
                         kwargs["--strength"] = 0.75
-                    if premium >= 2 and not force and "--strength" not in kwargs and str(kwargs["--guidance-scale"]) == "7.5" and str(kwargs["--eta"]) == "0.8":
-                        if isinstance(image_1, bytes):
-                            image_1b = image_1
-                        else:
-                            with open(image_1, "rb") as f:
-                                image_1b = f.read()
-                        if image_2:
-                            if isinstance(image_2, bytes):
-                                image_2b = image_2
-                            else:
-                                with open(image_2, "rb") as f:
-                                    image_2b = f.read()
-                        with tracebacksuppressor:
-                            if bot.is_trusted(guild) >= 2:
-                                for uid in bot.data.trusted[guild.id]:
-                                    if uid and bot.premium_level(uid, absolute=True) >= 2:
-                                        break
-                                else:
-                                    uid = next(iter(bot.data.trusted[guild.id]))
-                                u = await bot.fetch_user(uid)
-                            else:
-                                u = user
-                            data = bot.data.users.get(u.id, {})
-                            oai = data.get("trial") and data.get("openai_key")
-                            self.imagebot.token = oai or AUTH.get("openai_key")
-                            ims = await create_future(self.imagebot.dalle_i2i, prompt, image_1b, image_2b, False, amount, timeout=60)
-                            futs.extend(ims)
-                            amount2 = len(futs)
+                    # if premium >= 2 and not force and "--strength" not in kwargs and str(kwargs["--guidance-scale"]) == "7.5" and str(kwargs["--eta"]) == "0.8":
+                    #     if isinstance(image_1, bytes):
+                    #         image_1b = image_1
+                    #     else:
+                    #         with open(image_1, "rb") as f:
+                    #             image_1b = f.read()
+                    #     if image_2:
+                    #         if isinstance(image_2, bytes):
+                    #             image_2b = image_2
+                    #         else:
+                    #             with open(image_2, "rb") as f:
+                    #                 image_2b = f.read()
+                    #     with tracebacksuppressor:
+                    #         if bot.is_trusted(guild) >= 2:
+                    #             for uid in bot.data.trusted[guild.id]:
+                    #                 if uid and bot.premium_level(uid, absolute=True) >= 2:
+                    #                     break
+                    #             else:
+                    #                 uid = next(iter(bot.data.trusted[guild.id]))
+                    #             u = await bot.fetch_user(uid)
+                    #         else:
+                    #             u = user
+                    #         data = bot.data.users.get(u.id, {})
+                    #         oai = data.get("trial") and data.get("openai_key")
+                    #         self.imagebot.token = oai or AUTH.get("openai_key")
+                    #         ims = await create_future(self.imagebot.dalle_i2i, prompt, image_1b, image_2b, False, amount, timeout=60)
+                    #         futs.extend(ims)
+                    #         amount2 = len(futs)
                 oargs = args
                 att = 0
                 while amount2 < amount and att < 5:
