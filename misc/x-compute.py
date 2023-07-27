@@ -2796,7 +2796,7 @@ elif len(sys.argv) > 1 and int(sys.argv[1]) >= 3:
 			ib = CBOTS[None]
 		except KeyError:
 			ib = CBOTS[None] = imagebot.Bot()
-		im = ib.art_stablediffusion_refine(prompt, image)
+		im = ib.art_stablediffusion_refine(prompt, image)[0]
 		im = optimise(im)
 		b = io.BytesIO()
 		im.save(b, format="png")
