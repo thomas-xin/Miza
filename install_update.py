@@ -41,10 +41,12 @@ if os.environ.get("AI_FEATURES", True):
     modlist.extend((
         "accelerate>=0.20.3",
         "clip-interrogator>=0.6.0",
-        "diffusers>=0.18.1",
+        "diffusers>=0.19.0",
         "openai>=0.27.8",
+		"opencv-python>=4.8.0.74",
         "protobuf==3.20.3",
         "pytesseract>=0.3.10",
+		"safetensors>=0.3.1",
         "sentencepiece>=0.1.99",
         "sentence-transformers>=2.2.2",
         "tiktoken>=0.4.0",

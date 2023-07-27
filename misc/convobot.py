@@ -659,8 +659,25 @@ class Bot:
 			},
 		},
 		{
-			"name": "audiostate",
-			"description": "Adjusts audio state for current music player.",
+			"name": "astate",
+			"description": "Adjusts music player state.",
+			"parameters": {
+				"type": "object",
+				"properties": {
+					"mode": {
+						"type": "string",
+						"enum": ["pause", "loop", "repeat", "shuffle"],
+					},
+					"value": {
+						"type": "boolean",
+					},
+				},
+				"required": ["mode", "value"],
+			},
+		},
+		{
+			"name": "askip",
+			"description": "Skips a music player song.",
 			"parameters": {
 				"type": "object",
 				"properties": {
@@ -938,6 +955,8 @@ class Bot:
 				functions = self.functions
 				if self.jailbroken or not self.nsfw:
 					functions = [f for f in functions if f["name"] != "policy"]
+				if not set(q).intersection("0123456789"):
+					functions = [f for f in functions if f["name"] != "wolfram_alpha"]
 				if self.vc & 2:
 					pass
 				elif self.vc & 1:

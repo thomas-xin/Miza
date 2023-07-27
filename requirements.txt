@@ -37,7 +37,6 @@ python-dateutil>=2.8.2
 pytz>=2023.3
 requests>=2.31.0
 rule34>=1.8.1
-safetensors>=0.3.1
 selenium>=4.10.0
 sympy>=1.12
 tsc_utils>=0.2.3

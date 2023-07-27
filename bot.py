@@ -3184,7 +3184,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				status_changes = range(len(self.statuses))
 			self.status_iter = choice(status_changes)
 			with suppress(discord.NotFound):
-				if "blacklist" in self.data and self.data.blacklist.get(0):
+				if AUTH.get("status"):
+					text = AUTH["status"]
+				elif "blacklist" in self.data and self.data.blacklist.get(0):
 					text = "Currently under maintenance, please stay tuned!"
 				else:
 					text = f"{self.webserver}, to {uni_str(guild_count)} server{'s' if guild_count != 1 else ''}"

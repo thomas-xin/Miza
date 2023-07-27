@@ -1654,7 +1654,9 @@ class Art(Command):
                     c2 = c
                     while c2 > 0:
                         n = min(c2, xrand(floor(sqrt(c2) + 1)) + 1)
-                        fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, n], fix=3, pwr=500000 * n, timeout=120))
+                        if not n:
+                            n = c2
+                        fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, n], fix=3, pwr=500000 * n, timeout=240))
                         futt.append(fut)
                         c2 -= n
                 self.imagebot.token = oai or AUTH.get("openai_key")
@@ -1786,7 +1788,9 @@ class Art(Command):
                             futs.extend(ims)
                             amount2 = len(futs)
                 oargs = args
-                while amount2 < amount:
+                att = 0
+                while amount2 < amount and att < 5:
+                    att += 1
                     args = list(oargs)
                     if self.sdiff_sem.is_busy() and not getattr(message, "simulated", False):
                         await send_with_react(channel, italics(ini_md(f"StableDiffusion: {sqr_md(req)} enqueued in position {sqr_md(self.sdiff_sem.passive + 1)}.")), reacts="❎", reference=message)
@@ -1845,7 +1849,9 @@ class Art(Command):
                             c2 = c
                             while c2 > 0:
                                 n = min(c2, xrand(floor(sqrt(c2) + 1)) + 1)
-                                fut = create_task(process_image("IBASL", "&", [p, kwargs, nsfw, False, n], fix=3, pwr=500000 * n, timeout=120))
+                                if not n:
+                                    n = c2
+                                fut = create_task(process_image("IBASL", "&", [p, kwargs, nsfw, False, n], fix=3, pwr=500000 * n, timeout=240))
                                 futt.append(fut)
                                 c2 -= n
                             for fut in futt:

@@ -541,13 +541,13 @@ class Bot:
 	# device, dtype = determine_cuda(0)
 	# gen = torch.Generator(f"cuda:{device}" if device >= 0 else "cpu").manual_seed(time.time_ns() - 1)
 	def art_stablediffusion_local(self, prompt, kwargs=None, model="stabilityai/stable-diffusion-xl-base-1.0", fail_unless_gpu=True, nsfw=False, count=1):
-		from diffusers import StableDiffusionPipeline, StableDiffusionImg2ImgPipeline, StableDiffusionInpaintPipeline, StableDiffusionImageVariationPipeline
+		from diffusers import StableDiffusionXLPipeline, StableDiffusionXLImg2ImgPipeline, StableDiffusionXLInpaintPipeline, StableDiffusionImageVariationPipeline
 		if not kwargs.get("--init-image"):
-			pf = StableDiffusionPipeline
+			pf = StableDiffusionXLPipeline
 		elif kwargs.get("--mask"):
-			pf = StableDiffusionInpaintPipeline
+			pf = StableDiffusionXLInpaintPipeline
 		elif prompt:
-			pf = StableDiffusionImg2ImgPipeline
+			pf = StableDiffusionXLImg2ImgPipeline
 		else:
 			pf = StableDiffusionImageVariationPipeline
 		out = []
@@ -576,42 +576,51 @@ class Bot:
 			out.append(b.read())
 		return out
 
+	loading = False
 	def art_stablediffusion_sub(self, pf, model, prompt, kwargs, count, device=-1, dtype=torch.float32, nsfw=False, fail_unless_gpu=False):
-		from diffusers import DPMSolverMultistepScheduler, StableDiffusionPipeline, StableDiffusionImg2ImgPipeline, StableDiffusionInpaintPipeline, StableDiffusionImageVariationPipeline
+		from diffusers import DPMSolverMultistepScheduler, DiffusionPipeline, StableDiffusionXLPipeline, StableDiffusionXLImg2ImgPipeline, StableDiffusionXLInpaintPipeline, StableDiffusionImageVariationPipeline
 		cia = torch.cuda.is_available()
 		models = self.models.setdefault(device, {})
 		checkers = self.safety_checkers.setdefault(device, {})
-		pipe = cia and models.get((pf, model))
+		f2 = pf if pf != StableDiffusionImageVariationPipeline else StableDiffusionXLImg2ImgPipeline
+		pipe = cia and models.get((f2, model))
 		if pipe == False and fail_unless_gpu:
 			return ()
+		while self.loading:
+			time.sleep(1)
 		if not pipe:
-			kw = {}
 			try:
-				if fail_unless_gpu and (device < 0 or not models.get((pf, model), True)):
-					return
-				pipe = backup_model(pf.from_pretrained, model, requires_safety_checker=True, torch_dtype=dtype, use_safetensors=True, variant="fp16", **kw)
-				if device >= 0:
-					pipe.unet = torch.compile(pipe.unet, mode="reduce-overhead", fullgraph=True)
-					pipe = pipe.to(f"cuda:{device}")
-					pipe.enable_attention_slicing()
-					pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
-					try:
-						pipe.enable_model_cpu_offload()
-					except AttributeError:
-						pass
-			except:
-				print_exc()
-				if fail_unless_gpu:
-					models[(pf, model)] = False
-					print("StablediffusionL: CUDA f16 init failed")
-					return ()
-				pipe = backup_model(pf.from_pretrained, model, requires_safety_checker=pf is not StableDiffusionImageVariationPipeline, **kw)
-			checkers[model] = pipe.safety_checker
-			models[(pf, model)] = pipe
-		if nsfw:
-			pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
-		else:
-			pipe.safety_checker = checkers[model]
+				self.loading = True
+				kw = {}
+				try:
+					if fail_unless_gpu and (device < 0 or not models.get((f2, model), True)):
+						return
+					pipe = backup_model(f2.from_pretrained, model, requires_safety_checker=True, torch_dtype=dtype, use_safetensors=True, variant="fp16", **kw)
+					if device >= 0:
+						if os.name != "nt":
+							pipe.unet = torch.compile(pipe.unet, mode="reduce-overhead", fullgraph=True)
+						pipe = pipe.to(f"cuda:{device}")
+						pipe.enable_attention_slicing()
+						pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+						try:
+							pipe.enable_model_cpu_offload()
+						except AttributeError:
+							pass
+				except:
+					print_exc()
+					if fail_unless_gpu:
+						models[(f2, model)] = False
+						print("StablediffusionL: CUDA f16 init failed")
+						return ()
+					pipe = backup_model(f2.from_pretrained, model, requires_safety_checker=pf is not StableDiffusionImageVariationPipeline, use_safetensors=True, **kw)
+				# checkers[model] = pipe.safety_checker
+				models[(f2, model)] = pipe
+			finally:
+				self.loading = False
+		# if nsfw:
+			# pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
+		# else:
+			# pipe.safety_checker = checkers[model]
 		# pipe = pipe.to(f"cuda:{device}")
 		if kwargs.get("--init-image"):
 			b = kwargs["--init-image"]
@@ -623,97 +632,122 @@ class Bot:
 			if not isinstance(b, str):
 				b = io.BytesIO(b)
 			mask = Image.open(b)
-		with torch.cuda.device(device):
-			if pf is StableDiffusionInpaintPipeline:
-				data = pipe(
-					prompt,
-					image=image_to(im),
-					mask_image=image_to(mask, mode="L"),
-					num_images_per_prompt=count,
-					num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
-					guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
-					strength=float(kwargs.get("--strength", 0.8)),
-					output_type="latent",
-				)
-			elif pf is StableDiffusionImg2ImgPipeline:
-				data = pipe(
-					prompt,
-					image=image_to(im),
-					num_images_per_prompt=count,
-					num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
-					guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
-					strength=float(kwargs.get("--strength", 0.8)),
-					output_type="latent",
-				)
-			elif pf is StableDiffusionImageVariationPipeline:
-				data = pipe(
-					image=image_to(im),
-					num_images_per_prompt=count,
-					num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
-					guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
-					output_type="latent",
-				)
-			else:
-				data = pipe(
-					prompt,
-					num_images_per_prompt=count,
-					num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
-					guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
-					output_type="latent",
-				)
-		if not data or not data.images:
+		output_type = "pil" if 0 else "latent"
+		# with torch.cuda.device(device):
+		if f2 is StableDiffusionXLInpaintPipeline:
+			data = pipe(
+				prompt,
+				image=image_to(im),
+				mask_image=image_to(mask, mode="L"),
+				num_images_per_prompt=count,
+				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
+				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
+				strength=float(kwargs.get("--strength", 0.8)),
+				output_type=output_type,
+				denoising_end=0.8,
+			)
+		elif f2 is StableDiffusionXLImg2ImgPipeline:
+			data = pipe(
+				prompt,
+				image=image_to(im),
+				num_images_per_prompt=count,
+				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
+				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
+				strength=float(kwargs.get("--strength", 0.8)),
+				output_type=output_type,
+				denoising_end=0.8,
+			)
+		elif f2 is StableDiffusionImageVariationPipeline:
+			data = pipe(
+				image=image_to(im),
+				num_images_per_prompt=count,
+				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
+				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
+				output_type=output_type,
+				denoising_end=0.8,
+			)
+		else:
+			data = pipe(
+				prompt,
+				num_images_per_prompt=count,
+				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
+				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
+				output_type=output_type,
+				denoising_end=0.8,
+			)
+		# print(data, data.images)
+		if data is None or not len(data.images):
 			return ()
-		nsfw_content_detected = [data.nsfw_content_detected] if not isinstance(data.nsfw_content_detected, (list, tuple)) else data.nsfw_content_detected
+		nsfw_content_detected = getattr(data, "nsfw_content_detected", None)
+		nsfw_content_detected = [nsfw_content_detected] * len(data.images) if not isinstance(nsfw_content_detected, (list, tuple, torch.Tensor)) else nsfw_content_detected
 		images = []
 		for im, n in zip(data.images, nsfw_content_detected):
 			if n:
 				continue
-			p = np.sum(im.resize((32, 32)).convert("L"))
-			if p <= 1024:
+			if torch.sum(im > -torch.inf) < len(im.ravel()) // 4:
+				print("IBASL: Invalid")
 				continue
 			images.append(im)
 		if not images and all(nsfw_content_detected):
 			raise PermissionError("NSFW filter detected in non-NSFW channel. If you believe this was a mistake, please try again.")
-		if model == "stabilityai/stable-diffusion-xl-base-1.0":
+		if images and output_type == "latent":
+			vae = pipe.vae
+			text_encoder_2 = pipe.text_encoder_2
 			model = "stabilityai/stable-diffusion-xl-refiner-1.0"
+			f2 = DiffusionPipeline
 			cia = torch.cuda.is_available()
 			models = self.models.setdefault(device, {})
 			checkers = self.safety_checkers.setdefault(device, {})
-			pipe = cia and models.get((pf, model))
+			pipe = cia and models.get((f2, model))
 			if pipe == False and fail_unless_gpu:
 				return ()
+			while self.loading:
+				time.sleep(1)
 			if not pipe:
-				kw = {}
 				try:
-					if fail_unless_gpu and (device < 0 or not models.get((pf, model), True)):
-						return
-					pipe = backup_model(pf.from_pretrained, model, requires_safety_checker=True, torch_dtype=dtype, use_safetensors=True, variant="fp16", **kw)
-					if device >= 0:
-						pipe.unet = torch.compile(pipe.unet, mode="reduce-overhead", fullgraph=True)
-						pipe = pipe.to(f"cuda:{device}")
-						pipe.enable_attention_slicing()
-						pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
-						try:
-							pipe.enable_model_cpu_offload()
-						except AttributeError:
-							pass
-				except:
-					print_exc()
-					if fail_unless_gpu:
-						models[(pf, model)] = False
-						print("StablediffusionL: CUDA f16 init failed")
-						return ()
-					pipe = backup_model(pf.from_pretrained, model, requires_safety_checker=pf is not StableDiffusionImageVariationPipeline, **kw)
-				models[(pf, model)] = pipe
-			pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
+					self.loading = True
+					kw = {}
+					try:
+						if fail_unless_gpu and (device < 0 or not models.get((f2, model), True)):
+							return
+						pipe = backup_model(f2.from_pretrained, model, requires_safety_checker=True, torch_dtype=dtype, vae=vae, text_encoder_2=text_encoder_2, use_safetensors=True, variant="fp16", **kw)
+						if device >= 0:
+							if os.name != "nt":
+								pipe.unet = torch.compile(pipe.unet, mode="reduce-overhead", fullgraph=True)
+							pipe = pipe.to(f"cuda:{device}")
+							pipe.enable_attention_slicing()
+							pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+							try:
+								pipe.enable_model_cpu_offload()
+							except AttributeError:
+								pass
+					except:
+						print_exc()
+						if fail_unless_gpu:
+							models[(f2, model)] = False
+							print("StablediffusionL: CUDA f16 init failed")
+							return ()
+						pipe = backup_model(f2.from_pretrained, model, requires_safety_checker=f2 is not StableDiffusionImageVariationPipeline, vae=vae, text_encoder_2=text_encoder_2, use_safetensors=True, **kw)
+					models[(f2, model)] = pipe
+				finally:
+					self.loading = False
+			# pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
 			data = pipe(
-				[prompt] * len(images),
+				prompt=[prompt] * len(images),
+				negative_prompt=["blurry bad distorted disfigured poor ugly"] * len(images),
 				image=images,
 				num_images_per_prompt=1,
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
-				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
+				output_type="pil",
+				denoising_start=0.7,
 			)
-			images = data.images
+			images = []
+			for im in data.images:
+				p = np.sum(im.resize((32, 32)).convert("L"))
+				if p <= 1024:
+					print("IBASL: Invalid")
+					continue
+				images.append(im)
 		return images
 
 	def art_textsynth(self, prompt, kwargs=None, count=1):
@@ -800,7 +834,7 @@ class Bot:
 		ims = []
 		i = 0
 		while not elems:
-			if i >= 90 and ims:
+			if i >= 120 and ims:
 				break
 			if i >= 360:
 				print("ClipDrop: unavailable")
