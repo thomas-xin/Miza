@@ -747,7 +747,7 @@ class Bot:
 		# pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
 		data = pipe(
 			prompt=[prompt] * len(images),
-			negative_prompt=["blurry bad distorted disfigured poor ugly"] * len(images),
+			negative_prompt=["blurry, bad, distorted, disfigured, poor low quality, ugly"] * len(images),
 			image=images,
 			num_images_per_prompt=1,
 			num_inference_steps=48,
