@@ -2796,8 +2796,13 @@ elif len(sys.argv) > 1 and int(sys.argv[1]) >= 3:
 			ib = CBOTS[None]
 		except KeyError:
 			ib = CBOTS[None] = imagebot.Bot()
-		im = ib.art_stablediffusion_refine(prompt, image)[0]
-		im = optimise(im)
+		for i in range(3):
+			il = ib.art_stablediffusion_refine(prompt, image)
+			if il:
+				break
+		else:
+			raise RuntimeError("Maximum attempts exceeded.")
+		im = optimise(il[0])
 		b = io.BytesIO()
 		im.save(b, format="png")
 		b.seek(0)
