@@ -652,8 +652,9 @@ class Bot:
 				b = io.BytesIO(b)
 			mask = Image.open(b)
 		output_type = "latent" if sdxl else "pil"
-		denoising_end = 0.8 if sdxl else 1.0
-		# with torch.cuda.device(device):
+		kw = {}
+		if sdxl:
+			kw = dict(output_type=output_type, denoising_end=0.8)
 		if f2 in (StableDiffusionInpaintPipeline, StableDiffusionXLInpaintPipeline):
 			data = pipe(
 				prompt,
@@ -663,8 +664,7 @@ class Bot:
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
 				strength=float(kwargs.get("--strength", 0.8)),
-				output_type=output_type,
-				denoising_end=denoising_end,
+				**kw,
 			)
 		elif f2 in (StableDiffusionImg2ImgPipeline, StableDiffusionXLImg2ImgPipeline):
 			data = pipe(
@@ -674,8 +674,7 @@ class Bot:
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
 				strength=float(kwargs.get("--strength", 0.8)),
-				output_type=output_type,
-				denoising_end=denoising_end,
+				**kw,
 			)
 		elif f2 is StableDiffusionImageVariationPipeline:
 			data = pipe(
@@ -683,8 +682,7 @@ class Bot:
 				num_images_per_prompt=count,
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
-				output_type=output_type,
-				denoising_end=denoising_end,
+				**kw,
 			)
 		else:
 			data = pipe(
@@ -692,8 +690,7 @@ class Bot:
 				num_images_per_prompt=count,
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
-				output_type=output_type,
-				denoising_end=denoising_end,
+				**kw,
 			)
 		# print(data, data.images)
 		if data is None or not len(data.images):
