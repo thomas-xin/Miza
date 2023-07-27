@@ -1093,9 +1093,9 @@ class Resize(Command):
                 # Parse width and height multipliers
                 if "x" in value[:-1] or "X" in value or "*" in value or "×" in value:
                     func = "resize_to"
-                    value = value.replace("x", " ").replace("X", " ").replace("*", " ").replace("×", " ")
+                    value = value.replace("x", "X", 1).replace("X", "*", 1).replace("*", "×", 1).replace("×", " ", 1)
                 else:
-                    value = value.replace(":", " ")
+                    value = value.replace(":", " ", 1)
                 try:
                     spl = smart_split(value)
                 except ValueError:
