@@ -663,7 +663,9 @@ class Bot:
 				num_images_per_prompt=count,
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
-				strength=float(kwargs.get("--strength", 0.8)),
+				strength=float(kwargs.get("--strength", 0.9)),
+				width=im.width,
+				height=im.height,
 				**kw,
 			)
 		elif f2 in (StableDiffusionImg2ImgPipeline, StableDiffusionXLImg2ImgPipeline):
@@ -673,7 +675,9 @@ class Bot:
 				num_images_per_prompt=count,
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
-				strength=float(kwargs.get("--strength", 0.8)),
+				strength=float(kwargs.get("--strength", 0.7)),
+				width=im.width,
+				height=im.height,
 				**kw,
 			)
 		elif f2 is StableDiffusionImageVariationPipeline:
@@ -682,6 +686,8 @@ class Bot:
 				num_images_per_prompt=count,
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
+				width=im.width,
+				height=im.height,
 				**kw,
 			)
 		else:

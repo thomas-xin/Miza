@@ -1767,9 +1767,9 @@ class Art(Command):
                     if "--strength" not in kwargs:
                         args.extend((
                             "--strength",
-                            "0.75",
+                            "0.9",
                         ))
-                        kwargs["--strength"] = 0.75
+                        kwargs["--strength"] = 0.9
                     # if premium >= 2 and not force and "--strength" not in kwargs and str(kwargs["--guidance-scale"]) == "7.5" and str(kwargs["--eta"]) == "0.8":
                     #     if isinstance(image_1, bytes):
                     #         image_1b = image_1
