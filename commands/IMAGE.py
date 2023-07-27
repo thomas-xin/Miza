@@ -1636,7 +1636,8 @@ class Art(Command):
         emb = None
         fn = None
         futs = []
-        amount = 6 if premium >= 4 else 4 if premium > 2 else 1
+        amount = 4 if premium >= 4 else 1 if premium >= 2 else 1
+        sdxl = premium >= 2
         amount2 = 0
         if bot.is_trusted(guild) >= 2:
             for uid in bot.data.trusted[guild.id]:
@@ -1658,13 +1659,15 @@ class Art(Command):
                 futt = []
                 c = 0
                 if amount >= 1 and not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy():
+                    noprompt = not force and not kwargs.get("--mask")
+                    p = "" if noprompt and not sdxl else prompt
                     c = min(amount, 9 if nsfw and not self.sdiff_sem.active else 5)
                     c2 = c
                     while c2 > 0:
                         n = min(c2, xrand(floor(sqrt(c2) + 1)) + 1)
                         if not n:
                             n = c2
-                        fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, n], fix=3, pwr=700000 * n, timeout=240))
+                        fut = create_task(process_image("IBASL", "&", [p, kwargs, nsfw, False, n, sdxl], fix=3, pwr=700000 * n, timeout=240))
                         futt.append(fut)
                         c2 -= n
                 self.imagebot.token = oai or AUTH.get("openai_key")
@@ -1672,7 +1675,7 @@ class Art(Command):
                 try:
                     if c > amount:
                         raise PermissionError
-                    ims = await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2, openjourney, nsfw, amount - c, timeout=480)
+                    ims = await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2, openjourney, sdxl, nsfw, amount - c, timeout=480)
                 except PermissionError:
                     async with self.sdiff_sem:
                         for fut in futt:
@@ -1851,7 +1854,7 @@ class Art(Command):
                             amount2 = len(futs)
                         else:
                             noprompt = not force and not kwargs.get("--mask")
-                            p = "" if noprompt else prompt
+                            p = "" if noprompt and not sdxl else prompt
                             futt = []
                             c = amount - amount2
                             c2 = c
@@ -1859,7 +1862,7 @@ class Art(Command):
                                 n = min(c2, xrand(floor(sqrt(c2) + 1)) + 1)
                                 if not n:
                                     n = c2
-                                fut = create_task(process_image("IBASL", "&", [p, kwargs, nsfw, False, n], fix=3, pwr=700000 * n, timeout=240))
+                                fut = create_task(process_image("IBASL", "&", [p, kwargs, nsfw, False, n, sdxl], fix=3, pwr=700000 * n, timeout=240))
                                 futt.append(fut)
                                 c2 -= n
                             for fut in futt:

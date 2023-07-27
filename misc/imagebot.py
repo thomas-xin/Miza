@@ -540,16 +540,31 @@ class Bot:
 	safety_checkers = {}
 	# device, dtype = determine_cuda(0)
 	# gen = torch.Generator(f"cuda:{device}" if device >= 0 else "cpu").manual_seed(time.time_ns() - 1)
-	def art_stablediffusion_local(self, prompt, kwargs=None, model="stabilityai/stable-diffusion-xl-base-1.0", fail_unless_gpu=True, nsfw=False, count=1):
+	def art_stablediffusion_local(self, prompt, kwargs=None, model="stabilityai/stable-diffusion-xl-base-1.0", fail_unless_gpu=True, nsfw=False, count=1, sdxl=False):
 		from diffusers import StableDiffusionXLPipeline, StableDiffusionXLImg2ImgPipeline, StableDiffusionXLInpaintPipeline, StableDiffusionImageVariationPipeline
+		from diffusers import StableDiffusionPipeline, StableDiffusionImg2ImgPipeline, StableDiffusionInpaintPipeline, StableDiffusionImageVariationPipeline
 		if not kwargs.get("--init-image"):
-			pf = StableDiffusionXLPipeline
+			if sdxl:
+				pf = StableDiffusionXLPipeline
+			else:
+				pf = StableDiffusionPipeline
 		elif kwargs.get("--mask"):
-			pf = StableDiffusionXLInpaintPipeline
+			if sdxl:
+				pf = StableDiffusionXLInpaintPipeline
+			else:
+				pf = StableDiffusionInpaintPipeline
 		elif prompt:
-			pf = StableDiffusionXLImg2ImgPipeline
+			if sdxl:
+				pf = StableDiffusionXLImg2ImgPipeline
+			else:
+				pf = StableDiffusionImg2ImgPipeline
 		else:
-			pf = StableDiffusionImageVariationPipeline
+			if sdxl:
+				pf = StableDiffusionXLImg2ImgPipeline
+			else:
+				pf = StableDiffusionImageVariationPipeline
+		if not sdxl and model == "stabilityai/stable-diffusion-xl-base-1.0":
+			model = "runwayml/stable-diffusion-v1-5"
 		out = []
 		if self.models:
 			device = next(iter(self.models))
@@ -566,7 +581,7 @@ class Bot:
 				else:
 					device = -1
 					dtype = torch.float32
-		images = self.art_stablediffusion_sub(pf, model, prompt, kwargs, count, device, dtype, nsfw, fail_unless_gpu)
+		images = self.art_stablediffusion_sub(pf, model, prompt, kwargs, count, device, dtype, nsfw, fail_unless_gpu, sdxl=sdxl)
 		out = []
 		for im in images:
 			b = io.BytesIO()
@@ -577,12 +592,13 @@ class Bot:
 		return out
 
 	loading = False
-	def art_stablediffusion_sub(self, pf, model, prompt, kwargs, count, device=-1, dtype=torch.float32, nsfw=False, fail_unless_gpu=False):
+	def art_stablediffusion_sub(self, pf, model, prompt, kwargs, count, device=-1, dtype=torch.float32, nsfw=False, fail_unless_gpu=False, sdxl=False):
 		from diffusers import DPMSolverMultistepScheduler, StableDiffusionXLPipeline, StableDiffusionXLImg2ImgPipeline, StableDiffusionXLInpaintPipeline, StableDiffusionImageVariationPipeline
+		from diffusers import StableDiffusionPipeline, StableDiffusionImg2ImgPipeline, StableDiffusionInpaintPipeline
 		cia = torch.cuda.is_available()
 		models = self.models.setdefault(device, {})
 		checkers = self.safety_checkers.setdefault(device, {})
-		f2 = pf if pf != StableDiffusionImageVariationPipeline else StableDiffusionXLImg2ImgPipeline
+		f2 = pf
 		pipe = cia and models.get((f2, model))
 		if pipe == False and fail_unless_gpu:
 			return ()
@@ -592,10 +608,13 @@ class Bot:
 			try:
 				self.loading = True
 				kw = {}
+				if sdxl:
+					kw["use_safetensors"] = True
+					kw["variant"] = "fp16"
 				try:
 					if fail_unless_gpu and (device < 0 or not models.get((f2, model), True)):
 						return
-					pipe = backup_model(f2.from_pretrained, model, requires_safety_checker=True, torch_dtype=dtype, use_safetensors=True, variant="fp16", **kw)
+					pipe = backup_model(f2.from_pretrained, model, requires_safety_checker=False, torch_dtype=dtype, **kw)
 					if device >= 0:
 						if os.name != "nt":
 							pipe.unet = torch.compile(pipe.unet, mode="reduce-overhead", fullgraph=True)
@@ -612,7 +631,7 @@ class Bot:
 						models[(f2, model)] = False
 						print("StablediffusionL: CUDA f16 init failed")
 						return ()
-					pipe = backup_model(f2.from_pretrained, model, requires_safety_checker=pf is not StableDiffusionImageVariationPipeline, use_safetensors=True, variant="fp16", **kw)
+					pipe = backup_model(f2.from_pretrained, model, requires_safety_checker=False, **kw)
 				# checkers[model] = pipe.safety_checker
 				models[(f2, model)] = pipe
 			finally:
@@ -632,9 +651,10 @@ class Bot:
 			if not isinstance(b, str):
 				b = io.BytesIO(b)
 			mask = Image.open(b)
-		output_type = "pil" if 0 else "latent"
+		output_type = "latent" if sdxl else "pil"
+		denoising_end = 0.8 if sdxl else 1.0
 		# with torch.cuda.device(device):
-		if f2 is StableDiffusionXLInpaintPipeline:
+		if f2 in (StableDiffusionInpaintPipeline, StableDiffusionXLInpaintPipeline):
 			data = pipe(
 				prompt,
 				image=image_to(im),
@@ -644,9 +664,9 @@ class Bot:
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
 				strength=float(kwargs.get("--strength", 0.8)),
 				output_type=output_type,
-				denoising_end=0.8,
+				denoising_end=denoising_end,
 			)
-		elif f2 is StableDiffusionXLImg2ImgPipeline:
+		elif f2 in (StableDiffusionImg2ImgPipeline, StableDiffusionXLImg2ImgPipeline):
 			data = pipe(
 				prompt,
 				image=image_to(im),
@@ -655,7 +675,7 @@ class Bot:
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
 				strength=float(kwargs.get("--strength", 0.8)),
 				output_type=output_type,
-				denoising_end=0.8,
+				denoising_end=denoising_end,
 			)
 		elif f2 is StableDiffusionImageVariationPipeline:
 			data = pipe(
@@ -664,7 +684,7 @@ class Bot:
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
 				output_type=output_type,
-				denoising_end=0.8,
+				denoising_end=denoising_end,
 			)
 		else:
 			data = pipe(
@@ -673,7 +693,7 @@ class Bot:
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
 				output_type=output_type,
-				denoising_end=0.8,
+				denoising_end=denoising_end,
 			)
 		# print(data, data.images)
 		if data is None or not len(data.images):
@@ -684,7 +704,12 @@ class Bot:
 		for im, n in zip(data.images, nsfw_content_detected):
 			if n:
 				continue
-			if torch.sum(im > -torch.inf) < len(im.ravel()) // 4:
+			if isinstance(im, Image.Image):
+				p = np.sum(im.resize((32, 32)).convert("L"))
+				if p <= 1024:
+					print("IBASL: Invalid")
+					continue
+			elif torch.sum(im > -torch.inf) < len(im.ravel()) // 4:
 				print("IBASL: Invalid")
 				continue
 			images.append(im)
@@ -892,7 +917,7 @@ class Bot:
 			out.append(b)
 		return out
 
-	def art(self, prompt, url="", url2="", kwargs={}, specified=False, dalle2=False, openjourney=False, nsfw=False, count=1):
+	def art(self, prompt, url="", url2="", kwargs={}, specified=False, dalle2=False, openjourney=False, sdxl=False, nsfw=False, count=1):
 		funcs = []
 		# if not url and not dalle2 and nsfw:
 		# 	funcs.append((self.art_textsynth, 4))
@@ -909,7 +934,7 @@ class Bot:
 		eff = 0
 		funceff = [random.choice(funcs) for i in range(count - 1)]
 		funceff.insert(0, funcs[0])
-		if count > 1 and not specified and not url and os.name == "nt":
+		if sdxl and not specified and not url and os.name == "nt":
 			funceff = [(self.art_clipdrop, (3 if count == 9 else 4))] * count + [(a, min(b, 2)) for a, b in funceff]
 		while funceff:
 			counts = [t[1] for t in funceff]

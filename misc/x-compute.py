@@ -2784,12 +2784,12 @@ elif len(sys.argv) > 1 and int(sys.argv[1]) >= 3:
 			p2 = None
 		return (p1, p2)
 
-	def IBASL(prompt, kwargs, nsfw=False, force=True, count=1):
+	def IBASL(prompt, kwargs, nsfw=False, force=True, count=1, sdxl=False):
 		try:
 			ib = CBOTS[None]
 		except KeyError:
 			ib = CBOTS[None] = imagebot.Bot()
-		return ib.art_stablediffusion_local(prompt, kwargs, nsfw=nsfw, fail_unless_gpu=not force, count=count)
+		return ib.art_stablediffusion_local(prompt, kwargs, nsfw=nsfw, fail_unless_gpu=not force, count=count, sdxl=sdxl)
 
 	def IBASR(prompt, image):
 		try:
