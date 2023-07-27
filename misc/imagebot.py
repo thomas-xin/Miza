@@ -663,7 +663,7 @@ class Bot:
 				num_images_per_prompt=count,
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
-				strength=float(kwargs.get("--strength", 0.9)),
+				strength=float(kwargs.get("--strength", 0.8)),
 				width=im.width,
 				height=im.height,
 				**kw,
