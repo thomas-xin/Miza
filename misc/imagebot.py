@@ -937,7 +937,7 @@ class Bot:
 		eff = 0
 		funceff = [random.choice(funcs) for i in range(count - 1)]
 		funceff.insert(0, funcs[0])
-		if sdxl and not specified and not url and os.name == "nt":
+		if sdxl and not specified and not url and not dalle2 and os.name == "nt":
 			funceff = [(self.art_clipdrop, (3 if count == 9 else 4))] * count + [(a, min(b, 2)) for a, b in funceff]
 		while funceff:
 			counts = [t[1] for t in funceff]
