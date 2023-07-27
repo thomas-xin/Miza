@@ -1749,7 +1749,7 @@ class Art(Command):
                 image_1 = image_2 = None
                 image_1b = image_2b = None
                 if url:
-                    resp = await process_image(url, "resize_to", ["-nogif", 512, 512, "auto", "-f", "png"], timeout=60)
+                    resp = await process_image(url, "resize_max", ["-nogif", 512, 512, "auto", "-f", "png"], timeout=60)
                     image_1 = resp
                     if inpaint and url2:
                         image_2b = await bot.get_request(url2)
