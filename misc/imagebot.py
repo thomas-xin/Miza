@@ -612,7 +612,7 @@ class Bot:
 						models[(f2, model)] = False
 						print("StablediffusionL: CUDA f16 init failed")
 						return ()
-					pipe = backup_model(f2.from_pretrained, model, requires_safety_checker=pf is not StableDiffusionImageVariationPipeline, use_safetensors=True, **kw)
+					pipe = backup_model(f2.from_pretrained, model, requires_safety_checker=pf is not StableDiffusionImageVariationPipeline, use_safetensors=True, variant="fp16", **kw)
 				# checkers[model] = pipe.safety_checker
 				models[(f2, model)] = pipe
 			finally:
@@ -716,10 +716,14 @@ class Bot:
 			try:
 				self.loading = True
 				kw = {}
+				if vae:
+					kw["vae"] = vae
+				if text_encoder_2:
+					kw["text_encoder_2"] = text_encoder_2
 				try:
 					if fail_unless_gpu and (device < 0 or not models.get((f2, model), True)):
 						return
-					pipe = backup_model(f2.from_pretrained, model, requires_safety_checker=True, torch_dtype=dtype, vae=vae, text_encoder_2=text_encoder_2, use_safetensors=True, variant="fp16", **kw)
+					pipe = backup_model(f2.from_pretrained, model, requires_safety_checker=True, torch_dtype=dtype, use_safetensors=True, variant="fp16", **kw)
 					if device >= 0:
 						if os.name != "nt":
 							pipe.unet = torch.compile(pipe.unet, mode="reduce-overhead", fullgraph=True)
@@ -736,7 +740,7 @@ class Bot:
 						models[(f2, model)] = False
 						print("StablediffusionL: CUDA f16 init failed")
 						return ()
-					pipe = backup_model(f2.from_pretrained, model, requires_safety_checker=f2 is not StableDiffusionImageVariationPipeline, vae=vae, text_encoder_2=text_encoder_2, use_safetensors=True, **kw)
+					pipe = backup_model(f2.from_pretrained, model, requires_safety_checker=f2 is not StableDiffusionImageVariationPipeline, use_safetensors=True, variant="fp16", **kw)
 				models[(f2, model)] = pipe
 			finally:
 				self.loading = False
