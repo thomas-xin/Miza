@@ -1635,6 +1635,7 @@ resizers = dict(
 	nearestneighbour=Resampling.NEAREST,
 	crop="crop",
 	padding="crop",
+	sdxl=Resampling.LANCZOS,
 )
 
 def resize_mult(image, x, y, operation):
@@ -2789,6 +2790,18 @@ elif len(sys.argv) > 1 and int(sys.argv[1]) >= 3:
 		except KeyError:
 			ib = CBOTS[None] = imagebot.Bot()
 		return ib.art_stablediffusion_local(prompt, kwargs, nsfw=nsfw, fail_unless_gpu=not force, count=count)
+
+	def IBASR(prompt, image):
+		try:
+			ib = CBOTS[None]
+		except KeyError:
+			ib = CBOTS[None] = imagebot.Bot()
+		im = ib.art_stablediffusion_refine(prompt, image)
+		im = optimise(im)
+		b = io.BytesIO()
+		im.save(b, format="png")
+		b.seek(0)
+		return b.read()
 
 	# def whisper(url, best=False):
 	# 	ts = time.time()

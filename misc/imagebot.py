@@ -578,7 +578,7 @@ class Bot:
 
 	loading = False
 	def art_stablediffusion_sub(self, pf, model, prompt, kwargs, count, device=-1, dtype=torch.float32, nsfw=False, fail_unless_gpu=False):
-		from diffusers import DPMSolverMultistepScheduler, DiffusionPipeline, StableDiffusionXLPipeline, StableDiffusionXLImg2ImgPipeline, StableDiffusionXLInpaintPipeline, StableDiffusionImageVariationPipeline
+		from diffusers import DPMSolverMultistepScheduler, StableDiffusionXLPipeline, StableDiffusionXLImg2ImgPipeline, StableDiffusionXLInpaintPipeline, StableDiffusionImageVariationPipeline
 		cia = torch.cuda.is_available()
 		models = self.models.setdefault(device, {})
 		checkers = self.safety_checkers.setdefault(device, {})
@@ -693,61 +693,70 @@ class Bot:
 		if images and output_type == "latent":
 			vae = pipe.vae
 			text_encoder_2 = pipe.text_encoder_2
-			model = "stabilityai/stable-diffusion-xl-refiner-1.0"
-			f2 = DiffusionPipeline
-			cia = torch.cuda.is_available()
-			models = self.models.setdefault(device, {})
-			checkers = self.safety_checkers.setdefault(device, {})
-			pipe = cia and models.get((f2, model))
-			if pipe == False and fail_unless_gpu:
-				return ()
-			while self.loading:
-				time.sleep(1)
-			if not pipe:
+			images = self.art_stablediffusion_refine(prompt, images, vae=vae, text_encoder_2=text_encoder_2, fail_unless_gpu=fail_unless_gpu, device=device, dtype=dtype)
+		return images
+
+	def art_stablediffusion_refine(self, prompt, images, vae=None, text_encoder_2=None, fail_unless_gpu=False, device=0, dtype=torch.float16):
+		from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler, StableDiffusionImageVariationPipeline
+		if isinstance(images, (bytes, memoryview)):
+			images = [Image.open(io.BytesIO(images))]
+		elif not isinstance(images, (list, tuple, torch.tensor)):
+			images = [images]
+		model = "stabilityai/stable-diffusion-xl-refiner-1.0"
+		f2 = DiffusionPipeline
+		cia = torch.cuda.is_available()
+		models = self.models.setdefault(device, {})
+		checkers = self.safety_checkers.setdefault(device, {})
+		pipe = cia and models.get((f2, model))
+		if pipe == False and fail_unless_gpu:
+			return ()
+		while self.loading:
+			time.sleep(1)
+		if not pipe:
+			try:
+				self.loading = True
+				kw = {}
 				try:
-					self.loading = True
-					kw = {}
-					try:
-						if fail_unless_gpu and (device < 0 or not models.get((f2, model), True)):
-							return
-						pipe = backup_model(f2.from_pretrained, model, requires_safety_checker=True, torch_dtype=dtype, vae=vae, text_encoder_2=text_encoder_2, use_safetensors=True, variant="fp16", **kw)
-						if device >= 0:
-							if os.name != "nt":
-								pipe.unet = torch.compile(pipe.unet, mode="reduce-overhead", fullgraph=True)
-							pipe = pipe.to(f"cuda:{device}")
-							pipe.enable_attention_slicing()
-							pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
-							try:
-								pipe.enable_model_cpu_offload()
-							except AttributeError:
-								pass
-					except:
-						print_exc()
-						if fail_unless_gpu:
-							models[(f2, model)] = False
-							print("StablediffusionL: CUDA f16 init failed")
-							return ()
-						pipe = backup_model(f2.from_pretrained, model, requires_safety_checker=f2 is not StableDiffusionImageVariationPipeline, vae=vae, text_encoder_2=text_encoder_2, use_safetensors=True, **kw)
-					models[(f2, model)] = pipe
-				finally:
-					self.loading = False
-			# pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
-			data = pipe(
-				prompt=[prompt] * len(images),
-				negative_prompt=["blurry bad distorted disfigured poor ugly"] * len(images),
-				image=images,
-				num_images_per_prompt=1,
-				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
-				output_type="pil",
-				denoising_start=0.7,
-			)
-			images = []
-			for im in data.images:
-				p = np.sum(im.resize((32, 32)).convert("L"))
-				if p <= 1024:
-					print("IBASL: Invalid")
-					continue
-				images.append(im)
+					if fail_unless_gpu and (device < 0 or not models.get((f2, model), True)):
+						return
+					pipe = backup_model(f2.from_pretrained, model, requires_safety_checker=True, torch_dtype=dtype, vae=vae, text_encoder_2=text_encoder_2, use_safetensors=True, variant="fp16", **kw)
+					if device >= 0:
+						if os.name != "nt":
+							pipe.unet = torch.compile(pipe.unet, mode="reduce-overhead", fullgraph=True)
+						pipe = pipe.to(f"cuda:{device}")
+						pipe.enable_attention_slicing()
+						pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+						try:
+							pipe.enable_model_cpu_offload()
+						except AttributeError:
+							pass
+				except:
+					print_exc()
+					if fail_unless_gpu:
+						models[(f2, model)] = False
+						print("StablediffusionL: CUDA f16 init failed")
+						return ()
+					pipe = backup_model(f2.from_pretrained, model, requires_safety_checker=f2 is not StableDiffusionImageVariationPipeline, vae=vae, text_encoder_2=text_encoder_2, use_safetensors=True, **kw)
+				models[(f2, model)] = pipe
+			finally:
+				self.loading = False
+		# pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
+		data = pipe(
+			prompt=[prompt] * len(images),
+			negative_prompt=["blurry bad distorted disfigured poor ugly"] * len(images),
+			image=images,
+			num_images_per_prompt=1,
+			num_inference_steps=48,
+			output_type="pil",
+			denoising_start=0.7,
+		)
+		images = []
+		for im in data.images:
+			p = np.sum(im.resize((32, 32)).convert("L"))
+			if p <= 1024:
+				print("IBASL: Invalid")
+				continue
+			images.append(im)
 		return images
 
 	def art_textsynth(self, prompt, kwargs=None, count=1):

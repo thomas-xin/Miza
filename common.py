@@ -3012,7 +3012,9 @@ class FileStreamer(io.BufferedRandom, contextlib.AbstractContextManager):
 			if isinstance(f, (list, tuple)):
 				objs.extend(f)
 				continue
-			if isinstance(f, str):
+			if isinstance(f, (bytes, memoryview)):
+				f = io.BytesIO(f)
+			elif isinstance(f, str):
 				f = open(f, "rb")
 			self.data.append((i, f))
 			i += f.seek(0, os.SEEK_END)
@@ -3030,6 +3032,8 @@ class FileStreamer(io.BufferedRandom, contextlib.AbstractContextManager):
 				if i > self.pos:
 					break
 				t = (i, f)
+			if not t:
+				break
 			p = self.pos - t[0]
 			t[1].seek(p)
 			b = t[1].read(min(size, 4294967296))

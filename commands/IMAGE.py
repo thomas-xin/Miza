@@ -1035,9 +1035,9 @@ class CreateGIF(Command):
 
 
 class Resize(Command):
-    name = ["ImageScale", "Scale", "Rescale", "ImageResize"]
+    name = ["ImageScale", "Scale", "Rescale", "ImageResize", "Denoise", "Enhance", "Refine"]
     description = "Changes size of supplied image, using an optional scaling operation."
-    usage = "<0:url> <1:x_multiplier(1)>? <2:y_multiplier(x)>? (nearest|linear|hamming|bicubic|lanczos|scale2x|crop|auto)?"
+    usage = "<0:url> <1:x_multiplier(1)>? <2:y_multiplier(x)>? (nearest|linear|hamming|bicubic|lanczos|scale2x|sdxl|crop|auto)?"
     example = ("scale https://mizabot.xyz/favicon 4", "resize https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png 2048x2048 scale2x")
     no_parse = True
     rate_limit = (8, 13)
@@ -1045,7 +1045,7 @@ class Resize(Command):
     _timeout_ = 4
     typing = True
 
-    async def __call__(self, bot, user, guild, channel, message, flags, args, argv, _timeout, **void):
+    async def __call__(self, bot, user, guild, channel, message, flags, name, args, argv, _timeout, **void):
         # Take input from any attachments, or otherwise the message contents
         if message.attachments:
             args = [best_url(a) for a in message.attachments] + args
@@ -1119,6 +1119,8 @@ class Resize(Command):
                     fmt = spl.pop(0)
                 else:
                     fmt = fmt2
+            if op == "auto" and name in ("denoise", "enhance", "refine"):
+                op = "sdxl"
             # Try and find a good name for the output image
             try:
                 name = url[url.rindex("/") + 1:]
@@ -1130,7 +1132,13 @@ class Resize(Command):
                 name = "unknown"
             if not name.endswith("." + fmt):
                 name += "." + fmt
+            if op == "sdxl":
+                fut = create_task(bot.caption(url, best=True))
             resp = await process_image(url, func, [x, y, op, "-f", fmt], timeout=_timeout)
+            if op == "sdxl":
+                pt, p1, p2 = await fut
+                prompt = p1 + "\n" + p2
+                resp = await process_image("IBASR", "&", [prompt, resp], fix=3, pwr=500000, timeout=240)
             fn = resp
             if isinstance(fn, str) and "." in fn:
                 fmt = "." + fn.rsplit(".", 1)[-1]
@@ -1493,7 +1501,7 @@ class OCR(Command):
 
 class Art(Command):
     _timeout_ = 150
-    name = ["AIArt", "Inpaint", "StableDiffusion", "Dalle", "Dalle2", "Dream", "Imagine", "Inspire", "Openjourney", "Midjourney"]
+    name = ["AIArt", "Inpaint", "StableDiffusion", "SDXL", "Dalle", "Dalle2", "Dream", "Imagine", "Inspire", "Openjourney", "Midjourney"]
     description = "Runs a Stable Diffusion AI art generator on the input prompt or image. Operates on a global queue system for image prompts. Accepts appropriate keyword arguments."
     usage = "<0:prompt> <inpaint{?i}>"
     example = ("art cute kitten", "art https://mizabot.xyz/favicon")
@@ -1628,7 +1636,7 @@ class Art(Command):
         emb = None
         fn = None
         futs = []
-        amount = 9 if premium >= 4 else 4 if premium > 2 else 1
+        amount = 6 if premium >= 4 else 4 if premium > 2 else 1
         amount2 = 0
         if bot.is_trusted(guild) >= 2:
             for uid in bot.data.trusted[guild.id]:
@@ -1656,7 +1664,7 @@ class Art(Command):
                         n = min(c2, xrand(floor(sqrt(c2) + 1)) + 1)
                         if not n:
                             n = c2
-                        fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, n], fix=3, pwr=500000 * n, timeout=240))
+                        fut = create_task(process_image("IBASL", "&", [prompt, kwargs, nsfw, False, n], fix=3, pwr=700000 * n, timeout=240))
                         futt.append(fut)
                         c2 -= n
                 self.imagebot.token = oai or AUTH.get("openai_key")
@@ -1851,7 +1859,7 @@ class Art(Command):
                                 n = min(c2, xrand(floor(sqrt(c2) + 1)) + 1)
                                 if not n:
                                     n = c2
-                                fut = create_task(process_image("IBASL", "&", [p, kwargs, nsfw, False, n], fix=3, pwr=500000 * n, timeout=240))
+                                fut = create_task(process_image("IBASL", "&", [p, kwargs, nsfw, False, n], fix=3, pwr=700000 * n, timeout=240))
                                 futt.append(fut)
                                 c2 -= n
                             for fut in futt:

@@ -567,7 +567,7 @@ class UpdateExec(Database):
     async def stash(self, fn, start=0, end=inf):
         bot = self.bot
         fns = [fn] if isinstance(fn, str) else fn
-        print("Stash", fns, start, end)
+        print("Stash", lim_str(str(fns), 80), start, end)
         urls = []
         mids = []
         with FileStreamer(*fns) as f:
@@ -625,6 +625,7 @@ class UpdateExec(Database):
                         urls.append(str(a.url) + "?size=" + str(bs))
                     mids.append(message.id)
                     i = f.tell()
+                await asyncio.sleep(0.25)
         print(urls, mids)
         create_future_ex(bot.clear_cache, priority=True)
         return urls, mids
