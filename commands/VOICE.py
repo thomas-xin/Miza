@@ -5544,7 +5544,7 @@ class UpdateAudio(Database):
                 reason += " Apologies for any inconvenience! 🎵"
             else:
                 reason = ""
-            await create_future(auds.kill, reason=css_md(reason))
+            await create_future(auds.kill, reason=css_md(reason) if reason else None)
 
     # Restores all audio players from temporary database when applicable
     async def _bot_ready_(self, bot, **void):
