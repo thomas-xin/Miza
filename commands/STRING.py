@@ -1266,7 +1266,7 @@ class Ask(Command):
 				visible.append(m)
 		visible.append(reference)
 		visible.append(message)
-		visible = sorted(filter(visible, bool), key=lambda m: m.id, reverse=True)
+		visible = sorted(filter(bool, visible), key=lambda m: m.id, reverse=True)
 		ignores = set()
 		reset = True
 		visconts = []
