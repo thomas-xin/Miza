@@ -3682,18 +3682,11 @@ class Skip(Command):
                 q = auds.queue
                 song = q[i]
                 if song.skips is None or len(song.skips) >= required:
-                    if count <= 3:
-                        q.pop(i)
-                        if i == 1:
-                            auds.clear_next()
-                    else:
-                        pops.add(i)
-                        i += 1
+                    pops.add(i)
                     if count < 4:
                         response += f"{sqr_md(song.name)} has been removed from the queue.\n"
                     count += 1
-                else:
-                    i += 1
+                i += 1
             if pops:
                 auds.queue.pops(pops)
                 if 1 in pops:
