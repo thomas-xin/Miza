@@ -1354,10 +1354,10 @@ class Ask(Command):
 					name = m.author.name
 					if name == bot.name:
 						name = bot.name + "2"
-			if i == len(visible) - 2:
+			if reference and m.id == reference.id:
 				refs.append((f"[REPLIED TO]: {name}", content))
 				continue
-			if i == len(visible) - 1:
+			if i == 0:
 				q = content
 				print(q)
 				continue
