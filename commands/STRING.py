@@ -1273,7 +1273,7 @@ class Ask(Command):
 		refs = []
 		history = []
 		for i, m in enumerate(visible):
-			if not m or m.id > message or m.id == message.id and i != 0:
+			if not m or m.id > message.id or m.id == message.id and i != 0:
 				continue
 			if caid and caid.get("first_message_id") == m.id:
 				break
