@@ -1264,9 +1264,10 @@ class Ask(Command):
 		if not getattr(message, "simulated", False):
 			async for m in bot.history(channel, limit=16):
 				visible.append(m)
-		visible.append(reference)
-		visible.append(message)
-		visible = sorted(filter(bool, visible), key=lambda m: m.id, reverse=True)
+		visible.extend([message, reference])
+		mdic = {m.id: m for m in visible if m}
+		mids = sorted(mdic, reverse=True)
+		visible = [mdic[i] for i in mids]
 		ignores = set()
 		reset = True
 		visconts = []
