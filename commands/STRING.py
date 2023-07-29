@@ -1266,13 +1266,14 @@ class Ask(Command):
 				visible.append(m)
 		visible.append(reference)
 		visible.append(message)
+		visible.sort(lambda m: m.id, reverse=True)
 		ignores = set()
 		reset = True
 		visconts = []
 		refs = []
 		history = []
 		for i, m in enumerate(visible):
-			if not m or m.id == message.id and i != len(visible) - 1:
+			if not m or m.id > message or m.id == message.id and i != 0:
 				continue
 			if caid and caid.get("first_message_id") == m.id:
 				break
@@ -1280,7 +1281,7 @@ class Ask(Command):
 				reset = None
 			if m.id in ignores or caid and str(m.id) in caid.get("ids", ()) or any(str(e) == "❎" for e in m.reactions):
 				continue
-			if i == len(visible) - 1:
+			if m.id == message.id:
 				content = q
 			elif m.content:
 				content = m.clean_content
