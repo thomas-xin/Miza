@@ -2671,7 +2671,6 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 		prompt = inputs["prompt"]
 		key = inputs["key"]
 		ht = inputs["huggingface_token"]
-		vis = inputs.get("vis_session")
 		oai = inputs.get("oai")
 		bals = inputs.get("bals")
 		nsfw = inputs.get("nsfw")
@@ -2684,7 +2683,6 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 				huggingface_token=ht,
 				premium=premium,
 			)
-			cb.vis_s = vis
 		cb.user_id = user_id
 		cb.channel_id = channel_id
 		cb.oai = oai
