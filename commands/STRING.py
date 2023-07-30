@@ -1520,7 +1520,7 @@ class Ask(Command):
 			if premium >= 2 and freebies is not None:
 				bot.data.users[user.id].setdefault("freebies", []).append(utc())
 				rem = freelim - len(freebies)
-				if not emb and len(rem) <= 5:
+				if not emb and rem <= 5:
 					emb = discord.Embed(colour=rand_colour())
 					emb.set_author(**get_author(bot.user))
 					emb.description = f"{rem}/{freelim} free premium commands remaining today. Please help [fund my API]({bot.kofi_url}) for unlimited access!"
