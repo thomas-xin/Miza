@@ -2196,6 +2196,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				for role in u.roles:
 					if role.id in self.premium_roles:
 						lv = max(lv, self.premium_roles[role.id])
+		else:
+			return 3
 		if not absolute:
 			data = bot.data.users.get(uid)
 			if data and data.get("trial"):
@@ -3532,6 +3534,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							_timeout=timeout,               # timeout delay assigned to the command
 							timeout=timeout,                # timeout delay for the whole function
 						)
+						try:
+							message.__dict__.setdefault("inits", []).append(future)
+						except:
+							pass
 						# Add a callback to typing in the channel if the command takes too long
 						if fut is None and not hasattr(command, "typing") and not getattr(message, "simulated", False):
 							create_task(delayed_callback(future, sqrt(3), discord.abc.Messageable.trigger_typing, channel, repeat=True))
@@ -5838,6 +5844,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			guild = message.guild
 			if guild:
 				await self.send_event("_delete_", message=message)
+			with tracebacksuppressor:
+				inits = getattr(message, "inits", ())
+				for fut in inits:
+					try:
+						fut.cancel()
+					except AttributeError:
+						force_kill(fut)
 
 		# Message bulk delete event: uses raw payloads rather than discord.py message cache. calls _bulk_delete_ and _delete_ bot database events.
 		@self.event

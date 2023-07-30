@@ -57,16 +57,17 @@ class Translate(Command):
 		renamed = dict(chinese="zh-cn", zh="zh-cn", auto="auto", automatic="auto", none="auto", null="auto")
 
 	async def __call__(self, bot, guild, channel, argv, user, message, **void):
-		if not googletrans:
-			raise RuntimeError("Unable to load Google Translate.")
 		if not argv:
 			raise ArgumentError("Input string is empty.")
 		self.trans.client.headers.update(Request.header())
 		spl = argv.split(" ", 3)
+		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
 		if len(spl) > 1 and spl[0].casefold() in ("google", "chatgpt"):
 			engine = spl.pop(0).casefold()
 		else:
-			engine = "chatgpt"
+			engine = "chatgpt" if premium >= 2 else "google"
+		if engine == "google" and not googletrans:
+			raise RuntimeError("Unable to load Google Translate.")
 		if len(spl) > 2 and (src := (self.renamed.get(c := spl[0].casefold()) or (self.languages.get(c) and c))):
 			spl.pop(0)
 			src = lim_str(src, 32)
@@ -1249,6 +1250,14 @@ class Ask(Command):
 			mapd[s] = None
 
 		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
+		freelim = 25
+		if premium < 2:
+			data = bot.data.users.get(user.id)
+			freebies = [t for t in data.get("freebies", ()) if utc() - t < 86400]
+			if len(freebies) < freelim:
+				premium = 2
+		else:
+			freebies = None
 		if getattr(message, "reference", None):
 			reference = message.reference.resolved
 		else:
@@ -1409,8 +1418,12 @@ class Ask(Command):
 		elif cname == "platypus" or cname == "gplatty" or cname == "llama":
 			model = "platypus"
 		elif cname == "gpt3":
+			if premium < 2:
+				raise PermissionError(f"Distributed premium level 1 or higher required; please see {bot.kofi_url} for more info!")
 			model = "gpt3"
 		elif cname == "gpt3a":
+			if premium < 2:
+				raise PermissionError(f"Distributed premium level 1 or higher required; please see {bot.kofi_url} for more info!")
 			model = "gpt3+"
 		elif cname == "davinci":
 			if premium < 4:
@@ -1504,6 +1517,13 @@ class Ask(Command):
 			# if fut:
 			#     await fut
 			out = await process_image("CBAI", "$", [inputs], fix=1, pwr=1 if model.startswith("gpt") else 1000000, timeout=600)
+			if premium >= 2 and freebies is not None:
+				bot.data.users[user.id].setdefault("freebies", []).append(utc())
+				rem = freelim - len(freebies)
+				if not emb and len(rem) <= 5:
+					emb = discord.Embed(colour=rand_colour())
+					emb.set_author(**get_author(bot.user))
+					emb.description = f"{rem}/{freelim} free premium commands remaining today. Please help [fund my API]({bot.kofi_url}) for unlimited access!"
 			if isinstance(out, dict):
 				fname = out["func"]
 				argv = as_str(out.get("argv", ""))

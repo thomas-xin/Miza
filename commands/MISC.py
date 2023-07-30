@@ -522,6 +522,8 @@ class SpectralPulse(Command):
             async with self.spec_sem:
                 print(args)
                 proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd(), stdout=subprocess.DEVNULL)
+                with suppress():
+                    message.__dict__.setdefault("inits", []).append(proc)
                 try:
                     await asyncio.wait_for(proc.wait(), timeout=3200)
                 except (T0, T1, T2):

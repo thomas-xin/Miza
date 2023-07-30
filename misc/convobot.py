@@ -737,7 +737,7 @@ class Bot:
 			lim = 600 if premium >= 2 else 400
 			if len(self.gpttokens(r)) > lim + 16:
 				r = self.auto_summarise(q=r, max_length=lim, min_length=lim * 2 // 3)
-			lines.append("[SYSTEM]: Summary of history:\n" + r + "\n")
+			lines.append("[SYSTEM]: Snapshot of history:\n" + r + "\n")
 		for k, v in self.promises:
 			k = k.replace(":", "")
 			s = f"{k}: {v}\n"

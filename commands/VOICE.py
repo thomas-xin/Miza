@@ -2442,7 +2442,7 @@ class AudioDownloader:
             entry["url"] = ""
 
     # Video concatenation algorithm; supports different formats, codecs, resolutions, aspect ratios and framerates
-    def concat_video(self, urls, fmt, start, end, auds):
+    def concat_video(self, urls, fmt, start, end, auds, message=None):
         urls = list(urls)
         ts = ts_us()
         # Collect information on first video stream; use this as the baseline for all other streams to concatenate
@@ -2498,6 +2498,8 @@ class AudioDownloader:
         args.append(fnv)
         print(args)
         proc = psutil.Popen(args, stdin=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1048576)
+        with suppress():
+            message.__dict__.setdefault("inits", []).append(proc)
         with open(afile, "wb") as afp:
             for t, url in enumerate(urls, ts + 1):
                 with tracebacksuppressor:
@@ -2507,9 +2509,9 @@ class AudioDownloader:
                             start = round_min(float(start))
                         if str(end) != "None":
                             end = round_min(min(float(end), 86400))
-                        fut = create_future_ex(self.download_file, url, "pcm", start=start, end=end, auds=None, ts=t, child=False)
+                        fut = create_future_ex(self.download_file, url, "pcm", start=start, end=end, auds=None, ts=t, child=False, message=message)
                     else:
-                        fut = create_future_ex(self.download_file, url, "pcm", auds=None, ts=t, child=True)
+                        fut = create_future_ex(self.download_file, url, "pcm", auds=None, ts=t, child=True, message=message)
                     res = self.search(url)
                     if type(res) is str:
                         raise evalex(res)
@@ -2546,6 +2548,8 @@ class AudioDownloader:
                     cfn = fut.result()[0]
                     print(args)
                     pin = psutil.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=1048576)
+                    with suppress():
+                        message.__dict__.setdefault("inits", []).append(pin)
                     # Count amount of data for the raw video input, while piping to FFmpeg to encode
                     fsize = 0
                     while True:
@@ -2590,7 +2594,10 @@ class AudioDownloader:
         ac = "aac" if fmt == "mp4" else "libopus"
         args.extend(("-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", ac, "-b:a", "224k", fn))
         print(args)
-        subprocess.run(args, stderr=subprocess.PIPE)
+        proc = psutil.Popen(args, stderr=subprocess.PIPE)
+        with suppress():
+            message.__dict__.setdefault("inits", []).append(proc)
+        proc.wait()
         # with suppress():
             # os.remove(fnv)
             # os.remove(afile)
@@ -2599,7 +2606,7 @@ class AudioDownloader:
     emptybuff = b"\x00" * (48000 * 2 * 2)
     # codec_map = {}
     # For ~download
-    def download_file(self, url, fmt, start=None, end=None, auds=None, ts=None, copy=False, ar=SAMPLE_RATE, ac=2, size=None, container=None, child=False, silenceremove=False):
+    def download_file(self, url, fmt, start=None, end=None, auds=None, ts=None, copy=False, ar=SAMPLE_RATE, ac=2, size=None, container=None, child=False, silenceremove=False, message=None):
         if child:
             ctx = emptyctx
         else:
@@ -2728,7 +2735,7 @@ class AudioDownloader:
                                     container = "webm"
                                 elif selc.startswith("h26"):
                                     container = "mp4"
-                                vst[i] = self.download_file(url, selc, size=((w2, h2), (width, height)), auds=auds, ts=t, container=container)[0].rsplit("/", 1)[-1]
+                                vst[i] = self.download_file(url, selc, size=((w2, h2), (width, height)), auds=auds, ts=t, container=container, message=message)[0].rsplit("/", 1)[-1]
                     vsc = "\n".join(f"file '{i}'" for i in vst)
                     vsf = f"cache/{ts}~video.concat"
                     with open(vsf, "w", encoding="utf-8") as f:
@@ -2845,6 +2852,8 @@ class AudioDownloader:
             try:
                 if len(ast) > 1:
                     proc = psutil.Popen(args, stdin=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1048576)
+                    with suppress():
+                        message.__dict__.setdefault("inits", []).append(proc)
                     ress = []
                     futs = deque()
                     for i, info in enumerate(ast):
@@ -2858,7 +2867,7 @@ class AudioDownloader:
                             with tracebacksuppressor:
                                 cfn = futs.popleft().result()[0]
                                 ress.append(cfn)
-                        fut = create_future_ex(self.download_file, url, "pcm", auds=None, ts=t, child=True, silenceremove=silenceremove)
+                        fut = create_future_ex(self.download_file, url, "pcm", auds=None, ts=t, child=True, silenceremove=silenceremove, message=message)
                         futs.append(fut)
                     for fut in futs:
                         with tracebacksuppressor:
@@ -2886,8 +2895,8 @@ class AudioDownloader:
                     proc.stdin.close()
                     proc.wait()
                 else:
-                    resp = subprocess.run(args, stderr=subprocess.PIPE)
-                    resp.check_returncode()
+                    proc = psutil.Popen(args, stderr=subprocess.PIPE)
+                    proc.wait()
             except subprocess.CalledProcessError as ex:
                 # Attempt to convert file from org if FFmpeg failed
                 try:
@@ -4931,7 +4940,7 @@ class Download(Command):
     time_consuming = True
     _timeout_ = 75
     name = ["📥", "Search", "YTDL", "Youtube_DL", "AF", "AudioFilter", "Trim", "Concat", "Concatenate", "🌽🐱", "ConvertORG", "Org2xm", "Convert"]
-    description = "Searches and/or downloads a song from a YouTube/SoundCloud query or audio file link. Will extend (loop) if trimmed past the end."
+    description = "Searches and/or downloads a song from a YouTube/SoundCloud query or audio file link. Will extend (loop) if trimmed past the end. The \"-\" character is used to omit parameters for ~trim."
     usage = "<0:search_links>* <multi{?m}> <trim{?t}>? <-3:trim_start|->? <-2:trim_end|->? <-1:out_format(mp4)>? <concatenate{?c}|remove_silence{?r}|apply_settings{?a}|verbose_search{?v}>*"
     example = ("download https://www.youtube.com/watch?v=kJQP7kiw5Fk mp3", "trim https://www.youtube.com/watch?v=dQw4w9WgXcQ 1m 3m as mp4", "concatenate https://www.youtube.com/watch?v=kJQP7kiw5Fk https://www.youtube.com/watch?v=dQw4w9WgXcQ webm")
     flags = "avtzcrm"
@@ -5046,6 +5055,7 @@ class Download(Command):
                         auds=auds,
                         silenceremove=b,
                         child=len(entry) > 1,
+                        message=message,
                     ))
                 fn = f"cache/{ts_us()}.zip"
                 with zipfile.ZipFile(fn, "w", zipfile.ZIP_STORED, allowZip64=True, strict_timestamps=False) as z:
@@ -5080,6 +5090,7 @@ class Download(Command):
                     end=end,
                     auds=auds,
                     silenceremove=b,
+                    message=message,
                 )
                 create_task(bot.send_with_file(
                     channel=channel,
@@ -5221,6 +5232,7 @@ class Download(Command):
                         end=end,
                         auds=auds,
                         silenceremove=silenceremove,
+                        message=reference,
                     )
                 if not simulated:
                     create_task(message.edit(

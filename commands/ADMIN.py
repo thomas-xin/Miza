@@ -973,7 +973,7 @@ class Archive(Command):
         if bot.get_perms(user, guild) < 3:
             raise PermissionError("You must be in the target server and have a permission level of minimum 3.")
         if max(bot.is_trusted(guild), bot.premium_level(user) * 2) < 2:
-            raise PermissionError(f"Sorry, unfortunately this feature is for premium users only. Please make sure you have a subscription level of minimum 2 from {bot.kofi_url}!")
+            raise PermissionError(f"Sorry, unfortunately this feature is for premium users only. Please make sure you have a subscription level of minimum 1 from {bot.kofi_url}!")
         if "f" not in flags:
             raise InterruptedError(css_md(uni_str(sqr_md(f"WARNING: SERVER DOWNLOAD REQUESTED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0), force=True))
         fn = f"cache/{ts_us()}.zip"
