@@ -62,12 +62,10 @@ class Translate(Command):
 		self.trans.client.headers.update(Request.header())
 		spl = argv.split(" ", 3)
 		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
-		if len(spl) > 1 and spl[0].casefold() in ("google", "chatgpt"):
+		if spl[0].casefold() in ("google", "chatgpt"):
 			engine = spl.pop(0).casefold()
 		else:
 			engine = "chatgpt" if premium >= 2 else "google"
-		if engine == "google" and not googletrans:
-			raise RuntimeError("Unable to load Google Translate.")
 		if len(spl) > 2 and (src := (self.renamed.get(c := spl[0].casefold()) or (self.languages.get(c) and c))):
 			spl.pop(0)
 			src = lim_str(src, 32)
@@ -85,6 +83,11 @@ class Translate(Command):
 		text = " ".join(spl).removeprefix("\\").strip()
 		if not text:
 			raise ArgumentError("Input string is empty.")
+		spl = text.split()
+		if engine == "chatgpt" and len(spl) < 2 and (spl[0].isascii() or len(spl[0]) <= 1):
+			engine = "google"
+		if engine == "google" and not googletrans:
+			raise RuntimeError("Unable to load Google Translate.")
 		translated = {}
 		comments = {}
 
