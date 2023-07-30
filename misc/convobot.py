@@ -966,8 +966,8 @@ class Bot:
 					temperature=temp,
 					max_tokens=min(8192 if premium >= 2 else 1024, limit - pc - 512),
 					top_p=1,
-					frequency_penalty=1.0,
-					presence_penalty=0.6,
+					frequency_penalty=0.6,
+					presence_penalty=0.8,
 					user=str(hash(u)),
 					functions=functions,
 				)
@@ -1258,7 +1258,7 @@ class Bot:
 				temperature=temp,
 				top_k=192,
 				top_p=0.9,
-				repetition_penalty=1.2,
+				repetition_penalty=1.0,
 				max_length=max(limit, len(tokens) + 1024),
 				do_sample=True,
 			)
@@ -1411,8 +1411,8 @@ class Bot:
 				max_tokens=min(8192 if premium >= 2 else 1024, limit - pc - 64),
 				top_p=1,
 				stop=stop,
-				frequency_penalty=1.0,
-				presence_penalty=0.6,
+				frequency_penalty=0.8,
+				presence_penalty=0.8,
 				user=str(hash(u)),
 			)
 			for i in range(tries):
@@ -1810,6 +1810,8 @@ class Bot:
 				messages=[dict(role="user", content=data)],
 				temperature=0.7,
 				top_p=0.9,
+				frequency_penalty=0.5,
+				presence_penalty=0.5,
 				stop=stop,
 				max_tokens=min(2048, 4000 - len(self.gpttokens(data))),
 				model="gpt-3.5-turbo",
