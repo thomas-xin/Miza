@@ -3679,8 +3679,7 @@ class Skip(Command):
             count = 0
             i = 0
             while i < len(auds.queue):
-                q = auds.queue
-                song = q[i]
+                song = auds.queue[i]
                 if song.skips is None or len(song.skips) >= required:
                     pops.add(i)
                     if count < 4:
