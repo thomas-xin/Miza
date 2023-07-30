@@ -568,7 +568,7 @@ class Bot:
 	functions = [
 		{
 			"name": "web_search",
-			"description": "Searches an internet browser for up-to-date information, or visits a given URL.",
+			"description": "Searches internet browser, or visits given URL.",
 			"parameters": {
 				"type": "object",
 				"properties": {
@@ -582,7 +582,7 @@ class Bot:
 		},
 		{
 			"name": "wolfram_alpha",
-			"description": "Queries Wolfram Alpha. Must use this for advanced mathematics questions.",
+			"description": "Queries Wolfram Alpha. Must use for advanced maths questions.",
 			"parameters": {
 				"type": "object",
 				"properties": {
@@ -677,19 +677,16 @@ class Bot:
 		},
 		{
 			"name": "askip",
-			"description": "Skips a music player song.",
+			"description": "Skips music player songs.",
 			"parameters": {
 				"type": "object",
 				"properties": {
-					"mode": {
-						"type": "string",
-						"enum": ["pause", "loop", "repeat", "shuffle"],
-					},
-					"value": {
+					"range": {
 						"type": "boolean",
+						"description": "Python indexing syntax, e.g. 0 or 1:6",
 					},
 				},
-				"required": ["mode", "value"],
+				"required": ["range"],
 			},
 		},
 		{
@@ -955,14 +952,14 @@ class Bot:
 				functions = self.functions
 				if self.jailbroken or not self.nsfw:
 					functions = [f for f in functions if f["name"] != "policy"]
-				if not set(q).intersection("0123456789"):
+				if not set(q).intersection("0123456789()+"):
 					functions = [f for f in functions if f["name"] != "wolfram_alpha"]
 				if self.vc & 2:
 					pass
 				elif self.vc & 1:
-					functions = [f for f in functions if f["name"] not in ("audio", "audiostate")]
+					functions = [f for f in functions if f["name"] not in ("audio", "astate", "askip")]
 				else:
-					functions = [f for f in functions if f["name"] not in ("audio", "audiostate", "play")]
+					functions = [f for f in functions if f["name"] not in ("audio", "astate", "askip", "play")]
 				data = dict(
 					model="gpt-4-0613" if model.startswith("gpt-4") else "gpt-3.5-turbo-0613",
 					messages=messages,
@@ -1919,13 +1916,6 @@ class Bot:
 				response = refs[-1][1]
 			if response:
 				return self.after(tup, (self.name, response))
-		if self.premium > 0 and literal_question(q):
-			response = (self.google, self.bing)[random.randint(0, 1)](q)
-			if response:
-				return self.after(tup, (self.name, response))
-			googled = True
-		else:
-			googled = False
 		if not response:
 			response = self.gptcomplete(u, q, refs=refs)
 			if response:
