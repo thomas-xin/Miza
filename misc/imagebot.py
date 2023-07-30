@@ -564,7 +564,10 @@ class Bot:
 			else:
 				pf = StableDiffusionImageVariationPipeline
 		if not sdxl and model == "stabilityai/stable-diffusion-xl-base-1.0":
-			model = "runwayml/stable-diffusion-v1-5"
+			if pf is StableDiffusionImageVariationPipeline:
+				model = "lambdalabs/sd-image-variations-diffusers"
+			else:
+				model = "runwayml/stable-diffusion-v1-5"
 		out = []
 		if self.models:
 			device = next(iter(self.models))

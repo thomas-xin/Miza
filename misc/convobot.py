@@ -812,8 +812,8 @@ class Bot:
 			cm = 15
 			longer = True
 		elif model == "davinci":
-			# model = "text-davinci-003"
-			model = "gpt-3.5-turbo-instruct"
+			model = "text-davinci-003"
+			# model = "gpt-3.5-turbo-instruct"
 			temp = 0.8
 			limit = 3000
 			cm = 15
@@ -848,7 +848,7 @@ class Bot:
 		p = per
 		local_models = ("pygmalion-13b", "manticore-13b", "hippogriff-30b", "wizard-vicuna-30b", "gplatty-30b")
 		if self.name.casefold() not in p.casefold() and "you" not in p.casefold():
-			if model in ("gpt-3.5-turbo", "gpt-4", "gpt-3.5-turbo-instruct"):
+			if model in ("gpt-3.5-turbo", "gpt-4", "gpt-3.5-turbo-instruct", "text-davinci-003"):
 				nstart = f"Your name is {self.name}; you are {p}. Express emotion when appropriate!"
 				if self.nsfw:
 					nstart = nstart.strip() + " " + MIZAAC
@@ -862,7 +862,7 @@ class Bot:
 				nstart = f"The following is a conversation between {self.name} and humans. {self.name} is {p} AI."
 		else:
 			nstart = p
-			if model in ("gpt-3.5-turbo", "gpt-4", "gpt-3.5-turbo-instruct") or model in local_models:
+			if model in ("gpt-3.5-turbo", "gpt-4", "gpt-3.5-turbo-instruct", "text-davinci-003") or model in local_models:
 				if self.nsfw:
 					spl = nstart.rsplit("\n", 1)
 					nstart = nstart.strip() + " " + MIZAAC
@@ -1397,7 +1397,8 @@ class Bot:
 					break
 			if not text:
 				print(resp.status_code, resp.text)
-				model = "gpt-3.5-turbo-instruct"
+				# model = "gpt-3.5-turbo-instruct"
+				model = "text-davinci-003"
 				cm = 15
 		elif not model.endswith("-instruct") and (model.startswith("gpt-3.5-turbo") or model.startswith("gpt-4")):
 			tries = 7
@@ -1794,89 +1795,6 @@ class Bot:
 			chatgpt.timestamp -= 300
 		return res
 
-	vis_s = vis_c = vis_r = 0
-	def vai(self, q, stop=None):
-		if not self.vis_s or self.vis_r > time.time():
-			return ""
-		if self.vis_c > 48:
-			self.vis_r = max(self.vis_r + 86400, time.time())
-			resp = requests.post(
-				"https://app.visus.ai/t/kxzsjtzfxu/query/clfw3bcof01uqfbey053r4o93/clfw3bcoj01urfbey5czzjaji/?index=&_data=routes%2F_dashboard%2B%2Ft%2B%2F%24teamId%2B%2Fquery%2B%2F%24aiId.%24conversationId%2B%2Findex",
-				data={"newName": "", "intent": "clear-convo"},
-				headers={"Content-Type": "application/x-www-form-urlencoded;charset=UTF-8", "User-Agent": "Mozilla/5.1"},
-				cookies={"_session": vis_s},
-			)
-			print(resp)
-		# print("Visus prompt:", q)
-		rid = "-".join("".join(hex(random.randint(0, 15))[2:] for i in range(n)) for n in (8, 4, 4, 4, 12))
-		resp = requests.post(
-			"https://app.visus.ai/api/query",
-			data=orjson.dumps({
-				"aiId": "clfw3bcof01uqfbey053r4o93",
-				"teamId": "clfw3bcnv01uffbeypnj1bmrx",
-				"conversationId": "clfw3bcoj01urfbey5czzjaji",
-				"userId": "google-oauth2|111998687181999014199",
-				"focusedFiles": [],
-				"rId": rid,
-				"query": q,
-			}),
-			headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.1"},
-			cookies={"_session": self.vis_s},
-		)
-		try:
-			resp.raise_for_status()
-			if not resp.content:
-				raise EOFError
-			data = resp.json()
-			if not data.get("success"):
-				raise ValueError(data)
-		except:
-			print_exc()
-			self.vis_r = time.time() + 86400
-			return ""
-		try:
-			return html_decode(markdownify.markdownify(data["response"].strip()).strip()).strip()
-		except:
-			print_exc()
-			return data["response"].strip()
-
-	you_r = 0
-	def ycg(self, data, stop=None):
-		if self.you_r > time.time():
-			raise EOFError
-		if isinstance(data, str):
-			data = dict(
-				messages=[dict(role="user", content=data)],
-				temperature=0.7,
-				top_p=0.9,
-				stop=stop,
-				max_tokens=min(2048, 4000 - len(self.gpttokens(data))),
-				model="gpt-3.5-turbo",
-				user=str(random.randint(0, 4294967295)),
-			)
-		# print("YourChat prompt:", data)
-		headers = {
-			"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
-			"DNT": "1",
-			"X-Forwarded-For": ".".join(str(random.randint(1, 254)) for _ in range(4)),
-			"X-Real-Ip": ".".join(str(random.randint(1, 254)) for _ in range(4)),
-			"Content-Type": "text/plain"
-		}
-		resp = self.session.post(
-			"https://your-chat-gpt.vercel.app/api/openai-stream",
-			data=orjson.dumps(data),
-			headers=headers,
-		)
-		try:
-			resp.raise_for_status()
-			if not resp.content:
-				raise EOFError
-		except:
-			print_exc()
-			self.you_r = time.time() + 3600
-			return ""
-		return resp.text
-
 	def cgp(self, data, stop=None):
 		oai = getattr(self, "oai", None)
 		bals = getattr(self, "bals", {})
@@ -1921,8 +1839,8 @@ class Bot:
 			funcs = [self.cgp]
 		else:
 			funcs = [self.chatgpt, self.chatgpt, self.cgp, self.cgp]
-			if len(self.gpttokens(prompt)) > 24:
-				funcs.append(self.vai)
+			# if len(self.gpttokens(prompt)) > 24:
+				# funcs.append(self.vai)
 			random.shuffle(funcs)
 		funcs.extend((self.cgp, self.cgp))
 		while funcs:
