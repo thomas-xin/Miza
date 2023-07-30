@@ -1539,13 +1539,13 @@ class Art(Command):
             args = [("art " * xrand(1, 64)).rstrip()]
         premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
         freelim = 25
-		if premium < 2:
-			data = bot.data.users.get(user.id)
-			freebies = [t for t in data.get("freebies", ()) if utc() - t < 86400]
-			if len(freebies) < freelim:
-				premium = 2
-		else:
-			freebies = None
+        if premium < 2:
+            data = bot.data.users.get(user.id)
+            freebies = [t for t in data.get("freebies", ()) if utc() - t < 86400]
+            if len(freebies) < freelim:
+                premium = 2
+        else:
+            freebies = None
         req = " ".join(args)
         url = None
         url2 = None
@@ -1935,7 +1935,7 @@ class Art(Command):
         if premium >= 2 and freebies is not None:
             bot.data.users[user.id].setdefault("freebies", []).append(utc())
             rem = freelim - len(freebies)
-			if not emb and len(rem) <= 5:
+            if not emb and len(rem) <= 5:
                 emb = discord.Embed(colour=rand_colour())
                 emb.set_author(**get_author(bot.user))
                 emb.description = f"{rem}/{freelim} free premium commands remaining today. Please help [fund my API]({bot.kofi_url}) for unlimited access!"
