@@ -5232,7 +5232,7 @@ class Download(Command):
                         end=end,
                         auds=auds,
                         silenceremove=silenceremove,
-                        message=reference,
+                        message=message.reference.cached_message if message.reference else None,
                     )
                 if not simulated:
                     create_task(message.edit(
