@@ -916,7 +916,7 @@ class UpdatePremiums(Database):
         if lv < 3:
             return 1
         if lv < 4:
-            return 3
+            return 1
         return inf
 
     def register(self, user, guild):

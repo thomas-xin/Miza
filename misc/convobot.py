@@ -1488,7 +1488,7 @@ class Bot:
 						openai.ChatCompletion.create,
 						**data,
 					).result(timeout=60)
-					if model != "gpt-4":
+					if not model.startswith("gpt-4"):
 						model = "gpt-3.5-turbo"
 					self.submit_cost(intended, response["usage"]["prompt_tokens"] * cm * costs + response["usage"].get("completion_tokens", 0) * (cm2 or cm) * costs)
 				except Exception as ex:
