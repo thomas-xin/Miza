@@ -322,7 +322,7 @@ class UpdateTranslators(Database):
 						else:
 							raise TooManyRequests(f"Command has a rate limit of {sec2time(x)}; please wait {sec2time(-wait)}.")
 				ctx = discord.context_managers.Typing(channel) if channel else emptyctx
-				with ctx:
+				async with ctx:
 					print("Translator:", user, argv)
 					await tr(bot, guild, channel, argv, user, message)
 
@@ -1452,7 +1452,7 @@ class Ask(Command):
 		im = None
 		fr = fm = None
 		urls = []
-		with discord.context_managers.Typing(channel):
+		async with discord.context_managers.Typing(channel):
 			# fut = self.cbip = create_task(process_image("CBIP", "&", [], fix=1, timeout=360))
 			await ignore_embedding(message.id)
 			orig_tup = (name, q)

@@ -94,6 +94,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			allowed_mentions=self.allowed_mentions,
 			assume_unsync_clock=True,
 		)
+		create_task(super()._async_setup_hook())
 		self.cache_size = cache_size
 		# Base cache: contains all other caches
 		self.cache = fcdict((c, fdict()) for c in self.caches)
@@ -2131,16 +2132,18 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			return
 		if message.content:
 			c = no_md(message.content)
-			if not c.startswith(self.get_prefix(guild)):
+			if c and not c.startswith(self.get_prefix(guild)):
 				if c[0] in "\\#!%" or c[:2] in ("//", "/*"):
 					return False
 		u_id = verify_id(user)
 		if u_id in (member.id for member in message.mentions):
 			return True
-		if guild is None:
+		if guild is None and getattr(message.channel, "recipient", None) and self.ready:
 			return True
 		if "exec" in self.data and self.data.exec.get(message.channel.id, 0) & 64:
 			return True
+		if not guild:
+			return False
 		member = guild.get_member(u_id)
 		if member is None:
 			return False
@@ -2199,6 +2202,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				for role in u.roles:
 					if role.id in self.premium_roles:
 						lv = max(lv, self.premium_roles[role.id])
+		elif not self.ready:
+			return 0
 		else:
 			return 3
 		if not absolute:
@@ -3650,7 +3655,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				not_self = True
 				if u_id == bot.id:
 					not_self = False
-				elif getattr(message, "webhook_id", None) and message.author.name == guild.me.display_name:
+				elif getattr(message, "webhook_id", None) and guild and message.author.name == guild.me.display_name:
 					cola = await create_future(self.get_colour, self)
 					colb = await create_future(self.get_colour, message.author)
 					not_self = cola != colb
@@ -3886,7 +3891,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							message = self.ExtendedMessage.new(resp)
 					else:
 						message = await w.send(*args, wait=True, **kwargs)
-			except (discord.NotFound, discord.InvalidArgument, discord.Forbidden):
+			except (discord.NotFound, discord.Forbidden):
 				w = await self.ensure_webhook(mchannel, force=True)
 				async with getattr(w, "semaphore", emptyctx):
 					w = getattr(w, "webhook", w)
@@ -5405,8 +5410,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			raise discord.HTTPException(r, data)
 
 		# discord.http.HTTPClient.request = lambda self, *args, **kwargs: request(self, *args, **kwargs)
-		# print(discord.client._loop, eloop)
-		discord.client._loop = eloop
 
 	def send_exception(self, messageable, ex, reference=None, op=None):
 		if getattr(ex, "no_react", None):
@@ -6233,7 +6236,7 @@ class AudioClientInterface:
 	@tracebacksuppressor
 	def communicate(self):
 		proc = self.proc
-		i = b"~0~0\n"
+		i = b"~0~Fa\n" # DO NOT CHANGE THIS IS BASE64
 		proc.stdin.write(i)
 		proc.stdin.flush()
 		while not bot.closed and is_strict_running(proc):
@@ -6246,6 +6249,7 @@ class AudioClientInterface:
 				print(as_str(s))
 			time.sleep(0.2)
 		self.written = True
+		print("Audio client responded.")
 		self.fut.set_result(self)
 		while not bot.closed and is_strict_running(proc):
 			s = proc.stdout.readline()
@@ -6603,6 +6607,7 @@ if __name__ == "__main__":
 			print("Logging started.")
 			create_future_ex(proc_start)
 			create_task(Request._init_())
+			discord.client._loop = eloop
 			self = miza = bot = client = BOT[0] = Bot()
 			miza.http.user_agent = "Miza"
 			miza.miza = miza

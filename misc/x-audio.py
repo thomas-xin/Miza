@@ -13,6 +13,8 @@ except ModuleNotFoundError:
 	exec(code, globals())
 
 
+tracebacksuppressor.fn = traceback.print_exc
+
 ADDRESS = AUTH.get("webserver_address") or "0.0.0.0"
 if ADDRESS == "0.0.0.0":
 	ADDRESS = "127.0.0.1"
@@ -28,7 +30,7 @@ def send(*args, escape=True):
 	if s:
 		if s[-1] != "\n":
 			s += "\n"
-		sys.__stdout__.write(s)
+		sys.__stdout__.buffer.write(s.encode("utf-8"))
 		sys.__stdout__.flush()
 
 @tracebacksuppressor
@@ -46,10 +48,11 @@ def submit(s):
 	return resp
 
 async def respond(s):
-	send("%" + s)
+	# send("%" + as_str(s))
 	k, c = s[1:].rstrip().split(b"~", 1)
 	c = memoryview(base64.b85decode(c))
 	k = k.decode("ascii")
+	# send("%" + as_str(c))
 	if c == b"ytdl.update()":
 		with tracebacksuppressor:
 			await create_future(update_cache)
@@ -73,7 +76,7 @@ async def respond(s):
 				if code is None:
 					resp = await create_future(exec, c, client._globals)
 		except Exception as ex:
-			sys.stdout.write(traceback.format_exc())
+			traceback.print_exc()
 			s = f"bot.audio.returns[{k}].set_exception(pickle.loads({repr(pickle.dumps(ex))}))"
 			submit(s)
 			return
@@ -87,6 +90,7 @@ async def respond(s):
 			except SyntaxError:
 				res = repr(str(resp))
 	s = f"bot.audio.returns[{k}].set_result({res})"
+	# send("%" + as_str(s))
 	create_future_ex(submit, s)
 
 async def communicate():
@@ -875,6 +879,7 @@ class AudioClient(discord.Client):
 			guild_subscriptions=False,
 			intents=self.intents,
 		)
+		create_task(super()._async_setup_hook())
 		self._globals = globals()
 
 client = AudioClient()
@@ -920,7 +925,6 @@ async def mobile_identify(self):
 	await self.send_as_json(payload)
 
 discord.gateway.DiscordWebSocket.identify = lambda self: mobile_identify(self)
-discord.client._loop = eloop
 
 
 async def kill():
@@ -959,4 +963,5 @@ if __name__ == "__main__":
 	proc = psutil.Process(pid)
 	parent = psutil.Process(ppid)
 	create_task(ensure_parent(proc, parent))
-	client.run(AUTH["discord_token"])
+	discord.client._loop = eloop
+	eloop.run_until_complete(client.start(AUTH["discord_token"]))

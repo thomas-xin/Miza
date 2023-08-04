@@ -77,7 +77,7 @@ class Restart(Command):
             print("Saving message cache...")
             save = create_task(bot.send_event("_save_"))
         async with Delay(1):
-            with discord.context_managers.Typing(channel):
+            async with discord.context_managers.Typing(channel):
                 # Call _destroy_ bot event to indicate to all databases the imminent shutdown
                 print("Destroying database memory...")
                 await bot.send_event("_destroy_", shutdown=True)
@@ -454,7 +454,7 @@ class UpdateExec(Database):
                 except:
                     await send_with_react(channel, self.prepare_string(traceback.format_exc()), reacts="❎", reference=message)
         # Relay DM messages
-        elif message.guild is None:
+        elif message.guild is None and getattr(message.channel, "recipient", None):
             v = bot.data.blacklist.get(message.author.id) or 0
             if v > 1:
                 return await channel.send(
@@ -831,7 +831,7 @@ class SetAvatar(Command):
             url = args[0]
         else:
             raise ArgumentError(f"Please input an image by URL or attachment.")
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             # Initiating an aiohttp session
             try:
                 data = await bot.get_request(url, aio=True)

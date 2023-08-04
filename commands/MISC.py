@@ -442,7 +442,7 @@ class Wav2Png(Command):
         dest = f"cache/&{ts}." + ext
         w2p = "wav2png" if name == "wav2png" else "png2wav"
         args = [python, w2p + ".py", url, "../" + dest]
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             print(args)
             proc = await asyncio.create_subprocess_exec(*args, cwd=os.getcwd() + "/misc", stdout=subprocess.DEVNULL)
             try:
@@ -516,7 +516,7 @@ class SpectralPulse(Command):
             *itertools.chain(*kwargs.items()),
             "-dest", dest, url,
         ]
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             if self.spec_sem.is_busy() and not getattr(message, "simulated", False):
                 await send_with_react(channel, italics(ini_md(f"SpectralPulse: {sqr_md(url)} enqueued in position {sqr_md(self.spec_sem.passive + 1)}.")), reacts="❎", reference=message)
             async with self.spec_sem:

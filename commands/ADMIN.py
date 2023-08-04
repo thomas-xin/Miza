@@ -986,7 +986,7 @@ class Archive(Command):
         ]
         info = ini_md("Archive Started!")
         m = await send_with_reply(channel, message, info)
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             print(args)
             proc = psutil.Popen(args, stdout=subprocess.PIPE)
             t = utc()
@@ -1809,7 +1809,7 @@ class CreateEmoji(Command):
             argv += " " * bool(argv) + " ".join(best_url(a) for a in message.attachments)
         if not args:
             raise ArgumentError("Please enter URL, emoji, or attached file to add.")
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             try:
                 if len(args) > 1 and is_url(args[0]):
                     args.append(args.pop(0))
@@ -1896,7 +1896,7 @@ class CreateSticker(Command):
             argv += " " * bool(argv) + " ".join(best_url(a) for a in message.attachments)
         if not args:
             raise ArgumentError("Please enter URL, emoji, or attached file to add.")
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             try:
                 if len(args) > 1 and is_url(args[0]):
                     args.append(args.pop(0))
@@ -2018,7 +2018,7 @@ class ScanEmoji(Command):
         else:
             count = inf
         found = 0
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             for emoji in sorted(guild.emojis, key=lambda e: e.id):
                 url = str(emoji.url)
                 resp = await create_future(subprocess.run, self.ffprobe_start + (url,), stdout=subprocess.PIPE)

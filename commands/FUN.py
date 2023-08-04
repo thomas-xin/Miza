@@ -2948,7 +2948,7 @@ class Rickroll(Command):
         else:
             url = urls[0]
         if "exec" in bot.data:
-            with discord.context_managers.Typing(channel):
+            async with discord.context_managers.Typing(channel):
                 mime = await create_future(bot.detect_mime, url)
                 data = None
                 if "image/png" not in mime:

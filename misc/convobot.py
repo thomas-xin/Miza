@@ -486,6 +486,7 @@ class Bot:
 			print(devices, dtype)
 			pipes = []
 			for i in range(len(devices) // 2 + 1):
+				dtype = torch.float16 if torch.cuda.get_device_properties(i).major >= 7 else torch.float32
 				device = devices[i]
 				try:
 					smp = pipeline("summarization", model=m, device=device, torch_dtype=dtype)
@@ -953,7 +954,9 @@ class Bot:
 				functions = self.functions
 				if self.jailbroken or not self.nsfw:
 					functions = [f for f in functions if f["name"] != "policy"]
-				if not set(q).intersection("0123456789()+"):
+				if "<|im_sep" in q:
+					functions = [f for f in functions if f["name"] not in ("web_search", "wolfram_alpha")]
+				elif not set(q).intersection("0123456789()+"):
 					functions = [f for f in functions if f["name"] != "wolfram_alpha"]
 				if self.vc & 2:
 					pass

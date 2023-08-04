@@ -279,6 +279,9 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
 	def busy(self):
 		return self.is_busy()
 
+	def is_inactive(self):
+		return not self.is_busy()
+
 class SemaphoreOverflowError(RuntimeError):
 	__slots__ = ()
 
@@ -286,7 +289,8 @@ class SemaphoreOverflowError(RuntimeError):
 # A context manager that sends exception tracebacks to stdout.
 class TracebackSuppressor(contextlib.AbstractContextManager, contextlib.AbstractAsyncContextManager, contextlib.ContextDecorator, collections.abc.Callable):
 
-	def __init__(self, *args, **kwargs):
+	def __init__(self, *args, fn=print_exc, **kwargs):
+		self.fn = fn
 		self.exceptions = args + tuple(kwargs.values())
 
 	__enter__ = lambda self: self
@@ -295,7 +299,7 @@ class TracebackSuppressor(contextlib.AbstractContextManager, contextlib.Abstract
 			for exception in self.exceptions:
 				if issubclass(type(exc_value), exception):
 					return True
-			print_exc()
+			self.fn()
 		return True
 
 	__aenter__ = lambda self: emptyfut
@@ -1471,7 +1475,7 @@ def to_webp_ex(url):
 def get_url(obj, f=to_webp):
 	if type(obj) is str:
 		return obj
-	for attr in ("display_avatar", "avatar_url", "icon_url", "icon"):
+	for attr in ("display_avatar", "avatar_url", "icon_url", "icon", "avatar"):
 		url = getattr(obj, attr, None)
 		if url:
 			return f(url)
@@ -2609,6 +2613,7 @@ athreads = concurrent.futures.exc_worker = MultiThreadPool(pool_count=2, thread_
 athreads.pools.append(import_exc)
 
 def get_event_loop():
+	return eloop
 	try:
 		return asyncio.get_running_loop()
 	except:
@@ -2862,6 +2867,7 @@ class CompatFile(discord.File):
 		else:
 			self.filename = filename
 		self.filename = (self.filename or "untitled").strip().replace(" ", "_")
+		self.description = self.filename
 		if spoiler:
 			if self.filename is not None:
 				if not self.filename.startswith("SPOILER_"):

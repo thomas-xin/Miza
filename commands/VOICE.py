@@ -536,13 +536,13 @@ class CustomAudio(collections.abc.Hashable):
                 await m.edit(mute=False)
 
     async def connect_to(self, channel=None):
-        print(self)
+        # print(self)
         if not self.acsi:
             try:
                 acsi = AudioClientSubInterface(self, channel)
-                print(acsi)
+                # print(acsi)
                 await acsi.start()
-                print(acsi)
+                # print(acsi)
                 self.acsi = acsi
                 self.fut.set_result(self.acsi)
             except Exception as ex:
@@ -4921,7 +4921,7 @@ class Lyrics(Command):
             item = verify_search(to_alphanumeric(search))
             if not item:
                 item = search
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             try:
                 name, lyrics = await get_lyrics(item)
             except KeyError:
@@ -5039,7 +5039,7 @@ class Download(Command):
             entry = [e["url"] for e in res]
             print(entry)
             futs = []
-            with discord.context_managers.Typing(channel):
+            async with discord.context_managers.Typing(channel):
                 try:
                     if a:
                         auds = bot.data.audio.players[guild.id]
@@ -5078,7 +5078,7 @@ class Download(Command):
         if concat:
             entry = [e["url"] for e in res]
             print(entry)
-            with discord.context_managers.Typing(channel):
+            async with discord.context_managers.Typing(channel):
                 try:
                     if a:
                         auds = bot.data.audio.players[guild.id]
@@ -5165,7 +5165,7 @@ class Download(Command):
             data = orjson.loads(b642bytes(argv, True))
             url = data[num]
             # Perform all these tasks asynchronously to save time
-            with discord.context_managers.Typing(channel):
+            async with discord.context_managers.Typing(channel):
                 f = out = None
                 fmt = spl[2]
                 try:
@@ -5307,7 +5307,7 @@ class Transcribe(Command):
                 raise TypeError("Input must be a valid URL.")
             url = urls[0]
         simulated = getattr(message, "simulated", None)
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             entries = await create_future(ytdl.search, url)
             if entries:
                 name = entries[0].get("name")

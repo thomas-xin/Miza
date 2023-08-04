@@ -280,7 +280,7 @@ class ImageAdjust(Command):
         else:
             default = 2
         name2, value, url, fmt, extra = await get_image(bot, user, message, args, argv, default=default)
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             if name.startswith("sat"):
                 argi = ("Enhance", ["Color", value, "-f", fmt])
             elif name.startswith("con"):
@@ -376,7 +376,7 @@ class ColourDeficiency(Command):
         ext = "webp"
         if not name.endswith("." + ext):
             name += "." + ext
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             resp = await process_image(url, "colour_deficiency", [operation, value], timeout=_timeout)
             fn = resp
             if isinstance(fn, str) and "." in fn:
@@ -442,7 +442,7 @@ class ColourDeficiency(Command):
 #         ext = "png"
 #         if not name.endswith("." + ext):
 #             name += "." + ext
-#         with discord.context_managers.Typing(channel):
+#         async with discord.context_managers.Typing(channel):
 #             resp = await process_image(url, "remove_matte", [colour], timeout=_timeout)
 #             fn = resp
 #             if fn.endswith(".gif"):
@@ -465,7 +465,7 @@ class Invert(Command):
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
         name, value, url, fmt, extra = await get_image(bot, user, message, args, argv)
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             resp = await process_image(url, "invert", ["-f", fmt], timeout=_timeout)
             fn = resp
             if isinstance(fn, str) and "." in fn:
@@ -495,7 +495,7 @@ class GreyScale(Command):
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
         name, value, url, fmt, extra = await get_image(bot, user, message, args, argv)
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             resp = await process_image(url, "greyscale", ["-f", fmt], timeout=_timeout)
             fn = resp
             if isinstance(fn, str) and "." in fn:
@@ -525,7 +525,7 @@ class Laplacian(Command):
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
         name, value, url, fmt, extra = await get_image(bot, user, message, args, argv)
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             resp = await process_image(url, "laplacian", ["-f", fmt], timeout=_timeout)
             fn = resp
             if isinstance(fn, str) and "." in fn:
@@ -569,7 +569,7 @@ class ColourSpace(Command):
         for i in (source, dest):
             if i not in ("rgb", "cmy", "xyz", "hsv", "hsl", "hsi", "hcl", "lab", "luv", "yiq", "yuv"):
                 raise TypeError(f"Invalid colour space {i}.")
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             resp = await process_image(url, "colourspace", [source, dest, "-f", fmt], timeout=_timeout)
             fn = resp
             if isinstance(fn, str) and "." in fn:
@@ -599,7 +599,7 @@ class Magik(Command):
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
         name, value, url, fmt, extra = await get_image(bot, user, message, args, argv, default=7)
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             resp = await process_image(url, "magik", [value, "-f", fmt], timeout=_timeout)
             fn = resp
             if isinstance(fn, str) and "." in fn:
@@ -657,7 +657,7 @@ class Colour(Command):
             + "\nLUV values: " + sqr_md(", ".join(str(round(x)) for x in rgb_to_luv(adj)))
             + "\nXYZ values: " + sqr_md(", ".join(str(round(x * 255)) for x in rgb_to_xyz(adj)))
         )
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             resp = await process_image("from_colour", "$", [channels])
             fn = resp
             f = CompatFile(fn, filename="colour.png")
@@ -688,7 +688,7 @@ class Gradient(Command):
             count = await bot.eval_math(" ".join(args))
         else:
             count = 1
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             resp = await process_image("from_gradient", "$", [shape, count, colour])
             fn = resp
             f = CompatFile(fn, filename="gradient.png")
@@ -730,7 +730,7 @@ class Average(Command):
                     raise ArgumentError("Please input an image by URL or attachment.")
             else:
                 raise ArgumentError("Please input an image by URL or attachment.")
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             colour = await bot.data.colours.get(url, threshold=False)
             channels = raw2colour(colour)
             adj = [x / 255 for x in channels]
@@ -766,7 +766,7 @@ class QR(Command):
     async def __call__(self, bot, message, channel, argv, name, _timeout, **void):
         if not argv:
             raise ArgumentError("Input string is empty.")
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             resp = await process_image("to_qr", "$", [argv, "rainbow" in name], timeout=_timeout)
             fn = resp
         await bot.send_with_file(channel, "", fn, filename="QR." + ("gif" if "rainbow" in name else "png"), reference=message)
@@ -784,7 +784,7 @@ class Rainbow(Command):
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
         name, value, url, fmt, extra = await get_image(bot, user, message, args, argv, ext="gif")
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             # -gif signals to image subprocess that the output is always a .gif image
             resp = await process_image(url, "rainbow_gif", [value, "-gif", "-f", fmt], timeout=_timeout)
             fn = resp
@@ -853,7 +853,7 @@ class Scroll(Command):
             name = "unknown"
         if not name.endswith(".gif"):
             name += ".gif"
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             # -gif signals to image subprocess that the output is always a .gif image
             resp = await process_image(url, "scroll_gif", [direction, duration, fps, "-gif"], timeout=_timeout)
             fn = resp
@@ -872,7 +872,7 @@ class Spin(Command):
 
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
         name, value, url, fmt, extra = await get_image(bot, user, message, args, argv, ext="gif")
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             # -gif signals to image subprocess that the output is always a .gif image
             resp = await process_image(url, "spin_gif", [value, "-gif", "-f", fmt], timeout=_timeout)
             fn = resp
@@ -920,7 +920,7 @@ class Orbit(Command):
             duration = await bot.eval_math(spl[1])
         if count > 64:
             raise OverflowError()
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             resp = await process_image(url, "orbit_gif", [count, duration, list(extras), "-gif", "-f", fmt], timeout=_timeout)
             fn = resp
         await bot.send_with_file(channel, "", fn, filename=name, reference=message, reacts="🔳")
@@ -951,7 +951,7 @@ class GMagik(Command):
         if extra:
             arr.append(int(extra.pop(0)))
         arr.extend(("-gif", "-f", fmt))
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             resp = await process_image(url, "magik_gif", arr, timeout=_timeout)
             fn = resp
         await bot.send_with_file(channel, "", fn, filename=name, reference=message, reacts="🔳")
@@ -1005,7 +1005,7 @@ class CreateGIF(Command):
             delay = 1000
         elif delay and delay >= 16777216:
             raise OverflowError("GIF image framerate too low.")
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             found = []
             links = args.copy()
             while links:
@@ -1054,7 +1054,7 @@ class Resize(Command):
             if "l" in flags or argv == "list":
                 return ini_md("Available scaling operations: [nearest, linear, hamming, bicubic, lanczos, scale2x, crop, auto]")
             # raise ArgumentError("Please input an image by URL or attachment.")
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             try:
                 url = args.pop(0)
                 urls = await bot.follow_url(url, best=True, allow=True, limit=1)
@@ -1168,7 +1168,7 @@ class Rotate(Command):
     async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
         name, value, url, fmt, extra = await get_image(bot, user, message, args, argv, default=90, raw=True)
         value = await bot.eval_math(value)
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             resp = await process_image(url, "rotate_to", [value, "-f", fmt], timeout=_timeout)
             fn = resp
             if isinstance(fn, str) and "." in fn:
@@ -1223,7 +1223,7 @@ class Fill(Command):
                     raise ArgumentError("Please input an image by URL or attachment.")
             else:
                 raise ArgumentError("Please input an image by URL or attachment.")
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             if is_numeric(args[-1]):
                 value = await bot.eval_math(args.pop(-1))
                 if type(value) is not int:
@@ -1288,7 +1288,7 @@ class Blend(Command):
                     + "burn, linearburn, dodge, lineardodge, hue, sat, lum, colour, extract, merge]"
                 )
             raise ArgumentError("Please input an image by URL or attachment.")
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             urls = await bot.follow_url(args.pop(0), best=True, allow=True, limit=1)
             if urls:
                 url1 = urls[0]
@@ -1401,7 +1401,7 @@ class Steganography(Command):
             msg = str(user.id)
         remsg = " ".join(args)
         fon = url.rsplit("/", 1)[-1].rsplit(".", 1)[0]
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             fn = await self.call(b, msg)
         fn = f"cache/{ts}~1.png"
         if name == "nft":
@@ -1663,7 +1663,7 @@ class Art(Command):
             if dalle2 and premium < 4:
                 raise PermissionError("Premium subscription required to perform DALL·E 2 operations.")
             openjourney = "journey" in name
-            with discord.context_managers.Typing(channel):
+            async with discord.context_managers.Typing(channel):
                 futt = []
                 c = 0
                 if amount >= 1 and not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy():
@@ -1756,7 +1756,7 @@ class Art(Command):
                     "--prompt",
                     prompt,
                 ))
-            with discord.context_managers.Typing(channel):
+            async with discord.context_managers.Typing(channel):
                 image_1 = image_2 = None
                 image_1b = image_2b = None
                 if url:
@@ -1879,7 +1879,7 @@ class Art(Command):
                             amount2 = len(futs)
         ffuts = []
         exc = RuntimeError("Unknown error occured.")
-        with discord.context_managers.Typing(channel):
+        async with discord.context_managers.Typing(channel):
             for tup in futs:
                 if len(ffuts) >= amount:
                     break

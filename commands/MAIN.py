@@ -1035,7 +1035,7 @@ class Activity(Command):
 			u_id = user.id
 		data = await create_future(bot.data.users.fetch_events, u_id, interval=max(900, 3600 >> flags.get("v", 0)), timeout=_timeout)
 		ctx = discord.context_managers.Typing(channel) if channel else emptyctx
-		with ctx:
+		async with ctx:
 			resp = await process_image("plt_special", "$", (data, str(user)))
 			fn = resp
 			f = CompatFile(fn, filename=f"{user.id}.png")
@@ -1640,7 +1640,9 @@ class UpdateUrgentReminders(Database):
 	name = "urgentreminders"
 
 	async def _ready_(self, **void):
-		if "listed" not in self.data:
+		try:
+			self.data["listed"]
+		except KeyError:
 			self.data["listed"] = alist()
 		create_task(self.update_urgents())
 
