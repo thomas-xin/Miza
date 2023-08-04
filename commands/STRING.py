@@ -1273,7 +1273,7 @@ class Ask(Command):
 		embd = bot.data.chat_embeddings.get(channel.id, {})
 		chdd = bot.data.chat_dedups.get(channel.id, {})
 		visible = []
-		if not getattr(message, "simulated", False):
+		if q and not getattr(message, "simulated", False):
 			async for m in bot.history(channel, limit=16):
 				visible.append(m)
 		visible.extend([message, reference])

@@ -232,9 +232,9 @@ def determine_cuda(mem=1, priority=None, multi=False):
 	elif priority:
 		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.975, p.multi_processor_count, p.total_memory)
 	elif priority is False:
-		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.75, COMPUTE_LOAD[i], -gmems[i].free, p.multi_processor_count)
+		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, -p.major, -p.minor, COMPUTE_LOAD[i] < high * 0.75, COMPUTE_LOAD[i], -gmems[i].free, p.multi_processor_count)
 	else:
-		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.5, COMPUTE_LOAD[i], -p.multi_processor_count, -gmems[i].free)
+		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.5, -p.major, -p.minor, COMPUTE_LOAD[i], -p.multi_processor_count, -gmems[i].free)
 	pcs = sorted(range(n), key=key, reverse=True)
 	if multi:
 		return [i for i in pcs if gmems[i].free >= mem], torch.float16
@@ -479,22 +479,23 @@ class Bot:
 			return resp.content
 
 	def answer_summarise(self, m="Qiliang/bart-large-cnn-samsum-ChatGPT_v3", q="", max_length=128, min_length=64, do_sample=False):
-		for i in range(1):
-			try:
-				smp = self.models[m]
-				break
-			except KeyError:
-				pass
-			device, dtype = determine_cuda(2147483648, priority=True)
-			print(device, dtype)
-			try:
-				smp = pipeline("summarization", model=m, device=device, torch_dtype=dtype)
-				smp.devid = device
-			except:
-				print_exc()
-				smp = pipeline("summarization", model=m, device=-1, torch_dtype=torch.float32)
-				smp.devid = None
-		self.models[m] = smp
+		try:
+			smp = random.choice(self.models[m])
+		except KeyError:
+			devices, dtype = determine_cuda(2147483648, priority=False, multi=True)
+			print(devices, dtype)
+			pipes = []
+			for i in range(len(devices) // 2):
+				device = devices[i]
+				try:
+					smp = pipeline("summarization", model=m, device=device, torch_dtype=dtype)
+					smp.devid = device
+				except:
+					print_exc()
+					smp = pipeline("summarization", model=m, device=-1, torch_dtype=torch.float32)
+					smp.devid = None
+				pipes.append(smp)
+			self.models[m] = pipes
 		enc = tiktoken.get_encoding("cl100k_base")
 		tokens = enc.encode(q)
 		limit = 4096
@@ -2009,12 +2010,13 @@ class Bot:
 		gpt4=(480, 3),
 		gpt3a=(120, 2),
 		gpt4a=(480, 3),
+		hippogriff=(960, 4),
 		wizard=(960, 4),
 		platypus=(960, 4),
 	)
 
 	def rerender(self, model=""):
-		lim, r1 = self.model_limits.get(model) or ((720, 6) if self.premium >= 2 else (360, 4))
+		lim, r1 = self.model_limits.get(model) or ((480, 3) if self.premium >= 2 else (120, 2))
 		if not self.chat_history or len(self.chat_history) < r1 and len(self.gpttokens(self.chat_history[0][1])) <= lim * 1.5:
 			return
 		r2 = r1 // 2 + 1
@@ -2031,7 +2033,7 @@ class Bot:
 				if 0:# tc < 3072 and (tc > lim * 3 or (tc > lim * 1.5 and self.premium >= 2)):
 					try:
 						prompt = f'"""\n{v.strip()}\n"""\n\nSummarise the above into a paragraph, keeping most important parts. Do not be repetitive or continue the text!'
-						func = self.au if not self.jailbroken else self.cgp
+						func = self.cgp
 						v2 = func(prompt)[0]
 						if len(self.gpttokens(v2)) < 16:
 							raise ValueError(v2)

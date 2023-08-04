@@ -186,9 +186,9 @@ def determine_cuda(mem=1, priority=None, multi=False):
 	elif priority:
 		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.975, p.multi_processor_count, p.total_memory)
 	elif priority is False:
-		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.75, COMPUTE_LOAD[i], -gmems[i].free, p.multi_processor_count)
+		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, -p.major, -p.minor, COMPUTE_LOAD[i] < high * 0.75, COMPUTE_LOAD[i], -gmems[i].free, p.multi_processor_count)
 	else:
-		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.5, COMPUTE_LOAD[i], -p.multi_processor_count, -gmems[i].free)
+		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.5, -p.major, -p.minor, COMPUTE_LOAD[i], -p.multi_processor_count, -gmems[i].free)
 	pcs = sorted(range(n), key=key, reverse=True)
 	if multi:
 		return [i for i in pcs if gmems[i].free >= mem], torch.float16
@@ -630,7 +630,11 @@ class Bot:
 							pipe.enable_model_cpu_offload()
 						except AttributeError:
 							pass
-				except:
+				except Exception as ex:
+					if isinstance(ex, RuntimeError):
+						if sdxl:
+							exc.submit(self.art_stablediffusion_refine, "", [])
+						raise
 					print_exc()
 					if fail_unless_gpu:
 						models[(f2, model)] = False
@@ -764,7 +768,9 @@ class Bot:
 							pipe.enable_model_cpu_offload()
 						except AttributeError:
 							pass
-				except:
+				except Exception as ex:
+					if isinstance(ex, RuntimeError):
+						raise
 					print_exc()
 					if fail_unless_gpu:
 						models[(f2, model)] = False

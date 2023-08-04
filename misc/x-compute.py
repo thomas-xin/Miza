@@ -2655,7 +2655,7 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 		if inputs.get("reset"):
 			to = []
 			for i, t in enumerate(history):
-				cb.append(t, nin=len(history) - i - 1, to=to, ai=torch.cuda.is_available())
+				cb.append(t, nin=len(history) - i - 1, to=to, ai=i >= len(history) / 2 and torch.cuda.is_available())
 			cb.chat_history = to
 		cb.jailbroken = jb
 		if im:
@@ -2728,15 +2728,15 @@ elif len(sys.argv) > 1 and sys.argv[1] == "2":
 		elif priority:
 			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.975, p.multi_processor_count, p.total_memory)
 		elif priority is False:
-			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.75, COMPUTE_LOAD[i], -gmems[i].free, p.multi_processor_count)
+			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, -p.major, -p.minor, COMPUTE_LOAD[i] < high * 0.75, COMPUTE_LOAD[i], -gmems[i].free, p.multi_processor_count)
 		else:
-			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.5, COMPUTE_LOAD[i], -p.multi_processor_count, -gmems[i].free)
+			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.5, -p.major, -p.minor, COMPUTE_LOAD[i], -p.multi_processor_count, -gmems[i].free)
 		pcs = sorted(range(n), key=key, reverse=True)
 		if multi:
 			return [i for i in pcs if gmems[i].free >= mem], torch.float16
 		return pcs[0], torch.float16
 
-	device, dtype = determine_cuda(1073741824, priority=False)
+	device, dtype = determine_cuda(1073741824, priority=None)
 	device = f"cuda:{device}" if device >= 0 else "cpu"
 	from sentence_transformers import SentenceTransformer
 	Embedder = SentenceTransformer("LLukas22/all-mpnet-base-v2-embedding-all", device=device)
@@ -2750,7 +2750,7 @@ elif len(sys.argv) > 1 and sys.argv[1] == "2":
 		return a.data
 
 elif len(sys.argv) > 1 and int(sys.argv[1]) >= 3:
-	import imagebot
+	import imagebot, tiktoken
 	from clip_interrogator import Config, Interrogator
 	try:
 		import pytesseract
@@ -2778,7 +2778,23 @@ elif len(sys.argv) > 1 and int(sys.argv[1]) >= 3:
 			p1 = VIT.interrogate(image)
 		else:
 			p1 = VIT.interrogate_fast(image)
-		p1 = p1.strip()
+		enc = tiktoken.get_encoding("cl100k_base")
+		out = []
+		otok = list(enc.encode(p1.strip()))
+		if len(otok) >= 8:
+			last = None
+			count = 0
+			while otok:
+				c = otok.pop(0)
+				if c == last:
+					if count > 3:
+						continue
+					count += 1
+				else:
+					last = c
+					count = 0
+				out.append(c)
+			p1 = enc.decode(out) if len(out) >= 8 else p1
 		if fut:
 			p2 = fut.result().strip()
 		else:
