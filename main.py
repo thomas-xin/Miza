@@ -27,7 +27,7 @@ AUTH = {
     "giphy_key": "",
     "huggingface_key": "",
     "openai_key": "",
-    "backup_path": "backup",
+    "backup_path": "",
     "cache_path": "",
     "ai_features": bool(DC),
 }
@@ -53,7 +53,7 @@ if set(AUTH).difference(orig):
 
 
 if not AUTH.get("ai_features"):
-    os.environ["AI_FEATURES"] = False
+    os.environ["AI_FEATURES"] = ""
 
 # Loads the install_update module, which makes sure all required libraries are installed to their required versions.
 import install_update

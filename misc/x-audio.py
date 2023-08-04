@@ -46,6 +46,7 @@ def submit(s):
 	return resp
 
 async def respond(s):
+	send("%" + s)
 	k, c = s[1:].rstrip().split(b"~", 1)
 	c = memoryview(base64.b85decode(c))
 	k = k.decode("ascii")
@@ -89,7 +90,7 @@ async def respond(s):
 	create_future_ex(submit, s)
 
 async def communicate():
-	print("Audio client successfully connected.")
+	send("Audio client successfully connected.")
 	while True:
 		with tracebacksuppressor:
 			s = await create_future(sys.stdin.buffer.readline)
@@ -97,7 +98,7 @@ async def communicate():
 				break
 			if s.startswith(b"~"):
 				create_task(respond(s))
-	print("Audio client successfully disconnected.")
+	send("Audio client successfully disconnected.")
 
 def is_strict_running(proc):
 	if not proc:
@@ -216,6 +217,7 @@ class AudioPlayer(discord.AudioSource):
 		channel = client.get_channel(verify_id(channel))
 		self = cls(channel.guild)
 		players[channel.guild.id] = concurrent.futures.Future()
+		send(self, channel)
 		try:
 			if not self.vc:
 				if channel.guild.me.voice:
@@ -473,7 +475,7 @@ class AudioFile:
 			try:
 				self.proc = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, bufsize=1048576)
 			except:
-				print(cmd)
+				send(cmd)
 				raise
 			fl = 0
 			# Attempt to monitor status of output file
@@ -483,7 +485,7 @@ class AudioFile:
 						err = as_str(self.proc.stderr.read())
 						if check_fmt is not None:
 							if self.webpage_url and ("Server returned 5XX Server Error reply" in err or "Server returned 404 Not Found" in err or "Server returned 403 Forbidden" in err):
-								print(err)
+								send(err)
 								with tracebacksuppressor:
 									if "https://cf-hls-media.sndcdn.com/" in stream or expired(stream):
 										new_stream = request(f"VOICE.get_best_audio(VOICE.ytdl.extract_from({repr(self.webpage_url)}))")
@@ -496,7 +498,7 @@ class AudioFile:
 								new = request(f"VOICE.select_and_convert({repr(stream)})")
 							if new not in (None, "null"):
 								return self.load(eval_json(new), check_fmt=None, force=True)
-						print(self.proc.args)
+						send(self.proc.args)
 						if err:
 							ex = RuntimeError(err)
 						else:
@@ -864,6 +866,8 @@ class AudioClient(discord.Client):
 
 	def __init__(self):
 		super().__init__(
+			loop=eloop,
+			_loop=eloop,
 			max_messages=1,
 			heartbeat_timeout=60,
 			guild_ready_timeout=5,
@@ -879,7 +883,7 @@ client.http.user_agent = "Miza-Voice"
 
 async def mobile_identify(self):
 	"""Sends the IDENTIFY packet."""
-	print("Overriding with mobile status...")
+	send("Overriding with mobile status...")
 	payload = {
 		'op': self.IDENTIFY,
 		'd': {
@@ -916,86 +920,7 @@ async def mobile_identify(self):
 	await self.send_as_json(payload)
 
 discord.gateway.DiscordWebSocket.identify = lambda self: mobile_identify(self)
-
-SPEAKING = {}
-SSRC = {}
-USRC = {}
-
-async def received_message(self, msg):
-	# print("Voice websocket frame received:", msg)
-	op = msg['op']
-	data = msg['d']  # According to Discord this key is always given
-
-	if op == self.READY:
-		await self.initial_connection(data)
-		self.ssrc = data["ssrc"]
-	elif op == self.HEARTBEAT:
-		payload = {
-			'op': self.HEARTBEAT_ACK,
-			'd': time.time_ns() // 1000000,
-		}
-		await self.send_as_json(payload)
-		await self.speak(state=1)
-	elif op == self.HEARTBEAT_ACK:
-		if self._keep_alive:
-			self._keep_alive.ack()
-	elif op == self.RESUMED:
-		pass
-		# _log.debug('Voice RESUME succeeded.')
-	elif op == self.SESSION_DESCRIPTION:
-		self._connection.mode = data['mode']
-		self.secret_key = self._connection.secret_key = data['secret_key']
-		await self.speak(state=0)
-	elif op == self.SPEAKING:
-		uid = int(data["user_id"])
-		ssrc = int(data["ssrc"])
-		SPEAKING[uid] = data["speaking"]
-		SSRC[ssrc] = uid
-		USRC[uid] = ssrc
-	elif op == self.HELLO:
-		interval = data['heartbeat_interval'] / 1000.0
-		if getattr(self, "_keep_alive", None):
-			self._keep_alive.stop()
-		self._keep_alive = discord.gateway.VoiceKeepAliveHandler(ws=self, interval=min(interval, 5.0))
-		self._keep_alive.start()
-	elif op == 13:
-		uid = int(data["user_id"])
-		ssrc = USRC.pop(uid, None)
-		SSRC.pop(ssrc, None)
-		SPEAKING.pop(uid)
-	else:
-		print("Unknown audio event:\n" + str(msg))
-	await self._hook(self, msg)
-
-discord.gateway.DiscordVoiceWebSocket.received_message = received_message
-
-async def initial_connection(self, data) -> None:
-	state = self._connection
-	state.ssrc = data['ssrc']
-	state.voice_port = data['port']
-	state.endpoint_ip = data['ip']
-	packet = bytearray(74)
-	import struct
-	struct.pack_into('>H', packet, 0, 1)  # 1 = Send; TODO: Consider 3 for send + receive
-	struct.pack_into('>H', packet, 2, 70)  # 70 = Length
-	struct.pack_into('>I', packet, 4, state.ssrc)
-	state.socket.sendto(packet, (state.endpoint_ip, state.voice_port))
-	recv = await self.loop.sock_recv(state.socket, 74)
-	# _log.debug('received packet in initial_connection: %s', recv)
-	# the ip is ascii starting at the 8th byte and ending at the first null
-	ip_start = 8
-	ip_end = recv.index(0, ip_start)
-	state.ip = recv[ip_start:ip_end].decode('ascii')
-	state.port = struct.unpack_from('>H', recv, len(recv) - 2)[0]
-	# _log.debug('detected ip: %s port: %s', state.ip, state.port)
-	# there *should* always be at least one supported mode (xsalsa20_poly1305)
-	modes = [mode for mode in data['modes'] if mode in self._connection.supported_modes]
-	# _log.debug('received supported encryption modes: %s', ", ".join(modes))
-	mode = modes[0]
-	await self.select_protocol(state.ip, state.port, mode)
-	# _log.debug('selected the voice protocol for use (%s)', mode)
-
-discord.gateway.DiscordVoiceWebSocket.initial_connection = initial_connection
+discord.client._loop = eloop
 
 
 async def kill():
@@ -1006,6 +931,7 @@ async def kill():
 		futs.append(create_task(vc.disconnect(force=True)))
 	for fut in futs:
 		await fut
+	sys.stdin.close()
 	return await client.close()
 
 @client.event

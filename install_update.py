@@ -95,12 +95,12 @@ try:
 except pkg_resources.DistributionNotFound:
     subprocess.run([python, "-m", "pip", "install", "git+https://github.com/retostauffer/python-colorspace", "--user"])
 
-try:
-    v = pkg_resources.get_distribution("discord.py").version
-    assert v == "2.0.0a3575+g45d498c1"
-except:
-    print_exc()
-    subprocess.run([python, "-m", "pip", "install", "git+https://github.com/thomas-xin/discord.py.git", "--user"])
+# try:
+    # v = pkg_resources.get_distribution("discord.py").version
+    # assert v == "2.0.0a3575+g45d498c1"
+# except:
+    # print_exc()
+    # subprocess.run([python, "-m", "pip", "install", "git+https://github.com/thomas-xin/discord.py.git", "--user"])
 
 try:
     v = pkg_resources.get_distribution("googletrans").version

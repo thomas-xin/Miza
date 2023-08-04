@@ -85,6 +85,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		self.monkey_patch()
 		super().__init__(
 			loop=eloop,
+			_loop=eloop,
 			max_messages=256,
 			heartbeat_timeout=64,
 			chunk_guilds_at_startup=False,
@@ -263,8 +264,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			return
 
 	def update_slash_commands(self):
-		if not AUTH.get("slash_commands"):
-			return
 		print("Updating global slash commands...")
 		with tracebacksuppressor:
 			resp = reqs.next().get(
@@ -274,9 +273,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			if resp.status_code not in range(200, 400):
 				raise ConnectionError(f"Error {resp.status_code}", resp.text)
 			commands = dict((int(c["id"]), c) for c in resp.json() if str(c.get("application_id")) == str(self.id))
-			print(f"Successfully loaded {len(commands)} application command{'s' if len(commands) != 1 else ''}.")
+			if commands:
+				print(f"Successfully loaded {len(commands)} application command{'s' if len(commands) != 1 else ''}.")
 		sem = Semaphore(5, inf, 5)
 		for catg in self.categories.values():
+			if not AUTH.get("slash_commands"):
+				break
 			for command in catg:
 				with tracebacksuppressor:
 					if getattr(command, "msgcmd", None):
@@ -956,7 +958,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			_add_member=lambda member: self._members.__setitem__(member.id, member),
 			_pop_member=lambda m_id: self._members.pop(m_id, None),
 			send=lambda *args, **kwargs: discord.abc.Messageable.send(channel, *args, **kwargs),
-			trigger_typing=lambda: discord.abc.Messageable.trigger_typing(channel),
+			trigger_typing=lambda: self._state.http.send_typing(channel.id),
 			typing=lambda: discord.abc.Messageable.typing(channel),
 			fetch_message=lambda id: discord.abc.Messageable.fetch_message(channel, id),
 			pins=lambda: discord.abc.Messageable.pins(channel),
@@ -1004,8 +1006,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		with suppress(TypeError):
 			int(channel)
 			channel = await self.fetch_channel(channel)
-		history = discord.abc.Messageable.history(channel, limit=101, around=cdict(id=m_id))
-		messages = await history.flatten()
+		messages = []
+		async for m in discord.abc.Messageable.history(channel, limit=101, around=cdict(id=m_id)):
+			messages.append(m)
 		data = {m.id: m for m in messages}
 		self.cache.messages.update(data)
 		return self.cache.messages[m_id]
@@ -3505,7 +3508,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						# Automatically start typing if the command is time consuming
 						tc = getattr(command, "time_consuming", False)
 						if not loop and tc and not getattr(message, "simulated", False):
-							fut = create_task(discord.abc.Messageable.trigger_typing(channel))
+							fut = create_task(self._state.http.send_typing(channel.id))
 						# Get maximum time allowed for command to process
 						if isnan(u_perm):
 							timeout = None
@@ -3540,7 +3543,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							pass
 						# Add a callback to typing in the channel if the command takes too long
 						if fut is None and not hasattr(command, "typing") and not getattr(message, "simulated", False):
-							create_task(delayed_callback(future, sqrt(3), discord.abc.Messageable.trigger_typing, channel, repeat=True))
+							create_task(delayed_callback(future, sqrt(3), self._state.http.send_typing, channel.id, repeat=True))
 						if getattr(message, "slash", None):
 							create_task(delayed_callback(future, 1, self.defer_interaction, message))
 						with self.command_semaphore:
@@ -5041,29 +5044,123 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 		discord.http.HTTPClient.get_gateway = lambda self, *args, **kwargs: get_gateway(self, *args, **kwargs)
 
-		async def fill_messages(self):
+		async def history(self, limit=100, before=None, after=None, around=None, oldest_first=None):
 			if not getattr(self, "channel", None):
-				self.channel = await self.messageable._get_channel()
-			if self._get_retrieve():
 				try:
-					data = await self._retrieve_messages(self.retrieve)
-				except TypeError:
-					data = await self._retrieve_messages(self.retrieve)
-				if len(data) < 100:
-					self.limit = 0
-				if self.reverse:
+					self.channel = await self.messageable._get_channel()
+				except:
+					try:
+						self.channel = await self._get_channel()
+					except:
+						try:
+							self.channel = self
+						except:
+							pass
+			channel = getattr(self, "channel", self)
+
+			async def _around_strategy(retrieve, around=None, limit=None):
+				if not around:
+					return [], None, 0
+
+				around_id = around.id if around else None
+				data = await self._state.http.logs_from(channel.id, retrieve, around=around_id)
+
+				return data, None, 0
+
+			async def _after_strategy(retrieve, after=None, limit=None):
+				after_id = after.id if after else None
+				data = await self._state.http.logs_from(channel.id, retrieve, after=after_id)
+
+				if data:
+					if limit is not None:
+						limit -= len(data)
+
+					after = cdict(id=int(data[0]['id']))
+
+				return data, after, limit
+
+			async def _before_strategy(retrieve, before=None, limit=None):
+				before_id = before.id if before else None
+				data = await self._state.http.logs_from(channel.id, retrieve, before=before_id)
+
+				if data:
+					if limit is not None:
+						limit -= len(data)
+
+					before = cdict(id=int(data[-1]['id']))
+
+				return data, before, limit
+
+			if isinstance(before, datetime.datetime):
+				before = cdict(id=utils.time_snowflake(before, high=False))
+			if isinstance(after, datetime.datetime):
+				after = cdict(id=utils.time_snowflake(after, high=True))
+			if isinstance(around, datetime.datetime):
+				around = cdict(id=utils.time_snowflake(around))
+
+			if oldest_first is None:
+				reverse = after is not None
+			else:
+				reverse = oldest_first
+
+			after = after or 0
+			predicate = None
+
+			if around:
+				if limit is None:
+					raise ValueError('history does not support around with limit=None')
+				if limit > 101:
+					raise ValueError("history max limit 101 when specifying around parameter")
+
+				# Strange Discord quirk
+				limit = 100 if limit == 101 else limit
+
+				strategy, state = _around_strategy, around
+
+				if before and after:
+					predicate = lambda m: after.id < int(m['id']) < before.id
+				elif before:
+					predicate = lambda m: int(m['id']) < before.id
+				elif after:
+					predicate = lambda m: after.id < int(m['id'])
+			elif reverse:
+				strategy, state = _after_strategy, after
+				if before:
+					predicate = lambda m: int(m['id']) < before.id
+			else:
+				strategy, state = _before_strategy, before
+				if after and after != 0:
+					predicate = lambda m: int(m['id']) > after.id
+
+			channel = await self._get_channel()
+
+			CM = bot.CachedMessage
+			while True:
+				retrieve = 100 if limit is None else min(limit, 100)
+				if retrieve < 1:
+					return
+
+				data, state, limit = await strategy(retrieve, state, limit)
+
+				if reverse:
 					data = reversed(data)
-				if self._filter:
-					data = filter(self._filter, data)
-				c_id = self.channel.id
-				CM = bot.CachedMessage
-				for element in data:
-					element["channel_id"] = c_id
-					message = CM(element)
-					message.channel = self.channel
-					await self.messages.put(message)
-		
-		discord.iterators.HistoryIterator.fill_messages = lambda self: fill_messages(self)
+				if predicate:
+					data = filter(predicate, data)
+
+				count = 0
+
+				for count, raw_message in enumerate(data, 1):
+					raw_message["channel_id"] = raw_message.get("channel_id") or channel.id
+					message = CM(raw_message)
+					message.channel = channel
+					yield message
+					# yield self._state.create_message(channel=channel, data=raw_message)
+
+				if count < 100:
+					# There's no data left after this
+					break
+
+		discord.abc.Messageable.history = lambda self, *args, **kwargs: history(self, *args, **kwargs)
 
 		def parse_message_reaction_add(self, data):
 			emoji = data["emoji"]
@@ -5307,7 +5404,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				raise discord.DiscordServerError(r, data)
 			raise discord.HTTPException(r, data)
 
-		discord.http.HTTPClient.request = lambda self, *args, **kwargs: request(self, *args, **kwargs)
+		# discord.http.HTTPClient.request = lambda self, *args, **kwargs: request(self, *args, **kwargs)
+		# print(discord.client._loop, eloop)
+		discord.client._loop = eloop
 
 	def send_exception(self, messageable, ex, reference=None, op=None):
 		if getattr(ex, "no_react", None):
@@ -5455,6 +5554,19 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		create_task(self.fast_loop())
 		self.initialisation_complete = True
 		print("Initialisation complete.")
+
+	async def flatten_into_cache(self, history):
+		data = {}
+		async for m in history:
+			data[m.id] = m
+		create_future_ex(self.cache.messages.update, data)
+		return data
+
+	async def flatten(self, history):
+		messages = []
+		async for m in history:
+			messages.append(m)
+		return messages
 
 	def set_client_events(self):
 
@@ -5830,11 +5942,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					message.author = await self.fetch_user(self.deleted_user)
 					message.author.name = "Unknown User"
 					history = discord.abc.Messageable.history(channel, limit=101, around=message)
-					async def flatten_into_cache(history):
-						messages = await history.flatten()
-						data = {m.id: m for m in messages}
-						create_future_ex(self.cache.messages.update, data)
-					create_task(flatten_into_cache(history))
+					create_task(self.flatten_into_cache(history))
 			try:
 				message.deleted = True
 			except AttributeError:
@@ -6125,7 +6233,7 @@ class AudioClientInterface:
 	@tracebacksuppressor
 	def communicate(self):
 		proc = self.proc
-		i = b"~0~Fa\n"
+		i = b"~0~0\n"
 		proc.stdin.write(i)
 		proc.stdin.flush()
 		while not bot.closed and is_strict_running(proc):
@@ -6383,6 +6491,7 @@ class SimulatedMessage:
 	mentions = []
 	attachments = []
 	embeds = []
+	reactions = []
 	position = 0
 	voice = None
 	bot = False

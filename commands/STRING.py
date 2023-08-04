@@ -378,7 +378,7 @@ class Math(Command):
 		resp = await bot.solve_math(argv, p, r, timeout=24, variables=bot.data.variables.get(user.id))
 		# Determine whether output is a direct answer or a file
 		if type(resp) is dict and "file" in resp:
-			await channel.trigger_typing()
+			await bot._state.http.send_typing(channel.id),
 			fn = resp["file"]
 			f = CompatFile(fn)
 			await bot.send_with_file(channel, "", f, filename=fn, best=True, reference=message)

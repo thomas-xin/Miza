@@ -50,6 +50,8 @@ import pynvml
 try:
 	pynvml.nvmlInit()
 	DC = pynvml.nvmlDeviceGetCount()
+	if not os.environ.get("AI_FEATURES", True):
+		raise StopIteration("AI features disabled.")
 	import torch
 except:
 	DC = 0
@@ -68,7 +70,7 @@ escape_roles = lambda s: s#escape_everyone(s).replace("<@&", "<@\xad&")
 DISCORD_EPOCH = 1420070400000 # 1 Jan 2015
 MIZA_EPOCH = 1577797200000 # 1 Jan 2020
 
-time_snowflake = lambda dt, high=None: utils.time_snowflake(dt, high) if type(dt) is not int else getattr(dt, "id", None) or dt
+time_snowflake = lambda dt, high=None: utils.time_snowflake(dt, high=high) if type(dt) is not int else getattr(dt, "id", None) or dt
 
 def id2ts(id):
 	i = (id >> 22) + (id & 0xFFF)
@@ -484,6 +486,8 @@ def decrypt(s):
 	raise ValueError("Data header not found.")
 
 PORT = AUTH.get("webserver_port", 80)
+if PORT:
+	PORT = int(PORT)
 IND = "\x7f"
 
 
@@ -1283,13 +1287,13 @@ async def send_with_reply(channel, reference=None, content="", embed=None, embed
 			bucket = f"{channel.id}:{g_id}:" + "/channels/{channel_id}/messages"
 			try:
 				try:
-					sem = REPLY_SEM[channel.id] = bot.http._locks[bucket]
+					sem = REPLY_SEM[channel.id] = bot.http._buckets[bucket]
 				except KeyError:
 					bucket = f"{channel.id}:None:" + "/channels/{channel_id}/messages"
-					sem = REPLY_SEM[channel.id] = bot.http._locks[bucket]
+					sem = REPLY_SEM[channel.id] = bot.http._buckets[bucket]
 			except KeyError:
 				# print_exc()
-				sem = REPLY_SEM[channel.id] = bot.http._locks[bucket] = Semaphore(5, buffer=256, delay=0.1, rate_limit=5.15)
+				sem = REPLY_SEM[channel.id] = bot.http._buckets[bucket] = Semaphore(5, buffer=256, delay=0.1, rate_limit=5.15)
 		inter = False
 		url = f"https://discord.com/api/{api}/channels/{channel.id}/messages"
 		if getattr(channel, "dm_channel", None):
@@ -2352,7 +2356,7 @@ async def start_proc(k, i):
 	return proc
 
 def proc_start():
-	if torch:
+	if torch and os.environ.get("AI_FEATURES", True):
 		globals()["DC"] = torch.cuda.device_count()
 		COMPUTE_LOAD = AUTH.get("compute_load", [])
 		if len(COMPUTE_LOAD) < DC:
@@ -2605,7 +2609,10 @@ athreads = concurrent.futures.exc_worker = MultiThreadPool(pool_count=2, thread_
 athreads.pools.append(import_exc)
 
 def get_event_loop():
-	return eloop
+	try:
+		return asyncio.get_running_loop()
+	except:
+		return eloop
 
 # Creates an asyncio Future that waits on a multithreaded one.
 def wrap_future(fut, loop=None, shield=False, thread_safe=True):

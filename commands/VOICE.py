@@ -477,8 +477,8 @@ class CustomAudio(collections.abc.Hashable):
     @tracebacksuppressor
     def update(self, *void1, **void2):
         guild = self.guild
-        if self.fut.done() and not guild.me or not guild.me.voice:
-            return self.kill(css_md(f"🎵 Automatically disconnected from {sqr_md(guild)}. 🎵"))
+        if self.fut.done() and (not guild.me or not guild.me.voice):
+            return self.kill(css_md(f"🎵 Disconnected from {sqr_md(guild)}. 🎵"))
         try:
             self.fut.result(timeout=16)
         except:
@@ -536,13 +536,17 @@ class CustomAudio(collections.abc.Hashable):
                 await m.edit(mute=False)
 
     async def connect_to(self, channel=None):
+        print(self)
         if not self.acsi:
             try:
                 acsi = AudioClientSubInterface(self, channel)
+                print(acsi)
                 await acsi.start()
+                print(acsi)
                 self.acsi = acsi
                 self.fut.set_result(self.acsi)
             except Exception as ex:
+                print_exc()
                 self.fut.set_exception(ex)
         self.queue._init_(auds=self)
         self.timeout = utc()
@@ -5239,7 +5243,7 @@ class Download(Command):
                         content=css_md(f"Uploading {sqr_md(out)}..."),
                         embed=None,
                     ))
-                    create_task(channel.trigger_typing())
+                    create_task(self._state.http.send_typing(channel.id))
             reference = getattr(message, "reference", None)
             if reference:
                 r_id = getattr(reference, "message_id", None) or getattr(reference, "id", None)
@@ -5374,7 +5378,7 @@ class Transcribe(Command):
                     content=css_md(f"Translating {fni}..."),
                     embed=None,
                 ))
-                create_task(channel.trigger_typing())
+                create_task(self._state.http.send_typing(channel.id))
             translated = {}
             comments = {}
             await tr.chatgpt_translate(bot, guild, channel, user, text, "English", [dest], translated, comments)

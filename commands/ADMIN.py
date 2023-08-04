@@ -1418,7 +1418,7 @@ class UpdateMutes(Database):
             except:
                 print_exc()
                 d.pop(i, None)
-        self.listed = alist(sorted(((block[0]["t"], i) for i, block in d.items()), key=lambda x: x[0]))
+        self.listed = alist(sorted(((block[0]["t"], i) for i, block in d.items() if block), key=lambda x: x[0]))
 
     async def _call_(self):
         t = utc()
@@ -1590,7 +1590,7 @@ class UpdateBans(Database):
             except:
                 print_exc()
                 d.pop(i, None)
-        self.listed = alist(sorted(((block[0]["t"], i) for i, block in d.items()), key=lambda x: x[0]))
+        self.listed = alist(sorted(((block[0]["t"], i) for i, block in d.items() if block), key=lambda x: x[0]))
 
     async def _call_(self):
         t = utc()
@@ -2294,7 +2294,7 @@ class UpdateUserLogs(Database):
             # Check audit log to find whether user left or was kicked/banned
             with tracebacksuppressor(StopIteration):
                 ts = utc()
-                futs = [create_task(guild.audit_logs(limit=4, action=getattr(discord.AuditLogAction, action)).flatten()) for action in ("ban", "kick", "member_prune")]
+                futs = [create_task(bot.flatten(guild.audit_logs(limit=4, action=getattr(discord.AuditLogAction, action)))) for action in ("ban", "kick", "member_prune")]
                 bans = kicks = prunes = ()
                 with tracebacksuppressor:
                     bans = await futs[0]
@@ -2669,10 +2669,10 @@ class UpdateMessageLogs(Database):
                 # Attempt to find who deleted the message
                 if not guild.get_member(cu_id).guild_permissions.view_audit_log:
                     raise PermissionError
-                al = await guild.audit_logs(
+                al = await self.bot.flatten(guild.audit_logs(
                     limit=5,
                     action=action,
-                ).flatten()
+                ))
                 for e in reversed(al):
                     # This is because message delete events stack
                     try:
@@ -2726,10 +2726,10 @@ class UpdateMessageLogs(Database):
                 # Attempt to find who deleted the messages
                 if not guild.get_member(cu_id).guild_permissions.view_audit_log:
                     raise PermissionError
-                al = await guild.audit_logs(
+                al = await self.bot.flatten(guild.audit_logs(
                     limit=5,
                     action=action,
-                ).flatten()
+                ))
                 for e in reversed(al):
                     # For some reason bulk message delete events stack too
                     try:

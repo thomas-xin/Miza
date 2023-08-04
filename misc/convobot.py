@@ -485,7 +485,7 @@ class Bot:
 			devices, dtype = determine_cuda(2147483648, priority=False, multi=True)
 			print(devices, dtype)
 			pipes = []
-			for i in range(len(devices) // 2):
+			for i in range(len(devices) // 2 + 1):
 				device = devices[i]
 				try:
 					smp = pipeline("summarization", model=m, device=device, torch_dtype=dtype)
@@ -494,7 +494,7 @@ class Bot:
 					print_exc()
 					smp = pipeline("summarization", model=m, device=-1, torch_dtype=torch.float32)
 					smp.devid = None
-				pipes.append(smp)
+				pipes.insert(0, smp)
 			self.models[m] = pipes
 		enc = tiktoken.get_encoding("cl100k_base")
 		tokens = enc.encode(q)
