@@ -5233,183 +5233,19 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 		discord.message.MessageReference.cached_message = cached_message
 
-		async def _request(self, bucket, files, form, method, url, kwargs, lock, maybe_lock=None):
-			for tries in range(5):
-				if files:
-					for f in files:
-						f.reset(seek=tries)
-				if form:
-					form_data = aiohttp.FormData()
-					for params in form:
-						form_data.add_field(**params)
-					kwargs['data'] = form_data
+		async def do_typing(self) -> None:
+			channel = await self._get_channel()
+			typing = channel._state.http.send_typing
 
-				try:
-					r = await Request.sessions.next().request(method.upper(), url, **kwargs)
-					data = await discord.http.json_or_text(r)
-					status = r.status
+			while True:
+				async with Delay(9):
+					await typing(channel.id)
+		async def __aenter__(self):
+			self.task = self.loop.create_task(self.do_typing())
+			self.task.add_done_callback(discord.context_managers._typing_done_callback)
 
-					if maybe_lock and status != 429:
-						# check if we have rate limit header information
-						remaining = r.headers.get('X-Ratelimit-Remaining')
-						if remaining == '0':
-							# we've depleted our current bucket
-							delta = parse_ratelimit_header(r.headers)
-							# log.debug('A rate limit bucket has been exhausted (bucket: %s, retry: %s).', bucket, delta)
-							maybe_lock.defer()
-							self.loop.call_later(delta, lock.release)
-						if remaining and method.lower() != "patch":
-							limit = r.headers.get('X-Ratelimit-Limit')
-							if limit and int(limit) == int(remaining) + 1:
-								retry_after = r.headers.get("Retry-After") or r.headers.get("X-Ratelimit-Reset-After")
-								if retry_after and float(retry_after):
-									limit = int(limit)
-									retry_after = round_min(retry_after) + limit * 0.03
-									sem = Semaphore(
-										limit,
-										256,
-										rate_limit=retry_after,
-										weak=True,
-									)
-									async with sem:
-										self._locks[bucket] = sem
-									maybe_lock = None
-									# print("Successfully registered hard rate limit", sem, "for", bucket)
-
-					# the request was successful so just return the text/json
-					if status in range(200, 400):
-						return data
-
-					# we are being rate limited
-					if status == 429:
-						if not r.headers.get('Via'):
-							# Banned by Cloudflare more than likely.
-							raise discord.HTTPException(r, data)
-						# fmt = 'We are being rate limited. Retrying in %.2f seconds. Handled under the bucket "%s"'
-						delta = parse_ratelimit_header(r.headers)
-						is_global = data.get('global', False)
-						if is_global:
-							# log.warning('Global rate limit has been hit. Retrying in %.2f seconds.', retry_after)
-							self._global_over.clear()
-						if not maybe_lock:
-							lock.delay_for(delta)
-						await asyncio.sleep(delta)
-						if not maybe_lock:
-							fut = create_task(lock.__aenter__())
-							lock.__exit__()
-							await fut
-						if is_global:
-							self._global_over.set()
-							# log.debug('Global rate limit is now over.')
-						if tries < 3:
-							continue
-						print(url)
-						raise ConnectionError(429, r, data)
-
-					# we've received a 500 or 502, unconditional retry
-					if status >= 500 and tries < 3:
-						await asyncio.sleep(1 + tries * 2)
-						continue
-
-					if not hasattr(r, "reason"):
-						r.reason = as_str(data)
-					# the usual error cases
-					if status == 403:
-						raise discord.Forbidden(r, data)
-					elif status == 404:
-						raise discord.NotFound(r, data)
-					elif status == 503:
-						raise discord.DiscordServerError(r, data)
-					else:
-						raise discord.HTTPException(r, data)
-
-				# This is handling exceptions from the request
-				except (OSError, discord.DiscordServerError):
-					# Connection reset by peer
-					if tries < 4:
-						await asyncio.sleep(1 + tries * 2)
-						continue
-					if utc() - Request.ts > 720:
-						print("Reinitialising request client...")
-						await Request._init_()
-					raise
-			raise RuntimeError("Somehow ran out of attempts then used one more")
-	
-		async def request(self, route, *, files=None, form=None, **kwargs):
-			bucket = route.bucket
-			method = route.method
-			url = route.url
-
-			lock = self._locks.get(bucket)
-			if lock is None:
-				if "/reactions" in route.path:
-					lock = Semaphore(1, 16, rate_limit=0.28)
-				elif "/messages" in route.path:
-					if method.lower() == "post":
-						lock = Semaphore(5, 256, rate_limit=5.15)
-					elif method.lower() == "patch":
-						m_id = verify_id(url.rsplit("/", 1)[-1])
-						try:
-							message = await bot.fetch_message(m_id)
-						except LookupError:
-							pass
-						else:
-							lock = getattr(message, "sem", None)
-							if not lock and message.edited_at and (utc_ddt() - message.created_at).total_seconds() >= 3590:
-								lock = message.sem = Semaphore(3, 1, rate_limit=20.09)
-					# elif method.lower() == "patch":
-					#     m_id = int(route.url.rsplit("/", 1)[-1])
-					#     td = datetime.datetime.now() - snowflake_time_2(m_id)
-					#     if td.total_seconds() > 3599:
-					#         lock = Semaphore(5, 256, rate_limit=5.15)
-				if not lock:
-					lock = asyncio.Lock()
-				self._locks[bucket] = lock
-
-			# header creation
-			headers = {'User-Agent': self.user_agent}
-			if self.token is not None:
-				headers['Authorization'] = 'Bot ' + self.token
-			# some checking if it's a JSON request
-			if 'json' in kwargs:
-				headers['Content-Type'] = 'application/json'
-				kwargs['data'] = utils._to_json(kwargs.pop('json'))
-
-			try:
-				reason = kwargs.pop('reason')
-			except KeyError:
-				pass
-			else:
-				if reason:
-					headers['X-Audit-Log-Reason'] = urllib.parse.quote(reason, safe='/ ')
-			kwargs['headers'] = headers
-
-			# Proxy support
-			if self.proxy is not None:
-				kwargs['proxy'] = self.proxy
-			if self.proxy_auth is not None:
-				kwargs['proxy_auth'] = self.proxy_auth
-
-			if not self._global_over.is_set():
-				# wait until the global lock is complete
-				await self._global_over.wait()
-
-			if not isinstance(lock, Semaphore):
-				await lock.acquire()
-				lock = self._locks.get(bucket)
-				if not isinstance(lock, Semaphore):
-					with discord.http.MaybeUnlock(lock) as maybe_lock:
-						return await _request(self, bucket, files, form, method, url, kwargs, lock, maybe_lock=maybe_lock)
-			if isinstance(lock, Semaphore):
-				async with lock:
-					return await _request(self, bucket, files, form, method, url, kwargs, lock)
-
-			# We've run out of retries, raise.
-			if r.status >= 500:
-				raise discord.DiscordServerError(r, data)
-			raise discord.HTTPException(r, data)
-
-		# discord.http.HTTPClient.request = lambda self, *args, **kwargs: request(self, *args, **kwargs)
+		discord.context_managers.Typing.do_typing = do_typing
+		discord.context_managers.Typing.__aenter__ = __aenter__
 
 	def send_exception(self, messageable, ex, reference=None, op=None):
 		if getattr(ex, "no_react", None):

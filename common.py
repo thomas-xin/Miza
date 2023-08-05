@@ -2845,7 +2845,7 @@ class open2(io.IOBase):
 
 class CompatFile(discord.File):
 
-	def __init__(self, fp, filename=None, spoiler=False):
+	def __init__(self, fp, filename=None, description=None, spoiler=False):
 		if type(fp) in (bytes, memoryview):
 			fp = io.BytesIO(fp)
 		self.fp = self._fp = fp
@@ -2866,8 +2866,8 @@ class CompatFile(discord.File):
 				self.filename = getattr(fp, "name", None)
 		else:
 			self.filename = filename
+		self.description = description or self.filename or None
 		self.filename = (self.filename or "untitled").strip().replace(" ", "_")
-		self.description = self.filename
 		if spoiler:
 			if self.filename is not None:
 				if not self.filename.startswith("SPOILER_"):
