@@ -5249,6 +5249,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		discord.context_managers.Typing.do_typing = do_typing
 		discord.context_managers.Typing.__aenter__ = __aenter__
 
+		discord.Embed.__hash__ = lambda self: len(self)
+
 	def send_exception(self, messageable, ex, reference=None, op=None):
 		if getattr(ex, "no_react", None):
 			reacts = ""
