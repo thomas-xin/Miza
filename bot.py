@@ -4539,8 +4539,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			voice = None
 			display_avatar = avatar_url = icon_url = url = bot.discord_icon
 			joined_at = premium_since = None
-			_client_status = _status = cdict({None: "offline"})
-			_status._status = _status
+			_client_status = _status = discord.member._ClientStatus()
 			pending = False
 			ghost = True
 			roles = ()
