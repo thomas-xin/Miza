@@ -1342,7 +1342,7 @@ class Ask(Command):
 				visconts.append((i, m, content, found, cfut))
 			else:
 				visconts.append((i, m, content, found, None))
-			if reset:
+			if reset and m.id != message.id:
 				reset = False
 				if caid:
 					caid.pop("ids", None)
@@ -1526,7 +1526,7 @@ class Ask(Command):
 				if not emb and rem <= 5:
 					emb = discord.Embed(colour=rand_colour())
 					emb.set_author(**get_author(bot.user))
-					emb.description = f"{rem}/{freelim} free premium commands remaining today. Please help [fund my API]({bot.kofi_url}) for unlimited access!"
+					emb.description = f"{rem}/{freelim} free premium commands remaining today. Please help [fund my API]({bot.kofi_url}) for unlimited and improved commands!"
 			if isinstance(out, dict):
 				fname = out["func"]
 				argv = as_str(out.get("argv", ""))

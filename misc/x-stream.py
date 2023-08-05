@@ -87,6 +87,121 @@ MIMES = dict(
 	mp4="video/mp4",
 )
 
+if os.path.exists("misc/x-audio.py"):
+	import subprocess, threading, psutil, base64
+	from traceback import print_exc
+	python = sys.executable
+
+	class AudioClientInterface:
+
+		clients = {}
+		returns = {}
+		written = False
+		killed = False
+		communicating = None
+
+		def __init__(self):
+			self.proc = psutil.Popen([python, "x-audio.py"], cwd=os.getcwd() + "/misc", stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=65536)
+			if self.communicating:
+				self.communicating.join()
+			self.communicating = threading.Thread(target=self.communicate, daemon=True)
+			self.communicating.start()
+			try:
+				if os.name == "nt":
+					self.proc.ionice(psutil.IOPRIO_HIGH)
+				else:
+					self.proc.ionice(psutil.IOPRIO_CLASS_RT, value=7)
+			except:
+				pass
+			self.fut = concurrent.futures.Future()
+			self.audio = self
+
+		__bool__ = lambda self: self.written
+
+		def submit(self, s, aio=False, ignore=False, timeout=48):
+			key = time.time_ns() // 1000
+			while key in self.returns:
+				key += 1
+			self.returns[key] = None
+			if type(s) not in (bytes, memoryview):
+				s = str(s).encode("utf-8")
+			if aio:
+				s = b"await " + s
+			if ignore:
+				s = b"!" + s
+			out = (b"~", json.dumps(key).encode("ascii"), b"~", base64.b85encode(s), b"\n")
+			b = b"".join(out)
+			self.returns[key] = concurrent.futures.Future()
+			try:
+				self.fut.result()
+				self.proc.stdin.write(b)
+				self.proc.stdin.flush()
+				resp = self.returns[key].result(timeout=timeout)
+			except:
+				raise
+			finally:
+				self.returns.pop(key, None)
+			return resp
+
+		def communicate(self):
+			try:
+				proc = self.proc
+				i = b"~0~Fa\n" # DO NOT CHANGE THIS IS BASE64
+				proc.stdin.write(i)
+				proc.stdin.flush()
+				while proc.is_running():
+					s = proc.stdout.readline().rstrip()
+					if s:
+						if s.startswith(b"~"):
+							s = base64.b85decode(s[1:])
+							if s == b"bot.audio.returns[0].set_result(0)":
+								break
+						print(s)
+					time.sleep(0.2)
+				self.written = True
+				print("Audio client responded.")
+				self.fut.set_result(self)
+				while proc.is_running():
+					s = proc.stdout.readline()
+					if not s:
+						raise EOFError
+					s = s.rstrip()
+					if s:
+						if s[:1] == b"~":
+							c = memoryview(base64.b85decode(s[1:]))
+							if c[:18] == b"bot.audio.returns[":
+								out = False
+								if c[-18:] == b"].set_result(None)":
+									out = None
+								elif c[-18:] == b"].set_result(True)":
+									out = True
+								if out is not False:
+									k = int(c[18:-18])
+									try:
+										self.returns[k].set_result(out)
+									except:
+										print_exc()
+									continue
+							exc.submit(exec, c, bot._globals)
+						else:
+							print(s)
+			except:
+				print_exc()
+
+		def kill(self):
+			if not self.proc.is_running():
+				return
+			exc.submit(self.submit, "await kill()", priority=True).result(timeout=2)
+			time.sleep(0.5)
+			if self.proc.is_running():
+				try:
+					return self.proc.kill()
+				except psutil.NoSuchProcess:
+					pass
+
+	# bot = AudioClientInterface()
+
+
 
 class Server:
 
@@ -100,6 +215,17 @@ class Server:
 
 	@cp.expose
 	def heartbeat(self, key, uri=""):
+		assert key == discord_secret
+		uri = uri or f"https://IP:{webserver_port}"
+		uri = uri.replace("IP", cp.request.remote.ip)
+		if self.state["/"] != uri:
+			self.state["/"] = uri
+			with open("temp.json", "w") as f:
+				json.dump(self.state, f)
+		return "💜"
+
+	@cp.expose
+	def audio(self, key, uri=""):
 		assert key == discord_secret
 		uri = uri or f"https://IP:{webserver_port}"
 		uri = uri.replace("IP", cp.request.remote.ip)
