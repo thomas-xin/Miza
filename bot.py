@@ -4532,13 +4532,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			avatar = _avatar = ""
 			name = "[USER DATA NOT FOUND]"
 			nick = None
+			global_name = None
 			discriminator = "0"
 			id = 0
 			guild = None
+			mutual_guilds = []
 			status = None
 			voice = None
-			display_avatar = avatar_url = icon_url = url = bot.discord_icon
+			display_avatar = avatar_url = icon_url = avatar = url = bot.discord_icon
 			joined_at = premium_since = None
+			timed_out_until = None
 			_client_status = _status = discord.member._ClientStatus()
 			pending = False
 			ghost = True
@@ -4546,8 +4549,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			_roles = ()
 			activities = ()
 			_activities = ()
-			public_flags = discord.flags.PublicUserFlags()
-			_public_flags = discord.flags.PublicUserFlags()
+			_flags = public_flags = _public_flags = discord.flags.PublicUserFlags()
 			banner = None
 			_banner = None
 			accent_colour = None
