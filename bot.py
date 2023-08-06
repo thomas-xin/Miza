@@ -4554,6 +4554,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			_banner = None
 			accent_colour = None
 			_accent_colour = None
+			_permissions = discord.Permissions(0)
 
 			def __getattr__(self, k):
 				if k == "member":

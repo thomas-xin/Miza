@@ -480,7 +480,7 @@ class Bot:
 
 	def answer_summarise(self, m="Qiliang/bart-large-cnn-samsum-ChatGPT_v3", q="", max_length=128, min_length=64, do_sample=False):
 		try:
-			smp = random.choice(self.models[m])
+			smp = sorted(self.models[m], key= lambda p: p.busy)[0]
 		except KeyError:
 			devices, dtype = determine_cuda(2147483648, priority=False, multi=True)
 			print(devices, dtype)
@@ -495,49 +495,54 @@ class Bot:
 					print_exc()
 					smp = pipeline("summarization", model=m, device=-1, torch_dtype=torch.float32)
 					smp.devid = None
+				smp.busy = 0
 				pipes.insert(0, smp)
 			self.models[m] = pipes
 		enc = tiktoken.get_encoding("cl100k_base")
 		tokens = enc.encode(q)
 		limit = 4096
-		while len(tokens) > max_length:
-			if len(tokens) > limit:
-				e1 = tokens[:limit]
-				s1 = enc.decode(e1).strip()
+		smp.busy += 1
+		try:
+			while len(tokens) > max_length:
+				if len(tokens) > limit:
+					e1 = tokens[:limit]
+					s1 = enc.decode(e1).strip()
+					if smp.devid:
+						with torch.autocast("cuda"):
+							s2 = smp(s1, max_length=limit // 2, min_length=limit // 2 - 32, do_sample=do_sample, truncation=True)[0]["summary_text"]
+					else:
+						s2 = smp(s1, max_length=limit // 2, min_length=limit // 2 - 32, do_sample=do_sample, truncation=True)[0]["summary_text"]
+					e2 = enc.encode(s2 + " ")
+					tokens = e2 + tokens[limit:]
+					continue
+				break
+			e1 = tokens
+			s1 = enc.decode(e1).strip().replace("  ", " ")
+			if len(tokens) > max_length:
 				if smp.devid:
 					with torch.autocast("cuda"):
-						s2 = smp(s1, max_length=limit // 2, min_length=limit // 2 - 32, do_sample=do_sample, truncation=True)[0]["summary_text"]
+						s2 = smp(s1, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
 				else:
-					s2 = smp(s1, max_length=limit // 2, min_length=limit // 2 - 32, do_sample=do_sample, truncation=True)[0]["summary_text"]
-				e2 = enc.encode(s2 + " ")
-				tokens = e2 + tokens[limit:]
-				continue
-			break
-		e1 = tokens
-		s1 = enc.decode(e1).strip().replace("  ", " ")
-		if len(tokens) > max_length:
-			if smp.devid:
-				with torch.autocast("cuda"):
 					s2 = smp(s1, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
-			else:
-				s2 = smp(s1, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
-		out = []
-		otok = list(enc.encode(s2.strip()))
-		last = None
-		count = 0
-		while otok:
-			c = otok.pop(0)
-			if c == last:
-				if count > 3:
-					continue
-				count += 1
-			else:
-				last = c
-				count = 0
-			out.append(c)
-		if len(out) < min_length / 2:
-			return lim_tokens(q, max_length + min_length >> 1)
-		return enc.decode(out)
+			out = []
+			otok = list(enc.encode(s2.strip()))
+			last = None
+			count = 0
+			while otok:
+				c = otok.pop(0)
+				if c == last:
+					if count > 3:
+						continue
+					count += 1
+				else:
+					last = c
+					count = 0
+				out.append(c)
+			if len(out) < min_length / 2:
+				return lim_tokens(q, max_length + min_length >> 1)
+			return enc.decode(out)
+		finally:
+			smp.busy -= 1
 
 	def auto_summarise(self, q="", max_length=128, min_length=64):
 		if q and sum(c.isascii() for c in q) / len(q) > 0.75:
