@@ -2775,7 +2775,7 @@ elif len(sys.argv) > 1 and sys.argv[1] == "2":
 				config = Config(clip_model_name="ViT-H-14/laion2b_s32b_b79k")
 				config.apply_low_vram_defaults()
 				if torch.cuda.device_count() > 1:
-					config.device = f"cuda:{determine_cuda(priority=True)}"
+					config.device = f"cuda:{determine_cuda(priority=True)[0]}"
 				elif torch.cuda.device_count():
 					config.device = "cuda"
 				globals()["VIT2"] = Interrogator(config)
@@ -2788,7 +2788,7 @@ elif len(sys.argv) > 1 and sys.argv[1] == "2":
 				config = Config(clip_model_name="ViT-H-14/laion2b_s32b_b79k")
 				config.apply_low_vram_defaults()
 				if torch.cuda.device_count() > 1:
-					config.device = f"cuda:{determine_cuda(priority=False)}"
+					config.device = f"cuda:{determine_cuda(priority=False)[0]}"
 				elif torch.cuda.device_count():
 					config.device = "cuda"
 				globals()["VIT"] = Interrogator(config)
