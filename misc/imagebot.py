@@ -763,7 +763,7 @@ class Bot:
 			images = self.art_stablediffusion_refine(prompt, images, vae=vae, text_encoder_2=text_encoder_2, fail_unless_gpu=fail_unless_gpu, device=device, dtype=dtype)
 		return images
 
-	def art_stablediffusion_refine(self, prompt, images, vae=None, text_encoder_2=None, fail_unless_gpu=False, device=0, dtype=torch.bfloat16,):
+	def art_stablediffusion_refine(self, prompt, images, vae=None, text_encoder_2=None, fail_unless_gpu=False, device=0, dtype=torch.bfloat16, steps=48):
 		from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler, StableDiffusionImageVariationPipeline
 		if isinstance(images, (bytes, memoryview)):
 			images = [Image.open(io.BytesIO(images))]
@@ -820,7 +820,7 @@ class Bot:
 			negative_prompt=["((blurry)), [bad], (((distorted))), ((disfigured)), ((poor)) (low quality), ugly"] * len(images),
 			image=images,
 			num_images_per_prompt=1,
-			num_inference_steps=48,
+			num_inference_steps=steps,
 			output_type="pil",
 			denoising_start=0.7,
 		)

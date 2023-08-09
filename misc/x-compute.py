@@ -2832,7 +2832,7 @@ elif len(sys.argv) > 1 and int(sys.argv[1]) >= 3:
 		except KeyError:
 			ib = CBOTS[None] = imagebot.Bot()
 		for i in range(3):
-			il = ib.art_stablediffusion_refine(prompt, image)
+			il = ib.art_stablediffusion_refine(prompt, image, steps=64)
 			if il:
 				break
 		else:
