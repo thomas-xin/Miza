@@ -5243,7 +5243,7 @@ class Download(Command):
                         content=css_md(f"Uploading {sqr_md(out)}..."),
                         embed=None,
                     ))
-                    create_task(self._state.http.send_typing(channel.id))
+                    create_task(bot._state.http.send_typing(channel.id))
             reference = getattr(message, "reference", None)
             if reference:
                 r_id = getattr(reference, "message_id", None) or getattr(reference, "id", None)
@@ -5378,7 +5378,7 @@ class Transcribe(Command):
                     content=css_md(f"Translating {fni}..."),
                     embed=None,
                 ))
-                create_task(self._state.http.send_typing(channel.id))
+                create_task(bot._state.http.send_typing(channel.id))
             translated = {}
             comments = {}
             await tr.chatgpt_translate(bot, guild, channel, user, text, "English", [dest], translated, comments)

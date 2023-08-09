@@ -1463,7 +1463,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if not torch:
 			return ("File", url.rsplit("/", 1)[-1], "", None)
 		try:
-			p1, p2 = await process_image(url, "caption", ["-nogif", best], fix=3, pwr=1000000 if best else 1, timeout=300)
+			p1, p2 = await process_image(url, "caption", ["-nogif", best], fix=2, pwr=1000000 if best else 1, timeout=300)
 		except:
 			print_exc()
 			tup = None
@@ -2599,7 +2599,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 	compute_queue = {}
 	compute_wait = {}
-	def distribute(self, caps, pwrs, stat, resp):
+	def distribute(self, caps, pwrs, stat, resp, ip="127.0.0.1"):
 		for k, v in stat.items():
 			self.status_data.system[k].update(v)
 		if resp:
@@ -2607,6 +2607,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				k = int(k)
 				task = self.compute_wait.pop(k)
 				if isinstance(v, Exception):
+					print(repr(v), ip, k)
+					# v2 = v.__class__(*v.args, ip, k)
 					eloop.call_soon_threadsafe(task.set_exception, v)
 				else:
 					eloop.call_soon_threadsafe(task.set_result, v)

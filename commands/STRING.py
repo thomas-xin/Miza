@@ -1197,7 +1197,7 @@ class Match(Command):
 
 class Ask(Command):
 	_timeout_ = 24
-	name = ["Bloom", "NeoX", "Pyg", "Pygmalion", "GPT2", "Llama", "Vicuna", "Manticore", "Hippogriff", "Wizard", "Platypus", "GPlatty", "Davinci", "GPT3", "GPT3a", "GPT4", "GPT4a"]
+	name = ["Bloom", "NeoX", "Pyg", "Pygmalion", "GPT2", "Llama", "Vicuna", "Manticore", "Hippogriff", "Wizard", "Platypus", "GPlatty", "Airochronos", "Davinci", "GPT3", "GPT3a", "GPT4", "GPT4a"]
 	description = "Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. For premium tier chatbots, check using ~serverinfo, or apply with ~premium!"
 	usage = "<string>"
 	example = ("ask what's the date?", "gpt3 what is the square root of 3721?", "pyg can I have a hug?")
@@ -1418,8 +1418,10 @@ class Ask(Command):
 			model = "hippogriff"
 		elif cname == "wizard" or cname == "vicuna":
 			model = "wizard"
-		elif cname == "platypus" or cname == "gplatty" or cname == "llama":
+		elif cname == "platypus" or cname == "gplatty":
 			model = "platypus"
+		elif cname == "airochronos" or cname == "airoboros" or cname == "chronoboros" or cname == "llama":
+			model = "airochronos"
 		elif cname == "gpt3":
 			if premium < 2:
 				raise PermissionError(f"Distributed premium level 1 or higher required; please see {bot.kofi_url} for more info!")
@@ -1885,7 +1887,7 @@ class Personality(Command):
 					"Apologies, my AI has detected that your input may be inappropriate.\n"
 					+ "Please move to a NSFW channel, reword, or consider contacting the support server if you believe this is a mistake!"
 				)
-		models = ("auto", "gpt", "neox", "bloom", "pyg", "pygmalion", "manticore", "llama", "hippogriff", "wizard", "davinci", "gpt3", "gpt4")
+		models = ("auto", "gpt", "neox", "bloom", "pyg", "pygmalion", "manticore", "llama", "hippogriff", "wizard", "platypus", "airochronos", "davinci", "gpt3", "gpt4")
 		if ";" in p:
 			m, p = p.split(";", 1)
 			p = p.lstrip()

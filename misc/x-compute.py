@@ -2749,8 +2749,7 @@ elif len(sys.argv) > 1 and sys.argv[1] == "2":
 		a = Embedder.encode(s).astype(np.float16)
 		return a.data
 
-elif len(sys.argv) > 1 and int(sys.argv[1]) >= 3:
-	import imagebot, tiktoken
+	import tiktoken
 	from clip_interrogator import Config, Interrogator
 	try:
 		import pytesseract
@@ -2768,11 +2767,16 @@ elif len(sys.argv) > 1 and int(sys.argv[1]) >= 3:
 			fut = exc.submit(pytesseract.image_to_string, image, config="--psm 1", timeout=8)
 		else:
 			fut = None
+		while VIT is True:
+			time.sleep(0.5)
 		if not VIT:
+			globals()["VIT"] = True
 			config = Config(clip_model_name="ViT-H-14/laion2b_s32b_b79k")
 			config.apply_low_vram_defaults()
 			if torch.cuda.device_count() > 1:
 				config.device = "cuda:1"
+			elif torch.cuda.device_count():
+				config.device = "cuda"
 			globals()["VIT"] = Interrogator(config)
 		if best:
 			p1 = VIT.interrogate(image)
@@ -2800,6 +2804,9 @@ elif len(sys.argv) > 1 and int(sys.argv[1]) >= 3:
 		else:
 			p2 = None
 		return (p1, p2)
+
+elif len(sys.argv) > 1 and int(sys.argv[1]) >= 3:
+	import imagebot
 
 	def IBASL(prompt, kwargs, nsfw=False, force=True, count=1, sdxl=False):
 		try:

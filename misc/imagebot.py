@@ -212,14 +212,14 @@ def backup_model(cls, model, force=False, **kwargs):
 		pass
 	if force:
 		try:
-			return cls(model, **kwargs)
+			return cls(model, resume_download=True, **kwargs)
 		except Exception as ex:
 			ex2 = ex
 	else:
 		try:
-			return cls(model, local_files_only=True, **kwargs)
+			return cls(model, local_files_only=True, resume_download=True, **kwargs)
 		except:
-			fut = exc.submit(cached_model, cls, model, **kwargs)
+			fut = exc.submit(cached_model, cls, model, resume_download=True, **kwargs)
 			try:
 				return fut.result(timeout=24)
 			except Exception as ex:
@@ -783,7 +783,7 @@ class Bot:
 		# pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
 		data = pipe(
 			prompt=[prompt] * len(images),
-			negative_prompt=["blurry, bad, distorted, disfigured, poor low quality, ugly"] * len(images),
+			negative_prompt=["((blurry)), [bad], (((distorted))), ((disfigured)), ((poor)) (low quality), ugly"] * len(images),
 			image=images,
 			num_images_per_prompt=1,
 			num_inference_steps=48,

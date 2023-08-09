@@ -2382,7 +2382,7 @@ def proc_start():
 		PROCS[k] = [None] * v
 		for i in range(v):
 			if i >= 3:
-				if torch.cuda.get_device_properties(i - 3).total_memory <= 15 * 1073741824:
+				if torch.cuda.get_device_properties(i - 3).total_memory <= 15 * 1073741824 or COMPUTE_POT[i - 3] < 1000000:
 					continue
 				if COMPUTE_LOAD[i - 3] < 0.75 / len(COMPUTE_LOAD):
 					continue

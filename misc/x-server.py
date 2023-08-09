@@ -2423,6 +2423,7 @@ alert("File successfully deleted. Returning to home.");
 	def distribute(self, caps="[]", pwrs="[]", stat="{}", resp="{}"):
 		# if resp and resp != "{}":
 		# 	print(caps, pwrs, stat, resp)
+		ip = true_ip()
 		if not caps.startswith("["):
 			caps = base64.urlsafe_b64decode(caps + "==")
 		caps = orjson.loads(caps)
@@ -2431,7 +2432,7 @@ alert("File successfully deleted. Returning to home.");
 		caps = orjson.loads(caps)
 		if not stat.startswith("{"):
 			stat = base64.urlsafe_b64decode(stat + "==").decode("utf-8", "replace")
-		stat = orjson.loads(stat.replace("<IP>", true_ip()))
+		stat = orjson.loads(stat.replace("<IP>", ip))
 		if not resp.startswith("{"):
 			resp = base64.urlsafe_b64decode(resp + "==")
 		resp = literal_eval(resp)
@@ -2444,7 +2445,7 @@ alert("File successfully deleted. Returning to home.");
 		caps = orjson.dumps(caps).decode("ascii")
 		stat = orjson.dumps(stat).decode("utf-8", "replace")
 		resp = repr(resp)
-		tasks = self.bot_exec(f"bot.distribute({caps},{stat},{resp})")
+		tasks = self.bot_exec(f"bot.distribute({caps},{stat},{resp},{repr(ip)})")
 		cp.response.headers.update(HEADERS)
 		cp.response.headers["Content-Type"] = "application/json"
 		return orjson.dumps(tasks)
