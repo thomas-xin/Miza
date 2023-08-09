@@ -25,6 +25,38 @@ except AttributeError:
 	exc = concurrent.futures.exc_worker = concurrent.futures.ThreadPoolExecutor(max_workers=64)
 drivers = selenium.__dict__.setdefault("-drivers", [])
 
+import tiktoken
+from math import *
+def lim_str(s, maxlen=10, mode="centre"):
+	if maxlen is None:
+		return s
+	if type(s) is not str:
+		s = str(s)
+	over = (len(s) - maxlen) / 2
+	if over > 0:
+		if mode == "centre":
+			half = len(s) / 2
+			s = s[:ceil(half - over - 1)] + ".." + s[ceil(half + over + 1):]
+		else:
+			s = s[:maxlen - 3] + "..."
+	return s
+
+def lim_tokens(s, maxlen=10, mode="centre"):
+	if maxlen is None:
+		return s
+	if type(s) is not str:
+		s = str(s)
+	enc = tiktoken.get_encoding("cl100k_base")
+	tokens = enc.encode(s)
+	over = (len(tokens) - maxlen) / 2
+	if over > 0:
+		if mode == "centre":
+			half = len(tokens) / 2
+			s = enc.decode(tokens[:ceil(half - over - 1)]) + ".." + enc.decode(tokens[ceil(half + over + 1):])
+		else:
+			s = enc.decode(tokens[:maxlen - 3]) + "..."
+	return s.strip()
+
 class_name = webdriver.common.by.By.CLASS_NAME
 css_selector = webdriver.common.by.By.CSS_SELECTOR
 xpath = webdriver.common.by.By.XPATH
@@ -164,7 +196,7 @@ def update():
 			drivers.clear()
 			return_driver(d)
 
-def determine_cuda(mem=1, priority=None, multi=False):
+def determine_cuda(mem=1, priority=None, multi=False, major=0):
 	if not torch.cuda.is_available():
 		if multi:
 			return [-1], torch.float32
@@ -184,11 +216,11 @@ def determine_cuda(mem=1, priority=None, multi=False):
 	if priority == "full":
 		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i], p.major, p.minor, p.multi_processor_count, p.total_memory)
 	elif priority:
-		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.9, i, p.multi_processor_count, p.total_memory)
+		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, p.major >= major, COMPUTE_LOAD[i] < high * 0.9, i, p.multi_processor_count, p.total_memory)
 	elif priority is False:
-		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, -p.major, -p.minor, COMPUTE_LOAD[i] < high * 0.75, COMPUTE_LOAD[i], -gmems[i].free, p.multi_processor_count)
+		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, p.major >= major, -p.major, -p.minor, COMPUTE_LOAD[i] < high * 0.75, COMPUTE_LOAD[i], -gmems[i].free, p.multi_processor_count)
 	else:
-		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.5, -p.major, -p.minor, COMPUTE_LOAD[i], -p.multi_processor_count, -gmems[i].free)
+		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.5, p.major >= major, -p.major, -p.minor, COMPUTE_LOAD[i], -p.multi_processor_count, -gmems[i].free)
 	pcs = sorted(range(n), key=key, reverse=True)
 	if multi:
 		return [i for i in pcs if gmems[i].free >= mem], torch.float16
@@ -667,6 +699,7 @@ class Bot:
 			kw = dict(output_type=output_type, denoising_end=0.8)
 			if im:
 				kw["target_size"] = im.size
+		prompt = lim_tokens(prompt, 80, mode="left")
 		if f2 in (StableDiffusionInpaintPipeline, StableDiffusionXLInpaintPipeline):
 			data = pipe(
 				prompt,
@@ -781,6 +814,7 @@ class Bot:
 			finally:
 				self.loading = False
 		# pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
+		prompt = lim_tokens(prompt, 80, mode="left")
 		data = pipe(
 			prompt=[prompt] * len(images),
 			negative_prompt=["((blurry)), [bad], (((distorted))), ((disfigured)), ((poor)) (low quality), ugly"] * len(images),
