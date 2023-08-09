@@ -1075,7 +1075,7 @@ class Resize(Command):
                         raise ArgumentError("Please input an image by URL or attachment.")
                 else:
                     raise ArgumentError("Please input an image by URL or attachment.")
-            if args[-1] in ops:
+            if args and args[-1] in ops:
                 op = args.pop(-1)
             else:
                 if name in ("denoise", "enhance", "refine"):
