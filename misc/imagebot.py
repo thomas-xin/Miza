@@ -184,7 +184,7 @@ def determine_cuda(mem=1, priority=None, multi=False):
 	if priority == "full":
 		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i], p.major, p.minor, p.multi_processor_count, p.total_memory)
 	elif priority:
-		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.975, p.multi_processor_count, p.total_memory)
+		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.9, i, p.multi_processor_count, p.total_memory)
 	elif priority is False:
 		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, -p.major, -p.minor, COMPUTE_LOAD[i] < high * 0.75, COMPUTE_LOAD[i], -gmems[i].free, p.multi_processor_count)
 	else:

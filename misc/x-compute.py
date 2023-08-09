@@ -2726,7 +2726,7 @@ elif len(sys.argv) > 1 and sys.argv[1] == "2":
 		if priority == "full":
 			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i], p.major, p.minor, p.multi_processor_count, p.total_memory)
 		elif priority:
-			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.975, p.multi_processor_count, p.total_memory)
+			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.9, i, p.multi_processor_count, p.total_memory)
 		elif priority is False:
 			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, -p.major, -p.minor, COMPUTE_LOAD[i] < high * 0.75, COMPUTE_LOAD[i], -gmems[i].free, p.multi_processor_count)
 		else:
@@ -2756,7 +2756,7 @@ elif len(sys.argv) > 1 and sys.argv[1] == "2":
 	except ImportError:
 		pytesseract = None
 
-	VIT = None
+	VIT = VIT2 = None
 	def caption(im, best=False):
 		im = resize_max(im, 1536, "auto")
 		if im.mode != "RGB":
@@ -2767,20 +2767,31 @@ elif len(sys.argv) > 1 and sys.argv[1] == "2":
 			fut = exc.submit(pytesseract.image_to_string, image, config="--psm 1", timeout=8)
 		else:
 			fut = None
-		while VIT is True:
-			time.sleep(0.5)
-		if not VIT:
-			globals()["VIT"] = True
-			config = Config(clip_model_name="ViT-H-14/laion2b_s32b_b79k")
-			config.apply_low_vram_defaults()
-			if torch.cuda.device_count() > 1:
-				config.device = "cuda:1"
-			elif torch.cuda.device_count():
-				config.device = "cuda"
-			globals()["VIT"] = Interrogator(config)
 		if best:
-			p1 = VIT.interrogate(image)
+			while VIT2 is True:
+				time.sleep(0.5)
+			if not VIT2:
+				globals()["VIT2"] = True
+				config = Config(clip_model_name="ViT-H-14/laion2b_s32b_b79k")
+				config.apply_low_vram_defaults()
+				if torch.cuda.device_count() > 1:
+					config.device = f"cuda:{determine_cuda(priority=True)}"
+				elif torch.cuda.device_count():
+					config.device = "cuda"
+				globals()["VIT2"] = Interrogator(config)
+			p1 = VIT2.interrogate(image)
 		else:
+			while VIT is True:
+				time.sleep(0.5)
+			if not VIT:
+				globals()["VIT"] = True
+				config = Config(clip_model_name="ViT-H-14/laion2b_s32b_b79k")
+				config.apply_low_vram_defaults()
+				if torch.cuda.device_count() > 1:
+					config.device = f"cuda:{determine_cuda(priority=False)}"
+				elif torch.cuda.device_count():
+					config.device = "cuda"
+				globals()["VIT"] = Interrogator(config)
 			p1 = VIT.interrogate_fast(image)
 		enc = tiktoken.get_encoding("cl100k_base")
 		out = []
