@@ -1069,6 +1069,78 @@ transform: translate(-50%, -50%);
 		cp.response.headers["ETag"] = create_etag(data)
 		return data
 
+	ecdc_cache = {}
+	@cp.expose
+	@hostmap
+	def encodec(self, url, bitrate="24k"):
+		cp.response.headers.update(SHEADERS)
+		if isinstance(url, list):
+			url = url[0]
+		try:
+			out = self.ecdc_cache[url]
+			if not os.path.exists(out) or not os.path.getsize(out):
+				raise KeyError
+		except KeyError:
+			pass
+		else:
+			f = open(out, "rb")
+			return cp.lib.static.serve_fileobj(f, content_type="audio/ecdc", disposition="", name=url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0] + ".ecdc")
+		t = ts_us()
+		fn = f"cache/{t}"
+		with reqs.next().get(url, stream=True) as resp:
+			with open(fn, "wb") as f:
+				shutil.copyfileobj(resp.raw, f)
+		mime = get_mime(fn)
+		if mime != "audio/wav":
+			fn2 = f"{fn}.wav"
+			print(mime)
+			args = ["ffmpeg", "-i", fn, fn2]
+			subprocess.run(args)
+			fn = fn2
+		if isinstance(bitrate, int):
+			br = str(bitrate)
+		else:
+			br = bitrate.removesuffix("k")
+		out = fn.rsplit(".", 1)[0] + ".ecdc"
+		args = [python, "-m", "encodec", "-b", br, "--hq", fn, out]
+		subprocess.run(args)
+		assert os.path.exists(out)
+		while len(self.ecdc_cache) >= 4096:
+			self.ecdc_cache.pop(next(iter(self.ecdc_cache)))
+		self.ecdc_cache[url] = out
+		f = open(out, "rb")
+		return cp.lib.static.serve_fileobj(f, content_type="audio/ecdc", disposition="", name=url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0] + ".ecdc")
+
+	@cp.expose
+	@hostmap
+	def decodec(self, url, fmt="wav"):
+		cp.response.headers.update(SHEADERS)
+		if isinstance(url, list):
+			url = url[0]
+		try:
+			out = self.ecdc_cache[url]
+			if not os.path.exists(out) or not os.path.getsize(out):
+				raise KeyError
+		except KeyError:
+			pass
+		else:
+			f = open(out, "rb")
+			return cp.lib.static.serve_fileobj(f, content_type=f"audio/{fmt}", disposition="", name=url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0] + ".wav")
+		t = ts_us()
+		fn = f"cache/{t}.ecdc"
+		with reqs.next().get(url, stream=True) as resp:
+			with open(fn, "wb") as f:
+				shutil.copyfileobj(resp.raw, f)
+		out = fn.rsplit(".", 1)[0] + ".wav"
+		args = [python, "-m", "encodec", "-r", fn, out]
+		subprocess.run(args)
+		assert os.path.exists(out)
+		while len(self.ecdc_cache) >= 4096:
+			self.ecdc_cache.pop(next(iter(self.ecdc_cache)))
+		self.ecdc_cache[url] = out
+		f = open(out, "rb")
+		return cp.lib.static.serve_fileobj(f, content_type=f"audio/{fmt}", disposition="", name=url.rsplit("/", 1)[-1].split("?", 1)[0] + ".wav")
+
 	@cp.expose
 	@hostmap
 	def ytdl(self, **kwargs):

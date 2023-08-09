@@ -2472,7 +2472,7 @@ async def _sub_submit(ptype, command, fix=None, _timeout=12):
 		proc = await get_idle_proc(ptype, fix=fix)
 	async with sem:
 		try:
-			proc.stdin.write(s)
+			await create_future(proc.stdin.write, s, priority=True)
 			await proc.stdin.drain()
 			fut = PROC_RESP[ts]
 			tries = ceil(_timeout / 3) if _timeout and is_finite(_timeout) else 3600

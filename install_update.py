@@ -49,6 +49,7 @@ if os.environ.get("AI_FEATURES", True):
 		"safetensors>=0.3.1",
         "sentencepiece>=0.1.99",
         "sentence-transformers>=2.2.2",
+		"soundfile>=0.12.1",
         "tiktoken>=0.4.0",
         "tokenizers>=0.13.3",
         "torch>=2.0.1",
@@ -124,5 +125,11 @@ if os.name == "nt" and os.environ.get("AI_FEATURES", True):
         fold = dist.module_path + "/bitsandbytes_windows-" + dist.version + ".dist-info"
         if os.path.exists(fold):
             os.rename(fold, fold.replace("_windows", ""))
+
+if os.environ.get("AI_FEATURES", True):
+	try:
+		assert pkg_resources.get_distribution("encodec").version >= "0.1.2a3"
+	except pkg_resources.DistributionNotFound, AssertionError:
+		subprocess.run([python, "-m", "pip", "install", "git+https://github.com/facebookresearch/encodec", "--user"])
 
 print("Installer terminated.")
