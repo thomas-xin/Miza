@@ -1463,7 +1463,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if not torch:
 			return ("File", url.rsplit("/", 1)[-1], "", None)
 		try:
-			p1, p2 = await process_image(url, "caption", ["-nogif", best], fix=2, pwr=1000000 if best else 1, timeout=300)
+			p1, p2 = await process_image(url, "caption", ["-nogif", best], fix=2, pwr=1, timeout=300)
 		except:
 			print_exc()
 			tup = None
