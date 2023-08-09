@@ -1050,9 +1050,10 @@ class Resize(Command):
         if message.attachments:
             args = [best_url(a) for a in message.attachments] + args
             argv = " ".join(best_url(a) for a in message.attachments) + " " * bool(argv) + argv
+        ops = {"nearest", "linear", "hamming", "bicubic", "lanczos", "scale2x", "crop", "auto"}
         if not args or argv == "list":
             if "l" in flags or argv == "list":
-                return ini_md("Available scaling operations: [nearest, linear, hamming, bicubic, lanczos, scale2x, crop, auto]")
+                return ini_md(f"Available scaling operations: [{', '.join(ops)}]")
             # raise ArgumentError("Please input an image by URL or attachment.")
         async with discord.context_managers.Typing(channel):
             try:
@@ -1074,6 +1075,13 @@ class Resize(Command):
                         raise ArgumentError("Please input an image by URL or attachment.")
                 else:
                     raise ArgumentError("Please input an image by URL or attachment.")
+            if args[-1] in ops:
+                op = args.pop(-1)
+            else:
+                if name in ("denoise", "enhance", "refine"):
+                    op = "sdxl"
+                else:
+                    op = "auto"
             value = " ".join(args).strip()
             func = "resize_mult"
             fmt2 = url.split("?", 1)[0].rsplit(".", 1)[-1]
@@ -1087,7 +1095,6 @@ class Resize(Command):
                     fmt2 = "mp4"
             if not value:
                 x = y = 1
-                op = "auto"
                 fmt = fmt2
             else:
                 # Parse width and height multipliers
@@ -1110,17 +1117,9 @@ class Resize(Command):
                         if not value >= -32 or not value <= 32:
                             raise OverflowError("Maximum multiplier input is 32.")
                 if spl:
-                    op = spl.pop(0)
-                    if op == "scale2":
-                        op = "scale2x"
-                else:
-                    op = "auto"
-                if spl:
                     fmt = spl.pop(0)
                 else:
                     fmt = fmt2
-            if op == "auto" and name in ("denoise", "enhance", "refine"):
-                op = "sdxl"
             # Try and find a good name for the output image
             try:
                 name = url[url.rindex("/") + 1:]
