@@ -2827,6 +2827,7 @@ elif len(sys.argv) > 1 and int(sys.argv[1]) >= 3:
 		return ib.art_stablediffusion_local(prompt, kwargs, nsfw=nsfw, fail_unless_gpu=not force, count=count, sdxl=sdxl)
 
 	def IBASR(prompt, image):
+		print(prompt)
 		try:
 			ib = CBOTS[None]
 		except KeyError:
