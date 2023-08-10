@@ -1096,8 +1096,10 @@ transform: translate(-50%, -50%);
 			return cp.lib.static.serve_fileobj(f, content_type="audio/ecdc", disposition="", name=url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0] + ".ecdc")
 		if inference in ("None", "none", None):
 			if cp.request.body:
-				with open(out, "wb") as f:
-					shutil.copyfileobj(cp.request.body.fp, f, 65536)
+				b = cp.request.body.fp.read()
+				if b:
+					with open(out, "wb") as f:
+						f.write(b)
 			return b""
 		t = ts_us()
 		fn = f"cache/{t}"
