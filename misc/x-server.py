@@ -1069,15 +1069,21 @@ transform: translate(-50%, -50%);
 		cp.response.headers["ETag"] = create_etag(data)
 		return data
 
-	ecdc_cache = {}
 	@cp.expose
 	@hostmap
 	def encodec(self, url, bitrate="24k"):
 		cp.response.headers.update(SHEADERS)
 		if isinstance(url, list):
 			url = url[0]
+		url = regexp(r"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=").sub("https://youtu.be/", url)
+		if isinstance(bitrate, int):
+			br = str(bitrate)
+		else:
+			br = bitrate.removesuffix("k")
+		if not os.path.exists(cachedir + "/ecdc"):
+			os.mkdir(cachedir + "/ecdc")
+		out = cachedir + "/ecdc/!" + shash(url) + "~" + br + ".ecdc"
 		try:
-			out = self.ecdc_cache[url]
 			if not os.path.exists(out) or not os.path.getsize(out):
 				raise KeyError
 		except KeyError:
@@ -1089,7 +1095,7 @@ transform: translate(-50%, -50%);
 		fn = f"cache/{t}"
 		with reqs.next().get(url, stream=True) as resp:
 			with open(fn, "wb") as f:
-				shutil.copyfileobj(resp.raw, f)
+				shutil.copyfileobj(resp.raw, f, 65536)
 		mime = get_mime(fn)
 		if mime != "audio/wav":
 			fn2 = f"{fn}.wav"
@@ -1097,17 +1103,10 @@ transform: translate(-50%, -50%);
 			args = ["ffmpeg", "-i", fn, fn2]
 			subprocess.run(args)
 			fn = fn2
-		if isinstance(bitrate, int):
-			br = str(bitrate)
-		else:
-			br = bitrate.removesuffix("k")
-		out = fn.rsplit(".", 1)[0] + ".ecdc"
+		# out = fn.rsplit(".", 1)[0] + ".ecdc"
 		args = [python, "-m", "encodec", "-b", br, "--hq", fn, out]
 		subprocess.run(args)
 		assert os.path.exists(out)
-		while len(self.ecdc_cache) >= 4096:
-			self.ecdc_cache.pop(next(iter(self.ecdc_cache)))
-		self.ecdc_cache[url] = out
 		f = open(out, "rb")
 		return cp.lib.static.serve_fileobj(f, content_type="audio/ecdc", disposition="", name=url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0] + ".ecdc")
 
@@ -1117,8 +1116,8 @@ transform: translate(-50%, -50%);
 		cp.response.headers.update(SHEADERS)
 		if isinstance(url, list):
 			url = url[0]
+		out = "cache/!" + shash(url) + "~." + fmt
 		try:
-			out = self.ecdc_cache[url]
 			if not os.path.exists(out) or not os.path.getsize(out):
 				raise KeyError
 		except KeyError:
@@ -1130,14 +1129,11 @@ transform: translate(-50%, -50%);
 		fn = f"cache/{t}.ecdc"
 		with reqs.next().get(url, stream=True) as resp:
 			with open(fn, "wb") as f:
-				shutil.copyfileobj(resp.raw, f)
-		out = fn.rsplit(".", 1)[0] + ".wav"
+				shutil.copyfileobj(resp.raw, f, 65536)
+		# out = fn.rsplit(".", 1)[0] + ".wav"
 		args = [python, "-m", "encodec", "-r", fn, out]
 		subprocess.run(args)
 		assert os.path.exists(out)
-		while len(self.ecdc_cache) >= 4096:
-			self.ecdc_cache.pop(next(iter(self.ecdc_cache)))
-		self.ecdc_cache[url] = out
 		f = open(out, "rb")
 		return cp.lib.static.serve_fileobj(f, content_type=f"audio/{fmt}", disposition="", name=url.rsplit("/", 1)[-1].split("?", 1)[0] + ".wav")
 
@@ -1584,7 +1580,7 @@ transform: translate(-50%, -50%);
 					f.write(s)
 				return self.merge(name=name, index=1)
 			if mfs > 512 * 1048576:
-				fut = create_future_ex(shutil.copyfileobj, cp.request.body.fp, f)
+				fut = create_future_ex(shutil.copyfileobj, cp.request.body.fp, f, 65536)
 				try:
 					info = cdict(self.chunking[n])
 				except KeyError:
@@ -1638,7 +1634,7 @@ transform: translate(-50%, -50%);
 					fut.result()
 				self.update_merge()
 				return
-			shutil.copyfileobj(cp.request.body.fp, f)
+			shutil.copyfileobj(cp.request.body.fp, f, 65536)
 
 	chunk_file = "cache/chunking.json"
 	try:
@@ -1758,7 +1754,7 @@ transform: translate(-50%, -50%);
 						for i in range(1, high):
 							gn = nh + str(i)
 							with open(gn, "rb") as g:
-								shutil.copyfileobj(g, f)
+								shutil.copyfileobj(g, f, 65536)
 				if not key:
 					n = (ts_us() * random.randint(1, time.time_ns() % 65536) ^ random.randint(0, 1 << 63)) & (1 << 64) - 1
 					key = n2p(n)
