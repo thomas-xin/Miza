@@ -673,7 +673,7 @@ class Bot:
 				"properties": {
 					"mode": {
 						"type": "string",
-						"enum": ["pause", "loop", "repeat", "shuffle"],
+						"enum": ["pause", "loop", "repeat", "shuffle", "quit"],
 					},
 					"value": {
 						"type": "boolean",
@@ -1099,6 +1099,8 @@ class Bot:
 								return {"func": args["mode"], "argv": args["value"]}
 							elif name == "audiostate":
 								print("AudioState query:", args)
+								if args["mode"] == "quit":
+									return {"func": "disconnect"}
 								if args["mode"] == "pause":
 									return {"func": ("pause" if args["value"] else "resume")}
 								if args["mode"] == "loop":

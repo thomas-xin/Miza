@@ -1110,7 +1110,7 @@ transform: translate(-50%, -50%);
 		if mime != "audio/wav":
 			fn2 = f"{fn}.wav"
 			print(mime)
-			args = ["ffmpeg", "-i", fn, fn2]
+			args = ["ffmpeg", "-hide_banner", "-v", "error", "-i", fn, fn2]
 			subprocess.run(args)
 			fn = fn2
 		# out = fn.rsplit(".", 1)[0] + ".ecdc"
