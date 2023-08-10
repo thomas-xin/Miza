@@ -1093,7 +1093,7 @@ transform: translate(-50%, -50%);
 		else:
 			f = open(out, "rb")
 			return cp.lib.static.serve_fileobj(f, content_type="audio/ecdc", disposition="", name=url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0] + ".ecdc")
-		if inference not in ("None", "none", None):
+		if inference in ("None", "none", None):
 			return b""
 		t = ts_us()
 		fn = f"cache/{t}"
