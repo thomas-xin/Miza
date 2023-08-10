@@ -551,16 +551,16 @@ class AudioFile:
 			self.ensure_time()
 			return
 		# Remove any unused file that has been left for a long time
-		if utc() - self.time > 24000:
+		if utc() - self.time > 86400:
 			try:
 				fl = os.path.getsize("cache/" + self.file)
 			except FileNotFoundError:
 				fl = 0
 				if self.buffered:
 					self.time = -inf
-			ft = 24000 / (math.log2(fl / 16777216 + 1) + 1)
-			if ft > 86400:
-				ft = 86400
+			ft = 86400 / (math.log2(fl / 16777216 + 1) + 1)
+			if ft > 86400 * 14:
+				ft = 86400 * 14
 			if utc() - self.time > ft:
 				self.destroy()
 

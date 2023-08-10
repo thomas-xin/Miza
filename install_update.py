@@ -129,7 +129,7 @@ if os.name == "nt" and os.environ.get("AI_FEATURES", True):
 if os.environ.get("AI_FEATURES", True):
 	try:
 		assert pkg_resources.get_distribution("encodec").version >= "0.1.2a3"
-	except pkg_resources.DistributionNotFound, AssertionError:
+	except (pkg_resources.DistributionNotFound, AssertionError):
 		subprocess.run([python, "-m", "pip", "install", "git+https://github.com/facebookresearch/encodec", "--user"])
 
 print("Installer terminated.")

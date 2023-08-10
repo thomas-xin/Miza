@@ -1070,6 +1070,7 @@ transform: translate(-50%, -50%);
 		return data
 
 	@cp.expose
+	@cp.tools.accept(media="multipart/form-data")
 	@hostmap
 	def encodec(self, url, bitrate="24k", inference=False):
 		cp.response.headers.update(SHEADERS)
@@ -1094,6 +1095,9 @@ transform: translate(-50%, -50%);
 			f = open(out, "rb")
 			return cp.lib.static.serve_fileobj(f, content_type="audio/ecdc", disposition="", name=url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0] + ".ecdc")
 		if inference in ("None", "none", None):
+			if cp.request.body:
+				with open(out, "wb") as f:
+					shutil.copyfileobj(cp.request.body.fp, f, 65536)
 			return b""
 		t = ts_us()
 		fn = f"cache/{t}"
