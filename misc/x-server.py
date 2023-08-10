@@ -1069,6 +1069,7 @@ transform: translate(-50%, -50%);
 		cp.response.headers["ETag"] = create_etag(data)
 		return data
 
+	ecdc_running = set()
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
 	@hostmap
@@ -1084,6 +1085,8 @@ transform: translate(-50%, -50%);
 		if not os.path.exists(cachedir + "/ecdc"):
 			os.mkdir(cachedir + "/ecdc")
 		out = cachedir + "/ecdc/!" + shash(url) + "~" + br + ".ecdc"
+		while out in self.ecdc_running:
+			time.sleep(1)
 		try:
 			if inference in ("True", "true", True):
 				raise KeyError
@@ -1101,24 +1104,28 @@ transform: translate(-50%, -50%);
 					with open(out, "wb") as f:
 						f.write(b)
 			return b""
-		t = ts_us()
-		fn = f"cache/{t}"
-		with reqs.next().get(url, stream=True) as resp:
-			with open(fn, "wb") as f:
-				shutil.copyfileobj(resp.raw, f, 65536)
-		mime = get_mime(fn)
-		if mime != "audio/wav":
-			fn2 = f"{fn}.wav"
-			print(mime)
-			args = ["ffmpeg", "-hide_banner", "-v", "error", "-i", fn, fn2]
+		self.ecdc_running.add(out)
+		try:
+			t = ts_us()
+			fn = f"cache/{t}"
+			with reqs.next().get(url, stream=True) as resp:
+				with open(fn, "wb") as f:
+					shutil.copyfileobj(resp.raw, f, 65536)
+			mime = get_mime(fn)
+			if mime != "audio/wav":
+				fn2 = f"{fn}.wav"
+				print(mime)
+				args = ["ffmpeg", "-hide_banner", "-v", "error", "-i", fn, fn2]
+				subprocess.run(args)
+				fn = fn2
+			# out = fn.rsplit(".", 1)[0] + ".ecdc"
+			args = [python, "-m", "encodec", "-b", br, "--hq", fn, out]
 			subprocess.run(args)
-			fn = fn2
-		# out = fn.rsplit(".", 1)[0] + ".ecdc"
-		args = [python, "-m", "encodec", "-b", br, "--hq", fn, out]
-		subprocess.run(args)
-		assert os.path.exists(out)
-		f = open(out, "rb")
-		return cp.lib.static.serve_fileobj(f, content_type="audio/ecdc", disposition="", name=url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0] + ".ecdc")
+			assert os.path.exists(out)
+			f = open(out, "rb")
+			return cp.lib.static.serve_fileobj(f, content_type="audio/ecdc", disposition="", name=url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0] + ".ecdc")
+		finally:
+			self.ecdc_running.discard(out)
 
 	@cp.expose
 	@hostmap
@@ -1127,6 +1134,8 @@ transform: translate(-50%, -50%);
 		if isinstance(url, list):
 			url = url[0]
 		out = "cache/!" + shash(url) + "~." + fmt
+		while out in self.ecdc_running:
+			time.sleep(1)
 		try:
 			if not os.path.exists(out) or not os.path.getsize(out):
 				raise KeyError
@@ -1135,17 +1144,21 @@ transform: translate(-50%, -50%);
 		else:
 			f = open(out, "rb")
 			return cp.lib.static.serve_fileobj(f, content_type=f"audio/{fmt}", disposition="", name=url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0] + ".wav")
-		t = ts_us()
-		fn = f"cache/{t}.ecdc"
-		with reqs.next().get(url, stream=True) as resp:
-			with open(fn, "wb") as f:
-				shutil.copyfileobj(resp.raw, f, 65536)
-		# out = fn.rsplit(".", 1)[0] + ".wav"
-		args = [python, "-m", "encodec", "-r", fn, out]
-		subprocess.run(args)
-		assert os.path.exists(out)
-		f = open(out, "rb")
-		return cp.lib.static.serve_fileobj(f, content_type=f"audio/{fmt}", disposition="", name=url.rsplit("/", 1)[-1].split("?", 1)[0] + ".wav")
+		self.ecdc_running.add(out)
+		try:
+			t = ts_us()
+			fn = f"cache/{t}.ecdc"
+			with reqs.next().get(url, stream=True) as resp:
+				with open(fn, "wb") as f:
+					shutil.copyfileobj(resp.raw, f, 65536)
+			# out = fn.rsplit(".", 1)[0] + ".wav"
+			args = [python, "-m", "encodec", "-r", fn, out]
+			subprocess.run(args)
+			assert os.path.exists(out)
+			f = open(out, "rb")
+			return cp.lib.static.serve_fileobj(f, content_type=f"audio/{fmt}", disposition="", name=url.rsplit("/", 1)[-1].split("?", 1)[0] + ".wav")
+		finally:
+			self.ecdc_running.discard(out)
 
 	@cp.expose
 	@hostmap
