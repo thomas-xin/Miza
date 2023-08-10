@@ -4773,7 +4773,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						if "channel_id" not in ref:
 							ref["channel_id"] = d["channel_id"]
 						if "guild_id" not in ref:
-							if hasattr(channel, "guild"):
+							if getattr(channel, "guild", None):
 								ref["guild_id"] = channel.guild.id
 						if d.get("referenced_message"):
 							m = d["referenced_message"]
