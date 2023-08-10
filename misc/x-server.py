@@ -1071,7 +1071,7 @@ transform: translate(-50%, -50%);
 
 	@cp.expose
 	@hostmap
-	def encodec(self, url, bitrate="24k"):
+	def encodec(self, url, bitrate="24k", inference=False):
 		cp.response.headers.update(SHEADERS)
 		if isinstance(url, list):
 			url = url[0]
@@ -1084,6 +1084,8 @@ transform: translate(-50%, -50%);
 			os.mkdir(cachedir + "/ecdc")
 		out = cachedir + "/ecdc/!" + shash(url) + "~" + br + ".ecdc"
 		try:
+			if inference in ("True", "true", True):
+				raise KeyError
 			if not os.path.exists(out) or not os.path.getsize(out):
 				raise KeyError
 		except KeyError:
@@ -1091,6 +1093,8 @@ transform: translate(-50%, -50%);
 		else:
 			f = open(out, "rb")
 			return cp.lib.static.serve_fileobj(f, content_type="audio/ecdc", disposition="", name=url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0] + ".ecdc")
+		if inference not in ("None", "none", None):
+			return b""
 		t = ts_us()
 		fn = f"cache/{t}"
 		with reqs.next().get(url, stream=True) as resp:
