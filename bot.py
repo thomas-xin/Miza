@@ -3280,7 +3280,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			prefix = self.prefix
 		else:
 			prefix = self.get_prefix(guild)
-		if not slash:
+		if getattr(user, "bot", None) and getattr(user, "webhook_id", None):
+			comm = ""
+			op = False
+		elif not slash:
 			op = False
 			comm = msg
 			# Mentioning the bot serves as an alias for the prefix.
