@@ -2756,7 +2756,25 @@ elif len(sys.argv) > 1 and sys.argv[1] == "2":
 	except ImportError:
 		pytesseract = None
 
-	VIT = VIT2 = None
+	VIT = VIT2 = True
+	def download_model():
+		device = "cpu"
+		if torch.cuda.device_count() > 1:
+			device = f"cuda:{determine_cuda(priority=False, major=7)[0]}"
+		elif torch.cuda.device_count():
+			device = "cuda"
+		config = Config(clip_model_name="ViT-H-14/laion2b_s32b_b79k", device=device)
+		config.apply_low_vram_defaults()
+		globals()["VIT"] = globals()["VIT2"] = Interrogator(config)
+		if torch.cuda.device_count() > 1:
+			device2 = f"cuda:{determine_cuda(priority=True, major=7)[0]}"
+			if device != device2:
+				config = Config(clip_model_name="ViT-H-14/laion2b_s32b_b79k", device=device2)
+				globals()["VIT2"] = Interrogator(config)
+		im = Image.new("RGB", (4, 4))
+		VIT.interrogate_fast(im)
+		pytesseract.image_to_string(im, config="--psm 1")
+	exc.submit(download_model)
 	def caption(im, best=False):
 		im = resize_max(im, 1536, "auto")
 		if im.mode != "RGB":
@@ -2770,28 +2788,10 @@ elif len(sys.argv) > 1 and sys.argv[1] == "2":
 		if best:
 			while VIT2 is True:
 				time.sleep(0.5)
-			if not VIT2:
-				globals()["VIT2"] = True
-				config = Config(clip_model_name="ViT-H-14/laion2b_s32b_b79k")
-				config.apply_low_vram_defaults()
-				if torch.cuda.device_count() > 1:
-					config.device = f"cuda:{determine_cuda(priority=True, major=7)[0]}"
-				elif torch.cuda.device_count():
-					config.device = "cuda"
-				globals()["VIT2"] = Interrogator(config)
 			p1 = VIT2.interrogate(image)
 		else:
 			while VIT is True:
 				time.sleep(0.5)
-			if not VIT:
-				globals()["VIT"] = True
-				config = Config(clip_model_name="ViT-H-14/laion2b_s32b_b79k")
-				config.apply_low_vram_defaults()
-				if torch.cuda.device_count() > 1:
-					config.device = f"cuda:{determine_cuda(priority=False, major=7)[0]}"
-				elif torch.cuda.device_count():
-					config.device = "cuda"
-				globals()["VIT"] = Interrogator(config)
 			p1 = VIT.interrogate_fast(image)
 		enc = tiktoken.get_encoding("cl100k_base")
 		out = []
