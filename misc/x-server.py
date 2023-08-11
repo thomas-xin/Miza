@@ -1108,7 +1108,7 @@ transform: translate(-50%, -50%);
 		try:
 			t = ts_us()
 			fn = f"cache/{t}"
-			with reqs.next().get(url, stream=True) as resp:
+			with reqs.next().get(url, timeout=1800, stream=True) as resp:
 				with open(fn, "wb") as f:
 					shutil.copyfileobj(resp.raw, f, 65536)
 			mime = get_mime(fn)
@@ -1148,7 +1148,7 @@ transform: translate(-50%, -50%);
 		try:
 			t = ts_us()
 			fn = f"cache/{t}.ecdc"
-			with reqs.next().get(url, stream=True) as resp:
+			with reqs.next().get(url, timeout=1800, stream=True) as resp:
 				with open(fn, "wb") as f:
 					shutil.copyfileobj(resp.raw, f, 65536)
 			# out = fn.rsplit(".", 1)[0] + ".wav"
@@ -1220,8 +1220,12 @@ transform: translate(-50%, -50%);
 			# cp.response.headers["Content-Type"] = f"audio/{fmt[1:]}"
 			return cp.lib.static.serve_fileobj(f, content_type=f"audio/{fmt[1:]}", disposition="attachment" if d else "", name=name + fmt)
 		else:
-			count = 1 if is_url(q) else 10
-			res = self.bot_exec(f"[VOICE.copy_entry(e) for e in VOICE.ytdl.search({repr(q)},count={count})]")
+			count = 1 if is_url(q) else kwargs.get("count", 10)
+			res = self.bot_exec(f"[VOICE.copy_entry(e) for e in VOICE.ytdl.search({repr(q)},count={count}) if isinstance(e, dict)]")
+			if not res:
+				res = self.bot_exec(f"VOICE.ytdl.search({repr(q)},count={count})")
+				if isinstance(res, str):
+					res = evalEX(res)
 		cp.response.headers.update(CHEADERS)
 		cp.response.headers["Content-Type"] = "application/json"
 		return orjson.dumps(res)
