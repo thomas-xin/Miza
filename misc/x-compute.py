@@ -2763,13 +2763,13 @@ elif len(sys.argv) > 1 and sys.argv[1] == "2":
 			device = f"cuda:{determine_cuda(priority=False, major=7)[0]}"
 		elif torch.cuda.device_count():
 			device = "cuda"
-		config = Config(clip_model_name="ViT-H-14/laion2b_s32b_b79k", device=device)
+		config = Config(clip_model_name="ViT-H-14/laion2b_s32b_b79k", clip_model_path="misc/Clip", device=device)
 		config.apply_low_vram_defaults()
 		globals()["VIT"] = globals()["VIT2"] = Interrogator(config)
 		if torch.cuda.device_count() > 1:
 			device2 = f"cuda:{determine_cuda(priority=True, major=7)[0]}"
 			if device != device2:
-				config = Config(clip_model_name="ViT-H-14/laion2b_s32b_b79k", device=device2)
+				config = Config(clip_model_name="ViT-H-14/laion2b_s32b_b79k", clip_model_path="misc/Clip", device=device2)
 				globals()["VIT2"] = Interrogator(config)
 		im = Image.new("RGB", (4, 4))
 		VIT.interrogate_fast(im)
