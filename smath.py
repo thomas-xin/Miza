@@ -224,7 +224,7 @@ eval_const = {
 }
 
 # Not completely safe, but much safer than regular eval
-safe_eval = lambda s: eval(as_str(s).replace("__", ""), {}, eval_const)
+safe_eval = lambda s: eval(as_str(s).replace("__", ""), {}, eval_const) if not isnumeric(s) else int(s)
 
 null = None
 i = I = j = J = 1j
