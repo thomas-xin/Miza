@@ -1142,7 +1142,7 @@ class Bot:
 				import bitsandbytes
 			except ImportError:
 				bitsandbytes = None
-			buffer = 1.2
+			buffer = 1.3
 			if model == "pygmalion-13b":
 				m = "TehVenom/Pygmalion-13b-Merged"
 				req = 13
@@ -1156,15 +1156,15 @@ class Bot:
 				# m = "Panchovix/Wizard-Vicuna-30B-Uncensored-lxctx-PI-16384-LoRA-fp16"
 				m = "ehartford/Wizard-Vicuna-30B-Uncensored"
 				req = 33
-				buffer = 1.3
+				buffer = 1.5
 			elif model == "gplatty-30b":
 				m = "Panchovix/GPlatty-30B-lxctx-PI-16384-LoRA-fp16"
 				req = 33
-				buffer = 1.3
+				buffer = 1.5
 			else:
 				m = "Henk717/airochronos-33B"
 				req = 33
-				buffer = 1.3
+				buffer = 1.5
 			try:
 				tokenizer, model = self.models[m]
 			except KeyError:

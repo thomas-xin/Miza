@@ -2567,14 +2567,14 @@ def backup_model(cls, model, force=False, **kwargs):
 		pass
 	if force:
 		try:
-			return cls(model, **kwargs)
+			return cls(model, resume_download=True, **kwargs)
 		except Exception as ex:
 			ex2 = ex
 	else:
 		try:
-			return cls(model, local_files_only=True, **kwargs)
+			return cls(model, local_files_only=True, resume_download=True, **kwargs)
 		except:
-			fut = exc.submit(cached_model, cls, model, **kwargs)
+			fut = exc.submit(cached_model, cls, model, resume_download=True, **kwargs)
 			try:
 				return fut.result(timeout=24)
 			except Exception as ex:

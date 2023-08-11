@@ -2288,15 +2288,17 @@ async def proc_communicate(proc):
 async def proc_distribute(proc):
 	bot = BOT[0]
 	tasks = ()
+	executed = False
 	while True:
 		with tracebacksuppressor:
 			if not is_strict_running(proc):
 				return
 			if not tasks:
 				try:
-					await asyncio.wait_for(wrap_future(proc.fut), timeout=2)
+					await asyncio.wait_for(wrap_future(proc.fut), timeout=60)
 				except (T0, T1, T2):
-					pass
+					if proc.cap >= 3 and executed:
+						return create_task(start_proc("compute", proc.i))
 				else:
 					proc.fut = concurrent.futures.Future()
 				tasks = bot.distribute([proc.cap], [proc.pwr], {}, {})
@@ -2312,6 +2314,7 @@ async def proc_distribute(proc):
 					newtasks.extend(bot.distribute([proc.cap], [proc.pwr], {}, {i: ex}))
 				else:
 					newtasks.extend(bot.distribute([proc.cap], [proc.pwr], {}, {i: resp}))
+				executed = True
 			tasks = newtasks
 		await asyncio.sleep(0.01)
 
@@ -2338,6 +2341,8 @@ if COMPUTE_LOAD:
 	print("Compute load distribution:", COMPUTE_LOAD)
 
 async def start_proc(k, i):
+	if k in PROCS and is_strict_running(PROCS[k][i]):
+		force_kill(PROCS[k][i])
 	args = list(proc_args[k])
 	args.append(str(i))
 	args.append(orjson.dumps(COMPUTE_LOAD).decode("ascii"))
@@ -2382,7 +2387,7 @@ def proc_start():
 		PROCS[k] = [None] * v
 		for i in range(v):
 			if i >= 3:
-				if torch.cuda.get_device_properties(i - 3).total_memory <= 15 * 1073741824 or COMPUTE_POT[i - 3] < 1000000:
+				if torch.cuda.get_device_properties(i - 3).total_memory <= 11 * 1073741824 or COMPUTE_POT[i - 3] < 500000:
 					continue
 				if COMPUTE_LOAD[i - 3] < 0.75 / len(COMPUTE_LOAD):
 					continue

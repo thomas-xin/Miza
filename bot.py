@@ -4277,7 +4277,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							it = int(utc() // 3) * 3
 							interval = 86400 * 7
 							if it not in uptime:
-								uptime[it] = data.copy()
+								uptime[it] = copy.deepcopy(data)
 								sl = sorted(uptime)
 								while sl[0] <= it - interval:
 									uptime.pop(sl.pop(0), None)
