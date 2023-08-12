@@ -2650,7 +2650,7 @@ class AudioDownloader:
                 h = shash(url + ("~S" * silenceremove))
                 fn = "cache/~" + h + ".webm"
                 if not os.path.exists(fn):
-                    b = await_fut(process_image("ytdl", "$", [urls[0], True], fix=(0, 2), timeout=600))
+                    b = await_fut(process_image("ytdl", "$", [urls[0], True], fix=choice(0, 2), timeout=600))
                     with open(fn, "wb") as f:
                         f.write(b)
                 out = "cache/~" + h + "." + fmt
