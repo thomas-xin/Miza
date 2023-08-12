@@ -100,17 +100,20 @@ if __name__ != "__main__" and os.path.exists("auth.json"):
 
 if keep:
 	try:
-		import torch, cpuinfo, psutil
-		if DC and not torch.cuda.is_available():
-			raise ImportError
+		import cpuinfo, psutil
+		if DC:
+			import torch
+			if not torch.cuda.is_available():
+				raise ImportError
 	except ImportError:
 		subprocess.run([sys.executable, "-m", "pip", "install", "py-cpuinfo", "--upgrade", "--user"])
 		subprocess.run([sys.executable, "-m", "pip", "install", "psutil", "--upgrade", "--user"])
 		if DC:
 			subprocess.run([sys.executable, "-m", "pip", "install", "torch", "--index-url", "https://download.pytorch.org/whl/cu118", "--upgrade", "--user"])
-		else:
-			subprocess.run([sys.executable, "-m", "pip", "install", "torch", "--upgrade", "--user"])
-		import torch, cpuinfo, psutil
+			import torch
+		# else:
+		# 	subprocess.run([sys.executable, "-m", "pip", "install", "torch", "--upgrade", "--user"])
+		import cpuinfo, psutil
 
 	try:
 		import pkg_resources

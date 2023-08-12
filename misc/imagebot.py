@@ -13,7 +13,7 @@ def print(*args, sep=" ", end="\n"):
 	b = s.encode("utf-8")
 	return sys.stdout.buffer.write(b)
 
-if torch.cuda.is_available():
+if torch and torch.cuda.is_available():
 	try:
 		torch.cuda.set_enabled_lms(True)
 	except AttributeError:
@@ -197,7 +197,7 @@ def update():
 			return_driver(d)
 
 def determine_cuda(mem=1, priority=None, multi=False, major=0):
-	if not torch.cuda.is_available():
+	if not torch or not torch.cuda.is_available():
 		if multi:
 			return [-1], torch.float32
 		return -1, torch.float32

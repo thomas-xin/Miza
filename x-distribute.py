@@ -48,6 +48,10 @@ req = [
 	"mpmath",
 	"matplotlib",
 	"yt-dlp",
+	"tiktoken",
+	"sentence_transformers",
+	"pytesseract",
+	"clip_interrogator",
 ]
 import pkg_resources
 for mn in req:

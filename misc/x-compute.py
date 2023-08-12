@@ -853,7 +853,7 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
 		command = ["./ffmpeg", "-threads", "2", "-hide_banner", "-nostdin", "-v", "error", "-y", "-hwaccel", hwaccel]
 		if hwaccel == "cuda":
 			if out.endswith(".webm"):
-				devid = random.choice([i for i in range(ceil(torch.cuda.device_count() / 2)) if (torch.cuda.get_device_properties(i).major, torch.cuda.get_device_properties(i).major) >= (8, 9)])
+				devid = random.choice([i for i in range(torch.cuda.device_count()) if (torch.cuda.get_device_properties(i).major, torch.cuda.get_device_properties(i).minor) >= (8, 9)])
 			else:
 				devid = random.randint(0, ceil(torch.cuda.device_count() / 2))
 			command.extend(("-hwaccel_device", str(devid)))
@@ -2818,7 +2818,7 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 elif len(sys.argv) > 1 and sys.argv[1] == "2":
 
 	def determine_cuda(mem=1, priority=None, multi=False, major=0):
-		if not torch.cuda.is_available():
+		if not torch or not torch.cuda.is_available():
 			if multi:
 				return [-1], torch.float32
 			return -1, torch.float32
@@ -2870,10 +2870,11 @@ elif len(sys.argv) > 1 and sys.argv[1] == "2":
 	VIT = VIT2 = True
 	def download_model():
 		device = "cpu"
-		if torch.cuda.device_count() > 1:
-			device = f"cuda:{determine_cuda(priority=False, major=7)[0]}"
-		elif torch.cuda.device_count():
-			device = "cuda"
+		if torch:
+			if torch.cuda.device_count() > 1:
+				device = f"cuda:{determine_cuda(priority=False, major=7)[0]}"
+			elif torch.cuda.device_count():
+				device = "cuda"
 		config = Config(
 			clip_model_name="ViT-H-14/laion2b_s32b_b79k",
 			clip_model_path="misc/Clip",
@@ -2883,7 +2884,7 @@ elif len(sys.argv) > 1 and sys.argv[1] == "2":
 		)
 		config.apply_low_vram_defaults()
 		globals()["VIT"] = globals()["VIT2"] = Interrogator(config)
-		if torch.cuda.device_count() > 1:
+		if torch and torch.cuda.device_count() > 1:
 			device2 = f"cuda:{determine_cuda(priority=True, major=7)[0]}"
 			if device != device2:
 				config = Config(
@@ -3352,7 +3353,7 @@ def evalImg(url, operation, args):
 				command = ["./ffmpeg", "-threads", "2", "-hide_banner", "-v", "error", "-y", "-hwaccel", hwaccel]
 				if hwaccel == "cuda":
 					if mode == "RGBA":
-						devid = random.choice([i for i in range(ceil(torch.cuda.device_count() / 2)) if (torch.cuda.get_device_properties(i).major, torch.cuda.get_device_properties(i).major) >= (8, 9)])
+						devid = random.choice([i for i in range(torch.cuda.device_count()) if (torch.cuda.get_device_properties(i).major, torch.cuda.get_device_properties(i).minor) >= (8, 9)])
 					else:
 						devid = random.randint(0, ceil(torch.cuda.device_count() / 2))
 					command.extend(("-hwaccel_device", str(devid)))
