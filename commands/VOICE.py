@@ -2315,7 +2315,7 @@ class AudioDownloader:
         # Use SHA-256 hash of URL to avoid filename conflicts
         url = entry["url"]
         url = re.sub(r"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=", "https://youtu.be/", url)
-        h = shash(entry["url"])
+        h = shash(url)
         if type(download) is str:
             fn = "~" + h + download
         else:
