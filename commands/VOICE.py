@@ -2661,7 +2661,7 @@ class AudioDownloader:
                     if fmt == "mp3":
                         args.extend(("-b:a", "196608", out))
                     elif fmt == "ogg":
-                        args.extend(("-b:a", "131072", out))
+                        args.extend(("-c:a", "copy", out))
                     elif fmt == "wav":
                         args.extend(("-ar", SAMPLE_RATE, "-ac", 2, out))
                     elif fmt == "pcm":
@@ -2907,11 +2907,6 @@ class AudioDownloader:
                 if len(ast) > 1:
                     ress = []
                     futs = []
-                    try:
-                        concurrent = len(self.bot.status_data["system"]["cpu"]) * 8
-                    except:
-                        print_exc()
-                        concurrent = 8
                     for i, info in enumerate(ast):
                         t = i + ts + 1
                         cfn = None
@@ -2919,7 +2914,12 @@ class AudioDownloader:
                             url = info.get("url")
                         else:
                             url = info
-                        if len(futs) >= concurrent:
+                        try:
+                            concurrent = len(self.bot.status_data["system"]["cpu"]) * 8
+                        except:
+                            print_exc()
+                            concurrent = 8
+                        while len(futs) >= concurrent:
                             with tracebacksuppressor:
                                 cfn = futs.pop(0).result(timeout=600)[0]
                                 print(cfn)
@@ -2935,16 +2935,13 @@ class AudioDownloader:
                     with open(concf, "w", encoding="utf-8") as f:
                         for cfn in ress:
                             f.write(f"file '{cfn.split('/', 1)[-1]}'\n")
-                    temp = args
-                    i = temp.index("-i")
                     args = [
                         "./ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
                         "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets",
                         "-protocol_whitelist", "concat,tls,tcp,file,fd,http,https",
-                        "-to", str(odur), "-f", "concat", "-safe", "0",
-                        "-i", concf,
+                        "-to", str(odur), "-f", "concat", "-safe", "0", "-vn",
+                        "-i", concf, "-c:a", "copy", fn,
                     ]
-                    args.extend(temp[i + 1:])
                     print(args)
                     proc = psutil.Popen(args)
                     with suppress():
