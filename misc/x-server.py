@@ -1160,6 +1160,7 @@ transform: translate(-50%, -50%);
 		finally:
 			self.ecdc_running.discard(out)
 
+	ydl_sems = {}
 	@cp.expose
 	@hostmap
 	def ytdl(self, **kwargs):
@@ -1174,50 +1175,54 @@ transform: translate(-50%, -50%);
 		while t in RESPONSES:
 			t += 1
 		if v:
-			fmt = kwargs.get("fmt")
-			if not fmt:
-				fmt = "opus" if d else "webm"
-			if fmt == "weba":
-				fmt = "webm"
-			if fmt not in ("mp3", "opus", "webm", "ogg", "wav"):
-				raise TypeError(fmt)
-			fmt = "." + fmt
-			self.bot_exec(f"bot.audio.returns[{t}]=VOICE.ytdl.search({repr(q)})[0]")
-			stream = self.bot_exec(f"VOICE.ytdl.get_stream(bot.audio.returns[{t}],force=True,download=False)")
-			if fmt in ("webm", "weba"):
-				raise cp.HTTPRedirect(stream, status="307")
-			name, url = self.bot_exec(f"(bot.audio.returns[{t}].get('name'),bot.audio.returns[{t}].get('url'))")
-			if not name or not url:
-				raise FileNotFoundError(500, v)
-			h = shash(url)
-			fn = "~" + h + fmt
-			self.bot_exec(f"bot.audio.returns[{t}]=VOICE.ytdl.get_stream(bot.audio.returns[{t}],download={repr(fmt)},asap=True)")
-			fni = "cache/" + fn
+			ip = true_ip()
+			sem = self.ydl_sems.setdefault(ip, Semaphore(64, 256, rate_limit=8))
+			asap = not sem.active
+			with sem:
+				fmt = kwargs.get("fmt")
+				if not fmt:
+					fmt = "opus" if d else "webm"
+				if fmt == "weba":
+					fmt = "webm"
+				if fmt not in ("mp3", "opus", "webm", "ogg", "wav"):
+					raise TypeError(fmt)
+				fmt = "." + fmt
+				self.bot_exec(f"bot.audio.returns[{t}]=VOICE.ytdl.search({repr(q)})[0]")
+				stream = self.bot_exec(f"VOICE.ytdl.get_stream(bot.audio.returns[{t}],force=True,download=False)")
+				if fmt in ("webm", "weba"):
+					raise cp.HTTPRedirect(stream, status="307")
+				name, url = self.bot_exec(f"(bot.audio.returns[{t}].get('name'),bot.audio.returns[{t}].get('url'))")
+				if not name or not url:
+					raise FileNotFoundError(500, v)
+				h = shash(url)
+				fn = "~" + h + fmt
+				self.bot_exec(f"bot.audio.returns[{t}]=VOICE.ytdl.get_stream(bot.audio.returns[{t}],download={repr(fmt)},asap={asap})")
+				fni = "cache/" + fn
 
-			def af():
-				if not os.path.exists(fni):
-					return
-				if not os.path.getsize(fni):
-					return
-				try:
-					res = self.bot_exec(f"bool(getattr(bot.audio.returns[{t}], 'loaded', None))")
-				except:
-					print_exc()
-					return True
-				return res is not False
+				def af():
+					if not os.path.exists(fni):
+						return
+					if not os.path.getsize(fni):
+						return
+					try:
+						res = self.bot_exec(f"bool(getattr(bot.audio.returns[{t}], 'loaded', None))")
+					except:
+						print_exc()
+						return True
+					return res is not False
 
-			cp.response.headers.update(CHEADERS)
-			if af():
-				f = open(fni, "rb")
-			else:
-				f = DownloadingFile(fni, af=af)
-				if d:
-					cp.response.status = 202
-				cp.response.headers["Content-Type"] = f"audio/{fmt[1:]}"
-				cp.response.headers["Content-Disposition"] = "attachment; " * bool(d) + "filename=" + json.dumps(name + fmt)
-				cp.response.headers.pop("Accept-Ranges", None)
-				return cp.lib.file_generator(f, 262144)
-			# cp.response.headers["Content-Type"] = f"audio/{fmt[1:]}"
+				cp.response.headers.update(CHEADERS)
+				if af():
+					f = open(fni, "rb")
+				else:
+					f = DownloadingFile(fni, af=af)
+					if d:
+						cp.response.status = 202
+					cp.response.headers["Content-Type"] = f"audio/{fmt[1:]}"
+					cp.response.headers["Content-Disposition"] = "attachment; " * bool(d) + "filename=" + json.dumps(name + fmt)
+					cp.response.headers.pop("Accept-Ranges", None)
+					return cp.lib.file_generator(f, 262144)
+				# cp.response.headers["Content-Type"] = f"audio/{fmt[1:]}"
 			return cp.lib.static.serve_fileobj(f, content_type=f"audio/{fmt[1:]}", disposition="attachment" if d else "", name=name + fmt)
 		else:
 			count = 1 if is_url(q) else kwargs.get("count", 10)

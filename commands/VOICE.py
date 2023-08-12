@@ -2624,6 +2624,7 @@ class AudioDownloader:
             ctx = emptyctx
         else:
             ctx = self.download_sem
+        ofmt = fmt
         with ctx:
             # Select a filename based on current time to avoid conflicts
             if fmt[:3] == "mid":
@@ -2646,7 +2647,7 @@ class AudioDownloader:
             if rename and os.path.exists(rename) and os.path.getsize(rename):
                 return rename, rename
             if len(urls) == 1 and is_url(urls[0]) and fmt in ("opus", "pcm", "wav", "mp3"):
-                h = shash(url)
+                h = shash(url + ("~S" * silenceremove))
                 fn = "cache/~" + h + ".webm"
                 if not os.path.exists(fn):
                     b = await_fut(process_image("ytdl", "$", [urls[0], True], fix=(0, 2), timeout=600))
@@ -2899,14 +2900,15 @@ class AudioDownloader:
                     elif fmt == "webm":
                         args.extend(("-c:v", "av1_nvenc"))
                 args.extend(("-f", fmt, fn))
-            print(args)
             try:
                 if len(ast) > 1:
-                    proc = psutil.Popen(args, stdin=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1048576)
-                    with suppress():
-                        message.__dict__.setdefault("inits", []).append(proc)
                     ress = []
                     futs = []
+                    try:
+                        concurrent = len(self.bot.status_data["system"]["cpu"]) * 8
+                    except:
+                        print_exc()
+                        concurrent = 8
                     for i, info in enumerate(ast):
                         t = i + ts + 1
                         cfn = None
@@ -2914,45 +2916,39 @@ class AudioDownloader:
                             url = info.get("url")
                         else:
                             url = info
-                        if len(futs) >= 8:
+                        if len(futs) >= concurrent:
                             with tracebacksuppressor:
-                                for i, fut in enumerate(futs):
-                                    if futs[i].done():
-                                        cfn = futs.pop(i).result()[0]
-                                        break
-                                else:
-                                    cfn = futs.pop(0).result(timeout=600)[0]
+                                cfn = futs.pop(0).result(timeout=600)[0]
                                 print(cfn)
                                 ress.append(cfn)
-                        fut = create_future_ex(self.download_file, url, "pcm", auds=None, ts=t, child=True, silenceremove=silenceremove, message=message, timeout=720, rename=f"cache/C{shash(url + '1' * silenceremove)}.pcm")
+                        fut = create_future_ex(self.download_file, url, ofmt, auds=None, ts=t, child=True, silenceremove=silenceremove, message=message, timeout=720)
                         futs.append(fut)
                     for fut in futs:
                         with tracebacksuppressor:
                             cfn = fut.result(timeout=600)[0]
                             print(cfn)
                             ress.append(cfn)
-                    for cfn in ress:
-                        if cfn and os.path.exists(cfn):
-                            if os.path.getsize(cfn):
-                                with open(cfn, "rb") as f:
-                                    while True:
-                                        b = f.read(1048576)
-                                        if not b:
-                                            break
-                                        try:
-                                            proc.stdin.write(b)
-                                        except OSError:
-                                            print_exc()
-                                            print(proc.stderr.read())
-                                            break
-                            with suppress():
-                                os.remove(cfn)
-                            if not proc.is_running():
-                                break
-                    proc.stdin.flush()
-                    proc.stdin.close()
+                    concf = f"cache/{ts}~concat.txt"
+                    with open(concf, "w", encoding="utf-8") as f:
+                        for cfn in ress:
+                            f.write(f"file '{cfn.split('/', 1)[-1]}'\n")
+                    temp = args
+                    i = temp.index("-i")
+                    args = [
+                        "./ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                        "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets",
+                        "-protocol_whitelist", "concat,tls,tcp,file,fd,http,https",
+                        "-to", str(odur), "-f", "concat", "-safe", "0",
+                        "-i", concf,
+                    ]
+                    args.extend(temp[i + 1:])
+                    print(args)
+                    proc = psutil.Popen(args)
+                    with suppress():
+                        message.__dict__.setdefault("inits", []).append(proc)
                     proc.wait()
                 else:
+                    print(args)
                     proc = psutil.Popen(args, stderr=subprocess.PIPE)
                     proc.wait()
             except subprocess.CalledProcessError as ex:
@@ -2996,7 +2992,7 @@ class AudioDownloader:
                             "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets",
                             "-protocol_whitelist", "concat,tls,tcp,file,fd,http,https",
                             "-to", str(odur), "-f", "concat", "-safe", "0",
-                            "-i", loopf, "-c", "copy", fn
+                            "-i", loopf, "-c", "copy", fn,
                         ]
                         print(args)
                         try:
