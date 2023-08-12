@@ -2647,13 +2647,15 @@ class AudioDownloader:
             if rename and os.path.exists(rename) and os.path.getsize(rename):
                 return rename, rename
             if len(urls) == 1 and is_url(urls[0]) and fmt in ("opus", "pcm", "wav", "mp3", "ogg"):
-                h = shash(url + ("~S" * silenceremove))
+                h = shash(url)
                 fn = "cache/~" + h + ".webm"
+                out2 = "cache/~" + h + ".opus"
                 if not os.path.exists(fn):
                     b = await_fut(process_image("ytdl", "$", [urls[0], True], fix=choice(0, 2), timeout=600))
                     with open(fn, "wb") as f:
                         f.write(b)
-                out = "cache/~" + h + "." + fmt
+                h2 = shash(url + ("~S" * silenceremove))
+                out = "cache/~" + h2 + "." + fmt
                 if not os.path.exists(out):
                     args = [ffmpeg, "-hide_banner", "-v", "error", "-vn", "-i", fn]
                     if fmt == "mp3":
@@ -2669,7 +2671,6 @@ class AudioDownloader:
                 if args:
                     print(args)
                     subprocess.run(args)
-                out2 = "cache/~" + h + ".opus"
                 args = [ffmpeg, "-hide_banner", "-v", "error", "-vn", "-i", fn, "-c:a", "copy", out2]
                 if rename:
                     if os.path.exists(rename):
