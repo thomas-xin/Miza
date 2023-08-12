@@ -202,6 +202,8 @@ def yt_download(url, fmt="mp3", timeout=256):
 			elems = driver.find_elements(by=class_name, value="rounded-2xl")
 			if elems and elems[0].text.upper() == "CLOSE":
 				elems.clear()
+			if time.time() - t > timeout - 8:
+				raise TimeoutError("Button failed to load.")
 		if not os.path.exists(folder):
 			os.mkdir(folder)
 		driver.execute_script("document.getElementsByClassName('rounded-2xl')[0].click()")
@@ -217,7 +219,7 @@ def yt_download(url, fmt="mp3", timeout=256):
 		while not elems:
 			elems = [e for e in os.listdir(folder) if e.endswith(f".{fmt}")]
 			time.sleep(0.5)
-			if time.time() - t > timeout:
+			if time.time() - t > timeout - 8:
 				raise TimeoutError("Request timed out.")
 
 		ts = time.time_ns()

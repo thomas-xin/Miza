@@ -2294,10 +2294,11 @@ async def proc_distribute(proc):
 			if not is_strict_running(proc):
 				return
 			if not tasks:
+				out = 60 if proc.cap >= 3 else 1800
 				try:
 					await asyncio.wait_for(wrap_future(proc.fut), timeout=60)
 				except (T0, T1, T2):
-					if proc.cap >= 3 and executed:
+					if executed:
 						return create_task(start_proc("compute", proc.i))
 				else:
 					proc.fut = concurrent.futures.Future()
@@ -2435,17 +2436,6 @@ async def sub_submit(ptype, command, fix=None, pwr=None, _timeout=12):
 			continue
 	raise ex2
 
-last_sub = 0
-async def wait_sub():
-	globals()["last_sub"] = utc()
-	await asyncio.sleep(3600 * 8)
-	if utc() - last_sub < 3600 * 8:
-		return
-	globals()["last_sub"] = utc()
-	if any(proc.sem.busy for proc in PROCS.compute if proc):
-		return
-	return await create_future(sub_kill)
-
 def sub_kill(start=True, force=False):
 	for p in itertools.chain(*PROCS.values()):
 		if is_strict_running(p):
@@ -2513,9 +2503,6 @@ async def _sub_submit(ptype, command, fix=None, _timeout=12):
 			raise
 		finally:
 			PROC_RESP.pop(ts, None)
-	if SUB_WAITING:
-		SUB_WAITING.cancel()
-	globals()["SUB_WAITING"] = create_task(wait_sub())
 	return resp
 
 SUB_WAITING = None
