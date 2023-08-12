@@ -2661,6 +2661,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			gutil = [pynvml.nvmlDeviceGetUtilizationRates(d) for d in handles]
 			gpowa = [pynvml.nvmlDeviceGetPowerUsage(d) for d in handles]
 			gpowb = [pynvml.nvmlDeviceGetEnforcedPowerLimit(d) for d in handles]
+			gtempa = [pynvml.nvmlDeviceGetTemperature(d, 0) for d in handles]
+			gtempb = [pynvml.nvmlDeviceGetTemperatureThreshold(d, 0) for d in handles]
 		except:
 			gname = []
 		minfo = psutil.virtual_memory()
@@ -2706,6 +2708,15 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					count=1,
 					usage=gpowa[i] / 1000,
 					max=gpowb[i] / 1000,
+					time=t,
+				) for i, name in enumerate(gname)},
+			},
+			temperature={
+				**{f"{ip}-{i}": dict(
+					name=name,
+					count=1,
+					usage=gtempa[i],
+					max=gtempb[i],
 					time=t,
 				) for i, name in enumerate(gname)},
 			},
@@ -2783,6 +2794,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			disk={},
 			network={},
 			power={},
+			temperature={},
 		),
 		discord=cdict(),
 		misc=cdict(),
@@ -2975,7 +2987,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			expendable = sorted(expendable, key=lambda f: ((t - max(f.stat().st_atime, f.stat().st_mtime)) // 3600, f.stat().st_size), reverse=True)
 			if not expendable:
 				return 0
-			while stats.free < 81 * 1073741824 or len(expendable) > 4096 or (t - expendable[0].stat().st_atime) > 3600 * 12:
+			while stats.free < 81 * 1073741824 or len(expendable) > 8192 or (t - expendable[0].stat().st_atime) > 3600 * 12:
 				if not expendable:
 					break
 				with tracebacksuppressor:
@@ -3690,7 +3702,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			await self.react_callback(message, None, message.author)
 			out = orjson.dumps(list(message.response))
 		url = f"http://127.0.0.1:{PORT}/commands/{t}\x7f{after}"
-		await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, bypass=False, decode=True, aio=True, ssl=False)
+		await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, bypass=False, decode=True, aio=True, ssl=False, timeout=16)
 
 	@tracebacksuppressor
 	async def process_http_eval(self, t, proc):
@@ -3738,7 +3750,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				except typeError:
 					out = repr(dict(result=output))
 		# print(url, out)
-		await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, bypass=False, decode=True, aio=True, ssl=False)
+		await Request(url, data=out, method="POST", headers={"Content-Type": "application/json"}, bypass=False, decode=True, aio=True, ssl=False, timeout=16)
 
 	async def load_guild_http(self, guild):
 		_members = {}

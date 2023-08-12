@@ -1422,7 +1422,7 @@ class Bot:
 			if premium < 2:
 				stop = None
 			else:
-				stop = ["s an AI", "orry,", "cannot fulfill", "refrain"]
+				stop = ["s an AI", "Sorry,", "cannot fulfill", "refrain"]
 			response = None
 			data = dict(
 				model=model,
@@ -1791,10 +1791,6 @@ class Bot:
 		else:
 			res = asyncio.run(run_chatgpt(q))
 		if res:
-			# if not self.bl:
-			# 	print("ChatGPT response:", res)
-			# if len(self.gpttokens(res)) > 512:
-			# 	res = self.answer_summarise(q=res, max_length=500, min_length=256).strip()
 			errs = (
 				"Your ChatGPT session is not usable.",
 				"Failed to read response from ChatGPT.",

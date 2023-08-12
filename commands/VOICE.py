@@ -1282,61 +1282,63 @@ class AudioDownloader:
             self.spotify_header = {"authorization": f"Bearer {orjson.loads(token[:512])['accessToken']}"}
             self.other_x += 1
 
+    backup_sem = Semaphore(2, 256, rate_limit=1)
     # Gets data from yt-download.org, and adjusts the format to ensure compatibility with results from youtube-dl. Used as backup.
     def extract_backup(self, url, video=False):
-        url = verify_url(url)
-        if is_url(url) and not is_youtube_url(url):
-            with requests.head(url) as resp:
-                url = resp.url
-                name = url.rsplit("/", 1)[-1].rsplit(".", 1)[0]
-                ctype = resp.headers.get("Content-Type")
-                if ctype.startswith("video") or ctype.startswith("audio"):
-                    return dict(
-                        id=name,
-                        title=name,
-                        direct=True,
-                        url=url,
-                        webpage_url=url,
-                        extractor="generic",
-                    )
-                elif ctype == "application/octet-stream":
-                    dur = get_duration(url)
-                    d = dict(
-                        id=name,
-                        title=name,
-                        direct=True,
-                        url=url,
-                        webpage_url=url,
-                        extractor="generic",
-                    )
-                    if dur:
-                        d["duration"] = dur
-                    return d
-        if ":" in url:
-            url = url.rsplit("/", 1)[-1].split("v=", 1)[-1].split("&", 1)[0]
-        webpage_url = f"https://www.youtube.com/watch?v={url}"
-        if video:
-            title, stream = yt_download(webpage_url, fmt="mp4", timeout=720)
-            entry = dict(
-                formats=[dict(
-                    abr=1,
-                    url=stream,
-                    height=1080,
-                )],
-                title=title,
-                webpage_url=webpage_url,
-            )
-        else:
-            title, stream = yt_download(webpage_url, fmt="mp3", timeout=720)
-            entry = dict(
-                formats=[dict(
-                    abr=256,
-                    url=stream,
-                )],
-                duration=os.path.getsize(stream) / 256000 * 8,
-                title=title,
-                webpage_url=webpage_url,
-            )
+        with self.backup_sem:
+            url = verify_url(url)
+            if is_url(url) and not is_youtube_url(url):
+                with requests.head(url) as resp:
+                    url = resp.url
+                    name = url.rsplit("/", 1)[-1].rsplit(".", 1)[0]
+                    ctype = resp.headers.get("Content-Type")
+                    if ctype.startswith("video") or ctype.startswith("audio"):
+                        return dict(
+                            id=name,
+                            title=name,
+                            direct=True,
+                            url=url,
+                            webpage_url=url,
+                            extractor="generic",
+                        )
+                    elif ctype == "application/octet-stream":
+                        dur = get_duration(url)
+                        d = dict(
+                            id=name,
+                            title=name,
+                            direct=True,
+                            url=url,
+                            webpage_url=url,
+                            extractor="generic",
+                        )
+                        if dur:
+                            d["duration"] = dur
+                        return d
+            if ":" in url:
+                url = url.rsplit("/", 1)[-1].split("v=", 1)[-1].split("&", 1)[0]
+            webpage_url = f"https://www.youtube.com/watch?v={url}"
+            if video:
+                title, stream = yt_download(webpage_url, fmt="mp4", timeout=720)
+                entry = dict(
+                    formats=[dict(
+                        abr=1,
+                        url=stream,
+                        height=1080,
+                    )],
+                    title=title,
+                    webpage_url=webpage_url,
+                )
+            else:
+                title, stream = yt_download(webpage_url, fmt="mp3", timeout=720)
+                entry = dict(
+                    formats=[dict(
+                        abr=256,
+                        url=stream,
+                    )],
+                    duration=os.path.getsize(stream) / 256000 * 8,
+                    title=title,
+                    webpage_url=webpage_url,
+                )
         print("Successfully resolved with yt-download.")
         return entry
 
@@ -1690,7 +1692,7 @@ class AudioDownloader:
         return entries
 
     def ydl_errors(self, s):
-        return "this video has been removed" not in s and "private video" not in s and "has been terminated" not in s
+        return "this video has been removed" not in s and "private video" not in s and "has been terminated" not in s and ("Video unavailable" not in s or not self.backup_sem.active)
 
     blocked_yt = False
 
@@ -2612,7 +2614,7 @@ class AudioDownloader:
     emptybuff = b"\x00" * (48000 * 2 * 2)
     # codec_map = {}
     # For ~download
-    def download_file(self, url, fmt, start=None, end=None, auds=None, ts=None, copy=False, ar=SAMPLE_RATE, ac=2, size=None, container=None, child=False, silenceremove=False, message=None):
+    def download_file(self, url, fmt, start=None, end=None, auds=None, ts=None, copy=False, ar=SAMPLE_RATE, ac=2, size=None, container=None, child=False, silenceremove=False, message=None, rename=None):
         if child:
             ctx = emptyctx
         else:
@@ -2636,6 +2638,8 @@ class AudioDownloader:
             ast = deque()
             if not ts:
                 ts = ts_us()
+            if rename and os.path.exists(rename) and os.path.getsize(rename):
+                return rename, rename
             outf = None
             for url in urls:
                 if len(ast) > 1 and not vst:
@@ -2650,8 +2654,6 @@ class AudioDownloader:
                     print(url)
                     print_exc()
                     continue
-                if not (vid and info.get("video") and info["video"].startswith("https://www.yt-download.org/download/")):
-                    self.get_stream(info, video=vid, force=True, download=False)
                 if not outf:
                     outf = f"{info['name']}.{fmt}"
                     outft = outf.translate(filetrans)
@@ -2659,6 +2661,8 @@ class AudioDownloader:
                         fn = f"cache/C{ts}~{outft}"
                     else:
                         fn = f"cache/\x7f{ts}~{outft}"
+                if not (vid and info.get("video") and info["video"].startswith("https://www.yt-download.org/download/")):
+                    self.get_stream(info, video=vid, force=True, download=False)
                 if "yt_live_broadcast" in info["stream"] and "force_finished" in info["stream"]:
                     self.downloader.params["outtmpl"]["default"] = fn
                     self.downloader.download(info["url"])
@@ -2709,7 +2713,7 @@ class AudioDownloader:
                         copy = True
             else:
                 copy = False
-            args = alist((ffmpeg, "-nostdin", "-hide_banner", "-v", "error", "-hwaccel", hwaccel, "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y", "-protocol_whitelist", "file,http,https,tcp,tls"))
+            args = alist((ffmpeg, "-nostdin", "-hide_banner", "-v", "error", "-hwaccel", hwaccel, "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y", "-protocol_whitelist", "file,fd,http,https,tcp,tls"))
             if hwaccel == "cuda":
                 if "av1_nvenc" in args:
                     devid = random.choice([i for i in range(ceil(torch.cuda.device_count() / 2)) if (torch.cuda.get_device_properties(i).major, torch.cuda.get_device_properties(i).major) >= (8, 9)])
@@ -2758,6 +2762,11 @@ class AudioDownloader:
                 #     with tracebacksuppressor:
                 #         stream = proxy_download(stream, fii, timeout=86400)
                 asf = asc = stream
+            br = CustomAudio.max_bitrate
+            if auds and br > auds.stats.bitrate:
+                br = max(4096, auds.stats.bitrate)
+            sr = str(SAMPLE_RATE)
+            ac = "2"
             if not vst and not size:
                 args.append("-vn")
             elif fmt in ("gif", "apng", "webp"):
@@ -2780,6 +2789,12 @@ class AudioDownloader:
                     args.extend(("-ss", str(start)))
                 if end is not None:
                     args.extend(("-to", str(end)))
+            if asf == "-":
+                args.extend(("-f", "s16le"))
+            if not copy and len(ast) > 1:
+                args.extend(("-ar", sr, "-ac", ac))
+                if vst:
+                    args.extend(("-pix_fmt", "yuv420p", "-crf", "28"))
             args.extend(("-i", asf, "-map_metadata", "-1"))
             if auds:
                 args.extend(auds.construct_options(full=True))
@@ -2794,11 +2809,6 @@ class AudioDownloader:
                 if w != w2 or h != h2:
                     vf += f",pad=width={w2}:height={h2}:x=-1:y=-1:color=black"
                 args.extend(("-vf", vf))
-            br = CustomAudio.max_bitrate
-            if auds and br > auds.stats.bitrate:
-                br = max(4096, auds.stats.bitrate)
-            sr = str(SAMPLE_RATE)
-            ac = "2"
             if fmt in ("vox", "adpcm"):
                 args.extend(("-c:a", "adpcm_ms"))
                 fmt = "wav" if fmt == "adpcm" else "vox"
@@ -2827,12 +2837,12 @@ class AudioDownloader:
                 fn = f"cache/\x7f{ts}~" + outf.translate(filetrans)
             elif fmt == "mkv":
                 fmt = "matroska"
-            if asf == "-":
-                args.extend(("-f", "s16le"))
             if not copy and ast:
-                args.extend(("-ar", sr, "-ac", ac, "-b:a", str(br)))
-                if vst:
-                    args.extend(("-pix_fmt", "yuv420p", "-crf", "28"))
+                args.extend(("-b:a", str(br)))
+                if len(ast) == 1:
+                    args.extend(("-ar", sr, "-ac", ac, "-b:a", str(br)))
+                    if vst:
+                        args.extend(("-pix_fmt", "yuv420p", "-crf", "28"))
             if copy:
                 args.extend(("-c", "copy", fn))
             elif container:
@@ -2861,7 +2871,7 @@ class AudioDownloader:
                     with suppress():
                         message.__dict__.setdefault("inits", []).append(proc)
                     ress = []
-                    futs = deque()
+                    futs = []
                     for i, info in enumerate(ast):
                         t = i + ts + 1
                         cfn = None
@@ -2871,13 +2881,20 @@ class AudioDownloader:
                             url = info
                         if len(futs) >= 8:
                             with tracebacksuppressor:
-                                cfn = futs.popleft().result()[0]
+                                for i, fut in enumerate(futs):
+                                    if futs[i].done():
+                                        cfn = futs.pop(i).result()[0]
+                                        break
+                                else:
+                                    cfn = futs.pop(0).result(timeout=600)[0]
+                                print(cfn)
                                 ress.append(cfn)
-                        fut = create_future_ex(self.download_file, url, "pcm", auds=None, ts=t, child=True, silenceremove=silenceremove, message=message)
+                        fut = create_future_ex(self.download_file, url, "pcm", auds=None, ts=t, child=True, silenceremove=silenceremove, message=message, timeout=720, rename=f"cache/C{shash(url + '1' * silenceremove)}.pcm")
                         futs.append(fut)
                     for fut in futs:
                         with tracebacksuppressor:
-                            cfn = fut.result()[0]
+                            cfn = fut.result(timeout=600)[0]
+                            print(cfn)
                             ress.append(cfn)
                     for cfn in ress:
                         if cfn and os.path.exists(cfn):
@@ -2942,7 +2959,7 @@ class AudioDownloader:
                         args = [
                             "./ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
                             "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets",
-                            "-protocol_whitelist", "concat,tls,tcp,file,http,https",
+                            "-protocol_whitelist", "concat,tls,tcp,file,fd,http,https",
                             "-to", str(odur), "-f", "concat", "-safe", "0",
                             "-i", loopf, "-c", "copy", fn
                         ]
@@ -2959,7 +2976,10 @@ class AudioDownloader:
                                 os.remove(loopf)
                             os.remove(fn2)
             if not mid:
-                assert os.path.exists(fn)
+                assert os.path.exists(fn) and os.path.getsize(fn)
+                if rename:
+                    os.rename(fn, rename)
+                    return rename, outf
                 return fn, outf
             self.other_x += 1
             with open(fn, "rb") as f:
