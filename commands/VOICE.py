@@ -2646,7 +2646,7 @@ class AudioDownloader:
                 ts = ts_us()
             if rename and os.path.exists(rename) and os.path.getsize(rename):
                 return rename, rename
-            if len(urls) == 1 and is_url(urls[0]) and fmt in ("opus", "pcm", "wav", "mp3"):
+            if len(urls) == 1 and is_url(urls[0]) and fmt in ("opus", "pcm", "wav", "mp3", "ogg"):
                 h = shash(url + ("~S" * silenceremove))
                 fn = "cache/~" + h + ".webm"
                 if not os.path.exists(fn):
@@ -2658,6 +2658,8 @@ class AudioDownloader:
                     args = [ffmpeg, "-hide_banner", "-v", "error", "-vn", "-i", fn]
                     if fmt == "mp3":
                         args.extend(("-b:a", "196608", out))
+                    elif fmt == "ogg":
+                        args.extend(("-b:a", "131072", out))
                     elif fmt == "wav":
                         args.extend(("-ar", SAMPLE_RATE, "-ac", 2, out))
                     elif fmt == "pcm":
