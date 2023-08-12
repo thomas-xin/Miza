@@ -85,8 +85,8 @@ try:
 	DC = pynvml.nvmlDeviceGetCount()
 except:
 	DC = 0
-if not DC:
-	print(srgb(255, 0, 0, "WARNING: No NVIDIA GPUs detected. Please install one for AI compute acceleration."))
+# if not DC:
+	# print(srgb(255, 0, 0, "WARNING: No NVIDIA GPUs detected. Please install one for AI compute acceleration."))
 
 keep = True
 if __name__ != "__main__" and os.path.exists("auth.json"):
@@ -107,9 +107,9 @@ if keep:
 		subprocess.run([sys.executable, "-m", "pip", "install", "py-cpuinfo", "--upgrade", "--user"])
 		subprocess.run([sys.executable, "-m", "pip", "install", "psutil", "--upgrade", "--user"])
 		if DC:
-			subprocess.run([sys.executable, "-m", "pip", "install", "torch", "--upgrade", "--user"])
-		else:
 			subprocess.run([sys.executable, "-m", "pip", "install", "torch", "--index-url", "https://download.pytorch.org/whl/cu118", "--upgrade", "--user"])
+		else:
+			subprocess.run([sys.executable, "-m", "pip", "install", "torch", "--upgrade", "--user"])
 		import torch, cpuinfo, psutil
 
 	try:
@@ -133,10 +133,14 @@ if keep:
 		try:
 			pkg_resources.get_distribution("bitsandbytes")
 		except:
-			dist = pkg_resources.get_distribution("bitsandbytes-windows")
-			fold = dist.module_path + "/bitsandbytes_windows-" + dist.version + ".dist-info"
-			if os.path.exists(fold):
-				os.rename(fold, fold.replace("_windows", ""))
+			try:
+				dist = pkg_resources.get_distribution("bitsandbytes-windows")
+				fold = dist.module_path + "/bitsandbytes_windows-" + dist.version + ".dist-info"
+				if os.path.exists(fold):
+					os.rename(fold, fold.replace("_windows", ""))
+			except:
+				import traceback
+				print(srgb(255, 0, 0, traceback.format_exc()), end="")
 
 	total = 0
 	procs = []
@@ -145,38 +149,37 @@ if keep:
 
 	info = cpuinfo.get_cpu_info()
 	mem = psutil.virtual_memory().total
-	# mems.append(mem)
-	args = [sys.executable, sys.argv[0], "cpu", info["brand_raw"], str(info["count"]), str(mem)]
-	proc = subprocess.Popen(args, stdout=subprocess.PIPE)
-	procs.append(proc)
-	outs = []
-	for i in list(range(DC)[::2]) + list(range(DC)[1::2]):
-		# if len(procs) > 2:
-			# proc = procs.pop(0)
-			# proc.wait()
-			# outs.append(proc)
-		info = pynvml.nvmlDeviceGetHandleByIndex(i)
-		mem = torch.cuda.get_device_properties(i).total_memory
+	if DC:
 		# mems.append(mem)
-		args = [sys.executable, sys.argv[0], f"cuda:{i}", pynvml.nvmlDeviceGetName(info), str(pynvml.nvmlDeviceGetNumGpuCores(info)), str(mem)]
+		args = [sys.executable, sys.argv[0], "cpu", info["brand_raw"], str(info["count"]), str(mem)]
 		proc = subprocess.Popen(args, stdout=subprocess.PIPE)
-		proc.i = i
 		procs.append(proc)
-	outs.extend(procs)
-
-	print()
-	compute_load = [0] * len(outs)
-	olines = []
-	for n, proc in enumerate(outs):
-		s = proc.stdout.readlines()
-		avg = float(s.pop(-1))
-		# avgs.append(avg)
-		total += avg
-		if n:
-			compute_load[proc.i] = avg
-		olines.append(b"".join(s).decode("utf-8"))
-	print("\n".join(olines))
-	print(srgb(0, 255, 0, f"Benchmark complete. Total score: {round(total, 2)}"))
+		outs = []
+		for i in list(range(DC)[::2]) + list(range(DC)[1::2]):
+			# if len(procs) > 2:
+				# proc = procs.pop(0)
+				# proc.wait()
+				# outs.append(proc)
+			info = pynvml.nvmlDeviceGetHandleByIndex(i)
+			mem = torch.cuda.get_device_properties(i).total_memory
+			# mems.append(mem)
+			args = [sys.executable, sys.argv[0], f"cuda:{i}", pynvml.nvmlDeviceGetName(info), str(pynvml.nvmlDeviceGetNumGpuCores(info)), str(mem)]
+			proc = subprocess.Popen(args, stdout=subprocess.PIPE)
+			proc.i = i
+			procs.append(proc)
+		outs.extend(procs)
+		compute_load = [0] * len(outs)
+		olines = []
+		for n, proc in enumerate(outs):
+			s = proc.stdout.readlines()
+			avg = float(s.pop(-1))
+			# avgs.append(avg)
+			total += avg
+			if n:
+				compute_load[proc.i] = avg
+			olines.append(b"".join(s).decode("utf-8"))
+		print("\n" + "\n".join(olines))
+		print(srgb(0, 255, 0, f"Benchmark complete. Total score: {round(total, 2)}"))
 
 	if not os.path.exists("auth.json"):
 		keep = False
