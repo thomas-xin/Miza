@@ -2311,6 +2311,8 @@ class AudioDownloader:
             stream = entry.get("stream", None)
         icon = entry.get("icon", None)
         # Use SHA-256 hash of URL to avoid filename conflicts
+        url = entry["url"]
+        url = re.sub(r"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=", "https://youtu.be/", url)
         h = shash(entry["url"])
         if type(download) is str:
             fn = "~" + h + download
@@ -5323,6 +5325,7 @@ class Transcribe(Command):
             name, url = entries[0].get("name"), entries[0].get("url")
             if not name or not url:
                 raise FileNotFoundError(500, argv)
+            url = re.sub(r"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=", "https://youtu.be/", url)
             h = shash(url)
             fn = "~" + h + ".webm"
             file = await create_future(ytdl.get_stream, entries[0], download=".webm", asap=True)
