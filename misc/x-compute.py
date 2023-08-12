@@ -13,7 +13,7 @@ if os.path.exists("auth.json"):
 		os.environ["TRANSFORMERS_CACHE"] = f"{cachedir}/huggingface/transformers"
 		os.environ["HF_DATASETS_CACHE"] = f"{cachedir}/huggingface/datasets"
 
-import io, time, concurrent.futures, asyncio, subprocess, psutil, collections, traceback, re, requests, blend_modes, zipfile, contextlib, filetype, ast, colorspace, base64, random
+import io, time, concurrent.futures, asyncio, subprocess, psutil, collections, traceback, re, requests, blend_modes, zipfile, contextlib, filetype, ast, colorspace, base64, hashlib, random
 import numpy as np
 import PIL
 from PIL import Image, ImageCms, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhance, ImageMath, ImageStat, ImageFile
@@ -2589,6 +2589,117 @@ def backup_model(cls, model, force=False, **kwargs):
 if len(sys.argv) <= 1 or int(sys.argv[1]) in (0, 2):
 	x_math = __import__("x-math")
 
+	def get_best_icon(entry):
+		with suppress(KeyError):
+			return entry["thumbnail"]
+		with suppress(KeyError):
+			return entry["icon"]
+		try:
+			thumbnails = entry["thumbnails"]
+		except KeyError:
+			try:
+				url = entry["webpage_url"]
+			except KeyError:
+				url = entry["url"]
+			if not url:
+				return ""
+			if is_discord_url(url):
+				if not is_image(url):
+					return "https://cdn.discordapp.com/embed/avatars/0.png"
+			if is_youtube_url(url):
+				if "?v=" in url:
+					vid = url.split("?v=", 1)[-1]
+				else:
+					vid = url.rsplit("/", 1)[-1].split("?", 1)[0]
+				entry["thumbnail"] = f"https://i.ytimg.com/vi/{vid}/maxresdefault.jpg"
+				return entry["thumbnail"]
+			return url
+		return sorted(thumbnails, key=lambda x: float(x.get("width", x.get("preference", 0) * 4096)), reverse=True)[0]["url"]
+
+	def get_best_audio(entry):
+		with suppress(KeyError):
+			return entry["stream"]
+		best = -inf
+		try:
+			fmts = entry["formats"]
+		except KeyError:
+			fmts = ()
+		try:
+			url = entry["webpage_url"]
+		except KeyError:
+			url = entry["url"]
+		replace = True
+		for fmt in fmts:
+			q = fmt.get("abr", 0)
+			if not isinstance(q, (int, float)):
+				q = 0
+			if q <= 0:
+				if fmt.get("asr"):
+					q = fmt["asr"] / 1000
+				elif fmt.get("audio_channels"):
+					q = fmt["audio_channels"]
+			vcodec = fmt.get("vcodec", "none")
+			if vcodec not in (None, "none"):
+				q -= 1
+			if not fmt["url"].startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
+				replace = False
+			# print(fmt["url"], q)
+			if q > best or replace:
+				best = q
+				url = fmt["url"]
+		if "dropbox.com" in url:
+			if "?dl=0" in url:
+				url = url.replace("?dl=0", "?dl=1")
+		if url.startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
+			resp = reqs.get(url).content
+			fmts = deque()
+			with suppress(ValueError, KeyError):
+				while True:
+					search = b'<Representation id="'
+					resp = resp[resp.index(search) + len(search):]
+					f_id = resp[:resp.index(b'"')].decode("utf-8")
+					search = b"><BaseURL>"
+					resp = resp[resp.index(search) + len(search):]
+					stream = resp[:resp.index(b'</BaseURL>')].decode("utf-8")
+					fmt = cdict(youtube_dl.extractor.youtube.YoutubeIE._formats[f_id])
+					fmt.url = stream
+					fmts.append(fmt)
+			entry["formats"] = fmts
+			return get_best_audio(entry)
+		if not url:
+			raise KeyError("URL not found.")
+		return url
+
+	shash = lambda s: base64.urlsafe_b64encode(hashlib.sha256(s if type(s) is bytes else as_str(s).encode("utf-8")).digest()).rstrip(b"=").decode("ascii")
+
+	def ytdl(q, download=False):
+		import yt_dlp
+		params = dict(default_search="auto", source_address="0.0.0.0", final_ext="webm")
+		ydl = yt_dlp.ydl = getattr(yt_dlp, "ydl", None) or yt_dlp.YoutubeDL(params)
+		res = ydl.extract_info(q, download=False, process=True)
+		if "entries" in res:
+			entries = res["entries"]
+		else:
+			entries = [res]
+		if download:
+			url = entries[0]["webpage_url"]
+			url = re.sub(r"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=", "https://youtu.be/", url)
+			fn = "cache/~" + shash(url) + ".webm"
+			if not os.path.exists(fn) or not os.path.getsize(fn):
+				ydl.params["outtmpl"] = dict(default=fn)
+				ydl.download(url)
+			assert os.path.exists(fn) and os.path.getsize(fn)
+			with open(fn, "rb") as f:
+				return f.read()
+		output = [dict(
+			name=entry["title"],
+			url=entry["webpage_url"],
+			duration=entry.get("duration"),
+			stream=get_best_audio(entry),
+			icon=get_best_icon(entry),
+		) for entry in entries]
+		return output
+
 if len(sys.argv) > 1 and sys.argv[1] == "1":
 	import convobot, torch
 	convobot.COMPUTE_LOAD = COMPUTE_LOAD
@@ -2763,13 +2874,25 @@ elif len(sys.argv) > 1 and sys.argv[1] == "2":
 			device = f"cuda:{determine_cuda(priority=False, major=7)[0]}"
 		elif torch.cuda.device_count():
 			device = "cuda"
-		config = Config(clip_model_name="ViT-H-14/laion2b_s32b_b79k", clip_model_path="misc/Clip", device=device)
+		config = Config(
+			clip_model_name="ViT-H-14/laion2b_s32b_b79k",
+			clip_model_path="misc/Clip",
+			data_path="misc/Clip",
+			cache_path="misc/Clip",
+			device=device,
+		)
 		config.apply_low_vram_defaults()
 		globals()["VIT"] = globals()["VIT2"] = Interrogator(config)
 		if torch.cuda.device_count() > 1:
 			device2 = f"cuda:{determine_cuda(priority=True, major=7)[0]}"
 			if device != device2:
-				config = Config(clip_model_name="ViT-H-14/laion2b_s32b_b79k", clip_model_path="misc/Clip", device=device2)
+				config = Config(
+					clip_model_name="ViT-H-14/laion2b_s32b_b79k",
+					clip_model_path="misc/Clip",
+					data_path="misc/Clip",
+					cache_path="misc/Clip",
+					device=device2,
+				)
 				globals()["VIT2"] = Interrogator(config)
 		im = Image.new("RGB", (4, 4))
 		VIT.interrogate_fast(im)

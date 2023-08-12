@@ -1033,7 +1033,11 @@ class AudioFileLink:
         self.seekable = seekable
         self.webpage_url = webpage_url
         timeout = 48 if asap else 300
-        bot.audio.submit(f"!cache['{self.fn}'].load(" + ",".join(repr(i) for i in (stream, check_fmt, force, webpage_url, live, seekable, duration, asap)) + ")", timeout=timeout)
+        if not asap:
+            ytdl.download_file(self.webpage_url, fmt="opus")
+            return
+        else:
+            bot.audio.submit(f"!cache['{self.fn}'].load(" + ",".join(repr(i) for i in (stream, check_fmt, force, webpage_url, live, seekable, duration, asap)) + ")", timeout=timeout)
         if duration:
             self.dur = duration
         try:
@@ -2615,6 +2619,7 @@ class AudioDownloader:
     # codec_map = {}
     # For ~download
     def download_file(self, url, fmt, start=None, end=None, auds=None, ts=None, copy=False, ar=SAMPLE_RATE, ac=2, size=None, container=None, child=False, silenceremove=False, message=None, rename=None):
+        ffmpeg = "./ffmpeg"
         if child:
             ctx = emptyctx
         else:
@@ -2640,6 +2645,37 @@ class AudioDownloader:
                 ts = ts_us()
             if rename and os.path.exists(rename) and os.path.getsize(rename):
                 return rename, rename
+            if len(urls) == 1 and is_url(urls[0]) and fmt in ("opus", "pcm", "wav", "mp3"):
+                h = shash(url)
+                fn = "cache/~" + h + ".webm"
+                if not os.path.exists(fn):
+                    b = await_fut(process_image("ytdl", "$", [urls[0], True], fix=(0, 2), timeout=600))
+                    with open(fn, "wb") as f:
+                        f.write(b)
+                out = "cache/~" + h + "." + fmt
+                if not os.path.exists(out):
+                    args = [ffmpeg, "-hide_banner", "-v", "error", "-vn", "-i", fn]
+                    if fmt == "mp3":
+                        args.extend(("-b:a", "196608", out))
+                    elif fmt == "wav":
+                        args.extend(("-ar", SAMPLE_RATE, "-ac", 2, out))
+                    elif fmt == "pcm":
+                        args.extend(("f", "s16le", "-ar", SAMPLE_RATE, "-ac", 2, out))
+                    else:
+                        args = None
+                if args:
+                    print(args)
+                    subprocess.run(args)
+                out2 = "cache/~" + h + ".opus"
+                args = [ffmpeg, "-hide_banner", "-v", "error", "-vn", "-i", fn, "-c:a", "copy", out2]
+                if rename:
+                    if os.path.exists(rename):
+                        return rename
+                    os.rename(out, rename)
+                    return rename
+                file = out2.removeprefix("cache/")
+                self.cache[file] = AudioFileLink(file, out, wasfile=True)
+                return out
             outf = None
             for url in urls:
                 if len(ast) > 1 and not vst:
@@ -2701,7 +2737,6 @@ class AudioDownloader:
                 ast.append(info)
             if not ast and not vst:
                 raise LookupError(f"No stream URLs found for {url}")
-            ffmpeg = "./ffmpeg"
             if len(ast) <= 1 and not vst and fmt != "pcm":
                 if ast:
                     # if not is_youtube_stream(ast[0]["stream"]):
@@ -5346,10 +5381,8 @@ class Transcribe(Command):
             if not name or not url:
                 raise FileNotFoundError(500, argv)
             url = re.sub(r"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=", "https://youtu.be/", url)
-            h = shash(url)
-            fn = "~" + h + ".webm"
-            file = await create_future(ytdl.get_stream, entries[0], download=".webm", asap=True)
-            fni = "cache/" + fn
+            fn = await create_future(ytdl.download_file, entries[0], fmt="opus")
+            fni = fn.rsplit(".", 1)[0] + ".webm"
             if bot.is_trusted(guild) >= 2:
                 for uid in bot.data.trusted[guild.id]:
                     if uid and bot.premium_level(uid, absolute=True) >= 2:
@@ -5362,19 +5395,6 @@ class Transcribe(Command):
             data = bot.data.users.get(u.id, {})
             oai = data.get("trial") and data.get("openai_key") or AUTH.get("openai_key")
             bals = {k: v for k, v in bot.data.token_balances.items() if v < 0}
-            while file:
-                await asyncio.sleep(0.25)
-                if not os.path.exists(fni):
-                    continue
-                if not os.path.getsize(fni):
-                    continue
-                try:
-                    res = bool(getattr(file, 'loaded', None))
-                except:
-                    print_exc()
-                    break
-                if res is not False:
-                    break
             if bals:
                 openai.api_key = uoai = sorted(bals, key=bals.get)[0]
             else:

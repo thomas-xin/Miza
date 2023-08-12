@@ -15,27 +15,27 @@ if not os.path.exists("auth.json"):
 if os.path.exists("x-compute.py"):
     sys.path.append("..")
 
-import benchmark, json
+import benchmark, json, psutil
 
 with open("auth.json", "rb") as f:
     data = json.load(f)
 compute_load = data.get("compute_load", [])
 
 if benchmark.DC:
-    caps = [1, 2] if benchmark.DC > 1 else [0, 1]
+    caps = [2] if benchmark.DC > 1 else [0]
     import pynvml
     handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(benchmark.DC)]
     gmems = [pynvml.nvmlDeviceGetMemoryInfo(d).total for d in handles]
-    if sum(gmems) > 35 * 1073741824:
-        caps.insert(-1, 1)
+    # if sum(gmems) > 35 * 1073741824:
+        # caps.insert(-1, 1)
     for i, mem in enumerate(gmems):
-        if mem <= 3 * 1073741824:
-            continue
-        if compute_load[i] < 300000:
+        if mem <= 11 * 1073741824 or compute_load[i] < 300000:
             continue
         caps.append(i + 3)
 else:
-    caps = [1, 2]
+    if psutil.virtual_memory().total < 14 * 1073741824:
+        raise MemoryError("Memory too low for CPU inference.")
+    caps = [2] if psutil.cpu_count() >= 7 else [0]
 # if len(caps) < os.cpu_count() // 2:
 #     caps = [0] * (os.cpu_count() // 2 - len(caps)) + caps
 
@@ -47,6 +47,7 @@ req = [
     "sympy",
     "mpmath",
     "matplotlib",
+    "yt-dlp",
 ]
 import pkg_resources
 for mn in req:
@@ -55,7 +56,7 @@ for mn in req:
     except:
         subprocess.run([sys.executable, "-m", "pip", "install", mn, "--upgrade", "--user"])
 
-import time, base64, orjson, psutil, subprocess, threading, requests, urllib3, concurrent.futures
+import time, base64, orjson, subprocess, threading, requests, urllib3, concurrent.futures
 from math import *
 session = requests.Session()
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -65,7 +66,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 new_tasks = {}
 procs = []
 PROC_RESP = {}
-FORWARD = "https://mizabot.xyz/api/distribute"
+FORWARD = "https://api.mizabot.xyz/distribute"
 
 def task_submit(proc, command, _timeout=12):
     ts = time.time_ns() // 1000
@@ -74,7 +75,7 @@ def task_submit(proc, command, _timeout=12):
     PROC_RESP[ts] = fut = concurrent.futures.Future()
     command = "[" + ",".join(map(repr, command[:2])) + "," + ",".join(map(str, command[2:])) + "]"
     s = f"~{ts}~".encode("ascii") + base64.b64encode(command.encode("utf-8")) + b"\n"
-    print(s)
+    # print(s)
     proc.busy = concurrent.futures.Future()
     try:
         proc.stdin.write(s)
@@ -113,7 +114,7 @@ def update_resps(proc):
             except:
                 print_exc()
             s = b.rstrip()
-            print(proc, s)
+            # print(proc, s)
             try:
                 if s and s[:1] == b"$":
                     s, r = s.split(b"~", 1)
@@ -150,7 +151,7 @@ def update_tasks(proc):
                     verify=False
                 )
                 data = resp.content
-                # resp = session.get(f"https://mizabot.xyz/api/distribute?caps=[{proc.cap}]&resp={resp}")
+                # resp = session.get(f"https://api.mizabot.xyz/distribute?caps=[{proc.cap}]&resp={resp}")
                 resp.raise_for_status()
                 data = resp.json()
             except:
@@ -161,8 +162,8 @@ def update_tasks(proc):
                 time.sleep(10)
             else:
                 resps.clear()
-            if data:
-                print(data)
+            # if data:
+                # print(data)
             for task in data:
                 cap = task[1]
                 new_tasks.setdefault(cap, []).append(task)
@@ -185,7 +186,7 @@ def update_tasks(proc):
                     resps[str(i)] = "RES:" + resp if isinstance(resp, str) else resp
     return func
 
-def start_proc(cap):
+def start_proc(i):
     args = [python, "misc/x-compute.py", str(cap)]
     print(args)
     proc = psutil.Popen(
@@ -197,7 +198,7 @@ def start_proc(cap):
     )
     proc.busy = None
     proc.waiting = concurrent.futures.Future()
-    proc.cap = min(3, int(cap))
+    proc.cap = min(3, int(i))
     proc.pwr = compute_load[i - 3] if i >= 3 else 0 if not i else 1 if i == 2 else sum(compute_load)
     procs.append(proc)
     threading.Thread(target=update_tasks(proc)).start()
@@ -289,7 +290,7 @@ try:
         data = ()
         try:
             resp = session.post(
-                "https://mizabot.xyz/api/distribute",
+                "https://api.mizabot.xyz/distribute",
                 data=dict(
                     caps=orjson.dumps(caps),
                     pwrs=orjson.dumps(pwrs),
@@ -299,7 +300,7 @@ try:
             )
             FORWARD = resp.url
             data = resp.content
-            # resp = session.get(f"https://mizabot.xyz/api/distribute?caps={caps}&stat={stat}")
+            # resp = session.get(f"https://api.mizabot.xyz/distribute?caps={caps}&stat={stat}")
             resp.raise_for_status()
             data = resp.json()
         except:
@@ -308,8 +309,8 @@ try:
             data = ()
             print_exc()
             time.sleep(20)
-        if data:
-            print(data)
+        # if data:
+            # print(data)
         for task in data:
             cap = task[1]
             new_tasks.setdefault(cap, []).append(task)
