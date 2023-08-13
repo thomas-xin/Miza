@@ -90,6 +90,7 @@ def task_submit(proc, command, _timeout=12):
 		fut = PROC_RESP[ts]
 		resp = fut.result(timeout=_timeout)
 	except (BrokenPipeError, OSError) as ex:
+		print_exc()
 		proc.kill()
 		procs.remove(proc)
 		start_proc(proc.cap)
