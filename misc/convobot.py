@@ -226,6 +226,7 @@ def determine_cuda(mem=1, priority=None, multi=False, major=0):
 	handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(dc)]
 	gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
 	tinfo = [torch.cuda.get_device_properties(i) for i in range(n)]
+	COMPUTE_LOAD = globals()["COMPUTE_LOAD"] or [0] * dc
 	high = max(COMPUTE_LOAD)
 	if priority == "full":
 		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i], p.major, p.minor, p.multi_processor_count, p.total_memory)
