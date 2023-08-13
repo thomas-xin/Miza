@@ -2317,7 +2317,7 @@ async def proc_distribute(proc):
 				futs.append(fut)
 			for fut in futs:
 				try:
-					resp = fut.result()
+					resp = await fut
 				except Exception as ex:
 					resps[i] = ex
 				else:
