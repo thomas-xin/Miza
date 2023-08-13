@@ -39,6 +39,7 @@ else:
 
 req = [
 	"blend_modes",
+	"colorspace",
 	"filetype",
 	"matplotlib",
 	"mpmath",
