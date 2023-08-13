@@ -33,9 +33,7 @@ if benchmark.DC:
 			continue
 		caps.append(i + 3)
 else:
-	if psutil.virtual_memory().total < 14 * 1073741824:
-		raise MemoryError("Memory too low for CPU inference.")
-	caps = [2] if psutil.cpu_count() >= 7 else [0]
+	caps = [2] if psutil.cpu_count() >= 7 and psutil.virtual_memory().total >= 14 * 1073741824 else [0]
 # if len(caps) < os.cpu_count() // 2:
 #     caps = [0] * (os.cpu_count() // 2 - len(caps)) + caps
 
@@ -48,11 +46,14 @@ req = [
 	"mpmath",
 	"matplotlib",
 	"yt-dlp",
-	"tiktoken",
-	"sentence_transformers",
-	"pytesseract",
-	"clip_interrogator",
 ]
+if any(caps):
+	req.extend((
+		"tiktoken",
+		"sentence_transformers",
+		"pytesseract",
+		"clip_interrogator",
+	))
 import pkg_resources
 for mn in req:
 	try:
