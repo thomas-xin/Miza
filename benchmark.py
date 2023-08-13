@@ -122,28 +122,29 @@ if keep:
 		print(srgb(255, 0, 0, traceback.format_exc()), end="")
 		subprocess.run(["pip", "install", "setuptools", "--upgrade", "--user"])
 		import pkg_resources
-	req = ["diffusers", "accelerate"]
-	# if os.name == "nt":
-	# 	req.append("bitsandbytes-windows")
-	# else:
-	# 	req.append("bitsandbytes")
-	for mn in req:
-		try:
-			pkg_resources.get_distribution(mn)
-		except:
-			subprocess.run([sys.executable, "-m", "pip", "install", mn, "--upgrade", "--user"])
-	# if os.name == "nt":
-	# 	try:
-	# 		pkg_resources.get_distribution("bitsandbytes")
-	# 	except:
-	# 		try:
-	# 			dist = pkg_resources.get_distribution("bitsandbytes-windows")
-	# 			fold = dist.module_path + "/bitsandbytes_windows-" + dist.version + ".dist-info"
-	# 			if os.path.exists(fold):
-	# 				os.rename(fold, fold.replace("_windows", ""))
-	# 		except:
-	# 			import traceback
-	# 			print(srgb(255, 0, 0, traceback.format_exc()), end="")
+	if DC:
+		req = ["diffusers", "accelerate"]
+		# if os.name == "nt":
+		# 	req.append("bitsandbytes-windows")
+		# else:
+		# 	req.append("bitsandbytes")
+		for mn in req:
+			try:
+				pkg_resources.get_distribution(mn)
+			except:
+				subprocess.run([sys.executable, "-m", "pip", "install", mn, "--upgrade", "--user"])
+		# if os.name == "nt":
+		# 	try:
+		# 		pkg_resources.get_distribution("bitsandbytes")
+		# 	except:
+		# 		try:
+		# 			dist = pkg_resources.get_distribution("bitsandbytes-windows")
+		# 			fold = dist.module_path + "/bitsandbytes_windows-" + dist.version + ".dist-info"
+		# 			if os.path.exists(fold):
+		# 				os.rename(fold, fold.replace("_windows", ""))
+		# 		except:
+		# 			import traceback
+		# 			print(srgb(255, 0, 0, traceback.format_exc()), end="")
 
 	total = 0
 	procs = []
