@@ -1039,6 +1039,12 @@ class Bot:
 							redo = True
 						if not redo or i:
 							break
+						response = None
+						model = DEFMOD
+						temp = 0.8
+						limit = 4096
+						cm = 0
+						break
 				if response:
 					fc = m.get("function_call")
 					if not fc or fc.get("name") not in self.function_list:
@@ -1541,6 +1547,8 @@ class Bot:
 						text = ""
 					if not text:
 						redo = True
+					if i:
+						stop = None
 				elif not flagged and (not i or not response):
 					continue
 				else:

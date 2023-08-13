@@ -3549,9 +3549,9 @@ def evaluate(ts, args):
 			out = out.read()
 		if isinstance(out, (bytes, memoryview)):
 			b = base64.b64encode(out)
-			sys.stdout.buffer.write(f"$PROC_RESP[{ts}].set_result(_x)~".encode("utf-8"))
-			sys.stdout.buffer.write(b)
-			sys.stdout.buffer.write(b"\n")
+			sys.stdout.buffer.write(f"$PROC_RESP[{ts}].set_result(_x)~".encode("utf-8") + b + b"\n")
+			# sys.stdout.buffer.write(b)
+			# sys.stdout.buffer.write(b"\n")
 		else:
 			sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_result({repr(out)})\n".encode("utf-8"))
 	except Exception as ex:
