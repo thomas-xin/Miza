@@ -54,14 +54,14 @@ if any(caps):
 		"pytesseract",
 		"clip_interrogator",
 	))
-import pkg_resources
+import pkg_resources, subprocess
 for mn in req:
 	try:
 		pkg_resources.get_distribution(mn)
 	except:
 		subprocess.run([sys.executable, "-m", "pip", "install", mn, "--upgrade", "--user"])
 
-import time, base64, orjson, subprocess, threading, requests, urllib3, concurrent.futures
+import time, base64, orjson, threading, requests, urllib3, concurrent.futures
 from math import *
 session = requests.Session()
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
