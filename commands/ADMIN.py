@@ -2616,7 +2616,7 @@ class UpdateMessageLogs(Database):
         if after.author.bot and not force:
             return
         guild = before.guild
-        if guild.id not in self.data:
+        if not guild or guild.id not in self.data:
             return
         c_id = self.data[guild.id]
         try:
