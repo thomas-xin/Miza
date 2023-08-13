@@ -2710,7 +2710,7 @@ if len(sys.argv) <= 1 or int(sys.argv[1]) in (0, 2):
 				stream = get_best_audio(entry)
 				sys.stderr.write(stream + "\n")
 				try:
-					raise
+					# raise
 					ydl.download(url)
 				except:
 					traceback.print_exc()
