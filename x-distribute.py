@@ -200,7 +200,7 @@ def start_proc(i):
 		args,
 		stdin=subprocess.PIPE,
 		stdout=subprocess.PIPE,
-		stderr=None,
+		# stderr=None,
 		bufsize=262144,
 	)
 	proc.busy = None

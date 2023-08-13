@@ -2657,17 +2657,30 @@ class AudioDownloader:
                 h2 = shash(url + ("~S" * silenceremove))
                 out = "cache/~" + h2 + "." + fmt
                 if not os.path.exists(out):
-                    args = [ffmpeg, "-hide_banner", "-v", "error", "-vn", "-i", fn]
-                    if fmt == "mp3":
-                        args.extend(("-b:a", "196608", out))
-                    elif fmt == "ogg":
-                        args.extend(("-c:a", "copy", out))
-                    elif fmt == "wav":
-                        args.extend(("-ar", SAMPLE_RATE, "-ac", 2, out))
-                    elif fmt == "pcm":
-                        args.extend(("f", "s16le", "-ar", SAMPLE_RATE, "-ac", 2, out))
+                    args = [ffmpeg, "-hide_banner", "-v", "error", "-map_metadata", "-1", "-vn", "-i", fn]
+                    if silenceremove:
+                        args.extend(("-af", "silenceremove=start_periods=1:start_duration=1:start_threshold=-50dB:start_silence=0.5:stop_periods=-9000:stop_threshold=-50dB:window=0.015625"))
+                        if fmt == "mp3":
+                            args.extend(("-b:a", "196608", out))
+                        elif fmt == "ogg":
+                            args.extend(("-b:a", "196608", "-c:a", "libopus", out))
+                        elif fmt == "wav":
+                            args.extend(("-ar", SAMPLE_RATE, "-ac", 2, out))
+                        elif fmt == "pcm":
+                            args.extend(("f", "s16le", "-ar", SAMPLE_RATE, "-ac", 2, out))
+                        else:
+                            args.extend(("-b:a", "196608", "-c:a", "libopus", out))
                     else:
-                        args = None
+                        if fmt == "mp3":
+                            args.extend(("-b:a", "196608", out))
+                        elif fmt == "ogg":
+                            args.extend(("-c:a", "copy", out))
+                        elif fmt == "wav":
+                            args.extend(("-ar", SAMPLE_RATE, "-ac", 2, out))
+                        elif fmt == "pcm":
+                            args.extend(("f", "s16le", "-ar", SAMPLE_RATE, "-ac", 2, out))
+                        else:
+                            args = None
                 if args:
                     print(args)
                     subprocess.run(args)

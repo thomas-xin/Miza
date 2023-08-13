@@ -2678,9 +2678,21 @@ if len(sys.argv) <= 1 or int(sys.argv[1]) in (0, 2):
 
 	shash = lambda s: base64.urlsafe_b64encode(hashlib.sha256(s if type(s) is bytes else as_str(s).encode("utf-8")).digest()).rstrip(b"=").decode("ascii")
 
+	def format_selector(ctx):
+		formats = ctx.get('formats')[::-1]
+		# vcodec='none' means there is no video
+		best_audio = next(f for f in formats if (f['acodec'] != 'none' and f['vcodec'] == 'none' and f['ext'] in ("webm", "opus")))
+		yield {
+			'format_id': best_audio["format_id"],
+			'ext': "webm",
+			'requested_formats': [best_audio],
+			'protocol': best_audio["protocol"],
+		}
+
 	def ytdl(q, download=False):
 		import yt_dlp
-		params = dict(default_search="auto", source_address="0.0.0.0", final_ext="webm")
+		print("YTDL:", q)
+		params = dict(default_search="auto", source_address="0.0.0.0", final_ext="webm", format=format_selector)
 		ydl = yt_dlp.ydl = getattr(yt_dlp, "ydl", None) or yt_dlp.YoutubeDL(params)
 		res = ydl.extract_info(q, download=False, process=True)
 		if "entries" in res:
@@ -2688,12 +2700,43 @@ if len(sys.argv) <= 1 or int(sys.argv[1]) in (0, 2):
 		else:
 			entries = [res]
 		if download:
-			url = entries[0]["webpage_url"]
+			entry = entries[0]
+			url = entry["webpage_url"]
 			url = re.sub(r"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=", "https://youtu.be/", url)
 			fn = "cache/~" + shash(url) + ".webm"
 			if not os.path.exists(fn) or not os.path.getsize(fn):
 				ydl.params["outtmpl"] = dict(default=fn)
-				ydl.download(url)
+				headers = header()
+				stream = get_best_audio(entry)
+				sys.stderr.write(stream + "\n")
+				try:
+					raise
+					ydl.download(url)
+				except:
+					traceback.print_exc()
+				if not os.path.exists(fn):
+					part = fn + ".part"
+					sys.stderr.write(f"Incomplete download {part} {os.path.exists(part)}\n")
+					resp = requests.get(stream, headers=headers, stream=True)
+					length = int(resp.headers["Content-Length"])
+					sys.stderr.write(f"{resp} {length}\n")
+					resp.raise_for_status()
+					b = resp.raw.read()
+					sys.stderr.write(f"LENGTH, {len(b)}, {length}\n")
+					while len(b) < length:
+						sys.stderr.write(f"{len(b)}\n")
+						headers["Range"] = f"bytes={len(b)}-"
+						resp = requests.get(stream, headers=headers, stream=True)
+						resp.raise_for_status()
+						b += resp.raw.read()
+					if len(b) > length:
+						b = memoryview(b)[:length]
+					assert len(b)
+					with open(fn, "wb") as f:
+						f.write(b)
+					return b
+			else:
+				print(f"File {fn} already exists, skipping...")
 			assert os.path.exists(fn) and os.path.getsize(fn)
 			with open(fn, "rb") as f:
 				return f.read()
