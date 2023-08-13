@@ -38,21 +38,22 @@ else:
 #     caps = [0] * (os.cpu_count() // 2 - len(caps)) + caps
 
 req = [
-	"orjson",
-	"requests",
-	"pillow",
 	"blend_modes",
-	"sympy",
-	"mpmath",
+	"filetype",
 	"matplotlib",
+	"mpmath",
+	"orjson",
+	"pillow",
+	"requests",
+	"sympy",
 	"yt-dlp",
 ]
 if any(caps):
 	req.extend((
-		"tiktoken",
-		"sentence_transformers",
-		"pytesseract",
 		"clip_interrogator",
+		"pytesseract",
+		"sentence_transformers",
+		"tiktoken",
 	))
 import pkg_resources, subprocess
 for mn in req:
