@@ -2347,6 +2347,8 @@ async def start_proc(k, i):
 	args = list(proc_args[k])
 	args.append(str(i))
 	args.append(orjson.dumps(COMPUTE_LOAD).decode("ascii"))
+	properties = [torch.cuda.get_device_properties(i) for i in range(DC)]
+	args.append(orjson.dumps([(p.major, p.minor) for p in properties]))
 	proc = await asyncio.create_subprocess_exec(
 		*args,
 		limit=1073741824,

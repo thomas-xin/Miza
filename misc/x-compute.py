@@ -75,6 +75,12 @@ if len(sys.argv) > 1 and sys.argv[1].isnumeric() and int(sys.argv[1]) >= 3:
 	os.environ["CUDA_VISIBLE_DEVICES"] = str(fix)
 if len(sys.argv) > 2:
 	COMPUTE_LOAD = orjson.loads(sys.argv[2])
+else:
+	COMPUTE_LOAD = []
+if len(sys.argv) > 3:
+	COMPUTE_CAPS = orjson.loads(sys.argv[3])
+else:
+	COMPUTE_CAPS = []
 
 # os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 try:
@@ -852,10 +858,10 @@ def video2img(url, maxsize, fps, out, size=None, dur=None, orig_fps=None, data=N
 		f_in = fn if direct else url
 		command = ["./ffmpeg", "-threads", "2", "-hide_banner", "-nostdin", "-v", "error", "-y", "-hwaccel", hwaccel]
 		if hwaccel == "cuda":
-			if out.endswith(".webm"):
-				devid = random.choice([i for i in range(torch.cuda.device_count()) if (torch.cuda.get_device_properties(i).major, torch.cuda.get_device_properties(i).minor) >= (8, 9)])
+			if out.endswith(".webm") and COMPUTE_CAPS:
+				devid = random.choice([i for i, c in enumerate(COMPUTE_CAPS) if c >= [8, 9]])
 			else:
-				devid = random.randint(0, ceil(torch.cuda.device_count() / 2))
+				devid = random.randint(0, ceil(len(COMPUTE_CAPS) / 2))
 			command.extend(("-hwaccel_device", str(devid)))
 		command.extend(("-i", f_in, "-vf"))
 		w, h = max_size(*size, maxsize)
@@ -3352,10 +3358,10 @@ def evalImg(url, operation, args):
 			else:
 				command = ["./ffmpeg", "-threads", "2", "-hide_banner", "-v", "error", "-y", "-hwaccel", hwaccel]
 				if hwaccel == "cuda":
-					if mode == "RGBA":
-						devid = random.choice([i for i in range(torch.cuda.device_count()) if (torch.cuda.get_device_properties(i).major, torch.cuda.get_device_properties(i).minor) >= (8, 9)])
+					if mode == "RGBA" and COMPUTE_CAPS:
+						devid = random.choice([i for i, c in enumerate(COMPUTE_CAPS) if c >= [8, 9]])
 					else:
-						devid = random.randint(0, ceil(torch.cuda.device_count() / 2))
+						devid = random.randint(0, ceil(len(COMPUTE_CAPS) / 2))
 					command.extend(("-hwaccel_device", str(devid)))
 				command.extend([
 					"-f", "rawvideo", "-framerate", str(fps), "-pix_fmt", ("rgb24" if mode == "RGB" else "rgba"),
@@ -3403,7 +3409,7 @@ def evalImg(url, operation, args):
 						crf = max(24, min(51, round(log(np.prod(size), 2) * 6 - 92)))
 					command.extend(("-crf", str(crf), "-pix_fmt"))
 					if mode == "RGBA":
-						if hwaccel == "cuda":
+						if hwaccel == "cuda" and devid != -1:
 							command.extend(("yuv420p", "-c:v", "av1_nvenc"))
 						else:
 							command.extend(("yuv420p", "-c:v", "libsvtav1"))
