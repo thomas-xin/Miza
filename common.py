@@ -2288,18 +2288,20 @@ async def proc_communicate(proc):
 async def proc_distribute(proc):
 	bot = BOT[0]
 	tasks = ()
-	executed = False
+	executed = 0
 	while True:
 		with tracebacksuppressor:
 			if not is_strict_running(proc):
 				return
 			if not tasks:
-				out = 60 if proc.cap >= 3 else 1800
+				timeout = 180 if proc.cap >= 3 else 1800
 				try:
-					await asyncio.wait_for(wrap_future(proc.fut), timeout=60)
+					await asyncio.wait_for(wrap_future(proc.fut), timeout=timeout)
 				except (T0, T1, T2):
-					if executed:
+					if executed >= 2:
 						return create_task(start_proc("compute", proc.i))
+					elif executed:
+						executed += 1
 				else:
 					proc.fut = concurrent.futures.Future()
 				tasks = bot.distribute([proc.cap], [proc.pwr], {}, {})
@@ -2307,16 +2309,21 @@ async def proc_distribute(proc):
 					await asyncio.sleep(1 / 24)
 					continue
 			newtasks = []
+			futs = []
+			resps = {}
 			for task in tasks:
 				i, cap, command, timeout = task
+				fut = create_task(_sub_submit("compute", command, fix=proc.i, _timeout=timeout))
+				futs.append(fut)
+			for fut in futs:
 				try:
-					resp = await _sub_submit("compute", command, fix=proc.i, _timeout=timeout)
+					resp = fut.result()
 				except Exception as ex:
-					newtasks.extend(bot.distribute([proc.cap], [proc.pwr], {}, {i: ex}))
+					resps[i] = ex
 				else:
-					newtasks.extend(bot.distribute([proc.cap], [proc.pwr], {}, {i: resp}))
-				executed = True
-			tasks = newtasks
+					resps[i] = resp
+				executed = 1
+			tasks = bot.distribute([proc.cap], [proc.pwr], {}, resps)
 		await asyncio.sleep(0.01)
 
 proc_args = cdict(

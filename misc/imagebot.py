@@ -700,6 +700,8 @@ class Bot:
 			kw = dict(output_type=output_type, denoising_end=0.8)
 			if im:
 				kw["target_size"] = im.size
+			else:
+				kw["target_size"] = (768, 768)
 		prompt = lim_tokens(prompt, 80, mode="left")
 		if f2 in (StableDiffusionInpaintPipeline, StableDiffusionXLInpaintPipeline):
 			data = pipe(
@@ -761,13 +763,14 @@ class Bot:
 		if images and output_type == "latent":
 			vae = pipe.vae
 			text_encoder_2 = pipe.text_encoder_2
-			images = self.art_stablediffusion_refine(prompt, images, vae=vae, text_encoder_2=text_encoder_2, fail_unless_gpu=fail_unless_gpu, device=device, dtype=dtype)
+			images = self.art_stablediffusion_refine(prompt, images, vae=vae, text_encoder_2=text_encoder_2, fail_unless_gpu=fail_unless_gpu, device=device, dtype=dtype, orig_size=kw.get("target_size", (1024, 1024)))
 		return images
 
-	def art_stablediffusion_refine(self, prompt, images, vae=None, text_encoder_2=None, fail_unless_gpu=False, device=0, dtype=torch.bfloat16, steps=48):
+	def art_stablediffusion_refine(self, prompt, images, vae=None, text_encoder_2=None, fail_unless_gpu=False, device=0, dtype=torch.bfloat16, steps=48, orig_size=(1024, 1024)):
 		from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler, StableDiffusionImageVariationPipeline
 		if isinstance(images, (bytes, memoryview)):
 			images = [Image.open(io.BytesIO(images))]
+			orig_size = images[0].size
 		elif not isinstance(images, (list, tuple, torch.tensor)):
 			images = [images]
 		model = "stabilityai/stable-diffusion-xl-refiner-1.0"
@@ -816,6 +819,14 @@ class Bot:
 				self.loading = False
 		# pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
 		prompt = lim_tokens(prompt, 80, mode="left")
+		def max_size(w, h, maxsize, force=False):
+			s = w * h
+			m = maxsize * maxsize
+			if s > m or force:
+				r = (m / s) ** 0.5
+				w = round(w * r)
+				h = round(h * r)
+			return w, h
 		data = pipe(
 			prompt=[prompt] * len(images),
 			negative_prompt=["((blurry)), [bad], (((distorted))), ((disfigured)), ((poor)) (low quality), ugly"] * len(images),
@@ -824,6 +835,7 @@ class Bot:
 			num_inference_steps=steps,
 			output_type="pil",
 			denoising_start=0.7,
+			target_size=max_size(*orig_size, 1024, force=True),
 		)
 		images = []
 		for im in data.images:
