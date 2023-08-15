@@ -2131,9 +2131,9 @@ class UpdateUserLogs(Database):
                     change = True
                     colour[1] += 255
         bk, ak = before.avatar, after.avatar
-        if bk:
+        if hasattr(bk, "key"):
             bk = bk.key
-        if ak:
+        if hasattr(ak, "key"):
             ak = ak.key
         if bk != ak:
             b_url = best_url(before)

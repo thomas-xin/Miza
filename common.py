@@ -2304,26 +2304,38 @@ async def proc_distribute(proc):
 						executed += 1
 				else:
 					proc.fut = concurrent.futures.Future()
-				tasks = bot.distribute([proc.cap], [proc.pwr], {}, {})
+				tasks = bot.distribute([proc.cap], [proc.pwr] * proc.sem.limit, {}, {})
 				if not tasks:
 					await asyncio.sleep(1 / 24)
 					continue
-			newtasks = []
 			futs = []
-			resps = {}
-			for task in tasks:
-				i, cap, command, timeout = task
-				fut = create_task(_sub_submit("compute", command, fix=proc.i, _timeout=timeout))
-				futs.append(fut)
-			for fut in futs:
-				try:
-					resp = await fut
-				except Exception as ex:
-					resps[i] = ex
+			while tasks or futs:
+				resps = {}
+				for task in tasks:
+					i, cap, command, timeout = task
+					fut = create_task(_sub_submit(proc, command, _timeout=timeout))
+					fut.i = i
+					futs.append(fut)
+				futd = {i for i, fut in enumerate(futs) if fut.done()}
+				for i in futd:
+					try:
+						resp = futs[i].result()
+					except Exception as ex:
+						resps[fut.i] = ex
+					else:
+						resps[fut.i] = resp
+					executed = 1
+				futs = [futs[i] for i in range(len(futs)) if i not in futd]
+				if futs and not resps:
+					with tracebacksuppressor(T1):
+						await asyncio.wait_for(asyncio.shield(futs[0]), timeout=1)
+				if proc.sem.busy:
+					cap = pwr = []
 				else:
-					resps[i] = resp
-				executed = 1
-			tasks = bot.distribute([proc.cap], [proc.pwr], {}, resps)
+					cap = [proc.cap]
+					pwr = [proc.pwr]
+				tasks = bot.distribute(cap, pwr, {}, resps)
+				# print(tasks, resps, proc.sem.busy)
 		await asyncio.sleep(0.01)
 
 proc_args = cdict(
@@ -2365,7 +2377,7 @@ async def start_proc(k, i):
 	)
 	proc.i = i
 	proc.is_running = lambda: not proc.returncode
-	proc.sem = Semaphore(2, inf)
+	proc.sem = Semaphore(3, inf) if i < 3 else Semaphore(1, inf)
 	proc.comm = create_task(proc_communicate(proc))
 	proc.dist = create_task(proc_distribute(proc))
 	proc.cap = min(i, 3)
@@ -2456,9 +2468,8 @@ def sub_kill(start=True, force=False):
 	if start:
 		return proc_start()
 
-async def _sub_submit(ptype, command, fix=None, _timeout=12):
+async def _sub_submit(proc, command, _timeout=12):
 	ts = ts_us()
-	proc = await get_idle_proc(ptype, fix=fix)
 	while ts in PROC_RESP:
 		ts += 1
 	PROC_RESP[ts] = fut = concurrent.futures.Future()
@@ -2467,13 +2478,9 @@ async def _sub_submit(ptype, command, fix=None, _timeout=12):
 	s = f"~{ts}~".encode("ascii") + base64.b64encode(command.encode("utf-8")) + b"\n"
 	# s = f"~{ts}~{repr(command.encode('utf-8'))}\n".encode("utf-8")
 	sem = proc.sem
-	if fix:
-		# sem.clear()
-		sem = emptyctx
-	else:
-		await sem()
+	await sem()
 	if not is_strict_running(proc):
-		proc = await get_idle_proc(ptype, fix=fix)
+		proc = await start_proc("compute", proc.i)
 	async with sem:
 		try:
 			await create_future(proc.stdin.write, s, priority=True)
@@ -2502,13 +2509,10 @@ async def _sub_submit(ptype, command, fix=None, _timeout=12):
 					pass
 				else:
 					raise
-			try:
-				i = PROCS[ptype].index(proc)
-			except (LookupError, ValueError):
-				raise ex
+			i = proc.i
 			force_kill(proc)
-			PROCS[ptype][i] = None
-			create_task(start_proc(ptype, i))
+			PROCS["compute"][i] = None
+			create_task(start_proc("compute", i))
 			raise
 		finally:
 			PROC_RESP.pop(ts, None)

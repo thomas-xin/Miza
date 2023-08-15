@@ -1473,7 +1473,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					decode=True,
 					aio=True,
 				)
-				tup = ("Text", "", text, True)
+				tup = ("Text", "", lim_str(text, 128), False)
 			self.analysed[url] = tup
 		else:
 			self.analysed[url] = ("Image", p1, p2, best)
@@ -2988,11 +2988,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			if not expendable:
 				return 0
 			while stats.free < 81 * 1073741824 or len(expendable) > 8192 or (t - expendable[0].stat().st_atime) > 3600 * 12:
-				if not expendable:
-					break
 				with tracebacksuppressor:
 					os.remove(expendable.pop(0).path)
 					i += 1
+				if not expendable:
+					break
 			if i > 1:
 				print(f"{i} cached files flagged for deletion.")
 			return i

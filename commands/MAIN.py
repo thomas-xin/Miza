@@ -1036,7 +1036,7 @@ class Activity(Command):
 		data = await create_future(bot.data.users.fetch_events, u_id, interval=max(900, 3600 >> flags.get("v", 0)), timeout=_timeout)
 		ctx = discord.context_managers.Typing(channel) if channel else emptyctx
 		async with ctx:
-			resp = await process_image("plt_special", "$", (data, str(user)))
+			resp = await process_image("plt_special", "&", (data, str(user)), fix=choice(0, 2))
 			fn = resp
 			f = CompatFile(fn, filename=f"{user.id}.png")
 		return dict(file=f, filename=fn, best=True)
@@ -2252,7 +2252,7 @@ class UpdateUsers(Database):
 		set_dict(self.data, user.id, {})["last_typing"] = utc()
 		self.update(user.id)
 
-	async def _nocommand_(self, message, msg, force=False, flags=(), truemention=True, **void):
+	async def _nocommand_(self, message, msg, force=False, flags=(), truemention=True, perm=0, **void):
 		if getattr(message, "noresponse", False):
 			return
 		bot = self.bot
@@ -2268,6 +2268,16 @@ class UpdateUsers(Database):
 							return
 						if not user.bot:
 							break
+			if not isnan(perm) and "blacklist" in self.data:
+				gid = self.data.blacklist.get(0)
+				if gid != getattr(guild, "id", None):
+					create_task(send_with_react(
+						channel,
+						"I am currently under maintenance, please stay tuned!",
+						reacts="❎",
+						reference=message,
+					))
+					return 0
 			send = lambda *args, **kwargs: send_with_reply(channel, not flags and message, *args, **kwargs)
 			out = None
 			count = self.data.get(user.id, EMPTY).get("last_talk", 0)

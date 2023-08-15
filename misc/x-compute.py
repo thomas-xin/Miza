@@ -2483,67 +2483,69 @@ def expand_mask(image2, radius=4):
 	return outim
 
 
-# For the ~activity command.
-special_colours = {
-	"message": (0, 0, 1),
-	"typing": (0, 1, 0),
-	"command": (0, 1, 1),
-	"reaction": (1, 1, 0),
-	"misc": (1, 0, 0),
-}
+if len(sys.argv) <= 1 or int(sys.argv[1]) in (0, 2):
+	import matplotlib.pyplot as plt
+	# For the ~activity command.
+	special_colours = {
+		"message": (0, 0, 1),
+		"typing": (0, 1, 0),
+		"command": (0, 1, 1),
+		"reaction": (1, 1, 0),
+		"misc": (1, 0, 0),
+	}
 
-def plt_special(d, user=None, **void):
-	hours = 336
-	plt.style.use("dark_background")
-	plt.rcParams["figure.figsize"] = (24, 9)
-	plt.rcParams["figure.dpi"] = 96
-	plt.xlim(-hours, 0)
-	temp = np.zeros(len(next(iter(d.values()))))
-	width = hours / len(temp)
-	domain = width * np.arange(-len(temp), 0)
-	for k, v in d.items():
-		if len(v) > len(temp):
-			v = v[-len(temp):]
-		plt.bar(domain, v, bottom=temp, color=special_colours.get(k, "k"), edgecolor="white", width=width, label=k)
-		temp += np.array(v)
-	plt.bar(list(range(-hours, 0)), np.ones(hours) * max(temp) / 512, edgecolor="white", color="k")
-	if user:
-		plt.title("Recent Discord Activity for " + user)
-	plt.xlabel("Time (Hours)")
-	plt.ylabel("Action Count")
-	plt.legend(loc="upper left")
-	ts = time.time_ns() // 1000
-	out = f"cache/{ts}.png"
-	plt.savefig(out)
-	plt.clf()
-	return "$" + out
+	def plt_special(d, user=None, **void):
+		hours = 336
+		plt.style.use("dark_background")
+		plt.rcParams["figure.figsize"] = (24, 9)
+		plt.rcParams["figure.dpi"] = 96
+		plt.xlim(-hours, 0)
+		temp = np.zeros(len(next(iter(d.values()))))
+		width = hours / len(temp)
+		domain = width * np.arange(-len(temp), 0)
+		for k, v in d.items():
+			if len(v) > len(temp):
+				v = v[-len(temp):]
+			plt.bar(domain, v, bottom=temp, color=special_colours.get(k, "k"), edgecolor="white", width=width, label=k)
+			temp += np.array(v)
+		plt.bar(list(range(-hours, 0)), np.ones(hours) * max(temp) / 512, edgecolor="white", color="k")
+		if user:
+			plt.title("Recent Discord Activity for " + user)
+		plt.xlabel("Time (Hours)")
+		plt.ylabel("Action Count")
+		plt.legend(loc="upper left")
+		ts = time.time_ns() // 1000
+		out = f"cache/{ts}.png"
+		plt.savefig(out)
+		plt.clf()
+		return "$" + out
 
-def plt_mp(arr, hours, name):
-	if hours >= 336:
-		hours /= 24
+	def plt_mp(arr, hours, name):
 		if hours >= 336:
-			hours /= 30.436849166666665
-			if hours >= 24:
-				hours /= 12
-				word = "years"
+			hours /= 24
+			if hours >= 336:
+				hours /= 30.436849166666665
+				if hours >= 24:
+					hours /= 12
+					word = "years"
+				else:
+					word = "months"
 			else:
-				word = "months"
+				word = "days"
 		else:
-			word = "days"
-	else:
-		word = "hours"
-	plt.style.use("dark_background")
-	plt.rcParams["figure.figsize"] = (24, 9)
-	plt.rcParams["figure.dpi"] = 96
-	plt.xlim(-hours, 0)
-	x = np.linspace(-hours, 0, len(arr))
-	plt.plot(x, arr, "-w")
-	plt.xlabel(word.capitalize())
-	ts = time.time_ns() // 1000
-	out = f"misc/{name}.png"
-	plt.savefig(out)
-	plt.clf()
-	return out
+			word = "hours"
+		plt.style.use("dark_background")
+		plt.rcParams["figure.figsize"] = (24, 9)
+		plt.rcParams["figure.dpi"] = 96
+		plt.xlim(-hours, 0)
+		x = np.linspace(-hours, 0, len(arr))
+		plt.plot(x, arr, "-w")
+		plt.xlabel(word.capitalize())
+		ts = time.time_ns() // 1000
+		out = f"misc/{name}.png"
+		plt.savefig(out)
+		plt.clf()
+		return out
 
 discord_emoji = re.compile("^https?:\\/\\/(?:[a-z]+\\.)?discord(?:app)?\\.com\\/assets\\/[0-9A-Fa-f]+\\.svg")
 is_discord_emoji = lambda url: discord_emoji.search(url)
@@ -2928,7 +2930,7 @@ elif len(sys.argv) > 1 and sys.argv[1] == "2":
 		config = Config(
 			clip_model_name="ViT-H-14/laion2b_s32b_b79k",
 			clip_model_path="misc/Clip",
-			data_path="misc/Clip",
+			# data_path="misc/Clip",
 			cache_path="misc/Clip",
 			device=device,
 		)
@@ -2940,7 +2942,7 @@ elif len(sys.argv) > 1 and sys.argv[1] == "2":
 				config = Config(
 					clip_model_name="ViT-H-14/laion2b_s32b_b79k",
 					clip_model_path="misc/Clip",
-					data_path="misc/Clip",
+					# data_path="misc/Clip",
 					cache_path="misc/Clip",
 					device=device2,
 				)
@@ -2948,7 +2950,7 @@ elif len(sys.argv) > 1 and sys.argv[1] == "2":
 		im = Image.new("RGB", (4, 4))
 		VIT.interrogate_fast(im)
 		pytesseract.image_to_string(im, config="--psm 1")
-	exc.submit(download_model)
+	dfut = exc.submit(download_model)
 	def caption(im, best=False):
 		im = resize_max(im, 1536, "auto")
 		if im.mode != "RGB":
@@ -2960,12 +2962,10 @@ elif len(sys.argv) > 1 and sys.argv[1] == "2":
 		else:
 			fut = None
 		if best:
-			while VIT2 is True:
-				time.sleep(0.5)
+			dfut.result()
 			p1 = VIT2.interrogate(image)
 		else:
-			while VIT is True:
-				time.sleep(0.5)
+			dfut.result()
 			p1 = VIT.interrogate_fast(image)
 		enc = tiktoken.get_encoding("cl100k_base")
 		out = []
@@ -3595,10 +3595,6 @@ if __name__ == "__main__":
 				elif args[1] == "%":
 					args.pop(1)
 					x_math.evaluate(ts, args)
-				elif "plt_special" in args or "plt_mp" in args:
-					import matplotlib.pyplot
-					globals()["plt"] = matplotlib.pyplot
-					evaluate(ts, args)
 				else:
 					exc.submit(evaluate, ts, args)
 			except Exception as ex:

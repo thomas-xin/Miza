@@ -408,6 +408,8 @@ class UpdateExec(Database):
         bot = self.bot
         channel = message.channel
         if bot.id != message.author.id and bot.is_owner(message.author.id) and channel.id in self.data:
+            if any(bot.id == u.id for u in message.mentions):
+                return
             flag = self.data[channel.id]
             # Both main and virtual terminals may be active simultaneously
             for f in (flag & 1, flag & 4, flag & 32):
@@ -783,38 +785,6 @@ class UpdateProxies(Database):
     #         self[0] = {}
 
 
-class Immortalise(Command):
-    name = ["Immortalize"]
-    min_level = nan
-    description = "Immortalises a targeted webserver URL."
-    usage = "<url>"
-    example = ("immortalise https://mizabot.xyz/f/Be-084pLnw",)
-
-    async def __call__(self, argv, guild, **void):
-        url = find_urls(argv)[0]
-        if self.bot.is_webserver_url(url):
-            spl = url[8:].split("/")
-            if spl[1] in ("preview", "view", "file", "files", "download", "p", "f", "v", "d"):
-                path = spl[2]
-                orig_path = path
-                ind = "\x7f"
-                if path.startswith("!"):
-                    ind = "!"
-                    path = path[1:]
-                else:
-                    path = str(int.from_bytes(base64.urlsafe_b64decode(path.encode("utf-8") + b"==="), "big"))
-                p = find_file(path, ind=ind)
-                fn = urllib.parse.unquote(p.rsplit("/", 1)[-1].split("~", 1)[-1])
-                fid = guild.id
-                for fi in os.listdir("cache"):
-                    if fi.startswith(f"!{fid}~"):
-                        fid += 1
-                out = f"cache/!{fid}~{fn}"
-                os.rename(p, out)
-                return f"{self.bot.raw_webserver}/view/!{fid}\n{self.bot.raw_webserver}/files/!{fid}"
-        raise TypeError("Not a valid webserver URL.")
-        
-        
 class SetAvatar(Command):
     name = ["ChangeAvatar", "UpdateAvatar"]
     min_level = nan
