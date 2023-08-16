@@ -1671,7 +1671,7 @@ class Art(Command):
                     c = min(amount, 9 if nsfw and not self.sdiff_sem.active else 5)
                     c2 = c
                     while c2 > 0:
-                        n = min(c2, xrand(floor(sqrt(c2) + 1)) + 1)
+                        n = 1 if sdxl else min(c2, xrand(floor(sqrt(c2) + 1)) + 1)
                         if not n:
                             n = c2
                         fut = create_task(process_image("IBASL", "&", [p, kwargs, nsfw, False, n, sdxl], fix=3, pwr=700000 * n, timeout=240))
@@ -1866,7 +1866,7 @@ class Art(Command):
                             c = amount - amount2
                             c2 = c
                             while c2 > 0:
-                                n = min(c2, xrand(floor(sqrt(c2) + 1)) + 1)
+                                n = 1 if sdxl else min(c2, xrand(floor(sqrt(c2) + 1)) + 1)
                                 if not n:
                                     n = c2
                                 fut = create_task(process_image("IBASL", "&", [p, kwargs, nsfw, False, n, sdxl], fix=3, pwr=700000 * n, timeout=240))
