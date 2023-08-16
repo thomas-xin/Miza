@@ -1123,7 +1123,7 @@ class Identify(Command):
 		if not fields:
 			raise FileNotFoundError("Please input a file by URL or attachment.")
 		title = f"{len(fields)} file{'s' if len(fields) != 1 else ''} identified"
-		await bot.send_as_embeds(channel, title=title, author=get_author(user), fields=sorted(fields))
+		await bot.send_as_embeds(channel, title=title, author=get_author(user), fields=sorted(fields), reference=message)
 
 
 class Follow(Command):
@@ -1195,6 +1195,43 @@ class Match(Command):
 		return ini_md(match)
 
 
+class Describe(Command):
+	name = ["Description", "Image2Text", "Clip"]
+	description = "Describes the input image."
+	usage = "<url>"
+	example = ("describe https://cdn.discordapp.com/attachments/1088007891195265074/1097359599889289216/6e74595fa98e9c52e2fab6ece4639604.webp",)
+	rate_limit = (4, 5)
+	no_parse = True
+
+	async def __call__(self, bot, message, channel, guild, user, argv, **void):
+		try:
+			url = argv
+			urls = await bot.follow_url(url, best=True, allow=True, limit=1)
+			if not urls:
+				urls = await bot.follow_to_image(argv)
+				if not urls:
+					urls = await bot.follow_to_image(url)
+					if not urls:
+						raise ArgumentError
+			url = urls[0]
+		except (LookupError, ArgumentError):
+			if not argv:
+				url = None
+				try:
+					url = await bot.get_last_image(message.channel)
+				except FileNotFoundError:
+					raise ArgumentError("Please input an image by URL or attachment.")
+			else:
+				raise ArgumentError("Please input an image by URL or attachment.")
+		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
+		fut = create_future(reqs.next().head, url, headers=Request.header(), stream=True)
+		cap = await self.bot.caption(url, best=premium >= 2)
+		s = "\n\n".join(cap).strip()
+		resp = await fut
+		name = resp.headers.get("Attachment-Filename") or url.split("?", 1)[0].rsplit("/", 1)[-1]
+		await bot.send_as_embeds(channel, title=name, author=get_author(user), description=s, reference=message)
+
+
 class Ask(Command):
 	_timeout_ = 24
 	name = ["Bloom", "NeoX", "Pyg", "Pygmalion", "GPT2", "Llama", "Vicuna", "Manticore", "Hippogriff", "Wizard", "Platypus", "GPlatty", "Airochronos", "Davinci", "GPT3", "GPT3a", "GPT4", "GPT4a"]
@@ -1242,7 +1279,7 @@ class Ask(Command):
 				tup = tup[2:]
 				inp.append(f"{name}: {content}")
 			if not em:
-				data = await process_image("embedding", "$", ["\n".join(inp)], fix=2, pwr=1, timeout=90)
+				data = await process_image("embedding", "$", ["\n".join(inp)], fix=choice(0, 2), pwr=0, timeout=90)
 				em = base64.b64encode(data).decode("ascii")
 			mapd[s] = orig
 			embd[s] = em
@@ -1459,7 +1496,7 @@ class Ask(Command):
 			await ignore_embedding(message.id)
 			orig_tup = (name, q)
 			if embd:
-				data = await process_image("embedding", "$", [f"{name}: {q}"], fix=2, pwr=1, timeout=90)
+				data = await process_image("embedding", "$", [f"{name}: {q}"], fix=choice(0, 2), pwr=0, timeout=90)
 				em = base64.b64encode(data).decode("ascii")
 				objs = list(embd.items())
 				keys = [t[0] for t in objs]

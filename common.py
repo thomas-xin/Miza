@@ -2288,20 +2288,18 @@ async def proc_communicate(proc):
 async def proc_distribute(proc):
 	bot = BOT[0]
 	tasks = ()
-	executed = 0
+	t = 0
 	while True:
 		with tracebacksuppressor:
 			if not is_strict_running(proc):
 				return
 			if not tasks:
-				timeout = 180 if proc.cap >= 3 else 1800
 				try:
-					await asyncio.wait_for(wrap_future(proc.fut), timeout=timeout)
+					await asyncio.wait_for(wrap_future(proc.fut), timeout=5)
 				except (T0, T1, T2):
-					if executed >= 2:
+					timeout = 180 if proc.cap >= 3 else 1800
+					if t and utc() - t > timeout:
 						return create_task(start_proc("compute", proc.i))
-					elif executed:
-						executed += 1
 				else:
 					proc.fut = concurrent.futures.Future()
 				tasks = bot.distribute([proc.cap], [proc.pwr] * proc.sem.limit, {}, {})
@@ -2324,7 +2322,7 @@ async def proc_distribute(proc):
 						resps[fut.i] = ex
 					else:
 						resps[fut.i] = resp
-					executed = 1
+					t = utc()
 				futs = [futs[i] for i in range(len(futs)) if i not in futd]
 				if futs and not resps:
 					with tracebacksuppressor(T1):
@@ -2335,7 +2333,6 @@ async def proc_distribute(proc):
 					cap = [proc.cap]
 					pwr = [proc.pwr]
 				tasks = bot.distribute(cap, pwr, {}, resps)
-				# print(tasks, resps, proc.sem.busy)
 		await asyncio.sleep(0.01)
 
 proc_args = cdict(
@@ -2454,6 +2451,8 @@ async def sub_submit(ptype, command, fix=None, pwr=None, _timeout=12):
 			return await asyncio.wait_for(wrap_future(task), timeout=(_timeout or inf) + 2)
 		except (T1, CE) as ex:
 			ex2 = ex
+			print_exc()
+			task.cancel()
 			continue
 	raise ex2
 
@@ -2465,6 +2464,12 @@ def sub_kill(start=True, force=False):
 				force_kill(p)
 	PROCS.clear()
 	PROC_RESP.clear()
+	bot = BOT[0]
+	for k, v in bot.compute_wait.items():
+		v.cancel()
+	for k, v in bot.compute_queue.items():
+		for w in v:
+			w.cancel()
 	if start:
 		return proc_start()
 

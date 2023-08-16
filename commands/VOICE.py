@@ -2954,7 +2954,7 @@ class AudioDownloader:
 						"./ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
 						"-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets",
 						"-protocol_whitelist", "concat,tls,tcp,file,fd,http,https",
-						"-to", str(odur), "-f", "concat", "-safe", "0", "-vn",
+						"-f", "concat", "-safe", "0", "-vn",
 						"-i", concf, "-c:a", "copy", fn,
 					]
 					print(args)

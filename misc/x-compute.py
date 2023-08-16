@@ -2547,6 +2547,120 @@ if len(sys.argv) <= 1 or int(sys.argv[1]) in (0, 2):
 		plt.clf()
 		return out
 
+	def determine_cuda(mem=1, priority=None, multi=False, major=0):
+		if not torch or not torch.cuda.is_available():
+			if multi:
+				return [-1], torch.float32
+			return -1, torch.float32
+		n = torch.cuda.device_count()
+		if not n:
+			if multi:
+				return [-1], torch.float32
+			return -1, torch.float32
+		import pynvml
+		pynvml.nvmlInit()
+		dc = pynvml.nvmlDeviceGetCount()
+		handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(dc)]
+		gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
+		tinfo = [torch.cuda.get_device_properties(i) for i in range(n)]
+		COMPUTE_LOAD = globals()["COMPUTE_LOAD"] or [0] * dc
+		high = max(COMPUTE_LOAD)
+		if priority == "full":
+			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i], p.major, p.minor, p.multi_processor_count, p.total_memory)
+		elif priority:
+			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, p.major >= major, COMPUTE_LOAD[i] < high * 0.9, i, p.multi_processor_count, p.total_memory)
+		elif priority is False:
+			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, p.major >= major, -p.major, -p.minor, COMPUTE_LOAD[i] < high * 0.75, COMPUTE_LOAD[i], -gmems[i].free, p.multi_processor_count)
+		else:
+			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.5, p.major >= major, -p.major, -p.minor, COMPUTE_LOAD[i], -p.multi_processor_count, -gmems[i].free)
+		pcs = sorted(range(n), key=key, reverse=True)
+		if multi:
+			return [i for i in pcs if gmems[i].free >= mem], torch.float16
+		return pcs[0], torch.float16
+
+	if int(sys.argv[1]) == 2:
+		device, dtype = determine_cuda(1073741824, priority=None)
+	else:
+		device, dtype = -1, torch.float32
+	device = f"cuda:{device}" if device >= 0 else "cpu"
+	from sentence_transformers import SentenceTransformer
+	Embedder = SentenceTransformer("LLukas22/all-mpnet-base-v2-embedding-all", device=device)
+	if dtype == torch.float16:
+		try:
+			Embedder = Embedder.half()
+		except (RuntimeError, NotImplementedError):
+			pass
+	def embedding(s):
+		a = Embedder.encode(s).astype(np.float16)
+		return a.data
+
+	import tiktoken
+	from clip_interrogator import Config, Interrogator
+	try:
+		import pytesseract
+	except ImportError:
+		pytesseract = None
+
+	VIT = VIT2 = True
+	def download_model():
+		device = "cpu"
+		if torch and int(sys.argv[1]) == 2:
+			if torch.cuda.device_count() > 1:
+				device = f"cuda:{determine_cuda(priority='full', major=7)[0]}"
+			elif torch.cuda.device_count():
+				device = "cuda"
+		config = Config(
+			clip_model_name="ViT-H-14/laion2b_s32b_b79k",
+			clip_model_path="misc/Clip",
+			cache_path="misc/Clip",
+			device=device,
+		)
+		if device != "cpu":
+			config.apply_low_vram_defaults()
+		globals()["VIT"] = globals()["VIT2"] = Interrogator(config)
+		im = Image.new("RGB", (4, 4))
+		VIT.interrogate_fast(im)
+		return pytesseract.image_to_string(im, config="--psm 1")
+	dfut = exc.submit(download_model)
+	def caption(im, best=False):
+		im = resize_max(im, 1536, "auto")
+		if im.mode != "RGB":
+			image = im.convert("RGB")
+		else:
+			image = im
+		if pytesseract:
+			fut = exc.submit(pytesseract.image_to_string, image, config="--psm 1", timeout=8)
+		else:
+			fut = None
+		if best:
+			dfut.result()
+			p1 = VIT2.interrogate(image)
+		else:
+			dfut.result()
+			p1 = VIT.interrogate_fast(image)
+		enc = tiktoken.get_encoding("cl100k_base")
+		out = []
+		otok = list(enc.encode(p1.strip()))
+		if len(otok) >= 8:
+			last = None
+			count = 0
+			while otok:
+				c = otok.pop(0)
+				if c == last:
+					if count > 3:
+						continue
+					count += 1
+				else:
+					last = c
+					count = 0
+				out.append(c)
+			p1 = enc.decode(out) if len(out) >= 8 else p1
+		if fut:
+			p2 = fut.result().strip()
+		else:
+			p2 = None
+		return (p1, p2)
+
 discord_emoji = re.compile("^https?:\\/\\/(?:[a-z]+\\.)?discord(?:app)?\\.com\\/assets\\/[0-9A-Fa-f]+\\.svg")
 is_discord_emoji = lambda url: discord_emoji.search(url)
 
@@ -2865,130 +2979,6 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 		print(traceback.format_exc(), end="")
 	else:
 		convobot.AsyncChatGPT = AsyncChatGPT
-
-elif len(sys.argv) > 1 and sys.argv[1] == "2":
-
-	def determine_cuda(mem=1, priority=None, multi=False, major=0):
-		if not torch or not torch.cuda.is_available():
-			if multi:
-				return [-1], torch.float32
-			return -1, torch.float32
-		n = torch.cuda.device_count()
-		if not n:
-			if multi:
-				return [-1], torch.float32
-			return -1, torch.float32
-		import pynvml
-		pynvml.nvmlInit()
-		dc = pynvml.nvmlDeviceGetCount()
-		handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(dc)]
-		gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
-		tinfo = [torch.cuda.get_device_properties(i) for i in range(n)]
-		COMPUTE_LOAD = globals()["COMPUTE_LOAD"] or [0] * dc
-		high = max(COMPUTE_LOAD)
-		if priority == "full":
-			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i], p.major, p.minor, p.multi_processor_count, p.total_memory)
-		elif priority:
-			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, p.major >= major, COMPUTE_LOAD[i] < high * 0.9, i, p.multi_processor_count, p.total_memory)
-		elif priority is False:
-			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, p.major >= major, -p.major, -p.minor, COMPUTE_LOAD[i] < high * 0.75, COMPUTE_LOAD[i], -gmems[i].free, p.multi_processor_count)
-		else:
-			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.5, p.major >= major, -p.major, -p.minor, COMPUTE_LOAD[i], -p.multi_processor_count, -gmems[i].free)
-		pcs = sorted(range(n), key=key, reverse=True)
-		if multi:
-			return [i for i in pcs if gmems[i].free >= mem], torch.float16
-		return pcs[0], torch.float16
-
-	device, dtype = determine_cuda(1073741824, priority=None)
-	device = f"cuda:{device}" if device >= 0 else "cpu"
-	from sentence_transformers import SentenceTransformer
-	Embedder = SentenceTransformer("LLukas22/all-mpnet-base-v2-embedding-all", device=device)
-	if dtype == torch.float16:
-		try:
-			Embedder = Embedder.half()
-		except (RuntimeError, NotImplementedError):
-			pass
-	def embedding(s):
-		a = Embedder.encode(s).astype(np.float16)
-		return a.data
-
-	import tiktoken
-	from clip_interrogator import Config, Interrogator
-	try:
-		import pytesseract
-	except ImportError:
-		pytesseract = None
-
-	VIT = VIT2 = True
-	def download_model():
-		device = "cpu"
-		if torch:
-			if torch.cuda.device_count() > 1:
-				device = f"cuda:{determine_cuda(priority=False, major=7)[0]}"
-			elif torch.cuda.device_count():
-				device = "cuda"
-		config = Config(
-			clip_model_name="ViT-H-14/laion2b_s32b_b79k",
-			clip_model_path="misc/Clip",
-			# data_path="misc/Clip",
-			cache_path="misc/Clip",
-			device=device,
-		)
-		config.apply_low_vram_defaults()
-		globals()["VIT"] = globals()["VIT2"] = Interrogator(config)
-		if torch and torch.cuda.device_count() > 1:
-			device2 = f"cuda:{determine_cuda(priority=True, major=7)[0]}"
-			if device != device2:
-				config = Config(
-					clip_model_name="ViT-H-14/laion2b_s32b_b79k",
-					clip_model_path="misc/Clip",
-					# data_path="misc/Clip",
-					cache_path="misc/Clip",
-					device=device2,
-				)
-				globals()["VIT2"] = Interrogator(config)
-		im = Image.new("RGB", (4, 4))
-		VIT.interrogate_fast(im)
-		pytesseract.image_to_string(im, config="--psm 1")
-	dfut = exc.submit(download_model)
-	def caption(im, best=False):
-		im = resize_max(im, 1536, "auto")
-		if im.mode != "RGB":
-			image = im.convert("RGB")
-		else:
-			image = im
-		if pytesseract:
-			fut = exc.submit(pytesseract.image_to_string, image, config="--psm 1", timeout=8)
-		else:
-			fut = None
-		if best:
-			dfut.result()
-			p1 = VIT2.interrogate(image)
-		else:
-			dfut.result()
-			p1 = VIT.interrogate_fast(image)
-		enc = tiktoken.get_encoding("cl100k_base")
-		out = []
-		otok = list(enc.encode(p1.strip()))
-		if len(otok) >= 8:
-			last = None
-			count = 0
-			while otok:
-				c = otok.pop(0)
-				if c == last:
-					if count > 3:
-						continue
-					count += 1
-				else:
-					last = c
-					count = 0
-				out.append(c)
-			p1 = enc.decode(out) if len(out) >= 8 else p1
-		if fut:
-			p2 = fut.result().strip()
-		else:
-			p2 = None
-		return (p1, p2)
 
 elif len(sys.argv) > 1 and int(sys.argv[1]) >= 3:
 	import imagebot
@@ -3549,7 +3539,10 @@ def evaluate(ts, args):
 			out = out.read()
 		if isinstance(out, (bytes, memoryview)):
 			b = base64.b64encode(out)
-			sys.stdout.buffer.write(f"$PROC_RESP[{ts}].set_result(_x)~".encode("utf-8") + b + b"\n")
+			sys.stdout.buffer.write(f"$PROC_RESP[{ts}].set_result(_x)~".encode("utf-8"))
+			sys.stdout.buffer.write(b)
+			sys.stdout.buffer.write(b"\n")
+			# sys.stdout.buffer.write(f"$PROC_RESP[{ts}].set_result(_x)~".encode("utf-8") + b + b"\n")
 			# sys.stdout.buffer.write(b)
 			# sys.stdout.buffer.write(b"\n")
 		else:

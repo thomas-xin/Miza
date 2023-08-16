@@ -1026,6 +1026,9 @@ class Bot:
 			raise PermissionError("NSFW filter detected in non-NSFW channel. If you believe this was a mistake, please try again.")
 		return out
 
+	# def instructblip(self, url):
+		# https://replicate.com/joehoover/instructblip-vicuna13b
+
 if __name__ == "__main__":
 	import sys
 	token = sys.argv[1] if len(sys.argv) > 1 else ""

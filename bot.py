@@ -1462,9 +1462,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			pass
 		if not torch:
 			return ("File", url.rsplit("/", 1)[-1], "", None)
+		res = None
 		try:
-			p1, p2 = await process_image(url, "caption", ["-nogif", best], fix=2, pwr=1, timeout=300)
+			res = await process_image(url, "caption", ["-nogif", best], fix=2 if best else choice(0, 2), pwr=best, timeout=300)
+			p1, p2 = res
 		except:
+			if res:
+				print(res)
 			print_exc()
 			tup = None
 			with tracebacksuppressor:
@@ -3314,16 +3318,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				comm = comm[1:]
 			op = True
 		mentioning = (op or self.id in (member.id for member in message.mentions))
-		if (op or mentioning) and "blacklist" in self.data and not isnan(u_perm):
-			gid = self.data.blacklist.get(0)
-			if gid and gid != g_id:
-				create_task(send_with_react(
-					channel,
-					"I am currently under maintenance, please stay tuned!",
-					reacts="❎",
-					reference=message,
-				))
-				return 0
 		# Respond to blacklisted users attempting to use a command, or when mentioned without a command.
 		if (u_perm <= -inf and mentioning) and not cpy.startswith("~~"):
 			# print(f"Ignoring command from blacklisted user {user} ({u_id}): {lim_str(message.content, 256)}")
@@ -3375,6 +3369,15 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				command_check = full_prune(comm[:i]).replace("*", "").replace("_", "").replace("||", "")
 			# Hash table lookup for target command: O(1) average time complexity.
 			if command_check in bot.commands:
+				gid = self.data.blacklist.get(0)
+				if gid and gid != g_id:
+					create_task(send_with_react(
+						channel,
+						"I am currently under maintenance, please stay tuned!",
+						reacts="❎",
+						reference=message,
+					))
+					return 0
 				# Multiple commands may have the same alias, run all of them
 				for command in bot.commands[command_check]:
 					# Make sure command is enabled, administrators bypass this

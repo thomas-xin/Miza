@@ -57,149 +57,149 @@ def get_video(url, fps=None):
 VIDEOS = ("gif", "webp", "apng", "mp4", "mkv", "webm", "mov", "wmv", "flv", "avi", "qt", "f4v", "zip")
 
 
-class IMG(Command):
-    min_display = "0~2"
-    description = "Sends an image in the current chat from a list."
-    usage = "(add|delete)? <0:tags>* <1:url>? <verbose{?v}|delete{?x}|hide{?h}>?"
-    example = ("img add how https://media.discordapp.net/attachments/500919580596764673/642515924578205696/HOW.gif", "img delete how")
-    flags = "vraedhzfx"
-    rate_limit = (4, 6)
-    no_parse = True
-    directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
-    dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
-    slash = True
-
-    async def __call__(self, bot, flags, args, argv, user, message, channel, guild, perm, **void):
-        update = bot.data.images.update
-        imglists = bot.data.images
-        images = imglists.get(guild.id, {})
-        if "a" in flags or "e" in flags or "d" in flags:
-            if message.attachments:
-                args.extend(best_url(a) for a in message.attachments)
-                argv += " " * bool(argv) + " ".join(best_url(a) for a in message.attachments)
-            req = 2
-            if perm < req:
-                reason = "to change image list for " + guild.name
-                raise self.perm_error(perm, req, reason)
-            if "a" in flags or "e" in flags:
-                lim = 256 << bot.is_trusted(guild.id) * 2 + 1
-                if len(images) > lim:
-                    raise OverflowError(f"Image list for {guild} has reached the maximum of {lim} items. Please remove an item to add another.")
-                key = " ".join(args[:-1]).casefold()
-                if len(key) > 2000:
-                    raise ArgumentError("Image tag too long.")
-                elif not key:
-                    raise ArgumentError("Image tag must not be empty.")
-                if is_url(args[0]):
-                    if len(args) > 1:
-                        args = (args[-1], args[0])
-                    else:
-                        args = (args[0].split("?", 1)[0].rsplit("/", 1)[-1].rsplit(".", 1)[0], args[0])
-                urls = await bot.follow_url(args[-1], best=True, allow=True, limit=1)
-                url = urls[0]
-                if len(url) > 2000:
-                    raise ArgumentError("Image url too long.")
-                images[key] = url
-                images = {i: images[i] for i in sorted(images)}
-                imglists[guild.id] = images
-                if not "h" in flags:
-                    return css_md(f"Successfully added {sqr_md(key)} to the image list for {sqr_md(guild)}.")
-            if not args:
-                # This deletes all images for the current guild
-                if "f" not in flags and len(images) > 1:
-                    raise InterruptedError(css_md(sqr_md(f"WARNING: {len(images)} IMAGES TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), force=True))
-                imglists[guild.id] = {}
-                return italics(css_md(f"Successfully removed all {sqr_md(len(images))} images from the image list for {sqr_md(guild)}."))
-            key = argv.casefold()
-            images.pop(key)
-            imglists[guild.id] = images
-            return italics(css_md(f"Successfully removed {sqr_md(key)} from the image list for {sqr_md(guild)}."))
-        if not argv and not "r" in flags:
-            # Set callback message for scrollable list
-            buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
-            await send_with_reply(
-                None,
-                message,
-                "*```" + "\n" * ("z" in flags) + "callback-image-img-"
-                + str(user.id) + "_0"
-                + "-\nLoading Image database...```*",
-                buttons=buttons,
-            )
-            return
-        sources = alist()
-        for tag in args:
-            t = tag.casefold()
-            if t in images:
-                sources.append(images[t])
-        r = flags.get("r", 0)
-        for _ in loop(r):
-            sources.append(choice(images.values()))
-        if not len(sources):
-            raise LookupError(f"Target image {argv} not found. Use img for list.")
-        url = choice(sources)
-        if "x" in flags:
-            create_task(bot.silent_delete(message))
-        if "v" in flags:
-            msg = escape_roles(url)
-        else:
-            msg = None
-        url2 = await bot.get_proxy_url(message.author)
-        colour = await create_future(bot.get_colour, message.author)
-        emb = discord.Embed(colour=colour, url=url).set_image(url=url)
-        await bot.send_as_webhook(channel, msg, embed=emb, username=message.author.display_name, avatar_url=url2)
-
-    async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
-        u_id, pos = list(map(int, vals.split("_", 1)))
-        if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
-            return
-        if reaction not in self.directions and reaction is not None:
-            return
-        guild = message.guild
-        user = await bot.fetch_user(u_id)
-        imglists = bot.data.images
-        images = imglists.get(guild.id, {})
-        page = 12
-        last = max(0, len(images) - page)
-        if reaction is not None:
-            i = self.directions.index(reaction)
-            if i == 0:
-                new = 0
-            elif i == 1:
-                new = max(0, pos - page)
-            elif i == 2:
-                new = min(last, pos + page)
-            elif i == 3:
-                new = last
-            else:
-                new = pos
-            pos = new
-        content = message.content
-        if not content:
-            content = message.embeds[0].description
-        i = content.index("callback")
-        content = "*```" + "\n" * ("\n" in content[:i]) + (
-            "callback-image-img-"
-            + str(u_id) + "_" + str(pos)
-            + "-\n"
-        )
-        if not images:
-            content += f"Image list for {str(guild).replace('`', '')} is currently empty.```*"
-            msg = ""
-        else:
-            content += f"{len(images)} images currently assigned for {str(guild).replace('`', '')}:```*"
-            msg = ini_md(iter2str({k: "\n" + images[k] for k in tuple(images)[pos:pos + page]}))
-        colour = await self.bot.get_colour(guild)
-        emb = discord.Embed(
-            description=content + msg,
-            colour=colour,
-        )
-        emb.set_author(**get_author(user))
-        more = len(images) - pos - page
-        if more > 0:
-            emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
-        create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
-        if hasattr(message, "int_token"):
-            await bot.ignore_interaction(message)
+# class IMG(Command):
+#     min_display = "0~2"
+#     description = "Sends an image in the current chat from a list."
+#     usage = "(add|delete)? <0:tags>* <1:url>? <verbose{?v}|delete{?x}|hide{?h}>?"
+#     example = ("img add how https://media.discordapp.net/attachments/500919580596764673/642515924578205696/HOW.gif", "img delete how")
+#     flags = "vraedhzfx"
+#     rate_limit = (4, 6)
+#     no_parse = True
+#     directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
+#     dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
+#     slash = True
+# 
+#     async def __call__(self, bot, flags, args, argv, user, message, channel, guild, perm, **void):
+#         update = bot.data.images.update
+#         imglists = bot.data.images
+#         images = imglists.get(guild.id, {})
+#         if "a" in flags or "e" in flags or "d" in flags:
+#             if message.attachments:
+#                 args.extend(best_url(a) for a in message.attachments)
+#                 argv += " " * bool(argv) + " ".join(best_url(a) for a in message.attachments)
+#             req = 2
+#             if perm < req:
+#                 reason = "to change image list for " + guild.name
+#                 raise self.perm_error(perm, req, reason)
+#             if "a" in flags or "e" in flags:
+#                 lim = 256 << bot.is_trusted(guild.id) * 2 + 1
+#                 if len(images) > lim:
+#                     raise OverflowError(f"Image list for {guild} has reached the maximum of {lim} items. Please remove an item to add another.")
+#                 key = " ".join(args[:-1]).casefold()
+#                 if len(key) > 2000:
+#                     raise ArgumentError("Image tag too long.")
+#                 elif not key:
+#                     raise ArgumentError("Image tag must not be empty.")
+#                 if is_url(args[0]):
+#                     if len(args) > 1:
+#                         args = (args[-1], args[0])
+#                     else:
+#                         args = (args[0].split("?", 1)[0].rsplit("/", 1)[-1].rsplit(".", 1)[0], args[0])
+#                 urls = await bot.follow_url(args[-1], best=True, allow=True, limit=1)
+#                 url = urls[0]
+#                 if len(url) > 2000:
+#                     raise ArgumentError("Image url too long.")
+#                 images[key] = url
+#                 images = {i: images[i] for i in sorted(images)}
+#                 imglists[guild.id] = images
+#                 if not "h" in flags:
+#                     return css_md(f"Successfully added {sqr_md(key)} to the image list for {sqr_md(guild)}.")
+#             if not args:
+#                 # This deletes all images for the current guild
+#                 if "f" not in flags and len(images) > 1:
+#                     raise InterruptedError(css_md(sqr_md(f"WARNING: {len(images)} IMAGES TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), force=True))
+#                 imglists[guild.id] = {}
+#                 return italics(css_md(f"Successfully removed all {sqr_md(len(images))} images from the image list for {sqr_md(guild)}."))
+#             key = argv.casefold()
+#             images.pop(key)
+#             imglists[guild.id] = images
+#             return italics(css_md(f"Successfully removed {sqr_md(key)} from the image list for {sqr_md(guild)}."))
+#         if not argv and not "r" in flags:
+#             # Set callback message for scrollable list
+#             buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
+#             await send_with_reply(
+#                 None,
+#                 message,
+#                 "*```" + "\n" * ("z" in flags) + "callback-image-img-"
+#                 + str(user.id) + "_0"
+#                 + "-\nLoading Image database...```*",
+#                 buttons=buttons,
+#             )
+#             return
+#         sources = alist()
+#         for tag in args:
+#             t = tag.casefold()
+#             if t in images:
+#                 sources.append(images[t])
+#         r = flags.get("r", 0)
+#         for _ in loop(r):
+#             sources.append(choice(images.values()))
+#         if not len(sources):
+#             raise LookupError(f"Target image {argv} not found. Use img for list.")
+#         url = choice(sources)
+#         if "x" in flags:
+#             create_task(bot.silent_delete(message))
+#         if "v" in flags:
+#             msg = escape_roles(url)
+#         else:
+#             msg = None
+#         url2 = await bot.get_proxy_url(message.author)
+#         colour = await create_future(bot.get_colour, message.author)
+#         emb = discord.Embed(colour=colour, url=url).set_image(url=url)
+#         await bot.send_as_webhook(channel, msg, embed=emb, username=message.author.display_name, avatar_url=url2)
+# 
+#     async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
+#         u_id, pos = list(map(int, vals.split("_", 1)))
+#         if reaction not in (None, self.directions[-1]) and u_id != user.id and perm < 3:
+#             return
+#         if reaction not in self.directions and reaction is not None:
+#             return
+#         guild = message.guild
+#         user = await bot.fetch_user(u_id)
+#         imglists = bot.data.images
+#         images = imglists.get(guild.id, {})
+#         page = 12
+#         last = max(0, len(images) - page)
+#         if reaction is not None:
+#             i = self.directions.index(reaction)
+#             if i == 0:
+#                 new = 0
+#             elif i == 1:
+#                 new = max(0, pos - page)
+#             elif i == 2:
+#                 new = min(last, pos + page)
+#             elif i == 3:
+#                 new = last
+#             else:
+#                 new = pos
+#             pos = new
+#         content = message.content
+#         if not content:
+#             content = message.embeds[0].description
+#         i = content.index("callback")
+#         content = "*```" + "\n" * ("\n" in content[:i]) + (
+#             "callback-image-img-"
+#             + str(u_id) + "_" + str(pos)
+#             + "-\n"
+#         )
+#         if not images:
+#             content += f"Image list for {str(guild).replace('`', '')} is currently empty.```*"
+#             msg = ""
+#         else:
+#             content += f"{len(images)} images currently assigned for {str(guild).replace('`', '')}:```*"
+#             msg = ini_md(iter2str({k: "\n" + images[k] for k in tuple(images)[pos:pos + page]}))
+#         colour = await self.bot.get_colour(guild)
+#         emb = discord.Embed(
+#             description=content + msg,
+#             colour=colour,
+#         )
+#         emb.set_author(**get_author(user))
+#         more = len(images) - pos - page
+#         if more > 0:
+#             emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
+#         create_task(message.edit(content=None, embed=emb, allowed_mentions=discord.AllowedMentions.none()))
+#         if hasattr(message, "int_token"):
+#             await bot.ignore_interaction(message)
 
 
 async def get_image(bot, user, message, args, argv, default=2, raw=False, ext="webp", count=0):
