@@ -2288,7 +2288,7 @@ async def proc_communicate(proc):
 async def proc_distribute(proc):
 	bot = BOT[0]
 	tasks = ()
-	t = 0
+	st = 0
 	while True:
 		with tracebacksuppressor:
 			if not is_strict_running(proc):
@@ -2297,8 +2297,8 @@ async def proc_distribute(proc):
 				try:
 					await asyncio.wait_for(wrap_future(proc.fut), timeout=5)
 				except (T0, T1, T2):
-					timeout = 180 if proc.cap >= 3 else 1800
-					if t and utc() - t > timeout:
+					timeout = 300 if proc.cap >= 3 else 1800
+					if st and utc() - st > timeout:
 						return create_task(start_proc("compute", proc.i))
 				else:
 					proc.fut = concurrent.futures.Future()
@@ -2306,33 +2306,41 @@ async def proc_distribute(proc):
 				if not tasks:
 					await asyncio.sleep(1 / 24)
 					continue
+			resps = {}
 			futs = []
 			while tasks or futs:
-				resps = {}
+				if not is_strict_running(proc):
+					return
 				for task in tasks:
 					i, cap, command, timeout = task
+					# print("NEW TASK:", proc, i, bot.compute_wait, lim_str(str(command), 64), frand())
 					fut = create_task(_sub_submit(proc, command, _timeout=timeout))
-					fut.i = i
+					fut.ts = i
 					futs.append(fut)
+					if st:
+						st = utc()
+				# print(proc, tasks, [fut.ts for fut in futs], futs)
 				futd = {i for i, fut in enumerate(futs) if fut.done()}
 				for i in futd:
+					fut = futs[i]
 					try:
-						resp = futs[i].result()
+						resp = fut.result()
 					except Exception as ex:
-						resps[fut.i] = ex
+						resps[fut.ts] = ex
 					else:
-						resps[fut.i] = resp
-					t = utc()
+						resps[fut.ts] = resp
+					st = utc()
 				futs = [futs[i] for i in range(len(futs)) if i not in futd]
 				if futs and not resps:
 					with tracebacksuppressor(T1):
 						await asyncio.wait_for(asyncio.shield(futs[0]), timeout=1)
-				if proc.sem.busy:
+				if not is_strict_running(proc) or proc.sem.busy:
 					cap = pwr = []
 				else:
 					cap = [proc.cap]
 					pwr = [proc.pwr]
 				tasks = bot.distribute(cap, pwr, {}, resps)
+				resps.clear()
 		await asyncio.sleep(0.01)
 
 proc_args = cdict(
@@ -2343,28 +2351,37 @@ proc_args = cdict(
 
 COMPUTE_LOAD = AUTH.get("compute_load", [])
 COMPUTE_POT = COMPUTE_LOAD.copy()
+COMPUTE_ORDER = AUTH.get("compute_order", [])
 if len(COMPUTE_LOAD) < DC:
 	handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(DC)]
 	gcore = [pynvml.nvmlDeviceGetNumGpuCores(d) for d in handles]
 	COMPUTE_LOAD = AUTH["compute_load"] = gcore
 	COMPUTE_POT = [i * 100 for i in gcore]
+	COMPUTE_ORDER = list(range(DC))
 elif len(COMPUTE_LOAD) > DC:
 	COMPUTE_LOAD = COMPUTE_LOAD[:DC]
 	COMPUTE_POT = COMPUTE_POT[:DC]
+	COMPUTE_ORDER = COMPUTE_ORDER[:DC]
 if COMPUTE_LOAD:
 	total = sum(COMPUTE_LOAD)
 	if total != 1:
 		COMPUTE_LOAD = AUTH["compute_load"] = [i / total for i in COMPUTE_LOAD]
 	print("Compute load distribution:", COMPUTE_LOAD)
+	print("Compute pool order:", COMPUTE_ORDER)
 
 async def start_proc(k, i):
-	if k in PROCS and is_strict_running(PROCS[k][i]):
-		force_kill(PROCS[k][i])
+	if k in PROCS:
+		if is_strict_running(PROCS[k][i]):
+			force_kill(PROCS[k][i])
+			PROCS[k][i] = False
+		elif PROCS[k][i] is False:
+			return
 	args = list(proc_args[k])
 	args.append(str(i))
 	args.append(orjson.dumps(COMPUTE_LOAD).decode("ascii"))
 	properties = [torch.cuda.get_device_properties(i) for i in range(DC)]
 	args.append(orjson.dumps([(p.major, p.minor) for p in properties]))
+	args.append(orjson.dumps(COMPUTE_ORDER).decode("ascii"))
 	proc = await asyncio.create_subprocess_exec(
 		*args,
 		limit=1073741824,
@@ -2374,7 +2391,7 @@ async def start_proc(k, i):
 	)
 	proc.i = i
 	proc.is_running = lambda: not proc.returncode
-	proc.sem = Semaphore(3, inf) if i < 3 else Semaphore(1, inf)
+	proc.sem = Semaphore(4, inf) if i < 3 else Semaphore(1, inf)
 	proc.comm = create_task(proc_communicate(proc))
 	proc.dist = create_task(proc_distribute(proc))
 	proc.cap = min(i, 3)
@@ -2402,15 +2419,23 @@ def proc_start():
 	# PROC_COUNT.math = 3
 	# PROC_COUNT.image = 3 + dc
 	PROC_COUNT.compute = 3 + DC
+	starting = []
 	for k, v in PROC_COUNT.items():
 		PROCS[k] = [None] * v
 		for i in range(v):
 			if i >= 3:
-				if torch.cuda.get_device_properties(i - 3).total_memory <= 11 * 1073741824 or COMPUTE_POT[i - 3] < 500000:
+				cap = i - 3
+				# Reject any compute device below RTX 2080ti/3060 for SDXL
+				if torch.cuda.get_device_properties(cap).total_memory < 10 * 1073741824 or COMPUTE_POT[cap] < 400000:
 					continue
-				if COMPUTE_LOAD[i - 3] < 0.75 / len(COMPUTE_LOAD):
+				if COMPUTE_LOAD[cap] < 0.5 / len(COMPUTE_LOAD):
 					continue
-			create_task(start_proc(k, i))
+			starting.append((k, i))
+	if len(starting) > 5 and starting[3][1] == 3:
+		starting.pop(3)
+	print(starting)
+	for k, i in starting:
+		create_task(start_proc(k, i))
 
 async def get_idle_proc(ptype, fix=None):
 	if fix is not None:
@@ -2453,6 +2478,7 @@ async def sub_submit(ptype, command, fix=None, pwr=None, _timeout=12):
 			ex2 = ex
 			print_exc()
 			task.cancel()
+			queue.discard(task)
 			continue
 	raise ex2
 
@@ -2470,6 +2496,8 @@ def sub_kill(start=True, force=False):
 	for k, v in bot.compute_queue.items():
 		for w in v:
 			w.cancel()
+	bot.compute_wait.clear()
+	bot.compute_queue.clear()
 	if start:
 		return proc_start()
 

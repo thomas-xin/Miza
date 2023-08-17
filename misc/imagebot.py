@@ -212,7 +212,7 @@ def determine_cuda(mem=1, priority=None, multi=False, major=0):
 	handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(dc)]
 	gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
 	tinfo = [torch.cuda.get_device_properties(i) for i in range(n)]
-	COMPUTE_LOAD = globals()["COMPUTE_LOAD"] or [0] * dc
+	COMPUTE_LOAD = globals().get("COMPUTE_LOAD") or [0] * dc
 	high = max(COMPUTE_LOAD)
 	if priority == "full":
 		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i], p.major, p.minor, p.multi_processor_count, p.total_memory)
@@ -642,6 +642,8 @@ class Bot:
 			return ()
 		while self.loading:
 			time.sleep(1)
+		with torch.no_grad():
+			torch.cuda.empty_cache()
 		if not pipe:
 			try:
 				self.loading = True
@@ -656,13 +658,14 @@ class Bot:
 					if device >= 0:
 						if os.name != "nt":
 							pipe.unet = torch.compile(pipe.unet, mode="reduce-overhead", fullgraph=True)
-						pipe = pipe.to(f"cuda:{device}")
-						pipe.enable_attention_slicing()
+						# pipe.enable_attention_slicing()
 						pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 						try:
 							pipe.enable_model_cpu_offload()
 						except AttributeError:
-							pass
+							pipe = pipe.to(f"cuda:{device}")
+						if sdxl:
+							pipe.enable_vae_tiling()
 				except Exception as ex:
 					if isinstance(ex, RuntimeError):
 						if sdxl:
@@ -678,6 +681,14 @@ class Bot:
 				models[(f2, model)] = pipe
 			finally:
 				self.loading = False
+		# else:
+			# if len(models) > 1:
+				# models.clear()
+				# models[(f2, model)] = pipe
+				# import gc
+				# gc.collect()
+				# with torch.no_grad():
+					# torch.cuda.empty_cache()
 		# if nsfw:
 			# pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
 		# else:
@@ -701,7 +712,11 @@ class Bot:
 			if im:
 				kw["target_size"] = im.size
 			else:
-				kw["target_size"] = (768, 768)
+				if device >= 0 and torch.cuda.get_device_properties(device).total_memory > 15 * 1073741824:
+					kw["target_size"] = (768, 768)
+				else:
+					kw["target_size"] = (512, 512)
+			kw["negative_prompt"] = "(blurry), [bad], ((distorted)), (disfigured), poor (low quality), ugly"
 		prompt = lim_tokens(prompt, 80, mode="left")
 		if f2 in (StableDiffusionInpaintPipeline, StableDiffusionXLInpaintPipeline):
 			data = pipe(
@@ -741,6 +756,8 @@ class Bot:
 				**kw,
 			)
 		# print(data, data.images)
+		with torch.no_grad():
+			torch.cuda.empty_cache()
 		if data is None or not len(data.images):
 			return ()
 		nsfw_content_detected = getattr(data, "nsfw_content_detected", None)
@@ -764,6 +781,8 @@ class Bot:
 			vae = pipe.vae
 			text_encoder_2 = pipe.text_encoder_2
 			images = self.art_stablediffusion_refine(prompt, images, vae=vae, text_encoder_2=text_encoder_2, fail_unless_gpu=fail_unless_gpu, device=device, dtype=dtype, orig_size=kw.get("target_size", (1024, 1024)))
+		with torch.no_grad():
+			torch.cuda.empty_cache()
 		return images
 
 	def art_stablediffusion_refine(self, prompt, images, vae=None, text_encoder_2=None, fail_unless_gpu=False, device=0, dtype=torch.bfloat16, steps=48, orig_size=(1024, 1024)):
@@ -783,6 +802,8 @@ class Bot:
 			return ()
 		while self.loading:
 			time.sleep(1)
+		with torch.no_grad():
+			torch.cuda.empty_cache()
 		if not pipe:
 			try:
 				self.loading = True
@@ -798,13 +819,14 @@ class Bot:
 					if device >= 0:
 						if os.name != "nt":
 							pipe.unet = torch.compile(pipe.unet, mode="reduce-overhead", fullgraph=True)
-						pipe = pipe.to(f"cuda:{device}")
-						pipe.enable_attention_slicing()
+						# pipe.enable_attention_slicing()
 						pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 						try:
 							pipe.enable_model_cpu_offload()
 						except AttributeError:
-							pass
+							pipe = pipe.to(f"cuda:{device}")
+						if True:
+							pipe.enable_vae_tiling()
 				except Exception as ex:
 					if isinstance(ex, RuntimeError):
 						raise
@@ -817,6 +839,14 @@ class Bot:
 				models[(f2, model)] = pipe
 			finally:
 				self.loading = False
+		# else:
+			# if len(models) > 1:
+				# models.clear()
+				# models[(f2, model)] = pipe
+				# import gc
+				# gc.collect()
+				# with torch.no_grad():
+					# torch.cuda.empty_cache()
 		# pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
 		prompt = lim_tokens(prompt, 80, mode="left")
 		def max_size(w, h, maxsize, force=False):
@@ -829,7 +859,7 @@ class Bot:
 			return w, h
 		data = pipe(
 			prompt=[prompt] * len(images),
-			negative_prompt=["((blurry)), [bad], (((distorted))), ((disfigured)), ((poor)) (low quality), ugly"] * len(images),
+			negative_prompt=["(blurry), [bad], ((distorted)), (disfigured), poor (low quality), ugly"] * len(images),
 			image=images,
 			num_images_per_prompt=1,
 			num_inference_steps=steps,
@@ -844,6 +874,8 @@ class Bot:
 				print("IBASL: Invalid")
 				continue
 			images.append(im)
+		with torch.no_grad():
+			torch.cuda.empty_cache()
 		return images
 
 	def art_textsynth(self, prompt, kwargs=None, count=1):

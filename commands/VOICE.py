@@ -5652,7 +5652,7 @@ class UpdateAudio(Database):
 					if loading:
 						print("auto-loading queue of", len(argv["queue"]), "items to", guild)
 						create_task(dump(guild, channel, user, bot, perm, name, argv, flags, message, vc=vc))
-		self.data.clear()
+		# self.data.clear()
 
 
 class UpdatePlaylists(Database):

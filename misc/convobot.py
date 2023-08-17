@@ -226,7 +226,7 @@ def determine_cuda(mem=1, priority=None, multi=False, major=0):
 	handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(dc)]
 	gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
 	tinfo = [torch.cuda.get_device_properties(i) for i in range(n)]
-	COMPUTE_LOAD = globals()["COMPUTE_LOAD"] or [0] * dc
+	COMPUTE_LOAD = globals().get("COMPUTE_LOAD") or [0] * dc
 	high = max(COMPUTE_LOAD)
 	if priority == "full":
 		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i], p.major, p.minor, p.multi_processor_count, p.total_memory)
@@ -479,16 +479,18 @@ class Bot:
 			resp = reqx.get(url)
 			return resp.content
 
+	summ_waiting = None
 	def answer_summarise(self, m="Qiliang/bart-large-cnn-samsum-ChatGPT_v3", q="", max_length=128, min_length=64, do_sample=False):
+		while self.summ_waiting:
+			self.summ_waiting.result()
 		try:
-			smp = sorted(self.models[m], key= lambda p: p.busy)[0]
+			pipes = self.models[m]
 		except KeyError:
+			self.summ_waiting = concurrent.futures.Future()
 			devices, dtype = determine_cuda(2147483648, priority=False, multi=True)
-			print(devices, dtype)
-			pipes = []
-			for i in range(len(devices) // 2 + 1):
-				dtype = torch.float16 if torch.cuda.get_device_properties(i).major >= 7 else torch.float32
-				device = devices[i]
+			# print(devices, dtype)
+
+			def load_pipe(device, dtype):
 				try:
 					smp = pipeline("summarization", model=m, device=device, torch_dtype=dtype)
 					smp.devid = device
@@ -497,57 +499,89 @@ class Bot:
 					smp = pipeline("summarization", model=m, device=-1, torch_dtype=torch.float32)
 					smp.devid = None
 				smp.busy = 0
-				pipes.insert(0, smp)
+				return smp
+
+			futs = []
+			for i in range(len(devices) // 2 + 1):
+				dtype = torch.float16 if torch.cuda.get_device_properties(i).major >= 7 else torch.float32
+				futs.append(exc.submit(load_pipe, devices[i], dtype))
+			print(futs)
+			pipes = []
+			for fut in futs:
+				pipes.insert(0, fut.result())
 			self.models[m] = pipes
+			self.summ_waiting.set_result(pipes)
+			self.summ_waiting = None
+			print(pipes)
 		enc = tiktoken.get_encoding("cl100k_base")
 		tokens = enc.encode(q)
-		limit = 4096
-		smp.busy += 1
-		try:
-			while len(tokens) > max_length:
-				if len(tokens) > limit:
-					e1 = tokens[:limit]
-					s1 = enc.decode(e1).strip()
-					if smp.devid:
-						with torch.autocast("cuda"):
-							s2 = smp(s1, max_length=limit // 2, min_length=limit // 2 - 32, do_sample=do_sample, truncation=True)[0]["summary_text"]
-					else:
-						s2 = smp(s1, max_length=limit // 2, min_length=limit // 2 - 32, do_sample=do_sample, truncation=True)[0]["summary_text"]
-					e2 = enc.encode(s2 + " ")
-					tokens = e2 + tokens[limit:]
-					continue
-				break
-			e1 = tokens
-			s1 = enc.decode(e1).strip().replace("  ", " ")
-			if len(tokens) > max_length:
+		limit = 960
+
+		def apply_smp(smp, s1, ml, Ml, rm=False):
+			smp.busy += 1
+			try:
 				if smp.devid:
 					with torch.autocast("cuda"):
-						s2 = smp(s1, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
+						s2 = smp(s1, max_length=Ml, min_length=ml, do_sample=do_sample, truncation=True)[0]["summary_text"]
 				else:
-					s2 = smp(s1, max_length=max_length, min_length=min_length, do_sample=do_sample, truncation=True)[0]["summary_text"]
-			out = []
-			otok = list(enc.encode(s2.strip()))
-			last = None
-			count = 0
-			while otok:
-				c = otok.pop(0)
-				if c == last:
-					if count > 3:
-						continue
-					count += 1
-				else:
-					last = c
-					count = 0
-				out.append(c)
-			if len(out) < min_length / 2:
-				return lim_tokens(q, max_length + min_length >> 1)
-			return enc.decode(out)
-		finally:
-			smp.busy -= 1
+					s2 = smp(s1, max_length=Ml, min_length=ml, do_sample=do_sample, truncation=True)[0]["summary_text"]
+				if rm:
+					return re.sub(r"(?:in )?(?:the|this|some)? *(?:article|essay|page|study|text|report|topic)[s, ]*(?:also mentions|we discuss|we look at|is about|includes|is based on)? *", "", s2, flags=re.I)
+				return s2
+			finally:
+				smp.busy -= 1
+
+		# print(len(tokens))
+		while len(tokens) > max_length and len(tokens) > limit:
+			futs = []
+			count = ceil(len(tokens) / limit * 4 / 3)
+			for start in range(0, max(1, len(tokens) - limit * 3 // 4 - 1), limit * 3 // 4):
+				print(start, start + limit)
+				e1 = tokens[start:start + limit]
+				mt = max(max(limit, max_length) // count, limit // 5)
+				s1 = enc.decode(e1).strip()
+				if len(e1) <= mt:
+					futs.append(s1)
+					continue
+				random.shuffle(pipes)
+				smp = sorted(pipes, key=lambda p: p.busy)[0]
+				fut = exc.submit(apply_smp, smp, s1, mt - 32, mt, rm=bool(start))
+				futs.append(fut)
+			s2 = "\n".join((fut if isinstance(fut, str) else fut.result()) for fut in futs)
+			print(s2)
+			tokens = enc.encode(s2)
+		e1 = tokens
+		s1 = enc.decode(e1).strip().replace("  ", " ")
+		if len(tokens) > max_length:
+			random.shuffle(pipes)
+			smp = sorted(pipes, key=lambda p: p.busy)[0]
+			s2 = apply_smp(smp, s1, min_length, max_length)
+		else:
+			s2 = s1
+		out = []
+		otok = list(enc.encode(s2.strip()))
+		last = None
+		count = 0
+		while otok:
+			c = otok.pop(0)
+			if c == last:
+				if count > 3:
+					continue
+				count += 1
+			else:
+				last = c
+				count = 0
+			out.append(c)
+		with torch.no_grad():
+			torch.cuda.empty_cache()
+		if len(out) < min_length / 2:
+			return lim_tokens(q, max_length + min_length >> 1)
+		return enc.decode(out)
 
 	def auto_summarise(self, q="", max_length=128, min_length=64):
 		if q and sum(c.isascii() for c in q) / len(q) > 0.75:
-			q = lim_tokens(q, max_length + min_length << 1)
+			# Cut down summary if not enough devices
+			q = lim_tokens(q, (max_length + min_length << 1) * torch.cuda.device_count())
 			return self.answer_summarise(q=q, max_length=max_length, min_length=min_length)
 		else:
 			return lim_tokens(q, max_length)
@@ -761,10 +795,10 @@ class Bot:
 				v = self.auto_summarise(q=v, max_length=288, min_length=192).replace("\n", ". ")
 			s = f"{k}: {v}\n"
 			lines.append(s)
-		tq = q
-		mq = 600 if premium < 2 else 1200
-		if len(self.gpttokens(tq)) > mq:
-			tq = self.auto_summarise(q=tq, max_length=round(mq * 0.96), min_length=round(mq * 0.64)).replace("\n", ". ")
+		# tq = q
+		# mq = 600 if premium < 2 else 1200
+		# if len(self.gpttokens(tq)) > mq:
+			# tq = self.auto_summarise(q=tq, max_length=round(mq * 0.96), min_length=round(mq * 0.64)).replace("\n", ". ")
 		s = f"{u}: {q}\n"
 		lines.append(s)
 		ns = f"{self.name}:"
@@ -963,15 +997,16 @@ class Bot:
 			if extensions:
 				intended = None
 				functions = self.functions
+				length = len(self.gpttokens(messages[-1].get("content")))
 				if self.jailbroken or not self.nsfw:
 					functions = [f for f in functions if f["name"] != "policy"]
-				if "<|im_sep" in q:
+				if "<|im_sep" in q or length >= 512:
 					functions = [f for f in functions if f["name"] not in ("web_search", "wolfram_alpha")]
 				elif not set(q).intersection("0123456789()+"):
 					functions = [f for f in functions if f["name"] != "wolfram_alpha"]
-				if self.vc & 2:
+				if self.vc & 2 and length < 256:
 					pass
-				elif self.vc & 1:
+				elif self.vc & 1 and length < 256:
 					functions = [f for f in functions if f["name"] not in ("audio", "astate", "askip")]
 				else:
 					functions = [f for f in functions if f["name"] not in ("audio", "astate", "askip", "play")]
@@ -1191,20 +1226,20 @@ class Bot:
 				try:
 					import pynvml
 					pynvml.nvmlInit()
-					dc = pynvml.nvmlDeviceGetCount()
+					COMPUTE_ORDER = globals().get("COMPUTE_ORDER") or range(torch.cuda.device_count())
 
 					def cuda_info():
 						import torch
-						return [torch.cuda.get_device_properties(i) for i in range(torch.cuda.device_count())]
+						return [torch.cuda.get_device_properties(i) for i in COMPUTE_ORDER]
 
 					fut2 = exc.submit(cuda_info)
-					handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(dc)]
+					handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in COMPUTE_ORDER]
 					gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
 					tinfo = fut2.result()
 				except:
 					print_exc()
-					tinfo = gmems = []
-				bit8 = [i for i, ti in enumerate(tinfo) if ti.major >= 8 or not bitsandbytes]
+					tinfo = gmems = COMPUTE_ORDER = []
+				bit8 = [i for i, ti in zip(COMPUTE_ORDER, tinfo) if ti.major >= 8 or not bitsandbytes]
 				max_mem = {i: f"{round((gmems[i].total - gmems[i].used) / 1048576 - (2 if i else 3) * 1024)}MiB" for i in bit8}
 				max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("MiB")) > 0}
 				rem = sum(int(v.removesuffix("MiB")) for v in max_mem.values()) / 1024 - req
@@ -1289,6 +1324,8 @@ class Bot:
 				max_length=max(limit, len(tokens) + 1024),
 				do_sample=True,
 			)
+			with torch.no_grad():
+				torch.cuda.empty_cache()
 			text = tokenizer.decode(res[0]).removeprefix("<s>").strip().removeprefix(prompt).strip().split("</s>", 1)[0]
 			text = text.strip().replace(":\n", ": ").replace(f"You:", f"{u}:").replace("<USER>", u)
 			spl = text.split(": ")
@@ -2100,3 +2137,5 @@ if __name__ == "__main__":
 	bot = Bot(token)
 	while True:
 		print(bot.talk(input()))
+else:
+	exc.submit(Bot.answer_summarise, Bot, q="test")

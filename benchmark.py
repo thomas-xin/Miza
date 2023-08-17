@@ -58,11 +58,8 @@ if len(sys.argv) > 1:
 			it = 1
 		c = 2 ** n
 		# print(c)
-		a = torch.randn(c, c, dtype=dtype)
-		b = torch.randn(c, c, dtype=dtype)
-		if is_cuda:
-			a = a.cuda()
-			b = b.cuda()
+		a = torch.randn(c, c, dtype=dtype, device="cuda" if is_cuda else "cpu")
+		b = torch.randn(c, c, dtype=dtype, device="cuda" if is_cuda else "cpu")
 		# print("DEVICE:", device, count, len(a), c, it)
 		for i in range(it):
 			t = walltime('a @ b', dict(a=a, b=b))
@@ -120,7 +117,8 @@ if __name__ != "__main__" and os.path.exists("auth.json"):
 	with open("auth.json", "rb") as f:
 		data = json.load(f)
 	compute_load = data.get("compute_load")
-	if compute_load is not None and len(compute_load) == DC:
+	compute_order = data.get("compute_order")
+	if compute_load is not None and compute_order is not None and len(compute_load) == len(compute_order) == DC:
 		print(srgb(0, 255, 0, "No benchmark required, skipping..."))
 		keep = False
 
@@ -173,7 +171,47 @@ if keep:
 	# 			import traceback
 	# 			print(srgb(255, 0, 0, traceback.format_exc()), end="")
 
+	compute_queue = []
+	compute_order = []
+
 	import time
+	if DC > 2:
+		import torch, time
+		devices = list(range(DC - 1, -1, -1))
+
+		for i in devices:
+			print(f"Initialising device {i}...")
+			a = torch.zeros(1, dtype=torch.uint8, device=i)
+			del a
+
+		i = sorted(devices, key=lambda i: (d := torch.cuda.get_device_properties(i)) and (d.major * d.multi_processor_count * d.total_memory), reverse=True)[0]
+		compute_order.append(i)
+		devices.remove(i)
+		f = i
+		while len(devices) > 1:
+			print(f"Testing device {i}...")
+			best = next(iter(devices))
+			shortest = torch.inf
+			j = i
+			for i in devices:
+				a = torch.randint(0, 255, (1073741824,), dtype=torch.uint8, device=j)
+				t = time.time()
+				b = a.to(i)
+				t = time.time() - t
+				del a
+				print(i, t)
+				if t < shortest:
+					shortest = t
+					best = i
+			compute_order.append(best)
+			devices.remove(best)
+			i = best
+		compute_order.append(next(iter(devices)))
+		print("Optimal device order:", compute_order)
+	elif DC:
+		compute_order = list(range(DC - 1, -1, -1))
+
+	print("Starting benchmarks...")
 	total = 0
 	procs = []
 	# avgs = []
@@ -225,11 +263,11 @@ if keep:
 	if not os.path.exists("auth.json"):
 		keep = False
 
-if keep:
 	import json
 	with open("auth.json", "rb+") as f:
 		data = json.load(f)
 		data["compute_load"] = compute_load
+		data["compute_order"] = compute_order
 		b = json.dumps(data, indent="\t").encode("utf-8")
 		f.truncate(len(b))
 		f.seek(0)

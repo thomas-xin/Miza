@@ -2101,7 +2101,7 @@ class UpdateUserLogs(Database):
             )
             change = True
             colour[0] += 255
-        if hasattr(before, "guild"):
+        if hasattr(before, "guild") and hasattr(after, "guild"):
             if before.display_name != after.display_name:
                 emb.add_field(
                     name="Nickname",

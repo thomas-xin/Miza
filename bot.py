@@ -1464,7 +1464,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			return ("File", url.rsplit("/", 1)[-1], "", None)
 		res = None
 		try:
-			res = await process_image(url, "caption", ["-nogif", best], fix=2 if best else choice(0, 2), pwr=best, timeout=300)
+			res = await process_image(url, "caption", ["-nogif", best], fix=2, pwr=best, timeout=300)
 			p1, p2 = res
 		except:
 			if res:
@@ -2609,6 +2609,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if resp:
 			for k, v in resp.items():
 				k = int(k)
+				# print("END TASK:", k, bot.compute_wait, lim_str(str(v), 64), frand())
 				task = self.compute_wait.pop(k)
 				if isinstance(v, Exception):
 					print(repr(v), ip, k)
@@ -2643,6 +2644,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			i = ts_us() + id(task)
 			while i in self.compute_wait:
 				i += 1
+			task.ts = i
 			self.compute_wait[i] = task
 			prompt = [i, task.cap, task.command, task.timeout]
 			prompts.append(prompt)
