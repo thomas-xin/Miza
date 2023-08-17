@@ -6386,7 +6386,7 @@ class SimulatedMessage:
 		except KeyError:
 			pass
 		else:
-			embeds = [e for e in (embed.to_dict() for embed in embeds if embed is not None) if e]
+			embeds = [e for e in ((embed if isinstance(embed, dict) else embed.to_dict()) for embed in embeds if embed is not None) if e]
 			if embeds:
 				kwargs["embeds"] = embeds
 		try:

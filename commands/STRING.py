@@ -1310,7 +1310,8 @@ class Ask(Command):
 		embd = bot.data.chat_embeddings.get(channel.id, {})
 		chdd = bot.data.chat_dedups.get(channel.id, {})
 		visible = []
-		if q and not getattr(message, "simulated", False):
+		simulated = getattr(message, "simulated", False)
+		if q and not simulated:
 			async for m in bot.history(channel, limit=16):
 				visible.append(m)
 		visible.extend([message, reference])
@@ -1342,7 +1343,7 @@ class Ask(Command):
 			else:
 				content = ""
 			found = None
-			if i < 8 and not content.strip():
+			if i < 8 and not simulated and not content.strip():
 				url = f"https://discord.com/channels/0/{channel.id}/{m.id}"
 				found = self.visited.get(url)
 				if found is None:
@@ -1360,7 +1361,7 @@ class Ask(Command):
 			c = content
 			if c[0] in "\\#!%" or c[:2] in ("//", "/*"):
 				continue
-			if i < 8 and not found:
+			if i < 8 and not simulated and not found:
 				url = f"https://discord.com/channels/0/{channel.id}/{m.id}"
 				found = self.visited.get(url)
 				if found is None:
