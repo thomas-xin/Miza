@@ -1234,7 +1234,7 @@ class Describe(Command):
 
 class Ask(Command):
 	_timeout_ = 24
-	name = ["Bloom", "NeoX", "Pyg", "Pygmalion", "GPT2", "Llama", "Vicuna", "Manticore", "Hippogriff", "Wizard", "Platypus", "GPlatty", "Airochronos", "Davinci", "GPT3", "GPT3a", "GPT4", "GPT4a"]
+	name = ["Bloom", "Pyg", "Pygmalion", "GPT2", "Llama", "Vicuna", "Manticore", "Hippogriff", "Wizard", "Platypus", "GPlatty", "Airochronos", "Davinci", "GPT3", "GPT3a", "GPT4", "GPT4a"]
 	description = "Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. For premium tier chatbots, check using ~serverinfo, or apply with ~premium!"
 	usage = "<string>"
 	example = ("ask what's the date?", "gpt3 what is the square root of 3721?", "pyg can I have a hug?")
@@ -1438,11 +1438,11 @@ class Ask(Command):
 			model = "auto"
 		long_mem = 4096 if premium >= 2 else 1024
 		if cname == "gpt2" or not AUTH.get("openai_key"):
-			model = "neox"
+			model = "bloom"
 		elif cname == "bloom":
 			model = "bloom"
-		elif cname == "neox":
-			model = "neox"
+		# elif cname == "neox":
+			# model = "neox"
 		elif cname == "pyg" or cname == "pygmalion":
 			# if not bot.is_nsfw(channel):
 			#     if hasattr(channel, "recipient"):
@@ -1641,7 +1641,7 @@ class Ask(Command):
 					+ "If you are looking for improved knowledge, memory and intelligence, reduced censorship, ability to connect to the internet, or would simply like to support my developer, "
 					+ f"please check out my [kofi]({bot.kofi_url}) to help fund API, as these features are significantly more expensive!\n"
 					+ "Any support is greatly appreciated and contributes directly towards service and future development.\n"
-					+ f"Legacy chat models below GPT-3 may be invoked using {bot.get_prefix(guild)}neox, {bot.get_prefix(guild)}bloom, or {bot.get_prefix(guild)}pygmalion.\n"
+					+ f"Legacy chat models below GPT-3 may be invoked using {bot.get_prefix(guild)}bloom, {bot.get_prefix(guild)}pygmalion, etc.\n"
 					+ "Alternatively if you would like to manage pricing yourself through an OpenAI account (and/or free trial), check out the ~trial command!"
 				)
 				reacts.append("🚫")
@@ -1879,7 +1879,7 @@ class Personality(Command):
 	server_only = True
 	name = ["ResetChat", "ClearChat", "ChangePersonality"]
 	min_level = 2
-	description = "Customises ⟨MIZA⟩'s personality for ~ask in the current server. Uses the highest available model within specified family (for example, \"GPT\" will prefer GPT-4 if allowed). NeoX, Bloom, Pygmalion, Manticore, Hippogriff and Wizard are currently the alternate models enabled."
+	description = "Customises ⟨MIZA⟩'s personality for ~ask in the current server. Uses the highest available model within specified family (for example, \"GPT\" will prefer GPT-4 if allowed). Bloom, Pygmalion, Manticore, Hippogriff, Platypus, Wizard, and Airochronos are currently the alternate models enabled."
 	usage = "<traits>* <default{?d}>?"
 	example = ("personality Manticore; mischievous, cunning", "personality Wizard; dry, sarcastic, snarky", "personality Auto; sweet, loving", "personality GPT4; The following is a conversation between Miza and humans. Miza is an AI who is charming, friendly and positive.")
 	flags = "aed"
@@ -1924,7 +1924,7 @@ class Personality(Command):
 					"Apologies, my AI has detected that your input may be inappropriate.\n"
 					+ "Please move to a NSFW channel, reword, or consider contacting the support server if you believe this is a mistake!"
 				)
-		models = ("auto", "gpt", "neox", "bloom", "pyg", "pygmalion", "manticore", "llama", "hippogriff", "wizard", "platypus", "airochronos", "davinci", "gpt3", "gpt4")
+		models = ("auto", "gpt", "bloom", "pyg", "pygmalion", "manticore", "llama", "hippogriff", "wizard", "platypus", "airochronos", "davinci", "gpt3", "gpt4")
 		if ";" in p:
 			m, p = p.split(";", 1)
 			p = p.lstrip()
