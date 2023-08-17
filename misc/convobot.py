@@ -1066,12 +1066,9 @@ class Bot:
 						if m.get("function_call"):
 							break
 						text = m["content"].removeprefix(f"{self.name} says: ").replace("<|im_sep|>", ":").removeprefix(f"{self.name}:") if m["content"] else ""
-						if len(text) >= 2 and text[-1] in " aAsS" and text[-2] not in ".!?" or text.endswith(' "') or text.endswith('\n"'):
+						if not text or len(text) >= 2 and text[-1] in " aAsS" and text[-2] not in ".!?" or text.endswith(' "') or text.endswith('\n"'):
 							redo = True
 						text = text.strip()
-						if not text or len(self.gpttokens(text)) < 24:
-							text = ""
-							redo = True
 						if not redo or i:
 							break
 						response = None
@@ -1230,36 +1227,19 @@ class Bot:
 
 					def cuda_info():
 						import torch
-						return [torch.cuda.get_device_properties(i) for i in COMPUTE_ORDER]
+						return [torch.cuda.get_device_properties(i) for i in range(len(COMPUTE_ORDER))]
 
 					fut2 = exc.submit(cuda_info)
-					handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in COMPUTE_ORDER]
+					handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(len(COMPUTE_ORDER))]
 					gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
 					tinfo = fut2.result()
 				except:
 					print_exc()
 					tinfo = gmems = COMPUTE_ORDER = []
-				bit8 = [i for i, ti in zip(COMPUTE_ORDER, tinfo) if ti.major >= 8 or not bitsandbytes]
+				bit8 = [i for i in COMPUTE_ORDER if tinfo[i].major >= 8 or not bitsandbytes]
 				max_mem = {i: f"{round((gmems[i].total - gmems[i].used) / 1048576 - (2 if i else 3) * 1024)}MiB" for i in bit8}
 				max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("MiB")) > 0}
 				rem = sum(int(v.removesuffix("MiB")) for v in max_mem.values()) / 1024 - req
-				# if rem < 1:
-				# 	self.models.clear()
-				# 	bitsandbytes = None
-				# 	ginfo = fut.result()
-				# 	ginfo3 = {}
-				# 	ginfo2 = list(ginfo)
-				# 	tinfo2 = list(tinfo)
-				# 	while tinfo2:
-				# 		name = tinfo2.pop(0).name
-				# 		for gi in ginfo2:
-				# 			if gi.name == name:
-				# 				ginfo2.remove(gi)
-				# 				ginfo3[gi.index] = gi
-				# 				break
-				# 	ginfo = ginfo3
-				# 	max_mem = {i: f"{round((gi['memory.total'] - gi['memory.used']) - 3 * 1024)}MiB" for i, gi in ginfo.items()}
-				# 	max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("MiB")) > 0}
 				cap = sum(int(v.removesuffix("MiB")) for v in max_mem.values()) / 1024
 				if cap > req * buffer:
 					max_mem = {k: f"{round(int(v.removesuffix('MiB')) / buffer)}MiB" for k, v in max_mem.items()}
@@ -1580,8 +1560,8 @@ class Bot:
 						if len(self.gpttokens(text)) < 24:
 							text = ""
 					text = text.strip()
-					if len(self.gpttokens(text)) < 8:
-						text = ""
+					# if len(self.gpttokens(text)) < 8:
+						# text = ""
 					if not text:
 						redo = True
 					if i:
