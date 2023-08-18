@@ -3770,6 +3770,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							authorise=True,
 							json=True,
 							aio=True,
+							timeout=32,
 						)
 				except:
 					print_exc()
