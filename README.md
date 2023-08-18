@@ -151,7 +151,7 @@ git clone https://github.com/thomas-xin/Miza.git
 * Stable Diffusion XL offloading utilises around 12GB extra RAM per GPU when swapping from VRAM.
 * Most other features utilise minimal amounts of RAM, although subprocesses may temporarily use a few extra GB during heavy loads (such as file conversion)
 * VRAM (GPU RAM) requirements vary depending on the ML models invoked. Depending on demand up to 100GB may be utilised at a time.
-* For comparison, the official Miza currently runs on 60GB of GDDR6X, 24GB of GDDR6, 24GB of GDDR5X, 64GB of DDR5, and 192GB of NVMe swap.
+* For comparison, the official Miza currently runs on 60GB of GDDR6X, 24GB of GDDR6, 24GB of GDDR5X, 80GB of DDR5, and 192GB of NVMe swap.
 
 <a id="Logs"></a>
 #### Logs
