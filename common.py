@@ -3858,6 +3858,22 @@ class Command(collections.abc.Hashable, collections.abc.Callable):
 			req = self.min_level
 		if reason is None:
 			reason = f"for command {self.name[-1]}"
+		if isinstance(req, str):
+			req = req
+		elif not req <= inf:
+			req = "nan (Bot owner)"
+		elif req >= inf:
+			req = "inf (Admin)"
+		elif req >= 3:
+			req = f"{req} (Moderator)"
+		elif req >= 2:
+			req = f"{req} (Helper)"
+		elif req >= 1:
+			req = f"{req} (Trusted)"
+		elif req >= 0:
+			req = f"{req} (Member)"
+		else:
+			req = f"{req} (Guest)"
 		return PermissionError(f"Insufficient priviliges {reason}. Required level: {req}, Current level: {perm}.")
 
 	def __init__(self, bot, catg):

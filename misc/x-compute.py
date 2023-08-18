@@ -2582,7 +2582,7 @@ if len(sys.argv) <= 1 or int(sys.argv[1]) in (0, 2):
 			return [i for i in pcs if gmems[i].free >= mem], torch.float16
 		return pcs[0], torch.float16
 
-	if int(sys.argv[1]) == 2:
+	if len(sys.argv) > 1 and int(sys.argv[1]) == 2:
 		device, dtype = determine_cuda(1073741824, priority=None)
 	else:
 		device, dtype = -1, torch.float32
@@ -2598,7 +2598,7 @@ if len(sys.argv) <= 1 or int(sys.argv[1]) in (0, 2):
 		a = Embedder.encode(s).astype(np.float16)
 		return a.data
 
-	if int(sys.argv[1]) == 2:
+	if len(sys.argv) > 1 and int(sys.argv[1]) == 2:
 		import tiktoken
 		from clip_interrogator import Config, Interrogator
 		try:
@@ -2873,6 +2873,8 @@ def ytdl(q, download=False):
 if len(sys.argv) > 1 and sys.argv[1] == "1":
 	import convobot, torch
 	convobot.COMPUTE_LOAD = COMPUTE_LOAD
+	convobot.COMPUTE_CAPS = COMPUTE_CAPS
+	convobot.COMPUTE_ORDER = COMPUTE_ORDER
 
 	def CBAI(inputs):
 		user_id = inputs["user_id"]
@@ -3004,6 +3006,9 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 
 elif len(sys.argv) > 1 and int(sys.argv[1]) >= 3:
 	import imagebot
+	imagebot.COMPUTE_LOAD = COMPUTE_LOAD
+	imagebot.COMPUTE_CAPS = COMPUTE_CAPS
+	imagebot.COMPUTE_ORDER = COMPUTE_ORDER
 
 	def IBASL(prompt, kwargs, nsfw=False, force=True, count=1, sdxl=False):
 		try:

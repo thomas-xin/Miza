@@ -661,7 +661,8 @@ class Bot:
 						pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 						try:
 							compute_order = globals().get("COMPUTE_ORDER") or (0,)
-							if compute_order.index(device) >= len(compute_order) / 2:
+							di = int(sys.argv[1]) - 3 if len(sys.argv) > 1 else 0
+							if compute_order.index(di) >= len(compute_order) / 2:
 								raise AttributeError
 							pipe.enable_model_cpu_offload()
 						except AttributeError:
@@ -825,7 +826,8 @@ class Bot:
 						pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
 						try:
 							compute_order = globals().get("COMPUTE_ORDER") or (0,)
-							if compute_order.index(device) >= len(compute_order) / 2:
+							di = int(sys.argv[1]) - 3 if len(sys.argv) > 1 else 0
+							if compute_order.index(di) >= len(compute_order) / 2:
 								raise AttributeError
 							pipe.enable_model_cpu_offload()
 						except AttributeError:

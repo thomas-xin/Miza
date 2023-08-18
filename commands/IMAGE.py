@@ -1674,7 +1674,7 @@ class Art(Command):
                         n = 1 if sdxl else min(c2, xrand(floor(sqrt(c2) + 1)) + 1)
                         if not n:
                             n = c2
-                        fut = create_task(process_image("IBASL", "&", [p, kwargs, nsfw, False, n, sdxl], fix=3, pwr=500000 * n, timeout=240))
+                        fut = create_task(process_image("IBASL", "&", [p, kwargs, nsfw, False, n, sdxl], fix=3, pwr=500000 * n, timeout=420))
                         futt.append(fut)
                         c2 -= n
                 self.imagebot.token = oai or AUTH.get("openai_key")
@@ -1869,7 +1869,7 @@ class Art(Command):
                                 n = 1 if sdxl else min(c2, xrand(floor(sqrt(c2) + 1)) + 1)
                                 if not n:
                                     n = c2
-                                fut = create_task(process_image("IBASL", "&", [p, kwargs, nsfw, False, n, sdxl], fix=3, pwr=500000 * n, timeout=240))
+                                fut = create_task(process_image("IBASL", "&", [p, kwargs, nsfw, False, n, sdxl], fix=3, pwr=500000 * n, timeout=420))
                                 futt.append(fut)
                                 c2 -= n
                             for fut in futt:
