@@ -56,7 +56,9 @@ Sections     | Explanations
 <br>
 
 <a id="Hosting-Miza"></a>
-## Hosting Miza!
+## Hosting Miza
+
+If you would like to host a personal copy of Miza for various reasons, the below information may be helpful to be aware of!
 
 #### Prerequisites:
 
@@ -99,32 +101,33 @@ git clone https://github.com/thomas-xin/Miza.git
 <a id="AI-Support"></a>
 ## AI/Machine Learning features:
 <img alt="ChatGPT Logo" src="https://cdn.discordapp.com/attachments/1111010485647712348/1142085216656183336/ChatGPT-8958828c.png">
-* Toggle on/off using the `auth.json` key `"ai_features"`
-* Throughout 2021~2023, Miza has been equipped with support for various open source as well as proprietary AI models.
-  * Early models began with GPT-2, Roberta and Dialogpt, but those have since been deprecated and discontinued.
-* As of August 2023, Miza supports the following models:
-  * Bloom-176B (API)
-  * Stable Diffusion v1.5 (API)
-  * Dall-E 2 (API, fees apply)
-  * GPT-4 (API, fees apply)
-  * GPT-3.5 Turbo (API, fees apply)
-  * GPT-3.5 Davinci (API, fees apply, deprecated)
-  * GPT-3.5 Curie (API, fees apply, deprecated)
-  * OpenAI Whisper (API, fees apply)
-  * Airochronos-33B (Locally hosted, ~40GB VRAM)
-  * GPlatty-33B (Locally hosted, ~40GB VRAM)
-  * Wizard-Vicuna-30B (Locally hosted, ~40GB VRAM)
-  * Hippogriff-30B (Locally hosted, ~40GB VRAM)
-  * Manticore-13B (Locally hosted, ~40GB VRAM)
-  * Pygmalion-13B (Locally hosted, ~40GB VRAM)
-  * Stable Diffusion XL v1.0 (Locally hosted, ~12GB VRAM)
-  * Stable Diffusion v1.5 (Locally hosted, ~6GB VRAM)
-  * Encodec (Locally hosted, ~100MB RAM)
-* Locally hosted models do not incur fees, but they require substantial amounts of GPU memory, as well as compute power.
-  * Multiple weaker GPUs may be utilised, however at the moment the underlying frameworks do not appear to have NVLink support, meaning high PCIe bandwidth is necessary for some models.
-  * The main Miza bot's API use is funded by premium subscriptions, with GPT-4 being the most costly. Several methods of context optimisation have been implemented, including embeddings and summarisation (also hosted locally).
-  * Miza's framework also supports image captioning (currently utilising Clip-VIT and PyTesseract, as GPT-4's multimodal support has yet to be publicly released), function application (only OpenAI Chat models) with Google Search, WolframAlpha, and Miza's Voice API.
-* Distributed compute support (utilisation of multiple machines/servers) is currently being implemented, but is not yet officially supported as it has inconsistent stalling issues.
+
+- Toggle on/off using the `auth.json` key `"ai_features"`
+- Throughout 2021~2023, Miza has been equipped with support for various open source as well as proprietary AI models.
+  - Early models began with GPT-2, Roberta and Dialogpt, but those have since been deprecated and discontinued.
+- As of August 2023, Miza supports the following models:
+  - Bloom-176B (API)
+  - Stable Diffusion v1.5 (API)
+  - Dall-E 2 (API, fees apply)
+  - GPT-4 (API, fees apply)
+  - GPT-3.5 Turbo (API, fees apply)
+  - GPT-3.5 Davinci (API, fees apply, deprecated)
+  - GPT-3.5 Curie (API, fees apply, deprecated)
+  - OpenAI Whisper (API, fees apply)
+  - Airochronos-33B (Locally hosted, ~40GB VRAM)
+  - GPlatty-33B (Locally hosted, ~40GB VRAM)
+  - Wizard-Vicuna-30B (Locally hosted, ~40GB VRAM)
+  - Hippogriff-30B (Locally hosted, ~40GB VRAM)
+  - Manticore-13B (Locally hosted, ~40GB VRAM)
+  - Pygmalion-13B (Locally hosted, ~40GB VRAM)
+  - Stable Diffusion XL v1.0 (Locally hosted, ~12GB VRAM)
+  - Stable Diffusion v1.5 (Locally hosted, ~6GB VRAM)
+  - Encodec (Locally hosted, ~100MB RAM)
+- Locally hosted models do not incur fees, but they require substantial amounts of GPU memory, as well as compute power.
+  - Multiple weaker GPUs may be utilised, however at the moment the underlying frameworks do not appear to have NVLink support, meaning high PCIe bandwidth is necessary for some models.
+  - The main Miza bot's API use is funded by premium subscriptions, with GPT-4 being the most costly. Several methods of context optimisation have been implemented, including embeddings and summarisation (also hosted locally).
+  - Miza's framework also supports image captioning (currently utilising Clip-VIT and PyTesseract, as GPT-4's multimodal support has yet to be publicly released), function application (only OpenAI Chat models) with Google Search, WolframAlpha, and Miza's Voice API.
+- Distributed compute support (utilisation of multiple machines/servers) is currently being implemented, but is not yet officially supported as it has inconsistent stalling issues.
 
 <br>
 
