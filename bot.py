@@ -2762,9 +2762,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			for k, v in system.items():
 				self.status_data.system[k].update(v)
 		for k, v in self.status_data.system.items():
-			for i, e in tuple(v.items()):
+			temp = {}
+			for i, e in sorted(v.items()):
 				if t - e.get("time", 0) > 30:
 					v.pop(i)
+					continue
+				temp[i] = e
+			self.status_data.system[k] = temp
 		self.status_data.update({
 			"discord": {
 				"Shard count": len(self.status_data.system["cpu"]),
