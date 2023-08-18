@@ -2687,6 +2687,8 @@ class AudioDownloader:
 					print(args)
 					subprocess.run(args)
 				args = [ffmpeg, "-hide_banner", "-v", "error", "-vn", "-i", fn, "-c:a", "copy", out2]
+				print(args)
+				subprocess.run(args)
 				if rename:
 					if os.path.exists(rename):
 						return rename
