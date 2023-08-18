@@ -90,20 +90,23 @@ class AutoEmoji(Command):
 class UpdateAutoEmojis(Database):
     name = "autoemojis"
 
-    def guild_emoji_map(self, guild, emojis={}):
-        for e in sorted(guild.emojis, key=lambda e: e.id):
-            if not e.is_usable():
-                continue
-            n = e.name
-            while n in emojis:
-                if emojis[n] == e.id:
-                    break
-                t = n.rsplit("-", 1)
-                if t[-1].isnumeric():
-                    n = t[0] + "-" + str(int(t[-1]) + 1)
-                else:
-                    n = t[0] + "-1"
-            emojis[n] = e
+    def guild_emoji_map(self, guild, user, emojis={}):
+        guilds = sorted(getattr(user, "mutual_guilds", None) or [guild for guild in self.bot.guilds if user.id in guild._members], key=lambda guild: guild.id)
+        guilds.insert(0, guild)
+        for g in guilds:
+            for e in sorted(g.emojis, key=lambda e: e.id):
+                if not e.is_usable():
+                    continue
+                n = e.name
+                while n in emojis:
+                    if emojis[n] == e.id:
+                        break
+                    t = n.rsplit("-", 1)
+                    if t[-1].isnumeric():
+                        n = t[0] + "-" + str(int(t[-1]) + 1)
+                    else:
+                        n = t[0] + "-1"
+                emojis[n] = e
         return emojis
 
     async def _nocommand_(self, message, recursive=True, edit=False, **void):
@@ -163,7 +166,7 @@ class UpdateAutoEmojis(Database):
                 for name in (n for n in possible if n):
                     emoji = None
                     if emojis is None:
-                        emojis = self.guild_emoji_map(guild, dict(orig))
+                        emojis = self.guild_emoji_map(guild, message.author, dict(orig))
                     if ord(name[0]) >= 128:
                         emoji = name
                     else:
@@ -223,7 +226,7 @@ class UpdateAutoEmojis(Database):
                 continue
             name = s[1:-1]
             if emojis is None:
-                emojis = self.guild_emoji_map(guild, dict(orig))
+                emojis = self.guild_emoji_map(guild, message.author, dict(orig))
             emoji = emojis.get(name)
             if not emoji:
                 if name.isnumeric():
