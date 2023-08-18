@@ -32,6 +32,8 @@ if benchmark.DC:
 		if mem <= 11 * 1073741824 or compute_load[i] < 300000:
 			continue
 		caps.append(i + 3)
+	if caps == [0]:
+		caps = [2]
 else:
 	caps = [2] if psutil.cpu_count() >= 7 and psutil.virtual_memory().total >= 14 * 1073741824 else [0]
 # if len(caps) < os.cpu_count() // 2:

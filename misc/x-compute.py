@@ -2840,6 +2840,15 @@ def ytdl(q, download=False):
 			headers = header()
 			stream = get_best_audio(entry)
 			sys.stderr.write(stream + "\n")
+			if os.path.exists("cache") and not COMPUTE_ORDER:
+				dirlist = os.listdir("cache")
+				if len(dirlist) >= 1024:
+					random.shuffle(dirlist)
+					while len(dirlist) >= 1024:
+						try:
+							os.remove(dirlist.pop(0))
+						except:
+							traceback.print_exc()
 			try:
 				# raise
 				ydl.download(url)
