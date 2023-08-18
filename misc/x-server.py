@@ -2706,7 +2706,14 @@ alert("File successfully deleted. Returning to home.");
 			t = int(t)
 			after = float(after)
 			cl = int(cp.request.headers["Content-Length"])
-			j = orjson.loads(cp.request.body.read(cl))
+			d = cp.request.body.read(cl)
+			try:
+				j = orjson.loads(d)
+			except:
+				try:
+					j = eval(d, {}, {})
+				except:
+					j = d
 			if t in RESPONSES:
 				RESPONSES[t].set_result((j, after))
 				return b"\xf0\x9f\x92\x9c"
