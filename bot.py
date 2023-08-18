@@ -4813,6 +4813,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				for k in ("reactions", "attachments", "embeds"):
 					if k not in d:
 						d[k] = []
+				if d["reactions"]:
+					for r in d["reactions"]:
+						r.setdefault("me", False)
 				try:
 					message = bot.LoadedMessage(state=bot._state, channel=channel, data=d)
 				except:
