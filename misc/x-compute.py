@@ -2561,54 +2561,54 @@ if len(sys.argv) <= 1 or int(sys.argv[1]) in (0, 2):
 		plt.clf()
 		return out
 
-	def determine_cuda(mem=1, priority=None, multi=False, major=0):
-		if not torch or not torch.cuda.is_available():
+	if len(sys.argv) > 1 and int(sys.argv[1]) == 2:
+		def determine_cuda(mem=1, priority=None, multi=False, major=0):
+			if not torch or not torch.cuda.is_available():
+				if multi:
+					return [-1], "float32"
+				return -1, "float32"
+			n = torch.cuda.device_count()
+			if not n:
+				if multi:
+					return [-1], torch.float32
+				return -1, torch.float32
+			import pynvml
+			pynvml.nvmlInit()
+			dc = pynvml.nvmlDeviceGetCount()
+			handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(dc)]
+			gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
+			tinfo = [torch.cuda.get_device_properties(i) for i in range(n)]
+			COMPUTE_LOAD = globals().get("COMPUTE_LOAD") or [0] * dc
+			high = max(COMPUTE_LOAD)
+			if priority == "full":
+				key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i], p.major, p.minor, p.multi_processor_count, p.total_memory)
+			elif priority:
+				key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, p.major >= major, COMPUTE_LOAD[i] < high * 0.9, i, p.multi_processor_count, p.total_memory)
+			elif priority is False:
+				key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, p.major >= major, -p.major, -p.minor, COMPUTE_LOAD[i] < high * 0.75, COMPUTE_LOAD[i], -gmems[i].free, p.multi_processor_count)
+			else:
+				key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.5, p.major >= major, -p.major, -p.minor, COMPUTE_LOAD[i], -p.multi_processor_count, -gmems[i].free)
+			pcs = sorted(range(n), key=key, reverse=True)
 			if multi:
-				return [-1], torch.float32
-			return -1, torch.float32
-		n = torch.cuda.device_count()
-		if not n:
-			if multi:
-				return [-1], torch.float32
-			return -1, torch.float32
-		import pynvml
-		pynvml.nvmlInit()
-		dc = pynvml.nvmlDeviceGetCount()
-		handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(dc)]
-		gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
-		tinfo = [torch.cuda.get_device_properties(i) for i in range(n)]
-		COMPUTE_LOAD = globals().get("COMPUTE_LOAD") or [0] * dc
-		high = max(COMPUTE_LOAD)
-		if priority == "full":
-			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i], p.major, p.minor, p.multi_processor_count, p.total_memory)
-		elif priority:
-			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, p.major >= major, COMPUTE_LOAD[i] < high * 0.9, i, p.multi_processor_count, p.total_memory)
-		elif priority is False:
-			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, p.major >= major, -p.major, -p.minor, COMPUTE_LOAD[i] < high * 0.75, COMPUTE_LOAD[i], -gmems[i].free, p.multi_processor_count)
+				return [i for i in pcs if gmems[i].free >= mem], torch.float16
+			return pcs[0], torch.float16
+
+		if len(sys.argv) > 1 and int(sys.argv[1]) == 2:
+			device, dtype = determine_cuda(1073741824, priority=None)
 		else:
-			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.5, p.major >= major, -p.major, -p.minor, COMPUTE_LOAD[i], -p.multi_processor_count, -gmems[i].free)
-		pcs = sorted(range(n), key=key, reverse=True)
-		if multi:
-			return [i for i in pcs if gmems[i].free >= mem], torch.float16
-		return pcs[0], torch.float16
+			device, dtype = -1, torch.float32
+		device = f"cuda:{device}" if device >= 0 else "cpu"
+		from sentence_transformers import SentenceTransformer
+		Embedder = SentenceTransformer("LLukas22/all-mpnet-base-v2-embedding-all", device=device)
+		if torch and dtype == torch.float16:
+			try:
+				Embedder = Embedder.half()
+			except (RuntimeError, NotImplementedError):
+				pass
+		def embedding(s):
+			a = Embedder.encode(s).astype(np.float16)
+			return a.data
 
-	if len(sys.argv) > 1 and int(sys.argv[1]) == 2:
-		device, dtype = determine_cuda(1073741824, priority=None)
-	else:
-		device, dtype = -1, torch.float32
-	device = f"cuda:{device}" if device >= 0 else "cpu"
-	from sentence_transformers import SentenceTransformer
-	Embedder = SentenceTransformer("LLukas22/all-mpnet-base-v2-embedding-all", device=device)
-	if dtype == torch.float16:
-		try:
-			Embedder = Embedder.half()
-		except (RuntimeError, NotImplementedError):
-			pass
-	def embedding(s):
-		a = Embedder.encode(s).astype(np.float16)
-		return a.data
-
-	if len(sys.argv) > 1 and int(sys.argv[1]) == 2:
 		import tiktoken
 		from clip_interrogator import Config, Interrogator
 		try:
