@@ -13,7 +13,13 @@ if os.path.exists("auth.json"):
 		os.environ["TRANSFORMERS_CACHE"] = f"{cachedir}/huggingface/transformers"
 		os.environ["HF_DATASETS_CACHE"] = f"{cachedir}/huggingface/datasets"
 
-import io, time, concurrent.futures, asyncio, subprocess, psutil, collections, traceback, re, requests, blend_modes, zipfile, contextlib, filetype, ast, colorspace, base64, hashlib, random
+import io, time, concurrent.futures, asyncio, subprocess, psutil, collections, traceback, re, requests, blend_modes, zipfile, contextlib, filetype, ast, base64, hashlib, random
+try:
+	# This module apparently does not exist on Linux
+	import colorspace
+except:
+	traceback.print_exc()
+	colorspace = None
 import numpy as np
 import PIL
 from PIL import Image, ImageCms, ImageOps, ImageChops, ImageDraw, ImageFilter, ImageEnhance, ImageMath, ImageStat, ImageFile
@@ -347,9 +353,9 @@ def from_gradient(shape, count, colour):
 		return im.resize((s,) * 2, resample=Resampling.NEAREST)
 	return im
 
-def rgb_split(image, dtype=np.uint8):
+def rgb_split(image, dtype=np.uint8, force=False):
 	channels = None
-	if "RGB" not in str(image.mode):
+	if not force and "RGB" not in str(image.mode):
 		if str(image.mode) == "L":
 			channels = [np.asanyarray(image, dtype=dtype)] * 3
 		else:
@@ -360,6 +366,8 @@ def rgb_split(image, dtype=np.uint8):
 	return channels
 
 def xyz_split(image, convert=True, dtype=np.uint8):
+	if not colorspace:
+		return rgb_split(image.convert("XYZ"), dtype=dtype, force=True)
 	colorlib = colorspace.colorlib()
 	out = rgb_split(image, dtype=np.float32)
 	out *= 1 / 255
@@ -545,6 +553,8 @@ def rgb_merge(R, G, B, convert=True):
 	return out
 
 def xyz_merge(X, Y, Z, convert=True):
+	if not colorspace:
+		return fromarray(rgb_merge(X, Y, Z, convert=False), "XYZ").convert("RGB")
 	colorlib = colorspace.colorlib()
 	X = np.asanyarray(X, np.float32)
 	Y = np.asanyarray(Y, np.float32)
