@@ -199,8 +199,8 @@ def update():
 def determine_cuda(mem=1, priority=None, multi=False, major=0):
 	if not torch or not torch.cuda.is_available():
 		if multi:
-			return [-1], "float32"
-		return -1, "float32"
+			return [-1], torch.float32
+		return -1, torch.float32
 	n = torch.cuda.device_count()
 	if not n:
 		if multi:

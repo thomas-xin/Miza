@@ -1487,6 +1487,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if best:
 			p3 = await fut
 			tup = (tup[0], p3, p2, best)
+			print("BEST:", tup)
 		self.analysed[url] = tup
 		while len(self.analysed) > 65536:
 			self.analysed.pop(next(iter(self.analysed)))

@@ -2565,8 +2565,8 @@ if len(sys.argv) <= 1 or int(sys.argv[1]) in (0, 2):
 		def determine_cuda(mem=1, priority=None, multi=False, major=0):
 			if not torch or not torch.cuda.is_available():
 				if multi:
-					return [-1], "float32"
-				return -1, "float32"
+					return [-1], torch.float32
+				return -1, torch.float32
 			n = torch.cuda.device_count()
 			if not n:
 				if multi:
@@ -2627,9 +2627,11 @@ if len(sys.argv) <= 1 or int(sys.argv[1]) in (0, 2):
 		VIT = VIT2 = True
 		def download_model():
 			if torch and torch.cuda.device_count():
-				device, dtype = determine_cuda(priority=None, major=7)
+				device, dtype = determine_cuda(priority=None)
+				if torch.cuda.get_device_properties(device).total_memory < 9 * 1073741824:
+					device, dtype = "cpu", torch.float32
 			else:
-				device, dtype = "cpu", "float32"
+				device, dtype = "cpu", torch.float32
 			config = Config(
 				clip_model_name="ViT-H-14/laion2b_s32b_b79k",
 				clip_model_path="misc/Clip",
@@ -2640,7 +2642,7 @@ if len(sys.argv) <= 1 or int(sys.argv[1]) in (0, 2):
 			globals()["VIT"] = CustomInterrogator(config, dtype=dtype)
 			VIT.load_caption_model()
 			config.device = "cpu"
-			globals()["VIT2"] = CustomInterrogator(config, dtype="float32")
+			globals()["VIT2"] = CustomInterrogator(config, dtype=torch.float32)
 			VIT2.load_clip_model()
 			im = Image.new("RGB", (4, 4), (0, 0, 255))
 			caption = VIT.generate_caption(im)

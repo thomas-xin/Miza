@@ -2270,7 +2270,7 @@ class UpdateUsers(Database):
 							break
 			if not isnan(perm) and "blacklist" in self.bot.data:
 				gid = self.bot.data.blacklist.get(0)
-				if gid != getattr(guild, "id", None):
+				if gid and gid != getattr(guild, "id", None):
 					create_task(send_with_react(
 						channel,
 						"I am currently under maintenance, please stay tuned!",
