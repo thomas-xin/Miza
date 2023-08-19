@@ -1455,7 +1455,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 	analysed = {}
 	async def caption(self, url, best=False):
-		if self.data.get("analysed"):
+		if "analysed" in self.data:
 			self.analysed = self.data.analysed
 		try:
 			if self.analysed[url][-1] >= best:

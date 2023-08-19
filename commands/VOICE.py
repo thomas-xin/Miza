@@ -2658,6 +2658,7 @@ class AudioDownloader:
 							f.write(b)
 				h2 = shash(url + ("~S" * silenceremove))
 				out = "cache/~" + h2 + "." + fmt
+				args = ()
 				if not os.path.exists(out):
 					args = [ffmpeg, "-hide_banner", "-v", "error", "-vn", "-i", fn, "-map_metadata", "-1"]
 					if silenceremove:
