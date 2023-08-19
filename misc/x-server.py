@@ -1206,7 +1206,7 @@ transform: translate(-50%, -50%);
 					if not os.path.getsize(fni):
 						return
 					try:
-						res = self.bot_exec(f"bool(getattr(bot.audio.returns[{t}], 'loaded', None))")
+						res = self.bot_exec(f"bool(bot.audio.returns[{t}].is_finished())")
 					except:
 						print_exc()
 						return True

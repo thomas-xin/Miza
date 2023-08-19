@@ -996,6 +996,7 @@ class AudioFileLink:
 	seekable = True
 	live = False
 	dur = None
+	started = False
 
 	def __init__(self, fn, stream=None, wasfile=None):
 		self.fn = self.file = fn
@@ -1006,6 +1007,7 @@ class AudioFileLink:
 		self.readable = concurrent.futures.Future()
 		if wasfile:
 			self.readable.set_result(self)
+			self.started = True
 		source = bot.audio.submit(f"!AudioFile({repr(fn)},{repr(stream)},{repr(wasfile)})")
 		self.assign = deque()
 		# print("Loaded source", source)
@@ -1035,9 +1037,16 @@ class AudioFileLink:
 		timeout = 48 if asap else 300
 		if not asap:
 			ytdl.download_file(self.webpage_url, fmt="opus")
+			self.started = True
+			if duration:
+				self.dur = duration
+			try:
+				self.readable.set_result(self)
+			except concurrent.futures.InvalidStateError:
+				pass
 			return
-		else:
-			bot.audio.submit(f"!cache['{self.fn}'].load(" + ",".join(repr(i) for i in (stream, check_fmt, force, webpage_url, live, seekable, duration, asap)) + ")", timeout=timeout)
+		bot.audio.submit(f"!cache['{self.fn}'].load(" + ",".join(repr(i) for i in (stream, check_fmt, force, webpage_url, live, seekable, duration, asap)) + ")", timeout=timeout)
+		self.started = True
 		if duration:
 			self.dur = duration
 		try:
@@ -1085,6 +1094,9 @@ class AudioFileLink:
 	def destroy(self):
 		bot.audio.submit(f"cache['{self.fn}'].destroy()")
 		ytdl.cache.pop(self.fn, None)
+
+	def is_finished(self):
+		return self.started and (getattr(self, "loaded", None) or bot.audio.submit(f"not cache['{self.fn}'].proc.is_running()"))
 
 
 class AudioClientSubInterface:

@@ -2935,7 +2935,7 @@ class DownloadingFile(io.IOBase):
 		self.filename = filename or getattr(fn, "name", None) or fn
 		self.af = af
 		for _ in loop(720):
-			if os.path.exists(fn):
+			if os.path.exists(fn) and os.path.getsize(fn):
 				break
 			if af():
 				raise FileNotFoundError

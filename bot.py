@@ -1503,7 +1503,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		resp = self.replicate_client.run(
 			"joehoover/instructblip-vicuna13b:c4c54e3c8c97cd50c2d2fec9be3b6065563ccf7d43787fb99f84151b867178fe",
 			input=dict(
-				prompt="Describe this image in detail!",
+				prompt="Describe only what this image contains in detail!",
 				img=io.BytesIO(resp),
 				max_length=256,
 				temperature=0.75,

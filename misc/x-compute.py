@@ -219,8 +219,6 @@ def to_qr(s, rainbow=False):
 	fn = f"cache/{time.time_ns() // 1000}.png"
 	if not os.path.exists(fn):
 		img.png(fn, scale=1, module_color=(255,) * 3, background=(0,) * 4)
-	import pillow_heif
-	pillow_heif.register_heif_opener()
 	imo = Image.open(fn)
 	im = imo.convert("1")
 	imo.close()
@@ -3135,14 +3133,22 @@ def from_bytes(b, save=None, nogif=False):
 	else:
 		data = b
 		out = io.BytesIO(b) if type(b) is bytes else b
-	import pillow_heif
-	pillow_heif.register_heif_opener()
+	try:
+		import pillow_heif
+	except ImportError:
+		pass
+	else:
+		pillow_heif.register_heif_opener()
 	mime = magic.from_buffer(data)
 	if mime == "application/zip":
 		z = zipfile.ZipFile(io.BytesIO(data), compression=zipfile.ZIP_DEFLATED, strict_timestamps=False)
 		return ImageSequence(*(Image.open(z.open(f.filename)) for f in z.filelist if not f.is_dir()))
 	try:
-		if mime.split("/", 1)[0] == "image" and mime.split("/", 1)[-1] in "blp bmp cur dcx dds dib emf eps fits flc fli fpx ftex gbr gd heif heic icns ico im imt iptc jpeg jpg mcidas mic mpo msp naa pcd pcx pixar png ppm psd sgi sun spider tga tiff wal wmf xbm".split():
+		import wand, wand.image
+	except ImportError:
+		wand = None
+	try:
+		if not wand or mime.split("/", 1)[0] == "image" and mime.split("/", 1)[-1] in "blp bmp cur dcx dds dib emf eps fits flc fli fpx ftex gbr gd heif heic icns ico im imt iptc jpeg jpg mcidas mic mpo msp naa pcd pcx pixar png ppm psd sgi sun spider tga tiff wal wmf xbm".split():
 			try:
 				return Image.open(out)
 			except PIL.UnidentifiedImageError:
@@ -3203,7 +3209,6 @@ def from_bytes(b, save=None, nogif=False):
 		exc = ex
 	else:
 		exc = TypeError(f'Filetype "{mime}" is not supported.')
-	import wand, wand.image
 	with wand.image.Image() as im:
 		with wand.color.Color("transparent") as background_color:
 			wand.api.library.MagickSetBackgroundColor(
