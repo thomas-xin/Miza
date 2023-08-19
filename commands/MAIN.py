@@ -2268,8 +2268,8 @@ class UpdateUsers(Database):
 							return
 						if not user.bot:
 							break
-			if not isnan(perm) and "blacklist" in self.data:
-				gid = self.data.blacklist.get(0)
+			if not isnan(perm) and "blacklist" in self.bot.data:
+				gid = self.bot.data.blacklist.get(0)
 				if gid != getattr(guild, "id", None):
 					create_task(send_with_react(
 						channel,
@@ -2277,7 +2277,7 @@ class UpdateUsers(Database):
 						reacts="❎",
 						reference=message,
 					))
-					return 0
+					return
 			send = lambda *args, **kwargs: send_with_reply(channel, not flags and message, *args, **kwargs)
 			out = None
 			count = self.data.get(user.id, EMPTY).get("last_talk", 0)

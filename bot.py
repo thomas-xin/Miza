@@ -2628,7 +2628,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					continue
 			rem = []
 			task = misc.pop()
-			while task.pwr > p and round_random(p / task.pwr) < 1:
+			while task.pwr > p:
 				rem.append(task)
 				if not misc:
 					task = None
@@ -3372,7 +3372,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			# Hash table lookup for target command: O(1) average time complexity.
 			if command_check in bot.commands:
 				gid = self.data.blacklist.get(0)
-				if gid and gid != g_id:
+				if gid and gid != g_id and not isnan(u_perm):
 					create_task(send_with_react(
 						channel,
 						"I am currently under maintenance, please stay tuned!",

@@ -32,6 +32,8 @@ if benchmark.DC:
 		if mem <= 11 * 1073741824 or compute_load[i] < 300000:
 			continue
 		caps.append(i + 3)
+	if sum(gmems) > 47 * 1073741824 and os.name == "nt":
+		caps.append(1)
 	if caps == [0]:
 		caps = [2]
 else:

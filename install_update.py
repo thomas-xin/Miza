@@ -38,23 +38,24 @@ def try_int(i):
         return i
 
 if os.environ.get("AI_FEATURES", True):
-    modlist.extend((
-        "accelerate>=0.20.3",
-        "clip-interrogator>=0.6.0",
-        "diffusers>=0.19.0",
-        "openai>=0.27.8",
+	modlist.extend((
+		"accelerate>=0.20.3",
+		"clip-interrogator>=0.6.0",
+		"diffusers>=0.19.0",
+		"openai>=0.27.8",
 		"opencv-python>=4.8.0.74",
-        "protobuf==3.20.3",
-        "pytesseract>=0.3.10",
+		"protobuf==3.20.3",
+		"pytesseract>=0.3.10",
 		"safetensors>=0.3.1",
-        "sentencepiece>=0.1.99",
-        "sentence-transformers>=2.2.2",
+		"sentencepiece>=0.1.99",
+		"sentence-transformers>=2.2.2",
 		"soundfile>=0.12.1",
-        "tiktoken>=0.4.0",
-        "tokenizers>=0.13.3",
-        "torch>=2.0.1",
-        "transformers>=4.31.0",
-    ))
+		"tiktoken>=0.4.0",
+		"tokenizers>=0.13.3",
+		"torch>=2.0.1",
+		"transformers>=4.31.0",
+		"xformers>=0.0.21",
+	))
 
 # Parsed requirements.txt
 for mod in modlist:

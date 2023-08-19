@@ -1658,7 +1658,7 @@ resizers = dict(
 	sdxl=Resampling.LANCZOS,
 )
 
-def resize_mult(image, x, y, operation):
+def resize_mult(image, x, y, operation="auto"):
 	if x == y == 1:
 		return image
 	w = image.width * x
@@ -2635,6 +2635,8 @@ if len(sys.argv) <= 1 or int(sys.argv[1]) in (0, 2):
 			globals()["VIT"] = globals()["VIT2"] = Interrogator(config)
 			im = Image.new("RGB", (4, 4))
 			VIT.interrogate_fast(im)
+			with torch.no_grad():
+				torch.cuda.empty_cache()
 			return pytesseract.image_to_string(im, config="--psm 1")
 		dfut = exc.submit(download_model)
 		def caption(im, best=False):
@@ -2674,6 +2676,8 @@ if len(sys.argv) <= 1 or int(sys.argv[1]) in (0, 2):
 				p2 = fut.result().strip()
 			else:
 				p2 = None
+			with torch.no_grad():
+				torch.cuda.empty_cache()
 			return (p1, p2)
 
 discord_emoji = re.compile("^https?:\\/\\/(?:[a-z]+\\.)?discord(?:app)?\\.com\\/assets\\/[0-9A-Fa-f]+\\.svg")
@@ -3036,14 +3040,14 @@ elif len(sys.argv) > 1 and int(sys.argv[1]) >= 3:
 			ib = CBOTS[None] = imagebot.Bot()
 		return ib.art_stablediffusion_local(prompt, kwargs, nsfw=nsfw, fail_unless_gpu=not force, count=count, sdxl=sdxl)
 
-	def IBASR(prompt, image):
+	def IBASR(prompt, image, steps=64):
 		print(prompt)
 		try:
 			ib = CBOTS[None]
 		except KeyError:
 			ib = CBOTS[None] = imagebot.Bot()
 		for i in range(3):
-			il = ib.art_stablediffusion_refine(prompt, image, steps=64)
+			il = ib.art_stablediffusion_refine(prompt, image, steps=steps, upscale=False)
 			if il:
 				break
 		else:

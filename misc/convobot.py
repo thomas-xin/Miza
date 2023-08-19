@@ -520,7 +520,7 @@ class Bot:
 		def apply_smp(smp, s1, ml, Ml, rm=False):
 			smp.busy += 1
 			try:
-				if smp.devid:
+				if smp.devid is not None:
 					with torch.autocast("cuda"):
 						s2 = smp(s1, max_length=Ml, min_length=ml, do_sample=do_sample, truncation=True)[0]["summary_text"]
 				else:

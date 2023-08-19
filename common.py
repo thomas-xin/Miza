@@ -2372,8 +2372,9 @@ if COMPUTE_LOAD:
 async def start_proc(k, i):
 	if k in PROCS:
 		if is_strict_running(PROCS[k][i]):
-			force_kill(PROCS[k][i])
+			proc = PROCS[k][i]
 			PROCS[k][i] = False
+			await create_future(force_kill, proc)
 		elif PROCS[k][i] is False:
 			return
 	args = list(proc_args[k])
@@ -2431,8 +2432,8 @@ def proc_start():
 				if COMPUTE_LOAD[cap] < 0.5 / len(COMPUTE_LOAD):
 					continue
 			starting.append((k, i))
-	if len(starting) > 5 and starting[3][1] == 3:
-		starting.pop(3)
+	# if len(starting) > 5 and starting[3][1] == 3:
+		# starting.pop(3)
 	print(starting)
 	for k, i in starting:
 		create_task(start_proc(k, i))
@@ -2512,8 +2513,8 @@ async def _sub_submit(proc, command, _timeout=12):
 	# s = f"~{ts}~{repr(command.encode('utf-8'))}\n".encode("utf-8")
 	sem = proc.sem
 	await sem()
-	if not is_strict_running(proc):
-		proc = await start_proc("compute", proc.i)
+	# if not is_strict_running(proc):
+		# proc = await start_proc("compute", proc.i)
 	async with sem:
 		try:
 			await create_future(proc.stdin.write, s, priority=True)
@@ -2542,10 +2543,7 @@ async def _sub_submit(proc, command, _timeout=12):
 					pass
 				else:
 					raise
-			i = proc.i
-			force_kill(proc)
-			PROCS["compute"][i] = None
-			create_task(start_proc("compute", i))
+			create_task(start_proc("compute", proc.i))
 			raise
 		finally:
 			PROC_RESP.pop(ts, None)
