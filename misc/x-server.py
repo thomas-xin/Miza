@@ -1177,7 +1177,7 @@ transform: translate(-50%, -50%);
 		if v:
 			ip = true_ip()
 			sem = self.ydl_sems.setdefault(ip, Semaphore(64, 256, rate_limit=8))
-			asap = not sem.active
+			asap = kwargs.get("asap") or not sem.active
 			with sem:
 				fmt = kwargs.get("fmt")
 				if not fmt:

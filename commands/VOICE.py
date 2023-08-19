@@ -2660,7 +2660,7 @@ class AudioDownloader:
 				out = "cache/~" + h2 + "." + fmt
 				args = ()
 				if not os.path.exists(out):
-					args = [ffmpeg, "-hide_banner", "-v", "error", "-vn", "-i", fn, "-map_metadata", "-1"]
+					args = [ffmpeg, "-hide_banner", "-v", "error", "-n", "-vn", "-i", fn, "-map_metadata", "-1"]
 					if silenceremove:
 						args.extend(("-af", "silenceremove=start_periods=1:start_duration=1:start_threshold=-50dB:start_silence=0.5:stop_periods=-9000:stop_threshold=-50dB:window=0.015625"))
 						if fmt == "mp3":
@@ -2687,7 +2687,7 @@ class AudioDownloader:
 				if args:
 					print(args)
 					subprocess.run(args)
-				args = [ffmpeg, "-hide_banner", "-v", "error", "-vn", "-i", fn, "-c:a", "copy", out2]
+				args = [ffmpeg, "-hide_banner", "-v", "error", "-n", "-vn", "-i", fn, "-c:a", "copy", out2]
 				print(args)
 				subprocess.run(args)
 				if rename:

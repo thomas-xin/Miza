@@ -1505,6 +1505,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				prompt="Describe this image in detail!",
 				img=io.BytesIO(resp),
 				max_length=256,
+				temperature=0.75,
 				top_p=0.9,
 				top_k=0,
 				repetition_penalty=1.2,
