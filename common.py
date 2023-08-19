@@ -2392,7 +2392,7 @@ async def start_proc(k, i):
 	)
 	proc.i = i
 	proc.is_running = lambda: not proc.returncode
-	proc.sem = Semaphore(4, inf) if i < 3 else Semaphore(1, inf)
+	proc.sem = Semaphore(8, inf) if i < 3 else Semaphore(1, inf)
 	proc.comm = create_task(proc_communicate(proc))
 	proc.dist = create_task(proc_distribute(proc))
 	proc.cap = min(i, 3)
