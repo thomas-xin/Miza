@@ -1215,6 +1215,10 @@ class UpdateImagePools(Database):
         return choice(data)
 
 
+class UpdateAnalysed(Database):
+    name = "analysed"
+
+
 class UpdateInsights(Database):
     name = "insights"
 

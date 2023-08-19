@@ -1375,7 +1375,7 @@ class Ask(Command):
 				else:
 					found = None
 			if found:
-				best = False#premium >= 4 and i == len(visible) - 1
+				best = premium >= 2 and m.id == message.id
 				cfut = create_task(bot.caption(found, best=best))
 				visconts.append((i, m, content, found, cfut))
 			else:

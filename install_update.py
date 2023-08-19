@@ -46,6 +46,7 @@ if os.environ.get("AI_FEATURES", True):
 		"opencv-python>=4.8.0.74",
 		"protobuf==3.20.3",
 		"pytesseract>=0.3.10",
+		"replicate>=0.11.0",
 		"safetensors>=0.3.1",
 		"sentencepiece>=0.1.99",
 		"sentence-transformers>=2.2.2",

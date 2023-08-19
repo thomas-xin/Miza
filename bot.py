@@ -1455,6 +1455,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 	analysed = {}
 	async def caption(self, url, best=False):
+		if self.data.get("analysed"):
+			self.analysed = self.data.analysed
 		try:
 			if self.analysed[url][-1] >= best:
 				return self.analysed[url][:-1]
@@ -1462,6 +1464,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			pass
 		if not torch:
 			return ("File", url.rsplit("/", 1)[-1], "", None)
+		if best:
+			fut = create_future(self.replicate, url)
 		res = None
 		try:
 			res = await process_image(url, "caption", ["-nogif", best], fix=2, pwr=best, timeout=300)
@@ -1478,12 +1482,34 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					aio=True,
 				)
 				tup = ("Text", "", lim_str(text, 128), False)
-			self.analysed[url] = tup
 		else:
-			self.analysed[url] = ("Image", p1, p2, best)
-		while len(self.analysed) > 4096:
+			tup = ("Image", p1, p2, best)
+		if best:
+			p3 = await fut
+			tup = (tup[0], p3, p2, best)
+		self.analysed[url] = tup
+		while len(self.analysed) > 65536:
 			self.analysed.pop(next(iter(self.analysed)))
 		return self.analysed[url][:-1] if self.analysed.get(url) else None
+
+	replicate_client = None
+	def replicate(self, url):
+		resp = await_fut(process_image(url, "resize_max", ["-nogif", 512, "auto", "-f", "png"], timeout=60))
+		if not self.replicate_client:
+			import replicate
+			self.replicate_client = replicate.Client(api_token=AUTH.get("replicate_key") or "")
+		resp = self.replicate_client.run(
+			"joehoover/instructblip-vicuna13b:c4c54e3c8c97cd50c2d2fec9be3b6065563ccf7d43787fb99f84151b867178fe",
+			input=dict(
+				prompt="Describe this image in detail!",
+				img=io.BytesIO(resp),
+				max_length=256,
+				top_p=0.9,
+				top_k=0,
+				repetition_penalty=1.2,
+			),
+		)
+		return "".join(resp)
 
 	# Follows a message link, replacing emojis and user mentions with their icon URLs.
 	async def follow_to_image(self, url, follow=True):
