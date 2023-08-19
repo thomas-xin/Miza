@@ -1457,9 +1457,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 	async def caption(self, url, best=False):
 		if "analysed" in self.data:
 			self.analysed = self.data.analysed
+		h = shash(url)
 		try:
-			if self.analysed[url][-1] >= best:
-				return self.analysed[url][:-1]
+			if self.analysed[h][-1] >= best:
+				return self.analysed[h][:-1]
 		except (LookupError, TypeError):
 			pass
 		if not torch:
@@ -1488,10 +1489,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			p3 = await fut
 			tup = (tup[0], p3, p2, best)
 			print("BEST:", tup)
-		self.analysed[url] = tup
+		self.analysed[h] = tup
 		while len(self.analysed) > 65536:
 			self.analysed.pop(next(iter(self.analysed)))
-		return self.analysed[url][:-1] if self.analysed.get(url) else None
+		return self.analysed[h][:-1] if self.analysed.get(h) else None
 
 	replicate_client = None
 	def replicate(self, url):
