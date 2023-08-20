@@ -365,8 +365,8 @@ class EnabledCommands(Command):
 			return f"Currently enabled command categories in {mention(target.id)}:\n{ini_md(iter2str(temp))}"
 		if not req:
 			catg = argv.casefold()
-			if not bot.is_trusted(guild) and catg not in standard_commands:
-				raise PermissionError(f"Elevated server priviliges required for specified command category.")
+			# if not bot.is_trusted(guild) and catg not in standard_commands:
+				# raise PermissionError(f"Elevated server priviliges required for specified command category.")
 			if catg not in bot.categories:
 				raise LookupError(f"Unknown command category {argv}.")
 			if catg in bot.get_enabled(target):
@@ -374,8 +374,8 @@ class EnabledCommands(Command):
 			return css_md(f'Command category {sqr_md(catg)} is currently disabled in {sqr_md(target)}. Use "{bot.get_prefix(guild)}{name} enable" to enable.')
 		args = [i.casefold() for i in args]
 		for catg in args:
-			if not bot.is_trusted(guild) and catg not in standard_commands:
-				raise PermissionError(f"Elevated server priviliges required for specified command category.")
+			# if not bot.is_trusted(guild) and catg not in standard_commands:
+				# raise PermissionError(f"Elevated server priviliges required for specified command category.")
 			if not catg in bot.categories:
 				raise LookupError(f"Unknown command category {catg}.")
 		curr = set(bot.get_enabled(target))

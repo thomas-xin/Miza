@@ -840,6 +840,10 @@ def round_min(x):
 	if isinstance(x, int):
 		return x
 	if isinstance(x, str):
+		if not x:
+			return
+		if x[0] == "-" and x[1:].isnumeric():
+			return int(x[1:])
 		if x.isnumeric():
 			return int(x)
 		if "." in x:

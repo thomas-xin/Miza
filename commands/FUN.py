@@ -2001,7 +2001,7 @@ class Dogpile(Command):
 class UpdateDogpiles(Database):
 	name = "dogpiles"
 
-	reg = regexp(r"[0-9]+\.?[0-9]+|\.?[0-9]+")
+	reg = regexp(r"-?[0-9]+\.?[0-9]+|-?\.?[0-9]+")
 	async def _nocommand_(self, edit, message, **void):
 		if edit or message.guild is None or not message.content:
 			return

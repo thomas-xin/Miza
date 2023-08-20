@@ -1095,8 +1095,12 @@ class AudioFileLink:
 		bot.audio.submit(f"cache['{self.fn}'].destroy()")
 		ytdl.cache.pop(self.fn, None)
 
+	ctime = inf
 	def is_finished(self):
-		return self.started and (getattr(self, "loaded", None) or bot.audio.submit(f"not cache['{self.fn}'].proc.is_running()"))
+		if utc() - self.ctime > 60:
+			return True
+		self.ctime = utc()
+		return self.started and (getattr(self, "loaded", None) or bot.audio.submit(f"bool(cache['{self.fn}'].proc)") and bot.audio.submit(f"not cache['{self.fn}'].proc.is_running()"))
 
 
 class AudioClientSubInterface:

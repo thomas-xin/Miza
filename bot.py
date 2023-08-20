@@ -1150,8 +1150,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			async for message in self.data.channel_cache.get(channel.id, as_message=care, force=False):
 				if isinstance(message, int):
 					message = cdict(id=message)
-				if message.id in found:
-					continue
 				if before:
 					if message.id >= time_snowflake(before):
 						continue
