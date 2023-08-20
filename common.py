@@ -423,6 +423,10 @@ try:
 	CE = asyncio.exceptions.CancelledError
 except AttributeError:
 	CE = asyncio.CancelledError
+try:
+	CE2 = concurrent.futures._base.CancelledError
+except AttributeError:
+	CE2 = concurrent.futures.CancelledError
 
 
 class ArgumentError(LookupError):
@@ -431,7 +435,7 @@ class ArgumentError(LookupError):
 class TooManyRequests(PermissionError):
 	__slots__ = ()
 
-class CommandCancelledError(RuntimeError):
+class CommandCancelledError(CE):
 	__slots__ = ()
 
 

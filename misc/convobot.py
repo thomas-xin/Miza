@@ -213,8 +213,8 @@ def update():
 def determine_cuda(mem=1, priority=None, multi=False, major=0):
 	if not torch or not torch.cuda.is_available():
 		if multi:
-			return [-1], torch.float32
-		return -1, torch.float32
+			return [-1], "float32"
+		return -1, "float32"
 	n = torch.cuda.device_count()
 	if not n:
 		if multi:
@@ -1837,7 +1837,6 @@ class Bot:
 	def cgp(self, data, stop=None):
 		oai = getattr(self, "oai", None)
 		bals = getattr(self, "bals", {})
-		uoai = None
 		if oai:
 			openai.api_key = oai
 			costs = 0
@@ -1896,6 +1895,40 @@ class Bot:
 				print(func)
 				print_exc()
 		return ""
+
+	def aa(self, system, prompt):
+		oai = getattr(self, "oai", None)
+		bals = getattr(self, "bals", {})
+		if oai:
+			openai.api_key = oai
+			costs = 0
+		elif bals:
+			openai.api_key = uoai = sorted(bals, key=bals.get)[0]
+			costs = -1
+		else:
+			openai.api_key = self.key
+			costs = 1
+		data = dict(
+			messages=[dict(role="system", content=system), dict(role="user", content=prompt)],
+			temperature=0,
+			top_p=0,
+			max_tokens=256,
+			model="gpt-3.5-turbo",
+			user=str(random.randint(0, 4294967295)),
+		)
+		cm = cm2 = 20
+		ok = openai.api_key
+		try:
+			resp = exc.submit(
+				openai.ChatCompletion.create,
+				**data,
+			).result(timeout=60)
+		except concurrent.futures.TimeoutError:
+			print_exc()
+		else:
+			if resp:
+				self.submit_cost(ok, resp["usage"]["prompt_tokens"] * cm * costs + resp["usage"].get("completion_tokens", 0) * (cm2 or cm) * costs)
+				return resp["choices"][0]["message"]["content"]
 
 	def aq(self, prompt, stop=None, temp=0.3):
 		try:

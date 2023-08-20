@@ -1948,7 +1948,7 @@ class Art(Command):
 			if not emb and rem <= 5:
 				emb = discord.Embed(colour=rand_colour())
 				emb.set_author(**get_author(bot.user))
-				emb.description = f"{rem}/{freelim} free premium commands remaining today. Please help [fund my API]({bot.kofi_url}) for unlimited and improved commands!"
+				emb.description = f"{rem}/{freelim} premium commands remaining today (free commands will be used after).\nPlease help [fund my API]({bot.kofi_url}) for unlimited and improved commands!"
 		return await send_with_react(channel, comment, files=files, reference=message, reacts="🔳", embed=emb)
 		# await bot.send_with_file(channel, "", fn, filename=lim_str(prompt, 96) + ".png", reference=message, reacts="🔳", embed=emb)
 

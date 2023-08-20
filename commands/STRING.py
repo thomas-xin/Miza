@@ -196,7 +196,6 @@ class Translate(Command):
 			nsfw=bot.is_nsfw(channel),
 			premium=premium,
 		)
-		# await process_image("CBIP", "&", [], fix=1, timeout=360)
 		out = await process_image("CBAU", "$", [inputs], fix=1, timeout=192)
 		if out and out[0] == out[-1] == '"' and not text[0] == text[-1] == '"':
 			try:
@@ -1566,7 +1565,7 @@ class Ask(Command):
 				if not emb and rem <= 5:
 					emb = discord.Embed(colour=rand_colour())
 					emb.set_author(**get_author(bot.user))
-					emb.description = f"{rem}/{freelim} free premium commands remaining today. Please help [fund my API]({bot.kofi_url}) for unlimited and improved commands!"
+					emb.description = f"{rem}/{freelim} premium commands remaining today (free commands will be used after).\nPlease help [fund my API]({bot.kofi_url}) for unlimited and improved commands!"
 			if isinstance(out, dict):
 				fname = out["func"]
 				argv = as_str(out.get("argv", ""))

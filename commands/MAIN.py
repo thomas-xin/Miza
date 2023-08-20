@@ -1081,7 +1081,8 @@ class Status(Command):
 				if n == "Command count":
 					return f"{n}\n[`{x}`](https://github.com/thomas-xin/Miza/wiki/Commands)"
 				if n == "Website URL":
-					return f"{n}\n[`{x}`]({x})"
+					x2 = x.replace("https://", "").replace("http://", "")
+					return f"{n}\n[`{x2}`]({x})"
 				return f"{n}\n`{x}`"
 			s = await bot.status(simplified=True)
 			for k, v in s.items():

@@ -3029,6 +3029,33 @@ if len(sys.argv) > 1 and sys.argv[1] == "1":
 		cb.premium = premium
 		return cb.au(prompt)
 
+	def CBAA(inputs):
+		user_id = inputs["user_id"]
+		channel_id = inputs["channel_id"]
+		system = inputs["system"]
+		prompt = inputs["prompt"]
+		key = inputs["key"]
+		ht = inputs["huggingface_token"]
+		oai = inputs.get("oai")
+		bals = inputs.get("bals")
+		nsfw = inputs.get("nsfw")
+		premium = inputs.get("premium")
+		try:
+			cb = CBOTS["AU"]
+		except KeyError:
+			cb = CBOTS["AU"] = convobot.Bot( 
+				key=key,
+				huggingface_token=ht,
+				premium=premium,
+			)
+		cb.user_id = user_id
+		cb.channel_id = channel_id
+		cb.oai = oai
+		cb.bals = bals
+		cb.nsfw = nsfw
+		cb.premium = premium
+		return cb.aa(system, prompt)
+
 	try:
 		from chatgpt_wrapper import AsyncChatGPT
 	except ImportError:

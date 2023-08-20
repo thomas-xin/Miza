@@ -105,7 +105,7 @@ class Purge(Command):
 class Mute(Command):
 	server_only = True
 	_timeout_ = 16
-	name = ["🔇", "Revoke", "Silence", "UnMute"]
+	name = ["🔇", "Revoke", "Silence", "UnMute", "Timeout"]
 	min_level = 3
 	min_display = "3+"
 	description = "Mutes a user for a certain amount of time, with an optional reason."
@@ -131,11 +131,12 @@ class Mute(Command):
 				buttons=buttons,
 			)
 			return
-		update = self.bot.data.mutes.update
+		update = bot.data.mutes.update
 		ts = utc()
-		mutelist = bot.data.mutes.get(guild.id, alist())
-		if type(mutelist) is not alist:
-			mutelist = bot.data.mutes[guild.id] = alist(mutelist)
+		dt = discord.utils.utcnow()
+		omutes = bot.data.mutes.get(guild.id, {})
+		if not isinstance(omutes, dict):
+			omutes = bot.data.mutes[guild.id] = {m["u"]: m["t"] for m in omutes}
 		async with discord.context_managers.Typing(channel):
 			mutes, glob = await self.getMutes(guild)
 			users = await bot.find_users(argl, args, user, guild)
@@ -144,30 +145,25 @@ class Mute(Command):
 		if len(users) > 1 and "f" not in flags:
 			raise InterruptedError(css_md(uni_str(sqr_md(f"WARNING: {sqr_md(len(users))} USERS TARGETED. REPEAT COMMAND WITH ?F FLAG TO CONFIRM."), 0), force=True))
 		if not args or name == "unmute":
+			out = deque()
 			for user in users:
 				try:
 					mute = mutes[user.id]
 				except LookupError:
-					create_task(channel.send(ini_md(f"{sqr_md(user)} is currently not muted in {sqr_md(guild)}. Specify a duration for temporary mutes, or `inf` for permanent mutes.")))
+					out.append(f"{sqr_md(user)} is currently not muted in {sqr_md(guild)}. Specify a duration for temporary mutes, or `inf` for permanent mutes.")
 					continue
 				if name == "unmute":
-					# await self.unmute(guild, user)
-					try:
-						ind = mutelist.search(user.id, key=lambda b: b["u"])
-					except LookupError:
-						pass
-					else:
-						mute = mutelist.pops(ind)[0]
-						mute["t"] = 0
-						mutelist.insort(mute, key=lambda x: x["t"])
-						with suppress(LookupError):
-							bot.data.mutes.listed.remove(guild.id, key=lambda x: x[-1])
-						if mutelist:
-							bot.data.mutes.listed.insort((mutelist[0]["t"], guild.id), key=lambda x: x[0])
-						update(guild.id)
-					# create_task(channel.send(css_md(f"Successfully unmuted {sqr_md(user)} in {sqr_md(guild)}.")))
+					omutes.pop(user.id, None)
+					update(guild.id)
+					if getattr(user, "timed_out_until", None):
+						user.timeout(datetime.timedelta(0))
+						with suppress():
+							user.timed_out_until = None
+					out.append(f"Successfully unmuted {sqr_md(user)} in {sqr_md(guild)}.")
 					continue
-				create_task(channel.send(italics(ini_md(f"Current mute for {sqr_md(user)} in {sqr_md(guild)}: {sqr_md(time_until(mute['t']))}."))))
+				out.append(f"Current mute for {sqr_md(user)} in {sqr_md(guild)}: {sqr_md(time_until(mute))}.")
+			if out:
+				return italics(ini_md("\n".join(out)))
 			return
 		# This parser is a mess too
 		mutetype = " ".join(args)
@@ -195,6 +191,7 @@ class Mute(Command):
 				_op = at
 		num = await bot.eval_time(expr, op=False)
 		create_task(message.add_reaction("❗"))
+		out = deque()
 		for user in users:
 			p = bot.get_perms(user, guild)
 			if not p < 0 and not is_finite(p):
@@ -206,74 +203,42 @@ class Mute(Command):
 				ex = self.perm_error(perm, p + 1, reason)
 				bot.send_exception(channel, ex)
 				continue
-			if _op is not None:
+			orig = 0
+			try:
+				mute = mutes[user.id]
+				orig = mute - ts
+			except LookupError:
 				try:
-					mute = mutes[user.id]
-					orig = mute["t"] - ts
-				except LookupError:
-					orig = 0
+					mute = user.timed_out_until.timestamp()
+					orig = mute - ts
+				except AttributeError:
+					mute = 0
+			orig = max(0, orig)
+			if _op is not None:
 				new = getattr(float(orig), _op)(num)
 			else:
 				new = num
-			create_task(self.createMute(guild, user, reason=msg, length=new, channel=channel, mutes=mutes, glob=glob))
+			new_ts = ts + new
+			if new <= 28 * 86400:
+				omutes.pop(user.id, None)
+				update(guild.id)
+				user.timeout(datetime.timedelta(seconds=new))
+			else:
+				omutes[user.id] = new_ts
+				update(guild.id)
+				user.timeout(datetime.timedelta(days=28))
+			if orig:
+				orig_ts = ts + orig
+				out.append(f"Updated mute for {sqr_md(user)} in {sqr_md(guild)} from {sqr_md(time_until(orig_ts))} to {sqr_md(time_until(new_ts))}.")
+			else:
+				out.append(f"{sqr_md(user)} has been muted in {sqr_md(guild)} for {sqr_md(time_until(new_ts))}. Reason: {sqr_md(reason)}")
+		if out:
+			return italics(ini_md("\n".join(out)))
 
 	async def getMutes(self, guild):
-		loc = self.bot.data.mutes.get(guild.id)
-		# This API call could potentially be replaced with a single init call and a well maintained cache of muted users
-		role = await self.bot.data.muteroles.get(guild)
-		glob = [cdict(user=member) for member in role.members]
-		mutes = {mute.user.id: {"u": mute.user.id, "r": None, "t": inf} for mute in glob}
-		if loc:
-			for b in tuple(loc):
-				if b["u"] not in mutes:
-					loc.pop(b["u"])
-					continue
-				mutes[b["u"]]["t"] = b["t"]
-				mutes[b["u"]]["c"] = b["c"]
-		return mutes, glob
-
-	async def createMute(self, guild, user, reason, length, channel, mutes, glob):
-		ts = utc()
-		bot = self.bot
-		mutelist = set_dict(bot.data.mutes, guild.id, alist())
-		update = bot.data.mutes.update
-		for m in glob:
-			u = m.user
-			if user.id == u.id:
-				with bot.ExceptionSender(channel):
-					mute = mutes[u.id]
-					# Remove from global schedule, then sort and re-add
-					with suppress(LookupError):
-						mutelist.remove(user.id, key=lambda x: x["u"])
-					with suppress(LookupError):
-						bot.data.mutes.listed.remove(guild.id, key=lambda x: x[-1])
-					mutelist.insort({"u": user.id, "t": ts + length, "c": channel.id, "r": mute.get("r"), "x": mute.get("x", ())}, key=lambda x: x["t"])
-					bot.data.mutes.listed.insort((mutelist[0]["t"], guild.id), key=lambda x: x[0])
-					print(mutelist)
-					print(bot.data.mutes.listed)
-					update(guild.id)
-					msg = css_md(f"Updated mute for {sqr_md(user)} from {sqr_md(time_until(mute['t']))} to {sqr_md(time_until(ts + length))}.")
-					await channel.send(msg)
-				return
-		with bot.ExceptionSender(channel):
-			role = await self.bot.data.muteroles.get(guild)
-			member = guild.get_member(user.id)
-			if member is None:
-				roles = ()
-			else:
-				roles = member.roles[1:]
-				await member.edit(roles=[role], reason=reason)
-			with suppress(LookupError):
-				mutelist.remove(user.id, key=lambda x: x["u"])
-			with suppress(LookupError):
-				bot.data.mutes.listed.remove(guild.id, key=lambda x: x[-1])
-			mutelist.insort({"u": user.id, "t": ts + length, "c": channel.id, "r": reason, "x": {r.id for r in roles if not r.managed}}, key=lambda x: x["t"])
-			bot.data.mutes.listed.insort((mutelist[0]["t"], guild.id), key=lambda x: x[0])
-			print(mutelist)
-			print(bot.data.mutes.listed)
-			update(guild.id)
-			msg = css_md(f"{sqr_md(user)} has been muted in {sqr_md(guild)} for {sqr_md(time_until(ts + length))}. Reason: {sqr_md(reason)}")
-			await channel.send(msg)
+		mutes = {user.id: user.timed_out_until.timestamp() for user in guild._members.values()}
+		mutes.update(self.bot.data.mutes.get(guild.id, {}))
+		return mutes, list(mutes.keys())
 
 	async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
 		u_id, pos = list(map(int, vals.split("_", 1)))
@@ -285,7 +250,6 @@ class Mute(Command):
 		user = await bot.fetch_user(u_id)
 		update = self.bot.data.mutes.update
 		ts = utc()
-		mutelist = bot.data.mutes.get(guild.id, [])
 		mutes, glob = await self.getMutes(guild)
 		page = 25
 		last = max(0, len(mutes) - page)
@@ -323,7 +287,7 @@ class Mute(Command):
 				user = await bot.fetch_user(mute["u"])
 				emb.add_field(
 					name=f"{user} ({user.id})",
-					value=f"Duration {italics(single_md(time_until(mute['t'])))}\nReason: {italics(single_md(escape_markdown(str(mute['r']))))}"
+					value=f"Duration {italics(single_md(time_until(mute)))}"
 				)
 		more = len(mutes) - pos - page
 		if more > 0:
@@ -1407,178 +1371,56 @@ class Publish(Command):
 #         pass
 
 
-# Just like the reminders database, the mute and ban databases need to be this way to keep O(1) time complexity when idle.
-
 class UpdateMutes(Database):
 	name = "mutes"
-
-	def __load__(self):
-		d = self.data
-		for i in tuple(d):
-			try:
-				assert d[i][0]["t"]
-			except:
-				print_exc()
-				d.pop(i, None)
-		self.listed = alist(sorted(((block[0]["t"], i) for i, block in d.items() if block), key=lambda x: x[0]))
+	sem = Semaphore(1, 1, rate_limit=86400)
 
 	async def _call_(self):
-		t = utc()
-		while self.listed:
-			p = self.listed[0]
-			if t < p[0]:
-				break
-			self.listed.popleft()
-			g_id = p[1]
-			temp = self.data[g_id]
-			if not temp:
-				self.data.pop(g_id)
-				continue
-			x = temp[0]
-			if t < x["t"]:
-				self.listed.insort((x["t"], g_id), key=lambda x: x[0])
-				print(self.listed)
-				continue
-			x = cdict(temp.pop(0))
-			self.update(g_id)
-			if not temp:
-				self.data.pop(g_id)
-			else:
-				z = temp[0]["t"]
-				self.listed.insort((z, g_id), key=lambda x: x[0])
-			print(self.listed)
-			with tracebacksuppressor:
-				guild = await self.bot.fetch_guild(g_id)
-				user = await self.bot.fetch_user(x.u)
-				m = guild.me
+		if self.sem.active:
+			return
+		ts = utc()
+		async with self.sem:
+			for g_id, data in tuple(self.items()):
 				try:
-					channel = await self.bot.fetch_channel(x.c)
-					if not channel.permissions_for(m).send_messages:
-						raise LookupError
-				except (LookupError, discord.Forbidden, discord.NotFound):
-					channel = self.bot.get_first_sendable(guild, m)
-				try:
-					role = await self.bot.data.muteroles.get(guild)
-					member = guild.get_member(user.id)
-					if member is None or role not in member.roles:
-						raise LookupError
-					roles = [r for r in member.roles[1:] if r.id != role.id]
-					r_ids = x.get("x", ())
-					attempt = set()
-					for r_id in r_ids:
-						with tracebacksuppressor:
-							r = await self.bot.fetch_role(r_id, guild)
-							attempt.add(r)
-					try:
-						await member.edit(roles=list(set(roles + list(attempt))), reason="Temporary mute expired.")
-					except discord.Forbidden:
-						await member.edit(roles=roles, reason="Temporary mute expired.")
-						if attempt:
-							await member.add_roles(*attempt, reason="Temporary mute expired.")
-					text = italics(css_md(f"{sqr_md(user)} has been unmuted in {sqr_md(guild)}."))
-				except:
-					text = italics(css_md(f"Unable to unmute {sqr_md(user)} in {sqr_md(guild)}."))
-					print_exc()
-				await channel.send(text)
+					guild = self.bot.cache.guilds[g_id]
+				except LookupError:
+					self.pop(g_id, None)
+					continue
+				for u_id, t in tuple(data.items()):
+					user = guild._members.get(u_id)
+					if not u_id:
+						data.pop(u_id)
+						self.update(g_id)
+						continue
+					rem = ts - t
+					reason = "Mute refreshed"
+					if rem < 28 * 86400:
+						if rem < 0:
+							rem = 0
+							reason = "Mute expired"
+							if not getattr(user, "timed_out_until", None):
+								continue
+						data.pop(u_id)
+						self.update(g_id)
+						await user.timeout(datetime.timedelta(seconds=rem), reason=reason)
+						continue
+					await user.timeout(datetime.timedelta(days=28), reason=reason)
 
 	async def _join_(self, user, guild, **void):
-		if guild.id in self.data:
-			for x in self.data[guild.id]:
-				if x["u"] == user.id:
-					if not x.get("x"):
-						with suppress(KeyError):
-							x["x"] = self.bot.data.rolepreservers[guild.id][user.id]
-							self.bot.data.rolepreservers[guild.id].pop(user.id)
-							bot.data.rolepreservers.update(guild.id)
-					role = await self.bot.data.muteroles.get(guild)
-					return await user.add_roles(role, reason="Sticky mute")
-
-
-class UpdateMuteRoles(Database):
-	name = "muteroles"
-
-	mute = discord.PermissionOverwrite(
-		create_instant_invite=False,
-		kick_members=False,
-		ban_members=False,
-		administrator=False,
-		manage_channels=False,
-		manage_guild=False,
-		add_reactions=False,
-		view_audit_log=False,
-		priority_speaker=False,
-		stream=False,
-		read_messages=None,
-		send_messages=False,
-		send_tts_messages=False,
-		manage_messages=False,
-		embed_links=False,
-		attach_files=False,
-		read_message_history=None,
-		mention_everyone=False,
-		external_emojis=False,
-		view_guild_insights=False,
-		connect=False,
-		speak=False,
-		mute_members=False,
-		deafen_members=False,
-		move_members=False,
-		use_voice_activation=False,
-		change_nickname=False,
-		manage_nicknames=False,
-		manage_roles=False,
-		manage_webhooks=False,
-		manage_emojis=False,
-	)
-
-	failed = set()
-	last = 0
-
-	async def get(self, guild):
-		with suppress(KeyError):
-			return self.bot.cache.roles[self.data[guild.id]]
-		role = await guild.create_role(name="Muted", colour=discord.Colour(1), reason="Mute role setup.")
-		self.bot.cache.roles[role.id] = role
-		self.data[guild.id] = role.id
-		self.update(guild.id)
-		for channel in guild.channels:
-			if channel.permissions_for(guild.me).manage_channels and channel.permissions_for(guild.me).manage_roles and not channel.permissions_synced and channel.id not in self.failed:
-				try:
-					await channel.set_permissions(target=role, overwrite=self.mute)
-				except discord.Forbidden:
-					self.failed.add(channel.id)
-				except:
-					print_exc()
-		return role
-
-	async def __call__(self):
-		if utc() - self.last <= 720:
+		ts = utc()
+		data = self.get(guild.id)
+		if not data:
 			return
-		for g_id in deque(self.data):
-			guild = self.bot.cache.guilds.get(g_id)
-			try:
-				role = self.bot.cache.roles[self.data[g_id]]
-			except KeyError:
-				self.data.pop(g_id, None)
-				continue
-			if guild:
-				if role not in guild.roles[1:]:
-					self.data.pop(g_id)
-				role = await self.get(guild)
-				for channel in guild.channels:
-					if not channel.permissions_synced and channel.id not in self.failed and channel.permissions_for(role).send_messages:
-						perms = channel.permissions_for(guild.me)
-						if perms.manage_channels and perms.manage_roles:
-							try:
-								await channel.set_permissions(target=role, overwrite=self.mute)
-							except discord.Forbidden:
-								self.failed.add(channel.id)
-							except:
-								print_exc()
-		self.last = utc()
-
-	def _day_(self):
-		self.failed.clear()
+		t = data.get(user.id)
+		if not t:
+			return
+		rem = ts - t
+		if rem <= 0:
+			data.pop(t, None)
+			self.update(guild.id)
+			return
+		rem = min(rem, 28 * 86400)
+		await user.timeout(datetime.timedelta(seconds=rem), reason="Mute restored")
 
 
 class UpdateBans(Database):
