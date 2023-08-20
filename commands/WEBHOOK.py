@@ -642,7 +642,7 @@ class Mimic(Command):
                         mimics[prefix].remove(m_id)
                 mimicdb.pop(mimic.id)
             update(user.id)
-            return italics(css_md(f"Successfully removed webhook mimic {sqr_md(mimic.name)} for {sqr_md(user)}."))
+            return italics(css_md(f"Successfully removed webhook mimic {sqr_md(mimic.name if mimic else prefix)} for {sqr_md(user)}."))
         if not prefix:
             raise IndexError("Prefix must not be empty.")
         if len(prefix) > 16:
@@ -850,6 +850,7 @@ class MimicSend(Command):
 
 class UpdateMimics(Database):
     name = "mimics"
+    no_delete = True
 
     async def _nocommand_(self, message, **void):
         if not message.content:
@@ -958,23 +959,23 @@ class UpdateMimics(Database):
                     mimic.url = "https://cdn.discordapp.com/embed/avatars/0.png"
         return mimic
 
-    @tracebacksuppressor(SemaphoreOverflowError)
-    async def __call__(self):
-        async with self._semaphore:
-            async with Delay(120):
+    # @tracebacksuppressor(SemaphoreOverflowError)
+    # async def __call__(self):
+        # async with self._semaphore:
+            # async with Delay(120):
                 # Garbage collector for unassigned mimics
-                i = 1
-                for m_id in tuple(self.data):
-                    if type(m_id) is str:
-                        mimic = self.data[m_id]
-                        try:
-                            if mimic.u_id not in self.data or mimic.id not in self.data[mimic.u_id][mimic.prefix]:
-                                self.data.pop(m_id)
-                        except:
-                            self.data.pop(m_id)
-                    if not i % 8191:
-                        await asyncio.sleep(0.45)
-                    i += 1
+                # i = 1
+                # for m_id in tuple(self.data):
+                    # if type(m_id) is str:
+                        # mimic = self.data[m_id]
+                        # try:
+                            # if mimic.u_id not in self.data or mimic.id not in self.data[mimic.u_id][mimic.prefix]:
+                                # self.data.pop(m_id)
+                        # except:
+                            # self.data.pop(m_id)
+                    # if not i % 8191:
+                        # await asyncio.sleep(0.45)
+                    # i += 1
 
 
 class UpdateWebhooks(Database):

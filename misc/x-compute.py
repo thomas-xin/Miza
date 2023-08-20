@@ -2651,9 +2651,9 @@ if len(sys.argv) <= 1 or int(sys.argv[1]) in (0, 2):
 			return pytesseract.image_to_string(im, config="--psm 1")
 		dfut = exc.submit(download_model)
 		def caption(im, best=False):
-			im = resize_max(im, 1536, "auto")
-			if "RGB" not in im.mode:
-				image = im.convert("RGBA")
+			im = resize_max(im, 1024, "auto")
+			if im.mode != "RGB":
+				image = im.convert("RGB")
 			else:
 				image = im
 			if pytesseract:

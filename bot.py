@@ -1077,6 +1077,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				with suppress(ValueError, TypeError):
 					m_id = "&" + str(int(m_id))
 				mimic = self.data.mimics[m_id]
+				if not isinstance(mimic, cdict):
+					self.data.mimics[m_id] = mimic = cdict(mimic)
 				return mimic
 			if user is not None:
 				with suppress(KeyError):
@@ -1148,6 +1150,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			async for message in self.data.channel_cache.get(channel.id, as_message=care, force=False):
 				if isinstance(message, int):
 					message = cdict(id=message)
+				if message.id in found:
+					continue
 				if before:
 					if message.id >= time_snowflake(before):
 						continue
@@ -1167,6 +1171,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		async for message in discord.abc.Messageable.history(channel, limit=limit, before=before, after=after):
 			if message.id not in found:
 				self.add_message(message, files=False, force=True)
+				found.add(message.id)
 				yield message
 
 	async def get_last_message(self, channel, key=None):
@@ -2433,6 +2438,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			return int(x)
 		if type(x) is float:
 			return x
+		if x in (None, "None"):
+			return
 		x = round_min(x)
 		if type(x) is not int and len(str(x)) <= 16:
 			return float(x)
@@ -5316,6 +5323,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		fields = None
 		if isinstance(ex, TooManyRequests):# and not random.randint(0, 5):
 			fields = (("Running into the rate limit often?", f"Consider donating using one of the subscriptions from my [ko-fi]({self.kofi_url}), which will grant shorter rate limits amongst many feature improvements!"),)
+		elif isinstance(ex, discord.Forbidden):# and not random.randint(0, 5):
+			fields = (("This error usually indicates that I am missing one or more necessary Discord permissions to perform this command!"),)
 		elif isinstance(op, tuple):
 			fields = (op,)
 		else:

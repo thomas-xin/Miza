@@ -355,6 +355,10 @@ def predict_next(seq, limit=12):
 		temp = _predict_next(seq[-i:])
 		if temp is not None:
 			return temp
+	for i in range(min(8, limit) - 1, 3, -1):
+		temp = _predict_next(seq[-i:])
+		if temp is not None:
+			return temp
 
 # Multiple variable limit
 def lim(f, kwargs=None, **_vars):
