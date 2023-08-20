@@ -236,7 +236,7 @@ class Mute(Command):
 			return italics(ini_md("\n".join(out)))
 
 	async def getMutes(self, guild):
-		mutes = {user.id: user.timed_out_until.timestamp() for user in guild._members.values()}
+		mutes = {user.id: user.timed_out_until.timestamp() for user in guild._members.values() if getattr(user, "timed_out_until", None)}
 		mutes.update(self.bot.data.mutes.get(guild.id, {}))
 		return mutes, list(mutes.keys())
 
