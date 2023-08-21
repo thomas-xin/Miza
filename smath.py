@@ -843,7 +843,7 @@ def round_min(x):
 		if not x:
 			return
 		if x[0] == "-" and x[1:].isnumeric():
-			return int(x[1:])
+			return -int(x[1:])
 		if x.isnumeric():
 			return int(x)
 		if "." in x:

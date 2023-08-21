@@ -3120,7 +3120,7 @@ class Queue(Command):
 	name = ["▶️", "P", "Q", "Play", "Enqueue", "Search&Play"]
 	alias = name + ["LS"]
 	description = "Shows the music queue, or plays a song in voice."
-	usage = "<search_links>* <force{?f}|budge{?b}|random{?r}|verbose{?v}|hide{?h}>*"
+	usage = "<url>* <force{?f}|budge{?b}|random{?r}|verbose{?v}|hide{?h}>*"
 	example = ("play despacito", "queue", "enqueue https://www.youtube.com/watch?v=dQw4w9WgXcQ")
 	flags = "hvfbrz"
 	no_parse = True
@@ -3523,7 +3523,7 @@ class Playlist(Command):
 			msg = ""
 		else:
 			pl.sort(key=lambda x: x["name"].casefold())
-			content += f"{len(pl)} items in default playlist for {str(guild).replace('`', '')}:```*"
+			content += f"{len(pl)} item(s) in default playlist for {str(guild).replace('`', '')}:```*"
 			key = lambda x: lim_str(sqr_md(x["name"]) + "(" + x["url"] + ")", 1900 / page)
 			msg = iter2str(pl[pos:pos + page], key=key, offset=pos, left="`【", right="】`")
 		colour = await self.bot.get_colour(guild)

@@ -203,6 +203,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 	def command_options(self, usage, compare=False):
 		# default = False
+		accepts_attachments = False
 		out = deque()
 		for i in usage.split():
 			with tracebacksuppressor:
@@ -235,7 +236,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 								for n in name.split("|"):
 									arg = dict(arg)
 									arg["name"], flag = n.split("{", 1)
-									arg["choices"] = [dict(name="true", value=flag.rsplit("}", 1)[0]), dict(name="false", value=None if compare else "")]
+									# arg["choices"] = [dict(name="true", value=flag.rsplit("}", 1)[0]), dict(name="false", value=None if compare else "")]
+									arg["type"] = 5
 									out.append(arg)
 								continue
 						else:
@@ -245,8 +247,15 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						if name.startswith("("):
 							name = name.strip("()")
 						arg["name"] = name.split("(", 1)[0].replace("|", "-")
+				if arg["name"] == "user":
+					arg["type"] = 9
+				elif arg["name"] == "url":
+					accepts_attachments = True
 				out.append(arg)
-		return sorted(out, key=lambda arg: bool(arg.get("required")), reverse=True)
+		if accepts_attachments:
+			arg = dict(type=11, name="attachment", description="Attachment in place of URL")
+			out.append(arg)
+		return sorted(out, key=lambda arg: not arg.get("required"))
 
 	@tracebacksuppressor
 	def create_command(self, data):
@@ -342,7 +351,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 										else:
 											# print(f"{curr['name']}'s slash command matches, ignoring...")
 											found = True
-										commands.pop(i)
+										commands.pop(i, None)
 										break
 								if not found:
 									print(f"creating new slash command {command_data['name']}...")
@@ -4623,6 +4632,21 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						pass
 				return self.__getattribute__(k)
 
+			def edit(self, *args, **kwargs):
+				if not getattr(self, "guild", None):
+					raise AttributeError("Member is not in a guild.")
+				return discord.Member.edit(self, *args, **kwargs)
+
+			def ban(self, reason=None):
+				if not getattr(self, "guild", None):
+					raise AttributeError("Member is not in a guild.")
+				return discord.Member.ban(self, reason=reason)
+
+			def timeout(self, duration, reason=None):
+				if not getattr(self, "guild", None):
+					raise AttributeError("Member is not in a guild.")
+				return discord.Member.timeout(self, duration, reason=reason)
+
 			@property
 			def display_name(self):
 				return self.nick or self.name
@@ -5657,8 +5681,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					cdata = d.get("data")
 					if d["type"] == 2:
 						name = cdata["name"].replace(" ", "")
-						args = [i.get("value", "") for i in cdata.get("options", ())]
-						argv = " ".join(i for i in args if i)
+						try:
+							usage = self.commands[name][0].usage
+						except LookupError:
+							usage = ""
+						arguments = sorted(cdata.get("options", ()), key=lambda arg: ((i := usage.find(arg.get("value") or "")) < 0, i))
+						args = [orjson.dumps(arg.get("value") or "") for arg in arguments]
+						argv = b" ".join(i for i in args if i).decode("utf-8")
 						message.content = "/" + name + " " + argv
 						mdata = d.get("member")
 						if not mdata:
@@ -5673,9 +5702,6 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							for mdata in res.get("users", {}).values():
 								message.content += " " + mdata["id"]
 								user = self._state.store_user(mdata)
-							# for m_id in res.get("members", ()):
-							#     message.content += " " + m_id
-							#     user = await self.fetch_user(m_id)
 							for mdata in res.get("messages", {}).values():
 								msg = self.ExtendedMessage.new(mdata)
 								message.content += " " + msg.jump_url

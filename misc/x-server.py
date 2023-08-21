@@ -391,6 +391,7 @@ def true_ip():
 		ip = cp.request.headers.get("X-Real-Ip") or ip
 	if ip == "127.0.0.1":
 		ip = cp.request.remote.ip
+	cp.serving.request.remote.ip = cp.request.remote.ip = ip
 	return ip
 
 
@@ -1174,8 +1175,8 @@ transform: translate(-50%, -50%);
 		t = ts_us()
 		while t in RESPONSES:
 			t += 1
+		ip = true_ip()
 		if v:
-			ip = true_ip()
 			sem = self.ydl_sems.setdefault(ip, Semaphore(64, 256, rate_limit=8))
 			asap = kwargs.get("asap") or not sem.active
 			with sem:
@@ -2514,6 +2515,7 @@ alert("File successfully deleted. Returning to home.");
 	@cp.expose
 	@hostmap
 	def status(self, interval=None):
+		true_ip()
 		status = self.bot_exec(f"bot.status(interval={interval})")
 		cp.response.headers.update(HEADERS)
 		cp.response.headers["Content-Type"] = "application/json"

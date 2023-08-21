@@ -186,7 +186,7 @@ VIDEOS = ("gif", "webp", "apng", "mp4", "mkv", "webm", "mov", "wmv", "flv", "avi
 #             content += f"Image list for {str(guild).replace('`', '')} is currently empty.```*"
 #             msg = ""
 #         else:
-#             content += f"{len(images)} images currently assigned for {str(guild).replace('`', '')}:```*"
+#             content += f"{len(images)} image(s) currently assigned for {str(guild).replace('`', '')}:```*"
 #             msg = ini_md(iter2str({k: "\n" + images[k] for k in tuple(images)[pos:pos + page]}))
 #         colour = await self.bot.get_colour(guild)
 #         emb = discord.Embed(
@@ -1037,13 +1037,14 @@ class CreateGIF(Command):
 class Resize(Command):
 	name = ["ImageScale", "Scale", "Rescale", "ImageResize", "Denoise", "Enhance", "Refine"]
 	description = "Changes size of supplied image, using an optional scaling operation."
-	usage = "<0:url> <1:x_multiplier(1)>? <2:y_multiplier(x)>? (nearest|linear|hamming|bicubic|lanczos|scale2x|sdxl|crop|auto)?"
+	usage = "<0:url> <1:resolution|multiplier>? <2:y_multiplier(x)>? (nearest|linear|hamming|bicubic|lanczos|scale2x|sdxl|crop|auto)?"
 	example = ("scale https://mizabot.xyz/favicon 4", "resize https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png 2048x2048 scale2x")
 	no_parse = True
 	rate_limit = (8, 13)
 	flags = "l"
 	_timeout_ = 4
 	typing = True
+	slash = True
 
 	async def __call__(self, bot, user, guild, channel, message, flags, name, args, argv, _timeout, **void):
 		# Take input from any attachments, or otherwise the message contents
@@ -1101,17 +1102,22 @@ class Resize(Command):
 				if "x" in value[:-1] or "X" in value or "*" in value or "×" in value:
 					func = "resize_to"
 					value = value.replace("x", "X", 1).replace("X", "*", 1).replace("*", "×", 1).replace("×", " ", 1)
-				else:
+				elif ":" in value:
+					func = "resize_to"
 					value = value.replace(":", " ", 1)
 				try:
 					spl = smart_split(value)
 				except ValueError:
 					spl = value.split()
-				x = await bot.eval_math(spl.pop(0))
+				x = spl.pop(0)
+				if x != "-":
+					x = round_min(x)
 				if spl:
-					y = await bot.eval_math(spl.pop(0))
+					y = spl.pop(0)
+					if y != "-":
+						y = round_min(x)
 				else:
-					y = x
+					y = "-"
 				if func == "resize_mult":
 					for value in (x, y):
 						if not value >= -32 or not value <= 32:
@@ -1502,7 +1508,7 @@ class Art(Command):
 	_timeout_ = 150
 	name = ["AIArt", "Inpaint", "StableDiffusion", "SDXL", "Dalle", "Dalle2", "Dream", "Imagine", "Inspire", "Openjourney", "Midjourney"]
 	description = "Runs a Stable Diffusion AI art generator on the input prompt or image. Operates on a global queue system for image prompts. Accepts appropriate keyword arguments."
-	usage = "<0:prompt> <inpaint{?i}>"
+	usage = "<0:prompt> <inpaint{?i}>?"
 	example = ("art cute kitten", "art https://mizabot.xyz/favicon")
 	rate_limit = (45, 60)
 	flags = "i"

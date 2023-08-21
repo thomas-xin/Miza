@@ -251,7 +251,7 @@ class Perms(Command):
 	server_only = True
 	name = ["DefaultPerms", "ChangePerms", "Perm", "ChangePerm", "Permissions"]
 	description = "Shows or changes a user's permission level."
-	usage = "<0:users>* <1:new_level>? <default{?d}>? <hide{?h}>?"
+	usage = "<0:user>* <1:new_level>? <default{?d}>? <hide{?h}>?"
 	example = ("perms steven 2", "perms 201548633244565504 ?d")
 	flags = "fhd"
 	rate_limit = (5, 8)
@@ -459,8 +459,8 @@ class Loop(Command):
 		if not isnan(perm):
 			if channel.id in self.active:
 				raise PermissionError("Only one loop may be active in a channel at any time.")
-			elif iters > 32 and not bot.is_trusted(guild.id):
-				raise PermissionError("Elevated server priviliges required to execute loop of greater than 32 iterations.")
+			elif iters > 64 and not bot.is_trusted(guild.id):
+				raise PermissionError("Server premium level 1 or higher required to execute loop of greater than 64 iterations; please see {bot.kofi_url} for more info!")
 			elif iters > 256:
 				raise PermissionError("Loops cannot be more than 256 iterations.")
 		func = func2 = " ".join(args[1:])
@@ -611,7 +611,7 @@ class Avatar(Command):
 class Info(Command):
 	name = ["🔍", "🔎", "UserInfo", "ServerInfo", "WhoIs"]
 	description = "Shows information about the target user or server."
-	usage = "<objects>* <verbose{?v}>?"
+	usage = "<user>* <verbose{?v}>?"
 	example = ("info 201548633244565504", "info")
 	flags = "v"
 	rate_limit = (6, 9)
@@ -1621,7 +1621,7 @@ class Note(Command):
 			content += f"No currently assigned notes for {str(user).replace('`', '')}.```*"
 			msg = ""
 		else:
-			content += f"{len(curr)} notes currently assigned for {str(user).replace('`', '')}:```*"
+			content += f"{len(curr)} note(s) currently assigned for {str(user).replace('`', '')}:```*"
 			msg = iter2str(tuple(curr)[pos:pos + page], left="`【", right="】`")
 		colour = await self.bot.get_colour(user)
 		emb = discord.Embed(

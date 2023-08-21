@@ -230,7 +230,7 @@ if getattr(im, "text", None) and im.text.get("copyright") and not test:
 	if im.text["copyright"] != msg:
 		print("Copyright detected in metadata:", im.text["copyright"])
 		raise SystemExit
-if not msg and (im.width > 256 or im.height > 256):
+if not msg and (im.width > 156 or im.height > 156):
 
 	def max_size(w, h, maxsize, force=False):
 		s = w * h
@@ -241,7 +241,7 @@ if not msg and (im.width > 256 or im.height > 256):
 			h = round(h * r)
 		return w, h
 
-	im = im.resize(max_size(im.width, im.height, 256), resample=Resampling.NEAREST)
+	im = im.resize(max_size(im.width, im.height, 156), resample=Resampling.NEAREST)
 
 if "RGB" not in im.mode:
 	im = im.convert("RGBA")

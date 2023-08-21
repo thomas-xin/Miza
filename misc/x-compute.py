@@ -1664,6 +1664,12 @@ def resize_mult(image, x, y, operation="auto"):
 	return resize_to(image, round(w), round(h), operation)
 
 def resize_to(image, w, h, operation="auto"):
+	if w == "-":
+		if h == "-":
+			return image
+		w = image.width / image.height * h
+	elif h == "-":
+		h = image.height / image.width * w
 	if abs(w * h) > 1073741824:
 		raise OverflowError("Resulting image size too large.")
 	if w == image.width and h == image.height:
@@ -3080,7 +3086,7 @@ elif len(sys.argv) > 1 and int(sys.argv[1]) >= 3:
 		return ib.art_stablediffusion_local(prompt, kwargs, nsfw=nsfw, fail_unless_gpu=not force, count=count, sdxl=sdxl)
 
 	def IBASR(prompt, image, steps=64):
-		print(prompt)
+		# print(prompt)
 		try:
 			ib = CBOTS[None]
 		except KeyError:

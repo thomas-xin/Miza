@@ -2015,6 +2015,7 @@ class UpdateDogpiles(Database):
 		content = zwremove(message.content)
 		if not content:
 			return
+		numbers = ()
 		try:
 			number = round_min(content)
 		except ValueError:
@@ -2432,7 +2433,7 @@ class UpdateDailies(Database):
 class Wallet(Command):
 	name = ["Level", "Bal", "Balance", "Trial"]
 	description = "Shows the target users' wallet, or enables a token-based trial of ⟨MIZA⟩'s premium features, where 1 💎 = 25000 quota."
-	usage = "<users>* <trial{?t}>?"
+	usage = "<user>* <trial{?t}>?"
 	flags = "t"
 	example = ("bal", "wallet @Miza", "trial <OpenAI API key>")
 	rate_limit = (3, 4)

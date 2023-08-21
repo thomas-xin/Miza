@@ -7,7 +7,7 @@ class Purge(Command):
 	name = ["🗑", "Del", "Delete", "Purge_Range"]
 	min_level = 3
 	description = "Deletes a number of messages from a certain user in current channel."
-	usage = "<1:users>? <0:count(1)>? <ignore{?i}|range{?r}|hide{?h}>*"
+	usage = "<1:user>? <0:count(1)>? <ignore{?i}|range{?r}|hide{?h}>*"
 	example = ("purge @Miza 3", "purge 50", "purge_range 1038565892185222287 1128125804136579235")
 	flags = "fiaehr"
 	rate_limit = (7, 12)
@@ -105,11 +105,11 @@ class Purge(Command):
 class Mute(Command):
 	server_only = True
 	_timeout_ = 16
-	name = ["🔇", "Revoke", "Silence", "UnMute", "Timeout"]
+	name = ["🔇", "Revoke", "Silence", "UnMute", "Timeout", "Mutes"]
 	min_level = 3
 	min_display = "3+"
 	description = "Mutes a user for a certain amount of time, with an optional reason."
-	usage = "<0:users>* <1:time>? (reason)? <2:reason>? <hide{?h}>?"
+	usage = "<0:user>* <1:time>? <2:reason>? <hide{?h}>?"
 	example = ("mute @Miza 1h for being naughty",)
 	flags = "fhz"
 	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
@@ -118,7 +118,7 @@ class Mute(Command):
 	multi = True
 	slash = True
 
-	async def __call__(self, bot, args, argl, message, channel, guild, flags, perm, user, name, **void):
+	async def __call__(self, bot, argv, args, argl, message, channel, guild, flags, perm, user, name, **void):
 		if not args and not argl:
 			# Set callback message for scrollable list
 			buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
@@ -134,7 +134,7 @@ class Mute(Command):
 		update = bot.data.mutes.update
 		ts = utc()
 		dt = discord.utils.utcnow()
-		omutes = bot.data.mutes.get(guild.id, {})
+		omutes = bot.data.mutes.setdefault(guild.id, {})
 		if not isinstance(omutes, dict):
 			omutes = bot.data.mutes[guild.id] = {m["u"]: m["t"] for m in omutes}
 		async with discord.context_managers.Typing(channel):
@@ -155,10 +155,9 @@ class Mute(Command):
 				if name == "unmute":
 					omutes.pop(user.id, None)
 					update(guild.id)
-					if getattr(user, "timed_out_until", None):
-						user.timeout(datetime.timedelta(0))
-						with suppress():
-							user.timed_out_until = None
+					await user.timeout(datetime.timedelta(0))
+					with suppress(AttributeError):
+						user.timed_out_until = None
 					out.append(f"Successfully unmuted {sqr_md(user)} in {sqr_md(guild)}.")
 					continue
 				out.append(f"Current mute for {sqr_md(user)} in {sqr_md(guild)}: {sqr_md(time_until(mute))}.")
@@ -181,9 +180,12 @@ class Mute(Command):
 			i = mutetype.index("reason ")
 			expr = mutetype[:i].strip()
 			msg = mutetype[i + 7:].strip()
+		elif '"' in argv and len(args) == 2:
+			expr, msg = args
 		else:
 			expr = mutetype
 			msg = None
+		msg = msg or None
 		_op = None
 		for op, at in bot.op.items():
 			if expr.startswith(op):
@@ -219,19 +221,19 @@ class Mute(Command):
 			else:
 				new = num
 			new_ts = ts + new
-			if new <= 28 * 86400:
+			if new <= 21 * 86400:
 				omutes.pop(user.id, None)
 				update(guild.id)
-				user.timeout(datetime.timedelta(seconds=new))
+				await user.timeout(datetime.timedelta(seconds=new), reason=msg)
 			else:
 				omutes[user.id] = new_ts
 				update(guild.id)
-				user.timeout(datetime.timedelta(days=28))
+				await user.timeout(datetime.timedelta(days=21), reason=msg)
 			if orig:
 				orig_ts = ts + orig
 				out.append(f"Updated mute for {sqr_md(user)} in {sqr_md(guild)} from {sqr_md(time_until(orig_ts))} to {sqr_md(time_until(new_ts))}.")
 			else:
-				out.append(f"{sqr_md(user)} has been muted in {sqr_md(guild)} for {sqr_md(time_until(new_ts))}. Reason: {sqr_md(reason)}")
+				out.append(f"{sqr_md(user)} has been muted in {sqr_md(guild)} for {sqr_md(time_until(new_ts))}. Reason: {sqr_md(msg)}")
 		if out:
 			return italics(ini_md("\n".join(out)))
 
@@ -277,18 +279,13 @@ class Mute(Command):
 		)
 		if not mutes:
 			content += f"Mute list for {str(guild).replace('`', '')} is currently empty.```*"
+			msg = ""
 		else:
-			content += f"{len(mutes)} users currently muted in {str(guild).replace('`', '')}:```*"
+			content += f"{len(mutes)} mute(s) currently assigned for {str(guild).replace('`', '')}:```*"
+			msg = iter2str({user_mention(k): time_until(mutes[k]) for k in tuple(mutes)[pos:pos + page]}, left="", right="")
 		emb = discord.Embed(colour=discord.Colour(1))
-		emb.description = content
-		emb.set_author(**get_author(user))
-		for i, mute in enumerate(sorted(mutes.values(), key=lambda x: x["t"])[pos:pos + page]):
-			with tracebacksuppressor:
-				user = await bot.fetch_user(mute["u"])
-				emb.add_field(
-					name=f"{user} ({user.id})",
-					value=f"Duration {italics(single_md(time_until(mute)))}"
-				)
+		emb.description = content + "\n" + msg
+		emb.set_author(**get_author(guild))
 		more = len(mutes) - pos - page
 		if more > 0:
 			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
@@ -304,7 +301,7 @@ class Ban(Command):
 	min_level = 3
 	min_display = "3+"
 	description = "Bans a user for a certain amount of time, with an optional reason."
-	usage = "<0:users>* <1:time>? (reason)? <2:reason>? <hide{?h}>?"
+	usage = "<0:user>* <1:time>? <2:reason>? <hide{?h}>?"
 	example = ("ban @Miza 30m for being naughty",)
 	flags = "fhz"
 	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
@@ -313,7 +310,7 @@ class Ban(Command):
 	multi = True
 	slash = True
 
-	async def __call__(self, bot, args, argl, message, channel, guild, flags, perm, user, name, **void):
+	async def __call__(self, bot, argv, args, argl, message, channel, guild, flags, perm, user, name, **void):
 		if not args and not argl:
 			# Set callback message for scrollable list
 			buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
@@ -379,9 +376,12 @@ class Ban(Command):
 			i = bantype.index("reason ")
 			expr = bantype[:i].strip()
 			msg = bantype[i + 7:].strip()
+		elif '"' in argv and len(args) == 2:
+			expr, msg = args
 		else:
 			expr = bantype
 			msg = None
+		msg = msg or None
 		_op = None
 		for op, at in bot.op.items():
 			if expr.startswith(op):
@@ -505,10 +505,10 @@ class Ban(Command):
 		if not bans:
 			content += f"Ban list for {str(guild).replace('`', '')} is currently empty.```*"
 		else:
-			content += f"{len(bans)} users currently banned from {str(guild).replace('`', '')}:```*"
+			content += f"{len(bans)} user(s) currently banned from {str(guild).replace('`', '')}:```*"
 		emb = discord.Embed(colour=discord.Colour(1))
 		emb.description = content
-		emb.set_author(**get_author(user))
+		emb.set_author(**get_author(guild))
 		for i, ban in enumerate(sorted(bans.values(), key=lambda x: x["t"])[pos:pos + page]):
 			with tracebacksuppressor:
 				user = await bot.fetch_user(ban["u"])
@@ -1218,7 +1218,7 @@ class StarBoard(Command):
 			description=content + msg,
 			colour=colour,
 		)
-		emb.set_author(**get_author(user))
+		emb.set_author(**get_author(guild))
 		more = len(curr) - pos - page
 		if more > 0:
 			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
@@ -1314,14 +1314,14 @@ class Crosspost(Command):
 			content += f"No currently assigned crosspost subscriptions for #{str(message.channel).replace('`', '')}.```*"
 			msg = ""
 		else:
-			content += f"{len(curr)} crosspost subscriptions currently assigned for #{str(message.channel).replace('`', '')}:```*"
+			content += f"{len(curr)} crosspost subscription(s) currently assigned for #{str(message.channel).replace('`', '')}:```*"
 			msg = ini_md(iter2str({k: curr[k] for k in tuple(curr)[pos:pos + page]}))
 		colour = await self.bot.get_colour(guild)
 		emb = discord.Embed(
 			description=content + msg,
 			colour=colour,
 		)
-		emb.set_author(**get_author(user))
+		emb.set_author(**get_author(guild))
 		more = len(curr) - pos - page
 		if more > 0:
 			emb.set_footer(text=f"{uni_str('And', 1)} {more} {uni_str('more...', 1)}")
@@ -1376,7 +1376,7 @@ class UpdateMutes(Database):
 	sem = Semaphore(1, 1, rate_limit=86400)
 
 	async def _call_(self):
-		if self.sem.active:
+		if self.sem.active or self.sem.busy:
 			return
 		ts = utc()
 		async with self.sem:
@@ -1394,7 +1394,7 @@ class UpdateMutes(Database):
 						continue
 					rem = ts - t
 					reason = "Mute refreshed"
-					if rem < 28 * 86400:
+					if rem < 21 * 86400:
 						if rem < 0:
 							rem = 0
 							reason = "Mute expired"
@@ -1404,7 +1404,7 @@ class UpdateMutes(Database):
 						self.update(g_id)
 						await user.timeout(datetime.timedelta(seconds=rem), reason=reason)
 						continue
-					await user.timeout(datetime.timedelta(days=28), reason=reason)
+					await user.timeout(datetime.timedelta(days=21), reason=reason)
 
 	async def _join_(self, user, guild, **void):
 		ts = utc()
@@ -1419,7 +1419,11 @@ class UpdateMutes(Database):
 			data.pop(t, None)
 			self.update(guild.id)
 			return
-		rem = min(rem, 28 * 86400)
+		if rem <= 21 * 86400:
+			data.pop(t, None)
+			self.update(guild.id)
+		else:
+			rem = 21 * 86400
 		await user.timeout(datetime.timedelta(seconds=rem), reason="Mute restored")
 
 
