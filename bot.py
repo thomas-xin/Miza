@@ -1112,7 +1112,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return channel
 
 	def get_available_guild(self, animated=True):
-		found = [{} for _ in loop(5)]
+		found = [{} for _ in loop(6)]
 		for guild in self.guilds:
 			m = guild.me
 			if m is not None and m.guild_permissions.manage_emojis:
@@ -1121,12 +1121,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					x = 0
 				elif len(owners_in) == len(self.owners):
 					x = 1
-				elif owners_in:
+				elif guild.id == self.premium_server:
 					x = 2
-				elif m.guild_permissions.administrator and len(deque(member for member in guild.members if not member.bot)) <= 5:
+				elif owners_in:
 					x = 3
-				else:
+				elif m.guild_permissions.administrator and len(deque(member for member in guild.members if not member.bot)) <= 5:
 					x = 4
+				else:
+					x = 5
 				if animated:
 					rem = guild.emoji_limit - len(deque(e for e in guild.emojis if e.animated))
 					rem /= len(guild.members)

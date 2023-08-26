@@ -2338,7 +2338,7 @@ class UpdateMessageCache(Database):
 	async def _save_(self, **void):
 		if self.save_sem.is_busy():
 			return
-		# print("MESSAGE DATABASE UPDATING...")
+		print("MESSAGE DATABASE UPDATING...")
 		async with self.save_sem:
 			saving = deque(self.saving.items())
 			self.saving.clear()
@@ -2377,7 +2377,7 @@ class UpdateMessageCache(Database):
 				print(f"Message Database: {deleted} files deleted.")
 			if os.path.exists(self.files + "/~~~"):
 				self.setmtime()
-		# print("MESSAGE DATABASE COMPLETE.")
+		print("MESSAGE DATABASE COMPLETE.")
 
 	def getmtime(self):
 		try:

@@ -49,7 +49,7 @@ if len(sys.argv) > 1:
 		temp = []
 		# data = pipe(prompt, num_inference_steps=count + 1, callback=mark)
 		matmul_tflops = {}
-		dtype = torch.float16
+		dtype = torch.float16 if is_cuda else torch.float32
 		m = math.ceil(math.log2(count))
 		n = min(12, m)
 		if n < m:
@@ -189,7 +189,7 @@ if keep:
 		devices.remove(i)
 		f = i
 		while len(devices) > 1:
-			print(f"Testing device {i}...")
+			print(f"Transferring device {i}...")
 			best = next(iter(devices))
 			shortest = torch.inf
 			j = i
@@ -221,16 +221,19 @@ if keep:
 	mem = psutil.virtual_memory().total
 	if DC:
 		# mems.append(mem)
-		if DC < 3:
-			args = [sys.executable, sys.argv[0], "cpu", info["brand_raw"], str(info["count"]), str(mem)]
-			proc = subprocess.Popen(args, stdout=subprocess.PIPE)
-			procs.append(proc)
+		# if DC < 3:
+		args = [sys.executable, sys.argv[0], "cpu", info["brand_raw"], str(info["count"]), str(mem)]
+		print(args)
+		proc = subprocess.Popen(args, stdout=subprocess.PIPE)
+		proc.i = -1
+		procs.append(proc)
 		last = None
 		for i in list(range(DC)[::2]) + list(range(DC)[1::2]):
 			info = pynvml.nvmlDeviceGetHandleByIndex(i)
 			mem = torch.cuda.get_device_properties(i).total_memory
 			# mems.append(mem)
 			args = [sys.executable, sys.argv[0], f"cuda:{i}", pynvml.nvmlDeviceGetName(info), str(pynvml.nvmlDeviceGetNumGpuCores(info)), str(mem)]
+			print(args)
 			proc = subprocess.Popen(args, stdout=subprocess.PIPE)
 			proc.i = i
 			procs.append(proc)
@@ -242,21 +245,23 @@ if keep:
 			else:
 				time.sleep(1)
 			last = proc
-		half = DC + 1 >> 1
+		half = len(procs) >> 1
 		outs = []
-		for a, b in zip(procs[:half], procs[half:]):
+		for a, b in zip(procs[:half], procs[half:half * 2]):
 			outs.append(a)
 			outs.append(b)
-		compute_load = [0] * len(outs)
-		olines = []
+		outs.extend(procs[half * 2:])
+		compute_load = [0] * DC
+		olines = [""] * len(outs)
+		# print(outs)
 		for n, proc in enumerate(outs):
 			s = proc.stdout.readlines()
 			avg = float(s.pop(-1))
 			# avgs.append(avg)
 			total += avg
-			if n or DC >= 3:
+			if proc.i > -1:# or DC >= 3:
 				compute_load[proc.i] = avg
-			olines.append(b"".join(s).decode("utf-8"))
+			olines[proc.i + 1] = b"".join(s).decode("utf-8")
 		print("\n" + "\n".join(olines))
 		print(srgb(0, 255, 0, f"Benchmark complete. Total score: {round(total, 2)}"))
 

@@ -635,12 +635,20 @@ class FileHashDict(collections.abc.MutableMapping):
 		if self.path and not os.path.exists(self.path):
 			os.mkdir(self.path)
 			self.iter = []
+		self.load_cursor()
+		self.db_sem = Semaphore(1, 64)
+		self.c_updated = False
+
+	db = None
+	def load_cursor(self):
+		if self.db:
+			self.db.close()
+			self.db = None
 		self.db = sqlite3.connect(f"{self.path}/~~", check_same_thread=False)
 		self.cur = self.db.cursor()
 		self.cur.execute(f"CREATE TABLE IF NOT EXISTS '{self.path}' (key VARCHAR(256) PRIMARY KEY, value BLOB)")
 		self.codb = set(try_int(r[0]) for r in self.cur.execute(f"SELECT key FROM '{self.path}'") if r)
-		self.db_sem = Semaphore(1, 64)
-		self.c_updated = False
+		return self.codb
 
 	__hash__ = lambda self: lambda self: hash(self.path)
 	__str__ = lambda self: self.__class__.__name__ + "(" + str(self.data) + ")"
@@ -910,11 +918,12 @@ class FileHashDict(collections.abc.MutableMapping):
 
 	def vacuum(self):
 		with self.db_sem:
-			self.cur.execute(f"DELETE FROM '{self.path}' WHERE value=''")
 			self.db.commit()
-			self.cur.execute("VACUUM")
-			self.db.commit()
-			self.codb = set(try_int(r[0]) for r in self.cur.execute(f"SELECT key FROM '{self.path}'") if r)
+			self.db.close()
+			self.db = None
+			args = [python, "misc/vacuum.py", f"{self.path}/~~"]
+			subprocess.run(args)
+			return self.load_cursor()
 
 
 def safe_save(fn, s):
@@ -2139,14 +2148,14 @@ def from_file(path, mime=True):
 		out = filetype.guess_extension(path)
 	if out and out.split("/", 1)[-1] == "zip" and type(path) is str and path.endswith(".jar"):
 		return "application/java-archive"
-	if out == "application/octet-stream" and path.startswith(b'ECDC    <{"m": '):
-		return "audio/ecdc"
 	if not out:
 		if type(path) is not bytes:
 			if type(path) is str:
 				raise TypeError(path)
 			path = bytes(path)
 		out = simple_mimes(path, mime)
+	if out == "application/octet-stream" and path.startswith(b'ECDC\x00\x00\x00\x00<{"m": '):
+		return "audio/ecdc"
 	return out
 
 magic = cdict(

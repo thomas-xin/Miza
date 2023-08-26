@@ -1093,12 +1093,12 @@ transform: translate(-50%, -50%);
 			b = cp.request.body.fp.read()
 			if b:
 				mime = magic.from_buffer(b)
-			if mime == "audio/ecdc":
+			if mime in ("audio/ecdc", "application/octet-stream"):
 				with open(out, "wb") as f:
 					f.write(b)
 		else:
 			b = b""
-		if b and url.startswith(API + "/ytdl") and mime != "audio/ecdc":
+		if b and url.startswith(API + "/ytdl") and mime not in ("audio/ecdc", "application/octet-stream"):
 			u = url.replace("v=", "d=").split("d=", 1)[-1].split("&", 1)[0]
 			if is_url(u):
 				h = shash(u)

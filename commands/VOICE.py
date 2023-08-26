@@ -5609,7 +5609,8 @@ class UpdateAudio(Database):
 			d, _ = await create_future(auds.get_dump, True, True)
 			self.data[auds.acsi.channel.id] = dict(dump=d, channel=auds.text.id)
 			self.update(auds.acsi.channel.id)
-		await create_future(self.update, force=force, priority=True)
+		if force:
+			await create_future(self.update, force=True, priority=True)
 
 	# Stores all currently playing audio data to temporary database when bot shuts down
 	async def _destroy_(self, **void):
