@@ -2152,7 +2152,7 @@ class UpdateUsers(Database):
 				self.data.get(user.id, EMPTY).pop("last_typing", None)
 		else:
 			self.data.get(user.id, EMPTY).pop("last_typing", None)
-		if not xrand(1000):
+		if message.id % 1000 == 0:
 			self.add_diamonds(user, points)
 			points *= 1000
 			# create_task(message.add_reaction("✨"))
@@ -2285,7 +2285,7 @@ class UpdateUsers(Database):
 			# Simulates a randomized conversation
 			if count < 5:
 				create_task(message.add_reaction("👀"))
-			if "ask" in bot.commands:# and random.random() > math.atan(count / 16) / 4:
+			if "ask" in bot.commands and "string" in bot.get_enabled(channel):
 				argv = message.clean_content.strip()
 				me = guild.me if guild else bot
 				argv = argv.removeprefix(f"@{me.display_name}")

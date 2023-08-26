@@ -2585,13 +2585,13 @@ if len(sys.argv) <= 1 or int(sys.argv[1]) in (0, 2):
 			COMPUTE_LOAD = globals().get("COMPUTE_LOAD") or [0] * dc
 			high = max(COMPUTE_LOAD)
 			if priority == "full":
-				key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i], p.major, p.minor, p.multi_processor_count, p.total_memory)
+				key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] * (random.random() + 4.5) * 0.2, p.major, p.minor, p.multi_processor_count, p.total_memory)
 			elif priority:
-				key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, p.major >= major, COMPUTE_LOAD[i] < high * 0.9, i, p.multi_processor_count, p.total_memory)
+				key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, p.major >= major, COMPUTE_LOAD[i] < high * 0.9, COMPUTE_LOAD[i] * (random.random() + 4.5) * 0.2, i, p.multi_processor_count, p.total_memory)
 			elif priority is False:
-				key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, p.major >= major, -p.major, -p.minor, COMPUTE_LOAD[i] < high * 0.75, COMPUTE_LOAD[i], -gmems[i].free, p.multi_processor_count)
+				key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, p.major >= major, p.major >= 7, -p.major, -p.minor, COMPUTE_LOAD[i] < high * 0.75, COMPUTE_LOAD[i] * (random.random() + 4.5) * 0.2, -gmems[i].free, p.multi_processor_count)
 			else:
-				key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.5, p.major >= major, -p.major, -p.minor, COMPUTE_LOAD[i], -p.multi_processor_count, -gmems[i].free)
+				key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.5, p.major >= major, p.major >= 7, -p.major, -p.minor, COMPUTE_LOAD[i] * (random.random() + 4.5) * 0.2, -p.multi_processor_count, -gmems[i].free)
 			pcs = sorted(range(n), key=key, reverse=True)
 			if multi:
 				return [i for i in pcs if gmems[i].free >= mem], torch.float16
@@ -2604,7 +2604,7 @@ if len(sys.argv) <= 1 or int(sys.argv[1]) in (0, 2):
 		device = f"cuda:{device}" if device >= 0 else "cpu"
 		from sentence_transformers import SentenceTransformer
 		Embedder = SentenceTransformer("LLukas22/all-mpnet-base-v2-embedding-all", device=device)
-		if torch and dtype == torch.float16:
+		if torch and dtype == torch.float16 and torch.cuda.get_device_properties(device).major >= 7:
 			try:
 				Embedder = Embedder.half()
 			except (RuntimeError, NotImplementedError):
@@ -2834,7 +2834,10 @@ if len(sys.argv) <= 1 or int(sys.argv[1]) in (0, 2):
 	def format_selector(ctx):
 		formats = ctx.get('formats')[::-1]
 		# vcodec='none' means there is no video
-		best_audio = next(f for f in formats if (f['acodec'] != 'none' and f['vcodec'] == 'none' and f['ext'] in ("webm", "opus")))
+		try:
+			best_audio = next(f for f in formats if (f.get('acodec', 'none') != 'none' and f.get('vcodec', 'none') == 'none' and f.get('ext', 'none') in ("webm", "opus")))
+		except StopIteration:
+			best_audio = formats[0]
 		yield {
 			'format_id': best_audio["format_id"],
 			'ext': "webm",

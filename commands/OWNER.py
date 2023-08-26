@@ -1223,6 +1223,10 @@ class UpdateInsights(Database):
 	name = "insights"
 
 
+class UpdateUptimes(Database):
+	name = "uptimes"
+
+
 class UpdateGuildSettings(Database):
 	name = "guildsettings"
 

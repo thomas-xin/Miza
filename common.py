@@ -647,9 +647,29 @@ class FileHashDict(collections.abc.MutableMapping):
 	__repr__ = lambda self: self.__class__.__name__ + "(" + str(self.full) + ")"
 	__call__ = lambda self, k: self.__getitem__(k)
 	__len__ = lambda self: len(self.keys())
-	__contains__ = lambda self, k: k in self.keys()
+	__contains__ = lambda self, k: k in self.keys().to_frozenset()
 	__eq__ = lambda self, other: self.data == other
 	__ne__ = lambda self, other: self.data != other
+
+	rmap = {
+		"\\": "\U0001fb00",
+		"/": "\U0001fb01",
+		":": "\U0001fb02",
+		"*": "\U0001fb03",
+		"?": "\U0001fb04",
+		'"': "\U0001fb05",
+		"'": "\U0001fb06",
+		"<": "\U0001fb07",
+		">": "\U0001fb08",
+		"|": "\U0001fb09",
+		"%": "\U0001fb0a",
+	}
+	rtrans = "".maketrans(rmap)
+	dtrans = "".maketrans({v: k for k, v in rmap.items()})
+	def remap(self, k):
+		return k.translate(self.rtrans)
+	def demap(self, k):
+		return k.translate(self.dtrans)
 
 	def key_path(self, k):
 		return f"{self.path}/{k}"
@@ -669,8 +689,8 @@ class FileHashDict(collections.abc.MutableMapping):
 		return out
 
 	def keys(self):
-		if self.iter is None or self.modified or self.deleted:
-			gen = set(try_int(i) for i in os.listdir(self.path) if not i.endswith("\x7f"))
+		if self.iter is None:
+			gen = set(try_int(self.demap(i)) for i in os.listdir(self.path) if not i.endswith("\x7f"))
 			if self.modified:
 				gen.update(self.modified)
 			if self.deleted:
@@ -703,21 +723,19 @@ class FileHashDict(collections.abc.MutableMapping):
 			return self.data[k]
 		fn = self.key_path(k)
 		if not os.path.exists(fn):
-			fn += "\x7f\x7f"
-			if not os.path.exists(fn):
-				if k != "~":
-					if k in self.codb:
-						with self.db_sem:
-							s = next(self.cur.execute(f"SELECT value FROM '{self.path}' WHERE key=?", (k,)))[0]
-						if s:
-							with tracebacksuppressor:
-								data = select_and_loads(self.decode(s), mode="unsafe")
-								self.data[k] = data
-								return data
-					elif isinstance(k, str) and k.startswith("~"):
-						raise TypeError("Attempted to load SQL database inappropriately")
-				self.deleted.add(k)
-				raise KeyError(k)
+			if k != "~":
+				if k in self.codb:
+					with self.db_sem:
+						s = next(self.cur.execute(f"SELECT value FROM '{self.path}' WHERE key=?", (k,)))[0]
+					if s:
+						with tracebacksuppressor:
+							data = select_and_loads(self.decode(s), mode="unsafe")
+							self.data[k] = data
+							return data
+				elif isinstance(k, str) and k.startswith("~"):
+					raise TypeError("Attempted to load SQL database inappropriately")
+			self.deleted.add(k)
+			raise KeyError(k)
 		with self.sem:
 			with open(fn, "rb") as f:
 				s = f.read()
@@ -738,6 +756,7 @@ class FileHashDict(collections.abc.MutableMapping):
 							s = z.read(fn)
 					data = select_and_loads(self.decode(s), mode="unsafe")
 					self.modified.add(k)
+					self.iter = None
 					print(f"Successfully recovered backup of {fn} from {file}.")
 					break
 		if data is BaseException:
@@ -749,6 +768,8 @@ class FileHashDict(collections.abc.MutableMapping):
 	def __setitem__(self, k, v):
 		with suppress(ValueError):
 			k = int(k)
+		if k not in self:
+			self.iter = None
 		self.deleted.discard(k)
 		self.data[k] = v
 		self.modified.add(k)
@@ -806,11 +827,11 @@ class FileHashDict(collections.abc.MutableMapping):
 	def update(self, other):
 		self.modified.update(other)
 		self.data.update(other)
+		self.iter = None
 		return self
 
 	def clear(self):
-		if self.iter:
-			self.iter.clear()
+		self.iter = None
 		self.modified.clear()
 		self.deleted.clear()
 		self.data.clear()
@@ -826,75 +847,65 @@ class FileHashDict(collections.abc.MutableMapping):
 		return self
 
 	def __update__(self):
+		# print("DATABASE:", self.path)
 		modified = set(self.modified)
 		self.modified.clear()
-		deleted = list(self.deleted)
+		deleted = set(self.deleted)
 		self.deleted.clear()
-		inter = modified.union(deleted)
+		inter = modified.intersection(deleted)
+		modified.difference_update(deleted)
 		if modified or deleted:
 			self.iter = None
-			for k in inter:
-				if k in self.codb:
-					with self.db_sem:
-						self.cur.execute(f"DELETE FROM '{self.path}' WHERE key=?", (k,))
-					self.codb.discard(k)
-					self.c_updated = True
-		if not self.c_updated:
-			t = utc()
-			old = {try_int(f.name) for f in os.scandir(self.path) if not f.name.endswith("\x7f") and not f.name.startswith("~") and t - f.stat().st_mtime > 3600}
-			if old:
-				if self.deleted:
-					old.difference_update(self.deleted)
-				if self.codb:
-					old.difference_update(self.codb)
-			if old:
-				# print(f"{self.path}: Old {len(old)}")
-				for k in old:
-					with tracebacksuppressor:
-						d = self[k]
-						deleted.append(k)
-						d = self.encode(select_and_dumps(d, mode="unsafe", compress=True))
-						with self.db_sem:
-							self.cur.execute(
-								f"INSERT INTO '{self.path}' ('key', 'value') VALUES ('{k}', ?) "
-									+ "ON CONFLICT(key) DO UPDATE SET 'value' = ?",
-								[d, d],
-							)
-				self.c_updated = True
-		if self.c_updated:
-			modified.add("~")
-			self.c_updated = False
-			self.db.commit()
+		ndel = deleted.intersection(self.codb)
+		if ndel:
 			with self.db_sem:
+				for k in ndel:
+					self.cur.execute(f"DELETE FROM '{self.path}' WHERE key=?", (k,))
+			self.codb.difference_update(ndel)
+			self.c_updated = True
+		if modified:
+			mods = {}
+			for k in modified:
+				try:
+					d = self.data[k]
+				except KeyError:
+					self.deleted.add(k)
+					continue
+				s = self.encode(select_and_dumps(d, mode="unsafe", compress=True))
+				mods[k] = s
+			with self.db_sem:
+				for k, d in mods.items():
+					self.cur.execute(
+						f"INSERT INTO '{self.path}' ('key', 'value') VALUES ('{k}', ?) ON CONFLICT(key) DO UPDATE SET 'value' = ?",
+						[d, d],
+					)
+			self.c_updated = True
+			deleted.update(modified)
+		if self.c_updated:
+			self.c_updated = False
+			with self.db_sem:
+				self.db.commit()
 				self.codb = set(try_int(r[0]) for r in self.cur.execute(f"SELECT key FROM '{self.path}'") if r)
+		if any(not f.path.rsplit("/", 1)[-1].startswith("~") for f in os.scandir(self.path)):
+			for k in deleted:
+				self.data.pop(k, None)
+				fn = self.key_path(k)
+				with suppress(FileNotFoundError):
+					os.remove(fn)
+				with suppress(FileNotFoundError):
+					os.remove(fn + "\x7f")
+				with suppress(FileNotFoundError):
+					os.remove(fn + "\x7f\x7f")
+			t = utc()
+			for fn in (f.path for f in os.scandir(self.path) if f.name.endswith("\x7f") and t - f.stat().st_mtime > 3600):
+				with suppress(FileNotFoundError, PermissionError):
+					os.remove(fn)
+		if len(self.data) > self.cache_size * 2:
+			self.data.clear()
 		else:
-			self.data.pop("~", None)
-		for k in modified:
-			fn = self.key_path(k)
-			try:
-				d = self.data[k]
-			except KeyError:
-				self.deleted.add(k)
-				continue
-			s = self.encode(select_and_dumps(d, mode="unsafe", compress=True))
-			with self.sem:
-				safe_save(fn, s)
-		for k in deleted:
-			self.data.pop(k, None)
-			fn = self.key_path(k)
-			with suppress(FileNotFoundError):
-				os.remove(fn)
-			with suppress(FileNotFoundError):
-				os.remove(fn + "\x7f")
-			with suppress(FileNotFoundError):
-				os.remove(fn + "\x7f\x7f")
-		t = utc()
-		for fn in (f.path for f in os.scandir(self.path) if f.name.endswith("\x7f") and t - f.stat().st_mtime > 3600):
-			with suppress(FileNotFoundError, PermissionError):
-				os.remove(fn)
-		while len(self.data) > self.cache_size:
-			with suppress(RuntimeError):
-				self.data.pop(next(iter(self.data)))
+			while len(self.data) > self.cache_size:
+				with suppress(RuntimeError):
+					self.data.pop(next(iter(self.data)))
 		return inter
 
 	def vacuum(self):
@@ -2128,6 +2139,8 @@ def from_file(path, mime=True):
 		out = filetype.guess_extension(path)
 	if out and out.split("/", 1)[-1] == "zip" and type(path) is str and path.endswith(".jar"):
 		return "application/java-archive"
+	if out == "application/octet-stream" and path.startswith(b'ECDC    <{"m": '):
+		return "audio/ecdc"
 	if not out:
 		if type(path) is not bytes:
 			if type(path) is str:
@@ -3961,6 +3974,7 @@ class Database(collections.abc.MutableMapping, collections.abc.Hashable, collect
 						raise FileNotFoundError
 					data = FileHashDict(data, path=fhp, encode=self.encode, decode=self.decode)
 					data.modified.update(data.data.keys())
+					self.iter = None
 					self.data = data
 				except FileNotFoundError:
 					data = None
@@ -4036,6 +4050,7 @@ class Database(collections.abc.MutableMapping, collections.abc.Hashable, collect
 					self.data.modified.update(modified)
 				else:
 					self.data.modified.add(modified)
+			self.data.iter = None
 		return False
 
 	def unload(self):

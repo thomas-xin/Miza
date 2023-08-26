@@ -678,7 +678,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			if role is not None:
 				if roles:
 					return (role,)
-				return role.members
+				try:
+					return role.members
+				except AttributeError:
+					return [member for member in guild._members.values() if u_id in member._roles]
 		if type(u_id) is str and "@" in u_id and ("everyone" in u_id or "here" in u_id):
 			return await self.get_full_members(guild)
 		u = await self.fetch_user_member(u_id, guild)
@@ -2856,7 +2859,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			it = int(utc() // 3) * 3
 			out = []
 			for i in range(3, interval + 3, 3):
-				out.append(self.data.insights["uptimes"].get(i - interval + it, {}))
+				out.append(self.data.uptimes.get(i - interval + it, {}))
 			return out
 		status = self.status_data
 		if simplified:
@@ -3614,7 +3617,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						# Add a callback to typing in the channel if the command takes too long
 						if fut is None and not hasattr(command, "typing") and not getattr(message, "simulated", False):
 							create_task(delayed_callback(future, sqrt(3), self._state.http.send_typing, channel.id, repeat=True))
-						if getattr(message, "slash", None):
+						if slash or getattr(message, "slash", None):
 							create_task(delayed_callback(future, 1, self.defer_interaction, message))
 						with self.command_semaphore:
 							response = await future
@@ -3625,12 +3628,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							if fut is not None:
 								await fut
 							# Raise exceptions returned by the command
-							if issubclass(type(response), Exception):
+							if isinstance(response, Exception):
 								raise response
 							elif bool(response) is not False:
-								if callable(getattr(command, "_callback_", None)):
-									if getattr(message, "slash", None):
-										message.slash = False
+								# if callable(getattr(command, "_callback_", None)):
+									# if getattr(message, "slash", None):
+										# message.slash = False
 								# If 2-tuple returned, send as message-react pair
 								if type(response) is tuple and len(response) == 2:
 									response, react = response
@@ -4225,7 +4228,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						field = (field.name, field.value, getattr(field, "inline", None))
 				n = lim_str(field[0], 256)
 				v = lim_str(md(field[1]), 1024)
-				i = True if len(field) < 3 else field[2]
+				i = True if len(field) < 3 else bool(field[2])
 				if len(emb) + len(n) + len(v) > 6000 or len(emb.fields) > 24:
 					embs.append(emb)
 					emb = discord.Embed(colour=fin_col)
@@ -4331,10 +4334,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					create_task(self.update_status())
 					data = await self.status()
 					with MemoryTimer("update_bytes"):
-						if "insights" in self.data:
-							uptime = self.data.insights.setdefault("uptimes", {})
-							if not isinstance(uptime, dict):
-								uptime = {k: {} for k in uptime}
+						if "uptimes" in self.data:
+							uptime = self.data.uptimes
+							if "insights" in self.data and "uptimes" in self.data.insights:
+								print("Moving insights database...")
+								await create_future(uptime.data.update, self.data.insights["uptimes"])
+								self.data.insights.pop("uptimes")
+								print("Insights database transferred.")
 							it = int(utc() // 3) * 3
 							interval = 86400 * 7
 							if it not in uptime:
@@ -4364,13 +4370,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							self.data.insights["down_bytes"] = down_bytes = self.down_bytes[-1] + self.start_down
 							self.total_bytes = up_bytes + down_bytes
 
-							self.data.insights["uptimes"] = uptime
+							# self.data.insights["uptimes"] = uptime
 						else:
 							self.uptime = 0
 							self.up_bps = 0
 							self.down_bps = 0
 							self.bitrate = 0
 							self.total_bytes = 0
+
 	# The lazy update loop that runs once every 4-8 seconds.
 	async def lazy_loop(self):
 		await asyncio.sleep(5)
@@ -5325,7 +5332,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			typing = channel._state.http.send_typing
 
 			while True:
-				async with Delay(9):
+				async with Delay(7):
 					await typing(channel.id)
 		async def __aenter__(self):
 			self.task = self.loop.create_task(self.do_typing())
@@ -5680,14 +5687,21 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					message.slash = d["token"]
 					cdata = d.get("data")
 					if d["type"] == 2:
+						# print("SLASH:", cdata)
 						name = cdata["name"].replace(" ", "")
 						try:
 							usage = self.commands[name][0].usage
 						except LookupError:
 							usage = ""
-						arguments = sorted(cdata.get("options", ()), key=lambda arg: ((i := usage.find(arg.get("value") or "")) < 0, i))
-						args = [orjson.dumps(arg.get("value") or "") for arg in arguments]
-						argv = b" ".join(i for i in args if i).decode("utf-8")
+						arguments = sorted(cdata.get("options", ()), key=lambda arg: ((i := usage.find(arg.get("name") or "")) < 0, i))
+						args = []
+						for arg in arguments:
+							value = as_str(arg.get("value") or "")
+							if usage[usage.find(arg.get("name") or "") - 1] == ":":
+								args.append(orjson.dumps(value).decode("utf-8"))
+							else:
+								args.append(value)
+						argv = " ".join(i for i in args if i)
 						message.content = "/" + name + " " + argv
 						mdata = d.get("member")
 						if not mdata:
@@ -5697,16 +5711,16 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						author = self._state.store_user(mdata)
 						message.author = author
 						channel = None
-						if "resolved" in cdata:
-							res = cdata.get("resolved", {})
-							for mdata in res.get("users", {}).values():
-								message.content += " " + mdata["id"]
-								user = self._state.store_user(mdata)
-							for mdata in res.get("messages", {}).values():
-								msg = self.ExtendedMessage.new(mdata)
-								message.content += " " + msg.jump_url
-								self.add_message(msg, force=True)
-								message.channel = msg.channel or message.channel
+						# if "resolved" in cdata:
+							# res = cdata.get("resolved", {})
+							# for mdata in res.get("users", {}).values():
+								# message.content += " " + mdata["id"]
+								# user = self._state.store_user(mdata)
+							# for mdata in res.get("messages", {}).values():
+								# msg = self.ExtendedMessage.new(mdata)
+								# message.content += " " + msg.jump_url
+								# self.add_message(msg, force=True)
+								# message.channel = msg.channel or message.channel
 						try:
 							channel = self.force_channel(d["channel_id"])
 							guild = await self.fetch_guild(d["guild_id"])

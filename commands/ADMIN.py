@@ -197,7 +197,7 @@ class Mute(Command):
 		for user in users:
 			p = bot.get_perms(user, guild)
 			if not p < 0 and not is_finite(p):
-				ex = PermissionError(f"{user} has infinite permission level, and cannot be muted in this server.")
+				ex = PermissionError(f"{user} has administrator permission level, and cannot be muted in this server.")
 				bot.send_exception(channel, ex)
 				continue
 			elif not p + 1 <= perm and not isnan(perm):
@@ -238,8 +238,12 @@ class Mute(Command):
 			return italics(ini_md("\n".join(out)))
 
 	async def getMutes(self, guild):
+		ts = utc()
 		mutes = {user.id: user.timed_out_until.timestamp() for user in guild._members.values() if getattr(user, "timed_out_until", None)}
 		mutes.update(self.bot.data.mutes.get(guild.id, {}))
+		for k, v in tuple(mutes.items()):
+			if v <= ts:
+				mutes.pop(k, None)
 		return mutes, list(mutes.keys())
 
 	async def _callback_(self, bot, message, reaction, user, perm, vals, **void):
@@ -392,7 +396,7 @@ class Ban(Command):
 		for user in users:
 			p = bot.get_perms(user, guild)
 			if not p < 0 and not is_finite(p):
-				ex = PermissionError(f"{user} has infinite permission level, and cannot be banned from this server.")
+				ex = PermissionError(f"{user} has administrator permission level, and cannot be banned from this server.")
 				bot.send_exception(channel, ex)
 				continue
 			elif not p + 1 <= perm and not isnan(perm):
@@ -1373,7 +1377,7 @@ class Publish(Command):
 
 class UpdateMutes(Database):
 	name = "mutes"
-	sem = Semaphore(1, 1, rate_limit=86400)
+	sem = Semaphore(1, 1, rate_limit=3600)
 
 	async def _call_(self):
 		if self.sem.active or self.sem.busy:
@@ -1392,13 +1396,20 @@ class UpdateMutes(Database):
 						data.pop(u_id)
 						self.update(g_id)
 						continue
+					tou = getattr(user, "timed_out_until", None)
+					if not tou and not getattr(user, "ghost", None):
+						data.pop(u_id)
+						self.update(g_id)
+						continue
+					if tou and abs(tou.timestamp() - t) < 1:
+						continue
 					rem = ts - t
 					reason = "Mute refreshed"
 					if rem < 21 * 86400:
 						if rem < 0:
 							rem = 0
 							reason = "Mute expired"
-							if not getattr(user, "timed_out_until", None):
+							if not tou:
 								continue
 						data.pop(u_id)
 						self.update(g_id)
@@ -2327,6 +2338,7 @@ class UpdateMessageCache(Database):
 	async def _save_(self, **void):
 		if self.save_sem.is_busy():
 			return
+		# print("MESSAGE DATABASE UPDATING...")
 		async with self.save_sem:
 			saving = deque(self.saving.items())
 			self.saving.clear()
@@ -2334,20 +2346,20 @@ class UpdateMessageCache(Database):
 			for fn, messages in saving:
 				await create_future(self.saves, fn, messages)
 				i += 1
-				if not i & 3 or len(messages) > 65536:
+				if not i & 15 or len(messages) > 65536:
 					await asyncio.sleep(0.3)
 			while len(self.loaded) > 64:
 				with suppress(RuntimeError):
 					self.loaded.pop(next(iter(self.loaded)))
 				i += 1
-				if not i % 6:
+				if not i % 24:
 					await asyncio.sleep(0.2)
 			if not self.save_sem.is_busy():
 				while len(self.raws) > 64:
 					with suppress(RuntimeError):
 						self.raws.pop(next(iter(self.raws)))
 					i += 1
-					if not i % 6:
+					if not i % 24:
 						await asyncio.sleep(0.2)
 			if len(saving) >= 8:
 				print(f"Message Database: {len(saving)} files updated.")
@@ -2365,6 +2377,7 @@ class UpdateMessageCache(Database):
 				print(f"Message Database: {deleted} files deleted.")
 			if os.path.exists(self.files + "/~~~"):
 				self.setmtime()
+		# print("MESSAGE DATABASE COMPLETE.")
 
 	def getmtime(self):
 		try:

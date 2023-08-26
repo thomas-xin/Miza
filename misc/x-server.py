@@ -1088,6 +1088,26 @@ transform: translate(-50%, -50%);
 		out = cachedir + "/ecdc/!" + shash(url) + "~" + br + ".ecdc"
 		while out in self.ecdc_running:
 			time.sleep(1)
+		mime = None
+		if cp.request.body:
+			b = cp.request.body.fp.read()
+			if b:
+				mime = magic.from_buffer(b)
+			if mime == "audio/ecdc":
+				with open(out, "wb") as f:
+					f.write(b)
+		else:
+			b = b""
+		if b and url.startswith(API + "/ytdl") and mime != "audio/ecdc":
+			u = url.replace("v=", "d=").split("d=", 1)[-1].split("&", 1)[0]
+			if is_url(u):
+				h = shash(u)
+				fn = "~" + h + ".webm"
+				fni = "cache/" + fn
+				if not os.path.exists(fni) or not os.path.getsize(fni) or os.path.getmtime(fni) >= 3600:
+					with open(fni, "wb") as f:
+						f.write(b)
+					self.bot_exec(f"VOICE.ytdl.cache[{repr(fn)}]=VOICE.AudioFileLink({repr(fn)},{repr(fni)},wasfile=True)")
 		try:
 			if inference in ("True", "true", True):
 				raise KeyError
@@ -1098,12 +1118,7 @@ transform: translate(-50%, -50%);
 		else:
 			f = open(out, "rb")
 			return cp.lib.static.serve_fileobj(f, content_type="audio/ecdc", disposition="", name=url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0] + ".ecdc")
-		if inference in ("None", "none", None):
-			if cp.request.body:
-				b = cp.request.body.fp.read()
-				if b:
-					with open(out, "wb") as f:
-						f.write(b)
+		if b or inference in (None, "None", "none", "null", ""):
 			return b""
 		self.ecdc_running.add(out)
 		try:
@@ -1192,6 +1207,10 @@ transform: translate(-50%, -50%);
 				stream = self.bot_exec(f"VOICE.ytdl.get_stream(bot.audio.returns[{t}],force=True,download=False)")
 				if fmt in ("webm", "weba"):
 					raise cp.HTTPRedirect(stream, status="307")
+				test = self.bot_exec(f"str(bot.audio.returns[{t}])")
+				if not test or test[0] not in ("([{"):
+					print("YTDL Invalid:", test)
+					raise FileNotFoundError
 				name, url = self.bot_exec(f"(bot.audio.returns[{t}].get('name'),bot.audio.returns[{t}].get('url'))")
 				if not name or not url:
 					raise FileNotFoundError(500, v)
@@ -1216,6 +1235,7 @@ transform: translate(-50%, -50%);
 				cp.response.headers.update(CHEADERS)
 				if af():
 					f = open(fni, "rb")
+					self.bot_exec(f"bot.audio.returns.pop({t},None)")
 				else:
 					f = DownloadingFile(fni, af=af)
 					if d:
@@ -2682,7 +2702,7 @@ alert("File successfully deleted. Returning to home.");
 		print(res)
 		return as_str(res)
 
-	def bot_exec(self, s):
+	def bot_exec(self, s, wait=True):
 		t = ts_us()
 		while t in RESPONSES:
 			t += 1
@@ -2692,6 +2712,8 @@ alert("File successfully deleted. Returning to home.");
 		sys.__stderr__.buffer.write(f"!{t}\x7f".encode("ascii") + s + b"\n")
 		sys.__stderr__.flush()
 		# send(f"!{t}\x7f".encode("ascii") + s, escape=False)
+		if not wait:
+			return
 		try:
 			j, after = fut.result()
 		finally:

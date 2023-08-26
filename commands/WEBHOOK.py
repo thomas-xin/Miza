@@ -116,7 +116,7 @@ class UpdateAutoEmojis(Database):
 		for e in emojis:
 			name, e_id = e.split(":")[1:]
 			e_id = int("".join(regexp("[0-9]+").findall(e_id)))
-			animated = self.bot.cache.emojis.get(name)
+			animated = self.bot.cache.emojis.get(e_id)
 			if not animated:
 				animated = await create_future(self.bot.is_animated, e_id, verify=True)
 			else:
@@ -512,7 +512,7 @@ class MimicConfig(Command):
 		output = ""
 		noret = False
 		for mimic in mimlist:
-			await bot.data.mimics.update_mimic(mimic, message.guild)
+			mimic = await bot.data.mimics.update_mimic(mimic, message.guild)
 			if mimic.u_id != user.id and not isnan(perm):
 				raise PermissionError(f"Target mimic {mimic.name} does not belong to you.")
 			args.extend(best_url(a) for a in message.attachments)
@@ -914,7 +914,7 @@ class UpdateMimics(Database):
 					self.bot.send_embeds(c, emb)
 				for k in sending:
 					mimic = self.data[k.m_id]
-					await self.update_mimic(mimic, guild=guild)
+					mimic = await self.update_mimic(mimic, guild=guild)
 					name = mimic.name
 					url = mimic.url
 					msg = escape_roles(k.msg)
@@ -956,7 +956,7 @@ class UpdateMimics(Database):
 					it[mim] = True
 					if not len(it) & 255:
 						await asyncio.sleep(0.2)
-					await self.update_mimic(mimi, guild=guild, it=it)
+					mimic = await self.update_mimic(mimi, guild=guild, it=it)
 					mimic.name = mimi.name
 					mimic.url = mimi.url
 				except LookupError:

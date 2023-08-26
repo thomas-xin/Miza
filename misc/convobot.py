@@ -229,13 +229,13 @@ def determine_cuda(mem=1, priority=None, multi=False, major=0):
 	COMPUTE_LOAD = globals().get("COMPUTE_LOAD") or [0] * dc
 	high = max(COMPUTE_LOAD)
 	if priority == "full":
-		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i], p.major, p.minor, p.multi_processor_count, p.total_memory)
+		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] * (random.random() + 4.5) * 0.2, p.major, p.minor, p.multi_processor_count, p.total_memory)
 	elif priority:
-		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, p.major >= major, COMPUTE_LOAD[i] < high * 0.9, i, p.multi_processor_count, p.total_memory)
+		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, p.major >= major, COMPUTE_LOAD[i] < high * 0.9, COMPUTE_LOAD[i] * (random.random() + 4.5) * 0.2, i, p.multi_processor_count, p.total_memory)
 	elif priority is False:
-		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, p.major >= major, -p.major, -p.minor, COMPUTE_LOAD[i] < high * 0.75, COMPUTE_LOAD[i], -gmems[i].free, p.multi_processor_count)
+		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, p.major >= major, p.major >= 7, -p.major, -p.minor, COMPUTE_LOAD[i] < high * 0.75, COMPUTE_LOAD[i] * (random.random() + 4.5) * 0.2, -gmems[i].free, p.multi_processor_count)
 	else:
-		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.5, p.major >= major, -p.major, -p.minor, COMPUTE_LOAD[i], -p.multi_processor_count, -gmems[i].free)
+		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.5, p.major >= major, p.major >= 7, -p.major, -p.minor, COMPUTE_LOAD[i] * (random.random() + 4.5) * 0.2, -p.multi_processor_count, -gmems[i].free)
 	pcs = sorted(range(n), key=key, reverse=True)
 	if multi:
 		return [i for i in pcs if gmems[i].free >= mem], torch.float16
@@ -483,11 +483,18 @@ class Bot:
 	def answer_summarise(self, m="Qiliang/bart-large-cnn-samsum-ChatGPT_v3", q="", max_length=128, min_length=64, do_sample=False):
 		while self.summ_waiting:
 			self.summ_waiting.result()
+		devices, dtype = determine_cuda(2147483648, priority=False, multi=True)
+		dv2 = ()
 		try:
 			pipes = self.models[m]
+			if len(pipes) < len(devices) and all(smp.busy > 1 for smp in pipes):
+				dv2, dtype = set(devices).difference(smp.devid for smp in pipes), dtype
+				if dv2:
+					raise KeyError
 		except KeyError:
 			self.summ_waiting = concurrent.futures.Future()
-			devices, dtype = determine_cuda(2147483648, priority=False, multi=True)
+			if not dv2:
+				dv2, dtype = determine_cuda(2147483648, priority=False, multi=True, major=7)
 			# print(devices, dtype)
 
 			def load_pipe(device, dtype):
@@ -502,14 +509,17 @@ class Bot:
 				return smp
 
 			futs = []
-			for i in range(len(devices) // 2 + 1):
+			for i in range(len(dv2) // 2 + 1):
 				dtype = torch.float16 if torch.cuda.get_device_properties(i).major >= 7 else torch.float32
-				futs.append(exc.submit(load_pipe, devices[i], dtype))
+				futs.append(exc.submit(load_pipe, dv2[i], dtype))
 			print(futs)
 			pipes = []
 			for fut in futs:
 				pipes.insert(0, fut.result())
-			self.models[m] = pipes
+			try:
+				self.models[m].extend(pipes)
+			except KeyError:
+				self.models[m] = pipes
 			self.summ_waiting.set_result(pipes)
 			self.summ_waiting = None
 			print(pipes)

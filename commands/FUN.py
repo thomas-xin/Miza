@@ -1958,19 +1958,31 @@ class UpdateReacts(Database):
 			elif k in y:
 				emojis = following[k]
 				reacting[y.index(k) / len(y)] = emojis
+		try:
+			guild = await self.bot.fetch_guild(g_id)
+		except discord.Forbidden:
+			self.pop(g_id, None)
 		# Reactions sorted by their order of appearance in the message
 		for r in sorted(reacting):
 			for react in reacting[r]:
 				if isinstance(react, str) and not react.isnumeric():
 					react = await self.bot.id_from_message(react)
 				if isinstance(react, int):
-					react = await self.bot.fetch_emoji(react)
+					try:
+						react = await self.bot.fetch_emoji(react, guild=guild)
+					except (LookupError, discord.NotFound):
+						emojis.remove(react)
+						self.update(g_id)
+						continue
 				try:
 					await message.add_reaction(react)
 				except discord.HTTPException as ex:
 					if "10014" in repr(ex):
 						emojis.remove(react)
 						self.update(g_id)
+				except LookupError:
+					emojis.remove(react)
+					self.update(g_id)
 
 
 class Dogpile(Command):

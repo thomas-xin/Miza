@@ -39,7 +39,7 @@ def try_int(i):
 
 if os.environ.get("AI_FEATURES", True):
 	modlist.extend((
-		"accelerate>=0.20.3",
+		"accelerate>=0.22.0",
 		"clip-interrogator>=0.6.0",
 		"diffusers>=0.19.0",
 		"openai>=0.27.8",

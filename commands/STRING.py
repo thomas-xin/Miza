@@ -56,11 +56,11 @@ class Translate(Command):
 		trans.client = s = requests.Session()
 		renamed = dict(chinese="zh-cn", zh="zh-cn", auto="auto", automatic="auto", none="auto", null="auto")
 
-	async def __call__(self, bot, guild, channel, argv, user, message, **void):
-		if not argv:
+	async def __call__(self, bot, guild, channel, args, user, message, **void):
+		if not args:
 			raise ArgumentError("Input string is empty.")
 		self.trans.client.headers.update(Request.header())
-		spl = argv.split(" ", 3)
+		spl = args
 		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
 		if spl[0].casefold() in ("google", "chatgpt"):
 			engine = spl.pop(0).casefold()
@@ -284,7 +284,6 @@ class UpdateTranslators(Database):
 		tr = bot.commands.translate[0]
 		content = message.clean_content.strip()
 		engine = curr["engine"] if len(content) > 2 else "Google"
-		argv = engine + " auto " + " ".join(tr.languages[lang.casefold()] for lang in curr["languages"]) + " " + "\\" + content
 		with bot.ExceptionSender(channel, reference=message):
 			u_perm = bot.get_perms(user.id, guild)
 			u_id = user.id
@@ -322,8 +321,9 @@ class UpdateTranslators(Database):
 							raise TooManyRequests(f"Command has a rate limit of {sec2time(x)}; please wait {sec2time(-wait)}.")
 				ctx = discord.context_managers.Typing(channel) if channel else emptyctx
 				async with ctx:
-					print("Translator:", user, argv)
-					await tr(bot, guild, channel, argv, user, message)
+					args = [engine, "auto", *(tr.languages[lang.casefold()] for lang in curr["languages"]), "\\" + content]
+					print("Translator:", user, args)
+					await tr(bot, guild, channel, args, user, message)
 
 
 class Math(Command):
@@ -1506,7 +1506,7 @@ class Ask(Command):
 				n = 4 if premium < 2 else 6
 				argi = argsort[:n]
 				print("ARGI:", argi)
-				for i in shuffle(argi):
+				for i in sorted(argi, key=keys.__getitem__):
 					k = keys[i]
 					ki = int(k)
 					if ki in ignores or not mapd.get(k):
