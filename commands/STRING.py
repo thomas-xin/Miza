@@ -1203,6 +1203,8 @@ class Describe(Command):
 	no_parse = True
 
 	async def __call__(self, bot, message, channel, guild, user, argv, **void):
+		if message.attachments:
+			argv = " ".join(best_url(a) for a in message.attachments) + " " * bool(argv) + argv
 		try:
 			url = argv
 			urls = await bot.follow_url(url, best=True, allow=True, limit=1)
