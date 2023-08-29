@@ -29,7 +29,7 @@ class Purge(Command):
 		else:
 			count = 1
 		if not argl and not args:
-			uset = universal_set
+			uset = universal_set if guild and not getattr(guild, "ghost", None) else None
 		else:
 			users = await bot.find_users(argl, args, user, guild)
 			uset = {u.id for u in users}
@@ -1449,7 +1449,8 @@ class UpdateBans(Database):
 			except:
 				print_exc()
 				d.pop(i, None)
-		self.listed = alist(sorted(((block[0]["t"], i) for i, block in d.items() if block), key=lambda x: x[0]))
+		gen = ((block[0]["t"], i) for i, block in d.items() if block and isinstance(block[0], dict) and block[0].get("t") is not None)
+		self.listed = alist(sorted(gen, key=lambda x: x[0]))
 
 	async def _call_(self):
 		t = utc()

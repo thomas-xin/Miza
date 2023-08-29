@@ -214,7 +214,10 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
 			self.check_overflow()
 			self.passive += 1
 			while self.is_busy():
-				self.fut.result()
+				if self.fut.done():
+					time.sleep(0.08)
+				else:
+					self.fut.result()
 			self.passive -= 1
 		return self.enter()
 
@@ -254,7 +257,10 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
 
 	def wait(self):
 		while self.is_busy():
-			self.fut.result()
+			if self.fut.done():
+				time.sleep(0.08)
+			else:
+				self.fut.result()
 
 	async def __call__(self):
 		while self.is_busy():
@@ -269,7 +275,7 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
 		return self.active or self.passive
 
 	def is_busy(self):
-		return self.active >= self.limit or self.rate_limit and len(self._update_bin()) >= self.limit
+		return self.rate_limit and len(self._update_bin()) >= self.limit or self.active >= self.limit
 
 	def clear(self):
 		self.rate_bin.clear()
@@ -855,7 +861,7 @@ class FileHashDict(collections.abc.MutableMapping):
 		return self
 
 	def __update__(self):
-		# print("DATABASE:", self.path)
+		print("DATABASE:", self.path)
 		modified = set(self.modified)
 		self.modified.clear()
 		deleted = set(self.deleted)
@@ -4005,8 +4011,8 @@ class Database(collections.abc.MutableMapping, collections.abc.Hashable, collect
 				f()
 			except:
 				print_exc()
-				self.data.clear()
-				f()
+				# self.data.clear()
+				# f()
 
 	__hash__ = lambda self: hash(self.__name__)
 	__str__ = lambda self: f"Database <{self.__name__}>"

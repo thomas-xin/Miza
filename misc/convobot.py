@@ -264,7 +264,7 @@ def backup_model(cls, model, force=False, **kwargs):
 			ex2 = ex
 	else:
 		try:
-			return cls(model, local_files_only=True, resume_download=True, **kwargs)
+			return cls(model, local_files_only=True, **kwargs)
 		except:
 			fut = exc.submit(cached_model, cls, model, resume_download=True, **kwargs)
 			try:
@@ -426,7 +426,7 @@ class Bot:
 		# sys.__stdout__.flush()
 
 	def expire_key(self, key):
-		sys.__stdout__.buffer.write(f"~BOT[0]._globals['STRING'].EXPAPI.add(key)\n".encode("utf-8"))
+		sys.__stdout__.buffer.write(f"~BOT[0]._globals['STRING'].EXPAPI.add({repr(key)})\n".encode("utf-8"))
 		# sys.__stdout__.flush()
 
 	def get_proxy(self, retry=True):
@@ -821,7 +821,9 @@ class Bot:
 		# print("Model:", model)
 		extensions = model.endswith("+")
 		model = model.removesuffix("+")
-		DEFMOD = "airochronos-33b"
+		DEFMOD = "wizard-70b"
+		temp = 0.8
+		limit = 4096
 		if model == "bloom":
 			model = "bloom-176b"
 			temp = 0.9
@@ -847,7 +849,7 @@ class Bot:
 			temp = 0.8
 			limit = 4096
 			cm = 0
-		elif model == "wizard":
+		elif model == "wizvic":
 			model = "wizard-vicuna-30b"
 			temp = 0.8
 			limit = 4096
@@ -857,6 +859,22 @@ class Bot:
 			limit = 4096
 		elif model == "airochronos":
 			model = "airochronos-33b"
+			temp = 0.8
+			limit = 4096
+		elif model == "wizcode":
+			model = "wizard-coder-34b"
+			temp = 0.8
+			limit = 4096
+		elif model == "nouspuff":
+			model = "nous-puffin-70b"
+			temp = 0.8
+			limit = 4096
+		elif model == "orca":
+			model = "orca-70b"
+			temp = 0.8
+			limit = 4096
+		elif model == "wizard":
+			model = "wizard-70b"
 			temp = 0.8
 			limit = 4096
 		elif model == "instruct":
@@ -900,7 +918,9 @@ class Bot:
 			ins.append(lines.pop(-1))
 		print("INS:", ins)
 		p = per
-		local_models = ("pygmalion-13b", "manticore-13b", "hippogriff-30b", "wizard-vicuna-30b", "gplatty-30b", "airochronos-33b")
+		bnb_models = ("pygmalion-13b", "manticore-13b", "hippogriff-30b", "wizard-vicuna-30b", "gplatty-30b", "airochronos-33b")
+		gptq_models = ("wizard-70b", "nous-puffin-70b", "orca-70b", "wizard-coder-34b")
+		local_models = bnb_models + gptq_models
 		if self.name.casefold() not in p.casefold() and "you" not in p.casefold():
 			if model in ("gpt-3.5-turbo", "gpt-4", "gpt-3.5-turbo-instruct", "text-davinci-003"):
 				nstart = f"Your name is {self.name}; you are {p}. Express emotion when appropriate!"
@@ -1157,16 +1177,10 @@ class Bot:
 								return {"func": args["mode"], "argv": int(args["value"])}
 							elif name == "policy":
 								print("Policy!", messages[-1])
-								if 1: #model.startswith("gpt-3.5"):
-									model = DEFMOD
-									temp = 0.8
-									limit = 4096
-									cm = 0
-								else:
-									model = "gpt-3.5-turbo-instruct"
-									temp = 0.8
-									limit = 3000
-									cm = 15
+								model = DEFMOD
+								temp = 0.8
+								limit = 4096
+								cm = 0
 		if model in local_models:
 			prompt = "".join(reversed(ins))
 			prompt = nstart + "\n<START>\n" + prompt
@@ -1185,7 +1199,101 @@ class Bot:
 		text = ""
 		uoai = None
 		exclusive = {"neox-20b", "bloom-176b"}
-		if model in local_models:
+		if model in gptq_models:
+			omodel = model
+			from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
+			buffer = 1.3
+			if model == "wizard-70b":
+				m = "TheBloke/WizardLM-70B-V1.0-GPTQ"
+				req = 35
+			elif model == "nous-puffin-70b":
+				m = "TheBloke/Nous-Puffin-70B-GPTQ"
+				req = 35
+			elif model == "orca-70b":
+				m = "TheBloke/Llama-2-70B-Orca-200k-GPTQ"
+				req = 35
+			elif model == "wizard-coder-34b":
+				m = "TheBloke/WizardCoder-Python-34B-V1.0-GPTQ"
+				req = 17
+			else:
+				raise RuntimeError(f'Model "{model}" not found.')
+			try:
+				tokenizer, model = self.models[m]
+			except KeyError:
+				tokenizer = backup_model(AutoTokenizer.from_pretrained, m)
+				n = torch.cuda.device_count()
+				if not n:
+					raise RuntimeError("Required GPU not found.")
+				try:
+					import pynvml
+					pynvml.nvmlInit()
+					COMPUTE_ORDER = globals().get("COMPUTE_ORDER") or range(torch.cuda.device_count())
+
+					def cuda_info():
+						import torch
+						return [torch.cuda.get_device_properties(i) for i in range(len(COMPUTE_ORDER))]
+
+					fut2 = exc.submit(cuda_info)
+					handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(len(COMPUTE_ORDER))]
+					gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
+					tinfo = fut2.result()
+				except:
+					print_exc()
+					tinfo = gmems = COMPUTE_ORDER = []
+				COMPUTE_LOAD = globals().get("COMPUTE_LOAD") or [0] * dc
+				high = max(COMPUTE_LOAD)
+				bit4 = [i for i in COMPUTE_ORDER if COMPUTE_LOAD[i] > high / 3]
+				total = sum(COMPUTE_LOAD[i] for i in bit4)
+				if high:
+					loads = [i / total * req if i < high * 0.9 else inf for i in COMPUTE_LOAD]
+				else:
+					loads = [inf] * dc
+				max_mem = {i: f"{round(min(((gmems[i].total - gmems[i].used) / 1048576 - (2 if i else 3) * 1024), loads[i] * 1024))}MiB" for i in bit4}
+				max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("MiB")) > 0}
+				print("MAX_MEM:", max_mem)
+				model = AutoGPTQForCausalLM.from_quantized(
+					m,
+					max_memory=max_mem,
+					use_safetensors=True,
+					resume_download=True,
+					use_triton=False,
+					inject_fused_attention=False,
+					offload_folder="cache",
+				)
+				self.models[m] = (tokenizer, model)
+			prompt = prompt.strip().replace(f"{u}:", f"You:")
+			tokens = tokenizer(prompt, return_tensors="pt").input_ids.to(model.device)
+			pc = len(tokens)
+			res = model.generate(
+				inputs=tokens,
+				temperature=temp,
+				top_k=96,
+				top_p=0.9,
+				repetition_penalty=1.2,
+				max_length=max(limit, len(tokens) + 1024),
+				do_sample=True,
+			)
+			with torch.no_grad():
+				torch.cuda.empty_cache()
+			text = tokenizer.decode(res[0]).removeprefix("<s>").strip().removeprefix(prompt).strip().split("</s>", 1)[0]
+			text = text.strip().replace(":\n", ": ").replace("<USER>", u)
+			spl = text.split(": ")
+			if len(spl) > 1:
+				text = ""
+				while spl:
+					s = spl.pop(0)
+					if "\n" in s:
+						text += s.rsplit("\n", 1)[0]
+						break
+					text += s + ": "
+				text = text.strip()
+				if text.endswith(":"):
+					text = text.rsplit("\n", 1)[0]
+				start = ns
+				if text.startswith(start):
+					text = text[len(start):].strip()
+			model = omodel
+		if model in bnb_models:
 			omodel = model
 			try:
 				import bitsandbytes
@@ -1258,7 +1366,7 @@ class Bot:
 					dti = torch.float16
 				max_mem["cpu"] = f"{round(psutil.virtual_memory().free / 1073741824 - 8)}GiB"
 				max_mem["disk"] = "1024GiB"
-				print(max_mem)
+				print("MAX_MEM:", max_mem)
 				print(cap, req, dti, bitsandbytes)
 				if not bitsandbytes:
 					dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, no_split_module_classes=["LlamaDecoderLayer"], dtype=torch.float16)
@@ -1280,27 +1388,7 @@ class Bot:
 						if k in dev_map:
 							dev_map[k] = 0
 					model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, offload_folder="cache", load_in_8bit=True, quantization_config=quantization_config)
-					# else:
-					# model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, load_in_8bit=True)
 				print(dev_map)
-				# layers = {}
-				# real_map = {}
-				# for k, v in dev_map.items():
-				# 	if not k.startswith("model.layers."):
-				# 		continue
-				# 	c = k.rsplit(".", 3)[2]
-				# 	if c in layers:
-				# 		v = layers[c] = v + 1
-				# 		if v > n:
-				# 			v = "cpu"
-				# 		for k2 in real_map:
-				# 			if k2.rsplit(".", 3)[2] == c:
-				# 				real_map[k2] = v
-				# 	else:
-				# 		layers[c] = v
-				# 	real_map[k] = v
-				# dev_map.update(real_map)
-				# print(dev_map)
 				self.models[m] = (tokenizer, model)
 			prompt = prompt.strip().replace(f"{u}:", f"You:")
 			tokens = tokenizer.encode(prompt, return_tensors="pt").cuda()

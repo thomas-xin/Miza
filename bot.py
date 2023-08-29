@@ -4335,7 +4335,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				async with tracebacksuppressor:
 					create_task(self.update_status())
 					data = await self.status()
-					with MemoryTimer("update_bytes"):
+					with MemoryTimer("uptimes"):
 						if "uptimes" in self.data:
 							uptime = self.data.uptimes
 							if "insights" in self.data and "uptimes" in self.data.insights:
@@ -4347,14 +4347,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							interval = 86400 * 7
 							if it not in uptime:
 								uptime[it] = copy.deepcopy(data)
-								sl = sorted(uptime)
-								while sl[0] <= it - interval:
-									uptime.pop(sl.pop(0), None)
-								while sl[-1] > it:
-									uptime.pop(sl.pop(-1), None)
-							ut = 0
-							for i in range(3, interval + 3, 3):
-								ut += it - interval + i in uptime
+								if min(uptime) <= it - interval:
+									sl = sorted(uptime)
+									while sl[0] <= it - interval:
+										uptime.pop(sl.pop(0), None)
+									while sl[-1] > it:
+										uptime.pop(sl.pop(-1), None)
+							gen = ((it - interval + i in uptime) for i in range(3, interval + 3, 3))
+							ut = await create_future(sum, gen, priority=True)
 							self.uptime = ut / interval * 3
 
 							net = await create_future(psutil.net_io_counters)

@@ -1708,7 +1708,8 @@ class UpdateReminders(Database):
 			except:
 				print_exc()
 				d.pop(i, None)
-		self.listed = alist(sorted(((block[0]["t"], i) for i, block in d.items() if block), key=lambda x: x[0]))
+		gen = ((block[0]["t"], i) for i, block in d.items() if block and isinstance(block[0], dict) and block[0].get("t") is not None)
+		self.listed = alist(sorted(gen, key=lambda x: x[0]))
 		self.t = utc()
 
 	async def recurrent_message(self, channel, embed, wait=60):
@@ -2140,6 +2141,8 @@ class UpdateUsers(Database):
 		user = message.author
 		if user.id == self.bot.id or self.bot.get_perms(user, message.guild) <= -inf:
 			return
+		if not self.bot.get_enabled(message.channel):
+			return
 		size = get_message_length(message)
 		points = math.sqrt(size) + sum(1 for w in message.content.split() if len(w) > 1)
 		if points >= 32 and not message.attachments:
@@ -2285,7 +2288,7 @@ class UpdateUsers(Database):
 			# Simulates a randomized conversation
 			if count < 5:
 				create_task(message.add_reaction("👀"))
-			if "ask" in bot.commands and "string" in bot.get_enabled(channel):
+			if "ask" in bot.commands and ("string" in bot.get_enabled(channel) or not perm < inf):
 				argv = message.clean_content.strip()
 				me = guild.me if guild else bot
 				argv = argv.removeprefix(f"@{me.display_name}")

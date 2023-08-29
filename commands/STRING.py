@@ -1233,7 +1233,7 @@ class Describe(Command):
 
 class Ask(Command):
 	_timeout_ = 24
-	name = ["Bloom", "Pyg", "Pygmalion", "GPT2", "Llama", "Vicuna", "Manticore", "Hippogriff", "Wizard", "Platypus", "GPlatty", "Airochronos", "Davinci", "GPT3", "GPT3a", "GPT4", "GPT4a"]
+	name = ["Wizard", "Orca", "NousPuff", "WizCode", "Bloom", "Pyg", "Pygmalion", "GPT2", "Llama", "Vicuna", "Manticore", "Hippogriff", "WizVic", "Platypus", "GPlatty", "Airochronos", "Davinci", "GPT3", "GPT3a", "GPT4", "GPT4a"]
 	description = "Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. For premium tier chatbots, check using ~serverinfo, or apply with ~premium!"
 	usage = "<string>"
 	example = ("ask what's the date?", "gpt3 what is the square root of 3721?", "pyg can I have a hug?")
@@ -1453,12 +1453,20 @@ class Ask(Command):
 			model = "manticore"
 		elif cname == "hippogriff":
 			model = "hippogriff"
-		elif cname == "wizard" or cname == "vicuna":
-			model = "wizard"
+		elif cname == "wizvic" or cname == "vicuna":
+			model = "wizvic"
 		elif cname == "platypus" or cname == "gplatty":
 			model = "platypus"
-		elif cname == "airochronos" or cname == "airoboros" or cname == "chronoboros" or cname == "llama":
+		elif cname == "airochronos" or cname == "airoboros" or cname == "chronoboros":
 			model = "airochronos"
+		elif cname == "wizcode":
+			model = "wizcode"
+		elif cname == "nouspuff":
+			model = "nouspuff"
+		elif cname == "orca":
+			model = "orca"
+		elif cname == "wizard" or cname == "llama":
+			model = "wizard"
 		elif cname == "gpt3":
 			if premium < 2:
 				raise PermissionError(f"Distributed premium level 1 or higher required; please see {bot.kofi_url} for more info!")
@@ -1879,7 +1887,7 @@ class Personality(Command):
 	server_only = True
 	name = ["ResetChat", "ClearChat", "ChangePersonality"]
 	min_level = 2
-	description = "Customises ⟨MIZA⟩'s personality for ~ask in the current server. Uses the highest available model within specified family (for example, \"GPT\" will prefer GPT-4 if allowed). Bloom, Pygmalion, Manticore, Hippogriff, Platypus, Wizard, and Airochronos are currently the alternate models enabled."
+	description = "Customises ⟨MIZA⟩'s personality for ~ask in the current server. Uses the highest available model within specified family (for example, \"GPT\" will prefer GPT-4 if allowed). Wizard, Orca, NousPuff, WizCode, Bloom, Pygmalion, Manticore, Hippogriff, Platypus, WizVic, and Airochronos are currently the alternate models enabled."
 	usage = "<traits>* <default{?d}>?"
 	example = ("personality Manticore; mischievous, cunning", "personality Wizard; dry, sarcastic, snarky", "personality Auto; sweet, loving", "personality GPT4; The following is a conversation between Miza and humans. Miza is an AI who is charming, friendly and positive.")
 	flags = "aed"
@@ -1924,7 +1932,7 @@ class Personality(Command):
 					"Apologies, my AI has detected that your input may be inappropriate.\n"
 					+ "Please move to a NSFW channel, reword, or consider contacting the support server if you believe this is a mistake!"
 				)
-		models = ("auto", "gpt", "bloom", "pyg", "pygmalion", "manticore", "llama", "hippogriff", "wizard", "platypus", "airochronos", "davinci", "gpt3", "gpt4")
+		models = ("auto", "gpt", "wizard", "orca", "nouspuff", "wizcode", "bloom", "pyg", "pygmalion", "manticore", "llama", "hippogriff", "wizvic", "platypus", "airochronos", "davinci", "gpt3", "gpt4")
 		if ";" in p:
 			m, p = p.split(";", 1)
 			p = p.lstrip()
@@ -1935,7 +1943,7 @@ class Personality(Command):
 		m = m.split("-", 1)[0]
 		m2 = m.casefold()
 		if m2 not in models:
-			raise NotImplementedError(f'No such model "{m}" currently supported. Sorry!')
+			raise NotImplementedError(f'No such model "{m}" currently supported. Sorry!\nSupported list: [{", ".join(models)}]')
 		if m2.startswith("gpt4") and premium < 3:
 			raise PermissionError(f"Sorry, this model is currently for premium users only. Please make sure you have a subscription level of minimum 2 from {bot.kofi_url}, or try out ~trial if you would like to manage/fund your own usage!")
 		p = f"{m}; {p}"
