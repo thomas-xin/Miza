@@ -1201,7 +1201,7 @@ class Bot:
 		exclusive = {"neox-20b", "bloom-176b"}
 		if model in gptq_models:
 			omodel = model
-			from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig
+			from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig, exllama_set_max_input_length
 			buffer = 1.3
 			if model == "wizard-70b":
 				m = "TheBloke/WizardLM-70B-V1.0-GPTQ"
@@ -1260,6 +1260,7 @@ class Bot:
 					inject_fused_attention=False,
 					offload_folder="cache",
 				)
+				model = exllama_set_max_input_length(model, 4096)
 				self.models[m] = (tokenizer, model)
 			prompt = prompt.strip().replace(f"{u}:", f"You:")
 			tokens = tokenizer(prompt, return_tensors="pt").input_ids.to(model.device)
