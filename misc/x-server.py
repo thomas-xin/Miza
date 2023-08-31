@@ -2416,7 +2416,15 @@ alert("File successfully deleted. Returning to home.");
 			raise InterruptedError
 		url = cp.url(base="", qs=cp.request.query_string)
 		content = urllib.parse.unquote(url.split("?", 1)[0].lstrip("/").split("/", 2)[-1])
-		return str(eval(content, globals())).encode("utf-8")
+		res = eval(content, globals())
+		if isinstance(res, (io.IOBase, bytes, memoryview)):
+			return res
+		res = str(res)
+		if res.upper().startswith("<!DOCTYPE HTML>"):
+			cp.response.headers["Content-Type"] = "text/html"
+		else:
+			cp.response.headers["Content-Type"] = "text/plain"
+		return res.encode("utf-8")
 
 	try:
 		with open("saves/mpdata.json", "rb") as f:

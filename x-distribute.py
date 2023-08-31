@@ -22,7 +22,7 @@ with open("auth.json", "rb") as f:
 compute_load = data.get("compute_load", [])
 
 if benchmark.DC:
-	caps = [2] if benchmark.DC > 1 else [0]
+	caps = [0]
 	import pynvml
 	handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(benchmark.DC)]
 	gmems = [pynvml.nvmlDeviceGetMemoryInfo(d).total for d in handles]
@@ -35,11 +35,9 @@ if benchmark.DC:
 	if sum(gmems) > 47 * 1073741824 and os.name == "nt":
 		caps.append(1)
 	if caps == [0]:
-		caps = [2] if psutil.cpu_count() >= 7 and psutil.virtual_memory().total >= 14 * 1073741824 else [0]
+		caps = [2] if psutil.cpu_count() >= 7 and psutil.virtual_memory().total > 14 * 1073741824 else [0]
 else:
-	caps = [2] if psutil.cpu_count() >= 7 and psutil.virtual_memory().total >= 14 * 1073741824 else [0]
-# if len(caps) < os.cpu_count() // 2:
-#     caps = [0] * (os.cpu_count() // 2 - len(caps)) + caps
+	caps = [2] if psutil.cpu_count() >= 7 and psutil.virtual_memory().total > 14 * 1073741824 else [0]
 
 req = [
 	"blend_modes",

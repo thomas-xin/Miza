@@ -221,12 +221,12 @@ if keep:
 	mem = psutil.virtual_memory().total
 	if DC:
 		# mems.append(mem)
-		# if DC < 3:
-		args = [sys.executable, sys.argv[0], "cpu", info["brand_raw"], str(info["count"]), str(mem)]
-		print(args)
-		proc = subprocess.Popen(args, stdout=subprocess.PIPE)
-		proc.i = -1
-		procs.append(proc)
+		if __name__ == "__main__":
+			args = [sys.executable, sys.argv[0], "cpu", info["brand_raw"], str(info["count"]), str(mem)]
+			print(args)
+			proc = subprocess.Popen(args, stdout=subprocess.PIPE)
+			proc.i = -1
+			procs.append(proc)
 		last = None
 		for i in list(range(DC)[::2]) + list(range(DC)[1::2]):
 			info = pynvml.nvmlDeviceGetHandleByIndex(i)
@@ -268,6 +268,7 @@ if keep:
 	if not os.path.exists("auth.json"):
 		keep = False
 
+if keep:
 	import json
 	with open("auth.json", "rb+") as f:
 		data = json.load(f)
