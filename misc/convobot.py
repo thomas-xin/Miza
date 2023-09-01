@@ -1221,6 +1221,8 @@ class Bot:
 				tokenizer, model = self.models[m]
 			except KeyError:
 				tokenizer = backup_model(AutoTokenizer.from_pretrained, m)
+				mfut = concurrent.futures.Future()
+				self.models[m] = (tokenizer, mfut)
 				n = torch.cuda.device_count()
 				if not n:
 					raise RuntimeError("Required GPU not found.")
@@ -1240,14 +1242,14 @@ class Bot:
 				except:
 					print_exc()
 					tinfo = gmems = COMPUTE_ORDER = []
-				COMPUTE_LOAD = globals().get("COMPUTE_LOAD") or [0] * dc
+				COMPUTE_LOAD = globals().get("COMPUTE_LOAD") or [0] * n
 				high = max(COMPUTE_LOAD)
 				bit4 = [i for i in COMPUTE_ORDER if COMPUTE_LOAD[i] > high / 3]
 				total = sum(COMPUTE_LOAD[i] for i in bit4)
 				if high:
 					loads = [i / total * req if i < high * 0.9 else inf for i in COMPUTE_LOAD]
 				else:
-					loads = [inf] * dc
+					loads = [inf] * n
 				max_mem = {i: f"{round(min(((gmems[i].total - gmems[i].used) / 1048576 - (2 if i else 3) * 1024), loads[i] * 1024))}MiB" for i in bit4}
 				max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("MiB")) > 0}
 				print("MAX_MEM:", max_mem)
@@ -1261,7 +1263,10 @@ class Bot:
 					offload_folder="cache",
 				)
 				model = exllama_set_max_input_length(model, 4096)
+				mfut.set_result(model)
 				self.models[m] = (tokenizer, model)
+			if isinstance(model, concurrent.futures.Future):
+				model = model.result()
 			prompt = prompt.strip().replace(f"{u}:", f"You:")
 			tokens = tokenizer(prompt, return_tensors="pt").input_ids.to(model.device)
 			pc = len(tokens)

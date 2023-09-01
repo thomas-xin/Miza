@@ -1486,7 +1486,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			fut = create_future(self.replicate, url)
 		res = None
 		try:
-			res = await process_image(url, "caption", ["-nogif", best], fix=2, pwr=best, timeout=300)
+			res = await process_image(url, "caption", ["-nogif", False], fix=2, pwr=best, timeout=300)
 			p1, p2 = res
 		except:
 			if res:
@@ -1504,7 +1504,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			tup = ("Image", p1, p2, best)
 		if best:
 			p3 = await fut
-			tup = (tup[0], p3, p2, best)
+			p1, p2, p3 = sorted((p1, p2, p3), key=len)
+			tup = (tup[0], p2, p3, best)
 			print("BEST:", tup)
 		self.analysed[h] = tup
 		while len(self.analysed) > 65536:
