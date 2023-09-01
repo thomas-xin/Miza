@@ -624,7 +624,7 @@ class Bot:
 		for im in images:
 			b = io.BytesIO()
 			im.save(b, format="png")
-			print("StablediffusionL:", b)
+			print(f"IBASL {model}:", b)
 			b.seek(0)
 			out.append(b.read())
 		return out
