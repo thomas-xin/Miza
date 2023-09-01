@@ -2685,9 +2685,9 @@ class AudioDownloader:
 						elif fmt == "ogg":
 							args.extend(("-b:a", "196608", "-c:a", "libopus", out))
 						elif fmt == "wav":
-							args.extend(("-ar", SAMPLE_RATE, "-ac", 2, out))
+							args.extend(("-ar", SAMPLE_RATE, "-ac", "2", out))
 						elif fmt == "pcm":
-							args.extend(("f", "s16le", "-ar", SAMPLE_RATE, "-ac", 2, out))
+							args.extend(("f", "s16le", "-ar", SAMPLE_RATE, "-ac", "2", out))
 						else:
 							args.extend(("-b:a", "196608", "-c:a", "libopus", out))
 					else:
@@ -2696,9 +2696,9 @@ class AudioDownloader:
 						elif fmt == "ogg":
 							args.extend(("-c:a", "copy", out))
 						elif fmt == "wav":
-							args.extend(("-ar", SAMPLE_RATE, "-ac", 2, out))
+							args.extend(("-ar", SAMPLE_RATE, "-ac", "2", out))
 						elif fmt == "pcm":
-							args.extend(("f", "s16le", "-ar", SAMPLE_RATE, "-ac", 2, out))
+							args.extend(("f", "s16le", "-ar", SAMPLE_RATE, "-ac", "2", out))
 						else:
 							args = None
 				if args:
