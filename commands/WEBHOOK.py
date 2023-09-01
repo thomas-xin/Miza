@@ -9,6 +9,7 @@ class AutoEmoji(Command):
 	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
 	dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
 	rate_limit = (4, 6)
+	slash = True
 
 	async def __call__(self, bot, flags, guild, message, user, name, perm, **void):
 		data = bot.data.autoemojis

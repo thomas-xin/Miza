@@ -784,7 +784,7 @@ class EmojiCrypt(Command):
 	usage = "<string> <encrypt{?e}|decrypt{?d}> <encrypted{?p}>? <-1:password>"
 	rate_limit = (9, 12)
 	no_parse = True
-	slash = True
+	# slash = True
 	flags = "ed"
 
 	async def __call__(self, args, name, flags, message, **extra):
