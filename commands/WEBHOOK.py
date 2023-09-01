@@ -2,7 +2,7 @@ class AutoEmoji(Command):
 	server_only = True
 	name = ["NQN", "Emojis"]
 	min_level = 0
-	description = "Causes all failed emojis starting and ending with : to be deleted and reposted with a webhook, when possible."
+	description = "Causes all failed emojis starting and ending with : to be deleted and reposted with a webhook, when possible. See ~emojilist for assigned emojis!"
 	usage = "(enable|disable)?"
 	example = ("emojis", "autoemoji enable", "nqn disable")
 	flags = "aed"
