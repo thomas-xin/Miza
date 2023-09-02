@@ -1235,7 +1235,7 @@ class Describe(Command):
 
 class Ask(Command):
 	_timeout_ = 24
-	name = ["Wizard", "Orca", "NousPuff", "WizCode", "Bloom", "Pyg", "Pygmalion", "GPT2", "Llama", "Vicuna", "Manticore", "Hippogriff", "WizVic", "Platypus", "GPlatty", "Airochronos", "Davinci", "GPT3", "GPT3a", "GPT4", "GPT4a"]
+	name = ["Wizard", "Orca", "NousPuff", "Kimiko", "WizCode", "Bloom", "Pyg", "Pygmalion", "GPT2", "Llama", "Vicuna", "Manticore", "Hippogriff", "WizVic", "Platypus", "GPlatty", "Airochronos", "Davinci", "GPT3", "GPT3a", "GPT4", "GPT4a"]
 	description = "Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. For premium tier chatbots, check using ~serverinfo, or apply with ~premium!"
 	usage = "<string>"
 	example = ("ask what's the date?", "gpt3 what is the square root of 3721?", "pyg can I have a hug?")
@@ -1463,6 +1463,8 @@ class Ask(Command):
 			model = "airochronos"
 		elif cname == "wizcode":
 			model = "wizcode"
+		elif cname == "kimiko":
+			model = "kimiko"
 		elif cname == "nouspuff":
 			model = "nouspuff"
 		elif cname == "orca":
@@ -1889,7 +1891,7 @@ class Personality(Command):
 	server_only = True
 	name = ["ResetChat", "ClearChat", "ChangePersonality"]
 	min_level = 2
-	description = "Customises ⟨MIZA⟩'s personality for ~ask in the current server. Uses the highest available model within specified family (for example, \"GPT\" will prefer GPT-4 if allowed). Wizard, Orca, NousPuff, WizCode, Bloom, Pygmalion, Manticore, Hippogriff, Platypus, WizVic, and Airochronos are currently the alternate models enabled."
+	description = "Customises ⟨MIZA⟩'s personality for ~ask in the current server. Uses the highest available model within specified family (for example, \"GPT\" will prefer GPT-4 if allowed). Wizard, Orca, NousPuff, Kimiko, WizCode, Bloom, Pygmalion, Manticore, Hippogriff, Platypus, WizVic, and Airochronos are currently the alternate models enabled."
 	usage = "<traits>* <default{?d}>?"
 	example = ("personality Manticore; mischievous, cunning", "personality Wizard; dry, sarcastic, snarky", "personality Auto; sweet, loving", "personality GPT4; The following is a conversation between Miza and humans. Miza is an AI who is charming, friendly and positive.")
 	flags = "aed"
@@ -1934,7 +1936,7 @@ class Personality(Command):
 					"Apologies, my AI has detected that your input may be inappropriate.\n"
 					+ "Please move to a NSFW channel, reword, or consider contacting the support server if you believe this is a mistake!"
 				)
-		models = ("auto", "gpt", "wizard", "orca", "nouspuff", "wizcode", "bloom", "pyg", "pygmalion", "manticore", "llama", "hippogriff", "wizvic", "platypus", "airochronos", "davinci", "gpt3", "gpt4")
+		models = ("auto", "gpt", "wizard", "orca", "nouspuff", "kimiko", "wizcode", "bloom", "pyg", "pygmalion", "manticore", "llama", "hippogriff", "wizvic", "platypus", "airochronos", "davinci", "gpt3", "gpt4")
 		if ";" in p:
 			m, p = p.split(";", 1)
 			p = p.lstrip()

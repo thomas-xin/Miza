@@ -861,6 +861,10 @@ class Bot:
 			model = "airochronos-33b"
 			temp = 0.8
 			limit = 4096
+		elif model == "kimiko":
+			model = "kimiko-70b"
+			temp = 0.8
+			limit = 4096
 		elif model == "wizcode":
 			model = "wizard-coder-34b"
 			temp = 0.8
@@ -919,7 +923,7 @@ class Bot:
 		print("INS:", ins)
 		p = per
 		bnb_models = ("pygmalion-13b", "manticore-13b", "hippogriff-30b", "wizard-vicuna-30b", "gplatty-30b", "airochronos-33b")
-		gptq_models = ("wizard-70b", "nous-puffin-70b", "orca-70b", "wizard-coder-34b")
+		gptq_models = ("wizard-70b", "nous-puffin-70b", "orca-70b", "kimiko-70b", "wizard-coder-34b")
 		local_models = bnb_models + gptq_models
 		if self.name.casefold() not in p.casefold() and "you" not in p.casefold():
 			if model in ("gpt-3.5-turbo", "gpt-4", "gpt-3.5-turbo-instruct", "text-davinci-003"):
@@ -1177,7 +1181,7 @@ class Bot:
 								return {"func": args["mode"], "argv": int(args["value"])}
 							elif name == "policy":
 								print("Policy!", messages[-1])
-								model = DEFMOD
+								model = "kimiko-70b"
 								temp = 0.8
 								limit = 4096
 								cm = 0
@@ -1211,6 +1215,9 @@ class Bot:
 				req = 35
 			elif model == "orca-70b":
 				m = "TheBloke/Llama-2-70B-Orca-200k-GPTQ"
+				req = 35
+			elif model == "kimiko-70b":
+				m = "TheBloke/fiction.live-Kimiko-V2-70B-GPTQ"
 				req = 35
 			elif model == "wizard-coder-34b":
 				m = "TheBloke/WizardCoder-Python-34B-V1.0-GPTQ"
