@@ -2197,7 +2197,7 @@ class UpdateUserLogs(Database):
 		else:
 			emb.description = f"{user_mention(user.id)} has left the server."
 		roles = getattr(user, "roles", None) or ()
-		rchange = escape_markdown(", ".join(role_mention(r.id) for r in roles))
+		rchange = escape_markdown(", ".join(role_mention(r.id) for r in roles[1:]))
 		if rchange:
 			emb.add_field(name="Roles", value=rchange)
 		self.bot.send_embeds(channel, emb)
