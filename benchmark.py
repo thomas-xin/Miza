@@ -12,42 +12,16 @@ if len(sys.argv) > 1:
 		import os
 		os.environ["CUDA_VISIBLE_DEVICES"] = device.split(":", 1)[-1]
 		device = "cuda:0"
-	if os.path.exists("auth.json"):
-		import json
-		with open("auth.json", "rb") as f:
-			AUTH = json.loads(f.read())
-		cachedir = AUTH.get("cache_path") or None
-		if cachedir:
-			os.environ["HF_HOME"] = f"{cachedir}/huggingface"
-			os.environ["TORCH_HOME"] = f"{cachedir}/torch"
-			os.environ["HUGGINGFACE_HUB_CACHE"] = f"{cachedir}/huggingface/hub"
-			os.environ["TRANSFORMERS_CACHE"] = f"{cachedir}/huggingface/transformers"
-			os.environ["HF_DATASETS_CACHE"] = f"{cachedir}/huggingface/datasets"
 	import torch, time, math
 	from torch.utils import benchmark
 	def walltime(stmt, arg_dict, duration=1):
 		return benchmark.Timer(stmt=stmt, globals=arg_dict).blocked_autorange(
 			min_run_time=duration).median
-	# prompt = " ".join(["water"] * 64)
-	# from diffusers import StableDiffusionPipeline, DPMSolverMultistepScheduler
-	# model = "runwayml/stable-diffusion-v1-5"
-	# pipe = StableDiffusionPipeline.from_pretrained(model, torch_dtype=torch.float16 if is_cuda else torch.float32)
-	# if is_cuda:
-		# pipe = pipe.to(device)
-	# pipe.enable_attention_slicing()
-	# pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
-	# if is_cuda:
-		# try:
-			# pipe.enable_model_cpu_offload()
-		# except AttributeError:
-			# pass
-	# pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
 	count = 4096
 	mark = lambda *args: temp.append(time.time())
 	while True:
 		taken = 0
 		temp = []
-		# data = pipe(prompt, num_inference_steps=count + 1, callback=mark)
 		matmul_tflops = {}
 		dtype = torch.float16 if is_cuda else torch.float32
 		m = math.ceil(math.log2(count))
@@ -111,11 +85,14 @@ except:
 # if not DC:
 	# print(srgb(255, 0, 0, "WARNING: No NVIDIA GPUs detected. Please install one for AI compute acceleration."))
 
+import json
 keep = True
 if __name__ != "__main__" and os.path.exists("auth.json"):
-	import json
 	with open("auth.json", "rb") as f:
-		data = json.load(f)
+		try:
+			data = json.load(f)
+		except:
+			data = {}
 	compute_load = data.get("compute_load")
 	compute_order = data.get("compute_order")
 	if compute_load is not None and compute_order is not None and len(compute_load) == len(compute_order) == DC:
@@ -252,7 +229,7 @@ if keep:
 			outs.append(b)
 		outs.extend(procs[half * 2:])
 		compute_load = [0] * DC
-		olines = [""] * len(outs)
+		olines = [""] * (DC + 1)
 		# print(outs)
 		for n, proc in enumerate(outs):
 			s = proc.stdout.readlines()
@@ -262,16 +239,18 @@ if keep:
 			if proc.i > -1:# or DC >= 3:
 				compute_load[proc.i] = avg
 			olines[proc.i + 1] = b"".join(s).decode("utf-8")
-		print("\n" + "\n".join(olines))
+		print("\n" + "\n".join(olines).strip())
 		print(srgb(0, 255, 0, f"Benchmark complete. Total score: {round(total, 2)}"))
 
 	if not os.path.exists("auth.json"):
 		keep = False
 
 if keep:
-	import json
 	with open("auth.json", "rb+") as f:
-		data = json.load(f)
+		try:
+			data = json.load(f)
+		except:
+			data = {}
 		data["compute_load"] = compute_load
 		data["compute_order"] = compute_order
 		b = json.dumps(data, indent="\t").encode("utf-8")

@@ -267,20 +267,20 @@ class Perms(Command):
 		if not users:
 			raise LookupError("No results found.")
 		for t_user in users:
-			t_perm = round_min(bot.get_perms(t_user.id, guild))
+			t_perm = round_min(bot.get_perms(t_user, guild))
 			# If permission level is given, attempt to change permission level, otherwise get current permission level
 			if args or "d" in flags:
 				name = str(t_user)
 				if "d" in flags:
-					o_perm = round_min(bot.get_perms(t_user.id, guild))
-					bot.remove_perms(t_user.id, guild)
-					c_perm = round_min(bot.get_perms(t_user.id, guild))
+					o_perm = round_min(bot.get_perms(t_user, guild))
+					bot.remove_perms(t_user, guild)
+					c_perm = round_min(bot.get_perms(t_user, guild))
 					m_perm = max(abs(t_perm), abs(c_perm), 2) + 1
 					if not perm < m_perm and not isnan(m_perm):
 						create_task(channel.send(css_md(f"Changed permissions for {sqr_md(name)} in {sqr_md(guild)} from {sqr_md(t_perm)} to the default value of {sqr_md(c_perm)}.")))
 						continue
 					reason = f"to change permissions for {name} in {guild} from {t_perm} to {c_perm}"
-					bot.set_perms(t_user.id, guild, o_perm)
+					bot.set_perms(t_user, guild, o_perm)
 					raise self.perm_error(perm, m_perm, reason)
 				orig = t_perm
 				expr = " ".join(args)
@@ -294,7 +294,7 @@ class Perms(Command):
 				if not perm < m_perm and not isnan(m_perm):
 					if not m_perm < inf and guild.owner_id != user.id and not isnan(perm):
 						raise PermissionError("Must be server owner to assign non-finite permission level.")
-					bot.set_perms(t_user.id, guild, c_perm)
+					bot.set_perms(t_user, guild, c_perm)
 					if "h" in flags:
 						return
 					create_task(channel.send(css_md(f"Changed permissions for {sqr_md(name)} in {sqr_md(guild)} from {sqr_md(t_perm)} to {sqr_md(c_perm)}.")))

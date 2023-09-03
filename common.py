@@ -4059,7 +4059,7 @@ class Database(collections.abc.MutableMapping, collections.abc.Hashable, collect
 				print(self, traceback.format_exc(), sep="\n", end="")
 		else:
 			if modified is None:
-				self.data.modified = set(self.data.keys())
+				self.data.modified.update(self.data.keys())
 			else:
 				if issubclass(type(modified), collections.abc.Sized) and type(modified) not in (str, bytes):
 					self.data.modified.update(modified)

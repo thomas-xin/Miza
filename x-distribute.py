@@ -249,6 +249,8 @@ try:
 			gutil = [pynvml.nvmlDeviceGetUtilizationRates(d) for d in handles]
 			gpowa = [pynvml.nvmlDeviceGetPowerUsage(d) for d in handles]
 			gpowb = [pynvml.nvmlDeviceGetEnforcedPowerLimit(d) for d in handles]
+			gtempa = [pynvml.nvmlDeviceGetTemperature(d, 0) for d in handles]
+			gtempb = [pynvml.nvmlDeviceGetTemperatureThreshold(d, 0) for d in handles]
 		except:
 			gname = []
 		minfo = psutil.virtual_memory()
@@ -290,6 +292,15 @@ try:
 					count=1,
 					usage=gpowa[i] / 1000,
 					max=gpowb[i] / 1000,
+					time=t,
+				) for i, name in enumerate(gname)},
+			},
+			temperature={
+				**{f"{ip}-{i}": dict(
+					name=name,
+					count=1,
+					usage=gtempa[i],
+					max=gtempb[i],
 					time=t,
 				) for i, name in enumerate(gname)},
 			},

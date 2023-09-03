@@ -2076,20 +2076,23 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			u_id = user.id
 		except AttributeError:
 			u_id = user
-		g_perm = set_dict(perms, guild.id, {})
-		g_perm.update({u_id: round_min(value)})
-		self.data.perms.update()
+		g_perm = perms.setdefault(guild.id, {})
+		g_perm[u_id] = round_min(value)
+		self.data.perms.update(guild.id)
 
-	# Sets the permission value for a snowflake in a guild to a value.
+	# Removes the permission value for a snowflake in a guild.
 	def remove_perms(self, user, guild):
 		perms = self.data.perms
 		try:
 			u_id = user.id
 		except AttributeError:
 			u_id = user
-		g_perm = set_dict(perms, guild.id, {})
+		g_perm = perms.get(guild.id, {})
 		g_perm.pop(u_id, None)
-		self.data.perms.update()
+		if g_perm:
+			self.data.perms.update(guild.id)
+		else:
+			self.data.perms.pop(guild.id, None)
 
 	def get_enabled(self, channel):
 		guild = getattr(channel, "guild", None)
