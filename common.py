@@ -2390,7 +2390,7 @@ if len(COMPUTE_LOAD) < DC:
 	COMPUTE_LOAD = AUTH["compute_load"] = gcore
 	COMPUTE_POT = [i * 100 for i in gcore]
 	COMPUTE_ORDER = list(range(DC))
-elif len(COMPUTE_LOAD) > DC:
+else:
 	COMPUTE_LOAD = COMPUTE_LOAD[:DC]
 	COMPUTE_POT = COMPUTE_POT[:DC]
 	COMPUTE_ORDER = COMPUTE_ORDER[:DC]
