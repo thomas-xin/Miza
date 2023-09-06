@@ -1351,7 +1351,7 @@ if "ytdl" in CAPS:
 		) for entry in entries]
 		return output
 
-if "gptq" in CAPS:
+if "gptq" in CAPS or "agpt" in CAPS:
 	import convobot, torch
 	convobot.COMPUTE_LOAD = COMPUTE_LOAD
 	convobot.COMPUTE_CAPS = COMPUTE_CAPS
@@ -1449,7 +1449,6 @@ if "gptq" in CAPS:
 			torch.cuda.empty_cache()
 		return res
 
-if "agpt" in CAPS:
 	def CBAU(inputs):
 		user_id = inputs["user_id"]
 		channel_id = inputs["channel_id"]
