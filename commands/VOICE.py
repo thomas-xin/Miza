@@ -2763,14 +2763,14 @@ class AudioDownloader:
 						br = 24
 						print("BPS:", bps)
 					out3 = cachedir + "/ecdc/!" + h + "~" + str(br) + ".ecdc"
+					res = self.search(url)
+					if type(res) is str:
+						raise evalex(res)
+					info = res[0]
+					name = info.get("name") or "untitled"
 					if not os.path.exists(out3) or not os.path.getsize(out3):
 						with open(out, "rb") as f:
 							b = f.read()
-						res = self.search(url)
-						if type(res) is str:
-							raise evalex(res)
-						info = res[0]
-						name = info.get("name")
 						fn = ecdc_encode(b, br, name, url)
 						if os.path.exists(out3):
 							os.remove(out3)
