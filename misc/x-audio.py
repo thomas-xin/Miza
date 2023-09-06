@@ -500,8 +500,11 @@ class AudioFile:
 				if new not in (None, "null"):
 					return self.load(eval_json(new), check_fmt=None, force=True)
 			elif data == b"ECDC":
+				g = -1
 				if COMPUTE_POT:
-					g = random.choice(i for i, c in enumerate(COMPUTE_POT) if c > 100000)
+					usable = [i for i, c in enumerate(COMPUTE_POT) if c > 100000]
+					if usable:
+						g = random.choice(usable)
 				procargs = [
 					[sys.executable, "misc/ecdc_stream.py", "-g", str(g), "-d", stream],
 					["./ffmpeg", "-nostdin", "-y", "-hide_banner", "-v", "error", "-f", "s16le", "-ac", "2", "-ar", "48k", "-i", stream, "-map_metadata", "-1", "-f", fmt, "-c:a", cdc, "-ar", str(SAMPLE_RATE), "-ac", "2", "-b:a", "131072", "cache/" + self.file]
