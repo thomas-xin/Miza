@@ -1030,6 +1030,7 @@ if "ecdc" in CAPS:
 				self.exc.submit(self.pipe, i, bufsize=bufsize)
 			if self.exc:
 				self.exc.shutdown(wait=False)
+			self.pid = self.procs[0].pid
 
 		def pipe(self, i, bufsize=4096):
 			try:
@@ -1068,6 +1069,9 @@ if "ecdc" in CAPS:
 		def wait(self):
 			for proc in self.procs:
 				proc.wait()
+
+		def status(self):
+			return self.procs[-1].status()
 
 	def ecdc_encode(b, bitrate="24", name="", source=""):
 		ts = time.time_ns() // 1000

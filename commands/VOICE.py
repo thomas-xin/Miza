@@ -854,6 +854,10 @@ class AudioQueue(alist):
 		self.update_load()
 
 	def verify(self):
+		try:
+			assert len(self) >= 0
+		except (ValueError, AssertionError):
+			self.clear()
 		if len(self) > self.maxitems + 2048:
 			self.__init__(self[1 - self.maxitems:].appendleft(self[0]), fromarray=True)
 		elif len(self) > self.maxitems:

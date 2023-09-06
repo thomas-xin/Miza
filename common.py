@@ -3193,6 +3193,7 @@ class PipedProcess:
 			self.exc.submit(self.pipe, i, bufsize=bufsize)
 		if self.exc:
 			self.exc.shutdown(wait=False)
+		self.pid = self.procs[0].pid
 
 	def pipe(self, i, bufsize=4096):
 		try:
@@ -3227,6 +3228,9 @@ class PipedProcess:
 	def kill(self):
 		for proc in self.procs:
 			proc.kill()
+
+	def status(self):
+		return self.procs[-1].status()
 
 	def wait(self):
 		for proc in self.procs:

@@ -483,7 +483,7 @@ class AudioFile:
 		if not fixed:
 			headers = Request.header()
 			headers["Range"] = "Bytes=0-3"
-			resp = reqs.next(stream, headers=headers, stream=True)
+			resp = reqs.next().get(stream, headers=headers, stream=True)
 			resp.raise_for_status()
 			it = resp.iter_content(4)
 			data = next(it)[:4]
