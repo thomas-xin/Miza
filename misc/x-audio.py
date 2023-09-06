@@ -507,7 +507,7 @@ class AudioFile:
 						g = random.choice(usable)
 				procargs = [
 					[sys.executable, "misc/ecdc_stream.py", "-g", str(g), "-d", stream],
-					["./ffmpeg", "-nostdin", "-y", "-hide_banner", "-v", "error", "-f", "s16le", "-ac", "2", "-ar", "48k", "-i", stream, "-map_metadata", "-1", "-f", fmt, "-c:a", cdc, "-ar", str(SAMPLE_RATE), "-ac", "2", "-b:a", "131072", "cache/" + self.file]
+					["./ffmpeg", "-nostdin", "-y", "-hide_banner", "-v", "error", "-f", "s16le", "-ac", "2", "-ar", "48k", "-i", "-", "-map_metadata", "-1", "-f", fmt, "-c:a", cdc, "-ar", str(SAMPLE_RATE), "-ac", "2", "-b:a", "131072", "cache/" + self.file]
 				]
 		self.proc = None
 		try:
