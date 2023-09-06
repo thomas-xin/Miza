@@ -4,6 +4,7 @@ if __name__ == "__main__":
 		i = sys.argv.index("-g")
 		sys.argv.pop(i)
 		device = int(sys.argv.pop(i))
+		os.environ["CUDA_VISIBLE_DEVICES"] = str(device)
 	else:
 		device = None
 	if len(sys.argv) < 3 or "-d" not in sys.argv and "-e" not in sys.argv:
