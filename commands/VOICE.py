@@ -981,7 +981,7 @@ def ecdc_encode(ecdc, bitrate="24k", name=None, source=None):
 	if isinstance(ecdc, str):
 		with open(ecdc, "rb") as f:
 			ecdc = f.read()
-	b = await_fut(process_image("ecdc_encode", "&", [ecdc, bitrate, name, source], cap="ecdc", timeout=300))
+	b = await_fut(process_image("ecdc_encode", "$", [ecdc, bitrate, name, source], cap="ecdc", timeout=300))
 	ts = ts_us()
 	out = f"cache/{ts}.ecdc"
 	with open(out, "wb") as f:
@@ -993,7 +993,7 @@ def ecdc_decode(ecdc, out=None):
 	if isinstance(ecdc, str):
 		with open(ecdc, "rb") as f:
 			ecdc = f.read()
-	b = await_fut(process_image("ecdc_decode", "&", [ecdc, fmt], cap="ecdc", timeout=300))
+	b = await_fut(process_image("ecdc_decode", "$", [ecdc, fmt], cap="ecdc", timeout=300))
 	ts = ts_us()
 	out = out or f"cache/{ts}.{fmt}"
 	with open(out, "wb") as f:
@@ -2771,7 +2771,7 @@ class AudioDownloader:
 							raise evalex(res)
 						info = res[0]
 						name = info.get("name")
-						b = await_fut(process_image("ecdc_encode", "$", [b, br, name, url], cap="ecdc", timeout=300))
+						b = ecdc_encode(b, br, name, url)
 						with open(out3, "wb") as f:
 							f.write(b)
 					return out3
@@ -3128,7 +3128,7 @@ class AudioDownloader:
 							raise evalex(res)
 						info = res[0]
 						name = info.get("name")
-						b = await_fut(process_image("ecdc_encode", "$", [b, br, name, url], cap="ecdc", timeout=300))
+						b = ecdc_encode(b, br, name, url)
 						with open(out3, "wb") as f:
 							f.write(b)
 					fn = out3

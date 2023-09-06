@@ -99,7 +99,12 @@ def stream_from_file(fo: tp.IO[bytes], device='cpu') -> tp.Tuple[torch.Tensor, i
 	assert isinstance(num_codebooks, int)
 	if model_name not in MODELS:
 		raise ValueError(f"The audio was compressed with an unsupported model {model_name}.")
-	model = MODELS[model_name]().to(device=device)
+	try:
+		model = MODELS[model_name]().to(device=device)
+	except:
+		import traceback
+		traceback.print_exc()
+		sys.stderr.write(f"MODEL FAIL: {model_name} {device}\n")
 
 	if use_lm:
 		lm = model.get_lm_model()
@@ -184,7 +189,12 @@ def stream_to_file(fo: tp.IO[bytes], use_lm: bool = False, hq: bool = True, bitr
 	model_name = 'encodec_48khz' if hq else 'encodec_24khz'
 	if model_name not in MODELS:
 		raise ValueError(f"The provided model {model_name} is not supported.")
-	model = MODELS[model_name]().to(device=device)
+	try:
+		model = MODELS[model_name]().to(device=device)
+	except:
+		import traceback
+		traceback.print_exc()
+		sys.stderr.write(f"MODEL FAIL: {model_name} {device}\n")
 	model.set_target_bandwidth(bitrate)
 
 	if use_lm:
@@ -305,7 +315,7 @@ if __name__ == "__main__":
 				length, channels = wav.shape
 				if channels != 2:
 					wav = wav.expand(length, 2)
-				# Pytorch does not allow direct serialisation
+				# Pytorch does not allow direct serialisation & .data does not work because it's not contiguous
 				b = wav.cpu().numpy().tobytes()
 				sys.stdout.buffer.write(b)
 		except StopIteration:
