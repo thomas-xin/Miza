@@ -2762,7 +2762,7 @@ class AudioDownloader:
 					else:
 						br = 24
 						print("BPS:", bps)
-					out3 = cachedir + "/ecdc/!" + h + "~" + br + ".ecdc"
+					out3 = cachedir + "/ecdc/!" + h + "~" + str(br) + ".ecdc"
 					if not os.path.exists(out3) or not os.path.getsize(out3):
 						with open(out, "rb") as f:
 							b = f.read()
