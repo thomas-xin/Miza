@@ -83,7 +83,7 @@ if len(sys.argv) > 5:
 else:
 	COMPUTE_ORDER = []
 
-if "image" in CAPS:
+if CAPS.intersection(("image", "sd", "sdxl", "sdxlr")):
 	import zipfile, blend_modes
 	try:
 		# This module apparently does not exist on Linux
@@ -98,6 +98,8 @@ if "image" in CAPS:
 	Transpose = getattr(Image, "Transpose", Image)
 	Transform = getattr(Image, "Transform", Image)
 	Image.MAX_IMAGE_PIXELS = 4294967296
+else:
+	Image = None
 
 # os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 try:
@@ -1715,36 +1717,37 @@ def ImageIterator(image):
 			break
 		yield image
 
-class ImageSequence(Image.Image):
+if Image:
+	class ImageSequence(Image.Image):
 
-	def __init__(self, *images, copy=False, func=None, args=()):
-		if len(images) == 1:
-			images = ImageIterator(images[0])
-			if not func and not copy:
-				copy = True
-		if func:
-			self._images = [func(image, *args) for image in images]
-		elif copy:
-			self._images = [image.copy() for image in images]
-		else:
-			self._images = images
-		for i1, i2 in zip(self._images, images):
-			if "duration" in i2.info:
-				i1.info["duration"] = max(i2.info.get("duration", 0), 50)
-		self._position = 0
+		def __init__(self, *images, copy=False, func=None, args=()):
+			if len(images) == 1:
+				images = ImageIterator(images[0])
+				if not func and not copy:
+					copy = True
+			if func:
+				self._images = [func(image, *args) for image in images]
+			elif copy:
+				self._images = [image.copy() for image in images]
+			else:
+				self._images = images
+			for i1, i2 in zip(self._images, images):
+				if "duration" in i2.info:
+					i1.info["duration"] = max(i2.info.get("duration", 0), 50)
+			self._position = 0
 
-	__len__ = lambda self: len(self._images)
+		__len__ = lambda self: len(self._images)
 
-	def seek(self, position):
-		if position >= len(self._images):
-			raise EOFError
-		self._position = position
+		def seek(self, position):
+			if position >= len(self._images):
+				raise EOFError
+			self._position = position
 
-	def __getattr__(self, key):
-		try:
-			return self.__getattribute__(key)
-		except AttributeError:
-			return getattr(self._images[self._position], key)
+		def __getattr__(self, key):
+			try:
+				return self.__getattribute__(key)
+			except AttributeError:
+				return getattr(self._images[self._position], key)
 
 
 def get_image(url, out=None, nodel=False, nogif=False):
