@@ -2473,7 +2473,7 @@ def spec2cap():
 	pynvml.nvmlInit()
 	handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(DC)]
 	vrams = [pynvml.nvmlDeviceGetMemoryInfo(d).total for d in handles]
-	for i, v in reversed(enumerate(vrams)):
+	for i, v in reversed(tuple(enumerate(vrams))):
 		caps = [i]
 		if COMPUTE_POT[i] > 100000 and v > 3 * 1073741824 and ffmpeg:
 			caps.append("video", "ecdc")
