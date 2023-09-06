@@ -245,7 +245,7 @@ def get_request(url):
 		return resp.content
 
 
-if caps.intersection(("image", "sd", "sdxl", "sdxlr")):
+if CAPS.intersection(("image", "sd", "sdxl", "sdxlr")):
 	from_colour = lambda colour, size=128, key=None: Image.new("RGB" + "A" * (len(colour) > 3), (size, size), tuple(colour))
 
 	def from_gradient(shape, count, colour):
@@ -765,7 +765,7 @@ if caps.intersection(("image", "sd", "sdxl", "sdxlr")):
 		return im
 
 
-if "video" in caps:
+if "video" in CAPS:
 	sizecheck = re.compile("[1-9][0-9]*x[0-9]+")
 	fpscheck = re.compile("[0-9]+ fps")
 
