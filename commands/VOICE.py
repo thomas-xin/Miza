@@ -2771,10 +2771,16 @@ class AudioDownloader:
 							raise evalex(res)
 						info = res[0]
 						name = info.get("name")
-						b = ecdc_encode(b, br, name, url)
+						fn = ecdc_encode(b, br, name, url)
 						if os.path.exists(out3):
 							os.remove(out3)
-						os.rename(b, out3)
+						try:
+							os.rename(fn, out3)
+						except OSError:
+							with open(fn, "rb") as f:
+								b = f.read()
+							with open(out3, "wb") as f:
+								f.write(b)
 					return out3
 				return out
 			outf = None
