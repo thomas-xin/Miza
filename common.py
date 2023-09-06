@@ -3177,7 +3177,7 @@ class PipedProcess:
 	procs = ()
 	stdin = stdout = stderr = None
 
-	def __init__(self, *args, stdin=None, stdout=None, stderr=None, bufsize=4096):
+	def __init__(self, *args, stdin=None, stdout=None, stderr=None, cwd=".", bufsize=4096):
 		if not args:
 			return
 		self.exc = concurrent.futures.ThreadPoolExecutor(max_workers=len(args) - 1) if len(args) > 1 else None
@@ -3187,7 +3187,7 @@ class PipedProcess:
 			last = i >= len(args) - 1
 			si = stdin if first else subprocess.PIPE
 			so = stdout if last else subprocess.PIPE
-			proc = psutil.Popen(arg, stdin=si, stdout=so, stderr=stderr, bufsize=bufsize * 256)
+			proc = psutil.Popen(arg, stdin=si, stdout=so, stderr=stderr, cwd=cwd, bufsize=bufsize * 256)
 			self.procs.append(proc)
 		for i in range(len(args) - 1):
 			self.exc.submit(self.pipe, i, bufsize=bufsize)

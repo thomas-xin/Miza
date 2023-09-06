@@ -464,20 +464,52 @@ class AudioFile:
 		elif fmt == "opus":
 			cdc = "libopus"
 			cdc2 = "opus"
-		# Collects data from source, converts to 48khz 224kbps opus format, outputting to target file
-		cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", fmt, "-c:a", cdc, "-ar", str(SAMPLE_RATE), "-ac", "2", "-b:a", "196608", "cache/" + self.file]
+		# Collects data from source, converts to 48khz 128kbps opus format, outputting to target file
+		cmd = [ffmpeg, "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-f", fmt, "-c:a", cdc, "-ar", str(SAMPLE_RATE), "-ac", "2", "-b:a", "131072", "cache/" + self.file]
 		# if not stream.startswith("https://cf-hls-media.sndcdn.com/"):
+		fixed = False
 		with suppress():
 			if stream.startswith("https://www.yt-download.org/download/"):
 				fmt2 = "mp3"
+				fixed = True
 			else:
 				fmt2 = as_str(subprocess.check_output(["./ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=codec_name", "-of", "default=nokey=1:noprint_wrappers=1", stream])).strip()
 			if fmt2 == cdc2:
 				cmd = ["./ffmpeg", "-nostdin", "-y", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-vn", "-i", stream, "-map_metadata", "-1", "-c:a", "copy", "cache/" + self.file]
+				fixed = True
+			elif is_youtube_stream(stream):
+				fixed = True
+		procargs = [cmd]
+		if not fixed:
+			headers = Request.header()
+			headers["Range"] = "Bytes=0-3"
+			resp = reqs.next(stream, headers=headers, stream=True)
+			resp.raise_for_status()
+			it = resp.iter_content(4)
+			data = next(it)[:4]
+			if not data:
+				raise EOFError(stream)
+			CONVERTERS = (
+				b"MThd",
+				b"Org-",
+			)
+			if data in CONVERTERS:
+				new = None
+				with suppress(ValueError):
+					new = request(f"VOICE.select_and_convert({repr(stream)})")
+				if new not in (None, "null"):
+					return self.load(eval_json(new), check_fmt=None, force=True)
+			elif data == b"ECDC":
+				if COMPUTE_POT:
+					g = random.choice(i for i, c in enumerate(COMPUTE_POT) if c > 100000)
+				procargs = [
+					[sys.executable, "misc/ecdc_stream.py", "-g", str(g), "-d", stream],
+					["./ffmpeg", "-nostdin", "-y", "-hide_banner", "-v", "error", "-f", "s16le", "-ac", "2", "-ar", "48k", "-i", stream, "-map_metadata", "-1", "-f", fmt, "-c:a", cdc, "-ar", str(SAMPLE_RATE), "-ac", "2", "-b:a", "131072", "cache/" + self.file]
+				]
 		self.proc = None
 		try:
 			try:
-				self.proc = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, bufsize=1048576)
+				self.proc = PipedProcess(*procargs, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 			except:
 				send(cmd)
 				raise
@@ -645,7 +677,7 @@ class AudioFile:
 		if options is None:
 			options = auds.construct_options(full=self.live)
 		speed = 1
-		if options or auds.reverse or pos or auds.stats.bitrate != 1966.08 or self.live:
+		if options or auds.reverse or pos or auds.stats.bitrate != 1310.72 or self.live:
 			args = ["./ffmpeg", "-hide_banner", "-loglevel", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets"]
 			if (pos or auds.reverse) and self.seekable:
 				arg = "-to" if auds.reverse else "-ss"
@@ -664,7 +696,7 @@ class AudioFile:
 				buff = True
 				args.append("-")
 			auds.stats.bitrate = min(auds.stats.bitrate, auds.stats.max_bitrate)
-			if options or auds.stats.bitrate != 1966.08:
+			if options or auds.stats.bitrate != 1310.72:
 				br = 100 * auds.stats.bitrate
 				sr = SAMPLE_RATE
 				while br < 4096:

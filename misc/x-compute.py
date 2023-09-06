@@ -65,7 +65,9 @@ def convert_fut(fut):
 	return ret
 
 if len(sys.argv) > 1 and sys.argv[1].isnumeric() and int(sys.argv[1]) >= 0:
-	os.environ["CUDA_VISIBLE_DEVICES"] = str(sys.argv[1])
+	os.environ["CUDA_VISIBLE_DEVICES"] = DEV = str(sys.argv[1])
+else:
+	DEV = -1
 if len(sys.argv) > 2:
 	CAPS = set(sys.argv[2].split(","))
 else:
@@ -1005,6 +1007,95 @@ if "math" in CAPS:
 		z /= norms
 		top = np.max(z)
 		return [i for i in np.argsort(z)[::-1] if z[i] - random.random() / 3 >= (top - temp * 2 / 3)]
+
+if "ecdc" in CAPS:
+	class PipedProcess:
+
+		procs = ()
+		stdin = stdout = stderr = None
+
+		def __init__(self, *args, stdin=None, stdout=None, stderr=None, cwd=".", bufsize=4096):
+			if not args:
+				return
+			self.exc = concurrent.futures.ThreadPoolExecutor(max_workers=len(args) - 1) if len(args) > 1 else None
+			self.procs = []
+			for i, arg in enumerate(args):
+				first = not i
+				last = i >= len(args) - 1
+				si = stdin if first else subprocess.PIPE
+				so = stdout if last else subprocess.PIPE
+				proc = psutil.Popen(arg, stdin=si, stdout=so, stderr=stderr, cwd=cwd, bufsize=bufsize * 256)
+				self.procs.append(proc)
+			for i in range(len(args) - 1):
+				self.exc.submit(self.pipe, i, bufsize=bufsize)
+			self.exc.shutdown(wait=False)
+
+		def pipe(self, i, bufsize=4096):
+			try:
+				proc = self.procs[i]
+				proc2 = self.procs[i + 1]
+				si = 0
+				while proc.is_running() and proc2.is_running():
+					b = proc.stdout.read(si * (si + 1) * bufsize // 8 + bufsize)
+					if not b:
+						break
+					proc2.stdin.write(b)
+					proc2.stdin.flush()
+					si += 1
+				if proc2.is_running():
+					proc2.stdin.close()
+			except:
+				import traceback
+				traceback.print_exc()
+				if not proc.is_running() or not proc2.is_running():
+					self.terminate()
+
+		def is_running(self):
+			for proc in self.procs:
+				if proc.is_running():
+					return True
+			return False
+
+		def terminate(self):
+			for proc in self.procs:
+				proc.terminate()
+
+		def kill(self):
+			for proc in self.procs:
+				proc.kill()
+
+		def wait(self):
+			for proc in self.procs:
+				proc.wait()
+
+	def ecdc_encode(b, bitrate="24", name="", source=""):
+		ts = time.time_ns() // 1000
+		fn = "cache/" + str(ts)
+		with open(fn, "wb") as f:
+			f.write(b)
+		fo = "cache/" + str(ts) + ".ecdc"
+		args1 = ["./ffmpeg", "-v", "error", "-hide_banner", "-vn", "-i", fn, "-f", "s16le", "-ac", "2", "-ar", "48k", "-"]
+		args2 = [sys.executable, "misc/ecdc_stream.py", "-g", str(DEV), "-n", name, "-s", source, "-b", str(bitrate), "-e", fo]
+		print(args1)
+		print(args2)
+		PipedProcess(args1, args2).wait()
+		with open(fo, "rb") as f:
+			return fo.read()
+
+	def ecdc_decode(b, fmt="opus"):
+		ts = time.time_ns() // 1000
+		fn = "cache/" + str(ts)
+		with open(fn, "wb") as f:
+			f.write(b)
+		fo = "cache/" + str(ts) + "." + fmt
+		args1 = [sys.executable, "misc/ecdc_stream.py", "-g", str(DEV), "-d", fn]
+		args2 = ["./ffmpeg", "-v", "error", "-hide_banner", "-f", "s16le", "-ac", "2", "-ar", "48k", "-i", "-", "-b:a", "96k", fo]
+		print(args1)
+		print(args2)
+		PipedProcess(args1, args2).wait()
+		with open(fo, "rb") as f:
+			return fo.read()
+
 
 if "caption" in CAPS:
 	def determine_cuda(mem=1, priority=None, multi=False, major=0):

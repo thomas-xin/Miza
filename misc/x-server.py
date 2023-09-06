@@ -1074,7 +1074,7 @@ transform: translate(-50%, -50%);
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
 	@hostmap
-	def encodec(self, url, bitrate="24k", inference=False):
+	def encodec(self, url, name="", source="", bitrate="24k", inference=False):
 		cp.response.headers.update(SHEADERS)
 		if isinstance(url, list):
 			url = url[0]
@@ -1127,16 +1127,7 @@ transform: translate(-50%, -50%);
 			with reqs.next().get(url, timeout=1800, stream=True) as resp:
 				with open(fn, "wb") as f:
 					shutil.copyfileobj(resp.raw, f, 65536)
-			mime = get_mime(fn)
-			if mime != "audio/wav":
-				fn2 = f"{fn}.wav"
-				print(mime)
-				args = ["ffmpeg", "-hide_banner", "-v", "error", "-n", "-i", fn, fn2]
-				subprocess.run(args)
-				fn = fn2
-			# out = fn.rsplit(".", 1)[0] + ".ecdc"
-			args = [python, "-m", "encodec", "-b", br, "--hq", fn, out]
-			subprocess.run(args)
+			out = self.bot_exec(f"VOICE.ecdc_encode({repr(fn)},{repr(bitrate)},{repr(name)},{repr(source)})")
 			assert os.path.exists(out)
 			f = open(out, "rb")
 			return cp.lib.static.serve_fileobj(f, content_type="audio/ecdc", disposition="", name=url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0] + ".ecdc")
@@ -1167,9 +1158,7 @@ transform: translate(-50%, -50%);
 			with reqs.next().get(url, timeout=1800, stream=True) as resp:
 				with open(fn, "wb") as f:
 					shutil.copyfileobj(resp.raw, f, 65536)
-			# out = fn.rsplit(".", 1)[0] + ".wav"
-			args = [python, "-m", "encodec", "-r", fn, out]
-			subprocess.run(args)
+			out = self.bot_exec(f"VOICE.ecdc_decode({repr(fn)},{repr(out)})")
 			assert os.path.exists(out)
 			f = open(out, "rb")
 			return cp.lib.static.serve_fileobj(f, content_type=f"audio/{fmt}", disposition="", name=url.rsplit("/", 1)[-1].split("?", 1)[0] + ".wav")

@@ -247,7 +247,7 @@ class CustomAudio(collections.abc.Hashable):
 		"compressor": 0,
 		"chorus": 0,
 		"resample": 0,
-		"bitrate": max_bitrate / 100,
+		"bitrate": 131072 / 100,
 		"loop": False,
 		"repeat": False,
 		"shuffle": False,
@@ -973,10 +973,33 @@ def png2wav(png):
 	subprocess.run(args, cwd="misc", stderr=subprocess.PIPE)
 	return r_wav
 
+def ecdc_encode(ecdc, bitrate="24k", name=None, source=None):
+	if isinstance(ecdc, str):
+		with open(ecdc, "rb") as f:
+			ecdc = f.read()
+	b = await_fut(process_image("ecdc_encode", "&", [ecdc, bitrate, name, source], cap="ecdc"))
+	ts = ts_us()
+	out = f"cache/{ts}.ecdc"
+	with open(out, "wb") as f:
+		f.write(b)
+	return out
+
+def ecdc_decode(ecdc, out=None):
+	fmt = out.rsplit(".", 1)[-1] if out else "opus"
+	if isinstance(ecdc, str):
+		with open(ecdc, "rb") as f:
+			ecdc = f.read()
+	b = await_fut(process_image("ecdc_decode", "&", [ecdc, fmt], cap="ecdc"))
+	ts = ts_us()
+	out = out or f"cache/{ts}.{fmt}"
+	with open(out, "wb") as f:
+		f.write(b)
+	return out
 
 CONVERTERS = {
 	b"MThd": mid2mp3,
 	b"Org-": org2xm,
+	b"ECDC": ecdc_decode,
 }
 
 def select_and_convert(stream):
@@ -2621,7 +2644,7 @@ class AudioDownloader:
 		args = ["./ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y"]
 		args.extend(("-i", fnv, "-f", "s16le", "-ac", "2", "-ar", str(SAMPLE_RATE), "-i", afile))
 		ac = "aac" if fmt == "mp4" else "libopus"
-		args.extend(("-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", ac, "-b:a", "224k", fn))
+		args.extend(("-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", ac, "-b:a", "192k", fn))
 		print(args)
 		proc = psutil.Popen(args, stderr=subprocess.PIPE)
 		with suppress():
@@ -2663,7 +2686,7 @@ class AudioDownloader:
 				ts = ts_us()
 			if rename and os.path.exists(rename) and os.path.getsize(rename):
 				return rename, rename
-			if len(urls) == 1 and is_url(urls[0]) and fmt in ("opus", "pcm", "wav", "mp3", "ogg"):
+			if len(urls) == 1 and fmt in ("opus", "pcm", "wav", "mp3", "ogg") and is_youtube_url(urls[0]):
 				url = re.sub(r"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=", "https://youtu.be/", url)
 				h = shash(url)
 				fn = "cache/~" + h + ".webm"
