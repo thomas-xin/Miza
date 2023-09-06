@@ -18,6 +18,8 @@ import numpy as np
 from math import *
 sys.path.append("misc")
 
+CACHE = {}
+
 def wrap_future(fut, loop=None):
 	if loop is None:
 		loop = asyncio.main_new_loop

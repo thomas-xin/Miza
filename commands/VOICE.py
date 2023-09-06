@@ -2748,24 +2748,24 @@ class AudioDownloader:
 				file = out2.removeprefix("cache/")
 				self.cache[file] = AudioFileLink(file, out, wasfile=True)
 				if ecdc:
-					out3 = "cache/~" + h + ".ecdc"
+					try:
+						dur, bps = _get_duration(out)
+					except:
+						print_exc()
+						bps = 196608
+					if not bps:
+						br = 24
+					elif bps < 48000:
+						br = 6
+					elif bps < 96000:
+						br = 12
+					else:
+						br = 24
+						print("BPS:", bps)
+					out3 = cachedir + "/ecdc/!" + h + "~" + br + ".ecdc"
 					if not os.path.exists(out3) or not os.path.getsize(out3):
 						with open(out, "rb") as f:
 							b = f.read()
-						try:
-							dur, bps = _get_duration(out)
-						except:
-							print_exc()
-							bps = 196608
-						if not bps:
-							br = 24
-						elif bps < 48000:
-							br = 6
-						elif bps < 96000:
-							br = 12
-						else:
-							br = 24
-							print("BPS:", bps)
 						res = self.search(url)
 						if type(res) is str:
 							raise evalex(res)

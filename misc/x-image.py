@@ -1,4 +1,3 @@
-CACHE = {}
 ANIM = False
 
 qr_bytes = [
