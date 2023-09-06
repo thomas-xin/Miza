@@ -981,7 +981,7 @@ def ecdc_encode(ecdc, bitrate="24k", name=None, source=None):
 	if isinstance(ecdc, str):
 		with open(ecdc, "rb") as f:
 			ecdc = f.read()
-	b = await_fut(process_image("ecdc_encode", "&", [ecdc, bitrate, name, source], cap="ecdc"))
+	b = await_fut(process_image("ecdc_encode", "&", [ecdc, bitrate, name, source], cap="ecdc", timeout=300))
 	ts = ts_us()
 	out = f"cache/{ts}.ecdc"
 	with open(out, "wb") as f:
@@ -993,7 +993,7 @@ def ecdc_decode(ecdc, out=None):
 	if isinstance(ecdc, str):
 		with open(ecdc, "rb") as f:
 			ecdc = f.read()
-	b = await_fut(process_image("ecdc_decode", "&", [ecdc, fmt], cap="ecdc"))
+	b = await_fut(process_image("ecdc_decode", "&", [ecdc, fmt], cap="ecdc", timeout=300))
 	ts = ts_us()
 	out = out or f"cache/{ts}.{fmt}"
 	with open(out, "wb") as f:
@@ -2670,6 +2670,11 @@ class AudioDownloader:
 			ctx = self.download_sem
 		ofmt = fmt
 		with ctx:
+			if fmt == "ecdc":
+				fmt = "opus"
+				ecdc = True
+			else:
+				ecdc = False
 			# Select a filename based on current time to avoid conflicts
 			if fmt[:3] == "mid":
 				mid = True
@@ -2742,6 +2747,34 @@ class AudioDownloader:
 					return rename
 				file = out2.removeprefix("cache/")
 				self.cache[file] = AudioFileLink(file, out, wasfile=True)
+				if ecdc:
+					out3 = "cache/~" + h + ".ecdc"
+					if not os.path.exists(out3) or not os.path.getsize(out3):
+						with open(out, "rb") as f:
+							b = f.read()
+						try:
+							dur, bps, cdc = _get_duration(out)
+						except:
+							print_exc()
+							bps = 196608
+						if not bps:
+							br = 24
+						elif bps < 48000:
+							br = 6
+						elif bps < 96000:
+							br = 12
+						else:
+							br = 24
+							print("BPS:", bps)
+						res = self.search(url)
+						if type(res) is str:
+							raise evalex(res)
+						info = res[0]
+						name = info.get("name")
+						b = await_fut(process_image("ecdc_encode", "$", [b, br, name, url], cap="ecdc", timeout=300))
+						with open(out3, "wb") as f:
+							f.write(b)
+					return out3
 				return out
 			outf = None
 			for url in urls:
@@ -3071,6 +3104,34 @@ class AudioDownloader:
 							os.remove(fn2)
 			if not mid:
 				assert os.path.exists(fn) and os.path.getsize(fn)
+				if ecdc:
+					out3 = fn.rsplit(".", 1)[0] + ".ecdc"
+					if not os.path.exists(out3) or not os.path.getsize(out3):
+						with open(fn, "rb") as f:
+							b = f.read()
+						try:
+							dur, bps, cdc = _get_duration(fn)
+						except:
+							print_exc()
+							bps = 196608
+						if not bps:
+							br = 24
+						elif bps < 48000:
+							br = 6
+						elif bps < 96000:
+							br = 12
+						else:
+							br = 24
+							print("BPS:", bps)
+						res = self.search(urls[0])
+						if type(res) is str:
+							raise evalex(res)
+						info = res[0]
+						name = info.get("name")
+						b = await_fut(process_image("ecdc_encode", "$", [b, br, name, url], cap="ecdc", timeout=300))
+						with open(out3, "wb") as f:
+							f.write(b)
+					fn = out3
 				if rename:
 					os.rename(fn, rename)
 					return rename, outf
@@ -5088,7 +5149,7 @@ class Download(Command):
 				if not auds.queue:
 					raise LookupError
 				res = [{"name": e.name, "url": e.url} for e in auds.queue[:10]]
-				fmt = "mp3"
+				fmt = "ogg"
 				desc = f"Current items in queue for {guild}:"
 			except:
 				raise IndexError("Queue not found. Please input a search term, URL, or file.")
@@ -5098,7 +5159,7 @@ class Download(Command):
 				spl = smart_split(argv)
 				if len(spl) >= 1:
 					fmt = spl[-1].lstrip(".")
-					if fmt.casefold() not in ("mp3", "ogg", "opus", "m4a", "flac", "wav", "wma", "mp2", "weba", "vox", "adpcm", "pcm", "8bit", "mid", "midi", "webm", "mp4", "avi", "mov", "m4v", "mkv", "f4v", "flv", "wmv", "gif", "apng", "webp"):
+					if fmt.casefold() not in ("mp3", "ecdc", "opus", "ogg", "m4a", "flac", "wav", "wma", "mp2", "weba", "vox", "adpcm", "pcm", "8bit", "mid", "midi", "webm", "mp4", "avi", "mov", "m4v", "mkv", "f4v", "flv", "wmv", "gif", "apng", "webp"):
 						fmt = default_fmt
 					else:
 						if spl[-2] in ("as", "to"):
