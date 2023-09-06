@@ -1961,7 +1961,7 @@ def evalImg(url, operation, args):
 				new["frames"] = ImageOpIterator(image, step, operation=operation, ts=ts, args=args)
 	else:
 		new = eval(url)(*args)
-	if isinstance(new, Image.Image):
+	if Image and isinstance(new, Image.Image):
 		if getattr(new, "audio", None):
 			new = dict(count=1, duration=1, frames=[new])
 	if type(new) is dict and "frames" in new:
@@ -2134,7 +2134,7 @@ def evalImg(url, operation, args):
 			with open(out, "rb") as f:
 				return f.read()
 			# return [out]
-	if isinstance(new, Image.Image):
+	if Image and isinstance(new, Image.Image):
 		new = optimise(new, keep_rgb=False)
 		if new.entropy() > 8 and fmt in ("default", "webp"):
 			# out = "cache/" + str(ts) + ".webp"
