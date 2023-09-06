@@ -196,7 +196,7 @@ class Translate(Command):
 			nsfw=bot.is_nsfw(channel),
 			premium=premium,
 		)
-		out = await process_image("CBAU", "$", [inputs], fix=1, timeout=192)
+		out = await process_image("CBAU", "$", [inputs], cap="gptq", timeout=192)
 		if out and out[0] == out[-1] == '"' and not text[0] == text[-1] == '"':
 			try:
 				out = orjson.loads(out)
@@ -1280,7 +1280,7 @@ class Ask(Command):
 				tup = tup[2:]
 				inp.append(f"{name}: {content}")
 			if not em:
-				data = await process_image("embedding", "$", ["\n".join(inp)], fix=2, pwr=0, timeout=90)
+				data = await process_image("embedding", "$", ["\n".join(inp)], cap="image", timeout=90)
 				em = base64.b64encode(data).decode("ascii")
 			mapd[s] = orig
 			embd[s] = em
@@ -1504,17 +1504,16 @@ class Ask(Command):
 		fr = fm = None
 		urls = []
 		async with discord.context_managers.Typing(channel):
-			# fut = self.cbip = create_task(process_image("CBIP", "&", [], fix=1, timeout=360))
 			await ignore_embedding(message.id)
 			orig_tup = (name, q)
 			if embd:
-				data = await process_image("embedding", "$", [f"{name}: {q}"], fix=2, pwr=0, timeout=90)
+				data = await process_image("embedding", "$", [f"{name}: {q}"], cap="image", timeout=90)
 				em = base64.b64encode(data).decode("ascii")
 				objs = list(embd.items())
 				keys = [t[0] for t in objs]
 				ems = [t[1] for t in objs]
 				print("EM:", len(ems))
-				argsort = await process_image("rank_embeddings", "$", [ems, em], timeout=90)
+				argsort = await process_image("rank_embeddings", "$", [ems, em], cap="math", timeout=90)
 				n = 4 if premium < 2 else 6
 				argi = argsort[:n]
 				print("ARGI:", argi)
@@ -1570,7 +1569,7 @@ class Ask(Command):
 			)
 			# if fut:
 			#     await fut
-			out = await process_image("CBAI", "$", [inputs], fix=1, pwr=1 if model.startswith("gpt") else 1000000, timeout=600)
+			out = await process_image("CBAI", "$", [inputs], cap="gptq", timeout=600)
 			if premium >= 2 and freebies is not None:
 				bot.data.users[user.id].setdefault("freebies", []).append(utc())
 				rem = freelim - len(freebies)
@@ -1710,7 +1709,7 @@ class Ask(Command):
 		#     await emb_futs.pop(0)
 		# Syntax: Summary, Jailbroken
 		try:
-			caic = await process_image("lambda cid: [(b := CBOTS[cid]).chat_history, b.jailbroken]", "$", [channel.id], fix=1, timeout=120)
+			caic = await process_image("lambda cid: [(b := CBOTS[cid]).chat_history, b.jailbroken]", "$", [channel.id], cap="gptq", timeout=120)
 		except KeyError:
 			caic = False
 		if caic:
@@ -1788,7 +1787,6 @@ class Ask(Command):
 			else:
 				m = None
 			print("Redoing", channel)
-			# await process_image("lambda cid: CBOTS[cid].deletes()", "$", [channel.id], fix=1, timeout=120)
 			bot.data.chat_histories.get(channel.id, {}).pop("ids", None)
 			bot.data.chat_histories.get(channel.id, {}).pop("last_message_id", None)
 			colour = await bot.get_colour(bot.user)
@@ -1838,7 +1836,6 @@ class UpdateChatHistories(Database):
 		if message.reference.message_id != after.id:
 			return
 		print("Editing", channel)
-		# await process_image("lambda cid: CBOTS[cid].deletes()", "$", [channel.id], fix=1, timeout=120)
 		bot.data.chat_histories.get(channel.id, {}).pop("ids", None)
 		bot.data.chat_histories.get(channel.id, {}).pop("last_message_id", None)
 		colour = await bot.get_colour(bot.user)
@@ -1865,7 +1862,6 @@ class UpdateChatHistories(Database):
 		if message.reference.message_id != after.id:
 			return
 		print("Deleting", channel)
-		# await process_image("lambda cid: CBOTS[cid].deletes()", "$", [channel.id], fix=1, timeout=120)
 		bot.data.chat_histories.get(channel.id, {}).pop("ids", None)
 		bot.data.chat_histories.get(channel.id, {}).pop("last_message_id", None)
 		colour = await bot.get_colour(bot.user)

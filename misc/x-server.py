@@ -2559,16 +2559,11 @@ alert("File successfully deleted. Returning to home.");
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
 	@hostmap
-	def distribute(self, caps="[]", pwrs="[]", stat="{}", resp="{}"):
-		# if resp and resp != "{}":
-		# 	print(caps, pwrs, stat, resp)
+	def distribute(self, caps="[]", stat="{}", resp="{}"):
 		ip = true_ip()
 		if not caps.startswith("["):
 			caps = base64.urlsafe_b64decode(caps + "==")
 		caps = orjson.loads(caps)
-		if not pwrs.startswith("["):
-			pwrs = base64.urlsafe_b64decode(pwrs + "==")
-		pwrs = orjson.loads(pwrs)
 		if not stat.startswith("{"):
 			stat = base64.urlsafe_b64decode(stat + "==").decode("utf-8", "replace")
 		stat = orjson.loads(stat.replace("<IP>", ip))
@@ -2586,7 +2581,7 @@ alert("File successfully deleted. Returning to home.");
 		caps = orjson.dumps(caps).decode("ascii")
 		stat = orjson.dumps(stat).decode("utf-8", "replace")
 		resp = repr(resp)
-		tasks = self.bot_exec(f"bot.distribute({caps},{pwrs},{stat},{resp},{repr(ip)})")
+		tasks = self.bot_exec(f"bot.distribute({caps},{stat},{resp},{repr(ip)})")
 		cp.response.headers.update(HEADERS)
 		cp.response.headers["Content-Type"] = "application/json"
 		return orjson.dumps(tasks)

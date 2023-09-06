@@ -21,42 +21,108 @@ with open("auth.json", "rb") as f:
 	data = json.load(f)
 compute_load = data.get("compute_load", [])
 
-if benchmark.DC:
-	caps = [0]
+# Spec requirements:
+# ytdl											anything with internet
+# agpt											(planned) reliability
+# math			CPU >1							multithreading support
+# image			FFMPEG, CPU >3, RAM >6GB		multiprocessing support
+# caption		CPU >5, RAM >14GB				cpu inference
+# video			FFMPEG, GPU >100k, VRAM >3GB	GTX970, M60, GTX1050ti, P4, GTX1630
+# ecdc			FFMPEG, GPU >100k, VRAM >3GB	GTX970, M60, GTX1050ti, P4, GTX1630
+# sd			GPU >200k, VRAM >5GB			RTX2060, T4, RTX3050, RTX3060m, A16
+# sdxl			GPU >400k, VRAM >9GB			GTX1080ti, RTX2080ti, RTX3060, RTX3080, A2000
+# sdxlr			GPU >400k, VRAM >15GB			V100, RTX3090, A4000, RTX4080, L4
+# gptq			GPU >800k, VRAM >43GB			2xRTX3090, A6000, A40, A100, 2xRTX4090, L6000, L40
+def spec2cap():
+	caps = [-1, "ytdl", "agpt"]
+	cc = psutil.cpu_count()
+	ram = psutil.virtual_memory().total
+	try:
+		subprocess.run("ffmpeg")
+	except FileNotFoundError:
+		ffmpeg = False
+	else:
+		ffmpeg = True
+	if cc > 1:
+		caps.append("math")
+		if cc > 3 and ram > 6 * 1073741824 and ffmpeg:
+			caps.append("image")
+		if cc > 5 and ram > 14 * 1073741824:
+			caps.append("caption")
+	yield caps
+	if cc > 2:
+		caps = [-1, "ytdl", "math"]
+		if ram > 14 * 1073741824 and ffmpeg:
+			caps.append("image")
+		if ram > 46 * 1073741824:
+			caps.append("caption")
+		yield caps
+	if not DC:
+		return
+	done = set()
 	import pynvml
-	handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(benchmark.DC)]
-	gmems = [pynvml.nvmlDeviceGetMemoryInfo(d).total for d in handles]
-	# if sum(gmems) > 35 * 1073741824:
-		# caps.insert(-1, 1)
-	for i, mem in enumerate(gmems):
-		if mem <= 11 * 1073741824 or compute_load[i] < 300000:
-			continue
-		caps.append(i + 3)
-	if sum(gmems) > 47 * 1073741824 and os.name == "nt":
-		caps.append(1)
-	if caps == [0]:
-		caps = [2] if psutil.cpu_count() >= 7 and psutil.virtual_memory().total > 14 * 1073741824 else [0]
-else:
-	caps = [2] if psutil.cpu_count() >= 7 and psutil.virtual_memory().total > 14 * 1073741824 else [0]
+	pynvml.nvmlInit()
+	handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(DC)]
+	vrams = [pynvml.nvmlDeviceGetMemoryInfo(d).total for d in handles]
+	for i, v in reversed(enumerate(vrams)):
+		caps = [i]
+		if COMPUTE_POT[i] > 100000 and v > 3 * 1073741824 and ffmpeg:
+			caps.append("video", "ecdc")
+		if COMPUTE_POT[i] > 400000 and v > 15 * 1073741824:
+			if "sdxlr" not in done:
+				caps.append("sdxlr")
+				caps.append("sdxl")
+				done.add("sdxlr")
+				v -= 15 * 1073741824
+		elif COMPUTE_POT[i] > 400000 and v > 9 * 1073741824:
+			if "sdxl" not in done:
+				caps.append("sdxl")
+				caps.append("sd")
+				done.add("sdxl")
+				v -= 9 * 1073741824
+		elif COMPUTE_POT[i] > 200000 and v > 5 * 1073741824:
+			if "sd" not in done:
+				caps.append("sd")
+				done.add("sd")
+				v -= 5 * 1073741824
+		if v <= 7 * 1073741824:
+			v = 0
+		vrams[i] = v
+		if len(caps) > 1:
+			yield caps
+	vram = sum(vrams[i] for i in range(DC) if COMPUTE_POT[i] > 800000)
+	if vram > 43 * 1073741824:
+		yield [-1, "gptq"]
+
+COMPUTE_POT = compute_load.copy()
+DC = benchmark.DC
+CAPS = list(spec2cap())
 
 req = [
-	"blend_modes",
-	"colorspace",
 	"filetype",
-	"matplotlib",
-	"mpmath",
 	"orjson",
-	"pillow",
 	"requests",
-	"sympy",
-	"yt-dlp",
+	"tiktoken",
 ]
-if any(caps):
+if any("ytdl" in caps for caps in CAPS):
+	req.append("yt-dlp")
+if any("image" in caps for caps in CAPS):
+	req.extend((
+		"blend_modes",
+		"colorspace",
+		"pillow",
+	))
+if any("math" in caps for caps in CAPS):
+	req.extend((
+		"matplotlib",
+		"mpmath",
+		"sympy",
+	))
+if any("caption" in caps for caps in CAPS):
 	req.extend((
 		"clip_interrogator",
 		"pytesseract",
 		"sentence_transformers",
-		"tiktoken",
 	))
 import pkg_resources, subprocess
 for mn in req:
@@ -95,7 +161,7 @@ def task_submit(proc, command, _timeout=12):
 		print_exc()
 		proc.kill()
 		procs.remove(proc)
-		start_proc(proc.cap)
+		start_proc(proc.i, proc.caps)
 		raise
 	finally:
 		PROC_RESP.pop(ts, None)
@@ -110,7 +176,7 @@ def task_submit(proc, command, _timeout=12):
 def update_resps(proc):
 	def func():
 		while True:
-			print(proc, "waiting...")
+			print(proc, "starting...")
 			try:
 				if not proc.is_running():
 					return
@@ -154,8 +220,7 @@ def update_tasks(proc):
 				resp = session.post(
 					FORWARD,
 					data=dict(
-						caps=orjson.dumps([proc.cap]),
-						pwrs=orjson.dumps([proc.pwr]),
+						caps=orjson.dumps([proc.caps]),
 						resp=resp,
 					),
 					verify=False
@@ -177,14 +242,15 @@ def update_tasks(proc):
 			for task in data:
 				cap = task[1]
 				new_tasks.setdefault(cap, []).append(task)
-			tasks = new_tasks.get(proc.cap, [])
-			tasks.extend(new_tasks.get(-1, []))
+			tasks = []
+			for cap in proc.caps:
+				tasks.extend(new_tasks.get(cap, ()))
 			if not tasks:
 				if proc.waiting:
 					proc.waiting.result()
 					proc.waiting = concurrent.futures.Future()
 				else:
-					time.sleep(0.5)
+					time.sleep(1)
 				continue
 			if tasks:
 				i, cap, command, timeout = tasks.pop(0)
@@ -196,8 +262,8 @@ def update_tasks(proc):
 					resps[str(i)] = "RES:" + resp if isinstance(resp, str) else resp
 	return func
 
-def start_proc(i):
-	args = [python, "misc/x-compute.py", str(cap)]
+def start_proc(i, caps):
+	args = [python, "misc/x-compute.py", str(i), ",".join(caps)]
 	print(args)
 	proc = psutil.Popen(
 		args,
@@ -208,16 +274,16 @@ def start_proc(i):
 	)
 	proc.busy = None
 	proc.waiting = concurrent.futures.Future()
-	proc.cap = min(3, int(i))
-	proc.pwr = compute_load[i - 3] if i >= 3 else 0 if not i else 1 if i == 2 else sum(compute_load)
+	proc.i = i
+	proc.caps = caps
 	procs.append(proc)
 	threading.Thread(target=update_tasks(proc)).start()
 	threading.Thread(target=update_resps(proc)).start()
 	return proc
 
 
-for cap in caps:
-	start_proc(cap)
+for i, *caps in CAPS:
+	start_proc(i, caps)
 try:
 	import time, requests, orjson, base64, cpuinfo
 	class Self:
@@ -306,8 +372,10 @@ try:
 			},
 		))
 		prcs = [proc for proc in procs if not proc.busy or proc.busy.done()]
-		caps = [proc.cap for proc in prcs]
-		pwrs = [proc.pwr for proc in prcs]
+		caps = set()
+		for proc in prcs:
+			caps.update(proc.caps)
+		caps = list(caps)
 		stat = base64.urlsafe_b64encode(stats).rstrip(b"=")
 		data = ()
 		try:
@@ -315,7 +383,6 @@ try:
 				"https://api.mizabot.xyz/distribute",
 				data=dict(
 					caps=orjson.dumps(caps),
-					pwrs=orjson.dumps(pwrs),
 					stat=stat,
 				),
 				verify=False,
@@ -344,7 +411,7 @@ try:
 			for proc in procs:
 				if proc.waiting:
 					proc.waiting.set_result(None)
-					proc.waiting = None
+					# proc.waiting = None
 		time.sleep(5)
 except:
 	print_exc()

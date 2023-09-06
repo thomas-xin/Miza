@@ -1029,7 +1029,7 @@ class CreateGIF(Command):
 			filename = "unknown." + fmt
 			# if video is None:
 			#     video = args
-			resp = await process_image("create_gif", "$", ["image", found, delay, "-f", fmt], pwr=1, timeout=_timeout)
+			resp = await process_image("create_gif", "$", ["image", found, delay, "-f", fmt], cap="video", timeout=_timeout)
 			fn = resp
 		await bot.send_with_file(channel, "", fn, filename=filename, reference=message, reacts="🔳")
 
@@ -1112,20 +1112,27 @@ class Resize(Command):
 				x = spl.pop(0)
 				if x != "-":
 					x = round_min(x)
+				fmt = None
 				if spl:
 					y = spl.pop(0)
-					if y != "-":
+					if "." + y in IMAGE_FORMS or "." + y in VIDEO_FORMS:
+						fmt = y
+						y = "-"
+					elif y != "-":
 						y = round_min(x)
 				else:
 					y = "-"
 				if func == "resize_mult":
+					if y == "-":
+						y = x
 					for value in (x, y):
 						if not value >= -32 or not value <= 32:
 							raise OverflowError("Maximum multiplier input is 32.")
-				if spl:
-					fmt = spl.pop(0)
-				else:
-					fmt = fmt2
+				if not fmt:
+					if spl:
+						fmt = spl.pop(0)
+					else:
+						fmt = fmt2
 			# Try and find a good name for the output image
 			try:
 				name = url[url.rindex("/") + 1:]
@@ -1142,8 +1149,8 @@ class Resize(Command):
 			resp = await process_image(url, func, [x, y, op, "-f", fmt], timeout=_timeout)
 			if op == "sdxl":
 				pt, p1, p2 = await fut
-				prompt = p1 + "\n" + p2
-				resp = await process_image("IBASR", "&", [prompt, resp], fix=3, pwr=800000, timeout=240)
+				prompt = "4k, " + p1 + "\n" + p2
+				resp = await process_image("IBASR", "&", [prompt, resp], cap="sdxlr", timeout=240)
 			fn = resp
 			if isinstance(fn, str) and "." in fn:
 				fmt = "." + fn.rsplit(".", 1)[-1]
@@ -1665,11 +1672,11 @@ class Art(Command):
 		oai = data.get("trial") and data.get("openai_key")
 
 		async def ibasl_r(p, k, n, f, c, s):
-			resp = await process_image("IBASL", "&", [p, k, n, f, c, s], fix=3, pwr=500000 * c, timeout=420)
+			resp = await process_image("IBASL", "&", [p, k, n, f, c, s], cap="sdxl" if s else "sd", timeout=420)
 			if s:
 				out = []
 				for r1 in resp:
-					r2 = await process_image("IBASR", "&", [p, r1], fix=3, pwr=800000, timeout=240)
+					r2 = await process_image("IBASR", "&", [p, r1], cap="sdxlr", timeout=240)
 					out.append(r2)
 				return out
 			return resp

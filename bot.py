@@ -1486,7 +1486,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			fut = create_future(self.replicate, url)
 		res = None
 		try:
-			res = await process_image(url, "caption", ["-nogif", False], fix=2, pwr=best, timeout=300)
+			res = await process_image(url, "caption", ["-nogif", False], cap="caption", timeout=300)
 			p1, p2 = res
 		except:
 			if res:
@@ -2653,9 +2653,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		self.total_hosted = size
 		return size
 
+	last_pings = {}
 	compute_queue = {}
 	compute_wait = {}
-	def distribute(self, caps, pwrs, stat, resp, ip="127.0.0.1"):
+	def distribute(self, caps, stat, resp, ip="127.0.0.1"):
+		self.last_pings[ip] = utc()
 		for k, v in stat.items():
 			self.status_data.system[k].update(v)
 		if resp:
@@ -2671,23 +2673,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					eloop.call_soon_threadsafe(task.set_result, v)
 				# print("TASK:", k, task, v)
 		tasks = []
-		for i, p in zip(caps, pwrs):
-			i = i or 0
-			misc = self.compute_queue.get(i)
+		for cap in caps:
+			misc = self.compute_queue.get(cap)
 			if not misc:
-				misc = self.compute_queue.get(-1)
-				if not misc:
-					continue
-			rem = []
-			task = misc.pop()
-			while task.pwr > p:
-				rem.append(task)
-				if not misc:
-					task = None
-					break
-				task = misc.pop()
 				continue
-			misc.update(rem)
+			task = misc.pop()
 			if not task:
 				continue
 			tasks.append(task)

@@ -1036,7 +1036,7 @@ class Activity(Command):
 		data = await create_future(bot.data.users.fetch_events, u_id, interval=max(900, 3600 >> flags.get("v", 0)), timeout=_timeout)
 		ctx = discord.context_managers.Typing(channel) if channel else emptyctx
 		async with ctx:
-			resp = await process_image("plt_special", "&", (data, str(user)), fix=choice(0, 2))
+			resp = await process_image("plt_special", "&", (data, str(user)), cap="math")
 			fn = resp
 			f = CompatFile(fn, filename=f"{user.id}.png")
 		return dict(file=f, filename=fn, best=True)

@@ -1314,7 +1314,7 @@ class Bot:
 				bitsandbytes = None
 			buffer = 1.3
 			if model == "pygmalion-13b":
-				m = "TehVenom/Pygmalion-13b-Merged"
+				m = "PygmalionAI/mythalion-13b"
 				req = 13
 			elif model == "manticore-13b":
 				m = "openaccess-ai-collective/manticore-13b-chat-pyg"

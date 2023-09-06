@@ -2669,7 +2669,7 @@ class AudioDownloader:
 				fn = "cache/~" + h + ".webm"
 				out2 = "cache/~" + h + ".opus"
 				if not os.path.exists(fn):
-					b = await_fut(process_image("ytdl", "$", [urls[0], True], fix=choice(0, 2), timeout=600))
+					b = await_fut(process_image("ytdl", "$", [urls[0], True], cap="ytdl", timeout=600))
 					if not os.path.exists(fn) or not os.path.getsize(fn):
 						with open(fn, "wb") as f:
 							f.write(b)

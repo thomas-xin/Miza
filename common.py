@@ -2160,7 +2160,7 @@ def from_file(path, mime=True):
 				raise TypeError(path)
 			path = bytes(path)
 		out = simple_mimes(path, mime)
-	if out == "application/octet-stream" and path.startswith(b'ECDC\x00\x00\x00\x00<{"m": '):
+	if out == "application/octet-stream" and path.startswith(b'ECDC'):
 		return "audio/ecdc"
 	return out
 
@@ -2222,12 +2222,11 @@ status_order = tuple(status_text)
 
 
 # Subprocess pool for resource-consuming operations.
-PROC_COUNT = cdict()
-PROCS = cdict()
+PROCS = {}
 PROC_RESP = {}#weakref.WeakValueDictionary()
 
 # Gets amount of processes running in pool.
-sub_count = lambda: sum(sum(1 for p in v if p.is_running()) for v in PROCS.values())
+sub_count = lambda: sum(is_strict_running(p) for p in PROCS.values())
 
 def is_strict_running(proc):
 	if not proc:
@@ -2329,12 +2328,12 @@ async def proc_distribute(proc):
 				try:
 					await asyncio.wait_for(wrap_future(proc.fut), timeout=5)
 				except (T0, T1, T2):
-					timeout = 300 if proc.cap >= 3 else 1800
+					timeout = 1800
 					if st and utc() - st > timeout:
-						return create_task(start_proc("compute", proc.i))
+						return create_task(start_proc(proc))
 				else:
 					proc.fut = concurrent.futures.Future()
-				tasks = bot.distribute([proc.cap], [proc.pwr] * proc.sem.limit, {}, {})
+				tasks = bot.distribute(proc.caps, {}, {})
 				if not tasks:
 					await asyncio.sleep(1 / 24)
 					continue
@@ -2367,19 +2366,14 @@ async def proc_distribute(proc):
 					with tracebacksuppressor(T1):
 						await asyncio.wait_for(asyncio.shield(futs[0]), timeout=1)
 				if not is_strict_running(proc) or proc.sem.busy:
-					cap = pwr = []
+					caps = ()
 				else:
-					cap = [proc.cap]
-					pwr = [proc.pwr]
-				tasks = bot.distribute(cap, pwr, {}, resps)
+					caps = proc.caps
+				tasks = bot.distribute(caps, {}, resps)
 				resps.clear()
 		await asyncio.sleep(0.01)
 
-proc_args = cdict(
-	# math=(python, "misc/x-math.py"),
-	#image=(python, "misc/x-image.py"),
-	compute=(python, "misc/x-compute.py"),
-)
+proc_args = (python, "misc/x-compute.py")
 
 COMPUTE_LOAD = AUTH.get("compute_load", [])
 COMPUTE_POT = COMPUTE_LOAD.copy()
@@ -2401,16 +2395,19 @@ if COMPUTE_LOAD:
 	print("Compute load distribution:", COMPUTE_LOAD)
 	print("Compute pool order:", COMPUTE_ORDER)
 
-async def start_proc(k, i):
-	if k in PROCS:
-		if is_strict_running(PROCS[k][i]):
-			proc = PROCS[k][i]
-			PROCS[k][i] = False
+async def start_proc(n, i=-1, caps="ytdl"):
+	if hasattr(n, "caps"):
+		n, i, caps = n.n, n.i, n.caps
+	if n in PROCS:
+		proc = PROCS[n]
+		if is_strict_running(proc):
+			PROCS[n] = False
 			await create_future(force_kill, proc)
-		elif PROCS[k][i] is False:
+		elif PROCS[n] is False:
 			return
-	args = list(proc_args[k])
+	args = list(proc_args)
 	args.append(str(i))
+	args.append(",".join(caps))
 	args.append(orjson.dumps(COMPUTE_LOAD).decode("ascii"))
 	properties = [torch.cuda.get_device_properties(i) for i in range(DC)]
 	args.append(orjson.dumps([(p.major, p.minor) for p in properties]))
@@ -2422,16 +2419,89 @@ async def start_proc(k, i):
 		stdout=subprocess.PIPE,
 		stderr=None,
 	)
+	proc.n = n
 	proc.i = i
+	proc.caps = caps
 	proc.is_running = lambda: not proc.returncode
-	proc.sem = Semaphore(8, inf) if i < 3 else Semaphore(1, inf)
+	proc.sem = Semaphore(8, inf)
 	proc.comm = create_task(proc_communicate(proc))
 	proc.dist = create_task(proc_distribute(proc))
-	proc.cap = min(i, 3)
-	proc.pwr = COMPUTE_POT[i - 3] if i >= 3 else 0 if not i else 1 if i == 2 else sum(COMPUTE_POT)
 	proc.fut = newfut
-	PROCS[k][i] = proc
+	PROCS[n] = proc
 	return proc
+
+# Spec requirements:
+# ytdl											anything with internet
+# agpt											(planned) reliability
+# math			CPU >1							multithreading support
+# image			FFMPEG, CPU >3, RAM >6GB		multiprocessing support
+# caption		CPU >5, RAM >14GB				cpu inference
+# video			FFMPEG, GPU >100k, VRAM >3GB	GTX970, M60, GTX1050ti, P4, GTX1630
+# ecdc			FFMPEG, GPU >100k, VRAM >3GB	GTX970, M60, GTX1050ti, P4, GTX1630
+# sd			GPU >200k, VRAM >5GB			RTX2060, T4, RTX3050, RTX3060m, A16
+# sdxl			GPU >400k, VRAM >9GB			GTX1080ti, RTX2080ti, RTX3060, RTX3080, A2000
+# sdxlr			GPU >400k, VRAM >15GB			V100, RTX3090, A4000, RTX4080, L4
+# gptq			GPU >800k, VRAM >43GB			2xRTX3090, A6000, A40, A100, 2xRTX4090, L6000, L40
+def spec2cap():
+	caps = [-1, "ytdl", "agpt"]
+	cc = psutil.cpu_count()
+	ram = psutil.virtual_memory().total
+	try:
+		subprocess.run("ffmpeg")
+	except FileNotFoundError:
+		ffmpeg = False
+	else:
+		ffmpeg = True
+	if cc > 1:
+		caps.append("math")
+		if cc > 3 and ram > 6 * 1073741824 and ffmpeg:
+			caps.append("image")
+		if cc > 5 and ram > 14 * 1073741824:
+			caps.append("caption")
+	yield caps
+	if cc > 2:
+		caps = [-1, "ytdl", "math"]
+		if ram > 14 * 1073741824 and ffmpeg:
+			caps.append("image")
+		if ram > 46 * 1073741824:
+			caps.append("caption")
+		yield caps
+	if not DC:
+		return
+	done = set()
+	import pynvml
+	pynvml.nvmlInit()
+	handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(DC)]
+	vrams = [pynvml.nvmlDeviceGetMemoryInfo(d).total for d in handles]
+	for i, v in reversed(enumerate(vrams)):
+		caps = [i]
+		if COMPUTE_POT[i] > 100000 and v > 3 * 1073741824 and ffmpeg:
+			caps.append("video", "ecdc")
+		if COMPUTE_POT[i] > 400000 and v > 15 * 1073741824:
+			if "sdxlr" not in done:
+				caps.append("sdxlr")
+				caps.append("sdxl")
+				done.add("sdxlr")
+				v -= 15 * 1073741824
+		elif COMPUTE_POT[i] > 400000 and v > 9 * 1073741824:
+			if "sdxl" not in done:
+				caps.append("sdxl")
+				caps.append("sd")
+				done.add("sdxl")
+				v -= 9 * 1073741824
+		elif COMPUTE_POT[i] > 200000 and v > 5 * 1073741824:
+			if "sd" not in done:
+				caps.append("sd")
+				done.add("sd")
+				v -= 5 * 1073741824
+		if v <= 7 * 1073741824:
+			v = 0
+		vrams[i] = v
+		if len(caps) > 1:
+			yield caps
+	vram = sum(vrams[i] for i in range(DC) if COMPUTE_POT[i] > 800000)
+	if vram > 43 * 1073741824:
+		yield [-1, "gptq"]
 
 def proc_start():
 	if torch and os.environ.get("AI_FEATURES", True):
@@ -2449,61 +2519,25 @@ def proc_start():
 	else:
 		COMPUTE_LOAD = ()
 		globals()["DC"] = 0
-	# PROC_COUNT.math = 3
-	# PROC_COUNT.image = 3 + dc
-	PROC_COUNT.compute = 3 + DC
-	starting = []
-	for k, v in PROC_COUNT.items():
-		PROCS[k] = [None] * v
-		for i in range(v):
-			if i >= 3:
-				cap = i - 3
-				# Reject any compute device below RTX 2080ti/3060 for SDXL
-				if torch.cuda.get_device_properties(cap).total_memory < 10 * 1073741824 or COMPUTE_POT[cap] < 400000:
-					continue
-				if COMPUTE_LOAD[cap] < 0.5 / len(COMPUTE_LOAD):
-					continue
-			starting.append((k, i))
-	# if len(starting) > 5 and starting[3][1] == 3:
-		# starting.pop(3)
-	print(starting)
-	for k, i in starting:
-		create_task(start_proc(k, i))
+	caps = list(spec2cap())
+	for n, (i, *caps) in enumerate(caps):
+		create_task(start_proc(n, i, caps))
 
-async def get_idle_proc(ptype, fix=None):
-	if fix is not None:
-		i = fix % PROC_COUNT[ptype]
-		proc = PROCS[ptype][i]
-		if not proc or not is_strict_running(proc):
-			PROCS[ptype][i] = proc = await start_proc(ptype, i)
-		return proc
-	p = [p for p in PROCS[ptype] if p and not p.sem.is_busy()]
-	if not p:
-		if None in PROCS[ptype]:
-			i = PROCS[ptype].index(None)
-			proc = await start_proc(ptype, i)
-		else:
-			proc = choice(PROCS[ptype])
-	else:
-		proc = p[0]
-	return proc
-
-async def sub_submit(ptype, command, fix=None, pwr=None, _timeout=12):
+async def sub_submit(cap, command, _timeout=12):
 	bot = BOT[0]
 	ex2 = RuntimeError("Maximum compute attempts exceeded.")
 	for i in range(3):
-		fix = fix if fix is not None else -1
 		task = concurrent.futures.Future()
-		task.cap = fix
+		task.cap = cap
 		task.pwr = pwr or 0
 		task.command = command
 		task.timeout = _timeout
-		queue = bot.compute_queue.setdefault(fix, set())
+		queue = bot.compute_queue.setdefault(cap, set())
 		queue.add(task)
-		for proc in PROCS.compute:
+		for proc in PROCS.values():
 			if not proc:
 				continue
-			if not proc.fut.done():
+			if cap in proc.caps and not proc.fut.done():
 				proc.fut.set_result(None)
 		try:
 			return await asyncio.wait_for(wrap_future(task), timeout=(_timeout or inf) + 2)
@@ -2516,7 +2550,7 @@ async def sub_submit(ptype, command, fix=None, pwr=None, _timeout=12):
 	raise ex2
 
 def sub_kill(start=True, force=False):
-	for p in itertools.chain(*PROCS.values()):
+	for p in PROCS.values():
 		if is_strict_running(p):
 			sem = emptyctx if force else p.sem
 			with sem:
@@ -2539,17 +2573,13 @@ async def _sub_submit(proc, command, _timeout=12):
 	while ts in PROC_RESP:
 		ts += 1
 	PROC_RESP[ts] = fut = concurrent.futures.Future()
-	# print("PROC_RESP:", PROC_RESP.keys())
 	command = "[" + ",".join(map(repr, command[:2])) + "," + ",".join(map(str, command[2:])) + "]"
 	s = f"~{ts}~".encode("ascii") + base64.b64encode(command.encode("utf-8")) + b"\n"
-	# s = f"~{ts}~{repr(command.encode('utf-8'))}\n".encode("utf-8")
 	sem = proc.sem
 	await sem()
-	# if not is_strict_running(proc):
-		# proc = await start_proc("compute", proc.i)
 	async with sem:
 		try:
-			await create_future(proc.stdin.write, s, priority=True)
+			proc.stdin.write(s)
 			await proc.stdin.drain()
 			fut = PROC_RESP[ts]
 			tries = ceil(_timeout / 3) if _timeout and is_finite(_timeout) else 3600
@@ -2575,7 +2605,7 @@ async def _sub_submit(proc, command, _timeout=12):
 					pass
 				else:
 					raise
-			create_task(start_proc("compute", proc.i))
+			create_task(start_proc(proc))
 			raise
 		finally:
 			PROC_RESP.pop(ts, None)
@@ -2586,10 +2616,10 @@ SUB_WAITING = None
 
 # Sends an operation to the math subprocess pool.
 def process_math(expr, prec=64, rat=False, timeout=12, variables=None):
-	return sub_submit("compute", (expr, "%", prec, rat, variables), fix=choice((0, 2)), _timeout=timeout)
+	return sub_submit("math", (expr, "%", prec, rat, variables), _timeout=timeout)
 
 # Sends an operation to the image subprocess pool.
-def process_image(image, operation, args=[], fix=None, pwr=None, timeout=36):
+def process_image(image, operation, args=[], cap="image", timeout=36):
 	args = astype(args, list)
 	for i, a in enumerate(args):
 		if type(a) is mpf:
@@ -2606,7 +2636,7 @@ def process_image(image, operation, args=[], fix=None, pwr=None, timeout=36):
 		return repr(arg)
 
 	command = "[" + ",".join(map(as_arg, args)) + "]"
-	return sub_submit("compute", (image, operation, command), fix=fix, pwr=pwr, _timeout=timeout)
+	return sub_submit(cap, (image, operation, command), _timeout=timeout)
 
 
 def evalex(exc, g=None, l=None):
@@ -3140,6 +3170,65 @@ class FileStreamer(io.BufferedRandom, contextlib.AbstractContextManager):
 	tell = lambda self: self.pos
 	__enter__ = lambda self: self
 	__exit__ = lambda self, *args: self.close()
+
+class PipedProcess:
+
+	procs = ()
+	stdin = stdout = stderr = None
+
+	def __init__(self, *args, stdin=None, stdout=None, stderr=None, bufsize=4096):
+		if not args:
+			return
+		self.exc = concurrent.futures.ThreadPoolExecutor(max_workers=len(args) - 1) if len(args) > 1 else None
+		self.procs = []
+		for i, arg in enumerate(args):
+			first = not i
+			last = i >= len(args) - 1
+			si = stdin if first else subprocess.PIPE
+			so = stdout if last else subprocess.PIPE
+			proc = psutil.Popen(arg, stdin=si, stdout=so, stderr=stderr, bufsize=bufsize * 256)
+			self.procs.append(proc)
+		for i in range(len(args) - 1):
+			self.exc.submit(self.pipe, i, bufsize=bufsize)
+		self.exc.shutdown(wait=False)
+
+	def pipe(self, i, bufsize=4096):
+		try:
+			proc = self.procs[i]
+			proc2 = self.procs[i + 1]
+			si = 0
+			while proc.is_running() and proc2.is_running():
+				b = proc.stdout.read(si * (si + 1) * bufsize // 8 + bufsize)
+				if not b:
+					break
+				proc2.stdin.write(b)
+				proc2.stdin.flush()
+				si += 1
+			if proc2.is_running():
+				proc2.stdin.close()
+		except:
+			import traceback
+			traceback.print_exc()
+			if not proc.is_running() or not proc2.is_running():
+				self.terminate()
+
+	def is_running(self):
+		for proc in self.procs:
+			if proc.is_running():
+				return True
+		return False
+
+	def terminate(self):
+		for proc in self.procs:
+			proc.terminate()
+
+	def kill(self):
+		for proc in self.procs:
+			proc.kill()
+
+	def wait(self):
+		for proc in self.procs:
+			proc.wait()
 
 class seq(io.BufferedRandom, collections.abc.MutableSequence, contextlib.AbstractContextManager):
 
