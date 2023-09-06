@@ -3191,7 +3191,8 @@ class PipedProcess:
 			self.procs.append(proc)
 		for i in range(len(args) - 1):
 			self.exc.submit(self.pipe, i, bufsize=bufsize)
-		self.exc.shutdown(wait=False)
+		if self.exc:
+			self.exc.shutdown(wait=False)
 
 	def pipe(self, i, bufsize=4096):
 		try:
