@@ -245,7 +245,7 @@ def get_request(url):
 		return resp.content
 
 
-if caps.intersection(("image", "sd", "sdxl", "sdxlr"))
+if caps.intersection(("image", "sd", "sdxl", "sdxlr")):
 	from_colour = lambda colour, size=128, key=None: Image.new("RGB" + "A" * (len(colour) > 3), (size, size), tuple(colour))
 
 	def from_gradient(shape, count, colour):
