@@ -922,7 +922,8 @@ if "video" in CAPS:
 		return dict(duration=delay * count, count=count, frames=imgs)
 
 if "image" in CAPS:
-	with open("x-image.py", "rb") as f:
+	x_image = "misc/x-image.py" if os.path.exists("misc/x-image.py") else "x-image.py"
+	with open(x_image, "rb") as f:
 		b = f.read()
 	c = compile(b, "<x-image.py>", "exec", optimize=1)
 	exec(c, globals())
