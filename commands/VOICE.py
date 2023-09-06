@@ -2742,9 +2742,9 @@ class AudioDownloader:
 					subprocess.run(args)
 				if rename:
 					if os.path.exists(rename):
-						return rename
+						return rename, rename
 					os.rename(out, rename)
-					return rename
+					return rename, rename
 				file = out2.removeprefix("cache/")
 				self.cache[file] = AudioFileLink(file, out, wasfile=True)
 				if ecdc:
@@ -2781,8 +2781,8 @@ class AudioDownloader:
 								b = f.read()
 							with open(out3, "wb") as f:
 								f.write(b)
-					return out3
-				return out
+					return out3, name.translate(filetrans) + ".ecdc"
+				return out, out
 			outf = None
 			for url in urls:
 				if len(ast) > 1 and not vst:
@@ -3135,9 +3135,14 @@ class AudioDownloader:
 							raise evalex(res)
 						info = res[0]
 						name = info.get("name")
-						b = ecdc_encode(b, br, name, url)
-						with open(out3, "wb") as f:
-							f.write(b)
+						fn = ecdc_encode(b, br, name, url)
+						try:
+							os.rename(fn, out3)
+						except OSError:
+							with open(fn, "rb") as f:
+								b = f.read()
+							with open(out3, "wb") as f:
+								f.write(b)
 					fn = out3
 				if rename:
 					os.rename(fn, rename)
