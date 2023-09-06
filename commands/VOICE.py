@@ -3113,6 +3113,7 @@ class AudioDownloader:
 				assert os.path.exists(fn) and os.path.getsize(fn)
 				if ecdc:
 					out3 = fn.rsplit(".", 1)[0] + ".ecdc"
+					outf = outf.rsplit(".", 1)[0] + ".ecdc"
 					if not os.path.exists(out3) or not os.path.getsize(out3):
 						with open(fn, "rb") as f:
 							b = f.read()

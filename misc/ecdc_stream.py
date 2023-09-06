@@ -27,6 +27,9 @@ if __name__ == "__main__":
 			file = urllib.request.urlopen(req)
 		else:
 			file = open(fn, "rb")
+	elif "-i" in sys.argv:
+		mode = "info"
+		
 	else:
 		mode = "encode"
 		sys.argv.remove("-e")
@@ -34,6 +37,9 @@ if __name__ == "__main__":
 			i = sys.argv.index("-n")
 			sys.argv.pop(i)
 			name = sys.argv.pop(i)
+			if name.startswith(" "):
+				import base64
+				name = base64.b64decode(name.encode("ascii") + b"==").decode("utf-8", "replace")
 		else:
 			name = None
 		if "-s" in sys.argv:

@@ -1081,6 +1081,8 @@ if "ecdc" in CAPS:
 		with open(fn, "wb") as f:
 			f.write(b)
 		fo = "cache/" + str(ts) + ".ecdc"
+		if name:
+			name = " " + base64.b64encode(name.strip().encode("utf-8")).rstrip(b"=").decode("utf-8")
 		args1 = ["./ffmpeg", "-v", "error", "-hide_banner", "-vn", "-nostdin", "-i", fn, "-f", "s16le", "-ac", "2", "-ar", "48k", "-"]
 		args2 = [sys.executable, "misc/ecdc_stream.py", "-g", str(DEV), "-n", name, "-s", source, "-b", str(bitrate), "-e", fo]
 		print(args1)
@@ -1095,6 +1097,8 @@ if "ecdc" in CAPS:
 		with open(fn, "wb") as f:
 			f.write(b)
 		fo = "cache/" + str(ts) + "." + fmt
+		if name:
+			name = " " + base64.b64encode(name.strip().encode("utf-8")).rstrip(b"=").decode("utf-8")
 		args1 = [sys.executable, "misc/ecdc_stream.py", "-g", str(DEV), "-d", fn]
 		args2 = ["./ffmpeg", "-v", "error", "-hide_banner", "-f", "s16le", "-ac", "2", "-ar", "48k", "-i", "-", "-b:a", "96k", fo]
 		print(args1)
