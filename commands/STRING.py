@@ -1569,7 +1569,8 @@ class Ask(Command):
 			)
 			# if fut:
 			#     await fut
-			out = await process_image("CBAI", "$", [inputs], cap="gptq", timeout=600)
+			cap = "agpt" if model.removesuffix("+") in ("gpt3", "gpt4", "davinci", "bloom") else "gptq"
+			out = await process_image("CBAI", "$", [inputs], cap=cap, timeout=600)
 			if premium >= 2 and freebies is not None:
 				bot.data.users[user.id].setdefault("freebies", []).append(utc())
 				rem = freelim - len(freebies)

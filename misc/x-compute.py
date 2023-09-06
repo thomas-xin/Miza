@@ -1081,7 +1081,7 @@ if "ecdc" in CAPS:
 		with open(fn, "wb") as f:
 			f.write(b)
 		fo = "cache/" + str(ts) + ".ecdc"
-		args1 = ["./ffmpeg", "-v", "error", "-hide_banner", "-vn", "-i", fn, "-f", "s16le", "-ac", "2", "-ar", "48k", "-"]
+		args1 = ["./ffmpeg", "-v", "error", "-hide_banner", "-vn", "-nostdin", "-i", fn, "-f", "s16le", "-ac", "2", "-ar", "48k", "-"]
 		args2 = [sys.executable, "misc/ecdc_stream.py", "-g", str(DEV), "-n", name, "-s", source, "-b", str(bitrate), "-e", fo]
 		print(args1)
 		print(args2)

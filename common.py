@@ -2432,10 +2432,10 @@ async def start_proc(n, i=-1, caps="ytdl"):
 
 # Spec requirements:
 # ytdl											anything with internet
-# agpt											(planned) reliability
 # math			CPU >1							multithreading support
 # image			FFMPEG, CPU >3, RAM >6GB		multiprocessing support
 # caption		CPU >5, RAM >14GB				cpu inference
+# agpt			CPU >1, RAM >22GB				(planned) reliability
 # video			FFMPEG, GPU >100k, VRAM >3GB	GTX970, M60, GTX1050ti, P4, GTX1630
 # ecdc			FFMPEG, GPU >100k, VRAM >3GB	GTX970, M60, GTX1050ti, P4, GTX1630
 # sd			GPU >200k, VRAM >5GB			RTX2060, T4, RTX3050, RTX3060m, A16
@@ -2443,7 +2443,7 @@ async def start_proc(n, i=-1, caps="ytdl"):
 # sdxlr			GPU >400k, VRAM >15GB			V100, RTX3090, A4000, RTX4080, L4
 # gptq			GPU >800k, VRAM >43GB			2xRTX3090, A6000, A40, A100, 2xRTX4090, L6000, L40
 def spec2cap():
-	caps = [-1, "ytdl", "agpt"]
+	caps = [-1, "ytdl"]
 	cc = psutil.cpu_count()
 	ram = psutil.virtual_memory().total
 	try:
@@ -2458,6 +2458,8 @@ def spec2cap():
 			caps.append("image")
 		if cc > 5 and ram > 14 * 1073741824:
 			caps.append("caption")
+		if cc > 1 and ram > 22 * 1073741824:
+			caps.append("agpt")
 	yield caps
 	if cc > 2:
 		caps = [-1, "ytdl", "math"]
@@ -2465,6 +2467,8 @@ def spec2cap():
 			caps.append("image")
 		if ram > 46 * 1073741824:
 			caps.append("caption")
+		if cc > 3 and ram > 46 * 1073741824:
+			caps.append("agpt")
 		yield caps
 	if not DC:
 		return
@@ -2474,24 +2478,25 @@ def spec2cap():
 	handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(DC)]
 	vrams = [pynvml.nvmlDeviceGetMemoryInfo(d).total for d in handles]
 	for i, v in reversed(tuple(enumerate(vrams))):
+		c = COMPUTE_POT[i]
 		caps = [i]
-		if COMPUTE_POT[i] > 100000 and v > 3 * 1073741824 and ffmpeg:
+		if c > 100000 and v > 3 * 1073741824 and ffmpeg:
 			caps.append("video")
 			caps.append("ecdc")
-		if COMPUTE_POT[i] > 400000 and v > 15 * 1073741824:
-			if "sdxlr" not in done:
+		if c > 400000 and v > 15 * 1073741824:
+			if "sdxlr" not in done or c <= 800000:
 				caps.append("sdxlr")
 				caps.append("sdxl")
 				done.add("sdxlr")
 				v -= 15 * 1073741824
-		elif COMPUTE_POT[i] > 400000 and v > 9 * 1073741824:
-			if "sdxl" not in done:
+		elif c > 400000 and v > 9 * 1073741824:
+			if "sdxl" not in done or c <= 800000:
 				caps.append("sdxl")
 				caps.append("sd")
 				done.add("sdxl")
 				v -= 9 * 1073741824
-		elif COMPUTE_POT[i] > 200000 and v > 5 * 1073741824:
-			if "sd" not in done:
+		elif c > 200000 and v > 5 * 1073741824:
+			if "sd" not in done or c <= 800000:
 				caps.append("sd")
 				done.add("sd")
 				v -= 5 * 1073741824
