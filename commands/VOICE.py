@@ -2772,8 +2772,9 @@ class AudioDownloader:
 						info = res[0]
 						name = info.get("name")
 						b = ecdc_encode(b, br, name, url)
-						with open(out3, "wb") as f:
-							f.write(b)
+						if os.path.exists(out3):
+							os.remove(out3)
+						os.rename(b, out3)
 					return out3
 				return out
 			outf = None
