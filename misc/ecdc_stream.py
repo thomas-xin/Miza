@@ -1,10 +1,11 @@
+import os, sys
 if __name__ == "__main__":
-	import sys
 	if "-g" in sys.argv:
 		i = sys.argv.index("-g")
 		sys.argv.pop(i)
 		device = int(sys.argv.pop(i))
 		os.environ["CUDA_VISIBLE_DEVICES"] = str(device)
+		device = 0
 	else:
 		device = None
 	if len(sys.argv) < 3 or "-d" not in sys.argv and "-e" not in sys.argv:
@@ -268,7 +269,6 @@ def stream_to_file(fo: tp.IO[bytes], use_lm: bool = False, hq: bool = True, bitr
 	fo.close()
 
 
-import os
 if os.path.exists("auth.json"):
 	import json
 	with open("auth.json", "rb") as f:
@@ -287,7 +287,10 @@ if __name__ == "__main__":
 		device = "cpu"
 	elif device is None or device < 0:
 		import random
-		device = f"cuda:{random.randint(0, torch.cuda.device_count() - 1)}"
+		if torch.cuda.device_count() == 1:
+			device = "cuda"
+		else:
+			device = f"cuda:{random.randint(0, torch.cuda.device_count() - 1)}"
 	device = torch.device(device)
 	if mode == "decode":
 		# Read using a parallel thread; this avoids delays from blocking
