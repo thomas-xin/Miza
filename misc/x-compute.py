@@ -245,7 +245,7 @@ def get_request(url):
 		return resp.content
 
 
-if CAPS.intersection(("image", "sd", "sdxl", "sdxlr")):
+if "image" in CAPS:
 	from_colour = lambda colour, size=128, key=None: Image.new("RGB" + "A" * (len(colour) > 3), (size, size), tuple(colour))
 
 	def from_gradient(shape, count, colour):
@@ -676,6 +676,8 @@ if CAPS.intersection(("image", "sd", "sdxl", "sdxlr")):
 	# hsv2lab = ImageCms.buildTransformFromOpenProfiles(hsv_p, lab_p, "HSV", "LAB")
 	# lab2hsv = ImageCms.buildTransformFromOpenProfiles(lab_p, hsv_p, "LAB", "HSV")
 
+
+if CAPS.intersection(("image", "sd", "sdxl", "sdxlr")):
 	def fromarray(arr, mode="L"):
 		try:
 			return Image.fromarray(arr, mode=mode)
