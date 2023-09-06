@@ -1087,7 +1087,7 @@ if "ecdc" in CAPS:
 		print(args2)
 		PipedProcess(args1, args2).wait()
 		with open(fo, "rb") as f:
-			return fo.read()
+			return f.read()
 
 	def ecdc_decode(b, fmt="opus"):
 		ts = time.time_ns() // 10000 * 10 + int(DEV)
@@ -1101,7 +1101,7 @@ if "ecdc" in CAPS:
 		print(args2)
 		PipedProcess(args1, args2).wait()
 		with open(fo, "rb") as f:
-			return fo.read()
+			return f.read()
 
 
 if "caption" in CAPS:
