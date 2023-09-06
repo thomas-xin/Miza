@@ -1030,8 +1030,6 @@ if "ecdc" in CAPS:
 				self.procs.append(proc)
 			for i in range(len(args) - 1):
 				self.exc.submit(self.pipe, i, bufsize=bufsize)
-			if self.exc:
-				self.exc.shutdown(wait=False)
 			self.pid = self.procs[0].pid
 
 		def pipe(self, i, bufsize=4096):
@@ -1053,6 +1051,8 @@ if "ecdc" in CAPS:
 				traceback.print_exc()
 				if not proc.is_running() or not proc2.is_running():
 					self.terminate()
+			if self.exc:
+				self.exc.shutdown(wait=False)
 
 		def is_running(self):
 			for proc in self.procs:
@@ -1076,7 +1076,7 @@ if "ecdc" in CAPS:
 			return self.procs[-1].status()
 
 	def ecdc_encode(b, bitrate="24", name="", source=""):
-		ts = time.time_ns() // 1000
+		ts = time.time_ns() // 10000 * 10 + int(DEV)
 		fn = "cache/" + str(ts)
 		with open(fn, "wb") as f:
 			f.write(b)
@@ -1090,7 +1090,7 @@ if "ecdc" in CAPS:
 			return fo.read()
 
 	def ecdc_decode(b, fmt="opus"):
-		ts = time.time_ns() // 1000
+		ts = time.time_ns() // 10000 * 10 + int(DEV)
 		fn = "cache/" + str(ts)
 		with open(fn, "wb") as f:
 			f.write(b)

@@ -3191,8 +3191,6 @@ class PipedProcess:
 			self.procs.append(proc)
 		for i in range(len(args) - 1):
 			self.exc.submit(self.pipe, i, bufsize=bufsize)
-		if self.exc:
-			self.exc.shutdown(wait=False)
 		self.pid = self.procs[0].pid
 
 	def pipe(self, i, bufsize=4096):
@@ -3214,6 +3212,8 @@ class PipedProcess:
 			traceback.print_exc()
 			if not proc.is_running() or not proc2.is_running():
 				self.terminate()
+		if self.exc:
+			self.exc.shutdown(wait=False)
 
 	def is_running(self):
 		for proc in self.procs:
