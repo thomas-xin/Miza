@@ -257,6 +257,20 @@ def stream_to_file(fo: tp.IO[bytes], use_lm: bool = False, hq: bool = True, bitr
 	fo.close()
 
 
+import os
+if os.path.exists("auth.json"):
+	import json
+	with open("auth.json", "rb") as f:
+		AUTH = json.load(f)
+	cachedir = AUTH.get("cache_path") or None
+	if cachedir:
+		os.environ["HF_HOME"] = f"{cachedir}/huggingface"
+		os.environ["TORCH_HOME"] = f"{cachedir}/torch"
+		os.environ["HUGGINGFACE_HUB_CACHE"] = f"{cachedir}/huggingface/hub"
+		os.environ["TRANSFORMERS_CACHE"] = f"{cachedir}/huggingface/transformers"
+		os.environ["HF_DATASETS_CACHE"] = f"{cachedir}/huggingface/datasets"
+
+
 if __name__ == "__main__":
 	if not torch.cuda.is_available():
 		device = "cpu"

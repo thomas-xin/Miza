@@ -2753,7 +2753,7 @@ class AudioDownloader:
 						with open(out, "rb") as f:
 							b = f.read()
 						try:
-							dur, bps, cdc = _get_duration(out)
+							dur, bps = _get_duration(out)
 						except:
 							print_exc()
 							bps = 196608
@@ -3110,7 +3110,7 @@ class AudioDownloader:
 						with open(fn, "rb") as f:
 							b = f.read()
 						try:
-							dur, bps, cdc = _get_duration(fn)
+							dur, bps = _get_duration(fn)
 						except:
 							print_exc()
 							bps = 196608
