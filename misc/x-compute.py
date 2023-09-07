@@ -1342,9 +1342,9 @@ if "caption" in CAPS:
 			fut = None
 		if not best:
 			dfut.result()
-			cfut = exc.submit(VIT.generate_caption, image)
-			desc = VIT2.interrogate_fast(image, caption=" ", max_flavors=24)
-			p1 = cfut.result() + desc.lstrip()
+			# cfut = exc.submit(VIT.generate_caption, image)
+			desc = VIT2.interrogate_fast(image, max_flavors=24)#, caption=" ")
+			p1 = desc.lstrip()
 			enc = tiktoken.get_encoding("cl100k_base")
 			out = []
 			otok = list(enc.encode(p1.strip()))
