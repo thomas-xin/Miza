@@ -52,17 +52,14 @@ if __name__ == "__main__":
 			raise ValueError("File is not in ECDC format.")
 		print("Version:", version)
 		meta_bytes = binary._read_exactly(fo, meta_size)
-		try:
-			import orjson
-		except ImportError:
-			import json
-			metadata = json.loads(meta_bytes.decode('utf-8'))
-		else:
-			metadata = orjson.loads(meta_bytes)
+		import json
+		metadata = json.loads(meta_bytes.decode('utf-8'))
 		if "n" in metadata:
-			print("Name:", metadata.pop("n"))
+			print("Name:", json.dumps(metadata.pop("n")))
 		if "al" in metadata:
 			print("Duration:", metadata["al"] / float(metadata.get("m", "_48").rsplit("_", 1)[-1].removesuffix("khz")) / 1000 / 2)
+		if "s" in metadata:
+			print("Source:", json.dumps(metadata.pop("s")))
 		for k, v in metadata.items():
 			print(f"{k.upper()}:", v)
 		raise SystemExit
@@ -368,4 +365,4 @@ if __name__ == "__main__":
 			pass
 		exc.shutdown()
 	else:
-		stream_to_file(file, name=name, bitrate=bitrate, device=device)
+		stream_to_file(file, name=name, source=source, bitrate=bitrate, device=device)
