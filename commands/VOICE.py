@@ -2762,6 +2762,8 @@ class AudioDownloader:
 					else:
 						br = 24
 						print("BPS:", bps)
+					if not os.path.exists(cachedir + "/ecdc"):
+						os.mkdir(cachedir + "/ecdc")
 					out3 = cachedir + "/ecdc/!" + h + "~" + str(br) + ".ecdc"
 					res = self.search(url)
 					if type(res) is str:
@@ -5447,11 +5449,9 @@ class Download(Command):
 				rename=True,
 				reference=reference,
 			)
-			if resp.attachments and type(f) is str:
-				try:
+			if resp.attachments and type(f) is str and "~" not in f and "!" not in f and os.path.exists(f):
+				with suppress():
 					os.remove(f)
-				except:
-					pass
 			if not simulated:
 				create_task(bot.silent_delete(message, no_log=True))
 

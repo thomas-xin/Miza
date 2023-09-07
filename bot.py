@@ -1625,15 +1625,15 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				if filename is not None:
 					if hasattr(filename, "filename"):
 						filename = filename.filename
-					with suppress():
-						os.remove(filename)
+					# with suppress():
+					# 	os.remove(filename)
 		except:
 			if filename is not None:
 				if type(filename) is not str:
 					filename = getattr(filename, "filename", None) or filename.name
 				print(filename, os.path.getsize(filename))
-				with suppress():
-					os.remove(filename)
+				# with suppress():
+				# 	os.remove(filename)
 			raise
 		if not getattr(reference, "slash", None) and message.attachments:
 			await self.add_attachment(message.attachments[0], data)
