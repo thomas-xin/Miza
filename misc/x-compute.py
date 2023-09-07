@@ -1349,7 +1349,7 @@ if "ytdl" in CAPS:
 			if "?dl=0" in url:
 				url = url.replace("?dl=0", "?dl=1")
 		if url.startswith("https://manifest.googlevideo.com/api/manifest/dash/"):
-			resp = reqs.get(url).content
+			resp = requests.get(url).content
 			fmts = deque()
 			with suppress(ValueError, KeyError):
 				while True:
@@ -1496,20 +1496,7 @@ if "gptq" in CAPS or "agpt" in CAPS:
 			)
 		else:
 			cb.premium = premium
-		if model == "auto":
-			if not getattr(cb, "model", None):
-				if premium < 2:
-					cb.model = "wizard"
-				elif premium < 4:
-					cb.model = "gpt3+"
-				else:
-					cb.model = "gpt4+"
-		else:
-			if model.startswith("gpt3") and premium < 2:
-				cb.model = "wizard"
-			elif model.startswith("gpt4") and premium < 4:
-				cb.model = "gpt3+"
-			cb.model = model or "gpt3+"
+		cb.model = model or cb.model
 		cb.user_id = user_id
 		cb.channel_id = channel_id
 		cb.bl = bl

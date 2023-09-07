@@ -396,6 +396,7 @@ class Bot:
 	btime = 0
 	bl = False
 	alm_re = re.compile(r"(?:as |i am )?an ai(?: language model)?[, ]{,2}", flags=re.I)
+	model = None
 
 	def __init__(self, token="", key="", huggingface_token="", summary=None, email="", password="", name="Miza", personality=DEFPER, premium=0):
 		self.token = token

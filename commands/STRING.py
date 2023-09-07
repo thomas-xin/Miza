@@ -1710,14 +1710,14 @@ class Ask(Command):
 		#     await emb_futs.pop(0)
 		# Syntax: Summary, Jailbroken
 		try:
-			caic = await process_image("lambda cid: [(b := CBOTS[cid]).chat_history, b.jailbroken]", "$", [channel.id], cap="gptq", timeout=120)
+			caic = await process_image("lambda cid: [(b := CBOTS[cid]).chat_history,b.jailbroken,b.model]", "$", [channel.id], cap="gptq", timeout=120)
 		except KeyError:
 			caic = False
 		if caic:
 			caid = bot.data.chat_histories.get(channel.id, None)
 			if not isinstance(caid, dict):
 				caid = {}
-			caid.update(dict(summary=caic[0], jailbroken=caic[1], last_message_id=m.id))
+			caid.update(dict(summary=caic[0], jailbroken=caic[1], model=caic[2], last_message_id=m.id))
 			caid["long_mem"] = max(long_mem, caid.get("long_mem", 0) * 63 / 64)
 			bot.data.chat_histories[channel.id] = caid
 		elif caic is None:

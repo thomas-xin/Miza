@@ -2484,19 +2484,19 @@ def spec2cap():
 			caps.append("video")
 			caps.append("ecdc")
 		if c > 400000 and v > 15 * 1073741824:
-			if "sdxlr" not in done or c <= 800000:
+			if "sdxlr" not in done or c <= 600000:
 				caps.append("sdxlr")
 				caps.append("sdxl")
 				done.add("sdxlr")
 				v -= 15 * 1073741824
 		elif c > 400000 and v > 9 * 1073741824:
-			if "sdxl" not in done or c <= 800000:
+			if "sdxl" not in done or c <= 600000:
 				caps.append("sdxl")
 				caps.append("sd")
 				done.add("sdxl")
 				v -= 9 * 1073741824
 		elif c > 200000 and v > 5 * 1073741824:
-			if "sd" not in done or c <= 800000:
+			if "sd" not in done or c <= 600000:
 				caps.append("sd")
 				done.add("sd")
 				v -= 5 * 1073741824
@@ -2505,9 +2505,10 @@ def spec2cap():
 		vrams[i] = v
 		if len(caps) > 1:
 			yield caps
-	vram = sum(vrams[i] for i in range(DC) if COMPUTE_POT[i] > 800000)
-	if vram > 43 * 1073741824:
-		yield [-1, "gptq"]
+	if any(v > 6 * 1073741824 and c > 800000 for v, c in zip(vrams, COMPUTE_POT)):
+		vram = sum(vrams[i] for i in range(DC) if COMPUTE_POT[i] > 400000)
+		if vram > 43 * 1073741824:
+			yield [-1, "gptq"]
 
 def proc_start():
 	if torch and os.environ.get("AI_FEATURES", True):
