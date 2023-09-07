@@ -1151,7 +1151,13 @@ if "ecdc" in CAPS:
 				last = i >= len(args) - 1
 				si = stdin if first else subprocess.PIPE
 				so = stdout if last else subprocess.PIPE
-				proc = psutil.Popen(arg, stdin=si, stdout=so, stderr=stderr, cwd=cwd, bufsize=bufsize * 256)
+				se = stderr if last else None
+				proc = psutil.Popen(arg, stdin=si, stdout=so, stderr=se, cwd=cwd, bufsize=bufsize * 256)
+				if first:
+					self.stdin = proc.stdin
+				if last:
+					self.stdout = proc.stdout
+					self.stderr = proc.stderr
 				self.procs.append(proc)
 			for i in range(len(args) - 1):
 				self.exc.submit(self.pipe, i, bufsize=bufsize)

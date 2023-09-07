@@ -2529,6 +2529,7 @@ def proc_start():
 	caps = list(spec2cap())
 	for n, (i, *caps) in enumerate(caps):
 		create_task(start_proc(n, i, caps))
+		time.sleep(1)
 
 async def sub_submit(cap, command, _timeout=12):
 	bot = BOT[0]
@@ -3193,7 +3194,13 @@ class PipedProcess:
 			last = i >= len(args) - 1
 			si = stdin if first else subprocess.PIPE
 			so = stdout if last else subprocess.PIPE
-			proc = psutil.Popen(arg, stdin=si, stdout=so, stderr=stderr, cwd=cwd, bufsize=bufsize * 256)
+			se = stderr if last else None
+			proc = psutil.Popen(arg, stdin=si, stdout=so, stderr=se, cwd=cwd, bufsize=bufsize * 256)
+			if first:
+				self.stdin = proc.stdin
+			if last:
+				self.stdout = proc.stdout
+				self.stderr = proc.stderr
 			self.procs.append(proc)
 		for i in range(len(args) - 1):
 			self.exc.submit(self.pipe, i, bufsize=bufsize)
@@ -3235,12 +3242,12 @@ class PipedProcess:
 		for proc in self.procs:
 			proc.kill()
 
-	def status(self):
-		return self.procs[-1].status()
-
 	def wait(self):
 		for proc in self.procs:
 			proc.wait()
+
+	def status(self):
+		return self.procs[-1].status()
 
 class seq(io.BufferedRandom, collections.abc.MutableSequence, contextlib.AbstractContextManager):
 

@@ -8,11 +8,28 @@ if __name__ == "__main__":
 		device = 0
 	else:
 		device = None
-	if len(sys.argv) < 3 or "-d" not in sys.argv and "-e" not in sys.argv and "-i" not in sys.argv:
-		raise SystemExit(f"Usage: {sys.executable} {' '.join(sys.argv)} <-e | -d> <ecdc-file-or-url>")
+	if len(sys.argv) < 3 or "-d" not in sys.argv and "-e" not in sys.argv and "-i" not in sys.argv or "-h" in sys.argv:
+		raise SystemExit(
+			"Usage (arguments in parentheses are optional):\n"
+			+ f"Get ECDC info: {sys.argv[0]} -i <file-or-url>\n"
+			+ f"Decode ECDC->PCM: {sys.argv[0]} (-ss <seek-start> -to <seek-end> -g <cuda-device>) -d <file-or-url>\n"
+			+ f"Encode PCM->ECDC: {sys.argv[0]} (-b <bitrate> -n <song-name> -s <source-url> -g <cuda-device>) -e <file-or-url>\n"
+		)
 	if "-d" in sys.argv:
 		mode = "decode"
 		sys.argv.remove("-d")
+		if "-ss" in sys.argv:
+			i = sys.argv.index("-ss")
+			sys.argv.pop(i)
+			start = float(sys.argv.pop(i))
+		else:
+			start = 0
+		if "-to" in sys.argv:
+			i = sys.argv.index("-to")
+			sys.argv.pop(i)
+			end = float(sys.argv.pop(i))
+		else:
+			end = None
 		fn = sys.argv[-1]
 		is_url = lambda url: "://" in url and url.split("://", 1)[0].rstrip("s") in ("http", "hxxp", "ftp", "fxp")
 		if is_url(fn):
@@ -92,7 +109,9 @@ if __name__ == "__main__":
 		else:
 			bitrate = 24
 		fn = sys.argv[-1]
-		file = open(fn, "wb")
+		rfile = fn
+		import io
+		file = io.BytesIO()
 
 
 import io
@@ -113,7 +132,7 @@ MODELS = {
 }
 
 
-def stream_from_file(fo: tp.IO[bytes], device='cpu') -> tp.Tuple[torch.Tensor, int]:
+def stream_from_file(fo: tp.IO[bytes], s_start: float = 0, s_end: float = 0, device='cpu') -> tp.Tuple[torch.Tensor, int]:
 	"""Stream from a file-object.
 	Returns a tuple `(wav, sample_rate)`.
 
@@ -157,8 +176,17 @@ def stream_from_file(fo: tp.IO[bytes], device='cpu') -> tp.Tuple[torch.Tensor, i
 	frames: tp.List[EncodedFrame] = []
 	segment_length = model.segment_length or audio_length
 	segment_stride = model.segment_stride or audio_length
+	dur = audio_length / model.sample_rate
+	max_length = audio_length
+	if s_end:
+		max_length = min(max_length, audio_length * s_end / dur)
+		cut = round(((audio_length - max_length) % segment_stride) / audio_length * dur * model.sample_rate)
+		max_length = math.ceil(max_length / segment_stride) * segment_stride
+	else:
+		cut = 0
 	i = -1
-	for offset in range(0, audio_length, segment_stride):
+	skipped = 0
+	for offset in range(0, max_length, segment_stride):
 		# This section is the original ecdc decoder
 		this_segment_length = min(audio_length - offset, segment_length)
 		frame_length = int(math.ceil(this_segment_length * model.frame_rate / model.sample_rate))
@@ -194,12 +222,16 @@ def stream_from_file(fo: tp.IO[bytes], device='cpu') -> tp.Tuple[torch.Tensor, i
 			frame[0, :, t] = codes
 			if use_lm:
 				input_ = 1 + frame[:, :, t: t + 1]
+		if s_start / dur > (offset + segment_stride) / audio_length:
+			continue
+		if s_start / dur > offset / audio_length:
+			skipped = round((s_start - (offset / audio_length * dur)) * model.sample_rate)
+			# sys.stderr.write(f"{skipped, cut, offset, max_length, segment_stride}\n")
 		frames.append((frame, scale))
 		# Problem: Streaming the audio requires the first packet to be read asap, however each packet does not perfectly blend into the next unless both are decoded as one packet, which then does not perfectly blend into the packet after.
 		# Possible solution: Read windows of 3 consecutive packets at once, only outputting the central packet at any given time. This will decode the sequence perfectly; however this means a +200% computational overhead due to having to decode 3x the data compared to a single decode on the entire file.
 		# Proposed solution: Grab audio packets in sequence of triangle numbers -1; i.e. packets will be gathered and converted on iterations 0, 2, 5, 9, 14 etc. This iteratively expands the window, reducing computational overhead from window overlap later on, while still allowing the first window to be streamed as soon as possible. If the file is long enough, computational overhead approaches 0%.
-		if len(frames) >= 2 and (i * 8 + 1) ** 0.5 % 1 == 0 or offset + segment_stride >= audio_length:
-			# sys.stderr.write(str(len(frames)) + "\n")
+		if len(frames) >= 2 and (i * 8 + 1) ** 0.5 % 1 == 0 or offset + segment_stride >= max_length:
 			with torch.no_grad():
 				wav = model.decode(frames)
 			# Only include first window if on the initial iteration; skip otherwise as it is only used to bridge from the last window
@@ -208,10 +240,14 @@ def stream_from_file(fo: tp.IO[bytes], device='cpu') -> tp.Tuple[torch.Tensor, i
 			else:
 				start = segment_stride
 			# Only include the last window if on the final iteration; skip otherwise as it is only used to bridge to the next window
-			if offset + segment_stride >= audio_length:
-				end = audio_length
+			if offset + segment_stride >= max_length:
+				end = wav.shape[-1] - cut
+				# sys.stderr.write(f"{len(frames), wav.shape[-1], end}\n")
 			else:
 				end = segment_stride * (len(frames) - 1)
+			if skipped:
+				start += skipped
+				skipped = 0
 			yield wav[0, :, start:end], model.sample_rate
 			frames = [frames[-2], frames[-1]]
 		i += 1
@@ -308,8 +344,6 @@ def stream_to_file(fo: tp.IO[bytes], use_lm: bool = False, hq: bool = True, bitr
 		coder.flush()
 	else:
 		packer.flush()
-	fo.flush()
-	fo.close()
 
 
 if os.path.exists("auth.json"):
@@ -339,12 +373,13 @@ if __name__ == "__main__":
 		# Read using a parallel thread; this avoids delays from blocking
 		import concurrent.futures
 		exc = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-		it = stream_from_file(file, device=device)
+		it = stream_from_file(file, s_start=start, s_end=end, device=device)
 		try:
 			limit = 1
 			rescale = False
 			wav, sr = next(it)
 			fut = None
+			count = 0
 			while True:
 				if fut:
 					wav, sr = fut.result()
@@ -364,9 +399,16 @@ if __name__ == "__main__":
 					wav = wav.expand(length, 2)
 				# Pytorch does not allow direct serialisation & .data does not work because it's not contiguous
 				b = wav.cpu().numpy().tobytes()
+				count += len(b)
+				# sys.stderr.write(f"{count / 48000 / 2 / 2}    \n")
 				sys.stdout.buffer.write(b)
 		except StopIteration:
 			pass
+		sys.stdout.flush()
+		sys.stdout.close()
 		exc.shutdown()
 	else:
 		stream_to_file(file, name=name, source=source, bitrate=bitrate, device=device)
+		file.seek(0)
+		with open(rfile, "wb") as f:
+			f.write(file.getbuffer())

@@ -99,7 +99,7 @@ def spec2cap():
 	if any(v > 6 * 1073741824 and c > 800000 for v, c in zip(vrams, COMPUTE_POT)):
 		vram = sum(vrams[i] for i in range(DC) if COMPUTE_POT[i] > 400000)
 		if vram > 43 * 1073741824:
-			yield [-1, "gptq"]
+			yield [-1, "agpt", "gptq"]
 
 COMPUTE_POT = compute_load.copy()
 DC = benchmark.DC
@@ -227,7 +227,7 @@ def update_tasks(proc):
 				resp = session.post(
 					FORWARD,
 					data=dict(
-						caps=orjson.dumps([proc.caps]),
+						caps=orjson.dumps(proc.caps),
 						resp=resp,
 					),
 					verify=False
@@ -291,6 +291,7 @@ def start_proc(i, caps):
 
 for i, *caps in CAPS:
 	start_proc(i, caps)
+	time.sleep(1)
 try:
 	import time, requests, orjson, base64, cpuinfo
 	class Self:

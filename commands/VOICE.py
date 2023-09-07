@@ -2173,6 +2173,7 @@ class AudioDownloader:
 									dur = orjson.loads(info["Duration"]) or dur
 								if info.get("Source"):
 									url = orjson.loads(info["Source"]) or url
+									resp["url"] = url
 					temp = cdict({
 						"name": name,
 						"url": url,
