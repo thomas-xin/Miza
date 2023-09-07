@@ -44,20 +44,24 @@ if __name__ == "__main__":
 			file = urllib.request.urlopen(req)
 		else:
 			file = open(fn, "rb")
-		from encodec import binary
-		fo = file
-		header_bytes = binary._read_exactly(fo, binary._encodec_header_struct.size)
-		magic, version, meta_size = binary._encodec_header_struct.unpack(header_bytes)
-		if magic != binary._ENCODEC_MAGIC:
+		magic = file.read(4)
+		version = file.read(1)[0]
+		meta_size = int.from_bytes(file.read(4), "big")
+		# fo = file
+		# from encodec import binary
+		# header_bytes = binary._read_exactly(fo, binary._encodec_header_struct.size)
+		# magic, version, meta_size = binary._encodec_header_struct.unpack(header_bytes)
+		if magic != b"ECDC":
 			raise ValueError("File is not in ECDC format.")
 		print("Version:", version)
-		meta_bytes = binary._read_exactly(fo, meta_size)
+		meta_bytes = file.read(meta_size)
+		# meta_bytes = binary._read_exactly(fo, meta_size)
 		import json
 		metadata = json.loads(meta_bytes.decode('utf-8'))
 		if "n" in metadata:
 			print("Name:", json.dumps(metadata.pop("n")))
 		if "al" in metadata:
-			print("Duration:", metadata["al"] / float(metadata.get("m", "_48").rsplit("_", 1)[-1].removesuffix("khz")) / 1000 / 2)
+			print("Duration:", metadata["al"] / float(metadata.get("m", "_48").rsplit("_", 1)[-1].removesuffix("khz")) / 1000)
 		if "s" in metadata:
 			print("Source:", json.dumps(metadata.pop("s")))
 		for k, v in metadata.items():
