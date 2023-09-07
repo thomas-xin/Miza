@@ -1308,13 +1308,14 @@ if "caption" in CAPS:
 		# else:
 		# 	device, dtype = "cpu", torch.float32
 		config = Config(
-			clip_model_name="ViT-H-14/laion2b_s32b_b79k",
+			# clip_model_name="ViT-H-14/laion2b_s32b_b79k",
 			clip_model_path="misc/Clip",
 			cache_path="misc/Clip",
 			device="cpu",
 			caption_model_name="blip-base",
 			chunk_size=1024,
 			flavor_intermediate_count=1024,
+			caption_max_length=48,
 		)
 		# globals()["VIT"] = CustomInterrogator(config, dtype=dtype)
 		# VIT.load_caption_model()
@@ -1326,8 +1327,8 @@ if "caption" in CAPS:
 		# caption = VIT.generate_caption(im)
 		description = VIT2.interrogate_fast(im, max_flavors=12)#, caption=caption)
 		print("VIT:", description)
-		with torch.no_grad():
-			torch.cuda.empty_cache()
+		# with torch.no_grad():
+		# 	torch.cuda.empty_cache()
 		return pytesseract.image_to_string(im, config="--psm 1")
 	dfut = exc.submit(download_model)
 	def caption(im, best=False):
@@ -1368,8 +1369,8 @@ if "caption" in CAPS:
 			p2 = fut.result().strip()
 		else:
 			p2 = None
-		with torch.no_grad():
-			torch.cuda.empty_cache()
+		# with torch.no_grad():
+		# 	torch.cuda.empty_cache()
 		return (p1, p2)
 
 discord_emoji = re.compile("^https?:\\/\\/(?:[a-z]+\\.)?discord(?:app)?\\.com\\/assets\\/[0-9A-Fa-f]+\\.svg")
