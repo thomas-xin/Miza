@@ -480,7 +480,7 @@ class AudioFile:
 			elif is_youtube_stream(stream):
 				fixed = True
 		procargs = [cmd]
-		if not fixed:
+		if not fixed and is_url(stream):
 			headers = Request.header()
 			headers["Range"] = "Bytes=0-3"
 			resp = reqs.next().get(stream, headers=headers, stream=True)
