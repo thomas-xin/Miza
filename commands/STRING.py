@@ -196,7 +196,7 @@ class Translate(Command):
 			nsfw=bot.is_nsfw(channel),
 			premium=premium,
 		)
-		out = await process_image("CBAU", "$", [inputs], cap="gptq", timeout=192)
+		out = await process_image("CBAU", "$", [inputs], cap="agpt", timeout=192)
 		if out and out[0] == out[-1] == '"' and not text[0] == text[-1] == '"':
 			try:
 				out = orjson.loads(out)
@@ -1584,7 +1584,7 @@ class Ask(Command):
 			# if fut:
 			#     await fut
 			cap = "agpt" if model.removesuffix("+") in ("gpt3", "gpt4", "davinci", "bloom") else "gptq"
-			out = await process_image("CBAI", "$", [inputs], cap=cap, timeout=600)
+			out, caic = await process_image("lambda inputs, cid: [CBAI(inputs), [(b := CBOTS[cid]).chat_history,b.jailbroken,b.model]]", "$", [inputs, channel.id], cap=cap, timeout=600)
 			if premium >= 2 and freebies is not None:
 				bot.data.users[user.id].setdefault("freebies", []).append(utc())
 				rem = freelim - len(freebies)
@@ -1723,10 +1723,10 @@ class Ask(Command):
 		# while emb_futs:
 		#     await emb_futs.pop(0)
 		# Syntax: Summary, Jailbroken
-		try:
-			caic = await process_image("lambda cid: [(b := CBOTS[cid]).chat_history,b.jailbroken,b.model]", "$", [channel.id], cap="gptq", timeout=120)
-		except KeyError:
-			caic = False
+		# try:
+		# 	# caic = await process_image("lambda cid: [(b := CBOTS[cid]).chat_history,b.jailbroken,b.model]", "$", [channel.id], cap="gptq", timeout=120)
+		# except KeyError:
+		# 	caic = False
 		if caic:
 			caid = bot.data.chat_histories.get(channel.id, None)
 			if not isinstance(caid, dict):
