@@ -659,7 +659,7 @@ class Info(Command):
 			c = len(g.categories)
 			channelinfo = f"Text: {t}\nThread: {t2}\nVoice: {v}\nCategory: {c}"
 			if x > t + v + c:
-				channelinfo += f"\nOther: {t + v + c - x}"
+				channelinfo += f"\nOther: {x - (t + v + c)}"
 			emb.add_field(name=f"Channels ({x + t2})", value=channelinfo, inline=1)
 		with suppress(AttributeError):
 			a = r = 0

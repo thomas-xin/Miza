@@ -15,7 +15,7 @@ if not os.path.exists("auth.json"):
 if os.path.exists("x-compute.py"):
 	sys.path.append("..")
 
-import benchmark, json, psutil
+import benchmark, json, psutil, subprocess
 
 with open("auth.json", "rb") as f:
 	data = json.load(f)
