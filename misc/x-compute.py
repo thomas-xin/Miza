@@ -1359,8 +1359,8 @@ if "ytdl" in CAPS:
 					search = b"><BaseURL>"
 					resp = resp[resp.index(search) + len(search):]
 					stream = resp[:resp.index(b'</BaseURL>')].decode("utf-8")
-					fmt = cdict(youtube_dl.extractor.youtube.YoutubeIE._formats[f_id])
-					fmt.url = stream
+					fmt = dict(youtube_dl.extractor.youtube.YoutubeIE._formats[f_id])
+					fmt["url"] = stream
 					fmts.append(fmt)
 			entry["formats"] = fmts
 			return get_best_audio(entry)
