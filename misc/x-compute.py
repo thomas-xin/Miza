@@ -1295,7 +1295,7 @@ if "caption" in CAPS:
 
 	VIT = VIT2 = True
 	def download_model():
-		if torch and torch.cuda.device_count():
+		if 0:#torch and torch.cuda.device_count():
 			device, dtype = determine_cuda(priority=None)
 			if torch.cuda.get_device_properties(device).total_memory < 9 * 1073741824:
 				device, dtype = "cpu", torch.float32
