@@ -2165,6 +2165,7 @@ class AudioDownloader:
 							args = [sys.executable, "misc/ecdc_stream.py", "-i", url]
 							with suppress():
 								info = subprocess.check_output(args).decode("utf-8", "replace").splitlines()
+								assert info
 								info = cdict(line.split(": ", 1) for line in info if line)
 								if info.get("Name"):
 									name = orjson.loads(info["Name"]) or name
