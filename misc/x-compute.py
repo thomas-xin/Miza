@@ -1291,34 +1291,37 @@ if "caption" in CAPS:
 	except ImportError:
 		pytesseract = None
 
-	class CustomInterrogator(Interrogator):
-		def __init__(self, config, dtype=torch.float32):
-			self.config = config
-			self.device = config.device
-			self.dtype = dtype
-			self.caption_offloaded = True
-			self.clip_offloaded = True
+	# class CustomInterrogator(Interrogator):
+	# 	def __init__(self, config, dtype=torch.float32):
+	# 		self.config = config
+	# 		self.device = config.device
+	# 		self.dtype = dtype
+	# 		self.caption_offloaded = True
+	# 		self.clip_offloaded = True
 
 	VIT = VIT2 = True
 	def download_model():
-		if 0:#torch and torch.cuda.device_count():
-			device, dtype = determine_cuda(priority=None)
-			if torch.cuda.get_device_properties(device).total_memory < 9 * 1073741824:
-				device, dtype = "cpu", torch.float32
-		else:
-			device, dtype = "cpu", torch.float32
+		# if 0:#torch and torch.cuda.device_count():
+		# 	device, dtype = determine_cuda(priority=None)
+		# 	if torch.cuda.get_device_properties(device).total_memory < 9 * 1073741824:
+		# 		device, dtype = "cpu", torch.float32
+		# else:
+		# 	device, dtype = "cpu", torch.float32
 		config = Config(
 			clip_model_name="ViT-H-14/laion2b_s32b_b79k",
 			clip_model_path="misc/Clip",
 			cache_path="misc/Clip",
-			device=device,
+			device="cpu",
 			caption_model_name="blip-base",
+			chunk_size=1024,
+			flavor_intermediate_count=1024,
 		)
-		globals()["VIT"] = CustomInterrogator(config, dtype=dtype)
-		VIT.load_caption_model()
-		config.device = "cpu"
-		globals()["VIT2"] = CustomInterrogator(config, dtype=torch.float32)
-		VIT2.load_clip_model()
+		# globals()["VIT"] = CustomInterrogator(config, dtype=dtype)
+		# VIT.load_caption_model()
+		# config.device = "cpu"
+		# globals()["VIT2"] = CustomInterrogator(config, dtype=torch.float32)
+		# VIT2.load_clip_model()
+		VIT = VIT2 = Interrogator(config)
 		im = Image.new("RGB", (4, 4), (0, 0, 255))
 		caption = VIT.generate_caption(im)
 		description = VIT2.interrogate_fast(im, caption=caption, max_flavors=12)

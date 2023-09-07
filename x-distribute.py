@@ -306,9 +306,19 @@ try:
 	caps = []
 	tasks = []
 	responses = {}
+	ioc = psutil.net_io_counters()
+	up_old = ioc.bytes_sent
+	down_old = ioc.bytes_recv
+	ot = time.time() - 1
 	while True:
 		ip = "<IP>"
 		t = time.time()
+		ioc = psutil.net_io_counters()
+		up_bps = (ioc.bytes_sent - up_old) / (t - ot)
+		down_bps = (ioc.bytes_recv - down_old) / (t - ot)
+		up_old = ioc.bytes_sent
+		down_old = ioc.bytes_recv
+		ot = t
 		cinfo = self._cpuinfo
 		if not cinfo:
 			cinfo = self._cpuinfo = cpuinfo.get_cpu_info()
@@ -356,10 +366,10 @@ try:
 				) for i, name in enumerate(gname)},
 			},
 			disk={f"{ip}-{k}": dict(name=k, count=1, usage=v.used, max=v.total, time=t) for k, v in dinfo.items()},
-			# network={
-			#     f"{ip}-u": dict(name="Upstream", count=1, usage=self.up_bps, max=-1, time=t),
-			#     f"{ip}-d": dict(name="Downstream", count=1, usage=self.down_bps, max=-1, time=t),
-			# },
+			network={
+				f"{ip}-u": dict(name="Upstream", count=1, usage=up_bps, max=-1, time=t),
+				f"{ip}-d": dict(name="Downstream", count=1, usage=down_bps, max=-1, time=t),
+			},
 			power={
 				**{f"{ip}-{i}": dict(
 					name=name,
