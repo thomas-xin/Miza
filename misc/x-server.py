@@ -1108,6 +1108,7 @@ transform: translate(-50%, -50%);
 					with open(fni, "wb") as f:
 						f.write(b)
 					self.bot_exec(f"VOICE.ytdl.cache[{repr(fn)}]=VOICE.AudioFileLink({repr(fn)},{repr(fni)},wasfile=True)")
+			b = b""
 		try:
 			if inference in ("True", "true", True):
 				raise KeyError
