@@ -1491,6 +1491,20 @@ class Ask(Command):
 			if premium < 4:
 				raise PermissionError(f"Distributed premium level 2 or higher required; please see {bot.kofi_url} for more info!")
 			model = "gpt4+"
+		if model == "auto":
+			if not getattr(caid, "model", None):
+				if premium < 2:
+					model = "wizard"
+				elif premium < 4:
+					model = "gpt3+"
+				else:
+					model = "gpt4+"
+		else:
+			if model.startswith("gpt3") and premium < 2:
+				model = "wizard"
+			elif model.startswith("gpt4") and premium < 4:
+				model = "gpt3+"
+			model = model or "gpt3+"
 		# emb_futs = []
 
 		if not q and not message.attachments and not reference:
