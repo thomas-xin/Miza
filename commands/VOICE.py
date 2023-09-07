@@ -3131,7 +3131,8 @@ class AudioDownloader:
 						else:
 							br = 24
 							print("BPS:", bps)
-						res = self.search(urls[0])
+						url = urls[0]
+						res = self.search(url)
 						if type(res) is str:
 							raise evalex(res)
 						info = res[0]

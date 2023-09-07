@@ -8,7 +8,7 @@ if __name__ == "__main__":
 		device = 0
 	else:
 		device = None
-	if len(sys.argv) < 3 or "-d" not in sys.argv and "-e" not in sys.argv:
+	if len(sys.argv) < 3 or "-d" not in sys.argv and "-e" not in sys.argv and "-i" not in sys.argv:
 		raise SystemExit(f"Usage: {sys.executable} {' '.join(sys.argv)} <-e | -d> <ecdc-file-or-url>")
 	if "-d" in sys.argv:
 		mode = "decode"
@@ -29,7 +29,43 @@ if __name__ == "__main__":
 			file = open(fn, "rb")
 	elif "-i" in sys.argv:
 		mode = "info"
-		
+		sys.argv.remove("-i")
+		fn = sys.argv[-1]
+		is_url = lambda url: "://" in url and url.split("://", 1)[0].rstrip("s") in ("http", "hxxp", "ftp", "fxp")
+		if is_url(fn):
+			import urllib.request, random
+			def header():
+				return {
+					"User-Agent": f"Mozilla/5.{random.randint(1, 9)} (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36",
+					"DNT": "1",
+					"X-Forwarded-For": ".".join(str(random.randint(0, 255)) for _ in range(4)),
+				}
+			req = urllib.request.Request(fn, headers=header())
+			file = urllib.request.urlopen(req)
+		else:
+			file = open(fn, "rb")
+		from encodec import binary
+		fo = file
+		header_bytes = binary._read_exactly(fo, binary._encodec_header_struct.size)
+		magic, version, meta_size = binary._encodec_header_struct.unpack(header_bytes)
+		if magic != binary._ENCODEC_MAGIC:
+			raise ValueError("File is not in ECDC format.")
+		print("Version:", version)
+		meta_bytes = binary._read_exactly(fo, meta_size)
+		try:
+			import orjson
+		except ImportError:
+			import json
+			metadata = json.loads(meta_bytes.decode('utf-8'))
+		else:
+			metadata = orjson.loads(meta_bytes)
+		if "n" in metadata:
+			print("Name:", metadata.pop("n"))
+		if "al" in metadata:
+			print("Duration:", metadata["al"] / float(metadata.get("m", "_48").rsplit("_", 1)[-1].removesuffix("khz")) / 1000 / 2)
+		for k, v in metadata.items():
+			print(f"{k.upper()}:", v)
+		raise SystemExit
 	else:
 		mode = "encode"
 		sys.argv.remove("-e")
