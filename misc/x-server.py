@@ -1128,8 +1128,15 @@ transform: translate(-50%, -50%);
 			with reqs.next().get(url, timeout=1800, stream=True) as resp:
 				with open(fn, "wb") as f:
 					shutil.copyfileobj(resp.raw, f, 65536)
-			out = self.bot_exec(f"VOICE.ecdc_encode({repr(fn)},{repr(bitrate)},{repr(name)},{repr(source)})")
-			assert os.path.exists(out)
+			res = self.bot_exec(f"VOICE.ecdc_encode({repr(fn)},{repr(bitrate)},{repr(name)},{repr(source)})")
+			assert os.path.exists(res)
+			try:
+				os.rename(res, out)
+			except OSError:
+				with open(res, "rb") as f:
+					b = f.read()
+				with open(out, "wb") as f:
+					f.write(b)
 			f = open(out, "rb")
 			return cp.lib.static.serve_fileobj(f, content_type="audio/ecdc", disposition="", name=url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0] + ".ecdc")
 		finally:
