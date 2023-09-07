@@ -1308,15 +1308,18 @@ if "caption" in CAPS:
 		# else:
 		# 	device, dtype = "cpu", torch.float32
 		config = Config(
-			# clip_model_name="ViT-H-14/laion2b_s32b_b79k",
+			clip_model_name="ViT-H-14/laion2b_s32b_b79k",
 			clip_model_path="misc/Clip",
 			cache_path="misc/Clip",
 			device="cpu",
-			caption_model_name="blip-base",
-			chunk_size=1024,
-			flavor_intermediate_count=1024,
+			# caption_model_name="blip-base",
+			# caption_offload = True
+			# clip_offload = True
+			# chunk_size=1024,
+			# flavor_intermediate_count=1024,
 			caption_max_length=48,
 		)
+		config.apply_low_vram_defaults()
 		# globals()["VIT"] = CustomInterrogator(config, dtype=dtype)
 		# VIT.load_caption_model()
 		# config.device = "cpu"
