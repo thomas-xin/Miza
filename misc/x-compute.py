@@ -1323,8 +1323,8 @@ if "caption" in CAPS:
 		# VIT2.load_clip_model()
 		VIT = VIT2 = Interrogator(config)
 		im = Image.new("RGB", (4, 4), (0, 0, 255))
-		caption = VIT.generate_caption(im)
-		description = VIT2.interrogate_fast(im, caption=caption, max_flavors=12)
+		# caption = VIT.generate_caption(im)
+		description = VIT2.interrogate_fast(im, max_flavors=12)#, caption=caption)
 		print("VIT:", description)
 		with torch.no_grad():
 			torch.cuda.empty_cache()
