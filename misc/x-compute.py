@@ -1359,6 +1359,7 @@ if "ytdl" in CAPS:
 					search = b"><BaseURL>"
 					resp = resp[resp.index(search) + len(search):]
 					stream = resp[:resp.index(b'</BaseURL>')].decode("utf-8")
+					import yt_dlp
 					fmt = dict(yt_dlp.extractor.youtube.YoutubeIE._formats[f_id])
 					fmt["url"] = stream
 					fmts.append(fmt)
