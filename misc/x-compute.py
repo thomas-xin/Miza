@@ -1342,7 +1342,10 @@ if "caption" in CAPS:
 		else:
 			fut = None
 		if not best:
-			dfut.result()
+			try:
+				dfut.result(timeout=1)
+			except concurrent.futures.TimeoutError:
+				raise RuntimeError("Model is loading, please wait...")
 			# cfut = exc.submit(VIT.generate_caption, image)
 			desc = VIT2.interrogate_fast(image, max_flavors=24)#, caption=" ")
 			p1 = desc.lstrip()
