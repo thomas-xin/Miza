@@ -1485,6 +1485,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if best:
 			fut = create_future(self.replicate, url)
 		res = None
+		p1 = p2 = ""
 		try:
 			res = await process_image(url, "caption", ["-nogif", False], cap="caption", timeout=300)
 			p1, p2 = res
@@ -1499,7 +1500,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					decode=True,
 					aio=True,
 				)
-				tup = ("Text", "", lim_str(text, 128), False)
+				p1 = ""
+				p2 = lim_str(text, 128)
+				tup = ("Text", p1, p2, False)
 		else:
 			tup = ("Image", p1, p2, best)
 		if best:
