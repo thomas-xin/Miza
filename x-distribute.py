@@ -19,7 +19,7 @@ import benchmark, json, psutil, subprocess
 
 with open("auth.json", "rb") as f:
 	data = json.load(f)
-compute_load = data.get("compute_load", [])
+compute_load = data.get("compute_load") or []
 
 # Spec requirements:
 # ytdl											anything with internet
