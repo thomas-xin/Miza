@@ -1272,7 +1272,6 @@ if "caption" in CAPS:
 		return pcs[0], torch.float16
 
 	import tiktoken
-	from clip_interrogator import Config, Interrogator
 	try:
 		import pytesseract
 	except ImportError:
@@ -1280,7 +1279,7 @@ if "caption" in CAPS:
 
 	VIT = True
 	def download_model():
-		time.sleep(10)
+		from clip_interrogator import Config, Interrogator
 		Vconfig = Config(
 			clip_model_name="ViT-H-14/laion2b_s32b_b79k",
 			clip_model_path="misc/Clip",
@@ -1295,7 +1294,7 @@ if "caption" in CAPS:
 
 		def image_to_features(self, image: Image) -> torch.Tensor:
 			self._prepare_clip()
-			images = self.clip_preprocess(image).unsqueeze(0).to(self.device)
+			images = self.clip_preprocess(image).unsqueeze(0).to(self.device).to(torch.float32)
 			with torch.no_grad():
 				image_features = self.clip_model.encode_image(images)
 				image_features /= image_features.norm(dim=-1, keepdim=True)
@@ -1319,7 +1318,13 @@ if "caption" in CAPS:
 		# 	torch.cuda.empty_cache()
 		return pytesseract.image_to_string(im, config="--psm 1")
 	dfut = exc.submit(download_model)
+
 	def caption(im, best=False):
+		if not best:
+			try:
+				dfut.result(timeout=1)
+			except concurrent.futures.TimeoutError:
+				raise RuntimeError("Model is loading, please wait...")
 		im = resize_max(im, 1024, "auto")
 		if im.mode != "RGB":
 			image = im.convert("RGB")
@@ -1330,10 +1335,6 @@ if "caption" in CAPS:
 		else:
 			fut = None
 		if not best:
-			try:
-				dfut.result(timeout=1)
-			except concurrent.futures.TimeoutError:
-				raise RuntimeError("Model is loading, please wait...")
 			# cfut = exc.submit(VIT.generate_caption, image)
 			desc = VIT.interrogate_fast(image, max_flavors=24)#, caption=" ")
 			p1 = desc.lstrip()
@@ -1360,8 +1361,6 @@ if "caption" in CAPS:
 			p2 = fut.result().strip()
 		else:
 			p2 = None
-		# with torch.no_grad():
-		# 	torch.cuda.empty_cache()
 		return (p1, p2)
 
 	device, dtype = determine_cuda(1073741824, priority=None)

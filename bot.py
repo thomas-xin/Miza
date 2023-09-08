@@ -5352,9 +5352,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if isinstance(ex, TooManyRequests):
 			fields = (("Running into the rate limit often?", f"Consider donating using one of the subscriptions from my [ko-fi]({self.kofi_url}), which will grant shorter rate limits amongst many feature improvements!"),)
 		elif isinstance(ex, discord.Forbidden):
-			fields = (("This error usually indicates that I am missing one or more necessary Discord permissions to perform this command!",),)
+			fields = (("403", "This error usually indicates that I am missing one or more necessary Discord permissions to perform this command!",),)
 		elif isinstance(ex, (CE, CE2)):
-			fields = (("Response disconnected. If this error occurs during a command, it is likely due to maintenance!",),)
+			fields = (("Response disconnected.", "If this error occurs during a command, it is likely due to maintenance!"),)
 		elif isinstance(op, tuple):
 			fields = (op,)
 		else:

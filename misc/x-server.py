@@ -274,6 +274,8 @@ config = {
 		"server.socket_timeout": 65,
 		"server.ssl_module": "builtin",
 		"engine.autoreload_on": False,
+		"tools.gzip.on": True,
+		"tools.gzip.mime_types": ["text/*", "application/json"],
 	},
 	"/": {
 		"request.dispatch": EndpointRedirects(),
@@ -2552,7 +2554,6 @@ alert("File successfully deleted. Returning to home.");
 		cp.response.headers.update(HEADERS)
 		cp.response.headers["Content-Type"] = "application/json"
 		return orjson.dumps(status)
-	status._cp_config = {"tools.gzip.on": True, "tools.gzip.mime_types": ["text/*", "application/*"]}
 
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")

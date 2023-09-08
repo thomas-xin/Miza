@@ -33,6 +33,8 @@ config = {
 		"server.socket_timeout": 65,
 		"server.ssl_module": "builtin",
 		"engine.autoreload_on": True,
+		"tools.gzip.on": True,
+		"tools.gzip.mime_types": ["text/*", "application/json"],
 	},
 	"/": {
 		"request.dispatch": EndpointRedirects(),

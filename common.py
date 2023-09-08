@@ -2543,7 +2543,7 @@ async def sub_submit(cap, command, _timeout=12):
 		task.timeout = _timeout
 		queue = bot.compute_queue.setdefault(cap, set())
 		queue.add(task)
-		for proc in sorted(PROCS.values(), key=lambda proc: (proc.sem.active, -COMPUTE_POT[proc.i] if COMPUTE_POT else random.random())):
+		for proc in sorted(PROCS.values(), key=lambda proc: (proc.sem.active, i == 0, -COMPUTE_POT[proc.i] if COMPUTE_POT else random.random())):
 			if not proc:
 				continue
 			if cap in proc.caps and not proc.fut.done():
