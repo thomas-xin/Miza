@@ -1279,22 +1279,23 @@ if "caption" in CAPS:
 		pytesseract = None
 
 	VIT = VIT2 = True
+	config = Config(
+		clip_model_name="ViT-H-14/laion2b_s32b_b79k",
+		clip_model_path="misc/Clip",
+		caption_model_name="blip-base",
+		cache_path="misc/Clip",
+		device="cpu",
+		caption_max_length=48,
+	)
+	VIT = VIT2 = Interrogator(config)
+	print("Interrogator:", VIT)
 	def download_model():
-		config = Config(
-			clip_model_name="ViT-H-14/laion2b_s32b_b79k",
-			clip_model_path="misc/Clip",
-			cache_path="misc/Clip",
-			device="cpu",
-			caption_max_length=48,
-		)
-		config.apply_low_vram_defaults()
+		# config.apply_low_vram_defaults()
 		# globals()["VIT"] = CustomInterrogator(config, dtype=dtype)
 		# VIT.load_caption_model()
 		# config.device = "cpu"
 		# globals()["VIT2"] = CustomInterrogator(config, dtype=torch.float32)
 		# VIT2.load_clip_model()
-		VIT = VIT2 = Interrogator(config)
-		print("Interrogator:", VIT)
 		im = Image.new("RGB", (4, 4), (0, 0, 255))
 		# caption = VIT.generate_caption(im)
 		description = VIT2.interrogate_fast(im, max_flavors=12)#, caption=caption)
