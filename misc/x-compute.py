@@ -1299,7 +1299,7 @@ if "caption" in CAPS:
 				image_features = self.clip_model.encode_image(images)
 				image_features /= image_features.norm(dim=-1, keepdim=True)
 			return image_features
-		VIT.image_to_features = image_to_features
+		VIT.image_to_features = Interrogator.image_to_features = lambda self, image: image_to_features(self, image)
 
 		print("Interrogator:", VIT)
 		im = Image.new("RGB", (4, 4), (0, 0, 255))
