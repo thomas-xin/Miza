@@ -1293,7 +1293,7 @@ class Ask(Command):
 		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
 		freelim = 25
 		if premium < 2:
-			data = bot.data.users.get(user.id, {})
+			data = bot.data.users.setdefault(user.id, {})
 			freebies = [t for t in data.get("freebies", ()) if utc() - t < 86400]
 			if len(freebies) < freelim:
 				premium = 2
