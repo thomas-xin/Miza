@@ -1305,7 +1305,8 @@ if "caption" in CAPS:
 		im = Image.new("RGB", (4, 4), (0, 0, 255))
 		# VIT.caption_model = VIT.caption_model.to("cpu")
 		# VIT.clip_model = VIT.clip_model.to("cpu")
-		description = VIT.interrogate_fast(im, max_flavors=12)#, caption=caption)
+		with torch.autocast("cpu", dtype=torch.float32):
+			description = VIT.interrogate_fast(im, max_flavors=12)#, caption=caption)
 		print("VIT:", description)
 		# config.apply_low_vram_defaults()
 		# globals()["VIT"] = CustomInterrogator(config, dtype=dtype)
@@ -1334,7 +1335,8 @@ if "caption" in CAPS:
 			except concurrent.futures.TimeoutError:
 				raise RuntimeError("Model is loading, please wait...")
 			# cfut = exc.submit(VIT.generate_caption, image)
-			desc = VIT.interrogate_fast(image, max_flavors=24)#, caption=" ")
+			with torch.autocast("cpu", dtype=torch.float32):
+				desc = VIT.interrogate_fast(image, max_flavors=24)#, caption=" ")
 			p1 = desc.lstrip()
 			enc = tiktoken.get_encoding("cl100k_base")
 			out = []
