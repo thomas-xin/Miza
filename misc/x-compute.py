@@ -1290,6 +1290,17 @@ if "caption" in CAPS:
 		)
 		globals()["VIT"] = Interrogator(Vconfig)
 		VIT.dtype = torch.float32
+		VIT.device = "cpu"
+
+		def image_to_features(self, image: Image) -> torch.Tensor:
+			self._prepare_clip()
+			images = self.clip_preprocess(image).unsqueeze(0).to(self.device)
+			with torch.no_grad():
+				image_features = self.clip_model.encode_image(images)
+				image_features /= image_features.norm(dim=-1, keepdim=True)
+			return image_features
+		VIT.image_to_features = image_to_features
+
 		print("Interrogator:", VIT)
 		im = Image.new("RGB", (4, 4), (0, 0, 255))
 		# VIT.caption_model = VIT.caption_model.to("cpu")
