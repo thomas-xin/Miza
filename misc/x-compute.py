@@ -1289,10 +1289,11 @@ if "caption" in CAPS:
 			caption_max_length=48,
 		)
 		globals()["VIT"] = Interrogator(Vconfig)
+		VIT.dtype = torch.float32
 		print("Interrogator:", VIT)
 		im = Image.new("RGB", (4, 4), (0, 0, 255))
-		VIT.caption_model = VIT.caption_model.to("cpu")
-		VIT.clip_model = VIT.clip_model.to("cpu")
+		# VIT.caption_model = VIT.caption_model.to("cpu")
+		# VIT.clip_model = VIT.clip_model.to("cpu")
 		description = VIT.interrogate_fast(im, max_flavors=12)#, caption=caption)
 		print("VIT:", description)
 		# config.apply_low_vram_defaults()
