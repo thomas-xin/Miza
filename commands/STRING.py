@@ -1494,19 +1494,18 @@ class Ask(Command):
 		if model == "auto":
 			if getattr(caid, "model", None):
 				model = caid.model
-			else:
+			if model == "auto":
 				if premium < 2:
 					model = "wizard"
 				elif premium < 4:
 					model = "gpt3+"
 				else:
 					model = "gpt4+"
-		if model != "auto":
-			if model.startswith("gpt3") and premium < 2:
-				model = "wizard"
-			elif model.startswith("gpt4") and premium < 4:
-				model = "gpt3+"
-			model = model or "gpt3+"
+		if model.startswith("gpt3") and premium < 2:
+			model = "wizard"
+		elif model.startswith("gpt4") and premium < 4:
+			model = "gpt3+"
+		model = model or "gpt3+"
 		# emb_futs = []
 
 		if not q and not message.attachments and not reference:
