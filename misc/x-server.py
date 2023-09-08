@@ -275,7 +275,7 @@ config = {
 		"server.ssl_module": "builtin",
 		"engine.autoreload_on": False,
 		"tools.gzip.on": True,
-		"tools.gzip.mime_types": ["text/*", "application/json"],
+		"tools.gzip.mime_types": ["text/*", "application/json", "application/javascript"],
 	},
 	"/": {
 		"request.dispatch": EndpointRedirects(),
