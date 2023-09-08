@@ -110,6 +110,7 @@ req = [
 	"orjson",
 	"requests",
 	"tiktoken",
+	"pillow",
 ]
 if any("ytdl" in caps for caps in CAPS):
 	req.append("yt-dlp")
@@ -117,7 +118,6 @@ if any("image" in caps for caps in CAPS):
 	req.extend((
 		"blend_modes",
 		"colorspace",
-		"pillow",
 	))
 if any("math" in caps for caps in CAPS):
 	req.extend((
@@ -137,6 +137,12 @@ for mn in req:
 		pkg_resources.get_distribution(mn)
 	except:
 		subprocess.run([sys.executable, "-m", "pip", "install", mn, "--upgrade", "--user"])
+
+if any("ecdc" in caps for caps in CAPS):
+	try:
+		assert pkg_resources.get_distribution("encodec").version >= "0.1.2a3"
+	except (pkg_resources.DistributionNotFound, AssertionError):
+		subprocess.run([sys.executable, "-m", "pip", "install", "git+https://github.com/facebookresearch/encodec", "--user"])
 
 import time, base64, orjson, threading, requests, urllib3, concurrent.futures
 from math import *

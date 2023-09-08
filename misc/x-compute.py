@@ -1271,19 +1271,6 @@ if "caption" in CAPS:
 			return [i for i in pcs if gmems[i].free >= mem], torch.float16
 		return pcs[0], torch.float16
 
-	device, dtype = determine_cuda(1073741824, priority=None)
-	device = f"cuda:{device}" if device >= 0 else "cpu"
-	from sentence_transformers import SentenceTransformer
-	Embedder = SentenceTransformer("LLukas22/all-mpnet-base-v2-embedding-all", device=device)
-	if torch and dtype == torch.float16 and torch.cuda.get_device_properties(device).major >= 7:
-		try:
-			Embedder = Embedder.half()
-		except (RuntimeError, NotImplementedError):
-			pass
-	def embedding(s):
-		a = Embedder.encode(s).astype(np.float16)
-		return a.data
-
 	import tiktoken
 	from clip_interrogator import Config, Interrogator
 	try:
@@ -1291,32 +1278,13 @@ if "caption" in CAPS:
 	except ImportError:
 		pytesseract = None
 
-	# class CustomInterrogator(Interrogator):
-	# 	def __init__(self, config, dtype=torch.float32):
-	# 		self.config = config
-	# 		self.device = config.device
-	# 		self.dtype = dtype
-	# 		self.caption_offloaded = True
-	# 		self.clip_offloaded = True
-
 	VIT = VIT2 = True
 	def download_model():
-		# if 0:#torch and torch.cuda.device_count():
-		# 	device, dtype = determine_cuda(priority=None)
-		# 	if torch.cuda.get_device_properties(device).total_memory < 9 * 1073741824:
-		# 		device, dtype = "cpu", torch.float32
-		# else:
-		# 	device, dtype = "cpu", torch.float32
 		config = Config(
 			clip_model_name="ViT-H-14/laion2b_s32b_b79k",
 			clip_model_path="misc/Clip",
 			cache_path="misc/Clip",
 			device="cpu",
-			# caption_model_name="blip-base",
-			# caption_offload = True
-			# clip_offload = True
-			# chunk_size=1024,
-			# flavor_intermediate_count=1024,
 			caption_max_length=48,
 		)
 		config.apply_low_vram_defaults()
@@ -1326,6 +1294,7 @@ if "caption" in CAPS:
 		# globals()["VIT2"] = CustomInterrogator(config, dtype=torch.float32)
 		# VIT2.load_clip_model()
 		VIT = VIT2 = Interrogator(config)
+		print("Interrogator:", VIT)
 		im = Image.new("RGB", (4, 4), (0, 0, 255))
 		# caption = VIT.generate_caption(im)
 		description = VIT2.interrogate_fast(im, max_flavors=12)#, caption=caption)
@@ -1378,6 +1347,19 @@ if "caption" in CAPS:
 		# with torch.no_grad():
 		# 	torch.cuda.empty_cache()
 		return (p1, p2)
+
+	device, dtype = determine_cuda(1073741824, priority=None)
+	device = f"cuda:{device}" if device >= 0 else "cpu"
+	from sentence_transformers import SentenceTransformer
+	Embedder = SentenceTransformer("LLukas22/all-mpnet-base-v2-embedding-all", device=device)
+	if torch and dtype == torch.float16 and torch.cuda.get_device_properties(device).major >= 7:
+		try:
+			Embedder = Embedder.half()
+		except (RuntimeError, NotImplementedError):
+			pass
+	def embedding(s):
+		a = Embedder.encode(s).astype(np.float16)
+		return a.data
 
 discord_emoji = re.compile("^https?:\\/\\/(?:[a-z]+\\.)?discord(?:app)?\\.com\\/assets\\/[0-9A-Fa-f]+\\.svg")
 is_discord_emoji = lambda url: discord_emoji.search(url)

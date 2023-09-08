@@ -2363,8 +2363,9 @@ async def proc_distribute(proc):
 					st = utc()
 				futs = [futs[i] for i in range(len(futs)) if i not in futd]
 				if futs and not resps:
+					delay = 1 + len(proc.sem.active)
 					with tracebacksuppressor(T1):
-						await asyncio.wait_for(asyncio.shield(futs[0]), timeout=1)
+						await asyncio.wait_for(asyncio.shield(futs[0]), timeout=delay)
 				if not is_strict_running(proc) or proc.sem.busy:
 					caps = ()
 				else:
@@ -2542,7 +2543,7 @@ async def sub_submit(cap, command, _timeout=12):
 		task.timeout = _timeout
 		queue = bot.compute_queue.setdefault(cap, set())
 		queue.add(task)
-		for proc in PROCS.values():
+		for proc in sorted(PROCS.values(), key=lambda proc: len(proc.sem.active)):
 			if not proc:
 				continue
 			if cap in proc.caps and not proc.fut.done():
