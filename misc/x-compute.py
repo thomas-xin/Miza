@@ -1280,6 +1280,7 @@ if "caption" in CAPS:
 
 	VIT = True
 	def download_model():
+		time.sleep(10)
 		Vconfig = Config(
 			clip_model_name="ViT-H-14/laion2b_s32b_b79k",
 			clip_model_path="misc/Clip",
