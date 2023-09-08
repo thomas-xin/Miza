@@ -1278,21 +1278,21 @@ if "caption" in CAPS:
 	except ImportError:
 		pytesseract = None
 
-	VIT = VIT2 = True
-	config = Config(
-		clip_model_name="ViT-H-14/laion2b_s32b_b79k",
-		clip_model_path="misc/Clip",
-		caption_model_name="blip-base",
-		cache_path="misc/Clip",
-		device="cpu",
-		caption_max_length=48,
-	)
-	VIT = VIT2 = Interrogator(config)
-	print("Interrogator:", VIT)
-	im = Image.new("RGB", (4, 4), (0, 0, 255))
-	description = VIT2.interrogate_fast(im, max_flavors=12)#, caption=caption)
-	print("VIT:", description)
+	VIT = True
 	def download_model():
+		Vconfig = Config(
+			clip_model_name="ViT-H-14/laion2b_s32b_b79k",
+			clip_model_path="misc/Clip",
+			caption_model_name="blip-base",
+			cache_path="misc/Clip",
+			device="cpu",
+			caption_max_length=48,
+		)
+		globals()["VIT"] = Interrogator(Vconfig)
+		print("Interrogator:", VIT)
+		# im = Image.new("RGB", (4, 4), (0, 0, 255))
+		# description = VIT.interrogate_fast(im, max_flavors=12)#, caption=caption)
+		# print("VIT:", description)
 		# config.apply_low_vram_defaults()
 		# globals()["VIT"] = CustomInterrogator(config, dtype=dtype)
 		# VIT.load_caption_model()
@@ -1319,8 +1319,10 @@ if "caption" in CAPS:
 				dfut.result(timeout=1)
 			except concurrent.futures.TimeoutError:
 				raise RuntimeError("Model is loading, please wait...")
+			VIT.caption_model = VIT.caption_model.to("cpu")
+			VIT.clip_model = VIT.clip_model.to("cpu")
 			# cfut = exc.submit(VIT.generate_caption, image)
-			desc = VIT2.interrogate_fast(image, max_flavors=24)#, caption=" ")
+			desc = VIT.interrogate_fast(image, max_flavors=24)#, caption=" ")
 			p1 = desc.lstrip()
 			enc = tiktoken.get_encoding("cl100k_base")
 			out = []
