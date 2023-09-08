@@ -91,7 +91,7 @@ def spec2cap():
 				caps.append("sd")
 				done.add("sd")
 				v -= 5 * 1073741824
-		if v <= 7 * 1073741824:
+		if v <= 4 * 1073741824:
 			v = 0
 		vrams[i] = v
 		if len(caps) > 1:

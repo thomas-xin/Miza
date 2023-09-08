@@ -1293,7 +1293,7 @@ class Ask(Command):
 		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
 		freelim = 25
 		if premium < 2:
-			data = bot.data.users.get(user.id)
+			data = bot.data.users.get(user.id, {})
 			freebies = [t for t in data.get("freebies", ()) if utc() - t < 86400]
 			if len(freebies) < freelim:
 				premium = 2
@@ -1585,6 +1585,8 @@ class Ask(Command):
 			# if fut:
 			#     await fut
 			cap = "agpt" if model.removesuffix("+") in ("gpt3", "gpt4", "davinci", "bloom") else "gptq"
+			if cap == "gptq":
+				print("GPTQ:", inputs)
 			out, caic = await process_image("lambda inputs, cid: [CBAI(inputs), [(b := CBOTS[cid]).chat_history,b.jailbroken,b.model]]", "$", [inputs, channel.id], cap=cap, timeout=600)
 			if premium >= 2 and freebies is not None:
 				bot.data.users[user.id].setdefault("freebies", []).append(utc())
