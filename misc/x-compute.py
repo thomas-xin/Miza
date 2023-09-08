@@ -1289,6 +1289,9 @@ if "caption" in CAPS:
 	)
 	VIT = VIT2 = Interrogator(config)
 	print("Interrogator:", VIT)
+	im = Image.new("RGB", (4, 4), (0, 0, 255))
+	description = VIT2.interrogate_fast(im, max_flavors=12)#, caption=caption)
+	print("VIT:", description)
 	def download_model():
 		# config.apply_low_vram_defaults()
 		# globals()["VIT"] = CustomInterrogator(config, dtype=dtype)
@@ -1296,10 +1299,7 @@ if "caption" in CAPS:
 		# config.device = "cpu"
 		# globals()["VIT2"] = CustomInterrogator(config, dtype=torch.float32)
 		# VIT2.load_clip_model()
-		im = Image.new("RGB", (4, 4), (0, 0, 255))
 		# caption = VIT.generate_caption(im)
-		description = VIT2.interrogate_fast(im, max_flavors=12)#, caption=caption)
-		print("VIT:", description)
 		# with torch.no_grad():
 		# 	torch.cuda.empty_cache()
 		return pytesseract.image_to_string(im, config="--psm 1")
