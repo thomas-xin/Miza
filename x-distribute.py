@@ -331,6 +331,7 @@ try:
 		cpercent = psutil.cpu_percent()
 		try:
 			import pynvml
+			pynvml.nvmlInit()
 			dc = pynvml.nvmlDeviceGetCount()
 			handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(dc)]
 			gname = [pynvml.nvmlDeviceGetName(d) for d in handles]

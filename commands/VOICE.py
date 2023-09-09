@@ -2761,7 +2761,7 @@ class AudioDownloader:
 					os.rename(out, rename)
 					return rename, rename
 				file = out2.removeprefix("cache/")
-				self.cache[file] = AudioFileLink(file, out, wasfile=True)
+				self.cache[file] = AudioFileLink(file, out2, wasfile=True)
 				if ecdc:
 					try:
 						dur, bps = _get_duration(out)

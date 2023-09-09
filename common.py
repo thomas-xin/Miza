@@ -861,7 +861,7 @@ class FileHashDict(collections.abc.MutableMapping):
 		return self
 
 	def __update__(self):
-		print("DATABASE:", self.path)
+		# print("DATABASE:", self.path)
 		modified = set(self.modified)
 		self.modified.clear()
 		deleted = set(self.deleted)
