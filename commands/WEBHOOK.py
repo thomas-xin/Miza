@@ -92,7 +92,7 @@ class UpdateAutoEmojis(Database):
 	name = "autoemojis"
 
 	def guild_emoji_map(self, guild, user, emojis={}):
-		guilds = sorted(getattr(user, "mutual_guilds", None) or [guild for guild in self.bot.guilds if user.id in guild._members], key=lambda guild: guild.id)
+		guilds = sorted(getattr(user, "mutual_guilds", None) or [g for g in self.bot.guilds if user.id in g._members], key=lambda g: g.id)
 		try:
 			guilds.remove(guild)
 		except ValueError:
@@ -124,9 +124,9 @@ class UpdateAutoEmojis(Database):
 			return
 		emojis = find_emojis(message.content)
 		for e in emojis:
+			name, e_id = e.split(":")[1:]
 			anim = e.startswith("<a:")
 			self.bot.emoji_stuff[e_id] = anim
-			name, e_id = e.split(":")[1:]
 			e_id = int("".join(regexp("[0-9]+").findall(e_id)))
 			emoji = self.bot.cache.emojis.get(e_id)
 			if emoji:
