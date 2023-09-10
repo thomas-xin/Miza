@@ -1117,6 +1117,14 @@ transform: translate(-50%, -50%);
 						f.write(b)
 					self.bot_exec(f"VOICE.ytdl.cache[{repr(fn)}]=VOICE.AudioFileLink({repr(fn)},{repr(fni)},wasfile=True)")
 			b = b""
+		elif not b and url.startswith(API + "/ytdl") and mime not in ("audio/ecdc", "application/octet-stream"):
+			u = url.replace("v=", "d=").split("d=", 1)[-1].split("&", 1)[0]
+			if is_url(u):
+				h = shash(u)
+				fn = cachedir + "/ecdc/!" + shash(url) + "~" + br + ".ecdc"
+				if os.path.exists(fn) and os.path.getsize(fn):
+					f = open(fn, "rb")
+					return cp.lib.static.serve_fileobj(f, content_type="audio/ecdc", disposition="", name=url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0] + ".ecdc")
 		try:
 			if inference in ("True", "true", True):
 				raise KeyError
