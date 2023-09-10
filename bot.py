@@ -6445,6 +6445,7 @@ class SimulatedMessage:
 	bot = False
 	ghost = True
 	simulated = True
+	reference = None
 	__str__ = lambda self: self.name
 
 	async def send(self, *args, **kwargs):
