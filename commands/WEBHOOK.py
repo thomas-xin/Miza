@@ -93,7 +93,14 @@ class UpdateAutoEmojis(Database):
 
 	def guild_emoji_map(self, guild, user, emojis={}):
 		guilds = sorted(getattr(user, "mutual_guilds", None) or [guild for guild in self.bot.guilds if user.id in guild._members], key=lambda guild: guild.id)
+		try:
+			guilds.remove(guild)
+		except ValueError:
+			pass
 		guilds.insert(0, guild)
+		elist = self.bot.data.emojilists.get(guild.id)
+		if elist:
+			guilds.insert(0, cdict(emojis=elist))
 		for g in guilds:
 			for e in sorted(g.emojis, key=lambda e: e.id):
 				if not e.is_usable():
@@ -111,22 +118,27 @@ class UpdateAutoEmojis(Database):
 		return emojis
 
 	async def _nocommand_(self, message, recursive=True, edit=False, **void):
+		if getattr(message, "simulated", None):
+			return
 		if edit or not message.content or getattr(message, "webhook_id", None) or message.content.count("```") > 1:
 			return
 		emojis = find_emojis(message.content)
 		for e in emojis:
+			anim = e.startswith("<a:")
+			self.bot.emoji_stuff[e_id] = anim
 			name, e_id = e.split(":")[1:]
 			e_id = int("".join(regexp("[0-9]+").findall(e_id)))
-			animated = self.bot.cache.emojis.get(e_id)
-			if not animated:
-				animated = await create_future(self.bot.is_animated, e_id, verify=True)
-			else:
-				name = animated.name
-			if animated is not None and not message.webhook_id:
+			emoji = self.bot.cache.emojis.get(e_id)
+			if emoji:
+				name = emoji.name
+			if not message.webhook_id:
 				orig = self.bot.data.emojilists.setdefault(message.author.id, {})
 				orig[name] = e_id
 				self.bot.data.emojilists.update(message.author.id)
 				self.bot.data.emojinames[e_id] = name
+				if message.guild:
+					orig = self.bot.data.emojilists.setdefault(message.guild.id, {})
+					orig[name] = e_id
 		if not message.guild or message.guild.id not in self.data:
 			return
 		m_id = None

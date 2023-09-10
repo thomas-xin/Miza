@@ -1227,6 +1227,13 @@ class UpdateUptimes(Database):
 	name = "uptimes"
 
 
+class UpdateEmojiStats(Database):
+	name = "emojistats"
+
+	def __load__(self, **void):
+		self.bot.emoji_stuff = self
+
+
 class UpdateGuildSettings(Database):
 	name = "guildsettings"
 
