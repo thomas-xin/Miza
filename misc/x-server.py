@@ -1072,7 +1072,7 @@ transform: translate(-50%, -50%);
 		cp.response.headers["ETag"] = create_etag(data)
 		return data
 
-	ecdc_running = set()
+	ecdc_running = {}
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
 	@hostmap
@@ -1089,7 +1089,8 @@ transform: translate(-50%, -50%);
 			os.mkdir(cachedir + "/ecdc")
 		out = cachedir + "/ecdc/!" + shash(url) + "~" + br + ".ecdc"
 		while out in self.ecdc_running:
-			time.sleep(1)
+			self.ecdc_running[out].result()
+			time.sleep(random.random() / 16)
 		mime = None
 		if cp.request.body:
 			b = cp.request.body.fp.read()
@@ -1123,7 +1124,7 @@ transform: translate(-50%, -50%);
 			return cp.lib.static.serve_fileobj(f, content_type="audio/ecdc", disposition="", name=url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0] + ".ecdc")
 		if b or inference in (None, "None", "none", "null", ""):
 			return b""
-		self.ecdc_running.add(out)
+		self.ecdc_running[out] = concurrent.futures.Future()
 		try:
 			t = ts_us()
 			fn = f"cache/{t}"
@@ -1142,7 +1143,8 @@ transform: translate(-50%, -50%);
 			f = open(out, "rb")
 			return cp.lib.static.serve_fileobj(f, content_type="audio/ecdc", disposition="", name=url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0] + ".ecdc")
 		finally:
-			self.ecdc_running.discard(out)
+			fut = self.ecdc_running.pop(out, None)
+			fut.set_result(None)
 
 	@cp.expose
 	@hostmap
@@ -1152,7 +1154,8 @@ transform: translate(-50%, -50%);
 			url = url[0]
 		out = "cache/!" + shash(url) + "~." + fmt
 		while out in self.ecdc_running:
-			time.sleep(1)
+			self.ecdc_running[out].result()
+			time.sleep(random.random() / 16)
 		try:
 			if not os.path.exists(out) or not os.path.getsize(out):
 				raise KeyError
@@ -1161,7 +1164,7 @@ transform: translate(-50%, -50%);
 		else:
 			f = open(out, "rb")
 			return cp.lib.static.serve_fileobj(f, content_type=f"audio/{fmt}", disposition="", name=url.rsplit("/", 1)[-1].split("?", 1)[0].rsplit(".", 1)[0] + ".wav")
-		self.ecdc_running.add(out)
+		self.ecdc_running[out] = concurrent.futures.Future()
 		try:
 			t = ts_us()
 			fn = f"cache/{t}.ecdc"
@@ -1173,7 +1176,8 @@ transform: translate(-50%, -50%);
 			f = open(out, "rb")
 			return cp.lib.static.serve_fileobj(f, content_type=f"audio/{fmt}", disposition="", name=url.rsplit("/", 1)[-1].split("?", 1)[0] + ".wav")
 		finally:
-			self.ecdc_running.discard(out)
+			fut = self.ecdc_running.pop(out, None)
+			fut.set_result(None)
 
 	ydl_sems = {}
 	@cp.expose
