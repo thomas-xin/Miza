@@ -125,9 +125,9 @@ class UpdateAutoEmojis(Database):
 		emojis = find_emojis(message.content)
 		for e in emojis:
 			name, e_id = e.split(":")[1:]
+			e_id = int("".join(regexp("[0-9]+").findall(e_id)))
 			anim = e.startswith("<a:")
 			self.bot.emoji_stuff[e_id] = anim
-			e_id = int("".join(regexp("[0-9]+").findall(e_id)))
 			emoji = self.bot.cache.emojis.get(e_id)
 			if emoji:
 				name = emoji.name
