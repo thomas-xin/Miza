@@ -1085,7 +1085,7 @@ transform: translate(-50%, -50%);
 			br = str(bitrate)
 		elif bitrate == "auto":
 			for br in (3, 6, 12, 24):
-				out = cachedir + "/ecdc/!" + shash(url) + "~" + br + ".ecdc"
+				out = cachedir + "/ecdc/!" + shash(url) + "~" + str(br) + ".ecdc"
 				if os.path.exists(out):
 					break
 		else:
