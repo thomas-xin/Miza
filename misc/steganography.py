@@ -1,81 +1,18 @@
+import concurrent.futures
+exc = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+fut = exc.submit(__import__, "numpy")
 import os, sys, random, time, base64
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
-import pillow_heif
-pillow_heif.register_heif_opener()
-import numpy as np
+try:
+	import pillow_heif
+	pillow_heif.register_heif_opener()
+except:
+	pass
 
 Resampling = getattr(Image, "Resampling", Image)
 Transpose = getattr(Image, "Transpose", Image)
 Transform = getattr(Image, "Transform", Image)
-
-def rgb_split(image, dtype=np.uint8):
-	channels = None
-	if "RGB" not in str(image.mode):
-		if str(image.mode) == "L":
-			channels = [np.asanyarray(image, dtype=dtype)] * 3
-		else:
-			image = image.convert("RGB")
-	if channels is None:
-		a = np.asanyarray(image, dtype=dtype)
-		channels = np.swapaxes(a, 2, 0)[:3]
-	return channels
-
-def hsv_split(image, convert=True, partial=False, dtype=np.uint8):
-	channels = rgb_split(image, dtype=np.uint16)
-	R, G, B = channels
-	m = np.min(channels, 0)
-	M = np.max(channels, 0)
-	C = M - m #chroma
-	Cmsk = C != 0
-
-	# Hue
-	H = np.zeros(R.shape, dtype=np.float32)
-	for i, colour in enumerate(channels):
-		mask = (M == colour) & Cmsk
-		hm = np.asanyarray(channels[i - 2][mask], dtype=np.float32)
-		hm -= channels[i - 1][mask]
-		hm /= C[mask]
-		if i:
-			hm += i << 1
-		H[mask] = hm
-	H *= 256 / 6
-	H = np.asanyarray(H, dtype=dtype)
-
-	if partial:
-		return H, M, m, C, Cmsk, channels
-
-	# Saturation
-	S = np.zeros(R.shape, dtype=dtype)
-	Mmsk = M != 0
-	S[Mmsk] = np.clip(256 * C[Mmsk] // M[Mmsk], None, 255)
-
-	# Value
-	V = np.asanyarray(M, dtype=dtype)
-
-	out = [H, S, V]
-	if convert:
-		out = list(fromarray(a, "L") for a in out)
-	return out
-
-def hsl_split(image, convert=True, dtype=np.uint8):
-	H, M, m, C, Cmsk, channels = hsv_split(image, partial=True, dtype=dtype)
-
-	# Luminance
-	L = np.mean((M, m), 0, dtype=np.int16)
-
-	# Saturation
-	S = np.zeros(H.shape, dtype=dtype)
-	Lmsk = Cmsk
-	Lmsk &= (L != 1) & (L != 0)
-	S[Lmsk] = np.clip((C[Lmsk] << 8) // (255 - np.abs((L[Lmsk] << 1) - 255)), None, 255)
-
-	L = L.astype(dtype)
-
-	out = [H, S, L]
-	if convert:
-		out = list(fromarray(a, "L") for a in out)
-	return out
 
 def round_random(x):
 	try:
@@ -254,7 +191,7 @@ ar = im.size[0] / im.size[1]
 i_entropy = im.entropy()
 ie_req = 4
 entropy = min(1, abs(i_entropy) ** 3 / 384)
-# print(entropy, im.entropy())
+# print(entropy, i_entropy)
 
 write = bool(msg)
 mb = msg.encode("utf-8")
@@ -298,12 +235,83 @@ w = h = 17
 counted = True
 copydetect = True
 inverted = False
-np.random.seed(time.time_ns() & 4294967295)
 spl = list(im.split())
 if len(spl) > 3:
 	spl[-1] = spl[-1].point(lambda x: max(x, 8))
 
+np = fut.result()
+np.random.seed(time.time_ns() & 4294967295)
 ars = [np.array(pl, dtype=np.uint8) for pl in spl[:3]]
+
+
+def rgb_split(image, dtype=np.uint8):
+	channels = None
+	if "RGB" not in str(image.mode):
+		if str(image.mode) == "L":
+			channels = [np.asanyarray(image, dtype=dtype)] * 3
+		else:
+			image = image.convert("RGB")
+	if channels is None:
+		a = np.asanyarray(image, dtype=dtype)
+		channels = np.swapaxes(a, 2, 0)[:3]
+	return channels
+
+def hsv_split(image, convert=True, partial=False, dtype=np.uint8):
+	channels = rgb_split(image, dtype=np.uint16)
+	R, G, B = channels
+	m = np.min(channels, 0)
+	M = np.max(channels, 0)
+	C = M - m #chroma
+	Cmsk = C != 0
+
+	# Hue
+	H = np.zeros(R.shape, dtype=np.float32)
+	for i, colour in enumerate(channels):
+		mask = (M == colour) & Cmsk
+		hm = np.asanyarray(channels[i - 2][mask], dtype=np.float32)
+		hm -= channels[i - 1][mask]
+		hm /= C[mask]
+		if i:
+			hm += i << 1
+		H[mask] = hm
+	H *= 256 / 6
+	H = np.asanyarray(H, dtype=dtype)
+
+	if partial:
+		return H, M, m, C, Cmsk, channels
+
+	# Saturation
+	S = np.zeros(R.shape, dtype=dtype)
+	Mmsk = M != 0
+	S[Mmsk] = np.clip(256 * C[Mmsk] // M[Mmsk], None, 255)
+
+	# Value
+	V = np.asanyarray(M, dtype=dtype)
+
+	out = [H, S, V]
+	if convert:
+		out = list(fromarray(a, "L") for a in out)
+	return out
+
+def hsl_split(image, convert=True, dtype=np.uint8):
+	H, M, m, C, Cmsk, channels = hsv_split(image, partial=True, dtype=dtype)
+
+	# Luminance
+	L = np.mean((M, m), 0, dtype=np.int16)
+
+	# Saturation
+	S = np.zeros(H.shape, dtype=dtype)
+	Lmsk = Cmsk
+	Lmsk &= (L != 1) & (L != 0)
+	S[Lmsk] = np.clip((C[Lmsk] << 8) // (255 - np.abs((L[Lmsk] << 1) - 255)), None, 255)
+
+	L = L.astype(dtype)
+
+	out = [H, S, L]
+	if convert:
+		out = list(fromarray(a, "L") for a in out)
+	return out
+
 # sx, ex = round_random((w - 1) / 2 * im.width / w), round_random((w + 1) / 2 * im.width / w)
 # sy, ey = round_random((h - 1) / 2 * im.height / h), round_random((h + 1) / 2 * im.height / h)
 # pa = (ey - sy) * (ex - sx)
@@ -346,6 +354,67 @@ for p in range(w * h):
 	elif di == 3:
 		y += 1
 
+def encode(a, target, rc, bit):
+	if test:
+		if bit:
+			target[:] = 255
+		else:
+			target[:] = 0
+	elif write:
+		rv = target.ravel()
+
+		if entropy != 1:
+			r1 = np.random.randint(-1, 1, int(np.ceil(pa / 2)), dtype=np.int8)
+			r1 |= 1
+			r1 <<= 1
+			r1 = np.tile(r1, (2, 1)).T.ravel()[:pa]
+			r2 = np.random.randint(0, 4, int(np.ceil(pa / 2)), dtype=np.int8)
+			r2[r2 == 0] = -3
+			r2[r2 > 0] = 1
+			r2 = np.tile(r2, (2, 1)).T.ravel()[:pa]
+			# print(r1, r2)
+
+		if entropy != 0:
+			rind = np.random.binomial(1, entropy, len(rv))
+
+		if bit:
+			# rv[:] = 255
+			v = np.clip(rv, 2, 253, out=rv)
+			if entropy != 0:
+				v[rind] |= 2
+				v[rind] &= 254
+			if entropy != 1:
+				# must be &2 = 2
+				ind = v & 3
+				mask = ind == 0
+				t = v[mask]
+				v[mask] = np.subtract(t, r1[:len(t)], out=t, casting="unsafe")
+				mask = ind == 1
+				t = v[mask]
+				v[mask] = np.add(t, r2[:len(t)], out=t, casting="unsafe")
+				mask = ind == 3
+				t = v[mask]
+				v[mask] = np.subtract(t, r1[:len(t)], out=t, casting="unsafe")
+		else:
+			# rv[:] = 0
+			v = np.clip(rv, 0, 251, out=rv)
+			if entropy != 0:
+				v[rind] &= 252
+			if entropy != 1:
+				# must be &2 = 0
+				ind = v & 3
+				mask = ind == 1
+				t = v[mask]
+				v[mask] = np.subtract(t, r2[:len(t)], out=t, casting="unsafe")
+				mask = ind == 2
+				t = v[mask]
+				v[mask] = np.add(t, r1[:len(t)], out=t, casting="unsafe")
+				mask = ind == 3
+				t = v[mask]
+				v[mask] = np.add(t, r2[:len(t)], out=t, casting="unsafe")
+		# v = rv
+		target[:] = v.reshape(target.shape)
+
 corners = [
 	(0, 0),
 	(0, h - 1),
@@ -357,6 +426,7 @@ if w & 1 and h & 1:
 for p in corners:
 	vis.pop(p, None)
 cornerdata = []
+futs = []
 tiles = corners + list(reversed(vis))
 for p, (x, y) in enumerate(tiles):
 	if p == len(corners) and copydetect:
@@ -393,72 +463,16 @@ for p, (x, y) in enumerate(tiles):
 				cornerdata.append(rc >= pa / np.sqrt(2))
 			else:
 				reader.append(rc >= pa)
-
 		if counted:
 			bit = next(it, False if x * h + y & 8 else True)
 		else:
 			bit = True
-		if test:
-			if bit:
-				target[:] = 255
-			else:
-				target[:] = 0
-		elif write:
-			rv = target.ravel()
+		encode(a, target, rc, bit)
+		# fut = exc.submit(encode, a, target, rc, bit)
+		# futs.append(fut)
 
-			if entropy != 1:
-				r1 = np.random.randint(-1, 1, int(np.ceil(pa / 2)), dtype=np.int8)
-				r1 |= 1
-				r1 <<= 1
-				r1 = np.tile(r1, (2, 1)).T.ravel()[:pa]
-				r2 = np.random.randint(0, 4, int(np.ceil(pa / 2)), dtype=np.int8)
-				r2[r2 == 0] = -3
-				r2[r2 > 0] = 1
-				r2 = np.tile(r2, (2, 1)).T.ravel()[:pa]
-				# print(r1, r2)
-
-			if entropy != 0:
-				rind = np.zeros(len(rv), dtype=np.bool_)
-				rind[:int(len(rv) * entropy)] = True
-				np.random.shuffle(rind)
-
-			if bit:
-				# rv[:] = 255
-				v = np.clip(rv, 2, 253, out=rv)
-				if entropy != 0:
-					v[rind] |= 2
-					v[rind] &= 254
-				if entropy != 1:
-					# must be &2 = 2
-					ind = v & 3
-					mask = ind == 0
-					t = v[mask]
-					v[mask] = np.subtract(t, r1[:len(t)], out=t, casting="unsafe")
-					mask = ind == 1
-					t = v[mask]
-					v[mask] = np.add(t, r2[:len(t)], out=t, casting="unsafe")
-					mask = ind == 3
-					t = v[mask]
-					v[mask] = np.subtract(t, r1[:len(t)], out=t, casting="unsafe")
-			else:
-				# rv[:] = 0
-				v = np.clip(rv, 0, 251, out=rv)
-				if entropy != 0:
-					v[rind] &= 252
-				if entropy != 1:
-					# must be &2 = 0
-					ind = v & 3
-					mask = ind == 1
-					t = v[mask]
-					v[mask] = np.subtract(t, r2[:len(t)], out=t, casting="unsafe")
-					mask = ind == 2
-					t = v[mask]
-					v[mask] = np.add(t, r1[:len(t)], out=t, casting="unsafe")
-					mask = ind == 3
-					t = v[mask]
-					v[mask] = np.add(t, r2[:len(t)], out=t, casting="unsafe")
-			# v = rv
-			target[:] = v.reshape(target.shape)
+for fut in futs:
+	fut.result()
 
 if write:
 	for i in range(len(ars)):
@@ -548,7 +562,8 @@ except (ValueError, UnicodeDecodeError):
 		fn = ofn or fn.rsplit(".", 1)[0] + "~1.png"
 		meta = PngInfo()
 		meta.add_text("copyright", msg)
-		im.save(fn, format="png", optimize=True, pnginfo=meta)
+		level = round((1 - entropy) * 8 + 1)
+		im.save(fn, format="png", compress_level=level, pnginfo=meta)
 	print("No copyright detected.")
 else:
 	# if i_entropy >= ie_req:
