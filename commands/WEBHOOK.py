@@ -132,13 +132,14 @@ class UpdateAutoEmojis(Database):
 			if emoji:
 				name = emoji.name
 			if not message.webhook_id:
+				self.bot.data.emojinames[e_id] = name
 				orig = self.bot.data.emojilists.setdefault(message.author.id, {})
 				orig[name] = e_id
 				self.bot.data.emojilists.update(message.author.id)
-				self.bot.data.emojinames[e_id] = name
 				if message.guild:
 					orig = self.bot.data.emojilists.setdefault(message.guild.id, {})
 					orig[name] = e_id
+					self.bot.data.emojilists.update(message.guild.id)
 		if not message.guild or message.guild.id not in self.data:
 			return
 		m_id = None
