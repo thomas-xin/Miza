@@ -1076,13 +1076,18 @@ transform: translate(-50%, -50%);
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
 	@hostmap
-	def encodec(self, url, name="", source="", bitrate="24k", inference=False):
+	def encodec(self, url, name="", source="", bitrate="auto", inference=False):
 		cp.response.headers.update(SHEADERS)
 		if isinstance(url, list):
 			url = url[0]
 		url = regexp(r"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=").sub("https://youtu.be/", url)
 		if isinstance(bitrate, int):
 			br = str(bitrate)
+		elif bitrate == "auto":
+			for br in (3, 6, 12, 24):
+				out = cachedir + "/ecdc/!" + shash(url) + "~" + br + ".ecdc"
+				if os.path.exists(out):
+					break
 		else:
 			br = bitrate.removesuffix("k")
 		if not os.path.exists(cachedir + "/ecdc"):
@@ -1148,7 +1153,7 @@ transform: translate(-50%, -50%);
 
 	@cp.expose
 	@hostmap
-	def decodec(self, url, fmt="wav"):
+	def decodec(self, url, fmt="opus"):
 		cp.response.headers.update(SHEADERS)
 		if isinstance(url, list):
 			url = url[0]
