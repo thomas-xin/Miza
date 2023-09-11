@@ -2506,7 +2506,7 @@ def spec2cap():
 		vrams[i] = v
 		if len(caps) > 1:
 			yield caps
-	if any(v > 6 * 1073741824 and c > 700000 for v, c in zip(vrams, COMPUTE_POT)):
+	if AUTH.get("discord_token") and any(v > 6 * 1073741824 and c > 700000 for v, c in zip(vrams, COMPUTE_POT)):
 		vram = sum(vrams[i] for i in range(DC) if COMPUTE_POT[i] > 400000)
 		if vram > 43 * 1073741824:
 			yield [-1, "agpt", "gptq"]

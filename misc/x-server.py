@@ -2575,11 +2575,15 @@ alert("File successfully deleted. Returning to home.");
 	@cp.expose
 	@cp.tools.accept(media="multipart/form-data")
 	@hostmap
-	def distribute(self, caps="[]", stat="{}", resp="{}"):
+	def distribute(self, caps="[]", stat="{}", resp="{}", token=""):
 		ip = true_ip()
+		at = AUTH.get("discord_token")
+		verified = int(at == token)
 		if not caps.startswith("["):
 			caps = base64.urlsafe_b64decode(caps + "==")
 		caps = orjson.loads(caps)
+		if not verified:
+			caps = list(set(caps).difference(("gptq", "agpt")))
 		if not stat.startswith("{"):
 			stat = base64.urlsafe_b64decode(stat + "==").decode("utf-8", "replace")
 		stat = orjson.loads(stat.replace("<IP>", ip))

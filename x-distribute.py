@@ -18,8 +18,8 @@ if os.path.exists("x-compute.py"):
 import benchmark, json, psutil, subprocess
 
 with open("auth.json", "rb") as f:
-	data = json.load(f)
-compute_load = data.get("compute_load") or []
+	AUTH = json.load(f)
+compute_load = AUTH.get("compute_load") or []
 
 # Spec requirements:
 # ytdl											anything with internet
@@ -96,7 +96,7 @@ def spec2cap():
 		vrams[i] = v
 		if len(caps) > 1:
 			yield caps
-	if any(v > 6 * 1073741824 and c > 800000 for v, c in zip(vrams, COMPUTE_POT)):
+	if AUTH.get("discord_token") and any(v > 6 * 1073741824 and c > 700000 for v, c in zip(vrams, COMPUTE_POT)):
 		vram = sum(vrams[i] for i in range(DC) if COMPUTE_POT[i] > 400000)
 		if vram > 43 * 1073741824:
 			yield [-1, "agpt", "gptq"]
