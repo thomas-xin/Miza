@@ -443,11 +443,16 @@ class EmojiList(Command):
 					following[user.id].pop(k)
 					following.update(user.id)
 					return
-				curr[f":{k}:"] = f"({v})` {me}"
+				return f"({v})` {me}"
 
-			futs.append(create_task(check_emoji(k, v)))
+			fut = create_task(check_emoji(k, v))
+			fut.k = k
+			futs.append(fut)
 		for fut in futs:
-			await fut
+			info = await fut
+			if not info:
+				continue
+			curr[f":{fut.k}:"] = info
 		content = message.content
 		if not content:
 			content = message.embeds[0].description
