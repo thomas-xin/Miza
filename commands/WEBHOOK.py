@@ -100,7 +100,16 @@ class UpdateAutoEmojis(Database):
 		guilds.insert(0, guild)
 		elist = self.bot.data.emojilists.get(guild.id)
 		if elist:
-			guilds.insert(0, cdict(emojis=elist))
+			for n, e_id in sorted(elist.items(), key=lambda t: t[1]):
+				while n in emojis:
+					if emojis[n] == e_id:
+						break
+					t = n.rsplit("-", 1)
+					if t[-1].isnumeric():
+						n = t[0] + "-" + str(int(t[-1]) + 1)
+					else:
+						n = t[0] + "-1"
+				emojis[n] = e_id
 		for g in guilds:
 			for e in sorted(g.emojis, key=lambda e: e.id):
 				if not e.is_usable():
