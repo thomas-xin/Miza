@@ -1603,16 +1603,15 @@ if "gptq" in CAPS or "agpt" in CAPS:
 		channel_id = inputs["channel_id"]
 		key = inputs["key"]
 		ht = inputs["huggingface_token"]
-		# vis = inputs.get("vis_session")
 		name = inputs["name"]
 		model = inputs["model"]
 		personality = inputs["personality"]
 		premium = inputs["premium"]
 		summary = inputs["summary"]
-		jb = inputs["jb"]
-		history = inputs["history"]
-		refs = inputs["refs"]
-		im = inputs["im"]
+		jb = inputs.get("jb", False)
+		history = inputs.get("history", ())
+		refs = inputs.get("refs", ())
+		im = inputs.get("im")
 		prompt = inputs["prompt"]
 		bl = inputs.get("bl")
 		oai = inputs.get("oai")
@@ -1739,6 +1738,9 @@ if "gptq" in CAPS or "agpt" in CAPS:
 		print(traceback.format_exc(), end="")
 	else:
 		convobot.AsyncChatGPT = AsyncChatGPT
+
+	if "gptq" in CAPS:
+		exc.submit(convobot.Bot().load_gptq, "wizard-70b")
 
 if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 	import imagebot

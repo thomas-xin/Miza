@@ -1587,7 +1587,7 @@ class Ask(Command):
 			cap = "agpt" if model.removesuffix("+") in ("gpt3", "gpt4", "davinci", "bloom") else "gptq"
 			if cap == "gptq":
 				print("GPTQ:", inputs)
-			out, caic = await process_image("lambda inputs, cid: [CBAI(inputs), [(b := CBOTS[cid]).chat_history,b.jailbroken,b.model]]", "$", [inputs, channel.id], cap=cap, timeout=600)
+			out, caic = await process_image("lambda inputs, cid: [CBAI(inputs), [(b := CBOTS[cid]).chat_history,b.jailbroken,b.model]]", "$", [inputs, channel.id], cap=cap, timeout=3600 if cap == "gptq" else 300)
 			if premium >= 2 and freebies is not None:
 				bot.data.users[user.id].setdefault("freebies", []).append(utc())
 				rem = freelim - len(freebies)

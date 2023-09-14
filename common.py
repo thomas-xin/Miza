@@ -2326,11 +2326,12 @@ async def proc_distribute(proc):
 				return
 			if not tasks:
 				try:
-					await asyncio.wait_for(wrap_future(proc.fut), timeout=5)
+					await asyncio.wait_for(wrap_future(proc.fut), timeout=60)
 				except (T0, T1, T2):
-					timeout = 1800
-					if st and utc() - st > timeout:
-						return create_task(start_proc(proc))
+					pass
+					# timeout = 1800
+					# if st and utc() - st > timeout:
+						# return create_task(start_proc(proc))
 				else:
 					proc.fut = concurrent.futures.Future()
 				tasks = bot.distribute(proc.caps, {}, {})
