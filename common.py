@@ -2478,8 +2478,17 @@ def spec2cap():
 	pynvml.nvmlInit()
 	handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(DC)]
 	vrams = [pynvml.nvmlDeviceGetMemoryInfo(d).total for d in handles]
+	if AUTH.get("discord_token") and any(v > 6 * 1073741824 and c > 700000 for v, c in zip(vrams, COMPUTE_POT)):
+		vram = sum(vrams[i] for i in range(DC) if COMPUTE_POT[i] > 400000)
+		if vram > 43 * 1073741824:
+			yield [-1, "agpt", "gptq"]
+			cut = 48 * 1073741824
 	for i, v in reversed(tuple(enumerate(vrams))):
 		c = COMPUTE_POT[i]
+		if cut > 0:
+			red = min(cut, v)
+			v -= red
+			cut -= red
 		caps = [i]
 		if c > 100000 and v > 3 * 1073741824 and ffmpeg:
 			caps.append("video")
@@ -2506,10 +2515,6 @@ def spec2cap():
 		vrams[i] = v
 		if len(caps) > 1:
 			yield caps
-	if AUTH.get("discord_token") and any(v > 6 * 1073741824 and c > 700000 for v, c in zip(vrams, COMPUTE_POT)):
-		vram = sum(vrams[i] for i in range(DC) if COMPUTE_POT[i] > 400000)
-		if vram > 43 * 1073741824:
-			yield [-1, "agpt", "gptq"]
 
 def proc_start():
 	if torch and os.environ.get("AI_FEATURES", True):
@@ -2543,7 +2548,8 @@ async def sub_submit(cap, command, _timeout=12):
 		task.timeout = _timeout
 		queue = bot.compute_queue.setdefault(cap, set())
 		queue.add(task)
-		for proc in sorted(PROCS.values(), key=lambda proc: (proc.sem.active, i == 0, -COMPUTE_POT[proc.i] if COMPUTE_POT else random.random())):
+		procs = filter(bool, PROCS.values())
+		for proc in sorted(procs, key=lambda proc: (proc.sem.active, i == 0, -COMPUTE_POT[proc.i] if COMPUTE_POT else random.random())):
 			if not proc:
 				continue
 			if cap in proc.caps and not proc.fut.done():
