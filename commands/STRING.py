@@ -1434,7 +1434,7 @@ class Ask(Command):
 		pers = bot.commands.personality[0].retrieve((channel or guild).id)
 		if pers and ";" in pers:
 			model, pers = pers.split(";", 1)
-			model = model.casefold().split("-", 1)[0]
+			cname = model = model.casefold().split("-", 1)[0]
 			pers = pers.lstrip()
 		else:
 			model = "auto"
