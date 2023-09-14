@@ -1,4 +1,5 @@
-# Smudge invaded, on the 1st August 2020 this became my territory *places flag* B3
+# Lou invaded, on the 1st August 2020 this became my territory *places flag* B3
+# 11th of September 2023 she invaded again with 10x gay energy and stole your baby niece *places updated flag* B3
 
 #!/usr/bin/python3
 
