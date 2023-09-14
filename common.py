@@ -2485,12 +2485,17 @@ def spec2cap():
 		if vram > 43 * 1073741824:
 			yield [-1, "agpt", "gptq"]
 			cut = 48 * 1073741824
+	if cut:
+		for i in COMPUTE_ORDER:
+			v = vrams[i]
+			if cut > 0:
+				red = min(cut, v)
+				vrams[i] = v - red
+				cut -= red
+			else:
+				break
 	for i, v in reversed(tuple(enumerate(vrams))):
 		c = COMPUTE_POT[i]
-		if cut > 0:
-			red = min(cut, v)
-			v -= red
-			cut -= red
 		caps = [i]
 		if c > 100000 and v > 3 * 1073741824 and ffmpeg:
 			caps.append("video")

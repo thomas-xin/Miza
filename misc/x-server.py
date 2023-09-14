@@ -2587,6 +2587,11 @@ alert("File successfully deleted. Returning to home.");
 		if not stat.startswith("{"):
 			stat = base64.urlsafe_b64decode(stat + "==").decode("utf-8", "replace")
 		stat = orjson.loads(stat.replace("<IP>", ip))
+		t = utc()
+		for k, v in stat.items():
+			for i, d in v.items():
+				if abs(t - d.get("time", 0)) > 10:
+					d["time"] = t - 10
 		if not resp:
 			resp = cp.request.body.fp.read()
 		elif not resp.startswith("{"):
