@@ -1065,14 +1065,14 @@ class Bot:
 			limit = 3000
 			cm = 15
 			longer = True
-		elif model == "curie":
+		elif model == "curie" or premium < 2:
 			# model = "text-curie-001"
 			model = "gpt-3.5-turbo-instruct"
 			temp = 0.7
 			limit = 3000
 			cm = 15
 			longer = True
-		elif model.startswith("gpt3"):
+		elif model.startswith("gpt3") or premium < 4:
 			model = "gpt-3.5-turbo"
 			temp = 0.8
 			limit = 4000
