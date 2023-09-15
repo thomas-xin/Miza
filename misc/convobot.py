@@ -233,7 +233,7 @@ def determine_cuda(mem=1, priority=None, multi=False, major=0):
 	elif priority:
 		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, p.major >= major, COMPUTE_LOAD[i] < high * 0.9, COMPUTE_LOAD[i] * (random.random() + 4.5) * 0.2, i, p.multi_processor_count, p.total_memory)
 	elif priority is False:
-		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, p.major >= major, p.major >= 7, -p.major, -p.minor, COMPUTE_LOAD[i] < high * 0.75, COMPUTE_LOAD[i] * (random.random() + 4.5) * 0.2, -gmems[i].free, p.multi_processor_count)
+		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, -mem // 1073741824, p.major, p.minor, COMPUTE_LOAD[i] < high * 0.75, COMPUTE_LOAD[i] * (random.random() + 4.5) * 0.2, -gmems[i].free, p.multi_processor_count)
 	else:
 		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.5, p.major >= major, p.major >= 7, -p.major, -p.minor, COMPUTE_LOAD[i] * (random.random() + 4.5) * 0.2, -p.multi_processor_count, -gmems[i].free)
 	pcs = sorted(range(n), key=key, reverse=True)
@@ -619,174 +619,184 @@ class Bot:
 		return enc.encode(s)
 
 	def load_gptq(self, model):
-		from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig, exllama_set_max_input_length
-		buffer = 1.3
-		if model == "wizard-70b":
-			m = "TheBloke/WizardLM-70B-V1.0-GPTQ"
-			req = 35
-		elif model == "nous-puffin-70b":
-			m = "TheBloke/Nous-Puffin-70B-GPTQ"
-			req = 35
-		elif model == "orca-70b":
-			m = "TheBloke/Llama-2-70B-Orca-200k-GPTQ"
-			req = 35
-		elif model == "kimiko-70b":
-			m = "TheBloke/fiction.live-Kimiko-V2-70B-GPTQ"
-			req = 35
-		elif model == "wizard-coder-34b":
-			m = "TheBloke/WizardCoder-Python-34B-V1.0-GPTQ"
-			req = 17
-		else:
-			raise RuntimeError(f'Model "{model}" not found.')
+		print(f"LOADING GPTQ {model}...")
 		try:
-			tokenizer, model = self.models[m]
-		except KeyError:
-			tokenizer = backup_model(AutoTokenizer.from_pretrained, m)
-			mfut = concurrent.futures.Future()
-			self.models[m] = (tokenizer, mfut)
-			n = torch.cuda.device_count()
-			if not n:
-				raise RuntimeError("Required GPU not found.")
-			try:
-				import pynvml
-				pynvml.nvmlInit()
-				COMPUTE_ORDER = globals().get("COMPUTE_ORDER") or range(torch.cuda.device_count())
-
-				def cuda_info():
-					import torch
-					return [torch.cuda.get_device_properties(i) for i in range(len(COMPUTE_ORDER))]
-
-				fut2 = exc.submit(cuda_info)
-				handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(len(COMPUTE_ORDER))]
-				gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
-				tinfo = fut2.result()
-			except:
-				print_exc()
-				tinfo = gmems = COMPUTE_ORDER = []
-			COMPUTE_LOAD = globals().get("COMPUTE_LOAD") or [0] * n
-			high = max(COMPUTE_LOAD)
-			bit4 = [i for i in COMPUTE_ORDER if COMPUTE_LOAD[i] > high / 3]
-			total = sum(COMPUTE_LOAD[i] for i in bit4)
-			if high:
-				loads = [i / total * req if i < high * 0.9 else inf for i in COMPUTE_LOAD]
+			from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig, exllama_set_max_input_length
+			buffer = 1.3
+			if model == "wizard-70b":
+				m = "TheBloke/WizardLM-70B-V1.0-GPTQ"
+				req = 35
+			elif model == "nous-puffin-70b":
+				m = "TheBloke/Nous-Puffin-70B-GPTQ"
+				req = 35
+			elif model == "orca-70b":
+				m = "TheBloke/Llama-2-70B-Orca-200k-GPTQ"
+				req = 35
+			elif model == "kimiko-70b":
+				m = "TheBloke/fiction.live-Kimiko-V2-70B-GPTQ"
+				req = 35
+			elif model == "wizard-coder-34b":
+				m = "TheBloke/WizardCoder-Python-34B-V1.0-GPTQ"
+				req = 17
 			else:
-				loads = [inf] * n
-			max_mem = {i: f"{round(min(((gmems[i].total - gmems[i].used) / 1048576 - (2 if i else 3) * 1024), loads[i] * 1024))}MiB" for i in bit4}
-			max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("MiB")) > 0}
-			print("MAX_MEM:", max_mem)
-			model = AutoGPTQForCausalLM.from_quantized(
-				m,
-				max_memory=max_mem,
-				use_safetensors=True,
-				resume_download=True,
-				use_triton=False,
-				inject_fused_attention=False,
-				offload_folder="cache",
-			)
-			model = exllama_set_max_input_length(model, 4096)
-			mfut.set_result(model)
-			self.models[m] = (tokenizer, model)
-		if isinstance(model, concurrent.futures.Future):
-			model = model.result()
-		return model
+				raise RuntimeError(f'Model "{model}" not found.')
+			try:
+				tokenizer, model = self.models[m]
+			except KeyError:
+				tokenizer = backup_model(AutoTokenizer.from_pretrained, m)
+				mfut = concurrent.futures.Future()
+				self.models[m] = (tokenizer, mfut)
+				n = torch.cuda.device_count()
+				if not n:
+					raise RuntimeError("Required GPU not found.")
+				try:
+					import pynvml
+					pynvml.nvmlInit()
+					COMPUTE_ORDER = globals().get("COMPUTE_ORDER") or range(torch.cuda.device_count())
+
+					def cuda_info():
+						import torch
+						return [torch.cuda.get_device_properties(i) for i in range(len(COMPUTE_ORDER))]
+
+					fut2 = exc.submit(cuda_info)
+					handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(len(COMPUTE_ORDER))]
+					gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
+					tinfo = fut2.result()
+				except:
+					print_exc()
+					tinfo = gmems = COMPUTE_ORDER = []
+				COMPUTE_LOAD = globals().get("COMPUTE_LOAD") or [0] * n
+				high = max(COMPUTE_LOAD)
+				bit4 = [i for i in COMPUTE_ORDER if COMPUTE_LOAD[i] > high / 3]
+				total = sum(COMPUTE_LOAD[i] for i in bit4)
+				if high:
+					loads = [i / total * req if i < high * 0.9 else inf for i in COMPUTE_LOAD]
+				else:
+					loads = [inf] * n
+				max_mem = {i: f"{round(min(((gmems[i].total - gmems[i].used) / 1048576 - (2 if i else 3) * 1024), loads[i] * 1024))}MiB" for i in bit4}
+				max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("MiB")) > 0}
+				print("MAX_MEM:", max_mem)
+				model = AutoGPTQForCausalLM.from_quantized(
+					m,
+					max_memory=max_mem,
+					use_safetensors=True,
+					resume_download=True,
+					use_triton=False,
+					inject_fused_attention=False,
+					offload_folder="cache",
+				)
+				model = exllama_set_max_input_length(model, 4096)
+				mfut.set_result(model)
+				self.models[m] = (tokenizer, model)
+			if isinstance(model, concurrent.futures.Future):
+				model = model.result()
+			return model
+		except:
+			print_exc()
+			raise
 
 	def load_bnb(self, model):
+		print(f"LOADING BNB {model}...")
 		try:
-			import bitsandbytes
-		except ImportError:
-			bitsandbytes = None
-		buffer = 1.3
-		if model == "pygmalion-13b":
-			m = "PygmalionAI/mythalion-13b"
-			req = 13
-		elif model == "manticore-13b":
-			m = "openaccess-ai-collective/manticore-13b-chat-pyg"
-			req = 13
-		elif model == "hippogriff-30b":
-			m = "openaccess-ai-collective/hippogriff-30b-chat"
-			req = 33
-		elif model == "wizard-vicuna-30b":
-			# m = "Panchovix/Wizard-Vicuna-30B-Uncensored-lxctx-PI-16384-LoRA-fp16"
-			m = "ehartford/Wizard-Vicuna-30B-Uncensored"
-			req = 33
-			buffer = 1.5
-		elif model == "gplatty-30b":
-			m = "Panchovix/GPlatty-30B-lxctx-PI-16384-LoRA-fp16"
-			req = 33
-			buffer = 1.5
-		else:
-			m = "Henk717/airochronos-33B"
-			req = 33
-			buffer = 1.5
-		try:
-			tokenizer, model = self.models[m]
-		except KeyError:
-			tokenizer = backup_model(AutoTokenizer.from_pretrained, m)
-			# model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map="auto", torch_dtype=torch.float16, force=True)
-			n = torch.cuda.device_count()
-			if not n:
-				raise RuntimeError("Required GPU not found.")
-			config = AutoConfig.from_pretrained(
-				m,
-				tie_word_embeddings=True,
-				# max_position_embeddings=limit,
-				rope_scaling=dict(type="dynamic", factor=ceil(limit / 2048))
-			)
-			with accelerate.init_empty_weights():
-				model = AutoModelForCausalLM.from_config(config)
 			try:
-				import pynvml
-				pynvml.nvmlInit()
-				COMPUTE_ORDER = globals().get("COMPUTE_ORDER") or range(torch.cuda.device_count())
-
-				def cuda_info():
-					import torch
-					return [torch.cuda.get_device_properties(i) for i in range(len(COMPUTE_ORDER))]
-
-				fut2 = exc.submit(cuda_info)
-				handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(len(COMPUTE_ORDER))]
-				gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
-				tinfo = fut2.result()
-			except:
-				print_exc()
-				tinfo = gmems = COMPUTE_ORDER = []
-			bit8 = [i for i in COMPUTE_ORDER if tinfo[i].major >= 8 or not bitsandbytes]
-			max_mem = {i: f"{round((gmems[i].total - gmems[i].used) / 1048576 - (2 if i else 3) * 1024)}MiB" for i in bit8}
-			max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("MiB")) > 0}
-			rem = sum(int(v.removesuffix("MiB")) for v in max_mem.values()) / 1024 - req
-			cap = sum(int(v.removesuffix("MiB")) for v in max_mem.values()) / 1024
-			if cap > req * buffer:
-				max_mem = {k: f"{round(int(v.removesuffix('MiB')) / buffer)}MiB" for k, v in max_mem.items()}
-				dti = torch.int8
+				import bitsandbytes
+			except ImportError:
+				bitsandbytes = None
+			buffer = 1.3
+			if model == "pygmalion-13b":
+				m = "PygmalionAI/mythalion-13b"
+				req = 13
+			elif model == "manticore-13b":
+				m = "openaccess-ai-collective/manticore-13b-chat-pyg"
+				req = 13
+			elif model == "hippogriff-30b":
+				m = "openaccess-ai-collective/hippogriff-30b-chat"
+				req = 33
+			elif model == "wizard-vicuna-30b":
+				# m = "Panchovix/Wizard-Vicuna-30B-Uncensored-lxctx-PI-16384-LoRA-fp16"
+				m = "ehartford/Wizard-Vicuna-30B-Uncensored"
+				req = 33
+				buffer = 1.5
+			elif model == "gplatty-30b":
+				m = "Panchovix/GPlatty-30B-lxctx-PI-16384-LoRA-fp16"
+				req = 33
+				buffer = 1.5
 			else:
-				dti = torch.float16
-			max_mem["cpu"] = f"{round(psutil.virtual_memory().free / 1073741824 - 8)}GiB"
-			max_mem["disk"] = "1024GiB"
-			print("MAX_MEM:", max_mem)
-			print(cap, req, dti, bitsandbytes)
-			if not bitsandbytes:
-				dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, no_split_module_classes=["LlamaDecoderLayer"], dtype=torch.float16)
-				for k in ("lm_head", "model.norm"):
-					if k in dev_map:
-						dev_map[k] = 0
-				model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, offload_folder="cache", torch_dtype=torch.float16)
-			else:
-				dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, no_split_module_classes=["LlamaDecoderLayer"], dtype=dti)
-				# if rem > req * 3:
-				from transformers import BitsAndBytesConfig
-				quantization_config = BitsAndBytesConfig(
-					load_in_8bit=True,
-					llm_int8_threshold=6.0,
-					# llm_int8_enable_fp32_cpu_offload=True,
-					llm_int8_has_fp16_weight=False,
+				m = "Henk717/airochronos-33B"
+				req = 33
+				buffer = 1.5
+			try:
+				tokenizer, model = self.models[m]
+			except KeyError:
+				tokenizer = backup_model(AutoTokenizer.from_pretrained, m)
+				# model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map="auto", torch_dtype=torch.float16, force=True)
+				n = torch.cuda.device_count()
+				if not n:
+					raise RuntimeError("Required GPU not found.")
+				config = AutoConfig.from_pretrained(
+					m,
+					tie_word_embeddings=True,
+					# max_position_embeddings=limit,
+					rope_scaling=dict(type="dynamic", factor=ceil(limit / 2048))
 				)
-				for k in ("lm_head", "model.norm"):
-					if k in dev_map:
-						dev_map[k] = 0
-				model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, offload_folder="cache", load_in_8bit=True, quantization_config=quantization_config)
-			print(dev_map)
-			self.models[m] = (tokenizer, model)
-		return model
+				with accelerate.init_empty_weights():
+					model = AutoModelForCausalLM.from_config(config)
+				try:
+					import pynvml
+					pynvml.nvmlInit()
+					COMPUTE_ORDER = globals().get("COMPUTE_ORDER") or range(torch.cuda.device_count())
+
+					def cuda_info():
+						import torch
+						return [torch.cuda.get_device_properties(i) for i in range(len(COMPUTE_ORDER))]
+
+					fut2 = exc.submit(cuda_info)
+					handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(len(COMPUTE_ORDER))]
+					gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
+					tinfo = fut2.result()
+				except:
+					print_exc()
+					tinfo = gmems = COMPUTE_ORDER = []
+				bit8 = [i for i in COMPUTE_ORDER if tinfo[i].major >= 8 or not bitsandbytes]
+				max_mem = {i: f"{round((gmems[i].total - gmems[i].used) / 1048576 - (2 if i else 3) * 1024)}MiB" for i in bit8}
+				max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("MiB")) > 0}
+				rem = sum(int(v.removesuffix("MiB")) for v in max_mem.values()) / 1024 - req
+				cap = sum(int(v.removesuffix("MiB")) for v in max_mem.values()) / 1024
+				if cap > req * buffer:
+					max_mem = {k: f"{round(int(v.removesuffix('MiB')) / buffer)}MiB" for k, v in max_mem.items()}
+					dti = torch.int8
+				else:
+					dti = torch.float16
+				max_mem["cpu"] = f"{round(psutil.virtual_memory().free / 1073741824 - 8)}GiB"
+				max_mem["disk"] = "1024GiB"
+				print("MAX_MEM:", max_mem)
+				print(cap, req, dti, bitsandbytes)
+				if not bitsandbytes:
+					dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, no_split_module_classes=["LlamaDecoderLayer"], dtype=torch.float16)
+					for k in ("lm_head", "model.norm"):
+						if k in dev_map:
+							dev_map[k] = 0
+					model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, offload_folder="cache", torch_dtype=torch.float16)
+				else:
+					dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, no_split_module_classes=["LlamaDecoderLayer"], dtype=dti)
+					# if rem > req * 3:
+					from transformers import BitsAndBytesConfig
+					quantization_config = BitsAndBytesConfig(
+						load_in_8bit=True,
+						llm_int8_threshold=6.0,
+						# llm_int8_enable_fp32_cpu_offload=True,
+						llm_int8_has_fp16_weight=False,
+					)
+					for k in ("lm_head", "model.norm"):
+						if k in dev_map:
+							dev_map[k] = 0
+					model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, offload_folder="cache", load_in_8bit=True, quantization_config=quantization_config)
+				print(dev_map)
+				self.models[m] = (tokenizer, model)
+			return model
+		except:
+			print_exc()
+			raise
 
 	functions = [
 		{

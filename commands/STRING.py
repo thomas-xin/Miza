@@ -1432,9 +1432,10 @@ class Ask(Command):
 		if not bl:
 			print(f"{name}:", q)
 		pers = bot.commands.personality[0].retrieve((channel or guild).id)
-		if cname == "ask" and pers and ";" in pers:
+		if pers and ";" in pers:
 			model, pers = pers.split(";", 1)
-			cname = model = model.casefold().split("-", 1)[0]
+			if cname == "ask":
+				cname = model = model.casefold().split("-", 1)[0]
 			pers = pers.lstrip()
 		else:
 			model = "auto"
