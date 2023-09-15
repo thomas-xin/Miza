@@ -1432,7 +1432,7 @@ class Ask(Command):
 		if not bl:
 			print(f"{name}:", q)
 		pers = bot.commands.personality[0].retrieve((channel or guild).id)
-		if pers and ";" in pers:
+		if cname == "ask" and pers and ";" in pers:
 			model, pers = pers.split(";", 1)
 			cname = model = model.casefold().split("-", 1)[0]
 			pers = pers.lstrip()
@@ -1501,10 +1501,10 @@ class Ask(Command):
 					model = "gpt3+"
 				else:
 					model = "gpt4+"
+		if model.startswith("gpt4") and premium < 4:
+			model = "gpt3+"
 		if model.startswith("gpt3") and premium < 2:
 			model = "wizard"
-		elif model.startswith("gpt4") and premium < 4:
-			model = "gpt3+"
 		model = model or "gpt3+"
 		# emb_futs = []
 
