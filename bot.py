@@ -6475,12 +6475,15 @@ class SimulatedMessage:
 			if embeds:
 				kwargs["embeds"] = embeds
 		try:
-			file = kwargs.pop("file")
+			files = kwargs.pop("files", None) or [kwargs.pop("file")]
 		except KeyError:
 			pass
 		else:
-			f = await create_future(as_file, file)
-			kwargs["file"] = f[0]
+			ofiles = []
+			for file in files:
+				f = await create_future(as_file, file)
+				ofiles.append(f)
+			kwargs["files"] = ofiles
 		self.response.append(kwargs)
 		return self
 

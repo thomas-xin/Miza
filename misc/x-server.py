@@ -1949,6 +1949,8 @@ transform: translate(-50%, -50%);
 				fo = f"{of}.{fmt}"
 				if hwaccel == "cuda":
 					args.extend(("-c:v", "h264_nvenc"))
+					devid = random.randint(0, ceil(torch.cuda.device_count() / 2))
+					args = args[:1] + ["-hwaccel_device", str(devid)] + args[1:]
 				else:
 					args.extend(("-c:v", "h264"))
 				args.extend((

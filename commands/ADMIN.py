@@ -1695,7 +1695,7 @@ class CreateEmoji(Command):
 			if not name:
 				name = "emoji_" + str(len(guild.emojis))
 			# print(name, url)
-			image = resp = await bot.get_request(url, timeout=20)
+			image = resp = await bot.get_request(url, timeout=60)
 			if len(image) > 1073741824:
 				raise OverflowError("Max file size to load is 1GB.")
 			if len(image) > 262144 or not is_image(url):
@@ -1790,9 +1790,9 @@ class CreateSticker(Command):
 			if not name:
 				name = "emoji_" + str(len(guild.emojis))
 			# print(name, url)
-			image = resp = await bot.get_request(url, timeout=28)
-			if len(image) > 268435456:
-				raise OverflowError("Max file size to load is 256MB.")
+			image = resp = await bot.get_request(url, timeout=60)
+			if len(image) > 1073741824:
+				raise OverflowError("Max file size to load is 1GB.")
 			# if len(image) > 512000 or not is_image(url):
 			# ts = ts_us()
 			# path = "cache/" + str(ts)

@@ -165,6 +165,11 @@ def get_best_video(entry):
 
 # Joins a voice channel and returns the associated audio player.
 async def auto_join(guild, channel, user, bot, preparing=False, vc=None):
+	if not getattr(user, "voice", None):
+		g = vc.guild if vc else guild
+		perm = bot.get_perms(user, g)
+		if perm < 1:
+			raise Command.perm_error(Command, perm, 1, f"to remotely operate audio player for {g}")
 	if type(channel) in (str, int):
 		channel = await bot.fetch_channel(channel)
 	if guild.id not in bot.data.audio.players:
@@ -2595,6 +2600,12 @@ class AudioDownloader:
 						video = info["video"] = get_best_video(data)
 					vidinfo = as_str(subprocess.check_output(["./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "default=nokey=1:noprint_wrappers=1", video])).strip()
 					args = alist(("./ffmpeg", "-nostdin", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-err_detect", "ignore_err", "-fflags", "+discardcorrupt+genpts+igndts+flush_packets", "-y"))
+					if hwaccel == "cuda":
+						if "av1_nvenc" in args:
+							devid = random.choice([i for i in range(torch.cuda.device_count()) if (torch.cuda.get_device_properties(i).major, torch.cuda.get_device_properties(i).minor) >= (8, 9)])
+						else:
+							devid = random.randint(0, ceil(torch.cuda.device_count() / 2))
+						args.extend(("-hwaccel_device", str(devid)))
 					if len(urls) == 1:
 						if str(start) != "None":
 							start = round_min(float(start))
@@ -2616,7 +2627,6 @@ class AudioDownloader:
 					args.extend(("-vf", vf))
 					# Pipe to main process, as raw video is extremely bloated and easily overflows hundreds of GB disk
 					args.extend(("-f", "rawvideo", "-pix_fmt", "rgb24", "-"))
-					cfn = fut.result()[0]
 					print(args)
 					pin = psutil.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=1048576)
 					with suppress():
@@ -2632,6 +2642,7 @@ class AudioDownloader:
 					# Calculate duration and exact amount of audio samples to use, minimising possibility of desyncs
 					duration = fsize / np.prod(size) / 3 / fps
 					amax = round_random(duration * SAMPLE_RATE) * 2 * 2
+					cfn = fut.result()[0]
 					# Write audio to the raw pcm as desired; trim if there is too much, pad with zeros if not enough
 					asize = 0
 					if os.path.getsize(cfn):
