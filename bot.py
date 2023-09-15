@@ -1510,6 +1510,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			p3 = await fut
 			p1, p2, p3 = sorted((p1, p2, p3), key=len)
 			tup = (tup[0], p2, p3, best)
+			if len(p1) > 7 and " " in p1 and p1.isascii():
+				tup = (tup[0], p3, p2 + "\n" + p1, best)
 			print("BEST:", tup)
 		self.analysed[h] = tup
 		while len(self.analysed) > 65536:

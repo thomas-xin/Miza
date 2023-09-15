@@ -1699,15 +1699,17 @@ class CreateEmoji(Command):
 			if len(image) > 1073741824:
 				raise OverflowError("Max file size to load is 1GB.")
 			if len(image) > 262144 or not is_image(url):
-				ts = ts_us()
-				path = "cache/" + str(ts)
-				with open(path, "wb") as f:
-					await create_future(f.write, image, timeout=18)
+				# ts = ts_us()
+				# path = "cache/" + str(ts)
+				# with open(path, "wb") as f:
+					# await create_future(f.write, image, timeout=18)
+				o_image = image
 				verified = False
 				width = 128
 				while len(image) > 262144 or not verified:
+					print("RESIZE:", width)
 					try:
-						resp = await process_image(path, "resize_max", [width], timeout=_timeout)
+						resp = await process_image(o_image, "resize_max", [width, "-o"], timeout=_timeout)
 					except:
 						raise
 					else:
@@ -1717,12 +1719,18 @@ class CreateEmoji(Command):
 								break
 							r = os.path.getsize(fn) / 262144
 							if r > 1:
-								width = floor(width / sqrt(r))
+								width = min(width - 1, floor(width / sqrt(r)))
 								continue
 							with open(fn, "rb") as f:
 								image = await create_future(f.read, timeout=18)
 						else:
 							image = fn
+							if not image:
+								break
+							r = len(image) / 262144
+							if r > 1:
+								width = min(width - 1, floor(width / sqrt(r)))
+								continue
 						verified = True
 					finally:
 						with suppress():
@@ -1786,15 +1794,17 @@ class CreateSticker(Command):
 			if len(image) > 268435456:
 				raise OverflowError("Max file size to load is 256MB.")
 			# if len(image) > 512000 or not is_image(url):
-			ts = ts_us()
-			path = "cache/" + str(ts)
-			with open(path, "wb") as f:
-				await create_future(f.write, image, timeout=18)
+			# ts = ts_us()
+			# path = "cache/" + str(ts)
+			# with open(path, "wb") as f:
+				# await create_future(f.write, image, timeout=18)
+			o_image = image
 			verified = False
 			width = 320
 			while len(image) > 512000 or not verified:
+				print("RESIZE:", width)
 				try:
-					resp = await process_image(path, "resize_max", [width, "-d", 5, "-f", "apng"], timeout=_timeout)
+					resp = await process_image(o_image, "resize_max", [width, "-o", "-d", 5, "-f", "apng"], timeout=_timeout)
 				except:
 					raise
 				else:
@@ -1804,12 +1814,18 @@ class CreateSticker(Command):
 							break
 						r = os.path.getsize(fn) / 512000
 						if r > 1:
-							width = floor(width / sqrt(r))
+							width = min(width - 1, floor(width / sqrt(r)))
 							continue
 						with open(fn, "rb") as f:
 							image = await create_future(f.read, timeout=18)
 					else:
 						image = fn
+						if not image:
+							break
+						r = len(image) / 512000
+						if r > 1:
+							width = min(width - 1, floor(width / sqrt(r)))
+							continue
 					verified = True
 				finally:
 					with suppress():

@@ -18,6 +18,22 @@ import numpy as np
 from math import *
 sys.path.append("misc")
 
+print = lambda *args, sep=" ", end="\n": sys.stdout.buffer.write(f"~print(*{repr(tuple(args))},sep={repr(sep)},end={repr(end)})\n".encode("utf-8"))
+
+def lim_str(s, maxlen=10, mode="centre"):
+	if maxlen is None:
+		return s
+	if type(s) is not str:
+		s = str(s)
+	over = (len(s) - maxlen) / 2
+	if over > 0:
+		if mode == "centre":
+			half = len(s) / 2
+			s = s[:ceil(half - over - 1)] + ".." + s[ceil(half + over + 1):]
+		else:
+			s = s[:maxlen - 3] + "..."
+	return s
+
 CACHE = {}
 
 def wrap_future(fut, loop=None):
@@ -102,6 +118,8 @@ if CAPS.intersection(("image", "caption", "sd", "sdxl", "sdxlr")):
 	Transpose = getattr(Image, "Transpose", Image)
 	Transform = getattr(Image, "Transform", Image)
 	Image.MAX_IMAGE_PIXELS = 4294967296
+	from PIL import GifImagePlugin
+	GifImagePlugin.LOADING_STRATEGY = GifImagePlugin.LoadingStrategy.RGB_AFTER_DIFFERENT_PALETTE_ONLY
 else:
 	Image = None
 
@@ -964,7 +982,7 @@ if "video" in CAPS:
 				vf = ""
 			if w != size[0]:
 				vf += "scale=" + str(round(w)) + ":-1:flags=lanczos,"
-			vf += "split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle"
+			vf += "split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=sierra3:diff_mode=rectangle"
 			command.extend([vf, "-loop", "0", "-framerate", str(fps)])
 			if hwaccel == "cuda":
 				if out.endswith(".mp4"):
@@ -1915,9 +1933,23 @@ def from_bytes(b, save=None, nogif=False):
 		ib = io.BytesIO(im.make_blob("png32"))
 	return Image.open(ib)
 
+def round_random(x):
+	try:
+		y = int(x)
+	except (ValueError, TypeError):
+		return x
+	if y == x:
+		return y
+	x -= y
+	if random.random() <= x:
+		y += 1
+	return y
+
 def ImageOpIterator(image, step, operation, ts, args):
 	# Attempt to perform operation on all individual frames of .gif images
-	for i, f in enumerate(range(0, 2147483648, step)):
+	fl = 0
+	for i in range(2147483648):
+		f = max(fl, round_random(i * step))
 		np.random.seed(ts & 4294967295)
 		globals()["CURRENT_FRAME"] = i
 		try:
@@ -1963,7 +1995,7 @@ if Image:
 				self._images = images
 			for i1, i2 in zip(self._images, images):
 				if "duration" in i2.info:
-					i1.info["duration"] = max(i2.info.get("duration", 0), 50)
+					i1.info["duration"] = max(i2.info.get("duration", 0), 1000 / 40)
 			self._position = 0
 
 		__len__ = lambda self: len(self._images)
@@ -2033,7 +2065,13 @@ def evalImg(url, operation, args):
 	if len(args) > 1 and args[-2] == "-d":
 		dur = args.pop(-1) * 1000
 		args.pop(-1)
+	if args and args[-1] == "-o":
+		opt = True
+		args.pop(-1)
+	else:
+		opt = False
 	if operation != "$":
+		# print("IOPER:", operation, args)
 		if args and args[0] == "-nogif":
 			nogif = args.pop(0)
 		else:
@@ -2047,6 +2085,7 @@ def evalImg(url, operation, args):
 			else:
 				nodel = False
 			image = get_image(url, out, nodel=nodel, nogif=nogif)
+		# print("AOPER:", image, args)
 		# -gif is a special case where the output is always an animated format (gif, mp4, mkv etc)
 		if args and args[-1] == "-gif":
 			args.pop(-1)
@@ -2057,6 +2096,7 @@ def evalImg(url, operation, args):
 				if size != image.size:
 					image = ImageSequence(image, func=resize_to, args=size)
 			new = eval(operation)(image, *args)
+			# print("GIF:", new)
 		else:
 			try:
 				if nogif:
@@ -2076,6 +2116,7 @@ def evalImg(url, operation, args):
 					new = eval(operation)(temp, *args)
 				else:
 					new = func(*args)
+				# print("SINGLE:", new)
 			else:
 				new = dict(frames=deque(), duration=0)
 				globals()["ANIM"] = True
@@ -2084,18 +2125,24 @@ def evalImg(url, operation, args):
 						image.seek(f)
 					except EOFError:
 						break
-					new["duration"] += max(image.info.get("duration", 0), 50)
+					new["duration"] += max(image.info.get("duration", 0), 1000 / 240)
 				fps = 1000 * f / new["duration"]
+				fpl = 30 if opt else 40
 				step = 1
-				while fps / step >= 40:
+				while fps / step >= fpl:
 					step += 1
-				new["count"] = f // step
+				if f // step > 2000:
+					step = f / 1999
+				new["count"] = int(f // step)
+				print("ImageOPIterator:", image, step, fps, fpl, f)
 				new["frames"] = ImageOpIterator(image, step, operation=operation, ts=ts, args=args)
 	else:
 		new = eval(url)(*args)
+		# print("OPER:", new)
 	if Image and isinstance(new, Image.Image):
 		if getattr(new, "audio", None):
 			new = dict(count=1, duration=1, frames=[new])
+	# print("NEW:", new)
 	if type(new) is dict and "frames" in new:
 		frames = optimise(new["frames"])
 		if not frames:
@@ -2120,7 +2167,7 @@ def evalImg(url, operation, args):
 			# print("VIDEO:", new)
 			if fmt in ("default", "png", "jpg", "jpeg", "bmp"):
 				fmt = "gif"
-			print(duration, new["count"])
+			print("DURATION:", duration, new["count"])
 			# if new["count"] <= 1024:
 			#	 it = iter(frames)
 			#	 first = next(it)
@@ -2162,14 +2209,40 @@ def evalImg(url, operation, args):
 				])
 				if fmt in ("gif", "apng"):
 					command.extend(("-gifflags", "-offsetting"))
-					if new["count"] > 4096:
-						# vf = None
-						vf = "split[s0][s1];[s0]palettegen=reserve_transparent=1:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle:alpha_threshold=128"
+					vf = "split[s0][s1];[s0]palettegen="
+					if mode == "RGBA":
+						vf += "reserve_transparent=1:"
 					else:
-						vf = "split[s0][s1];[s0]palettegen="
-						if mode == "RGBA":
-							vf += "reserve_transparent=1:"
-						vf += "stats_mode=diff[p];[s1][p]paletteuse=alpha_threshold=128:diff_mode=rectangle"
+						vf += "reserve_transparent=0:"
+					if opt:
+						frames = list(frames)
+						fr = frames.copy()
+						first = fr.pop(0)
+						last = fr.pop(-1)
+						cols = set()
+						cols.add((0, 0, 0))
+						random.shuffle(fr)
+						fr = [first, last, *fr]
+						c = min(len(fr), max(5, floor(sqrt(len(fr)))))
+						for i, f in enumerate(fr[:c]):
+							if isinstance(f, Image.Image):
+								im = f.resize((5, 5), resample=Resampling.NEAREST)
+								R, G, B = rgb_split(im)
+								for r, g, b in zip(R.ravel(), G.ravel(), B.ravel()):
+									l = max(r, g, b)
+									if l < 1:
+										continue
+									t = tuple(min(255, round(x / l * 16) * 16) for x in (r, g, b))
+									if t not in cols:
+										cols.add(t)
+						mc = min(64, max(4 + ("A" in mode), len(cols) + 1 >> 1))
+						vf += f"max_colors={mc}:stats_mode=diff[p];[s1][p]paletteuse=dither=sierra3:diff_mode=rectangle"
+					elif new["count"] > 4096:
+						vf += "max_colors=128:stats_mode=diff[p];[s1][p]paletteuse=dither=sierra2_4a:diff_mode=rectangle"
+					else:
+						vf += "stats_mode=diff[p];[s1][p]paletteuse=dither=sierra3:diff_mode=rectangle"
+					if "A" in mode:
+						vf += ":alpha_threshold=128"
 					if vf:
 						command.extend(("-vf", vf))
 					if fmt == "apng":
@@ -2195,7 +2268,7 @@ def evalImg(url, operation, args):
 					if first.width & 1 or first.height & 1:
 						w = round(first.width / 2) * 2
 						h = round(first.height / 2) * 2
-						command.extend(("-vf", f"scale={w}:{h}"))
+						command.extend(("-vf", f"scale={w}:{h}:flags=bicubic"))
 					if new.get("count", inf) <= 16:
 						crf = 18
 					else:
@@ -2217,7 +2290,7 @@ def evalImg(url, operation, args):
 					out = "cache/" + str(ts) + "." + fmt
 				command.append(out)
 				print(command)
-				proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, bufsize=1048576)
+				proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, bufsize=1048576)
 			for i, frame in enumerate(frames):
 				if fmt == "zip":
 					b = io.BytesIO()
@@ -2263,9 +2336,33 @@ def evalImg(url, operation, args):
 			else:
 				proc.stdin.close()
 				proc.wait()
+			if opt and fmt == "gif":
+				if os.name == "nt":
+					if not os.path.exists("misc/gifsicle.exe") or os.path.getsize("misc/gifsicle.exe") < 4096:
+						import requests
+						with requests.get("https://cdn.discordapp.com/attachments/1093723058386256022/1152254352963145748/gifsicle.exe") as resp:
+							b = resp.content
+						with open("misc/gifsicle.exe", "wb") as f:
+							f.write(b)
+				else:
+					if not os.path.exists("misc/gifsicle") or os.path.getsize("misc/gifsicle") < 4096:
+						import requests
+						with requests.get("https://cdn.discordapp.com/attachments/1093723058386256022/1152254899694870599/gifsicle-static") as resp:
+							b = resp.content
+						with open("misc/gifsicle", "wb") as f:
+							f.write(b)
+						subprocess.run(("chmod", "777", "misc/gifsicle"))
+				if "." in out:
+					out2 = out.rsplit(".", 1)[0] + "~2." + out.rsplit(".", 1)[-1]
+				else:
+					out2 = out + "~2"
+				args = ["misc/gifsicle", "-O3", "--loopcount=forever", "--lossy=100", "-o", out2, out]
+				print(args)
+				subprocess.run(args)
+				out = out2
+			# return [out]
 			with open(out, "rb") as f:
 				return f.read()
-			# return [out]
 	if Image and isinstance(new, Image.Image):
 		new = optimise(new, keep_rgb=False)
 		if new.entropy() > 8 and fmt in ("default", "webp"):
@@ -2287,6 +2384,8 @@ def evalImg(url, operation, args):
 	return new
 
 
+ILLEGAL_EXCS = (BrokenPipeError, OSError, RuntimeError, TimeoutError, asyncio.TimeoutError, concurrent.futures.TimeoutError)
+
 def evaluate(ts, args):
 	try:
 		out = evalImg(*args)
@@ -2307,8 +2406,12 @@ def evaluate(ts, args):
 		else:
 			sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_result({repr(out)})\n".encode("utf-8"))
 	except Exception as ex:
+		if isinstance(ex, ILLEGAL_EXCS):
+			ex = SystemError(ex.__class__.__name__, *ex.args)
 		sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_exception({repr(ex)})\n".encode("utf-8"))
-		sys.stdout.buffer.write(f"~print({args},{repr(traceback.format_exc())},sep='\\n',end='')\n".encode("utf-8"))
+		sa = lim_str(args, 256)
+		sys.stdout.buffer.write(f"~print({sa},{repr(traceback.format_exc())},sep='\\n',end='')\n".encode("utf-8"))
+		traceback.print_exc()
 	sys.stdout.flush()
 
 
@@ -2350,9 +2453,13 @@ if __name__ == "__main__":
 				else:
 					exc.submit(evaluate, ts, args)
 			except Exception as ex:
+				if isinstance(ex, ILLEGAL_EXCS):
+					ex = SystemError(ex.__class__.__name__, *ex.args)
 				sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_exception({repr(ex)})\n".encode("utf-8"))
-				sys.stdout.buffer.write(f"~print({s}, end='')\n".encode("utf-8"))
+				sa = lim_str(s, 256)
+				sys.stdout.buffer.write(f"~print({sa}, end='')\n".encode("utf-8"))
 				sys.stdout.buffer.write(f"~print({repr(traceback.format_exc())}, end='')\n".encode("utf-8"))
+				traceback.print_exc()
 				sys.stdout.flush()
 			while len(CACHE) > 32:
 				try:

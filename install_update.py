@@ -132,6 +132,10 @@ if os.environ.get("AI_FEATURES", True):
 	try:
 		assert pkg_resources.get_distribution("encodec").version >= "0.1.2a3"
 	except (pkg_resources.DistributionNotFound, AssertionError):
-		subprocess.run([python, "-m", "pip", "install", "git+https://github.com/facebookresearch/encodec", "--user"])
+		subprocess.run([python, "-m", "pip", "install", "git+https://github.com/facebookresearch/encodec", "--upgrade", "--user"])
+	try:
+		assert pkg_resources.get_distribution("auto-gptq").version >= "0.4.2+cu118"
+	except (pkg_resources.DistributionNotFound, AssertionError):
+		subprocess.run([python, "-m", "pip", "install", "auto-gptq", "--upgrade", "--user", "--extra-index-url", "https://huggingface.github.io/autogptq-index/whl/cu118/"])
 
 print("Installer terminated.")

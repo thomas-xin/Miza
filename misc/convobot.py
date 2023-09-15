@@ -38,6 +38,7 @@ AC = bytes(i ^ 158 for i in b'n\x03\x07\nn\x03\x07:n\x03\x074\xben\x03\x07\x08n\
 chatgpt = AsyncChatGPT = None
 
 from math import *
+
 def lim_str(s, maxlen=10, mode="centre"):
 	if maxlen is None:
 		return s
@@ -667,7 +668,7 @@ class Bot:
 					tinfo = gmems = COMPUTE_ORDER = []
 				COMPUTE_LOAD = globals().get("COMPUTE_LOAD") or [0] * n
 				high = max(COMPUTE_LOAD)
-				bit4 = [i for i in COMPUTE_ORDER if COMPUTE_LOAD[i] > high / 3]
+				bit4 = [i for i in COMPUTE_ORDER if COMPUTE_LOAD[i] > high / 4]
 				total = sum(COMPUTE_LOAD[i] for i in bit4)
 				if high:
 					loads = [i / total * req if i < high * 0.9 else inf for i in COMPUTE_LOAD]

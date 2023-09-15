@@ -21,6 +21,7 @@ with open("auth.json", "rb") as f:
 	AUTH = json.load(f)
 compute_load = AUTH.get("compute_load") or []
 
+IS_MAIN = False
 # Spec requirements:
 # ytdl											anything with internet
 # math			CPU >1							multithreading support
@@ -43,6 +44,19 @@ def spec2cap():
 		ffmpeg = False
 	else:
 		ffmpeg = True
+	done = set()
+	import pynvml
+	pynvml.nvmlInit()
+	handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(DC)]
+	rrams = [pynvml.nvmlDeviceGetMemoryInfo(d).total for d in handles]
+	vrams = tuple(rrams)
+	cut = 0
+	if AUTH.get("discord_token") and any(v > 6 * 1073741824 and c > 700000 for v, c in zip(rrams, COMPUTE_POT)):
+		vram = sum(rrams[i] for i in range(DC) if COMPUTE_POT[i] > 400000)
+		if vram > 43 * 1073741824:
+			yield [-1, "agpt", "gptq"]
+			done.add("gptq")
+			cut = 48 * 1073741824
 	if cc > 1:
 		caps.append("math")
 		if cc > 3 and ram > 6 * 1073741824 and ffmpeg:
@@ -58,57 +72,56 @@ def spec2cap():
 			caps.append("image")
 		if ram > 46 * 1073741824:
 			caps.append("caption")
-		if cc > 3 and ram > 46 * 1073741824:
+		if not cut and cc > 3 and ram > 46 * 1073741824:
 			caps.append("agpt")
 		yield caps
 	if not DC:
 		return
-	done = set()
-	import pynvml
-	pynvml.nvmlInit()
-	handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(DC)]
-	vrams = [pynvml.nvmlDeviceGetMemoryInfo(d).total for d in handles]
-	cut = 0
-	if AUTH.get("discord_token") and any(v > 6 * 1073741824 and c > 700000 for v, c in zip(vrams, COMPUTE_POT)):
-		vram = sum(vrams[i] for i in range(DC) if COMPUTE_POT[i] > 400000)
-		if vram > 43 * 1073741824:
-			yield [-1, "agpt", "gptq"]
-			cut = 48 * 1073741824
 	if cut:
 		for i in COMPUTE_ORDER:
-			v = vrams[i]
+			v = rrams[i]
 			if cut > 0:
 				red = min(cut, v)
-				vrams[i] = v - red
+				rrams[i] = v - red
 				cut -= red
 			else:
 				break
-	for i, v in reversed(tuple(enumerate(vrams))):
+	for i, v in reversed(tuple(enumerate(rrams))):
 		c = COMPUTE_POT[i]
 		caps = [i]
 		if c > 100000 and v > 3 * 1073741824 and ffmpeg:
 			caps.append("video")
 			caps.append("ecdc")
 		if c > 400000 and v > 15 * 1073741824:
-			if "sdxlr" not in done or c <= 600000:
+			if "sdxlr" not in done or c <= 600000 or "sd" in done:
 				caps.append("sdxlr")
 				caps.append("sdxl")
 				done.add("sdxlr")
 				v -= 15 * 1073741824
+		elif c > 400000 and IS_MAIN and "sdxlr" not in done and vrams[i] > 15 * 1073741824:
+			caps.append("sdxlr")
+			caps.append("timeout")
+			done.add("sdxlr")
+			v = 0
 		elif c > 400000 and v > 9 * 1073741824:
-			if "sdxl" not in done or c <= 600000:
-				caps.append("sdxl")
-				caps.append("sd")
-				done.add("sdxl")
-				v -= 9 * 1073741824
+			# if "sdxl" not in done or c <= 600000:
+			caps.append("sdxl")
+			caps.append("sd")
+			done.add("sdxl")
+			v -= 9 * 1073741824
+		elif c > 400000 and IS_MAIN and "sdxl" not in done and vrams[i] > 9 * 1073741824:
+			caps.append("sdxl")
+			caps.append("timeout")
+			done.add("sdxl")
+			v = 0
 		elif c > 200000 and v > 5 * 1073741824:
 			if "sd" not in done or c <= 600000:
 				caps.append("sd")
 				done.add("sd")
 				v -= 5 * 1073741824
-		if v <= 4 * 1073741824:
-			v = 0
-		vrams[i] = v
+		# if v <= 4 * 1073741824:
+			# v = 0
+		# vrams[i] = v
 		if len(caps) > 1:
 			yield caps
 
