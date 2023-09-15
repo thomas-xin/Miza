@@ -446,7 +446,10 @@ try:
 		if data:
 			for proc in procs:
 				if proc.waiting:
-					proc.waiting.set_result(None)
+					try:
+						proc.waiting.set_result(None)
+					except:
+						pass
 					# proc.waiting = None
 		time.sleep(5)
 except:
