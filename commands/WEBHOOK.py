@@ -347,7 +347,7 @@ class UpdateAutoEmojis(Database):
 							)
 							await m.edit(embed=emb)
 							self.pop(m.channel.id)
-							self.temp.pop(m.channel.id)
+							self.bot.data.webhooks.temp.pop(m.channel.id, None)
 						# create_task(self.bot.silent_delete(m))
 						# m2 = await self.bot.send_as_webhook(message.channel, msg, files=files, username=message.author.display_name, avatar_url=url)
 

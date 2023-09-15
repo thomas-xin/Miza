@@ -1868,7 +1868,7 @@ def from_bytes(b, save=None, nogif=False):
 			fn = "cache/" + str(ts)
 			with open(fn, "wb") as f:
 				f.write(data)
-			cmd = ("./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,avg_frame_rate", "-of", "csv=s=x:p=0", fn)
+			cmd = ("./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,avg_frame_rate,duration", "-of", "csv=s=x:p=0", fn)
 			print(cmd)
 			p = psutil.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 			cmd2 = ["./ffmpeg", "-hide_banner", "-v", "error", "-y", "-i", fn, "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0"]
@@ -1877,23 +1877,38 @@ def from_bytes(b, save=None, nogif=False):
 			cmd2.append("-")
 			print(cmd2)
 			proc = psutil.Popen(cmd2, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1048576)
-			bcount = 4 if fmt == "rgba" else 3
 			mode = "RGBA" if fmt == "rgba" else "RGB"
 			try:
 				res = as_str(p.stdout.read()).strip()
 				if not res:
 					raise TypeError(f'Filetype "{mime}" is not supported.')
-				info = res.split("x", 2)
+				info = res.split("x", 3)
 			except:
 				print(as_str(p.stderr.read()), end="")
 				raise
 			print(info)
 			size = tuple(map(int, info[:2]))
+			dur = float(info[3])
 			try:
-				duration = 1000 / eval(info[-1], {}, {})
+				fps = eval(info[2], {}, {})
 			except (ValueError, TypeError, SyntaxError, ZeroDivisionError):
-				duration = 33.333333333333333
+				fps = 30
+			framedur = 1000 / fps
+			bcount = 4 if fmt == "rgba" else 3
 			bcount *= int(np.prod(size))
+			bytecount = bcount * dur * fps
+			if not nogif and bytecount > 32 * 1073741824:
+				proc.terminate()
+				scale = sqrt((32 * 1073741824) / bytecount)
+				fps = max(8, fps * scale)
+				w, h = round(size[0] * scale), round(size[1] * scale)
+				size = (w, h)
+				framedur = 1000 / fps
+				bcount = 4 if fmt == "rgba" else 3
+				bcount *= int(np.prod(size))
+				cmd3 = ["./ffmpeg", "-hide_banner", "-v", "error", "-y", "-i", fn, "-vf", f"fps=fps={fps},scale={w}:{h}:flags=bicubic", "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0", "-"]
+				print(cmd3)
+				proc = psutil.Popen(cmd3, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1048576)
 			images = deque()
 			while True:
 				b = proc.stdout.read(bcount)
@@ -1904,12 +1919,12 @@ def from_bytes(b, save=None, nogif=False):
 				if len(b) < bcount:
 					break
 				img = Image.frombuffer(mode, size, b)
-				img.info["duration"] = duration
+				img.info["duration"] = framedur
 				images.append(img)
 			if images:
 				proc.wait(timeout=2)
 				return ImageSequence(*images)
-			print(proc.stderr.read())
+			raise RuntimeError(as_str(proc.stderr.read()))
 	# except:
 	# 	pass
 	except Exception as ex:
@@ -2133,6 +2148,8 @@ def evalImg(url, operation, args):
 					step += 1
 				if f // step > 2000:
 					step = f / 1999
+				elif f // step > 1000 and fpl > 20:
+					step = f / 999
 				new["count"] = int(f // step)
 				print("ImageOPIterator:", image, step, fps, fpl, f)
 				new["frames"] = ImageOpIterator(image, step, operation=operation, ts=ts, args=args)
