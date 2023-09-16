@@ -102,6 +102,10 @@ if len(sys.argv) > 5:
 	COMPUTE_ORDER = orjson.loads(sys.argv[5])
 else:
 	COMPUTE_ORDER = []
+if len(sys.argv) > 6:
+	IT = int(sys.argv[6])
+else:
+	IT = 0
 
 if CAPS.intersection(("image", "caption", "sd", "sdxl", "sdxlr")):
 	import zipfile, blend_modes
@@ -1757,8 +1761,30 @@ if "gptq" in CAPS or "agpt" in CAPS:
 	else:
 		convobot.AsyncChatGPT = AsyncChatGPT
 
-	if "gptq" in CAPS:
-		exc.submit(convobot.Bot().load_gptq, "wizard-70b")
+	# if "gptq" in CAPS:
+		# mods = dict(
+			# load_gptq=(
+				# "wizard-70b",
+				# "kimiko-70b",
+				# "wizard-coder-34b",
+				# "orca-70b",
+				# "nous-puffin-70b",
+			# ),
+			# load_bnb=(
+				# "pygmalion-13b",
+				# "manticore-13b",
+				# "wizard-vicuna-30b",
+				# "airochronos-33b",
+				# "hippogriff-30b",
+				# "gplatty-30b",
+			# ),
+		# )
+		# exc.submit(load_models)
+		# exc.submit(convobot.Bot().load_gptq, "wizard-70b")
+		# def load_model(bot, func, mod):
+			# getattr(bot, func)(mod)
+			# sys.__stdout__.buffer.write(b"#R\n")
+			# sys.__stdout__.flush()
 
 if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 	import imagebot
@@ -2249,10 +2275,10 @@ def evalImg(url, operation, args):
 									l = max(r, g, b)
 									if l < 1:
 										continue
-									t = tuple(min(255, round(x / l * 16) * 16) for x in (r, g, b))
+									t = tuple(min(255, round(log2(x / l * 255 + 1) * 2) * 16) for x in (r, g, b))
 									if t not in cols:
 										cols.add(t)
-						mc = min(64, max(4 + ("A" in mode), len(cols) + 1 >> 1))
+						mc = min(64, max(4, 2 ** ceil(log2(len(cols) + 1 >> 1))))
 						vf += f"max_colors={mc}:stats_mode=diff[p];[s1][p]paletteuse=dither=sierra3:diff_mode=rectangle"
 					elif new["count"] > 4096:
 						vf += "max_colors=128:stats_mode=diff[p];[s1][p]paletteuse=dither=sierra2_4a:diff_mode=rectangle"

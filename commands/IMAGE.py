@@ -1035,7 +1035,7 @@ class CreateGIF(Command):
 
 
 class Resize(Command):
-	name = ["ImageScale", "Scale", "Rescale", "ImageResize", "Denoise", "Enhance", "Refine"]
+	name = ["ImageScale", "Scale", "Rescale", "ImageResize", "Denoise", "Enhance", "Refine", "Copy", "Jumbo"]
 	description = "Changes size of supplied image, using an optional scaling operation."
 	usage = "<0:url> <1:resolution|multiplier>? <2:y_multiplier(x)>? (nearest|linear|hamming|bicubic|lanczos|scale2x|sdxl|crop|auto)?"
 	example = ("scale https://mizabot.xyz/favicon 4", "resize https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png 2048x2048 scale2x")

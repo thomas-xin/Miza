@@ -847,7 +847,10 @@ def round_min(x):
 		if x.isnumeric():
 			return int(x)
 		if "." in x:
-			x = float(x.strip("0"))
+			x = x.strip("0")
+			if x == ".":
+				return 0
+			x = float(x)
 		else:
 			try:
 				return int(x)

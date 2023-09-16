@@ -1025,7 +1025,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			messages.append(m)
 		data = {m.id: m for m in messages}
 		self.cache.messages.update(data)
-		return self.cache.messages[m_id]
+		return apply_stickers(self.cache.messages[m_id])
 	def fetch_message(self, m_id, channel=None):
 		if type(m_id) is not int:
 			try:
@@ -1036,7 +1036,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			return as_fut(self.cache.messages[m_id])
 		if "message_cache" in self.data:
 			with suppress(KeyError):
-				return as_fut(self.data.message_cache.load_message(m_id))
+				message = self.data.message_cache.load_message(m_id)
+				return as_fut(message)
 		return self._fetch_message(m_id, channel)
 
 	# Fetches a role from ID and guild, using the bot cache when possible.
@@ -1272,6 +1273,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					temp = await self.follow_to_image(m.content, follow=reactions)
 					found.extend(filter(is_url, temp))
 					# Attempt to find URLs in embed contents
+					apply_stickers(m)
 					for e in m.embeds:
 						for a in medias:
 							obj = getattr(e, a, None)
@@ -1507,12 +1509,26 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		else:
 			tup = ("Image", p1, p2, best)
 		if best:
-			p3 = await fut
-			p1, p2, p3 = sorted((p1, p2, p3), key=len)
-			tup = (tup[0], p2, p3, best)
-			if len(p1) > 7 and " " in p1 and p1.isascii():
-				tup = (tup[0], p3, p2 + "\n" + p1, best)
-			print("BEST:", tup)
+			try:
+				p3 = await asyncio.wait_for(asyncio.shield(fut), timeout=20)
+			except (T0, T1, T2):
+
+				async def recaption(h, p1, p2, fut):
+					p3 = await fut
+					p1, p2, p3 = sorted((p1, p2, p3), key=len)
+					tup = (tup[0], p2, p3, best)
+					if len(p1) > 7 and " " in p1 and p1.isascii():
+						tup = (tup[0], p3, p2 + "\n" + p1, best)
+					print("BEST:", tup)
+					self.analysed[h] = tup
+
+				create_task(recaption(h, p1, p2, fut))
+			else:
+				p1, p2, p3 = sorted((p1, p2, p3), key=len)
+				tup = (tup[0], p2, p3, best)
+				if len(p1) > 7 and " " in p1 and p1.isascii():
+					tup = (tup[0], p3, p2 + "\n" + p1, best)
+				print("BEST:", tup)
 		self.analysed[h] = tup
 		while len(self.analysed) > 65536:
 			self.analysed.pop(next(iter(self.analysed)))
@@ -1688,6 +1704,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						if is_discord_url(url) and "attachments/" in url:
 							attachment = cdict(id=url.rsplit("/", 2)[-2], url=url, read=lambda: self.get_request(url))
 							create_task(self.add_and_test(message, attachment))
+			apply_stickers(message)
 			self.cache.messages[message.id] = message
 			if (utc_dt() - created_at).total_seconds() < 86400 * 14 and "message_cache" in self.data and not getattr(message, "simulated", None):
 				self.data.message_cache.save_message(message)
@@ -4343,7 +4360,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 								await create_future(uptime.data.update, self.data.insights["uptimes"])
 								self.data.insights.pop("uptimes")
 								print("Insights database transferred.")
-							it = int(utc() // 3) * 3
+							it = int(utc() // ninter) * ninter
 							interval = 86400 * 7
 							if it not in uptime:
 								uptime[it] = copy.deepcopy(data)
@@ -4353,14 +4370,19 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 										uptime.pop(sl.pop(0), None)
 									while sl[-1] > it:
 										uptime.pop(sl.pop(-1), None)
-							gen = ((it - interval + i in uptime) for i in range(3, interval + 3, 3))
+									for i in sl[:-3600 // ninter]:
+										if i * ninter % 3600 == 0:
+											continue
+										if uptime[i]:
+											uptime[i] = {}
+							gen = ((it - interval + i in uptime) for i in range(ninter, interval + ninter, ninter))
 							ut = await create_future(sum, gen, priority=True)
-							self.uptime = ut / interval * 3
+							self.uptime = ut / interval * ninter
 
 							net = await create_future(psutil.net_io_counters)
 							if not hasattr(self, "up_bytes"):
-								self.up_bytes = deque(maxlen=3)
-								self.down_bytes = deque(maxlen=3)
+								self.up_bytes = deque(maxlen=ninter)
+								self.down_bytes = deque(maxlen=ninter)
 								self.start_up = max(0, self.data.insights.get("up_bytes", 0) - net.bytes_sent)
 								self.start_down = max(0, self.data.insights.get("down_bytes", 0) - net.bytes_recv)
 							self.up_bytes.append(net.bytes_sent)

@@ -16,6 +16,7 @@ MIZAAC = ""
 
 import tiktoken, accelerate
 if torch and torch.cuda.is_available():
+	torch.cuda._lazy_init()
 	try:
 		torch.cuda.set_enabled_lms(True)
 	except AttributeError:
@@ -619,7 +620,7 @@ class Bot:
 		enc = tiktoken.encoding_for_model(model)
 		return enc.encode(s)
 
-	def load_gptq(self, model):
+	def load_gptq(self, model, limit=4096):
 		print(f"LOADING GPTQ {model}...")
 		try:
 			from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig, exllama_set_max_input_length
@@ -677,26 +678,27 @@ class Bot:
 				max_mem = {i: f"{round(min(((gmems[i].total - gmems[i].used) / 1048576 - (2 if i else 3) * 1024), loads[i] * 1024))}MiB" for i in bit4}
 				max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("MiB")) > 0}
 				print("MAX_MEM:", max_mem)
-				model = AutoGPTQForCausalLM.from_quantized(
+				model = backup_model(
+					AutoGPTQForCausalLM.from_quantized,
 					m,
 					max_memory=max_mem,
 					use_safetensors=True,
-					resume_download=True,
+					# resume_download=True,
 					use_triton=False,
 					inject_fused_attention=False,
 					offload_folder="cache",
 				)
-				model = exllama_set_max_input_length(model, 4096)
+				model = exllama_set_max_input_length(model, limit)
 				mfut.set_result(model)
 				self.models[m] = (tokenizer, model)
 			if isinstance(model, concurrent.futures.Future):
 				model = model.result()
-			return model
+			return model, tokenizer
 		except:
 			print_exc()
 			raise
 
-	def load_bnb(self, model):
+	def load_bnb(self, model, limit=4096):
 		print(f"LOADING BNB {model}...")
 		try:
 			try:
@@ -794,7 +796,7 @@ class Bot:
 					model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, offload_folder="cache", load_in_8bit=True, quantization_config=quantization_config)
 				print(dev_map)
 				self.models[m] = (tokenizer, model)
-			return model
+			return model, tokenizer
 		except:
 			print_exc()
 			raise
@@ -1173,6 +1175,7 @@ class Bot:
 				else:
 					m["role"] = "user"
 				if not k.isascii() or not k.isalnum():
+					k = k.replace("/", "-")
 					k2 = k.translate("".maketrans({"-": "", " ": "", "_": ""}))
 					orig_k = k
 					if k2.isascii() and k2.isalnum() and any(c.isalnum() for c in k):
@@ -1316,10 +1319,10 @@ class Bot:
 								print(f"Web Search {func}:", argv)
 								res = func(argv)
 								if res:
-									if len(self.gpttokens(res)) > 512:
-										res = self.auto_summarise(q=q + "\n" + res, max_length=500, min_length=384).replace("\n", ". ").replace(": ", " -")
+									if len(self.gpttokens(res)) > 800:
+										res = self.auto_summarise(q=q + "\n" + res, max_length=768, min_length=384).replace("\n", ". ").replace(": ", " -")
 									res = res.strip()
-									messages = [messages[-1]]
+									messages = [messages[0], messages[-1]]
 									messages.append(m)
 									messages.append(dict(role="function", name=name, content=res or ""))
 									model = "gpt-4-0613" if model.startswith("gpt-4") else "gpt-3.5-turbo-0613"
@@ -1333,7 +1336,7 @@ class Bot:
 									if len(self.gpttokens(res)) > 512:
 										res = self.auto_summarise(q=q + "\n" + res, max_length=500, min_length=384).replace("\n", ". ").replace(": ", " -")
 									res = res.strip()
-									messages = [messages[-1]]
+									messages = [messages[0], messages[-1]]
 									messages.append(m)
 									messages.append(dict(role="function", name=name, content=res or ""))
 									model = "gpt-4-0613" if model.startswith("gpt-4") else "gpt-3.5-turbo-0613"
@@ -1387,8 +1390,8 @@ class Bot:
 		exclusive = {"neox-20b", "bloom-176b"}
 		if model in gptq_models:
 			omodel = model
-			model = self.load_gptq(model)
-			prompt = prompt.strip().replace(f"{u}:", f"You:")
+			model, tokenizer = self.load_gptq(model)
+			prompt = prompt.strip()
 			tokens = tokenizer(prompt, return_tensors="pt").input_ids.to(model.device)
 			pc = len(tokens)
 			res = model.generate(
@@ -1422,7 +1425,7 @@ class Bot:
 			model = omodel
 		if model in bnb_models:
 			omodel = model
-			model = self.load_bnb(model)
+			model, tokenizer = self.load_bnb(model)
 			prompt = prompt.strip().replace(f"{u}:", f"You:")
 			tokens = tokenizer.encode(prompt, return_tensors="pt").cuda()
 			pc = len(tokens)
@@ -2233,32 +2236,32 @@ class Bot:
 		lines = self.condense(chat_history)
 		v = "".join(lines)
 		summ_start = "Summary of prior conversation:\n"
-		for i in (0,):
-			if (tc := len(self.gpttokens(v))) > lim + 16:
-				if 0:# tc < 3072 and (tc > lim * 3 or (tc > lim * 1.5 and self.premium >= 2)):
-					try:
-						prompt = f'"""\n{v.strip()}\n"""\n\nSummarise the above into a paragraph, keeping most important parts. Do not be repetitive or continue the text!'
-						func = self.cgp
-						v2 = func(prompt)[0]
-						if len(self.gpttokens(v2)) < 16:
-							raise ValueError(v2)
-						if v2[0] == v2[-1] == '"':
-							try:
-								v2 = orjson.loads(v2)
-							except orjson.JSONDecodeError:
-								pass
-						v = v2
-						tc = len(self.gpttokens(v))
-					except:
-						print_exc()
-					else:
-						break
-				if tc > lim * 1.5 and len(self.gpttokens(lines[0])) > lim * 3 / 4:
-					lines[0] = lim_tokens(lines[0], lim // 2)
-					v = "".join(lines)
-					tc = lim // 2
-				if tc > lim + 16:
-					v = self.auto_summarise(q=v, max_length=lim, min_length=lim * 2 // 3)
+		# for i in (0,):
+		if (tc := len(self.gpttokens(v))) > lim + 16:
+			# if 0:# tc < 3072 and (tc > lim * 3 or (tc > lim * 1.5 and self.premium >= 2)):
+				# try:
+					# prompt = f'"""\n{v.strip()}\n"""\n\nSummarise the above into a paragraph, keeping most important parts. Do not be repetitive or continue the text!'
+					# func = self.cgp
+					# v2 = func(prompt)[0]
+					# if len(self.gpttokens(v2)) < 16:
+						# raise ValueError(v2)
+					# if v2[0] == v2[-1] == '"':
+						# try:
+							# v2 = orjson.loads(v2)
+						# except orjson.JSONDecodeError:
+							# pass
+					# v = v2
+					# tc = len(self.gpttokens(v))
+				# except:
+					# print_exc()
+				# else:
+					# break
+			if tc > lim * 1.5 and len(self.gpttokens(lines[0])) > lim * 3 / 4:
+				lines[0] = lim_tokens(lines[0], lim // 2)
+				v = "".join(lines)
+				tc = lim // 2
+			if tc > lim + 16:
+				v = self.auto_summarise(q=v, max_length=lim, min_length=lim * 2 // 3)
 		v = summ_start + v
 		print("Chat summary:", v)
 		self.chat_history.insert(0, ("[SYSTEM]", v))

@@ -900,20 +900,21 @@ class FileHashDict(collections.abc.MutableMapping):
 			with self.db_sem:
 				self.db.commit()
 				self.codb = set(try_int(r[0]) for r in self.cur.execute(f"SELECT key FROM '{self.path}'") if r)
-		if any(not f.path.rsplit("/", 1)[-1].startswith("~") for f in os.scandir(self.path)):
-			for k in deleted:
-				self.data.pop(k, None)
-				fn = self.key_path(k)
-				with suppress(FileNotFoundError):
-					os.remove(fn)
-				with suppress(FileNotFoundError):
-					os.remove(fn + "\x7f")
-				with suppress(FileNotFoundError):
-					os.remove(fn + "\x7f\x7f")
-			t = utc()
-			for fn in (f.path for f in os.scandir(self.path) if f.name.endswith("\x7f") and t - f.stat().st_mtime > 3600):
-				with suppress(FileNotFoundError, PermissionError):
-					os.remove(fn)
+		# if any(not f.path.rsplit("/", 1)[-1].startswith("~") for f in os.scandir(self.path)):
+			# for k in deleted:
+				# self.data.pop(k, None)
+				# fn = self.key_path(k)
+				# with suppress(OSError):
+					# with suppress(FileNotFoundError):
+						# os.remove(fn)
+					# with suppress(FileNotFoundError):
+						# os.remove(fn + "\x7f")
+					# with suppress(FileNotFoundError):
+						# os.remove(fn + "\x7f\x7f")
+			# t = utc()
+			# for fn in (f.path for f in os.scandir(self.path) if f.name.endswith("\x7f") and t - f.stat().st_mtime > 3600):
+				# with suppress(FileNotFoundError, PermissionError):
+					# os.remove(fn)
 		if len(self.data) > self.cache_size * 2:
 			self.data.clear()
 		else:
@@ -1665,13 +1666,33 @@ def message_repr(message, limit=1024, username=False, link=False):
 
 
 # Applies stickers to a message based on its discord data.
-def apply_stickers(message, data):
-	if data.get("sticker_items"):
+def apply_stickers(message, data=None):
+	if not data and not getattr(message, "stickers", None):
+		return message
+	has = set()
+	for e in getattr(message, "embeds", ()):
+		has.add(e.image.url)
+		has.add(e.thumbnail.url)
+		has.add(e.url)
+	for a in getattr(message, "attachments", ()):
+		has.add(a.url)
+	for s in getattr(message, "stickers", ()):
+		url = s.url.replace("media.discordapp.net", "cdn.discordapp.com").replace(".webp", ".png")
+		if url in has:
+			continue
+		has.add(url)
+		emb = discord.Embed()
+		emb.set_image(url=url)
+		message.embeds.append(emb)
+	if data and data.get("sticker_items"):
 		for s in data["sticker_items"]:
 			if s.get("format_type") == 3:
 				url = f"https://discord.com/stickers/{s['id']}.json"
 			else:
-				url = f"https://media.discordapp.net/stickers/{s['id']}.png"
+				url = f"https://cdn.discordapp.com/stickers/{s['id']}.png"
+			if url in has:
+				continue
+			has.add(url)
 			emb = discord.Embed()
 			emb.set_image(url=url)
 			message.embeds.append(emb)
@@ -2291,6 +2312,8 @@ async def proc_communicate(proc):
 			if not is_strict_running(proc):
 				return
 			b = await proc.stdout.readline()
+			if b == b"#R\n":
+				return create_task(start_proc(proc))
 			if not b:
 				return
 			# s = as_str(b.rstrip())
@@ -2398,13 +2421,14 @@ if COMPUTE_LOAD:
 	print("Compute load distribution:", COMPUTE_LOAD)
 	print("Compute pool order:", COMPUTE_ORDER)
 
-async def start_proc(n, i=-1, caps="ytdl"):
+async def start_proc(n, i=-1, caps="ytdl", it=0):
 	if hasattr(n, "caps"):
-		n, i, caps = n.n, n.i, n.caps
+		n, i, caps, it = n.n, n.i, n.caps, it + 1
 	if n in PROCS:
 		proc = PROCS[n]
 		if is_strict_running(proc):
 			PROCS[n] = False
+			it = max(it, proc.it + 1)
 			await create_future(force_kill, proc)
 		elif PROCS[n] is False:
 			return
@@ -2415,6 +2439,7 @@ async def start_proc(n, i=-1, caps="ytdl"):
 	properties = [torch.cuda.get_device_properties(i) for i in range(DC)]
 	args.append(orjson.dumps([(p.major, p.minor) for p in properties]))
 	args.append(orjson.dumps(COMPUTE_ORDER).decode("ascii"))
+	args.append(str(it))
 	proc = await asyncio.create_subprocess_exec(
 		*args,
 		limit=1073741824,
@@ -2425,6 +2450,7 @@ async def start_proc(n, i=-1, caps="ytdl"):
 	proc.n = n
 	proc.i = i
 	proc.caps = caps
+	proc.it = it
 	proc.is_running = lambda: not proc.returncode
 	proc.sem = Semaphore(8, inf)
 	proc.comm = create_task(proc_communicate(proc))
@@ -2475,7 +2501,7 @@ def spec2cap():
 			caps.append("image")
 		if cc > 5 and ram > 14 * 1073741824:
 			caps.append("caption")
-		if cc > 1 and ram > 22 * 1073741824:
+		if "gptq" not in done and cc > 1 and ram > 22 * 1073741824:
 			caps.append("agpt")
 	yield caps
 	if cc > 2:
@@ -2484,7 +2510,7 @@ def spec2cap():
 			caps.append("image")
 		if ram > 46 * 1073741824:
 			caps.append("caption")
-		if not cut and cc > 3 and ram > 46 * 1073741824:
+		if "gptq" not in done and cc > 3 and ram > 46 * 1073741824:
 			caps.append("agpt")
 		yield caps
 	if not DC:

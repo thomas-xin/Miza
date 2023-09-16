@@ -14,6 +14,7 @@ def print(*args, sep=" ", end="\n"):
 	return sys.stdout.buffer.write(b)
 
 if torch and torch.cuda.is_available():
+	torch.cuda._lazy_init()
 	try:
 		torch.cuda.set_enabled_lms(True)
 	except AttributeError:
