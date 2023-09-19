@@ -13,6 +13,7 @@ for i in range(3):
 
 from collections2 import *
 MIZAAC = ""
+GPTQ = False
 
 import tiktoken, accelerate
 if torch and torch.cuda.is_available():
@@ -24,10 +25,7 @@ if torch and torch.cuda.is_available():
 from fp.fp import FreeProxy
 print_exc = lambda: sys.stdout.write(traceback.format_exc())
 
-def print(*args, sep=" ", end="\n"):
-	s = sep.join(map(str, args)) + end
-	b = s.encode("utf-8")
-	return sys.stdout.buffer.write(b)
+print = lambda *args, sep=" ", end="\n": sys.stdout.buffer.write(f"~print({repr(sep.join(map(str, args)))},end={repr(end)})\n".encode("utf-8"))
 
 try:
 	exc = concurrent.futures.exc_worker
@@ -399,6 +397,7 @@ class Bot:
 	bl = False
 	alm_re = re.compile(r"(?:as |i am )?an ai(?: language model)?[, ]{,2}", flags=re.I)
 	model = None
+	auto = False
 
 	def __init__(self, token="", key="", huggingface_token="", summary=None, email="", password="", name="Miza", personality=DEFPER, premium=0):
 		self.token = token
@@ -483,7 +482,7 @@ class Bot:
 			return resp.content
 
 	summ_waiting = None
-	def answer_summarise(self, m="Qiliang/bart-large-cnn-samsum-ChatGPT_v3", q="", max_length=128, min_length=64, do_sample=False):
+	def answer_summarise(self, m="Qiliang/bart-large-cnn-samsum-ChatGPT_v3", q="", max_length=128, min_length=64, do_sample=False, regroup=False):
 		while self.summ_waiting:
 			self.summ_waiting.result()
 		devices, dtype = determine_cuda(2147483648, priority=False, multi=True)
@@ -501,12 +500,17 @@ class Bot:
 			# print(devices, dtype)
 
 			def load_pipe(device, dtype):
-				try:
-					smp = pipeline("summarization", model=m, device=device, torch_dtype=dtype)
-					smp.devid = device
-				except:
-					print_exc()
-					smp = pipeline("summarization", model=m, device=-1, torch_dtype=torch.float32)
+				for i in range(3):
+					try:
+						smp = pipeline("summarization", model=m, device=device, torch_dtype=dtype)
+						smp.devid = device
+					except:
+						print_exc()
+						time.sleep(5)
+					else:
+						break
+				else:
+					smp = pipeline("summarization", model=m, device="cpu", torch_dtype=torch.float32)
 					smp.devid = None
 				smp.busy = 0
 				return smp
@@ -544,12 +548,31 @@ class Bot:
 			finally:
 				smp.busy -= 1
 
+		def myth_smp(s1):
+			model, tokeniser = self.load_gptq("mythalion-13b")
+			prompt = s1.strip()
+			tokens = tokeniser(prompt, return_tensors="pt").input_ids.to(model.device)
+			pc = len(tokens)
+			with torch.no_grad():
+				res = model.generate(
+					inputs=tokens,
+					temperature=0.1,
+					top_k=4,
+					top_p=0.1,
+					repetition_penalty=1.2,
+					max_length=4096,
+					do_sample=True,
+				)
+				torch.cuda.empty_cache()
+			text = tokeniser.decode(res[0]).removeprefix("<s>").strip().removeprefix(prompt).strip().split("</s>", 1)[0]
+			return text
+
 		# print(len(tokens))
 		while len(tokens) > max_length and len(tokens) > limit:
 			futs = []
 			count = ceil(len(tokens) / limit * 4 / 3)
 			for start in range(0, max(1, len(tokens) - limit * 3 // 4 - 1), limit * 3 // 4):
-				print(start, start + limit)
+				# print(start, start + limit)
 				e1 = tokens[start:start + limit]
 				mt = max(max(limit, max_length) // count, limit // 5)
 				s1 = enc.decode(e1).strip()
@@ -620,8 +643,11 @@ class Bot:
 		enc = tiktoken.encoding_for_model(model)
 		return enc.encode(s)
 
-	def load_gptq(self, model, limit=4096):
-		print(f"LOADING GPTQ {model}...")
+	def load_gptq(self, model, limit=4096, fail=False, priority=True):
+		if fail:
+			print(f"VERIFYING GPTQ {model}...")
+		else:
+			print(f"LOADING GPTQ {model}...")
 		try:
 			from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig, exllama_set_max_input_length
 			buffer = 1.3
@@ -640,66 +666,88 @@ class Bot:
 			elif model == "wizard-coder-34b":
 				m = "TheBloke/WizardCoder-Python-34B-V1.0-GPTQ"
 				req = 17
+			elif model == "mythalion-13b":
+				m = "TheBloke/Mythalion-13B-GPTQ"
+				req = 6.5
 			else:
 				raise RuntimeError(f'Model "{model}" not found.')
 			try:
-				tokenizer, model = self.models[m]
+				tokeniser, model = self.models[m]
 			except KeyError:
-				tokenizer = backup_model(AutoTokenizer.from_pretrained, m)
-				mfut = concurrent.futures.Future()
-				self.models[m] = (tokenizer, mfut)
-				n = torch.cuda.device_count()
-				if not n:
-					raise RuntimeError("Required GPU not found.")
-				try:
-					import pynvml
-					pynvml.nvmlInit()
-					COMPUTE_ORDER = globals().get("COMPUTE_ORDER") or range(torch.cuda.device_count())
-
-					def cuda_info():
-						import torch
-						return [torch.cuda.get_device_properties(i) for i in range(len(COMPUTE_ORDER))]
-
-					fut2 = exc.submit(cuda_info)
-					handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(len(COMPUTE_ORDER))]
-					gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
-					tinfo = fut2.result()
-				except:
-					print_exc()
-					tinfo = gmems = COMPUTE_ORDER = []
-				COMPUTE_LOAD = globals().get("COMPUTE_LOAD") or [0] * n
-				high = max(COMPUTE_LOAD)
-				bit4 = [i for i in COMPUTE_ORDER if COMPUTE_LOAD[i] > high / 4]
-				total = sum(COMPUTE_LOAD[i] for i in bit4)
-				if high:
-					loads = [i / total * req if i < high * 0.9 else inf for i in COMPUTE_LOAD]
+				if fail:
+					max_mem = {}
 				else:
-					loads = [inf] * n
-				max_mem = {i: f"{round(min(((gmems[i].total - gmems[i].used) / 1048576 - (2 if i else 3) * 1024), loads[i] * 1024))}MiB" for i in bit4}
-				max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("MiB")) > 0}
-				print("MAX_MEM:", max_mem)
-				model = backup_model(
-					AutoGPTQForCausalLM.from_quantized,
+					tokeniser = backup_model(AutoTokenizer.from_pretrained, m)
+					mfut = concurrent.futures.Future()
+					self.models[m] = (tokeniser, mfut)
+					n = torch.cuda.device_count()
+					if not n:
+						raise RuntimeError("Required GPU not found.")
+					try:
+						import pynvml
+						pynvml.nvmlInit()
+						COMPUTE_ORDER = globals().get("COMPUTE_ORDER") or range(torch.cuda.device_count())
+
+						def cuda_info():
+							import torch
+							return [torch.cuda.get_device_properties(i) for i in range(len(COMPUTE_ORDER))]
+
+						fut2 = exc.submit(cuda_info)
+						handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(len(COMPUTE_ORDER))]
+						gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
+						tinfo = fut2.result()
+					except:
+						print_exc()
+						tinfo = gmems = COMPUTE_ORDER = []
+					COMPUTE_LOAD = globals().get("COMPUTE_LOAD") or [0] * n
+					i = sorted(COMPUTE_ORDER, key=lambda i: (gmems[i].total - gmems[i].used >= (req * buffer + 2) * 1073741824, -round(gmems[i].total / 1073741824), COMPUTE_LOAD[i] if priority else -COMPUTE_LOAD[i]), reverse=True)[0]
+					if gmems[i].total - gmems[i].used >= (req * buffer + 2) * 1073741824:
+						max_mem = {i: f"{round((gmems[i].total - gmems[i].used) / 1048576 - 2048)}MiB"}
+					else:
+						high = max(COMPUTE_LOAD)
+						bit4 = [i for i in COMPUTE_ORDER if COMPUTE_LOAD[i] > high / 2]
+						total = sum(COMPUTE_LOAD[i] for i in bit4)
+						hmem = max(m.total for m in gmems)
+						if high:
+							loads = [(max(r / total, 1.25 / len(bit4)) * req if r < high * 0.9 else inf) if gmems[i].total > hmem * 0.6 else 0 for i, r in enumerate(COMPUTE_LOAD)]
+						else:
+							loads = [inf] * n
+						max_mem = {i: f"{round(min((gmems[i].total / 1048576 - (1 if i else 2) * 1024), loads[i] * 1024))}MiB" for i in bit4}
+						max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("MiB")) > 0}
+					print("MAX_MEM:", max_mem)
+				if fail:
+					# intentionally fail check so the model downloads but doesn't actually enter gpu ram
+					try:
+						with accelerate.init_empty_weights():
+							model = AutoModelForCausalLM.from_pretrained(m, device_map={}, offload_folder="cache", torch_dtype=torch.float16, resume_download=True)
+					except ValueError:
+				AutoGPTQForCausalLM.from_quantized(
 					m,
 					max_memory=max_mem,
 					use_safetensors=True,
-					# resume_download=True,
 					use_triton=False,
 					inject_fused_attention=False,
 					offload_folder="cache",
 				)
-				model = exllama_set_max_input_length(model, limit)
+				if model.config.max_position_embeddings < limit:
+					try:
+						model = exllama_set_max_input_length(model, limit)
+					except:
+						print_exc()
 				mfut.set_result(model)
-				self.models[m] = (tokenizer, model)
+				self.models[m] = (tokeniser, model)
 			if isinstance(model, concurrent.futures.Future):
 				model = model.result()
-			return model, tokenizer
+			return model, tokeniser
 		except:
 			print_exc()
 			raise
 
-	def load_bnb(self, model, limit=4096):
-		print(f"LOADING BNB {model}...")
+	def load_bnb(self, model, limit=4096, fail=False, priority=True):
+		if fail:
+			print(f"VERIFYING BNB {model}...")
+		else:
+			print(f"LOADING BNB {model}...")
 		try:
 			try:
 				import bitsandbytes
@@ -707,7 +755,7 @@ class Bot:
 				bitsandbytes = None
 			buffer = 1.3
 			if model == "pygmalion-13b":
-				m = "PygmalionAI/mythalion-13b"
+				m = "PygmalionAI/pygmalion-2-13b"
 				req = 13
 			elif model == "manticore-13b":
 				m = "openaccess-ai-collective/manticore-13b-chat-pyg"
@@ -729,52 +777,62 @@ class Bot:
 				req = 33
 				buffer = 1.5
 			try:
-				tokenizer, model = self.models[m]
+				tokeniser, model = self.models[m]
 			except KeyError:
-				tokenizer = backup_model(AutoTokenizer.from_pretrained, m)
-				# model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map="auto", torch_dtype=torch.float16, force=True)
-				n = torch.cuda.device_count()
-				if not n:
-					raise RuntimeError("Required GPU not found.")
-				config = AutoConfig.from_pretrained(
-					m,
-					tie_word_embeddings=True,
-					# max_position_embeddings=limit,
-					rope_scaling=dict(type="dynamic", factor=ceil(limit / 2048))
-				)
-				with accelerate.init_empty_weights():
-					model = AutoModelForCausalLM.from_config(config)
-				try:
-					import pynvml
-					pynvml.nvmlInit()
-					COMPUTE_ORDER = globals().get("COMPUTE_ORDER") or range(torch.cuda.device_count())
-
-					def cuda_info():
-						import torch
-						return [torch.cuda.get_device_properties(i) for i in range(len(COMPUTE_ORDER))]
-
-					fut2 = exc.submit(cuda_info)
-					handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(len(COMPUTE_ORDER))]
-					gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
-					tinfo = fut2.result()
-				except:
-					print_exc()
-					tinfo = gmems = COMPUTE_ORDER = []
-				bit8 = [i for i in COMPUTE_ORDER if tinfo[i].major >= 8 or not bitsandbytes]
-				max_mem = {i: f"{round((gmems[i].total - gmems[i].used) / 1048576 - (2 if i else 3) * 1024)}MiB" for i in bit8}
-				max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("MiB")) > 0}
-				rem = sum(int(v.removesuffix("MiB")) for v in max_mem.values()) / 1024 - req
-				cap = sum(int(v.removesuffix("MiB")) for v in max_mem.values()) / 1024
-				if cap > req * buffer:
-					max_mem = {k: f"{round(int(v.removesuffix('MiB')) / buffer)}MiB" for k, v in max_mem.items()}
-					dti = torch.int8
+				if fail:
+					dev_map = {}
 				else:
-					dti = torch.float16
-				max_mem["cpu"] = f"{round(psutil.virtual_memory().free / 1073741824 - 8)}GiB"
-				max_mem["disk"] = "1024GiB"
-				print("MAX_MEM:", max_mem)
-				print(cap, req, dti, bitsandbytes)
-				if not bitsandbytes:
+					tokeniser = backup_model(AutoTokenizer.from_pretrained, m)
+					# model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map="auto", torch_dtype=torch.float16, force=True)
+					n = torch.cuda.device_count()
+					if not n:
+						raise RuntimeError("Required GPU not found.")
+					config = AutoConfig.from_pretrained(
+						m,
+						tie_word_embeddings=True,
+						# max_position_embeddings=limit,
+						rope_scaling=dict(type="dynamic", factor=ceil(limit / 2048))
+					)
+					with accelerate.init_empty_weights():
+						model = AutoModelForCausalLM.from_config(config)
+					try:
+						import pynvml
+						pynvml.nvmlInit()
+						COMPUTE_ORDER = globals().get("COMPUTE_ORDER") or range(torch.cuda.device_count())
+
+						def cuda_info():
+							import torch
+							return [torch.cuda.get_device_properties(i) for i in range(len(COMPUTE_ORDER))]
+
+						fut2 = exc.submit(cuda_info)
+						handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(len(COMPUTE_ORDER))]
+						gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
+						tinfo = fut2.result()
+					except:
+						print_exc()
+						tinfo = gmems = COMPUTE_ORDER = []
+					bit8 = [i for i in COMPUTE_ORDER if tinfo[i].major >= 8 or not bitsandbytes]
+					max_mem = {i: f"{round((gmems[i].total - gmems[i].used) / 1048576 - (2 if i else 3) * 1024)}MiB" for i in bit8}
+					max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("MiB")) > 0}
+					rem = sum(int(v.removesuffix("MiB")) for v in max_mem.values()) / 1024 - req
+					cap = sum(int(v.removesuffix("MiB")) for v in max_mem.values()) / 1024
+					if cap > req * buffer:
+						max_mem = {k: f"{round(int(v.removesuffix('MiB')) / buffer)}MiB" for k, v in max_mem.items()}
+						dti = torch.int8
+					else:
+						dti = torch.float16
+					max_mem["cpu"] = f"{round(psutil.virtual_memory().free / 1073741824 - 8)}GiB"
+					max_mem["disk"] = "1024GiB"
+					print("MAX_MEM:", max_mem)
+					print(cap, req, dti, bitsandbytes)
+				if fail:
+					# intentionally fail check so the model downloads but doesn't actually enter gpu ram
+					try:
+						with accelerate.init_empty_weights():
+							model = AutoModelForCausalLM.from_pretrained(m, device_map={}, offload_folder="cache", torch_dtype=torch.float16, resume_download=True)
+					except ValueError:
+						return
+				elif not bitsandbytes:
 					dev_map = accelerate.infer_auto_device_map(model, max_memory=max_mem, no_split_module_classes=["LlamaDecoderLayer"], dtype=torch.float16)
 					for k in ("lm_head", "model.norm"):
 						if k in dev_map:
@@ -795,14 +853,99 @@ class Bot:
 							dev_map[k] = 0
 					model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, offload_folder="cache", load_in_8bit=True, quantization_config=quantization_config)
 				print(dev_map)
-				self.models[m] = (tokenizer, model)
-			return model, tokenizer
+				self.models[m] = (tokeniser, model)
+			return model, tokeniser
 		except:
 			print_exc()
 			raise
 
-	functions = [
-		{
+	modmap = dict(
+		bloom=dict(
+			name="bloom-176b",
+			temp=0.9,
+			limit=200,
+		),
+		neox=dict(
+			name="neox-20b",
+			limit=200,
+		),
+		pygmalion=dict(
+			name="pygmalion-13b",
+			limit=3072,
+		),
+		manticore=dict(
+			name="manticore-13b",
+			limit=3072,
+		),
+		hippogriff=dict(
+			name="hippogriff-30b",
+			cm=10,
+			longer=True,
+		),
+		wizvic=dict(
+			name="wizard-vicuna-30b",
+			cm=10,
+			longer=True,
+		),
+		platypus=dict(
+			name="gplatty-30b",
+			cm=10,
+			longer=True,
+		),
+		airochronos=dict(
+			name="airochronos-33b",
+			cm=10,
+			longer=True,
+		),
+		kimiko=dict(
+			name="kimiko-70b",
+			cm=20,
+		),
+		mythalion=dict(
+			name="mythalion-13b",
+			limit=2048,
+		),
+		wizcode=dict(
+			name="wizard-coder-34b",
+			cm=10,
+		),
+		nouspuff=dict(
+			name="nous-puffin-70b",
+			cm=20,
+		),
+		orca=dict(
+			name="orca-70b",
+			cm=20,
+		),
+		wizard=dict(
+			name="wizard-70b",
+			cm=20,
+		),
+		instruct=dict(
+			name="gpt-3.5-turbo-instruct",
+			cm=15,
+			longer=True,
+		),
+		davinci=dict(
+			name="text-davinci-003",
+			limit=3000,
+			cm=200,
+			longer=True,
+		),
+	)
+	mock_functions = [
+		[None, "Asking for real-world assistance or advice"],
+		[False, "Describes a roleplay or fictional scenario"],
+		["stable_diffusion", "Asking to create or edit a picture"],
+		["reminder", "Set alarm or reminder"],
+		["wolfram_alpha", "Math question"],
+		["play", "Play music"],
+		["astate", "Pause or repeat music"],
+		["audio", "Change audio settings"],
+		[None, "None of the above"],
+	]
+	functions = dict(
+		web_search={
 			"name": "web_search",
 			"description": "Searches internet browser, or visits given URL.",
 			"parameters": {
@@ -816,7 +959,7 @@ class Bot:
 				"required": ["query"],
 			},
 		},
-		{
+		wolfram_alpha={
 			"name": "wolfram_alpha",
 			"description": "Queries Wolfram Alpha. Must use for advanced maths questions.",
 			"parameters": {
@@ -830,7 +973,7 @@ class Bot:
 				"required": ["query"],
 			},
 		},
-		{
+		stable_diffusion={
 			"name": "stable_diffusion",
 			"description": "Creates an image of the input query. Please be descriptive!!",
 			"parameters": {
@@ -844,7 +987,7 @@ class Bot:
 				"required": ["query"],
 			},
 		},
-		{
+		reminder={
 			"name": "reminder",
 			"description": "Sets a reminder for the user.",
 			"parameters": {
@@ -862,7 +1005,7 @@ class Bot:
 				"required": ["message", "delay"],
 			},
 		},
-		{
+		play={
 			"name": "play",
 			"description": "Searches and plays a song in the nearest voice channel.",
 			"parameters": {
@@ -876,7 +1019,7 @@ class Bot:
 				"required": ["query"],
 			},
 		},
-		{
+		audio={
 			"name": "audio",
 			"description": "Adjusts audio settings for current music player.",
 			"parameters": {
@@ -894,7 +1037,7 @@ class Bot:
 				"required": ["mode", "value"],
 			},
 		},
-		{
+		astate={
 			"name": "astate",
 			"description": "Adjusts music player state.",
 			"parameters": {
@@ -911,7 +1054,7 @@ class Bot:
 				"required": ["mode", "value"],
 			},
 		},
-		{
+		askip={
 			"name": "askip",
 			"description": "Skips music player songs.",
 			"parameters": {
@@ -925,22 +1068,8 @@ class Bot:
 				"required": ["range"],
 			},
 		},
-		{
-			"name": "policy",
-			"description": "Highlight responses here if a request was not fulfilled.",
-			"parameters": {
-				"type": "object",
-				"properties": {
-					"query": {
-						"type": "string",
-						"description": "The response, e.g. Sorry, I cannot fulfill that request. My purpose is to assist and help users in a positive way.",
-					},
-				},
-				"required": ["query"],
-			},
-		},
-	]
-	function_list = [f.get("name") for f in functions]
+	)
+	function_list = list(functions)
 
 	def gptcomplete(self, u, q, refs=(), start="", model=None):
 		per = self.personality
@@ -1005,97 +1134,31 @@ class Bot:
 		# print("Model:", model)
 		extensions = model.endswith("+")
 		model = model.removesuffix("+")
-		DEFMOD = "wizard-70b"
+		DEFMOD = "mythalion"
 		temp = 0.8
 		limit = 4096
-		if model == "bloom":
-			model = "bloom-176b"
-			temp = 0.9
-			limit = 2000
-			cm = 0
-		elif model == "neox":
-			model = "neox-20b"
-			temp = 0.8
-			limit = 2000
-			cm = 0
-		elif model == "pygmalion":
-			model = "pygmalion-13b"
-			temp = 0.8
-			limit = 3072
-			cm = 0
-		elif model == "manticore":
-			model = "manticore-13b"
-			temp = 0.8
-			limit = 3072
-			cm = 0
-		elif model == "hippogriff":
-			model = "hippogriff-30b"
-			temp = 0.8
-			limit = 4096
-			cm = 0
-		elif model == "wizvic":
-			model = "wizard-vicuna-30b"
-			temp = 0.8
-			limit = 4096
-		elif model == "platypus":
-			model = "gplatty-30b"
-			temp = 0.8
-			limit = 4096
-		elif model == "airochronos":
-			model = "airochronos-33b"
-			temp = 0.8
-			limit = 4096
-		elif model == "kimiko":
-			model = "kimiko-70b"
-			temp = 0.8
-			limit = 4096
-		elif model == "wizcode":
-			model = "wizard-coder-34b"
-			temp = 0.8
-			limit = 4096
-		elif model == "nouspuff":
-			model = "nous-puffin-70b"
-			temp = 0.8
-			limit = 4096
-		elif model == "orca":
-			model = "orca-70b"
-			temp = 0.8
-			limit = 4096
-		elif model == "wizard":
-			model = "wizard-70b"
-			temp = 0.8
-			limit = 4096
-		elif model == "instruct":
-			model = "gpt-3.5-turbo-instruct"
-			temp = 0.8
-			limit = 4096
-			cm = 15
-			longer = True
-		elif model == "davinci":
-			model = "text-davinci-003"
-			# model = "gpt-3.5-turbo-instruct"
-			temp = 0.8
-			limit = 3000
-			cm = 15
-			longer = True
-		elif model == "curie" or premium < 2:
-			# model = "text-curie-001"
-			model = "gpt-3.5-turbo-instruct"
-			temp = 0.7
-			limit = 3000
-			cm = 15
-			longer = True
+		cm = 0
+		if model in self.modmap:
+			data = self.modmap[model]
+			model = data.get("name") or model
+			limit = data.get("limit") or model
+			cm = data.get("cm") or cm
+			longer = data.get("longer") or longer
+		elif premium < 2:
+			model = DEFMOD
+			limit = 2048
 		elif model.startswith("gpt3") or premium < 4:
 			model = "gpt-3.5-turbo"
-			temp = 0.8
 			limit = 4000
 			cm = 15
+			longer = True
 		else:
 			model = "gpt-4"
 			temp = 0.8
 			limit = 8000
 			cm = 300
 			cm2 = 600
+			longer = True
 		if longer:
 			soft = limit / 4
 		else:
@@ -1107,7 +1170,7 @@ class Bot:
 		print("INS:", ins)
 		p = per
 		bnb_models = ("pygmalion-13b", "manticore-13b", "hippogriff-30b", "wizard-vicuna-30b", "gplatty-30b", "airochronos-33b")
-		gptq_models = ("wizard-70b", "nous-puffin-70b", "orca-70b", "kimiko-70b", "wizard-coder-34b")
+		gptq_models = ("wizard-70b", "nous-puffin-70b", "orca-70b", "kimiko-70b", "wizard-coder-34b", "mythalion-13b")
 		local_models = bnb_models + gptq_models
 		if self.name.casefold() not in p.casefold() and "you" not in p.casefold():
 			if model in ("gpt-3.5-turbo", "gpt-4", "gpt-3.5-turbo-instruct", "text-davinci-003"):
@@ -1128,7 +1191,71 @@ class Bot:
 				if self.nsfw:
 					spl = nstart.rsplit("\n", 1)
 					nstart = nstart.strip() + " " + MIZAAC
-		if model in ("gpt-3.5-turbo", "gpt-4"):
+		blocked = set()
+		length = len(self.gpttokens(q))
+		if "<|im_sep" in q or length >= 512:
+			blocked.add("web_search")
+			blocked.add("wolfram_alpha")
+		elif not set(q).intersection("0123456789()+"):
+			blocked.add("wolfram_alpha")
+		if self.vc & 2 and length < 256:
+			pass
+		elif self.vc & 1 and length < 256:
+			blocked.update(("audio", "astate", "askip"))
+		else:
+			blocked.update(("audio", "astate", "askip", "play"))
+		if self.auto and GPTQ:
+			q2 = q.replace('"""', "'''")
+			if len(self.gpttokens(q2)) > 1024:
+				q2 = self.auto_summarise(q2, max_length=960, min_length=720)
+			prompt = '"""\n' + q2 + "\n" + f'''"""
+
+### Instruction:
+<|system|>: Your name is {self.name}. Classify the above request into one of the following:
+'''
+			mocked = {}
+			i = 1
+			for k, v in self.mock_functions:
+				if k not in blocked:
+					mocked[i] = k
+					prompt += f"{i}: {v}\n"
+					i += 1
+			prompt += "\n### Response:\n"
+			print("Mock prompt:", prompt)
+			model, tokeniser = self.load_gptq("mythalion-13b", priority=False)
+			tokens = tokeniser(prompt, return_tensors="pt").input_ids[:, -960:].to(model.device)
+			pc = len(tokens)
+			with torch.no_grad():
+				res = model.generate(
+					inputs=tokens,
+					temperature=0.1,
+					top_k=32,
+					top_p=0.1,
+					repetition_penalty=1.2,
+					max_new_tokens=32,
+					do_sample=True,
+				)
+				torch.cuda.empty_cache()
+			text = tokeniser.decode(res[0])
+			text = text.removeprefix("<s>").strip().removeprefix(prompt).strip().split("</s>", 1)[0]
+			print("MOCK:", text)
+			num = int(re.search("[0-9]+", text).group())
+			k = mocked.get(num)
+			if k is None:
+				pass
+			elif k is False:
+				blocked.update(self.functions)
+				extensions = False
+			else:
+				rem = set(self.functions)
+				rem.discard(k)
+				blocked.update(rem)
+				extensions = k not in blocked
+			if not extensions and model in ("gpt-3.5-turbo", "gpt-4") and sum(map(len, ins)) >= 512:
+				model = "wizard-70b"
+				cm = 20
+		if model in ("gpt-3.5-turbo", "gpt-4") or extensions:
+			mod = model if model in ("gpt-3.5-turbo", "gpt-4") else "gpt-3.5-turbo"
 			spl = nstart.rsplit("\n", 1)
 			if len(spl) > 1:
 				nstart = spl[0]
@@ -1190,11 +1317,11 @@ class Bot:
 						v = orig_k + ": " + v
 				if k:
 					m["name"] = lim_str(k, 48)
-					pc += len(self.gpttokens(m["name"], model))
+					pc += len(self.gpttokens(m["name"], mod))
 				m["content"] = v.strip(ZeroEnc)
 				messages.append(m)
-				pc += len(self.gpttokens(m["role"], model))
-				pc += len(self.gpttokens(m["content"], model))
+				pc += len(self.gpttokens(m["role"], mod))
+				pc += len(self.gpttokens(m["content"], mod))
 			text = res = flagged = None
 			v = ""
 			dtn = str(datetime.datetime.utcnow()).rsplit(".", 1)[0]
@@ -1208,32 +1335,19 @@ class Bot:
 				messages.insert(-1, m)
 			else:
 				messages.insert(-2, m)
-			pc += len(self.gpttokens(m["role"], model))
-			pc += len(self.gpttokens(m["content"], model))
+			pc += len(self.gpttokens(m["role"], mod))
+			pc += len(self.gpttokens(m["content"], mod))
 			print("ChatGPT prompt:", messages)
 			sys.stdout.flush()
 			prompt = None
 			if extensions:
+				functions = [v for k, v in self.functions.items() if k not in blocked]
 				intended = None
-				functions = self.functions
-				length = len(self.gpttokens(messages[-1].get("content")))
-				if self.jailbroken or not self.nsfw:
-					functions = [f for f in functions if f["name"] != "policy"]
-				if "<|im_sep" in q or length >= 512:
-					functions = [f for f in functions if f["name"] not in ("web_search", "wolfram_alpha")]
-				elif not set(q).intersection("0123456789()+"):
-					functions = [f for f in functions if f["name"] != "wolfram_alpha"]
-				if self.vc & 2 and length < 256:
-					pass
-				elif self.vc & 1 and length < 256:
-					functions = [f for f in functions if f["name"] not in ("audio", "astate", "askip")]
-				else:
-					functions = [f for f in functions if f["name"] not in ("audio", "astate", "askip", "play")]
 				data = dict(
-					model="gpt-4-0613" if model.startswith("gpt-4") else "gpt-3.5-turbo-0613",
+					model="gpt-4-0613" if mod.startswith("gpt-4") else "gpt-3.5-turbo-0613",
 					messages=messages,
 					temperature=temp,
-					max_tokens=min(8192 if premium >= 2 else 1024, limit - pc - 512),
+					max_tokens=min(8192 if premium >= 2 else 1024, limit - pc - 768),
 					top_p=1,
 					frequency_penalty=0.6,
 					presence_penalty=0.8,
@@ -1291,10 +1405,11 @@ class Bot:
 						if not redo or i:
 							break
 						response = None
-						model = DEFMOD
-						temp = 0.8
-						limit = 4096
-						cm = 0
+						if premium < 2:
+							model = DEFMOD
+							temp = 0.8
+							limit = 4096
+							cm = 0
 						break
 				if response:
 					fc = m.get("function_call")
@@ -1364,12 +1479,6 @@ class Bot:
 								if args["mode"] == "loop":
 									args["mode"] = "loopqueue"
 								return {"func": args["mode"], "argv": int(args["value"])}
-							elif name == "policy":
-								print("Policy!", messages[-1])
-								model = "kimiko-70b"
-								temp = 0.8
-								limit = 4096
-								cm = 0
 		if model in local_models:
 			prompt = "".join(reversed(ins))
 			prompt = nstart + "\n<START>\n" + prompt
@@ -1381,7 +1490,7 @@ class Bot:
 			prompt = "".join(reversed(ins))
 			prompt = nstart + "\n\n" + prompt
 			if not self.bl:
-				print("GPT prompt:", prompt)
+				print(f"{model.capitalize()} prompt:", prompt)
 			sys.stdout.flush()
 			pc = len(self.gpttokens(prompt))
 		response = None
@@ -1390,22 +1499,22 @@ class Bot:
 		exclusive = {"neox-20b", "bloom-176b"}
 		if model in gptq_models:
 			omodel = model
-			model, tokenizer = self.load_gptq(model)
+			model, tokeniser = self.load_gptq(model)
 			prompt = prompt.strip()
-			tokens = tokenizer(prompt, return_tensors="pt").input_ids.to(model.device)
+			tokens = tokeniser(prompt, return_tensors="pt").input_ids.to(model.device)
 			pc = len(tokens)
-			res = model.generate(
-				inputs=tokens,
-				temperature=temp,
-				top_k=96,
-				top_p=0.9,
-				repetition_penalty=1.2,
-				max_length=max(limit, len(tokens) + 1024),
-				do_sample=True,
-			)
 			with torch.no_grad():
+				res = model.generate(
+					inputs=tokens,
+					temperature=temp,
+					top_k=96,
+					top_p=0.9,
+					repetition_penalty=1.2,
+					max_length=max(limit, len(tokens) + 1024),
+					do_sample=True,
+				)
 				torch.cuda.empty_cache()
-			text = tokenizer.decode(res[0]).removeprefix("<s>").strip().removeprefix(prompt).strip().split("</s>", 1)[0]
+			text = tokeniser.decode(res[0]).removeprefix("<s>").strip().removeprefix(prompt).strip().split("</s>", 1)[0]
 			text = text.strip().replace(":\n", ": ").replace("<USER>", u)
 			spl = text.split(": ")
 			if len(spl) > 1:
@@ -1425,22 +1534,22 @@ class Bot:
 			model = omodel
 		if model in bnb_models:
 			omodel = model
-			model, tokenizer = self.load_bnb(model)
+			model, tokeniser = self.load_bnb(model)
 			prompt = prompt.strip().replace(f"{u}:", f"You:")
-			tokens = tokenizer.encode(prompt, return_tensors="pt").cuda()
+			tokens = tokeniser.encode(prompt, return_tensors="pt").cuda()
 			pc = len(tokens)
-			res = model.generate(
-				tokens,
-				temperature=temp,
-				top_k=96,
-				top_p=0.9,
-				repetition_penalty=1.2,
-				max_length=max(limit, len(tokens) + 1024),
-				do_sample=True,
-			)
 			with torch.no_grad():
+				res = model.generate(
+					tokens,
+					temperature=temp,
+					top_k=96,
+					top_p=0.9,
+					repetition_penalty=1.2,
+					max_length=max(limit, len(tokens) + 1024),
+					do_sample=True,
+				)
 				torch.cuda.empty_cache()
-			text = tokenizer.decode(res[0]).removeprefix("<s>").strip().removeprefix(prompt).strip().split("</s>", 1)[0]
+			text = tokeniser.decode(res[0]).removeprefix("<s>").strip().removeprefix(prompt).strip().split("</s>", 1)[0]
 			text = text.strip().replace(":\n", ": ").replace(f"You:", f"{u}:").replace("<USER>", u)
 			spl = text.split(": ")
 			if len(spl) > 1:
@@ -2218,6 +2327,7 @@ class Bot:
 		gpt4=(480, 3),
 		gpt3a=(120, 2),
 		gpt4a=(480, 3),
+		mythalion=(960, 4),
 		hippogriff=(960, 4),
 		wizard=(960, 4),
 		platypus=(960, 4),
@@ -2238,24 +2348,6 @@ class Bot:
 		summ_start = "Summary of prior conversation:\n"
 		# for i in (0,):
 		if (tc := len(self.gpttokens(v))) > lim + 16:
-			# if 0:# tc < 3072 and (tc > lim * 3 or (tc > lim * 1.5 and self.premium >= 2)):
-				# try:
-					# prompt = f'"""\n{v.strip()}\n"""\n\nSummarise the above into a paragraph, keeping most important parts. Do not be repetitive or continue the text!'
-					# func = self.cgp
-					# v2 = func(prompt)[0]
-					# if len(self.gpttokens(v2)) < 16:
-						# raise ValueError(v2)
-					# if v2[0] == v2[-1] == '"':
-						# try:
-							# v2 = orjson.loads(v2)
-						# except orjson.JSONDecodeError:
-							# pass
-					# v = v2
-					# tc = len(self.gpttokens(v))
-				# except:
-					# print_exc()
-				# else:
-					# break
 			if tc > lim * 1.5 and len(self.gpttokens(lines[0])) > lim * 3 / 4:
 				lines[0] = lim_tokens(lines[0], lim // 2)
 				v = "".join(lines)
@@ -2278,6 +2370,12 @@ class Bot:
 		return t2[1]
 
 
+class Cancel:
+	@classmethod
+	def result(timeout=None):
+		pass
+LOADED = Cancel
+
 if __name__ == "__main__":
 	import sys
 	token = sys.argv[1] if len(sys.argv) > 1 else ""
@@ -2285,4 +2383,4 @@ if __name__ == "__main__":
 	while True:
 		print(bot.talk(input()))
 else:
-	exc.submit(Bot.answer_summarise, Bot, q="test")
+	LOADED = exc.submit(Bot.answer_summarise, Bot, q="test")

@@ -1513,7 +1513,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				p3 = await asyncio.wait_for(asyncio.shield(fut), timeout=20)
 			except (T0, T1, T2):
 
-				async def recaption(h, p1, p2, fut):
+				async def recaption(h, p1, p2, fut, tup):
 					p3 = await fut
 					p1, p2, p3 = sorted((p1, p2, p3), key=len)
 					tup = (tup[0], p2, p3, best)
@@ -1522,7 +1522,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					print("BEST:", tup)
 					self.analysed[h] = tup
 
-				create_task(recaption(h, p1, p2, fut))
+				create_task(recaption(h, p1, p2, fut, tup))
 			else:
 				p1, p2, p3 = sorted((p1, p2, p3), key=len)
 				tup = (tup[0], p2, p3, best)
@@ -2748,6 +2748,23 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		# with tracebacksuppressor(asyncio.TimeoutError, asyncio.CancelledError):
 		# 	ip = await fut
 		t = utc()
+		ram_name = "RAM"
+		if os.name == "nt" and globals().get("WMI") is not False:
+			if not globals().get("WMI"):
+				try:
+					import wmi
+					globals()["WMI"] = wmi.WMI()
+				except:
+					print_exc()
+					globals()["WMI"] = False
+			if WMI:
+				OS = WMI.Win32_Operatingsystem()[0]
+				cswap = (int(OS.TotalVirtualMemorySize) - int(OS.FreeVirtualMemory)) * 1024 - psutil.virtual_memory().used
+				if cswap > sinfo.used:
+					sinfo = cdict(used=cswap, total=sinfo.total)
+				ram_speed = WMI.Win32_PhysicalMemory()[0].ConfiguredClockSpeed
+				ram_class = max(1, ceil(math.log2(ram_speed / 250)))
+				ram_name = f"DDR{ram_class}-{ram_speed}"
 		return dict(
 			cpu={ip: dict(name=cinfo["brand_raw"], count=cinfo["count"], usage=cpercent / 100, max=1, time=t)},
 			gpu={f"{ip}-{i}": dict(
@@ -2758,7 +2775,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				time=t,
 			) for i, name in enumerate(gname)},
 			memory={
-				f"{ip}-v": dict(name="RAM", count=1, usage=minfo.used, max=minfo.total, time=t),
+				f"{ip}-v": dict(name=ram_name, count=1, usage=minfo.used, max=minfo.total, time=t),
 				f"{ip}-s": dict(name="Swap", count=1, usage=sinfo.used, max=sinfo.total, time=t),
 				**{f"{ip}-{i}": dict(
 					name=name,
@@ -3909,12 +3926,14 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				w = await channel.create_webhook(name=self.name, avatar=data, reason="Auto Webhook")
 				w = self.add_webhook(w)
 			else:
+				wlist.sort(key=lambda w: (getattr(w, "user", None) != self.user, random.random()), reverse=True)
 				w = wlist[0]
 		except discord.HTTPException as ex:
 			if "maximum" in str(ex).lower():
 				print_exc()
 				wlist = await self.load_channel_webhooks(channel, force=True, bypass=bypass)
-				w = wlist.next()
+				wlist.sort(key=lambda w: (getattr(w, "user", None) != self.user, random.random()), reverse=True)
+				w = wlist[0]
 		if not w.avatar or str(w.avatar) == "https://cdn.discordapp.com/embed/avatars/0.png":
 			data = await self.get_request(get_author(self.user).url)
 			return await w.edit(name=self.name, avatar=data)
@@ -4090,20 +4109,31 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			return message
 
 	@tracebacksuppressor(ConnectionError)
-	async def ignore_interaction(self, message):
+	async def ignore_interaction(self, message, skip=False):
 		if hasattr(message, "int_id"):
 			int_id, int_token = message.int_id, message.int_token
 		elif hasattr(message, "slash"):
 			int_id, int_token = message.id, message.slash
 		else:
 			return
-		await Request(
-			f"https://discord.com/api/{api}/interactions/{int_id}/{int_token}/callback",
-			method="POST",
-			authorise=True,
-			data='{"type":6}',
-			aio=True,
-		)
+		try:
+			if skip:
+				raise ConnectionError(400)
+			await Request(
+				f"https://discord.com/api/{api}/interactions/{int_id}/{int_token}/callback",
+				method="POST",
+				authorise=True,
+				data='{"type":6}',
+				aio=True,
+			)
+		except ConnectionError:
+			message = await send_with_reply(None, message, "\xad", ephemeral=True)
+			await Request(
+				f"https://discord.com/api/{api}/webhooks/{self.id}/{int_token}/messages/@original",
+				method="DELETE",
+				authorise=True,
+				aio=True,
+			)
 
 	# Adds embeds to the embed sender, waiting for the next update event.
 	def send_embeds(self, channel, embeds=None, embed=None, reacts=None, reference=None, exc=True, bottleneck=False):
@@ -4119,10 +4149,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		elif not embeds:
 			return
 		if reference:
-			if getattr(reference, "slash", None):
-				create_task(self.ignore_interaction(reference))
 			if len(embeds) == 1:
 				return create_task(send_with_react(channel, embed=embeds[0], reference=reference, reacts=reacts))
+			if getattr(reference, "slash", None):
+				create_task(self.ignore_interaction(reference, skip=True))
 		c_id = verify_id(channel)
 		user = self.cache.users.get(c_id)
 		if user is not None:

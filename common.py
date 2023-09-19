@@ -2501,7 +2501,7 @@ def spec2cap():
 			caps.append("image")
 		if cc > 5 and ram > 14 * 1073741824:
 			caps.append("caption")
-		if "gptq" not in done and cc > 1 and ram > 22 * 1073741824:
+		if AUTH.get("discord_token") and cc > 1 and ram > 22 * 1073741824:
 			caps.append("agpt")
 	yield caps
 	if cc > 2:
@@ -2510,7 +2510,7 @@ def spec2cap():
 			caps.append("image")
 		if ram > 46 * 1073741824:
 			caps.append("caption")
-		if "gptq" not in done and cc > 3 and ram > 46 * 1073741824:
+		if AUTH.get("discord_token") and not cut and cc > 3 and ram > 46 * 1073741824:
 			caps.append("agpt")
 		yield caps
 	if not DC:
@@ -4255,11 +4255,11 @@ class ImagePool:
 	rate_limit = (0.05, 0.25)
 	threshold = 1024
 
-	async def __call__(self, bot, channel, flags, **void):
+	async def __call__(self, bot, channel, flags, message, **void):
 		url = await bot.data.imagepools.get(self.database, self.fetch_one, self.threshold)
 		if "v" in flags:
 			return escape_roles(url)
-		self.bot.send_as_embeds(channel, image=url)
+		self.bot.send_as_embeds(channel, image=url, reference=message)
 
 
 # Redirects all print operations to target files, limiting the amount of operations that can occur in any given amount of time for efficiency.

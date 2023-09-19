@@ -63,7 +63,7 @@ def spec2cap():
 			caps.append("image")
 		if cc > 5 and ram > 14 * 1073741824:
 			caps.append("caption")
-		if cc > 1 and ram > 22 * 1073741824:
+		if AUTH.get("discord_token") and cc > 1 and ram > 22 * 1073741824:
 			caps.append("agpt")
 	yield caps
 	if cc > 2:
@@ -72,7 +72,7 @@ def spec2cap():
 			caps.append("image")
 		if ram > 46 * 1073741824:
 			caps.append("caption")
-		if not cut and cc > 3 and ram > 46 * 1073741824:
+		if AUTH.get("discord_token") and not cut and cc > 3 and ram > 46 * 1073741824:
 			caps.append("agpt")
 		yield caps
 	if not DC:
@@ -376,6 +376,23 @@ try:
 				dinfo[p.mountpoint] = psutil.disk_usage(p.mountpoint)
 			except OSError:
 				pass
+		ram_name = "RAM"
+		if os.name == "nt" and globals().get("WMI") is not False:
+			if not globals().get("WMI"):
+				try:
+					import wmi
+					globals()["WMI"] = wmi.WMI()
+				except:
+					print_exc()
+					globals()["WMI"] = False
+			if WMI:
+				OS = WMI.Win32_Operatingsystem()[0]
+				cswap = (int(OS.TotalVirtualMemorySize) - int(OS.FreeVirtualMemory)) * 1024 - psutil.virtual_memory().used
+				if cswap > sinfo.used:
+					sinfo = cdict(used=cswap, total=sinfo.total)
+				ram_speed = WMI.Win32_PhysicalMemory()[0].ConfiguredClockSpeed
+				ram_class = max(1, ceil(math.log2(ram_speed / 250)))
+				ram_name = f"DDR{ram_class}-{ram_speed}"
 		stats = orjson.dumps(dict(
 			cpu={ip: dict(name=cinfo["brand_raw"], count=cinfo["count"], usage=cpercent / 100, max=1, time=t)},
 			gpu={f"{ip}-{i}": dict(
@@ -386,7 +403,7 @@ try:
 				time=t,
 			) for i, name in enumerate(gname)},
 			memory={
-				f"{ip}-v": dict(name="RAM", count=1, usage=minfo.used, max=minfo.total, time=t),
+				f"{ip}-v": dict(name=ram_name, count=1, usage=minfo.used, max=minfo.total, time=t),
 				f"{ip}-s": dict(name="Swap", count=1, usage=sinfo.used, max=sinfo.total, time=t),
 				**{f"{ip}-{i}": dict(
 					name=name,

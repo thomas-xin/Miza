@@ -120,7 +120,6 @@ MultiAutoImporter(
     "pickle",
     "io",
     "random",
-    "math",
     "cmath",
     "fractions",
     "mpmath",
@@ -152,7 +151,8 @@ with open(collections2f, "rb") as f:
 if time.time() - os.path.getmtime(collections2f) > 3600:
     import_exc.submit(update_collections2)
 
-
+import math
+from math import *
 dateutil.force()
 sympy.force()
 colormath.force()

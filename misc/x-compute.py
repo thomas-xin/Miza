@@ -18,7 +18,7 @@ import numpy as np
 from math import *
 sys.path.append("misc")
 
-print = lambda *args, sep=" ", end="\n": sys.stdout.buffer.write(f"~print(*{repr(tuple(args))},sep={repr(sep)},end={repr(end)})\n".encode("utf-8"))
+print = lambda *args, sep=" ", end="\n": sys.stdout.buffer.write(f"~print({repr(sep.join(map(str, args)))},end={repr(end)})\n".encode("utf-8"))
 
 def lim_str(s, maxlen=10, mode="centre"):
 	if maxlen is None:
@@ -172,7 +172,7 @@ mpf = float
 deque = collections.deque
 suppress = contextlib.suppress
 
-exc = concurrent.futures.ThreadPoolExecutor(max_workers=8)
+exc = concurrent.futures.ThreadPoolExecutor(max_workers=24)
 
 def load_mimes():
 	with open("misc/mimes.txt") as f:
@@ -1627,6 +1627,7 @@ if "gptq" in CAPS or "agpt" in CAPS:
 		ht = inputs["huggingface_token"]
 		name = inputs["name"]
 		model = inputs["model"]
+		auto = inputs["auto"]
 		personality = inputs["personality"]
 		premium = inputs["premium"]
 		summary = inputs["summary"]
@@ -1657,6 +1658,7 @@ if "gptq" in CAPS or "agpt" in CAPS:
 		else:
 			cb.premium = premium
 		cb.model = model or cb.model
+		cb.auto = auto
 		cb.user_id = user_id
 		cb.channel_id = channel_id
 		cb.bl = bl
@@ -1761,30 +1763,34 @@ if "gptq" in CAPS or "agpt" in CAPS:
 	else:
 		convobot.AsyncChatGPT = AsyncChatGPT
 
-	# if "gptq" in CAPS:
-		# mods = dict(
-			# load_gptq=(
-				# "wizard-70b",
-				# "kimiko-70b",
-				# "wizard-coder-34b",
-				# "orca-70b",
-				# "nous-puffin-70b",
-			# ),
-			# load_bnb=(
-				# "pygmalion-13b",
-				# "manticore-13b",
-				# "wizard-vicuna-30b",
-				# "airochronos-33b",
-				# "hippogriff-30b",
-				# "gplatty-30b",
-			# ),
-		# )
-		# exc.submit(load_models)
-		# exc.submit(convobot.Bot().load_gptq, "wizard-70b")
-		# def load_model(bot, func, mod):
-			# getattr(bot, func)(mod)
-			# sys.__stdout__.buffer.write(b"#R\n")
-			# sys.__stdout__.flush()
+	if "gptq" in CAPS:
+		convobot.GPTQ = True
+		def load_models():
+			convobot.LOADED.result()
+			mods = dict(
+				load_gptq=(
+					"wizard-70b",
+					"kimiko-70b",
+					"wizard-coder-34b",
+					"mythalion-13b",
+					"orca-70b",
+					"nous-puffin-70b",
+				),
+				load_bnb=(
+					"pygmalion-13b",
+					"manticore-13b",
+					"wizard-vicuna-30b",
+					"airochronos-33b",
+					"hippogriff-30b",
+					"gplatty-30b",
+				),
+			)
+			bot = convobot.Bot()
+			for k, v in mods.items():
+				for m in v:
+					exc.submit(getattr(bot, k), m, fail=True)
+					time.sleep(1)
+		exc.submit(load_models)
 
 if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 	import imagebot
@@ -2458,7 +2464,7 @@ def evaluate(ts, args):
 	sys.stdout.flush()
 
 
-exc = concurrent.futures.ThreadPoolExecutor(max_workers=12)
+# exc = concurrent.futures.ThreadPoolExecutor(max_workers=12)
 loop = asyncio.new_event_loop()
 if __name__ == "__main__":
 

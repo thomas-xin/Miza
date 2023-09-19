@@ -339,7 +339,7 @@ class Neko(Command):
         file = f"neko~{tag}" if tag else "neko"
         return self.bot.data.imagepools.get(file, fetch, self.threshold, args=(nekos, tag))
 
-    async def __call__(self, bot, channel, flags, args, argv, **void):
+    async def __call__(self, bot, message, channel, flags, args, argv, **void):
         isNSFW = bot.is_nsfw(channel)
         if "l" in flags or argv == "list":
             text = "Available tags in **" + channel.name + "**:\n```ini\n"
@@ -394,7 +394,7 @@ class Neko(Command):
             return escape_roles(url)
         embed = discord.Embed(colour=await bot.get_colour(url))
         embed.set_image(url=url)
-        await send_with_react(channel, embed=embed, reacts="🔳")
+        await send_with_react(channel, embed=embed, reference=message, reacts="🔳")
 
 
 class Lewd(Command):
@@ -426,7 +426,7 @@ class Lewd(Command):
             return escape_roles(text)
         embed = discord.Embed(colour=await self.bot.get_colour(url))
         embed.set_image(url=url)
-        await send_with_react(channel, embed=embed, reacts="🔳")
+        await send_with_react(channel, embed=embed, reference=message, reacts="🔳")
 
 
 class Verify(Command):

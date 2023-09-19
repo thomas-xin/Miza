@@ -163,11 +163,12 @@ class Translate(Command):
 
 	async def chatgpt_translate(self, bot, guild, channel, user, text, src, dests, translated, comments):
 		uid = user.id
+		temp = text.replace('"""', "'''")
 		if src and src != "auto":
 			src = googletrans.LANGUAGES.get(src) or src
-			prompt = f'"""\n{text}\n"""\n\nTranslate the above from {src} informally into '
+			prompt = f'"""\n{temp}\n"""\n\nTranslate the above from {src} informally into '
 		else:
-			prompt = f'"""\n{text}\n"""\n\nTranslate the above informally into '
+			prompt = f'"""\n{temp}\n"""\n\nTranslate the above informally into '
 		prompt += ",".join((googletrans.LANGUAGES.get(lang) or lang).capitalize() for lang in dests)
 		if len(dests) > 1:
 			prompt += ', each beginning with "•"'
@@ -1439,6 +1440,10 @@ class Ask(Command):
 			pers = pers.lstrip()
 		else:
 			model = "auto"
+		if model == "auto" and cname in ("ask", "auto"):
+			auto = True
+		else:
+			auto = False
 		long_mem = 4096 if premium >= 2 else 1024
 		if cname == "gpt2" or not AUTH.get("openai_key"):
 			model = "bloom"
@@ -1451,7 +1456,9 @@ class Ask(Command):
 			#     if hasattr(channel, "recipient"):
 			#         raise PermissionError(f"This model is only available in {uni_str('NSFW')} channels. Please verify your age using ~verify within a NSFW channel to enable NSFW in DMs.")
 			#     raise PermissionError(f"This model is only available in {uni_str('NSFW')} channels.")
-			model = "pygmalion"
+			model = "mythalion"
+		elif cname == "myth" or cname == "mythalion":
+			model = "mythalion"
 		elif cname == "manticore":
 			model = "manticore"
 		elif cname == "hippogriff":
@@ -1492,7 +1499,7 @@ class Ask(Command):
 			if premium < 4:
 				raise PermissionError(f"Distributed premium level 2 or higher required; please see {bot.kofi_url} for more info!")
 			model = "gpt4+"
-		if model == "auto":
+		if cname == "auto" or model == "auto":
 			if getattr(caid, "model", None):
 				model = caid.model
 			if model == "auto":
@@ -1568,6 +1575,7 @@ class Ask(Command):
 				vis_session=AUTH.get("vis_session"),
 				name=bot.name,
 				model=model,
+				auto=auto,
 				personality=pers,
 				premium=premium,
 				summary=summary,
@@ -1586,6 +1594,13 @@ class Ask(Command):
 			# if fut:
 			#     await fut
 			cap = "agpt" if model.removesuffix("+") in ("gpt3", "gpt4", "davinci", "bloom") else "gptq"
+			if cap == "agpt":
+				try:
+					await process_image("lambda: 1+1", "$", (), cap="gptq", timeout=2)
+				except:
+					print_exc()
+				else:
+					cap = "gptq"
 			if cap == "gptq":
 				print("GPTQ:", inputs)
 			out, caic = await process_image("lambda inputs, cid: [CBAI(inputs), [(b := CBOTS[cid]).chat_history,b.jailbroken,b.model]]", "$", [inputs, channel.id], cap=cap, timeout=3600 if cap == "gptq" else 300)
@@ -1671,7 +1686,7 @@ class Ask(Command):
 					+ "If you are looking for improved knowledge, memory and intelligence, reduced censorship, ability to connect to the internet, or would simply like to support my developer, "
 					+ f"please check out my [kofi]({bot.kofi_url}) to help fund API, as these features are significantly more expensive!\n"
 					+ "Any support is greatly appreciated and contributes directly towards service and future development.\n"
-					+ f"Legacy chat models below GPT-3 may be invoked using {bot.get_prefix(guild)}bloom, {bot.get_prefix(guild)}pygmalion, etc.\n"
+					+ f"Free open source models may be invoked using {bot.get_prefix(guild)}wizard, {bot.get_prefix(guild)}mythalion, etc.\n"
 					+ "Alternatively if you would like to manage pricing yourself through an OpenAI account (and/or free trial), check out the ~trial command!"
 				)
 				reacts.append("🚫")
@@ -1906,7 +1921,7 @@ class Personality(Command):
 	server_only = True
 	name = ["ResetChat", "ClearChat", "ChangePersonality"]
 	min_level = 2
-	description = "Customises ⟨MIZA⟩'s personality for ~ask in the current server. Uses the highest available model within specified family (for example, \"GPT\" will prefer GPT-4 if allowed). Wizard, Orca, NousPuff, Kimiko, WizCode, Bloom, Pygmalion, Manticore, Hippogriff, Platypus, WizVic, and Airochronos are currently the alternate models enabled."
+	description = "Customises ⟨MIZA⟩'s personality for ~ask in the current server. Uses the highest available model within specified family (for example, \"GPT\" will prefer GPT-4 if allowed). Wizard, Orca, NousPuff, Kimiko, WizCode, Mythalion, Bloom, Pygmalion, Manticore, Hippogriff, Platypus, WizVic, and Airochronos are currently the alternate models enabled."
 	usage = "<traits>* <default{?d}>?"
 	example = ("personality Manticore; mischievous, cunning", "personality Wizard; dry, sarcastic, snarky", "personality Auto; sweet, loving", "personality GPT4; The following is a conversation between Miza and humans. Miza is an AI who is charming, friendly and positive.")
 	flags = "aed"
@@ -1951,7 +1966,7 @@ class Personality(Command):
 					"Apologies, my AI has detected that your input may be inappropriate.\n"
 					+ "Please move to a NSFW channel, reword, or consider contacting the support server if you believe this is a mistake!"
 				)
-		models = ("auto", "gpt", "wizard", "orca", "nouspuff", "kimiko", "wizcode", "bloom", "pyg", "pygmalion", "manticore", "llama", "hippogriff", "wizvic", "platypus", "airochronos", "davinci", "gpt3", "gpt4")
+		models = ("auto", "gpt", "wizard", "orca", "nouspuff", "kimiko", "wizcode", "mythalion", "bloom", "pyg", "pygmalion", "manticore", "llama", "hippogriff", "wizvic", "platypus", "airochronos", "davinci", "gpt3", "gpt4")
 		if ";" in p:
 			m, p = p.split(";", 1)
 			p = p.lstrip()

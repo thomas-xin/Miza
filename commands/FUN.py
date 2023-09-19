@@ -2714,12 +2714,12 @@ class Cat(ImagePool, Command):
 			url = d["file" if x == 1 and alexflipnote_key else "url"]
 		return url
 
-	async def __call__(self, bot, channel, flags, argv, **void):
+	async def __call__(self, bot, channel, flags, argv, message, **void):
 		if argv.isnumeric() and int(argv) in self.http_nums:
 			url = f"https://http.cat/{int(argv)}"
-			self.bot.send_as_embeds(channel, image=url)
+			self.bot.send_as_embeds(channel, image=url, reference=message)
 			return
-		return await super().__call__(bot, channel, flags)
+		return await super().__call__(bot, channel, flags, message)
 
 
 class Dog(ImagePool, Command):

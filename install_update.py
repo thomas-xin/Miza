@@ -37,6 +37,8 @@ def try_int(i):
     except:
         return i
 
+if os.name == "nt":
+	modlist.append("wmi>=1.5.1")
 if os.environ.get("AI_FEATURES", True):
 	modlist.extend((
 		"accelerate>=0.22.0",

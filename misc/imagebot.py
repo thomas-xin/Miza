@@ -8,10 +8,7 @@ import numpy as np
 from PIL import Image
 print_exc = lambda: sys.stdout.write(traceback.format_exc())
 
-def print(*args, sep=" ", end="\n"):
-	s = sep.join(map(str, args)) + end
-	b = s.encode("utf-8")
-	return sys.stdout.buffer.write(b)
+print = lambda *args, sep=" ", end="\n": sys.stdout.buffer.write(f"~print({repr(sep.join(map(str, args)))},end={repr(end)})\n".encode("utf-8"))
 
 if torch and torch.cuda.is_available():
 	torch.cuda._lazy_init()
