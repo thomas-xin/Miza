@@ -1791,7 +1791,7 @@ if "gptq" in CAPS or "agpt" in CAPS:
 				for m in v:
 					exc.submit(getattr(bot, k), m, fail=True)
 					time.sleep(1)
-		exc.submit(load_models)
+		# exc.submit(load_models)
 
 if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 	import imagebot

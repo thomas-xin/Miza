@@ -2761,7 +2761,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				OS = WMI.Win32_Operatingsystem()[0]
 				cswap = (int(OS.TotalVirtualMemorySize) - int(OS.FreeVirtualMemory)) * 1024 - psutil.virtual_memory().used
 				if cswap > sinfo.used:
-					sinfo = cdict(used=cswap, total=sinfo.total)
+					class mtemp:
+						def __init__(self, used, total):
+							self.used, self.total = used, total
+					sinfo = mtemp(used=cswap, total=sinfo.total)
 				ram = WMI.Win32_PhysicalMemory()[0]
 				ram_speed = ram.ConfiguredClockSpeed
 				ram_type = ram.SMBIOSMemoryType

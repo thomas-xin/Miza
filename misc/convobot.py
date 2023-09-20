@@ -649,6 +649,7 @@ class Bot:
 			print(f"VERIFYING GPTQ {model}...")
 		else:
 			print(f"LOADING GPTQ {model}...")
+		mfut = None
 		try:
 			from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig, exllama_set_max_input_length
 			buffer = 1.3
@@ -745,7 +746,9 @@ class Bot:
 				except concurrent.futures.TimeoutError:
 					raise RuntimeError("Model is loading, please wait...")
 			return model, tokeniser
-		except:
+		except Exception as ex:
+			if mfut:
+				mfut.set_exception(ex)
 			print_exc()
 			raise
 
@@ -754,6 +757,7 @@ class Bot:
 			print(f"VERIFYING BNB {model}...")
 		else:
 			print(f"LOADING BNB {model}...")
+		mfut = None
 		try:
 			try:
 				import bitsandbytes
@@ -869,7 +873,9 @@ class Bot:
 				except concurrent.futures.TimeoutError:
 					raise RuntimeError("Model is loading, please wait...")
 			return model, tokeniser
-		except:
+		except Exception as ex:
+			if mfut:
+				mfut.set_exception(ex)
 			print_exc()
 			raise
 
@@ -1253,8 +1259,11 @@ class Bot:
 			text = T.decode(res[0])
 			text = text.removeprefix("<s>").strip().removeprefix(prompt).strip().split("</s>", 1)[0]
 			print("MOCK:", text)
-			num = int(re.search("[0-9]+", text).group())
-			k = mocked.get(num)
+			try:
+				num = int(re.search("[0-9]+", text).group())
+				k = mocked.get(num)
+			except:
+				k = None
 			if k is None:
 				pass
 			elif k is False:

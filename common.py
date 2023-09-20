@@ -2483,10 +2483,13 @@ def spec2cap():
 	else:
 		ffmpeg = True
 	done = set()
-	import pynvml
-	pynvml.nvmlInit()
-	handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(DC)]
-	rrams = [pynvml.nvmlDeviceGetMemoryInfo(d).total for d in handles]
+	try:
+		import pynvml
+		pynvml.nvmlInit()
+		handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(DC)]
+		rrams = [pynvml.nvmlDeviceGetMemoryInfo(d).total for d in handles]
+	except:
+		rrams = []
 	vrams = tuple(rrams)
 	cut = 0
 	if AUTH.get("discord_token") and any(v > 6 * 1073741824 and c > 700000 for v, c in zip(rrams, COMPUTE_POT)):
