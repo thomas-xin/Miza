@@ -82,9 +82,12 @@ def convert_fut(fut):
 		loop.create_task(_await_fut(fut, ret))
 	return ret
 
-if len(sys.argv) > 1 and sys.argv[1].isnumeric() and int(sys.argv[1]) >= 0:
-	os.environ["CUDA_VISIBLE_DEVICES"] = DEV = str(sys.argv[1])
+if len(sys.argv) > 1 and sys.argv[1]:
+	os.environ["CUDA_VISIBLE_DEVICES"] = sys.argv[1]
+	DEVICES = list(map(int, sys.argv[1].split(",")))
+	DEV = DEVICES[0]
 else:
+	DEVICES = []
 	DEV = -1
 if len(sys.argv) > 2:
 	CAPS = set(sys.argv[2].split(","))
@@ -99,7 +102,7 @@ if len(sys.argv) > 4:
 else:
 	COMPUTE_CAPS = []
 if len(sys.argv) > 5:
-	COMPUTE_ORDER = orjson.loads(sys.argv[5])
+	COMPUTE_ORDER = [i for i in orjson.loads(sys.argv[5]) if i in DEVICES]
 else:
 	COMPUTE_ORDER = []
 if len(sys.argv) > 6:
@@ -1263,7 +1266,7 @@ if "ecdc" in CAPS:
 
 if "caption" in CAPS:
 	def determine_cuda(mem=1, priority=None, multi=False, major=0):
-		if not torch or not torch.cuda.is_available():
+		if not torch or not DEVICES or not torch.cuda.is_available():
 			if multi:
 				return [-1], torch.float32
 			return -1, torch.float32
@@ -1288,7 +1291,7 @@ if "caption" in CAPS:
 			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, -mem // 1073741824, p.major, p.minor, COMPUTE_LOAD[i] < high * 0.75, COMPUTE_LOAD[i] * (random.random() + 4.5) * 0.2, -gmems[i].free, p.multi_processor_count)
 		else:
 			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.5, p.major >= major, p.major >= 7, -p.major, -p.minor, COMPUTE_LOAD[i] * (random.random() + 4.5) * 0.2, -p.multi_processor_count, -gmems[i].free)
-		pcs = sorted(range(n), key=key, reverse=True)
+		pcs = sorted(DEVICES, key=key, reverse=True)
 		if multi:
 			return [i for i in pcs if gmems[i].free >= mem], torch.float16
 		return pcs[0], torch.float16

@@ -271,6 +271,20 @@ class Semaphore(contextlib.AbstractContextManager, contextlib.AbstractAsyncConte
 	
 	acquire = __call__
 
+	def finish(self):
+		while self.active or self.is_busy():
+			if self.fut.done():
+				time.sleep(0.08)
+			else:
+				self.fut.result()
+
+	async def afinish(self):
+		while self.active or self.is_busy():
+			if self.fut.done():
+				await asyncio.sleep(0.08)
+			else:
+				await wrap_future(self.fut)
+
 	def is_active(self):
 		return self.active or self.passive
 
@@ -2342,7 +2356,6 @@ async def proc_communicate(proc):
 async def proc_distribute(proc):
 	bot = BOT[0]
 	tasks = ()
-	st = 0
 	while True:
 		with tracebacksuppressor:
 			if not is_strict_running(proc):
@@ -2351,11 +2364,7 @@ async def proc_distribute(proc):
 				try:
 					await asyncio.wait_for(wrap_future(proc.fut), timeout=60)
 				except (T0, T1, T2):
-					# pass
-					if "timeout" in proc.caps:
-						timeout = 1800
-						if st and utc() - st > timeout:
-							return create_task(start_proc(proc))
+					pass
 				else:
 					proc.fut = concurrent.futures.Future()
 				tasks = bot.distribute(proc.caps, {}, {})
@@ -2370,11 +2379,19 @@ async def proc_distribute(proc):
 				for task in tasks:
 					i, cap, command, timeout = task
 					# print("NEW TASK:", proc, i, bot.compute_wait, lim_str(str(command), 64), frand())
+					if "ngptq" in proc.caps:
+						for p2 in PROCS.values():
+							if p2.used and "gptq" in p2.caps:
+								await start_proc(p2, wait=True)
+					elif "gptq" in proc.caps:
+						for p2 in PROCS.values():
+							if p2.used and "ngptq" in p2.caps:
+								await start_proc(p2, wait=True)
 					fut = create_task(_sub_submit(proc, command, _timeout=timeout))
 					fut.ts = i
 					futs.append(fut)
-					if st:
-						st = utc()
+					if proc.used:
+						proc.used = utc()
 				# print(proc, tasks, [fut.ts for fut in futs], futs)
 				futd = {i for i, fut in enumerate(futs) if fut.done()}
 				for i in futd:
@@ -2385,7 +2402,7 @@ async def proc_distribute(proc):
 						resps[fut.ts] = ex
 					else:
 						resps[fut.ts] = resp
-					st = utc()
+					proc.used = utc()
 				futs = [futs[i] for i in range(len(futs)) if i not in futd]
 				if futs and not resps:
 					delay = 1 + proc.sem.active
@@ -2421,19 +2438,21 @@ if COMPUTE_LOAD:
 	print("Compute load distribution:", COMPUTE_LOAD)
 	print("Compute pool order:", COMPUTE_ORDER)
 
-async def start_proc(n, i=-1, caps="ytdl", it=0):
+async def start_proc(n, di=(), caps="ytdl", it=0, wait=False):
 	if hasattr(n, "caps"):
-		n, i, caps, it = n.n, n.i, n.caps, it + 1
+		n, di, caps, it = n.n, n.di, n.caps, it + 1
 	if n in PROCS:
 		proc = PROCS[n]
 		if is_strict_running(proc):
 			PROCS[n] = False
 			it = max(it, proc.it + 1)
+			if wait:
+				await proc.sem.afinish()
 			await create_future(force_kill, proc)
 		elif PROCS[n] is False:
 			return
 	args = list(proc_args)
-	args.append(str(i))
+	args.append(",".join(map(str, di)))
 	args.append(",".join(caps))
 	args.append(orjson.dumps(COMPUTE_LOAD).decode("ascii"))
 	properties = [torch.cuda.get_device_properties(i) for i in range(DC)]
@@ -2448,7 +2467,7 @@ async def start_proc(n, i=-1, caps="ytdl", it=0):
 		stderr=None,
 	)
 	proc.n = n
-	proc.i = i
+	proc.di = di
 	proc.caps = caps
 	proc.it = it
 	proc.is_running = lambda: not proc.returncode
@@ -2456,6 +2475,7 @@ async def start_proc(n, i=-1, caps="ytdl", it=0):
 	proc.comm = create_task(proc_communicate(proc))
 	proc.dist = create_task(proc_distribute(proc))
 	proc.fut = newfut
+	proc.used = 0
 	PROCS[n] = proc
 	return proc
 
@@ -2471,9 +2491,9 @@ IS_MAIN = True
 # sd			GPU >200k, VRAM >5GB			RTX2060, T4, RTX3050, RTX3060m, A16
 # sdxl			GPU >400k, VRAM >9GB			GTX1080ti, RTX2080ti, RTX3060, RTX3080, A2000
 # sdxlr			GPU >400k, VRAM >15GB			V100, RTX3090, A4000, RTX4080, L4
-# gptq			GPU >800k, VRAM >43GB			2xRTX3090, A6000, A40, A100, 2xRTX4090, L6000, L40
+# gptq			GPU >700k, VRAM >59GB			2xV100, 6xRTX3080, 3xRTX3090, 2xA6000, 2xA40, A100, 3xRTX4090, 2xL6000, 2xL40
 def spec2cap():
-	caps = [-1, "ytdl"]
+	caps = [[], "ytdl"]
 	cc = psutil.cpu_count()
 	ram = psutil.virtual_memory().total
 	try:
@@ -2494,10 +2514,20 @@ def spec2cap():
 	cut = 0
 	if AUTH.get("discord_token") and any(v > 6 * 1073741824 and c > 700000 for v, c in zip(rrams, COMPUTE_POT)):
 		vram = sum(rrams[i] for i in range(DC) if COMPUTE_POT[i] > 400000)
-		if vram > 43 * 1073741824:
-			yield [-1, "agpt", "gptq"]
+		if vram > 59 * 1073741824:
+			cut = 60 * 1073741824
+			did = []
+			for i in COMPUTE_ORDER:
+				v = rrams[i]
+				if cut > 0:
+					red = min(cut, v)
+					rrams[i] = v - red
+					cut -= red
+					did.append(i)
+				else:
+					break
+			yield [did, "agpt", "gptq"]
 			done.add("gptq")
-			cut = 48 * 1073741824
 	if cc > 1:
 		caps.append("math")
 		if cc > 3 and ram > 6 * 1073741824 and ffmpeg:
@@ -2508,7 +2538,7 @@ def spec2cap():
 			caps.append("agpt")
 	yield caps
 	if cc > 2:
-		caps = [-1, "ytdl", "math"]
+		caps = [[], "ytdl", "math"]
 		if ram > 14 * 1073741824 and ffmpeg:
 			caps.append("image")
 		if ram > 46 * 1073741824:
@@ -2518,18 +2548,9 @@ def spec2cap():
 		yield caps
 	if not DC:
 		return
-	if cut:
-		for i in COMPUTE_ORDER:
-			v = rrams[i]
-			if cut > 0:
-				red = min(cut, v)
-				rrams[i] = v - red
-				cut -= red
-			else:
-				break
 	for i, v in reversed(tuple(enumerate(rrams))):
 		c = COMPUTE_POT[i]
-		caps = [i]
+		caps = [[i]]
 		if c > 100000 and v > 3 * 1073741824 and ffmpeg:
 			caps.append("video")
 			caps.append("ecdc")
@@ -2541,7 +2562,7 @@ def spec2cap():
 				v -= 15 * 1073741824
 		elif c > 400000 and IS_MAIN and "sdxlr" not in done and vrams[i] > 15 * 1073741824:
 			caps.append("sdxlr")
-			caps.append("timeout")
+			caps.append("ngptq")
 			done.add("sdxlr")
 			v = 0
 		elif c > 400000 and v > 9 * 1073741824:
@@ -2552,7 +2573,7 @@ def spec2cap():
 			v -= 9 * 1073741824
 		elif c > 400000 and IS_MAIN and "sdxl" not in done and vrams[i] > 9 * 1073741824:
 			caps.append("sdxl")
-			caps.append("timeout")
+			caps.append("ngptq")
 			done.add("sdxl")
 			v = 0
 		elif c > 200000 and v > 5 * 1073741824:
@@ -2584,8 +2605,8 @@ def proc_start():
 		globals()["DC"] = 0
 	with tracebacksuppressor:
 		caps = list(spec2cap())
-	for n, (i, *caps) in enumerate(caps):
-		create_task(start_proc(n, i, caps))
+	for n, (di, *caps) in enumerate(caps):
+		create_task(start_proc(n, di, caps))
 		time.sleep(1)
 
 async def sub_submit(cap, command, _timeout=12):
@@ -2600,7 +2621,7 @@ async def sub_submit(cap, command, _timeout=12):
 		queue = bot.compute_queue.setdefault(cap, set())
 		queue.add(task)
 		procs = filter(bool, PROCS.values())
-		for proc in sorted(procs, key=lambda proc: (proc.sem.active, i == 0, -COMPUTE_POT[proc.i] if COMPUTE_POT else random.random())):
+		for proc in sorted(procs, key=lambda proc: (proc.sem.active, 0 in proc.di or "ngptq" in proc.caps, -COMPUTE_POT[proc.di[0]] if COMPUTE_POT and proc.di else random.random())):
 			if not proc:
 				continue
 			if cap in proc.caps and not proc.fut.done():
@@ -2618,9 +2639,9 @@ async def sub_submit(cap, command, _timeout=12):
 def sub_kill(start=True, force=False):
 	for p in PROCS.values():
 		if is_strict_running(p):
-			sem = emptyctx if force else p.sem
-			with sem:
-				force_kill(p)
+			if not force:
+				p.sem.finish()
+			force_kill(p)
 	PROCS.clear()
 	PROC_RESP.clear()
 	bot = BOT[0]

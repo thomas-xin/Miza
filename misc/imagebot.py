@@ -195,7 +195,7 @@ def update():
 			return_driver(d)
 
 def determine_cuda(mem=1, priority=None, multi=False, major=0):
-	if not torch or not torch.cuda.is_available():
+	if not torch or not DEVICES or not torch.cuda.is_available():
 		if multi:
 			return [-1], torch.float32
 		return -1, torch.float32
@@ -220,7 +220,7 @@ def determine_cuda(mem=1, priority=None, multi=False, major=0):
 		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, -mem // 1073741824, p.major, p.minor, COMPUTE_LOAD[i] < high * 0.75, COMPUTE_LOAD[i] * (random.random() + 4.5) * 0.2, -gmems[i].free, p.multi_processor_count)
 	else:
 		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.5, p.major >= major, p.major >= 7, -p.major, -p.minor, COMPUTE_LOAD[i] * (random.random() + 4.5) * 0.2, -p.multi_processor_count, -gmems[i].free)
-	pcs = sorted(range(n), key=key, reverse=True)
+	pcs = sorted(DEVICES, key=key, reverse=True)
 	if multi:
 		return [i for i in pcs if gmems[i].free >= mem], torch.float16
 	return pcs[0], torch.float16

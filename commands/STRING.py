@@ -1225,13 +1225,42 @@ class Describe(Command):
 					raise ArgumentError("Please input an image by URL or attachment.")
 			else:
 				raise ArgumentError("Please input an image by URL or attachment.")
-		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
-		fut = create_future(reqs.next().head, url, headers=Request.header(), stream=True)
-		cap = await self.bot.caption(url, best=premium >= 2)
-		s = "\n\n".join(cap).strip()
-		resp = await fut
-		name = resp.headers.get("Attachment-Filename") or url.split("?", 1)[0].rsplit("/", 1)[-1]
-		await bot.send_as_embeds(channel, title=name, author=get_author(user), description=s, reference=message)
+		s = None
+		if is_discord_message_link(url):
+			try:
+				spl = url[url.index("channels/") + 9:].replace("?", "/").split("/", 2)
+				c = await self.bot.fetch_channel(spl[1])
+				m = await self.bot.fetch_message(spl[2], c)
+			except:
+				print_exc()
+			else:
+				s = m.content
+				for e in m.attachments:
+					s += "\n" + e.url
+				for e in m.embeds:
+					if e.title:
+						s += "\n## " + e.title
+					if e.thumbnail.url:
+						s += "\n" + e.thumbnail.url
+					if e.description:
+						s += "\n" + e.description
+					if e.image.url:
+						s += "\n" + e.image.url
+					for f in e.fields:
+						s += "\n### " + f.name
+						s += "\n" + f.value
+					if e.footer.text:
+						s += "\n" + e.footer.text
+				return s.strip()
+		if not s:
+			premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
+			fut = create_future(reqs.next().head, url, headers=Request.header(), stream=True)
+			cap = await self.bot.caption(url, best=premium >= 2)
+			s = "\n\n".join(cap).strip()
+			resp = await fut
+			name = resp.headers.get("Attachment-Filename") or url.split("?", 1)[0].rsplit("/", 1)[-1]
+			author = get_author(user)
+		await bot.send_as_embeds(channel, title=name, author=author, description=s, reference=message)
 
 
 class Ask(Command):

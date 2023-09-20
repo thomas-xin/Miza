@@ -211,7 +211,7 @@ def update():
 			return_driver(d)
 
 def determine_cuda(mem=1, priority=None, multi=False, major=0):
-	if not torch or not torch.cuda.is_available():
+	if not torch or not DEVICES or not torch.cuda.is_available():
 		if multi:
 			return [-1], torch.float32
 		return -1, torch.float32
@@ -236,7 +236,7 @@ def determine_cuda(mem=1, priority=None, multi=False, major=0):
 		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, -mem // 1073741824, p.major, p.minor, COMPUTE_LOAD[i] < high * 0.75, COMPUTE_LOAD[i] * (random.random() + 4.5) * 0.2, -gmems[i].free, p.multi_processor_count)
 	else:
 		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.5, p.major >= major, p.major >= 7, -p.major, -p.minor, COMPUTE_LOAD[i] * (random.random() + 4.5) * 0.2, -p.multi_processor_count, -gmems[i].free)
-	pcs = sorted(range(n), key=key, reverse=True)
+	pcs = sorted(DEVICES, key=key, reverse=True)
 	if multi:
 		return [i for i in pcs if gmems[i].free >= mem], torch.float16
 	return pcs[0], torch.float16
@@ -688,15 +688,16 @@ class Bot:
 					try:
 						import pynvml
 						pynvml.nvmlInit()
+						dc = pynvml.nvmlDeviceGetCount()
 						COMPUTE_ORDER = globals().get("COMPUTE_ORDER") or range(torch.cuda.device_count())
 
 						def cuda_info():
 							import torch
-							return [torch.cuda.get_device_properties(i) for i in range(len(COMPUTE_ORDER))]
+							return [torch.cuda.get_device_properties(COMPUTE_ORDER.index(i)) if i in COMPUTE_ORDER else None for i in range(dc)]
 
 						fut2 = exc.submit(cuda_info)
-						handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(len(COMPUTE_ORDER))]
-						gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
+						handles = [pynvml.nvmlDeviceGetHandleByIndex(i) if i in COMPUTE_ORDER else None for i in range(dc)]
+						gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) if d else None for d in handles]
 						tinfo = fut2.result()
 					except:
 						print_exc()
@@ -704,17 +705,17 @@ class Bot:
 					COMPUTE_LOAD = globals().get("COMPUTE_LOAD") or [0] * n
 					i = sorted(COMPUTE_ORDER, key=lambda i: (gmems[i].total - gmems[i].used >= (req * buffer + 2) * 1073741824, -round(gmems[i].total / 1073741824), COMPUTE_LOAD[i] if priority else -COMPUTE_LOAD[i]), reverse=True)[0]
 					if gmems[i].total - gmems[i].used >= (req * buffer + 2) * 1073741824:
-						max_mem = {i: f"{round((gmems[i].total - gmems[i].used) / 1048576 - 2048)}MiB"}
+						max_mem = {COMPUTE_ORDER.index(i): f"{round((gmems[i].total - gmems[i].used) / 1048576 - 2048)}MiB"}
 					else:
 						high = max(COMPUTE_LOAD)
 						bit4 = [i for i in COMPUTE_ORDER if COMPUTE_LOAD[i] > high / 2]
 						total = sum(COMPUTE_LOAD[i] for i in bit4)
-						hmem = max(m.total for m in gmems)
+						hmem = max(m.total for m in gmems if m)
 						if high:
 							loads = [(max(r / total, 1.25 / len(bit4)) * req if r < high * 0.9 else inf) if gmems[i].total > hmem * 0.6 else 0 for i, r in enumerate(COMPUTE_LOAD)]
 						else:
 							loads = [inf] * n
-						max_mem = {i: f"{round(min((gmems[i].total / 1048576 - (1 if i else 2) * 1024), loads[i] * 1024))}MiB" for i in bit4}
+						max_mem = {COMPUTE_ORDER.index(i): f"{round(min((gmems[i].total / 1048576 - (1 if i else 2) * 1024), loads[i] * 1024))}MiB" for i in bit4}
 						max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("MiB")) > 0}
 					print("MAX_MEM:", max_mem)
 				if fail:
@@ -810,21 +811,22 @@ class Bot:
 					try:
 						import pynvml
 						pynvml.nvmlInit()
+						dc = pynvml.nvmlDeviceGetCount()
 						COMPUTE_ORDER = globals().get("COMPUTE_ORDER") or range(torch.cuda.device_count())
 
 						def cuda_info():
 							import torch
-							return [torch.cuda.get_device_properties(i) for i in range(len(COMPUTE_ORDER))]
+							return [torch.cuda.get_device_properties(COMPUTE_ORDER.index(i)) if i in COMPUTE_ORDER else None for i in range(dc)]
 
 						fut2 = exc.submit(cuda_info)
-						handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(len(COMPUTE_ORDER))]
-						gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
+						handles = [pynvml.nvmlDeviceGetHandleByIndex(i) if i in COMPUTE_ORDER else None for i in range(dc)]
+						gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) if d else None for d in handles]
 						tinfo = fut2.result()
 					except:
 						print_exc()
 						tinfo = gmems = COMPUTE_ORDER = []
 					bit8 = [i for i in COMPUTE_ORDER if tinfo[i].major >= 8 or not bitsandbytes]
-					max_mem = {i: f"{round((gmems[i].total - gmems[i].used) / 1048576 - (2 if i else 3) * 1024)}MiB" for i in bit8}
+					max_mem = {COMPUTE_ORDER.index(i): f"{round((gmems[i].total - gmems[i].used) / 1048576 - (2 if i else 3) * 1024)}MiB" for i in bit8}
 					max_mem = {k: v for k, v in max_mem.items() if int(v.removesuffix("MiB")) > 0}
 					rem = sum(int(v.removesuffix("MiB")) for v in max_mem.values()) / 1024 - req
 					cap = sum(int(v.removesuffix("MiB")) for v in max_mem.values()) / 1024
