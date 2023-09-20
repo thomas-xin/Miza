@@ -225,7 +225,7 @@ def determine_cuda(mem=1, priority=None, multi=False, major=0):
 	dc = pynvml.nvmlDeviceGetCount()
 	handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(dc)]
 	gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
-	tinfo = [torch.cuda.get_device_properties(i) for i in range(n)]
+	tinfo = [torch.cuda.get_device_properties(i) if i in range(n) else None for i in range(dc)]
 	COMPUTE_LOAD = globals().get("COMPUTE_LOAD") or [0] * dc
 	high = max(COMPUTE_LOAD)
 	if priority == "full":
@@ -238,8 +238,8 @@ def determine_cuda(mem=1, priority=None, multi=False, major=0):
 		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.5, p.major >= major, p.major >= 7, -p.major, -p.minor, COMPUTE_LOAD[i] * (random.random() + 4.5) * 0.2, -p.multi_processor_count, -gmems[i].free)
 	pcs = sorted(DEVICES, key=key, reverse=True)
 	if multi:
-		return [i for i in pcs if gmems[i].free >= mem], torch.float16
-	return pcs[0], torch.float16
+		return [COMPUTE_ORDER.index(i) for i in pcs if gmems[i].free >= mem], torch.float16
+	return COMPUTE_ORDER.index(pcs[0]), torch.float16
 
 mcache = {}
 def cached_model(cls, model, **kwargs):

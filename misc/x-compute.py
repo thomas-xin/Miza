@@ -1280,7 +1280,7 @@ if "caption" in CAPS:
 		dc = pynvml.nvmlDeviceGetCount()
 		handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(dc)]
 		gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
-		tinfo = [torch.cuda.get_device_properties(i) for i in range(n)]
+		tinfo = [torch.cuda.get_device_properties(i) if i in range(n) else None for i in range(dc)]
 		COMPUTE_LOAD = globals().get("COMPUTE_LOAD") or [0] * dc
 		high = max(COMPUTE_LOAD)
 		if priority == "full":
@@ -1293,8 +1293,8 @@ if "caption" in CAPS:
 			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.5, p.major >= major, p.major >= 7, -p.major, -p.minor, COMPUTE_LOAD[i] * (random.random() + 4.5) * 0.2, -p.multi_processor_count, -gmems[i].free)
 		pcs = sorted(DEVICES, key=key, reverse=True)
 		if multi:
-			return [i for i in pcs if gmems[i].free >= mem], torch.float16
-		return pcs[0], torch.float16
+			return [COMPUTE_ORDER.index(i) for i in pcs if gmems[i].free >= mem], torch.float16
+		return COMPUTE_ORDER.index(pcs[0]), torch.float16
 
 	import tiktoken
 	try:
@@ -1623,6 +1623,7 @@ if "gptq" in CAPS or "agpt" in CAPS:
 	convobot.COMPUTE_LOAD = COMPUTE_LOAD
 	convobot.COMPUTE_CAPS = COMPUTE_CAPS
 	convobot.COMPUTE_ORDER = COMPUTE_ORDER
+	convobot.DEVICES = DEVICES
 
 	def CBAI(inputs):
 		user_id = inputs["user_id"]
@@ -1801,6 +1802,7 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 	imagebot.COMPUTE_LOAD = COMPUTE_LOAD
 	imagebot.COMPUTE_CAPS = COMPUTE_CAPS
 	imagebot.COMPUTE_ORDER = COMPUTE_ORDER
+	imagebot.DEVICES = DEVICES
 
 	def IBASL(prompt, kwargs, nsfw=False, force=True, count=1, sdxl=False):
 		try:
