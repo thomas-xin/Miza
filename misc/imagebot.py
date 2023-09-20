@@ -236,6 +236,7 @@ def cached_model(cls, model, **kwargs):
 	return mcache[t]
 
 def backup_model(cls, model, force=False, **kwargs):
+	kwargs.pop("resume_download", None)
 	t = (cls, model, tuple(kwargs.keys()))
 	try:
 		return mcache[t]

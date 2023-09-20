@@ -252,6 +252,7 @@ def cached_model(cls, model, **kwargs):
 	return mcache[t]
 
 def backup_model(cls, model, force=False, **kwargs):
+	kwargs.pop("resume_download", None)
 	t = (cls, model, tuple(kwargs.keys()))
 	try:
 		return mcache[t]
@@ -721,13 +722,15 @@ class Bot:
 						with accelerate.init_empty_weights():
 							model = AutoModelForCausalLM.from_pretrained(m, device_map={}, offload_folder="cache", torch_dtype=torch.float16, resume_download=True)
 					except ValueError:
-				AutoGPTQForCausalLM.from_quantized(
+						return
+				model = AutoGPTQForCausalLM.from_quantized(
 					m,
 					max_memory=max_mem,
 					use_safetensors=True,
 					use_triton=False,
 					inject_fused_attention=False,
 					offload_folder="cache",
+					resume_download=True,
 				)
 				if model.config.max_position_embeddings < limit:
 					try:
@@ -737,7 +740,10 @@ class Bot:
 				mfut.set_result(model)
 				self.models[m] = (tokeniser, model)
 			if isinstance(model, concurrent.futures.Future):
-				model = model.result()
+				try:
+					model = model.result(timeout=40)
+				except concurrent.futures.TimeoutError:
+					raise RuntimeError("Model is loading, please wait...")
 			return model, tokeniser
 		except:
 			print_exc()
@@ -783,6 +789,8 @@ class Bot:
 					dev_map = {}
 				else:
 					tokeniser = backup_model(AutoTokenizer.from_pretrained, m)
+					mfut = concurrent.futures.Future()
+					self.models[m] = (tokeniser, mfut)
 					# model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map="auto", torch_dtype=torch.float16, force=True)
 					n = torch.cuda.device_count()
 					if not n:
@@ -852,8 +860,14 @@ class Bot:
 						if k in dev_map:
 							dev_map[k] = 0
 					model = backup_model(AutoModelForCausalLM.from_pretrained, m, device_map=dev_map, offload_folder="cache", load_in_8bit=True, quantization_config=quantization_config)
+				mfut.set_result(model)
 				print(dev_map)
 				self.models[m] = (tokeniser, model)
+			if isinstance(model, concurrent.futures.Future):
+				try:
+					model = model.result(timeout=40)
+				except concurrent.futures.TimeoutError:
+					raise RuntimeError("Model is loading, please wait...")
 			return model, tokeniser
 		except:
 			print_exc()
@@ -1222,11 +1236,11 @@ class Bot:
 					i += 1
 			prompt += "\n### Response:\n"
 			print("Mock prompt:", prompt)
-			model, tokeniser = self.load_gptq("mythalion-13b", priority=False)
-			tokens = tokeniser(prompt, return_tensors="pt").input_ids[:, -960:].to(model.device)
+			M, T = self.load_gptq("mythalion-13b", priority=False)
+			tokens = T(prompt, return_tensors="pt").input_ids[:, -960:].to(M.device)
 			pc = len(tokens)
 			with torch.no_grad():
-				res = model.generate(
+				res = M.generate(
 					inputs=tokens,
 					temperature=0.1,
 					top_k=32,
@@ -1236,7 +1250,7 @@ class Bot:
 					do_sample=True,
 				)
 				torch.cuda.empty_cache()
-			text = tokeniser.decode(res[0])
+			text = T.decode(res[0])
 			text = text.removeprefix("<s>").strip().removeprefix(prompt).strip().split("</s>", 1)[0]
 			print("MOCK:", text)
 			num = int(re.search("[0-9]+", text).group())

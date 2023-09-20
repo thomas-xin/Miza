@@ -1417,6 +1417,7 @@ def cached_model(cls, model, **kwargs):
 	return mcache[t]
 
 def backup_model(cls, model, force=False, **kwargs):
+	kwargs.pop("resume_download", None)
 	t = (cls, model, tuple(kwargs.keys()))
 	try:
 		return mcache[t]
@@ -2459,7 +2460,7 @@ def evaluate(ts, args):
 			ex = SystemError(ex.__class__.__name__, *ex.args)
 		sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_exception({repr(ex)})\n".encode("utf-8"))
 		sa = lim_str(args, 256)
-		sys.stdout.buffer.write(f"~print({sa},{repr(traceback.format_exc())},sep='\\n',end='')\n".encode("utf-8"))
+		sys.stdout.buffer.write(f"~print({repr(sa)},{repr(traceback.format_exc())},sep='\\n',end='')\n".encode("utf-8"))
 		traceback.print_exc()
 	sys.stdout.flush()
 
@@ -2506,7 +2507,7 @@ if __name__ == "__main__":
 					ex = SystemError(ex.__class__.__name__, *ex.args)
 				sys.stdout.buffer.write(f"~PROC_RESP[{ts}].set_exception({repr(ex)})\n".encode("utf-8"))
 				sa = lim_str(s, 256)
-				sys.stdout.buffer.write(f"~print({sa}, end='')\n".encode("utf-8"))
+				sys.stdout.buffer.write(f"~print({repr(sa)}, end='')\n".encode("utf-8"))
 				sys.stdout.buffer.write(f"~print({repr(traceback.format_exc())}, end='')\n".encode("utf-8"))
 				traceback.print_exc()
 				sys.stdout.flush()

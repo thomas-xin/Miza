@@ -2762,9 +2762,25 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				cswap = (int(OS.TotalVirtualMemorySize) - int(OS.FreeVirtualMemory)) * 1024 - psutil.virtual_memory().used
 				if cswap > sinfo.used:
 					sinfo = cdict(used=cswap, total=sinfo.total)
-				ram_speed = WMI.Win32_PhysicalMemory()[0].ConfiguredClockSpeed
-				ram_class = max(1, ceil(math.log2(ram_speed / 250)))
-				ram_name = f"DDR{ram_class}-{ram_speed}"
+				ram = WMI.Win32_PhysicalMemory()[0]
+				ram_speed = ram.ConfiguredClockSpeed
+				ram_type = ram.SMBIOSMemoryType
+				try:
+					ram_class = {
+						2: "DRAM",
+						5: "EDO",
+						9: "RAM",
+						10: "ROM",
+						20: "DDR1",
+						21: "DDR2",
+						24: "DDR3",
+						26: "DDR4",
+						34: "DDR5",
+						35: "DDR5",
+					}[ram_type]
+				except KeyError:
+					ram_class = "DDR" + str(max(1, ceil(math.log2(ram_speed / 250))))
+				ram_name = f"{ram_class}-{ram_speed}"
 		return dict(
 			cpu={ip: dict(name=cinfo["brand_raw"], count=cinfo["count"], usage=cpercent / 100, max=1, time=t)},
 			gpu={f"{ip}-{i}": dict(
