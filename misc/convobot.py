@@ -2136,7 +2136,7 @@ class Bot:
 				model="gpt-3.5-turbo",
 				user=str(random.randint(0, 4294967295)),
 			)
-		cm = cm2 = 20
+		cm = cm2 = 15
 		ok = openai.api_key
 		try:
 			resp = exc.submit(
@@ -2150,17 +2150,56 @@ class Bot:
 				self.submit_cost(ok, resp["usage"]["prompt_tokens"] * cm * costs + resp["usage"].get("completion_tokens", 0) * (cm2 or cm) * costs)
 				return resp["choices"][0]["message"]["content"]
 
+	def cgp2(self, data, stop=None):
+		prompt = data.strip() + "\n\n"
+		oai = getattr(self, "oai", None)
+		bals = getattr(self, "bals", {})
+		if oai:
+			openai.api_key = oai
+			costs = 0
+		elif bals:
+			openai.api_key = uoai = sorted(bals, key=bals.get)[0]
+			costs = -1
+		else:
+			openai.api_key = self.key
+			costs = 1
+		if isinstance(data, str):
+			data = dict(
+				prompt=prompt,
+				temperature=0.7,
+				top_p=0.9,
+				frequency_penalty=0.5,
+				presence_penalty=0.5,
+				stop=stop,
+				max_tokens=min(2048, 4000 - len(self.gpttokens(data))),
+				model="gpt-3.5-turbo-instruct",
+				user=str(random.randint(0, 4294967295)),
+			)
+		cm = cm2 = 15
+		ok = openai.api_key
+		try:
+			resp = exc.submit(
+				openai.Completion.create,
+				**data,
+			).result(timeout=60)
+		except concurrent.futures.TimeoutError:
+			print_exc()
+		else:
+			if resp:
+				self.submit_cost(ok, resp["usage"]["prompt_tokens"] * cm * costs + resp["usage"].get("completion_tokens", 0) * (cm2 or cm) * costs)
+				return resp.choices[0].text
+
 	def au(self, prompt, stop=None):
 		bals = getattr(self, "bals", {})
 		oai = getattr(self, "oai", None)
 		if bals or oai or self.premium >= 2:
-			funcs = [self.cgp]
+			funcs = [self.cgp2]
 		else:
-			funcs = [self.chatgpt, self.chatgpt, self.cgp, self.cgp]
+			funcs = [self.chatgpt, self.chatgpt, self.cgp2, self.cgp2]
 			# if len(self.gpttokens(prompt)) > 24:
 				# funcs.append(self.vai)
 			random.shuffle(funcs)
-		funcs.extend((self.cgp, self.cgp))
+		funcs.extend((self.cgp2, self.cgp))
 		while funcs:
 			func = funcs.pop(0)
 			try:
