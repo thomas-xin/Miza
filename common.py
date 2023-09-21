@@ -2466,6 +2466,8 @@ async def start_proc(n, di=(), caps="ytdl", it=0, wait=False):
 		stdout=subprocess.PIPE,
 		stderr=None,
 	)
+	if "load" in caps:
+		return
 	proc.n = n
 	proc.di = di
 	proc.caps = caps
