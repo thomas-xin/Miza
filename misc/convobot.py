@@ -964,9 +964,7 @@ class Bot:
 		["stable_diffusion", "Asking to create or edit a picture"],
 		["reminder", "Set alarm or reminder"],
 		["wolfram_alpha", "Math question"],
-		["play", "Play music"],
-		["astate", "Pause or repeat music"],
-		["audio", "Change audio settings"],
+		["audio", "Play or pause music, or change audio settings"],
 		[None, "None of the above"],
 	]
 	functions = dict(
@@ -1270,16 +1268,18 @@ class Bot:
 			except:
 				k = None
 			if k is None:
-				pass
+				blocked.update(("play", "audio", "astate", "askip", "reminder"))
 			elif k is False:
 				blocked.update(self.functions)
 				extensions = False
+			elif k == "audio":
+				blocked.update(("web_search", "wolfram_alpha", "stable_diffusion", "reminder"))
 			else:
 				rem = set(self.functions)
 				rem.discard(k)
 				blocked.update(rem)
 				extensions = k not in blocked
-			if not extensions and model in ("gpt-3.5-turbo", "gpt-4") and sum(map(len, ins)) >= 512:
+			if not extensions and model in ("gpt-3.5-turbo", "gpt-4") and sum(map(len, ins[:4])) >= 512:
 				model = "wizard-70b"
 				cm = 20
 		if model in ("gpt-3.5-turbo", "gpt-4") or extensions:
