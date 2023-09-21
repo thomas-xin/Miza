@@ -1550,7 +1550,7 @@ class Art(Command):
 			# print(s)
 			args = [("art " * xrand(1, 64)).rstrip()]
 		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
-		freelim = 25
+		freelim = 100
 		if premium < 2:
 			data = bot.data.users.setdefault(user.id, {})
 			freebies = [t for t in data.get("freebies", ()) if utc() - t < 86400]
