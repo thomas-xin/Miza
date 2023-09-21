@@ -1531,17 +1531,24 @@ class Bot:
 			prompt = prompt.strip()
 			tokens = tokeniser(prompt, return_tensors="pt").input_ids.to(model.device)
 			pc = len(tokens)
-			with torch.no_grad():
-				res = model.generate(
-					inputs=tokens,
-					temperature=temp,
-					top_k=96,
-					top_p=0.9,
-					repetition_penalty=1.2,
-					max_length=max(limit, len(tokens) + 1024),
-					do_sample=True,
-				)
-				torch.cuda.empty_cache()
+			while True:
+				try:
+					with torch.no_grad():
+						res = model.generate(
+							inputs=tokens,
+							temperature=temp,
+							top_k=96,
+							top_p=0.9,
+							repetition_penalty=1.2,
+							max_length=max(limit, len(tokens) + 1024),
+							do_sample=True,
+						)
+						torch.cuda.empty_cache()
+				except RuntimeError as ex:
+					if "probability tensor" in str(ex).lower():
+						continue
+					raise
+				break
 			text = tokeniser.decode(res[0]).removeprefix("<s>").strip().removeprefix(prompt).strip().split("</s>", 1)[0]
 			text = text.strip().replace(":\n", ": ").replace("<USER>", u)
 			spl = text.split(": ")
