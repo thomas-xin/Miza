@@ -1467,7 +1467,8 @@ class Bot:
 									res = res.strip()
 									messages = [messages[0], messages[-1]]
 									messages.append(m)
-									messages.append(dict(role="function", name=name, content=res or ""))
+									messages.append(dict(role="function", name=name, content=res))
+									pc += len(self.gpttokens(res))
 									model = "gpt-4-0613" if model.startswith("gpt-4") else "gpt-3.5-turbo-0613"
 									searched = True
 									print("ChatGPT prompt:", messages)
@@ -1481,7 +1482,8 @@ class Bot:
 									res = res.strip()
 									messages = [messages[0], messages[-1]]
 									messages.append(m)
-									messages.append(dict(role="function", name=name, content=res or ""))
+									messages.append(dict(role="function", name=name, content=res))
+									pc += len(self.gpttokens(res))
 									model = "gpt-4-0613" if model.startswith("gpt-4") else "gpt-3.5-turbo-0613"
 									searched = True
 									print("ChatGPT prompt:", messages)
@@ -1580,7 +1582,7 @@ class Bot:
 					top_k=96,
 					top_p=0.9,
 					repetition_penalty=1.2,
-					max_length=max(limit, len(tokens) + 1024),
+					max_length=max(min, len(tokens) + 1024),
 					do_sample=True,
 				)
 				torch.cuda.empty_cache()
