@@ -1321,7 +1321,7 @@ class Ask(Command):
 			mapd[s] = None
 
 		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
-		freelim = 100
+		freelim = 50
 		if premium < 2:
 			data = bot.data.users.setdefault(user.id, {})
 			freebies = [t for t in data.get("freebies", ()) if utc() - t < 86400]
@@ -1636,10 +1636,10 @@ class Ask(Command):
 			if premium >= 2 and freebies is not None:
 				bot.data.users[user.id].setdefault("freebies", []).append(utc())
 				rem = freelim - len(freebies)
-				if not emb and rem <= 5:
+				if not emb and rem in (27, 9, 3, 1):
 					emb = discord.Embed(colour=rand_colour())
 					emb.set_author(**get_author(bot.user))
-					emb.description = f"{rem}/{freelim} premium commands remaining today (free commands will be used after).\nPlease help [fund my API]({bot.kofi_url}) for unlimited and improved commands!"
+					emb.description = f"{rem}/{freelim} premium commands remaining today (free commands will be used after).\nIf you're able to contribute towards [funding my API]({bot.kofi_url}) hosting costs it would mean the world to us, and ensure that I can continue providing up-to-date tools and entertainment.\nEvery little bit helps due to the size of my audience, and you will receive access to unlimited and various improved commands as thanks!"
 			if isinstance(out, dict):
 				fname = out["func"]
 				argv = as_str(out.get("argv", ""))
