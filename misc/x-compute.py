@@ -1280,7 +1280,7 @@ if "caption" in CAPS:
 		dc = pynvml.nvmlDeviceGetCount()
 		handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(dc)]
 		gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
-		tinfo = [torch.cuda.get_device_properties(COMPUTE_ORDER.get(i)) if i in COMPUTE_ORDER else None for i in range(dc)]
+		tinfo = [torch.cuda.get_device_properties(COMPUTE_ORDER.index(i)) if i in COMPUTE_ORDER else None for i in range(dc)]
 		COMPUTE_LOAD = globals().get("COMPUTE_LOAD") or [0] * dc
 		high = max(COMPUTE_LOAD)
 		if priority == "full":
@@ -1758,20 +1758,9 @@ if "gptq" in CAPS or "agpt" in CAPS:
 		cb.premium = premium
 		return cb.aa(system, prompt)
 
-	try:
-		from chatgpt_wrapper import AsyncChatGPT
-	except ImportError:
-		convobot.AsyncChatGPT = None
-	except:
-		convobot.AsyncChatGPT = None
-		print(traceback.format_exc(), end="")
-	else:
-		convobot.AsyncChatGPT = AsyncChatGPT
-
 	if "gptq" in CAPS:
 		convobot.GPTQ = True
 		def load_models():
-			convobot.LOADED.result()
 			mods = dict(
 				load_gptq=(
 					"wizard-70b",
@@ -1795,7 +1784,22 @@ if "gptq" in CAPS or "agpt" in CAPS:
 				for m in v:
 					exc.submit(getattr(bot, k), m, fail=True)
 					time.sleep(1)
+		if "load" in CAPS:
+			load_models()
+			raise SystemExit
 		# exc.submit(load_models)
+
+	exc.submit(convobot.Bot.answer_summarise, convobot.Bot, q="test")
+
+	try:
+		from chatgpt_wrapper import AsyncChatGPT
+	except ImportError:
+		convobot.AsyncChatGPT = None
+	except:
+		convobot.AsyncChatGPT = None
+		print(traceback.format_exc(), end="")
+	else:
+		convobot.AsyncChatGPT = AsyncChatGPT
 
 if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 	import imagebot

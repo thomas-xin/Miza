@@ -2480,6 +2480,7 @@ async def start_proc(n, di=(), caps="ytdl", it=0, wait=False):
 	return proc
 
 IS_MAIN = True
+FIRST_LOAD = True
 # Spec requirements:
 # ytdl											anything with internet
 # math			CPU >1							multithreading support
@@ -2526,6 +2527,9 @@ def spec2cap():
 					did.append(i)
 				else:
 					break
+			if FIRST_LOAD:
+				yield [[], "load", "gptq"]
+				globals()["FIRST_LOAD"] = False
 			yield [did, "agpt", "gptq"]
 			done.add("gptq")
 	if cc > 1:

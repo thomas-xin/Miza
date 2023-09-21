@@ -225,7 +225,7 @@ def determine_cuda(mem=1, priority=None, multi=False, major=0):
 	dc = pynvml.nvmlDeviceGetCount()
 	handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(dc)]
 	gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
-	tinfo = [torch.cuda.get_device_properties(COMPUTE_ORDER.get(i)) if i in COMPUTE_ORDER else None for i in range(dc)]
+	tinfo = [torch.cuda.get_device_properties(COMPUTE_ORDER.index(i)) if i in COMPUTE_ORDER else None for i in range(dc)]
 	COMPUTE_LOAD = globals().get("COMPUTE_LOAD") or [0] * dc
 	high = max(COMPUTE_LOAD)
 	if priority == "full":
@@ -528,8 +528,11 @@ class Bot:
 				self.models[m].extend(pipes)
 			except KeyError:
 				self.models[m] = pipes
-			self.summ_waiting.set_result(pipes)
-			self.summ_waiting = None
+			try:
+				self.summ_waiting.set_result(pipes)
+				self.summ_waiting = None
+			except:
+				print_exc()
 			print(pipes)
 		enc = tiktoken.get_encoding("cl100k_base")
 		tokens = enc.encode(q)
@@ -712,7 +715,7 @@ class Bot:
 						total = sum(COMPUTE_LOAD[i] for i in bit4)
 						hmem = max(m.total for m in gmems if m)
 						if high:
-							loads = [(max(r / total, 1.25 / len(bit4)) * req if r < high * 0.9 else inf) if gmems[i].total > hmem * 0.6 else 0 for i, r in enumerate(COMPUTE_LOAD)]
+							loads = [(max(r / total, 1.25 / len(bit4)) * req if r < high * 0.9 else inf) if gmems[i] and gmems[i].total > hmem * 0.6 else 0 for i, r in enumerate(COMPUTE_LOAD)]
 						else:
 							loads = [inf] * n
 						max_mem = {COMPUTE_ORDER.index(i): f"{round(min((gmems[i].total / 1048576 - (1 if i else 2) * 1024), loads[i] * 1024))}MiB" for i in bit4}
@@ -1163,7 +1166,7 @@ class Bot:
 		if model in self.modmap:
 			data = self.modmap[model]
 			model = data.get("name") or model
-			limit = data.get("limit") or model
+			limit = data.get("limit") or limit
 			cm = data.get("cm") or cm
 			longer = data.get("longer") or longer
 		elif premium < 2:
@@ -2395,17 +2398,9 @@ class Bot:
 		return t2[1]
 
 
-class Cancel:
-	@classmethod
-	def result(timeout=None):
-		pass
-LOADED = Cancel
-
 if __name__ == "__main__":
 	import sys
 	token = sys.argv[1] if len(sys.argv) > 1 else ""
 	bot = Bot(token)
 	while True:
 		print(bot.talk(input()))
-else:
-	LOADED = exc.submit(Bot.answer_summarise, Bot, q="test")
