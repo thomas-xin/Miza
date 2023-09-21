@@ -2640,6 +2640,9 @@ async def sub_submit(cap, command, _timeout=12):
 			print_exc()
 			task.cancel()
 			queue.discard(task)
+			ts = getattr(task, "ts", None)
+			if ts:
+				bot.compute_wait.pop(ts, None)
 			continue
 	raise ex2
 
@@ -2679,6 +2682,8 @@ async def _sub_submit(proc, command, _timeout=12):
 			tries = ceil(_timeout / 3) if _timeout and is_finite(_timeout) else 3600
 			ex2 = None
 			for i in range(tries):
+				if not is_strict_running(proc):
+					raise CommandCancelledError("Retrying as process disappeared.")
 				if ts not in PROC_RESP:
 					raise ConnectionResetError("Response disconnected. If this error occurs during a command, it is likely due to maintenance!")
 				try:
