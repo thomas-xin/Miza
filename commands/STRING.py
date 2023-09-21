@@ -1474,6 +1474,7 @@ class Ask(Command):
 		else:
 			auto = False
 		long_mem = 4096 if premium >= 2 else 1024
+		keep_model = True
 		if cname == "gpt2" or not AUTH.get("openai_key"):
 			model = "bloom"
 		elif cname == "bloom":
@@ -1528,6 +1529,8 @@ class Ask(Command):
 			if premium < 4:
 				raise PermissionError(f"Distributed premium level 2 or higher required; please see {bot.kofi_url} for more info!")
 			model = "gpt4+"
+		else:
+			keep_model = False
 		if cname == "auto" or model == "auto":
 			if getattr(caid, "model", None):
 				model = caid.model
@@ -1604,6 +1607,7 @@ class Ask(Command):
 				vis_session=AUTH.get("vis_session"),
 				name=bot.name,
 				model=model,
+				keep_model=keep_model,
 				auto=auto,
 				personality=pers,
 				premium=premium,

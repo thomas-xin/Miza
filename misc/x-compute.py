@@ -1632,6 +1632,7 @@ if "gptq" in CAPS or "agpt" in CAPS:
 		ht = inputs["huggingface_token"]
 		name = inputs["name"]
 		model = inputs["model"]
+		keep_model = inputs.get("keep_model")
 		auto = inputs["auto"]
 		personality = inputs["personality"]
 		premium = inputs["premium"]
@@ -1699,7 +1700,7 @@ if "gptq" in CAPS or "agpt" in CAPS:
 			except AttributeError:
 				im = get_image(im)
 		res = cb.ai(*prompt, refs=refs, im=im)
-		if cb.model in ("gpt3", "gpt4", "gpt3+", "gpt4+"):
+		if not keep_model or cb.model in ("gpt3", "gpt4", "gpt3+", "gpt4+"):
 			cb.model = None
 		with torch.no_grad():
 			torch.cuda.empty_cache()
