@@ -1663,7 +1663,8 @@ if "gptq" in CAPS or "agpt" in CAPS:
 			)
 		else:
 			cb.premium = premium
-		cb.model = model or cb.model
+		orig_model = cb.model
+		cb.model = model or orig_model
 		cb.auto = auto
 		cb.user_id = user_id
 		cb.channel_id = channel_id
@@ -1700,8 +1701,10 @@ if "gptq" in CAPS or "agpt" in CAPS:
 			except AttributeError:
 				im = get_image(im)
 		res = cb.ai(*prompt, refs=refs, im=im)
-		if not keep_model or cb.model in ("gpt3", "gpt4", "gpt3+", "gpt4+"):
+		if cb.model in ("gpt3", "gpt4", "gpt3+", "gpt4+"):
 			cb.model = None
+		elif auto or not keep_model:
+			cb.model = orig_model
 		with torch.no_grad():
 			torch.cuda.empty_cache()
 		return res

@@ -2318,11 +2318,10 @@ class Bot:
 				return self.after(tup, (self.name, response))
 			response = "Sorry, I don't know."
 		return self.after(tup, (self.name, response))
+	ask = ai
 
 	def deletes(self):
 		self.chat_history = self.chat_history[:-2]
-
-	ask = ai
 
 	def append(self, tup, nin=0, to=None, ai=True):
 		to = to if to is not None else self.chat_history
