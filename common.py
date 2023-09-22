@@ -2636,13 +2636,15 @@ async def sub_submit(cap, command, _timeout=12):
 		try:
 			return await asyncio.wait_for(wrap_future(task), timeout=(_timeout or inf) + 2)
 		except (T1, CE) as ex:
-			ex2 = ex
-			print_exc()
 			task.cancel()
 			queue.discard(task)
 			ts = getattr(task, "ts", None)
 			if ts:
 				bot.compute_wait.pop(ts, None)
+			else:
+				raise
+			ex2 = ex
+			print_exc()
 			continue
 	raise ex2
 
