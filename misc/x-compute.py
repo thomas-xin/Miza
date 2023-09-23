@@ -1767,6 +1767,7 @@ if "gptq" in CAPS or "agpt" in CAPS:
 		def load_models():
 			mods = dict(
 				load_gptq=(
+					"xwin-70b",
 					"wizard-70b",
 					"kimiko-70b",
 					"wizard-coder-34b",
@@ -1836,6 +1837,13 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 		im.save(b, format="png")
 		b.seek(0)
 		return b.read()
+
+	def IBASLR(prompt, kwargs, nsfw=False, force=True, count=1):
+		try:
+			ib = CBOTS[None]
+		except KeyError:
+			ib = CBOTS[None] = imagebot.Bot()
+		return ib.art_stablediffusion_local(prompt, kwargs, nsfw=nsfw, fail_unless_gpu=not force, count=count, sdxl=2)
 
 	# def whisper(url, best=False):
 	# 	ts = time.time()

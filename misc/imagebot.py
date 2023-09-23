@@ -716,12 +716,14 @@ class Bot:
 			if not isinstance(b, str):
 				b = io.BytesIO(b)
 			mask = Image.open(b)
-		output_type = "pil"#"latent" if sdxl else "pil"
+		output_type = "latent" if sdxl > 1 else "pil"
 		kw = {}
 		if sdxl:
 			kw = dict(output_type=output_type, denoising_end=0.8)
 			if im:
 				kw["target_size"] = im.size
+			elif sdxl > 1:
+				kw["target_size"] = (1024, 1024)
 			else:
 				kw["target_size"] = (512, 512)
 			kw["negative_prompt"] = self.neg_prompt

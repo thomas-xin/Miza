@@ -1265,7 +1265,7 @@ class Describe(Command):
 
 class Ask(Command):
 	_timeout_ = 24
-	name = ["Wizard", "Orca", "NousPuff", "Kimiko", "WizCode", "Bloom", "Pyg", "Pygmalion", "GPT2", "Llama", "Vicuna", "Manticore", "Hippogriff", "WizVic", "Platypus", "GPlatty", "Airochronos", "Davinci", "GPT3", "GPT3a", "GPT4", "GPT4a"]
+	name = ["Wizard", "XWin", "Orca", "NousPuff", "Kimiko", "WizCode", "Bloom", "Pyg", "Pygmalion", "GPT2", "Llama", "Vicuna", "Manticore", "Hippogriff", "WizVic", "Platypus", "GPlatty", "Airochronos", "Davinci", "GPT3", "GPT3a", "GPT4", "GPT4a"]
 	description = "Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. For premium tier chatbots, check using ~serverinfo, or apply with ~premium!"
 	usage = "<string>"
 	example = ("ask what's the date?", "gpt3 what is the square root of 3721?", "pyg can I have a hug?")
@@ -1507,8 +1507,10 @@ class Ask(Command):
 			model = "nouspuff"
 		elif cname == "orca":
 			model = "orca"
-		elif cname == "wizard" or cname == "llama":
+		elif cname == "wizard":
 			model = "wizard"
+		elif cname == "xwin" or cname == "llama":
+			model = "xwin"
 		elif cname == "gpt3":
 			if premium < 2:
 				raise PermissionError(f"Distributed premium level 1 or higher required; please see {bot.kofi_url} for more info!")
@@ -1536,7 +1538,7 @@ class Ask(Command):
 				model = caid.model
 			if model == "auto":
 				if premium < 2:
-					model = "wizard"
+					model = "xwin"
 				elif premium < 4:
 					model = "gpt3+"
 				else:
@@ -1544,7 +1546,7 @@ class Ask(Command):
 		if model.startswith("gpt4") and premium < 4:
 			model = "gpt3+"
 		if model.startswith("gpt3") and premium < 2:
-			model = "wizard"
+			model = "xwin"
 		model = model or "gpt3+"
 		# emb_futs = []
 
@@ -1719,7 +1721,7 @@ class Ask(Command):
 					+ "If you are looking for improved knowledge, memory and intelligence, reduced censorship, ability to connect to the internet, or would simply like to support my developer, "
 					+ f"please check out my [kofi]({bot.kofi_url}) to help fund API, as these features are significantly more expensive!\n"
 					+ "Any support is greatly appreciated and contributes directly towards service and future development.\n"
-					+ f"Free open source models may be invoked using {bot.get_prefix(guild)}wizard, {bot.get_prefix(guild)}mythalion, etc.\n"
+					+ f"Free open source models may be invoked using {bot.get_prefix(guild)}xwin, {bot.get_prefix(guild)}mythalion, etc.\n"
 					+ "Alternatively if you would like to manage pricing yourself through an OpenAI account (and/or free trial), check out the ~trial command!"
 				)
 				reacts.append("🚫")
@@ -1954,7 +1956,7 @@ class Personality(Command):
 	server_only = True
 	name = ["ResetChat", "ClearChat", "ChangePersonality"]
 	min_level = 2
-	description = "Customises ⟨MIZA⟩'s personality for ~ask in the current server. Uses the highest available model within specified family (for example, \"GPT\" will prefer GPT-4 if allowed). Wizard, Orca, NousPuff, Kimiko, WizCode, Mythalion, Bloom, Pygmalion, Manticore, Hippogriff, Platypus, WizVic, and Airochronos are currently the alternate models enabled."
+	description = "Customises ⟨MIZA⟩'s personality for ~ask in the current server. Uses the highest available model within specified family (for example, \"GPT\" will prefer GPT-4 if allowed). Wizard, XWin, Orca, NousPuff, Kimiko, WizCode, Mythalion, Bloom, Pygmalion, Manticore, Hippogriff, Platypus, WizVic, and Airochronos are currently the alternate models enabled."
 	usage = "<traits>* <default{?d}>?"
 	example = ("personality Manticore; mischievous, cunning", "personality Wizard; dry, sarcastic, snarky", "personality Auto; sweet, loving", "personality GPT4; The following is a conversation between Miza and humans. Miza is an AI who is charming, friendly and positive.")
 	flags = "aed"
@@ -1999,7 +2001,7 @@ class Personality(Command):
 					"Apologies, my AI has detected that your input may be inappropriate.\n"
 					+ "Please move to a NSFW channel, reword, or consider contacting the support server if you believe this is a mistake!"
 				)
-		models = ("auto", "gpt", "wizard", "orca", "nouspuff", "kimiko", "wizcode", "mythalion", "bloom", "pyg", "pygmalion", "manticore", "llama", "hippogriff", "wizvic", "platypus", "airochronos", "davinci", "gpt3", "gpt4")
+		models = ("auto", "gpt", "wizard", "xwin", "orca", "nouspuff", "kimiko", "wizcode", "mythalion", "bloom", "pyg", "pygmalion", "manticore", "llama", "hippogriff", "wizvic", "platypus", "airochronos", "davinci", "gpt3", "gpt4")
 		if ";" in p:
 			m, p = p.split(";", 1)
 			p = p.lstrip()

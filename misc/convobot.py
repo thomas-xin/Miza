@@ -659,6 +659,9 @@ class Bot:
 			if model == "wizard-70b":
 				m = "TheBloke/WizardLM-70B-V1.0-GPTQ"
 				req = 35
+			elif model == "xwin-70b":
+				m = "TheBloke/Xwin-LM-70B-V0.1-GPTQ"
+				req = 35
 			elif model == "nous-puffin-70b":
 				m = "TheBloke/Nous-Puffin-70B-GPTQ"
 				req = 35
@@ -942,6 +945,10 @@ class Bot:
 			name="orca-70b",
 			cm=20,
 		),
+		xwin=dict(
+			name="xwin-70b",
+			cm=20,
+		),
 		wizard=dict(
 			name="wizard-70b",
 			cm=20,
@@ -1193,7 +1200,7 @@ class Bot:
 		print("INS:", ins)
 		p = per
 		bnb_models = ("pygmalion-13b", "manticore-13b", "hippogriff-30b", "wizard-vicuna-30b", "gplatty-30b", "airochronos-33b")
-		gptq_models = ("wizard-70b", "nous-puffin-70b", "orca-70b", "kimiko-70b", "wizard-coder-34b", "mythalion-13b")
+		gptq_models = ("wizard-70b", "xwin-70b", "nous-puffin-70b", "orca-70b", "kimiko-70b", "wizard-coder-34b", "mythalion-13b")
 		local_models = bnb_models + gptq_models
 		if self.name.casefold() not in p.casefold() and "you" not in p.casefold():
 			if model in ("gpt-3.5-turbo", "gpt-4", "gpt-3.5-turbo-instruct", "text-davinci-003"):
@@ -1234,7 +1241,7 @@ class Bot:
 			prompt = '"""\n' + q2 + "\n" + f'''"""
 
 ### Instruction:
-<|system|>: Your name is {self.name}. Classify the above request into one of the following:
+SYSTEM: Your name is {self.name}. Classify the above request as one of the following numbers:
 '''
 			mocked = {}
 			i = 1
@@ -1245,7 +1252,7 @@ class Bot:
 					i += 1
 			prompt += "\n### Response:\n"
 			print("Mock prompt:", prompt)
-			M, T = self.load_gptq("mythalion-13b", priority=False)
+			M, T = self.load_gptq("xwin-70b", priority=True)
 			tokens = T(prompt, return_tensors="pt").input_ids[:, -960:].to(M.device)
 			pc = len(tokens)
 			with torch.no_grad():
@@ -1268,7 +1275,7 @@ class Bot:
 			except:
 				k = None
 			if k is None:
-				blocked.update(("play", "audio", "astate", "askip", "reminder"))
+				blocked.update(("audio", "astate", "askip", "reminder"))
 			elif k is False:
 				blocked.update(self.functions)
 				extensions = False
@@ -1280,7 +1287,7 @@ class Bot:
 				blocked.update(rem)
 				extensions = k not in blocked
 			if not extensions and model in ("gpt-3.5-turbo", "gpt-4") and sum(map(len, ins[:4])) >= 512:
-				model = "wizard-70b"
+				model = "xwin-70b"
 				cm = 20
 		if model in ("gpt-3.5-turbo", "gpt-4") or extensions:
 			mod = model if model in ("gpt-3.5-turbo", "gpt-4") else "gpt-3.5-turbo"
@@ -2403,9 +2410,9 @@ class Bot:
 		gpt3a=(120, 2),
 		gpt4a=(480, 3),
 		mythalion=(960, 4),
-		hippogriff=(960, 4),
+		orca=(960, 4),
 		wizard=(960, 4),
-		platypus=(960, 4),
+		xwin=(960, 4),
 	)
 
 	def rerender(self, model=""):

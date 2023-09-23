@@ -2566,7 +2566,7 @@ def spec2cap():
 				caps.append("sdxl")
 				done.add("sdxlr")
 				v -= 15 * 1073741824
-		elif c > 400000 and IS_MAIN and "sdxlr" not in done and vrams[i] > 15 * 1073741824:
+		elif c > 400000 and IS_MAIN and vrams[i] > 15 * 1073741824:
 			caps.append("sdxlr")
 			caps.append("sdxl")
 			caps.append("ngptq")
