@@ -169,7 +169,7 @@ async def auto_join(guild, channel, user, bot, preparing=False, vc=None):
 		g = vc.guild if vc else guild
 		perm = bot.get_perms(user, g)
 		if perm < 1:
-			raise Command.perm_error(Command, perm, 1, f"to remotely operate audio player for {g}")
+			raise Command.perm_error(Command, perm, 1, f"to remotely operate audio player for {g} without joining voice")
 	if type(channel) in (str, int):
 		channel = await bot.fetch_channel(channel)
 	if guild.id not in bot.data.audio.players:

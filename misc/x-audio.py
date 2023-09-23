@@ -498,7 +498,7 @@ class AudioFile:
 				with suppress(ValueError):
 					new = request(f"VOICE.select_and_convert({repr(stream)})")
 				if new not in (None, "null"):
-					return self.load(eval_json(new), check_fmt=None, force=True)
+					return self.load(new, check_fmt=None, force=True)
 			elif data == b"ECDC":
 				g = -1
 				if COMPUTE_POT:
@@ -531,12 +531,12 @@ class AudioFile:
 									else:
 										new_stream = request(f"VOICE.get_best_audio(VOICE.ytdl.extract_backup({repr(self.webpage_url)}))")
 									if new_stream:
-										return self.load(eval_json(new_stream), check_fmt=None, force=True)
+										return self.load(new_stream, check_fmt=None, force=True)
 							new = None
 							with suppress(ValueError):
 								new = request(f"VOICE.select_and_convert({repr(stream)})")
 							if new not in (None, "null"):
-								return self.load(eval_json(new), check_fmt=None, force=True)
+								return self.load(new, check_fmt=None, force=True)
 						send(self.proc.args)
 						if err:
 							ex = RuntimeError(err)

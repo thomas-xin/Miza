@@ -1672,7 +1672,7 @@ class Art(Command):
 		oai = data.get("trial") and data.get("openai_key")
 
 		async def ibasl_r(p, k, n, f, c, s):
-			if sdxl and (premium >= 2 or random.randint(0, 1)):
+			if sdxl and (premium >= 2 and random.randint(0, 1) or random.randint(0, 1)):
 				try:
 					await process_image("lambda: 1+1", "$", (), cap="sdxlr", timeout=2)
 				except:
@@ -1683,7 +1683,7 @@ class Art(Command):
 			if s:
 				out = []
 				for r1 in resp:
-					r2 = await process_image("IBASR", "&", [p, r1], cap="sdxl", timeout=240)
+					r2 = await process_image("IBASR", "$", [p, r1], cap="sdxlr", timeout=240)
 					out.append(r2)
 				return out
 			return resp

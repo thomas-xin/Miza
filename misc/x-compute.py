@@ -1180,6 +1180,7 @@ if "ecdc" in CAPS:
 				proc = psutil.Popen(arg, stdin=si, stdout=so, stderr=se, cwd=cwd, bufsize=bufsize * 256)
 				if first:
 					self.stdin = proc.stdin
+					self.args = arg
 				if last:
 					self.stdout = proc.stdout
 					self.stderr = proc.stderr

@@ -455,7 +455,7 @@ class ArgumentError(LookupError):
 class TooManyRequests(PermissionError):
 	__slots__ = ()
 
-class CommandCancelledError(CE):
+class CommandCancelledError:
 	__slots__ = ()
 
 
@@ -2381,11 +2381,11 @@ async def proc_distribute(proc):
 					# print("NEW TASK:", proc, i, bot.compute_wait, lim_str(str(command), 64), frand())
 					if "ngptq" in proc.caps:
 						for p2 in PROCS.values():
-							if p2.used and "gptq" in p2.caps:
+							if p2 and p2.used and "gptq" in p2.caps:
 								await start_proc(p2, wait=True)
 					elif "gptq" in proc.caps:
 						for p2 in PROCS.values():
-							if p2.used and "ngptq" in p2.caps:
+							if p2 and p2.used and "ngptq" in p2.caps:
 								await start_proc(p2, wait=True)
 					fut = create_task(_sub_submit(proc, command, _timeout=timeout))
 					fut.ts = i
@@ -2568,7 +2568,6 @@ def spec2cap():
 				v -= 15 * 1073741824
 		elif c > 400000 and IS_MAIN and vrams[i] > 15 * 1073741824:
 			caps.append("sdxlr")
-			caps.append("sdxl")
 			caps.append("ngptq")
 			done.add("sdxlr")
 			v = 0
@@ -2641,6 +2640,8 @@ async def sub_submit(cap, command, _timeout=12):
 			ts = getattr(task, "ts", None)
 			if ts:
 				bot.compute_wait.pop(ts, None)
+			elif isinstance(ex, CE):
+				raise CommandCancelledError(*ex.args)
 			else:
 				raise
 			ex2 = ex
@@ -3291,6 +3292,7 @@ class PipedProcess:
 			proc = psutil.Popen(arg, stdin=si, stdout=so, stderr=se, cwd=cwd, bufsize=bufsize * 256)
 			if first:
 				self.stdin = proc.stdin
+				self.args = arg
 			if last:
 				self.stdout = proc.stdout
 				self.stderr = proc.stderr

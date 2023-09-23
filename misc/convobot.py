@@ -966,13 +966,14 @@ class Bot:
 		),
 	)
 	mock_functions = [
-		[None, "Asking for real-world assistance or advice"],
-		[False, "Describes a roleplay or fictional scenario"],
-		["stable_diffusion", "Asking to create or edit a picture"],
+		[None, "Placeholder (Do not choose this!)"],
+		[None, "Providing real-world assistance or advice"],
+		[False, "Describe a roleplay or fictional scenario (Choose this if user is roleplaying!)"],
+		["stable_diffusion", "Create or edit a picture or art"],
 		["reminder", "Set alarm or reminder"],
-		["wolfram_alpha", "Math question"],
-		["audio", "Play or pause music, or change audio settings"],
-		[None, "None of the above"],
+		["wolfram_alpha", "Math or calculator"],
+		["play", "Play or pause music, or change audio settings"],
+		[None, "None of the above or don't understand (Continues as normal)"],
 	]
 	functions = dict(
 		web_search={
@@ -1241,7 +1242,7 @@ class Bot:
 			prompt = '"""\n' + q2 + "\n" + f'''"""
 
 ### Instruction:
-SYSTEM: Your name is {self.name}. Classify the above request as one of the following numbers:
+SYSTEM: Your name is Miza. Please select one of the following actions by number:
 '''
 			mocked = {}
 			i = 1
@@ -1250,9 +1251,10 @@ SYSTEM: Your name is {self.name}. Classify the above request as one of the follo
 					mocked[i] = k
 					prompt += f"{i}: {v}\n"
 					i += 1
-			prompt += "\n### Response:\n"
+			prompt += f"\n### Response:\n{self.name}: I choose option"
 			print("Mock prompt:", prompt)
-			M, T = self.load_gptq("xwin-70b", priority=True)
+			# M, T = self.load_gptq("xwin-70b", priority=True)
+			M, T = self.load_gptq("mythalion-13b", priority=False)
 			tokens = T(prompt, return_tensors="pt").input_ids[:, -960:].to(M.device)
 			pc = len(tokens)
 			with torch.no_grad():
@@ -1279,7 +1281,7 @@ SYSTEM: Your name is {self.name}. Classify the above request as one of the follo
 			elif k is False:
 				blocked.update(self.functions)
 				extensions = False
-			elif k == "audio":
+			elif k == "play":
 				blocked.update(("web_search", "wolfram_alpha", "stable_diffusion", "reminder"))
 			else:
 				rem = set(self.functions)
@@ -2355,7 +2357,7 @@ SYSTEM: Your name is {self.name}. Classify the above request as one of the follo
 		if not to or tup != to[0]:
 			k, v = tup
 			if isinstance(v, dict):
-				v = v["func"] + " " + v["argv"]
+				v = (v["func"] + " " + v.get("argv", "")).strip()
 			if k == self.name:
 				v = self.alm_re.sub("", v)
 			tlim = round(2 ** (-nin / 3) * (384 if self.premium >= 2 else 192))
