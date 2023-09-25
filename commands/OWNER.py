@@ -148,7 +148,7 @@ class Execute(Command):
 	example = ("execute as @Miza run ~info",)
 	multi = True
 
-	async def __call__(self, bot, user, message, channel, guild, argl, args, argv, **void):
+	async def __call__(self, bot, user, message, channel, guild, argl, args, argv, perm, **void):
 		env = (user, channel)
 		envs = [env]
 		while args:
@@ -218,7 +218,7 @@ class Execute(Command):
 				fake_message.author = g.get_member(u.id) or u
 			else:
 				fake_message.author = u
-			futs.append(create_task(bot.process_message(fake_message, argv)))
+			futs.append(create_task(bot.process_message(fake_message, argv, min_perm=perm)))
 		for fut in futs:
 			await fut
 
