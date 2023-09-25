@@ -3229,6 +3229,8 @@ class FileStreamer(io.BufferedRandom, contextlib.AbstractContextManager):
 				f = io.BytesIO(f)
 			elif isinstance(f, str):
 				f = open(f, "rb")
+			elif isinstance(f, discord.File):
+				f = f.fp
 			self.data.append((i, f))
 			i += f.seek(0, os.SEEK_END)
 			self.filename = filename or getattr(f, "filename", None) or getattr(f, "name", None)

@@ -5494,7 +5494,7 @@ class Transcribe(Command):
 	slash = True
 
 	async def __call__(self, bot, channel, guild, message, name, argv, flags, user, **void):
-		if max(bot.is_trusted(guild), bot.premium_level(user) * 2) < 2:
+		if max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1) < 2:
 			raise PermissionError(f"Sorry, this feature is currently for premium users only. Please make sure you have a subscription level of minimum 1 from {bot.kofi_url}, or try out ~trial if you would like to manage/fund your own usage!")
 		dest = "English"
 		# Attempt to download items in queue if no search query provided

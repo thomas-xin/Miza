@@ -568,7 +568,7 @@ class UpdateExec(Database):
 	hmac_sem = Semaphore(5, 1, rate_limit=5)
 	async def stash(self, fn, start=0, end=inf):
 		bot = self.bot
-		fns = [fn] if isinstance(fn, str) else fn
+		fns = [fn] if isinstance(fn, (str, bytes, memoryview, io.BytesIO, discord.File)) else fn
 		print("Stash", lim_str(str(fns), 80), start, end)
 		urls = []
 		mids = []

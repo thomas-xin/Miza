@@ -1549,7 +1549,7 @@ class Art(Command):
 			# args = [s]
 			# print(s)
 			args = [("art " * xrand(1, 64)).rstrip()]
-		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
+		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
 		freelim = 50
 		if premium < 2:
 			data = bot.data.users.setdefault(user.id, {})
@@ -1656,8 +1656,10 @@ class Art(Command):
 		emb = None
 		fn = None
 		futs = []
-		amount = 4 if premium >= 4 else 1 if premium >= 2 else 1
+		amount = 4 if premium >= 4 else 2 if premium >= 3 else 1
 		sdxl = premium >= 2
+		if not sdxl:
+			amount = 4
 		amount2 = 0
 		if bot.is_trusted(guild) >= 2:
 			for uid in bot.data.trusted[guild.id]:
@@ -1672,7 +1674,7 @@ class Art(Command):
 		oai = data.get("trial") and data.get("openai_key")
 
 		async def ibasl_r(p, k, n, f, c, s):
-			if sdxl and (premium >= 2 and random.randint(0, 1) or random.randint(0, 1)):
+			if sdxl and (c > 1 or premium >= 2 and random.randint(0, 1) or random.randint(0, 1)):
 				try:
 					await process_image("lambda: 1+1", "$", (), cap="sdxlr", timeout=2)
 				except:
@@ -1702,7 +1704,7 @@ class Art(Command):
 					c = min(amount, 9 if nsfw and not self.sdiff_sem.active else 5)
 					c2 = c
 					while c2 > 0:
-						n = 1 if sdxl else min(c2, xrand(floor(sqrt(c2) + 1)) + 1)
+						n = min(c2, xrand(floor(sqrt(c2) + 1)) + 1, 2 if sdxl else 9)
 						if not n:
 							n = c2
 						fut = create_task(ibasl_r(p, kwargs, nsfw, False, n, sdxl))
@@ -1897,7 +1899,7 @@ class Art(Command):
 							c = amount - amount2
 							c2 = c
 							while c2 > 0:
-								n = 1 if sdxl else min(c2, xrand(floor(sqrt(c2) + 1)) + 1)
+								n = min(c2, xrand(floor(sqrt(c2) + 1)) + 1, 2 if sdxl else 9)
 								if not n:
 									n = c2
 								fut = create_task(ibasl_r(p, kwargs, nsfw, False, n, sdxl))
@@ -1969,6 +1971,11 @@ class Art(Command):
 				emb = discord.Embed(colour=rand_colour())
 				emb.set_author(**get_author(bot.user))
 				emb.description = f"{rem}/{freelim} premium commands remaining today (free commands will be used after).\nIf you're able to contribute towards [funding my API]({bot.kofi_url}) hosting costs it would mean the world to us, and ensure that I can continue providing up-to-date tools and entertainment.\nEvery little bit helps due to the size of my audience, and you will receive access to unlimited and various improved commands as thanks!"
+		if len(files) == 2:
+			fe = files.pop(1)
+			urls, mids = await bot.data.exec.uproxy(fe)
+			if urls:
+				comment = ("\n".join(urls) + "\n" + comment).strip()
 		return await send_with_react(channel, comment, files=files, reference=message, reacts="🔳", embed=emb)
 		# await bot.send_with_file(channel, "", fn, filename=lim_str(prompt, 96) + ".png", reference=message, reacts="🔳", embed=emb)
 

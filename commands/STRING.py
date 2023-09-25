@@ -61,7 +61,7 @@ class Translate(Command):
 			raise ArgumentError("Input string is empty.")
 		self.trans.client.headers.update(Request.header())
 		spl = args
-		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
+		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
 		if spl[0].casefold() in ("google", "chatgpt"):
 			engine = spl.pop(0).casefold()
 		else:
@@ -184,7 +184,7 @@ class Translate(Command):
 			u = user
 		data = bot.data.users.get(u.id, {})
 		oai = data.get("trial") and data.get("openai_key")
-		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
+		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
 		inputs = dict(
 			user_id=user.id,
 			channel_id=channel.id,
@@ -1253,7 +1253,7 @@ class Describe(Command):
 						s += "\n" + e.footer.text
 				return s.strip()
 		if not s:
-			premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
+			premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
 			fut = create_future(reqs.next().head, url, headers=Request.header(), stream=True)
 			cap = await self.bot.caption(url, best=premium >= 2)
 			s = "\n\n".join(cap).strip()
@@ -1320,7 +1320,7 @@ class Ask(Command):
 			s = str(i)
 			mapd[s] = None
 
-		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
+		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
 		freelim = 50
 		if premium < 2:
 			data = bot.data.users.setdefault(user.id, {})
@@ -1981,7 +1981,7 @@ class Personality(Command):
 		if not argv:
 			p = self.retrieve(channel.id)
 			return ini_md(f"My current personality for {sqr_md(channel)} is {sqr_md(p)}. Enter keywords for this command to modify the AI for default GPT-based chat, or enter \"default\" to reset.")
-		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2)
+		premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
 		if len(argv) > 4096 or len(argv) > 512 and premium < 2:
 			raise OverflowError("Maximum currently supported personality prompt size is 512 characters, 4096 for premium users.")
 		p = argv.replace(";", ";")

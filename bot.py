@@ -4566,7 +4566,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 									urls.add(best_url(e.thumbnail))
 							symrem = "".maketrans({c: "" for c in "<>|*"})
 							spl = [word.translate(symrem) for word in message.content.split()]
-							content = " ".join(word for word in spl if not is_url(word))
+							content = " ".join(word for word in spl if url and not is_url(word))
+							urls.update(word for word in spl if is_url(word))
 							if urls:
 								content += "\n" + "\n".join(f"||{url} ||" for url in urls)
 						before = copy.copy(message)
