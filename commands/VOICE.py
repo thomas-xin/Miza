@@ -1331,7 +1331,7 @@ class AudioDownloader:
 			self.youtube_dl_x += 1
 			self.downloader = youtube_dl.YoutubeDL(self.ydl_opts)
 			self.spotify_x += 1
-			token = await_fut(aretry(Request, "https://open.spotify.com/get_access_token", aio=True, attempts=8, delay=0.5))
+			token = await_fut(aretry(Request, "https://open.spotify.com/get_access_token", aio=True, attempts=8, delay=5))
 			self.spotify_header = {"authorization": f"Bearer {orjson.loads(token[:512])['accessToken']}"}
 			self.other_x += 1
 

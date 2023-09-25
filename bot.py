@@ -5603,7 +5603,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		@self.event
 		async def on_ready():
 			self.guilds_ready = create_task(self.load_guilds())
-			create_task(aretry(self.get_ip, delay=20))
+			create_task(aretry(self.get_ip, delay=10))
 			await create_future(self.update_subs, priority=True)
 			self.update_cache_feed()
 			with tracebacksuppressor:

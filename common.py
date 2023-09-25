@@ -416,6 +416,7 @@ async def aretry(func, *args, attempts=5, delay=1, exc=(), **kwargs):
 		remaining = delay - utc() + t
 		if remaining > 0:
 			await asyncio.sleep(delay)
+		delay += delay / 2
 
 
 # For compatibility with versions of asyncio and concurrent.futures that have the exceptions stored in a different module
