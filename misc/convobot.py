@@ -1478,7 +1478,7 @@ SYSTEM: Your name is Miza. Please select one of the following actions by number:
 									messages.append(m)
 									messages.append(dict(role="function", name=name, content=res))
 									pc += len(self.gpttokens(res))
-									model = "gpt-4-0613" if model.startswith("gpt-4") else "gpt-3.5-turbo-0613"
+									model = "gpt-4" if model.startswith("gpt-4") else "gpt-3.5-turbo"
 									searched = True
 									print("ChatGPT prompt:", messages)
 							elif name == "wolfram_alpha":
@@ -1525,7 +1525,7 @@ SYSTEM: Your name is Miza. Please select one of the following actions by number:
 				print(f"{model.capitalize()} prompt:", prompt)
 			sys.stdout.flush()
 			pc = len(self.gpttokens(prompt))
-		elif model not in ("gpt-3.5-turbo", "gpt-4"):
+		elif not any(model.startswith(n) for n in ("gpt-3.5-turbo", "gpt-4")):
 			prompt = "".join(reversed(ins))
 			prompt = nstart + "\n\n" + prompt
 			if not self.bl:
