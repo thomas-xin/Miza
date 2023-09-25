@@ -2197,10 +2197,10 @@ def evalImg(url, operation, args):
 						break
 					new["duration"] += max(image.info.get("duration", 0), 1000 / 240)
 				fps = 1000 * f / new["duration"]
-				fpl = 30 if opt else 40
+				fpl = 15 if opt else 30
 				step = 1
 				while fps / step >= fpl:
-					step += 1
+					step += 0.25
 				if f // step > 2000:
 					step = f / 1999
 				elif f // step > 1000 and fpl > 20:
@@ -2298,7 +2298,7 @@ def evalImg(url, operation, args):
 						c = min(len(fr), max(5, floor(sqrt(len(fr)))))
 						for i, f in enumerate(fr[:c]):
 							if isinstance(f, Image.Image):
-								im = f.resize((5, 5), resample=Resampling.NEAREST)
+								im = f.resize((7, 7), resample=Resampling.NEAREST)
 								R, G, B = rgb_split(im)
 								for r, g, b in zip(R.ravel(), G.ravel(), B.ravel()):
 									l = max(r, g, b)
@@ -2307,7 +2307,7 @@ def evalImg(url, operation, args):
 									t = tuple(min(255, round(log2(x / l * 255 + 1) * 2) * 16) for x in (r, g, b))
 									if t not in cols:
 										cols.add(t)
-						mc = min(64, max(4, 2 ** ceil(log2(len(cols) + 1 >> 1))))
+						mc = min(128, max(4, 2 ** ceil(log2(len(cols) + 2 >> 1))))
 						vf += f"max_colors={mc}:stats_mode=diff[p];[s1][p]paletteuse=dither=sierra3:diff_mode=rectangle"
 					elif new["count"] > 4096:
 						vf += "max_colors=128:stats_mode=diff[p];[s1][p]paletteuse=dither=sierra2_4a:diff_mode=rectangle"

@@ -1503,6 +1503,8 @@ typing = lambda self: create_task(self.trigger_typing())
 def to_webp(url):
 	if type(url) is not str:
 		url = str(url)
+	if url.startswith("https://cdn.discordapp.com/embed/avatars/"):
+		return url.replace("/media.discordapp.net/", "/cdn.discordapp.com/").replace(".webp", ".png")
 	if url.endswith("?size=1024"):
 		url = url[:-10] + "?size=4096"
 	if "/embed/" not in url[:48]:
@@ -1512,6 +1514,8 @@ def to_webp(url):
 def to_webp_ex(url):
 	if type(url) is not str:
 		url = str(url)
+	if url.startswith("https://cdn.discordapp.com/embed/avatars/"):
+		return url.replace("/media.discordapp.net/", "/cdn.discordapp.com/").replace(".webp", ".png")
 	if url.endswith("?size=1024"):
 		url = url[:-10] + "?size=256"
 	if "/embed/" not in url[:48]:
