@@ -566,10 +566,10 @@ class UpdateExec(Database):
 		return out if len(out) > 1 else out[0]
 
 	hmac_sem = Semaphore(5, 1, rate_limit=5)
-	async def stash(self, fn, start=0, end=inf):
+	async def stash(self, fn, start=0, end=inf, filename=None):
 		bot = self.bot
 		fns = [fn] if isinstance(fn, (str, bytes, memoryview, io.BytesIO, discord.File)) else fn
-		print("Stash", lim_str(str(fns), 80), start, end)
+		print("Stash", lim_str(str(fns), 80), start, end, filename)
 		urls = []
 		mids = []
 		with FileStreamer(*fns) as f:
@@ -586,11 +586,12 @@ class UpdateExec(Database):
 								break
 							if len(b) < 83886080:
 								raise ValueError(f"Skipping small chunk {len(b)}")
+							fn2 = filename or "c.7z"
 							resp = await create_future(
 								reqs.next().post,
 								AUTH.hmac_signed_url,
 								files=dict(
-									file=("c.7z", io.BytesIO(b), "application/octet-stream"),
+									file=(fn2, io.BytesIO(b), "application/octet-stream"),
 								),
 								cookies=dict(
 									authenticated="true",
@@ -609,11 +610,12 @@ class UpdateExec(Database):
 				with tracebacksuppressor:
 					fs = []
 					sizes = []
+					fn2 = filename or "c.b"
 					while len(fs) < 8:
 						b = f.read(25165824)
 						if not b:
 							break
-						fi = CompatFile(b, filename="c.b")
+						fi = CompatFile(b, filename=fn2)
 						fs.append(fi)
 						sizes.append(len(b))
 					if not fs:
