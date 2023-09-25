@@ -456,7 +456,7 @@ class ArgumentError(LookupError):
 class TooManyRequests(PermissionError):
 	__slots__ = ()
 
-class CommandCancelledError:
+class CommandCancelledError(Exception):
 	__slots__ = ()
 
 
