@@ -3366,7 +3366,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 								trace(create_future(u, priority=True))
 
 	# Processes a message, runs all necessary commands and bot events. May be called from another source.
-	async def process_message(self, message, msg=None, edit=True, orig=None, loop=False, slash=False, min_perm=-inf):
+	async def process_message(self, message, msg=None, edit=True, orig=None, loop=False, slash=False, min_perm=None):
 		if self.closed:
 			return 0
 		msg = msg if msg is not None else message.content
@@ -3393,7 +3393,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				msg = msg.replace("`", "").strip()
 		# Get list of enabled commands for the channel.
 		enabled = self.get_enabled(channel)
-		u_perm = max(min_perm, self.get_perms(u_id, guild))
+		u_perm = max(min_perm, self.get_perms(u_id, guild)) if min_perm is not None else self.get_perms(u_id, guild)
 		admin = not inf > u_perm
 		# Gets prefix for current guild.
 		if u_id == self.id:
