@@ -1473,7 +1473,7 @@ class Ask(Command):
 			auto = True
 		else:
 			auto = False
-		long_mem = 4096 if premium >= 2 else 1024
+		long_mem = 4096 if premium >= 3 else 1024
 		keep_model = True
 		if cname == "gpt2" or not AUTH.get("openai_key"):
 			model = "bloom"
@@ -1571,7 +1571,7 @@ class Ask(Command):
 				ems = [t[1] for t in objs]
 				print("EM:", len(ems))
 				argsort = await process_image("rank_embeddings", "$", [ems, em], cap="math", timeout=90)
-				n = 4 if premium < 2 else 6
+				n = 4 if premium < 3 else 6
 				argi = argsort[:n]
 				print("ARGI:", argi)
 				for i in sorted(argi, key=keys.__getitem__):
