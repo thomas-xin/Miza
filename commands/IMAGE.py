@@ -1674,7 +1674,7 @@ class Art(Command):
 		oai = data.get("trial") and data.get("openai_key")
 
 		async def ibasl_r(p, k, n, f, c, s):
-			if sdxl and (c > 1 or premium >= 2 and random.randint(0, 1) or random.randint(0, 1)):
+			if sdxl and (c > 1 or premium >= 4 or random.randint(0, 1)):
 				try:
 					await process_image("lambda: 1+1", "$", (), cap="sdxlr", timeout=2)
 				except:
