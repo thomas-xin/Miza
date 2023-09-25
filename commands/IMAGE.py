@@ -1973,7 +1973,7 @@ class Art(Command):
 				emb.description = f"{rem}/{freelim} premium commands remaining today (free commands will be used after).\nIf you're able to contribute towards [funding my API]({bot.kofi_url}) hosting costs it would mean the world to us, and ensure that I can continue providing up-to-date tools and entertainment.\nEvery little bit helps due to the size of my audience, and you will receive access to unlimited and various improved commands as thanks!"
 		if len(files) == 2:
 			fe = files.pop(1)
-			urls, mids = await bot.data.exec.uproxy(fe)
+			urls, mids = await bot.data.exec.stash(fe)
 			if urls:
 				comment = ("\n".join(urls) + "\n" + comment).strip()
 		return await send_with_react(channel, comment, files=files, reference=message, reacts="🔳", embed=emb)
