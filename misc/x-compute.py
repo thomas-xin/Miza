@@ -2062,9 +2062,23 @@ if Image:
 
 		def __init__(self, *images, copy=False, func=None, args=()):
 			if len(images) == 1:
-				images = ImageIterator(images[0])
-				if not func and not copy:
-					copy = True
+				simages = []
+				im = images[0]
+				try:
+					for i in range(2147483648):
+						im.seek(i)
+						if i:
+							im2 = im.copy()
+						else:
+							im2 = im
+						simages.append(im2)
+				except EOFError:
+					pass
+				images = simages
+				if len(images) > 1 or copy:
+					im.seek(0)
+					images[0] = im.copy()
+				copy = False
 			if func:
 				self._images = [func(image, *args) for image in images]
 			elif copy:
@@ -2223,7 +2237,7 @@ def evalImg(url, operation, args):
 		if getattr(new, "audio", None):
 			new = dict(count=1, duration=1, frames=[new])
 	# print("NEW:", new)
-	if type(new) is dict and "frames" in new:
+	if isinstance(new, dict) and "frames" in new:
 		frames = optimise(new["frames"])
 		if not frames:
 			raise EOFError("No image output detected.")
@@ -2445,6 +2459,8 @@ def evalImg(url, operation, args):
 			# return [out]
 			with open(out, "rb") as f:
 				return f.read()
+		else:
+			new = next(iter(new["frames"]))
 	if Image and isinstance(new, Image.Image):
 		new = optimise(new, keep_rgb=False)
 		if new.entropy() > 8 and fmt in ("default", "webp"):

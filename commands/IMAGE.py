@@ -839,8 +839,8 @@ class Scroll(Command):
 			fps = round(fps)
 			if fps <= 0:
 				raise ValueError("FPS value must be positive.")
-			elif fps > 64:
-				raise OverflowError("Maximum FPS value is 64.")
+			elif fps > 256:
+				raise OverflowError("Maximum FPS value is 256.")
 		else:
 			fps = 32
 		try:
@@ -918,8 +918,8 @@ class Orbit(Command):
 		else:
 			count = await bot.eval_math(spl[0])
 			duration = await bot.eval_math(spl[1])
-		if count > 64:
-			raise OverflowError()
+		if count > 256:
+			raise OverflowError("Maximum multiplier input is 256.")
 		async with discord.context_managers.Typing(channel):
 			resp = await process_image(url, "orbit_gif", [count, duration, list(extras), "-gif", "-f", fmt], timeout=_timeout)
 			fn = resp

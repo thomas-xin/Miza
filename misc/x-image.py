@@ -323,7 +323,7 @@ def orbit_gif(image, orbitals, duration, extras):
 	while fps > 32 and rate < 8:
 		fps >>= 1
 		rate <<= 1
-	while fps >= 64:
+	while fps >= 64 and rate <= 64:
 		fps >>= 1
 		rate <<= 1
 	if fps <= 0:
