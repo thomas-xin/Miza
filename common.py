@@ -2305,7 +2305,7 @@ def force_kill(proc):
 		return
 	if getattr(proc, "fut", None) and not proc.fut.done():
 		with tracebacksuppressor:
-			proc.fut.set_exception(ConnectionResetError("Response disconnected. If this error occurs during a command, it is likely due to maintenance!"))
+			proc.fut.set_exception(CommandCancelledError("Response disconnected. If this error occurs during a command, it is likely due to maintenance!"))
 	killed = deque()
 	if not callable(getattr(proc, "children", None)):
 		proc = psutil.Process(proc.pid)
@@ -2361,6 +2361,7 @@ async def proc_communicate(proc):
 async def proc_distribute(proc):
 	bot = BOT[0]
 	tasks = ()
+	frozen = False
 	while True:
 		with tracebacksuppressor:
 			if not is_strict_running(proc):
@@ -2374,7 +2375,7 @@ async def proc_distribute(proc):
 					proc.fut = concurrent.futures.Future()
 				tasks = bot.distribute(proc.caps, {}, {})
 				if not tasks:
-					await asyncio.sleep(1 / 24)
+					await asyncio.sleep(1 / 6)
 					continue
 			resps = {}
 			futs = []
@@ -2397,6 +2398,9 @@ async def proc_distribute(proc):
 					futs.append(fut)
 					if proc.used:
 						proc.used = utc()
+					if len(command) > 1 and command[1] == "&":
+						with suppress():
+							fut.result()
 				# print(proc, tasks, [fut.ts for fut in futs], futs)
 				futd = {i for i, fut in enumerate(futs) if fut.done()}
 				for i in futd:
@@ -2523,7 +2527,7 @@ def spec2cap():
 	if AUTH.get("discord_token") and any(v > 6 * 1073741824 and c > 700000 for v, c in zip(rrams, COMPUTE_POT)):
 		vram = sum(rrams[i] for i in range(DC) if COMPUTE_POT[i] > 400000)
 		if vram > 59 * 1073741824:
-			cut = 60 * 1073741824
+			cut = 59 * 1073741824
 			did = []
 			for i in COMPUTE_ORDER:
 				v = rrams[i]
@@ -2678,8 +2682,8 @@ async def _sub_submit(proc, command, _timeout=12):
 	while ts in PROC_RESP:
 		ts += 1
 	PROC_RESP[ts] = fut = concurrent.futures.Future()
-	command = "[" + ",".join(map(repr, command[:2])) + "," + ",".join(map(str, command[2:])) + "]"
-	s = f"~{ts}~".encode("ascii") + base64.b64encode(command.encode("utf-8")) + b"\n"
+	comm = "[" + ",".join(map(repr, command[:2])) + "," + ",".join(map(str, command[2:])) + "]"
+	s = f"~{ts}~".encode("ascii") + base64.b64encode(comm.encode("utf-8")) + b"\n"
 	sem = proc.sem
 	await sem()
 	async with sem:
@@ -2693,10 +2697,12 @@ async def _sub_submit(proc, command, _timeout=12):
 				if not is_strict_running(proc):
 					raise CommandCancelledError("Retrying as process disappeared.")
 				if ts not in PROC_RESP:
-					raise ConnectionResetError("Response disconnected. If this error occurs during a command, it is likely due to maintenance!")
+					raise CommandCancelledError("Response disconnected. If this error occurs during a command, it is likely due to maintenance!")
 				try:
 					resp = await asyncio.wait_for(wrap_future(fut), timeout=3)
 				except T1 as ex:
+					if command[0] == "lambda: 1+1" and command[1] in "$&" and command[2] in ("[]", "()"):
+						raise StopIteration("Temporary wait cancelled.")
 					if i >= tries - 1:
 						ex2 = ex
 						break
@@ -2707,13 +2713,20 @@ async def _sub_submit(proc, command, _timeout=12):
 			if ex2:
 				raise ex2
 		except (BrokenPipeError, OSError, RuntimeError) as ex:
+			with suppress(ISE):
+				fut.set_exception(ex)
 			if isinstance(ex, RuntimeError):
 				if "OutOfMemoryError" in repr(ex):
 					pass
 				else:
 					raise
+			print("Killing process", proc, command, ex)
 			create_task(start_proc(proc))
 			raise
+		except StopIteration as ex:
+			with suppress(ISE):
+				fut.set_exception(ex)
+			raise TimeoutError(*ex.args)
 		finally:
 			PROC_RESP.pop(ts, None)
 	return resp

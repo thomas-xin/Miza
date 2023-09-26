@@ -998,7 +998,9 @@ if "video" in CAPS:
 					command.extend(("-c:v", "av1_nvenc"))
 			command.append(out)
 			print(command)
-			subprocess.check_output(command)
+			env = dict(os.environ)
+			env.pop("CUDA_VISIBLE_DEVICES", None)
+			subprocess.check_output(command, env=env)
 			if direct:
 				os.remove(fn)
 		except:
@@ -1943,7 +1945,13 @@ def from_bytes(b, save=None, nogif=False):
 				raise
 			print(info)
 			size = tuple(map(int, info[:2]))
-			dur = float(info[3])
+			if info[3] == "N/A":
+				cmd = ("./ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "format=duration", "-of", "csv=p=0", fn)
+				info[3] = subprocess.check_output(cmd)
+			try:
+				dur = float(info[3])
+			except (ValueError, TypeError, SyntaxError, ZeroDivisionError):
+				dur = 0
 			try:
 				fps = eval(info[2], {}, {})
 			except (ValueError, TypeError, SyntaxError, ZeroDivisionError):
@@ -1961,7 +1969,7 @@ def from_bytes(b, save=None, nogif=False):
 				framedur = 1000 / fps
 				bcount = 4 if fmt == "rgba" else 3
 				bcount *= int(np.prod(size))
-				cmd3 = ["./ffmpeg", "-hide_banner", "-v", "error", "-y", "-i", fn, "-vf", f"fps=fps={fps},scale={w}:{h}:flags=bicubic", "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0", "-"]
+				cmd3 = ["./ffmpeg", "-hwaccel", hwaccel, "-hide_banner", "-v", "error", "-y", "-i", fn, "-vf", f"fps=fps={fps},scale={w}:{h}:flags=bicubic", "-f", "rawvideo", "-pix_fmt", fmt, "-vsync", "0", "-"]
 				print(cmd3)
 				proc = psutil.Popen(cmd3, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1048576)
 			images = deque()
@@ -2362,7 +2370,9 @@ def evalImg(url, operation, args):
 					out = "cache/" + str(ts) + "." + fmt
 				command.append(out)
 				print(command)
-				proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, bufsize=1048576)
+				env = dict(os.environ)
+				env.pop("CUDA_VISIBLE_DEVICES", None)
+				proc = psutil.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, bufsize=1048576, env=env)
 			for i, frame in enumerate(frames):
 				if fmt == "zip":
 					b = io.BytesIO()

@@ -1949,7 +1949,7 @@ class UpdateUsers(Database):
 			data.pop(key, None)
 
 	def __load__(self):
-		self.semaphore = Semaphore(1, 2, delay=0.5, rate_limit=60)
+		self.semaphore = Semaphore(1, 1, rate_limit=120)
 		self.facts = None
 		self.flavour_buffer = deque()
 		self.flavour_set = set()

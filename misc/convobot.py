@@ -518,7 +518,7 @@ class Bot:
 
 			futs = []
 			for i in range(len(dv2) // 2 + 1):
-				dtype = torch.float16 if torch.cuda.get_device_properties(i).major >= 7 else torch.float32
+				dtype = torch.float16 if dv2[i] >= 0 and torch.cuda.get_device_properties(dv2[i]).major >= 7 else torch.float32
 				futs.append(exc.submit(load_pipe, dv2[i], dtype))
 			print(futs)
 			pipes = []
@@ -1578,6 +1578,9 @@ SYSTEM: Your name is Miza. Please select one of the following actions by number:
 				if text.startswith(start):
 					text = text[len(start):].strip()
 			model = omodel
+			if text.endswith(":"):
+				t2 = self.gptcomplete(u, q, refs=refs, start=text or " ", model=DEFMOD)
+				text += " " + t2
 		if model in bnb_models:
 			omodel = model
 			model, tokeniser = self.load_bnb(model)
@@ -1844,7 +1847,7 @@ SYSTEM: Your name is Miza. Please select one of the following actions by number:
 					m = response["choices"][0]["message"]
 					role = m["role"]
 					text = m["content"].removeprefix(f"{self.name} says: ").replace("<|im_sep|>", ":").removeprefix(f"{self.name}:") if m["content"] else ""
-					if len(text) >= 2 and text[-1] in " aAsS" and text[-2] not in ".!?" or text.endswith(' "') or text.endswith('\n"'):
+					if len(text) >= 2 and text[-1] in "aAsS" and text[-2] in " " or text.endswith(' "') or text.endswith('\n"'):
 						redo = True
 						if len(self.gpttokens(text)) < 24:
 							text = ""
@@ -1866,7 +1869,7 @@ SYSTEM: Your name is Miza. Please select one of the following actions by number:
 					# if searched:
 					# 	refs = list(refs) + [(f"[{sname}]", searched)]
 					t2 = self.gptcomplete(u, q, refs=refs, start=text or " ", model=DEFMOD)
-					if len(text) >= 2 and text[-1] in " aAsS" and text[-2] not in ".!?":
+					if len(text) >= 2 and text[-1] in "aAsS" and text[-2] in " ":
 						text += t2
 					else:
 						text += " " + t2

@@ -264,6 +264,7 @@ def orbit_gif2(image, orbitals, duration, extras):
 		x = orbitals if len(sources) == 1 else 1
 		diameter = max(sources[0].size)
 		scale2 = orbitals / pi * (sqrt(5) + 1) / 2 + 0.5
+		diameter = min(diameter, round(2048 / scale2))
 		size = (round(diameter * scale2),) * 2
 		for f in range(0, length * scale):
 			im = Image.new("RGBA", size, (0,) * 4)
@@ -338,6 +339,7 @@ def orbit_gif(image, orbitals, duration, extras):
 		x = orbitals if len(sources) == 1 else 1
 		diameter = max(sources[0].size)
 		scale = orbitals / pi * (sqrt(5) + 1) / 2 + 0.5
+		diameter = min(diameter, round(2048 / scale))
 		size = (round(diameter * scale),) * 2
 		for i in range(0, 256, abs(rate)):
 			im = Image.new("RGBA", size, (0,) * 4)

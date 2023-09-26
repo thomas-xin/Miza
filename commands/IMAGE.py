@@ -1076,14 +1076,6 @@ class Resize(Command):
 						raise ArgumentError("Please input an image by URL or attachment.")
 				else:
 					raise ArgumentError("Please input an image by URL or attachment.")
-			if args and args[-1] in ops:
-				op = args.pop(-1)
-			else:
-				if name in ("denoise", "enhance", "refine"):
-					op = "sdxl"
-				else:
-					op = "auto"
-			value = " ".join(args).strip()
 			func = "resize_mult"
 			fmt2 = url.split("?", 1)[0].rsplit(".", 1)[-1]
 			if fmt2 not in ("mp4", "gif"):
@@ -1094,17 +1086,25 @@ class Resize(Command):
 						fmt2 = "mp4"
 				else:
 					fmt2 = "mp4"
+			if args and ("." + args[-1] in IMAGE_FORMS or "." + args[-1] in VIDEO_FORMS):
+				fmt = args.pop(-1)
+			else:
+				fmt = fmt2
+			if args and args[-1] in ops:
+				op = args.pop(-1)
+			else:
+				if name in ("denoise", "enhance", "refine"):
+					op = "sdxl"
+				else:
+					op = "auto"
+			value = " ".join(args).strip()
 			if not value:
 				x = y = 1
-				fmt = fmt2
 			else:
 				# Parse width and height multipliers
-				if "x" in value[:-1] or "X" in value or "*" in value or "×" in value:
+				if "x" in value or "X" in value or "*" in value or "×" in value or ":" in value:
 					func = "resize_to"
-					value = value.replace("x", "X", 1).replace("X", "*", 1).replace("*", "×", 1).replace("×", " ", 1)
-				elif ":" in value:
-					func = "resize_to"
-					value = value.replace(":", " ", 1)
+					value = value.replace("x", "X", 1).replace("X", "*", 1).replace("*", "×", 1).replace("×", ":", 1).replace(":", " ", 1)
 				try:
 					spl = smart_split(value)
 				except ValueError:
@@ -1112,27 +1112,18 @@ class Resize(Command):
 				x = spl.pop(0)
 				if x != "-":
 					x = round_min(x)
-				fmt = None
 				if spl:
 					y = spl.pop(0)
-					if "." + y in IMAGE_FORMS or "." + y in VIDEO_FORMS:
-						fmt = y
-						y = "-"
-					elif y != "-":
-						y = round_min(x)
+					if y != "-":
+						y = round_min(y)
 				else:
 					y = "-"
 				if func == "resize_mult":
 					if y == "-":
 						y = x
 					for value in (x, y):
-						if not value >= -32 or not value <= 32:
-							raise OverflowError("Maximum multiplier input is 32.")
-				if not fmt:
-					if spl:
-						fmt = spl.pop(0)
-					else:
-						fmt = fmt2
+						if not value >= -256 or not value <= 256:
+							raise OverflowError("Maximum multiplier input is 256.")
 			# Try and find a good name for the output image
 			try:
 				name = url[url.rindex("/") + 1:]
@@ -1146,6 +1137,7 @@ class Resize(Command):
 				name += "." + fmt
 			if op == "sdxl":
 				fut = create_task(bot.caption(url, best=True))
+			# print(url, func, x, y, op, fmt)
 			resp = await process_image(url, func, [x, y, op, "-f", fmt], timeout=_timeout)
 			if op == "sdxl":
 				pt, p1, p2 = await fut

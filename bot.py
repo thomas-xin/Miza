@@ -1656,7 +1656,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			raise
 		if not getattr(reference, "slash", None) and message.attachments:
 			await self.add_attachment(message.attachments[0], data)
-			content = message.content + ("" if message.content.endswith("```") else "\n") + ("\n".join("<" + best_url(a) + ">" for a in message.attachments) if best else "\n".join("<" + a.url + ">" for a in message.attachments))
+			content = message.content + ("" if message.content.endswith("```") else "\n") + ("\n".join("<" + best_url(a.url.split("?", 1)[0]) + ">" for a in message.attachments) if best else "\n".join("<" + a.url.split("?", 1)[0] + ">" for a in message.attachments))
 			message = await message.edit(content=content.strip())
 		if not message:
 			print("No message detected.")
