@@ -136,6 +136,53 @@ def bf_parse(s):
 _bf = lambda s: bf_evaluate(s)
 
 
+# Values in seconds of various time intervals.
+TIMEUNITS = {
+	"galactic year": 7157540528801820.28133333333333,
+	"millennium": [31556925216., "millennia"],
+	"century": [3155692521.6, "centuries"],
+	"decade": 315569252.16,
+	"year": 31556925.216,
+	"month": 2629743.768,
+	"week": 604800.,
+	"day": 86400.,
+	"hour": 3600.,
+	"minute": 60.,
+	"second": 1,
+}
+
+# Converts a time input in seconds to a list of time intervals.
+def time_convert(s):
+	if not math.isfinite(s):
+		high = "galactic years"
+		return [str(s) + " " + high]
+	r = 1 if s < 0 else 0
+	s = abs(s)
+	taken = []
+	for i in TIMEUNITS:
+		a = None
+		t = m = TIMEUNITS[i]
+		if type(t) is list:
+			t = t[0]
+		if type(t) is int:
+			a = round(s, 3)
+		elif s >= t:
+			a = int(s // t)
+			s = s % t
+		if a:
+			if a != 1:
+				if type(m) is list:
+					i = m[1]
+				else:
+					i += "s"
+			taken.append("-" * r + str(round_min(a)) + " " + str(i))
+	if not len(taken):
+		return [str(round_min(s)) + " seconds"]
+	return taken
+
+# Returns the string representation of a time value in seconds, in word form.
+sec2time = lambda s: " ".join(time_convert(s))
+
 # Returns the Roman Numeral representation of an integer.
 def roman_numerals(num, order=0):
 	num = int(num)
@@ -674,6 +721,7 @@ _globals.update({
 	"array": array,
 	"predict": predict_next,
 	"predict_next": predict_next,
+	"sec2time": sec2time,
 	"rollaxis": np.rollaxis,
 	"swapaxes": np.swapaxes,
 	"transpose": np.transpose,

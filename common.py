@@ -1,5 +1,6 @@
-import smath
-from smath import *
+if __name__ != "__mp_main__":
+	import smath
+	from smath import *
 
 with open("auth.json", "rb") as f:
 	AUTH = cdict(eval(f.read()))
@@ -44,18 +45,18 @@ from zipfile import ZipFile
 import urllib.request, urllib.parse
 import nacl.secret
 
-# os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-# import torch
-import pynvml
-try:
-	pynvml.nvmlInit()
-	DC = pynvml.nvmlDeviceGetCount()
-	if not os.environ.get("AI_FEATURES", True):
-		raise StopIteration("AI features disabled.")
-	import torch
-except:
-	DC = 0
-	torch = None
+DC = 0
+torch = None
+if __name__ != "__mp_main__":
+	import pynvml
+	try:
+		pynvml.nvmlInit()
+		DC = pynvml.nvmlDeviceGetCount()
+		if not os.environ.get("AI_FEATURES", True):
+			raise StopIteration("AI features disabled.")
+		import torch
+	except:
+		pass
 hwaccel = "cuda" if DC else "d3d11va" if os.name == "nt" else "auto"
 
 utils = discord.utils
@@ -506,7 +507,10 @@ def verify_openai():
 enc_key += "=="
 enc_box = nacl.secret.SecretBox(base64.b64decode(enc_key)[:32])
 
-encrypt = lambda s: b">~MIZA~>" + enc_box.encrypt(s if type(s) in (bytes, memoryview) else str(s).encode("utf-8"))
+def encrypt(s): 
+	if type(s) not in (bytes, memoryview):
+		s = str(s).encode("utf-8")
+	return b">~MIZA~>" + enc_box.encrypt(s)
 def decrypt(s):
 	if type(s) not in (bytes, memoryview):
 		s = str(s).encode("utf-8")
@@ -637,18 +641,24 @@ def select_and_dumps(data, mode="safe", compress=True):
 	return s
 
 
+def nop2(s):
+	return s
+
 class FileHashDict(collections.abc.MutableMapping):
 
 	sem = Semaphore(64, 128, 0.3, 1)
 	cache_size = 256
+	encoder = [nop2, nop2]
 
 	def __init__(self, *args, path="", encode=None, decode=None, **kwargs):
 		if not kwargs and len(args) == 1:
 			self.data = args[0]
 		else:
 			self.data = dict(*args, **kwargs)
-		self.encode = encode or (lambda s: s)
-		self.decode = decode or (lambda s: s)
+		if encode:
+			self.encoder[0] = encode
+		if decode:
+			self.encoder[1] = decode
 		self.path = path.rstrip("/")
 		self.modified = set()
 		self.deleted = set()
@@ -659,6 +669,14 @@ class FileHashDict(collections.abc.MutableMapping):
 		self.load_cursor()
 		self.db_sem = Semaphore(1, 64)
 		self.c_updated = False
+
+	@property
+	def encode(self):
+		return self.encoder[0]
+
+	@property
+	def decode(self):
+		return self.encoder[1]
 
 	db = None
 	def load_cursor(self):
@@ -894,13 +912,23 @@ class FileHashDict(collections.abc.MutableMapping):
 			self.c_updated = True
 		if modified:
 			mods = {}
+			futs = []
 			for k in modified:
 				try:
 					d = self.data[k]
 				except KeyError:
 					self.deleted.add(k)
 					continue
-				s = self.encode(select_and_dumps(d, mode="unsafe", compress=True))
+				futs.append((k, create_future_ex(select_and_dumps, d, mode="unsafe", compress=True, priority=2)))
+			fut2 = []
+			for k, fut in futs:
+				b = fut.result()
+				if self.encode is nop2:
+					fut2.append((k, create_future_ex(self.encode, b, priority=1)))
+				else:
+					fut2.append((k, create_future_ex(self.encode, b, priority=2)))
+			for k, fut in fut2:
+				s = fut.result()
 				mods[k] = s
 			with self.db_sem:
 				for k, d in mods.items():
@@ -2444,8 +2472,9 @@ if COMPUTE_LOAD:
 	total = sum(COMPUTE_LOAD)
 	if total != 1:
 		COMPUTE_LOAD = AUTH["compute_load"] = [i / total for i in COMPUTE_LOAD]
-	print("Compute load distribution:", COMPUTE_LOAD)
-	print("Compute pool order:", COMPUTE_ORDER)
+	if __name__ == "__main__":
+		print("Compute load distribution:", COMPUTE_LOAD)
+		print("Compute pool order:", COMPUTE_ORDER)
 
 async def start_proc(n, di=(), caps="ytdl", it=0, wait=False):
 	if hasattr(n, "caps"):
@@ -2781,6 +2810,7 @@ def evalEX(exc):
 
 
 ThreadPoolExecutor = concurrent.futures.ThreadPoolExecutor
+ProcessPoolExecutor = concurrent.futures.ProcessPoolExecutor
 
 # Thread pool manager for multithreaded operations.
 class MultiThreadPool(collections.abc.Sized, concurrent.futures.Executor):
@@ -2826,7 +2856,8 @@ class MultiThreadPool(collections.abc.Sized, concurrent.futures.Executor):
 
 	shutdown = lambda self, wait=True: [exc.shutdown(wait) for exc in self.pools].append(self.pools.clear())
 
-pthreads = ThreadPoolExecutor(32, initializer=__setloop__)
+pthreads = ProcessPoolExecutor(4)
+bthreads = ThreadPoolExecutor(32, initializer=__setloop__)
 athreads = concurrent.futures.exc_worker = MultiThreadPool(pool_count=2, thread_count=64, initializer=__setloop__)
 athreads.pools.append(import_exc)
 
@@ -2898,9 +2929,9 @@ def create_future_ex(func, *args, timeout=None, priority=False, **kwargs):
 		kwargs["timeout"] = kwargs.pop("_timeout_")
 	except KeyError:
 		pass
-	fut = (athreads, pthreads)[priority].submit(func, *args, **kwargs)
+	fut = (athreads, bthreads, pthreads)[priority].submit(func, *args, **kwargs)
 	if timeout is not None:
-		fut = (athreads, pthreads)[priority].submit(fut.result, timeout=timeout)
+		fut = (athreads, bthreads, pthreads)[priority].submit(fut.result, timeout=timeout)
 	return fut
 
 # Forces the operation to be a coroutine regardless of whether it is or not. Regular functions are executed in the thread pool.
@@ -3847,16 +3878,34 @@ class RequestManager(contextlib.AbstractContextManager, contextlib.AbstractAsync
 Request = RequestManager()
 
 
+emoji_translate = {}
+emoji_replace = {}
+em_trans = {}
+def reload_emojis():
+	global emoji_translate, emoji_replace, em_trans
+	if not os.path.exists("misc/emojis.json"):
+		return
+	with open("misc/emojis.json", "rb") as f:
+		b = f.read()
+	etrans = orjson.loads(b)
+	emoji_translate = {k: v for k, v in etrans.items() if len(k) == 1}
+	emoji_replace = {k: v for k, v in etrans.items() if len(k) > 1}
+	em_trans = "".maketrans(emoji_translate)
+
 @tracebacksuppressor
 def load_emojis():
 	global emoji_translate, emoji_replace, em_trans
+	if os.path.exists("misc/emojis.json") and utc() - os.path.getmtime("misc/emojis.json") < 86400:
+		return
 	data = Request("https://api.github.com/repos/twitter/twemoji/git/trees/master?recursive=1", json=True, timeout=None)
 	ems = [e for e in data["tree"] if e["path"].startswith("assets/svg/")]
 	e_ids = [e["path"].rsplit("/", 1)[-1].split(".", 1)[0] for e in ems]
 	urls = [f"https://raw.githubusercontent.com/twitter/twemoji/master/assets/svg/{e_id}.svg" for e_id in e_ids]
 	emojis = ["".join(chr(int(i, 16)) for i in e_id.split("-")) for e_id in e_ids]
 	etrans = dict(zip(emojis, urls))
-
+	b = orjson.dumps(etrans)
+	with open("misc/emojis.json", "wb") as f:
+		f.write(b)
 	emoji_translate = {k: v for k, v in etrans.items() if len(k) == 1}
 	emoji_replace = {k: v for k, v in etrans.items() if len(k) > 1}
 	em_trans = "".maketrans(emoji_translate)
@@ -4322,118 +4371,121 @@ class ImagePool:
 		self.bot.send_as_embeds(channel, image=url, reference=message)
 
 
-# Redirects all print operations to target files, limiting the amount of operations that can occur in any given amount of time for efficiency.
-class __logPrinter:
+if __name__ != "__mp_main__":
+	# Redirects all print operations to target files, limiting the amount of operations that can occur in any given amount of time for efficiency.
+	class __logPrinter:
 
-	ignored_messages = {
-		"A decoder-only architecture is being used, but right-padding was detected! For correct generation results, please set `padding_side='left'` when initializing the tokenizer.",
-	}
+		ignored_messages = {
+			"A decoder-only architecture is being used, but right-padding was detected! For correct generation results, please set `padding_side='left'` when initializing the tokenizer.",
+		}
 
-	def __init__(self, file=None):
-		self.buffer = self
-		self.data = {}
-		self.history = {}
-		self.counts = {}
-		self.funcs = alist()
-		self.file = file
-		self.closed = True
+		def __init__(self, file=None):
+			self.buffer = self
+			self.data = {}
+			self.history = {}
+			self.counts = {}
+			self.funcs = alist()
+			self.file = file
+			self.closed = True
 
-	def start(self):
-		self.exec = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-		self.future = self.exec.submit(self.update_print)
-		self.closed = False
+		def start(self):
+			# self.exec = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+			# self.future = self.exec.submit(self.update_print)
+			threading.Thread(target=self.update_print).start()
+			self.closed = False
 
-	def file_print(self, fn, b):
-		try:
-			if type(fn) not in (str, bytes):
-				f = fn
-			elif type(b) in (bytes, bytearray):
-				f = open(fn, "ab")
-			elif type(b) is str:
-				f = open(fn, "a", encoding="utf-8")
-			else:
-				f = fn
-			with closing(f):
-				try:
-					f.write(b)
-				except TypeError:
-					try:
-						f.write(as_str(b))
-					except ValueError:
-						pass
-		except:
-			sys.__stdout__.write(traceback.format_exc())
-
-	def flush(self):
-		outfunc = lambda s: self.file_print(self.file, s)
-		enc = lambda x: bytes(x, "utf-8")
-		try:
-			for f in tuple(self.data):
-				if not self.data[f]:
-					self.data.pop(f)
-					continue
-				out = lim_str(self.data[f], 65536)
-				data = enc(self.data[f])
-				self.data[f] = ""
-				if self.funcs and out.strip():
-					[func(out) for func in self.funcs]
-				if f == self.file:
-					outfunc(data)
+		def file_print(self, fn, b):
+			try:
+				if type(fn) not in (str, bytes):
+					f = fn
+				elif type(b) in (bytes, bytearray):
+					f = open(fn, "ab")
+				elif type(b) is str:
+					f = open(fn, "a", encoding="utf-8")
 				else:
-					self.file_print(f, data)
-		except:
-			sys.__stdout__.write(traceback.format_exc())
+					f = fn
+				with closing(f):
+					try:
+						f.write(b)
+					except TypeError:
+						try:
+							f.write(as_str(b))
+						except ValueError:
+							pass
+			except:
+				sys.__stdout__.write(traceback.format_exc())
 
-	def update_print(self):
-		if self.file is None:
-			return
-		while True:
-			with Delay(10):
-				self.flush()
-			while not os.path.exists("common.py") or self.closed:
-				time.sleep(1)
+		def flush(self):
+			outfunc = lambda s: self.file_print(self.file, s)
+			enc = lambda x: bytes(x, "utf-8")
+			try:
+				for f in tuple(self.data):
+					if not self.data[f]:
+						self.data.pop(f)
+						continue
+					out = lim_str(self.data[f], 65536)
+					data = enc(self.data[f])
+					self.data[f] = ""
+					if self.funcs and out.strip():
+						[func(out) for func in self.funcs]
+					if f == self.file:
+						outfunc(data)
+					else:
+						self.file_print(f, data)
+			except:
+				sys.__stdout__.write(traceback.format_exc())
 
-	def __call__(self, *args, sep=" ", end="\n", prefix="", file=None, **void):
-		out = str(sep).join(i if type(i) is str else str(i) for i in args) + str(end) + str(prefix)
-		if not out:
-			return
-		temp = out.strip()
-		if self.closed or temp.rsplit("\n", 1)[-1] in self.ignored_messages:
-			return sys.__stdout__.write(out)
-		if file is None:
-			file = self.file
-		if file not in self.data:
-			self.data[file] = ""
-		if temp:
-			if file in self.history and self.history.get(file).strip() == temp:
-				add_dict(self.counts, {file:1})
+		def update_print(self):
+			if self.file is None:
 				return
-			elif self.counts.get(file):
-				count = self.counts.pop(file)
-				times = "s" if count != 1 else ""
-				out, self.history[file] = f"<Last message repeated {count} time{times}>\n{out}", out
-			else:
-				self.history[file] = out
-				self.counts.pop(file, None)
-		self.data[file] += out
-		return sys.__stdout__.write(out)
+			while True:
+				with Delay(10):
+					self.flush()
+				while not os.path.exists("common.py") or self.closed:
+					time.sleep(1)
 
-	def write(self, *args, end="", **kwargs):
-		args2 = [as_str(arg) for arg in args]
-		return self.__call__(*args2, end=end, **kwargs)
+		def __call__(self, *args, sep=" ", end="\n", prefix="", file=None, **void):
+			out = str(sep).join(i if type(i) is str else str(i) for i in args) + str(end) + str(prefix)
+			if not out:
+				return
+			temp = out.strip()
+			if self.closed or temp.rsplit("\n", 1)[-1] in self.ignored_messages:
+				return sys.__stdout__.write(out)
+			if file is None:
+				file = self.file
+			if file not in self.data:
+				self.data[file] = ""
+			if temp:
+				if file in self.history and self.history.get(file).strip() == temp:
+					add_dict(self.counts, {file:1})
+					return
+				elif self.counts.get(file):
+					count = self.counts.pop(file)
+					times = "s" if count != 1 else ""
+					out, self.history[file] = f"<Last message repeated {count} time{times}>\n{out}", out
+				else:
+					self.history[file] = out
+					self.counts.pop(file, None)
+			self.data[file] += out
+			return sys.__stdout__.write(out)
 
-	read = lambda self, *args, **kwargs: bytes()
-	close = lambda self, force=False: self.__setattr__("closed", force)
-	isatty = lambda self: False
+		def write(self, *args, end="", **kwargs):
+			args2 = [as_str(arg) for arg in args]
+			return self.__call__(*args2, end=end, **kwargs)
+
+		read = lambda self, *args, **kwargs: bytes()
+		close = lambda self, force=False: self.__setattr__("closed", force)
+		isatty = lambda self: False
 
 
-create_future_ex(load_mimes)
-PRINT = __logPrinter("log.txt")
+	create_future_ex(load_mimes)
+	create_future_ex(reload_emojis)
+	PRINT = __logPrinter("log.txt")
 
-# Sets all instances of print to the custom print implementation.
+	# Sets all instances of print to the custom print implementation.
 
-# sys.stdout = sys.stderr = print
-# for mod in (discord, concurrent.futures, asyncio.futures, asyncio, psutil, subprocess, tracemalloc):
-#     builtins = getattr(mod, "__builtins__", None)
-#     if builtins:
-#         builtins["print"] = print
+	# sys.stdout = sys.stderr = print
+	# for mod in (discord, concurrent.futures, asyncio.futures, asyncio, psutil, subprocess, tracemalloc):
+	#     builtins = getattr(mod, "__builtins__", None)
+	#     if builtins:
+	#         builtins["print"] = print

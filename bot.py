@@ -11,16 +11,17 @@ ADDRESS = AUTH.get("webserver_address") or "0.0.0.0"
 if ADDRESS == "0.0.0.0":
 	ADDRESS = "127.0.0.1"
 
-create_future_ex(get_colour_list)
-create_future_ex(load_emojis)
-create_future_ex(load_timezones)
-create_future_ex(verify_openai)
-
 # Allows importing from commands and misc directories.
 sys.path.insert(1, "commands")
 sys.path.insert(1, "misc")
 
-heartbeat_proc = psutil.Popen([python, "misc/heartbeat.py"])
+if __name__ != "__mp_main__":
+	create_future_ex(get_colour_list)
+	create_future_ex(load_emojis)
+	create_future_ex(load_timezones)
+	create_future_ex(verify_openai)
+
+	heartbeat_proc = psutil.Popen([python, "misc/heartbeat.py"])
 
 
 # Main class containing all global bot data.
