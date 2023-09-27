@@ -1069,7 +1069,7 @@ class StarBoard(Command):
 	description = "Causes ⟨MIZA⟩ to repost popular messages with a certain number of a specified reaction anywhere from the server, into the current channel."
 	usage = "<0:reaction> <1:react_count(1)>? <enable_channel{?e}>? <disable_channel{?d}>? <channel_ids(-1)>*"
 	example = ("starboard 🐱 6", "starboard disable")
-	flags = "ed"
+	flags = "aed"
 	directions = [b'\xe2\x8f\xab', b'\xf0\x9f\x94\xbc', b'\xf0\x9f\x94\xbd', b'\xe2\x8f\xac', b'\xf0\x9f\x94\x84']
 	dirnames = ["First", "Prev", "Next", "Last", "Refresh"]
 	rate_limit = 1
