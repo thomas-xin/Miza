@@ -1579,8 +1579,9 @@ SYSTEM: Your name is Miza. Please select one of the following actions by number:
 					text = text[len(start):].strip()
 			model = omodel
 			if text.endswith(":"):
+				m2 = "mythalion-13b" if premium < 2 else "xwin-70b"
 				t2 = self.gptcomplete(u, q, refs=refs, start=text or " ", model=DEFMOD)
-				text += " " + t2
+				text += "\n" + t2
 		if model in bnb_models:
 			omodel = model
 			model, tokeniser = self.load_bnb(model)

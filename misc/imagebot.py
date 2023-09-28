@@ -55,6 +55,15 @@ def lim_tokens(s, maxlen=10, mode="centre"):
 			s = enc.decode(tokens[:maxlen - 3]) + "..."
 	return s.strip()
 
+def max_size(w, h, maxsize, force=False):
+	s = w * h
+	m = maxsize * maxsize
+	if s > m or force:
+		r = (m / s) ** 0.5
+		w = round(w * r)
+		h = round(h * r)
+	return w, h
+
 class_name = webdriver.common.by.By.CLASS_NAME
 css_selector = webdriver.common.by.By.CSS_SELECTOR
 xpath = webdriver.common.by.By.XPATH
@@ -721,7 +730,7 @@ class Bot:
 		if sdxl:
 			kw = dict(output_type=output_type, denoising_end=0.8)
 			if im:
-				kw["target_size"] = im.size
+				kw["target_size"] = max_size(*im.size, 1024 if sdxl > 1 else 512, force=True)
 			elif sdxl > 1:
 				kw["target_size"] = (1024, 1024)
 			else:
@@ -865,14 +874,6 @@ class Bot:
 					# torch.cuda.empty_cache()
 		# pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
 		prompt = lim_tokens(prompt, 80, mode="left")
-		def max_size(w, h, maxsize, force=False):
-			s = w * h
-			m = maxsize * maxsize
-			if s > m or force:
-				r = (m / s) ** 0.5
-				w = round(w * r)
-				h = round(h * r)
-			return w, h
 		data = pipe(
 			prompt=[prompt] * len(images),
 			negative_prompt=[self.neg_prompt] * len(images),
