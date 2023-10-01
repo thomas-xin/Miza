@@ -2065,7 +2065,8 @@ class AudioDownloader:
 				# Allow loading of files output by ~dump
 				if is_url(item):
 					url = verify_url(item)
-					if url[-5:] == ".json" or url[-4:] in (".txt", ".bin", ".zip"):
+					utest = url.split("?", 1)[0]
+					if utest[-5:] == ".json" or utest[-4:] in (".txt", ".bin", ".zip"):
 						s = await_fut(self.bot.get_request(url))
 						try:
 							d = select_and_loads(s, size=268435456)
@@ -4053,6 +4054,8 @@ class Dump(Command):
 			d = argv
 		if type(d) is list:
 			d = dict(queue=d, stats={})
+		elif "stats" not in d:
+			d["stats"] = {}
 		q = d["queue"][:262144]
 		try:
 			ctx = discord.context_managers.Typing(channel) if q else emptyctx
