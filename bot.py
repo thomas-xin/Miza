@@ -1053,33 +1053,39 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return self._fetch_message(m_id, channel)
 
 	async def renew_attachment(self, url, m_id=None):
-		c_id = int(url.split("?", 1)[0].rsplit("/", 3)[-3])
-		channel = await self.fetch_channel(c_id)
-		a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
+		if isinstance(url, int):
+			a_id = url
+			c_id, m_id = self.data.attachments.get(a_id)
+		else:
+			c_id = int(url.split("?", 1)[0].rsplit("/", 3)[-3])
+			a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
 		if not m_id:
 			m_id = self.data.attachments.get(a_id)
+			if isinstance(m_id, (tuple, list)):
+				c_id, m_id = m_id
 		if not m_id:
-			return url
+			return url.rstrip("&")
+		channel = await self.fetch_channel(c_id)
 		try:
 			message = self.data.message_cache.load_message(m_id)
 			for attachment in message.attachments:
 				if attachment.id == a_id:
 					url = str(attachment.url)
 					if not discord_expired(url):
-						return url
+						return url.rstrip("&")
 		except:
 			pass
 		try:
 			message = await channel.fetch_message(m_id)
 		except:
 			print_exc()
-			return url
+			return url.rstrip("&")
 		self.add_message(message, force=True)
 		for attachment in message.attachments:
 			if attachment.id == a_id:
-				return str(attachment.url)
+				return str(attachment.url).rstrip("&")
 		# raise FileNotFoundError(f"Attachment {a_id} disappeared.")
-		return url
+		return url.rstrip("&")
 
 	# Fetches a role from ID and guild, using the bot cache when possible.
 	async def fetch_role(self, r_id, guild=None):
@@ -1698,10 +1704,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				# 	os.remove(filename)
 			raise
 		if not getattr(reference, "slash", None) and message.attachments:
-			await self.add_attachment(message.attachments[0], data, m_id=message.id)
+			await self.add_attachment(message.attachments[0], data, c_id=message.channel.id, m_id=message.id)
 			def temp_url(url):
 				if is_discord_attachment:
-					return self.webserver + "/unproxy?url=" + url_parse(url.split("?", 1)[0]) + f"?mid={message.id}"
+					a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
+					if a_id in self.data.attachments:
+						return self.raw_webserver + "/unproxy?id=" + str(a_id)
+					return self.raw_webserver + "/unproxy?url=" + url_parse(url.split("?", 1)[0]) + f"?mid={message.id}"
 				return url
 			content = message.content + ("" if message.content.endswith("```") else "\n") + "\n".join("<" + temp_url(a.url) + ">" for a in message.attachments)
 			message = await message.edit(content=content.strip())
@@ -1757,7 +1766,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				self.data.message_cache.save_message(message)
 		if "attachments" in self.data:
 			for a in message.attachments:
-				self.data.attachments[a.id] = message.id
+				self.data.attachments[a.id] = (message.channel.id, message.id)
 		return message
 
 	# Deletes a message from the bot cache.
@@ -1768,9 +1777,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			ch = f"deleted/{message.channel.id}.txt"
 			print(s, file=ch)
 
-	async def add_attachment(self, attachment, data=None, m_id=None):
-		if m_id and "attachments" in self.data:
-			self.data.attachments[attachment.id] = m_id
+	async def add_attachment(self, attachment, data=None, c_id=None, m_id=None):
+		if c_id and m_id and "attachments" in self.data:
+			self.data.attachments[attachment.id] = (c_id, m_id)
 		if attachment.id not in self.cache.attachments:
 			self.cache.attachments[attachment.id] = None
 			if data is None:
@@ -1783,7 +1792,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return attachment
 
 	async def add_and_test(self, message, attachment):
-		attachment = await self.add_attachment(attachment, m_id=message.id)
+		attachment = await self.add_attachment(attachment, c_id=message.channel.id, m_id=message.id)
 		if "prot" in self.data:
 			fn = f"cache/attachment_{attachment.id}.bin"
 			if fn in self.cache.attachments:

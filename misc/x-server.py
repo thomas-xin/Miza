@@ -857,8 +857,13 @@ transform: translate(-50%, -50%);
 				yield b
 
 	@cp.expose
-	def unproxy(self, url, mid=None):
-		url = self.renew_url(url, mid=mid)
+	def unproxy(self, url=None, mid=None, id=None):
+		if id:
+			if not id.isnumeric():
+				raise ValueError(id)
+			url = self.bot_exec(f"bot.renew_attachment({id})")
+		else:
+			url = self.renew_url(url, mid=mid)
 		raise cp.HTTPRedirect(url, status="307")
 
 	@tracebacksuppressor

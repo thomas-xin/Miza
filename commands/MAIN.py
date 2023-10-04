@@ -1137,14 +1137,14 @@ class Invite(Command):
 
 
 class Upload(Command):
-	name = ["Filehost", "Files"]
-	description = "Sends a link to ⟨MIZA⟩'s webserver's upload page: ⟨WEBSERVER⟩/files"
+	name = ["Filehost", "Files", "Preserve"]
+	description = "Sends a reverse proxy link to preserve a Discord attachment URL, or sends a link to ⟨MIZA⟩'s webserver's upload page: ⟨WEBSERVER⟩/files"
 	example = ("upload https://cdn.discordapp.com/attachments/911168940246442006/1026474858705588224/6e74595fa98e9c52e2fab6ece4639604.png", "files")
 	rate_limit = (12, 17)
 	msgcmd = True
 	_timeout_ = 50
 
-	async def __call__(self, message, argv, **void):
+	async def __call__(self, name, message, argv, **void):
 		if message.attachments:
 			argv += " " * bool(argv) + " ".join(best_url(a) for a in message.attachments)
 		args = await self.bot.follow_url(argv)
@@ -1152,6 +1152,11 @@ class Upload(Command):
 			return self.bot.raw_webserver + "/files"
 		futs = deque()
 		for url in args:
+			if name in ("files", "preserve") and is_discord_attachment(url):
+				a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
+				if a_id in self.bot.data.attachments:
+					futs.append(as_fut(self.bot.raw_webserver + "/unproxy?id=" + str(a_id)))
+					continue
 			futs.append(Request(self.bot.raw_webserver + "/upload_url?url=" + url, decode=True, aio=True, timeout=1200))
 			await asyncio.sleep(0.1)
 		out = deque()
