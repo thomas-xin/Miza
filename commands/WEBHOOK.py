@@ -129,7 +129,7 @@ class UpdateAutoEmojis(Database):
 	async def _nocommand_(self, message, recursive=True, edit=False, **void):
 		if getattr(message, "simulated", None):
 			return
-		if (message.guild and not message.guild.get_member(message.author.id)) or not message.content or getattr(message, "webhook_id", None) or message.content.count("```") > 1:
+		if message.guild and not message.guild.get_member(message.author.id) or not message.content or getattr(message, "webhook_id", None) or message.content.count("```") > 1:
 			return
 		emojis = find_emojis(message.content)
 		for e in emojis:

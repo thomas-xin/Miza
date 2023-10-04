@@ -1557,7 +1557,7 @@ class Art(Command):
 		kwargs = {
 			"--device": "GPU",
 			"--num-inference-steps": "48" if premium < 4 else "64",
-			"--guidance-scale": "7.5",
+			"--guidance-scale": "9.9",
 			"--eta": "0.8",
 		}
 		inpaint = "i" in flags or name == "inpaint"

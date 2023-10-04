@@ -626,7 +626,10 @@ class UpdateExec(Database):
 					message = await channel.send(f"{fn.rsplit('/', 1)[-1]} ({i})", files=fs)
 					# message = await bot.send_as_webhook(channel, f"{fn.rsplit('/', 1)[-1]} ({i})", files=fs, username=m.display_name, avatar_url=best_url(m), recurse=False)
 					for a, bs in zip(message.attachments, sizes):
-						urls.append(str(a.url) + "?size=" + str(bs))
+						u = str(a.url)
+						u += "?" if "?" not in u else "&"
+						u += "size=" + str(bs) + "&mid=" + str(message.id)
+						urls.append(u)
 					mids.append(message.id)
 					i = f.tell()
 				await asyncio.sleep(0.25)
@@ -1215,6 +1218,10 @@ class UpdateImagePools(Database):
 		if not self.sem.is_busy():
 			create_task(self.proc(key, func, args=args))
 		return choice(data)
+
+
+class UpdateAttachments(Database):
+	name = "attachments"
 
 
 class UpdateAnalysed(Database):

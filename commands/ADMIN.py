@@ -2739,8 +2739,8 @@ class UpdateCrossposts(Database):
 	async def _send_(self, message, **void):
 		if message.channel.id not in self.data:
 			return
-		if message.flags.is_crossposted:
-			return
+		# if message.flags.is_crossposted:
+			# return
 		if "\u2009\u2009" in message.author.name:
 			return
 		content = message.content or message.system_content

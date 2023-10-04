@@ -665,7 +665,7 @@ class FileHashDict(collections.abc.MutableMapping):
 		self.iter = None
 		if self.path and not os.path.exists(self.path):
 			os.mkdir(self.path)
-			self.iter = []
+			self.iter = alist()
 		self.load_cursor()
 		self.db_sem = Semaphore(1, 64)
 		self.c_updated = False
@@ -2093,6 +2093,7 @@ verify_search = lambda f: strip_acc(single_space(f.strip().translate(__strans)))
 find_urls = lambda url: url and regexp("(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s`|\"'\\])>]+").findall(url)
 is_url = lambda url: url and isinstance(url, (str, bytes)) and regexp("^(?:http|hxxp|ftp|fxp)s?:\\/\\/[^\\s`|\"'\\])>]+$").fullmatch(url)
 is_discord_url = lambda url: url and regexp("^https?:\\/\\/(?:[A-Za-z]{3,8}\\.)?discord(?:app)?\\.(?:com|net)\\/").findall(url) + regexp("https:\\/\\/images-ext-[0-9]+\\.discordapp\\.net\\/external\\/").findall(url)
+is_discord_attachment = lambda url: url and regexp("^https?:\\/\\/(?:[A-Za-z]{3,8}\\.)?discord(?:app)?\\.(?:com|net)\\/attachments\\/").search(url)
 is_tenor_url = lambda url: url and regexp("^https?:\\/\\/tenor.com(?:\\/view)?/[a-zA-Z0-9\\-_]+-[0-9]+").findall(url)
 is_imgur_url = lambda url: url and regexp("^https?:\\/\\/(?:[A-Za-z]\\.)?imgur.com/[a-zA-Z0-9\\-_]+").findall(url)
 is_giphy_url = lambda url: url and regexp("^https?:\\/\\/giphy.com/gifs/[a-zA-Z0-9\\-_]+").findall(url)
@@ -2101,8 +2102,21 @@ is_youtube_stream = lambda url: url and regexp("^https?:\\/\\/r+[0-9]+---.{2}-[A
 is_deviantart_url = lambda url: url and regexp("^https?:\\/\\/(?:www\\.)?deviantart\\.com\\/[^\\s<>`|\"']+").findall(url)
 is_reddit_url = lambda url: url and regexp("^https?:\\/\\/(?:www\\.)?reddit.com\\/r\\/[^/]+\\/").findall(url)
 
+def discord_expired(url):
+	if is_discord_attachment(url):
+		if "?ex=" not in url and "&ex=" not in url:
+			return True
+		temp = url.replace("?ex=", "&ex=").split("&ex=", 1)[-1].split("&", 1)[0]
+		try:
+			ts = int(temp, 16)
+		except ValueError:
+			return True
+		return ts < utc() + 60
+
 def expired(stream):
 	if is_youtube_url(stream):
+		return True
+	if discord_expired(stream):
 		return True
 	if stream.startswith("https://www.yt-download.org/download/"):
 		if int(stream.split("/download/", 1)[1].split("/", 4)[3]) < utc() + 60:
@@ -2416,11 +2430,15 @@ async def proc_distribute(proc):
 					if "ngptq" in proc.caps:
 						for p2 in PROCS.values():
 							if p2 and p2.used and "gptq" in p2.caps:
-								await start_proc(p2, wait=True)
+								if utc() - p2.used < 10:
+									await asyncio.sleep(10)
+								await asyncio.shield(start_proc(p2, wait=True, timeout=3600))
 					elif "gptq" in proc.caps:
 						for p2 in PROCS.values():
 							if p2 and p2.used and "ngptq" in p2.caps:
-								await start_proc(p2, wait=True)
+								if utc() - p2.used < 10:
+									await asyncio.sleep(10)
+								await asyncio.shield(start_proc(p2, wait=True, timeout=3600))
 					fut = create_task(_sub_submit(proc, command, _timeout=timeout))
 					fut.ts = i
 					futs.append(fut)
@@ -2433,12 +2451,22 @@ async def proc_distribute(proc):
 				futd = {i for i, fut in enumerate(futs) if fut.done()}
 				for i in futd:
 					fut = futs[i]
-					try:
-						resp = fut.result()
-					except Exception as ex:
-						resps[fut.ts] = ex
-					else:
-						resps[fut.ts] = resp
+					while is_strict_running(proc):
+						try:
+							resp = await asyncio.wait_for(asyncio.shield(fut), timeout=6)
+						except Exception as ex:
+							if not fut.done():
+								continue
+							resps[fut.ts] = ex
+						else:
+							resps[fut.ts] = resp
+						break
+					if not is_strict_running(proc):
+						for i in futd:
+							fut = futs[i]
+							if fut.done():
+								resps[fut.ts] = fut.result()
+						break
 					proc.used = utc()
 				futs = [futs[i] for i in range(len(futs)) if i not in futd]
 				if futs and not resps:
@@ -2476,7 +2504,7 @@ if COMPUTE_LOAD:
 		print("Compute load distribution:", COMPUTE_LOAD)
 		print("Compute pool order:", COMPUTE_ORDER)
 
-async def start_proc(n, di=(), caps="ytdl", it=0, wait=False):
+async def start_proc(n, di=(), caps="ytdl", it=0, wait=False, timeout=None):
 	if hasattr(n, "caps"):
 		n, di, caps, it = n.n, n.di, n.caps, it + 1
 	if n in PROCS:
@@ -2485,7 +2513,11 @@ async def start_proc(n, di=(), caps="ytdl", it=0, wait=False):
 			PROCS[n] = False
 			it = max(it, proc.it + 1)
 			if wait:
-				await proc.sem.afinish()
+				with tracebacksuppressor:
+					if timeout is None:
+						await proc.sem.afinish()
+					else:
+						await asyncio.wait_for(proc.sem.afinish(), timeout=timeout)
 			await create_future(force_kill, proc)
 		elif PROCS[n] is False:
 			return
@@ -2599,11 +2631,11 @@ def spec2cap():
 			caps.append("video")
 			caps.append("ecdc")
 		if c > 400000 and v > 15 * 1073741824:
-			if "sdxlr" not in done or c <= 600000 or "sd" in done:
-				caps.append("sdxlr")
-				caps.append("sdxl")
-				done.add("sdxlr")
-				v -= 15 * 1073741824
+			# if "sdxlr" not in done or c <= 600000 or "sd" in done:
+			caps.append("sdxlr")
+			caps.append("sdxl")
+			done.add("sdxlr")
+			v -= 15 * 1073741824
 		elif c > 400000 and IS_MAIN and vrams[i] > 15 * 1073741824:
 			caps.append("sdxlr")
 			caps.append("ngptq")

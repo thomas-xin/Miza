@@ -856,6 +856,21 @@ transform: translate(-50%, -50%);
 					return
 				yield b
 
+	@cp.expose
+	def unproxy(self, url, mid=None):
+		url = self.renew_url(url, mid=mid)
+		raise cp.HTTPRedirect(url, status="307")
+
+	@tracebacksuppressor
+	def renew_url(self, url, mid=None):
+		if discord_expired(url):
+			if not mid and "&mid=" in url:
+				mid = int(url.split("&mid=", 1)[-1].split("&", 1)[0])
+			if mid:
+				return self.bot_exec(f"bot.renew_attachment({repr(url)},m_id={mid})")
+			return self.bot_exec(f"bot.renew_attachment({repr(url)})")
+		return url
+
 	@tracebacksuppressor
 	def dyn_serve(self, urls, size=0):
 		brange = cp.request.headers.get("Range", "").removeprefix("bytes=")
@@ -907,8 +922,9 @@ transform: translate(-50%, -50%);
 			big = False
 			while rems:
 				u = rems.pop(0)
-				if "?size=" in u:
-					u, ns = u.split("?size=", 1)
+				u = self.renew_url(u)
+				if "?size=" in u or "&size=" in u:
+					u, ns = u.replace("?size=", "&size").split("&size=", 1)
 					ns = int(ns)
 				elif u.startswith("https://s3-us-west-2"):
 					ns = 503316480
@@ -975,6 +991,7 @@ transform: translate(-50%, -50%);
 		headers.pop("Host", None)
 		headers.pop("Range", None)
 		headers.update(Request.header())
+		urls[0] = self.renew_url(urls[0])
 		with reqs.next().get(urls[0], headers=headers, stream=True) as resp:
 			resp.raise_for_status()
 			b = []
@@ -1003,6 +1020,7 @@ transform: translate(-50%, -50%);
 		futs = []
 		with open(on, "wb") as f:
 			for url in urls:
+				url = self.renew_url(url)
 				if len(futs) >= 16 or futs and futs[0].done():
 					fut = futs.pop(0)
 					fut.result()

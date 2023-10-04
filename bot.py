@@ -1033,13 +1033,53 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				m_id = int(m_id)
 			except (ValueError, TypeError):
 				raise TypeError(f"Invalid message identifier: {m_id}")
+		m = None
 		with suppress(KeyError):
-			return as_fut(self.cache.messages[m_id])
-		if "message_cache" in self.data:
+			m = self.cache.messages[m_id]
+		if not m and "message_cache" in self.data:
 			with suppress(KeyError):
-				message = self.data.message_cache.load_message(m_id)
-				return as_fut(message)
+				m = self.data.message_cache.load_message(m_id)
+		if m:
+			if m.attachments:
+				if any(expired(str(a.url)) for a in m.attachments):
+					if channel:
+						if isinstance(channel, int):
+							channel = self.cache.channels.get(channel)
+						if channel:
+							return channel.fetch_message(m_id)
+					m = None
+		if m:
+			return as_fut(m)
 		return self._fetch_message(m_id, channel)
+
+	async def renew_attachment(self, url, m_id=None):
+		c_id = int(url.split("?", 1)[0].rsplit("/", 3)[-3])
+		channel = await self.fetch_channel(c_id)
+		a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
+		if not m_id:
+			m_id = self.data.attachments.get(a_id)
+		if not m_id:
+			return url
+		try:
+			message = self.data.message_cache.load_message(m_id)
+			for attachment in message.attachments:
+				if attachment.id == a_id:
+					url = str(attachment.url)
+					if not discord_expired(url):
+						return url
+		except:
+			pass
+		try:
+			message = await channel.fetch_message(m_id)
+		except:
+			print_exc()
+			return url
+		self.add_message(message, force=True)
+		for attachment in message.attachments:
+			if attachment.id == a_id:
+				return str(attachment.url)
+		# raise FileNotFoundError(f"Attachment {a_id} disappeared.")
+		return url
 
 	# Fetches a role from ID and guild, using the bot cache when possible.
 	async def fetch_role(self, r_id, guild=None):
@@ -1253,6 +1293,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		else:
 			medias = "video"
 		for url in urls:
+			if discord_expired(url):
+				await self.renew_attachment(url)
 			u = getattr(url, "url", None)
 			if u:
 				url = u
@@ -1656,8 +1698,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				# 	os.remove(filename)
 			raise
 		if not getattr(reference, "slash", None) and message.attachments:
-			await self.add_attachment(message.attachments[0], data)
-			content = message.content + ("" if message.content.endswith("```") else "\n") + ("\n".join("<" + best_url(a.url.split("?", 1)[0]) + ">" for a in message.attachments) if best else "\n".join("<" + a.url.split("?", 1)[0] + ">" for a in message.attachments))
+			await self.add_attachment(message.attachments[0], data, m_id=message.id)
+			def temp_url(url):
+				if is_discord_attachment:
+					return self.webserver + "/unproxy?url=" + url_parse(url.split("?", 1)[0]) + f"?mid={message.id}"
+				return url
+			content = message.content + ("" if message.content.endswith("```") else "\n") + "\n".join("<" + temp_url(a.url) + ">" for a in message.attachments)
 			message = await message.edit(content=content.strip())
 		if not message:
 			print("No message detected.")
@@ -1701,14 +1747,17 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				if (utc_dt() - created_at).total_seconds() < 7200:
 					for attachment in message.attachments:
 						create_task(self.add_and_test(message, attachment))
-					for url in find_urls(message.content):
-						if is_discord_url(url) and "attachments/" in url:
-							attachment = cdict(id=url.rsplit("/", 2)[-2], url=url, read=lambda: self.get_request(url))
-							create_task(self.add_and_test(message, attachment))
+					# for url in find_urls(message.content):
+						# if is_discord_url(url) and "attachments/" in url:
+							# attachment = cdict(id=url.rsplit("/", 2)[-2], url=url, read=lambda: self.get_request(url))
+							# create_task(self.add_and_test(message, attachment))
 			apply_stickers(message)
 			self.cache.messages[message.id] = message
 			if (utc_dt() - created_at).total_seconds() < 86400 * 14 and "message_cache" in self.data and not getattr(message, "simulated", None):
 				self.data.message_cache.save_message(message)
+		if "attachments" in self.data:
+			for a in message.attachments:
+				self.data.attachments[a.id] = message.id
 		return message
 
 	# Deletes a message from the bot cache.
@@ -1719,7 +1768,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			ch = f"deleted/{message.channel.id}.txt"
 			print(s, file=ch)
 
-	async def add_attachment(self, attachment, data=None):
+	async def add_attachment(self, attachment, data=None, m_id=None):
+		if m_id and "attachments" in self.data:
+			self.data.attachments[attachment.id] = m_id
 		if attachment.id not in self.cache.attachments:
 			self.cache.attachments[attachment.id] = None
 			if data is None:
@@ -1732,7 +1783,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return attachment
 
 	async def add_and_test(self, message, attachment):
-		attachment = await self.add_attachment(attachment)
+		attachment = await self.add_attachment(attachment, m_id=message.id)
 		if "prot" in self.data:
 			fn = f"cache/attachment_{attachment.id}.bin"
 			if fn in self.cache.attachments:
@@ -4556,15 +4607,21 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						if message.content.startswith("||"):
 							content = message.content.replace("||", "")
 						else:
+							def temp_url(url, mid=None):
+								if is_discord_attachment:
+									if mid:
+										return self.webserver + "/unproxy?url=" + url_parse(url.split("?", 1)[0]) + f"?mid={mid}"
+									return self.webserver + "/unproxy?url=" + url_parse(url.split("?", 1)[0])
+								return url
 							urls = set()
 							for a in message.attachments:
 								url = await self.data.exec.uproxy(str(a.url))
-								urls.add(url)
+								urls.add(temp_url(url, mid=message.id))
 							for e in message.embeds:
 								if e.image:
-									urls.add(best_url(e.image.url))
+									urls.add(temp_url(e.image.url))
 								if e.thumbnail:
-									urls.add(best_url(e.thumbnail))
+									urls.add(temp_url(e.thumbnail))
 							symrem = "".maketrans({c: "" for c in "<>|*"})
 							spl = [word.translate(symrem) for word in message.content.split()]
 							content = " ".join(word for word in spl if url and not is_url(word))

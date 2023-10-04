@@ -1288,9 +1288,14 @@ SYSTEM: Your name is Miza. Please select one of the following actions by number:
 				rem.discard(k)
 				blocked.update(rem)
 				extensions = k not in blocked
-			if not extensions and model in ("gpt-3.5-turbo", "gpt-4") and sum(map(len, ins[:4])) >= 512:
-				model = "xwin-70b"
-				cm = 20
+			if not extensions and model in ("gpt-3.5-turbo",) and sum(map(len, ins[:4])) >= 512:
+				if premium >= 2:
+					model = "xwin-70b"
+					cm = 20
+				else:
+					model = "mythalion-13b"
+					cm = 0
+					limit = 2048
 		if model in ("gpt-3.5-turbo", "gpt-4") or extensions:
 			mod = model if model in ("gpt-3.5-turbo", "gpt-4") else "gpt-3.5-turbo"
 			spl = nstart.rsplit("\n", 1)
@@ -1525,6 +1530,9 @@ SYSTEM: Your name is Miza. Please select one of the following actions by number:
 				print(f"{model.capitalize()} prompt:", prompt)
 			sys.stdout.flush()
 			pc = len(self.gpttokens(prompt))
+			if pc > limit / 2:
+				pc = limit // 2
+				prompt = self.auto_summarise(prompt, min_length=limit // 4, max_length=limit // 2)
 		elif not any(model.startswith(n) for n in ("gpt-3.5-turbo", "gpt-4")):
 			prompt = "".join(reversed(ins))
 			prompt = nstart + "\n\n" + prompt
@@ -1532,6 +1540,9 @@ SYSTEM: Your name is Miza. Please select one of the following actions by number:
 				print(f"{model.capitalize()} prompt:", prompt)
 			sys.stdout.flush()
 			pc = len(self.gpttokens(prompt))
+			if pc > limit / 2:
+				pc = limit // 2
+				prompt = self.auto_summarise(prompt, min_length=limit // 4, max_length=limit // 2)
 		response = None
 		text = ""
 		uoai = None
@@ -1579,8 +1590,8 @@ SYSTEM: Your name is Miza. Please select one of the following actions by number:
 					text = text[len(start):].strip()
 			model = omodel
 			if text.endswith(":"):
-				m2 = "mythalion-13b" if premium < 2 else "xwin-70b"
-				t2 = self.gptcomplete(u, q, refs=refs, start=text or " ", model=DEFMOD)
+				m2 = "mythalion" if premium < 2 else "xwin"
+				t2 = self.gptcomplete(u, q, refs=refs, start=text or " ", model=m2)
 				text += "\n" + t2
 		if model in bnb_models:
 			omodel = model

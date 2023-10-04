@@ -3,6 +3,12 @@ import os, sys
 os.system("color")
 srgb = lambda r, g, b, s: f"\033[38;2;{r};{g};{b}m{s}\033[0m"
 
+if "-i" in sys.argv:
+	INT = True
+	sys.argv.remove("-i")
+else:
+	INT = False
+
 is_sub = False
 if len(sys.argv) > 1:
 	device, name, core, mem = sys.argv[1:]
@@ -27,8 +33,10 @@ if len(sys.argv) > 1:
 		while True:
 			taken = 0
 			temp = []
-			matmul_tflops = {}
-			dtype = torch.float16 if is_cuda else torch.float32
+			if INT:
+				dtype = torch.int8 if is_cuda else torch.int16
+			else:
+				dtype = torch.float16 if is_cuda else torch.float32
 			m = math.ceil(math.log2(count))
 			n = min(12, m)
 			if n < m:
@@ -37,8 +45,8 @@ if len(sys.argv) > 1:
 				it = 1
 			c = 2 ** n
 			# print(c)
-			a = torch.randn(c, c, dtype=dtype, device="cuda" if is_cuda else "cpu")
-			b = torch.randn(c, c, dtype=dtype, device="cuda" if is_cuda else "cpu")
+			a = torch.randn(c, c, dtype=torch.float32, device="cuda" if is_cuda else "cpu").to(dtype)
+			b = torch.randn(c, c, dtype=torch.float32, device="cuda" if is_cuda else "cpu").to(dtype)
 			# print("DEVICE:", device, count, len(a), c, it)
 			for i in range(it):
 				if is_cuda:
@@ -70,8 +78,9 @@ if len(sys.argv) > 1:
 		# im.save(f"{name} ({core}-core, {memc} GB).png")
 		iavg = sum(temp) / len(temp)
 		wavg = [n for n in temp if n >= iavg]
-		flops = sum(wavg) / len(wavg)
-		score = flops / 50000000
+		ops = sum(wavg) / len(wavg)
+		op = "I" if INT else "FL"
+		score = ops / 50000000
 		# diffs = [temp[i] - temp[i - 1] for i in range(1, len(temp))]
 		# iavg = sum(diffs) / len(diffs)
 		# wavg = [n for n in diffs if n <= iavg]
@@ -82,7 +91,7 @@ if len(sys.argv) > 1:
 		gb = f"{memc} GB"
 		gb = srgb(0, 255, 0, gb) if memc > 11 else srgb(255, 255, 0, gb) if memc >= 7 else srgb(255, 127, 0, gb) if memc > 3 else srgb(255, 0, 0, gb)
 		FP = "FP16" if dtype == torch.float16 else "FP32"
-		print(f"Benchmarked {srgb(0, 255, 255, name)} ({cc}, {gb}). Average peak {FP} performance: {flops / 1e12} TFLOPS.")
+		print(f"Benchmarked {srgb(0, 255, 255, name)} ({cc}, {gb}). Average peak {FP} performance: {ops / 1e12} T{op}OPS.")
 		sc = f"Score: {round(score, 2)}"
 		sc = srgb(0, 255, 0, sc) if score >= 1000000 else srgb(255, 255, 0, sc) if score >= 300000 else srgb(255, 127, 0, sc) if score >= 90000 else srgb(255, 0, 0, sc)
 		print(sc)
@@ -228,6 +237,8 @@ if not is_sub:
 			# mems.append(mem)
 		if __name__ == "__main__":
 			args = [sys.executable, sys.argv[0], "cpu", info["brand_raw"], str(info["count"]), str(mem)]
+			if INT:
+				args.append("-i")
 			print(args)
 			proc = subprocess.Popen(args, stdout=subprocess.PIPE)
 			proc.i = -1
@@ -240,6 +251,8 @@ if not is_sub:
 				mem = torch.cuda.get_device_properties(i).total_memory
 				# mems.append(mem)
 				args = [sys.executable, sys.argv[0], f"cuda:{i}", pynvml.nvmlDeviceGetName(info), str(pynvml.nvmlDeviceGetNumGpuCores(info)), str(mem)]
+				if INT:
+					args.append("-i")
 				print(args)
 				proc = subprocess.Popen(args, stdout=subprocess.PIPE)
 				proc.i = i
@@ -270,8 +283,10 @@ if not is_sub:
 				if proc.i > -1:# or DC >= 3:
 					compute_load[proc.i] = avg
 				olines[proc.i + 1] = b"".join(s).decode("utf-8")
+			ops = total * 50000000
+			op = "I" if INT else "FL"
 			print("\n" + "\n".join(olines).strip())
-			print(srgb(0, 255, 0, f"Benchmark complete. Total score: {round(total, 2)}"))
+			print(srgb(0, 255, 0, f"Benchmark complete. Total score: {round(total, 2)}, {round(ops / 1e12, 2)} T{op}OPS."))
 
 		if not os.path.exists("auth.json"):
 			keep = False

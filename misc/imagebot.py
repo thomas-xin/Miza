@@ -625,8 +625,8 @@ class Bot:
 				else:
 					device = -1
 					dtype = torch.float32
-		if dtype is torch.float16:
-			dtype = torch.bfloat16
+		# if dtype is torch.float16:
+		# 	dtype = torch.bfloat16
 		images = self.art_stablediffusion_sub(pf, model, prompt, kwargs, count, device, dtype, nsfw, fail_unless_gpu, sdxl=sdxl)
 		out = []
 		for im in images:
@@ -744,7 +744,7 @@ class Bot:
 				mask_image=image_to(mask, mode="L"),
 				num_images_per_prompt=count,
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
-				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
+				guidance_scale=float(kwargs.get("--guidance-scale", 9.9)),
 				strength=float(kwargs.get("--strength", 0.8)),
 				**kw,
 			)
@@ -754,7 +754,7 @@ class Bot:
 				image=image_to(im),
 				num_images_per_prompt=count,
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
-				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
+				guidance_scale=float(kwargs.get("--guidance-scale", 9.9)),
 				strength=float(kwargs.get("--strength", 0.7)),
 				**kw,
 			)
@@ -763,7 +763,7 @@ class Bot:
 				image=image_to(im),
 				num_images_per_prompt=count,
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
-				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
+				guidance_scale=float(kwargs.get("--guidance-scale", 9.9)),
 				**kw,
 			)
 		else:
@@ -771,7 +771,7 @@ class Bot:
 				prompt,
 				num_images_per_prompt=count,
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
-				guidance_scale=float(kwargs.get("--guidance-scale", 7.5)),
+				guidance_scale=float(kwargs.get("--guidance-scale", 9.9)),
 				**kw,
 			)
 		# print(data, data.images)
@@ -860,7 +860,7 @@ class Bot:
 						models[(f2, model)] = False
 						print("StablediffusionL: CUDA f16 init failed")
 						return ()
-					pipe = backup_model(f2.from_pretrained, model, requires_safety_checker=False, use_safetensors=True, variant="fp16", **kw)
+					pipe = backup_model(f2.from_pretrained, model, requires_safety_checker=False, use_safetensors=True, **kw)
 				models[(f2, model)] = pipe
 			finally:
 				self.loading.set_result(None)
