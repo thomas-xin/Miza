@@ -860,7 +860,8 @@ transform: translate(-50%, -50%);
 	def unproxy(self, url=None, mid=None, id=None):
 		if id:
 			if not id.isnumeric():
-				raise ValueError(id)
+				id = int.from_bytes(base64.urlsafe_b64decode(id + "=="), "big")
+				# raise ValueError(id)
 			url = self.bot_exec(f"bot.renew_attachment({id})")
 		else:
 			url = self.renew_url(url, mid=mid)

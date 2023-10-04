@@ -1709,7 +1709,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				if is_discord_attachment:
 					a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
 					if a_id in self.data.attachments:
-						return self.raw_webserver + "/unproxy?id=" + str(a_id)
+						return self.raw_webserver + "/unproxy?id=" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip("=").decode("ascii")
 					return self.raw_webserver + "/unproxy?url=" + url_parse(url.split("?", 1)[0]) + f"?mid={message.id}"
 				return url
 			content = message.content + ("" if message.content.endswith("```") else "\n") + "\n".join("<" + temp_url(a.url) + ">" for a in message.attachments)
@@ -4618,9 +4618,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						else:
 							def temp_url(url, mid=None):
 								if is_discord_attachment:
+									a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
+									if a_id in self.data.attachments:
+										return self.raw_webserver + "/unproxy?id=" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip("=").decode("ascii")
 									if mid:
-										return self.webserver + "/unproxy?url=" + url_parse(url.split("?", 1)[0]) + f"?mid={mid}"
-									return self.webserver + "/unproxy?url=" + url_parse(url.split("?", 1)[0])
+										return self.raw_webserver + "/unproxy?url=" + url_parse(url.split("?", 1)[0]) + f"?mid={mid}"
+									return self.raw_webserver + "/unproxy?url=" + url_parse(url.split("?", 1)[0])
 								return url
 							urls = set()
 							for a in message.attachments:
