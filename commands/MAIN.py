@@ -1155,7 +1155,7 @@ class Upload(Command):
 			if name in ("files", "preserve") and is_discord_attachment(url):
 				a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
 				if a_id in self.bot.data.attachments:
-					futs.append(as_fut(self.bot.raw_webserver + "/unproxy?id=" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip("=").decode("ascii")))
+					futs.append(as_fut(self.bot.raw_webserver + "/u/" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii")))
 					continue
 			futs.append(Request(self.bot.raw_webserver + "/upload_url?url=" + url, decode=True, aio=True, timeout=1200))
 			await asyncio.sleep(0.1)

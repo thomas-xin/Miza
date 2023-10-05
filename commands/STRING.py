@@ -66,7 +66,7 @@ class Translate(Command):
 			engine = spl.pop(0).casefold()
 		else:
 			engine = "chatgpt" if premium >= 2 else "google"
-		if len(spl) > 2 and (src := (self.renamed.get(c := spl[0].casefold()) or (self.languages.get(c) and c))):
+		if len(spl) > 2 and (spl[1].casefold() in self.renamed or spl[1].casefold() in self.languages) and(src := (self.renamed.get(c := spl[0].casefold()) or (self.languages.get(c) and c))):
 			spl.pop(0)
 			src = lim_str(src, 32)
 		else:

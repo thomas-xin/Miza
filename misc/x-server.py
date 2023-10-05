@@ -856,8 +856,8 @@ transform: translate(-50%, -50%);
 					return
 				yield b
 
-	@cp.expose
-	def unproxy(self, url=None, mid=None, id=None):
+	@cp.expose(("u"))
+	def unproxy(self, id=None, url=None, mid=None):
 		if id:
 			if not id.isnumeric():
 				id = int.from_bytes(base64.urlsafe_b64decode(id + "=="), "big")

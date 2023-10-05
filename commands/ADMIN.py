@@ -2863,7 +2863,7 @@ class UpdateStarboards(Database):
 		sem = self.sems.setdefault(message.guild.id, Semaphore(1, inf))
 		async with sem:
 			try:
-				reacts = sorted(map(str, message.reactions), key=lambda r: -r.count)
+				reacts = [str(r) for r in sorted(message.reactions, key=lambda r: -r.count)]
 				if not reacts:
 					return
 				react = reacts[0]

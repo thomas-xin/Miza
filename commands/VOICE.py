@@ -402,6 +402,8 @@ class CustomAudio(collections.abc.Hashable):
 			self.paused = False
 			self.acsi.resume()
 		else:
+			self.acsi.pause()
+			self.acsi.resume()
 			self.acsi.read()
 		self.queue.update_load()
 
@@ -4910,12 +4912,12 @@ class Player(Command):
 					auds.stats.shuffle = bool(auds.stats.shuffle ^ 1)
 				elif i == 3 or i == 4:
 					if i == 3:
-						pos = 0
+						auds.seek(0)
 					else:
-						pos = inf
-					auds.seek(pos)
-					if pos:
-						return
+						auds.queue.pop(0)
+						auds.clear_source()
+						await create_future(auds.reset)
+					return
 				elif i == 5:
 					v = abs(auds.stats.volume)
 					if v < 0.25 or v >= 2:
@@ -5733,7 +5735,8 @@ class UpdateAudio(Database):
 
 	backup_sem = Semaphore(1, 0, rate_limit=30)
 	async def backup(self, force=False):
-		self.data.clear()
+		if self.bot.ready:
+			self.data.clear()
 		for auds in tuple(self.players.values()):
 			if not auds.acsi:
 				continue
