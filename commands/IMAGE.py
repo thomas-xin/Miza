@@ -926,6 +926,44 @@ class Orbit(Command):
 		await bot.send_with_file(channel, "", fn, filename=name, reference=message, reacts="🔳")
 
 
+class Pet(Command):
+	name = ["PetGIF"]
+	description = "Creates a .gif image from applying the Petpet generator to the supplied image."
+	usage = "<0:url> <1:squish(0.1)>? <2:duration(0.25)>?"
+	example = ("pet https://mizabot.xyz/favicon", "pet https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png 3")
+	no_parse = True
+	rate_limit = (10, 13)
+	_timeout_ = 8
+	typing = True
+
+	async def __call__(self, bot, user, channel, message, args, argv, _timeout, **void):
+		name, value, url, fmt, extra = await get_image(bot, user, message, args, argv, ext="gif", raw=True, default="")
+		extras = deque()
+		while value:
+			spl = value.split(None, 1)
+			urls = await bot.follow_url(spl[0], best=True, allow=True, limit=1)
+			if not urls:
+				break
+			value = spl[-1] if len(spl) > 1 else ""
+			extras.append(urls[0])
+		spl = value.rsplit(None, 1)
+		if not spl:
+			squish = 0.1
+			duration = 0.25
+		elif len(spl) == 1:
+			squish = await bot.eval_math(spl[0])
+			duration = 0.25
+		else:
+			squish = await bot.eval_math(spl[0])
+			duration = await bot.eval_math(spl[1])
+		if squish < -0.5 or squish > 0.5:
+			raise OverflowError("Maximum multiplier input is 0.5.")
+		async with discord.context_managers.Typing(channel):
+			resp = await process_image(url, "pet_gif", [squish, duration, "-gif", "-f", fmt], timeout=_timeout)
+			fn = resp
+		await bot.send_with_file(channel, "", fn, filename=name, reference=message, reacts="🔳")
+
+
 class GMagik(Command):
 	name = ["Liquefy", "MagikGIF"]
 	description = "Repeatedly applies the Magik image filter to supplied image."

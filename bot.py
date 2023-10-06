@@ -1428,8 +1428,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						head = fcdict(resp.headers)
 						ctype = [t.strip() for t in head.get("Content-Type", "").split(";")]
 						if "text/html" in ctype:
-							it = resp.iter_content(65536)
-							data = await create_future(next, it)
+							rit = resp.iter_content(65536)
+							data = await create_future(next, rit)
 							s = as_str(data)
 							try:
 								s = s[s.index("<meta") + 5:]
@@ -3010,6 +3010,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		network_usage = sum(e["usage"] * e["count"] for e in system.network.values()) if system.network else 0
 		power_usage = sum(e["usage"] * e["count"] for e in system.power.values()) if system.power else 0
 		power_max = sum(e["max"] * e["count"] for e in system.power.values()) if system.power else 0
+		temp_usage = sum(e["usage"] * e["count"] for e in system.temperature.values()) if system.temperature else 0
 		discord_stats = dict(status.discord)
 		discord_stats["API latency"] = sec2time(discord_stats["API latency"])
 		misc_stats = dict(status.misc)
@@ -3024,6 +3025,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				"Disk usage": byte_scale(disk_usage) + "B/" + byte_scale(disk_max) + "B",
 				"Network usage": byte_scale(network_usage) + "bps",
 				"Power usage": f"{round(power_usage, 3)} W/{round(power_max, 3)} W",
+				"Temperature": f"{round(temp_usage, 3)} °C",
 			},
 			"Discord info": discord_stats,
 			"Misc info": misc_stats,

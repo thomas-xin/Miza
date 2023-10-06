@@ -167,6 +167,37 @@ def rainbow_gif(image, duration):
 	return dict(duration=1000 / fps * count, count=count, frames=rainbow_gif_iterator(image))
 
 
+def pet_gif(image, squeeze, duration):
+	try:
+		image.seek(1)
+	except EOFError:
+		image.seek(0)
+	else:
+		raise NotImplementedError("Animations currently not not supported.")
+		return spin_gif2(image, duration)
+	pet = get_image("https://mizabot.xyz/u/EBjYrqCEUDw")
+	count = len(pet._images)
+
+	def pet_gif_iterator(image):
+		w, h = image.width * 2.5, image.height * 2.5
+		if w < 256 and h < 256:
+			w, h = max_size(w, h, 256, force=True)
+		w, h = round_random(w), round_random(h)
+		for f in range(count):
+			im = Image.new("RGBA", (w, h))
+			sqr = (1 - cos(f / count * tau)) * 2.5
+			wm = 0.8 + sqr * 0.02
+			hm = 0.8 - sqr * 0.05
+			ox = (1 - wm) * 0.5 + 0.1
+			oy = (1 - hm) - 0.08
+			im.paste(image.resize((round_random(wm * w), round_random(hm * h)), resample=Resampling.LANCZOS), (round_random(ox * w), round_random(oy * h)))
+			pet2 = pet._images[f].resize((w, h), resample=Resampling.LANCZOS)
+			im.paste(pet2, mask=pet2)
+			yield im.resize((round(w / 2), round(h / 2)), resample=Resampling.LANCZOS)
+
+	return dict(duration=1000 * duration, count=count, frames=pet_gif_iterator(image))
+
+
 def spin_gif2(image, duration):
 	total = 0
 	for f in range(2147483648):
