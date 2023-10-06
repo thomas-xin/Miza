@@ -599,12 +599,13 @@ class UpdateExec(Database):
 								),
 							)
 							resp.raise_for_status()
-							url = resp.json()["url"].split("?", 1)[0] + "?size=" + str(len(b))
+							url = resp.json()["url"].split("?", 1)[0]
 					except:
 						print_exc()
 						f.seek(i)
 					else:
-						urls.append(url)
+						u = self.bot.preserve_attachment(url) + "?S=" + str(len(b))
+						urls.append(u)
 						i = f.tell()
 						continue
 				with tracebacksuppressor:

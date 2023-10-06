@@ -1053,17 +1053,28 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return self._fetch_message(m_id, channel)
 
 	def preserve_attachment(self, a_id):
+		if is_url(a_id):
+			url = a_id
+			a_id = ts_us()
+			while a_id in self.data.attachments:
+				a_id += 1
+			self.data.attachments[a_id] = url
 		return self.raw_webserver + "/u/" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii")
 
 	async def renew_attachment(self, url, m_id=None):
 		if isinstance(url, int):
 			a_id = url
-			c_id, m_id = self.data.attachments.get(a_id)
+			tup = self.data.attachments.get(a_id)
+			if is_url(tup):
+				return tup
+			c_id, m_id = tup
 		else:
 			c_id = int(url.split("?", 1)[0].rsplit("/", 3)[-3])
 			a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
 		if not m_id:
 			m_id = self.data.attachments.get(a_id)
+			if is_url(m_id):
+				return m_id
 			if isinstance(m_id, (tuple, list)):
 				c_id, m_id = m_id
 		if not m_id:

@@ -158,10 +158,10 @@ mapped_static = {k[:-5]: k for k in actually_static if k.endswith(".html")}
 def map_url(url):
 	if not isinstance(url, str):
 		return url
-	if url.startswith(HOST):
-		return url.replace(HOST, "M$")
-	if url.startswith(API):
-		return url.replace(API, "M$")
+	if url.startswith(HOST + "/u"):
+		return url.replace(HOST + "/u", "M$")
+	if url.startswith(API + "/u"):
+		return url.replace(API + "/u", "M$")
 	return url.removeprefix(
 		"https://"
 	).replace(
@@ -173,7 +173,7 @@ def remap_url(url):
 	if not isinstance(url, str) or url.startswith("https://"):
 		return url
 	if url.startswith("M$"):
-		return API + url[2:]
+		return API + "/u" + url[2:]
 	return "https://" + url.replace(
 		"D$", "cdn.discordapp.com/attachments/"
 	).replace(
@@ -495,6 +495,7 @@ class Server:
 		if path in ("hacks", "mods", "files", "download", "static"):
 			send(true_ip() + " was rickrolled 🙃")
 			raise cp.HTTPRedirect("https://www.youtube.com/watch?v=dQw4w9WgXcQ", status=301)
+		true_ip()
 		orig_path = path
 		ind = IND
 		p = None
@@ -536,7 +537,7 @@ class Server:
 				sem = SEMAPHORES.pop(next(iter(SEMAPHORES)))
 				if sem.is_busy():
 					raise SemaphoreOverflowError
-			sem = SEMAPHORES[p] = Semaphore(256, 256, rate_limit=60)
+			sem = SEMAPHORES[p] = Semaphore(256, 256, rate_limit=4)
 		with sem:
 			endpoint = cp.url(qs=cp.request.query_string, base="")[1:].split("/", 1)[0]
 			download = download and download[0] not in "0fFnN" or endpoint.startswith("d")
@@ -865,9 +866,8 @@ transform: translate(-50%, -50%);
 	@cp.expose(("u"))
 	def unproxy(self, id=None, url=None, mid=None, **kwargs):
 		if id:
-			if not id.isnumeric():
+			with tracebacksuppressor:
 				id = int.from_bytes(base64.urlsafe_b64decode(id + "=="), "big")
-				# raise ValueError(id)
 			url = self.bot_exec(f"bot.renew_attachment({id})")
 		else:
 			url = self.renew_url(url, mid=mid)
@@ -1413,76 +1413,77 @@ transform: translate(-50%, -50%);
 	@cp.expose(("index", "p", "preview", "files", "file", "chat", "tester", "atlas", "mizatlas", "user", "login", "logout", "mpinsights", "createredirect"))
 	@hostmap
 	def index(self, path=None, filename=None, *args, code=None, **kwargs):
-		url = cp.url(qs=cp.request.query_string).rstrip("/")
-		if "/user" in url:
-			try:
-				sessid = int(cp.request.cookie["sessid"].value)
-			except (KeyError, ValueError):
-				adata = None
-			else:
-				adata = cdict(self.bot_exec(f"bot.data.sessions.get({repr(sessid)})"))
-			t = utc()
-			if not adata:
-				if not code:
-					cp.response.cookie["sessid"] = ""
-					raise cp.HTTPRedirect(url.replace("/user", "/login"))
-				resp = reqs.next().post(
-					f"https://discord.com/api/oauth2/token",
-					data=dict(
-						client_id=AUTH.get("discord_id") or self.bot_exec("bot.id"),
-						client_secret=AUTH["discord_secret"],
-						grant_type="authorization_code",
-						code=code,
-						redirect_uri=f"{API}/user",
-					),
-				)
-				resp.raise_for_status()
-				adata = cdict(resp.json())
-				adata.ts = round_random(t * 1e6)
-				adata.expiry = t + adata.expires_in
-				adata.refreshed = 0
-			t = utc()
-			if t > adata.expiry:
-				resp = reqs.next().post(
-					f"https://discord.com/api/oauth2/token",
-					data=dict(
-						client_id=AUTH.get("discord_id") or self.bot_exec("bot.id"),
-						client_secret=AUTH["discord_secret"],
-						grant_type="refresh_token",
-						refresh_token=adata.refresh_token,
-					),
-				)
-				resp.raise_for_status()
-				adata.update(resp.json())
-				adata.expiry = t + adata.expires_in
-			t = utc()
-			if t > adata.refreshed + 30:
-				resp = reqs.next().get(
-					"https://discord.com/api/users/@me",
-					headers={"Authorization": f"{adata.token_type} {adata.access_token}"},
-				)
-				resp.raise_for_status()
-				adata.update(resp.json())
-				adata.refreshed = t
-			sessid = adata.id
-			if "email" in adata and "id" in adata:
-				self.bot_exec(
-					f"bot.data.accounts.setdefault({repr(adata.email)},{{}})['uid']={adata.id};"
-					+ f"bot.data.users.setdefault({adata.id},{{}})['email']={repr(adata.email)}"
-				)
-			cp.response.cookie["sessid"] = sessid
-			cp.response.cookie["email"] = adata.get("email") or ""
-			cp.response.cookie["name"] = adata.get("username") or adata.email.split("@", 1)[0]
-			cp.response.cookie["uid"] = int(adata.get("id", 0)) or ""
-			if "id" in adata:
-				adata["icon"] = self.bot_exec(
-					f"bot.cache.users[{adata.id}]=await bot.fetch_user({adata.id});"
-					+ f"return best_url(bot.cache.users[{adata.id}])"
-				)
-			else:
-				adata.pop("icon")
-			self.bot_exec(f"bot.data.sessions[{repr(sessid)}]={repr(adata)}")
-			cp.response.cookie["icon"] = adata.get("icon")
+		true_ip()
+		url = HOST + "/" + cp.url(qs=cp.request.query_string).rstrip("/").split("//", 1)[-1].split("/", 1)[-1]
+		# if "/user" in url:
+			# try:
+				# sessid = int(cp.request.cookie["sessid"].value)
+			# except (KeyError, ValueError):
+				# adata = None
+			# else:
+				# adata = cdict(self.bot_exec(f"bot.data.sessions.get({repr(sessid)})"))
+			# t = utc()
+			# if not adata:
+				# if not code:
+					# cp.response.cookie["sessid"] = ""
+					# raise cp.HTTPRedirect(url.replace("/user", "/login"))
+				# resp = reqs.next().post(
+					# f"https://discord.com/api/oauth2/token",
+					# data=dict(
+						# client_id=AUTH.get("discord_id") or self.bot_exec("bot.id"),
+						# client_secret=AUTH["discord_secret"],
+						# grant_type="authorization_code",
+						# code=code,
+						# redirect_uri=f"{API}/user",
+					# ),
+				# )
+				# resp.raise_for_status()
+				# adata = cdict(resp.json())
+				# adata.ts = round_random(t * 1e6)
+				# adata.expiry = t + adata.expires_in
+				# adata.refreshed = 0
+			# t = utc()
+			# if t > adata.expiry:
+				# resp = reqs.next().post(
+					# f"https://discord.com/api/oauth2/token",
+					# data=dict(
+						# client_id=AUTH.get("discord_id") or self.bot_exec("bot.id"),
+						# client_secret=AUTH["discord_secret"],
+						# grant_type="refresh_token",
+						# refresh_token=adata.refresh_token,
+					# ),
+				# )
+				# resp.raise_for_status()
+				# adata.update(resp.json())
+				# adata.expiry = t + adata.expires_in
+			# t = utc()
+			# if t > adata.refreshed + 30:
+				# resp = reqs.next().get(
+					# "https://discord.com/api/users/@me",
+					# headers={"Authorization": f"{adata.token_type} {adata.access_token}"},
+				# )
+				# resp.raise_for_status()
+				# adata.update(resp.json())
+				# adata.refreshed = t
+			# sessid = adata.id
+			# if "email" in adata and "id" in adata:
+				# self.bot_exec(
+					# f"bot.data.accounts.setdefault({repr(adata.email)},{{}})['uid']={adata.id};"
+					# + f"bot.data.users.setdefault({adata.id},{{}})['email']={repr(adata.email)}"
+				# )
+			# cp.response.cookie["sessid"] = sessid
+			# cp.response.cookie["email"] = adata.get("email") or ""
+			# cp.response.cookie["name"] = adata.get("username") or adata.email.split("@", 1)[0]
+			# cp.response.cookie["uid"] = int(adata.get("id", 0)) or ""
+			# if "id" in adata:
+				# adata["icon"] = self.bot_exec(
+					# f"bot.cache.users[{adata.id}]=await bot.fetch_user({adata.id});"
+					# + f"return best_url(bot.cache.users[{adata.id}])"
+				# )
+			# else:
+				# adata.pop("icon")
+			# self.bot_exec(f"bot.data.sessions[{repr(sessid)}]={repr(adata)}")
+			# cp.response.cookie["icon"] = adata.get("icon")
 		if "/p/" in url:
 			raise cp.HTTPRedirect(url.replace("/p/", "/file/"), status=307)
 		if "/preview/" in url:
@@ -1540,7 +1541,7 @@ transform: translate(-50%, -50%);
 						sem = SEMAPHORES.pop(next(iter(SEMAPHORES)))
 						if sem.is_busy():
 							raise SemaphoreOverflowError
-					sem = SEMAPHORES[p] = Semaphore(256, 256, rate_limit=60)
+					sem = SEMAPHORES[p] = Semaphore(256, 256, rate_limit=4)
 				with sem:
 					fn = p.rsplit("/", 1)[-1].split("~", 1)[-1].rstrip(IND)
 					if fn.startswith(".forward$"):
