@@ -1052,6 +1052,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			return as_fut(m)
 		return self._fetch_message(m_id, channel)
 
+	def preserve_attachment(self, a_id):
+		return self.raw_webserver + "/u/" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii")
+
 	async def renew_attachment(self, url, m_id=None):
 		if isinstance(url, int):
 			a_id = url
@@ -1709,7 +1712,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				if is_discord_attachment:
 					a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
 					if a_id in self.data.attachments:
-						return self.raw_webserver + "/u/" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii")
+						return self.preserve_attachment(a_id)
 					return self.raw_webserver + "/unproxy?url=" + url_parse(url.split("?", 1)[0]) + f"?mid={message.id}"
 				return url
 			content = message.content + ("" if message.content.endswith("```") else "\n") + "\n".join("<" + temp_url(a.url) + ">" for a in message.attachments)
@@ -4620,7 +4623,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 								if is_discord_attachment:
 									a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
 									if a_id in self.data.attachments:
-										return self.raw_webserver + "/u/" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii")
+										return self.preserve_attachment(a_id)
 									if mid:
 										return self.raw_webserver + "/unproxy?url=" + url_parse(url.split("?", 1)[0]) + f"?mid={mid}"
 									return self.raw_webserver + "/unproxy?url=" + url_parse(url.split("?", 1)[0])

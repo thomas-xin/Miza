@@ -3746,20 +3746,20 @@ class Connect(Command):
 			return await create_future(auds.kill, initiator=message)
 		if not vc_.permissions_for(guild.me).connect:
 			raise ConnectionError("Insufficient permissions to connect to voice channel.")
-		if vc_.permissions_for(guild.me).manage_channels:
-			if guild.id in bot.data.audio.players:
-				br = round(bot.data.audio.players[guild.id].stats.bitrate * 100)
-			else:
-				br = CustomAudio.max_bitrate
-			if vc_.type is discord.ChannelType.stage_voice:
-				bitrate = min(br, 64000)
-			else:
-				bitrate = min(br, guild.bitrate_limit)
-			if vc_.bitrate < bitrate:
-				try:
-					await vc_.edit(bitrate=bitrate, reason="I deliver maximum quality audio only! :3")
-				except:
-					print_exc()
+		# if vc_.permissions_for(guild.me).manage_channels:
+			# if guild.id in bot.data.audio.players:
+				# br = round(bot.data.audio.players[guild.id].stats.bitrate * 100)
+			# else:
+				# br = CustomAudio.max_bitrate
+			# if vc_.type is discord.ChannelType.stage_voice:
+				# bitrate = min(br, 64000)
+			# else:
+				# bitrate = min(br, guild.bitrate_limit)
+			# if vc_.bitrate < bitrate:
+				# try:
+					# await vc_.edit(bitrate=bitrate, reason="I deliver maximum quality audio only! :3")
+				# except:
+					# print_exc()
 		# Create audio source if none already exists
 		if guild.id not in bot.data.audio.players:
 			globals()["bot"] = bot
@@ -4288,15 +4288,15 @@ class AudioSettings(Command):
 			else:
 				if op == "bitrate":
 					if val > CustomAudio.max_bitrate:
-						raise PermissionError(f"Maximum allowed bitrate is {CustomAudio.max_bitrate}.")
+						raise PermissionError(f"Maximum permitted bitrate is {CustomAudio.max_bitrate}.")
 					elif val < 5.12:
 						raise ValueError("Bitrate must be equal to or above 512.")
 				elif op == "speed":
 					if abs(val * 2 ** (origStats.get("resample", 0) / 12)) > 16:
-						raise OverflowError("Maximum speed is 1600%.")
+						raise OverflowError("Maximum permitted speed is 1600%.")
 				elif op == "resample":
 					if abs(origStats.get("speed", 1) * 2 ** (val / 12)) > 16:
-						raise OverflowError("Maximum speed is 1600%.")
+						raise OverflowError("Maximum permitted speed is 1600%.")
 				origStats[op] = val
 				if "f" in flags:
 					bot.data.audiosettings.setdefault(guild.id, {})[op] = val

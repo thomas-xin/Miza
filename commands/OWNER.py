@@ -626,10 +626,12 @@ class UpdateExec(Database):
 					message = await channel.send(f"{fn.rsplit('/', 1)[-1]} ({i})", files=fs)
 					# message = await bot.send_as_webhook(channel, f"{fn.rsplit('/', 1)[-1]} ({i})", files=fs, username=m.display_name, avatar_url=best_url(m), recurse=False)
 					for a, bs in zip(message.attachments, sizes):
-						u = str(a.url).rstrip("&")
-						u += "?" if "?" not in u else "&"
-						u += "size=" + str(bs) + "&mid=" + str(message.id)
+						u = self.bot.preserve_attachment(a.id) + "?S=" + str(bs)
 						urls.append(u)
+						# u = str(a.url).rstrip("&")
+						# u += "?" if "?" not in u else "&"
+						# u += "size=" + str(bs) + "&mid=" + str(message.id)
+						# urls.append(u)
 					mids.append(message.id)
 					i = f.tell()
 				await asyncio.sleep(0.25)

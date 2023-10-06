@@ -266,42 +266,46 @@ class Perms(Command):
 			users = await bot.find_users(argl, args, user, guild, roles=True)
 		if not users:
 			raise LookupError("No results found.")
-		for t_user in users:
-			t_perm = round_min(bot.get_perms(t_user, guild))
-			# If permission level is given, attempt to change permission level, otherwise get current permission level
-			if args or "d" in flags:
-				name = str(t_user)
-				if "d" in flags:
-					o_perm = round_min(bot.get_perms(t_user, guild))
-					bot.remove_perms(t_user, guild)
-					c_perm = round_min(bot.get_perms(t_user, guild))
-					m_perm = max(abs(t_perm), abs(c_perm), 2) + 1
+		msgs = []
+		try:
+			for t_user in users:
+				t_perm = round_min(bot.get_perms(t_user, guild))
+				# If permission level is given, attempt to change permission level, otherwise get current permission level
+				if args or "d" in flags:
+					name = str(t_user)
+					if "d" in flags:
+						o_perm = round_min(bot.get_perms(t_user, guild))
+						bot.remove_perms(t_user, guild)
+						c_perm = round_min(bot.get_perms(t_user, guild))
+						m_perm = max(abs(t_perm), abs(c_perm), 2) + 1
+						if not perm < m_perm and not isnan(m_perm):
+							msgs.append(css_md(f"Changed permissions for {sqr_md(name)} in {sqr_md(guild)} from {sqr_md(t_perm)} to the default value of {sqr_md(c_perm)}."))
+							continue
+						reason = f"to change permissions for {name} in {guild} from {t_perm} to {c_perm}"
+						bot.set_perms(t_user, guild, o_perm)
+						raise self.perm_error(perm, m_perm, reason)
+					orig = t_perm
+					expr = " ".join(args)
+					num = await bot.eval_math(expr, orig)
+					c_perm = round_min(num)
+					if t_perm is nan or isnan(c_perm):
+						m_perm = nan
+					else:
+						# Required permission to change is absolute level + 1, with a minimum of 3
+						m_perm = max(abs(t_perm), abs(c_perm), 2) + 1
 					if not perm < m_perm and not isnan(m_perm):
-						create_task(channel.send(css_md(f"Changed permissions for {sqr_md(name)} in {sqr_md(guild)} from {sqr_md(t_perm)} to the default value of {sqr_md(c_perm)}.")))
+						if not m_perm < inf and guild.owner_id != user.id and not isnan(perm):
+							raise PermissionError("Must be server owner to assign non-finite permission level.")
+						bot.set_perms(t_user, guild, c_perm)
+						if "h" in flags:
+							continue
+						msgs.append(css_md(f"Changed permissions for {sqr_md(name)} in {sqr_md(guild)} from {sqr_md(t_perm)} to {sqr_md(c_perm)}."))
 						continue
 					reason = f"to change permissions for {name} in {guild} from {t_perm} to {c_perm}"
-					bot.set_perms(t_user, guild, o_perm)
 					raise self.perm_error(perm, m_perm, reason)
-				orig = t_perm
-				expr = " ".join(args)
-				num = await bot.eval_math(expr, orig)
-				c_perm = round_min(num)
-				if t_perm is nan or isnan(c_perm):
-					m_perm = nan
-				else:
-					# Required permission to change is absolute level + 1, with a minimum of 3
-					m_perm = max(abs(t_perm), abs(c_perm), 2) + 1
-				if not perm < m_perm and not isnan(m_perm):
-					if not m_perm < inf and guild.owner_id != user.id and not isnan(perm):
-						raise PermissionError("Must be server owner to assign non-finite permission level.")
-					bot.set_perms(t_user, guild, c_perm)
-					if "h" in flags:
-						return
-					create_task(channel.send(css_md(f"Changed permissions for {sqr_md(name)} in {sqr_md(guild)} from {sqr_md(t_perm)} to {sqr_md(c_perm)}.")))
-					continue
-				reason = f"to change permissions for {name} in {guild} from {t_perm} to {c_perm}"
-				raise self.perm_error(perm, m_perm, reason)
-			create_task(channel.send(css_md(f"Current permissions for {sqr_md(t_user)} in {sqr_md(guild)}: {sqr_md(t_perm)}.")))
+				msgs.append(css_md(f"Current permissions for {sqr_md(t_user)} in {sqr_md(guild)}: {sqr_md(t_perm)}."))
+		finally:
+			return "".join(msgs)
 
 
 class EnabledCommands(Command):
@@ -1155,7 +1159,7 @@ class Upload(Command):
 			if name in ("files", "preserve") and is_discord_attachment(url):
 				a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
 				if a_id in self.bot.data.attachments:
-					futs.append(as_fut(self.bot.raw_webserver + "/u/" + base64.urlsafe_b64encode(a_id.to_bytes(8, "big")).rstrip(b"=").decode("ascii")))
+					futs.append(as_fut(self.bot.preserve_attachment(a_id)))
 					continue
 			futs.append(Request(self.bot.raw_webserver + "/upload_url?url=" + url, decode=True, aio=True, timeout=1200))
 			await asyncio.sleep(0.1)

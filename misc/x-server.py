@@ -158,6 +158,10 @@ mapped_static = {k[:-5]: k for k in actually_static if k.endswith(".html")}
 def map_url(url):
 	if not isinstance(url, str):
 		return url
+	if url.startswith(HOST):
+		return url.replace(HOST, "M$")
+	if url.startswith(API):
+		return url.replace(API, "M$")
 	return url.removeprefix(
 		"https://"
 	).replace(
@@ -168,6 +172,8 @@ def map_url(url):
 def remap_url(url):
 	if not isinstance(url, str) or url.startswith("https://"):
 		return url
+	if url.startswith("M$"):
+		return API + url[2:]
 	return "https://" + url.replace(
 		"D$", "cdn.discordapp.com/attachments/"
 	).replace(
@@ -774,16 +780,16 @@ transform: translate(-50%, -50%);
 									self.serving.setdefault(p, weakref.WeakSet()).add(f)
 								return resp
 							if info[1] > 256 * 1048576:
-								uri = f"{API}/fileinfo/{orig_path}"
-								if not cp.request.headers.get("Range") and len(urls) > 48:
-									url = f"{HOST}/stream/?info={urllib.parse.quote_plus(uri)}"
-								else:
-									url = choice(
-										"https://stream.miza-stream.workers.dev/",
-										"https://stream.sub-stream.workers.dev/",
-									) + f"?info={urllib.parse.quote_plus(uri)}"
-								raise cp.HTTPRedirect(url, status="307")
-								# return self.dyn_serve(urls, size=info[1])
+								# uri = f"{API}/fileinfo/{orig_path}"
+								# if not cp.request.headers.get("Range") and len(urls) > 48:
+									# url = f"{HOST}/stream/?info={urllib.parse.quote_plus(uri)}"
+								# else:
+									# url = choice(
+										# "https://stream.miza-stream.workers.dev/",
+										# "https://stream.sub-stream.workers.dev/",
+									# ) + f"?info={urllib.parse.quote_plus(uri)}"
+								# raise cp.HTTPRedirect(url, status="307")
+								return self.dyn_serve(urls, size=info[1])
 							return self.concat(p, urls, name=info[0], mime=info[2], stn=stn)
 			f = open(p, "rb")
 			s = os.path.getsize(p)
@@ -857,7 +863,7 @@ transform: translate(-50%, -50%);
 				yield b
 
 	@cp.expose(("u"))
-	def unproxy(self, id=None, url=None, mid=None):
+	def unproxy(self, id=None, url=None, mid=None, **kwargs):
 		if id:
 			if not id.isnumeric():
 				id = int.from_bytes(base64.urlsafe_b64decode(id + "=="), "big")
@@ -931,6 +937,9 @@ transform: translate(-50%, -50%);
 				u = self.renew_url(u)
 				if "?size=" in u or "&size=" in u:
 					u, ns = u.replace("?size=", "&size").split("&size=", 1)
+					ns = int(ns)
+				elif "?S=" in u or "&S=" in u:
+					u, ns = u.replace("?S=", "&S").split("&S=", 1)
 					ns = int(ns)
 				elif u.startswith("https://s3-us-west-2"):
 					ns = 503316480
