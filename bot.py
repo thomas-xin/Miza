@@ -3010,7 +3010,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		network_usage = sum(e["usage"] * e["count"] for e in system.network.values()) if system.network else 0
 		power_usage = sum(e["usage"] * e["count"] for e in system.power.values()) if system.power else 0
 		power_max = sum(e["max"] * e["count"] for e in system.power.values()) if system.power else 0
-		temp_usage = sum(e["usage"] * e["count"] for e in system.temperature.values()) if system.temperature else 0
+		temp_usage = max(e["usage"] * e["count"] for e in system.temperature.values()) if system.temperature else 0
 		discord_stats = dict(status.discord)
 		discord_stats["API latency"] = sec2time(discord_stats["API latency"])
 		misc_stats = dict(status.misc)

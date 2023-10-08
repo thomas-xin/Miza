@@ -1094,6 +1094,7 @@ transform: translate(-50%, -50%);
 				send("Webserver cache cleared.")
 				return b"\xf0\x9f\x92\x9c"
 			raise PermissionError
+		true_ip()
 		filename = "/".join(filepath)
 		try:
 			data, mime = fetch_static("static/" + filename, ignore=True)
@@ -1111,6 +1112,7 @@ transform: translate(-50%, -50%);
 	@hostmap
 	def encodec(self, url, name="", source="", bitrate="auto", inference=False):
 		cp.response.headers.update(SHEADERS)
+		true_ip()
 		if isinstance(url, list):
 			url = url[0]
 		url = regexp(r"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=").sub("https://youtu.be/", url)
@@ -1196,6 +1198,7 @@ transform: translate(-50%, -50%);
 	@hostmap
 	def decodec(self, url, fmt="opus"):
 		cp.response.headers.update(SHEADERS)
+		true_ip()
 		if isinstance(url, list):
 			url = url[0]
 		out = "cache/!" + shash(url) + "~." + fmt

@@ -173,6 +173,8 @@ async def auto_join(guild, channel, user, bot, preparing=False, vc=None):
 	if type(channel) in (str, int):
 		channel = await bot.fetch_channel(channel)
 	if guild.id not in bot.data.audio.players:
+		if not channel:
+			raise LookupError("Unable to find voice channel.")
 		for func in bot.commands.connect:
 			try:
 				await func(user=user, channel=channel, vc=vc)
@@ -182,7 +184,7 @@ async def auto_join(guild, channel, user, bot, preparing=False, vc=None):
 		auds = bot.data.audio.players[guild.id]
 	except KeyError:
 		raise LookupError("Unable to find voice channel.")
-	auds.text = channel
+	auds.text = channel or auds.text
 	return auds
 
 
@@ -3409,7 +3411,7 @@ class Queue(Command):
 			return
 		user = await bot.fetch_user(u_id)
 		guild = message.guild
-		auds = await auto_join(guild, message.channel, user, bot)
+		auds = await auto_join(guild, None, user, bot)
 		q = auds.queue
 		last = max(0, len(q) - 10)
 		if reaction is not None:

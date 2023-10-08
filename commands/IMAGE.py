@@ -927,7 +927,7 @@ class Orbit(Command):
 
 
 class Pet(Command):
-	name = ["PetGIF"]
+	name = ["PatGIF", "Pat", "PetGIF"]
 	description = "Creates a .gif image from applying the Petpet generator to the supplied image."
 	usage = "<0:url> <1:squish(0.1)>? <2:duration(0.25)>?"
 	example = ("pet https://mizabot.xyz/favicon", "pet https://cdn.discordapp.com/attachments/911172125438660648/1026492110871990313/3d8860e07889ebddae42222a9793ab85.png 3")
