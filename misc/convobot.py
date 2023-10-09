@@ -978,7 +978,7 @@ class Bot:
 	functions = dict(
 		web_search={
 			"name": "web_search",
-			"description": "Searches internet browser, or visits given URL.",
+			"description": "Searches internet browser, or visits given URL. Please search for results in the US when location is relevant!",
 			"parameters": {
 				"type": "object",
 				"properties": {

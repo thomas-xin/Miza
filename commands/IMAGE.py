@@ -1544,11 +1544,11 @@ class OCR(Command):
 class Art(Command):
 	_timeout_ = 150
 	name = ["AIArt", "Inpaint", "StableDiffusion", "SDXL", "Dalle", "Dalle2", "Dream", "Imagine", "Inspire", "Openjourney", "Midjourney"]
-	description = "Runs a Stable Diffusion AI art generator on the input prompt or image. Operates on a global queue system for image prompts. Accepts appropriate keyword arguments."
-	usage = "<0:prompt> <inpaint{?i}>?"
+	description = "Runs a Stable Diffusion AI art generator on the input prompt or image. Operates on a global queue system for image prompts. Configurable parameters are --strength, --guidance-scale, --aspect-ratio and --negative-prompt."
+	usage = "<0:prompt> <inpaint{?i}>? <single{?s}>"
 	example = ("art cute kitten", "art https://mizabot.xyz/favicon")
 	rate_limit = (45, 60)
-	flags = "i"
+	flags = "is"
 	typing = True
 	slash = ("Art", "Imagine")
 	sdiff_sem = Semaphore(3, 256, rate_limit=7)
@@ -1672,6 +1672,43 @@ class Art(Command):
 			force = False
 		else:
 			force = True
+		sdxl = premium >= 2
+		if sdxl and prompt.count(" ") < 64:
+			oprompt = prompt
+			uid = user.id
+			temp = oprompt.replace('"""', "'''")
+			prompt = f'"""\n{temp}\n"""\n\nImprove the above input to Dall·E API, rewording anything that may violate policy guidelines.'
+			if bot.is_trusted(guild) >= 2:
+				for uid in bot.data.trusted[guild.id]:
+					if uid and bot.premium_level(uid, absolute=True) >= 2:
+						break
+				else:
+					uid = next(iter(bot.data.trusted[guild.id]))
+				u = await bot.fetch_user(uid)
+			else:
+				u = user
+			data = bot.data.users.get(u.id, {})
+			oai = data.get("trial") and data.get("openai_key")
+			premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
+			inputs = dict(
+				user_id=user.id,
+				channel_id=channel.id,
+				prompt=prompt,
+				key=AUTH.get("openai_key"),
+				huggingface_token=AUTH.get("huggingface_key"),
+				vis_session=AUTH.get("vis_session"),
+				bals={k: v for k, v in bot.data.token_balances.items() if v < 0},
+				oai=oai,
+				nsfw=bot.is_nsfw(channel),
+				premium=premium,
+			)
+			out = await process_image("CBAU", "$", [inputs], cap="agpt", timeout=20)
+			if out and out[0] == out[-1] == '"' and not text[0] == text[-1] == '"':
+				try:
+					out = orjson.loads(out)
+				except orjson.JSONDecodeError:
+					pass
+			prompt = oprompt + "\n\n" + out.strip()
 		req = prompt
 		if url:
 			if force:
@@ -1699,10 +1736,12 @@ class Art(Command):
 		emb = None
 		fn = None
 		futs = []
-		amount = 4 if premium >= 4 else 2 if premium >= 3 else 1
-		sdxl = premium >= 2
+		if "s" in flags:
+			amount = 1
+		else:
+			amount = 4 if premium >= 4 else 2 if premium >= 3 else 1
 		if not sdxl:
-			amount = 4
+			amount = 9 if premium >= 4 else 4
 		amount2 = 0
 		if bot.is_trusted(guild) >= 2:
 			for uid in bot.data.trusted[guild.id]:

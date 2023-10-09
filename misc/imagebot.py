@@ -289,7 +289,7 @@ def safecomp(gen):
 def split_prompt(prompt, limit=75, aggressive=False):
 	prompt2 = ""
 	if ".." in prompt:
-		prompt, prompt2 = prompt.split("..", 1)
+		prompt, prompt2 = (s.strip() for s in prompt.split("..", 1))
 	else:
 		prompt2 = prompt
 		if aggressive or ".." in lim_tokens(prompt, limit):

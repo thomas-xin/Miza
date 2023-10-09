@@ -197,7 +197,7 @@ class Translate(Command):
 			nsfw=bot.is_nsfw(channel),
 			premium=premium,
 		)
-		out = await process_image("CBAU", "$", [inputs], cap="agpt", timeout=192)
+		out = await process_image("CBAU", "$", [inputs], cap="agpt", timeout=30)
 		if out and out[0] == out[-1] == '"' and not text[0] == text[-1] == '"':
 			try:
 				out = orjson.loads(out)
