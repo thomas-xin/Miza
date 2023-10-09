@@ -1673,7 +1673,7 @@ class Art(Command):
 		else:
 			force = True
 		sdxl = premium >= 2
-		if sdxl and prompt.count(" ") < 64:
+		if sdxl and prompt.count(" ") < 48:
 			oprompt = prompt
 			uid = user.id
 			temp = oprompt.replace('"""', "'''")
@@ -1708,7 +1708,7 @@ class Art(Command):
 					out = orjson.loads(out)
 				except orjson.JSONDecodeError:
 					pass
-			prompt = oprompt + "\n\n" + out.strip()
+			prompt = oprompt + ".\n\n" + out.strip()
 		req = prompt
 		if url:
 			if force:

@@ -1102,10 +1102,13 @@ class Status(Command):
 				message = bot.cache.messages.get(m_id)
 				if message is None:
 					message = await aretry(channel.fetch_message, m_id, attempts=6, delay=2, exc=(discord.NotFound, discord.Forbidden))
+					if utc() - snowflake_time_2(message.id).timestamp() > 86400 * 14 - 60:
+						create_task(bot.silent_delete(message))
+						raise StopIteration
 				if message.id != channel.last_message_id:
 					async for m in bot.data.channel_cache.get(channel):
-						if message.id != m.id:
-							create_task(bot.silent_delete(message))
+						if message.id != m.id or utc() - snowflake_time_2(m.id).timestamp() > 86400 * 14 - 60:
+							create_task(bot.silent_delete(m))
 							raise StopIteration
 						break
 				func = lambda *args, **kwargs: message.edit(*args, content=None, **kwargs)
@@ -1147,7 +1150,8 @@ class Upload(Command):
 	rate_limit = (12, 17)
 	msgcmd = True
 	_timeout_ = 50
-	slash = "preserve"
+	slash = ("Preserve",)
+	msgcmd = ("Preserve Attachment(s)",)
 
 	async def __call__(self, name, message, argv, **void):
 		if message.attachments:
@@ -1837,7 +1841,7 @@ class UpdateEnabled(Database):
 
 class UpdateMessages(Database):
 	name = "messages"
-	semaphore = Semaphore(8, 1, delay=1, rate_limit=8)
+	semaphore = Semaphore(8, 1, delay=1, rate_limit=3)
 	closed = False
 	hue = 0
 
@@ -1861,7 +1865,7 @@ class UpdateMessages(Database):
 						self.data.pop(c_id)
 					else:
 						for m_id, v in data.items():
-							if t - v.t >= 8:
+							if t - v.t >= 3:
 								v.t = t
 								create_task(self.wrap_semaphore(eval(v.command, self.bot._globals)._callback2_, channel=channel, m_id=m_id, colour=col))
 

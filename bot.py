@@ -1555,7 +1555,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		res = None
 		p1 = p2 = ""
 		try:
-			res = await process_image(url, "caption", ["-nogif", False], cap="caption", timeout=300)
+			res = await process_image(url, "caption", ["-nogif", False], cap="caption", timeout=20)
 			p1, p2 = res
 		except:
 			if res:
@@ -1601,7 +1601,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 	replicate_client = None
 	def replicate(self, url):
-		resp = await_fut(process_image(url, "resize_max", ["-nogif", 512, "auto", "-f", "png"], timeout=60))
+		resp = await_fut(process_image(url, "resize_max", ["-nogif", 512, "auto", "-f", "png"], timeout=10))
 		if not self.replicate_client:
 			import replicate
 			self.replicate_client = replicate.Client(api_token=AUTH.get("replicate_key") or "")
@@ -3436,7 +3436,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 	# Handles all updates to the bot. Manages the bot's status and activity on discord, and updates all databases.
 	async def handle_update(self, force=False):
-		if utc() - self.last_check > 5 or force:
+		if utc() - self.last_check > 3 or force:
 			semaphore = self.semaphore if not force else emptyctx
 			with suppress(SemaphoreOverflowError):
 				with semaphore:
@@ -4534,11 +4534,11 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							self.bitrate = 0
 							self.total_bytes = 0
 
-	# The lazy update loop that runs once every 4-8 seconds.
+	# The lazy update loop that runs once every 3~5 seconds.
 	async def lazy_loop(self):
 		await asyncio.sleep(5)
 		while not self.closed:
-			async with Delay(frand(4) + 4):
+			async with Delay(random.random() * 2 + 3):
 				async with tracebacksuppressor:
 					# self.var_count = await create_future(var_count)
 					with MemoryTimer("handle_update"):

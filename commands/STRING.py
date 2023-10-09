@@ -1310,7 +1310,7 @@ class Ask(Command):
 				tup = tup[2:]
 				inp.append(f"{name}: {content}")
 			if not em:
-				data = await process_image("embedding", "$", ["\n".join(inp)], cap="caption", timeout=90)
+				data = await process_image("embedding", "$", ["\n".join(inp)], cap="caption", timeout=10)
 				em = base64.b64encode(data).decode("ascii")
 			mapd[s] = orig
 			embd[s] = em
@@ -1564,13 +1564,13 @@ class Ask(Command):
 			await ignore_embedding(message.id)
 			orig_tup = (name, q)
 			if embd:
-				data = await process_image("embedding", "$", [f"{name}: {q}"], cap="caption", timeout=90)
+				data = await process_image("embedding", "$", [f"{name}: {q}"], cap="caption", timeout=10)
 				em = base64.b64encode(data).decode("ascii")
 				objs = list(embd.items())
 				keys = [t[0] for t in objs]
 				ems = [t[1] for t in objs]
 				print("EM:", len(ems))
-				argsort = await process_image("rank_embeddings", "$", [ems, em], cap="math", timeout=90)
+				argsort = await process_image("rank_embeddings", "$", [ems, em], cap="math", timeout=20)
 				n = 4 if premium < 3 else 6
 				argi = argsort[:n]
 				print("ARGI:", argi)

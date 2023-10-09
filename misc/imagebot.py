@@ -292,7 +292,7 @@ def split_prompt(prompt, limit=75, aggressive=False):
 		prompt, prompt2 = (s.strip() for s in prompt.split("..", 1))
 	else:
 		prompt2 = prompt
-		if aggressive or ".." in lim_tokens(prompt, limit):
+		if aggressive or "\n\n" in prompt or ".." in lim_tokens(prompt, limit):
 			if "\n\n" in prompt:
 				spl = prompt.split("\n\n")
 				half = len(spl) + 1 >> 1
