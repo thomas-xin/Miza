@@ -1147,6 +1147,7 @@ class Upload(Command):
 	rate_limit = (12, 17)
 	msgcmd = True
 	_timeout_ = 50
+	slash = "preserve"
 
 	async def __call__(self, name, message, argv, **void):
 		if message.attachments:
@@ -1159,7 +1160,7 @@ class Upload(Command):
 			if name in ("files", "preserve") and is_discord_attachment(url):
 				a_id = int(url.split("?", 1)[0].rsplit("/", 2)[-2])
 				if a_id in self.bot.data.attachments:
-					futs.append(as_fut(self.bot.preserve_attachment(a_id)))
+					futs.append(as_fut("<" + self.bot.preserve_attachment(a_id) + ">"))
 					continue
 			futs.append(Request(self.bot.raw_webserver + "/upload_url?url=" + url, decode=True, aio=True, timeout=1200))
 			await asyncio.sleep(0.1)

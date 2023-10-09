@@ -16,7 +16,11 @@ if torch and torch.cuda.is_available():
 		torch.cuda.set_enabled_lms(True)
 	except AttributeError:
 		pass
-image_to = lambda im, mode="RGB": im if im.mode == mode else im.convert(mode)
+def image_to(im, mode="RGB", size=None):
+	im = im if im.mode == mode else im.convert(mode)
+	if size and size != im.size:
+		im = im.resize(size, resample=Image.Resampling.LANCZOS)
+	return im
 try:
 	exc = concurrent.futures.exc_worker
 except AttributeError:
@@ -281,6 +285,45 @@ def safecomp(gen):
 		except selenium.common.StaleElementReferenceException:
 			continue
 		yield e
+
+def split_prompt(prompt, limit=75, aggressive=False):
+	prompt2 = ""
+	if ".." in prompt:
+		prompt, prompt2 = prompt.split("..", 1)
+	else:
+		prompt2 = prompt
+		if aggressive or ".." in lim_tokens(prompt, limit):
+			if "\n\n" in prompt:
+				spl = prompt.split("\n\n")
+				half = len(spl) + 1 >> 1
+				prompt, prompt2 = "\n\n".join(spl[:half]).rstrip(), "\n\n".join(spl[half:]).lstrip()
+			elif "\n" in prompt:
+				spl = prompt.split("\n")
+				half = len(spl) + 1 >> 1
+				prompt, prompt2 = "\n".join(spl[:half]).rstrip(), "\n".join(spl[half:]).lstrip()
+			elif "." in prompt:
+				spl = prompt.split(".")
+				half = len(spl) + 1 >> 1
+				prompt, prompt2 = ".".join(spl[:half]), ".".join(spl[half:]).lstrip()
+			elif "," in prompt:
+				spl = prompt.split(",")
+				half = len(spl) + 1 >> 1
+				prompt, prompt2 = ",".join(spl[:half]), ",".join(spl[half:]).lstrip()
+			elif prompt.count(" ") >= 6:
+				spl = prompt.split(" ")
+				half = len(spl) + 1 >> 1
+				prompt, prompt2 = " ".join(spl[:half]), " ".join(spl[half:])
+	if prompt != prompt2 and "style:" in prompt.lower():
+		i = prompt.lower().index("style:")
+		prompt2 += ", " + prompt[i:]
+		prompt = prompt[:i].rstrip(", \n")
+	while "," in prompt and ".." in lim_tokens(prompt, limit) and ".." not in lim_tokens(prompt2, limit):
+		spl = prompt.rsplit(",", 1)
+		prompt, prompt2 = spl[0], spl[1].rstrip() + ", " + prompt2
+	while "," in prompt2 and ".." in lim_tokens(prompt2, limit) and ".." not in lim_tokens(prompt, limit):
+		spl = prompt2.split(",", 1)
+		prompt, prompt2 = prompt + ", " + spl[0], spl[1].rstrip()
+	return prompt, prompt2
 
 
 class Bot:
@@ -581,7 +624,7 @@ class Bot:
 	safety_checkers = {}
 	# device, dtype = determine_cuda(0)
 	# gen = torch.Generator(f"cuda:{device}" if device >= 0 else "cpu").manual_seed(time.time_ns() - 1)
-	def art_stablediffusion_local(self, prompt, kwargs=None, model="stabilityai/stable-diffusion-xl-base-1.0", fail_unless_gpu=True, nsfw=False, count=1, sdxl=False):
+	def art_stablediffusion_local(self, prompt, kwargs=None, aspect_ratio=0, negative_prompt=None, model="stabilityai/stable-diffusion-xl-base-1.0", fail_unless_gpu=True, nsfw=False, count=1, sdxl=False):
 		from diffusers import StableDiffusionXLPipeline, StableDiffusionXLImg2ImgPipeline, StableDiffusionXLInpaintPipeline, StableDiffusionImageVariationPipeline
 		from diffusers import StableDiffusionPipeline, StableDiffusionImg2ImgPipeline, StableDiffusionInpaintPipeline, StableDiffusionImageVariationPipeline
 		if not kwargs.get("--init-image"):
@@ -627,7 +670,7 @@ class Bot:
 					dtype = torch.float32
 		# if dtype is torch.float16:
 		# 	dtype = torch.bfloat16
-		images = self.art_stablediffusion_sub(pf, model, prompt, kwargs, count, device, dtype, nsfw, fail_unless_gpu, sdxl=sdxl)
+		images = self.art_stablediffusion_sub(pf, model, prompt, kwargs, count, aspect_ratio, negative_prompt, device, dtype, nsfw, fail_unless_gpu, sdxl=sdxl)
 		out = []
 		for im in images:
 			b = io.BytesIO()
@@ -645,8 +688,8 @@ class Bot:
 			print_exc()
 
 	loading = None
-	neg_prompt = "blurry, bad, distorted, disfigured, poor low quality, ugly"
-	def art_stablediffusion_sub(self, pf, model, prompt, kwargs, count, device=-1, dtype=torch.float32, nsfw=False, fail_unless_gpu=False, sdxl=False):
+	neg_prompt = "blurry, distorted, disfigured, bad anatomy, poorly drawn, low quality, ugly"
+	def art_stablediffusion_sub(self, pf, model, prompt, kwargs, count, aspect_ratio=0, negative_prompt=None, device=-1, dtype=torch.float32, nsfw=False, fail_unless_gpu=False, sdxl=False):
 		from diffusers import DPMSolverMultistepScheduler, StableDiffusionXLPipeline, StableDiffusionXLImg2ImgPipeline, StableDiffusionXLInpaintPipeline, StableDiffusionImageVariationPipeline
 		from diffusers import StableDiffusionPipeline, StableDiffusionImg2ImgPipeline, StableDiffusionInpaintPipeline
 		cia = torch.cuda.is_available()
@@ -714,7 +757,7 @@ class Bot:
 		# else:
 			# pipe.safety_checker = checkers[model]
 		# pipe = pipe.to(f"cuda:{device}")
-		im = None
+		im = mask = None
 		if kwargs.get("--init-image"):
 			b = kwargs["--init-image"]
 			if not isinstance(b, str):
@@ -729,20 +772,42 @@ class Bot:
 		kw = {}
 		if sdxl:
 			kw = dict(output_type=output_type, denoising_end=0.8)
-			if im:
-				kw["target_size"] = max_size(*im.size, 1024 if sdxl > 1 else 512, force=True)
-			elif sdxl > 1:
-				kw["target_size"] = (1024, 1024)
+			ms = 1024# if sdxl > 1 else 768
+			if aspect_ratio != 0:
+				x, y = max_size(aspect_ratio, 1, ms, force=True)
+			elif im:
+				x, y = max_size(*im.size, ms, force=True)
 			else:
-				kw["target_size"] = (512, 512)
-			kw["negative_prompt"] = self.neg_prompt
-		prompt = lim_tokens(prompt, 80, mode="left")
+				x = y = ms
+			d = 64 if sdxl > 1 else 32
+			w, h = (x // d * d, y // d * d)
+			kw["target_size"] = (w, h)
+			if not im and not mask:
+				kw["width"], kw["height"] = w, h
+		else:
+			w = h = 512
+		ois = (w, h)
+		original_prompt = prompt
+		prompt = lim_tokens(prompt, 150 if sdxl else 50)
+		if sdxl:
+			prompts = split_prompt(prompt)
+			prompt_indices = [random.randint(0, 1) for i in range(count)]
+			true_prompt = [prompts[i] for i in prompt_indices]
+			kw["prompt_2"] = [prompts[not i] for i in prompt_indices]
+			negative_prompt = negative_prompt if negative_prompt is not None else self.neg_prompt
+			if negative_prompt:
+				negs = split_prompt(negative_prompt, aggressive=True)
+				neg_indices = [random.randint(0, 1) for i in range(count)]
+				kw["negative_prompt"] = [negs[i] for i in neg_indices]
+				kw["negative_prompt_2"] = [negs[not i] for i in neg_indices]
+		else:
+			true_prompt = [prompt] * count
 		if f2 in (StableDiffusionInpaintPipeline, StableDiffusionXLInpaintPipeline):
 			data = pipe(
-				prompt,
-				image=image_to(im),
-				mask_image=image_to(mask, mode="L"),
-				num_images_per_prompt=count,
+				true_prompt,
+				image=[image_to(im, size=ois)] * count,
+				mask_image=[image_to(mask, mode="L", size=ois)] * count,
+				num_images_per_prompt=1,
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 9.9)),
 				strength=float(kwargs.get("--strength", 0.8)),
@@ -750,9 +815,9 @@ class Bot:
 			)
 		elif f2 in (StableDiffusionImg2ImgPipeline, StableDiffusionXLImg2ImgPipeline):
 			data = pipe(
-				prompt,
-				image=image_to(im),
-				num_images_per_prompt=count,
+				true_prompt,
+				image=[image_to(im, size=ois)] * count,
+				num_images_per_prompt=1,
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 9.9)),
 				strength=float(kwargs.get("--strength", 0.7)),
@@ -760,16 +825,16 @@ class Bot:
 			)
 		elif f2 is StableDiffusionImageVariationPipeline:
 			data = pipe(
-				image=image_to(im),
-				num_images_per_prompt=count,
+				image=[image_to(im, size=ois)] * count,
+				num_images_per_prompt=1,
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 9.9)),
 				**kw,
 			)
 		else:
 			data = pipe(
-				prompt,
-				num_images_per_prompt=count,
+				true_prompt,
+				num_images_per_prompt=1,
 				num_inference_steps=int(kwargs.get("--num-inference-steps", 24)),
 				guidance_scale=float(kwargs.get("--guidance-scale", 9.9)),
 				**kw,
@@ -798,16 +863,24 @@ class Bot:
 		if images and output_type == "latent":
 			vae = pipe.vae
 			text_encoder_2 = pipe.text_encoder_2
-			images = self.art_stablediffusion_refine(prompt, images, vae=vae, text_encoder_2=text_encoder_2, fail_unless_gpu=fail_unless_gpu, device=device, dtype=dtype, orig_size=kw.get("target_size", (1024, 1024)))
+			images = self.art_stablediffusion_refine(original_prompt, images, negative_prompt=negative_prompt, vae=vae, text_encoder_2=text_encoder_2, fail_unless_gpu=fail_unless_gpu, device=device, dtype=dtype, orig_size=max_size(*kw.get("target_size", (1024, 1024)), 1024))
+			# random.shuffle(images)
 		elif not self.loading or self.loading.done():
 			self.loading = exc.submit(self.conc_clear_cache)
 		return images
 
-	def art_stablediffusion_refine(self, prompt, images, vae=None, text_encoder_2=None, fail_unless_gpu=False, device=0, dtype=torch.bfloat16, steps=48, orig_size=(1024, 1024), upscale=False):
+	def art_stablediffusion_refine(self, prompt, images, negative_prompt=None, vae=None, text_encoder_2=None, fail_unless_gpu=False, device=0, dtype=torch.bfloat16, steps=48, orig_size=(1024, 1024), upscale=False):
 		from diffusers import DiffusionPipeline, DPMSolverMultistepScheduler
 		if isinstance(images, (bytes, memoryview)):
 			images = [Image.open(io.BytesIO(images))]
-			orig_size = images[0].size
+			if orig_size != images[0].size:
+				x, y = max_size(*images[0].size, 1024, force=True)
+				orig_size = images[0].size
+				size = (x // 64 * 64, y // 64 * 64)
+				if orig_size != size:
+					images[0] = images[0].resize(size, resample=Image.Resampling.LANCZOS)
+					# steps = ceil(steps * 1.5)
+					orig_size = images[0].size
 		elif not isinstance(images, (list, tuple, torch.tensor)):
 			images = [images]
 		elif isinstance(images[0], (bytes, memoryview)):
@@ -873,16 +946,33 @@ class Bot:
 				# with torch.no_grad():
 					# torch.cuda.empty_cache()
 		# pipe.safety_checker = lambda images, **kwargs: (images, [False] * len(images))
-		prompt = lim_tokens(prompt, 80, mode="left")
-		data = pipe(
-			prompt=[prompt] * len(images),
-			negative_prompt=[self.neg_prompt] * len(images),
-			image=images,
+		kw = dict(
+			original_size=orig_size,
 			num_images_per_prompt=1,
 			num_inference_steps=steps,
 			output_type="pil",
 			denoising_start=0.7,
-			target_size=max_size(*orig_size, 1024, force=True),
+		)
+		x, y = max_size(*orig_size, 1024, force=True)
+		w, h = (x // 64 * 64, y // 64 * 64)
+		kw["target_size"] = (w * 2, h * 2)
+		# kw["width"], kw["height"] = kw["target_size"]
+		count = len(images)
+		prompt = lim_tokens(prompt, 150)
+		prompts = split_prompt(prompt)
+		prompt_indices = [random.randint(0, 1) for i in range(count)]
+		kw["prompt"] = [prompts[i] for i in prompt_indices]
+		kw["prompt_2"] = [prompts[not i] for i in prompt_indices]
+		negative_prompt = negative_prompt if negative_prompt is not None else self.neg_prompt
+		if negative_prompt:
+			negs = split_prompt(negative_prompt)
+			neg_indices = [random.randint(0, 1) for i in range(count)]
+			kw["negative_prompt"] = [negs[i] for i in neg_indices]
+			kw["negative_prompt_2"] = [negs[not i] for i in neg_indices]
+		print("KW:", kw)
+		data = pipe(
+			image=images,
+			**kw,
 		)
 		images = []
 		for im in data.images:

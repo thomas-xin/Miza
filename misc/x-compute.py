@@ -1816,21 +1816,21 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 	imagebot.COMPUTE_ORDER = COMPUTE_ORDER
 	imagebot.DEVICES = DEVICES
 
-	def IBASL(prompt, kwargs, nsfw=False, force=True, count=1, sdxl=False):
+	def IBASL(prompt, kwargs, nsfw=False, force=True, count=1, sdxl=False, aspect_ratio=0, negative_prompt=None):
 		try:
 			ib = CBOTS[None]
 		except KeyError:
 			ib = CBOTS[None] = imagebot.Bot()
-		return ib.art_stablediffusion_local(prompt, kwargs, nsfw=nsfw, fail_unless_gpu=not force, count=count, sdxl=sdxl)
+		return ib.art_stablediffusion_local(prompt, kwargs, nsfw=nsfw, fail_unless_gpu=not force, count=count, sdxl=sdxl, aspect_ratio=aspect_ratio, negative_prompt=negative_prompt)
 
-	def IBASR(prompt, image, steps=64):
+	def IBASR(prompt, image, steps=64, negative_prompt=None):
 		# print(prompt)
 		try:
 			ib = CBOTS[None]
 		except KeyError:
 			ib = CBOTS[None] = imagebot.Bot()
 		for i in range(3):
-			il = ib.art_stablediffusion_refine(prompt, image, steps=steps, upscale=False)
+			il = ib.art_stablediffusion_refine(prompt, image, steps=steps, upscale=False, negative_prompt=negative_prompt)
 			if il:
 				break
 		else:
@@ -1841,12 +1841,12 @@ if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 		b.seek(0)
 		return b.read()
 
-	def IBASLR(prompt, kwargs, nsfw=False, force=True, count=1):
+	def IBASLR(prompt, kwargs, nsfw=False, force=True, count=1, aspect_ratio=0, negative_prompt=""):
 		try:
 			ib = CBOTS[None]
 		except KeyError:
 			ib = CBOTS[None] = imagebot.Bot()
-		return ib.art_stablediffusion_local(prompt, kwargs, nsfw=nsfw, fail_unless_gpu=not force, count=count, sdxl=2)
+		return ib.art_stablediffusion_local(prompt, kwargs, nsfw=nsfw, fail_unless_gpu=not force, count=count, sdxl=2, aspect_ratio=aspect_ratio, negative_prompt=negative_prompt)
 
 	# def whisper(url, best=False):
 	# 	ts = time.time()

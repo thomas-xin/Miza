@@ -1293,7 +1293,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return verify_id(m_id)
 
 	# Finds URLs in a string, following any discord message links found.
-	async def follow_url(self, url, it=None, best=False, preserve=True, images=True, reactions=True, allow=False, limit=None):
+	async def follow_url(self, url, it=None, best=False, preserve=True, images=True, reactions=False, allow=False, limit=None):
 		if limit is not None and limit <= 0:
 			return []
 		if it is None:
@@ -1372,13 +1372,15 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 										u = translate_emojis(e)
 										if is_url(u):
 											found.append(u)
+					if not found and (not images or not reactions):
+						found = await self.follow_url(url, it, best=best, preserve=preserve, images=True, reactions=True, allow=True, limit=limit)
 					for u in found:
 						# Do not attempt to find the same URL twice
 						if u not in it:
 							it[u] = True
 							if not len(it) & 255:
 								await asyncio.sleep(0.2)
-							found2 = await self.follow_url(u, it, best=best, preserve=preserve, images=images, allow=allow, limit=limit)
+							found2 = await self.follow_url(u, it, best=best, preserve=preserve, images=images, reactions=reactions, allow=allow, limit=limit)
 							if len(found2):
 								out.extend(found2)
 							elif allow and m.content:
@@ -2762,6 +2764,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			for k, v in resp.items():
 				k = int(k)
 				# print("END TASK:", k, bot.compute_wait, lim_str(str(v), 64), frand())
+				if k not in self.compute_wait:
+					print("MISSING:", k, v)
+					continue
 				task = self.compute_wait.pop(k)
 				if isinstance(v, Exception):
 					print(repr(v), ip, k)

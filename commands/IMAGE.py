@@ -1597,21 +1597,24 @@ class Art(Command):
 			"--num-inference-steps": "48" if premium < 4 else "64",
 			"--guidance-scale": "9.9",
 			"--eta": "0.8",
+			"--aspect-ratio": "0",
+			"--negative-prompt": "blurry, distorted, disfigured, bad anatomy, poorly drawn, low quality, ugly",
 		}
 		inpaint = "i" in flags or name == "inpaint"
 		specified = set()
-		size = (512, 512)
 		kwarg = ""
 		for arg in args:
 			if kwarg:
 				# if kwarg == "--model":
 				#     kwargs[kwarg] = arg
+				if kwarg.startswith("--"):
+					kwarg = kwarg.replace("_", "-")
 				if kwarg == "--seed":
 					kwargs[kwarg] = arg
-				elif kwarg in ("--num-inference-steps", "--ddim_steps"):
+				elif kwarg in ("--num-inference-steps", "--ddim-steps"):
 					kwarg = "--num-inference-steps"
 					kwargs[kwarg] = str(max(1, min(64, int(arg))))
-				elif kwarg in ("--guidance-scale", "--scale"):
+				elif kwarg in ("--guidance-scale", "--guidance", "--scale"):
 					kwarg = "--guidance-scale"
 					kwargs[kwarg] = str(max(0, min(100, float(arg))))
 				elif kwarg == "--eta":
@@ -1620,10 +1623,18 @@ class Art(Command):
 				#     kwargs["--tokenizer"] = arg
 				elif kwarg == "--prompt":
 					kwargs[kwarg] = arg
+				elif kwarg in ("--negative-prompt", "--negative", "--neg"):
+					kwarg = "--negative-prompt"
+					kwargs[kwarg] = arg
 				elif kwarg == "--strength":
 					kwargs[kwarg] = str(max(0, min(1, float(arg))))
-				elif kwarg == "--aspect-ratio":
-					aspect = float(arg)
+				elif kwarg in ("--aspect-ratio", "--aspect", "--ar"):
+					arg = await bot.eval_math(arg.replace(":", "/").replace("x", "/").replace("×", "/"))
+					arg = float(arg)
+					if arg < 1 / 256 or arg > 256:
+						raise OverflowError("Maximum permitted aspect ratio is 1:256.")
+					kwarg = "--aspect-ratio"
+					kwargs[kwarg] = str(arg)
 				# elif kwargs == "--mask":
 				#     kwargs[kwarg] = arg
 				specified = kwarg
@@ -1673,6 +1684,8 @@ class Art(Command):
 				req = url
 		if specified:
 			req += " ".join(f"{k} {v}" for k, v in kwargs.items() if k in specified)
+		aspect = float(kwargs.get("--aspect-ratio", 1))
+		negative = kwargs.get("--negative-prompt", "")
 		nsfw = bot.is_nsfw(channel)
 		# if not nsfw and prompt and AUTH.get("openai_key"):
 		#     import openai
@@ -1703,19 +1716,19 @@ class Art(Command):
 		data = bot.data.users.get(u.id, {})
 		oai = data.get("trial") and data.get("openai_key")
 
-		async def ibasl_r(p, k, n, f, c, s):
+		async def ibasl_r(p, k, n, f, c, s, a, np):
 			if sdxl and (c > 1 or premium >= 4 or random.randint(0, 1)):
 				try:
 					await process_image("lambda: 1+1", "$", (), cap="sdxlr", timeout=2)
 				except:
 					print_exc()
 				else:
-					return await process_image("IBASLR", "&", [p, k, n, f, c], cap="sdxlr", timeout=420)
-			resp = await process_image("IBASL", "&", [p, k, n, f, c, s], cap="sdxl" if s else "sd", timeout=420)
+					return await process_image("IBASLR", "&", [p, k, n, f, c, a, np], cap="sdxlr", timeout=420)
+			resp = await process_image("IBASL", "&", [p, k, n, f, c, s, a, np], cap="sdxl" if s else "sd", timeout=420)
 			if s:
 				out = []
 				for r1 in resp:
-					r2 = await process_image("IBASR", "$", [p, r1], cap="sdxlr", timeout=240)
+					r2 = await process_image("IBASR", "$", [p, r1, 64, np], cap="sdxlr", timeout=240)
 					out.append(r2)
 				return out
 			return resp
@@ -1728,7 +1741,7 @@ class Art(Command):
 			async with discord.context_managers.Typing(channel):
 				futt = []
 				c = 0
-				if amount >= 1 and not dalle2 and not openjourney and not url and not self.sdiff_sem.is_busy():
+				if not url and (aspect != 1 or negative or amount >= 1 and not dalle2 and not openjourney and not self.sdiff_sem.is_busy()):
 					noprompt = not force and not kwargs.get("--mask")
 					p = "" if noprompt and not sdxl else prompt
 					c = min(amount, 9 if nsfw and not self.sdiff_sem.active else 5)
@@ -1737,7 +1750,7 @@ class Art(Command):
 						n = min(c2, xrand(floor(sqrt(c2) + 1)) + 1, 2 if sdxl else 9)
 						if not n:
 							n = c2
-						fut = create_task(ibasl_r(p, kwargs, nsfw, False, n, sdxl))
+						fut = create_task(ibasl_r(p, kwargs, nsfw, False, n, sdxl, aspect, negative))
 						futt.append(fut)
 						c2 -= n
 				self.imagebot.token = oai or AUTH.get("openai_key")
@@ -1822,7 +1835,7 @@ class Art(Command):
 				image_1 = image_2 = None
 				image_1b = image_2b = None
 				if url:
-					resp = await process_image(url, "resize_max", ["-nogif", 512, "auto", "-f", "png"], timeout=60)
+					resp = await process_image(url, "resize_max", ["-nogif", 1024 if sdxl else 768, "auto", "-f", "png"], timeout=60)
 					image_1 = resp
 					if inpaint and url2:
 						image_2b = await bot.get_request(url2)
@@ -1932,7 +1945,7 @@ class Art(Command):
 								n = min(c2, xrand(floor(sqrt(c2) + 1)) + 1, 2 if sdxl else 9)
 								if not n:
 									n = c2
-								fut = create_task(ibasl_r(p, kwargs, nsfw, False, n, sdxl))
+								fut = create_task(ibasl_r(p, kwargs, nsfw, False, n, sdxl, aspect, negative))
 								futt.append(fut)
 								c2 -= n
 							for fut in futt:
@@ -1982,7 +1995,7 @@ class Art(Command):
 					with open(fn, "rb") as f:
 						fn = f.read()
 				ffut = create_task(bot.commands.steganography[0].call(fn, str(bot.id)))
-				ffut.name = (lim_str(prompt, 96).rstrip(".") or "untitled") + ".png"
+				ffut.name = (lim_str(prompt, 96).rstrip(".").replace(".", "_") or "untitled") + ".png"
 				ffut.back = fn
 				ffuts.append(ffut)
 		if not ffuts:
