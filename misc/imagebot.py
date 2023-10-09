@@ -322,7 +322,7 @@ def split_prompt(prompt, limit=75, aggressive=False):
 		prompt, prompt2 = spl[0], spl[1].rstrip() + ", " + prompt2
 	while "," in prompt2 and ".." in lim_tokens(prompt2, limit) and ".." not in lim_tokens(prompt, limit):
 		spl = prompt2.split(",", 1)
-		prompt, prompt2 = prompt + ", " + spl[0], spl[1].rstrip()
+		prompt, prompt2 = prompt + ", " + spl[0], spl[1].lstrip()
 	return prompt, prompt2
 
 

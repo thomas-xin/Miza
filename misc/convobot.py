@@ -2231,7 +2231,7 @@ SYSTEM: Your name is Miza. Please select one of the following actions by number:
 			try:
 				resp = func(prompt, stop=stop)
 				if resp:
-					return resp
+					return resp.replace("<|endoftext|>", "").strip()
 			except EOFError:
 				pass
 			except:

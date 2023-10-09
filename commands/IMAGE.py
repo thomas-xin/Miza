@@ -1703,7 +1703,7 @@ class Art(Command):
 				premium=premium,
 			)
 			out = await process_image("CBAU", "$", [inputs], cap="agpt", timeout=20)
-			if out and out[0] == out[-1] == '"' and not text[0] == text[-1] == '"':
+			if out and out[0] == out[-1] == '"' and not oprompt[0] == oprompt[-1] == '"':
 				try:
 					out = orjson.loads(out)
 				except orjson.JSONDecodeError:

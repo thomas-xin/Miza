@@ -2432,13 +2432,21 @@ async def proc_distribute(proc):
 							if p2 and p2.used and "gptq" in p2.caps:
 								if utc() - p2.used < 10:
 									await asyncio.sleep(10)
-								await asyncio.shield(start_proc(p2, wait=True, timeout=3600))
+								try:
+									await asyncio.wait_for(start_proc(p2, wait=True), timeout=timeout)
+								except:
+									create_task(asyncio.shield(start_proc(p2, wait=True, timeout=3600)))
+									raise
 					elif "gptq" in proc.caps:
 						for p2 in PROCS.values():
 							if p2 and p2.used and "ngptq" in p2.caps:
 								if utc() - p2.used < 10:
 									await asyncio.sleep(10)
-								await asyncio.shield(start_proc(p2, wait=True, timeout=3600))
+								try:
+									await asyncio.wait_for(start_proc(p2, wait=True), timeout=timeout)
+								except:
+									create_task(asyncio.shield(start_proc(p2, wait=True, timeout=3600)))
+									raise
 					fut = create_task(_sub_submit(proc, command, _timeout=timeout))
 					fut.ts = i
 					futs.append(fut)
@@ -2518,6 +2526,8 @@ async def start_proc(n, di=(), caps="ytdl", it=0, wait=False, timeout=None):
 						await proc.sem.afinish()
 					else:
 						await asyncio.wait_for(proc.sem.afinish(), timeout=timeout)
+				if timeout and proc.sem.active and utc() - proc.used < 60:
+					raise CommandCancelledError("Process schedule conflict.")
 			await create_future(force_kill, proc)
 		elif PROCS[n] is False:
 			return
