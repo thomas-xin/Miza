@@ -16,12 +16,12 @@ class Reload(Command):
 		await message.add_reaction("❗")
 		if name == "unload":
 			await send_with_reply(channel, content=f"Unloading{mod}...", reference=message)
-			succ = await create_future(bot.unload, _mod, priority=True)
+			succ = await asubmit(bot.unload, _mod, priority=True)
 			if succ:
 				return f"Successfully unloaded{mod}."
 			return f"Error unloading{mod}. Please see log for more info."
 		await send_with_reply(channel, content=f"Reloading{mod}...", reference=message)
-		succ = await create_future(bot.reload, _mod, priority=True)
+		succ = await asubmit(bot.reload, _mod, priority=True)
 		if succ:
 			return f"Successfully reloaded{mod}."
 		return f"Error reloading{mod}. Please see log for more info."
@@ -41,7 +41,7 @@ class Restart(Command):
 		await message.add_reaction("❗")
 		save = None
 		if name == "update":
-			resp = await create_future(subprocess.run, ["git", "pull"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+			resp = await asubmit(subprocess.run, ["git", "pull"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 			print(resp.stdout)
 			print(resp.stderr)
 		if argv == "when free":
@@ -83,11 +83,11 @@ class Restart(Command):
 				await bot.send_event("_destroy_", shutdown=True)
 				# Save any database that has not already been autosaved
 				print("Saving all databases...")
-				await create_future(bot.handle_update, force=True, priority=True)
-				await create_future(bot.update, force=True, priority=True)
+				await asubmit(bot.handle_update, force=True, priority=True)
+				await asubmit(bot.update, force=True, priority=True)
 				# Kill the audio player client
 				print("Shutting down audio client...")
-				kill = create_future(bot.audio.kill, timeout=16, priority=True)
+				kill = asubmit(bot.audio.kill, timeout=16, priority=True)
 				# Send the bot "offline"
 				bot.closed = True
 				print("Going offline...")
@@ -97,13 +97,13 @@ class Restart(Command):
 				print("Killing math and image subprocesses...")
 				with tracebacksuppressor:
 					try:
-						await create_future(sub_kill, start=False, timeout=8, priority=True)
+						await asubmit(sub_kill, start=False, timeout=8, priority=True)
 					except:
-						await create_future(sub_kill, start=False, force=True, timeout=8, priority=True)
+						await asubmit(sub_kill, start=False, force=True, timeout=8, priority=True)
 				# Kill the webserver
 				print("Killing webserver...")
 				with tracebacksuppressor:
-					await create_future(force_kill, bot.server, priority=True)
+					await asubmit(force_kill, bot.server, priority=True)
 				# Disconnect as many voice clients as possible
 				print("Disconnecting remaining voice clients...")
 				futs = deque()
@@ -118,7 +118,7 @@ class Restart(Command):
 					PRINT.flush()
 					PRINT.close(force=True)
 				with tracebacksuppressor:
-					await create_future(retry, os.remove, "log.txt", attempts=8, delay=0.1)
+					await asubmit(retry, os.remove, "log.txt", attempts=8, delay=0.1)
 				for fut in futs:
 					with suppress():
 						await fut
@@ -366,7 +366,7 @@ class UpdateExec(Database):
 				output = await glob["_"]()
 				glob["_"] = _
 		if code is not None:
-			output = await create_future(eval, code, glob, priority=True)
+			output = await asubmit(eval, code, glob, priority=True)
 		# Output sent to "_" variable if used
 		if output is not None:
 			glob["_"] = output
@@ -408,7 +408,7 @@ class UpdateExec(Database):
 		bot = self.bot
 		channel = message.channel
 		if bot.id != message.author.id and bot.is_owner(message.author.id) and channel.id in self.data:
-			if any(bot.id == u.id for u in message.mentions):
+			if bot.is_mentioned(message, bot, message.guild):
 				return
 			flag = self.data[channel.id]
 			# Both main and virtual terminals may be active simultaneously
@@ -581,13 +581,13 @@ class UpdateExec(Database):
 				if i and end - i > 83886080 and "hmac_signed_session" in AUTH and not self.hmac_sem.busy:
 					try:
 						async with self.hmac_sem:
-							b = await create_future(f.read, 503316480)
+							b = await asubmit(f.read, 503316480)
 							if not b:
 								break
 							if len(b) < 83886080:
 								raise ValueError(f"Skipping small chunk {len(b)}")
 							fn2 = filename or "c.7z"
-							resp = await create_future(
+							resp = await asubmit(
 								reqs.next().post,
 								AUTH.hmac_signed_url,
 								files=dict(
@@ -637,7 +637,7 @@ class UpdateExec(Database):
 					i = f.tell()
 				await asyncio.sleep(0.25)
 		print(urls, mids)
-		create_future_ex(bot.clear_cache, priority=True)
+		esubmit(bot.clear_cache, priority=True)
 		return urls, mids
 
 	async def delete(self, mids):
@@ -689,9 +689,9 @@ class UpdateExec(Database):
 								self.bot.data.proxies.pop(uhu, None)
 
 					if force:
-						await create_future(verify, out[i], uhu)
+						await asubmit(verify, out[i], uhu)
 					else:
-						create_future_ex(verify, out[i], uhu)
+						esubmit(verify, out[i], uhu)
 			except KeyError:
 				if not sendable:
 					out[i] = url
@@ -706,7 +706,7 @@ class UpdateExec(Database):
 						fn += ".webp"
 					elif fn.endswith(".pnglarge") or fn.endswith(".jpglarge"):
 						fn = fn[:-5]
-					files[i] = cdict(fut=create_future(reqs.next().get, url, stream=True), filename=fn, url=url)
+					files[i] = cdict(fut=asubmit(reqs.next().get, url, stream=True), filename=fn, url=url)
 				else:
 					out[i] = url
 		bot = self.bot

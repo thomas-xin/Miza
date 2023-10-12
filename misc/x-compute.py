@@ -1267,38 +1267,85 @@ if "ecdc" in CAPS:
 			return f.read()
 
 
-if "caption" in CAPS:
-	def determine_cuda(mem=1, priority=None, multi=False, major=0):
-		if not torch or not DEVICES or not torch.cuda.is_available():
-			if multi:
-				return [-1], torch.float32
-			return -1, torch.float32
-		n = torch.cuda.device_count()
-		if not n:
-			if multi:
-				return [-1], torch.float32
-			return -1, torch.float32
-		import pynvml
-		pynvml.nvmlInit()
-		dc = pynvml.nvmlDeviceGetCount()
-		handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(dc)]
-		gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
-		tinfo = [torch.cuda.get_device_properties(COMPUTE_ORDER.index(i)) if i in COMPUTE_ORDER else None for i in range(dc)]
-		COMPUTE_LOAD = globals().get("COMPUTE_LOAD") or [0] * dc
-		high = max(COMPUTE_LOAD)
-		if priority == "full":
-			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] * (random.random() + 4.5) * 0.2, p.major, p.minor, p.multi_processor_count, p.total_memory)
-		elif priority:
-			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, p.major >= major, COMPUTE_LOAD[i] < high * 0.9, COMPUTE_LOAD[i] * (random.random() + 4.5) * 0.2, i, p.multi_processor_count, p.total_memory)
-		elif priority is False:
-			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, -mem // 1073741824, p.major, p.minor, COMPUTE_LOAD[i] < high * 0.75, COMPUTE_LOAD[i] * (random.random() + 4.5) * 0.2, -gmems[i].free, p.multi_processor_count)
-		else:
-			key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.5, p.major >= major, p.major >= 7, -p.major, -p.minor, COMPUTE_LOAD[i] * (random.random() + 4.5) * 0.2, -p.multi_processor_count, -gmems[i].free)
-		pcs = sorted(DEVICES, key=key, reverse=True)
-		if multi:
-			return [COMPUTE_ORDER.index(i) for i in pcs if gmems[i].free >= mem], torch.float16
-		return COMPUTE_ORDER.index(pcs[0]), torch.float16
+discord_emoji = re.compile("^https?:\\/\\/(?:[a-z]+\\.)?discord(?:app)?\\.com\\/assets\\/[0-9A-Fa-f]+\\.svg")
+is_discord_emoji = lambda url: discord_emoji.search(url)
 
+
+CBOTS = {}
+def cb_exists(cid):
+	return cid in CBOTS
+
+mcache = {}
+def cached_model(cls, model, **kwargs):
+	t = (cls, model, tuple(kwargs.items()))
+	try:
+		return mcache[t]
+	except KeyError:
+		mcache[t] = cls(model, **kwargs)
+	print("CACHED_MODEL:", t)
+	return mcache[t]
+
+def backup_model(cls, model, force=False, **kwargs):
+	kwargs.pop("resume_download", None)
+	t = (cls, model, tuple(kwargs.keys()))
+	try:
+		return mcache[t]
+	except KeyError:
+		pass
+	if force:
+		try:
+			return cls(model, resume_download=True, **kwargs)
+		except Exception as ex:
+			ex2 = ex
+	else:
+		try:
+			return cls(model, local_files_only=True, **kwargs)
+		except:
+			fut = exc.submit(cached_model, cls, model, resume_download=True, **kwargs)
+			try:
+				return fut.result(timeout=24)
+			except Exception as ex:
+				ex2 = ex
+	if isinstance(ex2, concurrent.futures.TimeoutError):
+		try:
+			return fut.result(timeout=60)
+		except concurrent.futures.TimeoutError:
+			raise RuntimeError("Model is loading, please wait...")
+	raise ex2
+
+def determine_cuda(mem=1, priority=None, multi=False, major=0):
+	if not torch or not DEVICES or not torch.cuda.is_available():
+		if multi:
+			return [-1], torch.float32
+		return -1, torch.float32
+	n = torch.cuda.device_count()
+	if not n:
+		if multi:
+			return [-1], torch.float32
+		return -1, torch.float32
+	import pynvml
+	pynvml.nvmlInit()
+	dc = pynvml.nvmlDeviceGetCount()
+	handles = [pynvml.nvmlDeviceGetHandleByIndex(i) for i in range(dc)]
+	gmems = [pynvml.nvmlDeviceGetMemoryInfo(d) for d in handles]
+	tinfo = [torch.cuda.get_device_properties(COMPUTE_ORDER.index(i)) if i in COMPUTE_ORDER else None for i in range(dc)]
+	COMPUTE_LOAD = globals().get("COMPUTE_LOAD") or [0] * dc
+	high = max(COMPUTE_LOAD)
+	if priority == "full":
+		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] * (random.random() + 4.5) * 0.2, p.major, p.minor, p.multi_processor_count, p.total_memory)
+	elif priority:
+		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, p.major >= major, COMPUTE_LOAD[i] < high * 0.9, COMPUTE_LOAD[i] * (random.random() + 4.5) * 0.2, i, p.multi_processor_count, p.total_memory)
+	elif priority is False:
+		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, -mem // 1073741824, p.major, p.minor, COMPUTE_LOAD[i] < high * 0.75, COMPUTE_LOAD[i] * (random.random() + 4.5) * 0.2, -gmems[i].free, p.multi_processor_count)
+	else:
+		key = lambda i: (p := tinfo[i]) and (gmems[i].free >= mem, COMPUTE_LOAD[i] < high * 0.5, p.major >= major, p.major >= 7, -p.major, -p.minor, COMPUTE_LOAD[i] * (random.random() + 4.5) * 0.2, -p.multi_processor_count, -gmems[i].free)
+	pcs = sorted(DEVICES, key=key, reverse=True)
+	if multi:
+		return [COMPUTE_ORDER.index(i) for i in pcs if gmems[i].free >= mem], torch.float16
+	return COMPUTE_ORDER.index(pcs[0]), torch.float16
+
+
+if "caption" in CAPS:
 	import tiktoken
 	try:
 		import pytesseract
@@ -1404,51 +1451,80 @@ if "caption" in CAPS:
 		a = Embedder.encode(s).astype(np.float16)
 		return a.data
 
-discord_emoji = re.compile("^https?:\\/\\/(?:[a-z]+\\.)?discord(?:app)?\\.com\\/assets\\/[0-9A-Fa-f]+\\.svg")
-is_discord_emoji = lambda url: discord_emoji.search(url)
+if "summ" in CAPS:
+	from transformers import pipeline
+	smp = pipeline("summarization", model="Qiliang/bart-large-cnn-samsum-ChatGPT_v3", device=0, torch_dtype=torch.float16)
+	print(smp)
 
+	def summarise(s, min_length=128, max_length=192, rm=True, do_sample=True):
+		with torch.autocast("cuda"):
+			s2 = smp(s1, max_length=Ml, min_length=ml, do_sample=do_sample, truncation=True)[0]["summary_text"]
+		if rm:
+			return re.sub(r"(?:in )?(?:the|this|some)? *(?:article|essay|page|study|text|report|topic)[s, ]*(?:also mentions|we discuss|we look at|is about|includes|is based on)? *", "", s2, flags=re.I)
+		return s2
 
-CBOTS = {}
-def cb_exists(cid):
-	return cid in CBOTS
+	# def myth_smp(s1):
+		# model, tokeniser = self.load_gptq("mythalion-13b")
+		# prompt = s1.strip()
+		# tokens = tokeniser(prompt, return_tensors="pt").input_ids.to(model.device)
+		# pc = len(tokens)
+		# with torch.no_grad():
+			# res = model.generate(
+				# inputs=tokens,
+				# temperature=0.1,
+				# top_k=4,
+				# top_p=0.1,
+				# repetition_penalty=1.2,
+				# max_length=4096,
+				# do_sample=True,
+			# )
+			# torch.cuda.empty_cache()
+		# text = tokeniser.decode(res[0]).removeprefix("<s>").strip().removeprefix(prompt).strip().split("</s>", 1)[0]
+		# return text
 
-mcache = {}
-def cached_model(cls, model, **kwargs):
-	t = (cls, model, tuple(kwargs.items()))
-	try:
-		return mcache[t]
-	except KeyError:
-		mcache[t] = cls(model, **kwargs)
-	print("CACHED_MODEL:", t)
-	return mcache[t]
+if "class" in CAPS:
+	from transformers import AutoTokenizer
+	from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig, exllama_set_max_input_length
+	m = "TheBloke/Mythalion-13B-GPTQ"
+	T = backup_model(AutoTokenizer.from_pretrained, m)
+	i = sorted(range(torch.cuda.device_count()), key=lambda i: ((d := torch.cuda.get_device_properties(i)).total_memory > 11, -d.total_memory))[-1]
+	M = AutoGPTQForCausalLM.from_quantized(
+		m,
+		max_memory={i: torch.cuda.get_device_properties(i).total_memory},
+		use_safetensors=True,
+		use_triton=False,
+		inject_fused_attention=False,
+		offload_folder="cache",
+		resume_download=True,
+	)
+	print(M)
 
-def backup_model(cls, model, force=False, **kwargs):
-	kwargs.pop("resume_download", None)
-	t = (cls, model, tuple(kwargs.keys()))
-	try:
-		return mcache[t]
-	except KeyError:
-		pass
-	if force:
+	def moe_class(prompt, mocked={}):
+		if not mocked:
+			return
+		print("Mock prompt:", prompt)
+		tokens = T(prompt, return_tensors="pt").input_ids[:, -960:].to(M.device)
+		pc = len(tokens)
+		with torch.no_grad():
+			res = M.generate(
+				inputs=tokens,
+				temperature=0.1,
+				top_k=32,
+				top_p=0.1,
+				repetition_penalty=1.2,
+				max_new_tokens=32,
+				do_sample=True,
+			)
+			torch.cuda.empty_cache()
+		text = T.decode(res[0])
+		text = text.removeprefix("<s>").strip().removeprefix(prompt).strip().split("</s>", 1)[0]
+		print("MOCK:", text)
 		try:
-			return cls(model, resume_download=True, **kwargs)
-		except Exception as ex:
-			ex2 = ex
-	else:
-		try:
-			return cls(model, local_files_only=True, **kwargs)
+			num = int(re.search("[0-9]+", text).group())
+			k = mocked.get(num)
 		except:
-			fut = exc.submit(cached_model, cls, model, resume_download=True, **kwargs)
-			try:
-				return fut.result(timeout=24)
-			except Exception as ex:
-				ex2 = ex
-	if isinstance(ex2, concurrent.futures.TimeoutError):
-		try:
-			return fut.result(timeout=60)
-		except concurrent.futures.TimeoutError:
-			raise RuntimeError("Model is loading, please wait...")
-	raise ex2
+			k = None
+		return k
 
 if "math" in CAPS:
 	x_math = __import__("x-math")
@@ -1621,96 +1697,13 @@ if "ytdl" in CAPS:
 		) for entry in entries]
 		return output
 
-if "gptq" in CAPS or "agpt" in CAPS:
+if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 	import convobot, torch
 	convobot.COMPUTE_LOAD = COMPUTE_LOAD
 	convobot.COMPUTE_CAPS = COMPUTE_CAPS
 	convobot.COMPUTE_ORDER = COMPUTE_ORDER
 	convobot.DEVICES = DEVICES
-
-	def CBAI(inputs):
-		user_id = inputs["user_id"]
-		channel_id = inputs["channel_id"]
-		key = inputs["key"]
-		ht = inputs["huggingface_token"]
-		name = inputs["name"]
-		model = inputs["model"]
-		keep_model = inputs.get("keep_model")
-		auto = inputs["auto"]
-		personality = inputs["personality"]
-		premium = inputs["premium"]
-		summary = inputs["summary"]
-		jb = inputs.get("jb", False)
-		history = inputs.get("history", ())
-		refs = inputs.get("refs", ())
-		im = inputs.get("im")
-		prompt = inputs["prompt"]
-		bl = inputs.get("bl")
-		oai = inputs.get("oai")
-		bals = inputs.get("bals")
-		nsfw = inputs.get("nsfw")
-		vc = inputs.get("vc")
-		try:
-			cb = CBOTS[channel_id]
-			if cb.personality != personality:
-				summary = None
-				raise KeyError
-		except KeyError:
-			cb = CBOTS[channel_id] = convobot.Bot(
-				key=key,
-				huggingface_token=ht,
-				summary=summary,
-				name=name,
-				personality=personality,
-				premium=premium,
-			)
-		else:
-			cb.premium = premium
-		orig_model = cb.model
-		cb.model = model or orig_model
-		cb.auto = auto
-		cb.user_id = user_id
-		cb.channel_id = channel_id
-		cb.bl = bl
-		cb.oai = oai
-		cb.bals = bals
-		cb.nsfw = nsfw
-		# cb.vis_s = vis
-		cb.vc = vc
-		if inputs.get("reset"):
-			outs = []
-			futs = []
-			for i, t in enumerate(history):
-				to = []
-				fut = exc.submit(
-					cb.append,
-					t,
-					nin=len(history) - i - 1,
-					to=to,
-					ai=i >= len(history) / 2 and torch.cuda.is_available(),
-				)
-				outs.append(to)
-				futs.append(fut)
-				time.sleep(0.01)
-			history = []
-			for fut, out in zip(futs, outs):
-				fut.result()
-				history.extend(out)
-			cb.chat_history = history
-		cb.jailbroken = jb
-		if im:
-			try:
-				im = cb.image
-			except AttributeError:
-				im = get_image(im)
-		res = cb.ai(*prompt, refs=refs, im=im)
-		if cb.model in ("gpt3", "gpt4", "gpt3+", "gpt4+"):
-			cb.model = None
-		elif auto or not keep_model:
-			cb.model = orig_model
-		with torch.no_grad():
-			torch.cuda.empty_cache()
-		return res
+	BOT = convobot.Bot()
 
 	def CBAU(inputs):
 		user_id = inputs["user_id"]
@@ -1767,6 +1760,7 @@ if "gptq" in CAPS or "agpt" in CAPS:
 
 	if "gptq" in CAPS:
 		convobot.GPTQ = True
+
 		def load_models():
 			mods = dict(
 				load_gptq=(
@@ -1778,6 +1772,75 @@ if "gptq" in CAPS or "agpt" in CAPS:
 					"orca-70b",
 					"nous-puffin-70b",
 				),
+			)
+			bot = convobot.Bot()
+			for k, v in mods.items():
+				for m in v:
+					exc.submit(getattr(bot, k), m, fail=True)
+					time.sleep(1)
+		if "load" in CAPS:
+			load_models()
+			raise SystemExit
+
+		def GPTQ(inputs):
+			model = inputs["model"]
+			prompt = inputs["prompt"]
+			temperature = inputs.get("temperature", 0.8)
+			max_tokens = inputs.get("max_tokens", 1024)
+			top_p = inputs.get("top_p", 1)
+			stop = inputs.get("stop")
+			frequency_penalty = inputs.get("frequency_penalty", 0.5)
+			presence_penalty = inputs.get("presence_penalty", 0.5)
+			model, tokeniser = BOT.load_gptq(model)
+			prompt = prompt.strip()
+			tokens = tokeniser(prompt, return_tensors="pt").input_ids.to(model.device)
+			pc = len(tokens)
+			ex = RuntimeError("Maximum attempts exceeded.")
+			for i in range(3):
+				try:
+					with torch.no_grad():
+						res = model.generate(
+							inputs=tokens,
+							temperature=temperature,
+							top_k=round(top_p * 120),
+							top_p=top_p,
+							repetition_penalty=frequency_penalty,
+							max_length=min(len(tokens) + max_tokens, len(tokens) + 1024),
+							do_sample=True,
+						)
+						torch.cuda.empty_cache()
+				except RuntimeError as e:
+					if "probability tensor" in str(ex).lower():
+						ex = e
+						continue
+					raise
+				break
+			else:
+				raise ex
+			text = tokeniser.decode(res[0]).removeprefix("<s>").strip().removeprefix(prompt).strip().split("</s>", 1)[0]
+			text = text.strip().replace(":\n", ": ")
+			spl = text.split(": ")
+			if len(spl) > 1:
+				text = ""
+				while spl:
+					s = spl.pop(0)
+					if "\n" in s:
+						text += s.rsplit("\n", 1)[0]
+						break
+					text += s + ": "
+				text = text.strip()
+				if text.endswith(":"):
+					text = text.rsplit("\n", 1)[0]
+				start = ns
+				if text.startswith(start):
+					text = text[len(start):].strip()
+			return text
+
+	if "bnb" in CAPS:
+		convobot.BNB = True
+
+		def load_models():
+			mods = dict(
 				load_bnb=(
 					"pygmalion-13b",
 					"manticore-13b",
@@ -1795,19 +1858,72 @@ if "gptq" in CAPS or "agpt" in CAPS:
 		if "load" in CAPS:
 			load_models()
 			raise SystemExit
-		# exc.submit(load_models)
 
-	exc.submit(convobot.Bot.answer_summarise, convobot.Bot, q="test")
+		def BNB(inputs):
+			model = inputs["model"]
+			prompt = inputs["prompt"]
+			temperature = inputs.get("temperature", 0.8)
+			max_tokens = inputs.get("max_tokens", 1024)
+			top_p = inputs.get("top_p", 1)
+			stop = inputs.get("stop")
+			frequency_penalty = inputs.get("frequency_penalty", 0.5)
+			presence_penalty = inputs.get("presence_penalty", 0.5)
+			model, tokeniser = BOT.load_bnb(model)
+			prompt = prompt.strip()
+			tokens = tokeniser(prompt, return_tensors="pt").input_ids.to(model.device)
+			pc = len(tokens)
+			ex = RuntimeError("Maximum attempts exceeded.")
+			for i in range(3):
+				try:
+					with torch.no_grad():
+						res = model.generate(
+							inputs=tokens,
+							temperature=temperature,
+							top_k=round(top_p * 120),
+							top_p=top_p,
+							repetition_penalty=frequency_penalty,
+							max_length=min(len(tokens) + max_tokens, len(tokens) + 1024),
+							do_sample=True,
+						)
+						torch.cuda.empty_cache()
+				except RuntimeError as e:
+					if "probability tensor" in str(ex).lower():
+						ex = e
+						continue
+					raise
+				break
+			else:
+				raise ex
+			text = tokeniser.decode(res[0]).removeprefix("<s>").strip().removeprefix(prompt).strip().split("</s>", 1)[0]
+			text = text.strip().replace(":\n", ": ")
+			spl = text.split(": ")
+			if len(spl) > 1:
+				text = ""
+				while spl:
+					s = spl.pop(0)
+					if "\n" in s:
+						text += s.rsplit("\n", 1)[0]
+						break
+					text += s + ": "
+				text = text.strip()
+				if text.endswith(":"):
+					text = text.rsplit("\n", 1)[0]
+				start = ns
+				if text.startswith(start):
+					text = text[len(start):].strip()
+			return text
 
-	try:
-		from chatgpt_wrapper import AsyncChatGPT
-	except ImportError:
-		convobot.AsyncChatGPT = None
-	except:
-		convobot.AsyncChatGPT = None
-		print(traceback.format_exc(), end="")
-	else:
-		convobot.AsyncChatGPT = AsyncChatGPT
+	# exc.submit(convobot.Bot.answer_summarise, convobot.Bot, q="test")
+
+	# try:
+		# from chatgpt_wrapper import AsyncChatGPT
+	# except ImportError:
+		# convobot.AsyncChatGPT = None
+	# except:
+		# convobot.AsyncChatGPT = None
+		# print(traceback.format_exc(), end="")
+	# else:
+		# convobot.AsyncChatGPT = AsyncChatGPT
 
 if CAPS.intersection(("sd", "sdxl", "sdxlr")):
 	import imagebot

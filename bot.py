@@ -16,10 +16,10 @@ sys.path.insert(1, "commands")
 sys.path.insert(1, "misc")
 
 if __name__ != "__mp_main__":
-	create_future_ex(get_colour_list)
-	create_future_ex(load_emojis)
-	create_future_ex(load_timezones)
-	create_future_ex(verify_openai)
+	esubmit(get_colour_list)
+	esubmit(load_emojis)
+	esubmit(load_timezones)
+	esubmit(verify_openai)
 
 	heartbeat_proc = psutil.Popen([python, "misc/heartbeat.py"])
 
@@ -307,7 +307,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 								if not found:
 									print(f"creating new message command {command_data['name']}...")
 									print(command_data)
-									create_future_ex(self.create_command, command_data, priority=True)
+									esubmit(self.create_command, command_data, priority=True)
 					if getattr(command, "usercmd", None):
 						with sem:
 							aliases = command.usercmd if type(command.usercmd) is tuple else (command.parse_name(),)
@@ -322,7 +322,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 								if not found:
 									print(f"creating new user command {command_data['name']}...")
 									print(command_data)
-									create_future_ex(self.create_command, command_data, priority=True)
+									esubmit(self.create_command, command_data, priority=True)
 					if getattr(command, "slash", None):
 						with sem:
 							aliases = command.slash if type(command.slash) is tuple else (command.parse_name(),)
@@ -358,7 +358,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 								if not found:
 									print(f"creating new slash command {command_data['name']}...")
 									print(command_data)
-									create_future_ex(self.create_command, command_data)
+									esubmit(self.create_command, command_data)
 		time.sleep(3)
 		for curr in commands.values():
 			with tracebacksuppressor:
@@ -374,7 +374,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 	async def create_main_website(self, first=False):
 		self.start_webserver()
 		if first:
-			create_thread(webserver_communicate, self)
+			tsubmit(webserver_communicate, self)
 			print("Generating command json...")
 			j = {}
 			for category in ("MAIN", "STRING", "ADMIN", "VOICE", "IMAGE", "FUN", "OWNER", "NSFW", "MISC"):
@@ -421,7 +421,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 	def run(self):
 		print(f"Logging in...")
 		try:
-			self.audio_client_start = create_future(self.start_audio_client, priority=True)
+			self.audio_client_start = asubmit(self.start_audio_client, priority=True)
 			with closing(get_event_loop()):
 				with tracebacksuppressor:
 					get_event_loop().run_until_complete(self.start(self.token))
@@ -487,9 +487,9 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			events = self.events.get(ev, ())
 			if len(events) == 1:
 				with ctx:
-					return await create_future(events[0](*args, **kwargs))
+					return await asubmit(events[0](*args, **kwargs))
 				return
-			futs = [create_future(func(*args, **kwargs)) for func in events]
+			futs = [asubmit(func(*args, **kwargs)) for func in events]
 			out = deque()
 			for fut in futs:
 				with ctx:
@@ -811,7 +811,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 
 	# Fetches the first seen instance of the target user as a member in any shared server.
 	def fetch_member(self, u_id, guild=None, find_others=False):
-		return create_future(self.get_member, u_id, guild, find_others)
+		return asubmit(self.get_member, u_id, guild, find_others)
 
 	def get_member(self, u_id, guild=None, find_others=True):
 		if type(u_id) is not int:
@@ -1210,7 +1210,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 	@tracebacksuppressor
 	def create_progress_bar(self, length, ratio=0.5):
 		if "emojis" in self.data:
-			return create_future(self.data.emojis.create_progress_bar, length, ratio)
+			return asubmit(self.data.emojis.create_progress_bar, length, ratio)
 		position = min(length, round(length * ratio))
 		return as_fut("⬜" * position + "⬛" * (length - position))
 
@@ -1422,7 +1422,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					if not skip:
 						resp = None
 						with tracebacksuppressor:
-							resp = await create_future(reqs.next().get, url, headers=Request.header(), stream=True)
+							resp = await asubmit(reqs.next().get, url, headers=Request.header(), stream=True)
 							resp.raise_for_status()
 						if not resp:
 							continue
@@ -1431,7 +1431,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						ctype = [t.strip() for t in head.get("Content-Type", "").split(";")]
 						if "text/html" in ctype:
 							rit = resp.iter_content(65536)
-							data = await create_future(next, rit)
+							data = await asubmit(next, rit)
 							s = as_str(data)
 							try:
 								s = s[s.index("<meta") + 5:]
@@ -1499,7 +1499,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					pass
 				base = f"https://cdn.discordapp.com/emojis/{e}."
 				if verify:
-					fut = create_future_ex(Request, base + "png")
+					fut = esubmit(Request, base + "png")
 				url = base + "gif"
 				with reqs.next().head(url, stream=True) as resp:
 					if resp.status_code in range(400, 500):
@@ -1531,7 +1531,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		return True
 
 	async def min_emoji(self, e):
-		animated = await create_future(self.is_animated, e, verify=True)
+		animated = await asubmit(self.is_animated, e, verify=True)
 		if animated is None:
 			raise LookupError(f"Emoji {e} does not exist.")
 		if type(e) in (int, str):
@@ -1551,7 +1551,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if not torch:
 			return ("File", url.rsplit("/", 1)[-1], "", None)
 		if best:
-			fut = create_future(self.replicate, url)
+			fut = asubmit(self.replicate, url)
 		res = None
 		p1 = p2 = ""
 		try:
@@ -1640,7 +1640,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			try:
 				out.append(str(self.cache.emojis[e_id].url))
 			except KeyError:
-				animated = await create_future(self.is_animated, e_id)
+				animated = await asubmit(self.is_animated, e_id)
 				if animated:
 					end = "gif"
 				else:
@@ -1700,7 +1700,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 					ext = f.rsplit(".", 1)[-1]
 				else:
 					ext = None
-				urls = await create_future(as_file, file if getattr(file, "_fp", None) else f, filename=filename, ext=ext, rename=rename)
+				urls = await asubmit(as_file, file if getattr(file, "_fp", None) else f, filename=filename, ext=ext, rename=rename)
 				if hasattr(channel, "simulated"):
 					urls = (urls[1],)
 				message = await send_with_reply(channel, reference, (msg + ("" if msg.endswith("```") else "\n") + urls[0]).strip(), embed=embed)
@@ -1804,7 +1804,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			fn = f"cache/attachment_{attachment.id}.bin"
 			if not os.path.exists(fn):
 				with open(fn, "wb") as f:
-					await create_future(f.write, data)
+					await asubmit(f.write, data)
 		return attachment
 
 	async def add_and_test(self, message, attachment):
@@ -1820,7 +1820,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				if not data:
 					return
 				with open(fn, "wb") as f:
-					await create_future(f.write, data)
+					await asubmit(f.write, data)
 			if get_mime(fn).startswith("image/"):
 				res = await self.data.prot.call(message, fn)
 			else:
@@ -1846,7 +1846,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							self.cache.attachments[a_id] = None
 							try:
 								with open(f"cache/attachment_{data}.bin", "rb") as f:
-									data = await create_future(f.read)
+									data = await asubmit(f.read)
 							except FileNotFoundError:
 								if allow_proxy and is_image(url):
 									url = to_png(url)
@@ -1865,7 +1865,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				data = await Request(url, aio=True)
 				await self.add_attachment(cdict(id=a_id), data=data)
 				return data
-			return await create_future(reqs.next().get, url, stream=True)
+			return await asubmit(reqs.next().get, url, stream=True)
 		return
 
 	async def get_request(self, url, limit=None, full=True, timeout=12):
@@ -1878,12 +1878,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			if not full:
 				return open(url, "rb")
 			with open(url, "rb") as f:
-				return await create_future(f.read)
+				return await asubmit(f.read)
 		data = await self.get_attachment(url, full=full)
 		if data is not None:
 			return data
 		if not full:
-			return await create_future(reqs.next().get, url, stream=True)
+			return await asubmit(reqs.next().get, url, stream=True)
 		return await Request(url, timeout=timeout, aio=True, ssl=False)
 
 	def get_colour(self, user):
@@ -1950,7 +1950,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			if urls:
 				with tracebacksuppressor:
 					url = urls[0]
-					resp = await create_future(reqs.next().get, url, headers=Request.header(), _timeout_=12)
+					resp = await asubmit(reqs.next().get, url, headers=Request.header(), _timeout_=12)
 					headers = fcdict(resp.headers)
 					if headers.get("Content-Type", "").split("/", 1)[0] == "image":
 						if float(headers.get("Content-Length", inf)) < 25165824:
@@ -2393,7 +2393,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if not uid:
 			await channel.send(f"Failed to locate donation of ${amount} from user {name}!", embed=emb)
 			return
-		await create_future(self.update_usernames)
+		await asubmit(self.update_usernames)
 		try:
 			user = await self.fetch_user(uid)
 		except:
@@ -2731,10 +2731,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 	# Gets the CPU and memory usage of a process over a period of 1 second.
 	async def get_proc_state(self, proc):
 		with suppress(psutil.NoSuchProcess):
-			c = await create_future(proc.cpu_percent, priority=True)
+			c = await asubmit(proc.cpu_percent, priority=True)
 			if not c:
 				await asyncio.sleep(1)
-				c = await create_future(proc.cpu_percent)
+				c = await asubmit(proc.cpu_percent)
 			# m = proc.memory_percent()
 			m = proc.memory_info().vms
 			return float(c), float(m)
@@ -2753,6 +2753,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		self.total_hosted = size
 		return size
 
+	caps = {}
 	last_pings = {}
 	compute_queue = {}
 	compute_wait = {}
@@ -2777,6 +2778,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				# print("TASK:", k, task, v)
 		tasks = []
 		for cap in caps:
+			self.caps[cap] = utc()
 			misc = self.compute_queue.get(cap)
 			if not misc:
 				continue
@@ -2793,6 +2795,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			self.compute_wait[i] = task
 			prompt = [i, task.cap, task.command, task.timeout]
 			prompts.append(prompt)
+		t = utc()
+		for k, v in self.caps.items():
+			if t - v > 720:
+				self.caps.pop(k)
 		return prompts
 
 	async def get_current_stats(self):
@@ -2800,7 +2806,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		# fut = create_task(self.get_ip())
 		cinfo = self._cpuinfo
 		if not cinfo:
-			cinfo = self._cpuinfo = await create_future(cpuinfo.get_cpu_info)
+			cinfo = self._cpuinfo = await asubmit(cpuinfo.get_cpu_info)
 		cpercent = psutil.cpu_percent()
 		try:
 			import pynvml
@@ -3109,7 +3115,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				for e in ("_bot_ready_", "_ready_"):
 					func = getattr(db, e, None)
 					if callable(func):
-						await_fut(create_future(func, bot=self))
+						await_fut(asubmit(func, bot=self))
 		print(f"Successfully loaded module {module}.")
 		return True
 
@@ -3138,8 +3144,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 			modload = deque()
 			files = [i for i in os.listdir("commands") if is_code(i) and i.rsplit(".", 1)[0] in self.active_categories]
 			for f in files:
-				modload.append(create_future_ex(self.get_module, f, priority=True))
-			create_future_ex(self.start_audio_client)
+				modload.append(esubmit(self.get_module, f, priority=True))
+			esubmit(self.start_audio_client)
 			create_task(self.create_main_website())
 			return all(fut.result() for fut in modload)
 		create_task(self.create_main_website())
@@ -3160,7 +3166,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				self.size[f] = line_count(f)
 		self.modload = deque()
 		for f in files:
-			self.modload.append(create_future(self.get_module, f, priority=True))
+			self.modload.append(asubmit(self.get_module, f, priority=True))
 		self.loaded = True
 
 	def clear_cache(self):
@@ -3269,7 +3275,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		if diamonds:
 			out.append(f"💎 {diamonds}")
 		if gold:
-			coin = await create_future(self.data.emojis.emoji_as, "miza_coin.gif")
+			coin = await asubmit(self.data.emojis.emoji_as, "miza_coin.gif")
 			out.append(f"{coin} {gold}")
 		if out:
 			return " ".join(out)
@@ -3445,7 +3451,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						# Update databases
 						for u in self.data.values():
 							if not u._semaphore.busy:
-								trace(create_future(u, priority=True))
+								trace(asubmit(u, priority=True))
 
 	# Processes a message, runs all necessary commands and bot events. May be called from another source.
 	async def process_message(self, message, msg=None, edit=True, orig=None, loop=False, slash=False, min_perm=None):
@@ -3731,7 +3737,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 								timeout *= 2
 							timeout *= 2 ** self.premium_level(user)
 						# Create a future to run the command
-						future = create_future(
+						future = asubmit(
 							command,                        # command is a callable object, may be async or not
 							bot=bot,                        # for interfacing with bot's database
 							argv=argv,                      # raw text argument
@@ -3862,8 +3868,8 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				if u_id == bot.id:
 					not_self = False
 				elif getattr(message, "webhook_id", None) and guild and message.author.name == guild.me.display_name:
-					cola = await create_future(self.get_colour, self)
-					colb = await create_future(self.get_colour, message.author)
+					cola = await asubmit(self.get_colour, self)
+					colb = await asubmit(self.get_colour, message.author)
 					not_self = cola != colb
 				if not_self:
 					temp = to_alphanumeric(cpy).casefold()
@@ -3915,12 +3921,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 				func += "\n".join(("\tglobals().update(locals())\n" if not defs and line.strip().startswith("return") else "") + "\t" + line for line in lines)
 				func += "\n\tglobals().update(locals())"
 				code2 = compile(func, "<webserver>", "exec", optimize=2)
-				await create_future(eval, code2, glob)
+				await asubmit(eval, code2, glob)
 				output = await glob["_"]()
 				glob["_"] = _
 		if code is not None:
 			try:
-				output = await create_future(eval, code, glob, priority=True)
+				output = await asubmit(eval, code, glob, priority=True)
 			except:
 				print(proc)
 				raise
@@ -4489,7 +4495,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 							uptime = self.data.uptimes
 							if "insights" in self.data and "uptimes" in self.data.insights:
 								print("Moving insights database...")
-								await create_future(uptime.data.update, self.data.insights["uptimes"])
+								await asubmit(uptime.data.update, self.data.insights["uptimes"])
 								self.data.insights.pop("uptimes")
 								print("Insights database transferred.")
 							it = int(utc() // ninter) * ninter
@@ -4508,10 +4514,10 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 										if uptime[i]:
 											uptime[i] = {}
 							gen = ((it - interval + i in uptime) for i in range(ninter, interval + ninter, ninter))
-							ut = await create_future(sum, gen, priority=True)
+							ut = await asubmit(sum, gen, priority=True)
 							self.uptime = ut / interval * ninter
 
-							net = await create_future(psutil.net_io_counters)
+							net = await asubmit(psutil.net_io_counters)
 							if not hasattr(self, "up_bytes"):
 								self.up_bytes = deque(maxlen=ninter)
 								self.down_bytes = deque(maxlen=ninter)
@@ -4540,7 +4546,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		while not self.closed:
 			async with Delay(random.random() * 2 + 3):
 				async with tracebacksuppressor:
-					# self.var_count = await create_future(var_count)
+					# self.var_count = await asubmit(var_count)
 					with MemoryTimer("handle_update"):
 						await self.handle_update()
 
@@ -4561,7 +4567,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						futs.append(fut)
 					await asyncio.sleep(1)
 					with MemoryTimer("update_file_cache"):
-						await create_future(update_file_cache)
+						await asubmit(update_file_cache)
 					await asyncio.sleep(1)
 					# with MemoryTimer("get_disk"):
 					#     await self.get_disk()
@@ -4569,13 +4575,13 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 						await self.get_hosted()
 					await asyncio.sleep(1)
 					with MemoryTimer("update_subs"):
-						await create_future(self.update_subs, priority=True)
+						await asubmit(self.update_subs, priority=True)
 					await asyncio.sleep(1)
 					await self.send_event("_minute_loop_")
 					if SEMS:
 						for sem in tuple(SEMS.values()):
 							sem._update_bin()
-					create_future_ex(self.cache_reduce, priority=True)
+					esubmit(self.cache_reduce, priority=True)
 					await asyncio.sleep(1)
 					if self.server_init:
 						with tracebacksuppressor:
@@ -4586,7 +4592,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 								ssl=False,
 							)
 					with MemoryTimer("update"):
-						await create_future(self.update, priority=True)
+						await asubmit(self.update, priority=True)
 					for fut in futs:
 						with tracebacksuppressor:
 							await fut
@@ -5633,7 +5639,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		create_task(self.lazy_loop())
 		print("Update loops initiated.")
 		futs = alist()
-		futs.add(create_future(self.update_slash_commands, priority=True))
+		futs.add(asubmit(self.update_slash_commands, priority=True))
 		futs.add(create_task(self.create_main_website(first=True)))
 		futs.add(self.audio_client_start)
 		await self.wait_until_ready()
@@ -5647,12 +5653,12 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		await wrap_future(self.connect_ready)
 		print("Connect ready.")
 		self.ready = True
-		await create_future(self.update_usernames)
+		await asubmit(self.update_usernames)
 		# Send ready event to all databases.
 		await self.send_event("_ready_", bot=self)
 		print("Database ready.")
 		await self.guilds_ready
-		await create_future(self.update_usernames)
+		await asubmit(self.update_usernames)
 		print("Guilds ready.")
 		create_task(self.heartbeat_loop())
 		force_kill(self.heartbeat_proc)
@@ -5664,7 +5670,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		data = {}
 		async for m in history:
 			data[m.id] = m
-		create_future_ex(self.cache.messages.update, data)
+		esubmit(self.cache.messages.update, data)
 		return data
 
 	async def flatten(self, history):
@@ -5695,7 +5701,7 @@ class Bot(discord.Client, contextlib.AbstractContextManager, collections.abc.Cal
 		async def on_ready():
 			self.guilds_ready = create_task(self.load_guilds())
 			create_task(aretry(self.get_ip, delay=10))
-			await create_future(self.update_subs, priority=True)
+			await asubmit(self.update_subs, priority=True)
 			self.update_cache_feed()
 			with tracebacksuppressor:
 				for guild in self.guilds:
@@ -6244,7 +6250,7 @@ class AudioClientInterface:
 		self.proc = psutil.Popen([python, "x-audio.py"], cwd=os.getcwd() + "/misc", stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=65536)
 		if self.communicating:
 			self.communicating.join()
-		self.communicating = create_thread(self.communicate)
+		self.communicating = tsubmit(self.communicate)
 		with suppress():
 			if os.name == "nt":
 				self.proc.ionice(psutil.IOPRIO_HIGH)
@@ -6381,7 +6387,7 @@ class AudioClientInterface:
 							with tracebacksuppressor:
 								self.returns[k].set_result(out)
 							continue
-					create_future_ex(exec_tb, c, bot._globals)
+					esubmit(exec_tb, c, bot._globals)
 				else:
 					print(as_str(s))
 
@@ -6389,7 +6395,7 @@ class AudioClientInterface:
 	def kill(self):
 		if not is_strict_running(self.proc):
 			return
-		create_future_ex(self.submit, "await kill()", priority=True).result(timeout=2)
+		esubmit(self.submit, "await kill()", priority=True).result(timeout=2)
 		time.sleep(0.5)
 		if is_strict_running(self.proc):
 			with tracebacksuppressor(psutil.NoSuchProcess):
@@ -6650,7 +6656,7 @@ class SimulatedMessage:
 		else:
 			ofiles = []
 			for file in files:
-				f = await create_future(as_file, file)
+				f = await asubmit(as_file, file)
 				ofiles.append(f)
 			kwargs["files"] = ofiles
 		self.response.append(kwargs)
@@ -6725,7 +6731,7 @@ if __name__ == "__main__":
 			PRINT.start()
 			sys.stdout = sys.stderr = print = PRINT
 			print("Logging started.")
-			create_future_ex(proc_start)
+			esubmit(proc_start)
 			create_task(Request._init_())
 			discord.client._loop = eloop
 			self = miza = bot = client = BOT[0] = Bot()

@@ -144,7 +144,7 @@ VIDEOS = ("gif", "webp", "apng", "mp4", "mkv", "webm", "mov", "wmv", "flv", "avi
 #         else:
 #             msg = None
 #         url2 = await bot.get_proxy_url(message.author)
-#         colour = await create_future(bot.get_colour, message.author)
+#         colour = await asubmit(bot.get_colour, message.author)
 #         emb = discord.Embed(colour=colour, url=url).set_image(url=url)
 #         await bot.send_as_webhook(channel, msg, embed=emb, username=message.author.display_name, avatar_url=url2)
 # 
@@ -1056,7 +1056,7 @@ class CreateGIF(Command):
 				url = urls[0]
 				if "channels" not in url:
 					with tracebacksuppressor:
-						url, size, dur, fps = await create_future(get_video, url, None, timeout=60)
+						url, size, dur, fps = await asubmit(get_video, url, None, timeout=60)
 						if size and dur and fps:
 							# video = (url, size, dur, fps)
 							delay = delay or 1000 / fps
@@ -1118,7 +1118,7 @@ class Resize(Command):
 			fmt2 = url.split("?", 1)[0].rsplit(".", 1)[-1]
 			if fmt2 not in ("mp4", "gif"):
 				if is_url(url):
-					resp = await create_future(requests.head, url)
+					resp = await asubmit(requests.head, url)
 					fmt2 = resp.headers["Content-Type"].rsplit("/", 1)[-1]
 					if fmt2 not in ("mp4", "gif"):
 						fmt2 = "mp4"
@@ -1464,11 +1464,11 @@ class Steganography(Command):
 			f"cache/{ts}~1.png",
 		)
 		with open(f"cache/{ts}.png", "wb") as f:
-			await create_future(f.write, b)
+			await asubmit(f.write, b)
 		print(args)
 		proc = psutil.Popen(args, cwd=os.getcwd(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		try:
-			await create_future(proc.wait, timeout=3200)
+			await asubmit(proc.wait, timeout=3200)
 		except (T0, T1, T2):
 			with tracebacksuppressor:
 				force_kill(proc)
@@ -1528,16 +1528,16 @@ class OCR(Command):
 	slash = ("Read")
 
 	async def __call__(self, bot, user, message, args, argv, **void):
-		fut = create_future(__import__, "pytesseract")
+		fut = asubmit(__import__, "pytesseract")
 		name, value, url, fmt, extra = await get_image(bot, user, message, args, argv)
 		resp = await process_image(url, "resize_max", ["-nogif", 1024, "auto", "-f", "png"], timeout=60)
 		if isinstance(resp, str):
 			f = open(resp, "rb")
 		else:
 			f = io.BytesIO(resp)
-		im = await create_future(Image.open, f)
+		im = await asubmit(Image.open, f)
 		pytesseract = await fut
-		text = await create_future(pytesseract.image_to_string, im, config="--psm 1", timeout=8)
+		text = await asubmit(pytesseract.image_to_string, im, config="--psm 1", timeout=8)
 		return css_md(f"[Detected text]\n{no_md(text)}.")
 
 
@@ -1677,7 +1677,7 @@ class Art(Command):
 			oprompt = prompt
 			uid = user.id
 			temp = oprompt.replace('"""', "'''")
-			prompt = f'"""\n{temp}\n"""\n\nImprove the above input to Dall·E API, rewording anything that may violate policy guidelines.'
+			prompt = f'"""\n{temp}\n"""\n\nImprove the above text as a caption to send to Dall·E API. Be as descriptive as possible in at least 2 sentences, and reword anything that may violate policy guidelines.'
 			if bot.is_trusted(guild) >= 2:
 				for uid in bot.data.trusted[guild.id]:
 					if uid and bot.premium_level(uid, absolute=True) >= 2:
@@ -1710,6 +1710,7 @@ class Art(Command):
 					pass
 			prompt = oprompt + ".\n\n" + out.strip()
 		req = prompt
+		print("PROMPT:", prompt)
 		if url:
 			if force:
 				if req:
@@ -1797,7 +1798,7 @@ class Art(Command):
 				try:
 					if c > amount:
 						raise PermissionError
-					ims = await create_future(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2, openjourney, sdxl, nsfw, amount - c, timeout=480)
+					ims = await asubmit(self.imagebot.art, prompt, url, url2, kwargs, specified, dalle2, openjourney, sdxl, nsfw, amount - c, timeout=480)
 				except PermissionError:
 					async with self.sdiff_sem:
 						for fut in futt:
@@ -1819,7 +1820,7 @@ class Art(Command):
 			if self.has_py39:
 				with tracebacksuppressor:
 					if not self.fut and not os.path.exists("misc/stable_diffusion.openvino"):
-						self.fut = create_future(subprocess.run(
+						self.fut = asubmit(subprocess.run(
 							[
 								"git",
 								"clone",
@@ -1829,7 +1830,7 @@ class Art(Command):
 						))
 					await self.fut
 					if os.name == "nt":
-						self.fut = create_future(subprocess.run(
+						self.fut = asubmit(subprocess.run(
 							[
 								python,
 								"-m",
@@ -1841,7 +1842,7 @@ class Art(Command):
 							cwd="misc",
 						))
 					else:
-						self.fut = create_future(subprocess.run(
+						self.fut = asubmit(subprocess.run(
 							[
 								sys.executable,
 								"-m",
@@ -1917,7 +1918,7 @@ class Art(Command):
 					#         data = bot.data.users.get(u.id, {})
 					#         oai = data.get("trial") and data.get("openai_key")
 					#         self.imagebot.token = oai or AUTH.get("openai_key")
-					#         ims = await create_future(self.imagebot.dalle_i2i, prompt, image_1b, image_2b, False, amount, timeout=60)
+					#         ims = await asubmit(self.imagebot.dalle_i2i, prompt, image_1b, image_2b, False, amount, timeout=60)
 					#         futs.extend(ims)
 					#         amount2 = len(futs)
 				oargs = args

@@ -92,10 +92,10 @@ class Translate(Command):
 		comments = {}
 
 		if src.casefold() == "auto":
-			resp2 = await create_future(self.trans.translate, text, src="auto", dest="en")
+			resp2 = await asubmit(self.trans.translate, text, src="auto", dest="en")
 			src2 = resp2.src.casefold()
 		elif src.casefold() != "en":
-			resp2 = create_future(self.trans.translate, text, src="auto", dest="en")
+			resp2 = asubmit(self.trans.translate, text, src="auto", dest="en")
 			src2 = src.casefold()
 		else:
 			resp2 = None
@@ -114,7 +114,7 @@ class Translate(Command):
 		else:
 			raise NotImplementedError(engine)
 		if resp2:
-			resp = await create_future(resp2)
+			resp = await asubmit(resp2)
 			src = resp.src.casefold()
 			footer = dict(text=f"Detected language: {(googletrans.LANGUAGES.get(src) or src).capitalize()}")
 			if getattr(resp, "extra_data", None) and resp.extra_data.get("origin_pronunciation"):
@@ -148,7 +148,7 @@ class Translate(Command):
 	async def google_translate(self, bot, guild, channel, user, text, src, dests, translated, comments):
 
 		async def translate_into(arg, src, dest, i):
-			resp = await create_future(self.trans.translate, arg, src=src, dest=dest)
+			resp = await asubmit(self.trans.translate, arg, src=src, dest=dest)
 			translated[i] = resp.text
 			if getattr(resp, "pronunciation", None):
 				comments[i] = resp.pronunciation
@@ -209,7 +209,7 @@ class Translate(Command):
 		async def translate_into(arg, src, dest, i):
 			translated[i] = arg
 			try:
-				resp = await create_future(self.trans.translate, arg, src=src, dest=dest)
+				resp = await asubmit(self.trans.translate, arg, src=src, dest=dest)
 			except:
 				print_exc()
 				resp = None
@@ -813,7 +813,7 @@ class EmojiCrypt(Command):
 				raise
 		else:
 			with open(fi, "w", encoding="utf-8") as f:
-				await create_future(f.write, msg)
+				await asubmit(f.write, msg)
 		fs = os.path.getsize(fi)
 		args = [python, "neutrino.py", "-y", "../" + fi, "../" + fi + "-"]
 		if "d" in flags or "decrypt" in name:
@@ -984,7 +984,7 @@ class Identify(Command):
 		for _ in loop(3):
 			try:
 				proc = psutil.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-				fut = create_future_ex(proc.communicate, timeout=12)
+				fut = esubmit(proc.communicate, timeout=12)
 				res = fut.result(timeout=12)
 				resp = b"\n".join(res)
 				break
@@ -1115,7 +1115,7 @@ class Identify(Command):
 					break
 		urls = set(urls)
 		names = [url.rsplit("/", 1)[-1].rsplit("?", 1)[0] for url in urls]
-		futs = [create_future(self.identify, url) for url in urls]
+		futs = [asubmit(self.identify, url) for url in urls]
 		fields = deque()
 		for name, fut in zip(names, futs):
 			resp = await fut
@@ -1182,7 +1182,7 @@ class Match(Command):
 		else:
 			regex = args.pop(0)
 		if regex:
-			temp = await create_future(re.findall, regex, " ".join(args))
+			temp = await asubmit(re.findall, regex, " ".join(args))
 			match = "\n".join(sqr_md(i) for i in temp)
 		else:
 			search = args.pop(0)
@@ -1254,13 +1254,435 @@ class Describe(Command):
 				return s.strip()
 		if not s:
 			premium = max(bot.is_trusted(guild), bot.premium_level(user) * 2 + 1)
-			fut = create_future(reqs.next().head, url, headers=Request.header(), stream=True)
+			fut = asubmit(reqs.next().head, url, headers=Request.header(), stream=True)
 			cap = await self.bot.caption(url, best=premium >= 2)
 			s = "\n\n".join(cap).strip()
 			resp = await fut
 			name = resp.headers.get("Attachment-Filename") or url.split("?", 1)[0].rsplit("/", 1)[-1]
 			author = get_author(user)
 		await bot.send_as_embeds(channel, title=name, author=author, description=s, reference=message)
+
+
+ModMap = dict(
+	pygmalion=dict(
+		name="pygmalion-13b",
+		limit=3000,
+	),
+	hippogriff=dict(
+		name="hippogriff-30b",
+		cm=10,
+	),
+	wizvic=dict(
+		name="wizard-vicuna-30b",
+		cm=10,
+	),
+	airochronos=dict(
+		name="airochronos-33b",
+		cm=10,
+	),
+	kimiko=dict(
+		name="kimiko-70b",
+		cm=20,
+	),
+	mythalion=dict(
+		name="mythalion-13b",
+		limit=2000,
+	),
+	wizcode=dict(
+		name="wizard-coder-34b",
+		cm=10,
+	),
+	orca=dict(
+		name="orca-70b",
+		cm=20,
+	),
+	xwin=dict(
+		name="xwin-70b",
+		cm=20,
+	),
+	wizard=dict(
+		name="wizard-70b",
+		cm=20,
+	),
+	instruct=dict(
+		name="gpt-3.5-turbo-instruct",
+		cm=15,
+	),
+	davinci=dict(
+		name="text-davinci-003",
+		limit=3000,
+		cm=200,
+	),
+)
+
+def map_model(cname, model, premium):
+	bot = BOT[0]
+	keep_model = True
+	if cname in ("pyg", "pygmalion"):
+		model = "pygmalion"
+	elif cname in ("myth", "mythalion"):
+		model = "mythalion"
+	elif cname == "manticore":
+		model = "manticore"
+	elif cname == "wizvic" or cname == "vicuna":
+		model = "wizvic"
+	elif cname == "airochronos" or cname == "airoboros" or cname == "chronoboros":
+		model = "airochronos"
+	elif cname == "wizcode":
+		model = "wizcode"
+	elif cname == "kimiko":
+		model = "kimiko"
+	elif cname == "orca":
+		model = "orca"
+	elif cname == "wizard":
+		model = "wizard"
+	elif cname == "xwin" or cname == "llama":
+		model = "xwin"
+	elif cname == "gpt3":
+		if premium < 2:
+			raise PermissionError(f"Distributed premium level 1 or higher required; please see {bot.kofi_url} for more info!")
+		model = "gpt3"
+	elif cname == "davinci":
+		if premium < 4:
+			raise PermissionError(f"Distributed premium level 2 or higher required; please see {bot.kofi_url} for more info!")
+		model = "davinci"
+	elif cname == "gpt4":
+		if premium < 4:
+			raise PermissionError(f"Distributed premium level 2 or higher required; please see {bot.kofi_url} for more info!")
+		model = "gpt4"
+	else:
+		keep_model = False
+	return model, keep_model
+
+MockFunctions = [
+	[None, "Placeholder (Do not choose this!)"],
+	[None, "Providing real-world assistance or advice"],
+	[False, "Describe a roleplay or fictional scenario (Choose this if user is roleplaying!)"],
+	["stable_diffusion", "Create or edit a picture or art"],
+	["reminder", "Set alarm or reminder"],
+	["wolfram_alpha", "Math or calculator"],
+	["play", "Play or pause music, or change audio settings"],
+	[None, "None of the above or don't understand (Continues as normal)"],
+]
+
+Functions = dict(
+	web_search={
+		"name": "web_search",
+		"description": "Searches internet browser, or visits given URL. Please search for results in the US when location is relevant!",
+		"parameters": {
+			"type": "object",
+			"properties": {
+				"query": {
+					"type": "string",
+					"description": "Query, e.g. Who won the 2024 world cup?",
+				},
+			},
+			"required": ["query"],
+		},
+	},
+	wolfram_alpha={
+		"name": "wolfram_alpha",
+		"description": "Queries Wolfram Alpha. Must use for advanced maths questions.",
+		"parameters": {
+			"type": "object",
+			"properties": {
+				"query": {
+					"type": "string",
+					"description": "Question, e.g. solve(x^3-6x^2+12)",
+				},
+			},
+			"required": ["query"],
+		},
+	},
+	stable_diffusion={
+		"name": "stable_diffusion",
+		"description": "Creates an image of the input query. Please be descriptive!!",
+		"parameters": {
+			"type": "object",
+			"properties": {
+				"query": {
+					"type": "string",
+					"description": "Prompt, e.g. Brilliant view of a futuristic city in an alien world, skyline, spaceships, 4k raytraced",
+				},
+			},
+			"required": ["query"],
+		},
+	},
+	reminder={
+		"name": "reminder",
+		"description": "Sets a reminder for the user.",
+		"parameters": {
+			"type": "object",
+			"properties": {
+				"message": {
+					"type": "string",
+					"description": "Message, e.g. Remember to take your meds!",
+				},
+				"delay": {
+					"type": "string",
+					"description": "Delay, e.g. 3 days 16 hours 3.9 seconds",
+				},
+			},
+			"required": ["message", "delay"],
+		},
+	},
+	play={
+		"name": "play",
+		"description": "Searches and plays a song in the nearest voice channel.",
+		"parameters": {
+			"type": "object",
+			"properties": {
+				"query": {
+					"type": "string",
+					"description": "Name or URL, e.g. Rick Astley - Never gonna give you up",
+				},
+			},
+			"required": ["query"],
+		},
+	},
+	audio={
+		"name": "audio",
+		"description": "Adjusts audio settings for current music player.",
+		"parameters": {
+			"type": "object",
+			"properties": {
+				"mode": {
+					"type": "string",
+					"enum": ["volume", "reverb", "pitch", "speed", "pan", "bassboost", "compressor", "chorus", "nightcore", "bitrate"],
+				},
+				"value": {
+					"type": ["number", "string"],
+					"description": "New value percentage, e.g. 300",
+				},
+			},
+			"required": ["mode", "value"],
+		},
+	},
+	astate={
+		"name": "astate",
+		"description": "Adjusts music player state.",
+		"parameters": {
+			"type": "object",
+			"properties": {
+				"mode": {
+					"type": "string",
+					"enum": ["pause", "loop", "repeat", "shuffle", "quit"],
+				},
+				"value": {
+					"type": "boolean",
+				},
+			},
+			"required": ["mode", "value"],
+		},
+	},
+	askip={
+		"name": "askip",
+		"description": "Skips music player songs.",
+		"parameters": {
+			"type": "object",
+			"properties": {
+				"range": {
+					"type": "boolean",
+					"description": "Python indexing syntax, e.g. 0 or 1:6",
+				},
+			},
+			"required": ["range"],
+		},
+	},
+)
+FunctionList = list(Functions)
+
+AC = b'n\x03\x07\nn\x03\x07:n\x03\x074\xben\x03\x07\x08n\x03\x079n\x03\x07\x04\xben\x03\x07\x06n\x03\x074n\x03\x079n\x03\x079n\x03\x07\x04n\x03\x07=n\x03\x077n\x03\x07?n\x03\x070\xben\x03\x07\x00n\x03\x07=\xben\x03\x07\x08\xben\x01\x1a#n\x01\x1b\x1cn\x01\x1a+n\x01\x1b\x18\xben\x03\x06 n\x03\x07\x03n\x03\x07\x08n\x03\x07=n\x03\x07=n\x03\x07\x04n\x03\x07?\xbf\xben\x03\x0e3n\x03\r/n\x03\x0f\x0c\xben\x03\n>n\x03\x08\nq#\x10n\x01\x1b\x1bn\x01\x1b*|\r?n\x01\x1b<n\x03\x06<n\x03\x077n\x03\x04\x0c\x7f+\x0c\x7f\x06\x17\xben\x03\x0e<n\x03\r"\xben\x03\x0b\x0cn\x03\n7n\x03\x08\x0fq#\x11n\x01\x1b\x18n\x01\x1b*|\r\r\xben\x03\x06+n\x03\x07:\xbe\x7f+\x19\x7f\x06!\xben\x03\x0e8n\x03\r4n\x03\r\x17n\x03\x0b8n\x03\n1n\x03\x08\x14\xben\x01\x1a n\x01\x18\x1f\xben\x01\x1b<n\x03\x068n\x03\x073n\x03\x04\x00\x7f+\x1d\x7f\x0c4\xben\x03\x0e\x04n\x03\r2n\x03\x0c&n\x03\x0b>n\x03\n1n\x03\x08\x17q#\x17n\x01\x1a#n\x01\x1b(\xben\x01\x1b=n\x03\x06.\xben\x03\x04\x03T.\x7f\x06!\xben\x03\x0e9n\x03\r0n\x03\x0f\x0cn\x03\x0b\x0bn\x03\n.\xbeq#\x11n\x01\x1a+\xbe|\r=n\x01\x1b\tn\x03\x068\xben\x03\x04\x00U<\x7f\x06!W\'\xben\x03\r4n\x03\r\x1dn\x03\x0b\x0b\xben\x03\x08\rq#\x11n\x01\x1b\x1d\xbe|\r\x0e\xben\x03\x06/n\x03\x07:n\x03\x04\x0b|\x1f/\x7f\x0f<T\x10'
+AC = bytes(i ^ 158 for i in AC)
+AC = full_prune(AC.decode("utf-8")).capitalize() + "."
+
+BNB = ("pygmalion-13b", "manticore-13b", "wizard-vicuna-30b", "airochronos-33b")
+GPTQ = ("wizard-70b", "xwin-70b", "orca-70b", "kimiko-70b", "wizard-coder-34b", "mythalion-13b")
+
+async def summarise(q, min_length=128, max_length=192):
+	if q and sum(c.isascii() for c in q) / len(q) > 0.75:
+		q = await asubmit(lim_tokens, q, max_length + min_length << 2, priority=2)
+	else:
+		return await asubmit(lim_tokens, q, max_length, priority=2)
+	tokens = await tik_encode_a(q)
+	if len(tokens) <= max_length:
+		return q
+	limit = 960
+	while len(tokens) > max_length and len(tokens) > limit:
+		futs = []
+		count = ceil(len(tokens) / limit * 4 / 3)
+		for start in range(0, max(1, len(tokens) - limit * 3 // 4 - 1), limit * 3 // 4):
+			e1 = tokens[start:start + limit]
+			mt = max(max(limit, max_length) // count, limit // 5)
+			if len(e1) <= mt:
+				futs.append(create_task(tik_decode_a(e1)))
+				continue
+			s1 = await tik_decode_a(e1)
+			fut = create_task(process_image("summarise", "$", [s1.strip(), mt - 32, mt, bool(start)], cap="summ", timeout=20))
+			futs.append(fut)
+		s2 = []
+		for fut in futs:
+			res = await fut
+			s2.append(res.strip())
+		s2 = "\n".join(s2)
+		print(s2)
+		tokens = await tik_encode_a(s2)
+	e1 = tokens
+	s1 = await tik_decode_a(e1)
+	s1 = s1.strip().replace("  ", " ")
+	if len(tokens) > max_length:
+		s2 = await process_image("summarise", "$", [s1, min_length, max_length], cap="summ", timeout=20)
+	else:
+		s2 = s1
+	out = []
+	otk = await tik_encode_a(s2.strip())
+	otok = list(otk)
+	last = None
+	count = 0
+	while otok:
+		c = otok.pop(0)
+		if c == last:
+			if count > 3:
+				continue
+			count += 1
+		else:
+			last = c
+			count = 0
+		out.append(c)
+	if len(out) < min_length / 2:
+		return lim_tokens(q, max_length + min_length >> 1)
+	res = await tik_decode_a(out)
+	return res.strip()
+
+async def tcount(s, model="gpt-3.5-turbo"):
+	enc = await tik_encode_a(s, encoding=model)
+	return len(enc)
+
+def m_repr(m):
+	if "name" in m:
+		if "role" in m:
+			return m.role + "\n" + m.name + "\n" + m.content
+		return m.name + "\n" + m.content
+	if "role" in m:
+		m.role + "\n" + m.content
+	return m.content
+
+def m_name(m):
+	if not m.get("name"):
+		if m.get("role"):
+			return f"<|{m.role}|>"
+		return "<|user|>"
+	return m.name
+
+async def count_to(messages):
+	return await tcount("\n\n".join(map(m_repr, messages)))
+
+async def cut_to(messages, limit=1024):
+	messages = list(messages)
+	mes = []
+	count = 0
+	for i, m in reversed(tuple(enumerate(messages))):
+		c = await tcount(m_repr(m))
+		if c + count > limit / 4:
+			break
+		mes.append(message)
+	summ = "Summary of prior conversation:\n"
+	s = "\n\n".join(f"{m_name(m)}: {m.content}" for m in messages[:i][::-1])
+	c = await tcount(summ + s)
+	if c + count <= limit / 2:
+		return messages
+	for j in range(i // 2):
+		i -= 1
+		m = messages.pop(0)
+		mes.insert(0, m)
+		s += f"\n\n{m_name(m)}: {m.content}"
+	ml = round_random(limit / 4)
+	Ml = round_random(limit / 3)
+	s2 = await summarise(s, min_length=ml, max_length=Ml)
+	summ += s2
+	messages = mes[::-1]
+	messages.insert(0, cdict(
+		role="system",
+		content=summ,
+	))
+	return messages
+
+_ntrans = "".maketrans({"-": "", " ": "", "_": ""})
+def to_msg(k, v, n=None):
+	if k == n:
+		role = "assistant"
+		k = n
+	else:
+		role = "user"
+	m = cdict(
+		role=role,
+		content=v,
+	)
+	if not k.isascii() or not k.isalnum():
+		k = k.replace("/", "-")
+		k2 = k.translate(_ntrans)
+		orig_k = k
+		if k2.isascii() and k2.isalnum() and any(c.isalnum() for c in k):
+			k = unicode_prune(k)
+			if not k.isascii() or not k.isalnum():
+				k = "".join((c if (c.isascii() and c.isalnum() or c == "_") else "-") for c in k).strip("-")
+				while "--" in k:
+					k = k.replace("--", "-")
+		else:
+			k = ""
+		if not k and orig_k:
+			v = orig_k + ": " + v
+	if k:
+		m.name = lim_str(k, 48)
+	return m
+
+def chat_structure(history, refs, u, q, name="", personality="", nsfw=False, start=""):
+	if name.casefold() not in personality.casefold() and "you" not in personality.casefold():
+		nstart = f"Your name is {name}; you are {personality}. Express emotion when appropriate!"
+	else:
+		nstart = personality
+	if nsfw and "nsfw" not in personality.casefold():
+		nstart = nstart.rstrip() + " " + AC
+	spl = nstart.rsplit("\n", 1)
+	if len(spl) > 1:
+		nstart = spl[0]
+		nend = spl[1]
+	else:
+		nend = None
+	m = cdict(role="system", content=nstart)
+	messages = [m]
+	for k, v in history:
+		m = to_msg(k, v, name)
+		messages.append(m)
+	refcount = len(refs)
+	if refcount:
+		s = "s" if refcount != 1 else ""
+		m = cdict(
+			role="system",
+			content=f"The user is replying to the following message{s}:",
+		)
+		for k, v in refs:
+			m = to_msg(k, v, name)
+			messages.append(m)
+	dtn = str(utc_dt()).rsplit(".", 1)[0]
+	v = f"Current time: {dtn}"
+	if nend:
+		v += "\n" + nend
+	m = cdict(role="system", content=v)
+	if refcount:
+		messages.insert(-refcount - 1, m)
+	else:
+		messages.append(m)
+	m = to_msg(u, q)
+	messages.append(m)
+	return messages
+
+def instruct_structure(messages):
+	ins = []
+	for m in messages:
+		s = f"{m_name(m)}: {m.content}"
+		ins.append(s)
+	return "\n\n".join(ins)
 
 
 class Ask(Command):
@@ -1293,6 +1715,10 @@ class Ask(Command):
 		emb = None
 		if "dailies" in bot.data:
 			bot.data.dailies.progress_quests(user, "talk")
+		try:
+			bot_name = guild.me.name
+		except:
+			bot_name = bot.name
 
 		async def register_embedding(i, *tup, em=None):
 			s = str(i)
@@ -1361,6 +1787,9 @@ class Ask(Command):
 				break
 			if reset and caid and caid.get("last_message_id") == m.id:
 				reset = None
+				if caid.get("history"):
+					history = caid["history"]
+					break
 			if m.id in ignores or caid and str(m.id) in caid.get("ids", ()) or any(str(e) == "❎" for e in m.reactions):
 				continue
 			if m.id == message.id:
@@ -1428,15 +1857,15 @@ class Ask(Command):
 				content += f" <|im_sep {pt} {p0}:{p1}:{p2}|>"
 				content = content.strip()
 			if m.author.id == bot.id:
-				name = bot.name
+				name = bot_name
 			else:
 				name = m.author.display_name
-				if name == bot.name:
+				if name == bot_name:
 					name = m.author.name
-					if name == bot.name:
-						name = bot.name + "2"
+					if name == bot_name:
+						name = bot_name + "2"
 			if reference and m.id == reference.id:
-				refs.append((f"[REPLIED TO]: {name}", content))
+				refs.append((name, content))
 				continue
 			if i == 0:
 				q = content
@@ -1452,87 +1881,36 @@ class Ask(Command):
 			caid.setdefault("ids", {})[str(message.id)] = None
 		m = message
 		if m.author.id == bot.id:
-			name = bot.name
+			name = bot_name
 		else:
 			name = m.author.display_name
-			if name == bot.name:
+			if name == bot_name:
 				name = m.author.name
-				if name == bot.name:
-					name = bot.name + "2"
+				if name == bot_name:
+					name = bot_name + "2"
 		if not bl:
 			print(f"{name}:", q)
-		pers = bot.commands.personality[0].retrieve((channel or guild).id)
-		if pers and ";" in pers:
-			model, pers = pers.split(";", 1)
+		personality = bot.commands.personality[0].retrieve((channel or guild).id)
+		model = "auto"
+		if personality and ";" in personality:
+			temp, personality = personality.split(";", 1)
 			if cname == "ask":
-				cname = model = model.casefold().split("-", 1)[0]
-			pers = pers.lstrip()
-		else:
-			model = "auto"
+				cname = model = temp.casefold().split("-", 1)[0]
+			personality = personality.lstrip()
+		temperature = 0.8
+		if personality and ";" in personality:
+			temperature, temp = personality.split(";", 1)
+			if regexp(r"-[0-9]*\.?[0-9]+").fullmatch(temperature):
+				temperature = float(temperature)
+				personality = temp.strip()
+			else:
+				temperature = 0.8
 		if model == "auto" and cname in ("ask", "auto"):
 			auto = True
 		else:
 			auto = False
 		long_mem = 4096 if premium >= 3 else 1024
-		keep_model = True
-		if cname == "gpt2" or not AUTH.get("openai_key"):
-			model = "bloom"
-		elif cname == "bloom":
-			model = "bloom"
-		# elif cname == "neox":
-			# model = "neox"
-		elif cname == "pyg" or cname == "pygmalion":
-			# if not bot.is_nsfw(channel):
-			#     if hasattr(channel, "recipient"):
-			#         raise PermissionError(f"This model is only available in {uni_str('NSFW')} channels. Please verify your age using ~verify within a NSFW channel to enable NSFW in DMs.")
-			#     raise PermissionError(f"This model is only available in {uni_str('NSFW')} channels.")
-			model = "mythalion"
-		elif cname == "myth" or cname == "mythalion":
-			model = "mythalion"
-		elif cname == "manticore":
-			model = "manticore"
-		elif cname == "hippogriff":
-			model = "hippogriff"
-		elif cname == "wizvic" or cname == "vicuna":
-			model = "wizvic"
-		elif cname == "platypus" or cname == "gplatty":
-			model = "platypus"
-		elif cname == "airochronos" or cname == "airoboros" or cname == "chronoboros":
-			model = "airochronos"
-		elif cname == "wizcode":
-			model = "wizcode"
-		elif cname == "kimiko":
-			model = "kimiko"
-		elif cname == "nouspuff":
-			model = "nouspuff"
-		elif cname == "orca":
-			model = "orca"
-		elif cname == "wizard":
-			model = "wizard"
-		elif cname == "xwin" or cname == "llama":
-			model = "xwin"
-		elif cname == "gpt3":
-			if premium < 2:
-				raise PermissionError(f"Distributed premium level 1 or higher required; please see {bot.kofi_url} for more info!")
-			model = "gpt3"
-		elif cname == "gpt3a":
-			if premium < 2:
-				raise PermissionError(f"Distributed premium level 1 or higher required; please see {bot.kofi_url} for more info!")
-			model = "gpt3+"
-		elif cname == "davinci":
-			if premium < 4:
-				raise PermissionError(f"Distributed premium level 2 or higher required; please see {bot.kofi_url} for more info!")
-			model = "davinci"
-		elif cname == "gpt4":
-			if premium < 4:
-				raise PermissionError(f"Distributed premium level 2 or higher required; please see {bot.kofi_url} for more info!")
-			model = "gpt4"
-		elif cname == "gpt4a":
-			if premium < 4:
-				raise PermissionError(f"Distributed premium level 2 or higher required; please see {bot.kofi_url} for more info!")
-			model = "gpt4+"
-		else:
-			keep_model = False
+		model, keep_model = map_model(cname, model, premium)
 		if cname == "auto" or model == "auto":
 			if getattr(caid, "model", None):
 				model = caid.model
@@ -1540,14 +1918,14 @@ class Ask(Command):
 				if premium < 2:
 					model = "xwin"
 				elif premium < 4:
-					model = "gpt3+"
+					model = "gpt3"
 				else:
-					model = "gpt4+"
+					model = "gpt4"
 		if model.startswith("gpt4") and premium < 4:
-			model = "gpt3+"
+			model = "gpt3"
 		if model.startswith("gpt3") and premium < 2:
 			model = "xwin"
-		model = model or "gpt3+"
+		model = model or "gpt3"
 		# emb_futs = []
 
 		if not q and not message.attachments and not reference:
@@ -1556,25 +1934,24 @@ class Ask(Command):
 				emb = discord.Embed(colour=rand_colour())
 				emb.set_author(**get_author(bot.user))
 				emb.description = f"Did you instead intend to ask about my main bot? use {bot.get_prefix(guild)}help for help!"
-		m = None
-		im = None
-		fr = fm = None
-		urls = []
+		mresp = None
+		caic = None
+		out = None
 		async with discord.context_managers.Typing(channel):
 			await ignore_embedding(message.id)
 			orig_tup = (name, q)
 			if embd:
-				data = await process_image("embedding", "$", [f"{name}: {q}"], cap="caption", timeout=10)
+				data = await process_image("embedding", "$", [f"{name}: {q}"], cap="caption", timeout=5)
 				em = base64.b64encode(data).decode("ascii")
 				objs = list(embd.items())
 				keys = [t[0] for t in objs]
 				ems = [t[1] for t in objs]
 				print("EM:", len(ems))
-				argsort = await process_image("rank_embeddings", "$", [ems, em], cap="math", timeout=20)
+				argsort = await process_image("rank_embeddings", "$", [ems, em], cap="math", timeout=15)
 				n = 4 if premium < 3 else 6
 				argi = argsort[:n]
 				print("ARGI:", argi)
-				for i in sorted(argi, key=keys.__getitem__):
+				for i in sorted(argi, key=keys.__getitem__, reverse=True):
 					k = keys[i]
 					ki = int(k)
 					if ki in ignores or not mapd.get(k):
@@ -1583,7 +1960,7 @@ class Ask(Command):
 					while len(temp):
 						name, content = temp[:2]
 						temp = temp[2:]
-						refs.insert(0, (name, content))
+						history.insert(0, (name, content))
 					ignores.add(ki)
 			summary = caid and caid.get("summary")
 			if reset is not None:
@@ -1599,46 +1976,311 @@ class Ask(Command):
 				u = user
 			data = bot.data.users.get(u.id, {})
 			oai = data.get("trial") and data.get("openai_key")
-			# print("HISTORY:", history)
-			# print("REFS:", refs)
-			inputs = dict(
-				user_id=user.id,
-				channel_id=channel.id,
-				key=AUTH.get("openai_key"),
-				huggingface_token=AUTH.get("huggingface_key"),
-				vis_session=AUTH.get("vis_session"),
-				name=bot.name,
-				model=model,
-				keep_model=keep_model,
-				auto=auto,
-				personality=pers,
-				premium=premium,
-				summary=summary,
-				jb=caid and caid.get("jailbroken"),
-				history=history,
-				refs=refs,
-				im=im,
-				prompt=orig_tup,
-				reset=reset is not None,
-				bals={k: v for k, v in bot.data.token_balances.items() if v < 0},
-				oai=oai,
-				bl=bl,
-				nsfw=bot.is_nsfw(channel),
-				vc=bool(getattr(user, "voice", False)) | bool(bot.audio.players.get(getattr(guild, "id", None))) * 2,
-			)
-			# if fut:
-			#     await fut
-			cap = "agpt" if model.removesuffix("+") in ("gpt3", "gpt4", "davinci", "bloom") else "gptq"
-			if cap == "agpt":
-				try:
-					await process_image("lambda: 1+1", "$", (), cap="gptq", timeout=2)
-				except:
-					print_exc()
+			vc = bool(getattr(user, "voice", False)) | bool(bot.audio.players.get(getattr(guild, "id", None))) * 2
+
+			messages = chat_structure(history, refs, user.name, q, name=bot_name, personality=personality, nsfw=bot.is_nsfw(channel))
+			history.append((user.name, q))
+			# print("Messages:", messages)
+			length = await count_to(messages)
+			blocked = set()
+			if vc & 2 and length < 256:
+				pass
+			elif vc & 1 and length < 256:
+				blocked.update(("audio", "astate", "askip"))
+			else:
+				blocked.update(("audio", "astate", "askip", "play"))
+			extensions = premium >= 2
+			chatcompletion = ("gpt-4", "gpt-3.5-turbo")
+			if "class" in bot.caps:
+				mocked = {}
+				prompt = ""
+				i = 1
+				for k, v in MockFunctions:
+					if k not in blocked:
+						mocked[i] = k
+						prompt += f"{i}: {v}\n"
+					i += 1
+				if mocked:
+					q2 = q.replace('"""', "'''")
+					c = await tcount(q2)
+					if c > 1024:
+						q2 = await summarise(q2, max_length=960, min_length=720)
+					prompt = '"""\n' + q2 + "\n" + f'''"""
+
+### Instruction:
+SYSTEM: Your name is {bot_name}. Please select one of the following actions by number:
+''' + prompt
+					prompt += f"\n### Response:\n{bot_name}: I choose option"
+					k = await process_image("moe_class", "$", [prompt, mocked], cap="class", timeout=25)
+					if k is False or k is None and model not in chatcompletion:
+						blocked.update(Functions)
+						extensions = False
+					elif k is None:
+						blocked.update(("audio", "astate", "askip", "reminder"))
+					elif k == "play":
+						blocked.update(("web_search", "wolfram_alpha", "stable_diffusion", "reminder"))
+					else:
+						rem = set(Functions)
+						rem.discard(k)
+						blocked.update(rem)
+						extensions = k not in blocked
+			openai.api_key = AUTH["openai_key"]
+			target_model = model
+			text = ""
+			ex = RuntimeError("Maximum attempts exceeded.")
+			for attempts in range(12):
+				if attempts > 1:
+					await asyncio.sleep(attempts * 2)
+				if len(text) < 8:
+					text = ""
+				model = target_model
+				limit = 2000
+				cm = cm2 = None
+				if model in ModMap:
+					data = ModMap[model]
+					model = data.get("name") or model
+					limit = data.get("limit") or limit
+					cm = data.get("cm") or cm
+				elif premium < 2 or attempts >= 8:
+					model = "mythalion-13b"
+					limit = 2000
+				elif attempts >= 6:
+					model = "gpt-3.5-turbo-instruct"
+					limit = 4000
+					cm = 15
+				elif model == "gpt3" or premium < 4:
+					model = "gpt-3.5-turbo"
+					limit = 4000
+					cm = 15
 				else:
-					cap = "gptq"
-			if cap == "gptq":
-				print("GPTQ:", inputs)
-			out, caic = await process_image("lambda inputs, cid: [CBAI(inputs), [(b := CBOTS[cid]).chat_history,b.jailbroken,b.model]]", "$", [inputs, channel.id], cap=cap, timeout=180)
+					model = "gpt-4"
+					limit = 8000
+					cm = 300
+					cm2 = 600
+				if text:
+					extensions = False
+				if not extensions and model in ("gpt-3.5-turbo",) and length >= 192:
+					if premium >= 2:
+						model = "xwin-70b"
+						limit = 4000
+						cm = 20
+					else:
+						model = "mythalion-13b"
+						limit = 2000
+						cm = 0
+				if cm is None:
+					cm = 0
+				if cm2 is None:
+					cm2 = cm
+				intended = None
+				if model in chatcompletion or extensions and not attempts:
+					if model not in chatcompletion:
+						model = "gpt-3.5-turbo"
+					functions = [v for k, v in Functions.items() if k not in blocked] or None
+					print(f"{model} prompt:", messages)
+					data = dict(
+						model=model,
+						messages=messages,
+						temperature=temperature,
+						max_tokens=min(4096, limit - length - 768),
+						top_p=1,
+						frequency_penalty=0.6,
+						presence_penalty=0.8,
+						user=str(hash(user.name)),
+						functions=functions,
+					)
+					text = ""
+					response = None
+					try:
+						response = await create_future(openai.ChatCompletion.create, **data, timeout=120)
+					except openai.InvalidRequestError:
+						raise
+					except Exception as e:
+						ex = e
+						print_exc()
+						continue
+					print(response)
+					m = response["choices"][0]["message"]
+					fc = m.get("function_call")
+					if not fc or fc.get("name") not in FunctionList:
+						if target_model not in chatcompletion:
+							extensions = False
+							continue
+						text = m["content"] if m["content"] else ""
+						text = text.removeprefix(f"{bot_name} says: ").replace("<|im_sep|>", ":").removeprefix(f"{bot_name}:").replace("<USER>", user.name).replace("<|user|>", user.name)
+						if not text or len(text) >= 2 and text[-1] in ": aAsS" and text[-2] not in ".!?" or text.endswith(' "') or text.endswith('\n"'):
+							redo = True
+							continue
+						text = text.strip()
+						break
+					try:
+						args = orjson.loads(fc["arguments"])
+					except:
+						print_exc()
+						args = None
+					if args:
+						argv = " ".join(map(str, args.values()))
+					else:
+						argv = ""
+					name = fc["name"]
+					res = text or ""
+					if name == "web_search":
+						print(f"Web Search:", argv)
+						res = await process_image("BOT.browse", "$", [argv], cap="browse", timeout=60)
+						if res:
+							c = await tcount(res)
+							if c > 800:
+								res = await summarise(q=q + "\n" + res, max_length=768, min_length=384)
+								res = res.replace("\n", ". ").replace(": ", " -")
+							res = res.strip()
+							messages = [messages[0], messages[-1]]
+							messages.append(m)
+							messages.append(dict(role="function", name=name, content=res))
+							length = await count_to(messages)
+							print("New prompt:", messages)
+							continue
+					elif name == "wolfram_alpha":
+						print(f"Wolfram Alpha query:", argv)
+						print(f"Web Search:", argv)
+						res = await process_image("BOT.wolframalpha", "$", [argv], cap="browse", timeout=60)
+						res = func(argv)
+						if res:
+							c = await tcount(res)
+							if c > 512:
+								res = await summarise(q=q + "\n" + res, max_length=500, min_length=384)
+								res = res.replace("\n", ". ").replace(": ", " -")
+							res = res.strip()
+							messages = [messages[0], messages[-1]]
+							messages.append(m)
+							messages.append(dict(role="function", name=name, content=res))
+							length = await count_to(messages)
+							print("New prompt:", messages)
+							continue
+					elif name == "stable_diffusion":
+						print("Stable Diffusion query:", argv)
+						call = {"func": "stablediffusion", "argv": argv, "comment": res}
+					elif name == "reminder":
+						argv = args["message"] + " in " + args["delay"]
+						print("Reminder query:", argv)
+						call = {"func": "remind", "argv": argv, "comment": res}
+					elif name == "play":
+						print("Play query:", argv)
+						call = {"func": "play", "argv": argv, "comment": res}
+					elif name == "audio":
+						print("Audio query:", args)
+						call = {"func": args["mode"], "argv": args["value"]}
+					elif name == "audiostate":
+						print("AudioState query:", args)
+						if args["mode"] == "quit":
+							call = {"func": "disconnect"}
+						elif args["mode"] == "pause":
+							call = {"func": ("pause" if args["value"] else "resume")}
+						elif args["mode"] == "loop":
+							call = {"func": "loopqueue", "argv": int(args["value"])}
+						else:
+							call = {"func": args["mode"], "argv": int(args["value"])}
+					else:
+						raise ValueError("OpenAI API returned invalid or inactive function call.")
+					fname = call["func"]
+					argv = as_str(call.get("argv", ""))
+					args = argv.split()
+					argl = argv.split()
+					u_perm = bot.get_perms(user)
+					command_check = fname
+					loop = False
+					timeout = 240
+					command = bot.commands[fname][0]
+					fake_message = copy.copy(message)
+					fake_message.content = f"{bot.get_prefix(guild)}{fname} {argv}"
+					comment = (call.get("comment") or "") + f"\n> Used `{fake_message.content}`"
+					response = await asubmit(
+						command,
+						bot=bot,
+						argv=argv,
+						args=args,
+						argl=argl,
+						flags=flags,
+						perm=u_perm,
+						user=user,
+						message=fake_message,
+						channel=channel,
+						guild=guild,
+						name=command_check,
+						looped=loop,
+						_timeout=timeout,
+						timeout=timeout,
+						comment=comment,
+					)
+					if type(response) is tuple and len(response) == 2:
+						response, react = response
+						if react == 1:
+							react = "❎"
+					else:
+						react = False
+					if isinstance(response, str):
+						mresp = await send_with_react(channel, response, reference=not loop and message, reacts=react)
+					else:
+						mresp = response
+					break
+				prompt = instruct_structure(messages)
+				prompt += f"\n{bot_name}:"
+				if text:
+					prompt += " " + text
+				print(f"{model} prompt:", prompt)
+				data = dict(
+					model=model,
+					prompt=prompt,
+					temperature=temperature,
+					max_tokens=min(1024, limit - length - 64),
+					top_p=1,
+					stop=[f"{user.name}:"],
+					frequency_penalty=0.8,
+					presence_penalty=0.4,
+					user=str(hash(user.name)),
+				)
+				if model in ("gpt-3.5-turbo-instruct", "text-davinci-003"):
+					try:
+						response = await asubmit(openai.Completion.create, **data, timeout=60)
+					except openai.InvalidRequestError:
+						raise
+					except Exception as e:
+						ex = e
+						print_exc()
+						continue
+					print(response)
+					text = response.choices[0].text
+				elif model in GPTQ:
+					if "gptq" not in bot.caps:
+						target_model = "gpt-3.5-turbo"
+						continue
+					try:
+						text = await process_image("GPTQ", "$", [data], cap="gptq", timeout=180)
+					except Exception as e:
+						ex = e
+						print_exc()
+						continue
+				elif model in BNB:
+					if "bnb" not in bot.caps:
+						target_model = "gpt-3.5-turbo"
+						continue
+					try:
+						text = await process_image("BNB", "$", [data], cap="bnb", timeout=180)
+					except Exception as e:
+						ex = e
+						print_exc()
+						continue
+				else:
+					raise FileNotFoundError(f"Unable to find model \"{model}\".")
+				text = text.removeprefix(f"{bot_name} says: ").replace("<|im_sep|>", ":").removeprefix(f"{bot_name}:").replace("<USER>", user.name).replace("<|user|>", user.name)
+				if not text or len(text) >= 2 and text[-1] in ": aAsS" and text[-2] not in ".!?" or text.endswith(' "') or text.endswith('\n"'):
+					redo = True
+					continue
+				text = text.strip()
+				break
+			else:
+				raise ex
+			out = text
+
 			if premium >= 2 and freebies is not None:
 				bot.data.users[user.id].setdefault("freebies", []).append(utc())
 				rem = freelim - len(freebies)
@@ -1646,67 +2288,28 @@ class Ask(Command):
 					emb = discord.Embed(colour=rand_colour())
 					emb.set_author(**get_author(bot.user))
 					emb.description = f"{rem}/{freelim} premium commands remaining today (free commands will be used after).\nIf you're able to contribute towards [funding my API]({bot.kofi_url}) hosting costs it would mean the world to us, and ensure that I can continue providing up-to-date tools and entertainment.\nEvery little bit helps due to the size of my audience, and you will receive access to unlimited and various improved commands as thanks!"
-			if isinstance(out, dict):
-				fname = out["func"]
-				argv = as_str(out.get("argv", ""))
-				args = argv.split()
-				argl = argv.split()
-				u_perm = bot.get_perms(user)
-				command_check = fname
-				loop = False
-				timeout = 240
-				command = bot.commands[fname][0]
-				fake_message = copy.copy(message)
-				fake_message.content = f"{bot.get_prefix(guild)}{fname} {argv}"
-				comment = (out.get("comment") or "") + f"\n> Used `{fake_message.content}`"
-				response = await create_future(
-					command,
-					bot=bot,
-					argv=argv,
-					args=args,
-					argl=argl,
-					flags=flags,
-					perm=u_perm,
-					user=user,
-					message=fake_message,
-					channel=channel,
-					guild=guild,
-					name=command_check,
-					looped=loop,
-					_timeout=timeout,
-					timeout=timeout,
-					comment=comment,
-				)
-				if type(response) is tuple and len(response) == 2:
-					response, react = response
-					if react == 1:
-						react = "❎"
-				else:
-					react = False
-				if isinstance(response, str):
-					m = await send_with_react(channel, response, reference=not loop and message, reacts=react)
-				m = response
-			if oai in EXPAPI:
-				EXPAPI.discard(oai)
-				if bot.is_trusted(guild) >= 2:
-					for uid in bot.data.trusted[guild.id]:
-						if uid and bot.premium_level(uid, absolute=True) >= 2:
-							break
-					else:
-						uid = next(iter(bot.data.trusted[guild.id]))
-					u = await bot.fetch_user(uid)
-				else:
-					u = user
-				data = bot.data.users.get(u.id)
-				data.pop("trial", None)
-				bot.premium_level(u)
-				emb = discord.Embed(colour=rand_colour())
-				emb.set_author(**get_author(bot.user))
-				emb.description = (
-					f"Uh-oh, it appears your API key or credit was blocked! Please make sure your payment methods are functional, or purchase a consistent subscription [here]({bot.kofi_url})!"
-				)
-		if not bl:
-			print("Result:", out)
+			# if oai in EXPAPI:
+				# EXPAPI.discard(oai)
+				# if bot.is_trusted(guild) >= 2:
+					# for uid in bot.data.trusted[guild.id]:
+						# if uid and bot.premium_level(uid, absolute=True) >= 2:
+							# break
+					# else:
+						# uid = next(iter(bot.data.trusted[guild.id]))
+					# u = await bot.fetch_user(uid)
+				# else:
+					# u = user
+				# data = bot.data.users.get(u.id)
+				# data.pop("trial", None)
+				# bot.premium_level(u)
+				# emb = discord.Embed(colour=rand_colour())
+				# emb.set_author(**get_author(bot.user))
+				# emb.description = (
+					# f"Uh-oh, it appears your API key or credit was blocked! Please make sure your payment methods are functional, or purchase a consistent subscription [here]({bot.kofi_url})!"
+				# )
+		out = out or mresp.content
+		history.append((bot_name, out))
+		print("Result:", out)
 		code = "\xad"
 		reacts = []
 		reacts.extend(("🔄", "🗑️"))
@@ -1727,7 +2330,7 @@ class Ask(Command):
 				reacts.append("🚫")
 		# s = lim_str(code + escape_roles(out), 2000)
 		ref = message
-		if not m:
+		if not mresp:
 			s = escape_roles(out)
 			while len(code) + len(s) > 2000:
 				t = []
@@ -1760,12 +2363,14 @@ class Ask(Command):
 				create_task(send_with_react(channel, t, reference=ref))
 				ref = None
 				await asyncio.sleep(0.25)
-			m = await send_with_react(channel, code + s, embed=emb, reacts=reacts, reference=ref)
+			mresp = await send_with_react(channel, code + s, embed=emb, reacts=reacts, reference=ref)
 		else:
-			s = m.content.strip()
+			s = mresp.content.strip()
 		if isinstance(caid, dict):
-			caid.setdefault("ids", {})[str(m.id)] = None
-		m.replaceable = False
+			caid.setdefault("ids", {})[str(mresp.id)] = None
+		else:
+			caid = {}
+		mresp.replaceable = False
 		hist = bot.data.chat_histories.get(channel.id, ())
 		if isinstance(hist, dict):
 			mi2 = hist.get("last_message_id")
@@ -1781,17 +2386,18 @@ class Ask(Command):
 		# 	# caic = await process_image("lambda cid: [(b := CBOTS[cid]).chat_history,b.jailbroken,b.model]", "$", [channel.id], cap="gptq", timeout=120)
 		# except KeyError:
 		# 	caic = False
+		caid = bot.data.chat_histories.get(channel.id, None)
+		if not isinstance(caid, dict):
+			caid = {}
 		if caic:
-			caid = bot.data.chat_histories.get(channel.id, None)
-			if not isinstance(caid, dict):
-				caid = {}
-			caid.update(dict(summary=caic[0], jailbroken=caic[1], model=caic[2], last_message_id=m.id))
+			caid.update(dict(summary=caic[0], jailbroken=caic[1], model=caic[2], last_message_id=mresp.id))
 			caid["long_mem"] = max(long_mem, caid.get("long_mem", 0) * 63 / 64)
-			bot.data.chat_histories[channel.id] = caid
-		elif caic is None:
-			bot.data.chat_histories.pop(channel.id, None)
-		tup = orig_tup + (bot.name, self.alm_re.sub("", s))
-		await register_embedding(m.id, *tup)
+		caid["history"] = history
+		bot.data.chat_histories[channel.id] = caid
+		# elif caic is None:
+			# bot.data.chat_histories.pop(channel.id, None)
+		tup = orig_tup + (bot_name, self.alm_re.sub("", s))
+		await register_embedding(mresp.id, *tup)
 		lm = ceil(caid.get("long_mem", 0))
 		if len(embd) > lm:
 			keys = sorted(embd.keys())
@@ -1818,9 +2424,9 @@ class Ask(Command):
 			bot.data.chat_dedups[channel.id] = chdd
 		else:
 			bot.data.chat_dedups.update(channel.id)
-		m._react_callback_ = self._callback_
-		bot.add_message(m, files=False, force=True)
-		return m
+		mresp._react_callback_ = self._callback_
+		bot.add_message(mresp, files=False, force=True)
+		return mresp
 
 	@tracebacksuppressor
 	async def remove_reacts(self, message):
@@ -1956,7 +2562,7 @@ class Personality(Command):
 	server_only = True
 	name = ["ResetChat", "ClearChat", "ChangePersonality"]
 	min_level = 2
-	description = "Customises ⟨MIZA⟩'s personality for ~ask in the current server. Uses the largest available model within specified family (for example, \"GPT\" will prefer GPT-4 if allowed). Wizard, XWin, Orca, NousPuff, Kimiko, WizCode, Mythalion, Bloom, Pygmalion, Manticore, Hippogriff, Platypus, WizVic, and Airochronos are currently the alternate models enabled."
+	description = "Customises my personality for ~ask in the current server. Uses the largest available model within specified family (for example, \"GPT\" will prefer GPT-4 if allowed). Wizard, XWin, Orca, NousPuff, Kimiko, WizCode, Mythalion, Bloom, Pygmalion, Manticore, Hippogriff, Platypus, WizVic, and Airochronos are currently the alternate models enabled."
 	usage = "<traits>* <default{?d}>?"
 	example = ("personality XWin; mischievous, cunning", "personality Wizard; dry, sarcastic, snarky", "personality Auto; sweet, loving", "personality GPT4; The following is a conversation between Miza and humans. Miza is an AI who is charming, friendly and positive.")
 	flags = "aed"
@@ -1968,7 +2574,6 @@ class Personality(Command):
 		return p
 
 	async def __call__(self, bot, flags, guild, channel, message, name, user, argv, **void):
-		self.description = f"Customises {bot.name}'s personality for ~ask in the current server. Will attempt to use the highest available GPT-family tier; see {bot.kofi_url} for more info. Experimental long descriptions are now supported."
 		if "chat" in name:
 			bot.data.chat_histories[channel.id] = dict(first_message_id=message.id)
 			return css_md(f"Conversations for {sqr_md(channel)} have been reset.")
@@ -1988,7 +2593,7 @@ class Personality(Command):
 		if not bot.is_nsfw(channel):
 			inappropriate = False
 			openai.api_key = AUTH["openai_key"]
-			resp = await create_future(
+			resp = await asubmit(
 				openai.Moderation.create,
 				input=p,
 			)
@@ -2027,7 +2632,7 @@ class UpdatePersonalities(Database):
 
 #     def __call__(self, **void):
 #         if convobot:
-#             create_future_ex(convobot.update)
+#             esubmit(convobot.update)
 
 
 class Random(Command):

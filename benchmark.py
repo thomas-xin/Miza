@@ -100,6 +100,7 @@ if len(sys.argv) > 1:
 	else:
 		is_sub = True
 
+DC = 0
 if not is_sub:
 	print(srgb(0, 0, 255, "Scanning hardware..."))
 

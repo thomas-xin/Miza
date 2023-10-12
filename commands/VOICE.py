@@ -196,7 +196,7 @@ async def disconnect_members(bot, guild, members, channel=None):
 	if bot.id in (member.id for member in members):
 		with suppress(KeyError):
 			auds = bot.data.audio.players[guild.id]
-			await create_future(auds.kill)
+			await asubmit(auds.kill)
 	futs = [create_task(member.move_to(None)) for member in members]
 	for fut in futs:
 		await fut
@@ -375,12 +375,12 @@ class CustomAudio(collections.abc.Hashable):
 
 	def clear_source(self):
 		if self.source:
-			create_future_ex(self.acsi.clear_source)
+			esubmit(self.acsi.clear_source)
 		self.source = None
 	
 	def clear_next(self):
 		if self.next:
-			create_future_ex(self.acsi.clear_next)
+			esubmit(self.acsi.clear_next)
 		self.next = None
 
 	def reset(self, start=True):
@@ -796,7 +796,7 @@ class AudioQueue(alist):
 		#     e = self[2]
 		#     sufficient = auds.epos[1] - auds.epos[0] + (self[1].get("duration") or 0) >= (self[2].get("duration") or inf) / 2
 		#     if sufficient:
-		#         create_future_ex(self.preemptive_download, e)
+		#         esubmit(self.preemptive_download, e)
 
 	def preemptive_download(self, e):
 		with self.sem2:
@@ -894,7 +894,7 @@ class AudioQueue(alist):
 				self.extend(items)
 				self.rotate(len(items) + position)
 			self.verify()
-			create_future_ex(self.update_load, timeout=120)
+			esubmit(self.update_load, timeout=120)
 			return self
 
 
@@ -1238,8 +1238,8 @@ class AudioClientSubInterface:
 		key = ts_us()
 		if after:
 			self.afters[key] = after
-			return create_future_ex(self.bot.audio.submit, f"AP.from_guild({self.guild.id}).enqueue(players[{repr(src)}], after=lambda *args: submit('VOICE.ACSI.after({key})'))")
-		return create_future_ex(self.bot.audio.submit, f"AP.from_guild({self.guild.id}).enqueue(players[{repr(src)}])")
+			return esubmit(self.bot.audio.submit, f"AP.from_guild({self.guild.id}).enqueue(players[{repr(src)}], after=lambda *args: esubmit('VOICE.ACSI.after({key})'))")
+		return esubmit(self.bot.audio.submit, f"AP.from_guild({self.guild.id}).enqueue(players[{repr(src)}])")
 
 	def play(self, src, after=None):
 		self.ensure_bot()
@@ -1248,7 +1248,7 @@ class AudioClientSubInterface:
 		key = ts_us()
 		if after:
 			self.afters[key] = after
-			return self.bot.audio.submit(f"AP.from_guild({self.guild.id}).play(players[{repr(src)}], after=lambda *args: submit('VOICE.ACSI.after({key})'))")
+			return self.bot.audio.submit(f"AP.from_guild({self.guild.id}).play(players[{repr(src)}], after=lambda *args: esubmit('VOICE.ACSI.after({key})'))")
 		return self.bot.audio.submit(f"AP.from_guild({self.guild.id}).play(players[{repr(src)}])")
 
 	def connect(self, reconnect=True, timeout=60):
@@ -1302,9 +1302,9 @@ class AudioDownloader:
 		self.searched = cdict()
 		self.semaphore = Semaphore(4, 128)
 		self.download_sem = Semaphore(16, 64, rate_limit=0.5)
-		create_future_ex(self.update_dl)
-		create_future_ex(self.setup_pages)
-		create_future_ex(self.set_cookie)
+		esubmit(self.update_dl)
+		esubmit(self.setup_pages)
+		esubmit(self.set_cookie)
 
 	# Fetches youtube playlist page codes, split into pages of 10 items
 	def setup_pages(self):
@@ -1416,7 +1416,7 @@ class AudioDownloader:
 		except ConnectionError:
 			d = None
 		if not d:
-			await create_future(self.update_dl)
+			await asubmit(self.update_dl)
 			d = await Request(url, headers=self.spotify_header, json=True, aio=True)
 		return self.export_spotify_part(d)
 
@@ -1615,7 +1615,7 @@ class AudioDownloader:
 				token = self.produce_continuation(p_id, 1)
 			for page in range(1, ceil(count / 100)):
 				if is_main_thread():
-					fut = create_future_ex(self.get_youtube_continuation, token, context)
+					fut = esubmit(self.get_youtube_continuation, token, context)
 				else:
 					fut = convert_fut(self.get_youtube_continuation_async(token, context))
 				futs.append(fut)
@@ -1723,7 +1723,7 @@ class AudioDownloader:
 					url = p["permalink_url"]
 					if len(futs) >= 12:
 						futs.pop(0).result()
-					fut = create_future_ex(self.get_soundcloud_playlist, url)
+					fut = esubmit(self.get_soundcloud_playlist, url)
 					futs.append(fut)
 					entries.append(fut)
 				else:
@@ -2005,7 +2005,7 @@ class AudioDownloader:
 								break
 							search = f"{url}&offset={curr}&limit={page}"
 							if is_main_thread() or i < 8:
-								fut = create_future_ex(self.get_spotify_part, search, timeout=90)
+								fut = esubmit(self.get_spotify_part, search, timeout=90)
 							else:
 								fut = convert_fut(self.get_spotify_part_async(search))
 							print("Sent 1 spotify search.")
@@ -2402,7 +2402,7 @@ class AudioDownloader:
 			entry["icon"] = icon
 			# Files may have a callback set for when they are loaded
 			if callback is not None:
-				create_future_ex(callback)
+				esubmit(callback)
 			f = self.cache.get(fn)
 			if f is not None:
 				# Assign file duration estimate to queue entry
@@ -2515,7 +2515,7 @@ class AudioDownloader:
 			f.ensure_time()
 			# Files may have a callback set for when they are loaded
 			if callback is not None:
-				create_future(callback)
+				asubmit(callback)
 			return f
 		except:
 			# Remove entry URL if loading failed
@@ -2590,9 +2590,9 @@ class AudioDownloader:
 							start = round_min(float(start))
 						if str(end) != "None":
 							end = round_min(min(float(end), 86400))
-						fut = create_future_ex(self.download_file, url, "pcm", start=start, end=end, auds=None, ts=t, child=False, message=message)
+						fut = esubmit(self.download_file, url, "pcm", start=start, end=end, auds=None, ts=t, child=False, message=message)
 					else:
-						fut = create_future_ex(self.download_file, url, "pcm", auds=None, ts=t, child=True, message=message)
+						fut = esubmit(self.download_file, url, "pcm", auds=None, ts=t, child=True, message=message)
 					res = self.search(url)
 					if type(res) is str:
 						raise evalex(res)
@@ -3060,7 +3060,7 @@ class AudioDownloader:
 								cfn = futs.pop(0).result(timeout=600)[0]
 								print(cfn)
 								ress.append(cfn)
-						fut = create_future_ex(self.download_file, url, ofmt, auds=None, ts=t, child=True, silenceremove=silenceremove, message=message, timeout=720)
+						fut = esubmit(self.download_file, url, ofmt, auds=None, ts=t, child=True, silenceremove=silenceremove, message=message, timeout=720)
 						futs.append(fut)
 					for fut in futs:
 						with tracebacksuppressor:
@@ -3277,11 +3277,11 @@ class Queue(Command):
 			v = "v" in flags
 			if not v and len(q) and auds.paused & 1 and "p" in name:
 				auds.resume()
-				create_future_ex(auds.queue.update_load, timeout=120)
+				esubmit(auds.queue.update_load, timeout=120)
 				return css_md(f"Successfully resumed audio playback in {sqr_md(guild)}."), 1
 			if not len(q):
 				auds.preparing = False
-				create_future_ex(auds.update, timeout=180)
+				esubmit(auds.update, timeout=180)
 			# Set callback message for scrollable list
 			buttons = [cdict(emoji=dirn, name=name, custom_id=dirn) for dirn, name in zip(map(as_str, self.directions), self.dirnames)]
 			await send_with_reply(
@@ -3314,9 +3314,9 @@ class Queue(Command):
 						msg = await bot.fetch_message(spl[-1], channel)
 						argv = msg.content
 				else:
-					out = [create_future(ytdl.search, url) for url in urls]
+					out = [asubmit(ytdl.search, url) for url in urls]
 			if out is None:
-				resp = await create_future(ytdl.search, argv, timeout=180)
+				resp = await asubmit(ytdl.search, argv, timeout=180)
 			else:
 				resp = deque()
 				for fut in out:
@@ -3600,7 +3600,7 @@ class Playlist(Command):
 			argv = urls[0]
 		async with discord.context_managers.Typing(channel):
 		# Unlike ~queue this command only supports a single URL/search
-			resp = await create_future(ytdl.search, argv, timeout=180)
+			resp = await asubmit(ytdl.search, argv, timeout=180)
 		if type(resp) is str:
 			raise evalEX(resp)
 		# Assign search results to default playlist entries
@@ -3745,7 +3745,7 @@ class Connect(Command):
 			auds.text = channel
 			if not is_alone(auds, user) and perm < 1:
 				raise self.perm_error(perm, 1, "to disconnect while other users are in voice")
-			return await create_future(auds.kill, initiator=message)
+			return await asubmit(auds.kill, initiator=message)
 		if not vc_.permissions_for(guild.me).connect:
 			raise ConnectionError("Insufficient permissions to connect to voice channel.")
 		# if vc_.permissions_for(guild.me).manage_channels:
@@ -3884,7 +3884,7 @@ class Skip(Command):
 					if not is_finite(pos):
 						if name[0] in "rcf" or "f" in flags:
 							auds.queue.clear()
-							await create_future(auds.reset, start=False)
+							await asubmit(auds.reset, start=False)
 							if "h" not in flags:
 								return italics(fix_md("Removed all items from the queue.")), 1
 							return
@@ -3930,7 +3930,7 @@ class Skip(Command):
 				# If first item is skipped, advance queue and update audio player
 				if 0 in pops:
 					auds.clear_source()
-					await create_future(auds.reset)
+					await asubmit(auds.reset)
 			if "h" not in flags:
 				if count >= 4:
 					return italics(css_md(f"{sqr_md(count)} items have been removed from the queue."))
@@ -3957,16 +3957,16 @@ class Pause(Command):
 			if not is_alone(auds, user) and perm < 1:
 				raise self.perm_error(perm, 1, f"to {name} while other users are in voice")
 		if name in ("resume", "unpause"):
-			await create_future(auds.resume)
+			await asubmit(auds.resume)
 			word = name + "d"
 		elif name in ("⏹️", "stop"):
-			await create_future(auds.stop)
+			await asubmit(auds.stop)
 			word = "stopped"
 		elif name in ("⏸️", "pause"):
-			await create_future(auds.pause)
+			await asubmit(auds.pause)
 			word = "paused"
 		else:
-			await create_future(auds.pause, unpause=True)
+			await asubmit(auds.pause, unpause=True)
 			word = "paused" if auds.paused else "resumed"
 		if "h" not in flags:
 			s = css_md(f"Successfully {word} audio playback in {sqr_md(guild)}.")
@@ -4003,7 +4003,7 @@ class Seek(Command):
 			orig = auds.pos
 			expr = argv
 			num = await bot.eval_time(expr, orig)
-		pos = await create_future(auds.seek, num)
+		pos = await asubmit(auds.seek, num)
 		if "h" not in flags:
 			return italics(css_md(f"Successfully moved audio position to {sqr_md(sec2time(pos))}.")), 1
 
@@ -4029,7 +4029,7 @@ class Dump(Command):
 				raise ArgumentError("Please input a file or URL to load.")
 			async with discord.context_managers.Typing(channel):
 				x = "x" in flags
-				resp, fn = await create_future(auds.get_dump, x, paused=x, js=True, timeout=18)
+				resp, fn = await asubmit(auds.get_dump, x, paused=x, js=True, timeout=18)
 				f = CompatFile(resp, filename=fn)
 			create_task(bot.send_with_file(channel, f"Queue data for {bold(str(guild))}:", f, reference=message))
 			return
@@ -4047,7 +4047,7 @@ class Dump(Command):
 				raise ArgumentError("Input must be a valid URL or attachment.")
 			s = await self.bot.get_request(url)
 			try:
-				d = await create_future(select_and_loads, s, size=268435456)
+				d = await asubmit(select_and_loads, s, size=268435456)
 			except orjson.JSONDecodeError:
 				d = [url for url in as_str(s).splitlines() if is_url(url)]
 				if not d:
@@ -4092,7 +4092,7 @@ class Dump(Command):
 			auds.stats.update(d["stats"])
 			auds.seek_pos = d.get("pos", 0)
 			if d.get("paused"):
-				await create_future(auds.pause)
+				await asubmit(auds.pause)
 			auds.queue.enqueue(q, -1)
 			if "h" not in flags:
 				return italics(css_md(f"Successfully loaded audio data for {sqr_md(guild)}.")), 1
@@ -4250,7 +4250,7 @@ class AudioSettings(Command):
 					bot.data.audiosettings.pop(guild.id, None)
 				if auds.queue and res:
 					auds.clear_next()
-					await create_future(auds.play, auds.source, pos, timeout=18)
+					await asubmit(auds.play, auds.source, pos, timeout=18)
 				succ = "Permanently" if "f" in flags else "Successfully"
 				return italics(css_md(f"{succ} reset all audio settings for {sqr_md(guild)}."))
 			else:
@@ -4308,11 +4308,11 @@ class AudioSettings(Command):
 					# Attempt to adjust audio setting by re-initializing FFmpeg player
 					auds.clear_next()
 					try:
-						await create_future(auds.play, auds.source, auds.pos, timeout=12)
+						await asubmit(auds.play, auds.source, auds.pos, timeout=12)
 					except (T0, T1, T2):
 						if auds.source:
 							print(auds.args)
-						await create_future(auds.stop, timeout=18)
+						await asubmit(auds.stop, timeout=18)
 						raise RuntimeError("Unable to adjust audio setting.")
 			changed = "Permanently changed" if "f" in flags else "Changed"
 			s += f"\n{changed} audio {op} setting from {sqr_md(orig)} to {sqr_md(new)}."
@@ -4348,7 +4348,7 @@ class Jump(Command):
 			async with auds.semaphore:
 				# Clear "played" tag of current item
 				auds.queue.rotate(-amount)
-				await create_future(auds.reset)
+				await asubmit(auds.reset)
 		if "h" not in flags:
 			return italics(css_md(f"Successfully rotated queue [{amount}] step{'s' if amount != 1 else ''}.")), 1
 
@@ -4376,7 +4376,7 @@ class Shuffle(Command):
 			if "f" in flags or "s" in flags:
 				# Clear "played" tag of current item
 				shuffle(auds.queue)
-				await create_future(auds.reset)
+				await asubmit(auds.reset)
 			else:
 				temp = auds.queue.popleft()
 				shuffle(auds.queue)
@@ -4416,7 +4416,7 @@ class Dedup(Command):
 						found.add(e["url"])
 				queue.pops(pops)
 				if orig != queue[0]:
-					await create_future(auds.reset)
+					await asubmit(auds.reset)
 		if "h" not in flags:
 			return italics(css_md(f"Successfully removed duplicate items from queue for {sqr_md(guild)}.")), 1
 
@@ -4591,7 +4591,7 @@ class Radio(Command):
 
 	async def __call__(self, bot, channel, message, args, **void):
 		if not self.countries:
-			await create_future(self.get_countries)
+			await asubmit(self.get_countries)
 		path = deque()
 		if not args:
 			fields = msdict()
@@ -4602,13 +4602,13 @@ class Radio(Command):
 			return
 		c = args.pop(0)
 		if c not in self.countries:
-			await create_future(self.get_countries)
+			await asubmit(self.get_countries)
 			if c not in self.countries:
 				raise LookupError(f"Country {c} not found.")
 		path.append(c)
 		country = self.countries[c]
 		if not country.cities:
-			await create_future(country.get_cities, country)
+			await asubmit(country.get_cities, country)
 		if not args:
 			fields = msdict()
 			desc = deque()
@@ -4619,7 +4619,7 @@ class Radio(Command):
 			return
 		c = args.pop(0)
 		if c not in country.cities:
-			await create_future(country.get_cities, country)
+			await asubmit(country.get_cities, country)
 			if c not in country.cities:
 				raise LookupError(f"City/State {c} not found.")
 		path.append(c)
@@ -4627,7 +4627,7 @@ class Radio(Command):
 		if type(city) is not str:
 			state = city
 			if not state.cities:
-				await create_future(state.get_cities, state)
+				await asubmit(state.get_cities, state)
 			if not args:
 				fields = msdict()
 				desc = deque()
@@ -4637,7 +4637,7 @@ class Radio(Command):
 				return
 			c = args.pop(0)
 			if c not in state.cities:
-				await create_future(state.get_cities, state)
+				await asubmit(state.get_cities, state)
 				if c not in state.cities:
 					raise LookupError(f"City {c} not found.")
 			path.append(c)
@@ -4899,7 +4899,7 @@ class Player(Command):
 					create_task(bot.ignore_interaction(message))
 				i = self.buttons[emoji]
 				if i == 0:
-					await create_future(auds.pause, unpause=True)
+					await asubmit(auds.pause, unpause=True)
 				elif i == 1:
 					if auds.stats.loop:
 						auds.stats.loop = False
@@ -4918,7 +4918,7 @@ class Player(Command):
 					else:
 						auds.queue.pop(0)
 						auds.clear_source()
-						await create_future(auds.reset)
+						await asubmit(auds.reset)
 					return
 				elif i == 5:
 					v = abs(auds.stats.volume)
@@ -4929,7 +4929,7 @@ class Player(Command):
 					else:
 						v = 2
 					auds.stats.volume = v
-					await create_future(auds.play, auds.source, auds.pos, timeout=18)
+					await asubmit(auds.play, auds.source, auds.pos, timeout=18)
 				elif i == 6:
 					b = auds.stats.bassboost
 					if abs(b) < 1 / 3:
@@ -4939,7 +4939,7 @@ class Player(Command):
 					else:
 						b = -1
 					auds.stats.bassboost = b
-					await create_future(auds.play, auds.source, auds.pos, timeout=18)
+					await asubmit(auds.play, auds.source, auds.pos, timeout=18)
 				elif i == 7:
 					r = auds.stats.reverb
 					if r >= 1:
@@ -4949,7 +4949,7 @@ class Player(Command):
 					else:
 						r = 1
 					auds.stats.reverb = r
-					await create_future(auds.play, auds.source, auds.pos, timeout=18)
+					await asubmit(auds.play, auds.source, auds.pos, timeout=18)
 				elif i == 8:
 					c = abs(auds.stats.chorus)
 					if c:
@@ -4957,22 +4957,22 @@ class Player(Command):
 					else:
 						c = 1 / 3
 					auds.stats.chorus = c
-					await create_future(auds.play, auds.source, auds.pos, timeout=18)
+					await asubmit(auds.play, auds.source, auds.pos, timeout=18)
 				elif i == 9:
 					pos = auds.pos
 					auds.stats = cdict(auds.defaults)
 					auds.stats.quiet = True
-					await create_future(auds.play, auds.source, pos, timeout=18)
+					await asubmit(auds.play, auds.source, pos, timeout=18)
 				elif i == 10 or i == 11:
 					s = 0.25 if i == 11 else -0.25
 					auds.stats.speed = round(auds.stats.speed + s, 5)
-					await create_future(auds.play, auds.source, auds.pos, timeout=18)
+					await asubmit(auds.play, auds.source, auds.pos, timeout=18)
 				elif i == 12 or i == 13:
 					p = 1 if i == 13 else -1
 					auds.stats.pitch -= p
-					await create_future(auds.play, auds.source, auds.pos, timeout=18)
+					await asubmit(auds.play, auds.source, auds.pos, timeout=18)
 				elif i == 14:
-					await create_future(auds.kill)
+					await asubmit(auds.kill)
 					await bot.silent_delete(message)
 					return
 				else:
@@ -5028,7 +5028,7 @@ class Player(Command):
 	async def __call__(self, guild, channel, user, bot, flags, perm, **void):
 		auds = await auto_join(channel.guild, channel, user, bot)
 		auds.player = cdict(time=0, message=None)
-		create_future_ex(auds.update)
+		esubmit(auds.update)
 
 
 # Small helper function to fetch song lyrics from json data, because sometimes genius.com refuses to include it in the HTML
@@ -5082,7 +5082,7 @@ async def get_lyrics(item):
 			s = "https://genius.com" + path
 			page = await Request(s, headers=header, decode=True, aio=True)
 			text = page
-			html = await create_future(BeautifulSoup, text, "html.parser", timeout=18)
+			html = await asubmit(BeautifulSoup, text, "html.parser", timeout=18)
 			lyricobj = html.find('div', class_='lyrics')
 			if lyricobj is not None:
 				lyrics = lyricobj.get_text().strip()
@@ -5126,7 +5126,7 @@ class Lyrics(Command):
 		# Extract song name if input is a URL, otherwise search song name directly
 		urls = await bot.follow_url(argv, allow=True, images=False)
 		if urls:
-			resp = await create_future(ytdl.search, urls[0], timeout=18)
+			resp = await asubmit(ytdl.search, urls[0], timeout=18)
 			if type(resp) is str:
 				raise evalEX(resp)
 			search = resp[0].name
@@ -5236,7 +5236,7 @@ class Download(Command):
 					urls = (urls[0],)
 				futs = deque()
 				for e in urls:
-					futs.append(create_future(ytdl.extract, e, timeout=120))
+					futs.append(asubmit(ytdl.extract, e, timeout=120))
 				for fut in futs:
 					temp = await fut
 					res.extend(temp)
@@ -5246,10 +5246,10 @@ class Download(Command):
 				sc = min(4, flags.get("v", 0) + 1)
 				yt = min(6, sc << 1)
 				futs = deque()
-				futs.append(create_future(ytdl.search, argv, mode="yt", count=yt))
-				futs.append(create_future(ytdl.search, argv, mode="sc", count=sc))
-				futs.append(create_future(ytdl.search, "spsearch:" + argv.split("spsearch:", 1)[-1].replace(":", "-"), mode="sp"))
-				futs.append(create_future(ytdl.search, "bcsearch:" + argv.split("bcsearch:", 1)[-1].replace(":", "-"), mode="bc"))
+				futs.append(asubmit(ytdl.search, argv, mode="yt", count=yt))
+				futs.append(asubmit(ytdl.search, argv, mode="sc", count=sc))
+				futs.append(asubmit(ytdl.search, "spsearch:" + argv.split("spsearch:", 1)[-1].replace(":", "-"), mode="sp"))
+				futs.append(asubmit(ytdl.search, "bcsearch:" + argv.split("bcsearch:", 1)[-1].replace(":", "-"), mode="bc"))
 				for fut in futs:
 					temp = await fut
 					if type(temp) is not str:
@@ -5276,7 +5276,7 @@ class Download(Command):
 				for i, url in enumerate(entry):
 					if i >= 12:
 						await wrap_future(futs[i - 12])
-					futs.append(create_future_ex(
+					futs.append(esubmit(
 						ytdl.download_file,
 						url,
 						fmt=fmt,
@@ -5312,7 +5312,7 @@ class Download(Command):
 						auds = None
 				except LookupError:
 					auds = None
-				f, out = await create_future(
+				f, out = await asubmit(
 					ytdl.download_file,
 					entry,
 					fmt=fmt,
@@ -5415,7 +5415,7 @@ class Download(Command):
 					if tuple(map(str, (start, end))) == ("None", "None") and not silenceremove and not auds and fmt in ("mp3", "opus", "ogg", "wav", "weba"):
 						# view = bot.raw_webserver + "/ytdl?fmt=" + fmt + "&view=" + url
 						download =  f"http://127.0.0.1:{PORT}/ytdl?fmt={fmt}&download={url}"
-						entries = await create_future(ytdl.search, url)
+						entries = await asubmit(ytdl.search, url)
 						if entries:
 							name = entries[0].get("name")
 						else:
@@ -5454,7 +5454,7 @@ class Download(Command):
 						f = await bot.get_request(download, timeout=3600)
 						out = name + "." + (fmt if fmt != "weba" else "webm")
 				if not f:
-					f, out = await create_future(
+					f, out = await asubmit(
 						ytdl.download_file,
 						url,
 						fmt=fmt,
@@ -5532,7 +5532,7 @@ class Transcribe(Command):
 			url = urls[0]
 		simulated = getattr(message, "simulated", None)
 		async with discord.context_managers.Typing(channel):
-			entries = await create_future(ytdl.search, url)
+			entries = await asubmit(ytdl.search, url)
 			if entries:
 				name = entries[0].get("name")
 			else:
@@ -5543,12 +5543,12 @@ class Transcribe(Command):
 				)
 			else:
 				m = None
-			await create_future(ytdl.get_stream, entries[0], force=True, download=False)
+			await asubmit(ytdl.get_stream, entries[0], force=True, download=False)
 			name, url = entries[0].get("name"), entries[0].get("url")
 			if not name or not url:
 				raise FileNotFoundError(500, argv)
 			url = re.sub(r"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=", "https://youtu.be/", url)
-			fn = await create_future(ytdl.download_file, entries[0], fmt="opus")
+			fn = await asubmit(ytdl.download_file, entries[0], fmt="opus")
 			fni = fn.rsplit(".", 1)[0] + ".webm"
 			if bot.is_trusted(guild) >= 2:
 				for uid in bot.data.trusted[guild.id]:
@@ -5572,7 +5572,7 @@ class Transcribe(Command):
 					embed=None,
 				))
 			with open(fni, "rb") as f:
-				resp = await create_future(
+				resp = await asubmit(
 					openai.Audio.translate,
 					model="whisper-1",
 					temperature=0.5,
@@ -5625,7 +5625,7 @@ class UpdateAudio(Database):
 							break
 						if "research" in e:
 							try:
-								await create_future(ytdl.extract_single, e, timeout=18)
+								await asubmit(ytdl.extract_single, e, timeout=18)
 								e.pop("research", None)
 								searched += 1
 							except:
@@ -5634,7 +5634,7 @@ class UpdateAudio(Database):
 								break
 							e.pop("id", None)
 						if "research" not in e and not e.get("duration") and "stream" in e:
-							e["duration"] = await create_future(get_duration, e["stream"])
+							e["duration"] = await asubmit(get_duration, e["stream"])
 
 	# Delays audio player display message by 15 seconds when a user types in the target channel
 	async def _typing_(self, channel, user, **void):
@@ -5668,7 +5668,7 @@ class UpdateAudio(Database):
 				if m.voice is not None:
 					acsi = AudioClientSubInterface.from_guild(guild)
 					if acsi is not None:
-						return create_future(acsi.kill)
+						return asubmit(acsi.kill)
 					return guild.change_voice_state(channel=None)
 			else:
 				if m.voice is not None:
@@ -5696,7 +5696,7 @@ class UpdateAudio(Database):
 		if guild is not None:
 			if guild.id in self.players:
 				auds = self.players[guild.id]
-				create_future_ex(auds.update)
+				esubmit(auds.update)
 		else:
 			async with Delay(0.5):
 				a = 1
@@ -5704,7 +5704,7 @@ class UpdateAudio(Database):
 				for g in tuple(self.players):
 					with tracebacksuppressor(KeyError):
 						auds = self.players[g]
-						futs.append(create_future(auds.update, priority=True))
+						futs.append(asubmit(auds.update, priority=True))
 						futs.append(create_task(self.research(auds)))
 						if auds.queue and not auds.paused and "dailies" in bot.data:
 							if auds.ts is not None and auds.acsi:
@@ -5724,8 +5724,8 @@ class UpdateAudio(Database):
 					with tracebacksuppressor:
 						await fut
 			await bot.audio.asubmit("ytdl.update()")
-		create_future_ex(ytd.update)
-		create_future_ex(ytdl.update_dl, priority=True)
+		esubmit(ytd.update)
+		esubmit(ytdl.update_dl, priority=True)
 		if not self.backup_sem.busy:
 			async with self.backup_sem:
 				await self.backup()
@@ -5733,7 +5733,7 @@ class UpdateAudio(Database):
 	def _announce_(self, *args, **kwargs):
 		for auds in self.players.values():
 			if auds.queue and not auds.paused:
-				create_future_ex(auds.announce, *args, aio=True, **kwargs)
+				esubmit(auds.announce, *args, aio=True, **kwargs)
 
 	backup_sem = Semaphore(1, 0, rate_limit=30)
 	async def backup(self, force=False):
@@ -5742,18 +5742,18 @@ class UpdateAudio(Database):
 		for auds in tuple(self.players.values()):
 			if not auds.acsi:
 				continue
-			d, _ = await create_future(auds.get_dump, True, True)
+			d, _ = await asubmit(auds.get_dump, True, True)
 			self.data[auds.acsi.channel.id] = dict(dump=d, channel=auds.text.id)
 			self.update(auds.acsi.channel.id)
 		if force:
-			await create_future(self.update, force=True, priority=True)
+			await asubmit(self.update, force=True, priority=True)
 
 	# Stores all currently playing audio data to temporary database when bot shuts down
 	async def _destroy_(self, **void):
 		await self.backup(force=True)
 		for file in tuple(ytdl.cache.values()):
 			if not file.loaded:
-				await create_future(file.destroy)
+				await asubmit(file.destroy)
 		for auds in tuple(self.players.values()):
 			if auds.queue:
 				reason = "🎵 Temporarily disconnecting for maintenance"
@@ -5764,14 +5764,14 @@ class UpdateAudio(Database):
 				reason += " Apologies for any inconvenience! 🎵"
 			else:
 				reason = ""
-			await create_future(auds.kill, reason=css_md(reason) if reason else None)
+			await asubmit(auds.kill, reason=css_md(reason) if reason else None)
 
 	# Restores all audio players from temporary database when applicable
 	async def _bot_ready_(self, bot, **void):
 		globals()["bot"] = bot
 		ytdl.bot = bot
 		try:
-			await create_future(subprocess.check_output, ("./ffmpeg",))
+			await asubmit(subprocess.check_output, ("./ffmpeg",))
 		except subprocess.CalledProcessError:
 			pass
 		except FileNotFoundError:
@@ -5782,7 +5782,7 @@ class UpdateAudio(Database):
 		count = 0
 		for file in os.listdir("cache"):
 			if file.startswith("~") and file not in ytdl.cache:
-				ytdl.cache[file] = f = await create_future(AudioFileLink, file, "cache/" + file, wasfile=True)
+				ytdl.cache[file] = f = await asubmit(AudioFileLink, file, "cache/" + file, wasfile=True)
 				count += 1
 		if count:
 			print(f"Successfully reinstated {count} audio file{'s' if count != 1 else ''}")

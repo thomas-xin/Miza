@@ -172,7 +172,7 @@ async def searchRandomNSFW(argv, delay=10):
         pull_rule34_xxx,
         pull_e621,
     ]
-    data = [create_future(f, argv, delay - 3) for f in funcs]
+    data = [asubmit(f, argv, delay - 3) for f in funcs]
     out = deque()
     for fut in data:
         with tracebacksuppressor:
@@ -334,7 +334,7 @@ class Neko(Command):
             if tag in nekoslife_deprecated:
                 data = await Request(f"https://nekos.life/api/v2/img/{tag}", aio=True, json=True)
                 return data["url"]
-            return await create_future(nekos.img, tag)
+            return await asubmit(nekos.img, tag)
 
         file = f"neko~{tag}" if tag else "neko"
         return self.bot.data.imagepools.get(file, fetch, self.threshold, args=(nekos, tag))

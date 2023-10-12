@@ -270,7 +270,7 @@ class UpdateAutoEmojis(Database):
 				e_id = await self.bot.id_from_message(emoji)
 				emoji = self.bot.cache.emojis.get(e_id)
 				if not emoji:
-					animated = await create_future(self.bot.is_animated, e_id, verify=True)
+					animated = await asubmit(self.bot.is_animated, e_id, verify=True)
 					if animated is not None:
 						emoji = cdict(id=e_id, animated=animated, name=self.bot.data.emojinames.get(e_id))
 				if not emoji and not message.webhook_id:
@@ -383,7 +383,7 @@ class EmojiList(Command):
 			if not e_id.isnumeric():
 				raise ArgumentError("Only custom emojis are supported.")
 			e_id = int(e_id)
-			animated = await create_future(bot.is_animated, e_id, verify=True)
+			animated = await asubmit(bot.is_animated, e_id, verify=True)
 			if animated is None:
 				raise LookupError(f"Emoji {e_id} does not exist.")
 			bot.data.emojilists.setdefault(user.id, {})[name] = e_id

@@ -13,7 +13,7 @@ class DouClub:
 		self.secret = c_sec
 		self.time = utc()
 		self.knack = knackpy.App(app_id=self.id, api_key=self.secret)
-		create_future_ex(self.pull)
+		esubmit(self.pull)
 
 	@tracebacksuppressor
 	def pull(self):
@@ -23,7 +23,7 @@ class DouClub:
 
 	def update(self):
 		if utc() - self.time > 720:
-			create_future_ex(self.pull, timeout=60)
+			esubmit(self.pull, timeout=60)
 			self.time = utc()
 
 	def search(self, query):
@@ -89,18 +89,18 @@ class SheetPull:
 	def __init__(self, *urls):
 		self.urls = urls
 		self.time = utc()
-		self.fut = create_future_ex(self.pull)
+		self.fut = esubmit(self.pull)
 
 	def update(self):
 		if self.fut.done() and utc() - self.time > 720:
-			self.fut = create_future_ex(self.pull, timeout=60)
+			self.fut = esubmit(self.pull, timeout=60)
 			self.time = utc()
 
 	@tracebacksuppressor
 	def pull(self):
 		futs = []
 		for url in self.urls:
-			fut = create_future_ex(Request, url, timeout=32, decode=True)
+			fut = esubmit(Request, url, timeout=32, decode=True)
 			futs.append(fut)
 		sdata = [[], utc()]
 		for fut in futs:
@@ -323,7 +323,7 @@ class CS_npc(Command):
 	async def __call__(self, bot, args, flags, **void):
 		lim = ("c" not in flags) * 40 + 20
 		argv = " ".join(args)
-		data = await create_future(entity_list.search, argv, lim, timeout=8)
+		data = await asubmit(entity_list.search, argv, lim, timeout=8)
 		# Sends multiple messages up to 20000 characters total
 		if len(data):
 			head = entity_list.data[0][1]
@@ -362,7 +362,7 @@ class CS_npc(Command):
 	# async def __call__(self, args, flags, **void):
 		# lim = ("c" not in flags) * 40 + 20
 		# argv = " ".join(args)
-		# data = await create_future(tsc_list.search, argv, lim, timeout=8)
+		# data = await asubmit(tsc_list.search, argv, lim, timeout=8)
 		# Sends multiple messages up to 20000 characters total
 		# if len(data):
 			# head = tsc_list.data[0][0]
@@ -400,7 +400,7 @@ class CS_mod(Command):
 
 	async def __call__(self, channel, user, args, **void):
 		argv = " ".join(args)
-		fut = create_future(douclub.search, argv, timeout=8)
+		fut = asubmit(douclub.search, argv, timeout=8)
 		try:
 			data = await searchForums(argv)
 		except ConnectionError as ex:
@@ -544,7 +544,7 @@ class SpectralPulse(Command):
 						force_kill(proc)
 					raise
 				for ext in ("pcm", "riff"):
-					await create_future(os.remove, f"{dest}.{ext}")
+					await asubmit(os.remove, f"{dest}.{ext}")
 		await bot.send_with_file(channel, "", fn1, filename=n1, reference=message)
 		if kwargs.get("-image") in ("true", "True"):
 			await bot.send_with_file(channel, "", fn2, filename=n2, reference=message)
@@ -801,4 +801,4 @@ douclub = cdict(
 	update=lambda: None,
 	pull=lambda: None,
 )
-create_future_ex(load_douclub, priority=True)
+esubmit(load_douclub, priority=True)

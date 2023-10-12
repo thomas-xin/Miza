@@ -1037,7 +1037,7 @@ class Activity(Command):
 					u_id = f"#{user.id}"
 		if not u_id:
 			u_id = user.id
-		data = await create_future(bot.data.users.fetch_events, u_id, interval=max(900, 3600 >> flags.get("v", 0)), timeout=_timeout)
+		data = await asubmit(bot.data.users.fetch_events, u_id, interval=max(900, 3600 >> flags.get("v", 0)), timeout=_timeout)
 		ctx = discord.context_managers.Typing(channel) if channel else emptyctx
 		async with ctx:
 			resp = await process_image("plt_special", "&", (data, str(user)), cap="math")
@@ -1740,7 +1740,7 @@ class UpdateReminders(Database):
 
 	async def __call__(self):
 		if utc() - self.t >= 4800:
-			create_future_ex(self.__load__)
+			esubmit(self.__load__)
 			self.t = utc()
 
 	# Fast call: runs many times per second
@@ -2153,7 +2153,7 @@ class UpdateUsers(Database):
 
 	async def react_sparkle(self, message):
 		bot = self.bot
-		react = await create_future(bot.data.emojis.get, "sparkles.gif")
+		react = await asubmit(bot.data.emojis.get, "sparkles.gif")
 		return await message.add_reaction(react)
 
 	def _send_(self, message, **void):

@@ -963,7 +963,7 @@ class Archive(Command):
 			while proc.is_running():
 				line = bytearray()
 				while not line or line[-1] != 10:
-					b = await create_future(proc.stdout.read, 1)
+					b = await asubmit(proc.stdout.read, 1)
 					if not b:
 						break
 					line.append(b[0])
@@ -1598,7 +1598,7 @@ class ServerProtector(Database):
 			proc = psutil.Popen(args, cwd=os.getcwd(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		try:
 			if not known:
-				await create_future(proc.wait, timeout=3200)
+				await asubmit(proc.wait, timeout=3200)
 		except (T0, T1, T2):
 			with tracebacksuppressor:
 				force_kill(proc)
@@ -1626,7 +1626,7 @@ class ServerProtector(Database):
 						if str(u.id) in message.content:
 							return text
 						if u.bot:
-							react = await create_future(self.bot.data.emojis.get, "ai_art.gif")
+							react = await asubmit(self.bot.data.emojis.get, "ai_art.gif")
 							await message.add_reaction(react)
 							return text
 						create_task(send_with_react(
@@ -1702,7 +1702,7 @@ class CreateEmoji(Command):
 				# ts = ts_us()
 				# path = "cache/" + str(ts)
 				# with open(path, "wb") as f:
-					# await create_future(f.write, image, timeout=18)
+					# await asubmit(f.write, image, timeout=18)
 				o_image = image
 				verified = False
 				width = 128
@@ -1722,7 +1722,7 @@ class CreateEmoji(Command):
 								width = min(width - 1, floor(width / sqrt(r)))
 								continue
 							with open(fn, "rb") as f:
-								image = await create_future(f.read, timeout=18)
+								image = await asubmit(f.read, timeout=18)
 						else:
 							image = fn
 							if not image:
@@ -1797,7 +1797,7 @@ class CreateSticker(Command):
 			# ts = ts_us()
 			# path = "cache/" + str(ts)
 			# with open(path, "wb") as f:
-				# await create_future(f.write, image, timeout=18)
+				# await asubmit(f.write, image, timeout=18)
 			o_image = image
 			verified = False
 			width = 320
@@ -1817,7 +1817,7 @@ class CreateSticker(Command):
 							width = min(width - 1, floor(width / sqrt(r)))
 							continue
 						with open(fn, "rb") as f:
-							image = await create_future(f.read, timeout=18)
+							image = await asubmit(f.read, timeout=18)
 					else:
 						image = fn
 						if not image:
@@ -1831,7 +1831,7 @@ class CreateSticker(Command):
 					with suppress():
 						os.remove(fn)
 			try:
-				data = await create_future(
+				data = await asubmit(
 					Request,
 					f"https://discord.com/api/{api}/guilds/{guild.id}/stickers",
 					method="POST",
@@ -1897,14 +1897,14 @@ class ScanEmoji(Command):
 		async with discord.context_managers.Typing(channel):
 			for emoji in sorted(guild.emojis, key=lambda e: e.id):
 				url = str(emoji.url)
-				resp = await create_future(subprocess.run, self.ffprobe_start + (url,), stdout=subprocess.PIPE)
+				resp = await asubmit(subprocess.run, self.ffprobe_start + (url,), stdout=subprocess.PIPE)
 				width, height = map(int, resp.stdout.splitlines())
 				if width < 128 or height < 128:
 					found += 1
 					w, h = width, height
 					while w < 128 or h < 128:
 						w, h = w << 1, h << 1
-					colour = await create_future(bot.get_colour, url)
+					colour = await asubmit(bot.get_colour, url)
 					bot.send_as_embeds(
 						channel,
 						description=f"{emoji} is {width}×{height}, which is below the recommended discord emoji size, and may appear blurry when scaled by Discord. Scaling the image using {p}resize, with filters `nearest`, `scale2x` or `lanczos` is advised.",
@@ -2366,7 +2366,7 @@ class UpdateMessageCache(Database):
 			self.saving.clear()
 			i = 0
 			for fn, messages in saving:
-				await create_future(self.saves, fn, messages)
+				await asubmit(self.saves, fn, messages)
 				i += 1
 				if not i & 15 or len(messages) > 65536:
 					await asyncio.sleep(0.3)
