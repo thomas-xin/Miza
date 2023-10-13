@@ -1559,18 +1559,31 @@ async def tcount(s, model="gpt-3.5-turbo"):
 	return len(enc)
 
 def m_repr(m):
+	content = (m.content or str(m.get("function_call", "")))
 	if "name" in m:
 		if "role" in m:
-			return m.role + "\n" + m.name + "\n" + m.content
-		return m.name + "\n" + m.content
+			return m.role + "\n" + m.name + "\n" + content
+		return m.name + "\n" + content
 	if "role" in m:
-		m.role + "\n" + m.content
-	return m.content
+		m.role + "\n" + content
+	return content
+
+def m_str(m):
+	content = (m.content or str(m.get("function_call", "")))
+	if not m.get("name"):
+		if m.get("role") and m.role != "user":
+			return f"<|{m.role}|>: " + content
+		if content and ": " in content:
+			return content
+		return "<|user|>: " + content
+	return m.name + ": " + content
 
 def m_name(m):
 	if not m.get("name"):
-		if m.get("role"):
+		if m.get("role") and m.role != "user":
 			return f"<|{m.role}|>"
+		if m.content and ": " in m.content:
+			return m.content.split(": ", 1)[0]
 		return "<|user|>"
 	return m.name
 
@@ -1587,7 +1600,7 @@ async def cut_to(messages, limit=1024):
 			break
 		mes.append(message)
 	summ = "Summary of prior conversation:\n"
-	s = "\n\n".join(f"{m_name(m)}: {m.content}" for m in messages[:i][::-1])
+	s = "\n\n".join(m_str(m) for m in messages[:i][::-1])
 	c = await tcount(summ + s)
 	if c + count <= limit / 2:
 		return messages
@@ -1595,7 +1608,7 @@ async def cut_to(messages, limit=1024):
 		i -= 1
 		m = messages.pop(0)
 		mes.insert(0, m)
-		s += f"\n\n{m_name(m)}: {m.content}"
+		s += f"\n\n{m_str(m)}"
 	ml = round_random(limit / 4)
 	Ml = round_random(limit / 3)
 	s2 = await summarise(s, min_length=ml, max_length=Ml)
@@ -1991,6 +2004,7 @@ class Ask(Command):
 				blocked.update(("audio", "astate", "askip", "play"))
 			extensions = premium >= 2
 			chatcompletion = ("gpt-4", "gpt-3.5-turbo")
+			chatcc = ("gpt4", "gpt3")
 			if "class" in bot.caps:
 				mocked = {}
 				prompt = ""
@@ -2012,7 +2026,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 ''' + prompt
 					prompt += f"\n### Response:\n{bot_name}: I choose option"
 					k = await process_image("moe_class", "$", [prompt, mocked], cap="class", timeout=25)
-					if k is False or k is None and model not in chatcompletion:
+					if k is False or k is None and model not in chatcc:
 						blocked.update(Functions)
 						extensions = False
 					elif k is None:
@@ -2028,15 +2042,25 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 			target_model = model
 			text = ""
 			ex = RuntimeError("Maximum attempts exceeded.")
+			print("Chat", model, u, q, extensions)
 			for attempts in range(12):
 				if attempts > 1:
 					await asyncio.sleep(attempts * 2)
+					print("ATT", attempts)
 				if len(text) < 8:
 					text = ""
 				model = target_model
 				limit = 2000
 				cm = cm2 = None
-				if model in ModMap:
+				if not model or attempts >= 10:
+					model = choice((
+						"mythalion-13b",
+						"gpt-3.5-turbo-instruct",
+						"gpt-3.5-turbo",
+					))
+					limit = 2000
+					cm = 20
+				elif model in ModMap:
 					data = ModMap[model]
 					model = data.get("name") or model
 					limit = data.get("limit") or limit
@@ -2074,11 +2098,12 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 					cm2 = cm
 				intended = None
 				if model in chatcompletion or extensions and not attempts:
+					orig_model = model
 					if model not in chatcompletion:
 						model = "gpt-3.5-turbo"
-					functions = [v for k, v in Functions.items() if k not in blocked] or None
+					functions = [v for k, v in Functions.items() if k not in blocked]
 					print(f"{model} prompt:", messages)
-					data = dict(
+					data = cdict(
 						model=model,
 						messages=messages,
 						temperature=temperature,
@@ -2087,12 +2112,13 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 						frequency_penalty=0.6,
 						presence_penalty=0.8,
 						user=str(hash(user.name)),
-						functions=functions,
 					)
+					if functions:
+						data.functions = functions
 					text = ""
 					response = None
 					try:
-						response = await create_future(openai.ChatCompletion.create, **data, timeout=120)
+						response = await openai.ChatCompletion.acreate(**data, timeout=120)
 					except openai.InvalidRequestError:
 						raise
 					except Exception as e:
@@ -2103,8 +2129,9 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 					m = response["choices"][0]["message"]
 					fc = m.get("function_call")
 					if not fc or fc.get("name") not in FunctionList:
-						if target_model not in chatcompletion:
+						if orig_model not in chatcompletion:
 							extensions = False
+							print("Function mismatch:", target_model, orig_model, model)
 							continue
 						text = m["content"] if m["content"] else ""
 						text = text.removeprefix(f"{bot_name} says: ").replace("<|im_sep|>", ":").removeprefix(f"{bot_name}:").replace("<USER>", user.name).replace("<|user|>", user.name)
@@ -2143,7 +2170,6 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 						print(f"Wolfram Alpha query:", argv)
 						print(f"Web Search:", argv)
 						res = await process_image("BOT.wolframalpha", "$", [argv], cap="browse", timeout=60)
-						res = func(argv)
 						if res:
 							c = await tcount(res)
 							if c > 512:
@@ -2240,7 +2266,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 				)
 				if model in ("gpt-3.5-turbo-instruct", "text-davinci-003"):
 					try:
-						response = await asubmit(openai.Completion.create, **data, timeout=60)
+						response = await openai.Completion.acreate(**data, timeout=60)
 					except openai.InvalidRequestError:
 						raise
 					except Exception as e:
@@ -2251,23 +2277,28 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 					text = response.choices[0].text
 				elif model in GPTQ:
 					if "gptq" not in bot.caps:
-						target_model = "gpt-3.5-turbo"
+						target_model = "gpt3"
 						continue
 					try:
-						text = await process_image("GPTQ", "$", [data], cap="gptq", timeout=180)
+						if model == "mythalion-13b" and "class" in bot.caps:
+							text = await process_image("GPTQm", "$", [data], cap="class", timeout=300)
+						else:
+							text = await process_image("GPTQ", "$", [data], cap="gptq", timeout=600)
 					except Exception as e:
 						ex = e
 						print_exc()
+						target_model = "gpt3"
 						continue
 				elif model in BNB:
 					if "bnb" not in bot.caps:
-						target_model = "gpt-3.5-turbo"
+						target_model = "gpt3"
 						continue
 					try:
-						text = await process_image("BNB", "$", [data], cap="bnb", timeout=180)
+						text = await process_image("BNB", "$", [data], cap="bnb", timeout=600)
 					except Exception as e:
 						ex = e
 						print_exc()
+						target_model = "gpt3"
 						continue
 				else:
 					raise FileNotFoundError(f"Unable to find model \"{model}\".")

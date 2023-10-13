@@ -689,7 +689,7 @@ class Bot:
 
 	loading = None
 	neg_prompt = "blurry, distorted, disfigured, bad anatomy, poorly drawn, low quality, ugly"
-	def art_stablediffusion_sub(self, pf, model, prompt, kwargs, count, aspect_ratio=0, negative_prompt=None, device=-1, dtype=torch.float32, nsfw=False, fail_unless_gpu=False, sdxl=False):
+	def art_stablediffusion_sub(self, pf, model, prompt, kwargs, count, aspect_ratio=0, negative_prompt=None, device=-1, dtype=torch.float32, nsfw=False, fail_unless_gpu=True, sdxl=False):
 		from diffusers import DPMSolverMultistepScheduler, StableDiffusionXLPipeline, StableDiffusionXLImg2ImgPipeline, StableDiffusionXLInpaintPipeline, StableDiffusionImageVariationPipeline
 		from diffusers import StableDiffusionPipeline, StableDiffusionImg2ImgPipeline, StableDiffusionInpaintPipeline
 		cia = torch.cuda.is_available()

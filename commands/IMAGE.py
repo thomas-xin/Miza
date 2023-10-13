@@ -1545,10 +1545,10 @@ class Art(Command):
 	_timeout_ = 150
 	name = ["AIArt", "Inpaint", "StableDiffusion", "SDXL", "Dalle", "Dalle2", "Dream", "Imagine", "Inspire", "Openjourney", "Midjourney"]
 	description = "Runs a Stable Diffusion AI art generator on the input prompt or image. Operates on a global queue system for image prompts. Configurable parameters are --strength, --guidance-scale, --aspect-ratio and --negative-prompt."
-	usage = "<0:prompt> <inpaint{?i}>? <single{?s}>"
+	usage = "<0:prompt> <inpaint{?i}>? <single{?s}> <raw{?r}>"
 	example = ("art cute kitten", "art https://mizabot.xyz/favicon")
 	rate_limit = (45, 60)
-	flags = "is"
+	flags = "irs"
 	typing = True
 	slash = ("Art", "Imagine")
 	sdiff_sem = Semaphore(3, 256, rate_limit=7)
@@ -1565,6 +1565,13 @@ class Art(Command):
 			raise NotImplementedError("AI features are currently disabled, sorry!")
 		for a in reversed(message.attachments):
 			args.insert(0, a.url)
+		if not args:
+			if getattr(message, "reference", None) and getattr(message.reference, "resolved", None):
+				m = message.reference.resolved
+				url = f"https://discord.com/channels/0/{channel.id}/{m.id}"
+				urls = await bot.follow_url(url, allow=True, images=True)
+				if urls and urls[0] != url:
+					args = urls
 		if not args:
 			# raise ArgumentError("Input string is empty.")
 			# s = await Request(
@@ -1588,10 +1595,12 @@ class Art(Command):
 				premium = 2
 		else:
 			freebies = None
+		sdxl = premium >= 2
 		req = " ".join(args)
 		url = None
 		url2 = None
 		rems = deque()
+		nprompt = ""
 		kwargs = {
 			"--device": "GPU",
 			"--num-inference-steps": "48" if premium < 4 else "64",
@@ -1648,7 +1657,8 @@ class Art(Command):
 			if isinstance(i, int):
 				with suppress():
 					u = await bot.fetch_user(i)
-					rems.append(u.display_name)
+					if not rems:
+						nprompt = u.display_name
 					urls = [best_url(u)]
 			if not urls:
 				urls = await bot.follow_url(arg, allow=True, images=True)
@@ -1661,6 +1671,8 @@ class Art(Command):
 			if urls and not url2:
 				url2 = urls.pop(0)
 		prompt = " ".join(rems).strip()
+		if not prompt and not sdxl:
+			prompt = nprompt
 		if not prompt:
 			if not url:
 				raise ArgumentError("Please input a valid prompt.")
@@ -1672,12 +1684,11 @@ class Art(Command):
 			force = False
 		else:
 			force = True
-		sdxl = premium >= 2
-		if sdxl and prompt.count(" ") < 48:
+		if sdxl and "r" not in flags and prompt.count(" ") < 48:
 			oprompt = prompt
 			uid = user.id
 			temp = oprompt.replace('"""', "'''")
-			prompt = f'"""\n{temp}\n"""\n\nImprove the above text as a caption to send to Dall·E API. Be as descriptive as possible in at least 2 sentences, and reword anything that may violate policy guidelines.'
+			prompt = f'"""\n{temp}\n"""\n\nImprove the above image caption as a description to send to Dall·E image generation. Be as detailed as possible in at least 2 sentences, and reword anything that may violate policy guidelines.'
 			if bot.is_trusted(guild) >= 2:
 				for uid in bot.data.trusted[guild.id]:
 					if uid and bot.premium_level(uid, absolute=True) >= 2:
@@ -1708,7 +1719,8 @@ class Art(Command):
 					out = orjson.loads(out)
 				except orjson.JSONDecodeError:
 					pass
-			prompt = oprompt + ".\n\n" + out.strip()
+			out = out.replace("Dall·E", "art")
+			prompt = (oprompt or nprompt) + ".\n\n" + out.strip()
 		req = prompt
 		print("PROMPT:", prompt)
 		if url:

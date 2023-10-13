@@ -1526,6 +1526,58 @@ if "class" in CAPS:
 			k = None
 		return k
 
+	def GPTQm(inputs):
+		model = inputs["model"]
+		prompt = inputs["prompt"]
+		temperature = inputs.get("temperature", 0.8)
+		max_tokens = inputs.get("max_tokens", 1024)
+		top_p = inputs.get("top_p", 1)
+		stop = inputs.get("stop")
+		frequency_penalty = inputs.get("frequency_penalty", 0.5)
+		presence_penalty = inputs.get("presence_penalty", 0.5)
+		model, tokeniser = M, T
+		prompt = prompt.strip()
+		tokens = tokeniser(prompt, return_tensors="pt").input_ids.to(model.device)
+		ex = RuntimeError("Maximum attempts exceeded.")
+		for i in range(3):
+			try:
+				with torch.no_grad():
+					res = model.generate(
+						inputs=tokens,
+						temperature=temperature,
+						top_k=round(top_p * 120),
+						top_p=top_p,
+						repetition_penalty=frequency_penalty,
+						max_length=len(tokens[0]) + max_tokens,
+						do_sample=True,
+					)
+					torch.cuda.empty_cache()
+			except RuntimeError as e:
+				if "probability tensor" in str(ex).lower():
+					print(repr(ex))
+					ex = e
+					torch.cuda.empty_cache()
+					continue
+				raise
+			break
+		else:
+			raise ex
+		text = tokeniser.decode(res[0]).removeprefix("<s>").strip().removeprefix(prompt).strip().split("</s>", 1)[0]
+		text = text.strip().replace(":\n", ": ")
+		spl = text.split(": ")
+		if len(spl) > 1:
+			text = ""
+			while spl:
+				s = spl.pop(0)
+				if "\n" in s:
+					text += s.rsplit("\n", 1)[0]
+					break
+				text += s + ": "
+			text = text.strip()
+			if text.endswith(":"):
+				text = text.rsplit("\n", 1)[0]
+		return text
+
 if "math" in CAPS:
 	x_math = __import__("x-math")
 
@@ -1794,7 +1846,6 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 			model, tokeniser = BOT.load_gptq(model)
 			prompt = prompt.strip()
 			tokens = tokeniser(prompt, return_tensors="pt").input_ids.to(model.device)
-			pc = len(tokens)
 			ex = RuntimeError("Maximum attempts exceeded.")
 			for i in range(3):
 				try:
@@ -1805,13 +1856,15 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 							top_k=round(top_p * 120),
 							top_p=top_p,
 							repetition_penalty=frequency_penalty,
-							max_length=min(len(tokens) + max_tokens, len(tokens) + 1024),
+							max_length=len(tokens[0]) + max_tokens,
 							do_sample=True,
 						)
 						torch.cuda.empty_cache()
 				except RuntimeError as e:
 					if "probability tensor" in str(ex).lower():
+						print(repr(ex))
 						ex = e
+						torch.cuda.empty_cache()
 						continue
 					raise
 				break
@@ -1831,9 +1884,6 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 				text = text.strip()
 				if text.endswith(":"):
 					text = text.rsplit("\n", 1)[0]
-				start = ns
-				if text.startswith(start):
-					text = text[len(start):].strip()
 			return text
 
 	if "bnb" in CAPS:
@@ -1871,7 +1921,6 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 			model, tokeniser = BOT.load_bnb(model)
 			prompt = prompt.strip()
 			tokens = tokeniser(prompt, return_tensors="pt").input_ids.to(model.device)
-			pc = len(tokens)
 			ex = RuntimeError("Maximum attempts exceeded.")
 			for i in range(3):
 				try:
@@ -1882,13 +1931,15 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 							top_k=round(top_p * 120),
 							top_p=top_p,
 							repetition_penalty=frequency_penalty,
-							max_length=min(len(tokens) + max_tokens, len(tokens) + 1024),
+							max_length=len(tokens[0]) + max_tokens,
 							do_sample=True,
 						)
 						torch.cuda.empty_cache()
 				except RuntimeError as e:
 					if "probability tensor" in str(ex).lower():
+						print(repr(ex))
 						ex = e
+						torch.cuda.empty_cache()
 						continue
 					raise
 				break
@@ -1909,8 +1960,6 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 				if text.endswith(":"):
 					text = text.rsplit("\n", 1)[0]
 				start = ns
-				if text.startswith(start):
-					text = text[len(start):].strip()
 			return text
 
 	# exc.submit(convobot.Bot.answer_summarise, convobot.Bot, q="test")
