@@ -1463,25 +1463,6 @@ if "summ" in CAPS:
 			return re.sub(r"(?:in )?(?:the|this|some)? *(?:article|essay|page|study|text|report|topic)[s, ]*(?:also mentions|we discuss|we look at|is about|includes|is based on)? *", "", s2, flags=re.I)
 		return s2
 
-	# def myth_smp(s1):
-		# model, tokeniser = self.load_gptq("mythalion-13b")
-		# prompt = s1.strip()
-		# tokens = tokeniser(prompt, return_tensors="pt").input_ids.to(model.device)
-		# pc = len(tokens)
-		# with torch.no_grad():
-			# res = model.generate(
-				# inputs=tokens,
-				# temperature=0.1,
-				# top_k=4,
-				# top_p=0.1,
-				# repetition_penalty=1.2,
-				# max_length=4096,
-				# do_sample=True,
-			# )
-			# torch.cuda.empty_cache()
-		# text = tokeniser.decode(res[0]).removeprefix("<s>").strip().removeprefix(prompt).strip().split("</s>", 1)[0]
-		# return text
-
 if "class" in CAPS:
 	from transformers import AutoTokenizer
 	from auto_gptq import AutoGPTQForCausalLM, BaseQuantizeConfig, exllama_set_max_input_length
@@ -1547,8 +1528,8 @@ if "class" in CAPS:
 						temperature=temperature,
 						top_k=round(top_p * 120),
 						top_p=top_p,
-						repetition_penalty=frequency_penalty,
-						max_length=len(tokens[0]) + max_tokens,
+						repetition_penalty=(frequency_penalty + presence_penalty) / 4 + 1,
+						max_new_tokens=max_tokens,
 						do_sample=True,
 					)
 					torch.cuda.empty_cache()
@@ -1821,6 +1802,7 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 					"kimiko-70b",
 					"wizard-coder-34b",
 					"mythalion-13b",
+					"emerhyst-20b",
 					"orca-70b",
 					"nous-puffin-70b",
 				),
@@ -1855,8 +1837,8 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 							temperature=temperature,
 							top_k=round(top_p * 120),
 							top_p=top_p,
-							repetition_penalty=frequency_penalty,
-							max_length=len(tokens[0]) + max_tokens,
+							repetition_penalty=(frequency_penalty + presence_penalty) / 4 + 1,
+							max_new_tokens=max_tokens,
 							do_sample=True,
 						)
 						torch.cuda.empty_cache()
@@ -1896,8 +1878,6 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 					"manticore-13b",
 					"wizard-vicuna-30b",
 					"airochronos-33b",
-					"hippogriff-30b",
-					"gplatty-30b",
 				),
 			)
 			bot = convobot.Bot()
@@ -1930,8 +1910,8 @@ if "gptq" in CAPS or "bnb" in CAPS or "agpt" in CAPS or "browse" in CAPS:
 							temperature=temperature,
 							top_k=round(top_p * 120),
 							top_p=top_p,
-							repetition_penalty=frequency_penalty,
-							max_length=len(tokens[0]) + max_tokens,
+							repetition_penalty=(frequency_penalty + presence_penalty) / 4 + 1,
+							max_new_tokens=max_tokens,
 							do_sample=True,
 						)
 						torch.cuda.empty_cache()

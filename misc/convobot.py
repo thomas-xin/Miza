@@ -524,6 +524,18 @@ class Bot:
 			elif model == "wizard-coder-34b":
 				m = "TheBloke/WizardCoder-Python-34B-V1.0-GPTQ"
 				req = 17
+			elif model == "emerhyst-20b":
+				f = os.environ.get("TRANSFORMERS_CACHE", "cache").replace("\\", "/")
+				m = f + "/models--TheBloke--Emerhyst-20B-GPTQ"
+				if not os.path.exists(m) or not os.path.exists(m + "/snapshots") and not os.path.exists(m + "/model.safetensors"):
+					args = ["git", "clone", "https://huggingface.co/TheBloke/Emerhyst-20B-GPTQ", m]
+					print(args, m)
+					if os.path.exists(m):
+						import shutil
+						shutil.rmdir(m)
+					import subprocess
+					subprocess.run(args, cwd=f)
+				req = 10
 			elif model == "mythalion-13b":
 				m = "TheBloke/Mythalion-13B-GPTQ"
 				req = 6.5
@@ -627,16 +639,9 @@ class Bot:
 			elif model == "manticore-13b":
 				m = "openaccess-ai-collective/manticore-13b-chat-pyg"
 				req = 13
-			elif model == "hippogriff-30b":
-				m = "openaccess-ai-collective/hippogriff-30b-chat"
-				req = 33
 			elif model == "wizard-vicuna-30b":
 				# m = "Panchovix/Wizard-Vicuna-30B-Uncensored-lxctx-PI-16384-LoRA-fp16"
 				m = "ehartford/Wizard-Vicuna-30B-Uncensored"
-				req = 33
-				buffer = 1.5
-			elif model == "gplatty-30b":
-				m = "Panchovix/GPlatty-30B-lxctx-PI-16384-LoRA-fp16"
 				req = 33
 				buffer = 1.5
 			else:

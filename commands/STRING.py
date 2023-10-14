@@ -1284,6 +1284,10 @@ ModMap = dict(
 		name="kimiko-70b",
 		cm=20,
 	),
+	emerhyst=dict(
+		name="emerhyst-20b",
+		limit=4000,
+	),
 	mythalion=dict(
 		name="mythalion-13b",
 		limit=2000,
@@ -1320,6 +1324,8 @@ def map_model(cname, model, premium):
 	keep_model = True
 	if cname in ("pyg", "pygmalion"):
 		model = "pygmalion"
+	elif cname in ("emerhyst", "emerald", "amethyst"):
+		model = "emerhyst"
 	elif cname in ("myth", "mythalion"):
 		model = "mythalion"
 	elif cname == "manticore":
@@ -1497,7 +1503,7 @@ AC = bytes(i ^ 158 for i in AC)
 AC = full_prune(AC.decode("utf-8")).capitalize() + "."
 
 BNB = ("pygmalion-13b", "manticore-13b", "wizard-vicuna-30b", "airochronos-33b")
-GPTQ = ("wizard-70b", "xwin-70b", "orca-70b", "kimiko-70b", "wizard-coder-34b", "mythalion-13b")
+GPTQ = ("wizard-70b", "xwin-70b", "orca-70b", "kimiko-70b", "wizard-coder-34b", "emerhyst-20b", "mythalion-13b")
 
 async def summarise(q, min_length=128, max_length=192):
 	if q and sum(c.isascii() for c in q) / len(q) > 0.75:
@@ -1695,12 +1701,12 @@ def instruct_structure(messages):
 	for m in messages:
 		s = f"{m_name(m)}: {m.content}"
 		ins.append(s)
-	return "\n\n".join(ins)
+	return "### Instruction:\n" + "\n\n".join(ins) + "\n\n### Response:"
 
 
 class Ask(Command):
 	_timeout_ = 24
-	name = ["Wizard", "XWin", "Orca", "NousPuff", "Kimiko", "WizCode", "Bloom", "Pyg", "Pygmalion", "GPT2", "Llama", "Vicuna", "Manticore", "Hippogriff", "WizVic", "Platypus", "GPlatty", "Airochronos", "Davinci", "GPT3", "GPT3a", "GPT4", "GPT4a"]
+	name = ["Wizard", "XWin", "Orca", "Kimiko", "WizCode", "Emerhyst", "Mythalion", "Pyg", "Pygmalion", "Llama", "Vicuna", "Manticore", "WizVic", "Airochronos", "Davinci", "GPT3", "GPT3a", "GPT4", "GPT4a"]
 	description = "Ask me any question, and I'll answer it. Mentioning me also serves as an alias to this command, but only if no other command is specified. For premium tier chatbots, check using ~serverinfo, or apply with ~premium!"
 	usage = "<string>"
 	example = ("ask what's the date?", "gpt3 what is the square root of 3721?", "pyg can I have a hug?")
@@ -2005,7 +2011,7 @@ class Ask(Command):
 			extensions = premium >= 2
 			chatcompletion = ("gpt-4", "gpt-3.5-turbo")
 			chatcc = ("gpt4", "gpt3")
-			if "class" in bot.caps:
+			if extensions and "class" in bot.caps:
 				mocked = {}
 				prompt = ""
 				i = 1
@@ -2044,6 +2050,12 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 			ex = RuntimeError("Maximum attempts exceeded.")
 			print("Chat", model, u, q, extensions)
 			for attempts in range(12):
+				if hasattr(message, "simulated"):
+					curr_message = message
+				else:
+					curr_message = await bot.fetch_message(message.id, channel)
+				if getattr(message, "deleted", None) or getattr(curr_message, "deleted", None):
+					break
 				if attempts > 1:
 					await asyncio.sleep(attempts * 2)
 					print("ATT", attempts)
@@ -2052,9 +2064,10 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 				model = target_model
 				limit = 2000
 				cm = cm2 = None
-				if not model or attempts >= 10:
+				if not model or attempts >= 7:
 					model = choice((
 						"mythalion-13b",
+						"emerhyst-20b",
 						"gpt-3.5-turbo-instruct",
 						"gpt-3.5-turbo",
 					))
@@ -2065,10 +2078,13 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 					model = data.get("name") or model
 					limit = data.get("limit") or limit
 					cm = data.get("cm") or cm
-				elif premium < 2 or attempts >= 8:
+				elif attempts >= 6:
 					model = "mythalion-13b"
 					limit = 2000
-				elif attempts >= 6:
+				elif premium < 2 or attempts >= 5:
+					model = "emerhyst-20b"
+					limit = 4000
+				elif attempts >= 4:
 					model = "gpt-3.5-turbo-instruct"
 					limit = 4000
 					cm = 15
@@ -2083,9 +2099,9 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 					cm2 = 600
 				if text:
 					extensions = False
-				if not extensions and model in ("gpt-3.5-turbo",) and length >= 192:
-					if premium >= 2:
-						model = "xwin-70b"
+				if not extensions and model in ("gpt-3.5-turbo",) and length >= 192 and attempts < 2:
+					if premium >= 2 and length:
+						model = "emerhyst-20b"
 						limit = 4000
 						cm = 20
 					else:
@@ -2161,8 +2177,8 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 								res = res.replace("\n", ". ").replace(": ", " -")
 							res = res.strip()
 							messages = [messages[0], messages[-1]]
-							messages.append(m)
-							messages.append(dict(role="function", name=name, content=res))
+							messages.append(cdict(m))
+							messages.append(cdict(role="function", name=name, content=res))
 							length = await count_to(messages)
 							print("New prompt:", messages)
 							continue
@@ -2177,8 +2193,8 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 								res = res.replace("\n", ". ").replace(": ", " -")
 							res = res.strip()
 							messages = [messages[0], messages[-1]]
-							messages.append(m)
-							messages.append(dict(role="function", name=name, content=res))
+							messages.append(cdict(m))
+							messages.append(cdict(role="function", name=name, content=res))
 							length = await count_to(messages)
 							print("New prompt:", messages)
 							continue
@@ -2355,7 +2371,7 @@ SYSTEM: Your name is {bot_name}. Please select one of the following actions by n
 					+ "If you are looking for improved knowledge, memory and intelligence, reduced censorship, ability to connect to the internet, or would simply like to support my developer, "
 					+ f"please check out my [kofi]({bot.kofi_url}) to help fund API, as these features are significantly more expensive!\n"
 					+ "Any support is greatly appreciated and contributes directly towards service and future development.\n"
-					+ f"Free open source models may be invoked using {bot.get_prefix(guild)}xwin, {bot.get_prefix(guild)}mythalion, etc.\n"
+					+ f"Free open source models may be invoked using {bot.get_prefix(guild)}xwin, {bot.get_prefix(guild)}emerhyst, etc.\n"
 					+ "Alternatively if you would like to manage pricing yourself through an OpenAI account (and/or free trial), check out the ~trial command!"
 				)
 				reacts.append("🚫")
@@ -2593,7 +2609,7 @@ class Personality(Command):
 	server_only = True
 	name = ["ResetChat", "ClearChat", "ChangePersonality"]
 	min_level = 2
-	description = "Customises my personality for ~ask in the current server. Uses the largest available model within specified family (for example, \"GPT\" will prefer GPT-4 if allowed). Wizard, XWin, Orca, NousPuff, Kimiko, WizCode, Mythalion, Bloom, Pygmalion, Manticore, Hippogriff, Platypus, WizVic, and Airochronos are currently the alternate models enabled."
+	description = "Customises my personality for ~ask in the current server. Uses the largest available model within specified family (for example, \"GPT\" will prefer GPT-4 if allowed). Wizard, XWin, Orca, Kimiko, WizCode, Emerhyst, Mythalion, Pygmalion, Manticore, WizVic, and Airochronos are currently the alternate models enabled."
 	usage = "<traits>* <default{?d}>?"
 	example = ("personality XWin; mischievous, cunning", "personality Wizard; dry, sarcastic, snarky", "personality Auto; sweet, loving", "personality GPT4; The following is a conversation between Miza and humans. Miza is an AI who is charming, friendly and positive.")
 	flags = "aed"
@@ -2637,7 +2653,7 @@ class Personality(Command):
 					"Apologies, my AI has detected that your input may be inappropriate.\n"
 					+ "Please move to a NSFW channel, reword, or consider contacting the support server if you believe this is a mistake!"
 				)
-		models = ("auto", "gpt", "wizard", "xwin", "orca", "nouspuff", "kimiko", "wizcode", "mythalion", "bloom", "pyg", "pygmalion", "manticore", "llama", "hippogriff", "wizvic", "platypus", "airochronos", "davinci", "gpt3", "gpt4")
+		models = ("auto", "gpt", "wizard", "xwin", "orca", "kimiko", "wizcode", "emerhyst", "mythalion", "pyg", "pygmalion", "manticore", "llama", "hippogriff", "wizvic", "airochronos", "davinci", "gpt3", "gpt4")
 		if ";" in p:
 			m, p = p.split(";", 1)
 			p = p.lstrip()

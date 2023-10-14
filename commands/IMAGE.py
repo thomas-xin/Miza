@@ -1720,7 +1720,7 @@ class Art(Command):
 				except orjson.JSONDecodeError:
 					pass
 			out = out.replace("Dall·E", "art")
-			prompt = (oprompt or nprompt) + ".\n\n" + out.strip()
+			prompt = (nprompt or oprompt) + ".\n\n" + out.strip()
 		req = prompt
 		print("PROMPT:", prompt)
 		if url:
